@@ -360,6 +360,7 @@ def execute(c, decision, world):
         c["y"] = ny
 
         c["is_moving"] = True
+        c["animation_state"] = "walk"
 
     # ========================================
     # WAIT
@@ -379,6 +380,8 @@ def execute(c, decision, world):
                 2
             )
         }
+
+        c["animation_state"] = "idle"
 
     # ========================================
     # INTERACT
@@ -498,6 +501,10 @@ def execute(c, decision, world):
 
             "duration": 20
         }
+
+        c["animation_state"] = (ck
+            interaction_name
+        )
 
     # ========================================
     # SPEECH

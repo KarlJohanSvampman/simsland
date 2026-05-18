@@ -34,7 +34,6 @@ const loadingCharacters = {};
 const floorRegistry = {};
 const wallRegistry = {};
 const buildingRegistry = {};
-
 const WALL_HEIGHT = 2.8;
 const WALL_THICKNESS = 0.08;
 const textureLoader =
@@ -107,6 +106,7 @@ scene.add(
 
 const loader = new GLTFLoader();
 
+const characterAnimations = {};
 const sims = {};
 const props = {};
 const tiles = {};
@@ -403,9 +403,16 @@ async function loadModelCached(path){
 
   if(modelCache[path]){
 
-    return clone(
-      modelCache[path]
-    );
+    return {
+
+      scene: clone(
+        modelCache[path].scene
+      ),
+
+      animations:
+        modelCache[path]
+        .animations
+    };
   }
 
   // =========================
@@ -422,17 +429,23 @@ async function loadModelCached(path){
 
         (gltf)=>{
 
-          // store original
-          modelCache[path] =
-            gltf.scene;
+          modelCache[path] = {
 
-          // return clone
-          resolve(
+            scene: gltf.scene,
 
-            clone(
+            animations:
+              gltf.animations
+          };
+
+          resolve({
+
+            scene: clone(
               gltf.scene
-            )
-          );
+            ),
+
+            animations:
+              gltf.animations
+          });
         },
 
         undefined,
@@ -1079,6 +1092,52 @@ async function updateCharacters(state){
         c.y - 7
       );
 
+            // =========================
+      // ANIMATION STATE
+      // =========================
+
+      const animState =
+        c.animation_state || "idle";
+
+      const animData =
+        characterAnimations[id];
+
+      if(animData){
+
+        if(animData.current !== animState){
+
+          // stop previous
+          if(
+            animData.current &&
+            animData.actions[
+              animData.current
+            ]
+          ){
+            animData.actions[
+              animData.current
+            ].fadeOut(0.2);
+          }
+
+          // play new
+          const action =
+            animData.actions[
+              animState.toLowerCase()
+            ];
+
+          if(action){
+
+            action.reset();
+
+            action.fadeIn(0.2);
+
+            action.play();
+
+            animData.current =
+              animState;
+          }
+        }
+      }
+
       continue;
     }
 
@@ -1117,10 +1176,40 @@ async function updateCharacters(state){
 
 try {
 
+const loaded =
+  await loadModelCached(
+    character.model
+  );
+
   const model =
-    await loadModelCached(
-      character.model
-    );
+  loaded.scene;
+
+  model.animations =
+  loaded.animations;
+
+    // =========================
+    // ANIMATION SETUP
+    // =========================
+
+    let mixer = null;
+
+    const actions = {};
+
+    if(model.animations?.length){
+
+      mixer = new THREE.AnimationMixer(
+        model
+      );
+
+      for(const clip of model.animations){
+
+        actions[
+          clip.name.toLowerCase()
+        ] = mixer.clipAction(clip);
+      }
+    }
+
+
 
   model.position.set(
     c.x - 10,
@@ -1151,6 +1240,15 @@ try {
   scene.add(model);
 
   sims[id] = model;
+
+  characterAnimations[id] = {
+
+  mixer,
+
+  actions,
+
+  current: null
+};
 }
 
 catch(err){
@@ -1181,7 +1279,7 @@ delete loadingCharacters[id];
     scene.remove(mesh);
 
     removeSelectable(mesh);
-
+    delete characterAnimations[id];
     delete sims[id];
   }
 }
@@ -1276,6 +1374,18 @@ function animate(){
 
   requestAnimationFrame(animate);
   controls.update();
+    const delta = 0.016;
+
+  for(const id in characterAnimations){
+
+    const data =
+      characterAnimations[id];
+
+    if(data.mixer){
+
+      data.mixer.update(delta);
+    }
+  }
   renderer.render(
     scene,
     camera

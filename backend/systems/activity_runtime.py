@@ -216,7 +216,26 @@ def update_character_walking(
         character[
             "activity_state"
         ] = "using"
+        activity = character.get(
+            "activity"
+        )
 
+        if activity:
+
+            template = (
+                world["definitions"]
+                ["activity_templates"]
+                .get(activity)
+            )
+
+            if template:
+
+                character[
+                    "animation_state"
+                ] = template.get(
+                    "animation",
+                    "idle"
+                )
         return
 
     next_tile = path[idx]
@@ -285,7 +304,9 @@ def update_character_using(
 
         < duration
     ):
-
+        character[
+        "animation_state"
+        ] = "idle"
         return
 
     changes = activity_template.get(
@@ -328,6 +349,8 @@ def update_character_using(
     if target:
 
         release_object(target)
+
+        
 
     character["activity_target_id"] = None
 

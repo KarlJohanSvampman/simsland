@@ -35,9 +35,27 @@ def update_character_ai(
 
     if state == "idle":
 
-        activity = choose_activity(
+        activity = pop_next_activity(
             character
         )
+
+        if not activity:
+            scheduled = (
+                get_scheduled_activity(
+                world,
+                character
+                )
+            )
+
+            if scheduled:
+
+                queue_activity(
+                    character,
+                    scheduled
+                )
+                activity = choose_activity(
+                    character
+                )
 
         if not activity:
             return

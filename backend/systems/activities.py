@@ -41,7 +41,11 @@ def start_activity(c, world, name, prop):
         "start_time": world["calendar"]["timestamp"],
         "end_time": world["calendar"]["timestamp"] + duration
     }
+    # =====================================
+    # ANIMATION STATE
+    # =====================================
 
+    c["animation_state"] = name
 
 def update_activity(c, world):
 
@@ -70,7 +74,7 @@ def complete_activity(c, world):
 
     elif name == "sleep":
         c["needs"]["energy"] = 1.0
-
+    c["animation_state"] = "idle"
     release_anchor(c, world)
 
 def update_interaction_phases(c, world):
@@ -96,6 +100,9 @@ def update_interaction_phases(c, world):
     elif phase == "loop" and elapsed > act.get("duration", 20):
         act["phase"] = "stop"
         act["phase_started"] = world["tick"]
+        c["animation_state"] = (
+            act["name"]
+        )
 
     # -----------------
     # STOP → DONE
@@ -104,5 +111,5 @@ def update_interaction_phases(c, world):
         from systems.occupancy import release_anchor, release_reservation
         release_anchor(c, world)
         release_reservation(c, world)
-
+        c["animation_state"] = "idle"
         c["activity"] = None
