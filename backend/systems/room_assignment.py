@@ -19,7 +19,7 @@ def assign_prop_room(
 
     room_id = get_room_at_position(
 
-        building_id,
+        building,
 
         prop["x"],
 

@@ -33,6 +33,7 @@ const loadingProps = {};
 const loadingCharacters = {};
 const floorRegistry = {};
 const wallRegistry = {};
+const buildingRegistry = {};
 
 const WALL_HEIGHT = 2.8;
 const WALL_THICKNESS = 0.08;
@@ -197,9 +198,9 @@ function createWallMesh(
   }
 
   mesh.position.set(
-    px - 10,
+    px,
     WALL_HEIGHT / 2,
-    pz - 7
+    pz
   );
 
   mesh.castShadow = true;
@@ -296,9 +297,9 @@ function createDoorSegment(
   if(side === "east") px += 0.5;
 
   group.position.set(
-    px - 10,
+    px,
     WALL_HEIGHT / 2,
-    pz - 7
+    pz
   );
 
   return group;
@@ -386,9 +387,9 @@ function createWindowSegment(
   if(side === "east") px += 0.5;
 
   group.position.set(
-    px - 10,
+    px,
     WALL_HEIGHT / 2,
-    pz - 7
+    pz
   );
 
   return group;
@@ -441,20 +442,79 @@ async function loadModelCached(path){
     }
   );
 }
+
+function removeSelectable(obj){
+
+  const i =
+    selectable.indexOf(obj);
+
+  if(i !== -1){
+
+    selectable.splice(i, 1);
+  }
+}
+
+function getBuildingGroup(fp){
+
+  if(buildingRegistry[fp.id]){
+
+    return buildingRegistry[
+      fp.id
+    ];
+  }
+
+  const group =
+    new THREE.Group();
+
+  group.position.set(
+
+    fp.x - 10,
+
+    0,
+
+    fp.y - 7
+  );
+
+  group.rotation.y =
+    THREE.MathUtils.degToRad(
+      fp.rotation || 0
+    );
+
+  group.userData = {
+
+    type: "building",
+
+    id: fp.id
+  };
+
+  selectable.push(group);
+
+  scene.add(group);
+
+  buildingRegistry[
+    fp.id
+  ] = group;
+
+  return group;
+}
+
 function updateFloorplanWalls(state){
 
   const active = new Set();
+  const activeBuildings = new Set();
 
   const floorplans =
     state.floorplans || [];
 
   for(const fp of floorplans){
-
+    activeBuildings.add(fp.id);
     const building =
       resolveFloorplan(
         definitions,
         fp.building
       );
+
+    const buildingGroup = getBuildingGroup(fp.id);
 
     if(!building) continue;
 
@@ -489,18 +549,15 @@ function updateFloorplanWalls(state){
         if(wallData.type === "wall"){
 
           mesh = createWallMesh(
-            x + building.x,
-            y + building.y,
-            side,
-            wallData
-          );
+            x,
+            y,)
         }
 
         else if(wallData.type === "door"){
 
           mesh = createDoorSegment(
-            x + building.x,
-            y + building.y,
+            x,
+            y,
             side,
             wallData
           );
@@ -509,8 +566,8 @@ function updateFloorplanWalls(state){
         else if(wallData.type === "window"){
 
           mesh = createWindowSegment(
-            x + building.x,
-            y + building.y,
+            x,
+            y,
             side,
             wallData
           );
@@ -518,7 +575,7 @@ function updateFloorplanWalls(state){
 
         if(mesh){
 
-          scene.add(mesh);
+          buildingGroup.add(mesh);
 
           wallRegistry[
             wallKey
@@ -526,6 +583,7 @@ function updateFloorplanWalls(state){
         }
       }
     }
+    cleanupBuildings(activeBuildings);
   }
 
   // cleanup
@@ -614,9 +672,9 @@ function createFloorMesh(x, y, tileFloor){
     -Math.PI / 2;
 
   mesh.position.set(
-    x - 10,
+    x,
     0,
-    y - 7
+    y
   );
 
   mesh.receiveShadow = true;
@@ -627,17 +685,20 @@ function createFloorMesh(x, y, tileFloor){
 function updateFloorplanFloors(state){
 
   const active = new Set();
-
+  const activeBuildings = new Set();
   const floorplans =
     state.floorplans || [];
 
 for(const fp of floorplans){
-
+  activeBuildings.add(fp.id);
   const building =
     resolveFloorplan(
       definitions,
       fp.building
     );
+    
+
+  const buildingGroup = getBuildingGroup(fp.id);
 
   if(!building) continue;
 
@@ -660,12 +721,12 @@ for(const fp of floorplans){
 
         const mesh =
           createFloorMesh(
-            x + building.x,
-            y + building.y,
+            x,
+            y,
             tile.floor
           );
 
-        scene.add(mesh);
+        buildingGroup.add(mesh);
 
         floorRegistry[worldKey] = mesh;
       }
@@ -683,6 +744,8 @@ for(const fp of floorplans){
 
     delete floorRegistry[key];
   }
+
+  cleanupBuildings(activeBuildings);
 }
 
 
@@ -719,7 +782,7 @@ function createTile(tile){
 };
 
 selectable.push(mesh);
-  scene.add(mesh);
+scene.add(mesh);
 
 
 
@@ -728,21 +791,55 @@ selectable.push(mesh);
 
 function updateTiles(state){
 
+  const active = new Set();
+
   const arr =
+
     Array.isArray(state.tiles)
+
     ? state.tiles
-    : Object.values(state.tiles || {});
+
+    : Object.values(
+        state.tiles || {}
+      );
+
+  // =========================
+  // ACTIVE TILES
+  // =========================
 
   for(const tile of arr){
 
     const key =
       `${tile.x},${tile.y}`;
 
-    if(!tiles[key]){
+    active.add(key);
 
-      tiles[key] =
-        createTile(tile);
+    // already exists
+    if(tiles[key]){
+      continue;
     }
+
+    tiles[key] =
+      createTile(tile);
+  }
+
+  // =========================
+  // CLEANUP REMOVED
+  // =========================
+
+  for(const key in tiles){
+
+    if(active.has(key)){
+      continue;
+    }
+
+    const mesh = tiles[key];
+
+    scene.remove(mesh);
+
+    removeSelectable(mesh);
+
+    delete tiles[key];
   }
 }
 
@@ -899,7 +996,28 @@ delete loadingProps[prop.id];
 
     scene.remove(mesh);
 
+    removeSelectable(mesh);
+
     delete props[id];
+  }
+}
+
+function cleanupBuildings(activeIds){
+
+  for(const id in buildingRegistry){
+
+    if(activeIds.has(id)){
+      continue;
+    }
+
+    const group =
+      buildingRegistry[id];
+
+    scene.remove(group);
+
+    removeSelectable(group);
+
+    delete buildingRegistry[id];
   }
 }
 
@@ -1061,6 +1179,8 @@ delete loadingCharacters[id];
     const mesh = sims[id];
 
     scene.remove(mesh);
+
+    removeSelectable(mesh);
 
     delete sims[id];
   }

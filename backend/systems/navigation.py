@@ -107,12 +107,59 @@ def astar(start, goal, blocked):
 
     return []
 
+# =========================================================
+# BUILD PORTALS
+# =========================================================
 
+def build_portals(
+
+    building_id,
+
+    floorplan
+):
+
+    portals = {}
+
+    for door in floorplan.get(
+        "doors",
+        []
+    ):
+
+        portal_id = (
+
+            f"{building_id}:"
+
+            f"{door['id']}"
+        )
+
+        portals[portal_id] = {
+
+            "id": portal_id,
+
+            "building_id":
+                building_id,
+
+            "x": door["x"],
+
+            "y": door["y"],
+
+            "connects":
+                door.get(
+                    "connects",
+                    []
+                ),
+
+            "locked": False,
+
+            "open": True
+        }
+
+    return portals
 # =========================================================
 # ROOM LOOKUP
 # =========================================================
 
-def build_room_lookup(floorplan):
+def build_room_lookup(building_id,floorplan):
 
     lookup = {}
 
@@ -126,12 +173,12 @@ def build_room_lookup(floorplan):
             []
         ):
 
-            lookup[
-                (
-                    tile["x"],
-                    tile["y"]
-                )
-            ] = room["id"]
+            lookup[(x,y)] = runtime_room_id(
+
+                building_id,
+
+                room["id"]
+            )
 
     return lookup
 
@@ -234,6 +281,28 @@ def find_connecting_door(
             room_b
         }:
 
+        portal_id = (
+
+            f"{building['id']}:"
+
+            f"{door['id']}"
+        )
+
+        portal = get_portal(
+
+            building["id"],
+
+            portal_id
+        )
+
+        if portal:
+
+            if not portal["open"]:
+                continue
+
+            if portal["locked"]:
+                continue
+
             return door
 
     return None
@@ -285,8 +354,11 @@ def cache_floorplan(
 
         "room_lookup":
             build_room_lookup(
+
+                building_id,
+
                 floorplan
-            ),
+            )
 
         "door_lookup":
             build_door_lookup(
@@ -305,7 +377,12 @@ def cache_floorplan(
                 {}
             ),
 
-        "room_routes": {}
+        "room_routes": {},
+        "portals": 
+            build_portals(
+                building_id,
+                floorplan
+        ),
     }
 
     rooms = list(
@@ -345,16 +422,14 @@ def cache_floorplan(
 
 
 # =========================================================
-# GET ROOM FROM TILE
+# GET PORTAL
 # =========================================================
 
-def get_room_at_position(
+def get_portal(
 
     building_id,
 
-    x,
-
-    y
+    portal_id
 ):
 
     nav = NAV_CACHE.get(
@@ -365,8 +440,95 @@ def get_room_at_position(
         return None
 
     return nav[
+        "portals"
+    ].get(portal_id)
+
+
+# =========================================================
+# SET PORTAL OPEN
+# =========================================================
+
+def set_portal_open(
+
+    building_id,
+
+    portal_id,
+
+    is_open
+):
+
+    portal = get_portal(
+
+        building_id,
+
+        portal_id
+    )
+
+    if not portal:
+        return
+
+    portal["open"] = is_open
+
+
+# =========================================================
+# SET PORTAL LOCKED
+# =========================================================
+
+def set_portal_locked(
+
+    building_id,
+
+    portal_id,
+
+    locked
+):
+
+    portal = get_portal(
+
+        building_id,
+
+        portal_id
+    )
+
+    if not portal:
+        return
+
+    portal["locked"] = locked
+
+# =========================================================
+# GET ROOM FROM TILE
+# =========================================================
+
+def get_room_at_position(
+
+    building,
+
+    x,
+
+    y
+):
+
+    building_id = building["id"]
+
+    local = world_to_local(
+
+        building,
+
+        x,
+
+        y
+    )
+
+    nav = NAV_CACHE.get(
+        building_id
+    )
+
+    if not nav:
+        return None
+
+    return nav[
         "room_lookup"
-    ].get((x, y))
+    ].get(local)
 
 
 # =========================================================
@@ -403,12 +565,32 @@ def build_room_route(
 
 def build_building_path(
 
+    building,
+
     floorplan,
 
     start_tile,
 
     target_tile
 ):
+
+    local_start = world_to_local(
+
+        building,
+
+        start_tile[0],
+
+        start_tile[1]
+    )
+
+    local_target = world_to_local(
+
+        building,
+
+        target_tile[0],
+
+        target_tile[1]
+    )
 
     blocked_raw = (
 
@@ -438,18 +620,38 @@ def build_building_path(
 
         else:
 
-            blocked.add(
-                tuple(b)
-            )
+            blocked.add(tuple(b))
 
-    return astar(
+    local_path = astar(
 
-        start_tile,
+        local_start,
 
-        target_tile,
+        local_target,
 
         blocked
     )
+
+    # =====================================
+    # LOCAL -> WORLD
+    # =====================================
+
+    world_path = []
+
+    for p in local_path:
+
+        world_path.append(
+
+            local_to_world(
+
+                building,
+
+                p[0],
+
+                p[1]
+            )
+        )
+
+    return world_path
 
 
 # =========================================================
@@ -498,6 +700,7 @@ def build_multi_room_path(
     if start_room == target_room:
 
         return build_building_path(
+            building,
 
             floorplan,
 
@@ -551,7 +754,9 @@ def build_multi_room_path(
         if not door:
             continue
 
-        door_tile = (
+        door_tile = local_to_world(
+
+            building,
 
             door["x"],
 
@@ -559,7 +764,7 @@ def build_multi_room_path(
         )
 
         segment = build_building_path(
-
+            building,
             floorplan,
 
             current_tile,
@@ -576,6 +781,7 @@ def build_multi_room_path(
     # =====================================
 
     final_segment = build_building_path(
+        building,
 
         floorplan,
 
@@ -589,3 +795,73 @@ def build_multi_room_path(
     )
 
     return final_path
+
+# =========================================================
+# RUNTIME ROOM ID
+# =========================================================
+
+def runtime_room_id(
+
+    building_id,
+
+    room_id
+):
+
+    return f"{building_id}:{room_id}"
+
+# =========================================================
+# WORLD -> LOCAL
+# =========================================================
+
+def world_to_local(
+
+    building,
+
+    x,
+
+    y
+):
+
+    local_x = (
+        x - building["x"]
+    )
+
+    local_y = (
+        y - building["y"]
+    )
+
+    return (
+
+        int(local_x),
+
+        int(local_y)
+    )
+
+
+# =========================================================
+# LOCAL -> WORLD
+# =========================================================
+
+def local_to_world(
+
+    building,
+
+    x,
+
+    y
+):
+
+    world_x = (
+        x + building["x"]
+    )
+
+    world_y = (
+        y + building["y"]
+    )
+
+    return (
+
+        int(world_x),
+
+        int(world_y)
+    )
