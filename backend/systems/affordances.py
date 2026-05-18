@@ -50,6 +50,8 @@ def find_props_with_affordance(
 
         if affordance in affs:
 
-            results.append(prop)
+            if not is_reserved(prop):
+
+                results.append(prop)
 
     return results
