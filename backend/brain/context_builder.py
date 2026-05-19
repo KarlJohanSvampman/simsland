@@ -395,7 +395,8 @@ def build_context(
         "self_model": build_self_model(c).
         "public_reputation":build_reputation_context(c,world),
         "schedule": build_schedule_context(c),
-        "body_state": build_body_context(c)
+        "body_state": build_body_context(c),
+        "household_resources":build_household_resource_context( c,world)
     }
 
     return context
@@ -702,3 +703,55 @@ def build_body_context(c):
         )
 
     return issues
+
+# =========================================================
+# HOUSEHOLD RESOURCE CONTEXT
+# =========================================================
+
+def build_household_resource_context(
+
+    c,
+
+    world
+):
+
+    household_id = c.get(
+        "household_id"
+    )
+
+    if not household_id:
+        return None
+
+    household = get_household(
+        world,
+        household_id
+    )
+
+    if not household:
+        return None
+
+    resources = household.get(
+        "resources",
+        {}
+    )
+
+    return {
+
+        "food":
+            resources.get(
+                "food",
+                0
+            ),
+
+        "quick_food":
+            resources.get(
+                "quick_food",
+                0
+            ),
+
+        "drinks":
+            resources.get(
+                "drinks",
+                0
+            )
+    }
