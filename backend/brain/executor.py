@@ -692,6 +692,53 @@ def handle_speak(
         target,
         speech_act
     )
+    from social.reputation import (
+        apply_social_event
+    )
+
+    speech_act = action.get(
+        "speech_act"
+    )
+
+    if speech_act == "comfort":
+
+        apply_social_event(
+
+            world,
+
+            c["id"],
+
+            "helped",
+
+            0.05
+        )
+
+    elif speech_act == "insult":
+
+        apply_social_event(
+
+            world,
+
+            c["id"],
+
+            "insulted",
+
+            0.08
+        )
+
+    elif speech_act == "threat":
+
+        apply_social_event(
+
+            world,
+
+            c["id"],
+
+            "threatened",
+
+            0.12
+        )
+
     from brain.beliefs import (
     update_belief
     )

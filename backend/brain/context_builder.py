@@ -6,6 +6,10 @@ from social.relationship_score import (
     relationship_score
 )
 
+from social.reputation import (
+    get_reputation
+)
+
 from brain.beliefs import (
     compute_alignment
 )
@@ -388,7 +392,8 @@ def build_context(
         "beliefs": build_belief_context(c),
         "political_alignment": compute_alignment(c),
         "life_narratives": build_narratives(c),
-        "self_model": build_self_model(c)
+        "self_model": build_self_model(c).
+        "public_reputation":build_reputation_context(c,world)
     }
 
     return context
@@ -596,3 +601,36 @@ def build_self_model(c):
         })
 
     return results
+
+# =========================================================
+# PUBLIC REPUTATION
+# =========================================================
+
+def build_reputation_context(
+
+    c,
+
+    world
+):
+
+    rep = get_reputation(
+
+        world,
+
+        c["id"]
+    )
+
+    return {
+
+        "trust":
+            rep["trust"],
+
+        "respect":
+            rep["respect"],
+
+        "fear":
+            rep["fear"],
+
+        "controversy":
+            rep["controversy"]
+    }
