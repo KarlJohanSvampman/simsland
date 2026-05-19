@@ -3,12 +3,7 @@ from collections import deque
 
 from systems.navigation_cache import NAV_CACHE
 
-from systems.templates import (
 
-    get_floorplan_template,
-
-    resolve_floorplan
-)
 
 
 # =========================================================
@@ -173,7 +168,12 @@ def build_room_lookup(building_id,floorplan):
             []
         ):
 
-            lookup[(x,y)] = runtime_room_id(
+            tile_x = tile["x"]
+            tile_y = tile["y"]
+
+            lookup[
+                (tile_x, tile_y)
+            ] = runtime_room_id(
 
                 building_id,
 
@@ -251,11 +251,9 @@ def find_room_path(
     return []
 
 
-# =========================================================
-# CONNECTING DOOR
-# =========================================================
-
 def find_connecting_door(
+
+    building,
 
     floorplan,
 
@@ -274,12 +272,11 @@ def find_connecting_door(
             []
         )
 
-        if set(connects) == {
-
+        if set(connects) != {
             room_a,
-
             room_b
         }:
+            continue
 
         portal_id = (
 
@@ -295,15 +292,16 @@ def find_connecting_door(
             portal_id
         )
 
-        if portal:
+        if not portal:
+            continue
 
-            if not portal["open"]:
-                continue
+        if not portal["open"]:
+            continue
 
-            if portal["locked"]:
-                continue
+        if portal["locked"]:
+            continue
 
-            return door
+        return door
 
     return None
 
@@ -358,7 +356,7 @@ def cache_floorplan(
                 building_id,
 
                 floorplan
-            )
+            ),
 
         "door_lookup":
             build_door_lookup(
@@ -660,7 +658,7 @@ def build_building_path(
 
 def build_multi_room_path(
 
-    building_id,
+    building,
 
     floorplan,
 
@@ -671,7 +669,7 @@ def build_multi_room_path(
 
     start_room = get_room_at_position(
 
-        building_id,
+        building,
 
         start_tile[0],
 
@@ -680,7 +678,7 @@ def build_multi_room_path(
 
     target_room = get_room_at_position(
 
-        building_id,
+        building,
 
         target_tile[0],
 
@@ -743,6 +741,7 @@ def build_multi_room_path(
         room_b = room_route[i + 1]
 
         door = find_connecting_door(
+            building,
 
             floorplan,
 

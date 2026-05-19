@@ -62,6 +62,10 @@ from systems.story import (
     update_story_arc
 )
 
+from systems.movement import (
+    update_character_movement
+)
+
 
 # =========================================================
 # INTERNAL STATE UPDATE
@@ -388,6 +392,16 @@ def update_agent(
 
         world
     )
+
+    # =====================================
+    # MOVEMENT
+    # =====================================
+
+    if update_character_movement(
+        c,
+        world
+    ):
+        return
 
     # =====================================
     # LLM THINK

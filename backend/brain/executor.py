@@ -11,7 +11,9 @@ from systems.activities import (
     update_activity,
     update_interaction_phases
 )
-
+from systems.world_pathfinding import (
+    build_character_route
+)
 from systems.payments import attempt_pay_bills
 
 from systems.props import (
@@ -344,75 +346,6 @@ def execute_wait(
     }
 
     return True
-# ============================================
-# PATHFINDING
-# ============================================
-def find_path(c, tx, ty, world):
-
-    start = (c["x"], c["y"])
-    goal = (tx, ty)
-
-    blocked = build_blocked_set(world)
-
-    queue = deque([(start, [])])
-    visited = {start}
-
-    while queue:
-
-        (x, y), path = queue.popleft()
-
-        if (x, y) == goal:
-            return path
-
-        for nx, ny in neighbors(x, y):
-
-            if (nx, ny) in visited:
-                continue
-
-            # -----------------------------
-            # GRID LIMITS
-            # -----------------------------
-            if nx < 0 or ny < 0:
-                continue
-
-            if nx >= world["grid"]["width"]:
-                continue
-
-            if ny >= world["grid"]["height"]:
-                continue
-
-            # -----------------------------
-            # WALKABILITY
-            # -----------------------------
-            if (nx, ny) != goal:
-
-                if not is_walkable(
-                    nx,
-                    ny,
-                    world,
-                    blocked
-                ):
-                    continue
-
-                if is_occupied(
-                    nx,
-                    ny,
-                    world,
-                    ignore_id=c["id"]
-                ):
-                    continue
-
-            visited.add((nx, ny))
-
-            queue.append(
-                (
-                    (nx, ny),
-                    path + [(nx, ny)]
-                )
-            )
-
-    return []
-
 
 # ============================================
 # BUS
@@ -447,7 +380,7 @@ def find_bus_at_stop(c, world):
 
 
 # ============================================
-# ACTION HANDLERS
+# HANDLE MOVE
 # ============================================
 
 def handle_move(
@@ -459,45 +392,60 @@ def handle_move(
     world
 ):
 
-    tx = action.get("x")
-    ty = action.get("y")
-
-    if tx is None or ty is None:
-        return
-
-    path = find_path(
-        c,
-        tx,
-        ty,
-        world
+    target_id = action.get(
+        "target"
     )
 
-    if not path:
+    if not target_id:
+        return
 
-        release_reservation(
-            c,
-            world
-        )
+    target = get_prop_by_id(
+        world,
+        target_id
+    )
+
+    if not target:
+        return
+
+    # =====================================
+    # BUILD ROUTE
+    # =====================================
+
+    route = build_character_route(
+
+        world,
+
+        c,
+
+        target
+    )
+
+    if not route:
 
         c["activity"] = None
 
         return
 
-    nx, ny = path[0]
+    # =====================================
+    # STORE ROUTE
+    # =====================================
 
-    c["facing"] = compute_facing(
-        c["x"],
-        c["y"],
-        nx,
-        ny
-    )
+    c["route"] = route
 
-    c["x"] = nx
-    c["y"] = ny
+    c["route_segment_index"] = 0
+
+    c["path_index"] = 0
 
     c["is_moving"] = True
 
     c["animation_state"] = "walk"
+
+    c["activity"] = {
+
+        "name": "walking",
+
+        "target": target_id
+    }
 
 
 def handle_wait(
