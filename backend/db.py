@@ -133,6 +133,15 @@ def load_world(sim_id):
     build_world_tile_lookup(
         world
     )
+
+    from systems.outdoor_navigation import (
+        build_outdoor_navigation
+    )
+
+    build_outdoor_navigation(
+        world
+    )
+
     # =====================================
     # FIND FLOORPLAN
     # =====================================
