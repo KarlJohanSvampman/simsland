@@ -139,7 +139,211 @@ def snap_to_anchor(c, anchor):
     c["x"] = anchor["x"]
     c["y"] = anchor["y"]
 
+# =========================================================
+# SPEAK
+# =========================================================
 
+def execute_speak(
+
+    c,
+
+    world,
+
+    action
+):
+
+    target_id = action.get(
+        "target"
+    )
+
+    utterance = action.get(
+        "utterance",
+        ""
+    )
+
+    speech_act = action.get(
+        "speech_act",
+        "talk"
+    )
+
+    topic = action.get(
+        "topic",
+        "general"
+    )
+
+    # =====================================
+    # FIND TARGET
+    # =====================================
+
+    target = world.get(
+        "characters",
+        {}
+    ).get(target_id)
+
+    if not target:
+        return False
+
+    # =====================================
+    # STORE SPEECH
+    # =====================================
+
+    c["current_speech"] = {
+
+        "text":
+            utterance,
+
+        "target":
+            target_id,
+
+        "topic":
+            topic,
+
+        "speech_act":
+            speech_act
+    }
+
+    # =====================================
+    # STORE MEMORY
+    # =====================================
+
+    from brain.memory import (
+        store_memory
+    )
+
+    store_memory(
+
+        c,
+
+        text=utterance,
+
+        tags=[
+
+            "conversation",
+
+            speech_act,
+
+            topic
+        ],
+
+        people=[
+            target_id
+        ],
+
+        importance=15,
+
+        source="speech"
+    )
+
+    store_memory(
+
+        target,
+
+        text=utterance,
+
+        tags=[
+
+            "heard",
+
+            speech_act,
+
+            topic
+        ],
+
+        people=[
+            c["id"]
+        ],
+
+        importance=15,
+
+        source="speech"
+    )
+
+    return True
+
+    # =========================================================
+# MOVE
+# =========================================================
+
+def execute_move(
+
+    c,
+
+    world,
+
+    action
+):
+
+    target = action.get(
+        "target"
+    )
+
+    if not target:
+        return False
+
+    # =====================================
+    # LOCATION TARGET
+    # =====================================
+
+    target_position = resolve_target_position(
+
+        world,
+
+        target
+    )
+
+    if not target_position:
+        return False
+
+    # =====================================
+    # PATH
+    # =====================================
+
+    path = build_path(
+
+        world,
+
+        c,
+
+        target_position
+    )
+
+    if not path:
+        return False
+
+    c["path"] = path
+
+    c["path_index"] = 0
+
+    c["activity"] = {
+
+        "type": "walking",
+
+        "target": target
+    }
+
+    return True
+
+def execute_wait(
+
+    c,
+
+    world,
+
+    action
+):
+
+    c["activity"] = {
+
+        "type": "waiting",
+
+        "duration":
+            action.get(
+                "duration",
+                5
+            )
+    }
+
+    return True
 # ============================================
 # PATHFINDING
 # ============================================
@@ -243,31 +447,278 @@ def find_bus_at_stop(c, world):
 
 
 # ============================================
-# TARGET HELPER
+# ACTION HANDLERS
 # ============================================
-def _target(c, world, action):
 
-    tid = action.get("target_character_id")
+def handle_move(
 
-    if tid in world.get("characters", {}):
-        return world["characters"][tid]
+    c,
 
-    others = [
+    action,
 
-        o for o in world.get("characters", {}).values()
+    world
+):
 
-        if o["id"] != c["id"]
-        and not o.get("off_grid")
-    ]
+    tx = action.get("x")
+    ty = action.get("y")
 
-    others.sort(
-        key=lambda o:
-        abs(o["x"] - c["x"])
-        + abs(o["y"] - c["y"])
+    if tx is None or ty is None:
+        return
+
+    path = find_path(
+        c,
+        tx,
+        ty,
+        world
     )
 
-    return others[0] if others else None
+    if not path:
 
+        release_reservation(
+            c,
+            world
+        )
+
+        c["activity"] = None
+
+        return
+
+    nx, ny = path[0]
+
+    c["facing"] = compute_facing(
+        c["x"],
+        c["y"],
+        nx,
+        ny
+    )
+
+    c["x"] = nx
+    c["y"] = ny
+
+    c["is_moving"] = True
+
+    c["animation_state"] = "walk"
+
+
+def handle_wait(
+
+    c,
+
+    action,
+
+    world
+):
+
+    c["activity"] = {
+
+        "name": "wait",
+
+        "phase": "loop",
+
+        "phase_started":
+            world["tick"],
+
+        "duration":
+            action.get(
+                "duration",
+                2
+            )
+    }
+
+    c["animation_state"] = "idle"
+
+
+def handle_speak(
+
+    c,
+
+    action,
+
+    decision,
+
+    world
+):
+
+    utterance = (
+        action.get("utterance")
+        or ""
+    ).strip()
+
+    if not utterance:
+        return
+
+    target_id = action.get(
+        "target"
+    )
+
+    target = world.get(
+        "characters",
+        {}
+    ).get(target_id)
+
+    if not target:
+        return
+
+    c["last_utterance"] = utterance
+
+    c.setdefault(
+        "speech_bubbles",
+        []
+    ).append({
+
+        "text": utterance,
+
+        "tick": world["tick"]
+    })
+
+    c["speech_bubbles"] = (
+        c["speech_bubbles"][-4:]
+    )
+
+    speech_act = action.get(
+        "speech_act",
+        "statement"
+    )
+
+    topic = action.get(
+        "topic",
+        "general"
+    )
+
+    after_speech(
+        c,
+        target,
+        float(
+            decision.get(
+                "conversation_score",
+                50
+            )
+        ),
+        topic
+    )
+
+    store_memory(
+
+        c,
+
+        utterance,
+
+        .55,
+
+        [
+
+            "conversation",
+
+            topic,
+
+            speech_act
+        ],
+
+        "conversation",
+
+        world["tick"],
+
+        people=[
+            target["id"]
+        ],
+
+        speech_act=speech_act,
+
+        emotional_impact=5
+    )
+
+    store_memory(
+
+        target,
+
+        utterance,
+
+        .55,
+
+        [
+
+            "heard",
+
+            topic,
+
+            speech_act
+        ],
+
+        "conversation",
+
+        world["tick"],
+
+        people=[
+            c["id"]
+        ],
+
+        speech_act=speech_act
+    )
+
+    apply_interaction(
+        c,
+        target,
+        speech_act
+    )
+
+
+def handle_call(
+
+    c,
+
+    action,
+
+    world
+):
+
+    target = world["characters"].get(
+        action["target"]
+    )
+
+    if not target:
+        return
+
+    c["is_on_phone"] = True
+
+    make_call(
+        c,
+        target,
+        world
+    )
+
+
+def handle_call_911(
+
+    c,
+
+    action,
+
+    world
+):
+
+    report = (
+
+        action.get(
+            "utterance"
+        )
+
+        or "There is an emergency here."
+    )
+
+    create_911_call(
+
+        world,
+
+        c,
+
+        action.get(
+            "emergency_type"
+        ) or "police",
+
+        report
+    )
+
+    c["last_utterance"] = report
 
 # ============================================
 # EXECUTION
@@ -304,8 +755,10 @@ def execute(c, decision, world):
     c["mood"] = emotion
 
     action = decision.get("action", {})
-
-    raw_name = action.get("name", "wait")
+    raw_name = action.get(
+        "type",
+        "wait"
+    )
 
     name = EMOTION_BLOCKS.get(
         emotion,
@@ -326,256 +779,61 @@ def execute(c, decision, world):
 
     c["is_moving"] = False
 
-    # ========================================
+        
+        # ========================================
     # MOVE
     # ========================================
     if name == "move":
 
-        tx = action.get("x")
-        ty = action.get("y")
-
-        if tx is None or ty is None:
-            return
-
-        path = find_path(c, tx, ty, world)
-
-        if not path:
-
-            release_reservation(c, world)
-
-            c["activity"] = None
-
-            return
-
-        nx, ny = path[0]
-
-        c["facing"] = compute_facing(
-            c["x"],
-            c["y"],
-            nx,
-            ny
+        handle_move(
+            c,
+            action,
+            world
         )
-
-        c["x"] = nx
-        c["y"] = ny
-
-        c["is_moving"] = True
-        c["animation_state"] = "walk"
 
     # ========================================
     # WAIT
     # ========================================
     elif name == "wait":
 
-        c["activity"] = {
-
-            "name": "wait",
-
-            "phase": "loop",
-
-            "phase_started": world["tick"],
-
-            "duration": action.get(
-                "duration",
-                2
-            )
-        }
-
-        c["animation_state"] = "idle"
-
-    # ========================================
-    # INTERACT
-    # ========================================
-    elif name == "interact":
-
-        prop_id = action.get("prop_id")
-        anchor_name = action.get("anchor")
-
-        prop = get_prop_by_id(
-            world,
-            prop_id
-        )
-
-        if not prop:
-
-            release_reservation(c, world)
-
-            return
-
-        anchor = next(
-
-            (
-                a for a in prop.get("anchors", [])
-                if a["name"] == anchor_name
-            ),
-
-            None
-        )
-
-        if not anchor:
-
-            release_reservation(c, world)
-
-            return
-
-        # -----------------------------
-        # RESERVED BY SOMEONE ELSE
-        # -----------------------------
-        if anchor.get("reserved_by") not in [None, c["id"]]:
-            return
-
-        # -----------------------------
-        # MUST BE ADJACENT
-        # -----------------------------
-        if not is_adjacent(c, anchor):
-            return
-
-        # -----------------------------
-        # OCCUPIED
-        # -----------------------------
-        if anchor.get("occupied_by"):
-
-            enqueue_anchor(c, prop, anchor)
-
-            c["activity"] = {
-
-                "name": "waiting_for_anchor",
-
-                "prop_id": prop_id,
-
-                "anchor": anchor_name,
-
-                "phase": "loop",
-
-                "phase_started": world["tick"]
-            }
-
-            return
-
-        # -----------------------------
-        # FACE ANCHOR
-        # -----------------------------
-        face_target(c, anchor)
-
-        # -----------------------------
-        # OCCUPY
-        # -----------------------------
-        reserve_anchor(
+        handle_wait(
             c,
-            prop,
-            anchor
-        )
-
-        # reservation consumed
-        anchor["reserved_by"] = None
-        anchor["reserved_until"] = None
-
-        # -----------------------------
-        # START INTERACTION
-        # -----------------------------
-        interaction_name = anchor.get(
-            "interactionName",
-            "interact"
-        )
-
-        interaction_id = (
-            f"{c['id']}_"
-            f"{prop_id}_"
-            f"{anchor_name}_"
-            f"{world['tick']}"
-        )
-
-        c["activity"] = {
-
-            "interaction_id": interaction_id,
-
-            "name": interaction_name,
-
-            "prop_id": prop_id,
-
-            "anchor": anchor_name,
-
-            "phase": "start",
-
-            "phase_started": world["tick"],
-
-            "duration": 20
-        }
-
-        c["animation_state"] = (ck
-            interaction_name
+            action,
+            world
         )
 
     # ========================================
-    # SPEECH
+    # SPEAK
     # ========================================
     elif name in ["speak", "yell"]:
 
-        if not utterance:
-            return
-
-        target = _target(c, world, action)
-
-        if not target:
-            return
-
-        c["last_utterance"] = utterance
-
-        c.setdefault(
-            "speech_bubbles",
-            []
-        ).append({
-
-            "text": utterance,
-
-            "tick": world["tick"]
-        })
-
-        c["speech_bubbles"] = \
-            c["speech_bubbles"][-4:]
-
-        speech_act = decision.get(
-            "speech_act",
-            "statement"
-        )
-
-        topic = (
-
-            decision.get("topic")
-
-            or (c.get("conversation") or {})
-            .get("topic")
-
-            or "general"
-        )
-
-        after_speech(
+        handle_speak(
             c,
-            target,
-            float(
-                decision.get(
-                    "conversation_score",
-                    50
-                )
-            ),
-            topic
+            action,
+            decision,
+            world
         )
 
-        store_memory(
+    # ========================================
+    # PHONE
+    # ========================================
+    elif name == "call":
+
+        handle_call(
             c,
-            utterance,
-            .55,
-            ["conversation", topic, speech_act],
-            "conversation",
-            world["tick"],
-            target=target["id"],
-            speech_act=speech_act
+            action,
+            world
         )
 
-        apply_interaction(
+    # ========================================
+    # EMERGENCY
+    # ========================================
+    elif name == "call_911":
+
+        handle_call_911(
             c,
-            target,
-            speech_act
+            action,
+            world
         )
 
     # ========================================
@@ -667,49 +925,12 @@ def execute(c, decision, world):
             world
         )
 
-    # ========================================
-    # PHONE
-    # ========================================
-    elif name == "call":
 
-        target = world["characters"].get(
-            action["target"]
-        )
-
-        if not target:
-            return
-
-        c["is_on_phone"] = True
-
-        make_call(
-            c,
-            target,
-            world
-        )
 
     elif name == "end_call":
 
         c["is_on_phone"] = False
  
-    # ========================================
-    # EMERGENCY
-    # ========================================
-    elif name == "call_911":
-
-        report = (
-            utterance
-            or "There is an emergency here."
-        )
-
-        create_911_call(
-            world,
-            c,
-            action.get("emergency_type")
-            or "police",
-            report
-        )
-
-        c["last_utterance"] = report
 
     # ========================================
     # FALLBACK

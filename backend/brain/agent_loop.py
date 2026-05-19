@@ -2,40 +2,29 @@
 # IMPORTS
 # =========================================================
 
-from brain.perception import (
-    perceive_environment
+from brain.context_builder import (
+    build_context
+)
+
+from brain.llm_brain import (
+    think
+)
+
+from brain.memory import (
+    decay_memories,
+    store_memory
 )
 
 from brain.emotion import (
     update_emotion
 )
 
-from brain.memory import (
-    decay_memories
-)
-
 from systems.habits import (
     decay_habits
 )
 
-from brain.intention import (
-    generate_intentions
-)
-
-from brain.goals import (
-    select_goal
-)
-
-from brain.planner import (
-    generate_plan
-)
-
 from systems.activities import (
     execute_activity
-)
-
-from systems.commitment import (
-    is_committed
 )
 
 from systems.offgrid import (
@@ -50,8 +39,8 @@ from systems.jobs import (
 )
 
 from systems.health import (
-    trigger_health_event,
-    process_health
+    process_health,
+    trigger_health_event
 )
 
 from systems.payments import (
@@ -73,12 +62,7 @@ def update_internal_state(
 
     world
 ):
-    from brain.intentions import (
-        add_intention,
-        decay_intentions
-    )
 
-    decay_intentions(c)
     update_emotion(
         c,
         world
@@ -100,7 +84,7 @@ def update_internal_state(
 
 
 # =========================================================
-# ECONOMIC UPDATE
+# ECONOMY
 # =========================================================
 
 def update_economy(
@@ -132,7 +116,7 @@ def update_economy(
 
 
 # =========================================================
-# OFFGRID UPDATE
+# OFFGRID
 # =========================================================
 
 def update_offgrid(
@@ -154,139 +138,155 @@ def update_offgrid(
 
 
 # =========================================================
-# THINK
+# STORE INTENTION
 # =========================================================
 
-def think(
+def store_intention(
 
     c,
 
-    world
+    intention
 ):
 
-    # perception
-    perception = perceive_environment(
-        c,
-        world
-    )
+    if not intention:
+        return
 
-    c["perception"] = perception
-
-    # generate intentions
-    generate_intentions(
-        c,
-        world
-    )
-
-    connections = close_connections(
-    c,
-    world
-    )
-
-    if not connections:
-
-        add_intention(
-            c,
-            "friendship",
-            80
-        )
-
-    # committed?
-    if is_committed(c):
-
-        return c.get(
-            "commitment",
-            {}
-        ).get("goal")
-
-
-    traits = c.get(
-        "traits",
+    c.setdefault(
+        "active_intentions",
         []
     )
 
-    if "ambitious" in traits:
-
-        add_intention(
-            c,
-            "career",
-            70
-        )
-
-    if "romantic" in traits:
-
-        add_intention(
-            c,
-            "romance",
-            60
-        )
-
-    if "lonely" in traits:
-
-        add_intention(
-            c,
-            "friendship",
-            80
-        )
-    # select goal
-    goal = select_goal(
-        c,
-        world
+    c["active_intentions"].append(
+        intention
     )
 
-    return goal
+    # limit
+    c["active_intentions"] = (
+        c["active_intentions"][-10:]
+    )
 
 
 # =========================================================
-# PLAN
+# PROCESS AI DECISION
 # =========================================================
 
-def plan(
+def process_decision(
 
     c,
 
     world,
 
-    goal
+    decision
 ):
 
-    if not goal:
-        return None
+    from systems.action_validator import (
+        validate_action
+    )
+    # =====================================
+    # THOUGHT
+    # =====================================
 
-    return generate_plan(
+    c["last_thought"] = (
+        decision.get(
+            "thought"
+        )
+    )
+
+    # =====================================
+    # EMOTION
+    # =====================================
+
+    emotion = decision.get(
+        "emotion"
+    )
+
+    if emotion:
+
+        c["emotion"] = emotion
+
+    # =====================================
+    # REFLECTION
+    # =====================================
+
+    c["last_reflection"] = (
+        decision.get(
+            "reflection"
+        )
+    )
+
+    # =====================================
+    # INTENTION
+    # =====================================
+
+    intention = decision.get(
+        "intention"
+    )
+
+    if intention:
+
+        store_intention(
+            c,
+            intention
+        )
+
+    # =====================================
+    # MEMORY
+    # =====================================
+
+    if decision.get("thought"):
+
+        store_memory(
+
+            c,
+
+            text=decision[
+                "thought"
+            ],
+
+            tags=[
+                "thought"
+            ],
+
+            importance=10,
+
+            source="internal"
+        )
+
+    # =====================================
+    # ACTION
+    # =====================================
+
+    action = decision.get(
+        "action"
+    )
+
+    if action:
+
+    valid = validate_action(
 
         c,
 
         world,
 
-        goal
+        action
     )
 
+    if valid:
 
-# =========================================================
-# EXECUTE
-# =========================================================
+        execute_activity(
 
-def execute(
+            c,
 
-    c,
+            world,
 
-    world,
+            action
+        )
 
-    plan
-):
+    else:
 
-    if not plan:
-        return
-
-    execute_activity(
-
-        c,
-
-        world,
-
-        plan
-    )
+        c["last_invalid_action"] = (
+            action
+        )
 
 
 # =========================================================
@@ -327,7 +327,7 @@ def update_agent(
         return
 
     # =====================================
-    # INTERNAL STATE
+    # INTERNAL
     # =====================================
 
     update_internal_state(
@@ -345,50 +345,56 @@ def update_agent(
     )
 
     # =====================================
-    # ACTIVE ACTIVITY
+    # ALREADY BUSY?
     # =====================================
 
     if c.get("activity"):
 
         execute_activity(
+
             c,
+
             world,
+
             c["activity"]
         )
 
         return
 
     # =====================================
-    # THINK
+    # BUILD CONTEXT
     # =====================================
 
-    goal = think(
+    context = build_context(
+
         c,
+
         world
     )
 
     # =====================================
-    # PLAN
+    # LLM THINK
     # =====================================
 
-    p = plan(
-        c,
-        world,
-        goal
+    decision = think(
+        context
     )
 
     # =====================================
-    # EXECUTE
+    # PROCESS DECISION
     # =====================================
 
-    execute(
+    process_decision(
+
         c,
+
         world,
-        p
+
+        decision
     )
 
     # =====================================
-    # POST UPDATE
+    # POST
     # =====================================
 
     post_update(
