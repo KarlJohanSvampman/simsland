@@ -95,3 +95,145 @@ def build_social_groups(world):
         groups.append(group)
 
     world["social_groups"] = groups
+
+
+# =========================================================
+# UPDATE GROUP BELIEFS
+# =========================================================
+
+def update_group_beliefs(
+
+    group,
+
+    world
+):
+
+    totals = {}
+    counts = {}
+
+    for mid in group["members"]:
+
+        c = world[
+            "characters"
+        ].get(mid)
+
+        if not c:
+            continue
+
+        for topic, b in c.get(
+            "beliefs",
+            {}
+        ).items():
+
+            totals[topic] = (
+                totals.get(topic, 0)
+                + b.get("value", 0)
+            )
+
+            counts[topic] = (
+                counts.get(topic, 0)
+                + 1
+            )
+
+    group["beliefs"] = {
+
+        topic:
+            totals[topic]
+            / counts[topic]
+
+        for topic in totals
+    }
+
+
+    # =========================================================
+# UPDATE GROUP BELIEFS
+# =========================================================
+
+def update_group_beliefs(
+
+    group,
+
+    world
+):
+
+    totals = {}
+    counts = {}
+
+    for mid in group["members"]:
+
+        c = world[
+            "characters"
+        ].get(mid)
+
+        if not c:
+            continue
+
+        for topic, b in c.get(
+            "beliefs",
+            {}
+        ).items():
+
+            totals[topic] = (
+                totals.get(topic, 0)
+                + b.get("value", 0)
+            )
+
+            counts[topic] = (
+                counts.get(topic, 0)
+                + 1
+            )
+
+    group["beliefs"] = {
+
+        topic:
+            totals[topic]
+            / counts[topic]
+
+        for topic in totals
+    }
+
+from brain.beliefs import (
+    update_belief
+)
+
+def apply_group_influence(
+
+    group,
+
+    world
+):
+
+    beliefs = group.get(
+        "beliefs",
+        {}
+    )
+
+    for mid in group["members"]:
+
+        c = world[
+            "characters"
+        ].get(mid)
+
+        if not c:
+            continue
+
+        for topic, value in beliefs.items():
+
+            sentiment = (
+                "positive"
+                if value > 0
+                else "negative"
+            )
+
+            update_belief(
+
+                c,
+
+                topic,
+
+                sentiment,
+
+                abs(value) * 0.05,
+
+                world["tick"]
+            )

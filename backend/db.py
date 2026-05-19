@@ -114,6 +114,25 @@ def load_world(sim_id):
         sim_id,
         world
     )
+
+    from world.world_tiles import (
+
+    generate_world_tiles,
+
+    build_world_tile_lookup
+        )
+
+    if not world.get(
+        "world_tiles"
+    ):
+
+        generate_world_tiles(
+            world
+        )
+
+    build_world_tile_lookup(
+        world
+    )
     # =====================================
     # FIND FLOORPLAN
     # =====================================
