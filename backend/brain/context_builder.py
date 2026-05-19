@@ -13,6 +13,10 @@ from social.reputation import (
 from brain.beliefs import (
     compute_alignment
 )
+
+from brain.cognitive_pressure import (
+    build_cognitive_pressure
+)
 # =========================================================
 # RELATIONSHIP SUMMARY
 # =========================================================
@@ -396,7 +400,8 @@ def build_context(
         "public_reputation":build_reputation_context(c,world),
         "schedule": build_schedule_context(c),
         "body_state": build_body_context(c),
-        "household_resources":build_household_resource_context( c,world)
+        "household_resources":build_household_resource_context( c,world),
+        "cognitive_pressure": build_cognitive_pressure(c)
     }
 
     return context

@@ -63,6 +63,11 @@ Never narrate.
 
 Never describe actions outside the schema.
 
+Your current psychological pressures:
+
+{cognitive_pressure}
+
+
 Output format:
 
 {
