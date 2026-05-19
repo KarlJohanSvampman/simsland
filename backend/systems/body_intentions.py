@@ -20,14 +20,42 @@ def generate_body_intentions(c):
         0
     ) > 80:
 
+    intentions.append({
+
+        "type":
+            "use_toilet",
+
+        "category":
+            "survival",
+
+        "priority":
+            95,
+
+        "interrupts":
+            True
+    })
+
+
+    if b.get(
+        "bowels",
+        0
+        ) > 80:
+
         intentions.append({
 
             "type":
-                "use_toilet",
+                "use_toilet_bowels",
+
+            "category":
+                "survival",
 
             "priority":
-                0.95
+                95,
+
+            "interrupts":
+                True
         })
+
 
     # =====================================
     # SHOWER
@@ -37,15 +65,17 @@ def generate_body_intentions(c):
         "hygiene",
         100
     ) < 35:
+    intentions.append({
 
-        intentions.append({
+        "type":
+            "take_shower",
 
-            "type":
-                "take_shower",
+        "category":
+            "health",
 
-            "priority":
-                0.6
-        })
+        "priority":
+            60
+    })
 
     # =====================================
     # SLEEP
@@ -61,10 +91,38 @@ def generate_body_intentions(c):
             "type":
                 "sleep",
 
+            "category":
+                "survival",
+
             "priority":
-                0.98
+                98,
+
+            "interrupts":
+                True
         })
 
+    # =====================================
+    # DRINK
+    # =====================================
+
+    hydration = b.get(
+        "hydration",
+        100
+    )
+
+    if hydration < 35:
+
+        intentions.append({
+
+            "type":
+                "drink",
+
+            "category":
+                "survival",
+
+            "priority":
+                85
+        })
     # =====================================
     # FOOD
     # =====================================
@@ -79,8 +137,11 @@ def generate_body_intentions(c):
             "type":
                 "eat_food",
 
+            "category":
+                "survival",
+
             "priority":
-                0.8
+                80
         })
 
     return intentions

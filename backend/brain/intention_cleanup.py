@@ -1,3 +1,7 @@
+from brain.intention_priority import (
+    final_priority
+)
+
 # =========================================================
 # CLEAN INTENTIONS
 # =========================================================
@@ -44,11 +48,7 @@ def sort_intentions(c):
 
     intentions.sort(
 
-        key=lambda x:
-            x.get(
-                "priority",
-                0
-            ),
+        key=final_priority,
 
         reverse=True
     )
