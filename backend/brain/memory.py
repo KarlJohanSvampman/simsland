@@ -22,29 +22,100 @@ def score_importance(c, text, base):
 # =========================
 # STORE MEMORY
 # =========================
-def store_memory(c, text, importance=0.5, tags=None, kind="memory", tick=0, **extra):
 
-    importance = score_importance(c, text, float(importance))
+def store_memory(
+
+    c,
+
+    text,
+
+    importance=0.5,
+
+    tags=None,
+
+    kind="memory",
+
+    tick=0,
+
+    people=None,
+
+    emotional_impact=0,
+
+    source=None,
+
+    **extra
+):
+
+    importance = score_importance(
+        c,
+        text,
+        float(importance)
+    )
 
     mem = {
-        "id": f"mem_{uuid.uuid4().hex[:8]}",
-        "kind": kind,
-        "text": text,
-        "importance": importance,
-        "tags": tags or [],
-        "tick": tick,
-        "created_at": time.time(),
+
+        "id":
+            f"mem_{uuid.uuid4().hex[:8]}",
+
+        "kind":
+            kind,
+
+        "text":
+            text,
+
+        "importance":
+            importance,
+
+        "tags":
+            tags or [],
+
+        "tick":
+            tick,
+
+        "created_at":
+            time.time(),
+
+        # =========================
+        # SOCIAL CONTEXT
+        # =========================
+
+        "people":
+            people or [],
+
+        # =========================
+        # EMOTIONAL WEIGHT
+        # =========================
+
+        "emotional_impact":
+            emotional_impact,
+
+        # =========================
+        # SOURCE
+        # =========================
+
+        "source":
+            source,
+
         **extra
     }
 
-    c.setdefault("memories", []).append(mem)
+    c.setdefault(
+        "memories",
+        []
+    ).append(mem)
 
     prune_memories(c)
 
-    add_memory_vector(c["id"], mem["id"], text)
+    add_memory_vector(
+
+        c["id"],
+
+        mem["id"],
+
+        text
+    )
 
     return mem
-
 
 # =========================
 # BASIC RECALL (your original)

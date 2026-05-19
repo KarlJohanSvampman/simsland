@@ -178,6 +178,19 @@ def think(
         world
     )
 
+    connections = close_connections(
+    c,
+    world
+    )
+
+    if not connections:
+
+        add_intention(
+            c,
+            "friendship",
+            80
+        )
+
     # committed?
     if is_committed(c):
 
