@@ -2,7 +2,7 @@ import time
 from datetime import datetime
 
 from systems.jobs import generate_job_listings, maybe_fire, apply_for_job, process_interview
-from systems.offgrid import maybe_go_offgrid, process_return
+from brain.agent_loop import maybe_go_offgrid, process_return
 from systems.economy import apply_expenses
 from systems.market import update_market, produce, consume_households
 from systems.events import maybe_generate_shared_event

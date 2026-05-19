@@ -8,8 +8,8 @@ from brain.perception import perceive
 from brain.memory import recall_relevant, decay_memories
 from brain.monologue import think
 from brain.emotion import update_emotion
-from brain.goals import select_goal
-from brain.planner import generate_plan
+from brain.agent_loop import select_goal
+from brain.agent_loop import generate_plan
 from brain.decision_engine import decide_action
 from brain.executor import execute
 from systems.props import get_prop_category

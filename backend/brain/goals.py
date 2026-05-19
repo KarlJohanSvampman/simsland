@@ -1,6 +1,8 @@
 from systems.scheduling import get_current_activity
 from systems.commitment import is_committed
-
+from brain.intentions import (
+    select_primary_intention
+)
 import random
 
 # =========================
@@ -61,6 +63,23 @@ def select_goal(c, world):
     if c.get("phone", {}).get("inbox"):
         return "phone"
 
+    primary = select_primary_intention(c)
+
+    if primary:
+
+        typ = primary["type"]
+
+        if typ == "career":
+            return "work"
+
+        if typ == "romance":
+            return "socialize"
+
+        if typ == "friendship":
+            return "socialize"
+
+        if typ == "wealth":
+            return "earn_money"
     # =========================
     # 🚨 EXTREME NEED OVERRIDES
     # =========================
