@@ -6,6 +6,17 @@ from brain.context_builder import (
     build_context
 )
 
+from brain.self_model import (
+    consolidate_identity
+)
+
+from brain.narratives import (
+
+    consolidate_relationship_narratives,
+
+    consolidate_life_narratives
+)
+
 from brain.llm_brain import (
     think
 )
@@ -81,6 +92,12 @@ def update_internal_state(
         c,
         world
     )
+
+    consolidate_relationship_narratives(c)
+
+    consolidate_life_narratives(c)
+
+    consolidate_identity(c)
 
 
 # =========================================================

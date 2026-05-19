@@ -386,7 +386,9 @@ def build_context(
                 world
             ),
         "beliefs": build_belief_context(c),
-        "political_alignment": compute_alignment(c)
+        "political_alignment": compute_alignment(c),
+        "life_narratives": build_narratives(c),
+        "self_model": build_self_model(c)
     }
 
     return context
@@ -550,6 +552,47 @@ def build_belief_context(c):
 
             "interpretation":
                 interpretation
+        })
+
+    return results
+
+# =========================================================
+# BUILD NARRATIVES
+# =========================================================
+
+def build_narratives(c):
+
+    return c.get(
+        "narratives",
+        []
+    )[-5:]
+
+
+# =========================================================
+# BUILD SELF MODEL
+# =========================================================
+
+def build_self_model(c):
+
+    results = []
+
+    for key, v in c.get(
+        "self_model",
+        {}
+    ).items():
+
+        results.append({
+
+            "aspect": key,
+
+            "identity":
+                v.get("value"),
+
+            "confidence":
+                v.get(
+                    "confidence",
+                    0
+                )
         })
 
     return results
