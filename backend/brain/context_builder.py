@@ -393,7 +393,9 @@ def build_context(
         "political_alignment": compute_alignment(c),
         "life_narratives": build_narratives(c),
         "self_model": build_self_model(c).
-        "public_reputation":build_reputation_context(c,world)
+        "public_reputation":build_reputation_context(c,world),
+        "schedule": build_schedule_context(c),
+        "body_state": build_body_context(c)
     }
 
     return context
@@ -634,3 +636,69 @@ def build_reputation_context(
         "controversy":
             rep["controversy"]
     }
+
+    # =========================================================
+# BUILD SCHEDULE CONTEXT
+# =========================================================
+
+def build_schedule_context(c):
+
+    block = c.get(
+        "active_schedule_block"
+    )
+
+    if not block:
+        return None
+
+    return {
+
+        "type":
+            block["type"],
+
+        "start":
+            block["start"],
+
+        "end":
+            block["end"]
+    }
+
+# =========================================================
+# BODY CONTEXT
+# =========================================================
+
+def build_body_context(c):
+
+    b = c.get(
+        "body",
+        {}
+    )
+
+    issues = []
+
+    if b.get("bladder", 0) > 70:
+
+        issues.append(
+            "You urgently need "
+            "to use a toilet."
+        )
+
+    if b.get("fatigue", 0) > 70:
+
+        issues.append(
+            "You feel exhausted."
+        )
+
+    if b.get("hygiene", 100) < 30:
+
+        issues.append(
+            "You feel dirty and "
+            "socially uncomfortable."
+        )
+
+    if b.get("hunger", 0) > 70:
+
+        issues.append(
+            "You are very hungry."
+        )
+
+    return issues

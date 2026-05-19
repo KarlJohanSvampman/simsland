@@ -6,6 +6,19 @@ from brain.context_builder import (
     build_context
 )
 
+from brain.intention_cleanup import (
+
+    clean_intentions,
+
+    sort_intentions
+)
+from systems.body import (
+    update_body_needs
+)
+
+from systems.body_intentions import (
+    generate_body_intentions
+)
 from brain.self_model import (
     consolidate_identity
 )
@@ -36,6 +49,10 @@ from systems.habits import (
 
 from systems.activities import (
     execute_activity
+)
+
+from systems.schedule_runtime import (
+    update_schedule_runtime
 )
 
 from systems.offgrid import (
@@ -77,7 +94,7 @@ def update_internal_state(
 
     world
 ):
-
+    update_body_needs(c)
     update_emotion(
         c,
         world
@@ -102,7 +119,7 @@ def update_internal_state(
     consolidate_life_narratives(c)
 
     consolidate_identity(c)
-
+    merge_body_intentions(c)
 
 # =========================================================
 # ECONOMY
@@ -283,32 +300,25 @@ def process_decision(
 
     if action:
 
-    valid = validate_action(
-
-        c,
-
-        world,
-
-        action
-    )
-
-    if valid:
-
-        execute_activity(
-
+        valid = validate_action(
             c,
-
             world,
-
             action
         )
 
-    else:
+        if valid:
 
-        c["last_invalid_action"] = (
-            action
-        )
+            execute_activity(
+                c,
+                world,
+                action
+            )
 
+        else:
+
+            c["last_invalid_action"] = (
+                action
+            )
 
 # =========================================================
 # POST UPDATE
@@ -325,7 +335,7 @@ def post_update(
 
 
 # =========================================================
-# MAIN AGENT TICK
+# MAIN AGEN  T TICK
 # =========================================================
 
 def update_agent(
@@ -357,6 +367,14 @@ def update_agent(
     )
 
     # =====================================
+    # CLEANUP INTENTIONS
+    # =====================================
+
+    clean_intentions(c)
+
+    sort_intentions(c)      
+
+    # =====================================
     # ECONOMY
     # =====================================
 
@@ -366,7 +384,18 @@ def update_agent(
     )
 
     # =====================================
-    # ALREADY BUSY?
+    # MOVEMENT
+    # =====================================
+
+    if update_character_movement(
+        c,
+        world
+    ):
+        return
+
+    # =====================================
+
+    # ACTIVE ACTIVITY
     # =====================================
 
     if c.get("activity"):
@@ -383,6 +412,15 @@ def update_agent(
         return
 
     # =====================================
+    # SCHEDULE RUNTIME
+    # =====================================
+
+    update_schedule_runtime(
+        c,
+        world
+    )
+
+    # =====================================
     # BUILD CONTEXT
     # =====================================
 
@@ -392,16 +430,6 @@ def update_agent(
 
         world
     )
-
-    # =====================================
-    # MOVEMENT
-    # =====================================
-
-    if update_character_movement(
-        c,
-        world
-    ):
-        return
 
     # =====================================
     # LLM THINK
@@ -432,3 +460,19 @@ def update_agent(
         c,
         world
     )
+
+def merge_body_intentions(c):
+
+    for intention in generate_body_intentions(c):
+
+        store_intention(
+            c,
+            {
+                "type": intention["type"],
+                "priority": int(
+                    intention["priority"] * 100
+                ),
+                "source": "body",
+                "reason": "body_need"
+            }
+        )
