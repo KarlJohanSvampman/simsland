@@ -185,3 +185,145 @@ def decay_memories(c):
             kept.append(m)
 
     c["memories"] = kept[-150:]
+
+    # =========================================================
+# BIASED RECALL
+# =========================================================
+
+def biased_recall(
+
+    c,
+
+    query="",
+
+    limit=10
+):
+
+    memories = c.get(
+        "memories",
+        []
+    )
+
+    emotion = c.get(
+        "emotion",
+        "neutral"
+    )
+
+    beliefs = c.get(
+        "beliefs",
+        {}
+    )
+
+    intentions = c.get(
+        "active_intentions",
+        []
+    )
+
+    scored = []
+
+    for m in memories:
+
+        score = 0.0
+
+        # =====================================
+        # BASE IMPORTANCE
+        # =====================================
+
+        score += m.get(
+            "importance",
+            0
+        )
+
+        # =====================================
+        # RECENCY
+        # =====================================
+
+        score += (
+            m.get(
+                "recency_score",
+                0
+            ) * 0.5
+        )
+
+        # =====================================
+        # EMOTIONAL MATCH
+        # =====================================
+
+        emotional_impact = abs(
+
+            m.get(
+                "emotional_impact",
+                0
+            )
+        )
+
+        if emotion in [
+
+            "angry",
+
+            "afraid",
+
+            "sad"
+        ]:
+
+            score += (
+                emotional_impact * 2
+            )
+
+        # =====================================
+        # BELIEF MATCH
+        # =====================================
+
+        for topic in m.get(
+            "tags",
+            []
+        ):
+
+            belief = beliefs.get(
+                topic
+            )
+
+            if not belief:
+                continue
+
+            certainty = belief.get(
+                "certainty",
+                0
+            )
+
+            score += (
+                certainty * 5
+            )
+
+        # =====================================
+        # INTENTION MATCH
+        # =====================================
+
+        for i in intentions:
+
+            itype = i.get("type")
+
+            if not itype:
+                continue
+
+            if itype in m.get(
+                "tags",
+                []
+            ):
+
+                score += 8
+
+        scored.append(
+            (score, m)
+        )
+
+    scored.sort(
+        key=lambda x: x[0],
+        reverse=True
+    )
+
+    return [
+
+        m for _, m
+        in scored[:limit]
+    ]

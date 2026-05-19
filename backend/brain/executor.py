@@ -539,6 +539,12 @@ def handle_speak(
     world
 ):
 
+    from brain.conversations import (
+
+        get_or_create_conversation,
+
+        add_message
+    )
     utterance = (
         action.get("utterance")
         or ""
@@ -584,6 +590,17 @@ def handle_speak(
         "topic",
         "general"
     )
+
+    conv = get_or_create_conversation(
+
+    world,
+
+    c["id"],
+
+    target["id"],
+
+    topic
+)
 
     after_speech(
         c,
@@ -655,11 +672,62 @@ def handle_speak(
         speech_act=speech_act
     )
 
+    add_message(
+
+    conv,
+
+    c["id"],
+
+    utterance,
+
+    speech_act,
+
+    topic,
+
+    world["tick"]
+)
+
     apply_interaction(
         c,
         target,
         speech_act
     )
+    from brain.beliefs import (
+    update_belief
+    )
+
+    topic = action.get(
+        "topic"
+    )
+
+    speech_act = action.get(
+        "speech_act"
+    )
+
+    # persuasion
+    if speech_act in [
+
+        "argue",
+
+        "persuade",
+
+        "rant",
+
+        "debate"
+    ]:
+
+        update_belief(
+
+            target,
+
+            topic,
+
+            "positive",
+
+            0.2,
+
+            world["tick"]
+        )
 
 
 def handle_call(

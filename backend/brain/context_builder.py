@@ -1,12 +1,14 @@
 from brain.memory import (
-    recall_relevant
+    biased_recall
 )
 
 from social.relationship_score import (
     relationship_score
 )
 
-
+from brain.beliefs import (
+    compute_alignment
+)
 # =========================================================
 # RELATIONSHIP SUMMARY
 # =========================================================
@@ -125,7 +127,7 @@ def build_memories(
     limit=10
 ):
 
-    memories = recall_relevant(
+    memories = biased_recall(
 
         c,
 
@@ -371,7 +373,183 @@ def build_context(
             build_available_actions(
                 c,
                 world
-            )
+            ),
+
+        "conversations":
+            build_conversation_context(
+                c,
+                world
+            ),
+        "current_turn":
+            get_current_turn(
+                c,
+                world
+            ),
+        "beliefs": build_belief_context(c),
+        "political_alignment": compute_alignment(c)
     }
 
     return context
+
+
+# =========================================================
+# ACTIVE CONVERSATIONS
+# =========================================================
+
+def build_conversation_context(
+
+    c,
+
+    world
+):
+
+    results = []
+
+    for conv in world.get(
+        "conversations",
+        {}
+    ).values():
+
+        if not conv.get("active"):
+            continue
+
+        if c["id"] not in conv[
+            "participants"
+        ]:
+            continue
+
+        results.append({
+
+            "topic":
+                conv["topic"],
+
+            "tone":
+                conv["tone"],
+
+            "recent_history":
+                conv["history"][-5:],
+
+            "turn_owner":
+                conv["turn_owner"]
+        })
+
+    return results
+
+    # =========================================================
+# CURRENT TURN
+# =========================================================
+
+def get_current_turn(
+
+    c,
+
+    world
+):
+
+    for conv in world.get(
+        "conversations",
+        {}
+    ).values():
+
+        if not conv.get("active"):
+            continue
+
+        if conv.get(
+            "turn_owner"
+        ) == c["id"]:
+
+            return {
+
+                "conversation_id":
+                    conv["id"],
+
+                "topic":
+                    conv["topic"],
+
+                "tone":
+                    conv["tone"],
+
+                "participants":
+                    conv["participants"],
+
+                "recent_history":
+                    conv["history"][-5:]
+            }
+
+    return None
+
+    # =========================================================
+# BUILD BELIEF CONTEXT
+# =========================================================
+
+def build_belief_context(c):
+
+    results = []
+
+    for topic, belief in c.get(
+        "beliefs",
+        {}
+    ).items():
+
+        value = belief.get(
+            "value",
+            0
+        )
+
+        certainty = belief.get(
+            "certainty",
+            0
+        )
+
+        # =====================================
+        # INTERPRETATION
+        # =====================================
+
+        if value > 0.6:
+
+            interpretation = (
+                f"You strongly support "
+                f"{topic}."
+            )
+
+        elif value > 0.2:
+
+            interpretation = (
+                f"You somewhat support "
+                f"{topic}."
+            )
+
+        elif value < -0.6:
+
+            interpretation = (
+                f"You strongly oppose "
+                f"{topic}."
+            )
+
+        elif value < -0.2:
+
+            interpretation = (
+                f"You somewhat oppose "
+                f"{topic}."
+            )
+
+        else:
+
+            interpretation = (
+                f"You feel conflicted or "
+                f"uncertain about {topic}."
+            )
+
+        results.append({
+
+            "topic":
+                topic,
+
+            "certainty":
+                certainty,
+
+            "interpretation":
+                interpretation
+        })
+
+    return results
