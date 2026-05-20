@@ -1,115 +1,357 @@
-import time
 import random
 
+from systems.occupancy import (
+    release_anchor,
+    release_reservation
+)
+
+from systems.props import (
+    find_nearest_anchor
+)
+
+from systems.movement import (
+    request_route_to_anchor
+)
+
+
+# =========================================================
+# ACTIVITY CONFIG
+# =========================================================
+
 ACTIVITIES = {
-    "apply_job": {"prop": "computer", "avg_minutes": 6},
-    "look_for_job": {"prop": "computer", "avg_minutes": 4},
-    "use_toilet": {"prop": "toilet", "avg_minutes": 3},
-    "sleep": {"prop": "bed", "avg_minutes": 480}
+
+    "sleep": {
+
+        "prop": "sleep",
+
+        "base_duration_minutes": 480,
+
+        "interruptible": True
+    },
+
+    "use_toilet": {
+
+        "prop": "sit",
+
+        "base_duration_minutes": 3,
+
+        "interruptible": False
+    },
+
+    "take_shower": {
+
+        "prop": "take_shower",
+
+        "base_duration_minutes": 12,
+
+        "interruptible": False
+    },
+
+    "eat_snack": {
+
+        "prop": "eat",
+
+        "base_duration_minutes": 8,
+
+        "interruptible": True
+    }
 }
 
 
-def compute_duration_seconds(c, base_minutes):
-    seconds = base_minutes * 60
+# =========================================================
+# DURATION
+# =========================================================
 
-    emotion = c.get("emotion")
+def compute_duration_ticks(
+
+    c,
+
+    base_minutes
+):
+
+    ticks = base_minutes * 60
+
+    emotion = c.get(
+        "emotion"
+    )
 
     if emotion == "stressed":
-        seconds *= 1.3
+        ticks *= 1.3
+
     elif emotion == "focused":
-        seconds *= 0.8
+        ticks *= 0.8
 
-    if "lazy" in c.get("traits", []):
-        seconds *= 1.2
+    if "lazy" in c.get(
+        "traits",
+        []
+    ):
+        ticks *= 1.2
 
-    seconds *= random.uniform(0.85, 1.15)
+    ticks *= random.uniform(
+        0.85,
+        1.15
+    )
 
-    return int(seconds)
+    return int(ticks)
 
 
-def start_activity(c, world, name, prop):
+# =========================================================
+# START ACTIVITY
+# =========================================================
 
-    config = ACTIVITIES.get(name)
+def start_activity(
+
+    c,
+
+    world,
+
+    activity_type
+):
+
+    config = ACTIVITIES.get(
+        activity_type
+    )
+
     if not config:
-        return
+        return False
 
-    duration = compute_duration_seconds(c, config["avg_minutes"])
+    interaction = config["prop"]
+
+    result = find_nearest_anchor(
+
+        c,
+
+        world,
+
+        interaction
+    )
+
+    if not result:
+        return False
+
+    prop, anchor = result
+
+    duration = compute_duration_ticks(
+
+        c,
+
+        config[
+            "base_duration_minutes"
+        ]
+    )
 
     c["activity"] = {
-        "name": name,
-        "prop_id": prop["id"],
-        "start_time": world["calendar"]["timestamp"],
-        "end_time": world["calendar"]["timestamp"] + duration
+
+        "type":
+            activity_type,
+
+        "phase":
+            "walking",
+
+        "phase_started_tick":
+            world["tick"],
+
+        "target_id":
+            prop["id"],
+
+        "anchor_name":
+            anchor["name"],
+
+        "duration":
+            duration,
+
+        "state": {}
     }
-    # =====================================
-    # ANIMATION STATE
-    # =====================================
 
-    c["animation_state"] = name
+    request_route_to_anchor(
 
-def update_activity(c, world):
+        c,
 
-    act = c.get("activity")
+        world,
+
+        prop,
+
+        anchor
+    )
+
+    return True
+
+
+# =========================================================
+# UPDATE ACTIVITY
+# =========================================================
+
+def update_activity(
+
+    c,
+
+    world
+):
+
+    act = c.get(
+        "activity"
+    )
+
     if not act:
         return False
 
-    if world["calendar"]["timestamp"] >= act["end_time"]:
-        complete_activity(c, world)
+    activity_type = act.get(
+        "type"
+    )
+
+    # =====================================
+    # WALKING
+    # =====================================
+
+    if act["phase"] == "walking":
+
+        if c.get("is_moving"):
+            return True
+
+        act["phase"] = "using"
+
+        act[
+            "phase_started_tick"
+        ] = world["tick"]
+
+        c["animation_state"] = (
+            activity_type
+        )
+
+        return True
+
+    # =====================================
+    # USING
+    # =====================================
+
+    if act["phase"] == "using":
+
+        elapsed = (
+
+            world["tick"]
+
+            -
+
+            act[
+                "phase_started_tick"
+            ]
+        )
+
+        if elapsed >= act["duration"]:
+
+            complete_activity(
+
+                c,
+
+                world,
+
+                act
+            )
+
+            act["phase"] = (
+                "finishing"
+            )
+
+            act[
+                "phase_started_tick"
+            ] = world["tick"]
+
+        return True
+
+    # =====================================
+    # FINISHING
+    # =====================================
+
+    if act["phase"] == "finishing":
+
+        release_anchor(
+            c,
+            world
+        )
+
+        release_reservation(
+            c,
+            world
+        )
+
+        c["animation_state"] = (
+            "idle"
+        )
+
         c["activity"] = None
+
         return False
 
     return True
 
 
-def complete_activity(c, world):
+# =========================================================
+# COMPLETE ACTIVITY
+# =========================================================
 
-    name = c["activity"]["name"]
+def complete_activity(
 
-    if name == "apply_job":
-        from systems.jobs import apply_for_job
-        apply_for_job(c, world)
+    c,
 
-    elif name == "use_toilet":
-        c["needs"]["bladder"] = 0
+    world,
 
-    elif name == "sleep":
-        c["needs"]["energy"] = 1.0
-    c["animation_state"] = "idle"
-    release_anchor(c, world)
+    act
+):
 
-def update_interaction_phases(c, world):
-    act = c.get("activity")
-    if not act:
-        return
+    activity_type = act["type"]
 
-    phase = act.get("phase")
-    start_tick = act.get("phase_started", 0)
+    # =====================================
+    # SLEEP
+    # =====================================
 
-    elapsed = world["tick"] - start_tick
+    if activity_type == "sleep":
 
-    # -----------------
-    # START → LOOP
-    # -----------------
-    if phase == "start" and elapsed > 2:
-        act["phase"] = "loop"
-        act["phase_started"] = world["tick"]
+        c["needs"][
+            "energy"
+        ] = 1.0
 
-    # -----------------
-    # LOOP → STOP
-    # -----------------
-    elif phase == "loop" and elapsed > act.get("duration", 20):
-        act["phase"] = "stop"
-        act["phase_started"] = world["tick"]
-        c["animation_state"] = (
-            act["name"]
+    # =====================================
+    # TOILET
+    # =====================================
+
+    elif activity_type == (
+        "use_toilet"
+    ):
+
+        c["needs"][
+            "bladder"
+        ] = 0
+
+    # =====================================
+    # SHOWER
+    # =====================================
+
+    elif activity_type == (
+        "take_shower"
+    ):
+
+        c["needs"][
+            "hygiene"
+        ] = 1.0
+
+    # =====================================
+    # SNACK
+    # =====================================
+
+    elif activity_type == (
+        "eat_snack"
+    ):
+
+        c["needs"][
+            "hunger"
+        ] = max(
+
+            0,
+
+            c["needs"].get(
+                "hunger",
+                1
+            )
+
+            - 0.5
         )
-
-    # -----------------
-    # STOP → DONE
-    # -----------------
-    elif phase == "stop" and elapsed > 2:
-        from systems.occupancy import release_anchor, release_reservation
-        release_anchor(c, world)
-        release_reservation(c, world)
-        c["animation_state"] = "idle"
-        c["activity"] = None
