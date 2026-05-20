@@ -786,38 +786,66 @@ def handle_call_911(
 # ============================================
 # EXECUTION
 # ============================================
+
 def execute(c, decision, world):
 
     update_interaction_phases(c, world)
 
     # ========================================
-    # BLOCK MOVEMENT DURING START/STOP PHASES
+    # BLOCK START/STOP TRANSITIONS
     # ========================================
+
     act = c.get("activity")
 
-    if act and act.get("phase") in ["start", "stop"]:
+    if act and act.get("phase") in [
+
+        "start",
+
+        "stop"
+    ]:
         return
 
     # ========================================
     # ACTIVE ACTIVITY UPDATE
     # ========================================
+
     if update_activity(c, world):
         return
 
     if not decision:
         return
 
+    # ========================================
+    # EMOTION
+    # ========================================
+
     emotion = decision.get(
+
         "emotion",
-        c.get("emotion", "calm")
+
+        c.get(
+            "emotion",
+            "calm"
+        )
     )
 
-    apply_emotion_inertia(c, emotion)
+    apply_emotion_inertia(
+        c,
+        emotion
+    )
 
     c["emotion"] = emotion
     c["mood"] = emotion
 
-    action = decision.get("action", {})
+    # ========================================
+    # ACTION
+    # ========================================
+
+    action = decision.get(
+        "action",
+        {}
+    )
+
     raw_name = action.get(
         "type",
         "wait"
@@ -826,26 +854,37 @@ def execute(c, decision, world):
     name = EMOTION_BLOCKS.get(
         emotion,
         {}
-    ).get(raw_name, raw_name)
+    ).get(
+        raw_name,
+        raw_name
+    )
 
-    utterance = (
-        action.get("utterance")
-        or ""
-    ).strip()
+    strategy = action.get(
+        "strategy"
+    )
+
+    need = action.get(
+        "need"
+    )
 
     c["last_action"] = name
 
-    c["internal_thought"] = decision.get(
-        "thought",
-        c.get("internal_thought", "")
+    c["internal_thought"] = (
+        decision.get(
+            "thought",
+            c.get(
+                "internal_thought",
+                ""
+            )
+        )
     )
 
     c["is_moving"] = False
 
-        
-        # ========================================
+    # ========================================
     # MOVE
     # ========================================
+
     if name == "move":
 
         handle_move(
@@ -857,6 +896,7 @@ def execute(c, decision, world):
     # ========================================
     # WAIT
     # ========================================
+
     elif name == "wait":
 
         handle_wait(
@@ -868,7 +908,13 @@ def execute(c, decision, world):
     # ========================================
     # SPEAK
     # ========================================
-    elif name in ["speak", "yell"]:
+
+    elif name in [
+
+        "speak",
+
+        "yell"
+    ]:
 
         handle_speak(
             c,
@@ -880,6 +926,7 @@ def execute(c, decision, world):
     # ========================================
     # PHONE
     # ========================================
+
     elif name == "call":
 
         handle_call(
@@ -891,6 +938,7 @@ def execute(c, decision, world):
     # ========================================
     # EMERGENCY
     # ========================================
+
     elif name == "call_911":
 
         handle_call_911(
@@ -900,20 +948,197 @@ def execute(c, decision, world):
         )
 
     # ========================================
+    # SATISFY NEED
+    # ========================================
+
+    elif name == "satisfy_need":
+
+        # ------------------------------------
+        # FOOD
+        # ------------------------------------
+
+        if need == "food":
+
+            # ================================
+            # COOK MEAL
+            # ================================
+
+            if strategy == "cook_meal":
+
+                c["activity"] = {
+
+                    "type":
+                        "cook_meal",
+
+                    "phase":
+                        "start"
+                }
+
+            # ================================
+            # QUICK SNACK
+            # ================================
+
+            elif strategy == "quick_snack":
+
+                c["activity"] = {
+
+                    "type":
+                        "eat_snack",
+
+                    "phase":
+                        "start"
+                }
+
+            # ================================
+            # TAKEOUT
+            # ================================
+
+            elif strategy == "takeout":
+
+                send_offgrid(
+
+                    c,
+
+                    world,
+
+                    "shopping",
+
+                    12
+                )
+
+            # ================================
+            # RESTAURANT
+            # ================================
+
+            elif strategy == "restaurant":
+
+                send_offgrid(
+
+                    c,
+
+                    world,
+
+                    "leisure",
+
+                    24
+                )
+
+            # ================================
+            # IGNORE
+            # ================================
+
+            elif strategy == "ignore_need":
+
+                pass
+
+        # ------------------------------------
+        # DRINK
+        # ------------------------------------
+
+        elif need == "drink":
+
+            if strategy == "quick_drink":
+
+                c["activity"] = {
+
+                    "type":
+                        "drink",
+
+                    "phase":
+                        "start"
+                }
+
+        # ------------------------------------
+        # HYGIENE
+        # ------------------------------------
+
+        elif need == "hygiene":
+
+            if strategy == "take_shower":
+
+                c["activity"] = {
+
+                    "type":
+                        "take_shower",
+
+                    "phase":
+                        "start"
+                }
+
+            elif strategy == "wash_hands":
+
+                c["activity"] = {
+
+                    "type":
+                        "wash_hands",
+
+                    "phase":
+                        "start"
+                }
+
+            elif strategy == "brush_teeth":
+
+                c["activity"] = {
+
+                    "type":
+                        "brush_teeth",
+
+                    "phase":
+                        "start"
+                }
+
+        # ------------------------------------
+        # TOILET
+        # ------------------------------------
+
+        elif need == "toilet":
+
+            c["activity"] = {
+
+                "type":
+                    "use_toilet",
+
+                "phase":
+                    "start"
+            }
+
+        # ------------------------------------
+        # SLEEP
+        # ------------------------------------
+
+        elif need == "sleep":
+
+            c["activity"] = {
+
+                "type":
+                    "sleep",
+
+                "phase":
+                    "start"
+            }
+
+    # ========================================
     # LEAVE
     # ========================================
+
     elif name == "leave":
 
         c["conversation"] = None
 
-        c["x"] = max(0, c["x"] - 1)
+        c["x"] = max(
+            0,
+            c["x"] - 1
+        )
 
     # ========================================
     # OFFGRID
     # ========================================
+
     elif name == "go_work":
 
-        c["transport"] = {"mode": "car"}
+        c["transport"] = {
+            "mode": "car"
+        }
 
         send_offgrid(
             c,
@@ -950,56 +1175,22 @@ def execute(c, decision, world):
         )
 
     # ========================================
-    # NEEDS
+    # END CALL
     # ========================================
-    elif name == "eat":
-
-        start_commitment(
-            c,
-            "eat",
-            600
-        )
-
-        record_habit(
-            c,
-            "eat",
-            world
-        )
-
-    elif name == "drink":
-
-        start_commitment(
-            c,
-            "drink",
-            10
-        )
-
-        record_habit(
-            c,
-            "drink",
-            world
-        )
-
-    elif name == "sleep":
-
-        record_habit(
-            c,
-            "sleep",
-            world
-        )
-
-
 
     elif name == "end_call":
 
         c["is_on_phone"] = False
- 
 
     # ========================================
     # FALLBACK
     # ========================================
+
     else:
 
         c["last_utterance"] = ""
 
-    maybe_end(c, world)
+    maybe_end(
+        c,
+        world
+    )

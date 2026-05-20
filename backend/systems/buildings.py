@@ -1,59 +1,9 @@
 from copy import deepcopy
 
-
-# =========================================================
-# ROTATE TILE
-# =========================================================
-
-
-def rotate_tile(x, y, rotation):
-
-    # 0
-    if rotation == 0:
-        return x, y
-
-    # 90
-    if rotation == 90:
-        return -y, x
-
-    # 180
-    if rotation == 180:
-        return -x, -y
-
-    # 270
-    if rotation == 270:
-        return y, -x
-
-    return x, y
-
-
-# =========================================================
-# WORLD POSITION
-# =========================================================
-
-
-def world_pos(
-    building,
-    x,
-    y
-):
-
-    rx, ry = rotate_tile(
-        x,
-        y,
-        building.get(
-            "rotation",
-            0
-        )
-    )
-
-    return (
-        building["x"] + rx,
-        building["y"] + ry
-    )
-
-
-# =========================================================
+from systems.transforms import (
+    local_to_world
+)
+=============================================
 # INSTANTIATE FLOORPLAN
 # =========================================================
 
@@ -92,7 +42,7 @@ def instantiate_floorplan(
         tx = tile["x"]
         ty = tile["y"]
 
-        wx, wy = world_pos(
+        wx, wy = local_to_world(
             building,
             tx,
             ty
@@ -125,7 +75,7 @@ def instantiate_floorplan(
             []
         ):
 
-            wx, wy = world_pos(
+            wx, wy = local_to_world(
                 building,
                 tile["x"],
                 tile["y"]
@@ -155,7 +105,7 @@ def instantiate_floorplan(
 
         projected = deepcopy(door)
 
-        wx, wy = world_pos(
+        wx, wy = local_to_world(
             building,
             door["x"],
             door["y"]
@@ -179,7 +129,7 @@ def instantiate_floorplan(
 
         projected = deepcopy(window)
 
-        wx, wy = world_pos(
+        wx, wy = local_to_world(
             building,
             window["x"],
             window["y"]

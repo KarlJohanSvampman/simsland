@@ -3,7 +3,12 @@ from collections import deque
 
 from systems.navigation_cache import NAV_CACHE
 
+from systems.transforms import (
 
+    world_to_local,
+
+    local_to_world
+)
 
 
 # =========================================================
@@ -808,59 +813,3 @@ def runtime_room_id(
 
     return f"{building_id}:{room_id}"
 
-# =========================================================
-# WORLD -> LOCAL
-# =========================================================
-
-def world_to_local(
-
-    building,
-
-    x,
-
-    y
-):
-
-    local_x = (
-        x - building["x"]
-    )
-
-    local_y = (
-        y - building["y"]
-    )
-
-    return (
-
-        int(local_x),
-
-        int(local_y)
-    )
-
-
-# =========================================================
-# LOCAL -> WORLD
-# =========================================================
-
-def local_to_world(
-
-    building,
-
-    x,
-
-    y
-):
-
-    world_x = (
-        x + building["x"]
-    )
-
-    world_y = (
-        y + building["y"]
-    )
-
-    return (
-
-        int(world_x),
-
-        int(world_y)
-    )

@@ -1,8 +1,14 @@
-import math
+
 
 from systems.templates import get_prop_template
 
+from systems.transforms import (
+    transform_footprint
+)
 
+from systems.anchors import (
+    get_world_anchor
+)
 # =========================
 # GRID NEIGHBORS
 # =========================
@@ -19,39 +25,51 @@ def neighbors(x, y):
 # =========================
 # FOOTPRINT → WORLD TILES
 # =========================
-def get_prop_tiles(world, prop):
 
-    tiles = []
+def get_prop_tiles(
 
-    template = get_prop_template(world, prop)
+    world,
 
-    if not template:
-        return [(prop["x"], prop["y"])]
+    prop
+):
 
-    footprint = template.get(
-        "footprint",
-        [{"dx": 0, "dy": 0}]
+    template = get_prop_template(
+        world,
+        prop
     )
 
-    rot = prop.get("rotation", 0)
+    if not template:
 
-    cos = round(math.cos(rot))
-    sin = round(math.sin(rot))
+        return [(
+            prop["x"],
+            prop["y"]
+        )]
 
-    for t in footprint:
+    footprint = template.get(
 
-        dx = t["dx"]
-        dy = t["dy"]
+        "footprint",
 
-        rx = dx * cos - dy * sin
-        ry = dx * sin + dy * cos
+        [{
+            "dx": 0,
+            "dy": 0
+        }]
+    )
 
-        tiles.append((
-            prop["x"] + rx,
-            prop["y"] + ry
-        ))
+    rotation = prop.get(
+        "rotation",
+        0
+    )
 
-    return tiles
+    return transform_footprint(
+
+        prop["x"],
+
+        prop["y"],
+
+        footprint,
+
+        rotation
+    )
 
 
 # =========================
@@ -59,11 +77,28 @@ def get_prop_tiles(world, prop):
 # =========================
 def is_anchor_tile(x, y, world):
 
-    for p in world.get("props", []):
+    for p in world.get(
+        "props",
+        []
+    ):
 
-        for a in p.get("anchors", []):
+        for a in p.get(
+            "anchors",
+            []
+        ):
 
-            if (x, y) == (a["x"], a["y"]):
+            wa = get_world_anchor(
+                p,
+                a
+            )
+
+            if (
+                x,
+                y
+            ) == (
+                wa["x"],
+                wa["y"]
+            ):
                 return True
 
     return False

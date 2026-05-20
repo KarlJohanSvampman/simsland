@@ -197,33 +197,76 @@ def find_nearest_prop(
 # ============================================
 # ANCHORS
 # ============================================
-def get_anchor(prop, anchor_name):
+from systems.anchors import (
+    get_world_anchor
+)
 
-    for anchor in prop.get("anchors", []):
 
-        if anchor["name"] == anchor_name:
-            return anchor
+# ============================================
+# GET ANCHOR
+# ============================================
+
+def get_anchor(
+
+    prop,
+
+    anchor_name
+):
+
+    for anchor in prop.get(
+        "anchors",
+        []
+    ):
+
+        if anchor["name"] != anchor_name:
+            continue
+
+        return get_world_anchor(
+
+            prop,
+
+            anchor
+        )
 
     return None
 
 
+
 def get_anchors_by_interaction(
+
     prop,
+
     interaction_name
 ):
 
     results = []
 
-    for anchor in prop.get("anchors", []):
+    for anchor in prop.get(
+        "anchors",
+        []
+    ):
 
         if (
-            anchor.get("interactionName")
-            == interaction_name
+
+            anchor.get(
+                "interactionName"
+            )
+
+            != interaction_name
         ):
-            results.append(anchor)
+            continue
+
+        results.append(
+
+            get_world_anchor(
+
+                prop,
+
+                anchor
+            )
+        )
 
     return results
-
 
 # ============================================
 # CONTAINERS
@@ -274,32 +317,75 @@ def remove_item_from_prop(
 
     return None
 
-    # ============================================
+# ============================================
 # FIND NEAREST INTERACTION ANCHOR
 # ============================================
+
+
 def find_nearest_anchor(
+
     c,
+
     world,
+
     interaction_name
 ):
 
     best_prop = None
     best_anchor = None
+
     best_dist = 999999
 
-    for prop in world.get("props", []):
+    for prop in world.get(
+        "props",
+        []
+    ):
 
-        for anchor in prop.get("anchors", []):
+        for anchor in prop.get(
+            "anchors",
+            []
+        ):
+
+            # --------------------------------
+            # INTERACTION FILTER
+            # --------------------------------
 
             if (
-                anchor.get("interactionName")
+
+                anchor.get(
+                    "interactionName"
+                )
+
                 != interaction_name
             ):
                 continue
 
+            # --------------------------------
+            # PROJECT TO WORLD
+            # --------------------------------
+
+            wa = get_world_anchor(
+
+                prop,
+
+                anchor
+            )
+
+            # --------------------------------
+            # DISTANCE
+            # --------------------------------
+
             dist = (
-                abs(anchor["x"] - c["x"])
-                + abs(anchor["y"] - c["y"])
+
+                abs(
+                    wa["x"] - c["x"]
+                )
+
+                +
+
+                abs(
+                    wa["y"] - c["y"]
+                )
             )
 
             if dist < best_dist:
@@ -307,10 +393,16 @@ def find_nearest_anchor(
                 best_dist = dist
 
                 best_prop = prop
-                best_anchor = anchor
+
+                best_anchor = wa
 
     if not best_prop:
         return None
 
-    return best_prop, best_anchor
+    return (
+
+        best_prop,
+
+        best_anchor
+    )
     
