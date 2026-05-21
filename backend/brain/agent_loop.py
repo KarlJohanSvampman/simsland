@@ -350,36 +350,58 @@ def update_agent(
     # =====================================
 
     update_offgrid(
+
         c,
+
         world
     )
 
-    if c.get("off_grid"):
+    if c.get(
+        "off_grid"
+    ):
         return
 
     # =====================================
-    # INTERNAL
+    # INTERNAL STATE
     # =====================================
 
     update_internal_state(
+
         c,
+
         world
     )
-
-    # =====================================
-    # CLEANUP INTENTIONS
-    # =====================================
-
-    clean_intentions(c)
-
-    sort_intentions(c)      
 
     # =====================================
     # ECONOMY
     # =====================================
 
     update_economy(
+
         c,
+
+        world
+    )
+
+    # =====================================
+    # SCHEDULES
+    # =====================================
+
+    update_schedule_runtime(
+
+        c,
+
+        world
+    )
+
+    # =====================================
+    # INTENTIONS
+    # =====================================
+
+    update_intentions(
+
+        c,
+
         world
     )
 
@@ -387,38 +409,36 @@ def update_agent(
     # MOVEMENT
     # =====================================
 
-    if update_character_movement(
+    moving = update_character_movement(
+
         c,
+
         world
-    ):
-        return
+    )
 
     # =====================================
-
     # ACTIVE ACTIVITY
     # =====================================
 
-    if c.get("activity"):
+    if c.get(
+        "activity"
+    ):
 
-        execute_activity(
+        update_activity(
 
             c,
 
-            world,
-
-            c["activity"]
+            world
         )
 
         return
 
     # =====================================
-    # SCHEDULE RUNTIME
+    # STILL WALKING?
     # =====================================
 
-    update_schedule_runtime(
-        c,
-        world
-    )
+    if moving:
+        return
 
     # =====================================
     # BUILD CONTEXT
@@ -432,24 +452,27 @@ def update_agent(
     )
 
     # =====================================
-    # LLM THINK
+    # THINK
     # =====================================
 
     decision = think(
         context
     )
 
+    if not decision:
+        return
+
     # =====================================
-    # PROCESS DECISION
+    # EXECUTE
     # =====================================
 
-    process_decision(
+    execute(
 
         c,
 
-        world,
+        decision,
 
-        decision
+        world
     )
 
     # =====================================
@@ -457,7 +480,9 @@ def update_agent(
     # =====================================
 
     post_update(
+
         c,
+
         world
     )
 

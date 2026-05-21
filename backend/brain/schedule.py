@@ -1,3 +1,8 @@
+from brain.intentions import (
+    add_intention
+)
+
+
 #c["schedule"] = {
 #    "weekday": {
 #
@@ -16,7 +21,7 @@ def schedule_to_intentions(c, world):
 
         goal = c["schedule"]["weekday"][hour]
 
-        c["intentions"].append({
+        add_intention(c,{
             "goal": goal,
             "priority": 70,
             "status": "planned",

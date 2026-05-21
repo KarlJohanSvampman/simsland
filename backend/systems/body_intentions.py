@@ -1,3 +1,9 @@
+from brain.intentions import (
+    add_intention
+)
+
+
+
 # =========================================================
 # BODY INTENTIONS
 # =========================================================
@@ -20,7 +26,7 @@ def generate_body_intentions(c):
         0
     ) > 80:
 
-    intentions.append({
+    add_intention(c,{
 
         "type":
             "use_toilet",
@@ -41,7 +47,7 @@ def generate_body_intentions(c):
         0
         ) > 80:
 
-        intentions.append({
+        add_intention(c,{
 
             "type":
                 "use_toilet_bowels",
@@ -65,7 +71,7 @@ def generate_body_intentions(c):
         "hygiene",
         100
     ) < 35:
-    intentions.append({
+        add_intention(c, {
 
         "type":
             "take_shower",
@@ -86,7 +92,7 @@ def generate_body_intentions(c):
         0
     ) > 85:
 
-        intentions.append({
+        add_intention(c, {
 
             "type":
                 "sleep",
@@ -112,7 +118,7 @@ def generate_body_intentions(c):
 
     if hydration < 35:
 
-        intentions.append({
+        add_intention(c, {
 
             "type":
                 "drink",
@@ -132,7 +138,7 @@ def generate_body_intentions(c):
         0
     ) > 75:
 
-        intentions.append({
+        add_intention(c, {
 
             "type":
                 "eat_food",

@@ -316,7 +316,7 @@ def build_context(
         # ACTIVE INTENTIONS
         # =====================================
 
-        "intentions":
+        "active_intentions":
             build_intentions(c),
 
         # =====================================

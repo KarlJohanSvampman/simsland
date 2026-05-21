@@ -4,7 +4,19 @@ from brain.intention_types import (
     INTENTION_TYPES
 )
 
+from brain.intention_priority import (
+    final_priority
+)
+# =========================================================
+# ENSURE ACTIVE INTENTIONS
+# =========================================================
 
+def ensure_intentions(c):
+
+    c.setdefault(
+        "active_intentions",
+        []
+    )
 # =========================================================
 # HAS INTENTION
 # =========================================================
@@ -26,7 +38,6 @@ def has_intention(
 
     return False
 
-
 # =========================================================
 # ADD INTENTION
 # =========================================================
@@ -35,39 +46,58 @@ def add_intention(
 
     c,
 
-    name,
-
-    strength=None
+    intention
 ):
 
-    if has_intention(c, name):
-        return
+    ensure_intentions(c)
 
-    data = INTENTION_TYPES.get(
-        name,
-        {}
+    intentions = c[
+        "active_intentions"
+    ]
+
+    intention.setdefault(
+        "created_at",
+        0
     )
 
-    c.setdefault(
-        "intentions",
-        []
-    ).append({
+    intention.setdefault(
+        "source",
+        "unknown"
+    )
 
-        "type": name,
+    intention.setdefault(
+        "category",
+        "impulse"
+    )
 
-        "strength":
-            strength
-            if strength is not None
-            else data.get(
-                "priority",
-                50
-            ),
+    intention.setdefault(
+        "priority",
+        0
+    )
 
-        "progress": 0,
+    intention.setdefault(
+        "interrupts",
+        False
+    )
 
-        "active": True
-    })
+    # ------------------------------------
+    # REPLACE SAME TYPE
+    # ------------------------------------
 
+    intentions = [
+
+        i for i in intentions
+
+        if i["type"] != intention["type"]
+    ]
+
+    intentions.append(
+        intention
+    )
+
+    c["active_intentions"] = (
+        intentions
+    )
 
 # =========================================================
 # DECAY
@@ -76,7 +106,7 @@ def add_intention(
 def decay_intentions(c):
 
     for i in c.get(
-        "intentions",
+        "activeintentions",
         []
     ):
 
@@ -91,9 +121,9 @@ def decay_intentions(c):
 
         i["strength"] -= decay
 
-    c["intentions"] = [
+    c["active_intentions"] = [
 
-        i for i in c["intentions"]
+        i for i in c["active_intentions"]
 
         if i["strength"] > 0
     ]
@@ -120,3 +150,58 @@ def select_primary_intention(c):
         key=lambda i:
             i["strength"]
     )
+
+
+
+# =========================================================
+# CLEAN INTENTIONS
+# =========================================================
+
+def clean_intentions(c):
+
+    intentions = c.get(
+        "active_intentions",
+        []
+    )
+
+    seen = set()
+
+    cleaned = []
+
+    for i in reversed(intentions):
+
+        key = i.get("type")
+
+        if key in seen:
+            continue
+
+        seen.add(key)
+
+        cleaned.append(i)
+
+    cleaned.reverse()
+
+    c["active_intentions"] = (
+        cleaned[-10:]
+    )
+
+
+# =========================================================
+# SORT INTENTIONS
+# =========================================================
+
+def sort_intentions(c):
+
+    intentions = c.get(
+        "active_intentions",
+        []
+    )
+
+    intentions.sort(
+
+        key=final_priority,
+
+        reverse=True
+    )
+
+    

@@ -13,6 +13,9 @@ from systems.movement import (
     request_route_to_anchor
 )
 
+from systems.interactions import (
+    begin_interaction
+)
 
 # =========================================================
 # ACTIVITY CONFIG
@@ -115,21 +118,19 @@ def start_activity(
     if not config:
         return False
 
-    interaction = config["prop"]
+    interaction = begin_interaction(
 
-    result = find_nearest_anchor(
+    c,
 
-        c,
+    world,
 
-        world,
-
-        interaction
-    )
-
-    if not result:
+    interaction
+    ) 
+    if not interaction:
         return False
 
-    prop, anchor = result
+    prop = interaction["prop"]
+    anchor = interaction["anchor"]
 
     duration = compute_duration_ticks(
 
@@ -355,3 +356,35 @@ def complete_activity(
 
             - 0.5
         )
+
+def set_activity_phase(
+
+    act,
+
+    phase,
+
+    world
+):
+
+    act["phase"] = phase
+
+    act[
+        "phase_started_tick"
+    ] = world["tick"]
+
+
+def finish_activity(c, world):
+
+    release_anchor(
+        c,
+        world
+    )
+
+    release_reservation(
+        c,
+        world
+    )
+
+    c["animation_state"] = "idle"
+
+    c["activity"] = None
