@@ -24,6 +24,14 @@ from systems.social import (
 
     build_message_context
 )
+
+from conversations import (
+    find_conversation
+)
+
+from brain.memory import (
+    biased_recall
+)
 # =========================================================
 # RELATIONSHIP SUMMARY
 # =========================================================
@@ -436,7 +444,9 @@ def build_context(
         "body_state": build_body_context(c),
         "household_resources":build_household_resource_context( c,world),
         "cognitive_pressure": build_cognitive_pressure(c),
-        "social": build_social_context(c,world)
+        "social": build_social_context(c,world),
+        "memories": build_memory_context(c),
+        "active_conversations":build_active_conversations(c, world)
     }
 
     return context
@@ -798,3 +808,91 @@ def build_household_resource_context(
 
 
 
+# =========================================================
+# MEMORY CONTEXT
+# =========================================================
+
+def build_memory_context(
+
+    c
+):
+
+    memories = biased_recall(
+
+        c,
+
+        limit=8
+    )
+
+    results = []
+
+    for m in memories:
+
+        results.append({
+
+            "text":
+                m["text"],
+
+            "importance":
+                m.get(
+                    "importance",
+                    0
+                ),
+
+            "tags":
+                m.get(
+                    "tags",
+                    []
+                ),
+
+            "people":
+                m.get(
+                    "people",
+                    []
+                )
+        })
+
+    return results
+
+    # =========================================================
+# ACTIVE CONVERSATIONS
+# =========================================================
+
+def build_active_conversations(
+
+    c,
+
+    world
+):
+
+    results = []
+
+    for conv in world.get(
+        "conversations",
+        {}
+    ).values():
+
+        if not conv.get("active"):
+            continue
+
+        if c["id"] not in conv[
+            "participants"
+        ]:
+            continue
+
+        results.append({
+
+            "topic":
+                conv["topic"],
+
+            "tone":
+                conv["tone"],
+
+            "participants":
+                conv["participants"],
+
+            "recent_history":
+                conv["history"][-6:]
+        })
+
+    return results

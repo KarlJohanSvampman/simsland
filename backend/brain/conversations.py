@@ -201,6 +201,42 @@ def add_message(
             conv["turn_owner"] = p
 
             break
+    
+    from brain.memory import (
+        store_memory
+    )
+
+    speaker = world["characters"].get(
+    speaker_id
+)
+
+    if speaker:
+
+        store_memory(
+
+            speaker,
+
+            f"Conversation about {topic}: {utterance}",
+
+            tags=[
+                "conversation",
+                topic,
+                speech_act
+            ],
+
+            people=[
+                p for p in conv[
+                    "participants"
+                ]
+                if p != speaker_id
+            ],
+
+            emotional_impact=0.3,
+
+            source="conversation",
+
+            tick=tick
+        )
 
 # =========================================================
 # UPDATE TONE
