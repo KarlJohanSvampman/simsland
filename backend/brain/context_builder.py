@@ -17,6 +17,13 @@ from brain.beliefs import (
 from brain.cognitive_pressure import (
     build_cognitive_pressure
 )
+
+from systems.social import (
+
+    build_relationship_context,
+
+    build_message_context
+)
 # =========================================================
 # RELATIONSHIP SUMMARY
 # =========================================================
@@ -174,6 +181,33 @@ def build_memories(
 
     return results
 
+# =========================================================
+# SOCIAL CONTEXT
+# =========================================================
+
+def build_social_context(
+
+    c,
+
+    world
+):
+
+    return {
+
+        "relationships":
+
+            build_relationship_context(
+                c,
+                world
+            ),
+
+        "recent_messages":
+
+            build_message_context(
+                c,
+                world
+            )
+    }
 
 # =========================================================
 # ACTIVE INTENTIONS
@@ -401,7 +435,8 @@ def build_context(
         "schedule": build_schedule_context(c),
         "body_state": build_body_context(c),
         "household_resources":build_household_resource_context( c,world),
-        "cognitive_pressure": build_cognitive_pressure(c)
+        "cognitive_pressure": build_cognitive_pressure(c),
+        "social": build_social_context(c,world)
     }
 
     return context
@@ -760,3 +795,6 @@ def build_household_resource_context(
                 0
             )
     }
+
+
+

@@ -86,9 +86,10 @@ Examples:
 - ignore_need
 
 Your current psychological pressures:
-
 {cognitive_pressure}
 
+Social context:
+{social}
 
 Output format:
 
