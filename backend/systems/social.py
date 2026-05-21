@@ -476,3 +476,175 @@ def build_message_context(
         })
 
     return results
+
+
+from conversations import (
+    get_or_create_conversation
+)
+
+from systems.activities import (
+    start_activity
+)
+
+
+# =========================================================
+# START SOCIAL INTERACTION
+# =========================================================
+
+def start_social_interaction(
+
+    a,
+
+    b,
+
+    world,
+
+    topic="general"
+):
+
+    conv = get_or_create_conversation(
+
+        world,
+
+        a["id"],
+
+        b["id"],
+
+        topic
+    )
+
+    a["social_target"] = b["id"]
+    b["social_target"] = a["id"]
+
+    start_activity(
+
+        a,
+
+        world,
+
+        "conversation"
+    )
+
+    start_activity(
+
+        b,
+
+        world,
+
+        "conversation"
+    )
+
+    a["activity"][
+        "conversation_id"
+    ] = conv["id"]
+
+    b["activity"][
+        "conversation_id"
+    ] = conv["id"]
+
+    a["activity"][
+        "target_id"
+    ] = b["id"]
+
+    b["activity"][
+        "target_id"
+    ] = a["id"]
+
+    return conv
+
+    from conversations import (
+    add_message
+)
+
+
+def do_conversation_turn(
+
+    c,
+
+    world,
+
+    act
+):
+
+    conv = world[
+        "conversations"
+    ].get(
+
+        act[
+            "conversation_id"
+        ]
+    )
+
+    if not conv:
+        return
+
+    if conv.get(
+        "turn_owner"
+    ) != c["id"]:
+        return
+
+    target_id = act[
+        "target_id"
+    ]
+
+    target = world[
+        "characters"
+    ].get(
+        target_id
+    )
+
+    if not target:
+        return
+
+    context = {
+
+        "speaker":
+            c["name"],
+
+        "listener":
+            target["name"],
+
+        "topic":
+            conv["topic"],
+
+        "tone":
+            conv["tone"],
+
+        "relationship":
+            c.get(
+                "relationships",
+                {}
+            ).get(
+                target_id,
+                {}
+            )
+    }
+
+    from llm.social_llm import (
+        generate_dialogue
+    )
+
+    result = generate_dialogue(
+        context
+    )
+
+    if not result:
+        return
+
+    add_message(
+
+        conv,
+
+        c["id"],
+
+        result["text"],
+
+        result.get(
+            "speech_act",
+            "talk"
+        ),
+
+        conv["topic"],
+
+        world["tick"]
+    )

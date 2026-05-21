@@ -18,49 +18,621 @@ from systems.interactions import (
 )
 
 # =========================================================
-# ACTIVITY CONFIG
+# ACTIVITIES
 # =========================================================
-
 ACTIVITIES = {
+
+    # =====================================================
+    # BASIC NEEDS
+    # =====================================================
 
     "sleep": {
 
-        "prop": "sleep",
+        "interaction": "sleep",
 
         "base_duration_minutes": 480,
 
-        "interruptible": True
+        "interruptible": True,
+
+        "category": "survival"
+    },
+
+    "nap": {
+
+        "interaction": "sleep",
+
+        "base_duration_minutes": 45,
+
+        "interruptible": True,
+
+        "category": "survival"
     },
 
     "use_toilet": {
 
-        "prop": "sit",
+        "interaction": "use_toilet",
 
         "base_duration_minutes": 3,
 
-        "interruptible": False
+        "interruptible": False,
+
+        "category": "survival"
     },
 
     "take_shower": {
 
-        "prop": "take_shower",
+        "interaction": "take_shower",
 
         "base_duration_minutes": 12,
 
-        "interruptible": False
+        "interruptible": False,
+
+        "category": "survival"
+    },
+
+    "brush_teeth": {
+
+        "interaction": "brush_teeth",
+
+        "base_duration_minutes": 4,
+
+        "interruptible": True,
+
+        "category": "hygiene"
+    },
+
+    "wash_hands": {
+
+        "interaction": "wash_hands",
+
+        "base_duration_minutes": 2,
+
+        "interruptible": True,
+
+        "category": "hygiene"
+    },
+
+    "shave": {
+
+        "interaction": "mirror",
+
+        "base_duration_minutes": 8,
+
+        "interruptible": True,
+
+        "category": "appearance"
+    },
+
+    "apply_makeup": {
+
+        "interaction": "mirror",
+
+        "base_duration_minutes": 15,
+
+        "interruptible": True,
+
+        "category": "appearance"
     },
 
     "eat_snack": {
 
-        "prop": "eat",
+        "interaction": "eat",
 
         "base_duration_minutes": 8,
 
-        "interruptible": True
+        "interruptible": True,
+
+        "category": "survival"
+    },
+
+    "cook_meal": {
+
+        "interaction": "cook",
+
+        "base_duration_minutes": 35,
+
+        "interruptible": False,
+
+        "category": "survival"
+    },
+
+    "eat_meal": {
+
+        "interaction": "eat",
+
+        "base_duration_minutes": 25,
+
+        "interruptible": True,
+
+        "category": "survival"
+    },
+
+    "drink_water": {
+
+        "interaction": "drink",
+
+        "base_duration_minutes": 2,
+
+        "interruptible": True,
+
+        "category": "survival"
+    },
+
+    # =====================================================
+    # HOME LIFE
+    # =====================================================
+
+    "watch_tv": {
+
+        "interaction": "watch_tv",
+
+        "base_duration_minutes": 45,
+
+        "interruptible": True,
+
+        "category": "leisure"
+    },
+
+    "sit_and_relax": {
+
+        "interaction": "sit",
+
+        "base_duration_minutes": 30,
+
+        "interruptible": True,
+
+        "category": "leisure"
+    },
+
+    "listen_to_music": {
+
+        "interaction": "music",
+
+        "base_duration_minutes": 40,
+
+        "interruptible": True,
+
+        "category": "leisure"
+    },
+
+    "read_book": {
+
+        "interaction": "read",
+
+        "base_duration_minutes": 60,
+
+        "interruptible": True,
+
+        "category": "leisure"
+    },
+
+    "browse_phone": {
+
+        "interaction": "phone",
+
+        "base_duration_minutes": 20,
+
+        "interruptible": True,
+
+        "category": "leisure"
+    },
+
+    "clean_house": {
+
+        "interaction": "clean",
+
+        "base_duration_minutes": 45,
+
+        "interruptible": True,
+
+        "category": "maintenance"
+    },
+
+    "do_laundry": {
+
+        "interaction": "laundry",
+
+        "base_duration_minutes": 90,
+
+        "interruptible": True,
+
+        "category": "maintenance"
+    },
+
+    "wash_dishes": {
+
+        "interaction": "sink",
+
+        "base_duration_minutes": 20,
+
+        "interruptible": True,
+
+        "category": "maintenance"
+    },
+
+    "take_out_trash": {
+
+        "interaction": "trash",
+
+        "base_duration_minutes": 10,
+
+        "interruptible": True,
+
+        "category": "maintenance"
+    },
+
+    # =====================================================
+    # WORK / PRODUCTIVITY
+    # =====================================================
+
+    "work_shift": {
+
+        "interaction": "work",
+
+        "base_duration_minutes": 480,
+
+        "interruptible": False,
+
+        "category": "work"
+    },
+
+    "apply_job": {
+
+        "interaction": "computer",
+
+        "base_duration_minutes": 15,
+
+        "interruptible": True,
+
+        "category": "work"
+    },
+
+    "look_for_job": {
+
+        "interaction": "computer",
+
+        "base_duration_minutes": 25,
+
+        "interruptible": True,
+
+        "category": "work"
+    },
+
+    "study": {
+
+        "interaction": "desk",
+
+        "base_duration_minutes": 90,
+
+        "interruptible": True,
+
+        "category": "growth"
+    },
+
+    "write": {
+
+        "interaction": "desk",
+
+        "base_duration_minutes": 60,
+
+        "interruptible": True,
+
+        "category": "creative"
+    },
+
+    "paint": {
+
+        "interaction": "creative",
+
+        "base_duration_minutes": 90,
+
+        "interruptible": True,
+
+        "category": "creative"
+    },
+
+    "practice_skill": {
+
+        "interaction": "practice",
+
+        "base_duration_minutes": 60,
+
+        "interruptible": True,
+
+        "category": "growth"
+    },
+
+    # =====================================================
+    # SOCIAL
+    # =====================================================
+
+    "conversation": {
+
+        "interaction": "socialize",
+
+        "base_duration_minutes": 20,
+
+        "interruptible": True,
+
+        "category": "social"
+    },
+
+    "hangout": {
+
+        "interaction": "socialize",
+
+        "base_duration_minutes": 120,
+
+        "interruptible": True,
+
+        "category": "social"
+    },
+
+    "flirt": {
+
+        "interaction": "socialize",
+
+        "base_duration_minutes": 15,
+
+        "interruptible": True,
+
+        "category": "social"
+    },
+
+    "argue": {
+
+        "interaction": "socialize",
+
+        "base_duration_minutes": 20,
+
+        "interruptible": False,
+
+        "category": "social"
+    },
+
+    "comfort_someone": {
+
+        "interaction": "socialize",
+
+        "base_duration_minutes": 25,
+
+        "interruptible": False,
+
+        "category": "social"
+    },
+
+    "gossip": {
+
+        "interaction": "socialize",
+
+        "base_duration_minutes": 30,
+
+        "interruptible": True,
+
+        "category": "social"
+    },
+
+    "phone_call": {
+
+        "interaction": "phone",
+
+        "base_duration_minutes": 15,
+
+        "interruptible": True,
+
+        "category": "social"
+    },
+
+    "texting": {
+
+        "interaction": "phone",
+
+        "base_duration_minutes": 5,
+
+        "interruptible": True,
+
+        "category": "social"
+    },
+
+    "invite_over": {
+
+        "interaction": "phone",
+
+        "base_duration_minutes": 5,
+
+        "interruptible": True,
+
+        "category": "social"
+    },
+
+    # =====================================================
+    # OUTDOOR / ERRANDS
+    # =====================================================
+
+    "go_shopping": {
+
+        "interaction": "shop",
+
+        "base_duration_minutes": 90,
+
+        "interruptible": False,
+
+        "category": "errands"
+    },
+
+    "buy_food": {
+
+        "interaction": "shop_food",
+
+        "base_duration_minutes": 45,
+
+        "interruptible": False,
+
+        "category": "errands"
+    },
+
+    "walk_neighborhood": {
+
+        "interaction": "walk",
+
+        "base_duration_minutes": 40,
+
+        "interruptible": True,
+
+        "category": "leisure"
+    },
+
+    "exercise": {
+
+        "interaction": "exercise",
+
+        "base_duration_minutes": 60,
+
+        "interruptible": True,
+
+        "category": "health"
+    },
+
+    "jog": {
+
+        "interaction": "exercise",
+
+        "base_duration_minutes": 45,
+
+        "interruptible": True,
+
+        "category": "health"
+    },
+
+    "sit_in_park": {
+
+        "interaction": "sit",
+
+        "base_duration_minutes": 50,
+
+        "interruptible": True,
+
+        "category": "leisure"
+    },
+
+    # =====================================================
+    # SELF / INTERNAL
+    # =====================================================
+
+    "reflect": {
+
+        "interaction": "sit",
+
+        "base_duration_minutes": 30,
+
+        "interruptible": True,
+
+        "category": "internal"
+    },
+
+    "cry": {
+
+        "interaction": "sit",
+
+        "base_duration_minutes": 12,
+
+        "interruptible": False,
+
+        "category": "emotional"
+    },
+
+    "daydream": {
+
+        "interaction": "sit",
+
+        "base_duration_minutes": 20,
+
+        "interruptible": True,
+
+        "category": "internal"
+    },
+
+    "journal": {
+
+        "interaction": "desk",
+
+        "base_duration_minutes": 25,
+
+        "interruptible": True,
+
+        "category": "internal"
+    },
+
+    "doomscroll": {
+
+        "interaction": "phone",
+
+        "base_duration_minutes": 40,
+
+        "interruptible": True,
+
+        "category": "internal"
+    },
+
+    # =====================================================
+    # FUTURE / SPECIALIZED
+    # =====================================================
+
+    "cook_together": {
+
+        "interaction": "cook",
+
+        "base_duration_minutes": 45,
+
+        "interruptible": False,
+
+        "category": "social"
+    },
+
+    "watch_movie_together": {
+
+        "interaction": "watch_tv",
+
+        "base_duration_minutes": 120,
+
+        "interruptible": True,
+
+        "category": "social"
+    },
+
+    "family_dinner": {
+
+        "interaction": "eat",
+
+        "base_duration_minutes": 60,
+
+        "interruptible": False,
+
+        "category": "social"
+    },
+
+    "party": {
+
+        "interaction": "socialize",
+
+        "base_duration_minutes": 240,
+
+        "interruptible": False,
+
+        "category": "social"
+    },
+
+    "fight": {
+
+        "interaction": "socialize",
+
+        "base_duration_minutes": 10,
+
+        "interruptible": False,
+
+        "category": "conflict"
     }
 }
-
-
 # =========================================================
 # DURATION
 # =========================================================
@@ -357,6 +929,21 @@ def complete_activity(
             - 0.5
         )
 
+    # =====================================
+    # CONVERSATION
+    '
+    elif activity_type == "conversation":
+
+        return update_conversation_activity(
+
+            c,
+
+            world,
+
+            act
+        )
+    # =====================================
+
 def set_activity_phase(
 
     act,
@@ -388,3 +975,118 @@ def finish_activity(c, world):
     c["animation_state"] = "idle"
 
     c["activity"] = None
+
+
+from conversations import (
+    add_message
+)
+
+
+def update_conversation_activity(
+
+    c,
+
+    world,
+
+    act
+):
+
+    # =====================================
+    # WALKING
+    # =====================================
+
+    if act["phase"] == "walking":
+
+        if c.get("is_moving"):
+            return True
+
+        set_activity_phase(
+
+            act,
+
+            "using",
+
+            world
+        )
+
+        return True
+
+    # =====================================
+    # USING
+    # =====================================
+
+    if act["phase"] == "using":
+
+        elapsed = (
+
+            world["tick"]
+
+            -
+
+            act[
+                "phase_started_tick"
+            ]
+        )
+
+        # -------------------------
+        # SPEAK EVERY 20 TICKS
+        # -------------------------
+
+        if (
+
+            elapsed
+
+            -
+
+            act["state"].get(
+                "last_turn_tick",
+                0
+            )
+
+            >= 20
+        ):
+
+            do_conversation_turn(
+
+                c,
+
+                world,
+
+                act
+            )
+
+            act["state"][
+                "last_turn_tick"
+            ] = elapsed
+
+        # -------------------------
+        # END
+        # -------------------------
+
+        if elapsed >= act["duration"]:
+
+            set_activity_phase(
+
+                act,
+
+                "finishing",
+
+                world
+            )
+
+        return True
+
+    # =====================================
+    # FINISHING
+    # =====================================
+
+    if act["phase"] == "finishing":
+
+        finish_activity(
+            c,
+            world
+        )
+
+        return False
+
+    return True
