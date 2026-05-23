@@ -237,6 +237,38 @@ def add_message(
 
             tick=tick
         )
+    if speech_act in [
+
+        "insult",
+
+        "flirt",
+
+        "threat",
+
+        "compliment"
+    ]:
+
+        asyncio.create_task(
+
+            queue_social_reflection(
+
+                observer=speaker,
+
+                target=listener,
+
+                context={
+
+                    "observations": [
+
+                        {
+                            "text": utterance
+                        }
+                    ],
+
+                    "tick": tick
+                }
+            )
+    )
 
 # =========================================================
 # UPDATE TONE

@@ -194,6 +194,16 @@ ACTIVITIES = {
 
         "category": "leisure"
     },
+    "reflect": {
+
+    "interaction": "sit",
+
+    "base_duration_minutes": 25,
+
+    "interruptible": True,
+
+    "category": "internal" 
+    },
 
     "read_book": {
 

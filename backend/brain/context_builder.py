@@ -446,11 +446,69 @@ def build_context(
         "cognitive_pressure": build_cognitive_pressure(c),
         "social": build_social_context(c,world),
         "memories": build_memory_context(c),
-        "active_conversations":build_active_conversations(c, world)
+        "active_conversations":build_active_conversations(c, world),
+        "social_models":build_social_model_context(c)
     }
 
     return context
 
+
+# =========================================================
+# SOCIAL MODELS
+# =========================================================
+
+def build_social_model_context(
+
+    c,
+
+    limit=8
+):
+
+    models = c.get(
+        "social_models",
+        {}
+    )
+
+    results = []
+
+    for target_id, model in models.items():
+
+        results.append({
+
+            "target_id":
+                target_id,
+
+            "summary":
+                model["summary"],
+
+            "trust":
+                model["trust"],
+
+            "respect":
+                model["respect"],
+
+            "fear":
+                model["fear"],
+
+            "perceived_traits":
+                model[
+                    "perceived_traits"
+                ]
+        })
+
+    results.sort(
+
+        key=lambda x: (
+
+            abs(x["trust"])
+            +
+            abs(x["respect"])
+        ),
+
+        reverse=True
+    )
+
+    return results[:limit]
 
 # =========================================================
 # ACTIVE CONVERSATIONS

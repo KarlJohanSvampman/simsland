@@ -327,3 +327,34 @@ def biased_recall(
         m for _, m
         in scored[:limit]
     ]
+
+# =========================================================
+# REWRITE MEMORY SALIENCE
+# =========================================================
+
+def rewrite_memory_salience(
+
+    c,
+
+    memory,
+
+    emotional_shift
+):
+
+    current = memory.get(
+        "importance",
+        0.5
+    )
+
+    memory["importance"] = max(
+
+        0,
+
+        min(
+            1.0,
+
+            current
+            +
+            emotional_shift
+        )
+    )
