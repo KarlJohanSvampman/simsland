@@ -1,49 +1,579 @@
-from systems.contacts import update_contact, maybe_learn_phone
 import time
+import math
 
-def update_relationship_state(c, other):
-    oid=other["id"]; attraction=float(c.setdefault("attraction",{}).get(oid,0)); chemistry=float(c.setdefault("chemistry",{}).get(oid,0))
-    rel="couple" if chemistry>10 and attraction>12 else "crush" if chemistry>5 and attraction>8 else "friend" if chemistry>6 else "acquaintance" if chemistry>2 else "neutral"
-    c.setdefault("relationships",{})[oid]={"state":rel,"chemistry":chemistry,"attraction":attraction,"trust":c.get("relationships",{}).get(oid,{}).get("trust",0.5)}
-def apply_interaction(c, other, speech_act):
-    # update contacts both ways
+from systems.contacts import (
+    update_contact,
+    maybe_learn_phone
+)
+
+from brain.beliefs import (
+    belief_alignment
+)
+
+
+# =========================================================
+# ENSURE STORAGE
+# =========================================================
+
+def ensure_relationships(c):
+
+    c.setdefault(
+        "relationships",
+        {}
+    )
+
+
+# =========================================================
+# ENSURE RELATIONSHIP
+# =========================================================
+
+def ensure_relationship(
+
+    c,
+
+    other_id
+):
+
+    ensure_relationships(c)
+
+    rels = c["relationships"]
+
+    if other_id not in rels:
+
+        rels[other_id] = {
+
+            # =============================================
+            # CORE SOCIAL STATE
+            # =============================================
+
+            "familiarity": 0,
+
+            "trust": 0,
+
+            "friendship": 0,
+
+            "respect": 0,
+
+            "attraction": 0,
+
+            "romantic_interest": 0,
+
+            "sexual_interest": 0,
+
+            "comfort": 0,
+
+            "dependency": 0,
+
+            "resentment": 0,
+
+            "hostility": 0,
+
+            "fear": 0,
+
+            "rivalry": 0,
+
+            "chemistry": 0,
+
+            # =============================================
+            # HISTORY
+            # =============================================
+
+            "history_score": 0,
+
+            "memories_shared": 0,
+
+            "interaction_count": 0,
+
+            "positive_interactions": 0,
+
+            "negative_interactions": 0,
+
+            # =============================================
+            # METADATA
+            # =============================================
+
+            "compatibility": 0,
+
+            "state": "stranger",
+
+            "labels": [],
+
+            "known_secrets": [],
+
+            "shared_groups": [],
+
+            "last_interaction": 0,
+
+            "last_seen": 0
+        }
+
+    return rels[other_id]
+
+
+# =========================================================
+# MODIFY RELATIONSHIP
+# =========================================================
+
+def modify_relationship(
+
+    c,
+
+    other_id,
+
+    stat,
+
+    amount
+):
+
+    rel = ensure_relationship(
+
+        c,
+
+        other_id
+    )
+
+    rel[stat] = clamp_relationship(
+
+        rel.get(stat, 0)
+
+        + amount
+    )
+
+    update_relationship_state(
+        c,
+        other_id
+    )
+
+
+# =========================================================
+# UPDATE STATE LABEL
+# =========================================================
+
+def update_relationship_state(
+
+    c,
+
+    other_id
+):
+
+    rel = ensure_relationship(
+
+        c,
+
+        other_id
+    )
+
+    friendship = rel["friendship"]
+
+    attraction = rel["attraction"]
+
+    hostility = rel["hostility"]
+
+    familiarity = rel["familiarity"]
+
+    trust = rel["trust"]
+
+    if hostility > 60:
+
+        state = "enemy"
+
+    elif attraction > 60:
+
+        state = "romantic_interest"
+
+    elif friendship > 60:
+
+        state = "close_friend"
+
+    elif friendship > 30:
+
+        state = "friend"
+
+    elif familiarity > 15:
+
+        state = "acquaintance"
+
+    elif trust < -40:
+
+        state = "distrusted"
+
+    else:
+
+        state = "stranger"
+
+    rel["state"] = state
+
+
+# =========================================================
+# APPLY INTERACTION
+# =========================================================
+
+def apply_interaction(
+
+    c,
+
+    other,
+
+    speech_act
+):
+
+    oid = other["id"]
+
+    rel = ensure_relationship(
+        c,
+        oid
+    )
+
+    other_rel = ensure_relationship(
+        other,
+        c["id"]
+    )
+
+    # =====================================================
+    # CONTACTS
+    # =====================================================
+
     update_contact(c, other)
     update_contact(other, c)
 
-    # maybe learn phone numbers
     maybe_learn_phone(c, other)
     maybe_learn_phone(other, c)
 
-    # track last interaction
-    c.setdefault("relationships", {}).setdefault(oid, {})["last_interaction"] = time.time()
-    other.setdefault("relationships", {}).setdefault(c["id"], {})["last_interaction"] = time.time()
-    oid=other["id"]; c.setdefault("chemistry",{}).setdefault(oid,0); other.setdefault("chemistry",{}).setdefault(c["id"],0)
-    if speech_act in ["compliment","flirt","question","statement"]:
-        c["chemistry"][oid]+=1.0; other["chemistry"][c["id"]]+=0.8
-    elif speech_act in ["insult","threat"]:
-        c["chemistry"][oid]-=2.0; other["chemistry"][c["id"]]-=2.5; other["emotional_temperature"]=min(100,other.get("emotional_temperature",20)+12)
-    update_relationship_state(c,other); update_relationship_state(other,c)
-def first_impression(c, other):
-    if any(v.get("subject_id")==other["id"] for v in c.get("views",[])): return
-    app=other.get("appearance",{}); kws=[]; score=0
-    if app.get("posture") in ["confident","straight"]: kws.append("confident"); score+=2
-    if app.get("eyes")=="expressive": kws.append("engaging"); score+=2
-    if app.get("eyes")=="lifeless": kws.append("creepy"); score-=2
-    if app.get("posture") in ["slouched","hesitant"]: kws.append("insecure"); score-=1
-    c.setdefault("views",[]).append({"subject_id":other["id"],"keywords":kws,"sentiment":score/5})
-    c.setdefault("attraction",{})[other["id"]]=c.setdefault("attraction",{}).get(other["id"],0)+score
-def update_relationships(world):
+    # =====================================================
+    # INTERACTION COUNTS
+    # =====================================================
+
+    rel["interaction_count"] += 1
+    other_rel["interaction_count"] += 1
+
+    rel["last_interaction"] = time.time()
+    other_rel["last_interaction"] = time.time()
+
+    rel["last_seen"] = time.time()
+    other_rel["last_seen"] = time.time()
+
+    # =====================================================
+    # FAMILIARITY ALWAYS RISES
+    # =====================================================
+
+    rel["familiarity"] += 0.5
+    other_rel["familiarity"] += 0.5
+
+    # =====================================================
+    # SPEECH ACT EFFECTS
+    # =====================================================
+
+    positive = {
+
+        "compliment",
+
+        "comfort",
+
+        "supportive",
+
+        "flirt",
+
+        "joke"
+    }
+
+    negative = {
+
+        "insult",
+
+        "dismissive",
+
+        "challenge",
+
+        "threat"
+    }
+
+    vulnerable = {
+
+        "confession",
+
+        "vulnerable"
+    }
+
+    # -----------------------------------------------------
+    # POSITIVE
+    # -----------------------------------------------------
+
+    if speech_act in positive:
+
+        rel["friendship"] += 2
+        other_rel["friendship"] += 2
+
+        rel["chemistry"] += 1
+        other_rel["chemistry"] += 1
+
+        rel["comfort"] += 1
+        other_rel["comfort"] += 1
+
+        rel["positive_interactions"] += 1
+        other_rel["positive_interactions"] += 1
+
+    # -----------------------------------------------------
+    # FLIRT
+    # -----------------------------------------------------
+
+    if speech_act == "flirt":
+
+        rel["attraction"] += 4
+        other_rel["attraction"] += 2
+
+        rel["romantic_interest"] += 3
+
+    # -----------------------------------------------------
+    # VULNERABILITY
+    # -----------------------------------------------------
+
+    if speech_act in vulnerable:
+
+        rel["trust"] += 3
+        other_rel["trust"] += 2
+
+        rel["comfort"] += 2
+        other_rel["comfort"] += 2
+
+    # -----------------------------------------------------
+    # NEGATIVE
+    # -----------------------------------------------------
+
+    if speech_act in negative:
+
+        rel["hostility"] += 4
+        other_rel["hostility"] += 5
+
+        rel["resentment"] += 2
+        other_rel["resentment"] += 3
+
+        rel["negative_interactions"] += 1
+        other_rel["negative_interactions"] += 1
+
+        rel["trust"] -= 3
+        other_rel["trust"] -= 4
+
+    # =====================================================
+    # CLAMP
+    # =====================================================
+
+    normalize_relationship(rel)
+    normalize_relationship(other_rel)
+
+    update_relationship_state(
+        c,
+        oid
+    )
+
+    update_relationship_state(
+        other,
+        c["id"]
+    )
+
+
+# =========================================================
+# FIRST IMPRESSION
+# =========================================================
+
+def first_impression(
+
+    c,
+
+    other
+):
+
+    rel = ensure_relationship(
+
+        c,
+
+        other["id"]
+    )
+
+    if rel["familiarity"] > 0:
+        return
+
+    appearance = other.get(
+        "appearance",
+        {}
+    )
+
+    score = 0
+
+    posture = appearance.get(
+        "posture"
+    )
+
+    eyes = appearance.get(
+        "eyes"
+    )
+
+    if posture in [
+
+        "confident",
+
+        "straight"
+    ]:
+
+        score += 3
+
+    elif posture in [
+
+        "slouched",
+
+        "hesitant"
+    ]:
+
+        score -= 1
+
+    if eyes == "expressive":
+
+        score += 2
+
+    elif eyes == "lifeless":
+
+        score -= 3
+
+    rel["familiarity"] += 5
+
+    rel["attraction"] += score
+
+    rel["chemistry"] += score * 0.5
+
+    normalize_relationship(rel)
+
+    update_relationship_state(
+        c,
+        other["id"]
+    )
+
+
+# =========================================================
+# COMPATIBILITY
+# =========================================================
+
+def calculate_compatibility(
+
+    c,
+
+    other
+):
+
+    try:
+
+        alignment = belief_alignment(
+            c,
+            other
+        )
+
+    except Exception:
+
+        alignment = 0
+
+    shared_traits = len(set(
+
+        c.get("traits", [])
+
+        &
+
+        set(other.get(
+            "traits",
+            []
+        ))
+    ))
+
+    compatibility = (
+
+        alignment * 0.7
+
+        +
+
+        shared_traits * 5
+    )
+
+    rel = ensure_relationship(
+
+        c,
+
+        other["id"]
+    )
+
+    rel["compatibility"] = int(
+        compatibility
+    )
+
+    return compatibility
+
+
+# =========================================================
+# NORMALIZE
+# =========================================================
+
+def normalize_relationship(rel):
+
+    for k, v in rel.items():
+
+        if isinstance(v, (int, float)):
+
+            rel[k] = clamp_relationship(v)
+
+
+# =========================================================
+# DECAY
+# =========================================================
+
+def decay_relationships(world):
 
     now = time.time()
 
-    for c in world["characters"].values():
+    for c in world[
+        "characters"
+    ].values():
 
-        for oid, rel in c.get("relationships", {}).items():
+        for oid, rel in c.get(
+            "relationships",
+            {}
+        ).items():
 
-            last = rel.get("last_interaction", now)
+            last = rel.get(
+                "last_interaction",
+                now
+            )
 
             dt = now - last
 
-            # decay chemistry slowly
-            if dt > 600:
-                c["chemistry"][oid] *= 0.999
+            # =============================================
+            # VERY SLOW DECAY
+            # =============================================
+
+            if dt > 3600:
+
+                rel["comfort"] *= 0.9995
+
+                rel["friendship"] *= 0.9997
+
+                rel["attraction"] *= 0.9996
+
+                rel["resentment"] *= 0.9998
+
+                rel["hostility"] *= 0.9999
+
+                normalize_relationship(
+                    rel
+                )
+
+
+# =========================================================
+# CLAMP
+# =========================================================
+
+def clamp_relationship(v):
+
+    return max(
+
+        -100,
+
+        min(
+            100,
+            float(v)
+        )
+    )

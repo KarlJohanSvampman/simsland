@@ -1,3 +1,12 @@
+from systems.relationships import (
+    ensure_relationship
+)
+
+from brain.beliefs import (
+    belief_alignment
+)
+
+
 # =========================================================
 # RELATIONSHIP SCORE
 # =========================================================
@@ -6,52 +15,82 @@ def relationship_score(
 
     c,
 
-    other_id
+    other
 ):
 
-    trust = (
-        c.get("trust", {})
-        .get(other_id, 0)
+    other_id = other["id"]
+
+    rel = ensure_relationship(
+
+        c,
+
+        other_id
     )
 
-    attraction = (
-        c.get("attraction", {})
-        .get(other_id, 0)
+    trust = rel["trust"]
+
+    attraction = rel["attraction"]
+
+    chemistry = rel["chemistry"]
+
+    familiarity = rel["familiarity"]
+
+    friendship = rel["friendship"]
+
+    hostility = rel["hostility"]
+
+    respect = rel["respect"]
+
+    comfort = rel["comfort"]
+
+    resentment = rel["resentment"]
+
+    compatibility = rel.get(
+        "compatibility",
+        0
     )
 
-    chemistry = (
-        c.get("chemistry", {})
-        .get(other_id, 0)
-    )
+    # =====================================================
+    # BELIEF ALIGNMENT
+    # =====================================================
 
-    familiarity = (
-        c.get("familiarity", {})
-        .get(other_id, 0)
-    )
+    try:
 
-    friendship = (
-        c.get("friendship", {})
-        .get(other_id, 0)
-    )
+        alignment = belief_alignment(
+            c,
+            other
+        )
 
-    hostility = (
-        c.get("hostility", {})
-        .get(other_id, 0)
-    )
+    except Exception:
+
+        alignment = 0
+
+    # =====================================================
+    # SCORE
+    # =====================================================
 
     score = 0
-    alignment = belief_alignment(
-    c,
-    other
-    )
 
-    score += alignment * 0.2
+    score += alignment * 0.15
+
     score += trust * 0.25
-    score += attraction * 0.25
-    score += chemistry * 0.20
-    score += familiarity * 0.15
-    score += friendship * 0.25
 
-    score -= hostility * 0.40
+    score += attraction * 0.15
+
+    score += chemistry * 0.15
+
+    score += familiarity * 0.10
+
+    score += friendship * 0.20
+
+    score += comfort * 0.10
+
+    score += respect * 0.10
+
+    score += compatibility * 0.05
+
+    score -= hostility * 0.35
+
+    score -= resentment * 0.25
 
     return score
