@@ -17,11 +17,87 @@ from systems.interactions import (
     begin_interaction
 )
 
+from systems.conversation_runtime import (
+    update_conversation_activity
+)
+
 # =========================================================
 # ACTIVITIES
 # =========================================================
 ACTIVITIES = {
+    # =====================================================
+    # SOCIAL ACTIVITIES
+    # =====================================================
+    "text_person": {
 
+        "interaction": "phone",
+
+        "base_duration_minutes": 3,
+
+        "interruptible": True,
+
+        "category": "social"
+    },
+    "call_person": {
+
+    "interaction": "phone",
+
+    "base_duration_minutes": 12,
+
+    "interruptible": True,
+
+    "category": "social"
+    },
+    "visit_person": {
+
+        "interaction": "socialize",
+
+        "base_duration_minutes": 90,
+
+        "interruptible": True,
+
+        "category": "social"
+    },
+    "seek_comfort": {
+
+    "interaction": "socialize",
+
+    "base_duration_minutes": 25,
+
+    "interruptible": False,
+
+    "category": "social"
+    },
+    "apologize": {
+
+    "interaction": "socialize",
+
+    "base_duration_minutes": 15,
+
+    "interruptible": False,
+
+    "category": "social"
+    },
+    "gossip": {
+
+    "interaction": "socialize",
+
+    "base_duration_minutes": 20,
+
+    "interruptible": True,
+
+    "category": "social"
+    },
+    "hangout": {
+
+    "interaction": "socialize",
+
+    "base_duration_minutes": 120,
+
+    "interruptible": True,
+
+    "category": "social"
+    },
     # =====================================================
     # BASIC NEEDS
     # =====================================================
@@ -702,12 +778,12 @@ def start_activity(
 
     interaction = begin_interaction(
 
-    c,
+        c,
 
-    world,
+        world,
 
-    interaction
-    ) 
+        config["interaction"]
+    )
     if not interaction:
         return False
 
@@ -759,43 +835,55 @@ def start_activity(
 
     return True
 
-
 # =========================================================
-# UPDATE ACTIVITY
+# EXECUTE ACTIVITY
 # =========================================================
 
-def update_activity(
+def execute_activity(
 
     c,
 
-    world
+    world,
+
+    act
 ):
-
-    act = c.get(
-        "activity"
-    )
-
-    if not act:
-        return False
 
     activity_type = act.get(
         "type"
     )
 
-    # =====================================
+    # =====================================================
+    # CONVERSATION
+    # =====================================================
+
+    if activity_type == "conversation":
+
+        return update_conversation_activity(
+
+            c,
+
+            world,
+
+            act
+        )
+
+    # =====================================================
     # WALKING
-    # =====================================
+    # =====================================================
 
     if act["phase"] == "walking":
 
         if c.get("is_moving"):
             return True
 
-        act["phase"] = "using"
+        set_activity_phase(
 
-        act[
-            "phase_started_tick"
-        ] = world["tick"]
+            act,
+
+            "using",
+
+            world
+        )
 
         c["animation_state"] = (
             activity_type
@@ -803,9 +891,9 @@ def update_activity(
 
         return True
 
-    # =====================================
+    # =====================================================
     # USING
-    # =====================================
+    # =====================================================
 
     if act["phase"] == "using":
 
@@ -831,44 +919,34 @@ def update_activity(
                 act
             )
 
-            act["phase"] = (
-                "finishing"
-            )
+            set_activity_phase(
 
-            act[
-                "phase_started_tick"
-            ] = world["tick"]
+                act,
+
+                "finishing",
+
+                world
+            )
 
         return True
 
-    # =====================================
+    # =====================================================
     # FINISHING
-    # =====================================
+    # =====================================================
 
     if act["phase"] == "finishing":
 
-        release_anchor(
+        finish_activity(
+
             c,
+
             world
         )
-
-        release_reservation(
-            c,
-            world
-        )
-
-        c["animation_state"] = (
-            "idle"
-        )
-
-        c["activity"] = None
 
         return False
 
     return True
-
-
-# =========================================================
+#=======================================================
 # COMPLETE ACTIVITY
 # =========================================================
 
@@ -939,21 +1017,6 @@ def complete_activity(
             - 0.5
         )
 
-    # =====================================
-    # CONVERSATION
-    '
-    elif activity_type == "conversation":
-
-        return update_conversation_activity(
-
-            c,
-
-            world,
-
-            act
-        )
-    # =====================================
-
 def set_activity_phase(
 
     act,
@@ -985,118 +1048,3 @@ def finish_activity(c, world):
     c["animation_state"] = "idle"
 
     c["activity"] = None
-
-
-from conversations import (
-    add_message
-)
-
-
-def update_conversation_activity(
-
-    c,
-
-    world,
-
-    act
-):
-
-    # =====================================
-    # WALKING
-    # =====================================
-
-    if act["phase"] == "walking":
-
-        if c.get("is_moving"):
-            return True
-
-        set_activity_phase(
-
-            act,
-
-            "using",
-
-            world
-        )
-
-        return True
-
-    # =====================================
-    # USING
-    # =====================================
-
-    if act["phase"] == "using":
-
-        elapsed = (
-
-            world["tick"]
-
-            -
-
-            act[
-                "phase_started_tick"
-            ]
-        )
-
-        # -------------------------
-        # SPEAK EVERY 20 TICKS
-        # -------------------------
-
-        if (
-
-            elapsed
-
-            -
-
-            act["state"].get(
-                "last_turn_tick",
-                0
-            )
-
-            >= 20
-        ):
-
-            do_conversation_turn(
-
-                c,
-
-                world,
-
-                act
-            )
-
-            act["state"][
-                "last_turn_tick"
-            ] = elapsed
-
-        # -------------------------
-        # END
-        # -------------------------
-
-        if elapsed >= act["duration"]:
-
-            set_activity_phase(
-
-                act,
-
-                "finishing",
-
-                world
-            )
-
-        return True
-
-    # =====================================
-    # FINISHING
-    # =====================================
-
-    if act["phase"] == "finishing":
-
-        finish_activity(
-            c,
-            world
-        )
-
-        return False
-
-    return True

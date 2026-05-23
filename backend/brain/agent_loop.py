@@ -23,6 +23,10 @@ from brain.self_model import (
     consolidate_identity
 )
 
+from systems.strategy import (
+    resolve_strategy
+)
+
 from brain.narratives import (
 
     consolidate_relationship_narratives,
@@ -58,6 +62,10 @@ from systems.schedule_runtime import (
 from systems.offgrid import (
     maybe_go_offgrid,
     process_return
+)
+
+from systems.social_intentions import (
+    update_social_intentions
 )
 
 from systems.jobs import (
@@ -338,12 +346,24 @@ def post_update(
 # MAIN AGEN  T TICK
 # =========================================================
 
+# =========================================================
+# MAIN AGENT TICK
+# =========================================================
+
 def update_agent(
 
     c,
 
     world
 ):
+
+    from systems.reflection import (
+        process_reflections
+    )
+
+    from systems.social_execution import (
+        execute_social_intention
+    )
 
     # =====================================
     # OFFGRID
@@ -371,14 +391,28 @@ def update_agent(
 
         world
     )
+
     # =====================================
-    # RFLECTIONS
+    # REFLECTIONS
     # =====================================
 
     process_reflections(
-    c,
-    world
-)
+
+        c,
+
+        world
+    )
+
+    # =====================================
+    # SOCIAL INTENTIONS
+    # =====================================
+
+    update_social_intentions(
+
+        c,
+
+        world
+    )
 
     # =====================================
     # ECONOMY
@@ -403,15 +437,31 @@ def update_agent(
     )
 
     # =====================================
-    # INTENTIONS
+    # CLEAN / SORT INTENTIONS
     # =====================================
 
-    update_intentions(
+    clean_intentions(c)
 
-        c,
+    sort_intentions(c)
 
-        world
-    )
+    # =====================================
+    # ACTIVE ACTIVITY
+    # =====================================
+
+    if c.get(
+        "activity"
+    ):
+
+        execute_activity(
+
+            c,
+
+            world,
+
+            c["activity"]
+        )
+
+        return
 
     # =====================================
     # MOVEMENT
@@ -424,29 +474,47 @@ def update_agent(
         world
     )
 
+    if moving:
+        return
+
     # =====================================
-    # ACTIVE ACTIVITY
+    # EXECUTE SOCIAL INTENTIONS
     # =====================================
 
-    if c.get(
-        "activity"
+    for intention in c.get(
+        "active_intentions",
+        []
     ):
 
-        update_activity(
+
+        activity_type = resolve_strategy(
 
             c,
 
-            world
+            world,
+
+            intention
         )
 
-        return
+        if not activity_type:
+            continue
 
-    # =====================================
-    # STILL WALKING?
-    # =====================================
+        started = start_activity(
 
-    if moving:
-        return
+            c,
+
+            world,
+
+            activity_type
+        )
+
+        if started:
+
+            c["current_intention"] = (
+                intention
+            )
+
+            return
 
     # =====================================
     # BUILD CONTEXT
@@ -471,16 +539,16 @@ def update_agent(
         return
 
     # =====================================
-    # EXECUTE
+    # PROCESS DECISION
     # =====================================
 
-    execute(
+    process_decision(
 
         c,
 
-        decision,
+        world,
 
-        world
+        decision
     )
 
     # =====================================
