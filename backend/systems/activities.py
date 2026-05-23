@@ -99,6 +99,54 @@ ACTIVITIES = {
     "category": "social"
     },
     # =====================================================
+    # FOOD
+    # =====================================================
+    "heat_meal": {
+
+        "interaction": "microwave",
+
+        "base_duration_minutes": 4,
+
+        "interruptible": False,
+
+        "category": "food"
+    },
+
+    "retrieve_food": {
+
+        "interaction": "fridge",
+
+        "base_duration_minutes": 2,
+
+        "interruptible": False,
+
+        "category": "food"
+    },
+
+    "store_leftovers": {
+
+        "interaction": "fridge",
+
+        "base_duration_minutes": 3,
+
+        "interruptible": False,
+
+        "category": "food"
+    },
+
+    "cook_recipe": {
+
+        "interaction": "stove",
+
+        "base_duration_minutes": 20,
+
+        "interruptible": False,
+
+        "category": "food"
+    },
+
+
+    # =====================================================
     # BASIC NEEDS
     # =====================================================
 
@@ -995,6 +1043,108 @@ def complete_activity(
             "hygiene"
         ] = 1.0
 
+    # =====================================
+    # MEAL
+    # =====================================
+    elif activity_type == "eat_meal":
+
+    from systems.household_storage import (
+        find_household_resource,
+        remove_household_resource
+    )
+
+    household = world[
+        "households"
+    ].get(
+        c.get("household_id")
+    )
+
+    if household:
+
+        meal = find_household_resource(
+
+            household,
+
+            resource_type="MEAL"
+        )
+
+        if meal:
+
+            nutrition = meal.get(
+                "nutrition",
+                0.5
+            )
+
+            c["needs"]["hunger"] = max(
+
+                0,
+
+                c["needs"][
+                    "hunger"
+                ]
+
+                -
+
+                nutrition
+            )
+
+            meal["servings"] -= 1
+
+            if meal["servings"] <= 0:
+
+                remove_household_resource(
+
+                    household,
+
+                    meal,
+
+                    1
+                )
+            elif meal["servings"] > 0:
+
+                from systems.resource_runtime import (
+                    convert_meal_to_leftovers
+                )
+
+                convert_meal_to_leftovers(
+                    meal
+                )
+    # =====================================
+    # MEAL
+    # =====================================
+    elif activity_type == "cook_recipe":
+
+        from systems.cooking_process import (
+            start_cooking_process
+        )
+
+        household = world[
+            "households"
+        ].get(
+            c.get("household_id")
+        )
+
+        if household:
+
+            recipe_id = choose_recipe(
+
+                c,
+
+                household
+            )
+
+            if recipe_id:
+
+                start_cooking_process(
+
+                    c,
+
+                    household,
+
+                    recipe_id,
+
+                    world
+                )         
     # =====================================
     # SNACK
     # =====================================

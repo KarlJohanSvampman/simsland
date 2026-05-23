@@ -393,6 +393,32 @@ def update_agent(
     )
 
     # =====================================
+    # COOKING FOOD
+    # =====================================
+
+
+    from systems.cooking_process import (
+    update_cooking_process
+    )
+
+    household = world[
+        "households"
+    ].get(
+        c.get("household_id")
+    )
+
+    if household:
+
+        update_cooking_process(
+
+            c,
+
+            household,
+
+            world
+        )
+
+    # =====================================
     # REFLECTIONS
     # =====================================
 
