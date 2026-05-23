@@ -69,7 +69,8 @@ def tick(world):
     process_crises(world)
     check_election(world)
     apply_faction_influence(world)
-
+    update_postal_service(world)
+    update_service_vehicles(world)
     for c in list(world["characters"].values()):
         decay_memories(c)
         polarization_drift(c)
