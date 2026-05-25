@@ -166,12 +166,35 @@ def update_service_vehicles(world):
 # UPDATE VEHICLE
 # =========================================================
 
+# =========================================================
+# UPDATE VEHICLE
+# =========================================================
+
 def update_vehicle(
 
     vehicle,
 
     world
 ):
+
+    state = vehicle.get(
+        "state"
+    )
+
+    # =====================================================
+    # WAITING
+    # =====================================================
+
+    if state == "waiting_for_worker":
+
+        # worker runtime will
+        # reactivate vehicle later
+
+        return
+
+    # =====================================================
+    # NO ROUTE
+    # =====================================================
 
     route = vehicle.get(
         "route",
@@ -180,9 +203,11 @@ def update_vehicle(
 
     if not route:
 
-        if vehicle[
-            "state"
-        ] == "leaving":
+        # ================================================
+        # LEAVING
+        # ================================================
+
+        if state == "leaving":
 
             despawn_vehicle(
 
@@ -193,6 +218,14 @@ def update_vehicle(
 
             return
 
+        # ================================================
+        # ARRIVED
+        # ================================================
+
+        vehicle["state"] = (
+            "parked"
+        )
+
         spawn_service_worker(
 
             vehicle,
@@ -200,7 +233,17 @@ def update_vehicle(
             world
         )
 
+        vehicle["state"] = (
+            "waiting_for_worker"
+        )
+
         return
+
+    # =====================================================
+    # DRIVING
+    # =====================================================
+
+    vehicle["state"] = "driving"
 
     next_node = route[0]
 
@@ -261,7 +304,13 @@ def spawn_service_worker(
         return
 
     household = targets[idx]
+    vehicle["parked_x"] = (
+        vehicle["x"] + 0.3
+    )
 
+    vehicle["parked_y"] = (
+        vehicle["y"]
+    )
     worker = {
 
         "id":

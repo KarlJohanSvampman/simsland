@@ -1166,7 +1166,71 @@ def complete_activity(
 
             - 0.5
         )
+    elif activity_type == "check_mail":
 
+        household = world[
+            "households"
+        ].get(
+            c.get("household_id")
+        )
+
+        if household:
+
+            household.setdefault(
+                "mailbox",
+                {}
+            )
+
+            household[
+                "mailbox"
+            ][
+                "has_mail"
+            ] = False
+
+            c.setdefault(
+                "mail_history",
+                []
+            )
+
+            delivered = household.get(
+                "delivered_mail",
+                []
+            )
+
+            c[
+                "mail_history"
+            ].extend(delivered)
+
+            household[
+                "delivered_mail"
+            ] = []
+    elif activity_type == "retrieve_package":
+
+        household = world[
+            "households"
+        ].get(
+            c.get("household_id")
+        )
+
+        if household:
+
+            packages = household.get(
+                "pending_packages",
+                []
+            )
+
+            for package in packages:
+
+                acquire_product(
+
+                    household,
+
+                    package
+                )
+
+            household[
+                "pending_packages"
+            ] = []
 def set_activity_phase(
 
     act,

@@ -430,6 +430,19 @@ def build_context(
                 c,
                 world
             ),
+        "persistent_desires":
+        [
+            d
+
+            for d in c.get(
+                "persistent_desires",
+                []
+            )
+
+            if not d.get(
+                "resolved"
+            )
+        ][:5],
         "current_turn":
             get_current_turn(
                 c,

@@ -23,6 +23,11 @@ from brain.self_model import (
     consolidate_identity
 )
 
+from systems.cooking_process import (
+        update_cooking_process
+)
+
+
 from systems.strategy import (
     resolve_strategy
 )
@@ -32,6 +37,10 @@ from brain.narratives import (
     consolidate_relationship_narratives,
 
     consolidate_life_narratives
+)
+
+from systems.persistent_desires import (
+    update_desires
 )
 
 from brain.llm_brain import (
@@ -393,13 +402,17 @@ def update_agent(
     )
 
     # =====================================
-    # COOKING FOOD
+    # PERSISTENT DESIRES
     # =====================================
 
-
-    from systems.cooking_process import (
-    update_cooking_process
+    update_desires(
+    c,
+    world
     )
+
+    # =====================================
+    # COOKING FOOD
+    # =====================================
 
     household = world[
         "households"

@@ -17,13 +17,20 @@ from systems.story import update_story_arc
 from systems.hierarchy import update_hierarchy
 from systems.crisis import check_crises, process_crises
 from systems.faction_ai import apply_faction_influence
-
+from systems.traffic import (
+    update_ambient_traffic
+)
+from systems.household_monitoring import (
+    update_household_monitoring
+)
 from brain.memory import decay_memories
 from brain.beliefs import polarization_drift, compute_alignment
 from brain.relationships import first_impression, update_relationship_state
 from systems.scheduling import generate_week_schedule,adjust_for_household
 from systems.messaging import deliver_messages
-
+from systems.service_worker_runtime import (
+    update_service_workers
+)
 # =========================
 # 🕒 REAL-TIME CALENDAR
 # =========================
@@ -56,12 +63,13 @@ def tick(world):
             adjust_for_household(c, world)
     deliver_messages(world)
     generate_job_listings(world)
+    update_household_monitoring(world)
     process_pending_effects(world)
-
+    update_service_workers(world)
     update_market(world)
     produce(world)
     consume_households(world)
-
+    update_ambient_traffic(world)
     maybe_generate_shared_event(world)
     generate_news(world)
 
@@ -69,6 +77,8 @@ def tick(world):
     process_crises(world)
     check_election(world)
     apply_faction_influence(world)
+
+    update_deliveries(world)
     update_postal_service(world)
     update_service_vehicles(world)
     for c in list(world["characters"].values()):
