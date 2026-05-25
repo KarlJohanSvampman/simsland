@@ -4,7 +4,9 @@ from systems.occupancy import (
     release_anchor,
     release_reservation
 )
-
+from systems.waste import (
+    generate_activity_waste
+)
 from systems.props import (
     find_nearest_anchor
 )
@@ -60,43 +62,43 @@ ACTIVITIES = {
     },
     "seek_comfort": {
 
-    "interaction": "socialize",
+        "interaction": "socialize",
 
-    "base_duration_minutes": 25,
+        "base_duration_minutes": 25,
 
-    "interruptible": False,
+        "interruptible": False,
 
-    "category": "social"
+        "category": "social"
     },
     "apologize": {
 
-    "interaction": "socialize",
+        "interaction": "socialize",
 
-    "base_duration_minutes": 15,
+        "base_duration_minutes": 15,
 
-    "interruptible": False,
+        "interruptible": False,
 
-    "category": "social"
+        "category": "social"
     },
     "gossip": {
 
-    "interaction": "socialize",
+        "interaction": "socialize",
 
-    "base_duration_minutes": 20,
+        "base_duration_minutes": 20,
 
-    "interruptible": True,
+        "interruptible": True,
 
-    "category": "social"
+        "category": "social"
     },
     "hangout": {
 
-    "interaction": "socialize",
+        "interaction": "socialize",
 
-    "base_duration_minutes": 120,
+        "base_duration_minutes": 120,
 
-    "interruptible": True,
+        "interruptible": True,
 
-    "category": "social"
+        "category": "social"
     },
     # =====================================================
     # FOOD
@@ -109,7 +111,12 @@ ACTIVITIES = {
 
         "interruptible": False,
 
-        "category": "food"
+        "category": "food",
+
+        "waste": {
+
+            "TRASH_PLASTIC": 1
+        }
     },
 
     "retrieve_food": {
@@ -142,9 +149,15 @@ ACTIVITIES = {
 
         "interruptible": False,
 
-        "category": "food"
-    },
+        "category": "food",
+        
+        "waste": {
 
+            "TRASH_FOOD_PACKAGING": 2,
+
+            "TRASH_ORGANIC": 1
+        }
+    },
 
     # =====================================================
     # BASIC NEEDS
@@ -361,7 +374,16 @@ ACTIVITIES = {
 
         "category": "maintenance"
     },
+    "take_out_trash": {
 
+        "interaction": "garbage_bin",
+
+        "base_duration_minutes": 5,
+
+        "interruptible": False,
+
+        "category": "chore"
+    } ,
     "do_laundry": {
 
         "interaction": "laundry",
@@ -383,7 +405,16 @@ ACTIVITIES = {
 
         "category": "maintenance"
     },
+    "throw_away_trash": {
 
+        "interaction": "garbage_bin",
+
+        "base_duration_minutes": 3,
+
+        "interruptible": True,
+
+        "category": "chore"
+    },
     "take_out_trash": {
 
         "interaction": "trash",
@@ -765,7 +796,28 @@ ACTIVITIES = {
         "interruptible": False,
 
         "category": "conflict"
+    },
+    # =========================================================
+    # PACKAGE DELIVERIES
+    # =========================================================
+    "unpack_delivery": {
+
+        "interaction": "front_door",
+
+        "base_duration_minutes": 10,
+
+        "interruptible": False,
+
+        "category": "errand",
+
+        "waste": {
+
+            "TRASH_CARDBOARD": 3,
+
+            "TRASH_PLASTIC": 2
+        }
     }
+
 }
 # =========================================================
 # DURATION
@@ -1009,6 +1061,24 @@ def complete_activity(
 
     activity_type = act["type"]
 
+
+    # =====================================
+    # GENERATE WASTE
+    # =====================================
+    household = world[
+        "households"
+    ].get(
+        c.get("household_id")
+    )
+
+    if household:
+
+        generate_activity_waste(
+
+            household,
+
+            activity
+        )
     # =====================================
     # SLEEP
     # =====================================
@@ -1231,6 +1301,47 @@ def complete_activity(
             household[
                 "pending_packages"
             ] = []
+    elif activity_type == "take_out_trash":
+
+        household = world[
+            "households"
+        ].get(
+            c.get("household_id")
+        )
+
+        if household:
+
+            household[
+                "trash_level"
+            ] = max(
+
+                0,
+
+                household[
+                    "trash_level"
+                ] - 0.5
+            )
+
+            household.setdefault(
+                "garbage_bin",
+                {}
+            )
+
+            household[
+                "garbage_bin"
+            ][
+                "fullness"
+            ] = min(
+
+                1.0,
+
+                household[
+                    "garbage_bin"
+                ].get(
+                    "fullness",
+                    0
+                ) + 0.5
+            )
 def set_activity_phase(
 
     act,

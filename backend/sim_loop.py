@@ -23,6 +23,9 @@ from systems.traffic import (
 from systems.household_monitoring import (
     update_household_monitoring
 )
+from systems.appliance_degradation import (
+    update_appliance_degradation
+)
 from brain.memory import decay_memories
 from brain.beliefs import polarization_drift, compute_alignment
 from brain.relationships import first_impression, update_relationship_state
@@ -77,7 +80,7 @@ def tick(world):
     process_crises(world)
     check_election(world)
     apply_faction_influence(world)
-
+    update_appliance_degradation(world)
     update_deliveries(world)
     update_postal_service(world)
     update_service_vehicles(world)
