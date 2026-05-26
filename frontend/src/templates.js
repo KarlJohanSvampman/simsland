@@ -89,28 +89,6 @@ export function getItemTemplate(
 
 
 // =====================================================
-// FLOORPLAN TEMPLATE
-// =====================================================
-
-export function getFloorplanTemplate(
-
-  definitions,
-
-  floorplan
-){
-
-  return getTemplate(
-
-    definitions,
-
-    "floorplan_templates",
-
-    floorplan?.template
-  );
-}
-
-
-// =====================================================
 // RESOLVE INSTANCE
 // =====================================================
 

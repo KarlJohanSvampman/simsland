@@ -1,5 +1,10 @@
 from heapq import heappush, heappop
 
+from core.spatial import (
+    spatial_key,
+    parse_spatial_key
+)
+
 
 # =========================================================
 # BUILD OUTDOOR NAVIGATION
@@ -14,7 +19,11 @@ def build_outdoor_navigation(world):
         {}
     )
 
-    for (x, y), tile in lookup.items():
+    for key, tile in lookup.items():
+
+        x, y = parse_spatial_key(
+            key
+        )
 
         if not tile.get(
             "walkable",
@@ -36,7 +45,11 @@ def build_outdoor_navigation(world):
             ny = y + dy
 
             neighbor = lookup.get(
-                (nx, ny)
+
+                spatial_key(
+                    nx,
+                    ny
+                )
             )
 
             if not neighbor:
@@ -50,9 +63,11 @@ def build_outdoor_navigation(world):
 
             neighbors.append({
 
-                "x": nx,
-
-                "y": ny,
+                "key":
+                    spatial_key(
+                        nx,
+                        ny
+                    ),
 
                 "cost":
                     neighbor.get(
@@ -61,7 +76,9 @@ def build_outdoor_navigation(world):
                     )
             })
 
-        graph[(x, y)] = neighbors
+        graph[
+            spatial_key(x, y)
+        ] = neighbors
 
     world[
         "outdoor_navigation"
@@ -74,7 +91,15 @@ def build_outdoor_navigation(world):
 
 def heuristic(a, b):
 
-    return abs(a[0] - b[0]) + abs(a[1] - b[1])
+    ax, ay = parse_spatial_key(a)
+    bx, by = parse_spatial_key(b)
+
+    return (
+        abs(ax - bx)
+        +
+        abs(ay - by)
+    )
+
 
 # =========================================================
 # OUTDOOR PATHFINDING
@@ -88,6 +113,20 @@ def find_outdoor_path(
 
     goal
 ):
+
+    if isinstance(start, tuple):
+
+        start = spatial_key(
+            start[0],
+            start[1]
+        )
+
+    if isinstance(goal, tuple):
+
+        goal = spatial_key(
+            goal[0],
+            goal[1]
+        )
 
     graph = world.get(
         "outdoor_navigation",
@@ -104,7 +143,6 @@ def find_outdoor_path(
 
     heappush(
         open_set,
-
         (0, start)
     )
 
@@ -126,7 +164,12 @@ def find_outdoor_path(
 
             while current in came_from:
 
-                path.append(current)
+                path.append(
+
+                    parse_spatial_key(
+                        current
+                    )
+                )
 
                 current = came_from[
                     current
@@ -140,19 +183,13 @@ def find_outdoor_path(
             current
         ]:
 
-            nxt = (
-
-                neighbor["x"],
-
-                neighbor["y"]
-            )
+            nxt = neighbor["key"]
 
             movement_cost = neighbor[
                 "cost"
             ]
 
             tentative = (
-
                 g_score[current]
                 + movement_cost
             )
@@ -167,18 +204,16 @@ def find_outdoor_path(
                 g_score[nxt] = tentative
 
                 f = (
-
                     tentative
-                    + heuristic(
+                    +
+                    heuristic(
                         nxt,
                         goal
                     )
                 )
 
                 heappush(
-
                     open_set,
-
                     (f, nxt)
                 )
 

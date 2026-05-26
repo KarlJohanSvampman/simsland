@@ -1,4 +1,4 @@
-from systems.relationships import (
+from brain.relationships import (
     ensure_relationship
 )
 

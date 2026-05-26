@@ -2,9 +2,6 @@ from systems.props import (
     find_nearest_anchor
 )
 
-from systems.movement import (
-    request_route_to_anchor
-)
 
 from systems.occupancy import (
     reserve_anchor

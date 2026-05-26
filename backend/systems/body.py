@@ -110,7 +110,7 @@ def update_body_needs(
 
     if b["fatigue"] > 90:
 
-    c["emotion"] = "exhausted"
+        c["emotion"] = "exhausted"
 
 
     clamp_body(c)

@@ -1,3 +1,8 @@
+from core.spatial import (
+    spatial_key
+)
+
+
 # =========================================================
 # CREATE TILE
 # =========================================================
@@ -71,7 +76,7 @@ def create_world_tile(
     return tile
 
 
-    # =========================================================
+# =========================================================
 # GENERATE WORLD TILES
 # =========================================================
 
@@ -94,7 +99,7 @@ def generate_world_tiles(world):
         for y in range(height):
 
             # =====================================
-            # ROADS EVERY 20
+            # ROADS
             # =====================================
 
             if x % 20 == 0 or y % 20 == 0:
@@ -115,8 +120,11 @@ def generate_world_tiles(world):
             # =====================================
 
             elif (
+
                 x % 20 in [1, 19]
+
                 or
+
                 y % 20 in [1, 19]
             ):
 
@@ -132,7 +140,7 @@ def generate_world_tiles(world):
                 )
 
             # =====================================
-            # LOTS / GRASS
+            # GRASS
             # =====================================
 
             else:
@@ -153,7 +161,6 @@ def generate_world_tiles(world):
     world["world_tiles"] = tiles
 
 
-
 # =========================================================
 # BUILD TILE LOOKUP
 # =========================================================
@@ -168,12 +175,16 @@ def build_world_tile_lookup(world):
     ):
 
         lookup[
-            (t["x"], t["y"])
+            spatial_key(
+                t["x"],
+                t["y"]
+            )
         ] = t
 
-    world["world_tile_lookup"] = (
-        lookup
-    )
+    world[
+        "world_tile_lookup"
+    ] = lookup
+
 
 # =========================================================
 # GET TILE
@@ -191,7 +202,11 @@ def get_world_tile(
     return world.get(
         "world_tile_lookup",
         {}
-    ).get((x, y))
+    ).get(
+
+        spatial_key(x, y)
+    )
+
 
 # =========================================================
 # WALKABLE
@@ -207,8 +222,11 @@ def is_world_walkable(
 ):
 
     tile = get_world_tile(
+
         world,
+
         x,
+
         y
     )
 

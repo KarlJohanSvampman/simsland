@@ -4,6 +4,12 @@ from systems.occupancy import (
     release_anchor,
     release_reservation
 )
+
+from systems.household_storage import (
+    find_household_resource,
+    remove_household_resource
+)
+
 from systems.waste import (
     generate_activity_waste
 )
@@ -11,9 +17,6 @@ from systems.props import (
     find_nearest_anchor
 )
 
-from systems.movement import (
-    request_route_to_anchor
-)
 
 from systems.interactions import (
     begin_interaction
@@ -1118,16 +1121,11 @@ def complete_activity(
     # =====================================
     elif activity_type == "eat_meal":
 
-    from systems.household_storage import (
-        find_household_resource,
-        remove_household_resource
-    )
-
-    household = world[
-        "households"
-    ].get(
-        c.get("household_id")
-    )
+        household = world[
+            "households"
+        ].get(
+            c.get("household_id")
+        )
 
     if household:
 

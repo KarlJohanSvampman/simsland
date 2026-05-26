@@ -2,6 +2,26 @@ from collections import deque
 
 
 # =========================================================
+# ROAD KEY
+# =========================================================
+
+def road_key(x, y):
+
+    return f"{x},{y}"
+
+
+# =========================================================
+# PARSE ROAD KEY
+# =========================================================
+
+def parse_road_key(key):
+
+    x, y = key.split(",")
+
+    return int(x), int(y)
+
+
+# =========================================================
 # ENSURE ROAD NETWORK
 # =========================================================
 
@@ -35,9 +55,16 @@ def register_road_tile(
         world
     )
 
+    key = road_key(x, y)
+
     world[
         "road_network"
-    ][(x, y)] = []
+    ].setdefault(
+
+        key,
+
+        []
+    )
 
 
 # =========================================================
@@ -59,24 +86,31 @@ def build_road_connectivity(world):
         (0, -1)
     ]
 
-    for x, y in roads:
+    for key in roads.keys():
+
+        x, y = parse_road_key(
+            key
+        )
 
         neighbors = []
 
         for dx, dy in dirs:
 
-            n = (
+            nx = x + dx
+            ny = y + dy
 
-                x + dx,
-
-                y + dy
+            neighbor_key = road_key(
+                nx,
+                ny
             )
 
-            if n in roads:
+            if neighbor_key in roads:
 
-                neighbors.append(n)
+                neighbors.append(
+                    neighbor_key
+                )
 
-        roads[(x, y)] = neighbors
+        roads[key] = neighbors
 
 
 # =========================================================
@@ -97,6 +131,24 @@ def find_road_path(
         {}
     )
 
+    # =====================================================
+    # NORMALIZE
+    # =====================================================
+
+    if isinstance(start, tuple):
+
+        start = road_key(
+            start[0],
+            start[1]
+        )
+
+    if isinstance(goal, tuple):
+
+        goal = road_key(
+            goal[0],
+            goal[1]
+        )
+
     queue = deque()
     queue.append(start)
 
@@ -112,7 +164,9 @@ def find_road_path(
             break
 
         for neighbor in roads.get(
+
             current,
+
             []
         ):
 
@@ -130,13 +184,22 @@ def find_road_path(
     if goal not in came_from:
         return []
 
+    # =====================================================
+    # REBUILD PATH
+    # =====================================================
+
     path = []
 
     current = goal
 
     while current:
 
-        path.append(current)
+        path.append(
+
+            parse_road_key(
+                current
+            )
+        )
 
         current = came_from[
             current
@@ -168,7 +231,11 @@ def nearest_road_tile(
     best = None
     best_dist = 999999
 
-    for rx, ry in roads:
+    for key in roads.keys():
+
+        rx, ry = parse_road_key(
+            key
+        )
 
         dx = rx - x
         dy = ry - y
@@ -182,6 +249,10 @@ def nearest_road_tile(
         if dist < best_dist:
 
             best_dist = dist
-            best = (rx, ry)
+
+            best = (
+                rx,
+                ry
+            )
 
     return best

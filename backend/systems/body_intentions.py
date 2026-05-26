@@ -26,20 +26,20 @@ def generate_body_intentions(c):
         0
     ) > 80:
 
-    add_intention(c,{
+        add_intention(c,{
 
-        "type":
-            "use_toilet",
+            "type":
+                "use_toilet",
 
-        "category":
-            "survival",
+            "category":
+                "survival",
 
-        "priority":
-            95,
+            "priority":
+                95,
 
-        "interrupts":
-            True
-    })
+            "interrupts":
+                True
+        })
 
 
     if b.get(

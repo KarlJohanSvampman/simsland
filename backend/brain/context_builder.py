@@ -25,7 +25,7 @@ from systems.social import (
     build_message_context
 )
 
-from conversations import (
+from brain.conversations import (
     find_conversation
 )
 
@@ -451,7 +451,7 @@ def build_context(
         "beliefs": build_belief_context(c),
         "political_alignment": compute_alignment(c),
         "life_narratives": build_narratives(c),
-        "self_model": build_self_model(c).
+        "self_model": build_self_model(c),
         "public_reputation":build_reputation_context(c,world),
         "schedule": build_schedule_context(c),
         "body_state": build_body_context(c),

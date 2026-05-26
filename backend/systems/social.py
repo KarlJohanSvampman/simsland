@@ -478,7 +478,7 @@ def build_message_context(
     return results
 
 
-from conversations import (
+from brain.conversations import (
     get_or_create_conversation
 )
 

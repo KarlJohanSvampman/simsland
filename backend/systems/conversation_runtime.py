@@ -1,6 +1,6 @@
 import random
 
-from systems.conversations import (
+from brain.conversations import (
     add_message
 )
 
@@ -9,7 +9,7 @@ from systems.conversation_analysis import (
     should_schedule_reflection
 )
 
-from systems.relationships import (
+from brain.relationships import (
     apply_interaction
 )
 

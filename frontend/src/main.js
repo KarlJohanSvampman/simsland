@@ -18,7 +18,7 @@ import {
 
   getMaterialTemplate
 
-} from "./templates.js";
+} from "./templates";
 const selectable = [];
 const canvas = document.getElementById("c");
 const raycaster =
