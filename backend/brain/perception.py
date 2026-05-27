@@ -283,6 +283,26 @@ def perceive_people(
             world
         )
 
+        attention = c.get(
+            "attention",
+            {}
+        )
+
+        focus = attention.get(
+            "focus"
+        )
+
+        if focus:
+
+            fkey = focus.get(
+                "key",
+                ""
+            )
+
+        if fkey == f"person:{other['id']}":
+
+            vis += 0.25
+
         results.append({
 
             "id":
@@ -305,11 +325,8 @@ def perceive_people(
                 ),
 
             "activity":
-                other.get(
-                    "activity",
-                    {}
-                ).get(
-                    "type"
+                perceived_activity(
+                    other
                 ),
 
             "speaking":
@@ -395,7 +412,40 @@ def perceive_audio(
                 d
         })
 
-    return heard
+
+    for p in world.get(
+        "props",
+        []
+    ):
+
+        if not p.get(
+            "active_sound"
+        ):
+            continue
+
+        d = abs(
+            p["x"] - c["x"]
+        ) + abs(
+            p["y"] - c["y"]
+        )
+
+        if d > hrange:
+            continue
+
+        heard.append({
+
+            "type":
+                "ambient",
+
+            "sound":
+                p[
+                    "active_sound"
+                ],
+
+            "distance":
+                d
+        })
+        return heard
 
 
 # =========================================================
@@ -601,6 +651,13 @@ def perceive(
     c["perception"] = perception
     c["last_perception_tick"] = world["tick"]
 
+    c["recent_perception_memory"] = (
+        
+        perception[
+            "visible_people"
+        ][:5]
+    )
+
     return perception
 
 
@@ -691,3 +748,168 @@ def perceive_social_scenes(
         })
 
     return scenes
+
+# =========================================================
+# PERCEIVED ACTIVITY
+# =========================================================
+
+def perceived_activity(other):
+
+    activity = other.get(
+        "activity",
+        {}
+    )
+
+    atype = activity.get(
+        "type"
+    )
+
+    if not atype:
+        return None
+
+    mapping = {
+
+        "cook_food":
+            "cooking",
+
+        "eat":
+            "eating",
+
+        "watch_tv":
+            "watching television",
+
+        "sleep":
+            "sleeping",
+
+        "socialize":
+            "talking with someone",
+
+        "pay_bills":
+            "working on paperwork",
+
+        "sort_mail":
+            "sorting through mail",
+
+        "clean":
+            "cleaning",
+
+        "exercise":
+            "exercising",
+
+        "shop_online":
+            "shopping online",
+
+        "argue":
+            "arguing",
+
+        "wander":
+            "wandering around"
+    }
+
+    return mapping.get(
+        atype,
+        "doing something"
+    )
+
+# =========================================================
+# ENVIRONMENT
+# =========================================================
+
+def perceive_environment(
+
+    c,
+
+    world
+):
+
+    room = c.get(
+        "room_id"
+    )
+
+    building = c.get(
+        "building_id"
+    )
+
+    env = {
+
+        "location":
+            building,
+
+        "room":
+            room,
+
+        "tick":
+            world.get(
+                "tick"
+            ),
+
+        "weather":
+            world.get(
+                "weather"
+            ),
+
+        "time_of_day":
+            world.get(
+                "time_of_day"
+            )
+    }
+
+    # =====================================
+    # ROOM ATMOSPHERE
+    # =====================================
+
+    nearby_props = 0
+
+    clutter = 0
+
+    for p in world.get(
+        "props",
+        []
+    ):
+
+        if p.get(
+            "room_id"
+        ) != room:
+            continue
+
+        nearby_props += 1
+
+        if p.get(
+            "is_trash"
+        ):
+
+            clutter += 1
+
+    env["clutter"] = min(
+        1,
+        clutter / 10
+    )
+
+    env["crowded"] = nearby_props > 25
+
+    return env
+
+def sound_modifier(
+
+    c,
+
+    other
+):
+
+    if c.get(
+        "building_id"
+    ) != other.get(
+        "building_id"
+    ):
+
+        return 0.5
+
+    if c.get(
+        "room_id"
+    ) != other.get(
+        "room_id"
+    ):
+
+        return 0.7
+
+    return 1.0

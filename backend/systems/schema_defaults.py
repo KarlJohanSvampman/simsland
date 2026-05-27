@@ -402,6 +402,11 @@ def ensure_character_defaults(c):
     )
 
     c.setdefault(
+        "recent_perception_memory",
+        []
+    )
+
+    c.setdefault(
         "intentions",
         []
     )

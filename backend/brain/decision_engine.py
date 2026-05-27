@@ -177,6 +177,8 @@ def summarize_perception(
 
     lines = []
 
+
+    
     # =====================================
     # PEOPLE
     # =====================================
@@ -265,6 +267,30 @@ def summarize_perception(
             f"{a['speaker']} "
 
             f"speaking nearby."
+        )
+    # =====================================
+    # SUMMARIZE PERCIEVED ENVIRONMENT
+    # =====================================
+    env = perception.get(
+        "environment",
+        {}
+    )
+
+    if env.get(
+        "clutter",
+        0
+    ) > 0.5:
+
+        lines.append(
+            "The environment feels cluttered and messy."
+        )
+
+    if env.get(
+        "crowded"
+    ):
+
+        lines.append(
+            "The area feels somewhat crowded."
         )
 
     # =====================================
