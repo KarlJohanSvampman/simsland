@@ -14,7 +14,6 @@ from systems.activities import (
 from systems.world_pathfinding import (
     build_character_route
 )
-from systems.payments import attempt_pay_bills
 
 from systems.props import (
     find_nearest_prop,

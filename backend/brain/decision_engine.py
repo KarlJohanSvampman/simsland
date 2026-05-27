@@ -70,8 +70,8 @@ Needs: {c.get("needs")}
 Emotion: {c.get("emotion")}
 Plan: {c.get("plan")}
 
-Perception:
-{perception}
+Perceived surroundings:
+{summarize_perception(perception)}
 
 Memories:
 {memories}
@@ -116,3 +116,86 @@ async def decide_action(c, world, perception, memories):
     set_recent_decision(c, decision)
 
     return decision
+
+
+
+def summarize_perception(
+    perception
+):
+
+    lines = []
+
+    # =====================================
+    # PEOPLE
+    # =====================================
+
+    for p in perception.get(
+        "visible_people",
+        []
+    ):
+
+        line = (
+
+            f"You see "
+
+            f"{p['name']} "
+
+            f"nearby looking "
+
+            f"{p['appears']}."
+        )
+
+        if p.get("activity"):
+
+            line += (
+
+                f" They appear to be "
+
+                f"{p['activity']}."
+            )
+
+        lines.append(line)
+
+    # =====================================
+    # SOCIAL SCENES
+    # =====================================
+
+    for s in perception.get(
+        "social_scenes",
+        []
+    ):
+
+        lines.append(
+
+            f"There is a "
+
+            f"{s['tone']} "
+
+            f"conversation about "
+
+            f"{s['topic']} "
+
+            f"between "
+
+            f"{', '.join(s['participants'])}."
+        )
+
+    # =====================================
+    # AUDIO
+    # =====================================
+
+    for a in perception.get(
+        "audible_events",
+        []
+    ):
+
+        lines.append(
+
+            f"You hear "
+
+            f"{a['speaker']} "
+
+            f"speaking nearby."
+        )
+
+    return "\n".join(lines)

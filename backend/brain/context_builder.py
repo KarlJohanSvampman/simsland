@@ -85,56 +85,6 @@ def summarize_relationship(
 
 
 # =========================================================
-# RELEVANT MEMORIES
-# =========================================================
-
-def build_memories(
-
-    c,
-
-    limit=10
-):
-
-    memories = biased_recall(
-
-        c,
-
-        "recent important events",
-
-        limit
-    )
-
-    results = []
-
-    for m in memories:
-
-        results.append({
-
-            "text":
-                m.get("text"),
-
-            "importance":
-                m.get(
-                    "importance",
-                    0
-                ),
-
-            "emotion":
-                m.get(
-                    "emotional_impact",
-                    0
-                ),
-
-            "tags":
-                m.get(
-                    "tags",
-                    []
-                )
-        })
-
-    return results
-
-# =========================================================
 # SOCIAL CONTEXT
 # =========================================================
 
@@ -305,13 +255,6 @@ def build_context(
 
         "active_intentions":
             build_intentions(c),
-
-        # =====================================
-        # MEMORIES
-        # =====================================
-
-        "memories":
-            build_memories(c),
 
         # =====================================
         # PERCEPTION (SCENE)

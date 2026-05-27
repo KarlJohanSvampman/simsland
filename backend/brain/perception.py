@@ -127,35 +127,59 @@ def line_of_sight(a, b, world):
 # PERCEIVED EMOTION
 # =========================================================
 
+import random
+
 def perceived_emotion(other):
 
-    emotion = other.get(
+    actual = other.get(
         "emotion",
         "neutral"
     )
 
-    mapping = {
+    guesses = {
 
-        "angry":
+        "angry": [
+
             "tense",
+            "agitated",
+            "frustrated"
+        ],
 
-        "fear":
+        "fearful": [
+
             "anxious",
+            "uneasy",
+            "nervous"
+        ],
 
-        "sad":
+        "sad": [
+
             "withdrawn",
+            "quiet",
+            "low-energy"
+        ],
 
-        "happy":
-            "positive",
+        "calm": [
 
-        "calm":
-            "relaxed"
+            "relaxed",
+            "neutral",
+            "comfortable"
+        ],
+
+        "annoyed": [
+
+            "irritated",
+            "tense",
+            "impatient"
+        ]
     }
 
-    return mapping.get(
-        emotion,
-        "neutral"
+    pool = guesses.get(
+        actual,
+        ["neutral"]
     )
+
+    return random.choice(pool)
 
 
 # =========================================================
@@ -534,7 +558,11 @@ def perceive(
                 c,
                 world
             ),
-
+        "social_scenes":
+            perceive_social_scenes(
+                c,
+                world
+            ),
         "audible_events":
             perceive_audio(
                 c,
@@ -571,5 +599,95 @@ def perceive(
     )
 
     c["perception"] = perception
+    c["last_perception_tick"] = world["tick"]
 
     return perception
+
+
+# =========================================================
+# SOCIAL SCENES
+# =========================================================
+
+def perceive_social_scenes(
+
+    c,
+
+    world
+):
+
+    scenes = []
+
+    for conv in world.get(
+        "conversations",
+        {}
+    ).values():
+
+        if not conv.get(
+            "active"
+        ):
+            continue
+
+        participants = []
+
+        visible = False
+
+        for pid in conv.get(
+            "participants",
+            []
+        ):
+
+            p = world.get(
+                "characters",
+                {}
+            ).get(pid)
+
+            if not p:
+                continue
+
+            participants.append(
+                p.get("name")
+            )
+
+            d = manhattan(c, p)
+
+            if d <= visual_range(
+                c,
+                world
+            ):
+
+                if line_of_sight(
+                    c,
+                    p,
+                    world
+                ):
+
+                    visible = True
+
+        if not visible:
+            continue
+
+        scenes.append({
+
+            "type":
+                "conversation",
+
+            "topic":
+                conv.get(
+                    "topic"
+                ),
+
+            "tone":
+                conv.get(
+                    "tone"
+                ),
+
+            "participants":
+                participants,
+
+            "turn_owner":
+                conv.get(
+                    "turn_owner"
+                )
+        })
+
+    return scenes
