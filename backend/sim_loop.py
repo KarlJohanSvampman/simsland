@@ -20,6 +20,9 @@ from systems.faction_ai import apply_faction_influence
 from systems.traffic import (
     update_ambient_traffic
 )
+from brain.attention import (
+    update_attention
+)
 from systems.deliveries import (
     update_deliveries
 )
@@ -80,6 +83,10 @@ def tick(world):
     for c in world["characters"].values():
 
         perceive(
+            c,
+            world
+        )
+        update_attention(
             c,
             world
         )

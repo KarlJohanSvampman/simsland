@@ -489,6 +489,16 @@ def ensure_character_defaults(c):
         0.0
     )
 
+    c.setdefault(
+        "attention",
+        {
+            "focus": None,
+            "history": [],
+            "salience": {},
+            "last_update": 0
+        }
+    )
+
 # =========================================================
 # HOUSEHOLD DEFAULTS
 # =========================================================
