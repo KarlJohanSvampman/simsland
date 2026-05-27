@@ -2,89 +2,13 @@
 // GENERIC TEMPLATE LOOKUP
 // =====================================================
 
-export function getTemplate(
+export function getTemplate(definitions, category, templateId){
 
-  definitions,
+  if(!definitions || !category || !templateId){
+    return null;
+  }
 
-  category,
-
-  templateId
-){
-
-  return (
-
-    definitions
-    ?. [category]
-    ?. [templateId]
-
-    || null
-  );
-}
-
-
-// =====================================================
-// PROP TEMPLATE
-// =====================================================
-
-export function getPropTemplate(
-
-  definitions,
-
-  prop
-){
-
-  return getTemplate(
-
-    definitions,
-
-    "prop_templates",
-
-    prop?.template
-  );
-}
-
-
-// =====================================================
-// CHARACTER TEMPLATE
-// =====================================================
-
-export function getCharacterTemplate(
-
-  definitions,
-
-  character
-){
-
-  return getTemplate(
-
-    definitions,
-
-    "character_templates",
-
-    character?.template
-  );
-}
-
-
-// =====================================================
-// ITEM TEMPLATE
-// =====================================================
-
-export function getItemTemplate(
-
-  definitions,
-
-  item
-){
-
-  return getTemplate(
-
-    definitions,
-
-    "item_templates",
-
-    item?.template
-  );
+  return definitions?.[category]?.[templateId] || null;
 }
 
 
@@ -92,140 +16,127 @@ export function getItemTemplate(
 // RESOLVE INSTANCE
 // =====================================================
 
-export function resolveInstance(
+export function resolveInstance(definitions, category, instance){
 
-  definitions,
-
-  category,
-
-  instance
-){
-
-  const template =
-    getTemplate(
-
-      definitions,
-
-      category,
-
-      instance?.template
-    );
+  const template = getTemplate(
+    definitions,
+    category,
+    instance?.template
+  );
 
   if(!template){
-
     return instance;
   }
 
   return {
-
     ...template,
-
     ...instance
   };
 }
 
 
 // =====================================================
-// RESOLVED PROP
+// BASIC TEMPLATE GETTERS
 // =====================================================
 
-export function resolveProp(
+export function getPropTemplate(definitions, prop){
+  return getTemplate(definitions, "prop_templates", prop?.template);
+}
 
-  definitions,
+export function getCharacterTemplate(definitions, character){
+  return getTemplate(definitions, "character_templates", character?.template);
+}
 
-  prop
-){
+export function getItemTemplate(definitions, item){
+  return getTemplate(definitions, "item_templates", item?.template);
+}
 
-  return resolveInstance(
+export function getFloorplanTemplate(definitions, building){
+  return getTemplate(definitions, "floorplan_templates", building?.template);
+}
 
-    definitions,
-
-    "prop_templates",
-
-    prop
-  );
+export function getMaterialTemplate(definitions, materialId){
+  return getTemplate(definitions, "material_templates", materialId);
 }
 
 
 // =====================================================
-// RESOLVED CHARACTER
+// NEW TEMPLATE GETTERS
 // =====================================================
 
-export function resolveCharacter(
+export function getRecipeTemplate(definitions, recipeId){
+  return getTemplate(definitions, "recipe_templates", recipeId);
+}
 
-  definitions,
+export function getProductTemplate(definitions, productId){
+  return getTemplate(definitions, "product_templates", productId);
+}
 
-  character
-){
+export function getApplianceTemplate(definitions, applianceId){
+  return getTemplate(definitions, "appliance_templates", applianceId);
+}
 
-  return resolveInstance(
+export function getVehicleTemplate(definitions, vehicleId){
+  return getTemplate(definitions, "vehicle_templates", vehicleId);
+}
 
-    definitions,
+export function getServiceTemplate(definitions, serviceId){
+  return getTemplate(definitions, "service_templates", serviceId);
+}
 
-    "character_templates",
+export function getStorageTemplate(definitions, storageId){
+  return getTemplate(definitions, "storage_templates", storageId);
+}
 
-    character
-  );
+export function getSocialTemplate(definitions, socialId){
+  return getTemplate(definitions, "social_templates", socialId);
+}
+
+export function getNeedTemplate(definitions, needId){
+  return getTemplate(definitions, "need_templates", needId);
 }
 
 
 // =====================================================
-// FLOORPLAN TEMPLATE
+// RESOLVERS
 // =====================================================
 
-export function getFloorplanTemplate(
-
-  definitions,
-
-  building
-){
-
-  return getTemplate(
-
-    definitions,
-
-    "floorplan_templates",
-
-    building?.template
-  );
+export function resolveProp(definitions, prop){
+  return resolveInstance(definitions, "prop_templates", prop);
 }
 
-
-// =====================================================
-// RESOLVED FLOORPLAN
-// =====================================================
-
-export function resolveFloorplan(
-
-  definitions,
-
-  building
-){
-
-  return resolveInstance(
-
-    definitions,
-
-    "floorplan_templates",
-
-    building
-  );
+export function resolveCharacter(definitions, character){
+  return resolveInstance(definitions, "character_templates", character);
 }
 
+export function resolveItem(definitions, item){
+  return resolveInstance(definitions, "item_templates", item);
+}
 
-export function getMaterialTemplate(
+export function resolveFloorplan(definitions, building){
+  return resolveInstance(definitions, "floorplan_templates", building);
+}
 
-  definitions,
+export function resolveRecipe(definitions, recipe){
+  return resolveInstance(definitions, "recipe_templates", recipe);
+}
 
-  materialId
-){
+export function resolveProduct(definitions, product){
+  return resolveInstance(definitions, "product_templates", product);
+}
 
-  return getTemplate(
+export function resolveAppliance(definitions, appliance){
+  return resolveInstance(definitions, "appliance_templates", appliance);
+}
 
-    definitions,
+export function resolveVehicle(definitions, vehicle){
+  return resolveInstance(definitions, "vehicle_templates", vehicle);
+}
 
-    "material_templates",
+export function resolveService(definitions, service){
+  return resolveInstance(definitions, "service_templates", service);
+}
 
-    materialId
-  );
+export function resolveStorage(definitions, storage){
+  return resolveInstance(definitions, "storage_templates", storage);
 }

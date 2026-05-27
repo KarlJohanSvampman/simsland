@@ -11,8 +11,38 @@ let definitions = {
   character_templates: {},
   interaction_templates: {},
   activity_templates: {},
-  tile_templates: {}
+  tile_templates: {},
+  floorplan_templates: {},
+
+  material_templates: {},
+  recipe_templates: {},
+  product_templates: {},
+  appliance_templates: {},
+  vehicle_templates: {},
+  service_templates: {},
+  storage_templates: {},
+  social_templates: {},
+  need_templates: {}
 };
+
+const tabs = [
+  "prop_templates",
+  "character_templates",
+  "floorplan_templates",
+  "interaction_templates",
+  "activity_templates",
+  "recipe_templates",
+  "product_templates",
+  "appliance_templates",
+  "vehicle_templates",
+  "service_templates",
+  "storage_templates",
+  "material_templates",
+  "tile_templates",
+  "item_templates",
+  "social_templates",
+  "need_templates"
+];
 
 let assets = {
   props: [],
@@ -20,14 +50,7 @@ let assets = {
   items: []
 };
 
-const tabs = [
-  'prop_templates',
-  'item_templates',
-  'character_templates',
-  'interaction_templates',
-  'activity_templates',
-  'tile_templates'
-];
+
 
 let currentTab = 'prop_templates';
 let currentTemplateId = null;
@@ -101,7 +124,7 @@ async function loadDefinitions(){
   try {
 
     const res = await fetch(
-      '/definitions.html?sim_id=default'
+      '/api/editor/definitions?sim_id=default'
     );
 
     definitions = await res.json();
@@ -289,7 +312,7 @@ window.saveDefinitions = async function(){
     }
 
     await fetch(
-      '/definitions.html?sim_id=default',
+      '/api/editor/definitions?sim_id=default',
       {
         method: 'POST',
         headers: {

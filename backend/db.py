@@ -47,7 +47,35 @@ def init_db():
                 data JSONB
             );
             """)
+            # =====================================
+            # MIGRATIONS
+            # =====================================
 
+            cur.execute("""
+
+            ALTER TABLE characters
+
+            ADD COLUMN IF NOT EXISTS simulation_id TEXT;
+
+            """)
+
+            cur.execute("""
+
+            ALTER TABLE characters
+
+            ADD COLUMN IF NOT EXISTS updated_at
+            TIMESTAMP DEFAULT NOW();
+
+            """)
+
+            cur.execute("""
+
+            ALTER TABLE characters
+
+            ADD COLUMN IF NOT EXISTS version
+            INTEGER DEFAULT 0;
+
+            """)
             cur.execute("""
             CREATE TABLE IF NOT EXISTS world (
                 simulation_id TEXT PRIMARY KEY,
@@ -55,19 +83,151 @@ def init_db():
             );
             """)
 
-    world = generate_initial_world()
-    save_world("default", world)
+            cur.execute("""
 
- 
+            SELECT simulation_id
+            FROM world
+            WHERE simulation_id=%s
+
+            """, ("default",))
+
+            exists = cur.fetchone()
+
+            if not exists:
+
+                world = generate_initial_world()
+
+                save_world(
+                    "default",
+                    world
+                )
+# =====================================================
+# WORLD DEFAULTS
+# =====================================================
+
+def ensure_world_defaults(world):
+
+    world.setdefault(
+        "environment",
+        {
+            "unemployment_rate": 0.1,
+            "inflation": 0.02,
+            "crime_rate": 0.05,
+            "housing_pressure": 0.3
+        }
+    )
+
+    world.setdefault(
+        "households",
+        {}
+    )
+
+    world.setdefault(
+        "service_vehicles",
+        []
+    )
+
+    world.setdefault(
+        "deliveries",
+        []
+    )
+
+    world.setdefault(
+        "postal_service",
+        {}
+    )
+
+    world.setdefault(
+        "ambient_traffic",
+        []
+    )
+
+    world.setdefault(
+        "world_tiles",
+        []
+    )
+
+    world.setdefault(
+        "road_network",
+        {}
+    )
+
+    world.setdefault(
+        "outdoor_navigation",
+        {}
+    )
+
+    world.setdefault(
+        "job_listings",
+        []
+    )
+
+    world.setdefault(
+        "job_applications",
+        []
+    )
+
+    world.setdefault(
+        "shopping_sessions",
+        []
+    )
+
+    world.setdefault(
+        "mail",
+        []
+    )
+
+    world.setdefault(
+        "packages",
+        []
+    )
+
+    world.setdefault(
+        "garbage",
+        []
+    )
+
+    world.setdefault(
+        "active_incidents",
+        []
+    )
+
+    world.setdefault(
+        "traffic_vehicles",
+        []
+    )
+
+    world.setdefault(
+        "districts",
+        []
+    )
+
+    world.setdefault(
+        "events",
+        []
+    )
+
+    world.setdefault(
+        "weather",
+        {
+            "type": "clear",
+            "temperature": 18
+        }
+    )
+
 def load_world(sim_id):
 
     # =====================================
     # TRY CACHE
     # =====================================
-
     cached = get_world_cache(sim_id)
 
     if cached:
+
+        ensure_world_defaults(
+            cached
+        )
+
         return cached
 
     # =====================================
@@ -101,6 +261,14 @@ def load_world(sim_id):
 
                 "props": []
             }
+            
+        )
+
+        # =====================================
+        # WORLD DEFAULTS
+        # =====================================
+        ensure_world_defaults(
+            world
         )
 
     # =====================================
@@ -226,40 +394,36 @@ def save_character_safe(c, sim_id="default"):
     # 🔥 update cache immediately
     set_char_cache(sim_id, c["id"], c)
 
-def load_character(cid, sim_id="default"):
+def load_character(
 
-    conn = get_db()
-    cur = conn.cursor()
+    cid,
 
-    try:
+    sim_id="default"
+):
+
+    with conn.cursor() as cur:
 
         cur.execute(
+
             """
             SELECT data
             FROM characters
             WHERE id=%s
             AND simulation_id=%s
             """,
-            (cid, sim_id)
+
+            (
+                cid,
+                sim_id
+            )
         )
 
         row = cur.fetchone()
-
-        conn.commit()
 
         if not row:
             return None
 
         return row[0]
-
-    except Exception:
-
-        conn.rollback()
-        raise
-
-    finally:
-
-        cur.close()
 
 def update_world_tick(sim_id, tick):
     with conn:

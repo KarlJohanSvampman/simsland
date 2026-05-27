@@ -38,16 +38,24 @@ def load_definitions(sim_id: str):
     # =====================================
 
     if not path.exists():
-
         return {
-
             "prop_templates": {},
             "item_templates": {},
             "character_templates": {},
             "interaction_templates": {},
             "activity_templates": {},
             "tile_templates": {},
-            "floorplan_templates": {}
+            "floorplan_templates": {},
+
+            "material_templates": {},
+            "recipe_templates": {},
+            "product_templates": {},
+            "appliance_templates": {},
+            "vehicle_templates": {},
+            "service_templates": {},
+            "storage_templates": {},
+            "social_templates": {},
+            "need_templates": {}
         }
 
     # =====================================

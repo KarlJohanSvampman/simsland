@@ -20,6 +20,17 @@ from systems.faction_ai import apply_faction_influence
 from systems.traffic import (
     update_ambient_traffic
 )
+from systems.deliveries import (
+    update_deliveries
+)
+
+from systems.postal_service import (
+    update_postal_service
+)
+
+from systems.service_vehicles import (
+    update_service_vehicles
+)
 from systems.household_monitoring import (
     update_household_monitoring
 )

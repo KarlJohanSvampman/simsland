@@ -52,13 +52,12 @@ async def loop():
             SIM_ID
         )
 
-        world["tick"] += 1
+        tick(world)
 
         update_world_tick(
             SIM_ID,
             world["tick"]
         )
-
         for c in list(
             world.get("characters", {}).values()
         ):
