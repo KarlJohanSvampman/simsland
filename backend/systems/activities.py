@@ -10,6 +10,10 @@ from systems.household_storage import (
     remove_household_resource
 )
 
+from systems.mail import (
+    sort_household_mail
+)
+
 from systems.waste import (
     generate_activity_waste
 )
@@ -312,7 +316,31 @@ ACTIVITIES = {
 
         "category": "leisure"
     },
+    "sort_mail": {
+        "interaction": "desk",
+        "base_duration_minutes": 8,
+        "interruptible": True,
+        "category": "domestic"
+    },
+    "pay_bills": {
+        "interaction": "computer",
+        "base_duration_minutes": 12,
+        "interruptible": False,
+        "category": "domestic"
+    },
 
+    "respond_to_mail": {
+        "interaction": "desk",
+        "base_duration_minutes": 25,
+        "interruptible": False,
+        "category": "domestic"
+    },
+    "fill_form": {
+        "interaction": "desk",
+        "base_duration_minutes": 40,
+        "interruptible": False,
+        "category": "domestic"
+    },
     "sit_and_relax": {
 
         "interaction": "sit",
@@ -1272,6 +1300,16 @@ def complete_activity(
             household[
                 "delivered_mail"
             ] = []
+    elif activity_type == "sort_mail":
+
+        household = world[
+            "households"
+        ].get(
+            c.get("household_id")
+        )
+
+        if household:
+            sort_household_mail(household, world)
     elif activity_type == "retrieve_package":
 
         household = world[

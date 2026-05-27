@@ -546,3 +546,14 @@ def ensure_household_defaults(h):
         "housing_stress",
         0.0
     )
+
+    h.setdefault("mailbox", {
+        "has_mail": False,
+        "items": [],
+        "unopened_count": 0
+    })
+
+    h.setdefault("unopened_mail", [])
+    h.setdefault("unpaid_bills", [])
+    h.setdefault("pending_responses", [])
+    h.setdefault("completed_documents", [])
