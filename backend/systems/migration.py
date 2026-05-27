@@ -2,7 +2,19 @@ import random
 from brain.memory import store_memory
 def classify_tier(ses): return "lower" if ses<.33 else "upper" if ses>.66 else "middle"
 def update_mobility(c, world):
-    h=world["households"].get(c["household_id"],{}); delta=.0005*(h.get("wealth",0)/1000-.8)
+    hid = c.get("household_id")
+
+    if not hid:
+        return
+
+    h = world.get(
+        "households",
+        {}
+    ).get(
+        hid,
+        {}
+    )
+    delta=.0005*(h.get("wealth",0)/1000-.8)
     delta += .0008 if c.get("employed") else -.0015
     if c.get("health",{}).get("conditions"): delta-=.0008
     c["ses"]=max(0,min(1,c.get("ses",.5)+delta)); c["class_tier"]=classify_tier(c["ses"]); c["mobility_score"]=c.get("mobility_score",0)+delta

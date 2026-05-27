@@ -16,6 +16,9 @@ from api.editor import router as editor_router
 from api.editor import load_definitions, save_definitions
 from api.view import get_view
 from api.props import router as props_router
+from systems.schema_defaults import (
+    ensure_world_defaults
+)
 app = FastAPI(title="Simsland")
 app.add_middleware(
     CORSMiddleware,
@@ -48,6 +51,9 @@ async def loop():
 
         world = load_world(SIM_ID)
 
+        ensure_world_defaults(
+            world
+        )
         world["definitions"] = load_definitions(
             SIM_ID
         )

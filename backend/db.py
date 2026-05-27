@@ -1,6 +1,9 @@
 import psycopg2, json, os
 from core.cache import get_world_cache, set_world_cache
 from core.cache import get_char_cache, set_char_cache
+from systems.schema_defaults import (
+    ensure_world_defaults
+)
 from world.generate_world import generate_initial_world
 from systems.prop_index import (
     cache_prop_index
@@ -101,119 +104,6 @@ def init_db():
                     "default",
                     world
                 )
-# =====================================================
-# WORLD DEFAULTS
-# =====================================================
-
-def ensure_world_defaults(world):
-
-    world.setdefault(
-        "environment",
-        {
-            "unemployment_rate": 0.1,
-            "inflation": 0.02,
-            "crime_rate": 0.05,
-            "housing_pressure": 0.3
-        }
-    )
-
-    world.setdefault(
-        "households",
-        {}
-    )
-
-    world.setdefault(
-        "service_vehicles",
-        []
-    )
-
-    world.setdefault(
-        "deliveries",
-        []
-    )
-
-    world.setdefault(
-        "postal_service",
-        {}
-    )
-
-    world.setdefault(
-        "ambient_traffic",
-        []
-    )
-
-    world.setdefault(
-        "world_tiles",
-        []
-    )
-
-    world.setdefault(
-        "road_network",
-        {}
-    )
-
-    world.setdefault(
-        "outdoor_navigation",
-        {}
-    )
-
-    world.setdefault(
-        "job_listings",
-        []
-    )
-
-    world.setdefault(
-        "job_applications",
-        []
-    )
-
-    world.setdefault(
-        "shopping_sessions",
-        []
-    )
-
-    world.setdefault(
-        "mail",
-        []
-    )
-
-    world.setdefault(
-        "packages",
-        []
-    )
-
-    world.setdefault(
-        "garbage",
-        []
-    )
-
-    world.setdefault(
-        "active_incidents",
-        []
-    )
-
-    world.setdefault(
-        "traffic_vehicles",
-        []
-    )
-
-    world.setdefault(
-        "districts",
-        []
-    )
-
-    world.setdefault(
-        "events",
-        []
-    )
-
-    world.setdefault(
-        "weather",
-        {
-            "type": "clear",
-            "temperature": 18
-        }
-    )
 
 def load_world(sim_id):
 
@@ -264,13 +154,20 @@ def load_world(sim_id):
             
         )
 
-        # =====================================
-        # WORLD DEFAULTS
-        # =====================================
-        ensure_world_defaults(
-            world
-        )
+    # =====================================
+    # WORLD DEFAULTS
+    # =====================================
+    ensure_world_defaults(
+        world
+    )
+    for c in world.get(
+        "characters",
+        {}
+    ).values():
 
+        ensure_character_defaults(
+            c
+        )
     # =====================================
     # LOAD DEFINITIONS
     # =====================================
@@ -394,6 +291,140 @@ def save_character_safe(c, sim_id="default"):
     # 🔥 update cache immediately
     set_char_cache(sim_id, c["id"], c)
 
+# =====================================================
+# CHARACTER DEFAULTS
+# =====================================================
+
+def ensure_character_defaults(c):
+
+    # =====================================
+    # LEGAL
+    # =====================================
+
+    legal = c.setdefault(
+        "legal",
+        {}
+    )
+
+    legal.setdefault(
+        "status",
+        "free"
+    )
+
+    legal.setdefault(
+        "jail_until",
+        None
+    )
+
+    legal.setdefault(
+        "trial_tick",
+        None
+    )
+
+    legal.setdefault(
+        "record",
+        []
+    )
+
+    # =====================================
+    # STATUS
+    # =====================================
+
+    status = c.setdefault(
+        "status",
+        {}
+    )
+
+    status.setdefault(
+        "reputation",
+        0.5
+    )
+
+    # =====================================
+    # ECONOMY
+    # =====================================
+
+    c.setdefault(
+        "money",
+        100
+    )
+
+    c.setdefault(
+        "hourly_wage",
+        0
+    )
+
+    c.setdefault(
+        "employed",
+        False
+    )
+
+    c.setdefault(
+        "job_searching",
+        False
+    )
+
+    # =====================================
+    # SOCIAL
+    # =====================================
+
+    c.setdefault(
+        "relationships",
+        {}
+    )
+
+    c.setdefault(
+        "social_models",
+        {}
+    )
+
+    c.setdefault(
+        "conversation_memory",
+        []
+    )
+
+    # =====================================
+    # MEMORY
+    # =====================================
+
+    c.setdefault(
+        "memories",
+        []
+    )
+
+    c.setdefault(
+        "story_arc",
+        []
+    )
+
+    # =====================================
+    # ACTIVITIES
+    # =====================================
+
+    c.setdefault(
+        "activity",
+        None
+    )
+
+    c.setdefault(
+        "intentions",
+        []
+    )
+
+    # =====================================
+    # OFFGRID
+    # =====================================
+
+    c.setdefault(
+        "off_grid",
+        False
+    )
+
+    c.setdefault(
+        "off_grid_reason",
+        None
+    )
+
 def load_character(
 
     cid,
@@ -423,7 +454,13 @@ def load_character(
         if not row:
             return None
 
-        return row[0]
+        c = row[0]
+
+        ensure_character_defaults(
+            c
+        )
+
+        return c
 
 def update_world_tick(sim_id, tick):
     with conn:
