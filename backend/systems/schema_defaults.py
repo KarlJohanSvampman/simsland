@@ -541,3 +541,8 @@ def ensure_household_defaults(h):
         "home_id",
         None
     )
+
+    h.setdefault(
+        "housing_stress",
+        0.0
+    )

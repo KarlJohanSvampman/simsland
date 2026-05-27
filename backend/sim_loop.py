@@ -112,7 +112,9 @@ def tick(world):
         process_health(c, world)
 
         process_jail(c, world)
-        #consider_migration(c, world)
+        process_evictions(world)
+
+        process_migration(world)
         update_story_arc(c)
 
         for o in world["characters"].values():
