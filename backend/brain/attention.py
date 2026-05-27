@@ -94,7 +94,11 @@ def update_social_attention(
 
             "agitated",
 
-            "anxious"
+            "anxious",
+
+            "positive",
+
+             "confident"
         ]:
 
             strength += 0.2
@@ -105,6 +109,24 @@ def update_social_attention(
 
             strength += 0.1
 
+        focus = c.get(
+        "attention",
+            {}
+        ).get(
+            "focus"
+        )
+
+        if focus:
+
+            current_strength = focus.get(
+                "strength",
+                0
+            )
+
+            if current_strength > 0.8:
+
+            strength *= 0.5
+        
         boost_attention(
 
             c,

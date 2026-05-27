@@ -65,6 +65,15 @@ def select_goal(c, world):
 
     primary = select_primary_intention(c)
 
+    attention = c.get(
+        "attention",
+        {}
+    )
+
+    focus = attention.get(
+        "focus"
+    )
+
     if primary:
 
         typ = primary["type"]
@@ -137,7 +146,34 @@ def select_goal(c, world):
 
     if temp > 70:
         scores["relax"] *= 1.4
+    
+    
+    if focus:
 
+        key = focus.get(
+            "key",
+            ""
+        )
+
+        # =========================
+        # PERSON FOCUS
+        # =========================
+
+        if key.startswith(
+            "person:"
+        ):
+
+            return "socialize"
+
+        # =========================
+        # SCENE FOCUS
+        # =========================
+
+        if key.startswith(
+            "scene:"
+        ):
+
+            return "observe"
     # =========================
     # 🎲 RANDOMNESS
     # =========================

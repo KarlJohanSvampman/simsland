@@ -1,123 +1,175 @@
 import json
-from llm.llm_client import call_llm,call_llm_safe
+import random
 
-# =========================
+from llm.llm_client import (
+    call_llm,
+    call_llm_safe
+)
+
+
+# =========================================================
 # ⚡ HEURISTIC GATE
-# =========================
+# =========================================================
+
 def should_use_llm(c):
 
-    needs = c.get("needs", {})
+    needs = c.get(
+        "needs",
+        {}
+    )
 
-    # basic survival = no LLM
-    if needs.get("hunger", 0) > 0.8:
+    # =====================================
+    # BASIC SURVIVAL
+    # =====================================
+
+    if needs.get(
+        "hunger",
+        0
+    ) > 0.8:
+
         return False
 
-    if needs.get("energy", 1) < 0.2:
+    if needs.get(
+        "energy",
+        1
+    ) < 0.2:
+
         return False
 
-    # already executing plan
-    if c.get("plan"):
+    # =====================================
+    # ALREADY EXECUTING PLAN
+    # =====================================
+
+    if c.get(
+        "plan"
+    ):
+
         return False
 
-    # strong emotions → LLM
-    if c.get("emotion") in ["angry", "jealous", "fear"]:
+    # =====================================
+    # STRONG EMOTIONS
+    # =====================================
+
+    if c.get(
+        "emotion"
+    ) in [
+
+        "angry",
+
+        "jealous",
+
+        "fear",
+
+        "sad"
+
+    ]:
+
         return True
 
-    # default: skip most of the time
+    # =====================================
+    # ACTIVE ATTENTION
+    # =====================================
+
+    attention = c.get(
+        "attention",
+        {}
+    )
+
+    focus = attention.get(
+        "focus"
+    )
+
+    if focus:
+
+        if focus.get(
+            "strength",
+            0
+        ) > 0.5:
+
+            return True
+
+    # =====================================
+    # DEFAULT
+    # =====================================
+
     return False
 
 
-# =========================
+# =========================================================
 # 🔁 DECISION CACHE
-# =========================
+# =========================================================
+
 def get_recent_decision(c):
-    return c.get("_last_decision")
+
+    return c.get(
+        "_last_decision"
+    )
 
 
-def set_recent_decision(c, decision):
+def set_recent_decision(
+
+    c,
+
+    decision
+):
+
     c["_last_decision"] = decision
 
 
-# =========================
-# 🧠 FALLBACK LOGIC
-# =========================
+# =========================================================
+# 🧠 FALLBACK
+# =========================================================
+
 def fallback_decision(c):
 
-    needs = c.get("needs", {})
+    needs = c.get(
+        "needs",
+        {}
+    )
 
-    if needs.get("hunger", 0) > 0.7:
-        return {"action": "eat"}
+    if needs.get(
+        "hunger",
+        0
+    ) > 0.7:
 
-    if needs.get("energy", 1) < 0.3:
-        return {"action": "sleep"}
+        return {
 
-    if needs.get("bladder", 0) > 0.7:
-        return {"action": "toilet"}
+            "action":
+                "eat"
+        }
 
-    return {"action": "idle"}
+    if needs.get(
+        "energy",
+        1
+    ) < 0.3:
 
+        return {
 
-# =========================
-# 🧠 LLM DECISION
-# =========================
-async def llm_decision(c, world, perception, memories):
+            "action":
+                "sleep"
+        }
 
-    prompt = f"""
-You are {c.get("name")}.
+    if needs.get(
+        "bladder",
+        0
+    ) > 0.7:
 
-State:
-Needs: {c.get("needs")}
-Emotion: {c.get("emotion")}
-Plan: {c.get("plan")}
+        return {
 
-Perceived surroundings:
-{summarize_perception(perception)}
+            "action":
+                "toilet"
+        }
 
-Memories:
-{memories}
+    return {
 
-Respond ONLY in JSON:
-{{"action": "<action_name>", "target": "<optional>"}}
-"""
-
-    try:
-        result = await call_llm([{"role": "user", "content": prompt}])
-
-        # depending on your ollama response shape
-        if isinstance(result, dict) and "message" in result:
-            text = result["message"].get("content", "")
-        else:
-            text = str(result)
-
-        parsed = json.loads(text)
-        return parsed
-
-    except Exception:
-        return fallback_decision(c)
+        "action":
+            "idle"
+    }
 
 
-# =========================
-# 🎯 MAIN ENTRY
-# =========================
-async def decide_action(c, world, perception, memories):
-
-    # 🔁 reuse recent decision when safe
-    recent = get_recent_decision(c)
-    if recent and not should_use_llm(c):
-        return recent
-
-    # 🧠 decide whether to use LLM
-    if should_use_llm(c):
-        decision = await llm_decision(c, world, perception, memories)
-    else:
-        decision = fallback_decision(c)
-
-    # cache it
-    set_recent_decision(c, decision)
-
-    return decision
-
-
+# =========================================================
+# 🧠 PERCEPTION SUMMARY
+# =========================================================
 
 def summarize_perception(
     perception
@@ -145,7 +197,9 @@ def summarize_perception(
             f"{p['appears']}."
         )
 
-        if p.get("activity"):
+        if p.get(
+            "activity"
+        ):
 
             line += (
 
@@ -165,19 +219,34 @@ def summarize_perception(
         []
     ):
 
+        topic = s.get(
+            "topic"
+        ) or "something"
+
+        tone = s.get(
+            "tone"
+        ) or "neutral"
+
+        participants = ", ".join(
+            s.get(
+                "participants",
+                []
+            )
+        )
+
         lines.append(
 
             f"There is a "
 
-            f"{s['tone']} "
+            f"{tone} "
 
             f"conversation about "
 
-            f"{s['topic']} "
+            f"{topic} "
 
             f"between "
 
-            f"{', '.join(s['participants'])}."
+            f"{participants}."
         )
 
     # =====================================
@@ -198,4 +267,314 @@ def summarize_perception(
             f"speaking nearby."
         )
 
+    # =====================================
+    # EMPTY
+    # =====================================
+
+    if not lines:
+
+        return (
+            "Nothing especially "
+            "noteworthy is happening nearby."
+        )
+
     return "\n".join(lines)
+
+
+# =========================================================
+# 🧠 ATTENTION SUMMARY
+# =========================================================
+
+def build_attention_summary(
+
+    c,
+
+    world
+):
+
+    attention = c.get(
+        "attention",
+        {}
+    )
+
+    focus = attention.get(
+        "focus"
+    )
+
+    if not focus:
+
+        return (
+
+            "Nothing strongly "
+            "holds your attention "
+            "right now."
+        )
+
+    key = focus.get(
+        "key",
+        ""
+    )
+
+    strength = focus.get(
+        "strength",
+        0
+    )
+
+    intensity = "mildly"
+
+    if strength > 0.75:
+
+        intensity = "strongly"
+
+    elif strength > 0.45:
+
+        intensity = "noticeably"
+
+    # =====================================
+    # PERSON
+    # =====================================
+
+    if key.startswith(
+        "person:"
+    ):
+
+        pid = key.split(":")[1]
+
+        other = world.get(
+            "characters",
+            {}
+        ).get(pid)
+
+        if other:
+
+            return (
+
+                f"You are {intensity} "
+
+                f"focused on "
+
+                f"{other.get('name')}."
+            )
+
+    # =====================================
+    # SCENE
+    # =====================================
+
+    if key.startswith(
+        "scene:"
+    ):
+
+        scene = key.split(":")[1]
+
+        return (
+
+            f"Your attention keeps "
+
+            f"returning to the "
+
+            f"{scene} situation nearby."
+        )
+
+    # =====================================
+    # EVENT
+    # =====================================
+
+    if key.startswith(
+        "event:"
+    ):
+
+        evt = key.split(":")[1]
+
+        return (
+
+            f"You remain distracted "
+
+            f"by the recent "
+
+            f"{evt}."
+        )
+
+    return (
+        "Your thoughts feel scattered."
+    )
+
+
+# =========================================================
+# 🧠 LLM DECISION
+# =========================================================
+
+async def llm_decision(
+
+    c,
+
+    world,
+
+    perception,
+
+    memories
+):
+
+    attention_summary = (
+        build_attention_summary(
+            c,
+            world
+        )
+    )
+
+    perception_summary = (
+        summarize_perception(
+            perception
+        )
+    )
+
+    prompt = f"""
+You are {c.get("name")}.
+
+You are a real person living inside a persistent simulated world.
+
+Think naturally and emotionally.
+
+Do not behave randomly.
+
+Maintain continuity of attention, emotion, relationships, obligations, and ongoing situations.
+
+Current emotional state:
+{c.get("emotion")}
+
+Current needs:
+{json.dumps(c.get("needs", {}), indent=2)}
+
+Perceived surroundings:
+{perception_summary}
+
+Current attentional focus:
+{attention_summary}
+
+Recent memories:
+{memories}
+
+Respond ONLY with valid JSON.
+
+Format:
+{{
+  "action": "...",
+  "target": "...",
+  "reason": "..."
+}}
+"""
+
+    try:
+
+        result = await call_llm(
+
+            [
+                {
+                    "role":
+                        "user",
+
+                    "content":
+                        prompt
+                }
+            ]
+        )
+
+        if (
+
+            isinstance(result, dict)
+
+            and
+
+            "message" in result
+        ):
+
+            text = result[
+                "message"
+            ].get(
+                "content",
+                ""
+            )
+
+        else:
+
+            text = str(result)
+
+        parsed = json.loads(
+            text
+        )
+
+        return parsed
+
+    except Exception:
+
+        return fallback_decision(c)
+
+
+# =========================================================
+# 🎯 MAIN ENTRY
+# =========================================================
+
+async def decide_action(
+
+    c,
+
+    world,
+
+    perception,
+
+    memories
+):
+
+    # =====================================
+    # CACHE REUSE
+    # =====================================
+
+    recent = get_recent_decision(
+        c
+    )
+
+    if (
+
+        recent
+
+        and
+
+        not should_use_llm(c)
+    ):
+
+        return recent
+
+    # =====================================
+    # LLM OR FALLBACK
+    # =====================================
+
+    if should_use_llm(c):
+
+        decision = await llm_decision(
+
+            c,
+
+            world,
+
+            perception,
+
+            memories
+        )
+
+    else:
+
+        decision = fallback_decision(
+            c
+        )
+
+    # =====================================
+    # CACHE
+    # =====================================
+
+    set_recent_decision(
+
+        c,
+
+        decision
+    )
+
+    return decision

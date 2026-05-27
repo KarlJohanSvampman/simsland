@@ -267,10 +267,10 @@ def build_context(
         # =====================================
         # ATTENTION
         # =====================================
-        "attention":
-            c.get(
-                "attention",
-                {}
+        "attention_summary":
+            build_attention_summary(
+                c,
+                world
             ),
         # =====================================
         # CURRENT LOCATION
@@ -861,3 +861,112 @@ def build_active_conversations(
         })
 
     return results
+
+# =========================================================
+# ATTENTION SUMMARY
+# =========================================================
+
+def build_attention_summary(c, world):
+
+    attention = c.get(
+        "attention",
+        {}
+    )
+
+    focus = attention.get(
+        "focus"
+    )
+
+    if not focus:
+
+        return (
+            "Nothing strongly "
+            "holds your attention "
+            "right now."
+        )
+
+    key = focus.get(
+        "key",
+        ""
+    )
+
+    strength = focus.get(
+        "strength",
+        0
+    )
+
+    intensity = "mildly"
+
+    if strength > 0.75:
+        intensity = "strongly"
+
+    elif strength > 0.45:
+        intensity = "noticeably"
+
+    # =====================================
+    # PERSON
+    # =====================================
+
+    if key.startswith(
+        "person:"
+    ):
+
+        pid = key.split(":")[1]
+
+        other = world.get(
+            "characters",
+            {}
+        ).get(pid)
+
+        if other:
+
+            return (
+
+                f"You are {intensity} "
+
+                f"focused on "
+
+                f"{other.get('name')}."
+            )
+
+    # =====================================
+    # SCENE
+    # =====================================
+
+    if key.startswith(
+        "scene:"
+    ):
+
+        scene = key.split(":")[1]
+
+        return (
+
+            f"Your attention keeps "
+
+            f"returning to the "
+
+            f"{scene} situation nearby."
+        )
+
+    # =====================================
+    # EVENT
+    # =====================================
+
+    if key.startswith(
+        "event:"
+    ):
+
+        evt = key.split(":")[1]
+
+        return (
+
+            f"You remain distracted "
+
+            f"by the recent "
+
+            f"{evt}."
+        )
+
+    return (
+        "Your thoughts feel scattered."
+    )

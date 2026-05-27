@@ -81,7 +81,25 @@ def store_memory(
 
         "people":
             people or [],
+        attention = c.get(
+            "attention",
+            {}
+        )
 
+        focus = attention.get(
+            "focus"
+        )
+
+        importance = base_importance
+
+        if focus:
+
+            importance += (
+                focus.get(
+                    "strength",
+                    0
+                ) * 0.4
+            )
         # =========================
         # EMOTIONAL WEIGHT
         # =========================
