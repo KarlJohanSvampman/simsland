@@ -45,6 +45,7 @@ from systems.messaging import deliver_messages
 from systems.service_worker_runtime import (
     update_service_workers
 )
+from brain.perception import perceive
 # =========================
 # 🕒 REAL-TIME CALENDAR
 # =========================
@@ -75,6 +76,13 @@ def tick(world):
         for c in world["characters"].values():
             c["schedule"] = generate_week_schedule(c, world)
             adjust_for_household(c, world)
+
+    for c in world["characters"].values():
+
+        perceive(
+            c,
+            world
+        )
     deliver_messages(world)
     generate_job_listings(world)
     update_household_monitoring(world)

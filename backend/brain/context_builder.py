@@ -85,61 +85,6 @@ def summarize_relationship(
 
 
 # =========================================================
-# VISIBLE PEOPLE
-# =========================================================
-
-def build_visible_people(
-
-    c,
-
-    world
-):
-
-    visible = []
-
-    for other in world.get(
-        "characters",
-        {}
-    ).values():
-
-        if other["id"] == c["id"]:
-            continue
-
-        dx = abs(
-            other["x"] - c["x"]
-        )
-
-        dy = abs(
-            other["y"] - c["y"]
-        )
-
-        if dx <= 8 and dy <= 8:
-
-            visible.append({
-
-                "id":
-                    other["id"],
-
-                "name":
-                    other["name"],
-
-                "emotion":
-                    other.get(
-                        "emotion",
-                        "neutral"
-                    ),
-
-                "relationship":
-                    summarize_relationship(
-                        c,
-                        other
-                    )
-            })
-
-    return visible
-
-
-# =========================================================
 # RELEVANT MEMORIES
 # =========================================================
 
@@ -369,13 +314,12 @@ def build_context(
             build_memories(c),
 
         # =====================================
-        # VISIBLE PEOPLE
+        # PERCEPTION (SCENE)
         # =====================================
-
-        "visible_people":
-            build_visible_people(
-                c,
-                world
+        "perception":
+            c.get(
+                "perception",
+                {}
             ),
 
         # =====================================
