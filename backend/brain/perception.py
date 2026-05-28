@@ -1,4 +1,5 @@
 import math
+import random
 
 
 # =========================================================
@@ -36,6 +37,36 @@ def hearing_range(c):
 
 
 # =========================================================
+# SOUND MODIFIER
+# =========================================================
+
+def sound_modifier(
+
+    c,
+
+    other
+):
+
+    if c.get(
+        "building_id"
+    ) != other.get(
+        "building_id"
+    ):
+
+        return 0.5
+
+    if c.get(
+        "room_id"
+    ) != other.get(
+        "room_id"
+    ):
+
+        return 0.7
+
+    return 1.0
+
+
+# =========================================================
 # LINE OF SIGHT
 # =========================================================
 
@@ -62,7 +93,7 @@ def line_of_sight(a, b, world):
     blockers = set()
 
     # =====================================
-    # PROP LOS BLOCKERS
+    # PROP BLOCKERS
     # =====================================
 
     for p in world.get(
@@ -70,7 +101,9 @@ def line_of_sight(a, b, world):
         []
     ):
 
-        if p.get("blocks_los"):
+        if p.get(
+            "blocks_los"
+        ):
 
             blockers.add(
                 (
@@ -127,8 +160,6 @@ def line_of_sight(a, b, world):
 # PERCEIVED EMOTION
 # =========================================================
 
-import random
-
 def perceived_emotion(other):
 
     actual = other.get(
@@ -139,38 +170,33 @@ def perceived_emotion(other):
     guesses = {
 
         "angry": [
-
             "tense",
             "agitated",
             "frustrated"
         ],
 
         "fearful": [
-
             "anxious",
             "uneasy",
             "nervous"
         ],
 
         "sad": [
-
             "withdrawn",
             "quiet",
             "low-energy"
         ],
 
         "calm": [
-
             "relaxed",
-            "neutral",
-            "comfortable"
+            "comfortable",
+            "neutral"
         ],
 
         "annoyed": [
-
             "irritated",
-            "tense",
-            "impatient"
+            "impatient",
+            "tense"
         ]
     }
 
@@ -183,7 +209,70 @@ def perceived_emotion(other):
 
 
 # =========================================================
-# CHARACTER VISIBILITY SCORE
+# PERCEIVED ACTIVITY
+# =========================================================
+
+def perceived_activity(other):
+
+    activity = other.get(
+        "activity",
+        {}
+    )
+
+    atype = activity.get(
+        "type"
+    )
+
+    if not atype:
+        return None
+
+    mapping = {
+
+        "cook_food":
+            "cooking",
+
+        "eat":
+            "eating",
+
+        "watch_tv":
+            "watching television",
+
+        "sleep":
+            "sleeping",
+
+        "socialize":
+            "talking with someone",
+
+        "pay_bills":
+            "working on paperwork",
+
+        "sort_mail":
+            "sorting through mail",
+
+        "clean":
+            "cleaning",
+
+        "exercise":
+            "exercising",
+
+        "shop_online":
+            "shopping online",
+
+        "argue":
+            "arguing",
+
+        "wander":
+            "wandering around"
+    }
+
+    return mapping.get(
+        atype,
+        "doing something"
+    )
+
+
+# =========================================================
+# VISIBILITY SCORE
 # =========================================================
 
 def visibility_score(
@@ -195,10 +284,15 @@ def visibility_score(
     world
 ):
 
-    d = manhattan(c, other)
+    d = manhattan(
+        c,
+        other
+    )
 
     base = max(
+
         0,
+
         1 - (
             d / visual_range(
                 c,
@@ -218,9 +312,7 @@ def visibility_score(
     ) in [
 
         "angry",
-
         "fear"
-
     ]:
 
         base += 0.15
@@ -251,6 +343,23 @@ def perceive_people(
         world
     )
 
+    attention = c.get(
+        "attention",
+        {}
+    )
+
+    focus = attention.get(
+        "focus"
+    )
+
+    fkey = None
+
+    if focus:
+
+        fkey = focus.get(
+            "key"
+        )
+
     for other in world.get(
         "characters",
         {}
@@ -259,7 +368,9 @@ def perceive_people(
         if other["id"] == c["id"]:
             continue
 
-        if other.get("off_grid"):
+        if other.get(
+            "off_grid"
+        ):
             continue
 
         d = manhattan(
@@ -278,26 +389,17 @@ def perceive_people(
             continue
 
         vis = visibility_score(
+
             c,
+
             other,
+
             world
         )
 
-        attention = c.get(
-            "attention",
-            {}
-        )
-
-        focus = attention.get(
-            "focus"
-        )
-
-        if focus:
-
-            fkey = focus.get(
-                "key",
-                ""
-            )
+        # =====================================
+        # ATTENTION REINFORCEMENT
+        # =====================================
 
         if fkey == f"person:{other['id']}":
 
@@ -317,7 +419,7 @@ def perceive_people(
                 d,
 
             "visibility":
-                vis,
+                round(vis, 2),
 
             "appears":
                 perceived_emotion(
@@ -367,6 +469,10 @@ def perceive_audio(
 
     hrange = hearing_range(c)
 
+    # =====================================
+    # SPEECH
+    # =====================================
+
     for other in world.get(
         "characters",
         {}
@@ -387,7 +493,14 @@ def perceive_audio(
             other
         )
 
-        if d > hrange:
+        modifier = sound_modifier(
+            c,
+            other
+        )
+
+        effective = d / modifier
+
+        if effective > hrange:
             continue
 
         heard.append({
@@ -396,7 +509,9 @@ def perceive_audio(
                 "speech",
 
             "speaker":
-                other["name"],
+                other.get(
+                    "name"
+                ),
 
             "topic":
                 speech.get(
@@ -409,18 +524,26 @@ def perceive_audio(
                 ),
 
             "distance":
-                d
+                round(
+                    effective,
+                    2
+                )
         })
 
+    # =====================================
+    # AMBIENT SOUNDS
+    # =====================================
 
     for p in world.get(
         "props",
         []
     ):
 
-        if not p.get(
+        sound = p.get(
             "active_sound"
-        ):
+        )
+
+        if not sound:
             continue
 
         d = abs(
@@ -438,14 +561,13 @@ def perceive_audio(
                 "ambient",
 
             "sound":
-                p[
-                    "active_sound"
-                ],
+                sound,
 
             "distance":
                 d
         })
-        return heard
+
+    return heard
 
 
 # =========================================================
@@ -519,17 +641,21 @@ def perceive_environment(
     world
 ):
 
-    return {
+    room = c.get(
+        "room_id"
+    )
+
+    building = c.get(
+        "building_id"
+    )
+
+    env = {
 
         "location":
-            c.get(
-                "building_id"
-            ),
+            building,
 
         "room":
-            c.get(
-                "room_id"
-            ),
+            room,
 
         "tick":
             world.get(
@@ -547,126 +673,38 @@ def perceive_environment(
             )
     }
 
+    nearby_props = 0
 
-# =========================================================
-# FOCUS SELECTION
-# =========================================================
+    clutter = 0
 
-def select_focus(
-
-    perception
-):
-
-    people = perception.get(
-        "visible_people",
+    for p in world.get(
+        "props",
         []
+    ):
+
+        if p.get(
+            "room_id"
+        ) != room:
+            continue
+
+        nearby_props += 1
+
+        if p.get(
+            "is_trash"
+        ):
+
+            clutter += 1
+
+    env["clutter"] = min(
+        1,
+        clutter / 10
     )
 
-    if people:
-        return {
-
-            "type":
-                "person",
-
-            "target":
-                people[0]["id"]
-        }
-
-    audio = perception.get(
-        "audible_events",
-        []
+    env["crowded"] = (
+        nearby_props > 25
     )
 
-    if audio:
-        return {
-
-            "type":
-                "sound",
-
-            "target":
-                audio[0]
-        }
-
-    return None
-
-
-# =========================================================
-# MAIN
-# =========================================================
-
-def perceive(
-
-    c,
-
-    world
-):
-    perception_people = perceive_people(
-        c,
-        world
-    )
-    perception = {
-        "visible_people":
-            perception_people,
-        "social_relations":
-            perceive_social_relationships(
-
-                c,
-
-                world,
-
-                perception_people
-            ),
-        "social_scenes":
-            perceive_social_scenes(
-                c,
-                world
-            ),
-        "audible_events":
-            perceive_audio(
-                c,
-                world
-            ),
-
-        "visible_props":
-            perceive_props(
-                c,
-                world
-            ),
-
-        "environment":
-            perceive_environment(
-                c,
-                world
-            ),
-
-        "news":
-            world.get(
-                "news_feed",
-                []
-            )[-5:],
-
-        "events":
-            world.get(
-                "active_events",
-                []
-            )[-5:]
-    }
-
-    perception["focus"] = select_focus(
-        perception
-    )
-
-    c["perception"] = perception
-    c["last_perception_tick"] = world["tick"]
-
-    c["recent_perception_memory"] = (
-        
-        perception[
-            "visible_people"
-        ][:5]
-    )
-
-    return perception
+    return env
 
 
 # =========================================================
@@ -713,7 +751,10 @@ def perceive_social_scenes(
                 p.get("name")
             )
 
-            d = manhattan(c, p)
+            d = manhattan(
+                c,
+                p
+            )
 
             if d <= visual_range(
                 c,
@@ -730,19 +771,7 @@ def perceive_social_scenes(
 
         if not visible:
             continue
-        dominant = conv.get(
-            "dominant_speaker"
-        )
 
-        conflict = conv.get(
-            "conflict_level",
-            0
-        )
-
-        warmth = conv.get(
-            "warmth",
-            0
-        )
         scenes.append({
 
             "type":
@@ -765,185 +794,30 @@ def perceive_social_scenes(
                 conv.get(
                     "turn_owner"
                 ),
+
             "dominant":
-                dominant,
+                conv.get(
+                    "dominant_speaker"
+                ),
 
             "conflict":
-                conflict,
+                conv.get(
+                    "conflict_level",
+                    0
+                ),
 
             "warmth":
-                warmth
+                conv.get(
+                    "warmth",
+                    0
+                )
         })
 
     return scenes
 
-# =========================================================
-# PERCEIVED ACTIVITY
-# =========================================================
-
-def perceived_activity(other):
-
-    activity = other.get(
-        "activity",
-        {}
-    )
-
-    atype = activity.get(
-        "type"
-    )
-
-    if not atype:
-        return None
-
-    mapping = {
-
-        "cook_food":
-            "cooking",
-
-        "eat":
-            "eating",
-
-        "watch_tv":
-            "watching television",
-
-        "sleep":
-            "sleeping",
-
-        "socialize":
-            "talking with someone",
-
-        "pay_bills":
-            "working on paperwork",
-
-        "sort_mail":
-            "sorting through mail",
-
-        "clean":
-            "cleaning",
-
-        "exercise":
-            "exercising",
-
-        "shop_online":
-            "shopping online",
-
-        "argue":
-            "arguing",
-
-        "wander":
-            "wandering around"
-    }
-
-    return mapping.get(
-        atype,
-        "doing something"
-    )
 
 # =========================================================
-# ENVIRONMENT
-# =========================================================
-
-def perceive_environment(
-
-    c,
-
-    world
-):
-
-    room = c.get(
-        "room_id"
-    )
-
-    building = c.get(
-        "building_id"
-    )
-
-    env = {
-
-        "location":
-            building,
-
-        "room":
-            room,
-
-        "tick":
-            world.get(
-                "tick"
-            ),
-
-        "weather":
-            world.get(
-                "weather"
-            ),
-
-        "time_of_day":
-            world.get(
-                "time_of_day"
-            )
-    }
-
-    # =====================================
-    # ROOM ATMOSPHERE
-    # =====================================
-
-    nearby_props = 0
-
-    clutter = 0
-
-    for p in world.get(
-        "props",
-        []
-    ):
-
-        if p.get(
-            "room_id"
-        ) != room:
-            continue
-
-        nearby_props += 1
-
-        if p.get(
-            "is_trash"
-        ):
-
-            clutter += 1
-
-    env["clutter"] = min(
-        1,
-        clutter / 10
-    )
-
-    env["crowded"] = nearby_props > 25
-
-    return env
-
-def sound_modifier(
-
-    c,
-
-    other
-):
-
-    if c.get(
-        "building_id"
-    ) != other.get(
-        "building_id"
-    ):
-
-        return 0.5
-
-    if c.get(
-        "room_id"
-    ) != other.get(
-        "room_id"
-    ):
-
-        return 0.7
-
-    return 1.0
-
-# =========================================================
-# SOCIAL RELATIONAL PERCEPTION
+# SOCIAL RELATIONSHIP PERCEPTION
 # =========================================================
 
 def perceive_social_relationships(
@@ -1051,3 +925,171 @@ def perceive_social_relationships(
             })
 
     return results
+
+
+# =========================================================
+# FOCUS SELECTION
+# =========================================================
+
+def select_focus(
+    perception
+):
+
+    people = perception.get(
+        "visible_people",
+        []
+    )
+
+    if people:
+
+        strongest = max(
+
+            people,
+
+            key=lambda p: p.get(
+                "visibility",
+                0
+            )
+        )
+
+        return {
+
+            "key":
+                f"person:{strongest['id']}",
+
+            "strength":
+                strongest.get(
+                    "visibility",
+                    0.5
+                )
+        }
+
+    scenes = perception.get(
+        "social_scenes",
+        []
+    )
+
+    if scenes:
+
+        s = scenes[0]
+
+        return {
+
+            "key":
+                f"scene:{s.get('topic','conversation')}",
+
+            "strength":
+                0.5
+        }
+
+    audio = perception.get(
+        "audible_events",
+        []
+    )
+
+    if audio:
+
+        return {
+
+            "key":
+                "sound:ambient",
+
+            "strength":
+                0.3
+        }
+
+    return None
+
+
+# =========================================================
+# MAIN PERCEPTION
+# =========================================================
+
+def perceive(
+
+    c,
+
+    world
+):
+
+    perception_people = perceive_people(
+        c,
+        world
+    )
+
+    perception = {
+
+        "visible_people":
+            perception_people,
+
+        "social_relations":
+            perceive_social_relationships(
+
+                c,
+
+                world,
+
+                perception_people
+            ),
+
+        "social_scenes":
+            perceive_social_scenes(
+                c,
+                world
+            ),
+
+        "audible_events":
+            perceive_audio(
+                c,
+                world
+            ),
+
+        "visible_props":
+            perceive_props(
+                c,
+                world
+            ),
+
+        "environment":
+            perceive_environment(
+                c,
+                world
+            ),
+
+        "news":
+            world.get(
+                "news_feed",
+                []
+            )[-5:],
+
+        "events":
+            world.get(
+                "active_events",
+                []
+            )[-5:]
+    }
+
+    perception["focus"] = (
+        select_focus(
+            perception
+        )
+    )
+
+    c["perception"] = perception
+
+    c["last_perception_tick"] = (
+        world.get(
+            "tick",
+            0
+        )
+    )
+
+    c["recent_perception_memory"] = (
+
+        perception.get(
+            "visible_people",
+            []
+        )[:5]
+    )
+
+    return perception
