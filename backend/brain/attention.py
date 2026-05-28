@@ -125,7 +125,7 @@ def update_social_attention(
 
             if current_strength > 0.8:
 
-            strength *= 0.5
+                strength *= 0.5
         
         boost_attention(
 
@@ -169,7 +169,29 @@ def update_social_attention(
             strength
         )
 
+        social = c.get(
+            "social",
+            {}
+        )
 
+        rel = social.get(
+            p["id"],
+            {}
+        )
+
+        strength += (
+            rel.get(
+                "tension",
+                0
+            ) * 0.25
+        )
+
+        strength += (
+            rel.get(
+                "attraction",
+                0
+            ) * 0.15
+        )
 # =========================================================
 # SELECT FOCUS
 # =========================================================
@@ -245,5 +267,44 @@ def update_attention(
 
         perception
     )
+    focus = c.get(
+        "attention",
+        {}
+    ).get(
+        "focus"
+    )
 
+    if focus:
+
+        key = focus.get(
+            "key",
+            ""
+        )
+
+        if key.startswith(
+            "person:"
+        ):
+
+            pid = key.split(":")[1]
+
+            rel = c.get(
+                "social",
+                {}
+            ).get(
+                pid,
+                {}
+            )
+
+            if rel.get(
+                "tension",
+                0
+            ) > 0.7:
+
+                c["stress"] = min(
+                    1,
+                    c.get(
+                        "stress",
+                        0
+                    ) + 0.01
+                )
     select_attention_focus(c)

@@ -600,13 +600,21 @@ def perceive(
 
     world
 ):
-
+    perception_people = perceive_people(
+        c,
+        world
+    )
     perception = {
-
         "visible_people":
-            perceive_people(
+            perception_people,
+        "social_relations":
+            perceive_social_relationships(
+
                 c,
-                world
+
+                world,
+
+                perception_people
             ),
         "social_scenes":
             perceive_social_scenes(
@@ -722,7 +730,19 @@ def perceive_social_scenes(
 
         if not visible:
             continue
+        dominant = conv.get(
+            "dominant_speaker"
+        )
 
+        conflict = conv.get(
+            "conflict_level",
+            0
+        )
+
+        warmth = conv.get(
+            "warmth",
+            0
+        )
         scenes.append({
 
             "type":
@@ -744,7 +764,15 @@ def perceive_social_scenes(
             "turn_owner":
                 conv.get(
                     "turn_owner"
-                )
+                ),
+            "dominant":
+                dominant,
+
+            "conflict":
+                conflict,
+
+            "warmth":
+                warmth
         })
 
     return scenes
@@ -913,3 +941,113 @@ def sound_modifier(
         return 0.7
 
     return 1.0
+
+# =========================================================
+# SOCIAL RELATIONAL PERCEPTION
+# =========================================================
+
+def perceive_social_relationships(
+
+    c,
+
+    world,
+
+    visible_people
+):
+
+    results = []
+
+    social = c.get(
+        "social",
+        {}
+    )
+
+    for p in visible_people:
+
+        pid = p["id"]
+
+        rel = social.get(
+            pid,
+            {}
+        )
+
+        tension = rel.get(
+            "tension",
+            0
+        )
+
+        closeness = rel.get(
+            "closeness",
+            0
+        )
+
+        trust = rel.get(
+            "trust",
+            0.5
+        )
+
+        attraction = rel.get(
+            "attraction",
+            0
+        )
+
+        interpretation = []
+
+        # =====================================
+        # TENSION
+        # =====================================
+
+        if tension > 0.7:
+
+            interpretation.append(
+                "relationship feels strained"
+            )
+
+        elif tension > 0.4:
+
+            interpretation.append(
+                "some tension exists"
+            )
+
+        # =====================================
+        # CLOSENESS
+        # =====================================
+
+        if closeness > 0.7:
+
+            interpretation.append(
+                "you feel emotionally close"
+            )
+
+        # =====================================
+        # TRUST
+        # =====================================
+
+        if trust < 0.3:
+
+            interpretation.append(
+                "you feel wary around them"
+            )
+
+        # =====================================
+        # ATTRACTION
+        # =====================================
+
+        if attraction > 0.7:
+
+            interpretation.append(
+                "you feel drawn to them"
+            )
+
+        if interpretation:
+
+            results.append({
+
+                "target":
+                    p["name"],
+
+                "interpretation":
+                    interpretation
+            })
+
+    return results

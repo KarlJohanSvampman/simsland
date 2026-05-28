@@ -212,6 +212,30 @@ def summarize_perception(
 
         lines.append(line)
 
+   # =====================================
+    # SOCIAL RELATIONSHIPS
+    # =====================================
+
+    for r in perception.get(
+        "social_relations",
+        []
+    ):
+
+        target = r.get(
+            "target"
+        )
+
+        for i in r.get(
+            "interpretation",
+            []
+        ):
+
+            lines.append(
+
+                f"Around {target}, "
+
+                f"{i}."
+            )
     # =====================================
     # SOCIAL SCENES
     # =====================================
@@ -236,7 +260,7 @@ def summarize_perception(
             )
         )
 
-        lines.append(
+        line = (
 
             f"There is a "
 
@@ -250,6 +274,26 @@ def summarize_perception(
 
             f"{participants}."
         )
+
+        if s.get(
+            "conflict",
+            0
+        ) > 0.6:
+
+            line += (
+                " The interaction feels tense."
+            )
+
+        if s.get(
+            "warmth",
+            0
+        ) > 0.7:
+
+            line += (
+                " The atmosphere feels warm."
+            )
+
+        lines.append(line)
 
     # =====================================
     # AUDIO

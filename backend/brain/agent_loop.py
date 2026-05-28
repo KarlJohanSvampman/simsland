@@ -93,8 +93,10 @@ from systems.health import (
     trigger_health_event
 )
 
-from systems.payments import (
-    attempt_pay_bills
+from systems.mail import (
+    attempt_pay_bills,
+    sort_household_mail,
+    respond_to_mail
 )
 
 from systems.story import (

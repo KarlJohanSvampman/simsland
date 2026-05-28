@@ -1,27 +1,103 @@
 import uuid
 import time
-from brain.embeddings import add_memory_vector, search
 
-# =========================
+from brain.embeddings import (
+    add_memory_vector,
+    search
+)
+
+
+# =========================================================
 # IMPORTANCE SCORING
-# =========================
-def score_importance(c, text, base):
-    score = base
+# =========================================================
 
-    emotion = c.get("emotion")
+def score_importance(
 
-    if emotion in ["angry", "happy", "fear"]:
-        score += 0.2
+    c,
 
-    if any(k in text.lower() for k in ["fight", "love", "death", "money"]):
-        score += 0.3
+    text,
 
-    return min(score, 1.0)
+    base
+):
+
+    score = float(base)
+
+    emotion = c.get(
+        "emotion"
+    )
+
+    if emotion in [
+
+        "angry",
+
+        "happy",
+
+        "fear",
+
+        "sad"
+    ]:
+
+        score += 0.15
+
+    lowered = text.lower()
+
+    if any(
+
+        k in lowered
+
+        for k in [
+
+            "fight",
+
+            "love",
+
+            "death",
+
+            "money",
+
+            "kiss",
+
+            "argument",
+
+            "threat",
+
+            "cry"
+        ]
+    ):
+
+        score += 0.25
+
+    # =====================================
+    # ATTENTION BOOST
+    # =====================================
+
+    attention = c.get(
+        "attention",
+        {}
+    )
+
+    focus = attention.get(
+        "focus"
+    )
+
+    if focus:
+
+        score += (
+            focus.get(
+                "strength",
+                0
+            ) * 0.35
+        )
+
+    return min(
+        1.0,
+        score
+    )
 
 
-# =========================
+# =========================================================
 # STORE MEMORY
-# =========================
+# =========================================================
 
 def store_memory(
 
@@ -46,11 +122,42 @@ def store_memory(
     **extra
 ):
 
-    importance = score_importance(
-        c,
-        text,
-        float(importance)
+    if not text:
+        return None
+
+    tags = tags or []
+
+    people = people or []
+
+    # =====================================
+    # ATTENTION
+    # =====================================
+
+    attention = c.get(
+        "attention",
+        {}
     )
+
+    focus = attention.get(
+        "focus"
+    )
+
+    # =====================================
+    # FINAL IMPORTANCE
+    # =====================================
+
+    final_importance = score_importance(
+
+        c,
+
+        text,
+
+        importance
+    )
+
+    # =====================================
+    # MEMORY OBJECT
+    # =====================================
 
     mem = {
 
@@ -64,10 +171,10 @@ def store_memory(
             text,
 
         "importance":
-            importance,
+            final_importance,
 
         "tags":
-            tags or [],
+            tags,
 
         "tick":
             tick,
@@ -75,47 +182,49 @@ def store_memory(
         "created_at":
             time.time(),
 
-        # =========================
-        # SOCIAL CONTEXT
-        # =========================
+        # =================================
+        # SOCIAL
+        # =================================
 
         "people":
-            people or [],
-        attention = c.get(
-            "attention",
-            {}
-        )
+            people,
 
-        focus = attention.get(
-            "focus"
-        )
+        # =================================
+        # ATTENTION
+        # =================================
 
-        importance = base_importance
+        "attentional_focus":
 
-        if focus:
-
-            importance += (
-                focus.get(
-                    "strength",
-                    0
-                ) * 0.4
+            focus.get(
+                "key"
             )
-        # =========================
-        # EMOTIONAL WEIGHT
-        # =========================
+
+            if focus else None,
+
+        # =================================
+        # EMOTION
+        # =================================
 
         "emotional_impact":
             emotional_impact,
 
-        # =========================
+        # =================================
         # SOURCE
-        # =========================
+        # =================================
 
         "source":
             source,
 
+        # =================================
+        # EXTRA
+        # =================================
+
         **extra
     }
+
+    # =====================================
+    # STORE
+    # =====================================
 
     c.setdefault(
         "memories",
@@ -124,53 +233,188 @@ def store_memory(
 
     prune_memories(c)
 
-    add_memory_vector(
+    # =====================================
+    # VECTOR INDEX
+    # =====================================
 
-        c["id"],
+    try:
 
-        mem["id"],
+        add_memory_vector(
 
-        text
-    )
+            c["id"],
+
+            mem["id"],
+
+            text
+        )
+
+    except Exception:
+
+        pass
 
     return mem
 
-# =========================
-# BASIC RECALL (your original)
-# =========================
-def recall(c, query_or_tags, limit=6):
-    query = " ".join(query_or_tags) if isinstance(query_or_tags, list) else str(query_or_tags)
-    tags = set(query.split())
 
-    sem_ids = {r["memory_id"] for r in search(c["id"], query, limit)}
+# =========================================================
+# BASIC RECALL
+# =========================================================
+
+def recall(
+
+    c,
+
+    query_or_tags,
+
+    limit=6
+):
+
+    query = (
+
+        " ".join(query_or_tags)
+
+        if isinstance(
+            query_or_tags,
+            list
+        )
+
+        else str(query_or_tags)
+    )
+
+    tags = set(
+        query.split()
+    )
+
+    # =====================================
+    # SEMANTIC SEARCH
+    # =====================================
+
+    try:
+
+        sem_ids = {
+
+            r["memory_id"]
+
+            for r in search(
+                c["id"],
+                query,
+                limit
+            )
+        }
+
+    except Exception:
+
+        sem_ids = set()
 
     scored = []
-    for m in c.get("memories", []):
-        score = (
-            m.get("importance", 0.5) * 10
-            + len(tags & set(m.get("tags", []))) * 3
-            + (6 if m.get("id") in sem_ids else 0)
+
+    now = time.time()
+
+    for m in c.get(
+        "memories",
+        []
+    ):
+
+        age = now - m.get(
+            "created_at",
+            now
         )
-        scored.append((score, m))
 
-    scored.sort(key=lambda x: x[0], reverse=True)
+        recency = max(
+            0,
+            1 - (age / 86400)
+        )
 
-    return [m for _, m in scored[:limit]]
+        score = (
+
+            m.get(
+                "importance",
+                0.5
+            ) * 10
+
+            +
+
+            len(
+                tags & set(
+                    m.get(
+                        "tags",
+                        []
+                    )
+                )
+            ) * 3
+
+            +
+
+            recency * 2
+
+            +
+
+            (
+                6
+
+                if m.get("id")
+                in sem_ids
+
+                else 0
+            )
+        )
+
+        scored.append(
+            (
+                score,
+                m
+            )
+        )
+
+    scored.sort(
+
+        key=lambda x: x[0],
+
+        reverse=True
+    )
+
+    return [
+
+        m
+
+        for _, m in scored[:limit]
+    ]
 
 
-# =========================
-# SMART RECALL (NEW)
-# =========================
-def recall_relevant(c, query, k=5):
-    return recall(c, query, k)
+# =========================================================
+# SMART RECALL
+# =========================================================
+
+def recall_relevant(
+
+    c,
+
+    query,
+
+    k=5
+):
+
+    return recall(
+        c,
+        query,
+        k
+    )
 
 
-# =========================
-# PRUNING
-# =========================
-def prune_memories(c, max_memories=150):
+# =========================================================
+# PRUNE MEMORIES
+# =========================================================
 
-    memories = c.get("memories", [])
+def prune_memories(
+
+    c,
+
+    max_memories=150
+):
+
+    memories = c.get(
+        "memories",
+        []
+    )
 
     if len(memories) <= max_memories:
         return
@@ -178,33 +422,87 @@ def prune_memories(c, max_memories=150):
     now = time.time()
 
     def score(m):
-        age = now - m.get("created_at", now)
-        return m["importance"] * 2.0 - (age * 0.0001)
 
-    memories.sort(key=score, reverse=True)
+        age = now - m.get(
+            "created_at",
+            now
+        )
 
-    c["memories"] = memories[:max_memories]
+        recency = max(
+            0,
+            1 - (age / 86400)
+        )
+
+        return (
+
+            m.get(
+                "importance",
+                0
+            ) * 2
+
+            +
+
+            recency
+        )
+
+    memories.sort(
+
+        key=score,
+
+        reverse=True
+    )
+
+    c["memories"] = memories[
+        :max_memories
+    ]
 
 
-# =========================
-# DECAY (SINGLE CLEAN VERSION)
-# =========================
+# =========================================================
+# DECAY
+# =========================================================
+
 def decay_memories(c):
 
     now = time.time()
+
     kept = []
 
-    for m in c.get("memories", []):
-        age = now - m.get("created_at", now)
+    for m in c.get(
+        "memories",
+        []
+    ):
 
-        m["importance"] *= (0.999 ** age)
+        age = now - m.get(
+            "created_at",
+            now
+        )
 
-        if m["importance"] > 0.05:
+        decay_factor = (
+            0.999995 ** age
+        )
+
+        m["importance"] *= (
+            decay_factor
+        )
+
+        if m["importance"] > 0.03:
+
             kept.append(m)
+
+    kept.sort(
+
+        key=lambda m: m.get(
+            "importance",
+            0
+        ),
+
+        reverse=True
+    )
 
     c["memories"] = kept[-150:]
 
-    # =========================================================
+
+# =========================================================
 # BIASED RECALL
 # =========================================================
 
@@ -232,40 +530,57 @@ def biased_recall(
         {}
     )
 
-    intentions = c.get(
-        "active_intentions",
-        []
-    )
-
     scored = []
+
+    now = time.time()
 
     for m in memories:
 
         score = 0.0
 
-        # =====================================
+        # =================================
         # BASE IMPORTANCE
-        # =====================================
+        # =================================
 
         score += m.get(
             "importance",
             0
-        )
+        ) * 8
 
-        # =====================================
+        # =================================
         # RECENCY
-        # =====================================
+        # =================================
 
-        score += (
-            m.get(
-                "recency_score",
-                0
-            ) * 0.5
+        age = now - m.get(
+            "created_at",
+            now
         )
 
-        # =====================================
-        # EMOTIONAL MATCH
-        # =====================================
+        recency = max(
+            0,
+            1 - (age / 86400)
+        )
+
+        score += recency * 3
+
+        # =================================
+        # QUERY MATCH
+        # =================================
+
+        if query:
+
+            lowered = query.lower()
+
+            if lowered in m.get(
+                "text",
+                ""
+            ).lower():
+
+                score += 5
+
+        # =================================
+        # EMOTIONAL BIAS
+        # =================================
 
         emotional_impact = abs(
 
@@ -288,9 +603,9 @@ def biased_recall(
                 emotional_impact * 2
             )
 
-        # =====================================
-        # BELIEF MATCH
-        # =====================================
+        # =================================
+        # BELIEF REINFORCEMENT
+        # =================================
 
         for topic in m.get(
             "tags",
@@ -304,75 +619,31 @@ def biased_recall(
             if not belief:
                 continue
 
-            certainty = belief.get(
-                "certainty",
-                0
-            )
-
             score += (
-                certainty * 5
+
+                belief.get(
+                    "certainty",
+                    0
+                ) * 2
             )
-
-        # =====================================
-        # INTENTION MATCH
-        # =====================================
-
-        for i in intentions:
-
-            itype = i.get("type")
-
-            if not itype:
-                continue
-
-            if itype in m.get(
-                "tags",
-                []
-            ):
-
-                score += 8
 
         scored.append(
-            (score, m)
+            (
+                score,
+                m
+            )
         )
 
     scored.sort(
+
         key=lambda x: x[0],
+
         reverse=True
     )
 
     return [
 
-        m for _, m
-        in scored[:limit]
+        m
+
+        for _, m in scored[:limit]
     ]
-
-# =========================================================
-# REWRITE MEMORY SALIENCE
-# =========================================================
-
-def rewrite_memory_salience(
-
-    c,
-
-    memory,
-
-    emotional_shift
-):
-
-    current = memory.get(
-        "importance",
-        0.5
-    )
-
-    memory["importance"] = max(
-
-        0,
-
-        min(
-            1.0,
-
-            current
-            +
-            emotional_shift
-        )
-    )

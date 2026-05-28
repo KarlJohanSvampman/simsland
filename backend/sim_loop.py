@@ -12,11 +12,12 @@ from systems.health import trigger_health_event, process_health
 from systems.politics import process_pending_effects, check_election
 from systems.influence import apply_public_figure_influence, apply_social_influence
 from systems.media import generate_news
-from systems.migration import consider_migration
 from systems.story import update_story_arc
 from systems.hierarchy import update_hierarchy
 from systems.crisis import check_crises, process_crises
 from systems.faction_ai import apply_faction_influence
+from systems.migration import should_consider_moving, score_home, get_vacant_homes, process_migration
+from systems.eviction import process_evictions
 from systems.traffic import (
     update_ambient_traffic
 )
