@@ -14,6 +14,9 @@ from core.definitions import (
 from systems.room_assignment import (
     assign_prop_rooms
 )
+from systems.outdoor_navigation import (
+    build_outdoor_navigation
+)
 from systems.building_manager import (
     build_world_geometry
 )
@@ -24,14 +27,7 @@ import time
 #    password=os.getenv("POSTGRES_PASSWORD","postgres"),
 #    host=os.getenv("POSTGRES_HOST","db")
 #)
-from world.world_tiles import (
 
-    generate_world_tiles,
-
-    build_world_tile_lookup,
-
-    build_traffic_network
-)
 def connect_with_retry():
     for i in range(10):
         try:
@@ -194,8 +190,7 @@ def load_world(sim_id):
         build_world_tile_lookup,
 
         generate_road_gateways,
-
-        build_road_graph
+        build_traffic_network
     )
 
     if not world.get(

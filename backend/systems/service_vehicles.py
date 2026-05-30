@@ -313,26 +313,26 @@ def update_vehicle(
 
         return
 
-            # ================================================
-            # ARRIVED
-            # ================================================
+        # ================================================
+        # ARRIVED
+        # ================================================
 
-            vehicle["state"] = (
-                "parked"
-            )
+        vehicle["state"] = (
+            "parked"
+        )
 
-            spawn_service_worker(
+        spawn_service_worker(
 
-                vehicle,
+            vehicle,
 
-                world
-            )
+            world
+        )
 
-            vehicle["state"] = (
-                "waiting_for_worker"
-            )
+        vehicle["state"] = (
+            "waiting_for_worker"
+        )
 
-            return
+        return
 
     # =====================================================
     # DRIVING

@@ -271,22 +271,21 @@ def build_road_graph(world):
         if tile.get(
             "type"
         ) != "road":
-
             continue
 
         x = tile["x"]
         y = tile["y"]
 
-        node = (x, y)
+        node = f"{x},{y}"
 
         graph[node] = []
 
         for dx, dy in [
 
-            (1, 0),
-            (-1, 0),
-            (0, 1),
-            (0, -1)
+            (1,0),
+            (-1,0),
+            (0,1),
+            (0,-1)
 
         ]:
 
@@ -294,7 +293,6 @@ def build_road_graph(world):
             ny = y + dy
 
             neighbor = lookup.get(
-
                 spatial_key(
                     nx,
                     ny
@@ -310,14 +308,12 @@ def build_road_graph(world):
                 continue
 
             graph[node].append(
-                (nx, ny)
+                f"{nx},{ny}"
             )
 
     world["road_graph"] = graph
 
     return graph
-
-
 # =========================================================
 # DETECT INTERSECTIONS
 # =========================================================
