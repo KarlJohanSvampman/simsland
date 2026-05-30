@@ -20,7 +20,8 @@ const camera =
     0.1,
     1000
   );
-
+let selectedTile = null;
+let selectionHighlight = null;
 camera.position.set(10,10,10);
 
 const renderer =
@@ -125,7 +126,38 @@ function populateFloorplanDropdown(){
     select.appendChild(opt);
   }
 }
+function createSelectionHighlight(){
 
+  const geo =
+    new THREE.EdgesGeometry(
+      new THREE.PlaneGeometry(
+        1.05,
+        1.05
+      )
+    );
+
+  const line =
+    new THREE.LineSegments(
+
+      geo,
+
+      new THREE.LineBasicMaterial({
+
+        color: 0xffff00
+
+      })
+    );
+
+  line.rotation.x = -Math.PI / 2;
+
+  line.position.y = 0.05;
+
+  line.visible = false;
+
+  scene.add(line);
+
+  return line;
+}
 // =========================================
 // TILES
 // =========================================
@@ -171,7 +203,8 @@ for(let x=-40;x<40;x++){
     createTile(x,y);
   }
 }
-
+selectionHighlight =
+createSelectionHighlight();
 // =========================================
 // PREVIEW
 // =========================================
@@ -363,6 +396,20 @@ renderer.domElement
 
     const tile =
       hits[0].object;
+
+    selectedTile = tile;
+
+    selectionHighlight.visible = true;
+
+    selectionHighlight.position.set(
+
+    tile.userData.x,
+
+    0.03,
+
+    tile.userData.y
+
+    );
 
     // =====================================
     // PLACE FLOORPLAN
