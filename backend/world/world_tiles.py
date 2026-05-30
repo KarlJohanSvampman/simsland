@@ -185,7 +185,191 @@ def build_world_tile_lookup(world):
         "world_tile_lookup"
     ] = lookup
 
+# =========================================================
+# ROAD GATEWAYS
+# =========================================================
 
+def generate_road_gateways(world):
+
+    if not world.get("world_tile_lookup"):
+        build_world_tile_lookup(world)
+
+    width = (
+        world.get("world_width")
+        or world.get("grid", {}).get("width")
+        or 100
+    )
+
+    height = (
+        world.get("world_height")
+        or world.get("grid", {}).get("height")
+        or 100
+    )
+
+    traffic = world.setdefault("traffic", {})
+
+    entry_points = []
+    exit_points = []
+
+    for tile in world.get("world_tiles", []):
+
+        if tile.get("type") != "road":
+            continue
+
+        x = tile["x"]
+        y = tile["y"]
+
+        if x == 0:
+            entry_points.append({"x": x, "y": y, "direction": "east", "lane": "inbound"})
+            exit_points.append({"x": x, "y": y, "direction": "west", "lane": "outbound"})
+
+        elif x == width - 1:
+            entry_points.append({"x": x, "y": y, "direction": "west", "lane": "inbound"})
+            exit_points.append({"x": x, "y": y, "direction": "east", "lane": "outbound"})
+
+        elif y == 0:
+            entry_points.append({"x": x, "y": y, "direction": "south", "lane": "inbound"})
+            exit_points.append({"x": x, "y": y, "direction": "north", "lane": "outbound"})
+
+        elif y == height - 1:
+            entry_points.append({"x": x, "y": y, "direction": "north", "lane": "inbound"})
+            exit_points.append({"x": x, "y": y, "direction": "south", "lane": "outbound"})
+
+    traffic["entry_points"] = entry_points
+    traffic["exit_points"] = exit_points
+
+    # legacy compatibility
+    world["road_entry_points"] = entry_points
+    world["road_exit_points"] = exit_points
+
+    return traffic
+
+# =========================================================
+# BUILD ROAD GRAPH
+# =========================================================
+
+def build_road_graph(world):
+
+    if not world.get(
+        "world_tile_lookup"
+    ):
+        build_world_tile_lookup(
+            world
+        )
+
+    graph = {}
+
+    lookup = world[
+        "world_tile_lookup"
+    ]
+
+    for tile in world.get(
+        "world_tiles",
+        []
+    ):
+
+        if tile.get(
+            "type"
+        ) != "road":
+
+            continue
+
+        x = tile["x"]
+        y = tile["y"]
+
+        node = (x, y)
+
+        graph[node] = []
+
+        for dx, dy in [
+
+            (1, 0),
+            (-1, 0),
+            (0, 1),
+            (0, -1)
+
+        ]:
+
+            nx = x + dx
+            ny = y + dy
+
+            neighbor = lookup.get(
+
+                spatial_key(
+                    nx,
+                    ny
+                )
+            )
+
+            if not neighbor:
+                continue
+
+            if neighbor.get(
+                "type"
+            ) != "road":
+                continue
+
+            graph[node].append(
+                (nx, ny)
+            )
+
+    world["road_graph"] = graph
+
+    return graph
+
+
+# =========================================================
+# DETECT INTERSECTIONS
+# =========================================================
+
+def generate_intersections(world):
+
+    graph = world.get(
+        "road_graph",
+        {}
+    )
+
+    traffic = world.setdefault(
+        "traffic",
+        {}
+    )
+
+    intersections = []
+
+    for node, neighbors in graph.items():
+
+        if len(neighbors) >= 3:
+
+            intersections.append({
+
+                "x": node[0],
+
+                "y": node[1]
+            })
+
+    traffic[
+        "intersections"
+    ] = intersections
+
+    return intersections 
+
+# =========================================================
+# BUILD TRAFFIC NETWORK
+# =========================================================
+
+def build_traffic_network(world):
+
+    generate_road_gateways(
+        world
+    )
+
+    build_road_graph(
+        world
+    )
+
+    generate_intersections(
+        world
+    )
 # =========================================================
 # GET TILE
 # =========================================================
@@ -237,3 +421,4 @@ def is_world_walkable(
         "walkable",
         False
     )
+

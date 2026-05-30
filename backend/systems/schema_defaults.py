@@ -167,16 +167,45 @@ def ensure_world_defaults(world):
     # TRAFFIC
     # =====================================================
 
-    world.setdefault(
-        "ambient_traffic",
+    traffic = world.setdefault(
+        "traffic",
+        {}
+    )
+
+    traffic.setdefault(
+        "entry_points",
+        []
+    )
+
+    traffic.setdefault(
+        "exit_points",
+        []
+    )
+
+    traffic.setdefault(
+        "intersections",
+        []
+    )
+
+    traffic.setdefault(
+        "lanes",
         []
     )
 
     world.setdefault(
-        "traffic_vehicles",
+        "road_entry_points",
         []
     )
 
+    world.setdefault(
+        "road_exit_points",
+        []
+    )
+
+    world.setdefault(
+        "road_graph",
+        {}
+    )
     # =====================================================
     # JOBS
     # =====================================================

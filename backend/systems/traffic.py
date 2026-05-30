@@ -1,10 +1,6 @@
 import random
 import uuid
 
-from systems.service_vehicles import (
-    spawn_service_vehicle
-)
-
 
 # =========================================================
 # UPDATE AMBIENT TRAFFIC
@@ -12,24 +8,34 @@ from systems.service_vehicles import (
 
 def update_ambient_traffic(world):
 
-    traffic = world.get(
-        "ambient_traffic",
+    vehicles = world.setdefault(
+        "vehicles",
         []
     )
 
+    ambient = [
+
+        v
+
+        for v in vehicles
+
+        if v.get("type")
+        == "ambient_traffic"
+    ]
+
     max_traffic = 3
 
-    if len(traffic) >= max_traffic:
-        return
+    if len(ambient) < max_traffic:
 
-    # =====================================================
-    # RANDOM SPAWN
-    # =====================================================
+        if random.random() < 0.0015:
 
-    if random.random() > 0.0015:
-        return
+            spawn_traffic_vehicle(
+                world
+            )
 
-    spawn_traffic_vehicle(world)
+    update_traffic_vehicles(
+        world
+    )
 
 
 # =========================================================
@@ -38,99 +44,249 @@ def update_ambient_traffic(world):
 
 def spawn_traffic_vehicle(world):
 
-    entry = random.choice(
+    traffic = world.get(
+        "traffic",
+        {}
+    )
 
-        world[
-            "road_entry_points"
-        ]
+    entry_points = (
+
+        traffic.get(
+            "entry_points",
+            []
+        )
+
+        or
+
+        world.get(
+            "road_entry_points",
+            []
+        )
+    )
+
+    exit_points = (
+
+        traffic.get(
+            "exit_points",
+            []
+        )
+
+        or
+
+        world.get(
+            "road_exit_points",
+            []
+        )
+    )
+
+    if not entry_points:
+        return None
+
+    if not exit_points:
+        return None
+
+    start = random.choice(
+        entry_points
+    )
+
+    end = random.choice(
+        exit_points
     )
 
     vehicle = {
 
         "id":
-            str(uuid.uuid4()),
+            f"traffic_{uuid.uuid4().hex[:6]}",
 
         "type":
-            "vehicle",
-
-        "service_type":
-            "civilian",
-
-        "vehicle_model":
-            random.choice([
-
-                "sedan",
-
-                "pickup",
-
-                "compact",
-
-                "suv"
-            ]),
+            "ambient_traffic",
 
         "x":
-            entry["x"],
+            start["x"],
 
         "y":
-            entry["y"],
+            start["y"],
+
+        "entry":
+            start,
+
+        "exit":
+            end,
 
         "speed":
-            random.uniform(
-                0.03,
-                0.06
-            ),
+            0.25,
 
-        "route":
-            generate_random_drive(
-                world
-            ),
+        "path":
+            [],
 
-        "state":
-            "driving"
+        "path_index":
+            0,
+
+        "despawn":
+            False
     }
 
-    world.setdefault(
-        "service_vehicles",
-        []
+    build_vehicle_path(
+        vehicle,
+        world
     )
 
-    world[
-        "service_vehicles"
-    ].append(vehicle)
-
     world.setdefault(
-        "ambient_traffic",
+        "vehicles",
         []
-    )
+    ).append(vehicle)
 
-    world[
-        "ambient_traffic"
-    ].append(vehicle)
+    return vehicle
 
 
 # =========================================================
-# RANDOM DRIVE
+# BUILD VEHICLE PATH
 # =========================================================
 
-def generate_random_drive(world):
+def build_vehicle_path(
 
-    roads = list(
+    vehicle,
 
-        world.get(
-            "road_network",
-            {}
-        ).keys()
+    world
+):
+
+    graph = world.get(
+        "road_graph",
+        {}
     )
 
-    if len(roads) < 2:
+    start = (
+
+        vehicle["x"],
+        vehicle["y"]
+    )
+
+    end = (
+
+        vehicle["exit"]["x"],
+        vehicle["exit"]["y"]
+    )
+
+    path = simple_road_path(
+        graph,
+        start,
+        end
+    )
+
+    vehicle["path"] = path
+    vehicle["path_index"] = 0
+
+
+# =========================================================
+# SIMPLE ROAD PATH
+# =========================================================
+
+def simple_road_path(
+
+    graph,
+
+    start,
+
+    goal
+):
+
+    if start == goal:
+        return [start]
+
+    frontier = [start]
+
+    visited = {
+        start: None
+    }
+
+    while frontier:
+
+        current = frontier.pop(0)
+
+        if current == goal:
+            break
+
+        for n in graph.get(
+            current,
+            []
+        ):
+
+            if n in visited:
+                continue
+
+            visited[n] = current
+            frontier.append(n)
+
+    if goal not in visited:
         return []
 
-    return random.sample(
+    path = []
 
-        roads,
+    cur = goal
 
-        min(
-            20,
-            len(roads)
-        )
+    while cur:
+
+        path.append(cur)
+
+        cur = visited[cur]
+
+    path.reverse()
+
+    return path
+
+
+# =========================================================
+# UPDATE VEHICLES
+# =========================================================
+
+def update_traffic_vehicles(world):
+
+    vehicles = world.get(
+        "vehicles",
+        []
     )
+
+    remove = []
+
+    for vehicle in vehicles:
+
+        path = vehicle.get(
+            "path",
+            []
+        )
+
+        if not path:
+
+            remove.append(
+                vehicle
+            )
+
+            continue
+
+        idx = vehicle.get(
+            "path_index",
+            0
+        )
+
+        if idx >= len(path):
+
+            remove.append(
+                vehicle
+            )
+
+            continue
+
+        x, y = path[idx]
+
+        vehicle["x"] = x
+        vehicle["y"] = y
+
+        vehicle["path_index"] += 1
+
+    for vehicle in remove:
+
+        if vehicle in vehicles:
+
+            vehicles.remove(
+                vehicle
+            )
