@@ -9,7 +9,6 @@ from systems.road_network import (
 # =========================================================
 # SPAWN SERVICE VEHICLE
 # =========================================================
-
 def spawn_service_vehicle(
 
     world,
@@ -23,9 +22,30 @@ def spawn_service_vehicle(
     target_households
 ):
 
-    entry = world[
-        "road_entry_points"
-    ][0]
+    traffic = world.get(
+        "traffic",
+        {}
+    )
+
+    entries = (
+
+        traffic.get(
+            "entry_points",
+            []
+        )
+
+        or
+
+        world.get(
+            "road_entry_points",
+            []
+        )
+    )
+
+    if not entries:
+        return None
+
+    entry = entries[0]
 
     vehicle = {
 
@@ -62,7 +82,10 @@ def spawn_service_vehicle(
             target_households,
 
         "current_target":
-            0
+            0,
+
+        "entry_point":
+            entry
     }
 
     world.setdefault(
@@ -75,17 +98,11 @@ def spawn_service_vehicle(
     ].append(vehicle)
 
     assign_next_vehicle_route(
-
         vehicle,
-
         world
     )
 
     return vehicle
-
-
-# =========================================================
-# ASSIGN NEXT ROUTE
 # =========================================================
 
 def assign_next_vehicle_route(
@@ -103,13 +120,72 @@ def assign_next_vehicle_route(
         "current_target"
     ]
 
+    # =====================================
+    # FINISHED ALL TARGETS
+    # =====================================
+
     if idx >= len(targets):
+
+        traffic = world.get(
+            "traffic",
+            {}
+        )
+
+        exits = (
+
+            traffic.get(
+                "exit_points",
+                []
+            )
+
+            or
+
+            world.get(
+                "road_exit_points",
+                []
+            )
+        )
+
+        if not exits:
+
+            vehicle["state"] = (
+                "despawn"
+            )
+
+            return
+
+        exit_point = exits[0]
+
+        current = (
+
+            int(vehicle["x"]),
+            int(vehicle["y"])
+        )
+
+        vehicle["route"] = (
+
+            find_road_path(
+
+                world,
+
+                current,
+
+                (
+                    exit_point["x"],
+                    exit_point["y"]
+                )
+            )
+        )
 
         vehicle["state"] = (
             "leaving"
         )
 
         return
+
+    # =====================================
+    # NEXT HOUSE
+    # =====================================
 
     household = targets[idx]
 
@@ -129,19 +205,20 @@ def assign_next_vehicle_route(
     current = (
 
         int(vehicle["x"]),
-
         int(vehicle["y"])
     )
 
-    vehicle["route"] = find_road_path(
+    vehicle["route"] = (
 
-        world,
+        find_road_path(
 
-        current,
+            world,
 
-        road_target
+            current,
+
+            road_target
+        )
     )
-
 
 # =========================================================
 # UPDATE SERVICE VEHICLES
@@ -203,33 +280,30 @@ def update_vehicle(
 
     if not route:
 
-        # ================================================
-        # LEAVING
-        # ================================================
-
         if state == "leaving":
 
             despawn_vehicle(
-
                 vehicle,
-
                 world
             )
 
             return
 
-        # ================================================
-        # ARRIVED
-        # ================================================
+        if state == "despawn":
+
+            despawn_vehicle(
+                vehicle,
+                world
+            )
+
+            return
 
         vehicle["state"] = (
             "parked"
         )
 
         spawn_service_worker(
-
             vehicle,
-
             world
         )
 
@@ -238,6 +312,27 @@ def update_vehicle(
         )
 
         return
+
+            # ================================================
+            # ARRIVED
+            # ================================================
+
+            vehicle["state"] = (
+                "parked"
+            )
+
+            spawn_service_worker(
+
+                vehicle,
+
+                world
+            )
+
+            vehicle["state"] = (
+                "waiting_for_worker"
+            )
+
+            return
 
     # =====================================================
     # DRIVING
@@ -382,3 +477,30 @@ def despawn_vehicle(
     world[
         "service_vehicles"
     ].remove(vehicle)
+
+
+    # =========================================================
+# WORKER FINISHED
+# =========================================================
+
+def service_worker_complete(
+
+    vehicle,
+
+    world
+):
+
+    vehicle[
+        "current_target"
+    ] += 1
+
+    assign_next_vehicle_route(
+
+        vehicle,
+
+        world
+    )
+
+    vehicle["state"] = (
+        "driving"
+    )
