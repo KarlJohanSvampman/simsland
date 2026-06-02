@@ -87,7 +87,7 @@ const placementState = {
 async function loadDefinitions(){
 
   const res = await fetch(
-    "/definitions.html?sim_id=default"
+    "/definitions?sim_id=default"
   );
 
   definitions = await res.json();

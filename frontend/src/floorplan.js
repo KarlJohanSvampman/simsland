@@ -26,8 +26,10 @@ const ctx = canvas.getContext("2d");
 const TILE_SIZE = 32;
 
 let definitions = {};
+let currentTool = "tile";
 
-let currentTool = "floor";
+let currentTileTemplate = "grass";
+
 let currentMaterial = "wood_floor_01";
 let roomMode = false;
 let isMouseDown = false;
@@ -45,11 +47,6 @@ const ROOM_TYPES = [
   "secondary_exit"
 ];
 
-const TILE_COLORS = {
-  floor: "#555",
-  grass: "#3f7a3f",
-  staircase: "#ffcc33"
-};
 
 const ROOM_COLORS = {
   restroom: "rgba(0,255,255,0.2)",
@@ -129,22 +126,32 @@ function ensureTile(x, y) {
   return floorplan.tiles[key];
 }
 
-function setFloorTile(x, y, type) {
-  invalidateNavigation();
-  const tile = ensureTile(x, y);
+function setFloorTile(
+  x,
+  y,
+  action
+){
 
-  if (type === "erase") {
+  invalidateNavigation();
+
+  const tile =
+    ensureTile(x,y);
+
+  if(
+    action === "erase"
+  ){
 
     delete floorplan.tiles[
-      tileKey(x, y)
+      tileKey(x,y)
     ];
 
     return;
   }
 
   tile.floor = {
-    type,
-    material: currentMaterial
+
+    template:
+      currentTileTemplate
   };
 }
 
@@ -191,12 +198,27 @@ function paintTile(x, y) {
     return;
   }
 
-  if (
-    currentTool === "floor" ||
-    currentTool === "grass" ||
-    currentTool === "staircase" ||
+  if(
+    currentTool === "tile"
+  ){
+
+    setFloorTile(
+      x,
+      y,
+      "tile"
+    );
+  }
+
+  else if(
     currentTool === "erase"
-  ) {
+  ){
+
+    setFloorTile(
+      x,
+      y,
+      "erase"
+    );
+  }{
     setFloorTile(x, y, currentTool);
   }
 
@@ -268,30 +290,84 @@ function renderGrid() {
   }
 }
 
-function renderTiles() {
+function renderTiles(){
 
-  for (const key in floorplan.tiles) {
+  for(
+    const key
+    in floorplan.tiles
+  ){
 
-    const [x, y] = key
-      .split(",")
+    const [x,y] =
+      key.split(",")
       .map(Number);
 
-    const tile = floorplan.tiles[key];
+    const tile =
+      floorplan.tiles[key];
 
-    if (tile.floor) {
-
-      ctx.fillStyle =
-        TILE_COLORS[
-          tile.floor.type
-        ] || "#777";
-
-      ctx.fillRect(
-        x * TILE_SIZE,
-        y * TILE_SIZE,
-        TILE_SIZE,
-        TILE_SIZE
-      );
+    if(
+      !tile.floor
+    ){
+      continue;
     }
+
+    const templateId =
+
+      tile.floor.template;
+
+    const tpl =
+
+      definitions
+        ?.tile_templates
+        ?.[templateId];
+
+    let color =
+      "#777";
+
+    if(
+      tpl?.editor_color
+    ){
+
+      color =
+        tpl.editor_color;
+    }
+
+    else{
+
+      switch(
+        templateId
+      ){
+
+        case "grass":
+          color="#3f7a3f";
+          break;
+
+        case "road":
+          color="#444";
+          break;
+
+        case "sidewalk":
+          color="#aaa";
+          break;
+
+        case "water":
+          color="#4477cc";
+          break;
+      }
+    }
+
+    ctx.fillStyle =
+      color;
+
+    ctx.fillRect(
+
+      x * TILE_SIZE,
+
+      y * TILE_SIZE,
+
+      TILE_SIZE,
+
+      TILE_SIZE
+    );
   }
 }
 
@@ -472,12 +548,14 @@ function setStatus(text) {
 async function loadDefinitions() {
 
   const res = await fetch(
-    "/api/editor/definitions.html?sim_id=default"
+    "/api/editor/definitions?sim_id=default"
   );
 
   definitions = await res.json();
 
   populateMaterials();
+
+  populateTileTemplates();
 }
 
 function populateMaterials() {
@@ -510,10 +588,62 @@ function populateMaterials() {
   };
 }
 
+function populateTileTemplates(){
+
+  const select =
+    document.getElementById(
+      "tileTemplateSelect"
+    );
+
+  if(!select){
+    return;
+  }
+
+  select.innerHTML = "";
+
+  const templates =
+
+    definitions
+      .tile_templates
+    || {};
+
+  for(
+    const id
+    in templates
+  ){
+
+    const opt =
+      document.createElement(
+        "option"
+      );
+
+    opt.value = id;
+
+    opt.textContent =
+      templates[id].name
+      || id;
+
+    select.appendChild(opt);
+  }
+
+  if(
+    select.options.length
+  ){
+
+    currentTileTemplate =
+      select.options[0].value;
+  }
+
+  select.onchange = ()=>{
+
+    currentTileTemplate =
+      select.value;
+  };
+} 
 async function saveDefinitions(defs) {
 
   await fetch(
-    "/api/editor/definitions.html?sim_id=default",
+    "/api/editor/definitions?sim_id=default",
     {
       method: "POST",
 

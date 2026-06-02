@@ -1,18 +1,19 @@
 from fastapi import APIRouter, Request
 from pathlib import Path
 import json
+
 from db import load_world, save_world
-from core.definitions import (
-    load_definitions,
-    defs_path
+
+from systems.navigation import (
+    cache_floorplan
 )
 router = APIRouter()
 
-@router.get("/editor/world")
+@router.get("/world")
 def get_world(sim_id: str):
     return load_world(sim_id)
 
-@router.post("/editor/world")
+@router.post("/world")
 def save(sim_id: str, data: dict):
     save_world(sim_id, data)
     return {"status": "ok"}
