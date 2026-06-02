@@ -226,12 +226,24 @@ body {
     Definitions
   </button>
 
+  <button onclick="window.location='/floorplan.html'">
+    Floorplan Designer
+  </button>
+
 </div>
 <div id="placementToolbar">
 
-  <button id="placeFloorplanBtn">
-    Place Floorplan
-  </button>
+<div class="toolButton" data-tool="select">Select</div>
+<div class="toolButton" data-tool="paint_tile">Paint Tile</div>
+
+<select id="worldTileSelect">
+  <option value="grass">Grass</option>
+  <option value="sidewalk">Sidewalk</option>
+  <option value="road">Road</option>
+  <option value="park">Park</option>
+</select>
+
+<div class="toolButton" data-tool="place_floorplan">Place Floorplan</div>
 
   <select id="floorplanSelect"></select>
 
@@ -280,28 +292,61 @@ body {
 
   <hr>
 
-  <div class="toolButton">
+  <div
+    class="toolButton"
+    data-tool="select">
+
     Select
+
   </div>
 
-  <div class="toolButton">
-    Paint Floor
+  <div
+    class="toolButton"
+    data-tool="paint_tile">
+
+    Paint Tile
+
   </div>
 
-  <div class="toolButton">
-    Paint Grass
+  <select
+    id="worldTileSelect">
+
+    <option value="grass">
+      Grass
+    </option>
+
+    <option value="road">
+      Road
+    </option>
+
+    <option value="sidewalk">
+      Sidewalk
+    </option>
+
+    <option value="park">
+      Park
+    </option>
+
+    <option value="water">
+      Water
+    </option>
+
+  </select>
+
+  <div
+    class="toolButton"
+    data-tool="place_floorplan">
+
+    Place Floorplan
+
   </div>
 
-  <div class="toolButton">
+  <div
+    class="toolButton"
+    data-tool="place_prop">
+
     Place Prop
-  </div>
 
-  <div class="toolButton">
-    Spawn Character
-  </div>
-
-  <div class="toolButton">
-    Road Tool
   </div>
 
 </div>

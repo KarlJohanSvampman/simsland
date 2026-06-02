@@ -22,8 +22,31 @@ const camera =
   );
 let selectedTile = null;
 let selectionHighlight = null;
+let currentTool = "select";
+let currentWorldTileType = "grass";
 camera.position.set(10,10,10);
 
+document.querySelectorAll(".toolButton").forEach(btn => {
+  btn.onclick = () => {
+    document.querySelectorAll(".toolButton")
+      .forEach(b => b.classList.remove("active"));
+
+    btn.classList.add("active");
+    currentTool = btn.dataset.tool || "select";
+
+    placementState.active =
+      currentTool === "place_floorplan";
+  };
+});
+
+const worldTileSelect =
+  document.getElementById("worldTileSelect");
+
+if(worldTileSelect){
+  worldTileSelect.onchange = () => {
+    currentWorldTileType = worldTileSelect.value;
+  };
+}
 const renderer =
   new THREE.WebGLRenderer({
 
@@ -87,7 +110,7 @@ const placementState = {
 async function loadDefinitions(){
 
   const res = await fetch(
-    "/definitions?sim_id=default"
+    "/api/editor/definitions?sim_id=default"
   );
 
   definitions = await res.json();
@@ -396,7 +419,69 @@ renderer.domElement
 
     const tile =
       hits[0].object;
+if(
+  currentTool ===
+  "paint_tile"
+){
 
+  const colorMap = {
+
+    grass:
+      0x3f7a3f,
+
+    road:
+      0x333333,
+
+    sidewalk:
+      0xaaaaaa,
+
+    park:
+      0x55aa55,
+
+    water:
+      0x3377cc
+  };
+
+  tile.material.color.set(
+
+    colorMap[
+      currentWorldTileType
+    ] || 0x557799
+  );
+
+    worldState.world_tiles ||= [];
+
+    const existing =
+      worldState.world_tiles
+        .find(
+
+          t =>
+            t.x === tile.userData.x &&
+            t.y === tile.userData.y
+        );
+
+    if(existing){
+
+      existing.type =
+        currentWorldTileType;
+    }
+    else{
+
+      worldState.world_tiles.push({
+
+        x:
+          tile.userData.x,
+
+        y:
+          tile.userData.y,
+
+        type:
+          currentWorldTileType
+      });
+    }
+
+    return;
+  }
     selectedTile = tile;
 
     selectionHighlight.visible = true;
@@ -509,7 +594,60 @@ window.saveWorld = async function(){
 window.reloadWorld = ()=>{
   location.reload();
 };
+async function loadWorld(){
 
+  const res =
+    await fetch(
+      "/api/editor/world?sim_id=default"
+    );
+
+  const world =
+    await res.json();
+
+  Object.assign(
+    worldState,
+    world
+  );
+
+  for(
+    const t of
+    worldState.world_tiles || []
+  ){
+
+    const tile =
+      tiles[
+        `${t.x},${t.y}`
+      ];
+
+    if(!tile)
+      continue;
+
+    const colorMap = {
+
+      grass:
+        0x3f7a3f,
+
+      road:
+        0x333333,
+
+      sidewalk:
+        0xaaaaaa,
+
+      park:
+        0x55aa55,
+
+      water:
+        0x3377cc
+    };
+
+    tile.material.color.set(
+
+      colorMap[
+        t.type
+      ] || 0x557799
+    );
+  }
+}
 // =========================================
 // ANIMATE
 // =========================================
@@ -528,5 +666,8 @@ function animate(){
   );
 }
 
-loadDefinitions();
+await loadDefinitions();
+
+await loadWorld();
+
 animate();
