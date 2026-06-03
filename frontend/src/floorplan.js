@@ -218,10 +218,7 @@ function paintTile(x, y) {
       y,
       "erase"
     );
-  }{
-    setFloorTile(x, y, currentTool);
   }
-
   else if (currentTool === "wall") {
     setWallTile(x, y, "north", "wall");
     setWallTile(x, y, "west", "wall");
@@ -233,6 +230,9 @@ function paintTile(x, y) {
 
   else if (currentTool === "window") {
     setWallTile(x, y, "north", "window");
+  } else
+    {
+    setFloorTile(x, y, currentTool);
   }
 
   render();

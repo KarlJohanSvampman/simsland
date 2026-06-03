@@ -1,0 +1,41 @@
+{
+  "prop_templates": {},
+  "item_templates": {},
+  "character_templates": {},
+  "interaction_templates": {},
+  "activity_templates": {},
+  "tile_templates": {
+    "Grass": {
+      "grass": {
+        "name": "Grass",
+        "category": "terrain",
+        "material": "grass",
+        "walkable": true,
+        "vehicle_access": false,
+        "movement_cost": 1,
+        "blocks_los": false,
+        "buildable": true
+      }
+    }
+  },
+  "floorplan_templates": {},
+  "material_templates": {
+    "Grass": {
+      "grass": {
+        "name": "Grass",
+        "texture": "/materials/grass.jpg",
+        "editor_color": "#4f8f4f",
+        "roughness": 1,
+        "metalness": 0
+      }
+    }
+  },
+  "recipe_templates": {},
+  "product_templates": {},
+  "appliance_templates": {},
+  "vehicle_templates": {},
+  "service_templates": {},
+  "storage_templates": {},
+  "social_templates": {},
+  "need_templates": {}
+}

@@ -124,7 +124,7 @@ async function loadDefinitions(){
   try {
 
     const res = await fetch(
-      '/definitions?sim_id=default'
+      '/api/editor/definitions?sim_id=default'
     );
 
     definitions = await res.json();
@@ -312,7 +312,7 @@ window.saveDefinitions = async function(){
     }
 
     await fetch(
-      '/definitions?sim_id=default',
+      '/api/editor/definitions?sim_id=default',
       {
         method: 'POST',
         headers: {

@@ -17,6 +17,7 @@ services:
     volumes:
       - ./backend:/app
       - ./resources:/resources   # 👈 important for models/assets
+      - ./simulations:/data/simulations
     command: >
       uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 

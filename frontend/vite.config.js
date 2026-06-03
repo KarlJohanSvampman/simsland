@@ -16,7 +16,10 @@ export default defineConfig({
           resolve(__dirname, "editor.html"),
 
         definitions:
-          resolve(__dirname, "definitions.html")
+          resolve(__dirname, "definitions.html"),
+
+        floorplan:
+          resolve(__dirname, "floorplan.html")
       }
     }
   }
