@@ -533,6 +533,70 @@ def ensure_character_defaults(c):
         }
     )
 
+        appearance = c.setdefault(
+        "appearance",
+        {}
+    )
+
+    appearance.setdefault(
+        "traits",
+        []
+    )
+
+    appearance.setdefault(
+        "height",
+        None
+    )
+
+    appearance.setdefault(
+        "build",
+        None
+    )
+
+    appearance.setdefault(
+        "hair_color",
+        None
+    )
+
+    appearance.setdefault(
+        "hair_style",
+        None
+    )
+
+    appearance.setdefault(
+        "eye_color",
+        None
+    )
+
+    appearance.setdefault(
+        "clothing_style",
+        None
+    )
+
+    job = c.setdefault(
+        "job",
+        {}
+    )
+
+    job.setdefault(
+        "title",
+        None
+    )
+
+    job.setdefault(
+        "company",
+        None
+    )
+
+    job.setdefault(
+        "sector",
+        None
+    )
+
+    job.setdefault(
+        "job_template",
+        None
+    )
 # =========================================================
 # HOUSEHOLD DEFAULTS
 # =========================================================
