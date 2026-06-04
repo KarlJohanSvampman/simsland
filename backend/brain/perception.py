@@ -1,6 +1,6 @@
 import math
 import random
-
+import systems.perception.descriptions
 
 # =========================================================
 # DISTANCE
@@ -1006,9 +1006,7 @@ def select_focus(
 # =========================================================
 
 def perceive(
-
     c,
-
     world
 ):
 
@@ -1017,10 +1015,39 @@ def perceive(
         world
     )
 
+    visible_people = []
+
+    for other in perception_people:
+
+        target = (
+            world["characters"]
+            .get(other["id"])
+        )
+
+        if not target:
+            continue
+
+        enriched = dict(other)
+
+        enriched["description"] = (
+            build_visible_person_description(
+                c,
+                target,
+                world.get(
+                    "definitions",
+                    {}
+                )
+            )
+        )
+
+        visible_people.append(
+            enriched
+        )
+
     perception = {
 
         "visible_people":
-            perception_people,
+            visible_people,
 
         "social_relations":
             perceive_social_relationships(

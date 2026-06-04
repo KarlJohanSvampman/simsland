@@ -1,7 +1,100 @@
 {
-  "prop_templates": {},
+  "prop_templates": {
+    "Kitchen_Table": {
+      "kitchen_table": {
+        "name": "Kitchen Table",
+        "category": "furniture",
+        "model": "table_wood_01",
+        "material": "oak_wood",
+        "footprint": {
+          "width": 2,
+          "height": 2
+        },
+        "interaction_points": [
+          {
+            "x": 0,
+            "y": 1
+          },
+          {
+            "x": 1,
+            "y": 1
+          }
+        ],
+        "interactions": [
+          "eat_meal",
+          "chat"
+        ],
+        "cost": 250,
+        "durability": 100
+      }
+    }
+  },
   "item_templates": {},
-  "character_templates": {},
+  "character_templates": {
+    "MilesEvans": {
+      "miles_evans": {
+        "name": "Miles Evans",
+        "age_range": [
+          25,
+          55
+        ],
+        "traits": [
+          "responsible",
+          "social",
+          "envious",
+          "cheap",
+          "gambler",
+          "insurance company employee",
+          "pragmatic",
+          "economical",
+          "scared of rats",
+          "soccer fan",
+          "confrontational when drunk",
+          "beta male",
+          "blends in with crowd",
+          "bad driver",
+          "dog person",
+          "easily agitated",
+          "smoker"
+        ],
+        "needs": {
+          "hunger": 100,
+          "energy": 100,
+          "hygiene": 100,
+          "social": 100,
+          "fun": 100
+        },
+        "skills": {
+          "cooking": 20,
+          "cleaning": 30,
+          "repair": 10,
+          "social": 40
+        },
+        "employment": {
+          "job": "office_worker",
+          "salary": 3200
+        },
+        "daily_schedule": {
+          "sleep": [
+            22,
+            6
+          ],
+          "work": [
+            8,
+            17
+          ]
+        },
+        "appearance": {
+          "model": "human_male_01",
+          "material": "civilian_clothes_01"
+        },
+        "starting_inventory": [
+          "wallet",
+          "phone"
+        ]
+      }
+    }
+  },
   "interaction_templates": {},
   "activity_templates": {},
   "tile_templates": {

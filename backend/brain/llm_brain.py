@@ -85,6 +85,22 @@ Examples:
 - delivery
 - ignore_need
 
+Visible people may include a
+description field.
+
+Descriptions represent what your
+character currently observes or
+reasonably knows about that person.
+
+Use those descriptions when making
+social decisions, conversations,
+judgements and plans.
+
+Do not assume information that is
+not present in perception,
+memories, relationships or social
+models.
+
 Your current psychological pressures:
 {cognitive_pressure}
 

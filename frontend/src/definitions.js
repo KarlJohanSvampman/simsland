@@ -13,7 +13,6 @@ let definitions = {
   activity_templates: {},
   tile_templates: {},
   floorplan_templates: {},
-
   material_templates: {},
   recipe_templates: {},
   product_templates: {},
@@ -22,7 +21,10 @@ let definitions = {
   service_templates: {},
   storage_templates: {},
   social_templates: {},
-  need_templates: {}
+  need_templates: {},
+  trait_templates: {},
+  job_templates: {},
+  company_templates: {}
 };
 
 const tabs = [
@@ -41,7 +43,10 @@ const tabs = [
   "tile_templates",
   "item_templates",
   "social_templates",
-  "need_templates"
+  "need_templates",
+  "trait_templates",
+  "job_templates",
+  "company_templates"
 ];
 
 let assets = {
