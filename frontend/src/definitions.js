@@ -255,14 +255,23 @@ function openTemplate(id){
 
 window.createTemplate = function(){
 
-  const id = prompt('Template ID');
+  const id = prompt("Template ID");
 
   if(!id) return;
 
+  if(!definitions[currentTab]){
+
+    definitions[currentTab] = {};
+  }
+
   definitions[currentTab][id] = {};
 
+  currentTemplateId = id;
+
   renderTemplateList();
-}
+
+  openTemplate(id);
+};
 
 // =====================================================
 // DUPLICATE

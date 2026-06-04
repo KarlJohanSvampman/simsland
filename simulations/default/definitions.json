@@ -1,62 +1,26 @@
 {
   "prop_templates": {
-    "Kitchen_Table": {
-      "kitchen_table": {
-        "name": "Kitchen Table",
-        "category": "furniture",
-        "model": "table_wood_01",
-        "material": "oak_wood",
-        "footprint": {
-          "width": 2,
-          "height": 2
-        },
-        "interaction_points": [
-          {
-            "x": 0,
-            "y": 1
-          },
-          {
-            "x": 1,
-            "y": 1
-          }
-        ],
+    "Television": {
+      "television": {
+        "name": "Television",
+        "category": "electronics",
+        "model": "tv_01",
         "interactions": [
-          "eat_meal",
-          "chat"
-        ],
-        "cost": 250,
-        "durability": 100
+          "watch_tv"
+        ]
       }
     }
   },
   "item_templates": {},
   "character_templates": {
-    "MilesEvans": {
+    "Miles_Evans": {
       "miles_evans": {
         "name": "Miles Evans",
         "age_range": [
           25,
-          55
+          40
         ],
-        "traits": [
-          "responsible",
-          "social",
-          "envious",
-          "cheap",
-          "gambler",
-          "insurance company employee",
-          "pragmatic",
-          "economical",
-          "scared of rats",
-          "soccer fan",
-          "confrontational when drunk",
-          "beta male",
-          "blends in with crowd",
-          "bad driver",
-          "dog person",
-          "easily agitated",
-          "smoker"
-        ],
+        "traits": [],
         "needs": {
           "hunger": 100,
           "energy": 100,
@@ -95,8 +59,72 @@
       }
     }
   },
-  "interaction_templates": {},
-  "activity_templates": {},
+  "interaction_templates": {
+    "Eat_Meal": {
+      "eat_meal": {
+        "name": "Eat Meal",
+        "duration": 1800,
+        "required_prop_tags": [
+          "table"
+        ],
+        "need_changes": {
+          "hunger": 40,
+          "social": 5
+        },
+        "animation": "sit_eat",
+        "priority": 80
+      }
+    },
+    "Watch_TV": {
+      "watch_tv": {
+        "name": "Watch TV",
+        "duration": 3600,
+        "required_prop_tags": [
+          "television"
+        ],
+        "need_changes": {
+          "fun": 35,
+          "energy": -5
+        },
+        "animation": "sit_watch",
+        "priority": 50
+      }
+    }
+  },
+  "activity_templates": {
+    "Have_Breakfast": {
+      "have_breakfast": {
+        "name": "Have Breakfast",
+        "priority": 70,
+        "conditions": {
+          "hunger_below": 60,
+          "hour_range": [
+            6,
+            10
+          ]
+        },
+        "steps": [
+          "find_food",
+          "eat_meal"
+        ]
+      }
+    },
+    "Relax": {
+      "relax": {
+        "priority": 40,
+        "conditions": {
+          "fun_below": 70,
+          "hour_range": [
+            18,
+            23
+          ]
+        },
+        "steps": [
+          "watch_tv"
+        ]
+      }
+    }
+  },
   "tile_templates": {
     "Grass": {
       "grass": {
@@ -116,7 +144,7 @@
     "Grass": {
       "grass": {
         "name": "Grass",
-        "texture": "/materials/grass.jpg",
+        "texture": "/materials/terrain/grass.jpg",
         "editor_color": "#4f8f4f",
         "roughness": 1,
         "metalness": 0
@@ -130,5 +158,10 @@
   "service_templates": {},
   "storage_templates": {},
   "social_templates": {},
-  "need_templates": {}
+  "need_templates": {},
+  "trait_templates": {},
+  "job_templates": {
+    "Insurance_Salesman": {}
+  },
+  "company_templates": {}
 }

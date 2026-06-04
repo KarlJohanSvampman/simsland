@@ -36,7 +36,10 @@ def load_definitions(sim_id):
             "interaction_templates": {},
             "activity_templates": {},
             "tile_templates": {},
-            "floorplan_templates": {}
+            "floorplan_templates": {},
+            "trait_templates": {},
+            "job_templates": {},
+            "company_templates": {}
         }
 
     with open(path, "r") as f:

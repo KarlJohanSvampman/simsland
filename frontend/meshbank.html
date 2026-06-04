@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+
+<meta charset="utf-8">
+
+<title>Holosims Mesh Bank</title>
+
+<style>
+
+html,
+body{
+    margin:0;
+    width:100%;
+    height:100%;
+    overflow:hidden;
+
+    background:#1f2328;
+    color:white;
+
+    font-family:Arial;
+}
+
+#root{
+    display:flex;
+    width:100%;
+    height:100%;
+}
+
+#sidebar{
+
+    width:300px;
+
+    background:#2a2f36;
+
+    border-right:1px solid #444;
+
+    overflow:auto;
+}
+
+#preview{
+
+    flex:1;
+
+    position:relative;
+}
+
+#canvas{
+    width:100%;
+    height:100%;
+    display:block;
+}
+
+.section{
+
+    padding:12px;
+
+    border-bottom:1px solid #444;
+}
+
+.assetRow{
+
+    padding:6px;
+
+    cursor:pointer;
+
+    border-bottom:1px solid #333;
+}
+
+.assetRow:hover{
+    background:#3a414a;
+}
+
+.assetRow.active{
+    background:#4c5c70;
+}
+
+label{
+    display:block;
+    margin-top:8px;
+}
+
+input{
+    width:100%;
+    padding:4px;
+}
+
+button{
+    margin-top:8px;
+    padding:6px;
+}
+
+#hierarchy{
+
+    max-height:200px;
+    overflow:auto;
+    font-size:12px;
+}
+
+#anchors{
+
+    max-height:150px;
+    overflow:auto;
+    font-size:12px;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<div id="root">
+
+    <div id="sidebar">
+
+        <div class="section">
+
+            <h3>Assets</h3>
+
+            <select id="category">
+
+                <option value="characters">
+                    Characters
+                </option>
+
+                <option value="props">
+                    Props
+                </option>
+
+                <option value="items">
+                    Items
+                </option>
+
+            </select>
+
+        </div>
+
+        <div
+            id="assetList"
+            class="section">
+        </div>
+
+        <div class="section">
+
+            <h3>Metadata</h3>
+
+            <label>
+                Display Name
+            </label>
+
+            <input
+                id="displayName">
+
+            <label>
+                Tags
+            </label>
+
+            <input
+                id="tags">
+
+            <button
+                id="saveMetaBtn">
+
+                Save Metadata
+
+            </button>
+
+        </div>
+
+        <div class="section">
+
+            <h3>Animations</h3>
+
+        <button id="frameBtn">
+    Frame Model
+</button>
+            <div id="animations"></div>
+
+        </div>
+
+
+        <div class="section">
+
+            <h3>Anchors</h3>
+
+            <div id="anchors"></div>
+
+        </div>
+        <div class="section">
+
+    <h3>Statistics</h3>
+
+    <div id="stats">
+
+        No model loaded
+
+    </div>
+
+</div>
+
+        <div class="section">
+
+            <h3>Hierarchy</h3>
+
+            <div id="hierarchy"></div>
+
+        </div>
+
+    </div>
+
+    <div id="preview">
+
+        <canvas id="canvas"></canvas>
+
+    </div>
+
+</div>
+
+<script
+type="module"
+src="/src/meshbank.js">
+</script>
+
+</body>
+
+</html>
