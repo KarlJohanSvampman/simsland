@@ -533,7 +533,7 @@ def ensure_character_defaults(c):
         }
     )
 
-        appearance = c.setdefault(
+    appearance = c.setdefault(
         "appearance",
         {}
     )
