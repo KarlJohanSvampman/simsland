@@ -19,6 +19,9 @@ from api.props import router as props_router
 from systems.schema_defaults import (
     ensure_world_defaults
 )
+from api.meshbank import (
+    router as meshbank_router
+)
 app = FastAPI(title="Simsland")
 app.add_middleware(
     CORSMiddleware,
@@ -34,6 +37,7 @@ clients = []
 app.include_router(view_router)
 app.include_router(assets_router, prefix="/api")
 app.include_router(props_router, prefix="/api")
+app.include_router(meshbank_router,prefix="/api")
 SIM_ID = "default"
 
 frontend_dir = Path(__file__).parent / "frontend"

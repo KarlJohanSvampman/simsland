@@ -19,7 +19,10 @@ export default defineConfig({
           resolve(__dirname, "definitions.html"),
 
         floorplan:
-          resolve(__dirname, "floorplan.html")
+          resolve(__dirname, "floorplan.html"),
+
+        meshbank:
+          resolve(__dirname, "meshbank.html")
       }
     }
   }

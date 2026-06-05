@@ -6,6 +6,8 @@ from "three/examples/jsm/controls/OrbitControls.js";
 import { GLTFLoader }
 from "three/examples/jsm/loaders/GLTFLoader.js";
 
+
+
 const canvas =
     document.getElementById(
         "canvas"
@@ -117,9 +119,9 @@ scene.add(
     ground
 );
 let currentModel = null;
-
+let meshbank = {};
 let mixer = null;
-
+let currentAssetId;
 let currentAnimations = [];
 let currentBoxHelper = null;
 
@@ -141,6 +143,35 @@ async function loadAssets(){
         await res.json();
 
     populateAssetList();
+}
+
+function extractAnchors(root){
+
+    const anchors = {};
+
+    root.traverse(node=>{
+
+        const name =
+            node.name || "";
+
+        if(
+            name
+            .toLowerCase()
+            .startsWith(
+                "anchor_"
+            )
+        ){
+
+            anchors[
+                name.replace(
+                    "anchor_",
+                    ""
+                )
+            ] = name;
+        }
+    });
+
+    return anchors;
 }
 
 function populateAssetList(){
@@ -173,7 +204,32 @@ function populateAssetList(){
 
         div.onclick = ()=>{
 
+    currentAssetId =
+        asset
+            .split("/")
+            .pop()
+            .replace(".glb","");
+
             loadModel(asset);
+
+            const meta =
+                meshbank[currentAssetId];
+
+            document
+            .getElementById(
+                "displayName"
+            )
+            .value =
+                meta?.display_name || "";
+
+            document
+            .getElementById(
+                "tags"
+            )
+            .value =
+                (
+                    meta?.tags || []
+                ).join(",");
         };
 
         container.appendChild(
@@ -221,6 +277,113 @@ function clearCurrentModel(){
     mixer = null;
 }
 
+async function loadMeshbank(){
+
+    const res =
+        await fetch(
+            "/api/meshbank"
+        );
+
+    meshbank =
+        await res.json();
+}
+async function saveMeshbank(){
+
+    await fetch(
+
+        "/api/meshbank",
+
+        {
+            method:"POST",
+
+            headers:{
+                "Content-Type":
+                "application/json"
+            },
+
+            body: JSON.stringify(
+                meshbank
+            )
+        }
+    );
+}
+
+document
+.getElementById(
+    "uploadBtn"
+)
+.onclick = async ()=>{
+
+    const file =
+
+        document
+        .getElementById(
+            "uploadFile"
+        )
+        .files[0];
+
+    if(!file)
+        return;
+
+    const category =
+        document
+        .getElementById(
+            "category"
+        )
+        .value;
+
+    const form =
+        new FormData();
+
+    form.append(
+        "file",
+        file
+    );
+
+    const res =
+        await fetch(
+
+            `/api/assets/upload?category=${category}`,
+
+            {
+                method:"POST",
+                body:form
+            }
+        );
+
+    const result =
+        await res.json();
+
+    alert(
+        "Uploaded"
+    );
+
+    await loadAssets();
+
+    const assetId = file.name.replace(".glb","");
+    const meta = meshbank[assetId];
+    const tags = [];
+
+    meshbank[assetId] = {
+
+        display_name:
+            assetId,
+
+        category,
+
+        mesh:
+            result.path,
+
+        tags,
+
+        anchors: {}
+    };
+meshbank[
+    currentAssetId
+].anchors ||= {};
+    await saveMeshbank();
+
+};
 function addAnchorMarker(
     position,
     name
@@ -273,8 +436,8 @@ function addAnchorMarker(
             "button"
         );
 
-    row.textContent =
-        name;
+row.textContent =
+    `${name}`;
 
     row.onclick = ()=>{
 
@@ -484,6 +647,20 @@ function loadModel(url){
             currentModel =
                 gltf.scene;
 
+                if(currentAssetId){
+
+    meshbank[
+        currentAssetId
+    ] ||= {};
+
+    meshbank[
+        currentAssetId
+    ].anchors =
+        extractAnchors(
+            gltf.scene
+        );
+}
+
             scene.add(
                 currentModel
             );
@@ -595,7 +772,9 @@ window.addEventListener(
 );
 animate();
 
-loadAssets();
+await loadMeshbank();
+
+await loadAssets();
 
 document
 .getElementById(
@@ -609,4 +788,85 @@ document
             currentModel
         );
     }
+};
+
+
+document
+.getElementById(
+    "saveMetaBtn"
+)
+.onclick = async ()=>{
+
+    if(!currentAssetId)
+        return;
+
+    meshbank[
+        currentAssetId
+    ].display_name =
+
+        document
+        .getElementById(
+            "displayName"
+        )
+        .value;
+
+    meshbank[
+        currentAssetId
+    ].tags =
+
+        document
+        .getElementById(
+            "tags"
+        )
+        .value
+
+        .split(",")
+
+        .map(
+            s => s.trim()
+        )
+
+        .filter(Boolean);
+    meshbank[
+        currentAssetId
+    ].anchors ||= {};
+    await saveMeshbank();
+    
+await loadMeshbank();
+};
+
+document
+.getElementById(
+    "generateMetaBtn"
+)
+.onclick = async ()=>{
+
+    if(
+        !currentAssetId ||
+        !currentModel
+    ){
+        return;
+    }
+
+    meshbank[
+        currentAssetId
+    ] ||= {};
+
+    meshbank[
+        currentAssetId
+    ].display_name =
+        currentAssetId;
+
+    meshbank[
+        currentAssetId
+    ].anchors =
+        extractAnchors(
+            currentModel
+        );
+
+    await saveMeshbank();
+
+    alert(
+        "Metadata generated"
+    );
 };
