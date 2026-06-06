@@ -90,6 +90,13 @@
     "anchors": {
       "Anchor_Pull": "Anchor_Pull",
       "Anchor_Push": "Anchor_Push"
+    },
+    "bones": {},
+    "hasSkeleton": false,
+    "bounds": {
+      "width": 1.3407254815101624,
+      "height": 0.2859155386686325,
+      "depth": 2.4149136543273926
     }
   },
   "bed_a": {
@@ -103,7 +110,9 @@
       "width": 5.553552347776531,
       "height": 5.053544218216594,
       "depth": 1.262158059763756
-    }
+    },
+    "display_name": "",
+    "tags": []
   },
   "door_a": {
     "anchors": {
@@ -138,5 +147,18 @@
     "tags": [
       "Seat"
     ]
+  },
+  "television": {
+    "anchors": {
+      "powerbtn": "anchor_powerbtn",
+      "remote_origin": "anchor_remote_origin"
+    },
+    "bones": {},
+    "hasSkeleton": false,
+    "bounds": {
+      "width": 1.8330219984054565,
+      "height": 0.9085011589358437,
+      "depth": 0.058471131140260625
+    }
   }
 }

@@ -516,6 +516,7 @@ function populateAnimations(
 
     for(const clip of animations){
 
+
         const btn =
             document.createElement(
                 "button"
@@ -526,13 +527,15 @@ function populateAnimations(
 
         btn.onclick = ()=>{
 
-            mixer.stopAllAction();
+            if (mixer != null && mixer != undefined) {
+                mixer.stopAllAction();
+                mixer.clipAction(
+                        clip
+                    )
+                    .play();
+            }
 
-            mixer
-            .clipAction(
-                clip
-            )
-            .play();
+  
         };
 
         container.appendChild(
