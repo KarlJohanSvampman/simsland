@@ -9,6 +9,17 @@
           "watch_tv"
         ]
       }
+    },
+    "Sofa": {
+      "sofa": {
+        "name": "Sofa",
+        "category": "furniture",
+        "model": "sofa_a",
+        "interactions": [
+          "sit",
+          "lie_down"
+        ]
+      }
     }
   },
   "item_templates": {},

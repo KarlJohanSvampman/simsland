@@ -379,7 +379,7 @@ document
         anchors: {}
     };
 meshbank[
-    currentAssetId
+    assetId
 ].anchors ||= {};
     await saveMeshbank();
 
@@ -543,19 +543,19 @@ function populateAnimations(
 
 function frameModel(model){
 
+    
     const box =
-        new THREE.Box3()
-        .setFromObject(
-            model
-        );
+    new THREE.Box3()
+        .setFromObject(model);
+
+const size =
+    box.getSize(
+        new THREE.Vector3()
+    );
+
 
     const center =
         box.getCenter(
-            new THREE.Vector3()
-        );
-
-    const size =
-        box.getSize(
             new THREE.Vector3()
         );
 
@@ -569,7 +569,14 @@ function frameModel(model){
     model.position.sub(
         center
     );
+    meshbank[currentAssetId].bounds = {
 
+        width: size.x,
+
+        height: size.y,
+
+        depth: size.z
+    };  
     camera.position.set(
 
         maxDim * 1.8,
@@ -627,6 +634,134 @@ function frameModel(model){
         ${maxDim.toFixed(2)}
     `;
 }
+function extractBones(root){
+
+    const bones = {};
+
+    root.traverse(node=>{
+
+        if(node.isBone){
+
+            bones[node.name] = {
+                name: node.name
+            };
+        }
+    });
+
+    return bones;
+}
+
+
+function extractTargets(root){
+
+    const targets = {};
+
+    root.traverse(node=>{
+
+        if(
+            node.name.startsWith(
+                "target_"
+            )
+        ){
+
+            const id =
+                node.name
+                .replace(
+                    "target_",
+                    ""
+                );
+
+            targets[id] = {
+                node:
+                    node.name
+            };
+        }
+    });
+
+    return targets;
+}
+
+function extractAnimations(gltf){
+
+    const result = {};
+
+    for(
+        const clip
+        of gltf.animations
+    ){
+
+        result[
+            clip.name
+        ] = {
+
+            duration:
+                clip.duration
+        };
+    }
+
+    return result;
+}
+
+
+function detectSkeleton(root){
+
+    let found = false;
+
+    root.traverse(node=>{
+
+        if(node.isSkinnedMesh){
+
+            found = true;
+        }
+    });
+
+    return found;
+}
+
+function applyTransform(
+    object,
+    transform
+){
+
+    if(!transform)
+        return;
+
+    object.position.set(
+
+        transform.position?.x ?? 0,
+
+        transform.position?.y ?? 0,
+
+        transform.position?.z ?? 0
+    );
+
+    object.rotation.set(
+
+        THREE.MathUtils.degToRad(
+
+            transform.rotation?.x ?? 0
+        ),
+
+        THREE.MathUtils.degToRad(
+
+            transform.rotation?.y ?? 0
+        ),
+
+        THREE.MathUtils.degToRad(
+
+            transform.rotation?.z ?? 0
+        )
+    );
+
+    object.scale.set(
+
+        transform.scale?.x ?? 1,
+
+        transform.scale?.y ?? 1,
+
+        transform.scale?.z ?? 1
+    );
+}
 
 function loadModel(url){
 
@@ -649,9 +784,22 @@ function loadModel(url){
 
                 if(currentAssetId){
 
+                    meshbank[
+                        currentAssetId
+                    ] ||= {};
+    const transform =
     meshbank[
         currentAssetId
-    ] ||= {};
+    ]?.transform;
+
+    if(transform){
+        applyTransform(
+            currentModel,
+            meshbank[
+                currentAssetId
+            ].transform
+        );
+}
 
     meshbank[
         currentAssetId
@@ -659,7 +807,21 @@ function loadModel(url){
         extractAnchors(
             gltf.scene
         );
+
+        const bones =
+    extractBones(
+        gltf.scene
+    );
+
+meshbank[
+    currentAssetId
+].bones = bones;
 }
+
+meshbank[currentAssetId].hasSkeleton =
+    detectSkeleton(
+        gltf.scene
+    );
 
             scene.add(
                 currentModel

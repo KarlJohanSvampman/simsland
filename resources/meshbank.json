@@ -1,0 +1,142 @@
+{
+  "adult_male": {
+    "anchors": {},
+    "bones": {
+      "mixamorigHips": {
+        "name": "mixamorigHips"
+      },
+      "mixamorigSpine": {
+        "name": "mixamorigSpine"
+      },
+      "mixamorigSpine1": {
+        "name": "mixamorigSpine1"
+      },
+      "mixamorigSpine2": {
+        "name": "mixamorigSpine2"
+      },
+      "mixamorigNeck": {
+        "name": "mixamorigNeck"
+      },
+      "mixamorigHead": {
+        "name": "mixamorigHead"
+      },
+      "mixamorigHeadTop_End": {
+        "name": "mixamorigHeadTop_End"
+      },
+      "mixamorigLeftShoulder": {
+        "name": "mixamorigLeftShoulder"
+      },
+      "mixamorigLeftArm": {
+        "name": "mixamorigLeftArm"
+      },
+      "mixamorigLeftForeArm": {
+        "name": "mixamorigLeftForeArm"
+      },
+      "mixamorigLeftHand": {
+        "name": "mixamorigLeftHand"
+      },
+      "mixamorigRightShoulder": {
+        "name": "mixamorigRightShoulder"
+      },
+      "mixamorigRightArm": {
+        "name": "mixamorigRightArm"
+      },
+      "mixamorigRightForeArm": {
+        "name": "mixamorigRightForeArm"
+      },
+      "mixamorigRightHand": {
+        "name": "mixamorigRightHand"
+      },
+      "mixamorigLeftUpLeg": {
+        "name": "mixamorigLeftUpLeg"
+      },
+      "mixamorigLeftLeg": {
+        "name": "mixamorigLeftLeg"
+      },
+      "mixamorigLeftFoot": {
+        "name": "mixamorigLeftFoot"
+      },
+      "mixamorigLeftToeBase": {
+        "name": "mixamorigLeftToeBase"
+      },
+      "mixamorigLeftToe_End": {
+        "name": "mixamorigLeftToe_End"
+      },
+      "mixamorigRightUpLeg": {
+        "name": "mixamorigRightUpLeg"
+      },
+      "mixamorigRightLeg": {
+        "name": "mixamorigRightLeg"
+      },
+      "mixamorigRightFoot": {
+        "name": "mixamorigRightFoot"
+      },
+      "mixamorigRightToeBase": {
+        "name": "mixamorigRightToeBase"
+      },
+      "mixamorigRightToe_End": {
+        "name": "mixamorigRightToe_End"
+      }
+    },
+    "hasSkeleton": false,
+    "bounds": {
+      "width": 0,
+      "height": 0,
+      "depth": 0
+    },
+    "display_name": "adult_male"
+  },
+  "door_a_closed": {
+    "anchors": {
+      "Anchor_Pull": "Anchor_Pull",
+      "Anchor_Push": "Anchor_Push"
+    }
+  },
+  "bed_a": {
+    "anchors": {
+      "sleep_1": "anchor_sleep_1",
+      "sleep_2": "anchor_sleep_2"
+    },
+    "bones": {},
+    "hasSkeleton": false,
+    "bounds": {
+      "width": 5.553552347776531,
+      "height": 5.053544218216594,
+      "depth": 1.262158059763756
+    }
+  },
+  "door_a": {
+    "anchors": {
+      "pull": "anchor_pull",
+      "push": "anchor_push"
+    },
+    "bones": {},
+    "hasSkeleton": false,
+    "bounds": {
+      "width": 24.44374554734759,
+      "height": 42.28217485829657,
+      "depth": 6.691060692305438
+    }
+  },
+  "door_a_open": {
+    "anchors": {},
+    "bones": {},
+    "hasSkeleton": false,
+    "bounds": {
+      "width": 1.3407254815101624,
+      "height": 1.1786980650221182,
+      "depth": 2.4149136543273926
+    }
+  },
+  "sofa_a": {
+    "anchors": {
+      "seat_1": "anchor_seat_1",
+      "seat_2": "anchor_seat_2",
+      "seat_3": "anchor_seat_3"
+    },
+    "display_name": "Sofa",
+    "tags": [
+      "Seat"
+    ]
+  }
+}
