@@ -569,6 +569,17 @@ const size =
             size.z
         );
 
+
+        console.log(
+    "CENTER",
+    center
+);
+
+console.log(
+    "SIZE",
+    size
+);
+
     model.position.sub(
         center
     );
@@ -790,6 +801,25 @@ function loadModel(url){
                     meshbank[
                         currentAssetId
                     ] ||= {};
+
+console.log(
+    gltf.scene
+);
+
+gltf.scene.traverse(node=>{
+
+    if(node.isMesh){
+
+        node.visible = true;
+
+        node.frustumCulled = false;
+
+        console.log(
+            "Found mesh:",
+            node.name
+        );
+    }
+});
     const transform =
     meshbank[
         currentAssetId
@@ -819,12 +849,14 @@ function loadModel(url){
 meshbank[
     currentAssetId
 ].bones = bones;
-}
 
 meshbank[currentAssetId].hasSkeleton =
     detectSkeleton(
         gltf.scene
     );
+}
+
+
 
             scene.add(
                 currentModel
@@ -837,7 +869,12 @@ meshbank[currentAssetId].hasSkeleton =
             buildHierarchy(
                 currentModel
             );
+        const helper =
+            new THREE.SkeletonHelper(
+                currentModel
+            );
 
+        scene.add(helper);
             currentModel.traverse(node=>{
 
                 const name =
