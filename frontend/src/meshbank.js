@@ -151,29 +151,26 @@ function extractAnchors(root){
 
     root.traverse(node=>{
 
-        const name =
-            node.name || "";
-
         if(
-            name
-            .toLowerCase()
-            .startsWith(
-                "anchor_"
-            )
+            node.name
+                .toLowerCase()
+                .startsWith(
+                    "anchor_"
+                )
         ){
 
             anchors[
-                name.replace(
-                    "anchor_",
-                    ""
-                )
-            ] = name;
+                node.name
+            ] = {
+
+                name:
+                    node.name
+            };
         }
     });
 
     return anchors;
 }
-
 function populateAssetList(){
 
     const category =
@@ -657,6 +654,7 @@ function extractBones(root){
         if(node.isBone){
 
             bones[node.name] = {
+
                 name: node.name
             };
         }
@@ -664,8 +662,6 @@ function extractBones(root){
 
     return bones;
 }
-
-
 function extractTargets(root){
 
     const targets = {};
@@ -673,20 +669,18 @@ function extractTargets(root){
     root.traverse(node=>{
 
         if(
-            node.name.startsWith(
-                "target_"
-            )
+            node.name
+                .toLowerCase()
+                .startsWith(
+                    "target_"
+                )
         ){
 
-            const id =
+            targets[
                 node.name
-                .replace(
-                    "target_",
-                    ""
-                );
+            ] = {
 
-            targets[id] = {
-                node:
+                name:
                     node.name
             };
         }
@@ -695,7 +689,9 @@ function extractTargets(root){
     return targets;
 }
 
-function extractAnimations(gltf){
+function extractAnimations(
+    gltf
+){
 
     const result = {};
 
@@ -717,19 +713,53 @@ function extractAnimations(gltf){
 }
 
 
-function detectSkeleton(root){
+function detectSkeleton(
+    root
+){
 
     let found = false;
 
     root.traverse(node=>{
 
-        if(node.isSkinnedMesh){
+        if(node.isBone){
 
             found = true;
         }
     });
 
     return found;
+}
+
+function extractBounds(
+    root
+){
+
+    root.updateMatrixWorld(
+        true
+    );
+
+    const box =
+        new THREE.Box3()
+            .setFromObject(
+                root
+            );
+
+    const size =
+        box.getSize(
+            new THREE.Vector3()
+        );
+
+    return {
+
+        width:
+            size.x,
+
+        height:
+            size.y,
+
+        depth:
+            size.z
+    };
 }
 
 function applyTransform(
@@ -902,6 +932,24 @@ meshbank[currentAssetId].hasSkeleton =
                         node.name
                     );
                 }
+                                if(
+                    name.startsWith(
+                        "target_"
+                    )
+                ){
+
+                    const pos_target =
+                        new THREE.Vector3();
+
+                    node.getWorldPosition(
+                        pos_target
+                    );
+
+                    addTarget(
+                        pos,
+                        node.name
+                    );
+                }
             });
 
             currentAnimations =
@@ -1056,13 +1104,45 @@ document
 
     meshbank[
         currentAssetId
-    ].display_name =
-        currentAssetId;
+    ].anchors =
+        extractAnchors(
+            currentModel
+        );
 
     meshbank[
         currentAssetId
-    ].anchors =
-        extractAnchors(
+    ].bones =
+        extractBones(
+            currentModel
+        );
+
+    meshbank[
+        currentAssetId
+    ].targets =
+        extractTargets(
+            currentModel
+        );
+
+    meshbank[
+        currentAssetId
+    ].animations =
+        extractAnimations({
+
+            animations:
+                currentAnimations
+        });
+
+    meshbank[
+        currentAssetId
+    ].bounds =
+        extractBounds(
+            currentModel
+        );
+
+    meshbank[
+        currentAssetId
+    ].hasSkeleton =
+        detectSkeleton(
             currentModel
         );
 
