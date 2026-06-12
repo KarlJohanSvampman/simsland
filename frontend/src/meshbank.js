@@ -6,8 +6,9 @@ from "three/examples/jsm/controls/OrbitControls.js";
 import { GLTFLoader }
 from "three/examples/jsm/loaders/GLTFLoader.js";
 
-
-
+const anchorMarkers = [];
+const targetMarkers = [];
+let currentSkeletonHelper = null;
 const canvas =
     document.getElementById(
         "canvas"
@@ -262,6 +263,15 @@ function clearCurrentModel(){
         currentBoxHelper = null;
     }
 
+    if(currentSkeletonHelper){
+
+    scene.remove(
+        currentSkeletonHelper
+    );
+
+    currentSkeletonHelper = null;
+}
+
     for(const helper of anchorHelpers){
 
         scene.remove(
@@ -381,21 +391,51 @@ meshbank[
     await saveMeshbank();
 
 };
-function addAnchorMarker(
+
+
+function clearMarkers(){
+
+    for(
+        const marker
+        of anchorMarkers
+    ){
+
+        scene.remove(
+            marker
+        );
+    }
+
+    for(
+        const marker
+        of targetMarkers
+    ){
+
+        scene.remove(
+            marker
+        );
+    }
+
+    anchorMarkers.length = 0;
+    targetMarkers.length = 0;
+}
+function addMarker(
     position,
-    name
+    label,
+    color = 0x00ff00
 ){
 
     const sphere =
         new THREE.Mesh(
 
-            new THREE.SphereGeometry(
-                0.05
-            ),
+    new THREE.SphereGeometry(
+        0.1,
+        16,
+        16
+    ),
 
-            new THREE.MeshBasicMaterial({
+    new THREE.MeshBasicMaterial({
 
-                color:0xff0000
+                color
             })
         );
 
@@ -407,91 +447,8 @@ function addAnchorMarker(
         sphere
     );
 
-    anchorHelpers.push(
-        sphere
-    );
 
-    const axes =
-        new THREE.AxesHelper(
-            0.25
-        );
-
-    axes.position.copy(
-        position
-    );
-
-    scene.add(
-        axes
-    );
-
-    anchorHelpers.push(
-        axes
-    );
-
-    const row =
-        document.createElement(
-            "button"
-        );
-
-row.textContent =
-    `${name}`;
-
-    row.onclick = ()=>{
-
-        camera.position.copy(
-
-            position.clone().add(
-
-                new THREE.Vector3(
-                    0.5,
-                    0.5,
-                    0.5
-                )
-            )
-        );
-
-        controls.target.copy(
-            position
-        );
-
-        controls.update();
-    };
-
-    document
-    .getElementById(
-        "anchors"
-    )
-    .appendChild(
-        row
-    );
-}
-
-function buildHierarchy(
-    root
-){
-
-    const hierarchy =
-        document.getElementById(
-            "hierarchy"
-        );
-
-    hierarchy.innerHTML = "";
-
-    root.traverse(node=>{
-
-        const row =
-            document.createElement(
-                "div"
-            );
-
-        row.textContent =
-            node.name
-            || "(unnamed)";
-
-        hierarchy.appendChild(
-            row
-        );
-    });
+    return sphere;
 }
 
 function populateAnimations(
@@ -540,19 +497,43 @@ function populateAnimations(
         );
     }
 }
+function normalizeModel(model){
 
-function frameModel(model){
-
-    
     const box =
-    new THREE.Box3()
-        .setFromObject(model);
+        new THREE.Box3()
+            .setFromObject(model);
 
-const size =
-    box.getSize(
-        new THREE.Vector3()
+    const center =
+        box.getCenter(
+            new THREE.Vector3()
+        );
+
+    const minY =
+        box.min.y;
+
+    model.position.set(
+
+        -center.x,
+
+        -minY,
+
+        -center.z
     );
 
+    model.updateMatrixWorld(
+        true
+    );
+}
+function frameCamera(model){
+
+    const box =
+        new THREE.Box3()
+            .setFromObject(model);
+
+    const size =
+        box.getSize(
+            new THREE.Vector3()
+        );
 
     const center =
         box.getCenter(
@@ -561,70 +542,49 @@ const size =
 
     const maxDim =
         Math.max(
+
             size.x,
+
             size.y,
+
             size.z
         );
 
-
-        console.log(
-    "CENTER",
-    center
-);
-
-console.log(
-    "SIZE",
-    size
-);
-
-    model.position.sub(
-        center
-    );
-    meshbank[currentAssetId].bounds = {
-
-        width: size.x,
-
-        height: size.y,
-
-        depth: size.z
-    };  
     camera.position.set(
 
-        maxDim * 1.8,
+        center.x + maxDim * 1.8,
 
-        maxDim * 1.3,
+        center.y + maxDim * 1.3,
 
-        maxDim * 1.8
+        center.z + maxDim * 1.8
     );
 
-    controls.target.set(
-
-        0,
-
-        maxDim * 0.25,
-
-        0
+    controls.target.copy(
+        center
     );
 
     controls.update();
+}
+function updateStats(model){
 
-    if(currentBoxHelper){
+    const box =
+        new THREE.Box3()
+            .setFromObject(model);
 
-        scene.remove(
-            currentBoxHelper
-        );
-    }
-
-    currentBoxHelper =
-        new THREE.Box3Helper(
-            new THREE.Box3()
-            .setFromObject(model),
-            0xffff00
+    const size =
+        box.getSize(
+            new THREE.Vector3()
         );
 
-    scene.add(
-        currentBoxHelper
-    );
+    const maxDim =
+        Math.max(
+
+            size.x,
+
+            size.y,
+
+            size.z
+        );
 
     document
     .getElementById(
@@ -645,6 +605,30 @@ console.log(
         ${maxDim.toFixed(2)}
     `;
 }
+
+function updateBoxHelper(model){
+
+    if(currentBoxHelper){
+
+        scene.remove(
+            currentBoxHelper
+        );
+    }
+
+    currentBoxHelper =
+        new THREE.Box3Helper(
+
+            new THREE.Box3()
+                .setFromObject(model),
+
+            0xffff00
+        );
+
+    scene.add(
+        currentBoxHelper
+    );
+}
+
 function extractBones(root){
 
     const bones = {};
@@ -810,7 +794,7 @@ function applyTransform(
 function loadModel(url){
 
     clearCurrentModel();
-
+    clearMarkers();
     document
     .getElementById(
         "anchors"
@@ -844,10 +828,6 @@ gltf.scene.traverse(node=>{
 
         node.frustumCulled = false;
 
-        console.log(
-            "Found mesh:",
-            node.name
-        );
     }
 });
     const transform =
@@ -886,71 +866,141 @@ meshbank[currentAssetId].hasSkeleton =
     );
 }
 
+meshbank[
+    currentAssetId
+].targets =
+    extractTargets(
+        gltf.scene
+    );
 
+populateAnchors();
 
-            scene.add(
-                currentModel
-            );
+populateTargets();
 
-            frameModel(
-            currentModel
-            );
+populateBones();
+
+scene.add(
+    currentModel
+);
+
+normalizeModel(
+    currentModel
+);
+
+updateStats(
+    currentModel
+);
+
+updateBoxHelper(
+    currentModel
+);
+
+frameCamera(
+    currentModel
+);
 
             buildHierarchy(
                 currentModel
             );
-        const helper =
-            new THREE.SkeletonHelper(
-                currentModel
+if(currentSkeletonHelper){
+
+    scene.remove(
+        currentSkeletonHelper
+    );
+}
+
+if(
+    detectSkeleton(
+        currentModel
+    )
+){
+
+    currentSkeletonHelper =
+        new THREE.SkeletonHelper(
+            currentModel
+        );
+
+    scene.add(
+        currentSkeletonHelper
+    );
+}
+
+currentModel.traverse(node=>{
+
+    const name =
+        (
+            node.name
+            || ""
+        )
+        .toLowerCase();
+
+    if(
+        name.startsWith(
+            "anchor_"
+        )
+    ){
+
+        const pos =
+            new THREE.Vector3();
+
+        node.getWorldPosition(
+            pos
+        );
+
+        const marker =
+            addMarker(
+
+                pos,
+
+                node.name,
+
+                0x00ff00
             );
 
-        scene.add(helper);
-            currentModel.traverse(node=>{
+        anchorMarkers.push(
+            marker
+        );
+    }
+});
+currentModel.traverse(node=>{
 
-                const name =
-                    (
-                        node.name
-                        || ""
-                    )
-                    .toLowerCase();
+    const name =
+        (
+            node.name
+            || ""
+        )
+        .toLowerCase();
 
-                if(
-                    name.startsWith(
-                        "anchor_"
-                    )
-                ){
+    if(
+        name.startsWith(
+            "target_"
+        )
+    ){
 
-                    const pos =
-                        new THREE.Vector3();
+        const pos =
+            new THREE.Vector3();
 
-                    node.getWorldPosition(
-                        pos
-                    );
+        node.getWorldPosition(
+            pos
+        );
 
-                    addAnchorMarker(
-                        pos,
-                        node.name
-                    );
-                }
-                                if(
-                    name.startsWith(
-                        "target_"
-                    )
-                ){
+        const marker =
+            addMarker(
 
-                    const pos_target =
-                        new THREE.Vector3();
+                pos,
 
-                    node.getWorldPosition(
-                        pos_target
-                    );
+                node.name,
 
-                    addTarget(
-                        pos,
-                        node.name
-                    );
-                }
-            });
+                0x0088ff
+            );
+
+        targetMarkers.push(
+            marker
+        );
+    }
+});
+
+
 
             currentAnimations =
                 gltf.animations;
@@ -971,7 +1021,138 @@ meshbank[currentAssetId].hasSkeleton =
         }
     );
 }
+function populateAnchors(){
 
+    const container =
+        document.getElementById(
+            "anchors"
+        );
+
+    container.innerHTML = "";
+
+    const anchors =
+        meshbank[
+            currentAssetId
+        ]?.anchors || {};
+
+    for(
+        const name
+        in anchors
+    ){
+
+        const row =
+            document.createElement(
+                "div"
+            );
+
+        row.className = "assetRow";
+
+        row.textContent = name;
+
+        container.appendChild(
+            row
+        );
+    }
+}
+
+function populateTargets(){
+
+    const container =
+        document.getElementById(
+            "targets"
+        );
+
+    if(!container) return;
+
+    container.innerHTML = "";
+
+    const targets =
+        meshbank[
+            currentAssetId
+        ]?.targets || {};
+
+    for(
+        const name
+        in targets
+    ){
+
+        const row =
+            document.createElement(
+                "div"
+            );
+
+        row.className = "assetRow";
+
+        row.textContent = name;
+
+        container.appendChild(
+            row
+        );
+    }
+}
+
+function populateBones(){
+
+    const container =
+        document.getElementById(
+            "bones"
+        );
+
+    if(!container) return;
+
+    container.innerHTML = "";
+
+    const bones =
+        meshbank[
+            currentAssetId
+        ]?.bones || {};
+
+    for(
+        const name
+        in bones
+    ){
+
+        const row =
+            document.createElement(
+                "div"
+            );
+
+        row.className = "assetRow";
+
+        row.textContent = name;
+
+        container.appendChild(
+            row
+        );
+    }
+}
+function buildHierarchy(
+    root
+){
+
+    const hierarchy =
+        document.getElementById(
+            "hierarchy"
+        );
+
+    hierarchy.innerHTML = "";
+
+    root.traverse(node=>{
+
+        const row =
+            document.createElement(
+                "div"
+            );
+
+        row.textContent =
+            node.name
+            || "(unnamed)";
+
+        hierarchy.appendChild(
+            row
+        );
+    });
+}
 const clock =
     new THREE.Clock();
 
@@ -1034,9 +1215,9 @@ document
 
     if(currentModel){
 
-        frameModel(
-            currentModel
-        );
+frameCamera(
+    currentModel
+);
     }
 };
 
@@ -1147,7 +1328,9 @@ document
         );
 
     await saveMeshbank();
-
+    populateAnchors();
+    populateTargets();
+    populateBones();
     alert(
         "Metadata generated"
     );
