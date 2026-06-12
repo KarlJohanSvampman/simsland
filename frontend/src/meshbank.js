@@ -145,7 +145,73 @@ async function loadAssets(){
 
     populateAssetList();
 }
+function ensureTransform(asset){
 
+    asset.transform ||= {
+
+        position:{
+            x:0,
+            y:0,
+            z:0
+        },
+
+        rotation:{
+            x:0,
+            y:0,
+            z:0
+        },
+
+        scale:{
+            x:1,
+            y:1,
+            z:1
+        }
+    };
+
+    return asset.transform;
+}
+function loadTransformUI(){
+
+    if(!currentAssetId)
+        return;
+
+    const asset =
+        meshbank[
+            currentAssetId
+        ];
+
+    const t =
+        ensureTransform(
+            asset
+        );
+
+    posX.value =
+        t.position.x;
+
+    posY.value =
+        t.position.y;
+
+    posZ.value =
+        t.position.z;
+
+    rotX.value =
+        t.rotation.x;
+
+    rotY.value =
+        t.rotation.y;
+
+    rotZ.value =
+        t.rotation.z;
+
+    scaleX.value =
+        t.scale.x;
+
+    scaleY.value =
+        t.scale.y;
+
+    scaleZ.value =
+        t.scale.z;
+}
 function extractAnchors(root){
 
     const anchors = {};
@@ -230,6 +296,7 @@ function populateAssetList(){
                 ).join(",");
         };
 
+        loadTransformUI();
         container.appendChild(
             div
         );
@@ -242,7 +309,79 @@ document
 )
 .onchange =
 populateAssetList;
+function updateTransformFromUI(){
 
+    if(
+        !currentAssetId ||
+        !currentModel
+    ){
+        return;
+    }
+
+    const asset =
+        meshbank[
+            currentAssetId
+        ];
+
+    const t =
+        ensureTransform(
+            asset
+        );
+
+    t.position.x =
+        parseFloat(
+            posX.value
+        ) || 0;
+
+    t.position.y =
+        parseFloat(
+            posY.value
+        ) || 0;
+
+    t.position.z =
+        parseFloat(
+            posZ.value
+        ) || 0;
+
+    t.rotation.x =
+        parseFloat(
+            rotX.value
+        ) || 0;
+
+    t.rotation.y =
+        parseFloat(
+            rotY.value
+        ) || 0;
+
+    t.rotation.z =
+        parseFloat(
+            rotZ.value
+        ) || 0;
+
+    t.scale.x =
+        parseFloat(
+            scaleX.value
+        ) || 1;
+
+    t.scale.y =
+        parseFloat(
+            scaleY.value
+        ) || 1;
+
+    t.scale.z =
+        parseFloat(
+            scaleZ.value
+        ) || 1;
+
+    applyTransform(
+        currentModel,
+        t
+    );
+
+    updateBoxHelper(
+        currentModel
+    );
+}   
 function clearCurrentModel(){
 
     if(currentModel){
@@ -1206,7 +1345,71 @@ animate();
 await loadMeshbank();
 
 await loadAssets();
+[
+    posX,
+    posY,
+    posZ,
 
+    rotX,
+    rotY,
+    rotZ,
+
+    scaleX,
+    scaleY,
+    scaleZ
+]
+.forEach(input=>{
+
+    input.addEventListener(
+
+        "input",
+
+        updateTransformFromUI
+    );
+});
+document
+.getElementById(
+    "resetTransformBtn"
+)
+.onclick = ()=>{
+
+    if(!currentAssetId)
+        return;
+
+    meshbank[
+        currentAssetId
+    ].transform = {
+
+        position:{
+            x:0,
+            y:0,
+            z:0
+        },
+
+        rotation:{
+            x:0,
+            y:0,
+            z:0
+        },
+
+        scale:{
+            x:1,
+            y:1,
+            z:1
+        }
+    };
+
+    loadTransformUI();
+
+    applyTransform(
+
+        currentModel,
+
+        meshbank[
+            currentAssetId
+        ].transform
+    );
+};
 document
 .getElementById(
     "frameBtn"
