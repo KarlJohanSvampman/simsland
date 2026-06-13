@@ -271,6 +271,41 @@ function ensureInteractions(asset){
 
     return asset.interaction_points;
 }
+function populateSlotBones(){
+
+    const select =
+        document.getElementById(
+            "slotBone"
+        );
+
+    select.innerHTML = "";
+
+    const bones =
+        meshbank[
+            currentAssetId
+        ]?.bones || {};
+
+    for(
+        const bone
+        in bones
+    ){
+
+        const option =
+            document.createElement(
+                "option"
+            );
+
+        option.value =
+            bone;
+
+        option.textContent =
+            bone;
+
+        select.appendChild(
+            option
+        );
+    }
+}
 function ensurePlacement(asset){
 
     asset.placement ||= {
@@ -1763,7 +1798,29 @@ frameCamera(
     }
 };
 
+addSlotBtn.onclick =
+()=>{
 
+    const name =
+        prompt(
+            "Slot Name"
+        );
+
+    if(!name)
+        return;
+
+    const slots =
+        ensureBoneSlots(
+
+            meshbank[
+                currentAssetId
+            ]
+        );
+
+    slots[name] = "";
+
+    populateSlots();
+};
 document
 .getElementById(
     "saveMetaBtn"
