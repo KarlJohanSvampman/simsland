@@ -8,6 +8,7 @@ from "three/examples/jsm/loaders/GLTFLoader.js";
 
 const anchorMarkers = [];
 const targetMarkers = [];
+let pivotMarker = null;
 let currentSkeletonHelper = null;
 const canvas =
     document.getElementById(
@@ -145,6 +146,100 @@ async function loadAssets(){
 
     populateAssetList();
 }
+function updatePivotMarker(){
+
+    if(
+        !currentModel ||
+        !currentAssetId
+    ){
+        return;
+    }
+
+    if(pivotMarker){
+
+        scene.remove(
+            pivotMarker
+        );
+    }
+
+    const box =
+        new THREE.Box3()
+            .setFromObject(
+                currentModel
+            );
+
+    const center =
+        box.getCenter(
+            new THREE.Vector3()
+        );
+
+const p =
+    ensurePlacement(
+        meshbank[
+            currentAssetId
+        ]
+    );
+
+    let pos =
+        center.clone();
+
+    switch(
+        p?.pivot
+    ){
+
+        case "bottom_center":
+
+            pos.y =
+                box.min.y;
+
+            break;
+
+        case "top_center":
+
+            pos.y =
+                box.max.y;
+
+            break;
+
+        case "front_center":
+
+            pos.z =
+                box.max.z;
+
+            break;
+
+        case "rear_center":
+
+            pos.z =
+                box.min.z;
+
+            break;
+    }
+
+    pivotMarker =
+        new THREE.Mesh(
+
+            new THREE.SphereGeometry(
+                0.12,
+                16,
+                16
+            ),
+
+            new THREE.MeshBasicMaterial({
+
+                color:
+                    0xff0000
+            })
+        );
+
+    pivotMarker.position.copy(
+        pos
+    );
+
+    scene.add(
+        pivotMarker
+    );
+}
 function ensureTransform(asset){
 
     asset.transform ||= {
@@ -169,6 +264,202 @@ function ensureTransform(asset){
     };
 
     return asset.transform;
+}
+function ensureInteractions(asset){
+
+    asset.interaction_points ||= {};
+
+    return asset.interaction_points;
+}
+function ensurePlacement(asset){
+
+    asset.placement ||= {
+
+        pivot:
+            "bottom_center",
+
+        snap_to_ground:
+            true,
+
+        snap_to_grid:
+            true
+    };
+
+    return asset.placement;
+}
+function populateInteractionAnchors(){
+
+    const select =
+        document.getElementById(
+            "interactionAnchor"
+        );
+
+    select.innerHTML = "";
+
+    const anchors =
+        meshbank[
+            currentAssetId
+        ]?.anchors || {};
+
+    for(const name in anchors){
+
+        const option =
+            document.createElement(
+                "option"
+            );
+
+        option.value =
+            name;
+
+        option.textContent =
+            name;
+
+        select.appendChild(
+            option
+        );
+    }
+}   
+function populateInteractionTargets(){
+
+    const select =
+        document.getElementById(
+            "interactionTarget"
+        );
+
+    select.innerHTML = "";
+
+    const targets =
+        meshbank[
+            currentAssetId
+        ]?.targets || {};
+
+    for(const name in targets){
+
+        const option =
+            document.createElement(
+                "option"
+            );
+
+        option.value =
+            name;
+
+        option.textContent =
+            name;
+
+        select.appendChild(
+            option
+        );
+    }
+}
+function populateInteractions(){
+
+    const select =
+        document.getElementById(
+            "interactionSelect"
+        );
+
+    select.innerHTML = "";
+
+    const interactions =
+        ensureInteractions(
+
+            meshbank[
+                currentAssetId
+            ]
+        );
+
+    for(const id in interactions){
+
+        const option =
+            document.createElement(
+                "option"
+            );
+
+        option.value =
+            id;
+
+        option.textContent =
+            id;
+
+        select.appendChild(
+            option
+        );
+    }
+}
+function loadPlacementUI(){
+
+    if(!currentAssetId)
+        return;
+
+    const asset =
+        meshbank[
+            currentAssetId
+        ];
+
+    const p =
+        ensurePlacement(
+            asset
+        );
+
+    document
+    .getElementById(
+        "pivot"
+    )
+    .value =
+        p.pivot;
+
+    document
+    .getElementById(
+        "snapGround"
+    )
+    .checked =
+        p.snap_to_ground;
+
+    document
+    .getElementById(
+        "snapGrid"
+    )
+    .checked =
+        p.snap_to_grid;
+}
+function updatePlacementFromUI(){
+
+    if(!currentAssetId)
+        return;
+
+    const asset =
+        meshbank[
+            currentAssetId
+        ];
+
+    const p =
+        ensurePlacement(
+            asset
+        );
+
+    p.pivot =
+
+        document
+        .getElementById(
+            "pivot"
+        )
+        .value;
+
+    p.snap_to_ground =
+
+        document
+        .getElementById(
+            "snapGround"
+        )
+        .checked;
+
+    p.snap_to_grid =
+
+        document
+        .getElementById(
+            "snapGrid"
+        )
+        .checked;
 }
 function loadTransformUI(){
 
@@ -294,9 +585,12 @@ function populateAssetList(){
                 (
                     meta?.tags || []
                 ).join(",");
+                        loadPlacementUI();
+        loadTransformUI();
         };
 
-        loadTransformUI();
+
+
         container.appendChild(
             div
         );
@@ -381,6 +675,12 @@ function updateTransformFromUI(){
     updateBoxHelper(
         currentModel
     );
+updateStats(
+    currentModel
+);
+    updatePivotMarker();
+
+
 }   
 function clearCurrentModel(){
 
@@ -981,6 +1281,16 @@ gltf.scene.traverse(node=>{
                 currentAssetId
             ].transform
         );
+
+        updateBoxHelper(
+    currentModel
+);
+
+updateStats(
+    currentModel
+);
+
+updatePivotMarker();
 }
 
     meshbank[
@@ -1017,6 +1327,11 @@ populateAnchors();
 populateTargets();
 
 populateBones();
+populateInteractionAnchors();
+
+populateInteractionTargets();
+
+populateInteractions();
 
 scene.add(
     currentModel
@@ -1037,7 +1352,11 @@ updateBoxHelper(
 frameCamera(
     currentModel
 );
+loadTransformUI();
 
+loadPlacementUI();
+
+updatePivotMarker();
             buildHierarchy(
                 currentModel
             );
@@ -1345,6 +1664,26 @@ animate();
 await loadMeshbank();
 
 await loadAssets();
+pivot.onchange = ()=>{
+
+    updatePlacementFromUI();
+
+    updatePivotMarker();
+};
+
+snapGround.onchange = ()=>{
+
+    updatePlacementFromUI();
+
+    updatePivotMarker();
+};
+
+snapGrid.onchange = ()=>{
+
+    updatePlacementFromUI();
+
+    updatePivotMarker();
+};
 [
     posX,
     posY,
@@ -1468,7 +1807,135 @@ document
     
 await loadMeshbank();
 };
+document
+.getElementById(
+    "addInteractionBtn"
+)
+.onclick = ()=>{
 
+    const name =
+        prompt(
+            "Interaction Name"
+        );
+
+    if(!name)
+        return;
+
+    const interactions =
+        ensureInteractions(
+
+            meshbank[
+                currentAssetId
+            ]
+        );
+
+    interactions[name] = {
+
+        anchor: "",
+
+        target: "",
+
+        max_distance: 1,
+
+        required_item: ""
+    };
+
+    populateInteractions();
+};
+document
+.getElementById(
+    "interactionSelect"
+)
+.onchange = ()=>{
+
+    const id =
+        interactionSelect.value;
+
+    const data =
+
+        ensureInteractions(
+            meshbank[
+                currentAssetId
+            ]
+        )[id];
+
+    interactionName.value =
+        id;
+
+    interactionAnchor.value =
+        data.anchor || "";
+
+    interactionTarget.value =
+        data.target || "";
+
+    interactionDistance.value =
+        data.max_distance || 1;
+
+    interactionItem.value =
+        data.required_item || "";
+};
+function updateInteraction(){
+
+    const id =
+        interactionSelect.value;
+
+    if(!id)
+        return;
+
+    const interaction =
+
+        ensureInteractions(
+            meshbank[
+                currentAssetId
+            ]
+        )[id];
+
+    interaction.anchor =
+        interactionAnchor.value;
+
+    interaction.target =
+        interactionTarget.value;
+
+    interaction.max_distance =
+        parseFloat(
+            interactionDistance.value
+        ) || 1;
+
+    interaction.required_item =
+        interactionItem.value;
+}
+interactionAnchor.onchange =
+    updateInteraction;
+
+interactionTarget.onchange =
+    updateInteraction;
+
+interactionDistance.oninput =
+    updateInteraction;
+
+interactionItem.oninput =
+    updateInteraction;
+    document
+.getElementById(
+    "deleteInteractionBtn"
+)
+.onclick = ()=>{
+
+    const id =
+        interactionSelect.value;
+
+    if(!id)
+        return;
+
+    delete ensureInteractions(
+
+        meshbank[
+            currentAssetId
+        ]
+    )[id];
+
+    populateInteractions();
+};
 document
 .getElementById(
     "generateMetaBtn"

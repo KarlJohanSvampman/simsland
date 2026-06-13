@@ -191,7 +191,39 @@ button{
             <label>
                 Tags
             </label>
+<h3>Interactions</h3>
 
+<select id="interactionSelect">
+</select>
+
+<button id="addInteractionBtn">
+Add Interaction
+</button>
+
+<button id="deleteInteractionBtn">
+Delete Interaction
+</button>
+
+<hr>
+
+<label>Name</label>
+<input id="interactionName">
+
+<label>Anchor</label>
+<select id="interactionAnchor"></select>
+
+<label>Target</label>
+<select id="interactionTarget"></select>
+
+<label>Max Distance</label>
+<input
+    id="interactionDistance"
+    type="number"
+    value="1"
+>
+
+<label>Required Item</label>
+<input id="interactionItem">
             <input
                 id="tags">
 <h3>Transform</h3>
@@ -230,6 +262,54 @@ button{
 <button id="resetTransformBtn">
 Reset Transform
 </button>
+
+<h3>Placement</h3>
+
+<label>Pivot</label>
+
+<select id="pivot">
+
+    <option value="bottom_center">
+        Bottom Center
+    </option>
+
+    <option value="center">
+        Center
+    </option>
+
+    <option value="top_center">
+        Top Center
+    </option>
+
+    <option value="front_center">
+        Front Center
+    </option>
+
+    <option value="rear_center">
+        Rear Center
+    </option>
+
+</select>
+
+<label>
+
+<input
+    type="checkbox"
+    id="snapGround">
+
+Snap To Ground
+
+</label>
+
+<label>
+
+<input
+    type="checkbox"
+    id="snapGrid">
+
+Snap To Grid
+
+</label>
             <button
                 id="saveMetaBtn">
 
