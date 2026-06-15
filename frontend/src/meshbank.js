@@ -20,12 +20,51 @@ const renderer =
         canvas,
         antialias:true
     });
-
+renderer.autoClear = false;
 renderer.setSize(
     window.innerWidth - 300,
     window.innerHeight
 );
 
+const centerSphere =
+    new THREE.Mesh(
+
+        new THREE.SphereGeometry(
+            0.08,
+            16,
+            16
+        ),
+
+        new THREE.MeshBasicMaterial({
+
+            color: 0x666666
+        })
+    );
+// ======================================
+// ORIENTATION GIZMO
+// ======================================
+
+const gizmoScene =
+    new THREE.Scene();
+
+const gizmoCamera =
+    new THREE.PerspectiveCamera(
+        50,
+        1,
+        0.1,
+        10
+    );
+
+gizmoCamera.position.z = 3;
+
+const gizmoRoot =
+    new THREE.Group();
+gizmoRoot.add(
+    centerSphere
+);
+gizmoScene.add(
+    gizmoRoot
+);
 const scene =
     new THREE.Scene();
 
@@ -33,7 +72,7 @@ scene.background =
     new THREE.Color(
         0x20242a
     );
-
+buildOrientationGizmo();
 const camera =
     new THREE.PerspectiveCamera(
         60,
@@ -893,9 +932,10 @@ function clearMarkers(){
     targetMarkers.length = 0;
 }
 function addMarker(
+    parent,
     position,
     label,
-    color = 0x00ff00
+    color
 ){
 
     const sphere =
@@ -912,12 +952,11 @@ function addMarker(
                 color
             })
         );
-
     sphere.position.copy(
         position
     );
 
-    scene.add(
+    parent.add(
         sphere
     );
 
@@ -1304,29 +1343,6 @@ gltf.scene.traverse(node=>{
 
     }
 });
-    const transform =
-    meshbank[
-        currentAssetId
-    ]?.transform;
-
-    if(transform){
-        applyTransform(
-            currentModel,
-            meshbank[
-                currentAssetId
-            ].transform
-        );
-
-        updateBoxHelper(
-    currentModel
-);
-
-updateStats(
-    currentModel
-);
-
-updatePivotMarker();
-}
 
     meshbank[
         currentAssetId
@@ -1375,6 +1391,19 @@ scene.add(
 normalizeModel(
     currentModel
 );
+
+const transform =
+    meshbank[
+        currentAssetId
+    ]?.transform;
+
+if(transform){
+
+    applyTransform(
+        currentModel,
+        transform
+    );
+}
 
 updateStats(
     currentModel
@@ -1433,22 +1462,17 @@ currentModel.traverse(node=>{
         )
     ){
 
-        const pos =
-            new THREE.Vector3();
+       const marker =
+    addMarker(
 
-        node.getWorldPosition(
-            pos
-        );
+        node,
 
-        const marker =
-            addMarker(
+        new THREE.Vector3(),
 
-                pos,
+        node.name,
 
-                node.name,
-
-                0x00ff00
-            );
+        0x00ff00
+    );
 
         anchorMarkers.push(
             marker
@@ -1470,23 +1494,17 @@ currentModel.traverse(node=>{
         )
     ){
 
-        const pos =
-            new THREE.Vector3();
+const marker =
+    addMarker(
 
-        node.getWorldPosition(
-            pos
-        );
+        node,
 
-        const marker =
-            addMarker(
+        new THREE.Vector3(),
 
-                pos,
+        node.name,
 
-                node.name,
-
-                0x0088ff
-            );
-
+        0x0088ff
+    );
         targetMarkers.push(
             marker
         );
@@ -1619,6 +1637,145 @@ function populateBones(){
         );
     }
 }
+function makeAxisLabel(
+    text
+){
+
+    const canvas =
+        document.createElement(
+            "canvas"
+        );
+
+    canvas.width = 128;
+    canvas.height = 128;
+
+    const ctx =
+        canvas.getContext("2d");
+
+    ctx.fillStyle =
+        "white";
+
+    ctx.font =
+        "90px Arial";
+
+    ctx.textAlign =
+        "center";
+
+    ctx.fillText(
+        text,
+        64,
+        96
+    );
+
+    const texture =
+        new THREE.CanvasTexture(
+            canvas
+        );
+
+    const sprite =
+        new THREE.Sprite(
+
+            new THREE.SpriteMaterial({
+
+                map:
+                    texture
+            })
+        );
+
+    sprite.scale.set(
+        0.35,
+        0.35,
+        0.35
+    );
+
+    return sprite;
+}
+function buildOrientationGizmo(){
+
+    const origin =
+        new THREE.Vector3();
+
+    const length = 1;
+
+    const xArrow =
+        new THREE.ArrowHelper(
+
+            new THREE.Vector3(
+                1,0,0
+            ),
+
+            origin,
+
+            length,
+
+            0xff0000
+        );
+
+    const yArrow =
+        new THREE.ArrowHelper(
+
+            new THREE.Vector3(
+                0,1,0
+            ),
+
+            origin,
+
+            length,
+
+            0x00ff00
+        );
+
+    const zArrow =
+        new THREE.ArrowHelper(
+
+            new THREE.Vector3(
+                0,0,1
+            ),
+
+            origin,
+
+            length,
+
+            0x0000ff
+        );
+const yLabel =
+    makeAxisLabel("Y");
+
+yLabel.position.set(
+    0,
+    1.25,
+    0
+);
+
+const zLabel =
+    makeAxisLabel("Z");
+
+zLabel.position.set(
+    0,
+    0,
+    1.25
+);
+
+
+const xLabel =
+    makeAxisLabel("X");
+
+xLabel.position.set(
+    1.25,
+    0,
+    0
+);
+gizmoRoot.add(
+
+    xArrow,
+    yArrow,
+    zArrow,
+
+    xLabel,
+    yLabel,
+    zLabel
+);
+}
 function buildHierarchy(
     root
 ){
@@ -1655,21 +1812,73 @@ function animate(){
         animate
     );
 
-    const dt =
-        clock.getDelta();
-
-    if(mixer){
-
-        mixer.update(
-            dt
-        );
-    }
-
     controls.update();
+
+const size =
+    renderer.getSize(
+        new THREE.Vector2()
+    );
+
+renderer.setViewport(
+
+    0,
+    0,
+
+    size.x,
+
+    size.y
+);
 
     renderer.render(
         scene,
         camera
+    );
+
+    // ==================================
+    // GIZMO ROTATION
+    // ==================================
+
+    gizmoRoot.quaternion.copy(
+        camera.quaternion
+    );
+
+    gizmoRoot.quaternion.invert();
+
+    const viewportSize =
+        renderer.getSize(
+            new THREE.Vector2()
+        );
+
+    renderer.clearDepth();
+
+const gizmoSize = 140;
+
+renderer.setViewport(
+
+    viewportSize.x - gizmoSize - 10,
+
+    viewportSize.y - gizmoSize - 10,
+
+    gizmoSize,
+
+    gizmoSize
+);
+
+    renderer.render(
+
+        gizmoScene,
+
+        gizmoCamera
+    );
+
+    renderer.setViewport(
+
+        0,
+        0,
+
+        viewportSize.x,
+
+        viewportSize.y
     );
 }
 
