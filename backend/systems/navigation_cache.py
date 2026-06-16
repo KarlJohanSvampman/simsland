@@ -1,9 +1,0 @@
-NAV_CACHE = {}
-
-ROOM_CACHE = {}
-
-DOOR_CACHE = {}
-
-GRAPH_CACHE = {}
-
-PATH_CACHE = {}

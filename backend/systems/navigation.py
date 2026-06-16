@@ -1,7 +1,7 @@
 from heapq import heappush, heappop
 from collections import deque
 
-from systems.navigation_cache import NAV_CACHE
+NAV_CACHE = {}
 
 from systems.transforms import (
     world_to_local,

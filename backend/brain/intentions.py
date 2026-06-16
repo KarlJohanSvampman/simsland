@@ -1,12 +1,35 @@
 import random
 
-from brain.intention_types import (
-    INTENTION_TYPES
-)
+# =========================================================
+# INTENTION TYPES
+# =========================================================
 
-from brain.intention_priority import (
-    final_priority
-)
+INTENTION_TYPES = {
+    "wealth":     {"priority": 50, "decay": 0.01},
+    "romance":    {"priority": 40, "decay": 0.005},
+    "friendship": {"priority": 35, "decay": 0.005},
+    "survival":   {"priority": 90, "decay": 0},
+    "career":     {"priority": 45, "decay": 0.002},
+    "comfort":    {"priority": 30, "decay": 0.01},
+}
+
+# =========================================================
+# CATEGORY PRIORITY
+# =========================================================
+
+CATEGORY_PRIORITY = {
+    "survival": 100,
+    "health":   90,
+    "schedule": 75,
+    "social":   60,
+    "identity": 40,
+    "leisure":  20,
+    "impulse":  10,
+}
+
+def final_priority(i):
+    category_score = CATEGORY_PRIORITY.get(i.get("category", "impulse"), 0)
+    return category_score * 1000 + i.get("priority", 0)
 # =========================================================
 # ENSURE ACTIVE INTENTIONS
 # =========================================================
@@ -153,55 +176,4 @@ def select_primary_intention(c):
 
 
 
-# =========================================================
-# CLEAN INTENTIONS
-# =========================================================
-
-def clean_intentions(c):
-
-    intentions = c.get(
-        "active_intentions",
-        []
-    )
-
-    seen = set()
-
-    cleaned = []
-
-    for i in reversed(intentions):
-
-        key = i.get("type")
-
-        if key in seen:
-            continue
-
-        seen.add(key)
-
-        cleaned.append(i)
-
-    cleaned.reverse()
-
-    c["active_intentions"] = (
-        cleaned[-10:]
-    )
-
-
-# =========================================================
-# SORT INTENTIONS
-# =========================================================
-
-def sort_intentions(c):
-
-    intentions = c.get(
-        "active_intentions",
-        []
-    )
-
-    intentions.sort(
-
-        key=final_priority,
-
-        reverse=True
-    )
-
-    
+# ===================================================

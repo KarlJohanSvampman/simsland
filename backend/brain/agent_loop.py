@@ -11,10 +11,8 @@ from systems.activities import (
     start_activity
 )
 
-from brain.intention_cleanup import (
-
+from brain.intentions import (
     clean_intentions,
-
     sort_intentions
 )
 from systems.body import (
@@ -69,7 +67,7 @@ from systems.activities import (
     execute_activity
 )
 
-from systems.schedule_runtime import (
+from systems.scheduling import (
     update_schedule_runtime
 )
 
