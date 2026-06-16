@@ -1,6 +1,38 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
+
+function resolveMeshAsset(assetId){
+
+  if(!assetId){
+    return null;
+  }
+
+  return meshbank[
+    assetId
+  ] || null;
+}
+
+function resolveModelPath(template){
+
+  const modelId =
+    template?.model;
+
+  if(!modelId){
+    return null;
+  }
+
+  const asset =
+    resolveMeshAsset(
+      modelId
+    );
+
+  if(!asset){
+    return null;
+  }
+
+  return asset.mesh;
+}
 // =====================================================
 // STATE
 // =====================================================
@@ -55,7 +87,7 @@ let assets = {
   items: []
 };
 
-
+let meshbank = {};
 
 let currentTab = 'prop_templates';
 let currentTemplateId = null;
@@ -119,7 +151,199 @@ const previewLoader = new GLTFLoader();
 
 let previewModel = null;
 let previewMixer = null;
+let previewBones = [];
 
+
+function extractBones(root){
+
+  const bones = [];
+
+  root.traverse(node=>{
+
+    if(node.isBone){
+
+      bones.push(
+        node.name
+      );
+    }
+  });
+
+  return bones.sort();
+}
+
+const STANDARD_BONE_SLOTS = [
+
+  "head",
+
+  "neck",
+
+  "right_hand",
+
+  "left_hand",
+
+  "spine",
+
+  "pelvis",
+
+  "right_foot",
+
+  "left_foot"
+];
+
+function renderBoneSlotEditor(){
+
+  const container =
+    document.getElementById(
+      "boneSlotEditor"
+    );
+
+  container.innerHTML = "";
+
+  if(
+    currentTab !==
+    "character_templates"
+  ){
+    return;
+  }
+
+  if(!currentTemplateId){
+    return;
+  }
+
+  let template;
+
+  try{
+
+    template =
+      JSON.parse(
+        jsonEditor.value
+      );
+
+  }catch{
+
+    return;
+  }
+
+  template.bone_slots ||= {};
+
+  STANDARD_BONE_SLOTS.forEach(slot=>{
+
+    const row =
+      document.createElement("div");
+
+    row.className =
+      "boneSlotRow";
+
+    const label =
+      document.createElement("label");
+
+    label.textContent =
+      slot;
+
+    const select =
+      document.createElement("select");
+
+    const empty =
+      document.createElement("option");
+
+    empty.value = "";
+    empty.textContent = "--";
+
+
+const modelId =
+  template.model;
+
+const asset =
+  meshbank[
+    modelId
+  ];
+
+const bones =
+  Object.keys(
+    asset?.bones || {}
+  );
+  console.log(
+  "Model:",
+  template.model
+);
+
+console.log(
+  "Asset:",
+  asset
+);
+
+console.log(
+  "Bones:",
+  bones
+);
+
+select.appendChild(
+      empty
+    );
+bones.forEach(bone=>{
+
+      const option =
+        document.createElement(
+          "option"
+        );
+
+      option.value =
+        bone;
+
+      option.textContent =
+        bone;
+
+      if(
+        template
+        .bone_slots?.[slot]
+        === bone
+      ){
+        option.selected = true;
+      }
+
+      select.appendChild(
+        option
+      );
+    });
+
+    select.onchange = ()=>{
+
+      template.bone_slots ||= {};
+
+      template
+      .bone_slots[slot] =
+        select.value;
+
+      jsonEditor.value =
+        JSON.stringify(
+          template,
+          null,
+          2
+        );
+    };
+
+    row.appendChild(label);
+    row.appendChild(select);
+
+    container.appendChild(row);
+  });
+}
+
+async function loadMeshbank(){
+
+    const response =
+        await fetch(
+            "/api/meshbank"
+        );
+
+    meshbank =
+        await response.json();
+
+    console.log(
+        "MeshBank loaded",
+        meshbank
+    );
+}
 // =====================================================
 // LOAD DEFINITIONS
 // =====================================================
@@ -241,12 +465,24 @@ function openTemplate(id){
   );
 
   editorTitle.textContent = id;
+renderBoneSlotEditor();
+const path =
+  resolveModelPath(
+    data
+  );
 
-  const model = data.model;
+console.log(
+  "Resolved model path:",
+  path
+);
 
-  if(model){
-    loadPreviewModel(model);
-  }
+if(path){
+
+  loadPreviewModel(
+    path
+  );
+}
+
 }
 
 // =====================================================
@@ -415,11 +651,19 @@ function loadPreviewModel(path){
   }
 
   animationList.innerHTML = '';
-
+  console.log(
+      "Loading preview:",
+      path
+  );
   previewLoader.load(path,(gltf)=>{
 
     previewModel = gltf.scene;
+    previewBones =
+      extractBones(
+        previewModel
+      );
 
+    renderBoneSlotEditor();
     previewScene.add(previewModel);
 
     previewMixer = new THREE.AnimationMixer(
@@ -512,7 +756,60 @@ function animate(){
     previewCamera
   );
 }
+document
+.getElementById(
+  "autoMapMixamoBtn"
+)
+.onclick = ()=>{
 
+  if(
+    currentTab !==
+    "character_templates"
+  ){
+    return;
+  }
+
+  let template =
+    JSON.parse(
+      jsonEditor.value
+    );
+
+  template.bone_slots = {
+
+    head:
+      "mixamorigHead",
+
+    neck:
+      "mixamorigNeck",
+
+    right_hand:
+      "mixamorigRightHand",
+
+    left_hand:
+      "mixamorigLeftHand",
+
+    spine:
+      "mixamorigSpine2",
+
+    pelvis:
+      "mixamorigHips",
+
+    right_foot:
+      "mixamorigRightFoot",
+
+    left_foot:
+      "mixamorigLeftFoot"
+  };
+
+  jsonEditor.value =
+    JSON.stringify(
+      template,
+      null,
+      2
+    );
+
+  renderBoneSlotEditor();
+};
 animate();
 
 // =====================================================
@@ -520,5 +817,6 @@ animate();
 // =====================================================
 
 loadDefinitions();
+loadMeshbank();
 loadAssets();
 

@@ -108,6 +108,7 @@ const loader = new GLTFLoader();
 
 const characterAnimations = {};
 const sims = {};
+const characterAttachments = {};
 const props = {};
 const tiles = {};
 
@@ -639,6 +640,72 @@ function getMaterialTexture(materialId){
   materialCache[materialId] = tex;
 
   return tex;
+}
+
+function findBone(root, boneName){
+
+    let found = null;
+
+    root.traverse(node=>{
+
+        if(node.isBone &&
+           node.name === boneName){
+
+            found = node;
+        }
+    });
+
+    return found;
+}
+
+async function attachItemToBone(
+
+    characterModel,
+
+    boneName,
+
+    itemTemplate
+){
+
+    const bone =
+        findBone(
+            characterModel,
+            boneName
+        );
+
+    if(!bone){
+        return null;
+    }
+
+    const loaded =
+        await loadModelCached(
+            itemTemplate.model
+        );
+
+    const item =
+        loaded.scene;
+
+    bone.add(item);
+
+    item.position.set(
+        0,
+        0,
+        0
+    );
+
+    item.rotation.set(
+        0,
+        0,
+        0
+    );
+
+    item.scale.set(
+        1,
+        1,
+        1
+    );
+
+    return item;
 }
 
 function createFloorMaterial(tileFloor){
@@ -1240,6 +1307,28 @@ const loaded =
   scene.add(model);
 
   sims[id] = model;
+ // =========================
+// EQUIPMENT
+// =========================
+
+characterAttachments[id] = {};
+
+const equipped =
+    c.equipped || {};
+
+for(const slot in equipped){
+
+    const itemId =
+        equipped[slot];
+
+    console.log(
+        "Equip:",
+        slot,
+        itemId
+    );
+
+    // we'll fill this next
+}
 
   characterAnimations[id] = {
 

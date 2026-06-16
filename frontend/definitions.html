@@ -184,6 +184,36 @@ button:hover {
   border-top: 1px solid #444;
   font-size: 12px;
 }
+
+#boneSlotPanel {
+
+  padding: 10px;
+
+  border-bottom: 1px solid #444;
+
+  max-height: 250px;
+
+  overflow-y: auto;
+}
+
+.boneSlotRow {
+
+  margin-bottom: 8px;
+}
+
+.boneSlotRow label {
+
+  display: block;
+
+  font-size: 12px;
+
+  margin-bottom: 2px;
+}
+
+.boneSlotRow select {
+
+  width: 100%;
+}
 </style>
 </head>
 
@@ -221,7 +251,17 @@ button:hover {
   <div id="modelPreview"></div>
 
   <div id="animationList"></div>
+<div id="boneSlotPanel">
 
+  <h3>Bone Slots</h3>
+
+  <div id="boneSlotEditor"></div>
+
+  <button id="autoMapMixamoBtn">
+    Auto Map Mixamo
+  </button>
+
+</div>
   <div id="assetBrowser"></div>
 
   <div id="statusBar">Ready</div>
