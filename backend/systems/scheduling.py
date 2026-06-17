@@ -98,3 +98,37 @@ def get_current_activity(c, world):
             return block["activity"]
 
     return None
+
+
+# =========================================================
+# SCHEDULE RUNTIME (merged from schedule_runtime.py)
+# =========================================================
+
+def update_schedule_runtime(c, world):
+    """Update the character's active schedule block each tick."""
+    cal = world["calendar"]
+    day = cal["weekday"].lower()
+    time_str = f"{cal['hour']:02d}:{cal['minute']:02d}"
+
+    schedule = c.get("schedule", {}).get("week", {})
+    day_plan = schedule.get(day, [])
+
+    current = None
+    for block in day_plan:
+        if block["start"] <= time_str <= block["end"]:
+            current = block
+            break
+
+    previous = c.get("active_schedule_block")
+    if current == previous:
+        return
+
+    c["active_schedule_block"] = current
+
+    if not current:
+        return
+
+    c["current_intention"] = {
+        "type": current["activity"],
+        "source": "schedule",
+    }

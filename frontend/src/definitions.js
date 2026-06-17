@@ -644,7 +644,7 @@ function insertModelIntoEditor(path){
 // PREVIEW MODEL
 // =====================================================
 
-function loadPreviewModel(path){
+async function loadPreviewModel(path){
 
   if(previewModel){
     previewScene.remove(previewModel);
