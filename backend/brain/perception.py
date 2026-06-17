@@ -571,6 +571,77 @@ def perceive_audio(
 
 
 # =========================================================
+# PROP SEMANTIC TAGS
+# =========================================================
+
+# Maps anchor name prefixes to human-readable affordance tags
+_ANCHOR_TAGS = {
+    "anchor_sit":       "seatable",
+    "anchor_sleep":     "sleepable",
+    "anchor_cook":      "cookable",
+    "anchor_eat":       "eatable",
+    "anchor_watch":     "watchable",
+    "anchor_use":       "usable",
+    "anchor_work":      "workable",
+    "anchor_shower":    "shower",
+    "anchor_toilet":    "toilet",
+    "anchor_open":      "openable",
+    "anchor_read":      "readable",
+    "anchor_exercise":  "exercise",
+}
+
+
+def build_prop_tags(prop, definitions):
+    """
+    Derive semantic tags for a prop from its template definition.
+    Returns a list of plain-English tag strings the LLM can reason over.
+    """
+    tags = []
+    template_id = prop.get("template")
+    tpl = (
+        definitions
+        .get("prop_templates", {})
+        .get(template_id, {})
+    )
+
+    # --- category ---
+    category = tpl.get("category") or prop.get("category")
+    if category:
+        tags.append(category)
+
+    # --- anchor-derived affordances ---
+    interactions = []
+    for anchor in tpl.get("anchors", []):
+        aname = anchor.get("name", "")
+        interaction = anchor.get("interaction")
+        if interaction:
+            interactions.append(interaction)
+        for prefix, tag in _ANCHOR_TAGS.items():
+            if aname.startswith(prefix):
+                if tag not in tags:
+                    tags.append(tag)
+                break
+
+    # --- storage ---
+    storage = tpl.get("storage")
+    if storage:
+        accepted = storage.get("accepted_categories", [])
+        if "food" in accepted or "drink" in accepted:
+            tags.append("food_storage")
+        else:
+            tags.append("storage")
+
+    # --- occupancy ---
+    occupied_by = prop.get("occupied_by")
+    if occupied_by:
+        tags.append("occupied")
+    else:
+        tags.append("free")
+
+    return tags, interactions
+
+
+# =========================================================
 # VISIBLE PROPS
 # =========================================================
 
@@ -590,6 +661,8 @@ def perceive_props(
         world
     )
 
+    definitions = world.get("definitions", {})
+
     for p in world.get(
         "props",
         []
@@ -604,23 +677,14 @@ def perceive_props(
         if d > vrange:
             continue
 
+        tags, interactions = build_prop_tags(p, definitions)
+
         results.append({
-
-            "id":
-                p["id"],
-
-            "template":
-                p.get(
-                    "template"
-                ),
-
-            "category":
-                p.get(
-                    "category"
-                ),
-
-            "distance":
-                d
+            "id":           p["id"],
+            "template":     p.get("template"),
+            "distance":     round(d, 1),
+            "tags":         tags,
+            "interactions": interactions,
         })
 
     results.sort(
@@ -704,7 +768,48 @@ def perceive_environment(
         nearby_props > 25
     )
 
+    # --- semantic room summary for LLM ---
+    env["room_summary"] = _build_room_summary(
+        c, world, env
+    )
+
     return env
+
+
+def _build_room_summary(c, world, env):
+    """
+    One-sentence natural language description of the immediate environment.
+    Keeps the LLM oriented without forcing it to parse raw field names.
+    """
+    cal = world.get("calendar", {})
+    hour = cal.get("hour", 12)
+    if hour < 6:
+        time_label = "in the middle of the night"
+    elif hour < 12:
+        time_label = "in the morning"
+    elif hour < 17:
+        time_label = "in the afternoon"
+    elif hour < 21:
+        time_label = "in the evening"
+    else:
+        time_label = "late at night"
+
+    room = env.get("room") or "a room"
+    location = env.get("location") or "somewhere"
+
+    parts = [f"It is {time_label}."]
+    parts.append(f"You are in {room} at {location}.")
+
+    if env.get("clutter", 0) > 0.5:
+        parts.append("The place is quite messy.")
+    if env.get("crowded"):
+        parts.append("It feels crowded.")
+
+    weather = env.get("weather")
+    if weather:
+        parts.append(f"Outside it is {weather}.")
+
+    return " ".join(parts)
 
 
 # =========================================================
@@ -927,196 +1032,4 @@ def perceive_social_relationships(
     return results
 
 
-# =========================================================
-# FOCUS SELECTION
-# =========================================================
-
-def select_focus(
-    perception
-):
-
-    people = perception.get(
-        "visible_people",
-        []
-    )
-
-    if people:
-
-        strongest = max(
-
-            people,
-
-            key=lambda p: p.get(
-                "visibility",
-                0
-            )
-        )
-
-        return {
-
-            "key":
-                f"person:{strongest['id']}",
-
-            "strength":
-                strongest.get(
-                    "visibility",
-                    0.5
-                )
-        }
-
-    scenes = perception.get(
-        "social_scenes",
-        []
-    )
-
-    if scenes:
-
-        s = scenes[0]
-
-        return {
-
-            "key":
-                f"scene:{s.get('topic','conversation')}",
-
-            "strength":
-                0.5
-        }
-
-    audio = perception.get(
-        "audible_events",
-        []
-    )
-
-    if audio:
-
-        return {
-
-            "key":
-                "sound:ambient",
-
-            "strength":
-                0.3
-        }
-
-    return None
-
-
-# =========================================================
-# MAIN PERCEPTION
-# =========================================================
-
-def perceive(
-    c,
-    world
-):
-
-    perception_people = perceive_people(
-        c,
-        world
-    )
-
-    visible_people = []
-
-    for other in perception_people:
-
-        target = (
-            world["characters"]
-            .get(other["id"])
-        )
-
-        if not target:
-            continue
-
-        enriched = dict(other)
-
-        enriched["description"] = (
-            build_visible_person_description(
-                c,
-                target,
-                world.get(
-                    "definitions",
-                    {}
-                )
-            )
-        )
-
-        visible_people.append(
-            enriched
-        )
-
-    perception = {
-
-        "visible_people":
-            visible_people,
-
-        "social_relations":
-            perceive_social_relationships(
-
-                c,
-
-                world,
-
-                perception_people
-            ),
-
-        "social_scenes":
-            perceive_social_scenes(
-                c,
-                world
-            ),
-
-        "audible_events":
-            perceive_audio(
-                c,
-                world
-            ),
-
-        "visible_props":
-            perceive_props(
-                c,
-                world
-            ),
-
-        "environment":
-            perceive_environment(
-                c,
-                world
-            ),
-
-        "news":
-            world.get(
-                "news_feed",
-                []
-            )[-5:],
-
-        "events":
-            world.get(
-                "active_events",
-                []
-            )[-5:]
-    }
-
-    perception["focus"] = (
-        select_focus(
-            perception
-        )
-    )
-
-    c["perception"] = perception
-
-    c["last_perception_tick"] = (
-        world.get(
-            "tick",
-            0
-        )
-    )
-
-    c["recent_perception_memory"] = (
-
-        perception.get(
-            "visible_people",
-            []
-        )[:5]
-    )
-
-    return perception
+# =======

@@ -4,6 +4,8 @@ import { OrbitControls }
 from "three/examples/jsm/controls/OrbitControls.js";
 import { clone }
 from "three/examples/jsm/utils/SkeletonUtils.js";
+import { CSS2DRenderer, CSS2DObject }
+from "three/examples/jsm/renderers/CSS2DRenderer.js";
 import {
 
   getPropTemplate,
@@ -60,6 +62,17 @@ const renderer = new THREE.WebGLRenderer({
 
 renderer.setSize(window.innerWidth, window.innerHeight);
 
+// =========================================================
+// CSS2D RENDERER  (speech bubbles)
+// =========================================================
+
+const cssRenderer = new CSS2DRenderer();
+cssRenderer.setSize(window.innerWidth, window.innerHeight);
+cssRenderer.domElement.style.position = "absolute";
+cssRenderer.domElement.style.top = "0";
+cssRenderer.domElement.style.pointerEvents = "none";
+document.body.appendChild(cssRenderer.domElement);
+
 const controls = new OrbitControls(
   camera,
   renderer.domElement
@@ -70,6 +83,11 @@ controls.enableDamping = true;
 window.addEventListener("resize", ()=>{
 
   renderer.setSize(
+    window.innerWidth,
+    window.innerHeight
+  );
+
+  cssRenderer.setSize(
     window.innerWidth,
     window.innerHeight
   );
@@ -109,6 +127,7 @@ const loader = new GLTFLoader();
 const characterAnimations = {};
 const sims = {};
 const characterAttachments = {};
+const speechBubbles = {};   // id → { cssObject, div }
 const props = {};
 const tiles = {};
 
@@ -1101,6 +1120,83 @@ function cleanupBuildings(activeIds){
   }
 }
 
+// =========================================================
+// SPEECH BUBBLES
+// =========================================================
+
+function getOrCreateBubble(id){
+
+  if(speechBubbles[id]){
+    return speechBubbles[id];
+  }
+
+  const div = document.createElement("div");
+  div.className = "speech-bubble";
+  div.style.cssText = `
+    background: rgba(255,255,255,0.92);
+    color: #111;
+    padding: 4px 8px;
+    border-radius: 10px;
+    font-size: 12px;
+    font-family: sans-serif;
+    max-width: 160px;
+    text-align: center;
+    white-space: normal;
+    pointer-events: none;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+    display: none;
+  `;
+
+  const cssObject = new CSS2DObject(div);
+  cssObject.position.set(0, 2.6, 0);   // above head
+  speechBubbles[id] = { cssObject, div };
+  return speechBubbles[id];
+}
+
+function updateSpeechBubbles(state){
+
+  const active = new Set(
+    Object.keys(state.characters || {})
+  );
+
+  for(const [id, c]
+    of Object.entries(state.characters || {})
+  ){
+    const model = sims[id];
+    if(!model) continue;
+
+    const { cssObject, div } =
+      getOrCreateBubble(id);
+
+    // attach if not already attached
+    if(!model.getObjectById(cssObject.id)){
+      model.add(cssObject);
+    }
+
+    const speech = c.current_speech;
+
+    if(speech && speech.utterance){
+      div.textContent = speech.utterance;
+      div.style.display = "block";
+    } else {
+      div.style.display = "none";
+    }
+  }
+
+  // remove bubbles for characters that left
+  for(const id in speechBubbles){
+
+    if(active.has(id)) continue;
+
+    const { cssObject } = speechBubbles[id];
+    const model = sims[id];
+
+    if(model) model.remove(cssObject);
+
+    delete speechBubbles[id];
+  }
+}
+
 function createFallbackCharacter(c){
 
   const mesh = new THREE.Mesh(
@@ -1314,171 +1410,4 @@ const loaded =
 characterAttachments[id] = {};
 
 const equipped =
-    c.equipped || {};
-
-for(const slot in equipped){
-
-    const itemId =
-        equipped[slot];
-
-    console.log(
-        "Equip:",
-        slot,
-        itemId
-    );
-
-    // we'll fill this next
-}
-
-  characterAnimations[id] = {
-
-  mixer,
-
-  actions,
-
-  current: null
-};
-}
-
-catch(err){
-
-  console.error(
-    "Failed to load character:",
-    character.model,
-    err
-  );
-
-  sims[id] =
-    createFallbackCharacter(c);
-}
-
-delete loadingCharacters[id];
-  }
-
-  // =========================
-  // CLEANUP REMOVED CHARACTERS
-  // =========================
-
-  for(const id in sims){
-
-    if(active.has(id)) continue;
-
-    const mesh = sims[id];
-
-    scene.remove(mesh);
-
-    removeSelectable(mesh);
-    delete characterAnimations[id];
-    delete sims[id];
-  }
-}
-renderer.domElement.addEventListener(
-
-  "pointerdown",
-
-  (event)=>{
-
-    mouse.x =
-      (event.clientX /
-      window.innerWidth) * 2 - 1;
-
-    mouse.y =
-      -(event.clientY /
-      window.innerHeight) * 2 + 1;
-
-    raycaster.setFromCamera(
-      mouse,
-      camera
-    );
-
-    const hits =
-      raycaster
-        .intersectObjects(
-          selectable,
-          true
-        )
-        .filter(
-          h =>
-            !h.object.userData
-            ?.ignoreRaycast
-        );
-
-    if(!hits.length){
-
-      document
-        .getElementById(
-          "viewerSelection"
-        ).innerHTML =
-          "Nothing selected";
-
-      return;
-    }
-
-    let obj = hits[0].object;
-
-    while(
-      obj &&
-      !obj.userData?.type
-    ){
-      obj = obj.parent;
-    }
-
-    if(!obj) return;
-
-    const d = obj.userData;
-
-    document
-      .getElementById(
-        "viewerSelection"
-      ).innerHTML = `
-
-        <b>${d.type}</b><br>
-
-        ${d.id || ""}<br>
-
-        ${d.name || ""}
-      `;
-  }
-);
-const ws = new WebSocket(
-  `ws://${location.hostname}:8000/ws`
-);
-
-ws.onmessage = async (e)=>{
-
-  const state =
-    JSON.parse(e.data);
-
-  definitions =
-    state.definitions || {};
-
-  updateTiles(state);
-  await updateProps(state);
-  updateFloorplanFloors(state);
-  updateFloorplanWalls(state);
-  await updateCharacters(state);
-};
-
-function animate(){
-
-  requestAnimationFrame(animate);
-  controls.update();
-    const delta = 0.016;
-
-  for(const id in characterAnimations){
-
-    const data =
-      characterAnimations[id];
-
-    if(data.mixer){
-
-      data.mixer.update(delta);
-    }
-  }
-  renderer.render(
-    scene,
-    camera
-  );
-}
-
-animate();
+    c.equipped |

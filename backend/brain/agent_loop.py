@@ -105,6 +105,10 @@ from systems.movement import (
     update_character_movement
 )
 
+from systems.action_router import (
+    clear_expired_speech
+)
+
 
 # =========================================================
 # INTERNAL STATE UPDATE
@@ -121,6 +125,8 @@ def update_internal_state(
         c,
         world
     )
+
+    clear_expired_speech(c, world)
 
     decay_memories(c)
 
@@ -242,6 +248,11 @@ def process_decision(
     from systems.action_validator import (
         validate_action
     )
+
+    from systems.action_router import (
+        route_action
+    )
+
     # =====================================
     # THOUGHT
     # =====================================
@@ -313,12 +324,11 @@ def process_decision(
         )
 
     # =====================================
-    # ACTION
+    # ACTION + SPEECH  (via action router)
     # =====================================
 
-    action = decision.get(
-        "action"
-    )
+    action = decision.get("action")
+    speech = decision.get("speech")
 
     if action:
 
@@ -330,17 +340,34 @@ def process_decision(
 
         if valid:
 
-            execute_activity(
+            route_action(
                 c,
                 world,
-                action
+                action,
+                speech,
+                definitions=world.get("definitions", {})
             )
+
+            # still call execute_activity for non-router
+            # action types (eat, sleep, work handled there)
+            if action.get("type") not in (
+                "speak", "socialize", "move",
+                "interact", "wait", "call", "text",
+            ):
+                execute_activity(
+                    c,
+                    world,
+                    action
+                )
 
         else:
 
-            c["last_invalid_action"] = (
-                action
-            )
+            c["last_invalid_action"] = action
+
+    elif speech:
+        # LLM wants to speak but gave no movement action
+        from systems.action_router import apply_speech
+        apply_speech(c, world, speech)
 
 # =========================================================
 # POST UPDATE
@@ -573,51 +600,4 @@ def update_agent(
 
     # =====================================
     # THINK
-    # =====================================
-
-    decision = think(
-        context
-    )
-
-    if not decision:
-        return
-
-    # =====================================
-    # PROCESS DECISION
-    # =====================================
-
-    process_decision(
-
-        c,
-
-        world,
-
-        decision
-    )
-
-    # =====================================
-    # POST
-    # =====================================
-
-    post_update(
-
-        c,
-
-        world
-    )
-
-def merge_body_intentions(c):
-
-    for intention in generate_body_intentions(c):
-
-        store_intention(
-            c,
-            {
-                "type": intention["type"],
-                "priority": int(
-                    intention["priority"] * 100
-                ),
-                "source": "body",
-                "reason": "body_need"
-            }
-        )
+    # ==============
