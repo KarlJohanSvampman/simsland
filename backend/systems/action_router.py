@@ -15,6 +15,25 @@ SPEECH_BUBBLE_TICKS = 8   # how many ticks the bubble stays visible
 
 
 # =========================================================
+# ANIMATION STATE MAP
+# Maps action type → animation_state string used by frontend
+# =========================================================
+
+_ACTION_ANIMATION = {
+    "interact":   "interact",
+    "eat":        "eat",
+    "sleep":      "sleep",
+    "work":       "work",
+    "socialize":  "talk",
+    "speak":      "talk",
+    "move":       "walk",
+    "wait":       "idle",
+    "call":       "phone",
+    "text":       "phone",
+}
+
+
+# =========================================================
 # APPLY SPEECH
 # Stores utterance on the character so the frontend can
 # display it as a speech bubble.
@@ -102,6 +121,48 @@ def _route_move(c, world, action):
 
 
 # =========================================================
+# SCAFFOLD ACTIVITY
+# Wraps a bare activity dict in the phase/duration/tick
+# fields that execute_activity() requires.
+# =========================================================
+
+_INTERACTION_DURATIONS = {
+    "sit":        1800,
+    "sleep":      28800,
+    "eat":        720,
+    "cook":       1200,
+    "work":       28800,
+    "interact":   600,
+    "wait":       120,
+}
+
+def _scaffold(c, world, activity_type, target_id=None,
+              interaction=None, duration=None):
+    """Return a fully scaffolded activity dict."""
+    if duration is None:
+        duration = _INTERACTION_DURATIONS.get(
+            interaction or activity_type,
+            600
+        )
+
+    act = {
+        "type":               activity_type,
+        "phase":              "using",      # router actions start at 'using' (already at target)
+        "phase_started_tick": world.get("tick", 0),
+        "duration":           duration,
+        "state":              {},
+    }
+
+    if target_id:
+        act["target_id"] = target_id
+
+    if interaction:
+        act["interaction"] = interaction
+
+    return act
+
+
+# =========================================================
 # ROUTE INTERACT
 # =========================================================
 
@@ -111,31 +172,35 @@ def _route_interact(c, world, action, definitions):
         return
 
     props = world.get("props", {})
-    prop = props.get(target_id)
+    # props may be a dict keyed by id or a list
+    if isinstance(props, list):
+        prop = next((p for p in props if p.get("id") == target_id), None)
+    else:
+        prop = props.get(target_id)
+
     if not prop:
         return
 
-    # resolve which interaction to use from definitions
-    template_id = prop.get("template")
-    tpl = (
-        definitions
-        .get("prop_templates", {})
-        .get(template_id, {})
+    # prefer interaction specified by the LLM, then fall back to definition
+    interaction = action.get("interaction")
+
+    if not interaction:
+        template_id = prop.get("template")
+        tpl = (
+            definitions
+            .get("prop_templates", {})
+            .get(template_id, {})
+        )
+        for anchor in tpl.get("anchors", []):
+            interaction = anchor.get("interaction")
+            if interaction:
+                break
+
+    c["activity"] = _scaffold(
+        c, world, "interact",
+        target_id=target_id,
+        interaction=interaction,
     )
-    anchors = tpl.get("anchors", [])
-
-    # use first available anchor interaction as default
-    interaction = None
-    for anchor in anchors:
-        interaction = anchor.get("interaction")
-        if interaction:
-            break
-
-    c["activity"] = {
-        "type":      "interact",
-        "target_id": target_id,
-        "interaction": interaction,
-    }
 
     # mark prop occupied
     prop["occupied_by"] = c["id"]
@@ -147,10 +212,11 @@ def _route_interact(c, world, action, definitions):
 
 def _route_eat(c, world, action):
     target_id = action.get("target")
-    c["activity"] = {
-        "type":      "eat",
-        "target_id": target_id,
-    }
+    c["activity"] = _scaffold(
+        c, world, "eat",
+        target_id=target_id,
+        interaction="eat",
+    )
 
 
 # =========================================================
@@ -158,9 +224,12 @@ def _route_eat(c, world, action):
 # =========================================================
 
 def _route_sleep(c, world, action):
-    c["activity"] = {
-        "type": "sleep",
-    }
+    target_id = action.get("target")
+    c["activity"] = _scaffold(
+        c, world, "sleep",
+        target_id=target_id,
+        interaction="sleep",
+    )
 
 
 # =========================================================
@@ -168,10 +237,12 @@ def _route_sleep(c, world, action):
 # =========================================================
 
 def _route_wait(c, world, action):
-    c["activity"] = {
-        "type":     "wait",
-        "duration": action.get("duration", 2),
-    }
+    ticks = action.get("duration", 120)
+    c["activity"] = _scaffold(
+        c, world, "wait",
+        interaction="wait",
+        duration=ticks,
+    )
 
 
 # =========================================================
@@ -234,8 +305,12 @@ def route_action(c, world, action, speech, definitions=None):
         _route_wait(c, world, action)
 
     elif action_type == "work":
-        c["activity"] = {"type": "work"}
+        c["activity"] = _scaffold(c, world, "work", interaction="work")
 
     # "call" / "text" are future — for now just log
     elif action_type in ("call", "text"):
         c.setdefault("pending_comms", []).append(action)
+
+    # Set animation state based on action type
+    anim = _ACTION_ANIMATION.get(action_type, "idle")
+    c["animation_state"] = anim

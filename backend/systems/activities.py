@@ -1002,7 +1002,7 @@ def execute_activity(
     # WALKING
     # =====================================================
 
-    if act["phase"] == "walking":
+    if act.get("phase", "using") == "walking":
 
         if c.get("is_moving"):
             return True
@@ -1108,7 +1108,7 @@ def complete_activity(
 
             household,
 
-            activity
+            act
         )
     # =====================================
     # SLEEP

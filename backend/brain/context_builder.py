@@ -148,37 +148,67 @@ def build_intentions(c):
 
 # =========================================================
 # AVAILABLE ACTIONS
+# Enumerates concrete targets from current perception so the
+# LLM can reference real prop/character IDs in its action.
 # =========================================================
 
-def build_available_actions(
+def build_available_actions(c, world):
 
-    c,
+    perception = c.get("perception", {})
 
-    world
-):
+    # -----------------------------------------------
+    # INTERACTABLE PROPS  (from visible_props)
+    # -----------------------------------------------
+    interactable = []
 
-    return [
+    for prop in perception.get("visible_props", []):
+        tags = prop.get("tags", [])
+        interactions = prop.get("interactions", [])
 
+        if not tags and not interactions:
+            continue
+
+        interactable.append({
+            "id":           prop["id"],
+            "template":     prop.get("template"),
+            "distance":     prop.get("distance"),
+            "tags":         tags,
+            "interactions": interactions,
+        })
+
+    # -----------------------------------------------
+    # NEARBY CHARACTERS  (for speak/socialize targets)
+    # -----------------------------------------------
+    nearby_people = []
+
+    for person in perception.get("visible_people", []):
+        nearby_people.append({
+            "id":       person["id"],
+            "name":     person.get("name"),
+            "distance": person.get("distance"),
+        })
+
+    # -----------------------------------------------
+    # ACTION TYPES available this tick
+    # -----------------------------------------------
+    action_types = [
         "move",
-
         "speak",
-
         "interact",
-
         "wait",
-
-        "call",
-
-        "text",
-
         "eat",
-
         "sleep",
-
         "work",
-
-        "socialize"
+        "socialize",
+        "call",
+        "text",
     ]
+
+    return {
+        "action_types":       action_types,
+        "interactable_props": interactable,
+        "nearby_characters":  nearby_people,
+    }
 
 
 # =========================================================
