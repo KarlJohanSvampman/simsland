@@ -28,6 +28,30 @@ const raycaster =
 const modelCache = {};
 const mouse =
   new THREE.Vector2();
+
+// =========================================================
+// MESHBANK  (resolve model ID → actual GLB path)
+// =========================================================
+
+let meshbank = {};
+
+async function loadMeshbank() {
+  try {
+    const res = await fetch('/api/meshbank');
+    meshbank = await res.json();
+  } catch (e) {
+    console.warn('Meshbank unavailable', e);
+  }
+}
+
+function resolveModel(modelRef) {
+  if (!modelRef) return null;
+  // If it's a meshbank key, return the mesh path
+  const asset = meshbank[modelRef];
+  if (asset?.mesh) return asset.mesh;
+  // Backward compat: raw paths pass through
+  return modelRef;
+}
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x20242a);
 
@@ -1020,7 +1044,9 @@ async function updateProps(state){
     // FALLBACK
     // =========================
 
-    if(!resolved?.model){
+    const propModelPath = resolveModel(resolved?.model);
+
+    if(!propModelPath){
 
       props[prop.id] =
         createFallbackProp(prop);
@@ -1034,7 +1060,7 @@ try {
 
   const model =
     await loadModelCached(
-      resolved.model
+      propModelPath
     );
 
   model.position.set(
@@ -1327,7 +1353,9 @@ async function updateCharacters(state){
     // FALLBACK
     // =========================
 
-    if(!character?.model){
+    const charModelPath = resolveModel(character?.model);
+
+    if(!charModelPath){
 
       sims[id] =
         createFallbackCharacter(c);
@@ -1341,7 +1369,7 @@ try {
 
 const loaded =
   await loadModelCached(
-    character.model
+    charModelPath
   );
 
   const model =
@@ -1410,4 +1438,126 @@ const loaded =
 characterAttachments[id] = {};
 
 const equipped =
-    c.equipped |
+    c.equipped || {};
+
+for(const slot in equipped){
+
+    const itemId =
+        equipped[slot];
+
+    console.log(
+        "Equip:",
+        slot,
+        itemId
+    );
+
+    // we'll fill this next
+}
+
+  characterAnimations[id] = {
+
+  mixer,
+
+  actions,
+
+  current: null
+};
+}
+
+catch(err){
+
+  console.error(
+    "Failed to load character:",
+    character.model,
+    err
+  );
+
+  sims[id] =
+    createFallbackCharacter(c);
+}
+
+delete loadingCharacters[id];
+  }
+
+  // =========================
+  // CLEANUP REMOVED CHARACTERS
+  // =========================
+
+  for(const id in sims){
+
+    if(active.has(id)) continue;
+
+    const mesh = sims[id];
+
+    scene.remove(mesh);
+
+    removeSelectable(mesh);
+    delete characterAnimations[id];
+    delete sims[id];
+  }
+}
+renderer.domElement.addEventListener(
+
+  "pointerdown",
+
+  (event)=>{
+
+    mouse.x =
+      (event.clientX /
+      window.innerWidth) * 2 - 1;
+
+    mouse.y =
+      -(event.clientY /
+      window.innerHeight) * 2 + 1;
+
+    raycaster.setFromCamera(
+      mouse,
+      camera
+    );
+
+    const hits =
+      raycaster
+        .intersectObjects(
+          selectable,
+          true
+        )
+        .filter(
+          h =>
+            !h.object.userData
+            ?.ignoreRaycast
+        );
+
+    if(!hits.length){
+
+      document
+        .getElementById(
+          "viewerSelection"
+        ).innerHTML =
+          "Nothing selected";
+
+      return;
+    }
+
+    let obj = hits[0].object;
+
+    while(
+      obj &&
+      !obj.userData?.type
+    ){
+      obj = obj.parent;
+    }
+
+    if(!obj) return;
+
+    const d = obj.userData;
+
+    document
+      .getElementById(
+        "viewerSelection"
+      ).innerHTML = `
+
+        <b>${d.type}</b><br>
+
+        ${d.id || ""}<br>
+
+        ${d.name || ""

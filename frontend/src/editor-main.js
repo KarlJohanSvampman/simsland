@@ -63,22 +63,25 @@ const mouse =
 new THREE.Vector2();
 
 let definitions = {
-  floorplan_templates:{}
+  floorplan_templates: {},
+  prop_templates: {}
 };
 
 const worldState = {
-  floorplans:[],
-  world_tiles:[]
+  floorplans: [],
+  world_tiles: [],
+  placed_props: []
 };
 
 let currentTool = "select";
 let currentWorldTileType = "grass";
 
 const placementState = {
-  active:false,
-  templateId:null,
-  rotation:0,
-  preview:null
+  active: false,
+  mode: null,           // "floorplan" | "prop"
+  templateId: null,
+  rotation: 0,
+  preview: null
 };
 
 //
@@ -438,6 +441,27 @@ renderer.domElement
     placementState.active
   ){
 
+    if (placementState.mode === 'prop') {
+
+      worldState.placed_props.push({
+        id:       crypto.randomUUID(),
+        template: placementState.templateId,
+        x:        tile.x,
+        y:        tile.y,
+        rotation: placementState.rotation
+      });
+
+      document
+      .getElementById('editorSelection')
+      .innerHTML = `
+        <b>Placed prop</b><br>
+        ${placementState.templateId}<br>
+        @ ${tile.x}, ${tile.y}
+      `;
+
+      return;
+    }
+
     worldState.floorplans.push({
 
       id:
@@ -487,14 +511,15 @@ async function loadDefinitions(){
   definitions =
   await res.json();
 
-  const select =
+  // Populate floorplan selector
+  const fpSelect =
   document.getElementById(
     "floorplanSelect"
   );
 
-  if(select){
+  if(fpSelect){
 
-    select.innerHTML="";
+    fpSelect.innerHTML="";
 
     for(
       const id
@@ -509,7 +534,32 @@ async function loadDefinitions(){
       opt.value=id;
       opt.textContent=id;
 
-      select.appendChild(opt);
+      fpSelect.appendChild(opt);
+    }
+  }
+
+  // Populate prop selector
+  const propSelect =
+  document.getElementById(
+    "propSelect"
+  );
+
+  if(propSelect){
+
+    propSelect.innerHTML = '<option value="">— pick prop —</option>';
+
+    for(
+      const id
+      in definitions.prop_templates
+    ){
+
+      const opt =
+      document.createElement("option");
+
+      opt.value = id;
+      opt.textContent = id;
+
+      propSelect.appendChild(opt);
     }
   }
 }
@@ -579,85 +629,4 @@ async ()=>{
   );
 };
 
-window.reloadWorld =
-()=> location.reload();
-
-//
-// ===================================
-// TOOLS
-// ===================================
-//
-
-document
-.querySelectorAll(
-  ".toolButton"
-)
-.forEach(btn=>{
-
-  btn.onclick = ()=>{
-
-    currentTool =
-      btn.dataset.tool
-      ||
-      "select";
-
-    placementState.active =
-      currentTool ===
-      "place_floorplan";
-  };
-});
-
-const tileSelect =
-document.getElementById(
-  "worldTileSelect"
-);
-
-if(tileSelect){
-
-  tileSelect.onchange =
-  ()=>{
-
-    currentWorldTileType =
-      tileSelect.value;
-  };
-}
-
-const rotateBtn =
-document.getElementById(
-  "rotateFloorplanBtn"
-);
-
-if(rotateBtn){
-
-  rotateBtn.onclick =
-  ()=>{
-
-    placementState.rotation +=
-      Math.PI/2;
-  };
-}
-
-//
-// ===================================
-// RENDER LOOP
-// ===================================
-//
-
-function animate(){
-
-  requestAnimationFrame(
-    animate
-  );
-
-  controls.update();
-
-  renderer.render(
-    scene,
-    camera
-  );
-}
-
-await loadDefinitions();
-await loadWorld();
-
-animate();
+window.reloadW

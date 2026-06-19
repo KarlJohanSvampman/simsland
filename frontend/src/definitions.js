@@ -1,38 +1,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 
-
-function resolveMeshAsset(assetId){
-
-  if(!assetId){
-    return null;
-  }
-
-  return meshbank[
-    assetId
-  ] || null;
-}
-
-function resolveModelPath(template){
-
-  const modelId =
-    template?.model;
-
-  if(!modelId){
-    return null;
-  }
-
-  const asset =
-    resolveMeshAsset(
-      modelId
-    );
-
-  if(!asset){
-    return null;
-  }
-
-  return asset.mesh;
-}
 // =====================================================
 // STATE
 // =====================================================
@@ -81,14 +50,7 @@ const tabs = [
   "company_templates"
 ];
 
-let assets = {
-  props: [],
-  characters: [],
-  items: []
-};
-
 let meshbank = {};
-
 let currentTab = 'prop_templates';
 let currentTemplateId = null;
 
@@ -96,56 +58,46 @@ let currentTemplateId = null;
 // UI ELEMENTS
 // =====================================================
 
-const tabsEl = document.getElementById('tabs');
-const templateListEl = document.getElementById('templateList');
-const jsonEditor = document.getElementById('jsonEditor');
-const editorTitle = document.getElementById('editorTitle');
-const assetBrowser = document.getElementById('assetBrowser');
-const animationList = document.getElementById('animationList');
-const statusBar = document.getElementById('statusBar');
+const tabsEl          = document.getElementById('tabs');
+const templateListEl  = document.getElementById('templateList');
+const jsonEditor      = document.getElementById('jsonEditor');
+const editorTitle     = document.getElementById('editorTitle');
+const animationList   = document.getElementById('animationList');
+const statusBar       = document.getElementById('statusBar');
+const assetBrowser    = document.getElementById('assetBrowser');
+const assetSearch     = document.getElementById('assetSearch');
+const currentModelEl  = document.getElementById('currentModelLabel');
 
 // =====================================================
-// THREE PREVIEW
+// THREE PREVIEW  (with OrbitControls, like meshbank)
 // =====================================================
 
 const previewScene = new THREE.Scene();
-previewScene.background = new THREE.Color(0x20242a);
+previewScene.background = new THREE.Color(0x1a1e24);
 
-const previewCamera = new THREE.PerspectiveCamera(
-  60,
-  1,
-  0.1,
-  1000
-);
+const previewCamera = new THREE.PerspectiveCamera(50, 1, 0.1, 1000);
+previewCamera.position.set(3, 3, 3);
+previewCamera.lookAt(0, 0, 0);
 
-previewCamera.position.set(2,2,2);
-previewCamera.lookAt(0,0,0);
+const previewRenderer = new THREE.WebGLRenderer({ antialias: true });
+previewRenderer.setSize(420, 420);
 
-const previewRenderer = new THREE.WebGLRenderer({
-  antialias: true
-});
+const previewMount = document.getElementById('modelPreview');
+previewMount.appendChild(previewRenderer.domElement);
 
-previewRenderer.setSize(420,420);
+previewScene.add(new THREE.AmbientLight(0xffffff, 1.2));
 
-document
-  .getElementById('modelPreview')
-  .appendChild(previewRenderer.domElement);
+const previewSun = new THREE.DirectionalLight(0xffffff, 2);
+previewSun.position.set(5, 10, 5);
+previewScene.add(previewSun);
 
-previewScene.add(
-  new THREE.AmbientLight(0xffffff,1.2)
-);
+previewScene.add(new THREE.GridHelper(10, 10));
 
-const dir = new THREE.DirectionalLight(
-  0xffffff,
-  2
-);
-
-dir.position.set(5,10,5);
-previewScene.add(dir);
-
-previewScene.add(
-  new THREE.GridHelper(10,10)
-);
+const previewControls = new OrbitControls(previewCamera, previewRenderer.domElement);
+previewControls.enableDamping = true;
+previewControls.screenSpacePanning = true;
+previewControls.target.set(0, 1, 0);
+previewControls.update();
 
 const previewLoader = new GLTFLoader();
 
@@ -153,213 +105,162 @@ let previewModel = null;
 let previewMixer = null;
 let previewBones = [];
 
+// =====================================================
+// MODEL RESOLUTION  (meshbank ID → actual mesh path)
+// =====================================================
 
-function extractBones(root){
+function resolveModelPath(template) {
+
+  const modelRef = template?.model;
+  if (!modelRef) return null;
+
+  // Try meshbank ID first
+  const asset = meshbank[modelRef];
+  if (asset?.mesh) return asset.mesh;
+
+  // Fallback: treat as raw path (backward compat)
+  if (modelRef.startsWith('/') || modelRef.includes('.glb')) {
+    return modelRef;
+  }
+
+  return null;
+}
+
+function getMeshbankAsset(modelRef) {
+  if (!modelRef) return null;
+  return meshbank[modelRef] || null;
+}
+
+// =====================================================
+// BONE EXTRACTION
+// =====================================================
+
+function extractBones(root) {
 
   const bones = [];
 
-  root.traverse(node=>{
-
-    if(node.isBone){
-
-      bones.push(
-        node.name
-      );
+  root.traverse(node => {
+    if (node.isBone) {
+      bones.push(node.name);
     }
   });
 
   return bones.sort();
 }
 
+// =====================================================
+// AUTO FRAME
+// =====================================================
+
+function framePreviewCamera(model) {
+
+  const box    = new THREE.Box3().setFromObject(model);
+  const size   = box.getSize(new THREE.Vector3());
+  const center = box.getCenter(new THREE.Vector3());
+  const maxDim = Math.max(size.x, size.y, size.z);
+
+  previewCamera.position.set(
+    center.x + maxDim * 1.6,
+    center.y + maxDim * 1.0,
+    center.z + maxDim * 1.6
+  );
+
+  previewControls.target.copy(center);
+  previewControls.update();
+}
+
+// =====================================================
+// BONE SLOT EDITOR
+// =====================================================
+
 const STANDARD_BONE_SLOTS = [
-
-  "head",
-
-  "neck",
-
-  "right_hand",
-
-  "left_hand",
-
-  "spine",
-
-  "pelvis",
-
-  "right_foot",
-
-  "left_foot"
+  "head", "neck", "right_hand", "left_hand",
+  "spine", "pelvis", "right_foot", "left_foot"
 ];
 
-function renderBoneSlotEditor(){
+function renderBoneSlotEditor() {
 
-  const container =
-    document.getElementById(
-      "boneSlotEditor"
-    );
+  const container = document.getElementById('boneSlotEditor');
+  container.innerHTML = '';
 
-  container.innerHTML = "";
-
-  if(
-    currentTab !==
-    "character_templates"
-  ){
-    return;
-  }
-
-  if(!currentTemplateId){
-    return;
-  }
+  if (currentTab !== 'character_templates') return;
+  if (!currentTemplateId) return;
 
   let template;
-
-  try{
-
-    template =
-      JSON.parse(
-        jsonEditor.value
-      );
-
-  }catch{
-
+  try {
+    template = JSON.parse(jsonEditor.value);
+  } catch {
     return;
   }
 
   template.bone_slots ||= {};
 
-  STANDARD_BONE_SLOTS.forEach(slot=>{
+  // Get bones from meshbank first, then fall back to live-extracted bones
+  const asset    = getMeshbankAsset(template.model);
+  const boneKeys = asset?.bones
+    ? Object.keys(asset.bones)
+    : previewBones;
 
-    const row =
-      document.createElement("div");
+  STANDARD_BONE_SLOTS.forEach(slot => {
 
-    row.className =
-      "boneSlotRow";
+    const row = document.createElement('div');
+    row.className = 'boneSlotRow';
 
-    const label =
-      document.createElement("label");
+    const label = document.createElement('label');
+    label.textContent = slot;
 
-    label.textContent =
-      slot;
+    const select = document.createElement('select');
 
-    const select =
-      document.createElement("select");
+    const empty = document.createElement('option');
+    empty.value = '';
+    empty.textContent = '--';
+    select.appendChild(empty);
 
-    const empty =
-      document.createElement("option");
-
-    empty.value = "";
-    empty.textContent = "--";
-
-
-const modelId =
-  template.model;
-
-const asset =
-  meshbank[
-    modelId
-  ];
-
-const bones =
-  Object.keys(
-    asset?.bones || {}
-  );
-  console.log(
-  "Model:",
-  template.model
-);
-
-console.log(
-  "Asset:",
-  asset
-);
-
-console.log(
-  "Bones:",
-  bones
-);
-
-select.appendChild(
-      empty
-    );
-bones.forEach(bone=>{
-
-      const option =
-        document.createElement(
-          "option"
-        );
-
-      option.value =
-        bone;
-
-      option.textContent =
-        bone;
-
-      if(
-        template
-        .bone_slots?.[slot]
-        === bone
-      ){
-        option.selected = true;
-      }
-
-      select.appendChild(
-        option
-      );
+    boneKeys.forEach(bone => {
+      const option = document.createElement('option');
+      option.value = bone;
+      option.textContent = bone;
+      if (template.bone_slots[slot] === bone) option.selected = true;
+      select.appendChild(option);
     });
 
-    select.onchange = ()=>{
-
-      template.bone_slots ||= {};
-
-      template
-      .bone_slots[slot] =
-        select.value;
-
-      jsonEditor.value =
-        JSON.stringify(
-          template,
-          null,
-          2
-        );
+    select.onchange = () => {
+      template.bone_slots[slot] = select.value;
+      jsonEditor.value = JSON.stringify(template, null, 2);
     };
 
     row.appendChild(label);
     row.appendChild(select);
-
     container.appendChild(row);
   });
 }
 
-async function loadMeshbank(){
+// =====================================================
+// LOAD MESHBANK
+// =====================================================
 
-    const response =
-        await fetch(
-            "/api/meshbank"
-        );
+async function loadMeshbank() {
 
-    meshbank =
-        await response.json();
+  try {
+    const res = await fetch('/api/meshbank');
+    meshbank = await res.json();
+  } catch (err) {
+    console.warn('Meshbank load failed', err);
+  }
 
-    console.log(
-        "MeshBank loaded",
-        meshbank
-    );
+  renderAssetBrowser();
 }
+
 // =====================================================
 // LOAD DEFINITIONS
 // =====================================================
 
-async function loadDefinitions(){
+async function loadDefinitions() {
 
   try {
-
-    const res = await fetch(
-      '/api/editor/definitions?sim_id=default'
-    );
-
+    const res = await fetch('/api/editor/definitions?sim_id=default');
     definitions = await res.json();
-
-  } catch(err){
-
+  } catch (err) {
     console.warn(err);
   }
 
@@ -368,52 +269,28 @@ async function loadDefinitions(){
 }
 
 // =====================================================
-// LOAD ASSETS
-// =====================================================
-
-async function loadAssets(){
-
-  try {
-
-    const res = await fetch('/api/assets');
-
-    assets = await res.json();
-
-  } catch(err){
-
-    console.warn(err);
-  }
-
-  renderAssets();
-}
-
-// =====================================================
 // TABS
 // =====================================================
 
-function renderTabs(){
+function renderTabs() {
 
   tabsEl.innerHTML = '';
 
-  tabs.forEach(tab=>{
+  tabs.forEach(tab => {
 
     const el = document.createElement('div');
-
     el.className = 'tab';
+    if (tab === currentTab) el.classList.add('active');
 
-    if(tab === currentTab){
-      el.classList.add('active');
-    }
+    // Show just the prefix (e.g. "prop" from "prop_templates")
+    el.textContent = tab.replace('_templates', '');
 
-    el.textContent = tab;
-
-    el.onclick = ()=>{
-
+    el.onclick = () => {
       currentTab = tab;
       currentTemplateId = null;
-
       renderTabs();
       renderTemplateList();
+      document.getElementById('boneSlotEditor').innerHTML = '';
     };
 
     tabsEl.appendChild(el);
@@ -424,25 +301,21 @@ function renderTabs(){
 // TEMPLATE LIST
 // =====================================================
 
-function renderTemplateList(){
+function renderTemplateList() {
 
   templateListEl.innerHTML = '';
 
   const bucket = definitions[currentTab] || {};
 
-  Object.entries(bucket).forEach(([id,data])=>{
+  Object.entries(bucket).forEach(([id, data]) => {
 
     const row = document.createElement('div');
-
     row.className = 'templateRow';
-    if(id === currentTemplateId){
-    row.classList.add("active");
-    }
+    if (id === currentTemplateId) row.classList.add('active');
+
     row.textContent = id;
 
-    row.onclick = ()=>{
-      openTemplate(id);
-    };
+    row.onclick = () => openTemplate(id);
 
     templateListEl.appendChild(row);
   });
@@ -452,371 +325,245 @@ function renderTemplateList(){
 // OPEN TEMPLATE
 // =====================================================
 
-function openTemplate(id){
+function openTemplate(id) {
 
   currentTemplateId = id;
 
   const data = definitions[currentTab][id];
 
-  jsonEditor.value = JSON.stringify(
-    data,
-    null,
-    2
-  );
+  jsonEditor.value = JSON.stringify(data, null, 2);
+  editorTitle.textContent = `${currentTab} / ${id}`;
 
-  editorTitle.textContent = id;
-renderBoneSlotEditor();
-const path =
-  resolveModelPath(
-    data
-  );
-
-console.log(
-  "Resolved model path:",
-  path
-);
-
-if(path){
-
-  loadPreviewModel(
-    path
-  );
-}
-
-}
-
-// =====================================================
-// CREATE TEMPLATE
-// =====================================================
-
-window.createTemplate = function(){
-
-  const id = prompt("Template ID");
-
-  if(!id) return;
-
-  if(!definitions[currentTab]){
-
-    definitions[currentTab] = {};
-  }
-
-  definitions[currentTab][id] = {};
-
-  currentTemplateId = id;
-
-  renderTemplateList();
-
-  openTemplate(id);
-};
-
-// =====================================================
-// DUPLICATE
-// =====================================================
-
-window.duplicateTemplate = function(){
-
-  if(!currentTemplateId) return;
-
-  const id = prompt('Duplicate as');
-
-  if(!id) return;
-
-  definitions[currentTab][id] = JSON.parse(
-    JSON.stringify(
-      definitions[currentTab][currentTemplateId]
-    )
-  );
-
-  renderTemplateList();
-}
-
-// =====================================================
-// DELETE
-// =====================================================
-
-window.deleteTemplate = function(){
-
-  if(!currentTemplateId) return;
-
-  delete definitions[currentTab][currentTemplateId];
-
-  currentTemplateId = null;
-
-  jsonEditor.value = '';
-
-  renderTemplateList();
-}
-
-// =====================================================
-// SAVE
-// =====================================================
-
-window.saveDefinitions = async function(){
-
-  try {
-
-    if(currentTemplateId){
-
-      definitions[currentTab][currentTemplateId] =
-        JSON.parse(jsonEditor.value);
+  // Show current model label
+  const modelRef = data?.model;
+  if (currentModelEl) {
+    if (modelRef) {
+      const asset = getMeshbankAsset(modelRef);
+      const label = asset?.display_name || modelRef;
+      currentModelEl.textContent = `Model: ${label}`;
+      currentModelEl.style.color = asset ? '#7fc97f' : '#f0a060';
+    } else {
+      currentModelEl.textContent = 'No model set';
+      currentModelEl.style.color = '#888';
     }
-
-    await fetch(
-      '/api/editor/definitions?sim_id=default',
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(definitions)
-      }
-    );
-
-    setStatus('Saved');
-
-  } catch(err){
-
-    console.error(err);
-
-    setStatus('Save failed');
   }
-}
 
-// =====================================================
-// ASSET BROWSER
-// =====================================================
+  renderBoneSlotEditor();
 
-function renderAssets(){
-
-  assetBrowser.innerHTML = '';
-
-  Object.entries(assets).forEach(([type,list])=>{
-
-    const title = document.createElement('h4');
-    title.textContent = type;
-
-    assetBrowser.appendChild(title);
-
-    list.forEach(path=>{
-
-      const row = document.createElement('div');
-
-      row.className = 'assetRow';
-      row.textContent = path;
-
-      row.onclick = ()=>{
-
-        loadPreviewModel(path);
-
-        insertModelIntoEditor(path);
-      };
-
-      assetBrowser.appendChild(row);
-    });
-  });
-}
-
-// =====================================================
-// INSERT MODEL PATH
-// =====================================================
-
-function insertModelIntoEditor(path){
-
-  try {
-
-    const data = JSON.parse(jsonEditor.value || '{}');
-
-    data.model = path;
-
-    jsonEditor.value = JSON.stringify(
-      data,
-      null,
-      2
-    );
-
-  } catch(err){
-
-    console.warn(err);
+  const path = resolveModelPath(data);
+  if (path) {
+    loadPreviewModel(path);
+  } else {
+    clearPreviewModel();
   }
+
+  renderTemplateList();
 }
 
 // =====================================================
-// PREVIEW MODEL
+// CLEAR PREVIEW
 // =====================================================
 
-async function loadPreviewModel(path){
+function clearPreviewModel() {
 
-  if(previewModel){
+  if (previewModel) {
     previewScene.remove(previewModel);
+    previewModel = null;
   }
-
+  previewMixer = null;
+  previewBones = [];
   animationList.innerHTML = '';
-  console.log(
-      "Loading preview:",
-      path
-  );
-  previewLoader.load(path,(gltf)=>{
+}
+
+// =====================================================
+// LOAD PREVIEW MODEL
+// =====================================================
+
+function loadPreviewModel(path) {
+
+  clearPreviewModel();
+
+  setStatus(`Loading ${path}...`);
+
+  previewLoader.load(path, (gltf) => {
 
     previewModel = gltf.scene;
-    previewBones =
-      extractBones(
-        previewModel
-      );
+    previewBones = extractBones(previewModel);
 
-    renderBoneSlotEditor();
     previewScene.add(previewModel);
 
-    previewMixer = new THREE.AnimationMixer(
-      previewModel
-    );
+    // Auto-frame camera
+    framePreviewCamera(previewModel);
 
-    // animations
-    gltf.animations.forEach((clip)=>{
+    // Animations
+    animationList.innerHTML = '';
 
-      const btn = document.createElement('button');
+    if (gltf.animations.length) {
+      previewMixer = new THREE.AnimationMixer(previewModel);
 
-      btn.className = 'animButton';
+      gltf.animations.forEach(clip => {
+        const btn = document.createElement('button');
+        btn.className = 'animButton';
+        btn.textContent = clip.name;
 
-      btn.textContent = clip.name;
+        btn.onclick = () => {
+          previewMixer.stopAllAction();
+          const action = previewMixer.clipAction(clip);
+          action.reset();
+          action.fadeIn(0.2);
+          action.play();
+        };
 
-      btn.onclick = ()=>{
+        animationList.appendChild(btn);
+      });
+    }
 
-        previewMixer.stopAllAction();
-
-        const action = previewMixer.clipAction(clip);
-
-        action.reset();
-        action.fadeIn(0.2);
-        action.play();
-      };
-
-      animationList.appendChild(btn);
-    });
-
-    // anchors
-    previewModel.traverse((o)=>{
-
-      if(
-        o.name
-        .toLowerCase()
-        .startsWith('anchor_')
-      ){
-
+    // Highlight anchor nodes
+    previewModel.traverse(o => {
+      if (o.name.toLowerCase().startsWith('anchor_')) {
         const sphere = new THREE.Mesh(
           new THREE.SphereGeometry(0.05),
-          new THREE.MeshBasicMaterial({
-            color: 0xff0000
-          })
+          new THREE.MeshBasicMaterial({ color: 0xff4444 })
         );
-
         o.add(sphere);
       }
     });
 
-    setStatus(`Loaded ${path}`);
+    renderBoneSlotEditor();
 
-  },undefined,(err)=>{
+    setStatus(`Loaded: ${path}`);
 
+  }, undefined, (err) => {
     console.error(err);
-
     setStatus('Model load failed');
   });
 }
 
 // =====================================================
-// STATUS
+// SET MODEL FROM MESHBANK ASSET
 // =====================================================
 
-function setStatus(text){
-  statusBar.textContent = text;
+function selectMeshbankAsset(assetId) {
+
+  const asset = meshbank[assetId];
+  if (!asset) return;
+
+  // Insert meshbank ID (not path) into the template
+  try {
+    const data = JSON.parse(jsonEditor.value || '{}');
+    data.model = assetId;
+    jsonEditor.value = JSON.stringify(data, null, 2);
+  } catch {
+    // editor might be empty, that's ok
+  }
+
+  // Update model label
+  if (currentModelEl) {
+    currentModelEl.textContent = `Model: ${asset.display_name || assetId}`;
+    currentModelEl.style.color = '#7fc97f';
+  }
+
+  // Load preview
+  if (asset.mesh) {
+    loadPreviewModel(asset.mesh);
+  }
+
+  setStatus(`Selected: ${asset.display_name || assetId}`);
 }
 
 // =====================================================
-// ANIMATE
+// ASSET BROWSER  (meshbank entries grouped by category)
 // =====================================================
 
-const previewClock = new THREE.Clock();
+function renderAssetBrowser(filter) {
 
-function animate(){
+  assetBrowser.innerHTML = '';
 
-  requestAnimationFrame(animate);
+  // Group by category
+  const byCategory = {};
 
-  const delta = previewClock.getDelta();
+  for (const [id, asset] of Object.entries(meshbank)) {
 
-  if(previewMixer){
-    previewMixer.update(delta);
+    const name  = asset.display_name || id;
+    const query = (filter || '').toLowerCase();
+
+    if (query && !name.toLowerCase().includes(query) && !id.toLowerCase().includes(query)) {
+      continue;
+    }
+
+    const cat = asset.category || 'misc';
+    byCategory[cat] ||= [];
+    byCategory[cat].push({ id, asset });
   }
 
-  if(previewModel){
-    previewModel.rotation.y += 0.003;
-  }
-
-  previewRenderer.render(
-    previewScene,
-    previewCamera
-  );
-}
-document
-.getElementById(
-  "autoMapMixamoBtn"
-)
-.onclick = ()=>{
-
-  if(
-    currentTab !==
-    "character_templates"
-  ){
+  if (Object.keys(byCategory).length === 0) {
+    const empty = document.createElement('div');
+    empty.style.cssText = 'color:#888;padding:10px;font-size:12px;';
+    empty.textContent = filter ? 'No matches' : 'No meshbank assets loaded';
+    assetBrowser.appendChild(empty);
     return;
   }
 
-  let template =
-    JSON.parse(
-      jsonEditor.value
-    );
+  for (const [cat, entries] of Object.entries(byCategory)) {
 
-  template.bone_slots = {
+    const title = document.createElement('div');
+    title.className = 'assetCategory';
+    title.textContent = cat;
+    assetBrowser.appendChild(title);
 
-    head:
-      "mixamorigHead",
+    entries.forEach(({ id, asset }) => {
 
-    neck:
-      "mixamorigNeck",
+      const row = document.createElement('div');
+      row.className = 'assetRow';
 
-    right_hand:
-      "mixamorigRightHand",
+      const name = document.createElement('div');
+      name.className = 'assetName';
+      name.textContent = asset.display_name || id;
 
-    left_hand:
-      "mixamorigLeftHand",
+      const sub = document.createElement('div');
+      sub.className = 'assetId';
+      sub.textContent = id;
 
-    spine:
-      "mixamorigSpine2",
+      row.appendChild(name);
+      row.appendChild(sub);
 
-    pelvis:
-      "mixamorigHips",
+      row.onclick = () => selectMeshbankAsset(id);
 
-    right_foot:
-      "mixamorigRightFoot",
+      assetBrowser.appendChild(row);
+    });
+  }
+}
 
-    left_foot:
-      "mixamorigLeftFoot"
-  };
+// =====================================================
+// TEMPLATE CRUD
+// =====================================================
 
-  jsonEditor.value =
-    JSON.stringify(
-      template,
-      null,
-      2
-    );
+window.createTemplate = function () {
 
-  renderBoneSlotEditor();
+  const id = prompt('Template ID');
+  if (!id) return;
+
+  definitions[currentTab] ||= {};
+  definitions[currentTab][id] = {};
+
+  currentTemplateId = id;
+  renderTemplateList();
+  openTemplate(id);
 };
-animate();
 
-// =====================================================
-// STARTUP
-// =====================================================
+window.duplicateTemplate = function () {
 
-loadDefinitions();
-loadMeshbank();
-loadAssets();
+  if (!currentTemplateId) return;
+  const id = prompt('Duplicate as');
+  if (!id) return;
 
+  definitions[currentTab][id] = JSON.parse(
+    JSON.stringify(definitions[currentTab][currentTemplateId])
+  );
+
+  renderTemplateList();
+};
+
+window.deleteTemplate = function () {
+
+  if (!currentTemplateId) 
