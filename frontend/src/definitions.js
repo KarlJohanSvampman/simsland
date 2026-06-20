@@ -100,10 +100,12 @@ previewControls.target.set(0, 1, 0);
 previewControls.update();
 
 const previewLoader = new GLTFLoader();
+const previewTexLoader = new THREE.TextureLoader();
 
 let previewModel = null;
 let previewMixer = null;
 let previewBones = [];
+let previewMesh = null;   // for tile / material previews
 
 // =====================================================
 // MODEL RESOLUTION  (meshbank ID → actual mesh path)
@@ -350,14 +352,103 @@ function openTemplate(id) {
 
   renderBoneSlotEditor();
 
-  const path = resolveModelPath(data);
-  if (path) {
-    loadPreviewModel(path);
+  // Choose preview type based on tab
+  if (currentTab === 'material_templates') {
+    loadMaterialPreview(data);
+  } else if (currentTab === 'tile_templates') {
+    loadTilePreview(data);
   } else {
-    clearPreviewModel();
+    const path = resolveModelPath(data);
+    if (path) {
+      loadPreviewModel(path);
+    } else {
+      clearPreviewModel();
+    }
   }
 
   renderTemplateList();
+}
+
+// =====================================================
+// MATERIAL / TILE PREVIEW
+// =====================================================
+
+function clearPreviewMesh() {
+  if (previewMesh) {
+    previewScene.remove(previewMesh);
+    previewMesh = null;
+  }
+}
+
+function applyTextureToMat(mat, texturePath) {
+  if (!texturePath) return;
+  previewTexLoader.load(texturePath, (tex) => {
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    tex.repeat.set(2, 2);
+    mat.map = tex;
+    mat.needsUpdate = true;
+  });
+}
+
+function loadMaterialPreview(data) {
+  clearPreviewModel();
+  clearPreviewMesh();
+  animationList.innerHTML = '';
+
+  const mat = new THREE.MeshStandardMaterial({
+    color: data.color ? new THREE.Color(data.color) : 0xcccccc,
+    roughness: data.roughness ?? 0.7,
+    metalness: data.metalness ?? 0.0,
+  });
+
+  if (data.texture) applyTextureToMat(mat, data.texture);
+
+  previewMesh = new THREE.Mesh(new THREE.SphereGeometry(1.2, 64, 64), mat);
+  previewMesh.position.set(0, 1.2, 0);
+  previewScene.add(previewMesh);
+
+  // Frame camera on sphere
+  previewCamera.position.set(3, 2.5, 3);
+  previewControls.target.set(0, 1.2, 0);
+  previewControls.update();
+
+  setStatus(data.texture ? `Material: ${data.texture}` : 'Material preview (no texture)');
+}
+
+function loadTilePreview(data) {
+  clearPreviewModel();
+  clearPreviewMesh();
+  animationList.innerHTML = '';
+
+  const mat = new THREE.MeshStandardMaterial({
+    color: 0xdddddd,
+    roughness: 0.9,
+  });
+
+  // Try to find matching material template by tile id similarity
+  const matTemplates = definitions.material_templates || {};
+  const tileId = currentTemplateId || '';
+  const matchKey = Object.keys(matTemplates).find(k =>
+    k.startsWith(tileId) || tileId.startsWith(k.split('_01')[0])
+  );
+  const matchedMat = matchKey ? matTemplates[matchKey] : null;
+
+  if (matchedMat?.texture) {
+    applyTextureToMat(mat, matchedMat.texture);
+    setStatus(`Tile preview — texture: ${matchedMat.texture}`);
+  } else {
+    setStatus('Tile preview (no matching material texture)');
+  }
+
+  // 4x4 tile plane viewed at an angle
+  const geo = new THREE.PlaneGeometry(4, 4);
+  geo.rotateX(-Math.PI / 2);
+  previewMesh = new THREE.Mesh(geo, mat);
+  previewScene.add(previewMesh);
+
+  previewCamera.position.set(3, 4, 4);
+  previewControls.target.set(0, 0, 0);
+  previewControls.update();
 }
 
 // =====================================================
@@ -365,6 +456,8 @@ function openTemplate(id) {
 // =====================================================
 
 function clearPreviewModel() {
+
+  clearPreviewMesh();
 
   if (previewModel) {
     previewScene.remove(previewModel);
