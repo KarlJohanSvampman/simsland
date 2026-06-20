@@ -220,13 +220,12 @@ function pickTile(event) {
 // ===================================
 //
 
+// Single click — select tile only
 renderer.domElement.addEventListener("pointerdown", (event) => {
   const tile = pickTile(event);
   if (!tile) return;
 
   const world = gridToWorld(tile.x, tile.y);
-
-  // Always select tile on click
   lastClickedTile = tile;
   selection.visible = true;
   selection.position.set(world.x, 0.03, world.z);
@@ -235,9 +234,16 @@ renderer.domElement.addEventListener("pointerdown", (event) => {
     <b>Tile</b><hr>
     Grid: ${tile.x}, ${tile.y}
   `;
+});
+
+// Double click — place / paint
+renderer.domElement.addEventListener("dblclick", (event) => {
+  const tile = pickTile(event);
+  if (!tile) return;
 
   if (currentTool === "paint_tile") {
     paintTile(tile.x, tile.y, currentWorldTileType);
+    setStatus(`Painted ${currentWorldTileType} @ ${tile.x}, ${tile.y}`);
     return;
   }
 
@@ -255,6 +261,7 @@ renderer.domElement.addEventListener("pointerdown", (event) => {
         ${placementState.templateId}<br>
         @ ${tile.x}, ${tile.y}
       `;
+      setStatus(`Placed prop: ${placementState.templateId} @ ${tile.x}, ${tile.y}`);
       return;
     }
 
@@ -270,6 +277,7 @@ renderer.domElement.addEventListener("pointerdown", (event) => {
       ${placementState.templateId}<br>
       @ ${tile.x}, ${tile.y}
     `;
+    setStatus(`Placed floorplan: ${placementState.templateId} @ ${tile.x}, ${tile.y}`);
     return;
   }
 });
@@ -409,16 +417,3 @@ document.getElementById("btn-spawn_character").onclick = () => {
     document.getElementById("list-spawn_character"),
     definitions.character_templates,
     async (id) => {
-      closeModal("modal-spawn_character");
-
-      if (!lastClickedTile) {
-        setStatus("Click a tile first, then spawn character");
-        return;
-      }
-
-      setStatus(`Spawning ${id} at ${lastClickedTile.x}, ${lastClickedTile.y}…`);
-
-      try {
-        const res = await fetch("/api/editor/spawn_character", {
-          method:  "POST",
-          headers: { "Content-Type": "application/j
