@@ -6,7 +6,7 @@
 
 import time
 
-from systems.activities import get_phase_animation
+from systems.activities import get_phase_animation, get_clean_animation
 
 
 # =========================================================
@@ -252,66 +252,59 @@ def _route_wait(c, world, action):
 
 
 # =========================================================
-# MAIN ROUTER
+# ROUTE EXAMINE / INSPECT
 # =========================================================
 
-def route_action(c, world, action, speech, definitions=None):
-    """
-    Dispatch the LLM's action and speech into world state.
+def _route_examine(c, world, action):
+    target_id = action.get("target")
+    c["activity"] = _scaffold(
+        c, world, "examine",
+        target_id=target_id,
+        interaction="examine",
+        duration=180,
+    )
+    c["animation_state"] = get_phase_animation("examine", "using")
 
-    action = {
-        "type":   str,
-        "target": str | None,
-        "reason": str | None,
-    }
-    speech = {
-        "utterance": str,
-        ...
-    }
-    definitions = world["definitions"] (optional, for prop lookups)
-    """
-    if definitions is None:
-        definitions = world.get("definitions", {})
 
-    # Always apply speech first so it displays even if action fails
-    if speech:
-        apply_speech(c, world, speech)
+# =========================================================
+# ROUTE SEARCH FOR ITEM
+# =========================================================
 
-    if not action:
-        return
+def _route_search(c, world, action):
+    target_id = action.get("target")
+    c["activity"] = _scaffold(
+        c, world, "search",
+        target_id=target_id,
+        interaction="search",
+        duration=600,
+    )
+    c["animation_state"] = get_phase_animation("search", "using")
 
-    action_type = action.get("type", "")
 
-    if action_type == "move":
-        _route_move(c, world, action)
+# =========================================================
+# ROUTE TRASH / DESTROY
+# =========================================================
 
-    elif action_type == "interact":
-        _route_interact(c, world, action, definitions)
+def _route_trash(c, world, action):
+    target_id = action.get("target")
+    interaction = "trash" if action.get("type") == "trash" else "destroy"
+    c["activity"] = _scaffold(
+        c, world, action.get("type", "trash"),
+        target_id=target_id,
+        interaction=interaction,
+        duration=120,
+    )
+    c["animation_state"] = get_phase_animation(interaction, "using")
 
-    elif action_type in ("speak", "socialize"):
-        # Speech was already applied above.
-        # Also point character toward target if given.
-        target_id = action.get("target")
-        if target_id:
-            chars = world.get("characters", {})
-            if target_id in chars:
-                t = chars[target_id]
-                c["look_target"] = {
-                    "x": t.get("x", 0),
-                    "y": t.get("y", 0),
-                }
 
-    elif action_type == "eat":
-        _route_eat(c, world, action)
+# =========================================================
+# ROUTE CARRY
+# Character picks up target prop and walks it to destination.
+# LLM action must include:
+#   target:      prop_id to carry
+#   destination: { x, y } tile to deliver to
+# =========================================================
 
-    elif action_type == "sleep":
-        _route_sleep(c, world, action)
-
-    elif action_type == "wait":
-        _route_wait(c, world, action)
-
-    elif action_type == "work":
-        c["activity"] = _scaffold(c, world, "work", interaction="work")
-
-    # "call" / "text" are future — for now just log
-    elif action_type in ("c
+def _route_carry(c, world, action):
+    target_id = action.get("target")
+    if not

@@ -80,9 +80,53 @@ INTERACTION_ANIMATIONS = {
     # --- reading / hobbies ---
     "read":         {"walking": "walk", "using": "read",       "finishing": "idle"},
 
+    # --- inspection / investigation ---
+    "examine":      {"walking": "walk", "using": "examine",    "finishing": "idle"},
+    "inspect":      {"walking": "walk", "using": "examine",    "finishing": "idle"},
+    "search":       {"walking": "walk", "using": "search",     "finishing": "idle"},
+
+    # --- object manipulation ---
+    "carry":        {"walking": "walk", "using": "carry_idle", "finishing": "put_down"},
+    "trash":        {"walking": "walk", "using": "throw",      "finishing": "idle"},
+    "destroy":      {"walking": "walk", "using": "smash",      "finishing": "idle"},
+
+    # --- cleaning (generic; use get_clean_animation for prop-aware variant) ---
+    "clean":        {"walking": "walk", "using": "clean_generic", "finishing": "idle"},
+    "clean_floor":  {"walking": "walk", "using": "mop",           "finishing": "idle"},
+    "sweep":        {"walking": "walk", "using": "sweep",         "finishing": "idle"},
+    "scrub":        {"walking": "walk", "using": "scrub",         "finishing": "idle"},
+    "wipe":         {"walking": "walk", "using": "wipe",          "finishing": "idle"},
+    "wash_dishes":  {"walking": "walk", "using": "wash_dishes",   "finishing": "idle"},
+    "window_clean": {"walking": "walk", "using": "window_wipe",   "finishing": "idle"},
+
     # --- generic fallback ---
     "interact":     {"walking": "walk", "using": "interact",   "finishing": "idle"},
 }
+
+
+# =========================================================
+# CLEAN ANIMATION RESOLVER
+# Picks the right cleaning animation based on prop tags,
+# overriding the generic "clean" entry above.
+# =========================================================
+
+_CLEAN_TAG_ANIMATIONS = [
+    ({"floor", "carpet", "rug"},                "mop"),
+    ({"toilet", "sink", "bathtub", "shower"},   "scrub"),
+    ({"table", "counter", "desk", "surface"},   "wipe"),
+    ({"window", "glass", "mirror"},             "window_wipe"),
+    ({"dish", "plate", "bowl", "cup"},          "wash_dishes"),
+]
+
+def get_clean_animation(prop, phase="using"):
+    """Return the cleaning animation for a given prop based on its tags."""
+    if phase != "using":
+        return "idle" if phase == "finishing" else "walk"
+    tags = set(prop.get("tags", []))
+    for tag_set, anim in _CLEAN_TAG_ANIMATIONS:
+        if tags & tag_set:
+            return anim
+    return "clean_generic"
 
 
 def get_phase_animation(interaction, phase):
@@ -1076,180 +1120,47 @@ def execute_activity(
     # WALKING  — wait until movement system clears is_moving
     # =====================================================
 
-    if act.get("phase", "using") == "walking":
+    # =====================================================
+    # CARRY — special multi-leg phases
+    # picking_up → delivering → put_down
+    # =====================================================
 
-        if c.get("is_moving"):
+    if interaction == "carry":
+
+        phase = act.get("phase", "picking_up")
+
+        if phase == "walking":
+            # Walking to the prop to pick up
+            if c.get("is_moving"):
+                return True
+            # Arrived at prop — attach it to character
+            prop = get_prop_by_id(world, act.get("target_id"))
+            if prop:
+                prop["carried_by"] = c["id"]
+                prop["visible"] = False   # hide world instance; frontend shows carried model
+                c["carrying"] = act.get("target_id")
+            set_activity_phase(act, "picking_up", world)
+            c["animation_state"] = "pick_up"
             return True
 
-        # Character arrived — snap logical grid position to anchor
-        prop = get_prop_by_id(world, act.get("target_id"))
-        if prop and act.get("anchor_name"):
-            anchor = get_anchor(prop, act["anchor_name"])
-            if anchor:
-                c["x"] = anchor["x"]
-                c["y"] = anchor["y"]
+        if phase == "picking_up":
+            # Brief pickup animation, then route to destination
+            elapsed = world["tick"] - act["phase_started_tick"]
+            if elapsed < 3:
+                return True
+            dest = act.get("destination", {})
+            c["move_target"] = {
+                "x": dest.get("x", c.get("x", 0)),
+                "y": dest.get("y", c.get("y", 0)),
+                "target_type": "tile",
+            }
+            c["is_moving"] = True
+            set_activity_phase(act, "delivering", world)
+            c["animation_state"] = "carry_walk"
+            return True
 
-        set_activity_phase(act, "using", world)
-        c["animation_state"] = get_phase_animation(interaction, "using")
-        return True
-
-    # =====================================================
-    # USING  — tick elapsed time
-    # =====================================================
-
-    if act["phase"] == "using":
-
-        elapsed = world["tick"] - act["phase_started_tick"]
-
-        if elapsed >= act["duration"]:
-
-            complete_activity(c, world, act)
-            set_activity_phase(act, "finishing", world)
-            c["animation_state"] = get_phase_animation(interaction, "finishing")
-
-        return True
-
-    # =====================================================
-    # FINISHING  — one tick to play finishing animation
-    # =====================================================
-
-    if act["phase"] == "finishing":
-
-        finish_activity(c, world)
-        return False
-
-    return True
-#=======================================================
-# COMPLETE ACTIVITY
-# =========================================================
-
-def complete_activity(
-
-    c,
-
-    world,
-
-    act
-):
-
-    activity_type = act["type"]
-
-
-    # =====================================
-    # GENERATE WASTE
-    # =====================================
-    household = world[
-        "households"
-    ].get(
-        c.get("household_id")
-    )
-
-    if household:
-
-        generate_activity_waste(
-
-            household,
-
-            act
-        )
-    # =====================================
-    # SLEEP
-    # =====================================
-
-    if activity_type == "sleep":
-
-        c["needs"][
-            "energy"
-        ] = 1.0
-
-    # =====================================
-    # TOILET
-    # =====================================
-
-    elif activity_type == (
-        "use_toilet"
-    ):
-
-        c["needs"][
-            "bladder"
-        ] = 0
-
-    # =====================================
-    # SHOWER
-    # =====================================
-
-    elif activity_type == (
-        "take_shower"
-    ):
-
-        c["needs"][
-            "hygiene"
-        ] = 1.0
-
-    # =====================================
-    # MEAL
-    # =====================================
-    elif activity_type == "eat_meal":
-
-        household = world[
-            "households"
-        ].get(
-            c.get("household_id")
-        )
-
-    if household:
-
-        meal = find_household_resource(
-
-            household,
-
-            resource_type="MEAL"
-        )
-
-        if meal:
-
-            nutrition = meal.get(
-                "nutrition",
-                0.5
-            )
-
-            c["needs"]["hunger"] = max(
-
-                0,
-
-                c["needs"][
-                    "hunger"
-                ]
-
-                -
-
-                nutrition
-            )
-
-            meal["servings"] -= 1
-
-            if meal["servings"] <= 0:
-
-                remove_household_resource(
-
-                    household,
-
-                    meal,
-
-                    1
-                )
-            elif meal["servings"] > 0:
-
-                from systems.resource_runtime import (
-                    convert_meal_to_leftovers
-                )
-
-                convert_meal_to_leftovers(
-                    meal
-                )
-    # =====================================
-    # MEAL
-    # =====================================
-    elif activity_type == "cook_recipe":
-
-        from systems.cooking_proce
+        if phase == "delivering":
+            # Walking to destination while carrying
+            if c.get("is_moving"):
+                c["animation_state"] = "carry_walk"
+                retur
