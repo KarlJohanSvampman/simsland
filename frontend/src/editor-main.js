@@ -629,4 +629,85 @@ async ()=>{
   );
 };
 
-window.reloadW
+window.reloadWorld =
+()=> location.reload();
+
+//
+// ===================================
+// TOOLS
+// ===================================
+//
+
+document
+.querySelectorAll(
+  ".toolButton"
+)
+.forEach(btn=>{
+
+  btn.onclick = ()=>{
+
+    currentTool =
+      btn.dataset.tool
+      ||
+      "select";
+
+    placementState.active =
+      currentTool ===
+      "place_floorplan";
+  };
+});
+
+const tileSelect =
+document.getElementById(
+  "worldTileSelect"
+);
+
+if(tileSelect){
+
+  tileSelect.onchange =
+  ()=>{
+
+    currentWorldTileType =
+      tileSelect.value;
+  };
+}
+
+const rotateBtn =
+document.getElementById(
+  "rotateFloorplanBtn"
+);
+
+if(rotateBtn){
+
+  rotateBtn.onclick =
+  ()=>{
+
+    placementState.rotation +=
+      Math.PI/2;
+  };
+}
+
+//
+// ===================================
+// RENDER LOOP
+// ===================================
+//
+
+function animate(){
+
+  requestAnimationFrame(
+    animate
+  );
+
+  controls.update();
+
+  renderer.render(
+    scene,
+    camera
+  );
+}
+
+await loadDefinitions();
+await loadWorld();
+
+animate();

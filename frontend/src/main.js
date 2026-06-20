@@ -1464,4 +1464,150 @@ for(const slot in equipped){
 };
 }
 
-cat
+catch(err){
+
+  console.error(
+    "Failed to load character:",
+    character.model,
+    err
+  );
+
+  sims[id] =
+    createFallbackCharacter(c);
+}
+
+delete loadingCharacters[id];
+  }
+
+  // =========================
+  // CLEANUP REMOVED CHARACTERS
+  // =========================
+
+  for(const id in sims){
+
+    if(active.has(id)) continue;
+
+    const mesh = sims[id];
+
+    scene.remove(mesh);
+
+    removeSelectable(mesh);
+    delete characterAnimations[id];
+    delete sims[id];
+  }
+}
+renderer.domElement.addEventListener(
+
+  "pointerdown",
+
+  (event)=>{
+
+    mouse.x =
+      (event.clientX /
+      window.innerWidth) * 2 - 1;
+
+    mouse.y =
+      -(event.clientY /
+      window.innerHeight) * 2 + 1;
+
+    raycaster.setFromCamera(
+      mouse,
+      camera
+    );
+
+    const hits =
+      raycaster
+        .intersectObjects(
+          selectable,
+          true
+        )
+        .filter(
+          h =>
+            !h.object.userData
+            ?.ignoreRaycast
+        );
+
+    if(!hits.length){
+
+      document
+        .getElementById(
+          "viewerSelection"
+        ).innerHTML =
+          "Nothing selected";
+
+      return;
+    }
+
+    let obj = hits[0].object;
+
+    while(
+      obj &&
+      !obj.userData?.type
+    ){
+      obj = obj.parent;
+    }
+
+    if(!obj) return;
+
+    const d = obj.userData;
+
+    document
+      .getElementById(
+        "viewerSelection"
+      ).innerHTML = `
+
+        <b>${d.type}</b><br>
+
+        ${d.id || ""}<br>
+
+        ${d.name || ""}
+      `;
+  }
+);
+// Load meshbank once at startup so model references resolve
+loadMeshbank();
+
+const ws = new WebSocket(
+  `ws://${location.hostname}:8000/ws`
+);
+
+ws.onmessage = async (e)=>{
+
+  const state =
+    JSON.parse(e.data);
+
+  definitions =
+    state.definitions || {};
+
+  updateTiles(state);
+  await updateProps(state);
+  updateFloorplanFloors(state);
+  updateFloorplanWalls(state);
+  await updateCharacters(state);
+  updateSpeechBubbles(state);
+};
+
+function animate(){
+
+  requestAnimationFrame(animate);
+  controls.update();
+    const delta = 0.016;
+
+  for(const id in characterAnimations){
+
+    const data =
+      characterAnimations[id];
+
+    if(data.mixer){
+
+      data.mixer.update(delta);
+    }
+  }
+  renderer.render(
+    scene,
+    camera
+  );
+  cssRenderer.render(scene, camera);
+}
+
+animate();
