@@ -2274,4 +2274,4 @@ document
     alert(
         "Metadata generated"
     );
-};                              
+};
