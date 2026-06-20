@@ -153,7 +153,12 @@ const sims = {};
 const characterAttachments = {};
 const speechBubbles = {};   // id → { cssObject, div }
 const props = {};
+const propNodes = {};        // prop.id → { anchors: Map<name, Object3D>, targets: Map<name, Object3D> }
 const tiles = {};
+
+// Reusable vectors for IK (avoid GC pressure)
+const _ikA = new THREE.Vector3();
+const _ikB = new THREE.Vector3();
 
 let definitions = {};
 function createWallMaterial(wallData){
@@ -1058,10 +1063,13 @@ async function updateProps(state){
 
 try {
 
-  const model =
+  // loadModelCached returns { scene, animations } — use .scene
+  const loaded =
     await loadModelCached(
       propModelPath
     );
+
+  const model = loaded.scene;
 
   model.position.set(
     prop.x - 10,
@@ -1092,6 +1100,11 @@ try {
   scene.add(model);
 
   props[prop.id] = model;
+
+  // Scan anchor_* / target_* nodes for use by IK system
+  const pn = { anchors: new Map(), targets: new Map() };
+  model.traverse(scanPropNode.bind(null, pn));
+  propNodes[prop.id] = pn;
 }
 
 catch(err){
@@ -1124,6 +1137,7 @@ delete loadingProps[prop.id];
     removeSelectable(mesh);
 
     delete props[id];
+    delete propNodes[id];
   }
 }
 
@@ -1275,11 +1289,20 @@ async function updateCharacters(state){
 
     if(sims[id]){
 
-      sims[id].position.set(
-        c.x - 10,
-        1,
-        c.y - 7
-      );
+      // Store latest server state so IK can read it every frame
+      if (characterAnimations[id]) {
+        characterAnimations[id].state = c;
+      }
+
+      // Only update position from server when NOT anchored to a prop
+      // (the IK system handles position when activity.target_id is set)
+      if (!c.activity?.target_id) {
+        sims[id].position.set(
+          c.x - 10,
+          0,
+          c.y - 7
+        );
+      }
 
             // =========================
       // ANIMATION STATE
@@ -1432,6 +1455,17 @@ const loaded =
 
   sims[id] = model;
  // =========================
+// BONE SCANNING
+// =========================
+
+  const bones = {};
+  model.traverse(node => {
+    if (node.isBone || node.isObject3D) {
+      bones[node.name.toLowerCase()] = node;
+    }
+  });
+
+ // =========================
 // EQUIPMENT
 // =========================
 
@@ -1455,12 +1489,11 @@ for(const slot in equipped){
 }
 
   characterAnimations[id] = {
-
   mixer,
-
   actions,
-
-  current: null
+  current: null,
+  bones,
+  state: c,       // latest server state, updated every tick
 };
 }
 
@@ -1496,118 +1529,19 @@ delete loadingCharacters[id];
     delete sims[id];
   }
 }
-renderer.domElement.addEventListener(
+// =========================================================
+// NODE SCANNING HELPERS
+// =========================================================
 
-  "pointerdown",
-
-  (event)=>{
-
-    mouse.x =
-      (event.clientX /
-      window.innerWidth) * 2 - 1;
-
-    mouse.y =
-      -(event.clientY /
-      window.innerHeight) * 2 + 1;
-
-    raycaster.setFromCamera(
-      mouse,
-      camera
-    );
-
-    const hits =
-      raycaster
-        .intersectObjects(
-          selectable,
-          true
-        )
-        .filter(
-          h =>
-            !h.object.userData
-            ?.ignoreRaycast
-        );
-
-    if(!hits.length){
-
-      document
-        .getElementById(
-          "viewerSelection"
-        ).innerHTML =
-          "Nothing selected";
-
-      return;
-    }
-
-    let obj = hits[0].object;
-
-    while(
-      obj &&
-      !obj.userData?.type
-    ){
-      obj = obj.parent;
-    }
-
-    if(!obj) return;
-
-    const d = obj.userData;
-
-    document
-      .getElementById(
-        "viewerSelection"
-      ).innerHTML = `
-
-        <b>${d.type}</b><br>
-
-        ${d.id || ""}<br>
-
-        ${d.name || ""}
-      `;
-  }
-);
-// Load meshbank once at startup so model references resolve
-loadMeshbank();
-
-const ws = new WebSocket(
-  `ws://${location.hostname}:8000/ws`
-);
-
-ws.onmessage = async (e)=>{
-
-  const state =
-    JSON.parse(e.data);
-
-  definitions =
-    state.definitions || {};
-
-  updateTiles(state);
-  await updateProps(state);
-  updateFloorplanFloors(state);
-  updateFloorplanWalls(state);
-  await updateCharacters(state);
-  updateSpeechBubbles(state);
-};
-
-function animate(){
-
-  requestAnimationFrame(animate);
-  controls.update();
-    const delta = 0.016;
-
-  for(const id in characterAnimations){
-
-    const data =
-      characterAnimations[id];
-
-    if(data.mixer){
-
-      data.mixer.update(delta);
-    }
-  }
-  renderer.render(
-    scene,
-    camera
-  );
-  cssRenderer.render(scene, camera);
+function scanPropNode(pn, node) {
+  const ln = node.name.toLowerCase();
+  if (ln.startsWith("anchor_")) pn.anchors.set(ln, node);
+  if (ln.startsWith("target_")) pn.targets.set(ln, node);
 }
 
-animate();
+// =========================================================
+// IK + PROCEDURAL INTERACTIONS  (called every frame)
+// =========================================================
+
+function updateIK(id) {
+ 
