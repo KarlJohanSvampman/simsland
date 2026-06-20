@@ -182,31 +182,33 @@ function gridToWorld(x, y) {
 //
 
 function tileColor(type) {
+  const t = (type || "").toLowerCase();
   // 1. Check material_templates for an editor_color (dynamic, from definitions)
   const matBucket = definitions.material_templates || {};
   for (const bucket of Object.values(matBucket)) {
-    const inner = bucket[type];
+    const inner = bucket[t];
     if (inner && inner.editor_color) {
       return parseInt(inner.editor_color.replace("#", ""), 16);
     }
   }
   // 2. Fall back to hardcoded map
-  return TILE_COLORS[type] || 0x557799;
+  return TILE_COLORS[t] || 0x557799;
 }
 
 function paintTile(x, y, type) {
+  const t = (type || "").toLowerCase();
   const index = tileIndexMap.get(key(x, y));
   if (index == null) return;
 
-  color.setHex(tileColor(type));
+  color.setHex(tileColor(t));
   tileMesh.setColorAt(index, color);
   tileMesh.instanceColor.needsUpdate = true;
 
   const existing = worldState.world_tiles.find(t => t.x === x && t.y === y);
   if (existing) {
-    existing.type = type;
+    existing.type = t;
   } else {
-    worldState.world_tiles.push({ x, y, type });
+    worldState.world_tiles.push({ x, y, type: t });
   }
 }
 
@@ -375,7 +377,7 @@ document.getElementById("btn-paint_tile").onclick = () => {
       // definitions.tile_templates uses nested structure:
       // { "Grass": { "grass": { name, material, ... } } }
       // The outer key is the display name; we need the inner key for paintTile.
-      const innerKey = Object.keys(tmpl).find(k => typeof tmpl[k] === "object") || id.toLowerCase();
+      const innerKey = (Object.keys(tmpl).find(k => typeof tmpl[k] === "object") || id).toLowerCase();
       currentWorldTileType = innerKey;
       setActiveTool("paint_tile");
       closeModal("modal-paint_tile");
@@ -399,7 +401,4 @@ document.getElementById("btn-place_floorplan").onclick = () => {
       placementState.active     = true;
       setActiveTool("place_floorplan");
       closeModal("modal-place_floorplan");
-      setStatus(`Place floorplan: ${id} — click a tile`);
-    }
-  );
-  openModal("modal-
+      setStatus(`
