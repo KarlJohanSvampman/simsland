@@ -631,241 +631,36 @@ window.saveDefinitions = async function(){
   }
 }
 
-// =====================================================
-// ASSET BROWSER
-// =====================================================
-
-function renderAssets(){
-
-  assetBrowser.innerHTML = '';
-
-  Object.entries(assets).forEach(([type,list])=>{
-
-    const title = document.createElement('h4');
-    title.textContent = type;
-
-    assetBrowser.appendChild(title);
-
-    list.forEach(path=>{
-
-      const row = document.createElement('div');
-
-      row.className = 'assetRow';
-      row.textContent = path;
-
-      row.onclick = ()=>{
-
-        loadPreviewModel(path);
-
-        insertModelIntoEditor(path);
-      };
-
-      assetBrowser.appendChild(row);
-    });
-  });
-}
-
-// =====================================================
-// INSERT MODEL PATH
-// =====================================================
-
-function insertModelIntoEditor(path){
-
-  try {
-
-    const data = JSON.parse(jsonEditor.value || '{}');
-
-    data.model = path;
-
-    jsonEditor.value = JSON.stringify(
-      data,
-      null,
-      2
-    );
-
-  } catch(err){
-
-    console.warn(err);
-  }
-}
-
-// =====================================================
-// PREVIEW MODEL
-// =====================================================
-
-async function loadPreviewModel(path){
-
-  if(previewModel){
-    previewScene.remove(previewModel);
-  }
-
-  animationList.innerHTML = '';
-  console.log(
-      "Loading preview:",
-      path
-  );
-  previewLoader.load(path,(gltf)=>{
-
-    previewModel = gltf.scene;
-    previewBones =
-      extractBones(
-        previewModel
-      );
-
-    renderBoneSlotEditor();
-    previewScene.add(previewModel);
-
-    previewMixer = new THREE.AnimationMixer(
-      previewModel
-    );
-
-    // animations
-    gltf.animations.forEach((clip)=>{
-
-      const btn = document.createElement('button');
-
-      btn.className = 'animButton';
-
-      btn.textContent = clip.name;
-
-      btn.onclick = ()=>{
-
-        previewMixer.stopAllAction();
-
-        const action = previewMixer.clipAction(clip);
-
-        action.reset();
-        action.fadeIn(0.2);
-        action.play();
-      };
-
-      animationList.appendChild(btn);
-    });
-
-    // anchors
-    previewModel.traverse((o)=>{
-
-      if(
-        o.name
-        .toLowerCase()
-        .startsWith('anchor_')
-      ){
-
-        const sphere = new THREE.Mesh(
-          new THREE.SphereGeometry(0.05),
-          new THREE.MeshBasicMaterial({
-            color: 0xff0000
-          })
-        );
-
-        o.add(sphere);
-      }
-    });
-
-    setStatus(`Loaded ${path}`);
-
-  },undefined,(err)=>{
-
-    console.error(err);
-
-    setStatus('Model load failed');
-  });
-}
 
 // =====================================================
 // STATUS
 // =====================================================
 
-function setStatus(text){
-  statusBar.textContent = text;
+function setStatus(text) {
+  if (statusBar) statusBar.textContent = text;
 }
 
 // =====================================================
-// ANIMATE
+// ANIMATE  (OrbitControls damping, no auto-rotation)
 // =====================================================
 
 const previewClock = new THREE.Clock();
 
-function animate(){
-
+function animate() {
   requestAnimationFrame(animate);
-
   const delta = previewClock.getDelta();
-
-  if(previewMixer){
-    previewMixer.update(delta);
-  }
-
-  if(previewModel){
-    previewModel.rotation.y += 0.003;
-  }
-
-  previewRenderer.render(
-    previewScene,
-    previewCamera
-  );
+  previewControls.update();
+  if (previewMixer) previewMixer.update(delta);
+  previewRenderer.render(previewScene, previewCamera);
 }
-document
-.getElementById(
-  "autoMapMixamoBtn"
-)
-.onclick = ()=>{
 
-  if(
-    currentTab !==
-    "character_templates"
-  ){
-    return;
-  }
-
-  let template =
-    JSON.parse(
-      jsonEditor.value
-    );
-
-  template.bone_slots = {
-
-    head:
-      "mixamorigHead",
-
-    neck:
-      "mixamorigNeck",
-
-    right_hand:
-      "mixamorigRightHand",
-
-    left_hand:
-      "mixamorigLeftHand",
-
-    spine:
-      "mixamorigSpine2",
-
-    pelvis:
-      "mixamorigHips",
-
-    right_foot:
-      "mixamorigRightFoot",
-
-    left_foot:
-      "mixamorigLeftFoot"
-  };
-
-  jsonEditor.value =
-    JSON.stringify(
-      template,
-      null,
-      2
-    );
-
-  renderBoneSlotEditor();
-};
 animate();
 
 // =====================================================
 // STARTUP
 // =====================================================
 
-loadDefinitions();
-loadMeshbank();
-loadAssets();
-
+(async () => {
+  await loadMeshbank();
+  await loadDefinitions();
+})();
