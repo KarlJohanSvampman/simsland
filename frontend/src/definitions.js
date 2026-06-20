@@ -628,132 +628,136 @@ function renderAssetBrowser(filter) {
 }
 
 // =====================================================
-// TEMPLATE CRUD
+// =====================================================
+// DEFAULT TEMPLATES  — one skeleton per category so
+// the user can see all the available fields.
 // =====================================================
 
-window.createTemplate = function(){
+const DEFAULT_TEMPLATES = {
 
-  const id = prompt("Template ID");
+  prop_templates: {
+    name: "New Prop",
+    category: "furniture",
+    model: "",
+    tags: [],
+    carryable: false,
+    interactions: [],
+    anchors: []
+  },
 
-  if(!id) return;
+  item_templates: {
+    name: "New Item",
+    category: "misc",
+    model: "",
+    tags: [],
+    stackable: true,
+    max_stack: 10,
+    weight: 0.5,
+    value: 1
+  },
 
-  if(!definitions[currentTab]){
+  character_templates: {
+    name: "New Character",
+    age_range: [25, 40],
+    traits: [],
+    model: "adult_male",
+    bone_slots: {
+      head:        "mixamorigHead",
+      neck:        "mixamorigNeck",
+      right_hand:  "mixamorigRightHand",
+      left_hand:   "mixamorigLeftHand",
+      spine:       "mixamorigSpine2",
+      pelvis:      "mixamorigHips",
+      right_foot:  "mixamorigRightFoot",
+      left_foot:   "mixamorigLeftFoot"
+    },
+    needs: {
+      hunger: 100,
+      energy: 100,
+      hygiene: 100,
+      social: 100,
+      fun: 100
+    },
+    skills: {
+      cooking: 0,
+      cleaning: 0,
+      repair: 0,
+      social: 0
+    },
+    employment: {
+      job: "",
+      salary: 0
+    },
+    daily_schedule: {
+      sleep: [22, 6],
+      work: [8, 17]
+    },
+    starting_inventory: []
+  },
 
-    definitions[currentTab] = {};
-  }
+  clothing_templates: {
+    name: "New Clothing",
+    slot: "upper_layer1",
+    model: "",
+    shared_skeleton: true,
+    tags: ["clothing"],
+    color: "#ffffff",
+    offset: { x: 0, y: 0, z: 0 },
+    rotation: { x: 0, y: 0, z: 0 },
+    scale: 1.0
+  },
 
-  definitions[currentTab][id] = {};
+  interaction_templates: {
+    name: "New Interaction",
+    duration: 600,
+    required_prop_tags: [],
+    need_changes: {
+      hunger: 0,
+      energy: 0,
+      hygiene: 0,
+      social: 0,
+      fun: 0
+    },
+    animation: "interact",
+    priority: 50
+  },
 
-  currentTemplateId = id;
+  activity_templates: {
+    name: "New Activity",
+    priority: 50,
+    conditions: {
+      hour_range: [0, 24]
+    },
+    steps: []
+  },
 
-  renderTemplateList();
+  tile_templates: {
+    name: "New Tile",
+    category: "terrain",
+    material: "",
+    walkable: true,
+    vehicle_access: false,
+    movement_cost: 1,
+    blocks_los: false,
+    buildable: true
+  },
 
-  openTemplate(id);
-};
+  material_templates: {
+    name: "New Material",
+    texture: "/resources/tiles/",
+    editor_color: "#888888",
+    roughness: 1.0,
+    metalness: 0.0,
+    normal_map: "",
+    repeat: [1, 1]
+  },
 
-// =====================================================
-// DUPLICATE
-// =====================================================
+  floorplan_templates: {
+    name: "New Floorplan",
+    rooms: [],
+    doors: [],
+    windows: [],
+    walls: []
+  },
 
-window.duplicateTemplate = function(){
-
-  if(!currentTemplateId) return;
-
-  const id = prompt('Duplicate as');
-
-  if(!id) return;
-
-  definitions[currentTab][id] = JSON.parse(
-    JSON.stringify(
-      definitions[currentTab][currentTemplateId]
-    )
-  );
-
-  renderTemplateList();
-}
-
-// =====================================================
-// DELETE
-// =====================================================
-
-window.deleteTemplate = function(){
-
-  if(!currentTemplateId) return;
-
-  delete definitions[currentTab][currentTemplateId];
-
-  currentTemplateId = null;
-
-  jsonEditor.value = '';
-
-  renderTemplateList();
-}
-
-// =====================================================
-// SAVE
-// =====================================================
-
-window.saveDefinitions = async function(){
-
-  try {
-
-    if(currentTemplateId){
-
-      definitions[currentTab][currentTemplateId] =
-        JSON.parse(jsonEditor.value);
-    }
-
-    await fetch(
-      '/api/editor/definitions?sim_id=default',
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(definitions)
-      }
-    );
-
-    setStatus('Saved');
-
-  } catch(err){
-
-    console.error(err);
-
-    setStatus('Save failed');
-  }
-}
-
-
-// =====================================================
-// STATUS
-// =====================================================
-
-function setStatus(text) {
-  if (statusBar) statusBar.textContent = text;
-}
-
-// =====================================================
-// ANIMATE  (OrbitControls damping, no auto-rotation)
-// =====================================================
-
-const previewClock = new THREE.Clock();
-
-function animate() {
-  requestAnimationFrame(animate);
-  const delta = previewClock.getDelta();
-  previewControls.update();
-  if (previewMixer) previewMixer.update(delta);
-  previewRenderer.render(previewScene, previewCamera);
-}
-
-animate();
-
-// =====================================================
-// STARTUP
-// =====================================================
-
-(async () => {
-  await loadMeshbank();
-  await loadDefinitions();
-})();
+  recipe_templat
