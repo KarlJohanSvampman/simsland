@@ -5,21 +5,22 @@
         "name": "Television",
         "category": "electronics",
         "model": "tv_01",
-        "interactions": [
-          "watch_tv"
-        ]
-      }
+        "tags": ["electronics", "screen"],
+        "carryable": false,
+        "interactions": ["watch_tv", "examine"]
+      },
+      "model": "television"
     },
     "Sofa": {
       "sofa": {
         "name": "Sofa",
         "category": "furniture",
         "model": "sofa_a",
-        "interactions": [
-          "sit",
-          "lie_down"
-        ]
-      }
+        "tags": ["furniture", "surface", "seatable"],
+        "carryable": false,
+        "interactions": ["sit", "lie_down", "examine", "clean"]
+      },
+      "model": "sofa_a"
     }
   },
   "item_templates": {},
@@ -59,15 +60,22 @@
             17
           ]
         },
-        "appearance": {
-          "model": "human_male_01",
-          "material": "civilian_clothes_01"
-        },
         "starting_inventory": [
           "wallet",
           "phone"
         ]
-      }
+      },
+      "bone_slots": {
+        "head": "mixamorigHead",
+        "neck": "mixamorigNeck",
+        "right_hand": "mixamorigRightHand",
+        "left_hand": "mixamorigLeftHand",
+        "spine": "mixamorigSpine2",
+        "pelvis": "mixamorigHips",
+        "right_foot": "mixamorigRightFoot",
+        "left_foot": "mixamorigLeftFoot"
+      },
+      "model": "adult_male"
     }
   },
   "interaction_templates": {
@@ -155,24 +163,15 @@
     "Grass": {
       "grass": {
         "name": "Grass",
-        "texture": "/materials/terrain/grass.jpg",
+        "texture": "/resources/tiles/grass.jpg",
         "editor_color": "#4f8f4f",
         "roughness": 1,
         "metalness": 0
-      }
+      },
+      "texture": "/resources/tiles/grass.jpg"
     }
   },
   "recipe_templates": {},
   "product_templates": {},
   "appliance_templates": {},
-  "vehicle_templates": {},
-  "service_templates": {},
-  "storage_templates": {},
-  "social_templates": {},
-  "need_templates": {},
-  "trait_templates": {},
-  "job_templates": {
-    "Insurance_Salesman": {}
-  },
-  "company_templates": {}
-}
+  "vehi
