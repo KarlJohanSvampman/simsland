@@ -600,4 +600,51 @@ def update_agent(
 
     # =====================================
     # THINK
-    # ==============
+    # ===================================================================
+
+    decision = think(
+        context
+    )
+
+    if not decision:
+        return
+
+    # =====================================
+    # PROCESS DECISION
+    # =====================================
+
+    process_decision(
+
+        c,
+
+        world,
+
+        decision
+    )
+
+    # =====================================
+    # POST
+    # =====================================
+
+    post_update(
+
+        c,
+
+        world
+    )
+
+def merge_body_intentions(c):
+
+    for intention in generate_body_intentions(c):
+
+        store_intention(
+            c,
+            {
+                "type": intention["type"],
+                "priority": int(
+                    intention["priority"] * 100
+                ),
+                "source": "body",
+                "reason": "body_need"
+            }
+        )
