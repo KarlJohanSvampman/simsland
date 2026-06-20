@@ -690,6 +690,170 @@ function getMaterialTexture(materialId){
   return tex;
 }
 
+// =========================================================
+// ANIMATION LAYER SYSTEM
+// =========================================================
+
+// Mixamo bone names that belong to each layer.
+// Lower: hips + both legs. Upper: everything from spine up.
+// Hips are lower-only so locomotion controls the root motion;
+// sit/lie poses author a separate sit_lower clip that repositions
+// the hips and folds the legs.
+
+const LOWER_BONES = new Set([
+  "mixamorighips",
+  "mixamorigleftupleg",  "mixamorigrightupleg",
+  "mixamorigleftleg",    "mixamorigrightleg",
+  "mixamorigleftfoot",   "mixamorigrightfoot",
+  "mixamoriglefttoebase","mixamorigrighttoebase",
+]);
+
+// Upper body = everything NOT in LOWER_BONES.
+// We derive it dynamically from clip tracks so we never need a hard list.
+
+function makeLayerClip(clip, layer) {
+  const tracks = clip.tracks.filter(track => {
+    // track.name format: "BoneName.property" (Three.js GLB loader)
+    const boneName = track.name.split(".")[0].toLowerCase()
+      .replace(/\s/g, "");
+    const isLower = LOWER_BONES.has(boneName);
+    return layer === "lower" ? isLower : !isLower;
+  });
+  return new THREE.AnimationClip(
+    `${clip.name}_${layer}`,
+    clip.duration,
+    tracks
+  );
+}
+
+// Maps animation_state → { lower, upper }
+// lower: which _lower clip to play (locomotion layer)
+// upper: which _upper clip to play (interaction layer), null = keep lower-layer upper
+//
+// Convention for clip names (must match GLB action names, lowercased):
+//   walk, run, idle                   — locomotion, authored full-body
+//   sit_idle, lie_idle, sleep_idle    — full seated/lying pose (full-body)
+//   eat, cook, work, phone, examine   — standing interaction (full-body)
+//   talk, wave, carry_idle, carry_walk— standing gestures (full-body)
+//
+// Three.js splits every full-body clip into _lower and _upper at load time.
+// We then play the right combination per layer.
+
+const ANIM_LAYERS = {
+  // ── Locomotion (lower drives legs, upper comes from same clip) ──
+  idle:          { lower: "idle",        upper: "idle"        },
+  walk:          { lower: "walk",        upper: "walk"        },
+  run:           { lower: "run",         upper: "run"         },
+
+  // ── Standing interactions (idle legs + active upper) ──
+  talk:          { lower: "idle",        upper: "talk"        },
+  eat:           { lower: "idle",        upper: "eat"         },
+  cook:          { lower: "idle",        upper: "cook"        },
+  work:          { lower: "idle",        upper: "work"        },
+  phone:         { lower: "idle",        upper: "phone"       },
+  examine:       { lower: "idle",        upper: "examine"     },
+  search:        { lower: "idle",        upper: "search"      },
+  wipe:          { lower: "idle",        upper: "wipe"        },
+  mop:           { lower: "walk",        upper: "mop"         },
+  scrub:         { lower: "idle",        upper: "scrub"       },
+  wash_dishes:   { lower: "idle",        upper: "wash_dishes" },
+  window_wipe:   { lower: "idle",        upper: "window_wipe" },
+  clean_generic: { lower: "idle",        upper: "clean_generic"},
+  pick_up:       { lower: "idle",        upper: "pick_up"     },
+  put_down:      { lower: "idle",        upper: "put_down"    },
+  throw:         { lower: "idle",        upper: "throw"       },
+  smash:         { lower: "idle",        upper: "smash"       },
+
+  // ── Carry (different upper depending on whether moving) ──
+  carry_idle:    { lower: "idle",        upper: "carry_idle"  },
+  carry_walk:    { lower: "walk",        upper: "carry_idle"  },
+
+  // ── Seated (sit_idle lower folds legs; upper does activity) ──
+  sit_idle:      { lower: "sit_idle",    upper: "sit_idle"    },
+  sit_watch:     { lower: "sit_idle",    upper: "sit_watch"   },
+  sit_eat:       { lower: "sit_idle",    upper: "eat"         },
+  sit_talk:      { lower: "sit_idle",    upper: "talk"        },
+  sit_phone:     { lower: "sit_idle",    upper: "phone"       },
+  sit_work:      { lower: "sit_idle",    upper: "work"        },
+  read:          { lower: "sit_idle",    upper: "read"        },
+
+  // ── Lying / sleep ──
+  lie_idle:      { lower: "lie_idle",    upper: "lie_idle"    },
+  sleep_idle:    { lower: "lie_idle",    upper: "sleep_idle"  },
+  wake_up:       { lower: "lie_idle",    upper: "wake_up"     },
+
+  // ── Transitions ──
+  stand_up:      { lower: "stand_up",    upper: "stand_up"    },
+  shower:        { lower: "idle",        upper: "shower"      },
+};
+
+const FADE_TIME = 0.2;  // seconds
+
+function playLayeredAnim(animData, animState) {
+  const key = (animState || "idle").toLowerCase();
+  const layers = ANIM_LAYERS[key];
+
+  if (!layers) {
+    // Unknown state — fall back to full-body single action
+    _playSingleAction(animData, key);
+    return;
+  }
+
+  const wantLower = layers.lower + "_lower";
+  const wantUpper = layers.upper + "_upper";
+
+  // ── Lower layer ──
+  if (animData.lowerCurrent !== wantLower) {
+    _crossFadeLayer(animData, "lowerCurrent", wantLower);
+  }
+
+  // ── Upper layer ──
+  if (animData.upperCurrent !== wantUpper) {
+    _crossFadeLayer(animData, "upperCurrent", wantUpper);
+  }
+}
+
+function _crossFadeLayer(animData, trackingKey, wantName) {
+  const prev = animData[trackingKey];
+  const prevAction = prev ? animData.actions[prev] : null;
+  const nextAction = animData.actions[wantName];
+
+  if (!nextAction) {
+    // Clip not available — leave current layer running
+    return;
+  }
+
+  if (prevAction && prevAction !== nextAction) {
+    prevAction.fadeOut(FADE_TIME);
+  }
+
+  nextAction.reset();
+  nextAction.setEffectiveWeight(1);
+  nextAction.fadeIn(FADE_TIME);
+  nextAction.play();
+
+  animData[trackingKey] = wantName;
+}
+
+function _playSingleAction(animData, name) {
+  // Fallback for states not in ANIM_LAYERS: treat as full-body
+  if (animData.current === name) return;
+
+  const prev = animData.current;
+  if (prev && animData.actions[prev]) {
+    animData.actions[prev].fadeOut(FADE_TIME);
+  }
+
+  const action = animData.actions[name];
+  if (action) {
+    action.reset();
+    action.fadeIn(FADE_TIME);
+    action.play();
+    animData.current = name;
+  }
+}
+
+
 function findBone(root, boneName){
 
     let found = null;
@@ -1039,374 +1203,3 @@ scene.add(mesh);
 
 
   return mesh;
-}
-
-function updateTiles(state){
-
-  const active = new Set();
-
-  const arr =
-
-    Array.isArray(state.tiles)
-
-    ? state.tiles
-
-    : Object.values(
-        state.tiles || {}
-      );
-
-  // =========================
-  // ACTIVE TILES
-  // =========================
-
-  for(const tile of arr){
-
-    const key =
-      `${tile.x},${tile.y}`;
-
-    active.add(key);
-
-    // already exists
-    if(tiles[key]){
-      continue;
-    }
-
-    tiles[key] =
-      createTile(tile);
-  }
-
-  // =========================
-  // CLEANUP REMOVED
-  // =========================
-
-  for(const key in tiles){
-
-    if(active.has(key)){
-      continue;
-    }
-
-    const mesh = tiles[key];
-
-    scene.remove(mesh);
-
-    removeSelectable(mesh);
-
-    delete tiles[key];
-  }
-}
-
-function createFallbackProp(prop){
-
-  const mesh = new THREE.Mesh(
-
-    new THREE.BoxGeometry(1,1,1),
-
-    new THREE.MeshStandardMaterial({
-      color: 0xff00ff
-    })
-  );
-
-  mesh.position.set(
-    prop.x - 10,
-    0.5,
-    prop.y - 7
-  );
-  mesh.userData = {
-
-    type: "prop",
-
-    id: prop.id,
-
-    template: prop.template
-  };
-
-  selectable.push(mesh);
-  scene.add(mesh);
-
-  return mesh;
-}
-
-async function updateProps(state){
-
-  const active = new Set();
-
-  for(const prop of state.props || []){
-
-    active.add(prop.id);
-
-    // =========================
-    // ALREADY EXISTS
-    // =========================
-
-    if(props[prop.id]){
-
-      props[prop.id].position.set(
-        prop.x - 10,
-        0.5,
-        prop.y - 7
-      );
-
-      continue;
-    }
-
-    // =========================
-    // CURRENTLY LOADING
-    // =========================
-
-    if(loadingProps[prop.id]){
-      continue;
-    }
-
-    loadingProps[prop.id] = true;
-
-    // =========================
-    // TEMPLATE
-    // =========================
-
-    const resolved =
-      resolveProp(
-        definitions,
-        prop
-      );
-
-    // =========================
-    // FALLBACK
-    // =========================
-
-    const propModelPath = resolveModel(resolved?.model);
-
-    if(!propModelPath){
-
-      props[prop.id] =
-        createFallbackProp(prop);
-
-      delete loadingProps[prop.id];
-
-      continue;
-    }
-
-try {
-
-  // loadModelCached returns { scene, animations } — use .scene
-  const loaded =
-    await loadModelCached(
-      propModelPath
-    );
-
-  const model = loaded.scene;
-
-  model.position.set(
-    prop.x - 10,
-    0,
-    prop.y - 7
-  );
-
-  model.userData = {
-
-    type: "prop",
-
-    id: prop.id,
-
-    template: prop.template
-  };
-
-  model.traverse((o)=>{
-
-    if(o.isMesh){
-
-      o.castShadow = true;
-      o.receiveShadow = true;
-    }
-  });
-
-  selectable.push(model);
-
-  scene.add(model);
-
-  props[prop.id] = model;
-
-  // Scan anchor_* / target_* nodes for use by IK system
-  const pn = { anchors: new Map(), targets: new Map() };
-  model.traverse(scanPropNode.bind(null, pn));
-  propNodes[prop.id] = pn;
-}
-
-catch(err){
-
-  console.error(
-    "Failed to load prop:",
-    resolved.model,
-    err
-  );
-
-  props[prop.id] =
-    createFallbackProp(prop);
-}
-
-delete loadingProps[prop.id];
-  }
-
-  // =========================
-  // CLEANUP REMOVED PROPS
-  // =========================
-
-  for(const id in props){
-
-    if(active.has(id)) continue;
-
-    const mesh = props[id];
-
-    scene.remove(mesh);
-
-    removeSelectable(mesh);
-
-    delete props[id];
-    delete propNodes[id];
-  }
-}
-
-function cleanupBuildings(activeIds){
-
-  for(const id in buildingRegistry){
-
-    if(activeIds.has(id)){
-      continue;
-    }
-
-    const group =
-      buildingRegistry[id];
-
-    scene.remove(group);
-
-    removeSelectable(group);
-
-    delete buildingRegistry[id];
-  }
-}
-
-// =========================================================
-// SPEECH BUBBLES
-// =========================================================
-
-function getOrCreateBubble(id){
-
-  if(speechBubbles[id]){
-    return speechBubbles[id];
-  }
-
-  const div = document.createElement("div");
-  div.className = "speech-bubble";
-  div.style.cssText = `
-    background: rgba(255,255,255,0.92);
-    color: #111;
-    padding: 4px 8px;
-    border-radius: 10px;
-    font-size: 12px;
-    font-family: sans-serif;
-    max-width: 160px;
-    text-align: center;
-    white-space: normal;
-    pointer-events: none;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.25);
-    display: none;
-  `;
-
-  const cssObject = new CSS2DObject(div);
-  cssObject.position.set(0, 2.6, 0);   // above head
-  speechBubbles[id] = { cssObject, div };
-  return speechBubbles[id];
-}
-
-function updateSpeechBubbles(state){
-
-  const active = new Set(
-    Object.keys(state.characters || {})
-  );
-
-  for(const [id, c]
-    of Object.entries(state.characters || {})
-  ){
-    const model = sims[id];
-    if(!model) continue;
-
-    const { cssObject, div } =
-      getOrCreateBubble(id);
-
-    // attach if not already attached
-    if(!model.getObjectById(cssObject.id)){
-      model.add(cssObject);
-    }
-
-    const speech = c.current_speech;
-
-    if(speech && speech.utterance){
-      div.textContent = speech.utterance;
-      div.style.display = "block";
-    } else {
-      div.style.display = "none";
-    }
-  }
-
-  // remove bubbles for characters that left
-  for(const id in speechBubbles){
-
-    if(active.has(id)) continue;
-
-    const { cssObject } = speechBubbles[id];
-    const model = sims[id];
-
-    if(model) model.remove(cssObject);
-
-    delete speechBubbles[id];
-  }
-}
-
-function createFallbackCharacter(c){
-
-  const mesh = new THREE.Mesh(
-
-    new THREE.CapsuleGeometry(
-      0.35,
-      1
-    ),
-
-    new THREE.MeshStandardMaterial({
-      color: 0x00ffff
-    })
-  );
-
-  mesh.position.set(
-    c.x - 10,
-    1,
-    c.y - 7
-  );
-  mesh.userData = {
-
-    type: "character",
-
-    id: c.id,
-
-    name: c.name
-  };
-
-  selectable.push(mesh);
-  scene.add(mesh);
-
-  return mesh;
-}
-
-async function updateCharacters(state){
-
-  const active = new Set();
-
-  for(const [id, c]
-    of Object.entries(
-      state.characters || {}
-    )
-  ){
-
-    active.add(id);
-
-    // =========================
-    // ALREADY EXISTS
-    // =========================
