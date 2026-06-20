@@ -87,12 +87,40 @@
       "width": 1.8653565386523816,
       "height": 1.8792264003894479,
       "depth": 0.3209891038079762
-    }
+    },
+    "placement": {
+      "pivot": "bottom_center",
+      "snap_to_ground": true,
+      "snap_to_grid": true
+    },
+    "transform": {
+      "position": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "rotation": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "targets": {},
+    "interaction_points": {}
   },
   "door_a_closed": {
     "anchors": {
-      "Anchor_Pull": "Anchor_Pull",
-      "Anchor_Push": "Anchor_Push"
+      "Anchor_Pull": {
+        "name": "Anchor_Pull"
+      },
+      "Anchor_Push": {
+        "name": "Anchor_Push"
+      }
     },
     "bones": {},
     "hasSkeleton": false,
@@ -100,13 +128,35 @@
       "width": 1.3407254815101624,
       "height": 0.2859155386686325,
       "depth": 2.4149136543273926
-    }
+    },
+    "placement": {
+      "pivot": "bottom_center",
+      "snap_to_ground": true,
+      "snap_to_grid": true
+    },
+    "transform": {
+      "position": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "rotation": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "targets": {},
+    "interaction_points": {},
+    "mesh": "/resources/props/door_a_closed.glb"
   },
   "bed_a": {
-    "anchors": {
-      "sleep_1": "anchor_sleep_1",
-      "sleep_2": "anchor_sleep_2"
-    },
+    "anchors": {},
     "bones": {},
     "hasSkeleton": false,
     "bounds": {
@@ -114,13 +164,42 @@
       "height": 5.053544218216594,
       "depth": 1.262158059763756
     },
-    "display_name": "",
-    "tags": []
+    "display_name": "Bed",
+    "tags": [],
+    "placement": {
+      "pivot": "bottom_center",
+      "snap_to_ground": true,
+      "snap_to_grid": true
+    },
+    "transform": {
+      "position": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "rotation": {
+        "x": -90,
+        "y": 0,
+        "z": 0
+      },
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "targets": {},
+    "interaction_points": {},
+    "mesh": "/resources/props/bed_a.glb"
   },
   "door_a": {
     "anchors": {
-      "pull": "anchor_pull",
-      "push": "anchor_push"
+      "anchor_pull": {
+        "name": "anchor_pull"
+      },
+      "anchor_push": {
+        "name": "anchor_push"
+      }
     },
     "bones": {},
     "hasSkeleton": false,
@@ -128,7 +207,32 @@
       "width": 24.44374554734759,
       "height": 42.28217485829657,
       "depth": 6.691060692305438
-    }
+    },
+    "placement": {
+      "pivot": "bottom_center",
+      "snap_to_ground": true,
+      "snap_to_grid": true
+    },
+    "transform": {
+      "position": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "rotation": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "targets": {},
+    "interaction_points": {},
+    "mesh": "/resources/props/door_a.glb"
   },
   "door_a_open": {
     "anchors": {},
@@ -138,18 +242,76 @@
       "width": 1.3407254815101624,
       "height": 1.1786980650221182,
       "depth": 2.4149136543273926
-    }
+    },
+    "placement": {
+      "pivot": "bottom_center",
+      "snap_to_ground": true,
+      "snap_to_grid": true
+    },
+    "transform": {
+      "position": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "rotation": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "targets": {},
+    "interaction_points": {},
+    "mesh": "/resources/props/door_a_open.glb"
   },
   "sofa_a": {
     "anchors": {
-      "seat_1": "anchor_seat_1",
-      "seat_2": "anchor_seat_2",
-      "seat_3": "anchor_seat_3"
+      "anchor_seat_1": {
+        "name": "anchor_seat_1"
+      },
+      "anchor_seat_2": {
+        "name": "anchor_seat_2"
+      },
+      "anchor_seat_3": {
+        "name": "anchor_seat_3"
+      }
     },
-    "display_name": "Sofa",
+    "display_name": "sofa_a",
     "tags": [
       "Seat"
-    ]
+    ],
+    "placement": {
+      "pivot": "center",
+      "snap_to_ground": false,
+      "snap_to_grid": false
+    },
+    "transform": {
+      "position": {
+        "x": 0,
+        "y": -0.1,
+        "z": 0
+      },
+      "rotation": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "bones": {},
+    "hasSkeleton": false,
+    "targets": {},
+    "interaction_points": {},
+    "mesh": "/resources/props/sofa_a.glb"
   },
   "television": {
     "anchors": {
@@ -162,7 +324,8 @@
       "width": 1.8330219984054565,
       "height": 0.9085011589358437,
       "depth": 0.058471131140260625
-    }
+    },
+    "mesh": "/resources/props/television.glb"
   },
   "elder_male": {
     "anchors": {},
@@ -386,6 +549,31 @@
       "width": 1.8653545537741907,
       "height": 1.8792243223039187,
       "depth": 0.3397393316111178
-    }
+    },
+    "placement": {
+      "pivot": "bottom_center",
+      "snap_to_ground": true,
+      "snap_to_grid": true
+    },
+    "transform": {
+      "position": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "rotation": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "targets": {},
+    "interaction_points": {},
+    "mesh": "/resources/characters/elder_male.glb"
   }
 }

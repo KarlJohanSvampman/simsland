@@ -641,6 +641,10 @@ function populateAssetList(){
 
             loadModel(asset);
 
+            // Ensure mesh path is always stored
+            meshbank[currentAssetId] ||= { display_name: currentAssetId, anchors: {} };
+            meshbank[currentAssetId].mesh = asset;
+
             const meta =
                 meshbank[currentAssetId];
 
@@ -2270,4 +2274,4 @@ document
     alert(
         "Metadata generated"
     );
-};
+};                              
