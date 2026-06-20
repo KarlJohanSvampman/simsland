@@ -1,8 +1,10 @@
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, HTTPException, Request
 from pathlib import Path
 import json
+import uuid
 
 from db import load_world, save_world
+from core.definitions import load_definitions
 
 from systems.navigation import (
     cache_floorplan
@@ -134,9 +136,4 @@ async def save_definitions(
         if "id" not in fp:
             fp["id"] = fp_id
 
-        cache_floorplan(
-            fp_id,
-            fp
-        )
-
-    return {"ok": True}
+        cache_floorplan
