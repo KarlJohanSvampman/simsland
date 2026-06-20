@@ -1,1 +1,0 @@
-Frontend is served by FastAPI and uses Three.js from CDN.\n
