@@ -18,9 +18,10 @@ from systems.waste import (
     generate_activity_waste
 )
 from systems.props import (
-    find_nearest_anchor
+    find_nearest_anchor,
+    get_prop_by_id,
+    get_anchor,
 )
-
 
 from systems.interactions import (
     begin_interaction
@@ -29,6 +30,70 @@ from systems.interactions import (
 from systems.conversation_runtime import (
     update_conversation_activity
 )
+
+# =========================================================
+# INTERACTION ANIMATIONS
+# Maps interaction name → animations per activity phase.
+# Used by execute_activity and action_router to drive the
+# frontend animation state machine.
+#
+# Convention for prop GLB nodes:
+#   anchor_<interaction>  — where the character stands/sits
+#   target_<anything>     — what they look at (IK target)
+# =========================================================
+
+INTERACTION_ANIMATIONS = {
+    # --- furniture ---
+    "sit":          {"walking": "walk", "using": "sit_idle",   "finishing": "stand_up"},
+    "lie":          {"walking": "walk", "using": "lie_idle",   "finishing": "stand_up"},
+    "lie_down":     {"walking": "walk", "using": "lie_idle",   "finishing": "stand_up"},
+
+    # --- sleep ---
+    "sleep":        {"walking": "walk", "using": "sleep_idle", "finishing": "wake_up"},
+
+    # --- screens / entertainment ---
+    "watch_tv":     {"walking": "walk", "using": "sit_idle",   "finishing": "stand_up"},
+    "use_computer": {"walking": "walk", "using": "sit_idle",   "finishing": "stand_up"},
+
+    # --- food ---
+    "eat":          {"walking": "walk", "using": "eat",        "finishing": "idle"},
+    "cook":         {"walking": "walk", "using": "cook",       "finishing": "idle"},
+    "stove":        {"walking": "walk", "using": "cook",       "finishing": "idle"},
+    "microwave":    {"walking": "walk", "using": "cook",       "finishing": "idle"},
+    "fridge":       {"walking": "walk", "using": "interact",   "finishing": "idle"},
+
+    # --- hygiene ---
+    "take_shower":  {"walking": "walk", "using": "shower",     "finishing": "idle"},
+    "use_toilet":   {"walking": "walk", "using": "sit_idle",   "finishing": "stand_up"},
+    "brush_teeth":  {"walking": "walk", "using": "interact",   "finishing": "idle"},
+    "wash_hands":   {"walking": "walk", "using": "interact",   "finishing": "idle"},
+    "mirror":       {"walking": "walk", "using": "interact",   "finishing": "idle"},
+
+    # --- social ---
+    "socialize":    {"walking": "walk", "using": "talk",       "finishing": "idle"},
+    "talk":         {"walking": "walk", "using": "talk",       "finishing": "idle"},
+    "phone":        {"walking": "walk", "using": "phone",      "finishing": "idle"},
+
+    # --- work ---
+    "work":         {"walking": "walk", "using": "work",       "finishing": "idle"},
+
+    # --- reading / hobbies ---
+    "read":         {"walking": "walk", "using": "read",       "finishing": "idle"},
+
+    # --- generic fallback ---
+    "interact":     {"walking": "walk", "using": "interact",   "finishing": "idle"},
+}
+
+
+def get_phase_animation(interaction, phase):
+    """Return the animation name for a given interaction + phase.
+    Falls back to sensible defaults when no mapping exists."""
+    entry = INTERACTION_ANIMATIONS.get(interaction)
+    if entry:
+        return entry.get(phase, "idle")
+    defaults = {"walking": "walk", "using": "interact", "finishing": "idle"}
+    return defaults.get(phase, "idle")
+
 
 # =========================================================
 # ACTIVITIES
@@ -998,8 +1063,17 @@ def execute_activity(
             act
         )
 
+    # Resolve the interaction name for animation lookups
+    # (LLM-dispatched activities store it as act["interaction"];
+    #  ACTIVITIES-config activities use their config's "interaction" field)
+    interaction = (
+        act.get("interaction")
+        or ACTIVITIES.get(activity_type, {}).get("interaction")
+        or activity_type
+    )
+
     # =====================================================
-    # WALKING
+    # WALKING  — wait until movement system clears is_moving
     # =====================================================
 
     if act.get("phase", "using") == "walking":
@@ -1007,73 +1081,41 @@ def execute_activity(
         if c.get("is_moving"):
             return True
 
-        set_activity_phase(
+        # Character arrived — snap logical grid position to anchor
+        prop = get_prop_by_id(world, act.get("target_id"))
+        if prop and act.get("anchor_name"):
+            anchor = get_anchor(prop, act["anchor_name"])
+            if anchor:
+                c["x"] = anchor["x"]
+                c["y"] = anchor["y"]
 
-            act,
-
-            "using",
-
-            world
-        )
-
-        c["animation_state"] = (
-            activity_type
-        )
-
+        set_activity_phase(act, "using", world)
+        c["animation_state"] = get_phase_animation(interaction, "using")
         return True
 
     # =====================================================
-    # USING
+    # USING  — tick elapsed time
     # =====================================================
 
     if act["phase"] == "using":
 
-        elapsed = (
-
-            world["tick"]
-
-            -
-
-            act[
-                "phase_started_tick"
-            ]
-        )
+        elapsed = world["tick"] - act["phase_started_tick"]
 
         if elapsed >= act["duration"]:
 
-            complete_activity(
-
-                c,
-
-                world,
-
-                act
-            )
-
-            set_activity_phase(
-
-                act,
-
-                "finishing",
-
-                world
-            )
+            complete_activity(c, world, act)
+            set_activity_phase(act, "finishing", world)
+            c["animation_state"] = get_phase_animation(interaction, "finishing")
 
         return True
 
     # =====================================================
-    # FINISHING
+    # FINISHING  — one tick to play finishing animation
     # =====================================================
 
     if act["phase"] == "finishing":
 
-        finish_activity(
-
-            c,
-
-            world
-        )
-
+        finish_activity(c, world)
         return False
 
     return True
@@ -1210,202 +1252,4 @@ def complete_activity(
     # =====================================
     elif activity_type == "cook_recipe":
 
-        from systems.cooking_process import (
-            start_cooking_process
-        )
-
-        household = world[
-            "households"
-        ].get(
-            c.get("household_id")
-        )
-
-        if household:
-
-            recipe_id = choose_recipe(
-
-                c,
-
-                household
-            )
-
-            if recipe_id:
-
-                start_cooking_process(
-
-                    c,
-
-                    household,
-
-                    recipe_id,
-
-                    world
-                )         
-    # =====================================
-    # SNACK
-    # =====================================
-
-    elif activity_type == (
-        "eat_snack"
-    ):
-
-        c["needs"][
-            "hunger"
-        ] = max(
-
-            0,
-
-            c["needs"].get(
-                "hunger",
-                1
-            )
-
-            - 0.5
-        )
-    elif activity_type == "check_mail":
-
-        household = world[
-            "households"
-        ].get(
-            c.get("household_id")
-        )
-
-        if household:
-
-            household.setdefault(
-                "mailbox",
-                {}
-            )
-
-            household[
-                "mailbox"
-            ][
-                "has_mail"
-            ] = False
-
-            c.setdefault(
-                "mail_history",
-                []
-            )
-
-            delivered = household.get(
-                "delivered_mail",
-                []
-            )
-
-            c[
-                "mail_history"
-            ].extend(delivered)
-
-            household[
-                "delivered_mail"
-            ] = []
-    elif activity_type == "sort_mail":
-
-        household = world[
-            "households"
-        ].get(
-            c.get("household_id")
-        )
-
-        if household:
-            sort_household_mail(household, world)
-    elif activity_type == "retrieve_package":
-
-        household = world[
-            "households"
-        ].get(
-            c.get("household_id")
-        )
-
-        if household:
-
-            packages = household.get(
-                "pending_packages",
-                []
-            )
-
-            for package in packages:
-
-                acquire_product(
-
-                    household,
-
-                    package
-                )
-
-            household[
-                "pending_packages"
-            ] = []
-    elif activity_type == "take_out_trash":
-
-        household = world[
-            "households"
-        ].get(
-            c.get("household_id")
-        )
-
-        if household:
-
-            household[
-                "trash_level"
-            ] = max(
-
-                0,
-
-                household[
-                    "trash_level"
-                ] - 0.5
-            )
-
-            household.setdefault(
-                "garbage_bin",
-                {}
-            )
-
-            household[
-                "garbage_bin"
-            ][
-                "fullness"
-            ] = min(
-
-                1.0,
-
-                household[
-                    "garbage_bin"
-                ].get(
-                    "fullness",
-                    0
-                ) + 0.5
-            )
-def set_activity_phase(
-
-    act,
-
-    phase,
-
-    world
-):
-
-    act["phase"] = phase
-
-    act[
-        "phase_started_tick"
-    ] = world["tick"]
-
-
-def finish_activity(c, world):
-
-    release_anchor(
-        c,
-        world
-    )
-
-    release_reservation(
-        c,
-        world
-    )
-
-    c["animation_state"] = "idle"
-
-    c["activity"] = None
+        from systems.cooking_proce

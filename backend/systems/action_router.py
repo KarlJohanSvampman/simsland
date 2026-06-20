@@ -6,6 +6,8 @@
 
 import time
 
+from systems.activities import get_phase_animation
+
 
 # =========================================================
 # SPEECH BUBBLE DURATION (sim ticks)
@@ -202,6 +204,10 @@ def _route_interact(c, world, action, definitions):
         interaction=interaction,
     )
 
+    # Set per-interaction using-phase animation immediately
+    if interaction:
+        c["animation_state"] = get_phase_animation(interaction, "using")
+
     # mark prop occupied
     prop["occupied_by"] = c["id"]
 
@@ -308,9 +314,4 @@ def route_action(c, world, action, speech, definitions=None):
         c["activity"] = _scaffold(c, world, "work", interaction="work")
 
     # "call" / "text" are future — for now just log
-    elif action_type in ("call", "text"):
-        c.setdefault("pending_comms", []).append(action)
-
-    # Set animation state based on action type
-    anim = _ACTION_ANIMATION.get(action_type, "idle")
-    c["animation_state"] = anim
+    elif action_type in ("c
