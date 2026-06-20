@@ -1,0 +1,579 @@
+{
+  "adult_male": {
+    "display_name": "adult_male",
+    "category": "characters",
+    "mesh": "/resources/characters/adult_male.glb",
+    "tags": [],
+    "anchors": {},
+    "bones": {
+      "mixamorigHips": {
+        "name": "mixamorigHips"
+      },
+      "mixamorigSpine": {
+        "name": "mixamorigSpine"
+      },
+      "mixamorigSpine1": {
+        "name": "mixamorigSpine1"
+      },
+      "mixamorigSpine2": {
+        "name": "mixamorigSpine2"
+      },
+      "mixamorigNeck": {
+        "name": "mixamorigNeck"
+      },
+      "mixamorigHead": {
+        "name": "mixamorigHead"
+      },
+      "mixamorigHeadTop_End": {
+        "name": "mixamorigHeadTop_End"
+      },
+      "mixamorigLeftShoulder": {
+        "name": "mixamorigLeftShoulder"
+      },
+      "mixamorigLeftArm": {
+        "name": "mixamorigLeftArm"
+      },
+      "mixamorigLeftForeArm": {
+        "name": "mixamorigLeftForeArm"
+      },
+      "mixamorigLeftHand": {
+        "name": "mixamorigLeftHand"
+      },
+      "mixamorigRightShoulder": {
+        "name": "mixamorigRightShoulder"
+      },
+      "mixamorigRightArm": {
+        "name": "mixamorigRightArm"
+      },
+      "mixamorigRightForeArm": {
+        "name": "mixamorigRightForeArm"
+      },
+      "mixamorigRightHand": {
+        "name": "mixamorigRightHand"
+      },
+      "mixamorigLeftUpLeg": {
+        "name": "mixamorigLeftUpLeg"
+      },
+      "mixamorigLeftLeg": {
+        "name": "mixamorigLeftLeg"
+      },
+      "mixamorigLeftFoot": {
+        "name": "mixamorigLeftFoot"
+      },
+      "mixamorigLeftToeBase": {
+        "name": "mixamorigLeftToeBase"
+      },
+      "mixamorigLeftToe_End": {
+        "name": "mixamorigLeftToe_End"
+      },
+      "mixamorigRightUpLeg": {
+        "name": "mixamorigRightUpLeg"
+      },
+      "mixamorigRightLeg": {
+        "name": "mixamorigRightLeg"
+      },
+      "mixamorigRightFoot": {
+        "name": "mixamorigRightFoot"
+      },
+      "mixamorigRightToeBase": {
+        "name": "mixamorigRightToeBase"
+      },
+      "mixamorigRightToe_End": {
+        "name": "mixamorigRightToe_End"
+      }
+    },
+    "hasSkeleton": true,
+    "bounds": {
+      "width": 1.8653565386523816,
+      "height": 1.8792264003894479,
+      "depth": 0.3209891038079762
+    },
+    "placement": {
+      "pivot": "bottom_center",
+      "snap_to_ground": true,
+      "snap_to_grid": true
+    },
+    "transform": {
+      "position": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "rotation": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "targets": {},
+    "interaction_points": {}
+  },
+  "door_a_closed": {
+    "anchors": {
+      "Anchor_Pull": {
+        "name": "Anchor_Pull"
+      },
+      "Anchor_Push": {
+        "name": "Anchor_Push"
+      }
+    },
+    "bones": {},
+    "hasSkeleton": false,
+    "bounds": {
+      "width": 1.3407254815101624,
+      "height": 0.2859155386686325,
+      "depth": 2.4149136543273926
+    },
+    "placement": {
+      "pivot": "bottom_center",
+      "snap_to_ground": true,
+      "snap_to_grid": true
+    },
+    "transform": {
+      "position": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "rotation": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "targets": {},
+    "interaction_points": {},
+    "mesh": "/resources/props/door_a_closed.glb"
+  },
+  "bed_a": {
+    "anchors": {},
+    "bones": {},
+    "hasSkeleton": false,
+    "bounds": {
+      "width": 5.553552347776531,
+      "height": 5.053544218216594,
+      "depth": 1.262158059763756
+    },
+    "display_name": "Bed",
+    "tags": [],
+    "placement": {
+      "pivot": "bottom_center",
+      "snap_to_ground": true,
+      "snap_to_grid": true
+    },
+    "transform": {
+      "position": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "rotation": {
+        "x": -90,
+        "y": 0,
+        "z": 0
+      },
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "targets": {},
+    "interaction_points": {},
+    "mesh": "/resources/props/bed_a.glb"
+  },
+  "door_a": {
+    "anchors": {
+      "anchor_pull": {
+        "name": "anchor_pull"
+      },
+      "anchor_push": {
+        "name": "anchor_push"
+      }
+    },
+    "bones": {},
+    "hasSkeleton": false,
+    "bounds": {
+      "width": 24.44374554734759,
+      "height": 42.28217485829657,
+      "depth": 6.691060692305438
+    },
+    "placement": {
+      "pivot": "bottom_center",
+      "snap_to_ground": true,
+      "snap_to_grid": true
+    },
+    "transform": {
+      "position": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "rotation": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "targets": {},
+    "interaction_points": {},
+    "mesh": "/resources/props/door_a.glb"
+  },
+  "door_a_open": {
+    "anchors": {},
+    "bones": {},
+    "hasSkeleton": false,
+    "bounds": {
+      "width": 1.3407254815101624,
+      "height": 1.1786980650221182,
+      "depth": 2.4149136543273926
+    },
+    "placement": {
+      "pivot": "bottom_center",
+      "snap_to_ground": true,
+      "snap_to_grid": true
+    },
+    "transform": {
+      "position": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "rotation": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "targets": {},
+    "interaction_points": {},
+    "mesh": "/resources/props/door_a_open.glb"
+  },
+  "sofa_a": {
+    "anchors": {
+      "anchor_seat_1": {
+        "name": "anchor_seat_1"
+      },
+      "anchor_seat_2": {
+        "name": "anchor_seat_2"
+      },
+      "anchor_seat_3": {
+        "name": "anchor_seat_3"
+      }
+    },
+    "display_name": "sofa_a",
+    "tags": [
+      "Seat"
+    ],
+    "placement": {
+      "pivot": "center",
+      "snap_to_ground": false,
+      "snap_to_grid": false
+    },
+    "transform": {
+      "position": {
+        "x": 0,
+        "y": -0.1,
+        "z": 0
+      },
+      "rotation": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "bones": {},
+    "hasSkeleton": false,
+    "targets": {},
+    "interaction_points": {},
+    "mesh": "/resources/props/sofa_a.glb"
+  },
+  "television": {
+    "anchors": {
+      "powerbtn": "anchor_powerbtn",
+      "remote_origin": "anchor_remote_origin"
+    },
+    "bones": {},
+    "hasSkeleton": false,
+    "bounds": {
+      "width": 1.8330219984054565,
+      "height": 0.9085011589358437,
+      "depth": 0.058471131140260625
+    },
+    "mesh": "/resources/props/television.glb"
+  },
+  "elder_male": {
+    "anchors": {},
+    "bones": {
+      "RL_BoneRoot": {
+        "name": "RL_BoneRoot"
+      },
+      "CC_Base_Hip": {
+        "name": "CC_Base_Hip"
+      },
+      "CC_Base_Pelvis": {
+        "name": "CC_Base_Pelvis"
+      },
+      "CC_Base_L_Thigh": {
+        "name": "CC_Base_L_Thigh"
+      },
+      "CC_Base_L_Calf": {
+        "name": "CC_Base_L_Calf"
+      },
+      "CC_Base_L_Foot": {
+        "name": "CC_Base_L_Foot"
+      },
+      "CC_Base_L_ToeBaseShareBone": {
+        "name": "CC_Base_L_ToeBaseShareBone"
+      },
+      "CC_Base_L_ToeBase": {
+        "name": "CC_Base_L_ToeBase"
+      },
+      "CC_Base_L_PinkyToe1": {
+        "name": "CC_Base_L_PinkyToe1"
+      },
+      "CC_Base_L_RingToe1": {
+        "name": "CC_Base_L_RingToe1"
+      },
+      "CC_Base_L_MidToe1": {
+        "name": "CC_Base_L_MidToe1"
+      },
+      "CC_Base_L_IndexToe1": {
+        "name": "CC_Base_L_IndexToe1"
+      },
+      "CC_Base_L_BigToe1": {
+        "name": "CC_Base_L_BigToe1"
+      },
+      "CC_Base_L_CalfTwist01": {
+        "name": "CC_Base_L_CalfTwist01"
+      },
+      "CC_Base_L_CalfTwist02": {
+        "name": "CC_Base_L_CalfTwist02"
+      },
+      "CC_Base_L_KneeShareBone": {
+        "name": "CC_Base_L_KneeShareBone"
+      },
+      "CC_Base_L_ThighTwist01": {
+        "name": "CC_Base_L_ThighTwist01"
+      },
+      "CC_Base_L_ThighTwist02": {
+        "name": "CC_Base_L_ThighTwist02"
+      },
+      "CC_Base_R_Thigh": {
+        "name": "CC_Base_R_Thigh"
+      },
+      "CC_Base_R_ThighTwist01": {
+        "name": "CC_Base_R_ThighTwist01"
+      },
+      "CC_Base_R_ThighTwist02": {
+        "name": "CC_Base_R_ThighTwist02"
+      },
+      "CC_Base_R_Calf": {
+        "name": "CC_Base_R_Calf"
+      },
+      "CC_Base_R_Foot": {
+        "name": "CC_Base_R_Foot"
+      },
+      "CC_Base_R_ToeBase": {
+        "name": "CC_Base_R_ToeBase"
+      },
+      "CC_Base_R_PinkyToe1": {
+        "name": "CC_Base_R_PinkyToe1"
+      },
+      "CC_Base_R_BigToe1": {
+        "name": "CC_Base_R_BigToe1"
+      },
+      "CC_Base_R_IndexToe1": {
+        "name": "CC_Base_R_IndexToe1"
+      },
+      "CC_Base_R_MidToe1": {
+        "name": "CC_Base_R_MidToe1"
+      },
+      "CC_Base_R_RingToe1": {
+        "name": "CC_Base_R_RingToe1"
+      },
+      "CC_Base_R_ToeBaseShareBone": {
+        "name": "CC_Base_R_ToeBaseShareBone"
+      },
+      "CC_Base_R_KneeShareBone": {
+        "name": "CC_Base_R_KneeShareBone"
+      },
+      "CC_Base_R_CalfTwist01": {
+        "name": "CC_Base_R_CalfTwist01"
+      },
+      "CC_Base_R_CalfTwist02": {
+        "name": "CC_Base_R_CalfTwist02"
+      },
+      "CC_Base_Waist": {
+        "name": "CC_Base_Waist"
+      },
+      "CC_Base_Spine01": {
+        "name": "CC_Base_Spine01"
+      },
+      "CC_Base_Spine02": {
+        "name": "CC_Base_Spine02"
+      },
+      "CC_Base_NeckTwist01": {
+        "name": "CC_Base_NeckTwist01"
+      },
+      "CC_Base_NeckTwist02": {
+        "name": "CC_Base_NeckTwist02"
+      },
+      "CC_Base_Head": {
+        "name": "CC_Base_Head"
+      },
+      "CC_Base_FacialBone": {
+        "name": "CC_Base_FacialBone"
+      },
+      "CC_Base_JawRoot": {
+        "name": "CC_Base_JawRoot"
+      },
+      "CC_Base_Tongue01": {
+        "name": "CC_Base_Tongue01"
+      },
+      "CC_Base_Tongue02": {
+        "name": "CC_Base_Tongue02"
+      },
+      "CC_Base_Tongue03": {
+        "name": "CC_Base_Tongue03"
+      },
+      "CC_Base_Teeth02": {
+        "name": "CC_Base_Teeth02"
+      },
+      "CC_Base_R_Eye": {
+        "name": "CC_Base_R_Eye"
+      },
+      "CC_Base_L_Eye": {
+        "name": "CC_Base_L_Eye"
+      },
+      "CC_Base_UpperJaw": {
+        "name": "CC_Base_UpperJaw"
+      },
+      "CC_Base_Teeth01": {
+        "name": "CC_Base_Teeth01"
+      },
+      "CC_Base_L_Clavicle": {
+        "name": "CC_Base_L_Clavicle"
+      },
+      "CC_Base_L_Upperarm": {
+        "name": "CC_Base_L_Upperarm"
+      },
+      "CC_Base_L_Forearm": {
+        "name": "CC_Base_L_Forearm"
+      },
+      "CC_Base_L_ForearmTwist01": {
+        "name": "CC_Base_L_ForearmTwist01"
+      },
+      "CC_Base_L_ForearmTwist02": {
+        "name": "CC_Base_L_ForearmTwist02"
+      },
+      "CC_Base_L_ElbowShareBone": {
+        "name": "CC_Base_L_ElbowShareBone"
+      },
+      "CC_Base_L_Hand": {
+        "name": "CC_Base_L_Hand"
+      },
+      "CC_Base_L_UpperarmTwist01": {
+        "name": "CC_Base_L_UpperarmTwist01"
+      },
+      "CC_Base_L_UpperarmTwist02": {
+        "name": "CC_Base_L_UpperarmTwist02"
+      },
+      "CC_Base_R_Clavicle": {
+        "name": "CC_Base_R_Clavicle"
+      },
+      "CC_Base_R_Upperarm": {
+        "name": "CC_Base_R_Upperarm"
+      },
+      "CC_Base_R_UpperarmTwist01": {
+        "name": "CC_Base_R_UpperarmTwist01"
+      },
+      "CC_Base_R_UpperarmTwist02": {
+        "name": "CC_Base_R_UpperarmTwist02"
+      },
+      "CC_Base_R_Forearm": {
+        "name": "CC_Base_R_Forearm"
+      },
+      "CC_Base_R_ForearmTwist01": {
+        "name": "CC_Base_R_ForearmTwist01"
+      },
+      "CC_Base_R_ForearmTwist02": {
+        "name": "CC_Base_R_ForearmTwist02"
+      },
+      "CC_Base_R_ElbowShareBone": {
+        "name": "CC_Base_R_ElbowShareBone"
+      },
+      "CC_Base_R_Hand": {
+        "name": "CC_Base_R_Hand"
+      },
+      "CC_Base_R_RibsTwist": {
+        "name": "CC_Base_R_RibsTwist"
+      },
+      "CC_Base_R_Breast": {
+        "name": "CC_Base_R_Breast"
+      },
+      "CC_Base_L_RibsTwist": {
+        "name": "CC_Base_L_RibsTwist"
+      },
+      "CC_Base_L_Breast": {
+        "name": "CC_Base_L_Breast"
+      }
+    },
+    "hasSkeleton": true,
+    "bounds": {
+      "width": 1.8653545537741907,
+      "height": 1.8792243223039187,
+      "depth": 0.3397393316111178
+    },
+    "placement": {
+      "pivot": "bottom_center",
+      "snap_to_ground": true,
+      "snap_to_grid": true
+    },
+    "transform": {
+      "position": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "rotation": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "targets": {},
+    "interaction_points": {},
+    "mesh": "/resources/characters/elder_male.glb"
+  }
+}

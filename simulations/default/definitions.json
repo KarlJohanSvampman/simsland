@@ -1,0 +1,177 @@
+{
+  "prop_templates": {
+    "Television": {
+      "television": {
+        "name": "Television",
+        "category": "electronics",
+        "model": "tv_01",
+        "tags": ["electronics", "screen"],
+        "carryable": false,
+        "interactions": ["watch_tv", "examine"]
+      },
+      "model": "television"
+    },
+    "Sofa": {
+      "sofa": {
+        "name": "Sofa",
+        "category": "furniture",
+        "model": "sofa_a",
+        "tags": ["furniture", "surface", "seatable"],
+        "carryable": false,
+        "interactions": ["sit", "lie_down", "examine", "clean"]
+      },
+      "model": "sofa_a"
+    }
+  },
+  "item_templates": {},
+  "character_templates": {
+    "Miles_Evans": {
+      "miles_evans": {
+        "name": "Miles Evans",
+        "age_range": [
+          25,
+          40
+        ],
+        "traits": [],
+        "needs": {
+          "hunger": 100,
+          "energy": 100,
+          "hygiene": 100,
+          "social": 100,
+          "fun": 100
+        },
+        "skills": {
+          "cooking": 20,
+          "cleaning": 30,
+          "repair": 10,
+          "social": 40
+        },
+        "employment": {
+          "job": "office_worker",
+          "salary": 3200
+        },
+        "daily_schedule": {
+          "sleep": [
+            22,
+            6
+          ],
+          "work": [
+            8,
+            17
+          ]
+        },
+        "starting_inventory": [
+          "wallet",
+          "phone"
+        ]
+      },
+      "bone_slots": {
+        "head": "mixamorigHead",
+        "neck": "mixamorigNeck",
+        "right_hand": "mixamorigRightHand",
+        "left_hand": "mixamorigLeftHand",
+        "spine": "mixamorigSpine2",
+        "pelvis": "mixamorigHips",
+        "right_foot": "mixamorigRightFoot",
+        "left_foot": "mixamorigLeftFoot"
+      },
+      "model": "adult_male"
+    }
+  },
+  "interaction_templates": {
+    "Eat_Meal": {
+      "eat_meal": {
+        "name": "Eat Meal",
+        "duration": 1800,
+        "required_prop_tags": [
+          "table"
+        ],
+        "need_changes": {
+          "hunger": 40,
+          "social": 5
+        },
+        "animation": "sit_eat",
+        "priority": 80
+      }
+    },
+    "Watch_TV": {
+      "watch_tv": {
+        "name": "Watch TV",
+        "duration": 3600,
+        "required_prop_tags": [
+          "television"
+        ],
+        "need_changes": {
+          "fun": 35,
+          "energy": -5
+        },
+        "animation": "sit_watch",
+        "priority": 50
+      }
+    }
+  },
+  "activity_templates": {
+    "Have_Breakfast": {
+      "have_breakfast": {
+        "name": "Have Breakfast",
+        "priority": 70,
+        "conditions": {
+          "hunger_below": 60,
+          "hour_range": [
+            6,
+            10
+          ]
+        },
+        "steps": [
+          "find_food",
+          "eat_meal"
+        ]
+      }
+    },
+    "Relax": {
+      "relax": {
+        "priority": 40,
+        "conditions": {
+          "fun_below": 70,
+          "hour_range": [
+            18,
+            23
+          ]
+        },
+        "steps": [
+          "watch_tv"
+        ]
+      }
+    }
+  },
+  "tile_templates": {
+    "Grass": {
+      "grass": {
+        "name": "Grass",
+        "category": "terrain",
+        "material": "grass",
+        "walkable": true,
+        "vehicle_access": false,
+        "movement_cost": 1,
+        "blocks_los": false,
+        "buildable": true
+      }
+    }
+  },
+  "floorplan_templates": {},
+  "material_templates": {
+    "Grass": {
+      "grass": {
+        "name": "Grass",
+        "texture": "/resources/tiles/grass.jpg",
+        "editor_color": "#4f8f4f",
+        "roughness": 1,
+        "metalness": 0
+      },
+      "texture": "/resources/tiles/grass.jpg"
+    }
+  },
+  "clothing_templates": {
+    "basic_tshirt": {
+      "name": "Basic T-Shirt",
+      "slo
