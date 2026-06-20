@@ -1032,4 +1032,193 @@ def perceive_social_relationships(
     return results
 
 
-# =======
+
+def select_focus(
+    perception
+):
+
+    people = perception.get(
+        "visible_people",
+        []
+    )
+
+    if people:
+
+        strongest = max(
+
+            people,
+
+            key=lambda p: p.get(
+                "visibility",
+                0
+            )
+        )
+
+        return {
+
+            "key":
+                f"person:{strongest['id']}",
+
+            "strength":
+                strongest.get(
+                    "visibility",
+                    0.5
+                )
+        }
+
+    scenes = perception.get(
+        "social_scenes",
+        []
+    )
+
+    if scenes:
+
+        s = scenes[0]
+
+        return {
+
+            "key":
+                f"scene:{s.get('topic','conversation')}",
+
+            "strength":
+                0.5
+        }
+
+    audio = perception.get(
+        "audible_events",
+        []
+    )
+
+    if audio:
+
+        return {
+
+            "key":
+                "sound:ambient",
+
+            "strength":
+                0.3
+        }
+
+    return None
+
+
+# =========================================================
+# MAIN PERCEPTION
+# =========================================================
+
+def perceive(
+    c,
+    world
+):
+
+    perception_people = perceive_people(
+        c,
+        world
+    )
+
+    visible_people = []
+
+    for other in perception_people:
+
+        target = (
+            world["characters"]
+            .get(other["id"])
+        )
+
+        if not target:
+            continue
+
+        enriched = dict(other)
+
+        enriched["description"] = (
+            build_visible_person_description(
+                c,
+                target,
+                world.get(
+                    "definitions",
+                    {}
+                )
+            )
+        )
+
+        visible_people.append(
+            enriched
+        )
+
+    perception = {
+
+        "visible_people":
+            visible_people,
+
+        "social_relations":
+            perceive_social_relationships(
+
+                c,
+
+                world,
+
+                perception_people
+            ),
+
+        "social_scenes":
+            perceive_social_scenes(
+                c,
+                world
+            ),
+
+        "audible_events":
+            perceive_audio(
+                c,
+                world
+            ),
+
+        "visible_props":
+            perceive_props(
+                c,
+                world
+            ),
+
+        "environment":
+            perceive_environment(
+                c,
+                world
+            ),
+
+        "news":
+            world.get(
+                "news_feed",
+                []
+            )[-5:],
+
+        "events":
+            world.get(
+                "active_events",
+                []
+            )[-5:]
+    }
+
+    perception["focus"] = (
+        select_focus(
+            perception
+        )
+    )
+
+    c["perception"] = perception
+
+    c["last_perception_tick"] = (
+        world.get(
+            "tick",
+            0
+        )
+    )
+
+    c["recent_perception_memory"] = (
+
+        perception.get(
+            "visible_people",
+            []
+        )[:5]
+    )
+
+    return perception
