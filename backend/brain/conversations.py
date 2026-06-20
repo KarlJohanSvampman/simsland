@@ -376,89 +376,40 @@ def add_message(
         speech_act
     )
 
-    # =====================================================
-    # REFLECTION TRIGGERS
-    # =====================================================
-
-    if should_trigger_reflection(
-
-        speech_act,
-
-        conv
-    ):
-
-        schedule_conversation_reflection(
-
-            world,
-
-            conv,
-
-            speaker_id,
-
-            utterance,
-
-            speech_act,
-
-            tick
-        )
+    # NOTE: reflection scheduling is handled by conversation_runtime.py
+    # after each turn so it is not duplicated here.
 
 
 # =========================================================
 # UPDATE TONE
 # =========================================================
 
-def update_conversation_tone(
+def update_conversation_tone(conv, speech_act):
+    """Blend tone toward warm/tense/emotional based on recent act.
+    Reads the tracked tension/comfort floats so the drift is gradual
+    rather than an instant overwrite."""
 
-    conv,
+    positive   = {"comfort", "joke", "flirt", "apology", "supportive", "compliment"}
+    negative   = {"accuse", "insult", "threat", "dismissive", "challenge"}
+    vulnerable = {"confession", "vulnerable"}
 
-    speech_act
-):
-
-    positive = {
-
-        "comfort",
-
-        "joke",
-
-        "flirt",
-
-        "apology",
-
-        "supportive",
-
-        "compliment"
-    }
-
-    negative = {
-
-        "accuse",
-
-        "insult",
-
-        "threat",
-
-        "dismissive",
-
-        "challenge"
-    }
-
-    vulnerable = {
-
-        "confession",
-
-        "vulnerable"
-    }
+    tension = conv.get("tension", 0)
+    comfort = conv.get("comfort", 0)
 
     if speech_act in positive:
-
-        conv["tone"] = "warm"
-
+        if comfort > 0.5:
+            conv["tone"] = "warm"
+        elif tension < 0.3:
+            conv["tone"] = "warm"
+        # else leave current tone — one kind act doesn't fix a tense room
     elif speech_act in negative:
-
-        conv["tone"] = "tense"
-
+        if tension > 0.4:
+            conv["tone"] = "tense"
+        elif conv.get("tone") == "warm":
+            conv["tone"] = "neutral"
+        else:
+            conv["tone"] = "tense"
     elif speech_act in vulnerable:
-
         conv["tone"] = "emotional"
 
 
@@ -943,11 +894,4 @@ def cleanup_conversations(
 
 # =========================================================
 # CLAMP
-# =========================================================
-
-def clamp01(v):
-
-    return max(
-        0.0,
-        min(1.0, v)
-    )
+# ==========================================

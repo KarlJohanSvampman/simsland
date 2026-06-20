@@ -97,18 +97,14 @@ def update_conversation_activity(
 
     # =====================================================
     # GENERATE TURN
+    # Returns None when the conversation should end.
     # =====================================================
 
-    turn = generate_dialogue_turn(
+    turn = generate_dialogue_turn(c, listener, conv, world)
 
-        c,
-
-        listener,
-
-        conv,
-
-        world
-    )
+    if turn is None:
+        # Conversation ended (timeout or silence) — clean up activity
+        return False
 
     if not turn:
         return True
@@ -239,14 +235,4 @@ def update_conversation_activity(
         "next_turn_tick"
     ] = (
 
-        world["tick"]
-
-        +
-
-        random.randint(
-            20,
-            80
-        )
-    )
-
-    return True
+        w

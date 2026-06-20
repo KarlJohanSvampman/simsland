@@ -160,52 +160,28 @@ def line_of_sight(a, b, world):
 # PERCEIVED EMOTION
 # =========================================================
 
-def perceived_emotion(other):
+def perceived_emotion(observer, other):
+    """Return a stable perceived emotion label for 'other' as seen by 'observer'.
+    Uses a deterministic hash of the two character IDs so the reading doesn't
+    flicker every tick, while still producing slightly varied descriptions."""
 
-    actual = other.get(
-        "emotion",
-        "neutral"
-    )
+    actual = other.get("emotion", "neutral")
 
     guesses = {
-
-        "angry": [
-            "tense",
-            "agitated",
-            "frustrated"
-        ],
-
-        "fearful": [
-            "anxious",
-            "uneasy",
-            "nervous"
-        ],
-
-        "sad": [
-            "withdrawn",
-            "quiet",
-            "low-energy"
-        ],
-
-        "calm": [
-            "relaxed",
-            "comfortable",
-            "neutral"
-        ],
-
-        "annoyed": [
-            "irritated",
-            "impatient",
-            "tense"
-        ]
+        "angry":    ["tense", "agitated", "frustrated"],
+        "fearful":  ["anxious", "uneasy", "nervous"],
+        "sad":      ["withdrawn", "quiet", "low-energy"],
+        "calm":     ["relaxed", "comfortable", "neutral"],
+        "annoyed":  ["irritated", "impatient", "tense"],
     }
 
-    pool = guesses.get(
-        actual,
-        ["neutral"]
-    )
+    pool = guesses.get(actual, [actual])
 
-    return random.choice(pool)
+    # Stable index: hash of (observer_id, other_id, emotion) so it only
+    # changes when the actual emotion changes, not every tick.
+    key = f"{observer.get('id','')}:{other.get('id','')}:{actual}"
+    idx = hash(key) % len(pool)
+    return pool[idx]
 
 
 # =========================================================
@@ -213,62 +189,73 @@ def perceived_emotion(other):
 # =========================================================
 
 def perceived_activity(other):
+    """Return a human-readable description of what 'other' is doing.
+    Checks the interaction field first (new system), then the activity
+    type (legacy), so both paths produce meaningful descriptions."""
 
-    activity = other.get(
-        "activity",
-        {}
-    )
-
-    atype = activity.get(
-        "type"
-    )
-
-    if not atype:
+    activity = other.get("activity") or {}
+    if not activity:
         return None
 
+    # Prefer the specific interaction name (watch_tv, sit, cook, etc.)
+    # over the generic activity type (interact, eat, sleep).
+    key = (
+        activity.get("interaction")
+        or activity.get("type")
+    )
+
+    if not key:
+        return None
+
+    phase = activity.get("phase", "using")
+
     mapping = {
-
-        "cook_food":
-            "cooking",
-
-        "eat":
-            "eating",
-
-        "watch_tv":
-            "watching television",
-
-        "sleep":
-            "sleeping",
-
-        "socialize":
-            "talking with someone",
-
-        "pay_bills":
-            "working on paperwork",
-
-        "sort_mail":
-            "sorting through mail",
-
-        "clean":
-            "cleaning",
-
-        "exercise":
-            "exercising",
-
-        "shop_online":
-            "shopping online",
-
-        "argue":
-            "arguing",
-
-        "wander":
-            "wandering around"
+        # --- interactions (new system) ---
+        "watch_tv":     "watching television",
+        "sit":          "sitting down",
+        "lie_down":     "lying down",
+        "sleep":        "sleeping",
+        "cook":         "cooking",
+        "eat":          "eating",
+        "take_shower":  "taking a shower",
+        "use_toilet":   "using the bathroom",
+        "brush_teeth":  "brushing their teeth",
+        "wash_hands":   "washing their hands",
+        "use_computer": "using a computer",
+        "read":         "reading",
+        "work":         "working",
+        "exercise":     "exercising",
+        "clean":        "cleaning",
+        "clean_floor":  "mopping the floor",
+        "scrub":        "scrubbing",
+        "wipe":         "wiping surfaces",
+        "wash_dishes":  "washing dishes",
+        "examine":      "examining something",
+        "search":       "searching through something",
+        "carry":        "carrying something",
+        "socialize":    "talking with someone",
+        "phone":        "on the phone",
+        # --- legacy activity types ---
+        "cook_food":    "cooking",
+        "pay_bills":    "working on paperwork",
+        "sort_mail":    "sorting through mail",
+        "shop_online":  "shopping online",
+        "argue":        "arguing",
+        "wander":       "wandering around",
+        "conversation": "having a conversation",
+        "interact":     "doing something",
+        "wait":         "waiting",
     }
 
-    return mapping.get(
-        atype,
-        "doing something"
-    )
+    description = mapping.get(key)
+    if not description:
+        return "doing something"
+
+    # Prefix walking phase so it reads naturally
+    if phase == "walking":
+        return f"walking somewhere to {description.replace('doing something', 'do something')}"
+
+    return description
 
 
 # =========================================================
@@ -423,6 +410,7 @@ def perceive_people(
 
             "appears":
                 perceived_emotion(
+                    c,
                     other
                 ),
 
@@ -1117,108 +1105,4 @@ def perceive(
         world
     )
 
-    visible_people = []
-
-    for other in perception_people:
-
-        target = (
-            world["characters"]
-            .get(other["id"])
-        )
-
-        if not target:
-            continue
-
-        enriched = dict(other)
-
-        enriched["description"] = (
-            build_visible_person_description(
-                c,
-                target,
-                world.get(
-                    "definitions",
-                    {}
-                )
-            )
-        )
-
-        visible_people.append(
-            enriched
-        )
-
-    perception = {
-
-        "visible_people":
-            visible_people,
-
-        "social_relations":
-            perceive_social_relationships(
-
-                c,
-
-                world,
-
-                perception_people
-            ),
-
-        "social_scenes":
-            perceive_social_scenes(
-                c,
-                world
-            ),
-
-        "audible_events":
-            perceive_audio(
-                c,
-                world
-            ),
-
-        "visible_props":
-            perceive_props(
-                c,
-                world
-            ),
-
-        "environment":
-            perceive_environment(
-                c,
-                world
-            ),
-
-        "news":
-            world.get(
-                "news_feed",
-                []
-            )[-5:],
-
-        "events":
-            world.get(
-                "active_events",
-                []
-            )[-5:]
-    }
-
-    perception["focus"] = (
-        select_focus(
-            perception
-        )
-    )
-
-    c["perception"] = perception
-
-    c["last_perception_tick"] = (
-        world.get(
-            "tick",
-            0
-        )
-    )
-
-    c["recent_perception_memory"] = (
-
-        perception.get(
-            "visible_people",
-            []
-        )[:5]
-    )
-
-    return perception
+    
