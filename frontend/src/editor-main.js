@@ -181,11 +181,24 @@ function gridToWorld(x, y) {
 // ===================================
 //
 
+function tileColor(type) {
+  // 1. Check material_templates for an editor_color (dynamic, from definitions)
+  const matBucket = definitions.material_templates || {};
+  for (const bucket of Object.values(matBucket)) {
+    const inner = bucket[type];
+    if (inner && inner.editor_color) {
+      return parseInt(inner.editor_color.replace("#", ""), 16);
+    }
+  }
+  // 2. Fall back to hardcoded map
+  return TILE_COLORS[type] || 0x557799;
+}
+
 function paintTile(x, y, type) {
   const index = tileIndexMap.get(key(x, y));
   if (index == null) return;
 
-  color.setHex(TILE_COLORS[type] || 0x557799);
+  color.setHex(tileColor(type));
   tileMesh.setColorAt(index, color);
   tileMesh.instanceColor.needsUpdate = true;
 
@@ -358,11 +371,15 @@ document.getElementById("btn-paint_tile").onclick = () => {
   buildModalList(
     document.getElementById("list-paint_tile"),
     definitions.tile_templates,
-    (id) => {
-      currentWorldTileType = id;
+    (id, tmpl) => {
+      // definitions.tile_templates uses nested structure:
+      // { "Grass": { "grass": { name, material, ... } } }
+      // The outer key is the display name; we need the inner key for paintTile.
+      const innerKey = Object.keys(tmpl).find(k => typeof tmpl[k] === "object") || id.toLowerCase();
+      currentWorldTileType = innerKey;
       setActiveTool("paint_tile");
       closeModal("modal-paint_tile");
-      setStatus(`Paint tile: ${id}`);
+      setStatus(`Paint tile: ${innerKey}`);
     }
   );
   openModal("modal-paint_tile");
@@ -385,35 +402,4 @@ document.getElementById("btn-place_floorplan").onclick = () => {
       setStatus(`Place floorplan: ${id} — click a tile`);
     }
   );
-  openModal("modal-place_floorplan");
-};
-
-//
-// Place Prop button
-//
-
-document.getElementById("btn-place_prop").onclick = () => {
-  buildModalList(
-    document.getElementById("list-place_prop"),
-    definitions.prop_templates,
-    (id) => {
-      placementState.templateId = id;
-      placementState.mode       = "prop";
-      placementState.active     = true;
-      setActiveTool("place_prop");
-      closeModal("modal-place_prop");
-      setStatus(`Place prop: ${id} — click a tile`);
-    }
-  );
-  openModal("modal-place_prop");
-};
-
-//
-// Spawn Character button
-//
-
-document.getElementById("btn-spawn_character").onclick = () => {
-  buildModalList(
-    document.getElementById("list-spawn_character"),
-    definitions.character_templates,
-    async (id) => {
+  openModal("modal-
