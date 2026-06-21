@@ -440,6 +440,15 @@ def ensure_character_defaults(c):
     c.setdefault("reaction_cooldowns", {})
     c.setdefault("animation_reaction", None)
 
+    # Item knowledge — where the character last saw each item type
+    c.setdefault("item_knowledge",           {})
+
+    # Ordered activity queue for multi-step hobby preparation
+    c.setdefault("activity_queue",           [])
+
+    # Serialised queues saved when an urgent activity interrupted a hobby
+    c.setdefault("suspended_hobby_sessions", [])
+
     c.setdefault(
         "intentions",
         []

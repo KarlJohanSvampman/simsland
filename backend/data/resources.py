@@ -147,5 +147,66 @@ RESOURCE_TYPES = {
     "CLEANING": {
 
         "category": "consumable"
-    }
+    },
+
+    # =====================================================
+    # HOBBY SUPPLIES
+    # max_uses: how many sessions one unit lasts.
+    # consumable: True means the item is eventually depleted.
+    # =====================================================
+
+    "PAINT_SET": {
+        "category":   "hobby_supply",
+        "max_uses":   12,
+        "hobby":      "painting",
+        "consumable": True,
+    },
+    "CANVAS": {
+        "category":   "hobby_supply",
+        "max_uses":   1,
+        "hobby":      "painting",
+        "consumable": True,
+    },
+    "ART_BRUSH": {
+        "category":   "hobby_supply",
+        "max_uses":   20,
+        "hobby":      "painting",
+        "consumable": False,
+    },
+    "GUITAR": {
+        "category":   "hobby_supply",
+        "max_uses":   500,
+        "hobby":      "music",
+        "consumable": False,
+    },
+    "GUITAR_PICK": {
+        "category":   "hobby_supply",
+        "max_uses":   10,
+        "hobby":      "music",
+        "consumable": True,
+    },
+    "YARN": {
+        "category":   "hobby_supply",
+        "max_uses":   8,
+        "hobby":      "craft",
+        "consumable": True,
+    },
+    "KNITTING_NEEDLES": {
+        "category":   "hobby_supply",
+        "max_uses":   200,
+        "hobby":      "craft",
+        "consumable": False,
+    },
+    "BOOK": {
+        "category":   "hobby_supply",
+        "max_uses":   1,
+        "hobby":      "reading",
+        "consumable": False,
+    },
+    "GAME_CONTROLLER": {
+        "category":   "hobby_supply",
+        "max_uses":   1000,
+        "hobby":      "gaming",
+        "consumable": False,
+    },
 }
