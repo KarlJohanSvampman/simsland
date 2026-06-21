@@ -1,4 +1,3 @@
-```html
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -28,41 +27,53 @@ html, body {
   border-right: 1px solid #444;
   padding: 10px;
   overflow-y: auto;
+  flex-shrink: 0;
 }
 
 #canvasContainer {
   flex: 1;
   position: relative;
   background: #111;
+  overflow: hidden;
+  cursor: crosshair;
+}
+
+#canvasHint {
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  font-size: 11px;
+  color: #666;
+  pointer-events: none;
 }
 
 #sidepanel {
-  width: 320px;
+  width: 280px;
   background: #252b33;
   border-left: 1px solid #444;
   overflow-y: auto;
   padding: 10px;
+  flex-shrink: 0;
 }
 
 button {
   width: 100%;
   margin-bottom: 6px;
-  padding: 10px;
+  padding: 8px 10px;
   border: none;
   background: #3a4552;
   color: white;
   cursor: pointer;
+  text-align: left;
+  font-size: 13px;
 }
 
-button:hover {
-  background: #4d5a69;
-}
+button:hover { background: #4d5a69; }
+button.active { background: #5588bb; }
+button.danger { background: #7a2222; }
+button.danger:hover { background: #993333; }
 
-button.active {
-  background: #6699cc;
-}
-
-input, select {
+input, select, textarea {
   width: 100%;
   margin-bottom: 8px;
   background: #111;
@@ -70,6 +81,7 @@ input, select {
   border: 1px solid #444;
   padding: 6px;
   box-sizing: border-box;
+  font-size: 13px;
 }
 
 canvas {
@@ -81,108 +93,115 @@ canvas {
   background: #333;
   padding: 8px;
   margin-bottom: 6px;
+  border-radius: 3px;
+  font-size: 12px;
+}
+
+.roomRow .roomRowType {
+  font-size: 11px;
+  color: #aaa;
+}
+
+.roomRow button {
+  width: auto;
+  padding: 3px 8px;
+  margin: 4px 4px 0 0;
+  font-size: 11px;
+  background: #555;
 }
 
 #status {
   margin-top: 10px;
-  font-size: 12px;
-  color: #aaa;
+  font-size: 11px;
+  color: #888;
+  padding: 4px;
 }
 
 .section {
-  margin-bottom: 20px;
+  margin-bottom: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #333;
 }
-</style>
-</head>
-<body>
 
-<div id="root">
+.section h3 {
+  margin: 0 0 8px 0;
+  font-size: 12px;
+  text-transform: uppercase;
+  color: #889;
+  letter-spacing: 0.05em;
+}
 
-  <div id="toolbar">
+.section h2 {
+  margin: 0 0 10px 0;
+  font-size: 14px;
+}
 
-    <div class="section">
-      <h2>Paint Tools</h2>
+#roomModeIndicator {
+  display: none;
+  background: #335533;
+  color: #88ff88;
+  padding: 6px 10px;
+  margin-bottom: 8px;
+  font-size: 12px;
+  border-radius: 3px;
+  text-align: center;
+}
 
-    <button
-      class="toolBtn"
-      data-tool="tile">
+#roomModeIndicator.active {
+  display: block;
+}
 
-      Tile
-    </button>
+#roomCreateForm {
+  display: none;
+  background: #1e2530;
+  border: 1px solid #445;
+  padding: 10px;
+  margin-bottom: 8px;
+  border-radius: 4px;
+}
 
-    <select id="tileTemplateSelect">
-    </select>
-      <button class="toolBtn" data-tool="wall">Wall</button>
-      <button class="toolBtn" data-tool="door">Door</button>
-      <button class="toolBtn" data-tool="window">Window</button>
-      <button class="toolBtn" data-tool="staircase">Staircase</button>
-      <button class="toolBtn" data-tool="erase">Erase</button>
-    </div>
+#roomCreateForm h4 {
+  margin: 0 0 8px 0;
+  font-size: 12px;
+  color: #aac;
+}
 
-    <div class="section">
-      <h3>Material</h3>
-      <select id="materialSelect"></select>
-    </div>
+#roomCreateForm label {
+  display: block;
+  font-size: 11px;
+  color: #889;
+  margin-bottom: 2px;
+}
 
-    <div class="section">
-      <h3>Room Tools</h3>
+#propSpawnForm {
+  display: none;
+  background: #1e2530;
+  border: 1px solid #445;
+  padding: 8px;
+  margin-top: 8px;
+  font-size: 12px;
+  border-radius: 4px;
+}
 
-      <button id="roomModeBtn">
-        Room Selection Mode
-      </button>
+.propSpawnRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #333;
+  padding: 5px 8px;
+  margin-bottom: 4px;
+  border-radius: 3px;
+  font-size: 12px;
+}
 
-      <button id="createRoomBtn">
-        Create Room
-      </button>
-    </div>
+.propSpawnRow button {
+  width: auto;
+  padding: 2px 6px;
+  margin: 0;
+  font-size: 11px;
+  background: #662222;
+}
 
-    <div class="section">
-      <h3>Floorplan</h3>
+hr { border-color: #333; margin: 12px 0; }
 
-      <input id="floorplanId" placeholder="template id" />
-      <input id="floorplanWidth" type="number" value="20" />
-      <input id="floorplanHeight" type="number" value="20" />
-
-      <button id="newFloorplanBtn">
-        New Floorplan
-      </button>
-
-      <button id="saveFloorplanBtn">
-        Save Floorplan
-      </button>
-
-      <button id="loadFloorplanBtn">
-        Load Floorplan
-      </button>
-    </div>
-
-    <div id="status"></div>
-
-  </div>
-
-  <div id="canvasContainer">
-    <canvas id="floorCanvas"></canvas>
-  </div>
-
-  <div id="sidepanel">
-
-    <h2>Rooms</h2>
-
-    <div id="roomList"></div>
-
-    <hr>
-
-    <h2>Selection</h2>
-
-    <div id="selectionInfo">
-      None
-    </div>
-
-  </div>
-
-</div>
-
-<script type="module" src="/src/floorplan.js"></script>
-
-</body>
-</html>
+h2 { font-size: 15px; margin: 

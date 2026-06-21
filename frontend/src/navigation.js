@@ -1,74 +1,39 @@
-export function generateNavigationGrid(floorplan){
+// A tile is walkable if it has a floor. Wall edges restrict
+// movement between adjacent tiles but don't make a tile itself unwalkable.
+//
+// Output:
+//   floorplan.navigation = {
+//     walkable:  [{x, y}, ...]        — tiles characters can stand on
+//     blocked:   ["x,y", ...]         — tiles without floors
+//     wallEdges: [{x, y, side, type}] — wall/door/window edge data for pathfinding
+//   }
 
-  const blocked = new Set();
+export function generateNavigationGrid(floorplan) {
+  const tiles     = floorplan.tiles || {};
+  const walkable  = [];
+  const blocked   = [];
+  const wallEdges = [];
 
-  // =====================================
-  // BLOCKED WALLS
-  // =====================================
-
-  for(const key in floorplan.tiles){
-
-    const tile =
-      floorplan.tiles[key];
-
-    const [x, y] =
-      key.split(",").map(Number);
-
-    const walls =
-      tile.walls || {};
-
-    for(const side in walls){
-
-      const wall = walls[side];
-
-      if(!wall) continue;
-
-      if(wall.type === "wall"){
-
-        blocked.add(`${x},${y}`);
+  // Walkable / blocked from floor presence
+  for (let x = 0; x < floorplan.width; x++) {
+    for (let y = 0; y < floorplan.height; y++) {
+      const key  = `${x},${y}`;
+      const tile = tiles[key];
+      if (tile?.floor) {
+        walkable.push({ x, y });
+      } else {
+        blocked.push(key);
       }
     }
   }
 
-  // =====================================
-  // DOORS REMOVE BLOCK
-  // =====================================
-
-  for(const door of floorplan.doors || []){
-
-    blocked.delete(
-      `${door.x},${door.y}`
-    );
-  }
-
-  // =====================================
-  // WALKABLE
-  // =====================================
-
-  const walkable = [];
-
-  for(let x=0;x<floorplan.width;x++){
-
-    for(let y=0;y<floorplan.height;y++){
-
-      const key = `${x},${y}`;
-
-      if(!blocked.has(key)){
-
-        walkable.push({
-          x,
-          y
-        });
-      }
+  // Wall edges — tell pathfinder which transitions are gated by walls/doors/windows
+  for (const key in tiles) {
+    const tile    = tiles[key];
+    const [x, y] = key.split(",").map(Number);
+    for (const [side, wall] of Object.entries(tile.walls || {})) {
+      if (wall) wallEdges.push({ x, y, side, type: wall.type });
     }
   }
 
-  floorplan.navigation = {
-
-    blocked: [...blocked],
-
-    walkable
-  };
-
-  return floorplan.navigation;
-}
+  floorplan.navigation = { walkable, blocked, wallE

@@ -1,937 +1,493 @@
-import { detectRooms } from './roomDetection.js';
-import { generateRoomGraph } from './roomGraph.js';
-import { generateNavigationGrid } from './navigation.js';
-import {
+import { detectRooms }            from "./roomDetection.js";
+import { generateRoomGraph }       from "./roomGraph.js";
+import { generateNavigationGrid }  from "./navigation.js";
 
-  resolveFloorplan
-
-} from "./templates.js";
-const FLOORPLAN_CACHE = {
-
-  roomsDirty: true,
-
-  navDirty: true,
-
-  graphDirty: true,
-
-  cachedRoomLookup: null,
-
-  cachedGraph: null,
-
-  cachedNavigation: null
-};
-const canvas = document.getElementById("floorCanvas");
-const ctx = canvas.getContext("2d");
+// =========================================================
+// CONSTANTS
+// =========================================================
 
 const TILE_SIZE = 32;
 
-let definitions = {};
-let currentTool = "tile";
+const ROOM_TYPES = [
+  "restroom", "kitchen", "living_room", "bedroom", "dining_room",
+  "home_office", "corridor", "main_entrance", "secondary_exit",
+  "storage", "garage", "laundry", "room",
+];
 
-let currentTileTemplate = "grass";
+const ROOM_COLORS = {
+  restroom:       "rgba(0,255,255,0.18)",
+  kitchen:        "rgba(255,165,0,0.18)",
+  living_room:    "rgba(180,100,255,0.18)",
+  bedroom:        "rgba(80,80,255,0.18)",
+  dining_room:    "rgba(255,220,120,0.18)",
+  home_office:    "rgba(120,220,255,0.18)",
+  corridor:       "rgba(180,180,180,0.12)",
+  main_entrance:  "rgba(255,255,255,0.18)",
+  secondary_exit: "rgba(255,80,80,0.18)",
+  storage:        "rgba(140,100,60,0.18)",
+  garage:         "rgba(100,140,80,0.18)",
+  laundry:        "rgba(60,180,220,0.18)",
+};
 
-let currentMaterial = "wood_floor_01";
-let roomMode = false;
-let isMouseDown = false;
+const WALL_COLORS = { wall: "#ddd", door: "#b07030", window: "#55aaee" };
+
+// =========================================================
+// STATE
+// =========================================================
+
+const canvas = document.getElementById("floorCanvas");
+const ctx    = canvas.getContext("2d");
+
+let definitions        = {};
+let currentTool        = "tile";
+let currentTileTemplate= "grass";
+let currentMaterial    = "wood_floor_01";
+let currentPropTemplate= "";
+let currentPropRotation= 0;
+let roomMode           = false;
+let isLeftDown         = false;
+let isPanning          = false;
+let panStartX          = 0;
+let panStartY          = 0;
+
+// Pan / zoom
+let viewX    = 0;
+let viewY    = 0;
+let viewZoom = 1;
+
+// Hover info (world coords & detected wall side)
+let hoverInfo = null;  // { x, y, fx, fy, side }
 
 const selectedTiles = new Set();
 
-const ROOM_TYPES = [
-  "restroom",
-  "kitchen",
-  "living_room",
-  "bedroom",
-  "dining_room",
-  "home_office",
-  "main_entrance",
-  "secondary_exit"
-];
-
-
-const ROOM_COLORS = {
-  restroom: "rgba(0,255,255,0.2)",
-  kitchen: "rgba(255,165,0,0.2)",
-  living_room: "rgba(180,100,255,0.2)",
-  bedroom: "rgba(100,100,255,0.2)",
-  dining_room: "rgba(255,220,120,0.2)",
-  home_office: "rgba(120,220,255,0.2)",
-  main_entrance: "rgba(255,255,255,0.2)",
-  secondary_exit: "rgba(255,100,100,0.2)"
-};
-
 let floorplan = {
-
-  id: "starter_house",
-
-  category: "residential",
-
-  tags: [
-
-    "small",
-
-    "starter"
-  ],
-
-  width: 20,
-
-  height: 20,
-
-  tiles: {},
-
-  rooms: [],
-
-  roomGraph: {},
-
-  navigation: {}
+  id:         "starter_house",
+  category:   "residential",
+  tags:       ["small", "starter"],
+  width:      20,
+  height:     20,
+  tiles:      {},
+  rooms:      [],
+  roomGraph:  {},
+  navigation: {},
+  prop_spawns: [],
 };
-function invalidateNavigation(){
 
-  FLOORPLAN_CACHE.navDirty = true;
+const FLOORPLAN_CACHE = {
+  roomsDirty: true,
+  navDirty:   true,
+  graphDirty: true,
+};
 
-  FLOORPLAN_CACHE.graphDirty = true;
+// =========================================================
+// COORDINATE HELPERS
+// =========================================================
 
-  FLOORPLAN_CACHE.roomsDirty = true;
+function screenToWorld(mx, my) {
+  return {
+    wx: (mx - viewX) / viewZoom,
+    wy: (my - viewY) / viewZoom,
+  };
 }
-function tileKey(x, y) {
-  return `${x},${y}`;
+
+function worldToTile(wx, wy) {
+  const tx = Math.floor(wx / TILE_SIZE);
+  const ty = Math.floor(wy / TILE_SIZE);
+  const fx = ((wx % TILE_SIZE) + TILE_SIZE) % TILE_SIZE;
+  const fy = ((wy % TILE_SIZE) + TILE_SIZE) % TILE_SIZE;
+  return { x: tx, y: ty, fx, fy };
 }
+
+// Returns the nearest edge side given a fractional (fx, fy) position within a tile.
+function getWallSide(fx, fy) {
+  const dN = fy, dS = TILE_SIZE - fy, dW = fx, dE = TILE_SIZE - fx;
+  const min = Math.min(dN, dS, dW, dE);
+  if (min === dN) return "north";
+  if (min === dS) return "south";
+  if (min === dW) return "west";
+  return "east";
+}
+
+const OPPOSITE = { north: "south", south: "north", east: "west", west: "east" };
+const DELTA    = { north: [0,-1], south: [0,1], east: [1,0], west: [-1,0] };
+
+// =========================================================
+// CANVAS RESIZE
+// =========================================================
 
 function resizeCanvas() {
-  canvas.width = window.innerWidth - 580;
-  canvas.height = window.innerHeight;
+  canvas.width  = canvas.parentElement.clientWidth;
+  canvas.height = canvas.parentElement.clientHeight;
   render();
 }
-
 window.addEventListener("resize", resizeCanvas);
 resizeCanvas();
 
+// =========================================================
+// TILE HELPERS
+// =========================================================
+
+function tileKey(x, y) { return `${x},${y}`; }
+
 function ensureTile(x, y) {
-
   const key = tileKey(x, y);
-
   if (!floorplan.tiles[key]) {
-
     floorplan.tiles[key] = {
       floor: null,
-
-      walls: {
-        north: null,
-        south: null,
-        east: null,
-        west: null
-      }
+      walls: { north: null, south: null, east: null, west: null },
     };
   }
-
   return floorplan.tiles[key];
 }
 
-function setFloorTile(
-  x,
-  y,
-  action
-){
-
-  invalidateNavigation();
-
-  const tile =
-    ensureTile(x,y);
-
-  if(
-    action === "erase"
-  ){
-
-    delete floorplan.tiles[
-      tileKey(x,y)
-    ];
-
-    return;
-  }
-
-  tile.floor = {
-
-    template:
-      currentTileTemplate
-  };
+function invalidateNavigation() {
+  FLOORPLAN_CACHE.roomsDirty = true;
+  FLOORPLAN_CACHE.navDirty   = true;
+  FLOORPLAN_CACHE.graphDirty = true;
 }
 
-function setWallTile(x, y, side, type) {
+function inBounds(x, y) {
+  return x >= 0 && y >= 0 && x < floorplan.width && y < floorplan.height;
+}
+
+// =========================================================
+// PAINT ACTIONS
+// =========================================================
+
+function setFloorTile(x, y, erase = false) {
   invalidateNavigation();
+  if (erase) {
+    delete floorplan.tiles[tileKey(x, y)];
+    return;
+  }
   const tile = ensureTile(x, y);
-
-  tile.walls[side] = {
-    type,
-    material: currentMaterial
-  };
+  tile.floor = { template: currentTileTemplate };
 }
 
-function screenToTile(mx, my) {
+// Paints a wall/door/window on the given side of (x,y).
+// Also mirrors the opposite side on the adjacent tile so walls are bidirectional.
+function setWallEdge(x, y, side, type) {
+  if (!inBounds(x, y)) return;
+  invalidateNavigation();
 
-  return {
-    x: Math.floor(mx / TILE_SIZE),
-    y: Math.floor(my / TILE_SIZE)
-  };
+  const tile = ensureTile(x, y);
+  tile.walls[side] = type ? { type, material: currentMaterial } : null;
+
+  // Mirror on adjacent tile
+  const [dx, dy] = DELTA[side];
+  const nx = x + dx, ny = y + dy;
+  if (inBounds(nx, ny)) {
+    const nTile = ensureTile(nx, ny);
+    nTile.walls[OPPOSITE[side]] = type ? { type, material: currentMaterial } : null;
+  }
 }
 
-function paintTile(x, y) {
+function eraseWallEdge(x, y, side) {
+  setWallEdge(x, y, side, null);
+}
 
-  if (
-    x < 0 ||
-    y < 0 ||
-    x >= floorplan.width ||
-    y >= floorplan.height
-  ) {
+function placeOrEraseProp(x, y, erase = false) {
+  if (!inBounds(x, y)) return;
+  if (erase) {
+    floorplan.prop_spawns = floorplan.prop_spawns.filter(
+      p => !(p.x === x && p.y === y)
+    );
     return;
   }
+  if (!currentPropTemplate) { setStatus("Select a prop template first"); return; }
+  // Remove existing spawn at this tile before placing
+  floorplan.prop_spawns = floorplan.prop_spawns.filter(
+    p => !(p.x === x && p.y === y)
+  );
+  floorplan.prop_spawns.push({
+    id:       crypto.randomUUID(),
+    template: currentPropTemplate,
+    x, y,
+    rotation: currentPropRotation,
+  });
+  updatePropSpawnList();
+}
+
+// =========================================================
+// PAINT DISPATCH
+// =========================================================
+
+function paintAt(mx, my, eraseOverride = false) {
+  const rect = canvas.getBoundingClientRect();
+  const { wx, wy } = screenToWorld(mx - rect.left, my - rect.top);
+  const { x, y, fx, fy } = worldToTile(wx, wy);
+  if (!inBounds(x, y) && currentTool !== "erase") return;
+
+  const erase = eraseOverride || currentTool === "erase";
 
   if (roomMode) {
-
     const key = tileKey(x, y);
+    if (inBounds(x, y)) {
+      if (selectedTiles.has(key)) selectedTiles.delete(key);
+      else selectedTiles.add(key);
+      updateSelectionInfo();
+      render();
+    }
+    return;
+  }
 
-    if (selectedTiles.has(key)) {
-      selectedTiles.delete(key);
-    } else {
-      selectedTiles.add(key);
+  if (currentTool === "tile") {
+    setFloorTile(x, y, erase);
+
+  } else if (currentTool === "erase") {
+    // Erase floor first; if already empty try erasing nearest wall edge
+    const key  = tileKey(x, y);
+    const tile = floorplan.tiles[key];
+    if (tile?.floor) {
+      setFloorTile(x, y, true);
+    } else if (tile) {
+      const side = getWallSide(fx, fy);
+      eraseWallEdge(x, y, side);
     }
 
+  } else if (currentTool === "wall") {
+    const side = getWallSide(fx, fy);
+    if (erase) eraseWallEdge(x, y, side);
+    else setWallEdge(x, y, side, "wall");
+
+  } else if (currentTool === "door") {
+    const side = getWallSide(fx, fy);
+    if (erase) eraseWallEdge(x, y, side);
+    else setWallEdge(x, y, side, "door");
+
+  } else if (currentTool === "window") {
+    const side = getWallSide(fx, fy);
+    if (erase) eraseWallEdge(x, y, side);
+    else setWallEdge(x, y, side, "window");
+
+  } else if (currentTool === "staircase") {
+    setFloorTile(x, y, erase);
+    if (!erase) {
+      const tile = ensureTile(x, y);
+      tile.floor.template = "staircase";
+    }
+
+  } else if (currentTool === "prop") {
+    placeOrEraseProp(x, y, erase);
+  }
+
+  render();
+}
+
+// =========================================================
+// CANVAS EVENTS
+// =========================================================
+
+canvas.addEventListener("contextmenu", e => e.preventDefault());
+
+canvas.addEventListener("mousedown", e => {
+  // Middle button or right button = start pan
+  if (e.button === 1 || e.button === 2 && e.shiftKey) {
+    isPanning  = true;
+    panStartX  = e.clientX - viewX;
+    panStartY  = e.clientY - viewY;
+    canvas.style.cursor = "grab";
+    e.preventDefault();
+    return;
+  }
+
+  // Right button without shift = erase
+  if (e.button === 2) {
+    paintAt(e.clientX, e.clientY, true);
+    return;
+  }
+
+  // Left button = paint
+  if (e.button === 0) {
+    isLeftDown = true;
+    paintAt(e.clientX, e.clientY, false);
+  }
+});
+
+canvas.addEventListener("mousemove", e => {
+  // Pan
+  if (isPanning) {
+    viewX = e.clientX - panStartX;
+    viewY = e.clientY - panStartY;
     render();
     return;
   }
 
-  if(
-    currentTool === "tile"
-  ){
+  // Update hover info for wall edge preview
+  const rect   = canvas.getBoundingClientRect();
+  const { wx, wy } = screenToWorld(e.clientX - rect.left, e.clientY - rect.top);
+  const ti     = worldToTile(wx, wy);
+  hoverInfo    = { ...ti, side: getWallSide(ti.fx, ti.fy) };
 
-    setFloorTile(
-      x,
-      y,
-      "tile"
-    );
+  // Paint while dragging (not in room mode — room mode is click-only)
+  if (isLeftDown && !roomMode) {
+    paintAt(e.clientX, e.clientY, false);
+  } else {
+    render(); // re-render for hover highlight
   }
+});
 
-  else if(
-    currentTool === "erase"
-  ){
+canvas.addEventListener("mouseup", e => {
+  if (isPanning) { isPanning = false; canvas.style.cursor = "crosshair"; }
+  if (e.button === 0) isLeftDown = false;
+});
 
-    setFloorTile(
-      x,
-      y,
-      "erase"
-    );
-  }
-  else if (currentTool === "wall") {
-    setWallTile(x, y, "north", "wall");
-    setWallTile(x, y, "west", "wall");
-  }
-
-  else if (currentTool === "door") {
-    setWallTile(x, y, "north", "door");
-  }
-
-  else if (currentTool === "window") {
-    setWallTile(x, y, "north", "window");
-  } else
-    {
-    setFloorTile(x, y, currentTool);
-  }
-
+canvas.addEventListener("mouseleave", () => {
+  isLeftDown = false;
+  isPanning  = false;
+  hoverInfo  = null;
   render();
+});
+
+// Zoom toward cursor on scroll
+canvas.addEventListener("wheel", e => {
+  e.preventDefault();
+  const rect      = canvas.getBoundingClientRect();
+  const mx        = e.clientX - rect.left;
+  const my        = e.clientY - rect.top;
+  const factor    = e.deltaY < 0 ? 1.12 : 1 / 1.12;
+  const newZoom   = Math.max(0.2, Math.min(6, viewZoom * factor));
+  viewX           = mx - (mx - viewX) * (newZoom / viewZoom);
+  viewY           = my - (my - viewY) * (newZoom / viewZoom);
+  viewZoom        = newZoom;
+  render();
+}, { passive: false });
+
+// =========================================================
+// RENDER
+// =========================================================
+
+function render() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  ctx.save();
+  ctx.setTransform(viewZoom, 0, 0, viewZoom, viewX, viewY);
+
+  renderGrid();
+  renderTiles();
+  renderRooms();
+  renderSelection();
+  renderPropSpawns();
+  renderWalls();
+  renderHoverEdge();
+
+  ctx.restore();
 }
-
-canvas.addEventListener("mousedown", (e) => {
-
-  isMouseDown = true;
-
-  const rect = canvas.getBoundingClientRect();
-
-  const tile = screenToTile(
-    e.clientX - rect.left,
-    e.clientY - rect.top
-  );
-
-  paintTile(tile.x, tile.y);
-});
-
-canvas.addEventListener("mousemove", (e) => {
-
-  if (!isMouseDown) return;
-
-  if (roomMode) return;
-
-  const rect = canvas.getBoundingClientRect();
-
-  const tile = screenToTile(
-    e.clientX - rect.left,
-    e.clientY - rect.top
-  );
-
-  paintTile(tile.x, tile.y);
-});
-
-window.addEventListener("mouseup", () => {
-  isMouseDown = false;
-});
 
 function renderGrid() {
+  const invZ = 1 / viewZoom;
 
-  ctx.strokeStyle = "#333";
+  // Compute visible tile range
+  const x0 = Math.max(0, Math.floor((-viewX * invZ) / TILE_SIZE));
+  const y0 = Math.max(0, Math.floor((-viewY * invZ) / TILE_SIZE));
+  const x1 = Math.min(floorplan.width,  Math.ceil(((-viewX + canvas.width)  * invZ) / TILE_SIZE));
+  const y1 = Math.min(floorplan.height, Math.ceil(((-viewY + canvas.height) * invZ) / TILE_SIZE));
 
-  for (let x = 0; x < floorplan.width; x++) {
+  ctx.strokeStyle = "#2a2f38";
+  ctx.lineWidth   = 0.5;
 
-    for (let y = 0; y < floorplan.height; y++) {
-
-      ctx.strokeRect(
-        x * TILE_SIZE,
-        y * TILE_SIZE,
-        TILE_SIZE,
-        TILE_SIZE
-      );
-    }
+  for (let x = x0; x <= x1; x++) {
+    ctx.beginPath();
+    ctx.moveTo(x * TILE_SIZE, y0 * TILE_SIZE);
+    ctx.lineTo(x * TILE_SIZE, y1 * TILE_SIZE);
+    ctx.stroke();
   }
+  for (let y = y0; y <= y1; y++) {
+    ctx.beginPath();
+    ctx.moveTo(x0 * TILE_SIZE, y * TILE_SIZE);
+    ctx.lineTo(x1 * TILE_SIZE, y * TILE_SIZE);
+    ctx.stroke();
+  }
+
+  // Floorplan border
+  ctx.strokeStyle = "#445";
+  ctx.lineWidth   = 1;
+  ctx.strokeRect(0, 0, floorplan.width * TILE_SIZE, floorplan.height * TILE_SIZE);
 }
 
-function renderTiles(){
+function renderTiles() {
+  for (const key in floorplan.tiles) {
+    const tile = floorplan.tiles[key];
+    if (!tile.floor) continue;
 
-  for(
-    const key
-    in floorplan.tiles
-  ){
+    const [x, y] = key.split(",").map(Number);
+    const tpl    = definitions?.tile_templates?.[tile.floor.template];
 
-    const [x,y] =
-      key.split(",")
-      .map(Number);
-
-    const tile =
-      floorplan.tiles[key];
-
-    if(
-      !tile.floor
-    ){
-      continue;
-    }
-
-    const templateId =
-
-      tile.floor.template;
-
-    const tpl =
-
-      definitions
-        ?.tile_templates
-        ?.[templateId];
-
-    let color =
-      "#777";
-
-    if(
-      tpl?.editor_color
-    ){
-
-      color =
-        tpl.editor_color;
-    }
-
-    else{
-
-      switch(
-        templateId
-      ){
-
-        case "grass":
-          color="#3f7a3f";
-          break;
-
-        case "road":
-          color="#444";
-          break;
-
-        case "sidewalk":
-          color="#aaa";
-          break;
-
-        case "water":
-          color="#4477cc";
-          break;
+    let color = tpl?.editor_color ?? "#555";
+    if (!tpl) {
+      switch (tile.floor.template) {
+        case "grass":     color = "#3a6e3a"; break;
+        case "road":      color = "#3a3a3a"; break;
+        case "sidewalk":  color = "#888";    break;
+        case "water":     color = "#3a5e99"; break;
+        case "staircase": color = "#667";    break;
+        default:          color = "#4a4a55"; break;
       }
     }
 
-    ctx.fillStyle =
-      color;
+    ctx.fillStyle = color;
+    ctx.fillRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+  }
+}
 
-    ctx.fillRect(
+function renderRooms() {
+  for (const room of floorplan.rooms || []) {
+    ctx.fillStyle = ROOM_COLORS[room.type] || "rgba(255,255,255,0.1)";
+    for (const tile of room.tiles) {
+      ctx.fillRect(tile.x * TILE_SIZE, tile.y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+    }
+    // Label first tile
+    if (room.tiles.length > 0) {
+      const t  = room.tiles[0];
+      const cx = t.x * TILE_SIZE + 2;
+      const cy = t.y * TILE_SIZE + 10;
+      ctx.fillStyle   = "rgba(255,255,255,0.6)";
+      ctx.font        = `${Math.max(8, Math.round(9 / viewZoom * viewZoom))}px sans-serif`;
+      ctx.font        = "8px sans-serif";
+      ctx.fillText(room.type, cx, cy);
+    }
+  }
+}
 
-      x * TILE_SIZE,
+function renderSelection() {
+  if (selectedTiles.size === 0) return;
+  ctx.fillStyle   = "rgba(120,180,255,0.3)";
+  ctx.strokeStyle = "rgba(120,180,255,0.8)";
+  ctx.lineWidth   = 1.5;
+  for (const key of selectedTiles) {
+    const [x, y] = key.split(",").map(Number);
+    ctx.fillRect  (x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+    ctx.strokeRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+  }
+}
 
-      y * TILE_SIZE,
+function renderPropSpawns() {
+  for (const ps of floorplan.prop_spawns || []) {
+    const cx = (ps.x + 0.5) * TILE_SIZE;
+    const cy = (ps.y + 0.5) * TILE_SIZE;
 
-      TILE_SIZE,
+    ctx.fillStyle = "rgba(255,200,50,0.55)";
+    ctx.beginPath();
+    ctx.arc(cx, cy, TILE_SIZE * 0.35, 0, Math.PI * 2);
+    ctx.fill();
 
-      TILE_SIZE
-    );
+    ctx.fillStyle = "rgba(0,0,0,0.7)";
+    ctx.font      = "7px sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(ps.template.slice(0, 8), cx, cy);
+    ctx.textAlign    = "left";
+    ctx.textBaseline = "alphabetic";
   }
 }
 
 function renderWalls() {
-
-  ctx.lineWidth = 4;
+  ctx.lineCap = "round";
 
   for (const key in floorplan.tiles) {
-
-    const [x, y] = key
-      .split(",")
-      .map(Number);
-
-    const tile = floorplan.tiles[key];
-
-    const px = x * TILE_SIZE;
-    const py = y * TILE_SIZE;
-
-    const walls = tile.walls || {};
-
-    for (const side in walls) {
-
-      const wall = walls[side];
-
-      if (!wall) continue;
-
-      if (wall.type === "wall") {
-        ctx.strokeStyle = "#dddddd";
-      }
-
-      else if (wall.type === "door") {
-        ctx.strokeStyle = "#996633";
-      }
-
-      else if (wall.type === "window") {
-        ctx.strokeStyle = "#66ccff";
-      }
-
-      ctx.beginPath();
-
-      if (side === "north") {
-        ctx.moveTo(px, py);
-        ctx.lineTo(px + TILE_SIZE, py);
-      }
-
-      if (side === "south") {
-        ctx.moveTo(px, py + TILE_SIZE);
-        ctx.lineTo(px + TILE_SIZE, py + TILE_SIZE);
-      }
-
-      if (side === "west") {
-        ctx.moveTo(px, py);
-        ctx.lineTo(px, py + TILE_SIZE);
-      }
-
-      if (side === "east") {
-        ctx.moveTo(px + TILE_SIZE, py);
-        ctx.lineTo(px + TILE_SIZE, py + TILE_SIZE);
-      }
-
-      ctx.stroke();
-    }
-  }
-}
-
-function renderRooms(){
-
-  for(const room of floorplan.rooms || []){
-
-    ctx.fillStyle =
-
-      ROOM_COLORS[
-        room.type
-      ]
-
-      || "rgba(255,255,255,0.15)";
-
-    for(const tile of room.tiles){
-
-      ctx.fillRect(
-
-        tile.x * TILE_SIZE,
-
-        tile.y * TILE_SIZE,
-
-        TILE_SIZE,
-
-        TILE_SIZE
-      );
-    }
-  }
-}
-
-
-function renderSelection() {
-
-  ctx.fillStyle =
-    "rgba(255,255,255,0.35)";
-
-  for (const key of selectedTiles) {
-
-    const parts = key.split(",");
-
-    const x = parseInt(parts[0]);
-
-    const y = parseInt(parts[1]);
-    ctx.fillRect(
-      x * TILE_SIZE,
-      y * TILE_SIZE,
-      TILE_SIZE,
-      TILE_SIZE
-    );
-  }
-}
-
-function render(){
-
-  ctx.clearRect(
-
-    0,
-    0,
-
-    canvas.width,
-
-    canvas.height
-  );
-
-  renderGrid();
-
-  renderTiles();
-
-  renderRooms();
-
-  renderSelection();
-
-  renderWalls();
-
-  document.getElementById(
-    "selectionInfo"
-  ).innerHTML =
-
-    `${selectedTiles.size} selected`;
-}
-
-function updateRoomList() {
-
-  const el =
-    document.getElementById(
-      "roomList"
-    );
-
-  el.innerHTML = "";
-
-  for (const room of floorplan.rooms) {
-
-    const div =
-      document.createElement("div");
-
-    div.className = "roomRow";
-
-    div.innerHTML = `
-      <b>${room.id}</b><br>
-      ${room.type}<br>
-      ${room.tiles.length} tiles
-    `;
-
-    el.appendChild(div);
-  }
-}
-
-function setStatus(text) {
-
-  document.getElementById(
-    "status"
-  ).innerText = text;
-}
-
-async function loadDefinitions() {
-
-  const res = await fetch(
-    "/api/editor/definitions?sim_id=default"
-  );
-
-  definitions = await res.json();
-
-  populateMaterials();
-
-  populateTileTemplates();
-}
-
-function populateMaterials() {
-
-  const select =
-    document.getElementById(
-      "materialSelect"
-    );
-
-  select.innerHTML = "";
-
-  const mats =
-    definitions.material_templates
-    || {};
-
-  for (const id in mats) {
-
-    const opt =
-      document.createElement("option");
-
-    opt.value = id;
-    opt.innerText =
-      mats[id].name || id;
-
-    select.appendChild(opt);
-  }
-
-  select.onchange = () => {
-    currentMaterial = select.value;
-  };
-}
-
-function populateTileTemplates(){
-
-  const select =
-    document.getElementById(
-      "tileTemplateSelect"
-    );
-
-  if(!select){
-    return;
-  }
-
-  select.innerHTML = "";
-
-  const templates =
-
-    definitions
-      .tile_templates
-    || {};
-
-  for(
-    const id
-    in templates
-  ){
-
-    const opt =
-      document.createElement(
-        "option"
-      );
-
-    opt.value = id;
-
-    opt.textContent =
-      templates[id].name
-      || id;
-
-    select.appendChild(opt);
-  }
-
-  if(
-    select.options.length
-  ){
-
-    currentTileTemplate =
-      select.options[0].value;
-  }
-
-  select.onchange = ()=>{
-
-    currentTileTemplate =
-      select.value;
-  };
-} 
-async function saveDefinitions(defs) {
-
-  await fetch(
-    "/api/editor/definitions?sim_id=default",
-    {
-      method: "POST",
-
-      headers: {
-        "Content-Type": "application/json"
-      },
-
-      body: JSON.stringify(defs)
-    }
-  );
-}
-function rebuildFloorplanCaches(){
-
-  // =========================
-  // ROOM DETECTION
-  // =========================
-
-  if(FLOORPLAN_CACHE.roomsDirty){
-
-    detectRooms(floorplan);
-
-    FLOORPLAN_CACHE.roomsDirty = false;
-  }
-
-  // =========================
-  // ROOM GRAPH
-  // =========================
-
-  if(FLOORPLAN_CACHE.graphDirty){
-
-    generateRoomGraph(floorplan);
-
-    FLOORPLAN_CACHE.cachedGraph =
-      floorplan.roomGraph;
-
-    FLOORPLAN_CACHE.graphDirty = false;
-  }
-  buildRoomLookup();
-  // =========================
-  // NAVIGATION
-  // =========================
-
-  if(FLOORPLAN_CACHE.navDirty){
-
-    generateNavigationGrid(
-      floorplan
-    );
-
-    FLOORPLAN_CACHE.cachedNavigation =
-      floorplan.navigation;
-
-    FLOORPLAN_CACHE.navDirty = false;
-  }
-}
-function buildRoomLookup(){
-
-  const lookup = {};
-
-  for(const room of floorplan.rooms){
-
-    for(const tile of room.tiles){
-
-      lookup[
-        `${tile.x},${tile.y}`
-      ] = room.id;
-    }
-  }
-
-  FLOORPLAN_CACHE.cachedRoomLookup =
-    lookup;
-}
-async function saveFloorplan(){
-
-  rebuildFloorplanCaches();
-
-  const defs = definitions;
-
-  defs.floorplan_templates =
-    defs.floorplan_templates || {};
-
-  defs.floorplan_templates[
-    floorplan.id
-  ] = floorplan;
-
-  await saveDefinitions(defs);
-
-  setStatus(
-    `Saved ${floorplan.id}`
-  );
-}
-
-async function loadFloorplan(){
-
-  const id = prompt(
-    "Floorplan ID"
-  );
-
-  if(!id) return;
-
-  const fp =
-    definitions
-    ?.floorplan_templates
-    ?.[id];
-
-  if(!fp){
-
-    alert("Not found");
-
-    return;
-  }
-
-  floorplan = structuredClone(fp);
-
-  rebuildFloorplanCaches();
-
-  updateRoomList();
-
-  render();
-
-  setStatus(
-    `Loaded ${id}`
-  );
-}
-
-// TOOL BUTTONS
-
-document
-  .querySelectorAll(".toolBtn")
-  .forEach(btn => {
-
-    btn.onclick = () => {
-
-      document
-        .querySelectorAll(".toolBtn")
-        .forEach(b =>
-          b.classList.remove("active")
-        );
-
-      btn.classList.add("active");
-
-      currentTool =
-        btn.dataset.tool;
-
-      roomMode = false;
-    };
-  });
-
-// ROOM MODE
-
-document.getElementById(
-  "roomModeBtn"
-).onclick = () => {
-
-  roomMode = !roomMode;
-};
-
-// CREATE ROOM
-
-document.getElementById(
-  "createRoomBtn"
-).onclick = () => {
-
-  if(selectedTiles.size === 0){
-    return;
-  }
-
-  invalidateNavigation();
-
-  const type = prompt(
-
-    "Room Type:\n"
-
-    + ROOM_TYPES.join(", ")
-  );
-
-  if(!type) return;
-
-  const tags = (
-
-    prompt(
-      "Tags (comma separated)"
-    )
-
-    || ""
-  );
-
-  const id =
-
-    `${type}_${
-      floorplan.rooms.length
-    }`;
-
-  const tiles = [];
-
-  for(const key of selectedTiles){
-
-    const [x, y] = key
-      .split(",")
-      .map(Number);
-
-    tiles.push({
-      x,
-      y
-    });
-  }
-
-  floorplan.rooms.push({
-
-    id,
-
-    type,
-
-    tags: tags
-      .split(",")
-      .map(t => t.trim())
-      .filter(Boolean),
-
-    tiles
-  });
-
-  selectedTiles.clear();
-
-  rebuildFloorplanCaches();
-
-  updateRoomList();
-
-  render();
-};
-
-
-// NEW FLOORPLAN
-document.getElementById(
-  "newFloorplanBtn"
-).onclick = () => {
-
-  floorplan = {
-
-    id:
-
-      document.getElementById(
-        "floorplanId"
-      ).value
-
-      || "new_floorplan",
-
-    category: "residential",
-
-    tags: [],
-
-    width: parseInt(
-
-      document.getElementById(
-        "floorplanWidth"
-      ).value
-    ),
-
-    height: parseInt(
-
-      document.getElementById(
-        "floorplanHeight"
-      ).value
-    ),
-
-    tiles: {},
-
-    rooms: [],
-
-    roomGraph: {},
-
-    navigation: {}
-  };
-
-  invalidateNavigation();
-
-  updateRoomList();
-
-  render();
-};
-// SAVE / LOAD
-
-document.getElementById(
-  "saveFloorplanBtn"
-).onclick = saveFloorplan;
-
-document.getElementById(
-  "loadFloorplanBtn"
-).onclick = loadFloorplan;
-
-loadDefinitions().then(() => {
-  render();
-});
+    const [x, y] = key.split(",").map(Number);
+    const tile   = floorplan.tiles[key];
+    const px     = x * TILE_SIZE;
+    const py     = y * TILE_SIZE;
+
+    for (const [side,

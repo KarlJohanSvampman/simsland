@@ -1,86 +1,43 @@
-export function detectRooms(floorplan){
+// =========================================================
+// ROOM DETECTION
+// Flood-fills over tiles that have floors, treating solid
+// walls as barriers between adjacent tiles. Door and window
+// wall types are passable.
+//
+// Wall storage format:
+//   floorplan.tiles["x,y"].walls = {
+//     north: { type: "wall"|"door"|"window", material: ... } | null,
+//     south: ..., east: ..., west: ...
+//   }
+//
+// A wall on the north side of tile (x,y) is the same physical
+// edge as a wall on the south side of tile (x,y-1). We check
+// both sides to support one-sided wall painting.
+// =========================================================
 
-  const width = floorplan.width;
-  const height = floorplan.height;
+const OPPOSITE = { north: "south", south: "north", east: "west", west: "east" };
+const NEIGHBOR_DELTA = {
+  north: [  0, -1 ],
+  south: [  0,  1 ],
+  east:  [  1,  0 ],
+  west:  [ -1,  0 ],
+};
 
-  const walls = new Set();
+/**
+ * Returns true if movement from (x,y) toward `side` is blocked by a solid wall.
+ * Checks both the leaving tile's outgoing edge AND the entering tile's incoming edge.
+ */
+function edgeBlocked(tiles, x, y, side) {
+  const key  = `${x},${y}`;
+  const tile = tiles[key];
 
-  for(const tile of floorplan.tiles){
+  // Outgoing wall on this tile
+  const outWall = tile?.walls?.[side];
+  if (outWall?.type === "wall") return true;
 
-    if(tile.type === 'wall'){
-
-      walls.add(`${tile.x},${tile.y}`);
-    }
-  }
-
-  const visited = new Set();
-
-  const rooms = [];
-
-  function floodFill(startX, startY){
-
-    const queue = [[startX, startY]];
-
-    const roomTiles = [];
-
-    visited.add(`${startX},${startY}`);
-
-    while(queue.length){
-
-      const [x,y] = queue.shift();
-
-      roomTiles.push({x,y});
-
-      const neighbors = [
-        [x+1,y],
-        [x-1,y],
-        [x,y+1],
-        [x,y-1]
-      ];
-
-      for(const [nx,ny] of neighbors){
-
-        if(nx < 0 || ny < 0) continue;
-        if(nx >= width || ny >= height) continue;
-
-        const key = `${nx},${ny}`;
-
-        if(visited.has(key)) continue;
-
-        if(walls.has(key)) continue;
-
-        visited.add(key);
-
-        queue.push([nx,ny]);
-      }
-    }
-
-    return roomTiles;
-  }
-
-  for(let x=0;x<width;x++){
-    for(let y=0;y<height;y++){
-
-      const key = `${x},${y}`;
-
-      if(visited.has(key)) continue;
-
-      if(walls.has(key)) continue;
-
-      const tiles = floodFill(x,y);
-
-      if(tiles.length < 4) continue;
-
-      rooms.push({
-        id: crypto.randomUUID(),
-        type: 'room',
-        tiles,
-        tags: []
-      });
-    }
-  }
-
-  floorplan.rooms = rooms;
-
-  return rooms;
-}
+  // Incoming wall on the adjacent tile (opposite side)
+  const [dx, dy] = NEIGHBOR_DELTA[side];
+  const nKey  = `${x + dx},${y + dy}`;
+  const nTile = tiles[nKey];
+  const inWall = nTile?.walls?.[OPPOSITE[side]];
+  if (inWall?.type === "wall") return true;
