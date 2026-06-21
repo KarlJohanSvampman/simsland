@@ -174,4 +174,74 @@
   "clothing_templates": {
     "basic_tshirt": {
       "name": "Basic T-Shirt",
-      "slo
+      "slot": "upper_layer1",
+      "model": "clothing/tshirt_basic",
+      "shared_skeleton": true,
+      "tags": ["clothing", "upper", "casual"],
+      "color": "#ffffff"
+    },
+    "casual_jacket": {
+      "name": "Casual Jacket",
+      "slot": "upper_layer2",
+      "model": "clothing/jacket_casual",
+      "shared_skeleton": true,
+      "tags": ["clothing", "upper", "casual"],
+      "color": "#3a3a3a"
+    },
+    "jeans_blue": {
+      "name": "Blue Jeans",
+      "slot": "pants",
+      "model": "clothing/jeans_basic",
+      "shared_skeleton": true,
+      "tags": ["clothing", "legs", "casual"],
+      "color": "#2255aa"
+    },
+    "sneakers_white": {
+      "name": "White Sneakers",
+      "slot": "shoes",
+      "model": "clothing/sneakers_basic",
+      "shared_skeleton": false,
+      "offset": { "x": 0, "y": 0, "z": 0 },
+      "scale": 1.0,
+      "tags": ["clothing", "feet", "casual"]
+    },
+    "baseball_cap": {
+      "name": "Baseball Cap",
+      "slot": "hat",
+      "model": "clothing/cap_baseball",
+      "shared_skeleton": false,
+      "offset": { "x": 0, "y": 0.05, "z": 0 },
+      "scale": 1.0,
+      "tags": ["clothing", "head", "casual"]
+    },
+    "work_shirt": {
+      "name": "Work Shirt",
+      "slot": "upper_layer1",
+      "model": "clothing/shirt_work",
+      "shared_skeleton": true,
+      "tags": ["clothing", "upper", "formal"],
+      "color": "#ccddff"
+    },
+    "work_trousers": {
+      "name": "Work Trousers",
+      "slot": "pants",
+      "model": "clothing/trousers_work",
+      "shared_skeleton": true,
+      "tags": ["clothing", "legs", "formal"],
+      "color": "#222244"
+    }
+  },
+  "recipe_templates": {},
+  "product_templates": {},
+  "appliance_templates": {},
+  "vehicle_templates": {},
+  "service_templates": {},
+  "storage_templates": {},
+  "social_templates": {},
+  "need_templates": {},
+  "trait_templates": {},
+  "job_templates": {
+    "Insurance_Salesman": {}
+  },
+  "company_templates": {}
+}

@@ -307,4 +307,188 @@ def _route_trash(c, world, action):
 
 def _route_carry(c, world, action):
     target_id = action.get("target")
-    if not
+    if not target_id:
+        return
+
+    props = world.get("props", {})
+    prop = props.get(target_id) if isinstance(props, dict) else next(
+        (p for p in props if p.get("id") == target_id), None
+    )
+
+    if not prop:
+        return
+
+    # Only carry props flagged carryable (or small by default)
+    if not prop.get("carryable", True):
+        return
+
+    dest = action.get("destination", {})
+
+    act = _scaffold(
+        c, world, "carry",
+        target_id=target_id,
+        interaction="carry",
+        duration=0,    # duration not used; phase logic drives carry
+    )
+    act["phase"] = "walking"           # walk to prop first
+    act["destination"] = dest
+    act["phase_started_tick"] = world.get("tick", 0)
+
+    # Route character to the prop's current position
+    c["move_target"] = {
+        "x": prop.get("x", 0),
+        "y": prop.get("y", 0),
+        "target_id": target_id,
+        "target_type": "prop",
+    }
+    c["is_moving"] = True
+    c["activity"] = act
+    c["animation_state"] = "walk"
+
+
+# =========================================================
+# ROUTE CLEAN
+# Picks the correct animation based on the target prop's tags.
+# =========================================================
+
+def _route_clean(c, world, action, definitions):
+    target_id = action.get("target")
+
+    props = world.get("props", {})
+    prop = props.get(target_id) if isinstance(props, dict) else next(
+        (p for p in props if p.get("id") == target_id), None
+    )
+
+    c["activity"] = _scaffold(
+        c, world, "clean",
+        target_id=target_id,
+        interaction="clean",
+        duration=900,
+    )
+
+    # Use prop-aware animation immediately
+    c["animation_state"] = get_clean_animation(prop, "using") if prop else "clean_generic"
+
+
+# =========================================================
+# ROUTE WEAR / UNDRESS
+# Instantly equips or removes a clothing template on the character.
+# action = { "type": "wear",   "template": "jeans_blue", "slot": "pants" }
+# action = { "type": "undress","slot": "pants" }
+# =========================================================
+
+def _route_wear(c, world, action, definitions):
+    slot     = action.get("slot")
+    template = action.get("template")
+    if not slot:
+        return
+    clothing_templates = definitions.get("clothing_templates", {})
+    if template and template not in clothing_templates:
+        return
+    equipped = c.setdefault("equipped", {})
+    equipped[slot] = template   # None clears the slot
+
+
+def _route_undress(c, world, action):
+    slot = action.get("slot")
+    if slot:
+        c.setdefault("equipped", {})[slot] = None
+    else:
+        # undress all if no slot given
+        for k in c.get("equipped", {}):
+            c["equipped"][k] = None
+
+
+# =========================================================
+# MAIN ROUTER
+# =========================================================
+
+def route_action(c, world, action, speech, definitions=None):
+    """
+    Dispatch the LLM's action and speech into world state.
+
+    action = {
+        "type":   str,
+        "target": str | None,
+        "reason": str | None,
+    }
+    speech = {
+        "utterance": str,
+        ...
+    }
+    definitions = world["definitions"] (optional, for prop lookups)
+    """
+    if definitions is None:
+        definitions = world.get("definitions", {})
+
+    # Always apply speech first so it displays even if action fails
+    if speech:
+        apply_speech(c, world, speech)
+
+    if not action:
+        return
+
+    action_type = action.get("type", "")
+
+    if action_type == "move":
+        _route_move(c, world, action)
+
+    elif action_type == "interact":
+        _route_interact(c, world, action, definitions)
+
+    elif action_type in ("speak", "socialize"):
+        # Speech was already applied above.
+        # Also point character toward target if given.
+        target_id = action.get("target")
+        if target_id:
+            chars = world.get("characters", {})
+            if target_id in chars:
+                t = chars[target_id]
+                c["look_target"] = {
+                    "x": t.get("x", 0),
+                    "y": t.get("y", 0),
+                }
+
+    elif action_type == "eat":
+        _route_eat(c, world, action)
+
+    elif action_type == "sleep":
+        _route_sleep(c, world, action)
+
+    elif action_type == "wait":
+        _route_wait(c, world, action)
+
+    elif action_type == "work":
+        c["activity"] = _scaffold(c, world, "work", interaction="work")
+
+    elif action_type == "examine":
+        _route_examine(c, world, action)
+
+    elif action_type == "search":
+        _route_search(c, world, action)
+
+    elif action_type in ("trash", "destroy"):
+        _route_trash(c, world, action)
+
+    elif action_type == "carry":
+        _route_carry(c, world, action)
+
+    elif action_type == "clean":
+        _route_clean(c, world, action, definitions)
+
+    elif action_type == "wear":
+        _route_wear(c, world, action, definitions)
+
+    elif action_type == "undress":
+        _route_undress(c, world, action)
+
+    # "call" / "text" are future — for now just log
+    elif action_type in ("call", "text"):
+        c.setdefault("pending_comms", []).append(action)
+
+    # Set animation state — specific handlers set their own; only fall back for generic types
+    _NO_GENERIC_ANIM = {"interact", "examine", "search", "trash", "destroy",
+                        "carry", "clean", "wear", "undress"}
+    if action_type not in _NO_GENERIC_ANIM:
+        anim = _ACTION_ANIMATION.get(action_type, "idle")
+        c["animation_state"] = anim

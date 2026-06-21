@@ -147,4 +147,8 @@ def tick(world):
     maybe_arrest_from_incidents(world)
     process_trials(world)
 
-    apply_public_figure_inf
+    apply_public_figure_influence(world)
+    apply_social_influence(world)
+    update_hierarchy(world)
+
+    apply_expenses(world)

@@ -401,4 +401,133 @@ document.getElementById("btn-place_floorplan").onclick = () => {
       placementState.active     = true;
       setActiveTool("place_floorplan");
       closeModal("modal-place_floorplan");
-      setStatus(`
+      setStatus(`Place floorplan: ${id} — click a tile`);
+    }
+  );
+  openModal("modal-place_floorplan");
+};
+
+//
+// Place Prop button
+//
+
+document.getElementById("btn-place_prop").onclick = () => {
+  buildModalList(
+    document.getElementById("list-place_prop"),
+    definitions.prop_templates,
+    (id) => {
+      placementState.templateId = id;
+      placementState.mode       = "prop";
+      placementState.active     = true;
+      setActiveTool("place_prop");
+      closeModal("modal-place_prop");
+      setStatus(`Place prop: ${id} — click a tile`);
+    }
+  );
+  openModal("modal-place_prop");
+};
+
+//
+// Spawn Character button
+//
+
+document.getElementById("btn-spawn_character").onclick = () => {
+  buildModalList(
+    document.getElementById("list-spawn_character"),
+    definitions.character_templates,
+    async (id) => {
+      closeModal("modal-spawn_character");
+
+      if (!lastClickedTile) {
+        setStatus("Click a tile first, then spawn character");
+        return;
+      }
+
+      setStatus(`Spawning ${id} at ${lastClickedTile.x}, ${lastClickedTile.y}…`);
+
+      try {
+        const res = await fetch("/api/editor/spawn_character", {
+          method:  "POST",
+          headers: { "Content-Type": "application/json" },
+          body:    JSON.stringify({
+            sim_id:   "default",
+            template: id,
+            x:        lastClickedTile.x,
+            y:        lastClickedTile.y
+          })
+        });
+
+        if (res.ok) {
+          setStatus(`Spawned ${id} at ${lastClickedTile.x}, ${lastClickedTile.y}`);
+        } else {
+          const err = await res.text();
+          setStatus(`Spawn failed: ${err}`);
+        }
+      } catch (e) {
+        setStatus(`Spawn error: ${e.message}`);
+      }
+    }
+  );
+  openModal("modal-spawn_character");
+};
+
+//
+// ===================================
+// DEFINITIONS
+// ===================================
+//
+
+async function loadDefinitions() {
+  const res = await fetch("/api/editor/definitions?sim_id=default");
+  definitions = await res.json();
+}
+
+//
+// ===================================
+// LOAD WORLD
+// ===================================
+//
+
+async function loadWorld() {
+  const res   = await fetch("/api/editor/world?sim_id=default");
+  const world = await res.json();
+
+  Object.assign(worldState, world);
+
+  for (const tile of worldState.world_tiles || []) {
+    paintTile(tile.x, tile.y, tile.type);
+  }
+}
+
+//
+// ===================================
+// SAVE
+// ===================================
+//
+
+window.saveWorld = async () => {
+  await fetch("/api/editor/world?sim_id=default", {
+    method:  "POST",
+    headers: { "Content-Type": "application/json" },
+    body:    JSON.stringify(worldState)
+  });
+  alert("World saved");
+};
+
+window.reloadWorld = () => location.reload();
+
+//
+// ===================================
+// RENDER LOOP
+// ===================================
+//
+
+function animate() {
+  requestAnimationFrame(animate);
+  controls.update();
+  renderer.render(scene, camera);
+}
+
+await loadDefinitions();
+await loadWorld();
+animate();

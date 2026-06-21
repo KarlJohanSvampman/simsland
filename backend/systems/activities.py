@@ -121,6 +121,40 @@ _CLEAN_TAG_ANIMATIONS = [
     ({"dish", "plate", "bowl", "cup"},          "wash_dishes"),
 ]
 
+# =========================================================
+# PROP ANIMATION STATES
+# Controls what anim_state is set on the prop when a character
+# enters the "using" phase and when the interaction finishes.
+# The frontend plays the GLB clip matching the state name.
+#
+# Convention for prop GLB clip names:
+#   open, close, activated, flushing, on, off, idle
+# =========================================================
+
+_PROP_ANIM_STATES = {
+    # interaction         (on_use,       on_finish)
+    "open":              ("open",         None),        # stays open
+    "open_door":         ("open",         "closed"),    # auto-closes
+    "close_door":        ("closed",       None),
+    "open_cabinet":      ("open",         "closed"),
+    "close_cabinet":     ("closed",       None),
+    "open_fridge":       ("open",         "closed"),
+    "open_drawer":       ("open",         "closed"),
+    "close_drawer":      ("closed",       None),
+    "press_button":      ("activated",    "idle"),
+    "press":             ("activated",    "idle"),
+    "flush":             ("flushing",     "idle"),
+    "turn_on":           ("on",           None),
+    "turn_off":          ("off",          None),
+}
+
+
+def _set_prop_anim(prop, state):
+    """Set prop["anim_state"] if prop exists and state is not None."""
+    if prop is not None and state is not None:
+        prop["anim_state"] = state
+
+
 def get_clean_animation(prop, phase="using"):
     """Return the cleaning animation for a given prop based on its tags."""
     if phase != "using":
@@ -1156,4 +1190,444 @@ def execute_activity(
 
         if phase == "picking_up":
             # Brief pickup animation, then route to destination
-            elapsed = world["tick"] - a
+            elapsed = world["tick"] - act["phase_started_tick"]
+            if elapsed < 3:
+                return True
+            dest = act.get("destination", {})
+            c["move_target"] = {
+                "x": dest.get("x", c.get("x", 0)),
+                "y": dest.get("y", c.get("y", 0)),
+                "target_type": "tile",
+            }
+            c["is_moving"] = True
+            set_activity_phase(act, "delivering", world)
+            c["animation_state"] = "carry_walk"
+            return True
+
+        if phase == "delivering":
+            # Walking to destination while carrying
+            if c.get("is_moving"):
+                c["animation_state"] = "carry_walk"
+                return True
+            set_activity_phase(act, "put_down", world)
+            c["animation_state"] = "put_down"
+            return True
+
+        if phase == "put_down":
+            # Release prop at current position
+            prop = get_prop_by_id(world, act.get("target_id"))
+            if prop:
+                prop["x"] = c.get("x", 0)
+                prop["y"] = c.get("y", 0)
+                prop.pop("carried_by", None)
+                prop["visible"] = True
+            c.pop("carrying", None)
+            finish_activity(c, world)
+            return False
+
+        return True
+
+    # =====================================================
+    # WALKING  — wait until movement system clears is_moving
+    # =====================================================
+
+    if act.get("phase", "using") == "walking":
+
+        if c.get("is_moving"):
+            return True
+
+        # Character arrived — snap logical grid position to anchor
+        prop = get_prop_by_id(world, act.get("target_id"))
+        if prop and act.get("anchor_name"):
+            anchor = get_anchor(prop, act["anchor_name"])
+            if anchor:
+                c["x"] = anchor["x"]
+                c["y"] = anchor["y"]
+
+        # Resolve animation: clean gets prop-aware variant
+        if interaction in ("clean", "clean_floor", "sweep", "scrub",
+                           "wipe", "wash_dishes", "window_clean"):
+            using_anim = get_clean_animation(prop, "using") if prop else "clean_generic"
+        else:
+            using_anim = get_phase_animation(interaction, "using")
+
+        # Trigger prop animation (door opens, button activates, etc.)
+        _set_prop_anim(prop, _PROP_ANIM_STATES.get(interaction, (None, None))[0])
+
+        set_activity_phase(act, "using", world)
+        c["animation_state"] = using_anim
+        return True
+
+    # =====================================================
+    # USING  — tick elapsed time
+    # =====================================================
+
+    if act["phase"] == "using":
+
+        elapsed = world["tick"] - act["phase_started_tick"]
+
+        if elapsed >= act["duration"]:
+
+            # Trash/Destroy: remove prop from world on completion
+            if interaction in ("trash", "destroy"):
+                prop = get_prop_by_id(world, act.get("target_id"))
+                if prop:
+                    props = world.get("props", {})
+                    pid = prop.get("id")
+                    if isinstance(props, dict):
+                        props.pop(pid, None)
+                    else:
+                        world["props"] = [p for p in props if p.get("id") != pid]
+
+            # Reset prop animation (door closes, button returns to idle, etc.)
+            prop = get_prop_by_id(world, act.get("target_id"))
+            _set_prop_anim(prop, _PROP_ANIM_STATES.get(interaction, (None, None))[1])
+
+            complete_activity(c, world, act)
+            set_activity_phase(act, "finishing", world)
+            c["animation_state"] = get_phase_animation(interaction, "finishing")
+
+        return True
+
+    # =====================================================
+    # FINISHING  — one tick to play finishing animation
+    # =====================================================
+
+    if act["phase"] == "finishing":
+
+        finish_activity(c, world)
+        return False
+
+    return True
+#=======================================================
+# COMPLETE ACTIVITY
+# =========================================================
+
+def complete_activity(
+
+    c,
+
+    world,
+
+    act
+):
+
+    activity_type = act["type"]
+
+
+    # =====================================
+    # GENERATE WASTE
+    # =====================================
+    household = world[
+        "households"
+    ].get(
+        c.get("household_id")
+    )
+
+    if household:
+
+        generate_activity_waste(
+
+            household,
+
+            act
+        )
+    # =====================================
+    # SLEEP
+    # =====================================
+
+    if activity_type == "sleep":
+
+        c["needs"][
+            "energy"
+        ] = 1.0
+
+    # =====================================
+    # TOILET
+    # =====================================
+
+    elif activity_type == (
+        "use_toilet"
+    ):
+
+        c["needs"][
+            "bladder"
+        ] = 0
+
+    # =====================================
+    # SHOWER
+    # =====================================
+
+    elif activity_type == (
+        "take_shower"
+    ):
+
+        c["needs"][
+            "hygiene"
+        ] = 1.0
+
+    # =====================================
+    # MEAL
+    # =====================================
+    elif activity_type == "eat_meal":
+
+        household = world[
+            "households"
+        ].get(
+            c.get("household_id")
+        )
+
+    if household:
+
+        meal = find_household_resource(
+
+            household,
+
+            resource_type="MEAL"
+        )
+
+        if meal:
+
+            nutrition = meal.get(
+                "nutrition",
+                0.5
+            )
+
+            c["needs"]["hunger"] = max(
+
+                0,
+
+                c["needs"][
+                    "hunger"
+                ]
+
+                -
+
+                nutrition
+            )
+
+            meal["servings"] -= 1
+
+            if meal["servings"] <= 0:
+
+                remove_household_resource(
+
+                    household,
+
+                    meal,
+
+                    1
+                )
+            elif meal["servings"] > 0:
+
+                from systems.resource_runtime import (
+                    convert_meal_to_leftovers
+                )
+
+                convert_meal_to_leftovers(
+                    meal
+                )
+    # =====================================
+    # MEAL
+    # =====================================
+    elif activity_type == "cook_recipe":
+
+        from systems.cooking_process import (
+            start_cooking_process
+        )
+
+        household = world[
+            "households"
+        ].get(
+            c.get("household_id")
+        )
+
+        if household:
+
+            recipe_id = choose_recipe(
+
+                c,
+
+                household
+            )
+
+            if recipe_id:
+
+                start_cooking_process(
+
+                    c,
+
+                    household,
+
+                    recipe_id,
+
+                    world
+                )         
+    # =====================================
+    # SNACK
+    # =====================================
+
+    elif activity_type == (
+        "eat_snack"
+    ):
+
+        c["needs"][
+            "hunger"
+        ] = max(
+
+            0,
+
+            c["needs"].get(
+                "hunger",
+                1
+            )
+
+            - 0.5
+        )
+    elif activity_type == "check_mail":
+
+        household = world[
+            "households"
+        ].get(
+            c.get("household_id")
+        )
+
+        if household:
+
+            household.setdefault(
+                "mailbox",
+                {}
+            )
+
+            household[
+                "mailbox"
+            ][
+                "has_mail"
+            ] = False
+
+            c.setdefault(
+                "mail_history",
+                []
+            )
+
+            delivered = household.get(
+                "delivered_mail",
+                []
+            )
+
+            c[
+                "mail_history"
+            ].extend(delivered)
+
+            household[
+                "delivered_mail"
+            ] = []
+    elif activity_type == "sort_mail":
+
+        household = world[
+            "households"
+        ].get(
+            c.get("household_id")
+        )
+
+        if household:
+            sort_household_mail(household, world)
+    elif activity_type == "retrieve_package":
+
+        household = world[
+            "households"
+        ].get(
+            c.get("household_id")
+        )
+
+        if household:
+
+            packages = household.get(
+                "pending_packages",
+                []
+            )
+
+            for package in packages:
+
+                acquire_product(
+
+                    household,
+
+                    package
+                )
+
+            household[
+                "pending_packages"
+            ] = []
+    elif activity_type == "take_out_trash":
+
+        household = world[
+            "households"
+        ].get(
+            c.get("household_id")
+        )
+
+        if household:
+
+            household[
+                "trash_level"
+            ] = max(
+
+                0,
+
+                household[
+                    "trash_level"
+                ] - 0.5
+            )
+
+            household.setdefault(
+                "garbage_bin",
+                {}
+            )
+
+            household[
+                "garbage_bin"
+            ][
+                "fullness"
+            ] = min(
+
+                1.0,
+
+                household[
+                    "garbage_bin"
+                ].get(
+                    "fullness",
+                    0
+                ) + 0.5
+            )
+def set_activity_phase(
+
+    act,
+
+    phase,
+
+    world
+):
+
+    act["phase"] = phase
+
+    act[
+        "phase_started_tick"
+    ] = world["tick"]
+
+
+def finish_activity(c, world):
+
+    release_anchor(
+        c,
+        world
+    )
+
+    release_reservation(
+        c,
+        world
+    )
+
+    c["animation_state"] = "idle"
+
+    c["activity"] = None

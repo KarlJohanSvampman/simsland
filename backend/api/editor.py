@@ -136,4 +136,73 @@ async def save_definitions(
         if "id" not in fp:
             fp["id"] = fp_id
 
-        cache_floorplan
+        cache_floorplan(
+            fp_id,
+            fp
+        )
+
+    return {"ok": True}
+
+
+# =====================================
+# SPAWN CHARACTER
+# =====================================
+
+@router.post("/spawn_character")
+async def spawn_character(request: Request):
+
+    body     = await request.json()
+    sim_id   = body.get("sim_id", "default")
+    template_id = body.get("template")
+    x        = body.get("x", 0)
+    y        = body.get("y", 0)
+
+    if not template_id:
+        raise HTTPException(status_code=400, detail="template is required")
+
+    defs = load_definitions(sim_id)
+    tmpl = defs.get("character_templates", {}).get(template_id)
+    if not tmpl:
+        raise HTTPException(status_code=404, detail=f"Character template '{template_id}' not found")
+
+    world = load_world(sim_id)
+
+    cid = f"char_{uuid.uuid4().hex[:8]}"
+    name = tmpl.get("name") or template_id.replace("_", " ").title()
+
+    character = {
+        "id":       cid,
+        "template": template_id,
+        "name":     name,
+        "model":    tmpl.get("model"),
+        "x":        x,
+        "y":        y,
+        "rotation": 0,
+        "facing":   "south",
+        "needs": {
+            "energy":   0.8,
+            "hunger":   0.5,
+            "social":   0.7,
+            "fun":      0.6,
+            "hygiene":  0.9
+        },
+        "traits":               tmpl.get("traits", []),
+        "goal":                 {"type": "rest"},
+        "plan":                 None,
+        "task_queue":           [],
+        "current_task":         None,
+        "activity":             None,
+        "secondary_activity":   None,
+        "reservations":         [],
+        "path":                 [],
+        "destination":          None,
+        "animation_state":      {"base": "idle", "upper": None},
+        "last_utterance":       "",
+        "conversation_target":  None,
+        "look_target":          None
+    }
+
+    world.setdefault("characters", {})[cid] = character
+    save_world(sim_id, world)
+
+    return {"ok": True, "id": cid, "name": name}

@@ -760,4 +760,233 @@ const DEFAULT_TEMPLATES = {
     walls: []
   },
 
-  recipe_templat
+  recipe_templates: {
+    name: "New Recipe",
+    ingredients: [],
+    result_item: "",
+    result_quantity: 1,
+    skill_required: "cooking",
+    skill_level: 0,
+    duration: 300
+  },
+
+  product_templates: {
+    name: "New Product",
+    category: "misc",
+    base_price: 1.0,
+    tags: [],
+    perishable: false
+  },
+
+  appliance_templates: {
+    name: "New Appliance",
+    category: "kitchen",
+    model: "",
+    power_consumption: 0,
+    interactions: [],
+    durability: 100
+  },
+
+  vehicle_templates: {
+    name: "New Vehicle",
+    model: "",
+    max_speed: 60,
+    seats: 4,
+    fuel_type: "petrol",
+    fuel_capacity: 50,
+    tags: []
+  },
+
+  service_templates: {
+    name: "New Service",
+    category: "utility",
+    cost_per_tick: 0,
+    satisfaction_gain: 0,
+    tags: []
+  },
+
+  storage_templates: {
+    name: "New Storage",
+    model: "",
+    capacity: 10,
+    allowed_tags: [],
+    tags: []
+  },
+
+  social_templates: {
+    name: "New Social Event",
+    relationship_change: 0,
+    mood_change: 0,
+    required_relationship: 0,
+    tags: []
+  },
+
+  need_templates: {
+    name: "New Need",
+    max: 100,
+    decay_per_tick: 0.1,
+    critical_threshold: 20,
+    tags: []
+  },
+
+  trait_templates: {
+    name: "New Trait",
+    description: "",
+    need_modifiers: {},
+    skill_modifiers: {},
+    behavior_flags: []
+  },
+
+  job_templates: {
+    name: "New Job",
+    sector: "services",
+    salary: 2000,
+    work_hours: [8, 17],
+    work_days: [1, 2, 3, 4, 5],
+    skill_requirements: {},
+    promotion_path: []
+  },
+
+  company_templates: {
+    name: "New Company",
+    sector: "services",
+    job_slots: [],
+    starting_funds: 10000,
+    tags: []
+  }
+};
+
+function getDefaultTemplate(tab) {
+  return JSON.parse(JSON.stringify(DEFAULT_TEMPLATES[tab] || {}));
+}
+
+// =====================================================
+// TEMPLATE CRUD
+// =====================================================
+
+window.createTemplate = function(){
+
+  const id = prompt("Template ID");
+
+  if(!id) return;
+
+  if(!definitions[currentTab]){
+
+    definitions[currentTab] = {};
+  }
+
+  definitions[currentTab][id] = getDefaultTemplate(currentTab);
+
+  currentTemplateId = id;
+
+  renderTemplateList();
+
+  openTemplate(id);
+};
+
+// =====================================================
+// DUPLICATE
+// =====================================================
+
+window.duplicateTemplate = function(){
+
+  if(!currentTemplateId) return;
+
+  const id = prompt('Duplicate as');
+
+  if(!id) return;
+
+  definitions[currentTab][id] = JSON.parse(
+    JSON.stringify(
+      definitions[currentTab][currentTemplateId]
+    )
+  );
+
+  renderTemplateList();
+}
+
+// =====================================================
+// DELETE
+// =====================================================
+
+window.deleteTemplate = function(){
+
+  if(!currentTemplateId) return;
+
+  delete definitions[currentTab][currentTemplateId];
+
+  currentTemplateId = null;
+
+  jsonEditor.value = '';
+
+  renderTemplateList();
+}
+
+// =====================================================
+// SAVE
+// =====================================================
+
+window.saveDefinitions = async function(){
+
+  try {
+
+    if(currentTemplateId){
+
+      definitions[currentTab][currentTemplateId] =
+        JSON.parse(jsonEditor.value);
+    }
+
+    await fetch(
+      '/api/editor/definitions?sim_id=default',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(definitions)
+      }
+    );
+
+    setStatus('Saved');
+
+  } catch(err){
+
+    console.error(err);
+
+    setStatus('Save failed');
+  }
+}
+
+
+// =====================================================
+// STATUS
+// =====================================================
+
+function setStatus(text) {
+  if (statusBar) statusBar.textContent = text;
+}
+
+// =====================================================
+// ANIMATE  (OrbitControls damping, no auto-rotation)
+// =====================================================
+
+const previewClock = new THREE.Clock();
+
+function animate() {
+  requestAnimationFrame(animate);
+  const delta = previewClock.getDelta();
+  previewControls.update();
+  if (previewMixer) previewMixer.update(delta);
+  previewRenderer.render(previewScene, previewCamera);
+}
+
+animate();
+
+// =====================================================
+// STARTUP
+// =====================================================
+
+(async () => {
+  await loadMeshbank();
+  await loadDefinitions();
+})();

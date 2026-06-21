@@ -295,4 +295,77 @@ html, body {
 
 <!-- =========================
      STATUS BAR
-=========
+========================= -->
+
+<div id="statusBar">World Editor Ready</div>
+
+<!-- =========================
+     MAIN CANVAS
+========================= -->
+
+<canvas id="c"></canvas>
+
+<!-- =========================
+     MODAL: Paint Tile
+========================= -->
+
+<div class="modal-overlay" id="modal-paint_tile">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3>Select Tile Type</h3>
+      <button class="modal-close" onclick="closeModal('modal-paint_tile')">✕</button>
+    </div>
+    <div class="modal-list" id="list-paint_tile"></div>
+  </div>
+</div>
+
+<!-- =========================
+     MODAL: Place Floorplan
+========================= -->
+
+<div class="modal-overlay" id="modal-place_floorplan">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3>Select Floorplan</h3>
+      <button class="modal-close" onclick="closeModal('modal-place_floorplan')">✕</button>
+    </div>
+    <div class="modal-list" id="list-place_floorplan"></div>
+  </div>
+</div>
+
+<!-- =========================
+     MODAL: Place Prop
+========================= -->
+
+<div class="modal-overlay" id="modal-place_prop">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3>Select Prop</h3>
+      <button class="modal-close" onclick="closeModal('modal-place_prop')">✕</button>
+    </div>
+    <div class="modal-list" id="list-place_prop"></div>
+  </div>
+</div>
+
+<!-- =========================
+     MODAL: Spawn Character
+========================= -->
+
+<div class="modal-overlay" id="modal-spawn_character">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3>Spawn Character</h3>
+      <button class="modal-close" onclick="closeModal('modal-spawn_character')">✕</button>
+    </div>
+    <div class="modal-list" id="list-spawn_character"></div>
+  </div>
+</div>
+
+<!-- =========================
+     WORLD EDITOR APP
+========================= -->
+
+<script type="module" src="/src/editor-main.js"></script>
+
+</body>
+</html>

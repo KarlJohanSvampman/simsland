@@ -153,7 +153,8 @@ const sims = {};
 const characterAttachments = {};
 const speechBubbles = {};   // id → { cssObject, div }
 const props = {};
-const propNodes = {};        // prop.id → { anchors: Map<name, Object3D>, targets: Map<name, Object3D> }
+const propNodes = {};        // prop.id → { anchors, targets, ikHands } Maps of named Object3Ds
+const propAnimations = {};   // prop.id → { mixer, actions, currentState }
 const tiles = {};
 
 // Reusable vectors for IK (avoid GC pressure)
@@ -1060,4 +1061,1436 @@ function playReaction(animData, type) {
   // Play reaction LoopOnce
   const action = animData.actions[clipName];
   action.reset();
-  action.loop 
+  action.loop = THREE.LoopOnce;
+  action.clampWhenFinished = false;
+  action.setEffectiveWeight(1);
+  action.fadeIn(FADE_TIME);
+  action.play();
+
+  animData.reactionCurrent = clipName;
+}
+
+/**
+ * Called when a reaction clip finishes. Re-enters the activity
+ * upper layer (respecting variants if applicable).
+ */
+function _resumeUpperAfterReaction(animData) {
+  if (!animData.upperStem) return;
+
+  const pool = ANIM_VARIANTS[animData.upperStem];
+  if (pool && pool.length > 1) {
+    // Re-enter the variant cycle
+    const chosen = _pickVariant(pool, animData.upperVariantLast);
+    animData.upperVariantLast = chosen;
+    _crossFadeLayerOnce(animData, "upperCurrent", chosen + "_upper");
+  } else {
+    // Single-clip upper — resume with LoopRepeat
+    const clip = (pool ? pool[0] : animData.upperStem) + "_upper";
+    _crossFadeLayer(animData, "upperCurrent", clip);
+  }
+}
+
+function _playSingleAction(animData, name) {
+  // Fallback for states not in ANIM_LAYERS: treat as full-body
+  if (animData.current === name) return;
+
+  const prev = animData.current;
+  if (prev && animData.actions[prev]) {
+    animData.actions[prev].fadeOut(FADE_TIME);
+  }
+
+  const action = animData.actions[name];
+  if (action) {
+    action.reset();
+    action.fadeIn(FADE_TIME);
+    action.play();
+    animData.current = name;
+  }
+}
+
+
+function findBone(root, boneName){
+
+    let found = null;
+
+    root.traverse(node=>{
+
+        if(node.isBone &&
+           node.name === boneName){
+
+            found = node;
+        }
+    });
+
+    return found;
+}
+
+async function attachItemToBone(
+
+    characterModel,
+
+    boneName,
+
+    itemTemplate
+){
+
+    const bone =
+        findBone(
+            characterModel,
+            boneName
+        );
+
+    if(!bone){
+        return null;
+    }
+
+    const loaded =
+        await loadModelCached(
+            itemTemplate.model
+        );
+
+    const item =
+        loaded.scene;
+
+    bone.add(item);
+
+    item.position.set(
+        0,
+        0,
+        0
+    );
+
+    item.rotation.set(
+        0,
+        0,
+        0
+    );
+
+    item.scale.set(
+        1,
+        1,
+        1
+    );
+
+    return item;
+}
+
+// =========================================================
+// CLOTHING BONE SLOT MAP
+// Maps clothing slot name → one or more bone names to attach to.
+// Slots with two entries (shoes, gloves) clone one mesh per bone.
+// Slots marked shared_skeleton in the template use SkinnedMesh
+// overlay sharing the character's skeleton instead.
+// =========================================================
+
+const CLOTHING_BONE_SLOTS = {
+    hat:           ["mixamorigHead"],
+    upper_layer1:  ["mixamorigSpine2"],
+    upper_layer2:  ["mixamorigSpine2"],
+    pants:         ["mixamorigHips"],
+    shoes:         ["mixamorigRightFoot", "mixamorigLeftFoot"],
+    gloves:        ["mixamorigRightHand", "mixamorigLeftHand"],
+    belt:          ["mixamorigHips"],
+    mask:          ["mixamorigHead"],
+    backpack:      ["mixamorigSpine2"],
+};
+
+// =========================================================
+// ATTACH CLOTHING ITEM
+// Attaches a clothing mesh to the character model.
+// If template.shared_skeleton === true: adds SkinnedMesh as
+//   sibling of the character root, sharing its skeleton.
+// Otherwise: rigid bone-child attachment (good for hats/shoes).
+// Returns array of attached THREE objects for later removal.
+// =========================================================
+
+async function attachClothing(characterModel, slot, clothingTemplate, characterRoot) {
+    if (!clothingTemplate || !clothingTemplate.model) return [];
+
+    const boneNames = CLOTHING_BONE_SLOTS[slot] || [];
+    const attached  = [];
+
+    const loaded = await loadModelCached(clothingTemplate.model);
+
+    // -- Shared skeleton mode (shirts, pants, jackets) --
+    if (clothingTemplate.shared_skeleton) {
+        const clothingScene = loaded.scene.clone(true);
+
+        // Collect the character's skeleton
+        let skeleton = null;
+        characterModel.traverse(n => {
+            if (n.isSkinnedMesh && n.skeleton) skeleton = n.skeleton;
+        });
+
+        if (skeleton) {
+            clothingScene.traverse(n => {
+                if (n.isSkinnedMesh) {
+                    n.skeleton = skeleton;
+                    n.bindMatrix.copy(characterModel.matrixWorld);
+                    n.bindMatrixInverse.copy(characterModel.matrixWorld).invert();
+                }
+            });
+        }
+
+        characterRoot.add(clothingScene);
+        attached.push(clothingScene);
+        return attached;
+    }
+
+    // -- Rigid bone-child mode (hats, shoes, accessories) --
+    for (const boneName of boneNames) {
+        const bone = findBone(characterModel, boneName);
+        if (!bone) { console.warn("Clothing: bone not found:", boneName); continue; }
+
+        // Clone scene so left/right get independent transforms
+        const piece = loaded.scene.clone(true);
+
+        const offset = clothingTemplate.offset || {};
+        piece.position.set(offset.x || 0, offset.y || 0, offset.z || 0);
+
+        const rot = clothingTemplate.rotation || {};
+        piece.rotation.set(
+            (rot.x || 0) * Math.PI / 180,
+            (rot.y || 0) * Math.PI / 180,
+            (rot.z || 0) * Math.PI / 180,
+        );
+
+        const sc = clothingTemplate.scale || 1;
+        piece.scale.setScalar(typeof sc === "number" ? sc : 1);
+
+        // Mirror left-side pieces (shoes left, glove left)
+        if (boneName.includes("Left")) {
+            piece.scale.x *= -1;
+        }
+
+        bone.add(piece);
+        attached.push(piece);
+    }
+
+    return attached;
+}
+
+// =========================================================
+// EQUIP ALL CLOTHING FOR A CHARACTER
+// Called on character load and again whenever equipped changes.
+// Stores attached meshes in characterAttachments[id].clothing
+// so they can be removed/replaced without reloading the character.
+// =========================================================
+
+async function equipAllClothing(id, characterModel, characterRoot, equipped, definitions) {
+    const clothingTemplates = definitions?.clothing_templates || {};
+
+    // Remove any previously attached clothing
+    const prev = (characterAttachments[id] || {}).clothing || {};
+    for (const meshes of Object.values(prev)) {
+        for (const m of meshes) m.parent?.remove(m);
+    }
+
+    if (!characterAttachments[id]) characterAttachments[id] = {};
+    characterAttachments[id].clothing = {};
+
+    for (const [slot, templateId] of Object.entries(equipped || {})) {
+        if (!templateId) continue;
+        const tpl = clothingTemplates[templateId];
+        if (!tpl) { console.warn("Clothing template not found:", templateId); continue; }
+
+        const meshes = await attachClothing(characterModel, slot, tpl, characterRoot);
+        characterAttachments[id].clothing[slot] = meshes;
+    }
+}
+
+function createFloorMaterial(tileFloor){
+
+  const texture =
+    getMaterialTexture(
+      tileFloor.material
+    );
+
+  if(texture){
+
+    return new THREE.MeshStandardMaterial({
+      map: texture
+    });
+  }
+
+  let color = 0x777777;
+
+  if(tileFloor.type === "grass"){
+    color = 0x447744;
+  }
+
+  if(tileFloor.type === "staircase"){
+    color = 0xaa8833;
+  }
+
+  return new THREE.MeshStandardMaterial({
+    color
+  });
+}
+
+function createFloorMesh(x, y, tileFloor){
+
+  const geo =
+    new THREE.PlaneGeometry(1,1);
+
+  const mat =
+    createFloorMaterial(tileFloor);
+
+  const mesh =
+    new THREE.Mesh(geo, mat);
+  mesh.userData.ignoreRaycast = true;
+  mesh.rotation.x =
+    -Math.PI / 2;
+
+  mesh.position.set(
+    x,
+    0,
+    y
+  );
+
+  mesh.receiveShadow = true;
+
+  return mesh;
+}
+
+function updateFloorplanFloors(state){
+
+  const active = new Set();
+  const activeBuildings = new Set();
+  const floorplans =
+    state.floorplans || [];
+
+for(const fp of floorplans){
+  activeBuildings.add(fp.id);
+  const building =
+    resolveFloorplan(
+      definitions,
+      fp.building
+    );
+    
+
+  const buildingGroup = getBuildingGroup(fp.id);
+
+  if(!building) continue;
+
+  for(const key in building.tiles){
+
+      const tile = building.tiles[key];
+
+      if(!tile.floor) continue;
+
+      const [x,y] = key
+        .split(",")
+        .map(Number);
+
+      const worldKey =
+        `${fp.id}_${x}_${y}`;
+
+      active.add(worldKey);
+
+      if(!floorRegistry[worldKey]){
+
+        const mesh =
+          createFloorMesh(
+            x,
+            y,
+            tile.floor
+          );
+
+        buildingGroup.add(mesh);
+
+        floorRegistry[worldKey] = mesh;
+      }
+    }
+  }
+
+  // cleanup
+  for(const key in floorRegistry){
+
+    if(active.has(key)) continue;
+
+    scene.remove(
+      floorRegistry[key]
+    );
+
+    delete floorRegistry[key];
+  }
+
+  cleanupBuildings(activeBuildings);
+}
+
+
+function createTile(tile){
+
+  const mesh = new THREE.Mesh(
+
+    new THREE.PlaneGeometry(1,1),
+
+    new THREE.MeshStandardMaterial({
+
+      color:
+        tile.walkable
+        ? 0x557799
+        : 0xaa3333,
+
+      side: THREE.DoubleSide
+    })
+  );
+
+  mesh.rotation.x = -Math.PI / 2;
+
+  mesh.position.set(
+    tile.x - 10,
+    0.01,
+    tile.y - 7
+  );
+  mesh.userData = {
+
+  type: "tile",
+
+  x: tile.x,
+  y: tile.y
+};
+
+selectable.push(mesh);
+scene.add(mesh);
+
+
+
+  return mesh;
+}
+
+function updateTiles(state){
+
+  const active = new Set();
+
+  const arr =
+
+    Array.isArray(state.tiles)
+
+    ? state.tiles
+
+    : Object.values(
+        state.tiles || {}
+      );
+
+  // =========================
+  // ACTIVE TILES
+  // =========================
+
+  for(const tile of arr){
+
+    const key =
+      `${tile.x},${tile.y}`;
+
+    active.add(key);
+
+    // already exists
+    if(tiles[key]){
+      continue;
+    }
+
+    tiles[key] =
+      createTile(tile);
+  }
+
+  // =========================
+  // CLEANUP REMOVED
+  // =========================
+
+  for(const key in tiles){
+
+    if(active.has(key)){
+      continue;
+    }
+
+    const mesh = tiles[key];
+
+    scene.remove(mesh);
+
+    removeSelectable(mesh);
+
+    delete tiles[key];
+  }
+}
+
+function createFallbackProp(prop){
+
+  const mesh = new THREE.Mesh(
+
+    new THREE.BoxGeometry(1,1,1),
+
+    new THREE.MeshStandardMaterial({
+      color: 0xff00ff
+    })
+  );
+
+  mesh.position.set(
+    prop.x - 10,
+    0.5,
+    prop.y - 7
+  );
+  mesh.userData = {
+
+    type: "prop",
+
+    id: prop.id,
+
+    template: prop.template
+  };
+
+  selectable.push(mesh);
+  scene.add(mesh);
+
+  return mesh;
+}
+
+async function updateProps(state){
+
+  const active = new Set();
+
+  for(const prop of state.props || []){
+
+    active.add(prop.id);
+
+    // =========================
+    // ALREADY EXISTS
+    // =========================
+
+    if(props[prop.id]){
+
+      props[prop.id].position.set(
+        prop.x - 10,
+        0.5,
+        prop.y - 7
+      );
+
+      // ── Prop animation state sync ──
+      // If the server changed anim_state, cross-fade to the new clip.
+      const pa = propAnimations[prop.id];
+      if (pa && prop.anim_state && prop.anim_state !== pa.currentState) {
+        const clipName = prop.anim_state.toLowerCase();
+        const action   = pa.actions[clipName];
+        if (action) {
+          // Stop all currently playing actions with a short fade
+          for (const a of Object.values(pa.actions)) {
+            if (a.isRunning()) a.fadeOut(0.15);
+          }
+          action.reset().fadeIn(0.15).play();
+        }
+        pa.currentState = prop.anim_state;
+      }
+
+      continue;
+    }
+
+    // =========================
+    // CURRENTLY LOADING
+    // =========================
+
+    if(loadingProps[prop.id]){
+      continue;
+    }
+
+    loadingProps[prop.id] = true;
+
+    // =========================
+    // TEMPLATE
+    // =========================
+
+    const resolved =
+      resolveProp(
+        definitions,
+        prop
+      );
+
+    // =========================
+    // FALLBACK
+    // =========================
+
+    const propModelPath = resolveModel(resolved?.model);
+
+    if(!propModelPath){
+
+      props[prop.id] =
+        createFallbackProp(prop);
+
+      delete loadingProps[prop.id];
+
+      continue;
+    }
+
+try {
+
+  // loadModelCached returns { scene, animations } — use .scene
+  const loaded =
+    await loadModelCached(
+      propModelPath
+    );
+
+  const model = loaded.scene;
+
+  model.position.set(
+    prop.x - 10,
+    0,
+    prop.y - 7
+  );
+
+  model.userData = {
+
+    type: "prop",
+
+    id: prop.id,
+
+    template: prop.template
+  };
+
+  model.traverse((o)=>{
+
+    if(o.isMesh){
+
+      o.castShadow = true;
+      o.receiveShadow = true;
+    }
+  });
+
+  selectable.push(model);
+
+  scene.add(model);
+
+  props[prop.id] = model;
+
+  // Scan anchor_* / target_* / ik_* nodes
+  const pn = { anchors: new Map(), targets: new Map(), ikHands: new Map() };
+  model.traverse(scanPropNode.bind(null, pn));
+  propNodes[prop.id] = pn;
+
+  // Build animation system for props that have clips (doors, drawers, etc.)
+  if (loaded.animations && loaded.animations.length > 0) {
+    const mixer   = new THREE.AnimationMixer(model);
+    const actions = {};
+    for (const clip of loaded.animations) {
+      const name = clip.name.toLowerCase();
+      const action = mixer.clipAction(clip);
+      action.loop = THREE.LoopOnce;
+      action.clampWhenFinished = true;  // hold last frame (e.g., door stays open)
+      actions[name] = action;
+    }
+    propAnimations[prop.id] = { mixer, actions, currentState: null };
+  }
+}
+
+catch(err){
+
+  console.error(
+    "Failed to load prop:",
+    resolved.model,
+    err
+  );
+
+  props[prop.id] =
+    createFallbackProp(prop);
+}
+
+delete loadingProps[prop.id];
+  }
+
+  // =========================
+  // CLEANUP REMOVED PROPS
+  // =========================
+
+  for(const id in props){
+
+    if(active.has(id)) continue;
+
+    const mesh = props[id];
+
+    scene.remove(mesh);
+
+    removeSelectable(mesh);
+
+    delete props[id];
+    delete propNodes[id];
+    delete propAnimations[id];
+  }
+}
+
+function cleanupBuildings(activeIds){
+
+  for(const id in buildingRegistry){
+
+    if(activeIds.has(id)){
+      continue;
+    }
+
+    const group =
+      buildingRegistry[id];
+
+    scene.remove(group);
+
+    removeSelectable(group);
+
+    delete buildingRegistry[id];
+  }
+}
+
+// =========================================================
+// SPEECH BUBBLES
+// =========================================================
+
+function getOrCreateBubble(id){
+
+  if(speechBubbles[id]){
+    return speechBubbles[id];
+  }
+
+  const div = document.createElement("div");
+  div.className = "speech-bubble";
+  div.style.cssText = `
+    background: rgba(255,255,255,0.92);
+    color: #111;
+    padding: 4px 8px;
+    border-radius: 10px;
+    font-size: 12px;
+    font-family: sans-serif;
+    max-width: 160px;
+    text-align: center;
+    white-space: normal;
+    pointer-events: none;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+    display: none;
+  `;
+
+  const cssObject = new CSS2DObject(div);
+  cssObject.position.set(0, 2.6, 0);   // above head
+  speechBubbles[id] = { cssObject, div };
+  return speechBubbles[id];
+}
+
+function updateSpeechBubbles(state){
+
+  const active = new Set(
+    Object.keys(state.characters || {})
+  );
+
+  for(const [id, c]
+    of Object.entries(state.characters || {})
+  ){
+    const model = sims[id];
+    if(!model) continue;
+
+    const { cssObject, div } =
+      getOrCreateBubble(id);
+
+    // attach if not already attached
+    if(!model.getObjectById(cssObject.id)){
+      model.add(cssObject);
+    }
+
+    const speech = c.current_speech;
+
+    if(speech && speech.utterance){
+      div.textContent = speech.utterance;
+      div.style.display = "block";
+    } else {
+      div.style.display = "none";
+    }
+  }
+
+  // remove bubbles for characters that left
+  for(const id in speechBubbles){
+
+    if(active.has(id)) continue;
+
+    const { cssObject } = speechBubbles[id];
+    const model = sims[id];
+
+    if(model) model.remove(cssObject);
+
+    delete speechBubbles[id];
+  }
+}
+
+function createFallbackCharacter(c){
+
+  const mesh = new THREE.Mesh(
+
+    new THREE.CapsuleGeometry(
+      0.35,
+      1
+    ),
+
+    new THREE.MeshStandardMaterial({
+      color: 0x00ffff
+    })
+  );
+
+  mesh.position.set(
+    c.x - 10,
+    1,
+    c.y - 7
+  );
+  mesh.userData = {
+
+    type: "character",
+
+    id: c.id,
+
+    name: c.name
+  };
+
+  selectable.push(mesh);
+  scene.add(mesh);
+
+  return mesh;
+}
+
+async function updateCharacters(state){
+
+  const active = new Set();
+
+  for(const [id, c]
+    of Object.entries(
+      state.characters || {}
+    )
+  ){
+
+    active.add(id);
+
+    // =========================
+    // ALREADY EXISTS
+    // =========================
+
+    if(sims[id]){
+
+      // Store latest server state so IK can read it every frame
+      if (characterAnimations[id]) {
+        const prev = characterAnimations[id].state;
+        characterAnimations[id].state = c;
+
+        // Re-equip clothing if equipped dict changed
+        const prevEquipped = JSON.stringify(prev?.equipped || {});
+        const nextEquipped = JSON.stringify(c.equipped   || {});
+        if (prevEquipped !== nextEquipped) {
+          equipAllClothing(id, sims[id], sims[id], c.equipped || {}, definitions);
+        }
+      }
+
+      // Only update position from server when NOT anchored to a prop
+      // (the IK system handles position when activity.target_id is set)
+      if (!c.activity?.target_id) {
+        sims[id].position.set(
+          c.x - 10,
+          0,
+          c.y - 7
+        );
+      }
+
+            // =========================
+      // ANIMATION STATE
+      // =========================
+
+      const animState =
+        c.animation_state || "idle";
+
+      const animData =
+        characterAnimations[id];
+
+      if(animData){
+        // ── Reaction interrupt ──
+        // Check for a new reaction pushed by the server this tick.
+        // We compare against lastReactionTick so we only fire it once.
+        const reaction = c.animation_reaction;
+        if (reaction && reaction.tick != null) {
+          if (animData.lastReactionTick == null ||
+              reaction.tick > animData.lastReactionTick) {
+            animData.lastReactionTick = reaction.tick;
+            playReaction(animData, reaction.type);
+          }
+        }
+
+        // ── Activity / locomotion layer ──
+        playLayeredAnim(animData, animState);
+      }
+
+      continue;
+    }
+
+    // =========================
+    // CURRENTLY LOADING
+    // =========================
+
+    if(loadingCharacters[id]){
+      continue;
+    }
+
+    loadingCharacters[id] = true;
+
+    // =========================
+    // TEMPLATE
+    // =========================
+
+    const character =
+      resolveCharacter(
+        definitions,
+        c
+      );
+    // =========================
+    // FALLBACK
+    // =========================
+
+    const charModelPath = resolveModel(character?.model);
+
+    if(!charModelPath){
+
+      sims[id] =
+        createFallbackCharacter(c);
+
+      delete loadingCharacters[id];
+
+      continue;
+    }
+
+try {
+
+const loaded =
+  await loadModelCached(
+    charModelPath
+  );
+
+  const model =
+  loaded.scene;
+
+  model.animations =
+  loaded.animations;
+
+    // =========================
+    // ANIMATION SETUP
+    // =========================
+
+    let mixer = null;
+
+    const actions = {};
+
+    if(model.animations?.length){
+
+      mixer = new THREE.AnimationMixer(model);
+
+      // Build lower + upper filtered variants of every clip,
+      // plus keep the full clip under its original name.
+      for(const clip of model.animations){
+        const name = clip.name.toLowerCase();
+
+        // Full-body action (fallback)
+        actions[name] = mixer.clipAction(clip);
+
+        // Lower-body filtered clip
+        const lowerClip = makeLayerClip(clip, "lower");
+        if(lowerClip.tracks.length){
+          actions[name + "_lower"] = mixer.clipAction(lowerClip);
+        }
+
+        // Upper-body filtered clip
+        const upperClip = makeLayerClip(clip, "upper");
+        if(upperClip.tracks.length){
+          actions[name + "_upper"] = mixer.clipAction(upperClip);
+        }
+      }
+    }
+
+
+
+  model.position.set(
+    c.x - 10,
+    0,
+    c.y - 7
+  );
+
+  model.userData = {
+
+    type: "character",
+
+    id: c.id,
+
+    name: c.name
+  };
+
+  model.traverse((o)=>{
+
+    if(o.isMesh){
+
+      o.castShadow = true;
+      o.receiveShadow = true;
+    }
+  });
+
+  selectable.push(model);
+
+  scene.add(model);
+
+  sims[id] = model;
+ // =========================
+// BONE SCANNING
+// =========================
+
+  const bones = {};
+  model.traverse(node => {
+    if (node.isBone || node.isObject3D) {
+      bones[node.name.toLowerCase()] = node;
+    }
+  });
+
+ // =========================
+// EQUIPMENT
+// =========================
+
+characterAttachments[id] = {};
+
+await equipAllClothing(
+    id,
+    model,
+    model,
+    c.equipped || {},
+    definitions
+);
+
+  const animData = {
+    mixer,
+    actions,
+    // Two-layer tracking — current clip names (with _lower / _upper suffix)
+    lowerCurrent:     null,
+    upperCurrent:     null,
+    // Stem tracking — the ANIM_LAYERS stem name (without suffix)
+    lowerStem:        null,
+    upperStem:        null,
+    // Variant re-roll — last chosen stem per layer (to avoid repeating)
+    lowerVariantLast: null,
+    upperVariantLast: null,
+    // Reaction layer — upper-body interrupt clip
+    reactionCurrent:  null,
+    lastReactionTick: null,
+    // Legacy single-layer fallback
+    current:          null,
+    bones,
+    state: c,
+  };
+
+  setupVariantReroll(animData);
+
+  characterAnimations[id] = animData;
+}
+
+catch(err){
+
+  console.error(
+    "Failed to load character:",
+    character.model,
+    err
+  );
+
+  sims[id] =
+    createFallbackCharacter(c);
+}
+
+delete loadingCharacters[id];
+  }
+
+  // =========================
+  // CLEANUP REMOVED CHARACTERS
+  // =========================
+
+  for(const id in sims){
+
+    if(active.has(id)) continue;
+
+    const mesh = sims[id];
+
+    scene.remove(mesh);
+
+    removeSelectable(mesh);
+    delete characterAnimations[id];
+    delete sims[id];
+  }
+}
+// =========================================================
+// NODE SCANNING HELPERS
+// =========================================================
+
+function scanPropNode(pn, node) {
+  const ln = node.name.toLowerCase();
+  if (ln.startsWith("anchor_"))  pn.anchors.set(ln, node);
+  if (ln.startsWith("target_"))  pn.targets.set(ln, node);
+  // Hand IK reach points: ik_hand_r, ik_hand_l, ik_finger_r, ik_finger_l
+  if (ln.startsWith("ik_"))      pn.ikHands.set(ln, node);
+}
+
+// =========================================================
+// TWO-BONE IK SOLVER
+// =========================================================
+// Rotates `upper` (shoulder/upperArm) and `lower` (forearm) bones
+// so that `tip` (hand/wrist) reaches `targetWS` (world Vector3).
+// `poleWS` hints which direction the elbow bends.
+// `weight` [0..1] blends between the animation pose and the IK result.
+//
+// Prop GLB convention for hand targets:
+//   ik_hand_r  — right hand reach point
+//   ik_hand_l  — left hand reach point
+//   ik_finger_r / ik_finger_l — fingertip for buttons (finger IK only)
+//
+// Mixamo arm chain bone names (lowercase):
+//   upper: mixamorigrightarm / mixamorigleftarm
+//   lower: mixamorigrightforearm / mixamorigleftforearm
+//   tip:   mixamiorigrighthand / mixamoriglefthand
+// =========================================================
+
+// Right-arm default pole direction (elbow bends outward + slightly down)
+const _POLE_RIGHT = new THREE.Vector3( 1, -0.5, 0).normalize();
+const _POLE_LEFT  = new THREE.Vector3(-1, -0.5, 0).normalize();
+
+// Pre-allocated scratch vectors / quaternions (no GC in hot path)
+const _ikRoot = new THREE.Vector3();
+const _ikMid  = new THREE.Vector3();
+const _ikTip  = new THREE.Vector3();
+const _ikTgt  = new THREE.Vector3();
+const _ikDir  = new THREE.Vector3();
+const _ikElbow = new THREE.Vector3();
+const _ikQa   = new THREE.Quaternion();
+const _ikQb   = new THREE.Quaternion();
+const _ikQpar = new THREE.Quaternion();
+
+function solveTwoBoneIK(upper, lower, tip, targetWS, poleWS, weight) {
+  if (weight < 0.001) return;
+
+  upper.getWorldPosition(_ikRoot);
+  lower.getWorldPosition(_ikMid);
+  tip.getWorldPosition(_ikTip);
+
+  const lenU = _ikRoot.distanceTo(_ikMid);
+  const lenL = _ikMid.distanceTo(_ikTip);
+  const maxR = (lenU + lenL) * 0.9999;
+
+  // Direction root → target, clamped to chain length
+  _ikDir.subVectors(targetWS, _ikRoot);
+  const dist = Math.min(_ikDir.length(), maxR);
+  if (dist < 0.0001) return;
+  _ikDir.normalize();
+  _ikTgt.copy(_ikRoot).addScaledVector(_ikDir, dist);
+
+  // Law of cosines → shoulder bend angle
+  const u = lenU, l = lenL, d = dist;
+  const cosA = THREE.MathUtils.clamp((u*u + d*d - l*l) / (2*u*d), -1, 1);
+  const angA  = Math.acos(cosA);
+
+  // Build orthonormal frame in the IK plane
+  const xAxis = _ikDir;                                               // root → target
+  const pole  = poleWS || new THREE.Vector3(0, -1, 0);
+  const zAxis = new THREE.Vector3().crossVectors(xAxis, pole).normalize();
+  if (zAxis.lengthSq() < 0.0001) zAxis.set(0, 0, 1);
+  const yAxis = new THREE.Vector3().crossVectors(zAxis, xAxis);       // elbow-bend axis
+
+  // Desired upper-arm direction: rotate xAxis by -angA around zAxis
+  const ca = Math.cos(-angA), sa = Math.sin(-angA);
+  const desiredUpper = new THREE.Vector3(
+    xAxis.x * ca + yAxis.x * sa,
+    xAxis.y * ca + yAxis.y * sa,
+    xAxis.z * ca + yAxis.z * sa,
+  ).normalize();
+
+  // ── Rotate upper bone ──
+  const currUpper = new THREE.Vector3().subVectors(_ikMid, _ikRoot).normalize();
+  if (currUpper.dot(desiredUpper) < 0.9999) {
+    _ikQa.setFromUnitVectors(currUpper, desiredUpper);
+    _applyWorldDeltaQ(upper, _ikQa, weight);
+    upper.updateWorldMatrix(false, true);
+  }
+
+  // Re-read positions after upper moved
+  lower.getWorldPosition(_ikMid);
+  tip.getWorldPosition(_ikTip);
+
+  // ── Rotate lower bone ──
+  const currLower = new THREE.Vector3().subVectors(_ikTip, _ikMid).normalize();
+  const wantLower = new THREE.Vector3().subVectors(_ikTgt, _ikMid).normalize();
+  if (currLower.dot(wantLower) < 0.9999) {
+    _ikQa.setFromUnitVectors(currLower, wantLower);
+    _applyWorldDeltaQ(lower, _ikQa, weight);
+    lower.updateWorldMatrix(false, true);
+  }
+}
+
+/**
+ * Apply a world-space rotation delta on top of a bone's current local rotation.
+ * Converts worldDeltaQ into the bone's local space via the parent world quaternion,
+ * then slerp-blends by `weight` before applying (so weight=1 is full IK).
+ */
+function _applyWorldDeltaQ(bone, worldDeltaQ, weight) {
+  if (bone.parent) {
+    bone.parent.getWorldQuaternion(_ikQpar);
+  } else {
+    _ikQpar.identity();
+  }
+  // localDelta = inv(parentWorldQ) * worldDeltaQ * parentWorldQ
+  _ikQb.copy(_ikQpar).invert()
+       .premultiply(worldDeltaQ)  // = worldDeltaQ * _ikQpar^-1  ... hmm
+  // Correct formula: localDelta = inv(parent) * worldDelta * parent
+  _ikQb.copy(_ikQpar).invert();
+  _ikQb.multiply(worldDeltaQ).multiply(_ikQpar);
+
+  // Blend identity → localDelta by weight
+  _ikQa.identity().slerp(_ikQb, weight);
+  bone.quaternion.premultiply(_ikQa);
+  bone.updateMatrix();
+}
+
+
+// =========================================================
+// IK + PROCEDURAL INTERACTIONS  (called every frame)
+// =========================================================
+
+function updateIK(id) {
+  const data = characterAnimations[id];
+  const model = sims[id];
+  if (!data || !model || !data.state) return;
+
+  const c = data.state;
+
+  // ---- Anchor snap & target facing ------------------------------------
+  // When a character is doing an activity at a prop, move them to the
+  // matching anchor_<interaction> node and face the nearest target_* node.
+  const actTargetId = c.activity?.target_id;
+  if (actTargetId) {
+    const pn = propNodes[actTargetId];
+    if (pn) {
+      const interaction = c.activity?.interaction;
+
+      // Find anchor: try exact match first, then any anchor in the prop
+      const anchorKey = `anchor_${interaction}`;
+      const anchorNode = pn.anchors.get(anchorKey) || pn.anchors.values().next().value;
+
+      if (anchorNode) {
+        anchorNode.getWorldPosition(_ikA);
+        // Lerp character toward anchor position smoothly
+        model.position.lerp(_ikA, 0.12);
+      }
+
+      // Face the most relevant target node
+      // Convention: target_<interaction> takes priority, else first target found
+      const targetKey = `target_${interaction}`;
+      const targetNode = pn.targets.get(targetKey) || pn.targets.values().next().value;
+
+      if (targetNode) {
+        targetNode.getWorldPosition(_ikB);
+        const dx = _ikB.x - model.position.x;
+        const dz = _ikB.z - model.position.z;
+        if (Math.abs(dx) > 0.01 || Math.abs(dz) > 0.01) {
+          const targetYaw = Math.atan2(dx, dz);
+          model.rotation.y = THREE.MathUtils.lerp(
+            model.rotation.y, targetYaw, 0.10
+          );
+        }
+      }
+    }
+  }
+
+  // ---- Head look IK ---------------------------------------------------
+  // Rotate the head/neck bone to glance toward look_target (2D grid coord).
+  // We apply a clamped Y-rotation in the bone's local space so it blends
+  // naturally with whatever animation is playing.
+  const headBone = data.bones?.head || data.bones?.neck;
+  const lookTarget = c.look_target;
+
+  if (headBone) {
+    let desiredYaw = 0; // neutral
+
+    if (lookTarget) {
+      // look_target is a 2D grid position {x, y}
+      const tx = (lookTarget.x ?? 0) - 10;
+      const tz = (lookTarget.y ?? 0) - 7;
+      const yawToTarget = Math.atan2(tx - model.position.x, tz - model.position.z);
+      // Relative to character body yaw, clamped to ±75°
+      desiredYaw = THREE.MathUtils.clamp(
+        yawToTarget - model.rotation.y,
+        -Math.PI * 0.42,
+        Math.PI * 0.42
+      );
+    }
+
+    headBone.rotation.y = THREE.MathUtils.lerp(
+      headBone.rotation.y,
+      desiredYaw,
+      lookTarget ? 0.08 : 0.04   // snap faster when looking, drift back slower
+    );
+  }
+
+  // ---- Hand IK ----------------------------------------------------------
+  // When a character is in the "using" phase and the prop has ik_hand_r /
+  // ik_hand_l nodes, pull the arm chain toward that point procedurally.
+  // The IK weight blends in when the using phase begins and out when it ends.
+  // -----------------------------------------------------------------------
+  const phase = c.activity?.phase;
+  const inUse = (phase === "using");
+
+  // Smooth weight in/out (lerp toward 1 when active, 0 otherwise)
+  data.handIkWeight = THREE.MathUtils.lerp(
+    data.handIkWeight ?? 0,
+    inUse ? 1 : 0,
+    0.08                           // ~12 frames to fully blend
+  );
+  const ikW = data.handIkWeight;
+
+  if (ikW > 0.01 && actTargetId) {
+    const pn = propNodes[actTargetId];
+    if (pn) {
+      const bones = data.bones;
+
+      // ── Right hand ──
+      const ikHandR = pn.ikHands.get("ik_hand_r") || pn.ikHands.get("ik_finger_r");
+      if (ikHandR) {
+        const shoulder = bones["mixamorigrightarm"];
+        const forearm  = bones["mixamorigrightforearm"];
+        const hand     = bones["mixamiorigrighthand"] || bones["mixamorigrighthand"];
+        if (shoulder && forearm && hand) {
+          const targetWS = new THREE.Vector3();
+          ikHandR.getWorldPosition(targetWS);
+          solveTwoBoneIK(shoulder, forearm, hand, targetWS, _POLE_RIGHT, ikW);
+        }
+      }
+
+      // ── Left hand ──
+      const ikHandL = pn.ikHands.get("ik_hand_l") || pn.ikHands.get("ik_finger_l");
+      if (ikHandL) {
+        const shoulder = bones["mixamorigleftarm"];
+        const forearm  = bones["mixamorigleftforearm"];
+        const hand     = bones["mixamoriglefthand"];
+        if (shoulder && forearm && hand) {
+          const targetWS = new THREE.Vector3();
+          ikHandL.getWorldPosition(targetWS);
+          solveTwoBoneIK(shoulder, forearm, hand, targetWS, _POLE_LEFT, ikW);
+        }
+      }
+    }
+  }
+}
+
+renderer.domElement.addEventListener(
+
+  "pointerdown",
+
+  (event)=>{
+
+    mouse.x =
+      (event.clientX /
+      window.innerWidth) * 2 - 1;
+
+    mouse.y =
+      -(event.clientY /
+      window.innerHeight) * 2 + 1;
+
+    raycaster.setFromCamera(
+      mouse,
+      camera
+    );
+
+    const hits =
+      raycaster
+        .intersectObjects(
+          selectable,
+          true
+        )
+        .filter(
+          h =>
+            !h.object.userData
+            ?.ignoreRaycast
+        );
+
+    if(!hits.length){
+
+      document
+        .getElementById(
+          "viewerSelection"
+        ).innerHTML =
+          "Nothing selected";
+
+      return;
+    }
+
+    let obj = hits[0].object;
+
+    while(
+      obj &&
+      !obj.userData?.type
+    ){
+      obj = obj.parent;
+    }
+
+    if(!obj) return;
+
+    const d = obj.userData;
+
+    document
+      .getElementById(
+        "viewerSelection"
+      ).innerHTML = `
+
+        <b>${d.type}</b><br>
+
+        ${d.id || ""}<br>
+
+        ${d.name || ""}
+      `;
+  }
+);
+// Load meshbank once at startup so model references resolve
+loadMeshbank();
+
+const ws = new WebSocket(
+  `ws://${location.hostname}:8000/ws`
+);
+
+ws.onmessage = async (e)=>{
+
+  const state =
+    JSON.parse(e.data);
+
+  definitions =
+    state.definitions || {};
+
+  updateTiles(state);
+  await updateProps(state);
+  updateFloorplanFloors(state);
+  updateFloorplanWalls(state);
+  await updateCharacters(state);
+  updateSpeechBubbles(state);
+};
+
+function animate(){
+
+  requestAnimationFrame(animate);
+  controls.update();
+    const delta = 0.016;
+
+  for(const id in characterAnimations){
+
+    const data =
+      characterAnimations[id];
+
+    if(data.mixer){
+      data.mixer.update(delta);
+    }
+
+    // IK runs after the mixer has set bone transforms for this frame
+    updateIK(id);
+  }
+
+  // Tick prop animation mixers
+  for (const id in propAnimations) {
+    propAnimations[id].mixer.update(delta);
+  }
+  renderer.render(
+    scene,
+    camera
+  );
+  cssRenderer.render(scene, camera);
+}
+
+animate();

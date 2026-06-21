@@ -231,4 +231,34 @@ def update_conversation_activity(
                 +
 
                 random.randint(
-     
+                    50,
+                    300
+                ),
+
+            "observations":
+
+                result.get(
+                    "observations",
+                    []
+                )
+        })
+
+    # =====================================================
+    # NEXT TURN DELAY
+    # =====================================================
+
+    activity[
+        "next_turn_tick"
+    ] = (
+
+        world["tick"]
+
+        +
+
+        random.randint(
+            20,
+            80
+        )
+    )
+
+    return True

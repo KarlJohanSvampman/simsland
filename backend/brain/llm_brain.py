@@ -149,4 +149,50 @@ def fallback_response():
             "target":
                 None,
 
- 
+            "reason":
+                "No valid action."
+        },
+
+        "speech": None,
+
+        "reflection":
+            "",
+
+        "confidence":
+            0.1
+    }
+
+
+# =========================================================
+# MAIN THINK FUNCTION
+# =========================================================
+
+def think(
+
+    context
+):
+
+    prompt = build_prompt(
+        context
+    )
+
+    raw = call_llm_safe(
+
+        SYSTEM_PROMPT,
+
+        prompt
+    )
+
+    try:
+
+        data = json.loads(raw)
+
+    except Exception:
+
+        return fallback_response()
+
+    if not validate_response(data):
+
+        return fallback_response()
+
+    return data
