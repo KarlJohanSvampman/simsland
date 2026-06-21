@@ -17,6 +17,10 @@ from systems.dialogue_generation import (
     generate_dialogue_turn
 )
 
+from systems.reactions import (
+    push_conversation_reaction
+)
+
 
 # =========================================================
 # UPDATE CONVERSATION ACTIVITY
@@ -149,6 +153,18 @@ def update_conversation_activity(
     )
 
     # =====================================================
+    # LISTENER REACTION
+    # Push a physical reaction animation on the listener
+    # based on what speech act they just heard.
+    # =====================================================
+
+    push_conversation_reaction(
+        listener,
+        speech_act,
+        world["tick"]
+    )
+
+    # =====================================================
     # RELATIONSHIP EFFECTS
     # =====================================================
 
@@ -215,24 +231,4 @@ def update_conversation_activity(
                 +
 
                 random.randint(
-                    50,
-                    300
-                ),
-
-            "observations":
-
-                result.get(
-                    "observations",
-                    []
-                )
-        })
-
-    # =====================================================
-    # NEXT TURN DELAY
-    # =====================================================
-
-    activity[
-        "next_turn_tick"
-    ] = (
-
-        w
+     

@@ -955,14 +955,26 @@ function _crossFadeLayerOnce(animData, trackingKey, wantName) {
 }
 
 /**
- * Attach a 'finished' listener to the mixer that automatically re-rolls
- * variant clips when a LoopOnce clip ends. Call once per character.
+ * Attach a 'finished' listener to the mixer. Handles both reaction clip
+ * completion (restores the activity upper layer) and variant re-rolls.
+ * Call once per character at creation time.
  */
 function setupVariantReroll(animData) {
   animData.mixer.addEventListener('finished', (e) => {
     const action = e.action;
 
-    // Re-roll upper if it just finished and we're still in a variant state
+    // ── Reaction finished → restore activity upper layer ──
+    if (animData.reactionCurrent &&
+        action === animData.actions[animData.reactionCurrent]) {
+      animData.reactionCurrent = null;
+      _resumeUpperAfterReaction(animData);
+      return;
+    }
+
+    // ── Suppress variant re-rolls while a reaction is playing ──
+    if (animData.reactionCurrent) return;
+
+    // ── Re-roll upper variant ──
     if (animData.upperStem && ANIM_VARIANTS[animData.upperStem]) {
       const pool = ANIM_VARIANTS[animData.upperStem];
       if (pool.length > 1 && action === animData.actions[animData.upperCurrent]) {
@@ -972,7 +984,7 @@ function setupVariantReroll(animData) {
       }
     }
 
-    // Re-roll lower if needed (rare, but supported)
+    // ── Re-roll lower variant (rare, supported) ──
     if (animData.lowerStem && ANIM_VARIANTS[animData.lowerStem]) {
       const pool = ANIM_VARIANTS[animData.lowerStem];
       if (pool.length > 1 && action === animData.actions[animData.lowerCurrent]) {
@@ -984,116 +996,68 @@ function setupVariantReroll(animData) {
   });
 }
 
-function _playSingleAction(animData, name) {
-  // Fallback for states not in ANIM_LAYERS: treat as full-body
-  if (animData.current === name) return;
-
-  const prev = animData.current;
-  if (prev && animData.actions[prev]) {
-    animData.actions[prev].fadeOut(FADE_TIME);
-  }
-
-  const action = animData.actions[name];
-  if (action) {
-    action.reset();
-    action.fadeIn(FADE_TIME);
-    action.play();
-    animData.current = name;
-  }
-}
-
-
-function findBone(root, boneName){
-
-    let found = null;
-
-    root.traverse(node=>{
-
-        if(node.isBone &&
-           node.name === boneName){
-
-            found = node;
-        }
-    });
-
-    return found;
-}
-
-async function attachItemToBone(
-
-    characterModel,
-
-    boneName,
-
-    itemTemplate
-){
-
-    const bone =
-        findBone(
-            characterModel,
-            boneName
-        );
-
-    if(!bone){
-        return null;
-    }
-
-    const loaded =
-        await loadModelCached(
-            itemTemplate.model
-        );
-
-    const item =
-        loaded.scene;
-
-    bone.add(item);
-
-    item.position.set(
-        0,
-        0,
-        0
-    );
-
-    item.rotation.set(
-        0,
-        0,
-        0
-    );
-
-    item.scale.set(
-        1,
-        1,
-        1
-    );
-
-    return item;
-}
 
 // =========================================================
-// CLOTHING BONE SLOT MAP
-// Maps clothing slot name → one or more bone names to attach to.
-// Slots with two entries (shoes, gloves) clone one mesh per bone.
-// Slots marked shared_skeleton in the template use SkinnedMesh
-// overlay sharing the character's skeleton instead.
+// REACTION ANIMATIONS
 // =========================================================
 
-const CLOTHING_BONE_SLOTS = {
-    hat:           ["mixamorigHead"],
-    upper_layer1:  ["mixamorigSpine2"],
-    upper_layer2:  ["mixamorigSpine2"],
-    pants:         ["mixamorigHips"],
-    shoes:         ["mixamorigRightFoot", "mixamorigLeftFoot"],
-    gloves:        ["mixamorigRightHand", "mixamorigLeftHand"],
-    belt:          ["mixamorigHips"],
-    mask:          ["mixamorigHead"],
-    backpack:      ["mixamorigSpine2"],
+// Maps reaction type → pool of upper-body clip stems.
+// These are played as LoopOnce interrupts over the current
+// upper layer, then the activity animation resumes.
+// Stems must match GLB action names (with _upper suffix appended).
+const REACTION_ANIMATIONS = {
+  // Surprise family
+  surprise:     ["react_surprise", "react_gasp"],
+  startled:     ["react_startled"],
+  shocked:      ["react_shocked", "react_gasp"],
+
+  // Negative
+  disgust:      ["react_disgust", "react_recoil"],
+  fear:         ["react_fear", "react_cower"],
+  angry_react:  ["react_angry", "react_fist"],
+
+  // Positive
+  laugh:        ["react_laugh", "react_chuckle", "react_laugh_big"],
+  happy_react:  ["react_happy", "react_clap"],
+
+  // Social / conversational
+  nod:          ["react_nod", "react_nod_slow"],
+  shake_head:   ["react_shake_head"],
+  confused:     ["react_confused", "react_scratch_head"],
+  interested:   ["react_interested", "react_lean"],
+  shrug:        ["react_shrug"],
+
+  // Environmental
+  look_around:  ["react_look_around"],
 };
 
-// =========================================================
-// ATTACH CLOTHING ITEM
-// Attaches a clothing mesh to the character model.
-// If template.shared_skeleton === true: adds SkinnedMesh as
-//   sibling of the character root, sharing its skeleton.
-// Otherwise: rigid bone-child attachment (good for hats/shoes).
-// Returns array of attached THREE objects for later removal.
-// =========================================================
+/**
+ * Play a reaction animation as a LoopOnce upper-body interrupt.
+ * Fades out the current upper activity layer, plays the reaction,
+ * then the finished listener restores the activity layer.
+ */
+function playReaction(animData, type) {
+  const pool = REACTION_ANIMATIONS[type];
+  if (!pool || !pool.length) return;
+
+  // Pick a random variant, find one that exists in the GLB
+  const shuffled = [...pool].sort(() => Math.random() - 0.5);
+  let clipName = null;
+  for (const stem of shuffled) {
+    if (animData.actions[stem + "_upper"]) {
+      clipName = stem + "_upper";
+      break;
+    }
+  }
+  if (!clipName) return; // none of the clips available yet
+
+  // Fade out the current upper activity
+  const prevAction = animData.upperCurrent
+    ? animData.actions[animData.upperCurrent]
+    : null;
+  if (prevAction) prevAction.fadeOut(FADE_TIME);
+
+  // Play reaction LoopOnce
+  const action = animData.actions[clipName];
+  action.reset();
+  action.loop 

@@ -435,6 +435,11 @@ def ensure_character_defaults(c):
         []
     )
 
+    # Reaction system
+    c.setdefault("reaction_queue",     [])
+    c.setdefault("reaction_cooldowns", {})
+    c.setdefault("animation_reaction", None)
+
     c.setdefault(
         "intentions",
         []
@@ -645,15 +650,4 @@ def ensure_household_defaults(h):
     )
 
     h.setdefault(
-        "owned_objects",
-        []
-    )
-
-    h.setdefault(
-        "cleanliness",
-        1.0
-    )
-
-    h.setdefault(
-        "trash_level",
-     
+ 
