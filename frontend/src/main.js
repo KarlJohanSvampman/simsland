@@ -789,6 +789,96 @@ const ANIM_LAYERS = {
 
 const FADE_TIME = 0.2;  // seconds
 
+// =========================================================
+// ANIMATION VARIANTS
+// Maps a clip stem to a pool of alternatives. When ANIM_LAYERS
+// resolves an upper (or lower) to a stem listed here, a random
+// variant from the pool is chosen on each state entry. The
+// finished event re-rolls to the next variant so the character
+// continuously cycles through the pool without ever repeating
+// the same clip twice in a row.
+//
+// These are STEM names — the layer suffix (_upper / _lower) is
+// appended automatically. Every stem in the pool must have a
+// corresponding named clip exported from Blender. If a variant
+// clip isn't found in the GLB the system gracefully falls back
+// to the next available one.
+// =========================================================
+
+const ANIM_VARIANTS = {
+  // Conversation — cycle gesture animations while talking
+  talk:          ["talk", "talk_gesture_a", "talk_gesture_b", "talk_nod", "talk_think"],
+
+  // Phone call — alternate gestures
+  phone:         ["phone", "phone_gesture"],
+
+  // Standing idle — subtle fidgets
+  idle:          ["idle", "idle_look", "idle_shift"],
+
+  // Seated idle — seated fidgets
+  sit_idle:      ["sit_idle", "sit_fidget", "sit_look"],
+
+  // Working at a desk
+  work:          ["work", "work_type", "work_read"],
+
+  // Examining objects
+  examine:       ["examine", "examine_crouch"],
+};
+
+
+// =========================================================
+// VARIANT HELPERS
+// =========================================================
+
+/** Pick a random variant from the pool, avoiding the last played. */
+function _pickVariant(pool, last) {
+  if (pool.length === 1) return pool[0];
+  const filtered = last ? pool.filter(v => v !== last) : pool;
+  return filtered[Math.floor(Math.random() * filtered.length)];
+}
+
+/**
+ * Cross-fade to a new clip on the given layer (upper or lower).
+ * Handles both variant (LoopOnce + re-roll) and looping (LoopRepeat) modes.
+ *
+ * @param {object}  animData  - character's animation tracking object
+ * @param {string}  layer     - "upper" or "lower"
+ * @param {string}  newStem   - target stem from ANIM_LAYERS (e.g. "talk")
+ */
+function _setLayer(animData, layer, newStem) {
+  const stemKey     = layer + "Stem";        // e.g. "upperStem"
+  const currentKey  = layer + "Current";     // e.g. "upperCurrent"
+  const lastKey     = layer + "VariantLast"; // e.g. "upperVariantLast"
+  const suffix      = "_" + layer;           // "_upper" or "_lower"
+
+  const pool = ANIM_VARIANTS[newStem];
+
+  if (pool && pool.length > 1) {
+    // ── Variant pool mode ──
+    // If we're already in this pool, do nothing — let the current clip play
+    // to completion; the finished listener will re-roll automatically.
+    if (animData[stemKey] === newStem) return;
+
+    // Entering a new variant state — pick first clip
+    const chosen = _pickVariant(pool, null);
+    animData[stemKey]    = newStem;
+    animData[lastKey]    = chosen;
+    _crossFadeLayerOnce(animData, currentKey, chosen + suffix);
+
+  } else {
+    // ── Single clip / loop mode ──
+    const clip = (pool ? pool[0] : newStem) + suffix;
+    if (animData[stemKey] === newStem && animData[currentKey] === clip) return;
+    animData[stemKey] = newStem;
+    _crossFadeLayer(animData, currentKey, clip);
+  }
+}
+
+
+// =========================================================
+// PLAY LAYERED ANIMATION
+// =========================================================
+
 function playLayeredAnim(animData, animState) {
   const key = (animState || "idle").toLowerCase();
   const layers = ANIM_LAYERS[key];
@@ -799,40 +889,99 @@ function playLayeredAnim(animData, animState) {
     return;
   }
 
-  const wantLower = layers.lower + "_lower";
-  const wantUpper = layers.upper + "_upper";
-
-  // ── Lower layer ──
-  if (animData.lowerCurrent !== wantLower) {
-    _crossFadeLayer(animData, "lowerCurrent", wantLower);
-  }
-
-  // ── Upper layer ──
-  if (animData.upperCurrent !== wantUpper) {
-    _crossFadeLayer(animData, "upperCurrent", wantUpper);
-  }
+  _setLayer(animData, "lower", layers.lower);
+  _setLayer(animData, "upper", layers.upper);
 }
 
+
+// =========================================================
+// CROSS-FADE HELPERS
+// =========================================================
+
+/** Standard looping cross-fade. */
 function _crossFadeLayer(animData, trackingKey, wantName) {
-  const prev = animData[trackingKey];
+  const prev       = animData[trackingKey];
   const prevAction = prev ? animData.actions[prev] : null;
   const nextAction = animData.actions[wantName];
 
-  if (!nextAction) {
-    // Clip not available — leave current layer running
-    return;
-  }
+  if (!nextAction) return;  // clip unavailable — leave current running
 
   if (prevAction && prevAction !== nextAction) {
     prevAction.fadeOut(FADE_TIME);
   }
 
   nextAction.reset();
+  nextAction.loop = THREE.LoopRepeat;
   nextAction.setEffectiveWeight(1);
   nextAction.fadeIn(FADE_TIME);
   nextAction.play();
 
   animData[trackingKey] = wantName;
+}
+
+/** LoopOnce cross-fade used for variant clips. Emits 'finished' so the
+ *  re-roll listener can pick the next variant in the pool. */
+function _crossFadeLayerOnce(animData, trackingKey, wantName) {
+  // If the clip doesn't exist, try to fall back to any available variant
+  let resolvedName = wantName;
+  if (!animData.actions[wantName]) {
+    // Attempt other clips in the pool before giving up
+    const suffix = wantName.endsWith("_upper") ? "_upper" : "_lower";
+    const layer  = suffix === "_upper" ? "upper" : "lower";
+    const pool   = ANIM_VARIANTS[animData[layer + "Stem"]] || [];
+    for (const stem of pool) {
+      const alt = stem + suffix;
+      if (animData.actions[alt]) { resolvedName = alt; break; }
+    }
+    if (!animData.actions[resolvedName]) return; // nothing available
+  }
+
+  const prev       = animData[trackingKey];
+  const prevAction = prev ? animData.actions[prev] : null;
+  const nextAction = animData.actions[resolvedName];
+
+  if (prevAction && prevAction !== nextAction) {
+    prevAction.fadeOut(FADE_TIME);
+  }
+
+  nextAction.reset();
+  nextAction.loop = THREE.LoopOnce;
+  nextAction.clampWhenFinished = false;
+  nextAction.setEffectiveWeight(1);
+  nextAction.fadeIn(FADE_TIME);
+  nextAction.play();
+
+  animData[trackingKey] = resolvedName;
+}
+
+/**
+ * Attach a 'finished' listener to the mixer that automatically re-rolls
+ * variant clips when a LoopOnce clip ends. Call once per character.
+ */
+function setupVariantReroll(animData) {
+  animData.mixer.addEventListener('finished', (e) => {
+    const action = e.action;
+
+    // Re-roll upper if it just finished and we're still in a variant state
+    if (animData.upperStem && ANIM_VARIANTS[animData.upperStem]) {
+      const pool = ANIM_VARIANTS[animData.upperStem];
+      if (pool.length > 1 && action === animData.actions[animData.upperCurrent]) {
+        const chosen = _pickVariant(pool, animData.upperVariantLast);
+        animData.upperVariantLast = chosen;
+        _crossFadeLayerOnce(animData, "upperCurrent", chosen + "_upper");
+      }
+    }
+
+    // Re-roll lower if needed (rare, but supported)
+    if (animData.lowerStem && ANIM_VARIANTS[animData.lowerStem]) {
+      const pool = ANIM_VARIANTS[animData.lowerStem];
+      if (pool.length > 1 && action === animData.actions[animData.lowerCurrent]) {
+        const chosen = _pickVariant(pool, animData.lowerVariantLast);
+        animData.lowerVariantLast = chosen;
+        _crossFadeLayerOnce(animData, "lowerCurrent", chosen + "_lower");
+      }
+    }
+  });
 }
 
 function _playSingleAction(animData, name) {
@@ -947,259 +1096,4 @@ const CLOTHING_BONE_SLOTS = {
 //   sibling of the character root, sharing its skeleton.
 // Otherwise: rigid bone-child attachment (good for hats/shoes).
 // Returns array of attached THREE objects for later removal.
-// =========================================================
-
-async function attachClothing(characterModel, slot, clothingTemplate, characterRoot) {
-    if (!clothingTemplate || !clothingTemplate.model) return [];
-
-    const boneNames = CLOTHING_BONE_SLOTS[slot] || [];
-    const attached  = [];
-
-    const loaded = await loadModelCached(clothingTemplate.model);
-
-    // -- Shared skeleton mode (shirts, pants, jackets) --
-    if (clothingTemplate.shared_skeleton) {
-        const clothingScene = loaded.scene.clone(true);
-
-        // Collect the character's skeleton
-        let skeleton = null;
-        characterModel.traverse(n => {
-            if (n.isSkinnedMesh && n.skeleton) skeleton = n.skeleton;
-        });
-
-        if (skeleton) {
-            clothingScene.traverse(n => {
-                if (n.isSkinnedMesh) {
-                    n.skeleton = skeleton;
-                    n.bindMatrix.copy(characterModel.matrixWorld);
-                    n.bindMatrixInverse.copy(characterModel.matrixWorld).invert();
-                }
-            });
-        }
-
-        characterRoot.add(clothingScene);
-        attached.push(clothingScene);
-        return attached;
-    }
-
-    // -- Rigid bone-child mode (hats, shoes, accessories) --
-    for (const boneName of boneNames) {
-        const bone = findBone(characterModel, boneName);
-        if (!bone) { console.warn("Clothing: bone not found:", boneName); continue; }
-
-        // Clone scene so left/right get independent transforms
-        const piece = loaded.scene.clone(true);
-
-        const offset = clothingTemplate.offset || {};
-        piece.position.set(offset.x || 0, offset.y || 0, offset.z || 0);
-
-        const rot = clothingTemplate.rotation || {};
-        piece.rotation.set(
-            (rot.x || 0) * Math.PI / 180,
-            (rot.y || 0) * Math.PI / 180,
-            (rot.z || 0) * Math.PI / 180,
-        );
-
-        const sc = clothingTemplate.scale || 1;
-        piece.scale.setScalar(typeof sc === "number" ? sc : 1);
-
-        // Mirror left-side pieces (shoes left, glove left)
-        if (boneName.includes("Left")) {
-            piece.scale.x *= -1;
-        }
-
-        bone.add(piece);
-        attached.push(piece);
-    }
-
-    return attached;
-}
-
-// =========================================================
-// EQUIP ALL CLOTHING FOR A CHARACTER
-// Called on character load and again whenever equipped changes.
-// Stores attached meshes in characterAttachments[id].clothing
-// so they can be removed/replaced without reloading the character.
-// =========================================================
-
-async function equipAllClothing(id, characterModel, characterRoot, equipped, definitions) {
-    const clothingTemplates = definitions?.clothing_templates || {};
-
-    // Remove any previously attached clothing
-    const prev = (characterAttachments[id] || {}).clothing || {};
-    for (const meshes of Object.values(prev)) {
-        for (const m of meshes) m.parent?.remove(m);
-    }
-
-    if (!characterAttachments[id]) characterAttachments[id] = {};
-    characterAttachments[id].clothing = {};
-
-    for (const [slot, templateId] of Object.entries(equipped || {})) {
-        if (!templateId) continue;
-        const tpl = clothingTemplates[templateId];
-        if (!tpl) { console.warn("Clothing template not found:", templateId); continue; }
-
-        const meshes = await attachClothing(characterModel, slot, tpl, characterRoot);
-        characterAttachments[id].clothing[slot] = meshes;
-    }
-}
-
-function createFloorMaterial(tileFloor){
-
-  const texture =
-    getMaterialTexture(
-      tileFloor.material
-    );
-
-  if(texture){
-
-    return new THREE.MeshStandardMaterial({
-      map: texture
-    });
-  }
-
-  let color = 0x777777;
-
-  if(tileFloor.type === "grass"){
-    color = 0x447744;
-  }
-
-  if(tileFloor.type === "staircase"){
-    color = 0xaa8833;
-  }
-
-  return new THREE.MeshStandardMaterial({
-    color
-  });
-}
-
-function createFloorMesh(x, y, tileFloor){
-
-  const geo =
-    new THREE.PlaneGeometry(1,1);
-
-  const mat =
-    createFloorMaterial(tileFloor);
-
-  const mesh =
-    new THREE.Mesh(geo, mat);
-  mesh.userData.ignoreRaycast = true;
-  mesh.rotation.x =
-    -Math.PI / 2;
-
-  mesh.position.set(
-    x,
-    0,
-    y
-  );
-
-  mesh.receiveShadow = true;
-
-  return mesh;
-}
-
-function updateFloorplanFloors(state){
-
-  const active = new Set();
-  const activeBuildings = new Set();
-  const floorplans =
-    state.floorplans || [];
-
-for(const fp of floorplans){
-  activeBuildings.add(fp.id);
-  const building =
-    resolveFloorplan(
-      definitions,
-      fp.building
-    );
-    
-
-  const buildingGroup = getBuildingGroup(fp.id);
-
-  if(!building) continue;
-
-  for(const key in building.tiles){
-
-      const tile = building.tiles[key];
-
-      if(!tile.floor) continue;
-
-      const [x,y] = key
-        .split(",")
-        .map(Number);
-
-      const worldKey =
-        `${fp.id}_${x}_${y}`;
-
-      active.add(worldKey);
-
-      if(!floorRegistry[worldKey]){
-
-        const mesh =
-          createFloorMesh(
-            x,
-            y,
-            tile.floor
-          );
-
-        buildingGroup.add(mesh);
-
-        floorRegistry[worldKey] = mesh;
-      }
-    }
-  }
-
-  // cleanup
-  for(const key in floorRegistry){
-
-    if(active.has(key)) continue;
-
-    scene.remove(
-      floorRegistry[key]
-    );
-
-    delete floorRegistry[key];
-  }
-
-  cleanupBuildings(activeBuildings);
-}
-
-
-function createTile(tile){
-
-  const mesh = new THREE.Mesh(
-
-    new THREE.PlaneGeometry(1,1),
-
-    new THREE.MeshStandardMaterial({
-
-      color:
-        tile.walkable
-        ? 0x557799
-        : 0xaa3333,
-
-      side: THREE.DoubleSide
-    })
-  );
-
-  mesh.rotation.x = -Math.PI / 2;
-
-  mesh.position.set(
-    tile.x - 10,
-    0.01,
-    tile.y - 7
-  );
-  mesh.userData = {
-
-  type: "tile",
-
-  x: tile.x,
-  y: tile.y
-};
-
-selectable.push(mesh);
-scene.add(mesh);
-
-
-
-  return mesh;
+// =========================================================

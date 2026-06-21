@@ -70,19 +70,22 @@ INTERACTION_ANIMATIONS = {
     "mirror":       {"walking": "walk", "using": "interact",   "finishing": "idle"},
 
     # --- social ---
-    "socialize":    {"walking": "walk", "using": "talk",       "finishing": "idle"},
-    "talk":         {"walking": "walk", "using": "talk",       "finishing": "idle"},
-    "phone":        {"walking": "walk", "using": "phone",      "finishing": "idle"},
+    # Using lists here: the backend picks one at random when the phase starts.
+    # The frontend also has its own ANIM_VARIANTS pool that cycles through
+    # variants for the full duration of the activity.
+    "socialize":    {"walking": "walk", "using": ["talk", "talk_gesture_a", "talk_gesture_b", "talk_nod"], "finishing": "idle"},
+    "talk":         {"walking": "walk", "using": ["talk", "talk_gesture_a", "talk_gesture_b", "talk_nod"], "finishing": "idle"},
+    "phone":        {"walking": "walk", "using": ["phone", "phone_gesture"], "finishing": "idle"},
 
     # --- work ---
-    "work":         {"walking": "walk", "using": "work",       "finishing": "idle"},
+    "work":         {"walking": "walk", "using": ["work", "work_type", "work_read"], "finishing": "idle"},
 
     # --- reading / hobbies ---
     "read":         {"walking": "walk", "using": "read",       "finishing": "idle"},
 
     # --- inspection / investigation ---
-    "examine":      {"walking": "walk", "using": "examine",    "finishing": "idle"},
-    "inspect":      {"walking": "walk", "using": "examine",    "finishing": "idle"},
+    "examine":      {"walking": "walk", "using": ["examine", "examine_crouch"], "finishing": "idle"},
+    "inspect":      {"walking": "walk", "using": ["examine", "examine_crouch"], "finishing": "idle"},
     "search":       {"walking": "walk", "using": "search",     "finishing": "idle"},
 
     # --- object manipulation ---
@@ -131,10 +134,18 @@ def get_clean_animation(prop, phase="using"):
 
 def get_phase_animation(interaction, phase):
     """Return the animation name for a given interaction + phase.
-    Falls back to sensible defaults when no mapping exists."""
+
+    Values in INTERACTION_ANIMATIONS may be a string (single clip) or a list
+    of strings (variants). When a list is given, one is chosen at random so
+    that the same interaction doesn't always play the same clip.
+    Falls back to sensible defaults when no mapping exists.
+    """
     entry = INTERACTION_ANIMATIONS.get(interaction)
     if entry:
-        return entry.get(phase, "idle")
+        val = entry.get(phase, "idle")
+        if isinstance(val, list):
+            return random.choice(val)
+        return val
     defaults = {"walking": "walk", "using": "interact", "finishing": "idle"}
     return defaults.get(phase, "idle")
 
@@ -1145,22 +1156,4 @@ def execute_activity(
 
         if phase == "picking_up":
             # Brief pickup animation, then route to destination
-            elapsed = world["tick"] - act["phase_started_tick"]
-            if elapsed < 3:
-                return True
-            dest = act.get("destination", {})
-            c["move_target"] = {
-                "x": dest.get("x", c.get("x", 0)),
-                "y": dest.get("y", c.get("y", 0)),
-                "target_type": "tile",
-            }
-            c["is_moving"] = True
-            set_activity_phase(act, "delivering", world)
-            c["animation_state"] = "carry_walk"
-            return True
-
-        if phase == "delivering":
-            # Walking to destination while carrying
-            if c.get("is_moving"):
-                c["animation_state"] = "carry_walk"
-                retur
+            elapsed = world["tick"] - a
