@@ -19,6 +19,7 @@ from systems.hobby_requirements  import HOBBY_REQUIREMENTS
 from systems.item_knowledge      import get_known_location, record_item_location, FORGET_THRESHOLD
 from systems.household_storage   import find_household_resource, resources_in_container
 from systems.activity_queue      import queue_task, ensure_queue
+from systems.seating_planner     import SEATING_PREFERRED, plan_seating
 
 
 # =========================================================
@@ -221,9 +222,22 @@ def plan_hobby(c, world, hobby_name):
         return False
 
     # ── 5. Build dependency graph ─────────────────────────
+
+    # Seating block — prepended if the activity prefers a seat.
+    # seat_ids must complete before setup/retrieve so the character
+    # is seated before they start using items at the prop.
+    seat_ids = []
+    activity_type = reqs.get("activity", hobby_name)
+    if can_proceed and activity_type in SEATING_PREFERRED and main_prop:
+        seat_ids, seat_prop_id = plan_seating(c, world, main_prop)
+        if seat_prop_id:
+            # Stash on the hobby_session params so the frontend knows
+            # which seat to anchor the character to
+            c.setdefault("_pending_seat_prop_id", seat_prop_id)
+
     setup_ids = []
     for task_type, params in setup_tasks:
-        tid = queue_task(c, task_type, params)
+        tid = queue_task(c, task_type, params, depends_on=seat_ids)
         setup_ids.append(tid)
 
     search_ids = []
@@ -246,10 +260,11 @@ def plan_hobby(c, world, hobby_name):
     # Hobby itself depends on all preparation
     hobby_deps = gather_deps + examine_ids
     hobby_id   = queue_task(c, "hobby_session", {
-        "hobby":        hobby_name,
-        "activity":     reqs["activity"],
-        "target_id":    main_prop_id,
-        "items_used":   retrieved_item_types,
+        "hobby":         hobby_name,
+        "activity":      reqs["activity"],
+        "target_id":     main_prop_id,
+        "seat_prop_id":  c.pop("_pending_seat_prop_id", None),
+        "items_used":    retrieved_item_types,
         "uses_per_item": {
             req["type"]: req.get("uses_per_session", 1)
             for req in reqs.get("items", [])
@@ -306,6 +321,14 @@ def validate_and_trim_queue(c, world, remaining_queue, session):
             resource = find_household_resource(household, p.get("item_type", ""))
             if resource and _item_uses(resource) > 0:
                 task["status"] = "skipped"
+
+        # Seat already in place — skip carry/sit
+        elif t == "carry_seat":
+            from systems.seating_planner import find_free_seats, NEARBY_THRESHOLD, _dist_between_props
+            if main_prop:
+                seats = find_free_seats(world, near_prop=main_prop)
+                if seats and _dist_between_props(seats[0], main_prop) <= NEARBY_THRESHOLD:
+                    task["status"] = "skipped"
 
         cleaned.append(task)
 

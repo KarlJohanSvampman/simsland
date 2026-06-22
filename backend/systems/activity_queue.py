@@ -280,6 +280,12 @@ def _dispatch_task(c, world, task):
     if t == "return_item":
         return _dispatch_return(c, world, task)
 
+    if t == "carry_seat":
+        return _dispatch_carry_seat(c, world, task)
+
+    if t == "use_seat":
+        return _dispatch_use_seat(c, world, task)
+
     if t in ("go_shopping", "order_online"):
         from systems.activities import ACTIVITIES, start_activity
         act_type = "go_shopping" if t == "go_shopping" else "browse_phone"
