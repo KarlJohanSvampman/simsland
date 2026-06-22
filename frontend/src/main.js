@@ -1876,9 +1876,9 @@ async function updateCharacters(state){
         }
       }
 
-      // Only update position from server when NOT anchored to a prop
-      // (the IK system handles position when activity.target_id is set)
-      if (!c.activity?.target_id) {
+      // Sync position from server unless the IK system has already taken
+      // over fine-alignment (isAnchored flag set by updateIK once close).
+      if (!characterAnimations[id]?.isAnchored) {
         sims[id].position.set(
           c.x - 10,
           0,
@@ -2255,39 +2255,69 @@ function updateIK(id) {
   const c = data.state;
 
   // ---- Anchor snap & target facing ------------------------------------
-  // When a character is doing an activity at a prop, move them to the
-  // matching anchor_<interaction> node and face the nearest target_* node.
-  const actTargetId = c.activity?.target_id;
-  if (actTargetId) {
-    const pn = propNodes[actTargetId];
+  // When seated (seat_prop_id set), the SEAT drives position snapping
+  // while the activity target prop drives the facing direction.
+  // Without a seat, both come from the activity target as before.
+  const actTargetId  = c.activity?.target_id;
+  const seatPropId   = c.seat_prop_id;
+  const viewTargetId = c.view_target_id ?? actTargetId;
+
+  // ── Position: walk normally until close to anchor, then fine-align ──
+  // ANCHOR_SNAP_DIST: how close (world units ≈ tiles) the character must
+  // be before IK lerp takes over from the server grid position.
+  const ANCHOR_SNAP_DIST = 1.2;
+
+  const anchorSourceId = seatPropId ?? actTargetId;
+  if (anchorSourceId) {
+    const pn = propNodes[anchorSourceId];
     if (pn) {
-      const interaction = c.activity?.interaction;
-
-      // Find anchor: try exact match first, then any anchor in the prop
-      const anchorKey = `anchor_${interaction}`;
-      const anchorNode = pn.anchors.get(anchorKey) || pn.anchors.values().next().value;
-
+      const interaction = seatPropId ? "sit" : c.activity?.interaction;
+      const anchorKey   = `anchor_${interaction}`;
+      const anchorNode  = pn.anchors.get(anchorKey) || pn.anchors.values().next().value;
       if (anchorNode) {
         anchorNode.getWorldPosition(_ikA);
-        // Lerp character toward anchor position smoothly
-        model.position.lerp(_ikA, 0.12);
+        const distToAnchor = model.position.distanceTo(_ikA);
+
+        if (distToAnchor < ANCHOR_SNAP_DIST) {
+          // Close enough — IK takes over position; lerp into exact spot
+          data.isAnchored = true;
+          model.position.lerp(_ikA, 0.15);
+        } else {
+          // Still walking — release IK lock so server pos syncs normally
+          data.isAnchored = false;
+        }
+      } else {
+        data.isAnchored = false;
       }
+    } else {
+      data.isAnchored = false;
+    }
+  } else {
+    // No anchor target — always track server position
+    data.isAnchored = false;
+  }
 
-      // Face the most relevant target node
-      // Convention: target_<interaction> takes priority, else first target found
-      const targetKey = `target_${interaction}`;
-      const targetNode = pn.targets.get(targetKey) || pn.targets.values().next().value;
-
+  // ── Facing: always toward the view target (desk/computer/etc.) ──────
+  if (viewTargetId) {
+    const pn = propNodes[viewTargetId];
+    if (pn) {
+      const interaction = c.activity?.interaction;
+      const targetKey   = `target_${interaction}`;
+      const targetNode  = pn.targets.get(targetKey) || pn.targets.values().next().value;
       if (targetNode) {
         targetNode.getWorldPosition(_ikB);
-        const dx = _ikB.x - model.position.x;
-        const dz = _ikB.z - model.position.z;
-        if (Math.abs(dx) > 0.01 || Math.abs(dz) > 0.01) {
-          const targetYaw = Math.atan2(dx, dz);
-          model.rotation.y = THREE.MathUtils.lerp(
-            model.rotation.y, targetYaw, 0.10
-          );
-        }
+      } else if (pn.root) {
+        // No target_ node on this prop — face its world origin
+        pn.root.getWorldPosition(_ikB);
+      } else {
+        _ikB.set(-1e9, 0, -1e9); // sentinel — skip rotation
+      }
+      const dx = _ikB.x - model.position.x;
+      const dz = _ikB.z - model.position.z;
+      if (Math.abs(dx) > 0.01 || Math.abs(dz) > 0.01) {
+        model.rotation.y = THREE.MathUtils.lerp(
+          model.rotation.y, Math.atan2(dx, dz), 0.10
+        );
       }
     }
   }
@@ -2431,53 +2461,131 @@ renderer.domElement.addEventListener(
       .getElementById(
         "viewerSelection"
       ).innerHTML = `
-
         <b>${d.type}</b><br>
-
         ${d.id || ""}<br>
-
         ${d.name || ""}
       `;
   }
 );
+
+// =========================================================
+// WEBSOCKET + STATE APPLICATION
+// =========================================================
+
 // Load meshbank once at startup so model references resolve
 loadMeshbank();
 
-const ws = new WebSocket(
-  `ws://${location.hostname}:8000/ws`
-);
+// Cached last-known full world state so delta patches have something to merge into
+let _worldState = {};
 
-ws.onmessage = async (e)=>{
+// Camera viewport in world-tile space — sent to server so it broadcasts
+// only the slice this client is actually looking at.
+let _viewport = { cx: 0, cy: 0, zoom: 2 };
 
-  const state =
-    JSON.parse(e.data);
+function _sendViewport(ws) {
+  if (ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({ type: "viewport", ..._viewport }));
+  }
+}
 
-  definitions =
-    state.definitions || {};
+// Recompute viewport center from camera and notify server.
+// Call whenever the camera moves significantly.
+function _updateViewport(ws) {
+  // Camera looks at isometric origin offset (10, 7); each tile is 1 unit.
+  const cx = Math.round(camera.position.x);
+  const cy = Math.round(camera.position.z);
+  // Map zoom level: close = zoom 3, medium = 2, far = 1
+  const dist = camera.position.distanceTo(controls.target ?? new THREE.Vector3());
+  const zoom = dist < 15 ? 3 : dist < 30 ? 2 : 1;
+  if (cx !== _viewport.cx || cy !== _viewport.cy || zoom !== _viewport.zoom) {
+    _viewport = { cx, cy, zoom };
+    _sendViewport(ws);
+  }
+}
 
+async function _applyState(state) {
+  definitions = state.definitions || definitions;
   updateTiles(state);
   await updateProps(state);
   updateFloorplanFloors(state);
   updateFloorplanWalls(state);
   await updateCharacters(state);
   updateSpeechBubbles(state);
-};
+}
 
-function animate(){
+async function _applyDelta(delta) {
+  // Merge changed characters and props into cached world state
+  if (delta.characters) {
+    _worldState.characters = { ...(_worldState.characters || {}), ...delta.characters };
+  }
+  if (delta.props) {
+    // Props may be array or dict on the server; normalise to dict by id
+    if (!_worldState._propsMap) {
+      _worldState._propsMap = {};
+      for (const p of (_worldState.props || [])) _worldState._propsMap[p.id] = p;
+    }
+    Object.assign(_worldState._propsMap, delta.props);
+    _worldState.props = Object.values(_worldState._propsMap);
+  }
+  await _applyState(_worldState);
+}
 
+function connectWS() {
+  const ws = new WebSocket(`ws://${location.hostname}:8000/ws`);
+
+  ws.onopen = () => {
+    _sendViewport(ws);
+  };
+
+  ws.onmessage = async (e) => {
+    const msg = JSON.parse(e.data);
+
+    if (msg.type === "snapshot") {
+      // Full state for this viewport — store and apply
+      _worldState = msg;
+      await _applyState(msg);
+    } else if (msg.type === "delta") {
+      // Partial update — merge and apply
+      await _applyDelta(msg);
+    } else {
+      // Legacy: server sent plain state without a type field
+      _worldState = msg;
+      await _applyState(msg);
+    }
+  };
+
+  ws.onclose = () => {
+    // Reconnect after 2 s
+    setTimeout(connectWS, 2000);
+  };
+
+  // Report viewport when camera moves (throttled to once per second)
+  let _vpTimer = null;
+  controls.addEventListener("change", () => {
+    if (_vpTimer) return;
+    _vpTimer = setTimeout(() => {
+      _vpTimer = null;
+      _updateViewport(ws);
+    }, 1000);
+  });
+
+  return ws;
+}
+
+connectWS();
+
+// =========================================================
+// RENDER LOOP
+// =========================================================
+
+function animate() {
   requestAnimationFrame(animate);
   controls.update();
-    const delta = 0.016;
+  const delta = 0.016;
 
-  for(const id in characterAnimations){
-
-    const data =
-      characterAnimations[id];
-
-    if(data.mixer){
-      data.mixer.update(delta);
-    }
-
+  for (const id in characterAnimations) {
+    const data = characterAnimations[id];
+    if (data.mixer) data.mixer.update(delta);
     // IK runs after the mixer has set bone transforms for this frame
     updateIK(id);
   }
@@ -2486,10 +2594,8 @@ function animate(){
   for (const id in propAnimations) {
     propAnimations[id].mixer.update(delta);
   }
-  renderer.render(
-    scene,
-    camera
-  );
+
+  renderer.render(scene, camera);
   cssRenderer.render(scene, camera);
 }
 
