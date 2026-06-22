@@ -154,41 +154,36 @@ def find_better_home(
 # PROCESS MIGRATION
 # =========================================================
 
+def check_migration_desires(world):
+    """
+    Scan all households and emit 'household_wants_to_move' when the
+    threshold is crossed. Replaces the old polling process_migration.
+    """
+    from core.event_bus import emit
+    for hid, household in world.get("households", {}).items():
+        if household.get("_migration_emitted"):
+            continue
+        if should_consider_moving(household, world):
+            household["_migration_emitted"] = True
+            emit("household_wants_to_move", {"household_id": hid})
+
+
 def process_migration(world):
-
-    for household in world.get(
-        "households",
-        {}
-    ).values():
-
-        if not should_consider_moving(
-            household,
-            world
-        ):
+    """Legacy full-scan — kept for compatibility but no longer called from sim_loop."""
+    for household in world.get("households", {}).values():
+        if not should_consider_moving(household, world):
             continue
+        _do_migrate(household, world)
 
-        new_home = find_better_home(
-            household,
-            world
-        )
 
-        if not new_home:
-            continue
-
-        old = get_household_home(
-            household,
-            world
-        )
-
-        if old:
-
-            old["vacant"] = True
-
-            old["household_id"] = None
-
-        assign_household_to_home(
-            household,
-            new_home
-        )
-
-        household["housing_stress"] *= 0.5
+def _do_migrate(household, world):
+    new_home = find_better_home(household, world)
+    if not new_home:
+        return
+    old = get_household_home(household, world)
+    if old:
+        old["vacant"]       = True
+        old["household_id"] = None
+    assign_household_to_home(household, new_home)
+    household["housing_stress"]    *= 0.5
+    household["_migration_emitted"] = False  # reset so threshold can re-fi

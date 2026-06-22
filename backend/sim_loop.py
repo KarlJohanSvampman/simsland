@@ -3,22 +3,31 @@ sim_loop.py — main simulation tick
 
 Systems are bucketed by how often they need to run:
 
-  EVERY TICK   — body needs, activities, movement, reactions, item knowledge
-  FAST (÷5)    — perception, attention
-  MEDIUM (÷10-20) — memory, market, cooking, relationships
-  SLOW (÷30-60)   — health events, news, traffic, job market
-  VERY SLOW (÷300) — elections, factions, hierarchy, migration
-  WEEKLY       — schedule generation
+  EVERY TICK    — body needs, activities, movement, reactions, item knowledge
+  FAST  (÷5)   — perception, attention
+  MEDIUM(÷10-20)— memory, market, cooking, relationships
+  SLOW  (÷30-60)— traffic, postal, appliance degradation, news
+                  jail release check (process_jail, because it needs a tick poll)
+  VERY SLOW(÷300)— elections, factions, hierarchy
+  WEEKLY        — schedule generation
 
-Event-driven systems subscribe to core.event_bus and only fire
-when something actually happened (see core/event_bus.py).
+EVENT-DRIVEN (no longer polled — fire only when something actually happened):
+  health events         ← health_threshold_crossed  (emitted by body.py)
+  incident pipeline     ← incident_created → call_created → resolved → arrested
+  job changes           ← character_fired, interview_scheduled
+  evictions             ← bills_overdue  (emitted by _check_households below)
+  migration             ← household_wants_to_move (emitted by check_migration_desires)
+
+See core/event_handlers.py for all subscriptions.
 """
 
 from datetime import datetime
 import time
 
+import core.event_handlers  # noqa: F401 — registers all subscriptions on import
+
 from core.tick_schedule import every, CADENCE
-from core.event_bus     import emit, flush as flush_events
+from core.event_bus     import flush as flush_events
 
 # -- Per-tick (always) -------------------------------------------
 from brain.agent_loop   import update_agent
@@ -39,28 +48,27 @@ from systems.deliveries import update_deliveries
 from systems.service_worker_runtime import update_service_workers
 from systems.household_monitoring   import update_household_monitoring
 
-# -- Slow (÷30-60) -----------------------------------------------
+# -- Slow (÷30-60) — still periodic ─────────────────────────────
 from systems.traffic    import update_ambient_traffic
 from systems.media      import generate_news
-from systems.emergency  import trigger_incident, auto_report_incidents, dispatch, resolve
-from systems.law        import maybe_arrest_from_incidents, process_trials, process_jail
-from systems.health     import trigger_health_event, process_health
-from systems.jobs       import generate_job_listings, maybe_fire, apply_for_job, process_interview
+from systems.emergency  import trigger_incident, resolve   # resolve polls arrival ticks
+from systems.law        import process_jail, process_trials, maybe_arrest_from_incidents
+from systems.jobs       import generate_job_listings, maybe_fire, process_interview
 from systems.postal_service     import update_postal_service
 from systems.service_vehicles   import update_service_vehicles
 from systems.appliance_degradation import update_appliance_degradation
 from systems.messaging  import deliver_messages
+from systems.migration  import check_migration_desires
+from systems.eviction   import check_household_for_eviction
 
-# -- Very slow (÷300) --------------------------------------------
+# -- Very slow (÷300) ─────────────────────────────────────────────
 from systems.crisis     import check_crises, process_crises
 from systems.politics   import process_pending_effects, check_election
 from systems.influence  import apply_public_figure_influence, apply_social_influence
 from systems.hierarchy  import update_hierarchy
-from systems.eviction   import process_evictions
-from systems.migration  import process_migration
 from systems.faction_ai import apply_faction_influence
 
-# -- Weekly ------------------------------------------------------
+# -- Weekly ───────────────────────────────────────────────────────
 from systems.scheduling import generate_week_schedule, adjust_for_household
 from systems.story      import update_story_arc
 from systems.events     import maybe_generate_shared_event
@@ -91,8 +99,6 @@ def _is_monday_midnight(world):
 
 # =========================================================
 # DIRTY TRACKING
-# Marks which entities changed this tick so the broadcaster
-# sends only deltas instead of the full world every tick.
 # =========================================================
 
 def _mark_dirty(world, char_ids=(), prop_ids=()):
@@ -102,33 +108,16 @@ def _mark_dirty(world, char_ids=(), prop_ids=()):
 
 
 def collect_dirty(world) -> dict:
-    """
-    Return dirty entities and reset tracking.
-    Called by main.py after tick() to build the WS delta payload.
-    """
     dirty = world.pop("_dirty", {"chars": set(), "props": set()})
-
-    chars = {
-        cid: world["characters"][cid]
-        for cid in dirty["chars"]
-        if cid in world["characters"]
-    }
-
+    chars = {cid: world["characters"][cid] for cid in dirty["chars"] if cid in world["characters"]}
     props_raw = world.get("props", {})
     props_map = props_raw if isinstance(props_raw, dict) else {p["id"]: p for p in props_raw}
-    props = {
-        pid: props_map[pid]
-        for pid in dirty["props"]
-        if pid in props_map
-    }
-
+    props = {pid: props_map[pid] for pid in dirty["props"] if pid in props_map}
     return {"chars": chars, "props": props}
 
 
 # =========================================================
 # SPATIAL RELATIONSHIP FILTER
-# Replaces the every-tick O(N^2) loop with a proximity gate:
-# only update relationships for characters within ~8 tiles.
 # =========================================================
 
 _RELATIONSHIP_RADIUS = 8
@@ -157,16 +146,15 @@ def tick(world):
     t = world["tick"]
 
     advance_calendar(world)
-
     characters = list(world.get("characters", {}).values())
 
-    # -- Weekly: regenerate schedules --------------------------
+    # -- Weekly ─────────────────────────────────────────────
     if _is_monday_midnight(world):
         for c in characters:
             c["schedule"] = generate_week_schedule(c, world)
             adjust_for_household(c, world)
 
-    # -- Fast: perception + attention (÷5) ---------------------
+    # -- Fast: perception + attention (÷5) ──────────────────
     if every(world, CADENCE["perception"]):
         for c in characters:
             perceive(c, world)
@@ -175,17 +163,16 @@ def tick(world):
         for c in characters:
             update_attention(c, world)
 
-    # -- Per-tick: agent brain + reactions ---------------------
+    # -- Per-tick: agent brain ──────────────────────────────
     dirty_char_ids = set()
     for c in characters:
         update_item_knowledge(c, world)
         process_reaction_queue(c, t)
         update_agent(c, world)
         dirty_char_ids.add(c["id"])
-
     _mark_dirty(world, char_ids=dirty_char_ids)
 
-    # -- Medium: memory / beliefs / relationships (÷15) --------
+    # -- Medium: memory / beliefs / relationships (÷15) ─────
     if every(world, CADENCE["memory_decay"], offset=2):
         for c in characters:
             decay_memories(c)
@@ -198,7 +185,7 @@ def tick(world):
     if every(world, CADENCE["relationships"], offset=4):
         _update_nearby_relationships(characters, world)
 
-    # -- Medium: household systems (÷10) -----------------------
+    # -- Medium: household systems (÷10) ────────────────────
     if every(world, CADENCE["cooking"], offset=5):
         for c in characters:
             hh = world.get("households", {}).get(c.get("household_id"))
@@ -215,79 +202,77 @@ def tick(world):
     if every(world, CADENCE["household_monitoring"], offset=8):
         update_household_monitoring(world)
 
-    # -- Medium: market (÷20) ----------------------------------
+    # -- Medium: market (÷20) ───────────────────────────────
     if every(world, CADENCE["market"], offset=9):
         update_market(world)
         produce(world)
         consume_households(world)
 
-    # -- Slow: health, incidents, law (÷30-60) -----------------
-    if every(world, CADENCE["health"], offset=10):
-        for c in characters:
-            trigger_health_event(c, world)
-            process_health(c, world)
+    # -- Slow: still-periodic systems (÷30-60) ──────────────
 
-    if every(world, CADENCE["job_market"], offset=11):
+    # Job listings refresh; maybe_fire emits character_fired → handler calls apply_for_job
+    if every(world, CADENCE["job_market"], offset=10):
         generate_job_listings(world)
         for c in characters:
-            maybe_fire(c, world)
-            apply_for_job(c, world)
-            process_interview(c, world)
+            maybe_fire(c, world)        # emits character_fired → apply_for_job
+            process_interview(c, world) # polls interview.tick; emits character_hired
 
-    if every(world, CADENCE["traffic"], offset=12):
+    if every(world, CADENCE["traffic"], offset=11):
         update_ambient_traffic(world)
 
-    if every(world, CADENCE["postal"], offset=13):
+    if every(world, CADENCE["postal"], offset=12):
         update_postal_service(world)
 
-    if every(world, CADENCE["appliance_degradation"], offset=14):
+    if every(world, CADENCE["appliance_degradation"], offset=13):
         update_appliance_degradation(world)
 
-    if every(world, CADENCE["service_workers"], offset=15):
+    if every(world, CADENCE["service_workers"], offset=14):
         update_service_vehicles(world)
 
-    if every(world, CADENCE["arrests"], offset=16):
-        trigger_incident(world, None)
-        auto_report_incidents(world)
-        dispatch(world)
-        resolve(world)
+    # World-level random incidents (character-level ones emitted in agent_loop)
+    if every(world, CADENCE["arrests"], offset=15):
+        trigger_incident(world, None)  # world-level random only
+        resolve(world)                 # poll responder arrival ticks
         maybe_arrest_from_incidents(world)
 
-    if every(world, CADENCE["trials"], offset=17):
+    # Jail release still needs tick poll
+    if every(world, CADENCE["trials"], offset=16):
         for c in characters:
-            process_jail(c, world)
-        process_trials(world)
+            process_jail(c, world)     # emits character_released
+        process_trials(world)          # emits character_jailed / character_acquitted
 
-    if every(world, CADENCE["news"], offset=18):
+    if every(world, CADENCE["news"], offset=17):
         generate_news(world)
         maybe_generate_shared_event(world)
 
-    # -- Very slow: big world systems (÷300) -------------------
-    if every(world, CADENCE["crisis"], offset=19):
+    # Eviction / migration: emit events when thresholds crossed
+    if every(world, CADENCE["evictions"], offset=18):
+        for hh in world.get("households", {}).values():
+            check_household_for_eviction(hh, world)  # emits bills_overdue
+
+    if every(world, CADENCE["migration"], offset=19):
+        check_migration_desires(world)               # emits household_wants_to_move
+
+    # -- Very slow (÷300) ───────────────────────────────────
+    if every(world, CADENCE["crisis"], offset=20):
         check_crises(world)
         process_crises(world)
 
-    if every(world, CADENCE["election"], offset=20):
+    if every(world, CADENCE["election"], offset=21):
         check_election(world)
         process_pending_effects(world)
 
-    if every(world, CADENCE["faction"], offset=21):
+    if every(world, CADENCE["faction"], offset=22):
         apply_faction_influence(world)
         apply_public_figure_influence(world)
         apply_social_influence(world)
 
-    if every(world, CADENCE["hierarchy"], offset=22):
+    if every(world, CADENCE["hierarchy"], offset=23):
         update_hierarchy(world)
-
-    if every(world, CADENCE["migration"], offset=23):
-        process_migration(world)
-
-    if every(world, CADENCE["evictions"], offset=24):
-        process_evictions(world)
 
     # Story arcs are lightweight — keep per-tick
     for c in characters:
         update_story_arc(c)
 
-    # -- Flush event bus ---------------------------------------
+    # -- Flush event bus (runs all handlers for events emitted this tick)
     flush_events(world)
