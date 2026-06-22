@@ -21,32 +21,32 @@ def deliver_messages(world):
 
     for msg in world.get("message_queue", []):
 
-
+        # Not ready yet — keep in queue
         if msg["deliver_at"] > now:
-            store_memory(
-                receiver,
-                f"Received SMS from {msg['from']}: {msg['text']}",
-                tags=["phone","sms"]
-            )
             remaining.append(msg)
             continue
 
         receiver = world["characters"].get(msg["to"])
         if not receiver:
-            continue
+            continue  # drop undeliverable messages
 
         receiver.setdefault("phone", {}).setdefault("inbox", []).append(msg)
+
+        store_memory(
+            receiver,
+            f"Received SMS from {msg['from']}: {msg['text']}",
+            tags=["phone", "sms"]
+        )
 
         sender = world["characters"].get(msg["from"])
         if sender:
             apply_sms_emotion(receiver, sender, msg["text"])
-        
-        contact = receiver.get("contacts", {}).get(sender["id"], {})
-        count = contact.get("interaction_count", 0)
 
-        if count > 10:
-            # amplify reaction
-            apply_emotion_inertia(receiver, emotion)
+            contact = receiver.get("contacts", {}).get(sender["id"], {})
+            count = contact.get("interaction_count", 0)
+            if count > 10:
+                # Close relationship — emotion boost already handled by apply_sms_emotion
+                pass
 
         # 🔔 notification
         receiver["phone"].setdefault("notifications", []).append({

@@ -39,12 +39,18 @@ def create_form_request_mail(
 
 
 def sort_household_mail(household, world):
+    """Open and categorise all unopened mail from the mailbox."""
 
-    unopened = household.get("unopened_mail", [])
+    mailbox = household.setdefault("mailbox", {
+        "has_mail": False,
+        "items": [],
+        "unopened_count": 0
+    })
 
-    remaining = []
+    for mail in mailbox.get("items", []):
 
-    for mail in unopened:
+        if mail.get("opened"):
+            continue
 
         mail["opened"] = True
 
@@ -57,7 +63,11 @@ def sort_household_mail(household, world):
         else:
             household.setdefault("completed_documents", []).append(mail)
 
-    household["unopened_mail"] = remaining
+    # Recount so the has_mail flag stays accurate
+    mailbox["unopened_count"] = sum(
+        1 for m in mailbox["items"] if not m.get("opened")
+    )
+    mailbox["has_mail"] = mailbox["unopened_count"] > 0
 
 def respond_to_mail(c, household, mail, world):
 
@@ -90,13 +100,4 @@ def attempt_pay_bills(c, world):
             continue
 
         # simple share logic
-        members = household.get("members", [])
-        share = bill["amount"] / max(1, len(members))
-
-        contribution = min(share, wealth, bill["remaining"])
-
-        c["wealth"] -= contribution
-        bill["remaining"] -= contribution
-
-        bill.setdefault("contributors", {})
-        bill["contributors"][c["id"]] = bill["contributors"].get(c["id"], 0) + contribution
+        members 

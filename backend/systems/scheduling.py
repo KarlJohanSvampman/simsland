@@ -73,8 +73,12 @@ def adjust_for_household(c, world):
         if x.get("household_id") == hid
     ]
 
-    # stagger work start times
-    offset = members.index(c) % 2
+    # stagger work start times — look up by id to avoid dict identity mismatch
+    member_ids = [x["id"] for x in members]
+    try:
+        offset = member_ids.index(c["id"]) % 2
+    except ValueError:
+        offset = 0
 
     for day, blocks in c["schedule"]["week"].items():
         for b in blocks:

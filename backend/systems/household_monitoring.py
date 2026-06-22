@@ -312,6 +312,10 @@ def monitor_appliances(
             "object_type"
         )
 
+        # Importance scales up as the appliance approaches failure (0.05).
+        # add_desire deduplicates by type+target and keeps the higher importance.
+        importance = 0.6 if durability > 0.10 else 0.9
+
         create_household_procurement_desire(
 
             household,
@@ -325,7 +329,7 @@ def monitor_appliances(
                 object_type,
 
             importance=
-                0.8
+                importance
         )
 
 

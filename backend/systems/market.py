@@ -6,5 +6,8 @@ def update_market(world):
 def produce(world):
     world["market"]["food"]["supply"]+=4; world["market"]["medicine"]["supply"]+=1
 def consume_households(world):
-    for h in world.get("households",{}).values():
-        h["wealth"]-=world["market"]["food"]["price"]*.1*len(h.get("members",[])); world["market"]["food"]["demand"]+=len(h.get("members",[]))*.5
+    # Track demand only — wealth deduction is handled by economy.apply_expenses
+    # to avoid double-charging households.
+    for h in world.get("households", {}).values():
+        member_count = len(h.get("members", []))
+        world["market"]["food"]["demand"] += member_count * 0.5

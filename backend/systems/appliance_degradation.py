@@ -119,20 +119,28 @@ def trigger_appliance_failure(
 
     world
 ):
+    from systems.household_monitoring import choose_responsible_member
 
     object_type = obj.get(
         "object_type"
     )
 
-    members = household.get(
-        "members",
-        []
-    )
+    raw_members = household.get("members", [])
+
+    # members may be character IDs or objects — normalise to objects
+    members = []
+    for m in raw_members:
+        if isinstance(m, str):
+            char = world["characters"].get(m)
+            if char:
+                members.append(char)
+        elif isinstance(m, dict):
+            members.append(m)
 
     if not members:
         return
 
-    responsible = members[0]
+    responsible = choose_responsible_member(members, world) or members[0]
 
     add_desire(
 
