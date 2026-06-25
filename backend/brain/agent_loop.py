@@ -109,6 +109,34 @@ from systems.action_router import (
     clear_expired_speech
 )
 
+from systems.activity_queue import (
+    process_activity_queue,
+    suspend_activity_queue,
+)
+
+from systems.item_knowledge import (
+    update_item_knowledge,
+)
+
+# =========================================================
+# URGENT NEED THRESHOLDS — beyond these, interrupt a hobby
+# Only activities flagged "interruptible" can be suspended.
+# =========================================================
+_INTERRUPT_THRESHOLDS = {
+    "bladder": 0.90,
+    "hunger":  0.88,
+    "energy":  0.87,
+    "hygiene": 0.93,
+}
+
+def _check_urgent_interruption(c):
+    """Return a reason string if a body need is critical, else None."""
+    needs = c.get("needs", {})
+    for need, threshold in _INTERRUPT_THRESHOLDS.items():
+        if needs.get(need, 0) >= threshold:
+            return f"urgent_{need}"
+    return None
+
 
 # =========================================================
 # INTERNAL STATE UPDATE
@@ -516,135 +544,36 @@ def update_agent(
     sort_intentions(c)
 
     # =====================================
+    # ITEM KNOWLEDGE DECAY
+    # =====================================
+
+    update_item_knowledge(c, world)
+
+    # =====================================
     # ACTIVE ACTIVITY
     # =====================================
 
-    if c.get(
-        "activity"
-    ):
+    if c.get("activity"):
 
-        execute_activity(
-
-            c,
-
-            world,
-
-            c["activity"]
-        )
-
-        return
-
-    # =====================================
-    # MOVEMENT
-    # =====================================
-
-    moving = update_character_movement(
-
-        c,
-
-        world
-    )
-
-    if moving:
-        return
-
-    # =====================================
-    # EXECUTE SOCIAL INTENTIONS
-    # =====================================
-
-    for intention in c.get(
-        "active_intentions",
-        []
-    ):
-
-
-        activity_type = resolve_strategy(
-
-            c,
-
-            world,
-
-            intention
-        )
-
-        if not activity_type:
-            continue
-
-        started = start_activity(
-
-            c,
-
-            world,
-
-            activity_type
-        )
-
-        if started:
-
-            c["current_intention"] = (
-                intention
-            )
-
+        # Check whether an urgent body need should interrupt a queued hobby.
+        # Only activities in queues flagged "interruptible" can be suspended;
+        # survival activities (sleep, toilet, eat) always run to completion.
+        urgent = _check_urgent_interruption(c)
+        if urgent and c.get("activity_queue"):
+            from systems.hobby_requirements import HOBBY_REQUIREMENTS
+            act_type = (c["activity"] or {}).get("type", "")
+            hobby_params = c.get("_active_hobby_params", {})
+            hobby_name   = hobby_params.get("hobby", "")
+            interruptible = HOBBY_REQUIREMENTS.get(hobby_name, {}).get("interruptible", False)
+            if interruptible:
+                suspend_activity_queue(c, world, reason=urgent)
+                # Fall through: no activity now, agent loop will address the urgent need
+            else:
+                execute_activity(c, world, c["activity"])
+                return
+        else:
+            execute_activity(c, world, c["activity"])
             return
 
     # =====================================
-    # BUILD CONTEXT
-    # =====================================
-
-    context = build_context(
-
-        c,
-
-        world
-    )
-
-    # =====================================
-    # THINK
-    # ===================================================================
-
-    decision = think(
-        context
-    )
-
-    if not decision:
-        return
-
-    # =====================================
-    # PROCESS DECISION
-    # =====================================
-
-    process_decision(
-
-        c,
-
-        world,
-
-        decision
-    )
-
-    # =====================================
-    # POST
-    # =====================================
-
-    post_update(
-
-        c,
-
-        world
-    )
-
-def merge_body_intentions(c):
-
-    for intention in generate_body_intentions(c):
-
-        store_intention(
-            c,
-            {
-                "type": intention["type"],
-                "priority": int(
-                    intention["priority"] * 100
-                ),
-                "source": "body",
-                "reason": "body_need"
-            }
-        )
+    #

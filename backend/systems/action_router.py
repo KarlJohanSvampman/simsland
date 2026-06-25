@@ -486,9 +486,9 @@ def route_action(c, world, action, speech, definitions=None):
     elif action_type in ("call", "text"):
         c.setdefault("pending_comms", []).append(action)
 
-    # Set animation state — specific handlers set their own; only fall back for generic types
-    _NO_GENERIC_ANIM = {"interact", "examine", "search", "trash", "destroy",
-                        "carry", "clean", "wear", "undress"}
-    if action_type not in _NO_GENERIC_ANIM:
-        anim = _ACTION_ANIMATION.get(action_type, "idle")
-        c["animation_state"] = anim
+    # ── Hobby actions: run the planner first ──────────────
+    # If the action maps to a hobby with requirements, build
+    # the full prerequisite queue instead of starting directly.
+    elif action_type in _HOBBY_ACTION_TYPES:
+        _route_hobby(c, world, action_type)
+        return  # planner sets c["activity_queue"]; queue process

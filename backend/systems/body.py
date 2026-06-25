@@ -29,6 +29,32 @@ def ensure_body(c):
 # UPDATE BODY
 # =========================================================
 
+
+# Health threshold emitter — emit once when a need crosses into danger zone.
+# Uses a small set stored on the character to avoid flooding the bus every tick.
+_HEALTH_THRESHOLDS = {
+    "hunger":   85,
+    "fatigue":  88,
+    "sickness": 60,
+    "pain":     70,
+}
+
+
+def _check_health_thresholds(c):
+    from core.event_bus import emit
+    b = c.get("body", {})
+    fired = c.setdefault("_health_events_fired", set())
+    for need, threshold in _HEALTH_THRESHOLDS.items():
+        key = f"{need}_critical"
+        val = b.get(need, 0)
+        if val >= threshold and key not in fired:
+            fired.add(key)
+            emit("health_threshold_crossed", {"character_id": c["id"], "need": need, "value": val})
+        elif val < threshold * 0.7:
+            # Recovered — allow re-firing later
+            fired.discard(key)
+
+
 def update_body_needs(
 
     c,
@@ -114,7 +140,7 @@ def update_body_needs(
 
 
     clamp_body(c)
-
+    _check_health_thresholds(c)
 
 
 # =========================================================
@@ -141,52 +167,4 @@ def apply_body_emotions(c):
 
     # =====================================
     # BLADDER
-    # =====================================
-
-    if b["bladder"] > 90:
-
-        c["emotion"] = (
-            "desperate"
-        )
-
-    elif b["bladder"] > 75:
-
-        c["emotion"] = (
-            "uncomfortable"
-        )
-
-    # =====================================
-    # FATIGUE
-    # =====================================
-
-    if b["fatigue"] > 90:
-
-        c["emotion"] = (
-            "exhausted"
-        )
-
-    elif b["fatigue"] > 70:
-
-        c["emotion"] = (
-            "tired"
-        )
-
-    # =====================================
-    # HYGIENE
-    # =====================================
-
-    if b["hygiene"] < 20:
-
-        c["emotion"] = (
-            "embarrassed"
-        )
-
-    # =====================================
-    # HUNGER
-    # =====================================
-
-    if b["hunger"] > 90:
-
-        c["emotion"] = (
-            "starving"
-        )
+    # ==============================

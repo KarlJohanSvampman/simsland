@@ -1221,11 +1221,43 @@ def execute_activity(
                 prop["y"] = c.get("y", 0)
                 prop.pop("carried_by", None)
                 prop["visible"] = True
+                # If carrying a seat to a target prop, rotate it to face the target
+                if act.get("is_seat_carry"):
+                    target_prop = get_prop_by_id(world, act.get("destination", {}).get("target_prop_id"))
+                    if target_prop:
+                        import math
+                        dx = target_prop["x"] - prop["x"]
+                        dy = target_prop["y"] - prop["y"]
+                        prop["rotation"] = round(math.degrees(math.atan2(dx, dy)) / 90) * 90
             c.pop("carrying", None)
+            from systems.activity_queue import mark_queue_task_done
+            mark_queue_task_done(c, "carry_seat", success=True)
             finish_activity(c, world)
             return False
 
         return True
+
+    # =====================================================
+    # SEARCH ROOM — walk to each container prop, check contents
+    # Placed before walking so it can manage its own movement.
+    # =====================================================
+
+    if activity_type == "search_room":
+        return _execute_search_room(c, world, act)
+
+    # =====================================================
+    # RETRIEVE ITEM — walk to container, pick up item, carry to dest
+    # =====================================================
+
+    if activity_type in ("retrieve_item", "return_item"):
+        return _execute_retrieve_or_return(c, world, act)
+
+    # =====================================================
+    # USE SEAT — walk to chair, sit, mark as seated
+    # =====================================================
+
+    if activity_type == "use_seat":
+        return _execute_use_seat(c, world, act)
 
     # =====================================================
     # WALKING  — wait until movement system clears is_moving
@@ -1314,6 +1346,24 @@ def complete_activity(
 
     activity_type = act["type"]
 
+    # =====================================
+    # ADVANCE ACTIVITY QUEUE
+    # =====================================
+
+    from systems.activity_queue import mark_queue_task_done
+    mark_queue_task_done(c, activity_type, success=True)
+
+    # =====================================
+    # HOBBY SESSION — consume item uses
+    # and queue put-away for organized chars
+    # =====================================
+
+    if activity_type == "hobby_session" or c.get("_active_hobby_params"):
+        hobby_params = c.pop("_active_hobby_params", None) or act
+        consume_hobby_uses(c, world, hobby_params)
+        # Stand up if the character was seated for this hobby
+        if c.get("seat_prop_id"):
+            _finish_seated(c, world)
 
     # =====================================
     # GENERATE WASTE
@@ -1505,129 +1555,4 @@ def complete_activity(
                 "has_mail"
             ] = False
 
-            c.setdefault(
-                "mail_history",
-                []
-            )
-
-            delivered = household.get(
-                "delivered_mail",
-                []
-            )
-
-            c[
-                "mail_history"
-            ].extend(delivered)
-
-            household[
-                "delivered_mail"
-            ] = []
-    elif activity_type == "sort_mail":
-
-        household = world[
-            "households"
-        ].get(
-            c.get("household_id")
-        )
-
-        if household:
-            sort_household_mail(household, world)
-    elif activity_type == "retrieve_package":
-
-        household = world[
-            "households"
-        ].get(
-            c.get("household_id")
-        )
-
-        if household:
-
-            packages = household.get(
-                "pending_packages",
-                []
-            )
-
-            for package in packages:
-
-                acquire_product(
-
-                    household,
-
-                    package
-                )
-
-            household[
-                "pending_packages"
-            ] = []
-    elif activity_type == "take_out_trash":
-
-        household = world[
-            "households"
-        ].get(
-            c.get("household_id")
-        )
-
-        if household:
-
-            household[
-                "trash_level"
-            ] = max(
-
-                0,
-
-                household[
-                    "trash_level"
-                ] - 0.5
-            )
-
-            household.setdefault(
-                "garbage_bin",
-                {}
-            )
-
-            household[
-                "garbage_bin"
-            ][
-                "fullness"
-            ] = min(
-
-                1.0,
-
-                household[
-                    "garbage_bin"
-                ].get(
-                    "fullness",
-                    0
-                ) + 0.5
-            )
-def set_activity_phase(
-
-    act,
-
-    phase,
-
-    world
-):
-
-    act["phase"] = phase
-
-    act[
-        "phase_started_tick"
-    ] = world["tick"]
-
-
-def finish_activity(c, world):
-
-    release_anchor(
-        c,
-        world
-    )
-
-    release_reservation(
-        c,
-        world
-    )
-
-    c["animation_state"] = "idle"
-
-    c["activity"] = None
+            c.se
