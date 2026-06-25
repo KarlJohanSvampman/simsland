@@ -647,3 +647,21 @@ def biased_recall(
 
         for _, m in scored[:limit]
     ]
+
+# =========================================================
+# REWRITE MEMORY SALIENCE
+# Nudge an existing memory's importance up or down.
+# Used by reflection.py when emotion reappraisal makes a
+# memory feel more or less significant in hindsight.
+# =========================================================
+
+def rewrite_memory_salience(c, memory, delta):
+    """
+    Adjust `memory["importance"]` by `delta` (positive or negative),
+    clamped to [0.0, 1.0].  `memory` must be a dict already in
+    c["memories"] — we update it in place.
+    """
+    if not isinstance(memory, dict):
+        return
+    current = memory.get("importance", 0.5)
+    memory["importance"] = max(0.0, min(1.0, current + delta))
