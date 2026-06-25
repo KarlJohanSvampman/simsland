@@ -2,7 +2,7 @@ from systems.activities import (
     start_activity
 )
 
-from systems.conversations import (
+from brain.conversations import (
     get_or_create_conversation
 )
 
