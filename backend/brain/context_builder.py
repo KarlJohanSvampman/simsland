@@ -6,10 +6,6 @@ from social.relationship_score import (
     relationship_score
 )
 
-from social.reputation import (
-    get_reputation
-)
-
 from brain.beliefs import (
     compute_alignment
 )
@@ -19,9 +15,6 @@ from brain.cognitive_pressure import (
 )
 
 from systems.social import (
-
-    build_relationship_context,
-
     build_message_context
 )
 
@@ -85,6 +78,104 @@ def summarize_relationship(
 
 
 # =========================================================
+# RELATIONSHIP CONTEXT
+# Uses the full brain/relationships.py schema to produce a
+# natural-language summary of each known relationship, sorted
+# by significance (most emotionally charged first).
+# =========================================================
+
+def build_relationship_context(c, world, limit=10):
+    import time
+    now = time.time()
+    chars = world.get("characters", {})
+    results = []
+
+    for other_id, rel in c.get("relationships", {}).items():
+        # Skip if truly never met
+        if rel.get("familiarity", 0) < 1 and rel.get("interaction_count", 0) == 0:
+            continue
+
+        other = chars.get(other_id)
+        name = other["name"] if other else other_id
+
+        state      = rel.get("state", "stranger")
+        trust      = rel.get("trust", 0)
+        friendship = rel.get("friendship", 0)
+        hostility  = rel.get("hostility", 0)
+        attraction = rel.get("attraction", 0)
+        resentment = rel.get("resentment", 0)
+        comfort    = rel.get("comfort", 0)
+        familiarity= rel.get("familiarity", 0)
+
+        # Core summary sentence
+        if state == "close_friend":
+            summary = f"{name} is one of your closest friends — you trust them deeply."
+        elif state == "friend":
+            summary = f"You consider {name} a friend."
+        elif state == "romantic_interest":
+            summary = f"You have romantic feelings toward {name}."
+        elif state == "acquaintance":
+            summary = f"You know {name} a little — more acquaintance than friend."
+        elif state == "enemy":
+            summary = f"You and {name} have real hostility between you."
+        elif state == "distrusted":
+            summary = f"You've met {name} but don't trust them."
+        else:
+            summary = f"You've met {name} but don't know them well yet."
+
+        # Nuance additions
+        extras = []
+        if resentment > 40:
+            extras.append("There's lingering resentment between you.")
+        if attraction > 50 and state != "romantic_interest":
+            extras.append(f"You find {name} attractive.")
+        if comfort > 60:
+            extras.append(f"You feel very comfortable around {name}.")
+        if trust < -20:
+            extras.append(f"You don't fully trust {name}.")
+        if hostility > 30 and state != "enemy":
+            extras.append(f"There's tension between you.")
+        if extras:
+            summary += " " + " ".join(extras)
+
+        # Recency
+        last = rel.get("last_interaction", 0)
+        if last:
+            elapsed = now - last
+            if elapsed < 3600:
+                recency = "very recently"
+            elif elapsed < 86400:
+                recency = "today"
+            elif elapsed < 604800:
+                recency = f"{int(elapsed/86400)}d ago"
+            else:
+                recency = f"{int(elapsed/604800)}w ago"
+        else:
+            recency = None
+
+        significance = (
+            abs(friendship) + abs(trust) + abs(hostility) +
+            abs(attraction) + abs(resentment) + familiarity * 0.3
+        )
+
+        results.append({
+            "name":             name,
+            "id":               other_id,
+            "state":            state,
+            "summary":          summary,
+            "trust":            round(trust),
+            "friendship":       round(friendship),
+            "hostility":        round(hostility),
+            "attraction":       round(attraction),
+            "last_interaction": recency,
+            "_sig":             significance,
+        })
+
+    results.sort(key=lambda x: x.pop("_sig"), reverse=True)
+    return results[:limit]
+
+
+# =========================================================
 # SOCIAL CONTEXT
 # =========================================================
 
@@ -96,20 +187,8 @@ def build_social_context(
 ):
 
     return {
-
-        "relationships":
-
-            build_relationship_context(
-                c,
-                world
-            ),
-
-        "recent_messages":
-
-            build_message_context(
-                c,
-                world
-            )
+        "relationships":   build_relationship_context(c, world),
+        "recent_messages": build_message_context(c, world),
     }
 
 # =========================================================
@@ -376,7 +455,6 @@ def build_context(
         "political_alignment": compute_alignment(c),
         "life_narratives": build_narratives(c),
         "self_model": build_self_model(c),
-        "public_reputation":build_reputation_context(c,world),
         "schedule": build_schedule_context(c),
         "body_state": build_body_context(c),
         "household_resources":build_household_resource_context( c,world),
@@ -650,39 +728,6 @@ def build_self_model(c):
 
     return results
 
-# =========================================================
-# PUBLIC REPUTATION
-# =========================================================
-
-def build_reputation_context(
-
-    c,
-
-    world
-):
-
-    rep = get_reputation(
-
-        world,
-
-        c["id"]
-    )
-
-    return {
-
-        "trust":
-            rep["trust"],
-
-        "respect":
-            rep["respect"],
-
-        "fear":
-            rep["fear"],
-
-        "controversy":
-            rep["controversy"]
-    }
-
     # =========================================================
 # BUILD SCHEDULE CONTEXT
 # =========================================================
@@ -832,7 +877,7 @@ def build_memory_context(
                 m.get(
                     "importance",
                     0
-                ),
+                    ),
 
             "tags":
                 m.get(
@@ -848,155 +893,3 @@ def build_memory_context(
         })
 
     return results
-
-    # =========================================================
-# ACTIVE CONVERSATIONS
-# =========================================================
-
-def build_active_conversations(
-
-    c,
-
-    world
-):
-
-    results = []
-
-    for conv in world.get(
-        "conversations",
-        {}
-    ).values():
-
-        if not conv.get("active"):
-            continue
-
-        if c["id"] not in conv[
-            "participants"
-        ]:
-            continue
-
-        results.append({
-
-            "topic":
-                conv["topic"],
-
-            "tone":
-                conv["tone"],
-
-            "participants":
-                conv["participants"],
-
-            "recent_history":
-                conv["history"][-6:]
-        })
-
-    return results
-
-# =========================================================
-# ATTENTION SUMMARY
-# =========================================================
-
-def build_attention_summary(c, world):
-
-    attention = c.get(
-        "attention",
-        {}
-    )
-
-    focus = attention.get(
-        "focus"
-    )
-
-    if not focus:
-
-        return (
-            "Nothing strongly "
-            "holds your attention "
-            "right now."
-        )
-
-    key = focus.get(
-        "key",
-        ""
-    )
-
-    strength = focus.get(
-        "strength",
-        0
-    )
-
-    intensity = "mildly"
-
-    if strength > 0.75:
-        intensity = "strongly"
-
-    elif strength > 0.45:
-        intensity = "noticeably"
-
-    # =====================================
-    # PERSON
-    # =====================================
-
-    if key.startswith(
-        "person:"
-    ):
-
-        pid = key.split(":")[1]
-
-        other = world.get(
-            "characters",
-            {}
-        ).get(pid)
-
-        if other:
-
-            return (
-
-                f"You are {intensity} "
-
-                f"focused on "
-
-                f"{other.get('name')}."
-            )
-
-    # =====================================
-    # SCENE
-    # =====================================
-
-    if key.startswith(
-        "scene:"
-    ):
-
-        scene = key.split(":")[1]
-
-        return (
-
-            f"Your attention keeps "
-
-            f"returning to the "
-
-            f"{scene} situation nearby."
-        )
-
-    # =====================================
-    # EVENT
-    # =====================================
-
-    if key.startswith(
-        "event:"
-    ):
-
-        evt = key.split(":")[1]
-
-        return (
-
-            f"You remain distracted "
-
-            f"by the recent "
-
-            f"{evt}."
-        )
-
-    return (
-        "Your thoughts feel scattered."
-    )

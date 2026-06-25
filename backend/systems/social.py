@@ -189,22 +189,8 @@ def send_message(
 # GET CHARACTER BY ID
 # =========================================================
 
-def get_character_by_id(
-
-    world,
-
-    char_id
-):
-
-    for c in world.get(
-        "characters",
-        []
-    ):
-
-        if c["id"] == char_id:
-            return c
-
-    return None
+def get_character_by_id(world, char_id):
+    return world.get("characters", {}).get(char_id)
 
 
 # =========================================================
