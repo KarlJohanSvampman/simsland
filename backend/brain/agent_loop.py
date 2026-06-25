@@ -175,7 +175,7 @@ def update_internal_state(
     consolidate_life_narratives(c)
 
     consolidate_identity(c)
-    merge_body_intentions(c)
+    generate_body_intentions(c)
 
 # =========================================================
 # ECONOMY
