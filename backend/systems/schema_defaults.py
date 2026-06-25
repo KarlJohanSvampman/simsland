@@ -32,6 +32,9 @@ def ensure_world_defaults(world):
         "vacant_homes",
         []
     )
+    world.setdefault("conflicts",        {})
+    world.setdefault("social_contracts", {})
+
 
     world.setdefault(
         "events",
@@ -414,6 +417,13 @@ def ensure_character_defaults(c):
         "social_models",
         {}
     )
+
+    # Social conflict system
+    c.setdefault("grievances",               [])
+    c.setdefault("social_contract_ids",      [])
+    c.setdefault("cold_shoulder_towards",    [])
+    c.setdefault("_confrontation_emitted",   [])
+    c.setdefault("recent_behavior_tags",     [])
 
     c.setdefault(
         "memories",
