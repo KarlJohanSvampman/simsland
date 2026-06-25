@@ -6,7 +6,7 @@ def apply_emotion_inertia(c, llm_emotion=None):
         current=current*(1-0.25*volatility)+target*(0.25*volatility)
     current += max(0,float(c.get("stress",0))-50)*0.01
     c["emotional_temperature"]=max(0,min(100,current*0.995))
-def update_emotion(c):
+def update_emotion(c, world=None):
     t=float(c.get("emotional_temperature",20))
     c["emotion"]="furious" if t>=85 else "angry" if t>=70 else "annoyed" if t>=55 else "calm" if t<=25 else c.get("emotion","neutral")
     c["mood"]=c["emotion"]
