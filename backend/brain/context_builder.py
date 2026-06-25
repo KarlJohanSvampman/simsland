@@ -462,7 +462,9 @@ def build_context(
         "social": build_social_context(c,world),
         "memories": build_memory_context(c),
         "active_conversations":build_active_conversations(c, world),
-        "social_models":build_social_model_context(c)
+        "social_models":build_social_model_context(c),
+        "active_conflict": build_conflict_context(c, world),
+        "grievances": build_grievance_context(c, world),
     }
 
     return context
@@ -893,3 +895,84 @@ def build_memory_context(
         })
 
     return results
+
+
+# =========================================================
+# CONFLICT CONTEXT
+# Surfaces the character's active conflict (if any) so the
+# LLM knows what phase they're in and what's at stake.
+# =========================================================
+
+def build_conflict_context(c, world):
+    chars = world.get("characters", {})
+    for conflict in world.get("conflicts", {}).values():
+        if conflict["outcome"] is not None:
+            continue
+        if c["id"] not in conflict["parties"]:
+            continue
+
+        other_id   = None
+        for pid in conflict["parties"]:
+            if pid != c["id"]:
+                other_id = pid
+                break
+        other      = chars.get(other_id)
+        other_name = other["name"] if other else other_id
+
+        phase = conflict["phase"]
+        result = {
+            "conflict_id":  conflict["id"],
+            "phase":        phase,
+            "with":         other_name,
+            "with_id":      other_id,
+            "issues":       conflict.get("issues", []),
+            "my_willingness": round(conflict["willingness"].get(c["id"], 0), 2),
+            "their_willingness": round(conflict["willingness"].get(other_id, 0), 2),
+            "exchanges":    conflict["exchanges"],
+        }
+
+        if phase == "fight":
+            result["fight_stage"] = conflict.get("fight_stage")
+            result["escalation_score"] = round(conflict.get("escalation_score", 0), 1)
+
+        if phase == "negotiation":
+            result["proposed_terms"]  = conflict.get("proposed_terms",  [])
+            result["accepted_terms"]  = conflict.get("accepted_terms",  [])
+
+        return result
+
+    return None
+
+
+# =========================================================
+# GRIEVANCE CONTEXT
+# Shows top grievances against others so the LLM knows
+# what's bothering this character even before a confrontation.
+# =========================================================
+
+def build_grievance_context(c, world):
+    from systems.grievances import get_grievance_score
+    chars   = world.get("characters", {})
+    scores  = {}
+    for g in c.get("grievances", []):
+        bid = g["caused_by"]
+        scores[bid] = scores.get(bid, 0) + g["weight"]
+
+    results = []
+    for other_id, score in scores.items():
+        if score < 3.0:
+            continue
+        other = chars.get(other_id)
+        name  = other["name"] if other else other_id
+        top_events = sorted(
+            [g for g in c["grievances"] if g["caused_by"] == other_id],
+            key=lambda g: g["weight"], reverse=True
+        )[:2]
+        results.append({
+            "with":       name,
+            "score":      round(score, 1),
+            "top_issues": [g["event_type"] for g in top_events],
+        })
+
+    results.sort(key=lambda x: x["score"], reverse=True)
+    return results[:5]
