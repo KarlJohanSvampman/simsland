@@ -31,6 +31,7 @@ from api.editor  import router as editor_router
 from api.props   import router as props_router
 from api.meshbank import router as meshbank_router
 from api.view    import router as view_router
+from api.debug   import router as debug_router
 
 app = FastAPI(title="Simsland")
 app.add_middleware(
@@ -47,6 +48,7 @@ app.include_router(assets_router, prefix="/api")
 app.include_router(props_router,  prefix="/api")
 app.include_router(meshbank_router, prefix="/api")
 app.include_router(editor_router,   prefix="/api/editor")
+app.include_router(debug_router)
 
 frontend_dir = Path(__file__).parent / "frontend"
 if frontend_dir.exists():

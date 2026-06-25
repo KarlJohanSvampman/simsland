@@ -1,0 +1,1109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HoloSims Dev Tools</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --bg2: #161b22;
+    --bg3: #21262d;
+    --border: #30363d;
+    --text: #c9d1d9;
+    --text-dim: #8b949e;
+    --accent: #58a6ff;
+    --accent2: #3fb950;
+    --warn: #d29922;
+    --err: #f85149;
+    --purple: #bc8cff;
+    --orange: #ffa657;
+    --mono: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+    --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 13px; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+  /* ── Top bar ── */
+  #topbar { background: var(--bg2); border-bottom: 1px solid var(--border); padding: 8px 14px; display: flex; align-items: center; gap: 16px; flex-shrink: 0; }
+  #topbar h1 { font-size: 14px; font-weight: 600; color: var(--text); letter-spacing: .3px; }
+  #topbar h1 span { color: var(--accent); }
+  .tabs { display: flex; gap: 2px; margin-left: auto; }
+  .tab-btn { background: transparent; border: 1px solid transparent; color: var(--text-dim); padding: 5px 14px; border-radius: 6px; cursor: pointer; font-size: 12px; font-family: var(--sans); transition: all .15s; }
+  .tab-btn:hover { color: var(--text); background: var(--bg3); }
+  .tab-btn.active { color: var(--accent); border-color: var(--accent); background: rgba(88,166,255,.08); }
+
+  /* ── Layout ── */
+  #main { display: flex; flex: 1; overflow: hidden; }
+  #sidebar { width: 320px; min-width: 280px; border-right: 1px solid var(--border); overflow-y: auto; display: flex; flex-direction: column; }
+  #content { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
+
+  /* ── Sidebar sections ── */
+  .section { border-bottom: 1px solid var(--border); }
+  .section-hdr { padding: 8px 12px; background: var(--bg3); font-size: 11px; font-weight: 600; letter-spacing: .5px; color: var(--text-dim); text-transform: uppercase; display: flex; align-items: center; justify-content: space-between; cursor: pointer; user-select: none; }
+  .section-hdr:hover { background: var(--border); }
+  .section-body { padding: 10px 12px; display: flex; flex-direction: column; gap: 7px; }
+  .section-body.collapsed { display: none; }
+
+  /* ── Form elements ── */
+  label { font-size: 11px; color: var(--text-dim); display: block; margin-bottom: 2px; }
+  input[type=text], input[type=number], select, textarea {
+    width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 4px;
+    color: var(--text); padding: 5px 8px; font-size: 12px; font-family: var(--sans);
+    outline: none; transition: border-color .15s;
+  }
+  input:focus, select:focus, textarea:focus { border-color: var(--accent); }
+  textarea { font-family: var(--mono); font-size: 11px; resize: vertical; }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
+
+  /* Sliders */
+  .slider-row { display: grid; grid-template-columns: 90px 1fr 32px; gap: 6px; align-items: center; }
+  .slider-row label { margin: 0; white-space: nowrap; }
+  input[type=range] { width: 100%; accent-color: var(--accent); cursor: pointer; }
+  .slider-val { text-align: right; font-family: var(--mono); font-size: 11px; color: var(--accent); }
+
+  /* Buttons */
+  .btn { background: var(--bg3); border: 1px solid var(--border); color: var(--text); padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; font-family: var(--sans); transition: all .15s; }
+  .btn:hover { border-color: var(--accent); color: var(--accent); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #000; font-weight: 600; }
+  .btn.primary:hover { background: #79bfff; }
+  .btn.danger { border-color: var(--err); color: var(--err); }
+  .btn-row { display: flex; gap: 6px; flex-wrap: wrap; }
+
+  /* Chip tags */
+  .chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 3px; }
+  .chip { background: var(--bg3); border: 1px solid var(--border); border-radius: 12px; padding: 2px 8px; font-size: 11px; cursor: pointer; transition: all .12s; }
+  .chip:hover { border-color: var(--err); color: var(--err); }
+  .chip.active { background: rgba(88,166,255,.15); border-color: var(--accent); color: var(--accent); }
+  .chip-add { background: transparent; border: 1px dashed var(--border); border-radius: 12px; padding: 2px 8px; font-size: 11px; cursor: pointer; color: var(--text-dim); transition: all .12s; }
+  .chip-add:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* Preset picker */
+  .presets { display: flex; gap: 4px; flex-wrap: wrap; }
+  .preset { font-size: 10px; padding: 3px 7px; border: 1px solid var(--border); border-radius: 4px; cursor: pointer; background: var(--bg); color: var(--text-dim); transition: all .12s; }
+  .preset:hover { color: var(--text); border-color: var(--text-dim); }
+
+  /* ── Content panels ── */
+  .tab-panel { display: none; flex: 1; overflow: hidden; }
+  .tab-panel.active { display: flex; }
+
+  /* ── Context / LLM tab ── */
+  #tab-context { flex-direction: row; }
+  .ctx-pane { flex: 1; overflow: hidden; display: flex; flex-direction: column; border-right: 1px solid var(--border); }
+  .ctx-pane:last-child { border-right: none; }
+  .pane-hdr { padding: 8px 14px; background: var(--bg2); border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+  .pane-hdr span { font-size: 12px; font-weight: 600; }
+  .pane-hdr .badge { font-size: 10px; padding: 2px 6px; border-radius: 10px; }
+  .badge-ok { background: rgba(63,185,80,.2); color: var(--accent2); }
+  .badge-err { background: rgba(248,81,73,.2); color: var(--err); }
+  .badge-warn { background: rgba(210,153,34,.2); color: var(--warn); }
+  .badge-info { background: rgba(88,166,255,.15); color: var(--accent); }
+  .pane-body { flex: 1; overflow-y: auto; padding: 10px 14px; }
+
+  /* ── JSON tree ── */
+  .json-tree { font-family: var(--mono); font-size: 11.5px; line-height: 1.7; }
+  .json-tree ul { list-style: none; padding-left: 18px; }
+  .json-tree .key { color: var(--purple); }
+  .json-tree .str { color: var(--accent2); }
+  .json-tree .num { color: var(--orange); }
+  .json-tree .bool { color: var(--accent); }
+  .json-tree .null { color: var(--text-dim); }
+  .json-tree .toggle { cursor: pointer; user-select: none; }
+  .json-tree .toggle::before { content: '▾ '; font-size: 10px; color: var(--text-dim); }
+  .json-tree .toggle.closed::before { content: '▸ '; }
+  .json-tree .collapsed { display: none; }
+
+  /* ── LLM response panel ── */
+  .prompt-box { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 10px; font-family: var(--mono); font-size: 11px; white-space: pre-wrap; overflow-y: auto; max-height: 220px; color: var(--text-dim); }
+  .response-box { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 10px; font-family: var(--mono); font-size: 11.5px; white-space: pre-wrap; overflow-y: auto; flex: 1; }
+  .response-box.valid { border-color: var(--accent2); }
+  .response-box.invalid { border-color: var(--err); }
+  .error-box { background: rgba(248,81,73,.08); border: 1px solid var(--err); border-radius: 6px; padding: 8px 10px; font-family: var(--mono); font-size: 11px; color: var(--err); white-space: pre-wrap; }
+  .action-card { background: var(--bg3); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; margin-top: 8px; }
+  .action-card .action-type { font-size: 14px; font-weight: 700; color: var(--accent); }
+  .action-card .kv { display: grid; grid-template-columns: 80px 1fr; gap: 3px 8px; margin-top: 6px; font-size: 11.5px; }
+  .action-card .kv .k { color: var(--text-dim); }
+  .action-card .thought { border-top: 1px solid var(--border); margin-top: 8px; padding-top: 8px; font-style: italic; color: var(--text-dim); font-size: 11.5px; }
+  .action-card .speech { background: rgba(88,166,255,.08); border-radius: 4px; padding: 6px 8px; margin-top: 6px; font-size: 12px; }
+
+  /* ── Schedule tab ── */
+  #tab-schedule { flex-direction: column; }
+  #schedule-grid-wrap { flex: 1; overflow: auto; padding: 14px; }
+  .schedule-grid { display: grid; grid-template-columns: 50px repeat(7, 1fr); gap: 0; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; min-width: 600px; }
+  .sg-head { background: var(--bg2); padding: 6px 8px; text-align: center; font-size: 11px; font-weight: 600; color: var(--text-dim); border-bottom: 1px solid var(--border); border-right: 1px solid var(--border); text-transform: uppercase; letter-spacing: .4px; }
+  .sg-head:last-child { border-right: none; }
+  .sg-col { position: relative; border-right: 1px solid var(--border); background: var(--bg); }
+  .sg-col:last-child { border-right: none; }
+  .sg-time { font-size: 10px; color: var(--text-dim); text-align: right; padding-right: 6px; display: flex; align-items: flex-start; justify-content: flex-end; border-right: 1px solid var(--border); }
+  .sg-hour { height: 24px; border-bottom: 1px solid rgba(48,54,61,.5); }
+  .sg-hour:last-child { border-bottom: none; }
+  .sched-block { position: absolute; left: 2px; right: 2px; border-radius: 3px; padding: 2px 4px; font-size: 10px; font-weight: 600; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; cursor: default; }
+  .sched-sleep  { background: rgba(88,166,255,.18); color: #79bfff; border-left: 3px solid var(--accent); }
+  .sched-work   { background: rgba(63,185,80,.18);  color: #7ce38b; border-left: 3px solid var(--accent2); }
+  .sched-eat    { background: rgba(255,166,87,.18); color: var(--orange); border-left: 3px solid var(--orange); }
+  .sched-relax  { background: rgba(188,140,255,.18);color: var(--purple); border-left: 3px solid var(--purple); }
+  .sched-contract { background: rgba(210,153,34,.18);color: var(--warn); border-left: 3px solid var(--warn); }
+  .sched-other  { background: rgba(201,209,217,.1); color: var(--text-dim); border-left: 3px solid var(--text-dim); }
+  .legend { display: flex; gap: 12px; flex-wrap: wrap; padding: 8px 14px 0; border-top: 1px solid var(--border); flex-shrink: 0; }
+  .legend-item { display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--text-dim); }
+  .legend-dot { width: 10px; height: 10px; border-radius: 2px; }
+
+  /* ── Activity tab ── */
+  #tab-activity { flex-direction: row; }
+  .activity-left { width: 320px; min-width: 260px; border-right: 1px solid var(--border); display: flex; flex-direction: column; overflow-y: auto; }
+  .activity-right { flex: 1; overflow-y: auto; padding: 14px; }
+  .phase-card { background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 10px; overflow: hidden; }
+  .phase-card-hdr { background: var(--bg3); padding: 8px 12px; display: flex; align-items: center; gap: 8px; }
+  .phase-card-hdr .interaction-name { font-family: var(--mono); font-size: 12px; font-weight: 700; color: var(--accent); }
+  .phase-card-hdr .prop-id { font-size: 11px; color: var(--text-dim); }
+  .phase-list { display: grid; grid-template-columns: 80px 1fr; gap: 0; }
+  .phase-row { display: contents; }
+  .phase-row .ph-name { padding: 6px 10px; font-size: 11px; color: var(--text-dim); border-bottom: 1px solid var(--border); font-family: var(--mono); background: var(--bg); }
+  .phase-row .ph-anims { padding: 6px 10px; border-bottom: 1px solid var(--border); display: flex; gap: 4px; flex-wrap: wrap; }
+  .phase-row:last-child .ph-name, .phase-row:last-child .ph-anims { border-bottom: none; }
+  .anim-tag { background: rgba(188,140,255,.15); border: 1px solid rgba(188,140,255,.3); border-radius: 12px; padding: 2px 8px; font-size: 10.5px; color: var(--purple); font-family: var(--mono); }
+  .tag-pill { background: var(--bg3); border: 1px solid var(--border); border-radius: 4px; padding: 2px 6px; font-size: 10px; color: var(--text-dim); }
+  .interaction-ref { background: var(--bg2); border: 1px solid var(--border); border-radius: 6px; padding: 10px; font-family: var(--mono); font-size: 11px; }
+  .interaction-ref table { width: 100%; border-collapse: collapse; }
+  .interaction-ref th { text-align: left; color: var(--text-dim); font-size: 10px; padding: 3px 6px; border-bottom: 1px solid var(--border); }
+  .interaction-ref td { padding: 3px 6px; border-bottom: 1px solid rgba(48,54,61,.4); }
+  .interaction-ref tr:last-child td { border-bottom: none; }
+  .interaction-ref .int-name { color: var(--accent); }
+  .interaction-ref .int-anims { color: var(--purple); }
+
+  /* Prop editor */
+  .prop-item { background: var(--bg3); border: 1px solid var(--border); border-radius: 6px; padding: 8px; display: flex; flex-direction: column; gap: 5px; }
+  .prop-item-hdr { display: flex; align-items: center; justify-content: space-between; }
+  .prop-id-label { font-family: var(--mono); font-size: 12px; color: var(--accent); font-weight: 600; }
+  .prop-delete { background: none; border: none; color: var(--text-dim); cursor: pointer; font-size: 14px; padding: 0 3px; }
+  .prop-delete:hover { color: var(--err); }
+
+  /* ── Misc ── */
+  .spinner { display: inline-block; width: 12px; height: 12px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin .7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .empty-state { text-align: center; color: var(--text-dim); padding: 40px 20px; font-size: 12px; }
+  .empty-state .icon { font-size: 32px; margin-bottom: 8px; }
+  .divider { border: none; border-top: 1px solid var(--border); margin: 4px 0; }
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--text-dim); }
+</style>
+</head>
+<body>
+
+<!-- ── Top bar ── -->
+<div id="topbar">
+  <h1>🧠 HoloSims <span>Dev Tools</span></h1>
+  <div class="tabs">
+    <button class="tab-btn active" onclick="switchTab('context')">Context / LLM</button>
+    <button class="tab-btn" onclick="switchTab('schedule')">Schedule</button>
+    <button class="tab-btn" onclick="switchTab('activity')">Activity Phases</button>
+  </div>
+</div>
+
+<!-- ── Main ── -->
+<div id="main">
+
+  <!-- ── Sidebar ── -->
+  <div id="sidebar">
+
+    <!-- Presets -->
+    <div class="section">
+      <div class="section-hdr" onclick="toggleSection(this)">⚡ Presets</div>
+      <div class="section-body">
+        <div class="presets">
+          <button class="preset" onclick="loadPreset('default')">Default</button>
+          <button class="preset" onclick="loadPreset('stressed_parent')">Stressed Parent</button>
+          <button class="preset" onclick="loadPreset('workaholic')">Workaholic</button>
+          <button class="preset" onclick="loadPreset('night_owl')">Night Owl</button>
+          <button class="preset" onclick="loadPreset('in_conflict')">In Conflict</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Character -->
+    <div class="section">
+      <div class="section-hdr" onclick="toggleSection(this)">👤 Character</div>
+      <div class="section-body">
+        <div class="row2">
+          <div><label>Name</label><input type="text" id="c-name" value="Debug Sim"></div>
+          <div><label>Age</label><input type="number" id="c-age" value="28" min="18" max="90"></div>
+        </div>
+        <div class="row2">
+          <div><label>Occupation</label><input type="text" id="c-occupation" value="none"></div>
+          <div><label>Wage ($/hr)</label><input type="number" id="c-wage" value="15" min="1" step="0.5"></div>
+        </div>
+        <div><label>Traits (click to toggle)</label>
+          <div class="chips" id="trait-chips"></div>
+        </div>
+        <div><label>Emotion</label>
+          <select id="c-emotion">
+            <option>neutral</option><option>happy</option><option>sad</option>
+            <option>anxious</option><option>angry</option><option>stressed</option>
+            <option>excited</option><option>bored</option><option>content</option>
+            <option>lonely</option><option>jealous</option><option>proud</option>
+          </select>
+        </div>
+        <div class="slider-row"><label>Energy</label><input type="range" id="c-energy" min="0" max="100" value="80" oninput="this.nextElementSibling.textContent=this.value"><span class="slider-val">80</span></div>
+        <div class="slider-row"><label>Stress</label><input type="range" id="c-stress" min="0" max="100" value="20" oninput="this.nextElementSibling.textContent=this.value"><span class="slider-val">20</span></div>
+        <div class="slider-row"><label>Wealth</label><input type="range" id="c-wealth" min="0" max="2000" value="500" oninput="this.nextElementSibling.textContent=this.value"><span class="slider-val">500</span></div>
+      </div>
+    </div>
+
+    <!-- Body needs -->
+    <div class="section">
+      <div class="section-hdr" onclick="toggleSection(this)">💪 Body Needs</div>
+      <div class="section-body">
+        <div class="slider-row"><label>Hunger</label><input type="range" id="n-hunger" min="0" max="100" value="20" oninput="this.nextElementSibling.textContent=this.value"><span class="slider-val">20</span></div>
+        <div class="slider-row"><label>Bladder</label><input type="range" id="n-bladder" min="0" max="100" value="10" oninput="this.nextElementSibling.textContent=this.value"><span class="slider-val">10</span></div>
+        <div class="slider-row"><label>Fatigue</label><input type="range" id="n-fatigue" min="0" max="100" value="15" oninput="this.nextElementSibling.textContent=this.value"><span class="slider-val">15</span></div>
+        <div class="slider-row"><label>Hygiene</label><input type="range" id="n-hygiene" min="0" max="100" value="90" oninput="this.nextElementSibling.textContent=this.value"><span class="slider-val">90</span></div>
+      </div>
+    </div>
+
+    <!-- Location & World -->
+    <div class="section">
+      <div class="section-hdr" onclick="toggleSection(this)">🌍 World / Location</div>
+      <div class="section-body">
+        <div class="row2">
+          <div><label>Day</label>
+            <select id="w-day">
+              <option value="monday">Mon</option><option value="tuesday">Tue</option>
+              <option value="wednesday">Wed</option><option value="thursday">Thu</option>
+              <option value="friday">Fri</option><option value="saturday">Sat</option>
+              <option value="sunday">Sun</option>
+            </select>
+          </div>
+          <div><label>Hour</label><input type="number" id="w-hour" min="0" max="23" value="9"></div>
+        </div>
+        <div class="row2">
+          <div><label>Building ID</label><input type="text" id="c-building" value="home_1"></div>
+          <div><label>Room ID</label><input type="text" id="c-room" value="living_room"></div>
+        </div>
+        <div><label>Cost of Living</label>
+          <input type="range" id="w-col" min="0.5" max="2.0" step="0.1" value="1.0" oninput="document.getElementById('w-col-val').textContent=parseFloat(this.value).toFixed(1)">
+          <span id="w-col-val" style="font-family:var(--mono);font-size:11px;color:var(--accent)">1.0</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Nearby props -->
+    <div class="section">
+      <div class="section-hdr" onclick="toggleSection(this)">🪑 Nearby Props</div>
+      <div class="section-body">
+        <div id="props-list"></div>
+        <button class="btn" onclick="addProp()" style="margin-top:4px">+ Add Prop</button>
+      </div>
+    </div>
+
+    <!-- Nearby characters -->
+    <div class="section">
+      <div class="section-hdr" onclick="toggleSection(this)">👥 Nearby Characters</div>
+      <div class="section-body">
+        <div id="nearby-chars-list"></div>
+        <button class="btn" onclick="addNearbyChar()" style="margin-top:4px">+ Add Character</button>
+      </div>
+    </div>
+
+    <!-- Relationships -->
+    <div class="section">
+      <div class="section-hdr" onclick="toggleSection(this)">❤️ Relationships</div>
+      <div class="section-body">
+        <div id="rel-list"></div>
+        <button class="btn" onclick="addRelationship()" style="margin-top:4px">+ Add Relationship</button>
+      </div>
+    </div>
+
+    <!-- Household (for schedule) -->
+    <div class="section">
+      <div class="section-hdr" onclick="toggleSection(this)">🏠 Household (Schedule)</div>
+      <div class="section-body">
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+          <input type="checkbox" id="hh-enabled" checked> Enable household
+        </label>
+        <div class="slider-row"><label>Members</label><input type="range" id="hh-members" min="1" max="6" value="2" oninput="this.nextElementSibling.textContent=this.value"><span class="slider-val">2</span></div>
+        <div><label>Weekly Expenses ($)</label><input type="number" id="hh-expenses" value="950" min="100" step="50"></div>
+      </div>
+    </div>
+
+    <!-- Extra JSON -->
+    <div class="section">
+      <div class="section-hdr" onclick="toggleSection(this)">📝 Extra JSON (merged)</div>
+      <div class="section-body">
+        <label>Character extra fields</label>
+        <textarea id="extra-char" rows="3" placeholder='{"memories":[],"beliefs":{}}'>{}</textarea>
+        <label>World extra fields</label>
+        <textarea id="extra-world" rows="3" placeholder='{"news_feed":[]}'>{}</textarea>
+      </div>
+    </div>
+
+    <!-- Run buttons -->
+    <div style="padding:12px;display:flex;flex-direction:column;gap:6px;">
+      <button class="btn primary" id="run-btn" onclick="runCurrent()">▶ Run</button>
+      <button class="btn" onclick="copyPayload()">📋 Copy payload</button>
+    </div>
+
+  </div><!-- /sidebar -->
+
+  <!-- ── Content panels ── -->
+  <div id="content">
+
+    <!-- Tab: Context / LLM -->
+    <div class="tab-panel active" id="tab-context">
+      <!-- Context pane -->
+      <div class="ctx-pane" style="flex:1.2">
+        <div class="pane-hdr">
+          <span>Context JSON</span>
+          <span id="ctx-badge"></span>
+          <button class="btn" style="margin-left:auto;font-size:11px;padding:3px 8px" onclick="expandAll()">Expand All</button>
+          <button class="btn" style="font-size:11px;padding:3px 8px" onclick="collapseAll()">Collapse All</button>
+        </div>
+        <div class="pane-body" id="ctx-pane">
+          <div class="empty-state"><div class="icon">🔍</div>Click <strong>Run</strong> to build context</div>
+        </div>
+      </div>
+      <!-- LLM pane -->
+      <div class="ctx-pane" style="flex:1">
+        <div class="pane-hdr">
+          <span>LLM Response</span>
+          <span id="llm-badge"></span>
+          <label style="margin-left:auto;display:flex;align-items:center;gap:4px;font-size:11px;color:var(--text-dim)">
+            <input type="checkbox" id="llm-auto"> Auto-send to LLM
+          </label>
+        </div>
+        <div class="pane-body" id="llm-pane" style="display:flex;flex-direction:column;gap:10px">
+          <div class="empty-state"><div class="icon">🤖</div>Enable <em>Auto-send</em> or Run with LLM mode active</div>
+        </div>
+      </div>
+    </div><!-- /tab-context -->
+
+    <!-- Tab: Schedule -->
+    <div class="tab-panel" id="tab-schedule">
+      <div style="padding:10px 14px;background:var(--bg2);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;flex-shrink:0">
+        <span style="font-size:12px;font-weight:600">Weekly Schedule</span>
+        <span id="sched-info" style="font-size:11px;color:var(--text-dim)"></span>
+        <span id="sched-badge"></span>
+      </div>
+      <div class="legend">
+        <div class="legend-item"><div class="legend-dot" style="background:rgba(88,166,255,.4)"></div>Sleep</div>
+        <div class="legend-item"><div class="legend-dot" style="background:rgba(63,185,80,.4)"></div>Work</div>
+        <div class="legend-item"><div class="legend-dot" style="background:rgba(255,166,87,.4)"></div>Eat</div>
+        <div class="legend-item"><div class="legend-dot" style="background:rgba(188,140,255,.4)"></div>Relax</div>
+        <div class="legend-item"><div class="legend-dot" style="background:rgba(210,153,34,.4)"></div>Contract</div>
+      </div>
+      <div id="schedule-grid-wrap">
+        <div class="empty-state"><div class="icon">📅</div>Switch to <strong>Schedule</strong> tab and click <strong>Run</strong></div>
+      </div>
+    </div><!-- /tab-schedule -->
+
+    <!-- Tab: Activity Phases -->
+    <div class="tab-panel" id="tab-activity">
+      <div class="activity-left">
+        <div class="section">
+          <div class="section-hdr">Intention</div>
+          <div class="section-body">
+            <div><label>Intention type</label>
+              <select id="act-intention">
+                <option>relax</option><option>eat</option><option>sleep</option>
+                <option>work</option><option>hygiene</option><option>socialize</option>
+                <option>clean</option><option>explore</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        <div class="section">
+          <div class="section-hdr">Quick prop presets</div>
+          <div class="section-body">
+            <div class="presets">
+              <button class="preset" onclick="addPropPreset('living_room')">Living Room</button>
+              <button class="preset" onclick="addPropPreset('kitchen')">Kitchen</button>
+              <button class="preset" onclick="addPropPreset('bedroom')">Bedroom</button>
+              <button class="preset" onclick="addPropPreset('bathroom')">Bathroom</button>
+              <button class="preset" onclick="addPropPreset('office')">Office</button>
+            </div>
+          </div>
+        </div>
+        <div style="padding:10px 12px;border-top:1px solid var(--border)">
+          <div style="font-size:11px;color:var(--text-dim);margin-bottom:6px">Props defined in the sidebar are used here too.</div>
+          <button class="btn primary" onclick="runActivity()" style="width:100%">▶ Inspect Phases</button>
+        </div>
+        <div style="padding:10px 12px">
+          <div style="font-size:11px;font-weight:600;color:var(--text-dim);margin-bottom:6px;text-transform:uppercase;letter-spacing:.4px">Full Interaction Reference</div>
+          <div id="interaction-ref-wrap">
+            <div style="font-size:11px;color:var(--text-dim)">Run to populate</div>
+          </div>
+        </div>
+      </div>
+      <div class="activity-right" id="activity-pane">
+        <div class="empty-state"><div class="icon">🎬</div>Add props in the sidebar, then click <strong>Inspect Phases</strong></div>
+      </div>
+    </div><!-- /tab-activity -->
+
+  </div><!-- /content -->
+</div><!-- /main -->
+
+<script>
+// ─── State ────────────────────────────────────────────────────────────────────
+const TRAITS = [
+  'ambitious','lazy','workaholic','night_owl','early_bird','anxious','confident',
+  'friendly','introverted','extroverted','stubborn','agreeable','hot_headed',
+  'empathetic','materialistic','frugal','neurotic','optimistic','pessimistic',
+];
+
+const PROP_PRESETS = {
+  living_room: [
+    { id:'sofa_1', template:'sofa', tags:['seatable','furniture'], interactions:['sit'], distance:2 },
+    { id:'tv_1', template:'tv', tags:['entertainment','screen'], interactions:['watch_tv'], distance:3 },
+    { id:'coffee_table_1', template:'coffee_table', tags:['surface','table'], interactions:['examine'], distance:2.5 },
+  ],
+  kitchen: [
+    { id:'stove_1', template:'stove', tags:['cooking_appliance'], interactions:['cook','stove'], distance:1.5 },
+    { id:'fridge_1', template:'fridge', tags:['food_storage','fridge'], interactions:['fridge','open_fridge'], distance:2 },
+    { id:'counter_1', template:'counter', tags:['surface','counter'], interactions:['examine','wipe'], distance:1.5 },
+    { id:'dining_chair_1', template:'chair', tags:['seatable','furniture'], interactions:['sit','eat'], distance:2 },
+  ],
+  bedroom: [
+    { id:'bed_1', template:'bed', tags:['sleepable','furniture'], interactions:['sleep','lie','lie_down'], distance:2 },
+    { id:'wardrobe_1', template:'wardrobe', tags:['storage','furniture'], interactions:['examine','search'], distance:2 },
+    { id:'desk_1', template:'desk', tags:['surface','desk','workable'], interactions:['work','use_computer'], distance:2 },
+  ],
+  bathroom: [
+    { id:'toilet_1', template:'toilet', tags:['toilet'], interactions:['use_toilet','flush'], distance:1 },
+    { id:'shower_1', template:'shower', tags:['shower','hygiene'], interactions:['take_shower'], distance:1.5 },
+    { id:'sink_1', template:'sink', tags:['sink','hygiene'], interactions:['wash_hands','brush_teeth'], distance:1 },
+    { id:'mirror_1', template:'mirror', tags:['mirror','glass'], interactions:['mirror'], distance:1.5 },
+  ],
+  office: [
+    { id:'office_desk_1', template:'office_desk', tags:['surface','desk','workable'], interactions:['work','use_computer'], distance:2 },
+    { id:'office_chair_1', template:'office_chair', tags:['seatable','furniture'], interactions:['sit'], distance:1.5 },
+    { id:'filing_cabinet_1', template:'filing_cabinet', tags:['storage'], interactions:['search','examine'], distance:2 },
+  ],
+};
+
+let props = [];      // [{id, template, tags:[], interactions:[], distance}]
+let nearbyChars = [];  // [{id, name, distance}]
+let relationships = []; // [{id, name, state, trust, friendship}]
+let activeTraits = new Set();
+let currentTab = 'context';
+
+// ─── Trait chips ─────────────────────────────────────────────────────────────
+function renderTraitChips() {
+  const el = document.getElementById('trait-chips');
+  el.innerHTML = '';
+  TRAITS.forEach(t => {
+    const chip = document.createElement('span');
+    chip.className = 'chip' + (activeTraits.has(t) ? ' active' : '');
+    chip.textContent = t;
+    chip.onclick = () => {
+      if (activeTraits.has(t)) activeTraits.delete(t); else activeTraits.add(t);
+      renderTraitChips();
+    };
+    el.appendChild(chip);
+  });
+}
+
+// ─── Props ────────────────────────────────────────────────────────────────────
+function renderProps() {
+  const el = document.getElementById('props-list');
+  el.innerHTML = '';
+  props.forEach((p, i) => {
+    const div = document.createElement('div');
+    div.className = 'prop-item';
+    div.style.marginBottom = '6px';
+    div.innerHTML = `
+      <div class="prop-item-hdr">
+        <span class="prop-id-label">${p.id}</span>
+        <button class="prop-delete" onclick="removeProp(${i})">✕</button>
+      </div>
+      <div class="row2">
+        <div><label>ID</label><input type="text" value="${p.id}" onchange="props[${i}].id=this.value;renderProps()"></div>
+        <div><label>Template</label><input type="text" value="${p.template||''}" onchange="props[${i}].template=this.value"></div>
+      </div>
+      <div><label>Tags (comma-sep)</label><input type="text" value="${(p.tags||[]).join(',')}" onchange="props[${i}].tags=this.value.split(',').map(s=>s.trim()).filter(Boolean)"></div>
+      <div><label>Interactions (comma-sep)</label><input type="text" value="${(p.interactions||[]).join(',')}" onchange="props[${i}].interactions=this.value.split(',').map(s=>s.trim()).filter(Boolean)"></div>
+      <div class="slider-row"><label>Distance</label><input type="range" min="0.5" max="10" step="0.5" value="${p.distance||2}" onchange="props[${i}].distance=parseFloat(this.value);this.nextElementSibling.textContent=this.value"><span class="slider-val">${p.distance||2}</span></div>
+    `;
+    el.appendChild(div);
+  });
+}
+
+function addProp() {
+  const id = 'prop_' + (props.length + 1);
+  props.push({ id, template: id, tags: [], interactions: [], distance: 2 });
+  renderProps();
+}
+
+function removeProp(i) { props.splice(i, 1); renderProps(); }
+
+function addPropPreset(name) {
+  const preset = PROP_PRESETS[name] || [];
+  preset.forEach(p => {
+    if (!props.find(x => x.id === p.id)) props.push({...p, tags:[...p.tags], interactions:[...p.interactions]});
+  });
+  renderProps();
+}
+
+// ─── Nearby characters ────────────────────────────────────────────────────────
+function renderNearbyChars() {
+  const el = document.getElementById('nearby-chars-list');
+  el.innerHTML = '';
+  nearbyChars.forEach((nc, i) => {
+    const div = document.createElement('div');
+    div.style.cssText = 'background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:8px;margin-bottom:6px';
+    div.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+        <span style="font-family:var(--mono);font-size:11px;color:var(--accent)">${nc.id}</span>
+        <button class="prop-delete" onclick="nearbyChars.splice(${i},1);renderNearbyChars()">✕</button>
+      </div>
+      <div class="row2">
+        <div><label>ID</label><input type="text" value="${nc.id}" onchange="nearbyChars[${i}].id=this.value;renderNearbyChars()"></div>
+        <div><label>Name</label><input type="text" value="${nc.name}" onchange="nearbyChars[${i}].name=this.value"></div>
+      </div>
+    `;
+    el.appendChild(div);
+  });
+}
+
+function addNearbyChar() {
+  nearbyChars.push({ id: 'char_' + Date.now().toString(36), name: 'NPC', distance: 3 });
+  renderNearbyChars();
+}
+
+// ─── Relationships ────────────────────────────────────────────────────────────
+const REL_STATES = ['stranger','acquaintance','friend','close_friend','enemy','distrusted','romantic_interest'];
+function renderRelationships() {
+  const el = document.getElementById('rel-list');
+  el.innerHTML = '';
+  relationships.forEach((r, i) => {
+    const div = document.createElement('div');
+    div.style.cssText = 'background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:8px;margin-bottom:6px';
+    div.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+        <span style="font-family:var(--mono);font-size:11px;color:var(--purple)">${r.name || r.id}</span>
+        <button class="prop-delete" onclick="relationships.splice(${i},1);renderRelationships()">✕</button>
+      </div>
+      <div class="row2">
+        <div><label>ID</label><input type="text" value="${r.id}" onchange="relationships[${i}].id=this.value"></div>
+        <div><label>Name</label><input type="text" value="${r.name}" onchange="relationships[${i}].name=this.value;renderRelationships()"></div>
+      </div>
+      <div><label>State</label>
+        <select onchange="relationships[${i}].state=this.value">
+          ${REL_STATES.map(s=>`<option ${r.state===s?'selected':''}>${s}</option>`).join('')}
+        </select>
+      </div>
+      <div class="row2">
+        <div class="slider-row" style="grid-template-columns:50px 1fr 28px"><label>Trust</label><input type="range" min="-100" max="100" value="${r.trust||0}" onchange="relationships[${i}].trust=parseInt(this.value);this.nextElementSibling.textContent=this.value"><span class="slider-val">${r.trust||0}</span></div>
+        <div class="slider-row" style="grid-template-columns:50px 1fr 28px"><label>Friend</label><input type="range" min="-100" max="100" value="${r.friendship||0}" onchange="relationships[${i}].friendship=parseInt(this.value);this.nextElementSibling.textContent=this.value"><span class="slider-val">${r.friendship||0}</span></div>
+      </div>
+    `;
+    el.appendChild(div);
+  });
+}
+
+function addRelationship() {
+  const id = 'npc_' + Date.now().toString(36);
+  relationships.push({ id, name: 'NPC', state: 'acquaintance', trust: 30, friendship: 30, familiarity: 5, interaction_count: 3 });
+  renderRelationships();
+}
+
+// ─── Build payload ─────────────────────────────────────────────────────────────
+function buildPayload() {
+  let extraChar = {}, extraWorld = {};
+  try { extraChar = JSON.parse(document.getElementById('extra-char').value || '{}'); } catch(e){}
+  try { extraWorld = JSON.parse(document.getElementById('extra-world').value || '{}'); } catch(e){}
+
+  // Build relationship dict for character
+  const relDict = {};
+  relationships.forEach(r => {
+    relDict[r.id] = {
+      state: r.state || 'acquaintance',
+      trust: r.trust || 0,
+      friendship: r.friendship || 0,
+      hostility: r.hostility || 0,
+      attraction: r.attraction || 0,
+      resentment: r.resentment || 0,
+      comfort: r.comfort || 0,
+      familiarity: r.familiarity || 5,
+      interaction_count: r.interaction_count || 3,
+      last_interaction: Date.now() / 1000 - 3600,
+    };
+  });
+
+  // Build character's other objects in world for name lookups
+  const worldChars = {};
+  relationships.forEach(r => { worldChars[r.id] = { id: r.id, name: r.name || r.id }; });
+  nearbyChars.forEach(nc => { worldChars[nc.id] = { id: nc.id, name: nc.name || nc.id }; });
+
+  const propDict = {};
+  props.forEach(p => { propDict[p.id] = {...p}; });
+
+  const perceptionProps = props.map(p => ({
+    id: p.id, template: p.template || p.id,
+    tags: p.tags, interactions: p.interactions, distance: p.distance || 2,
+  }));
+  const perceptionPeople = nearbyChars.map(nc => ({
+    id: nc.id, name: nc.name, distance: nc.distance || 3
+  }));
+
+  const char = {
+    name: document.getElementById('c-name').value,
+    age: parseInt(document.getElementById('c-age').value),
+    occupation: document.getElementById('c-occupation').value,
+    hourly_wage: parseFloat(document.getElementById('c-wage').value),
+    traits: [...activeTraits],
+    emotion: document.getElementById('c-emotion').value,
+    energy: parseInt(document.getElementById('c-energy').value),
+    stress: parseInt(document.getElementById('c-stress').value),
+    wealth: parseInt(document.getElementById('c-wealth').value),
+    needs: {
+      hunger: parseInt(document.getElementById('n-hunger').value),
+      bladder: parseInt(document.getElementById('n-bladder').value),
+      fatigue: parseInt(document.getElementById('n-fatigue').value),
+    },
+    body: {
+      hunger: parseInt(document.getElementById('n-hunger').value),
+      bladder: parseInt(document.getElementById('n-bladder').value),
+      fatigue: parseInt(document.getElementById('n-fatigue').value),
+      hygiene: parseInt(document.getElementById('n-hygiene').value),
+    },
+    building_id: document.getElementById('c-building').value || null,
+    room_id: document.getElementById('c-room').value || null,
+    relationships: relDict,
+    perception: {
+      visible_props: perceptionProps,
+      visible_people: perceptionPeople,
+    },
+    ...extraChar,
+  };
+
+  const world = {
+    calendar: {
+      weekday: document.getElementById('w-day').value,
+      hour: parseInt(document.getElementById('w-hour').value),
+      minute: 0,
+    },
+    environment: {
+      cost_of_living_index: parseFloat(document.getElementById('w-col').value),
+      tax_rate: 0.2,
+    },
+    characters: worldChars,
+    props: propDict,
+    ...extraWorld,
+  };
+
+  let household = null;
+  if (document.getElementById('hh-enabled').checked) {
+    const members = parseInt(document.getElementById('hh-members').value);
+    household = {
+      id: 'debug_household',
+      members: Array.from({length: members}, (_, i) => i === 0 ? 'debug_char' : `housemate_${i}`),
+      weekly_expenses: parseInt(document.getElementById('hh-expenses').value),
+    };
+  }
+
+  return { char, world, household };
+}
+
+// ─── Run current tab ──────────────────────────────────────────────────────────
+async function runCurrent() {
+  if (currentTab === 'context') await runContext();
+  else if (currentTab === 'schedule') await runSchedule();
+  else if (currentTab === 'activity') await runActivity();
+}
+
+async function runContext() {
+  const { char, world } = buildPayload();
+  const btn = document.getElementById('run-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Building...';
+
+  try {
+    const res = await fetch('/debug/build-context', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ character: char, world }),
+    });
+    const data = await res.json();
+    renderContext(data.context, data.errors);
+
+    if (document.getElementById('llm-auto').checked) {
+      await runLLM(char, world, data.context);
+    } else {
+      clearLLMPane();
+    }
+  } catch(e) {
+    document.getElementById('ctx-pane').innerHTML = `<div class="error-box">${e}</div>`;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '▶ Run';
+  }
+}
+
+async function runLLM(char, world, context) {
+  const pane = document.getElementById('llm-pane');
+  pane.innerHTML = '<div style="padding:20px;text-align:center"><span class="spinner"></span><span style="margin-left:8px;color:var(--text-dim)">Calling LLM...</span></div>';
+
+  try {
+    const res = await fetch('/debug/llm-test', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ character: char, world, use_cache: false }),
+    });
+    const data = await res.json();
+    renderLLMResult(data);
+  } catch(e) {
+    pane.innerHTML = `<div class="error-box">LLM error: ${e}</div>`;
+  }
+}
+
+async function runSchedule() {
+  const { char, world, household } = buildPayload();
+  const btn = document.getElementById('run-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Generating...';
+  try {
+    const res = await fetch('/debug/generate-schedule', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ character: char, world, household }),
+    });
+    const data = await res.json();
+    renderSchedule(data);
+  } catch(e) {
+    document.getElementById('schedule-grid-wrap').innerHTML = `<div class="error-box">${e}</div>`;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '▶ Run';
+  }
+}
+
+async function runActivity() {
+  const { char, world } = buildPayload();
+  const propDict = {};
+  props.forEach(p => { propDict[p.id] = {...p}; });
+
+  const btn = document.getElementById('run-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>';
+  try {
+    const intention_type = document.getElementById('act-intention').value;
+    const res = await fetch('/debug/plan-activity', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ intention_type, character: char, props: propDict, world }),
+    });
+    const data = await res.json();
+    renderActivityPhases(data);
+  } catch(e) {
+    document.getElementById('activity-pane').innerHTML = `<div class="error-box">${e}</div>`;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '▶ Run';
+  }
+}
+
+// ─── Renderers ────────────────────────────────────────────────────────────────
+
+function renderContext(ctx, errors) {
+  const pane = document.getElementById('ctx-pane');
+  const errCount = Object.keys(errors || {}).length;
+  const badge = document.getElementById('ctx-badge');
+  badge.className = 'badge ' + (errCount ? 'badge-warn' : 'badge-ok');
+  badge.textContent = errCount ? `${errCount} error(s)` : `${Object.keys(ctx).length} keys`;
+
+  let html = '';
+  if (errCount) {
+    html += '<div class="error-box" style="margin-bottom:10px">';
+    for (const [k,v] of Object.entries(errors)) html += `<div><strong>${k}</strong>: ${v}</div>`;
+    html += '</div>';
+  }
+  html += '<div class="json-tree">' + jsonTreeHTML(ctx, 0) + '</div>';
+  pane.innerHTML = html;
+  // Bind toggle events
+  pane.querySelectorAll('.toggle').forEach(el => {
+    el.addEventListener('click', e => {
+      e.stopPropagation();
+      const ul = el.parentElement.querySelector(':scope > ul');
+      if (ul) { ul.classList.toggle('collapsed'); el.classList.toggle('closed'); }
+    });
+  });
+}
+
+function jsonTreeHTML(val, depth) {
+  if (val === null) return `<span class="null">null</span>`;
+  if (typeof val === 'boolean') return `<span class="bool">${val}</span>`;
+  if (typeof val === 'number') return `<span class="num">${val}</span>`;
+  if (typeof val === 'string') return `<span class="str">"${escHtml(val)}"</span>`;
+  if (Array.isArray(val)) {
+    if (val.length === 0) return '<span class="null">[]</span>';
+    const collapsed = depth >= 2;
+    return `<span class="toggle${collapsed?' closed':''}">Array[${val.length}]</span><ul class="${collapsed?'collapsed':''}">` +
+      val.map((v,i) => `<li><span class="num">${i}</span>: ${jsonTreeHTML(v, depth+1)}</li>`).join('') +
+      '</ul>';
+  }
+  if (typeof val === 'object') {
+    const keys = Object.keys(val);
+    if (keys.length === 0) return '<span class="null">{}</span>';
+    const collapsed = depth >= 2;
+    return `<span class="toggle${collapsed?' closed':''}">Object{${keys.length}}</span><ul class="${collapsed?'collapsed':''}">` +
+      keys.map(k => `<li><span class="key">"${escHtml(k)}"</span>: ${jsonTreeHTML(val[k], depth+1)}</li>`).join('') +
+      '</ul>';
+  }
+  return escHtml(String(val));
+}
+
+function escHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function expandAll() {
+  document.querySelectorAll('#ctx-pane .toggle').forEach(t => t.classList.remove('closed'));
+  document.querySelectorAll('#ctx-pane ul').forEach(u => u.classList.remove('collapsed'));
+}
+function collapseAll() {
+  document.querySelectorAll('#ctx-pane .toggle').forEach(t => t.classList.add('closed'));
+  document.querySelectorAll('#ctx-pane ul').forEach(u => u.classList.add('collapsed'));
+}
+
+function clearLLMPane() {
+  document.getElementById('llm-pane').innerHTML = '<div class="empty-state"><div class="icon">🤖</div>Enable <em>Auto-send</em> to call the LLM</div>';
+  document.getElementById('llm-badge').textContent = '';
+}
+
+function renderLLMResult(data) {
+  const pane = document.getElementById('llm-pane');
+  const badge = document.getElementById('llm-badge');
+  badge.className = 'badge ' + (data.valid ? 'badge-ok' : (data.parse_error ? 'badge-err' : 'badge-warn'));
+  badge.textContent = data.valid ? `✓ valid (${data.elapsed_s}s)` : (data.parse_error ? `✗ parse error` : `⚠ invalid schema`);
+
+  let html = '';
+
+  // Parse error
+  if (data.parse_error) {
+    html += `<div class="error-box">Parse error: ${escHtml(data.parse_error)}</div>`;
+  }
+
+  // Parsed action card
+  if (data.parsed_action) {
+    const p = data.parsed_action;
+    const a = p.action || {};
+    const s = p.speech || {};
+    html += `<div class="action-card">
+      <div class="action-type">${escHtml(a.type || '?')} → <span style="color:var(--text)">${escHtml(a.target || 'none')}</span></div>
+      <div class="kv">
+        <span class="k">reason</span><span>${escHtml(a.reason || '')}</span>
+        <span class="k">emotion</span><span style="color:var(--orange)">${escHtml(p.emotion || '')}</span>
+        <span class="k">goal</span><span>${escHtml(p.goal || '')}</span>
+        ${a.interaction ? `<span class="k">interaction</span><span style="color:var(--purple)">${escHtml(a.interaction)}</span>` : ''}
+        <span class="k">confidence</span><span>${p.confidence ?? '?'}</span>
+      </div>
+      ${p.thought ? `<div class="thought">"${escHtml(p.thought)}"</div>` : ''}
+      ${s.utterance ? `<div class="speech">💬 ${escHtml(s.utterance)}</div>` : ''}
+    </div>`;
+  }
+
+  // Raw response
+  const rawStr = typeof data.raw_response === 'string' ? data.raw_response : JSON.stringify(data.raw_response, null, 2);
+  html += `<div style="font-size:11px;color:var(--text-dim);font-weight:600;margin-top:8px;margin-bottom:4px">RAW RESPONSE</div>`;
+  html += `<div class="response-box ${data.valid?'valid':'invalid'}" style="max-height:280px">${escHtml(rawStr || '')}</div>`;
+
+  pane.innerHTML = html;
+}
+
+// ─── Schedule renderer ────────────────────────────────────────────────────────
+const DAYS = ['monday','tuesday','wednesday','thursday','friday','saturday','sunday'];
+const DAY_LABELS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+const HOURS = Array.from({length:24}, (_,i) => i);
+const HOUR_PX = 24; // px per hour
+
+function activityClass(act) {
+  if (!act) return 'sched-other';
+  const a = act.toLowerCase();
+  if (a === 'sleep') return 'sched-sleep';
+  if (a === 'work') return 'sched-work';
+  if (a === 'eat' || a === 'meal') return 'sched-eat';
+  if (a === 'relax' || a === 'leisure') return 'sched-relax';
+  if (a.includes('contract')) return 'sched-contract';
+  return 'sched-other';
+}
+
+function renderSchedule(data) {
+  if (data.errors && Object.keys(data.errors).length) {
+    document.getElementById('sched-badge').textContent = '';
+    document.getElementById('schedule-grid-wrap').innerHTML =
+      `<div class="error-box">${Object.entries(data.errors).map(([k,v])=>`${k}: ${v}`).join('\n')}</div>`;
+    return;
+  }
+
+  const week = (data.schedule || {}).week || {};
+  const c = data.character || {};
+  const minHours = c.hourly_wage ? `${Math.round(c.hourly_wage)}$/hr` : '';
+  document.getElementById('sched-info').textContent = `${c.name || 'Sim'} · ${minHours}`;
+  document.getElementById('sched-badge').className = 'badge badge-ok';
+  document.getElementById('sched-badge').textContent = '✓';
+
+  const totalPx = HOURS.length * HOUR_PX;
+
+  // Build grid
+  let html = '<div class="schedule-grid" style="grid-template-rows:auto">';
+  // Header row
+  html += '<div class="sg-head">Hour</div>';
+  DAY_LABELS.forEach(d => { html += `<div class="sg-head">${d}</div>`; });
+
+  // Content: one row per hour, but we'll use a column-based layout with position:absolute blocks
+  // Actually we build 7 columns, each with relative positioning
+  // Time label column + 7 day columns
+  html += `<div style="grid-column:1;grid-row:2;display:flex;flex-direction:column;border-right:1px solid var(--border)">`;
+  HOURS.forEach(h => {
+    html += `<div class="sg-time sg-hour" style="height:${HOUR_PX}px">${h.toString().padStart(2,'0')}</div>`;
+  });
+  html += '</div>';
+
+  DAYS.forEach((day, di) => {
+    const blocks = week[day] || [];
+    html += `<div class="sg-col" style="grid-column:${di+2};grid-row:2;position:relative;height:${totalPx}px">`;
+    // Hour lines
+    HOURS.forEach(() => { html += `<div class="sg-hour" style="height:${HOUR_PX}px"></div>`; });
+    // Activity blocks
+    blocks.forEach(b => {
+      const sh = parseInt(b.start), sm = parseInt((b.start.split(':')[1])||0);
+      let eh = parseInt(b.end),     em = parseInt((b.end.split(':')[1])||0);
+      // Handle overnight (sleep 23→07)
+      let topPct, heightPct;
+      if (sh > eh) {
+        // Overnight: draw two pieces
+        // piece 1: sh → 24
+        const top1 = (sh * 60 + sm) / (24*60) * 100;
+        const h1   = ((24*60) - (sh*60+sm)) / (24*60) * 100;
+        html += `<div class="sched-block ${activityClass(b.activity)}" style="top:${top1}%;height:${h1}%">${b.activity}</div>`;
+        // piece 2: 0 → eh
+        const h2 = (eh*60+em) / (24*60) * 100;
+        if (h2 > 0) html += `<div class="sched-block ${activityClass(b.activity)}" style="top:0;height:${h2}%">${b.activity}</div>`;
+        return;
+      }
+      topPct = (sh * 60 + sm) / (24*60) * 100;
+      heightPct = ((eh*60+em) - (sh*60+sm)) / (24*60) * 100;
+      const src = b.source === 'contract' ? ' ★' : '';
+      html += `<div class="sched-block ${activityClass(b.activity)}" title="${b.start}–${b.end}" style="top:${topPct}%;height:${Math.max(heightPct,1.5)}%">${b.activity}${src}</div>`;
+    });
+    html += '</div>';
+  });
+
+  html += '</div>';
+  document.getElementById('schedule-grid-wrap').innerHTML = html;
+}
+
+// ─── Activity phase renderer ──────────────────────────────────────────────────
+function renderActivityPhases(data) {
+  const pane = document.getElementById('activity-pane');
+  const refWrap = document.getElementById('interaction-ref-wrap');
+
+  if (data.errors && Object.keys(data.errors).length) {
+    pane.innerHTML = `<div class="error-box">${Object.entries(data.errors).map(([k,v])=>`${k}: ${v}`).join('\n')}</div>`;
+  }
+
+  if (!data.prop_phases || data.prop_phases.length === 0) {
+    pane.innerHTML = '<div class="empty-state"><div class="icon">🪑</div>No props with known interactions found.<br>Add props with tags/interactions in the sidebar.</div>';
+  } else {
+    let html = `<div style="margin-bottom:10px;font-size:12px;color:var(--text-dim)">Showing phase animations for <strong style="color:var(--text)">${data.intention_type}</strong> context · ${data.prop_phases.length} interaction(s)</div>`;
+    data.prop_phases.forEach(pp => {
+      html += `<div class="phase-card">
+        <div class="phase-card-hdr">
+          <span class="interaction-name">${escHtml(pp.interaction)}</span>
+          <span style="color:var(--border)">|</span>
+          <span class="prop-id">${escHtml(pp.prop_id)}</span>
+          <span style="margin-left:auto;display:flex;gap:4px">`;
+      (pp.prop_tags||[]).forEach(t => { html += `<span class="tag-pill">${escHtml(t)}</span>`; });
+      html += `</span></div><div class="phase-list">`;
+      for (const [phase, anims] of Object.entries(pp.phases || {})) {
+        html += `<div class="phase-row">
+          <div class="ph-name">${escHtml(phase)}</div>
+          <div class="ph-anims">${anims.map(a=>`<span class="anim-tag">${escHtml(a)}</span>`).join('')}</div>
+        </div>`;
+      }
+      html += '</div></div>';
+    });
+    pane.innerHTML = html;
+  }
+
+  // Interaction reference table
+  if (data.all_interactions) {
+    const entries = Object.entries(data.all_interactions);
+    let rhtml = `<div class="interaction-ref"><table>
+      <thead><tr><th>Interaction</th><th>walking</th><th>using</th><th>finishing</th></tr></thead><tbody>`;
+    entries.forEach(([name, phases]) => {
+      const w = (phases.walking||[]).join('/');
+      const u = (phases.using||[]).join('/');
+      const f = (phases.finishing||[]).join('/');
+      rhtml += `<tr><td class="int-name">${escHtml(name)}</td><td>${escHtml(w)}</td><td class="int-anims">${escHtml(u)}</td><td>${escHtml(f)}</td></tr>`;
+    });
+    rhtml += '</tbody></table></div>';
+    refWrap.innerHTML = rhtml;
+  }
+}
+
+// ─── Presets ──────────────────────────────────────────────────────────────────
+const PRESETS = {
+  default: { name:'Debug Sim', age:28, occupation:'none', wage:15, traits:[], emotion:'neutral', energy:80, stress:20, wealth:500, hunger:20, bladder:10, fatigue:15, hygiene:90 },
+  stressed_parent: { name:'Sarah K.', age:36, occupation:'nurse', wage:22, traits:['anxious','empathetic'], emotion:'stressed', energy:40, stress:75, wealth:200, hunger:50, bladder:40, fatigue:60, hygiene:70 },
+  workaholic: { name:'Alex P.', age:32, occupation:'developer', wage:45, traits:['ambitious','workaholic','neurotic'], emotion:'content', energy:70, stress:50, wealth:1200, hunger:30, bladder:15, fatigue:25, hygiene:85 },
+  night_owl: { name:'Jamie R.', age:24, occupation:'streamer', wage:8, traits:['night_owl','lazy','extroverted'], emotion:'excited', energy:90, stress:10, wealth:150, hunger:40, bladder:20, fatigue:5, hygiene:80 },
+  in_conflict: { name:'Marco V.', age:41, occupation:'manager', wage:30, traits:['hot_headed','ambitious','stubborn'], emotion:'angry', energy:60, stress:80, wealth:800, hunger:30, bladder:10, fatigue:30, hygiene:90 },
+};
+
+function loadPreset(name) {
+  const p = PRESETS[name]; if (!p) return;
+  document.getElementById('c-name').value = p.name;
+  document.getElementById('c-age').value = p.age;
+  document.getElementById('c-occupation').value = p.occupation;
+  document.getElementById('c-wage').value = p.wage;
+  document.getElementById('c-emotion').value = p.emotion;
+  const setSlider = (id, val) => { const el = document.getElementById(id); el.value = val; el.nextElementSibling.textContent = val; };
+  setSlider('c-energy', p.energy); setSlider('c-stress', p.stress); setSlider('c-wealth', p.wealth);
+  setSlider('n-hunger', p.hunger); setSlider('n-bladder', p.bladder); setSlider('n-fatigue', p.fatigue); setSlider('n-hygiene', p.hygiene);
+  activeTraits = new Set(p.traits);
+  renderTraitChips();
+
+  // Add preset-specific relationships for in_conflict preset
+  if (name === 'in_conflict') {
+    relationships = [
+      { id: 'npc_rival', name: 'Dana L.', state: 'distrusted', trust: -40, friendship: -20, hostility: 60, attraction: 0, resentment: 70, comfort: -20, familiarity: 20, interaction_count: 50 },
+    ];
+    renderRelationships();
+  }
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+function toggleSection(hdr) {
+  const body = hdr.nextElementSibling;
+  body.classList.toggle('collapsed');
+}
+
+function switchTab(tab) {
+  currentTab = tab;
+  document.querySelectorAll('.tab-btn').forEach((b,i) => {
+    const names = ['context','schedule','activity'];
+    b.classList.toggle('active', names[i] === tab);
+  });
+  document.querySelectorAll('.tab-panel').forEach(p => { p.classList.remove('active'); });
+  document.getElementById('tab-' + tab).classList.add('active');
+
+  // Update run button label
+  const labels = { context: '▶ Build Context', schedule: '▶ Generate Schedule', activity: '▶ Inspect Phases' };
+  document.getElementById('run-btn').textContent = labels[tab] || '▶ Run';
+}
+
+function copyPayload() {
+  const { char, world, household } = buildPayload();
+  navigator.clipboard.writeText(JSON.stringify({ character: char, world, household }, null, 2));
+}
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+renderTraitChips();
+loadPreset('default');
+// Add a living room by default
+addPropPreset('living_room');
+switchTab('context');
+</script>
+</body>
+</html>
