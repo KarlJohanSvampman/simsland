@@ -141,6 +141,14 @@ class ActivityPlanReq(BaseModel):
 
 # ─── Endpoints ─────────────────────────────────────────────────────────────────
 
+@router.get("/architecture")
+def architecture_page():
+    path = Path(__file__).parent.parent / "frontend" / "architecture.html"
+    if path.exists():
+        return FileResponse(path)
+    return JSONResponse({"error": "architecture.html not found"}, status_code=404)
+
+
 @router.get("")
 @router.get("/")
 def debug_page():

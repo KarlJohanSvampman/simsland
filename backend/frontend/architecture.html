@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>HoloSims Architecture Map</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:#020810;overflow:hidden;font-family:'Cascadia Code','Fira Code',monospace}
+  canvas{display:block}
+  #ui{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none}
+  #topbar{position:absolute;top:0;left:0;right:0;padding:12px 20px;background:linear-gradient(to bottom,rgba(2,8,16,.9),transparent);display:flex;align-items:center;gap:14px}
+  #topbar h1{color:#58a6ff;font-size:14px;font-weight:700;letter-spacing:.3px}
+  #topbar p{color:#8b949e;font-size:11px}
+  #info{position:absolute;bottom:20px;right:20px;width:330px;max-height:70vh;background:rgba(13,17,23,.95);border:1px solid #30363d;border-radius:10px;padding:16px;overflow-y:auto;transition:opacity .2s;pointer-events:auto}
+  #info.hidden{opacity:0;pointer-events:none}
+  #info h2{color:#c9d1d9;font-size:13px;font-weight:700;margin-bottom:3px}
+  #info .gtype{font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:#8b949e;margin-bottom:8px}
+  #info .gdesc{color:#8b949e;font-size:11.5px;line-height:1.65;margin-bottom:10px}
+  #info .mod{background:rgba(33,38,45,.8);border:1px solid #21262d;border-radius:5px;padding:7px 10px;margin-bottom:5px}
+  #info .mname{font-size:11px;font-weight:700;font-family:monospace}
+  #info .mdesc{color:#8b949e;font-size:10.5px;margin-top:3px;line-height:1.5}
+  #legend{position:absolute;top:60px;left:18px;display:flex;flex-direction:column;gap:6px}
+  .li{display:flex;align-items:center;gap:8px;font-size:10.5px;color:#8b949e;cursor:pointer;padding:3px 6px;border-radius:4px;transition:background .1s}
+  .li:hover{background:rgba(88,166,255,.08);color:#c9d1d9}
+  .ld{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+  #hint{position:absolute;bottom:20px;left:20px;color:#8b949e;font-size:10.5px;line-height:1.9}
+</style>
+</head>
+<body>
+<div id="ui">
+  <div id="topbar">
+    <h1>🧠 HoloSims Architecture</h1>
+    <p>Click a node to expand · Hover for details · Drag to orbit · Scroll to zoom</p>
+  </div>
+  <div id="legend"></div>
+  <div id="info" class="hidden"></div>
+  <div id="hint">⬡ Click group: expand/collapse modules<br>🔗 Lines show system dependencies<br>🖱 Drag to orbit &nbsp;·&nbsp; Scroll to zoom</div>
+</div>
+<script src="https://unpkg.com/three@0.128.0/build/three.min.js"></script>
+<script src="https://unpkg.com/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+// ── Architecture data ─────────────────────────────────────────────────────────
+const GROUPS = [
+{
+  id:'core', label:'Core', color:'#58a6ff',
+  pos:[0,0,0],
+  desc:'Heartbeat of the simulation. sim_loop.py drives every other system on a cadence schedule. event_bus.py decouples systems via synchronous pub/sub. db.py persists the single world dict to PostgreSQL with Redis as a write-through cache. Everything else is called from here.',
+  connects_to:['brain','social','economy','physical','society','api'],
+  modules:[
+    {id:'sim_loop',    label:'sim_loop.py',      color:'#58a6ff', desc:'Main tick function. Calls every system on its CADENCE slot, advances the wall-clock calendar, then flushes the event bus. The only place that decides WHEN systems run.'},
+    {id:'event_bus',   label:'event_bus.py',      color:'#58a6ff', desc:'In-process pub/sub. emit() queues events; flush() delivers to all subscribers once per tick. Handlers may emit new events (one recursive level). Replaces "run every tick just in case" polling.'},
+    {id:'event_handlers',label:'event_handlers.py',color:'#58a6ff',desc:'All subscriptions wired at import time. Maps event types to handlers: bills_overdue→evict, incident_created→auto_report, character_fired→apply_for_job, confrontation_desired→start_conflict, etc.'},
+    {id:'tick_sched',  label:'tick_schedule.py',  color:'#58a6ff', desc:'every(world, n, offset) helper + CADENCE dict. All cadence numbers live here. Offsets stagger systems so nothing fires simultaneously. FAST=5, MEDIUM=15-20, SLOW=30-60, VERY_SLOW=300.'},
+    {id:'db',          label:'db.py',             color:'#58a6ff', desc:'PostgreSQL persistence + Redis cache. load_world() checks Redis first, falls back to DB and caches on load. save_world() writes both. World stored as a single JSONB blob.'},
+    {id:'cache',       label:'cache.py',          color:'#58a6ff', desc:'Redis get/set wrappers for world and character objects. Keeps hot data in memory so the tick loop rarely hits Postgres.'},
+    {id:'redis_queue', label:'redis_queue.py',    color:'#58a6ff', desc:'Job queue for the async LLM worker process. enqueue() pushes a job dict to Redis list; dequeue_batch() pops up to N jobs for the worker to process concurrently.'},
+    {id:'definitions', label:'definitions.py',    color:'#58a6ff', desc:'Loads prop and building template definitions from JSON. Templates define base stats, interactions, and anchor points used at world-load time and by the editor.'},
+  ]
+},
+{
+  id:'brain', label:'Brain / Cognition', color:'#bc8cff',
+  pos:[320,80,0],
+  desc:'Character AI. Each tick, agent_loop orchestrates: update body → generate intentions → build LLM context → call LLM → route the action → store memory → update emotion. All subjective reasoning, memory, relationships, and emotion live here. context_builder.py is the bridge between the simulation state and the LLM.',
+  connects_to:['llm','social','physical'],
+  modules:[
+    {id:'agent_loop',    label:'agent_loop.py',     color:'#bc8cff', desc:'Per-character update called every tick. Full pipeline: body needs → body_intentions → strategy → schedule → offgrid check → LLM think → action_router → memory store → emotion update.'},
+    {id:'ctx_builder',   label:'context_builder.py',color:'#bc8cff', desc:'Assembles the JSON context dict fed to the LLM. Pulls memory, relationships, conflicts, grievances, perception, schedule, body state, beliefs, social models, cognitive pressure, and available actions into one object.'},
+    {id:'llm_brain',     label:'llm_brain.py',      color:'#bc8cff', desc:'System prompt, build_prompt(), validate_response(), fallback_response(). Defines the strict JSON output schema the model must produce: thought, emotion, intention, goal, action, speech, reflection, confidence.'},
+    {id:'memory',        label:'memory.py',         color:'#bc8cff', desc:'Episodic memory: store_memory() adds entries weighted by importance. biased_recall() returns most relevant recent memories using recency + importance scoring. decay_memories() runs at MEDIUM cadence.'},
+    {id:'emotion',       label:'emotion.py',        color:'#bc8cff', desc:'Updates character emotion each tick based on recent events, body state, and interaction outcomes. Produces a single emotion label surfaced in context and speech bubbles.'},
+    {id:'perception',    label:'perception.py',     color:'#bc8cff', desc:'Builds visible_props and visible_people from the world around the character. Runs every 5 ticks. Output feeds available_actions in context so LLM can reference real prop/character IDs.'},
+    {id:'attention',     label:'attention.py',      color:'#bc8cff', desc:'Salience map over perceived objects. Decays each tick. Boosted when something interesting is perceived. Influences what the character notices and prioritises.'},
+    {id:'beliefs',       label:'beliefs.py',        color:'#bc8cff', desc:'Political and social beliefs with certainty values. polarization_drift() shifts beliefs based on social circle. compute_alignment() produces a political label included in LLM context.'},
+    {id:'relationships_b',label:'relationships.py', color:'#bc8cff', desc:'Per-character relationship schema with 18 fields: trust, friendship, hostility, attraction, resentment, comfort, familiarity, state label. first_impression() and update_relationship_state() run when characters are nearby.'},
+    {id:'intentions',    label:'intentions.py',     color:'#bc8cff', desc:'Manages active_intentions list. sort_intentions() by urgency/priority. clean_intentions() removes resolved or expired entries. Body and social systems push intentions here.'},
+  ]
+},
+{
+  id:'llm', label:'LLM / Ollama', color:'#ffa657',
+  pos:[160,120,277],
+  desc:'AI inference layer. All LLM calls go through llm_client.py which caches responses in Redis (5 min TTL, keyed by prompt hash). The worker process dequeues jobs and runs them with a MAX_CONCURRENCY=5 semaphore to prevent thundering-herd Ollama pressure.',
+  connects_to:['brain','core'],
+  modules:[
+    {id:'llm_client',  label:'llm_client.py',       color:'#ffa657', desc:'Raw Ollama HTTP client + Redis response cache. call_llm() is async, hitting /api/chat on the configured OLLAMA_BASE_URL. call_llm_safe() adds a 15s timeout. Cache key is SHA256 of the full message list.'},
+    {id:'llm_q',       label:'llm_queue.py',         color:'#ffa657', desc:'In-process asyncio.Queue for serialising LLM calls within a single FastAPI request. Returns a Future so callers can await the result.'},
+    {id:'cog_jobs',    label:'cognition_jobs.py',    color:'#ffa657', desc:'Packages cognition tasks as Redis queue jobs for offloading to the worker process. Used when agent ticks are dispatched async rather than inline.'},
+    {id:'social_i',    label:'social_interpretation.py',color:'#ffa657',desc:'LLM-powered analysis of conversation outcomes. Generates relationship impact scores and emotion tags from dialogue summaries after a conversation ends.'},
+    {id:'worker',      label:'workers/worker.py',    color:'#ffa657', desc:'Separate process consuming Redis job queue. Loads character + world from DB, calls agent_loop, saves updated character. MAX_CONCURRENCY=5 semaphore limits concurrent Ollama calls.'},
+  ]
+},
+{
+  id:'social', label:'Social Drama', color:'#f85149',
+  pos:[-160,40,260],
+  desc:'Interpersonal conflict, negotiation, grudges, and binding agreements. Grievances accumulate per-tick until confrontation threshold is crossed, triggering the three-phase conflict pipeline. Successful negotiation creates a social contract; failed negotiation escalates to a fight which may invoke the law pipeline.',
+  connects_to:['brain','economy','core'],
+  modules:[
+    {id:'grievances',   label:'grievances.py',      color:'#f85149', desc:'Grievance list per character decaying at 0.997/tick. add_grievance() adds weighted events (SEVERITY dict: insulted=8, betrayed=15, contract_violated=10). When total vs someone exceeds 30, emits confrontation_desired.'},
+    {id:'conflict',     label:'conflict_pipeline.py',color:'#f85149', desc:'Three-phase state machine: DELIBERATION→NEGOTIATION or FIGHT. Fight has four sub-stages (verbal_dispute→heated_argument→shouting_match→physical_altercation). Outcomes: agreement, cold_shoulder, storm_off, intervention, physical_resolved.'},
+    {id:'contracts',    label:'social_contracts.py', color:'#f85149', desc:'Bilateral agreements created by successful negotiation. Terms checked by type: behavior_tag, resource_state, activity, schedule, manual. Violations re-feed grievances at 2.5× weight (betrayal of explicit agreement).'},
+    {id:'social_sys',   label:'social.py',           color:'#f85149', desc:'Social context utilities: build_message_context() surfaces recent in-world messages for LLM context. Social group queries and relationship helper functions.'},
+    {id:'conv_runtime', label:'conversation_runtime.py',color:'#f85149',desc:'Manages active conversation state: participants, history, topic, tone, turn ownership. update_conversation_activity() advances the turn machine each tick.'},
+    {id:'messaging',    label:'messaging.py',        color:'#f85149', desc:'In-world SMS/phone message delivery. Routes messages between characters. deliver_messages() runs every 10 ticks, delivers queued messages to receiver and updates their emotion.'},
+    {id:'reactions',    label:'reactions.py',        color:'#f85149', desc:'Queued emotional reactions to world events. process_reaction_queue() applies pending reactions each tick, modifying emotion and stress.'},
+    {id:'soc_int',      label:'social_intentions.py',color:'#f85149', desc:'Generates social drive intentions: want to call a friend, resolve a conflict, attend an event. Pushes into agent_loop intention stack to influence LLM decisions.'},
+  ]
+},
+{
+  id:'economy', label:'Economy', color:'#3fb950',
+  pos:[-320,0,0],
+  desc:'Household finances, market, jobs, and expense-driven scheduling. Weekly bills are calculated from real home costs (rent, utilities, gasoline, internet) plus food. Minimum work hours = expenses ÷ wage. Social contract recurring blocks are reserved before leisure. All wealth deduction flows through apply_expenses only.',
+  connects_to:['physical','core','social'],
+  modules:[
+    {id:'economy_s',  label:'economy.py',           color:'#3fb950', desc:'apply_expenses() issues weekly bills on Monday 00:00. Splits into fixed_home (rent+utilities) + food (80×members×cost_of_living). Caches household["weekly_expenses"] for schedule generator.'},
+    {id:'market',     label:'market.py',            color:'#3fb950', desc:'Supply/demand simulation. produce() generates goods each 20 ticks. consume_households() tracks demand. Prices adjust to supply/demand ratio. Wealth deduction handled by economy.py only, not here.'},
+    {id:'jobs',       label:'jobs.py',              color:'#3fb950', desc:'Job listing generation, hiring, and firing. maybe_fire() emits character_fired → apply_for_job handler. process_interview() emits character_hired on success. generate_job_listings() refreshes market every 60 ticks.'},
+    {id:'housing',    label:'housing.py',           color:'#3fb950', desc:'Home assignment and expense defaults. ensure_home_defaults() sets rent/electricity/water/gasoline/internet. weekly_home_expenses() sums them. assign_household_to_home() and vacate_home() manage occupancy.'},
+    {id:'scheduling', label:'scheduling.py',        color:'#3fb950', desc:'Expense-driven weekly schedule generator. Priority: sleep → contract blocks → work (hours=expenses/wage) → meals → leisure. adjust_for_household() staggers housemates. Contract recurring_activity terms reserved as fixed slots.'},
+    {id:'mail',       label:'mail.py',              color:'#3fb950', desc:'Mailbox, bill payment, and form requests. sort_household_mail() routes items from mailbox["items"]. attempt_pay_bills() deducts from household wealth against bills_due list. respond_to_mail() handles form responses.'},
+    {id:'eviction',   label:'eviction.py',          color:'#3fb950', desc:'check_household_for_eviction() emits bills_overdue when overdue bills cross threshold. Event handler calls evict_household() to vacate home and update household status.'},
+    {id:'hh_monitor', label:'household_monitoring.py',color:'#3fb950',desc:'Monitors appliance durability and home state each 20 ticks. Importance scales with urgency: 0.6 at ≤25% durability, 0.9 near failure (≤10%). Triggers alerts and repair intentions.'},
+  ]
+},
+{
+  id:'physical', label:'Physical World', color:'#d29922',
+  pos:[-160,-60,-260],
+  desc:'Character embodiment: location, actions, and movement. Activities are the unit of embodied action with a 6-phase lifecycle (start→walking→arriving→using→finishing→complete). Navigation uses A* between rooms. offgrid.py abstracts work/shopping/leisure that happens off-screen.',
+  connects_to:['brain','economy','core'],
+  modules:[
+    {id:'activities',  label:'activities.py',       color:'#d29922', desc:'Authoritative activity executor. execute_activity() advances the current phase. INTERACTION_ANIMATIONS maps interaction→{walking,using,finishing} animations. Manages reservations, IK anchor approach, prop anim states, and completion events.'},
+    {id:'act_queue',   label:'activity_queue.py',   color:'#d29922', desc:'Ordered task queue with dependency graph. queue_task() appends with depends_on list. Tasks: pending→active→done. Suspended sessions serialised when higher-priority activity interrupts.'},
+    {id:'movement',    label:'movement.py',         color:'#d29922', desc:'Route traversal and interpolation. update_character_movement() advances along route segment-by-segment. Handles arrival detection. Does NOT choose destinations — that is navigation.py and agent_loop.'},
+    {id:'navigation',  label:'navigation.py',       color:'#d29922', desc:'A* pathfinding within buildings. Room connectivity graph + NAV_CACHE avoids recomputing identical routes. world_to_local / local_to_world conversions via transforms.py.'},
+    {id:'outdoor_nav', label:'outdoor_navigation.py',color:'#d29922',desc:'Between-building navigation. Connects building exits to road network. Finds multi-hop paths across the world tile map for characters traveling between locations.'},
+    {id:'anchors',     label:'anchors.py',          color:'#d29922', desc:'Prop interaction anchor points. Defined in local-space in templates, projected to world-space at runtime via transforms.py. Characters walk to the anchor position before starting an interaction.'},
+    {id:'occupancy',   label:'occupancy.py',        color:'#d29922', desc:'Prop reservation system. Characters reserve anchors before approaching. release_anchor() and release_reservation() called on completion or interruption. Prevents two sims sitting on the same chair.'},
+    {id:'props_sys',   label:'props.py',            color:'#d29922', desc:'Prop lookup, get_prop_by_id(), find_nearest_anchor(). Central prop query interface used by activities, navigation, and context builder.'},
+    {id:'offgrid',     label:'offgrid.py',          color:'#d29922', desc:'Abstracts off-screen life. send_offgrid() removes character for N ticks. process_return() generates a story arc summary (random events modulated by environment risk) and applies outcomes: money earned, stress changes.'},
+    {id:'transforms',  label:'transforms.py',       color:'#d29922', desc:'Authoritative coordinate math: local↔world conversion, rotation, footprint projection, anchor projection. No other system should implement rotation math.'},
+  ]
+},
+{
+  id:'society', label:'Society & Macro', color:'#79c0ff',
+  pos:[160,-40,-260],
+  desc:'Big-picture systems shaping the world: politics, health, law, emergency services, factions, media, crises, and story arcs. Most are event-driven (fire only when something happens) or very slow cadence (every 300 ticks). Together they create the socioeconomic backdrop characters navigate.',
+  connects_to:['core','economy','social'],
+  modules:[
+    {id:'health',    label:'health.py',         color:'#79c0ff', desc:'Health events triggered by health_threshold_crossed event. process_health() applies treatment/hospitalisation decisions. trigger_health_event() determines severity based on body stats and environment.'},
+    {id:'emergency', label:'emergency.py',      color:'#79c0ff', desc:'911 pipeline: trigger_incident() creates incidents, auto_report_incidents() makes calls, dispatch() sends responders. resolve() polls responder arrival ticks. Feeds into law pipeline via incident_resolved event.'},
+    {id:'law',       label:'law.py',            color:'#79c0ff', desc:'Arrests, trials, and jail. maybe_arrest_from_incidents() charges characters. process_trials() advances trial_tick. process_jail() releases when jail_until passed. All outcomes emitted as events into event_bus.'},
+    {id:'politics',  label:'politics.py',       color:'#79c0ff', desc:'Elections (every 300 ticks) and policy consequences. process_pending_effects() applies economic/social modifiers from enacted policies. check_election() advances election cycle and resolves outcomes.'},
+    {id:'faction',   label:'faction_ai.py',     color:'#79c0ff', desc:'Faction behaviour and influence. apply_faction_influence() shifts member beliefs, relationships, and economic outcomes based on faction power and agenda.'},
+    {id:'hierarchy', label:'hierarchy.py',      color:'#79c0ff', desc:'Power structure updates. update_hierarchy() recalculates dominance relationships within organisations, workplaces, and households.'},
+    {id:'influence', label:'influence.py',      color:'#79c0ff', desc:'Public figure influence on world beliefs. apply_public_figure_influence() shifts character beliefs toward prominent figures. apply_social_influence() propagates attitudes through social networks.'},
+    {id:'media',     label:'media.py',          color:'#79c0ff', desc:'News generation with media bias filter. generate_news() creates news_feed entries from world events, framed by outlet bias. News appears in character LLM context.'},
+    {id:'crisis',    label:'crisis.py',         color:'#79c0ff', desc:'Economic/social crises. check_crises() detects threshold conditions (unemployment, inequality, unrest). process_crises() applies cascading environment modifiers.'},
+    {id:'migration', label:'migration.py',      color:'#79c0ff', desc:'Household migration decisions. check_migration_desires() emits household_wants_to_move when cost-of-living, crime risk, or dissatisfaction exceeds threshold. Handler calls do_migrate().'},
+    {id:'story',     label:'story.py',          color:'#79c0ff', desc:'Story arc generation. update_story_arc() creates narrative milestones from significant life events. Used by context_builder to give characters a sense of personal history and trajectory.'},
+  ]
+},
+{
+  id:'api', label:'API & Frontend', color:'#e3b341',
+  pos:[0,360,0],
+  desc:'HTTP and WebSocket surface. main.py runs the FastAPI app, serves the Three.js frontend, and runs the sim tick loop in a background asyncio task. Clients receive a full viewport snapshot on connect, then only dirty (changed) entities each tick. The debug page at /debug provides a stateless dev toolset.',
+  connects_to:['core','brain'],
+  modules:[
+    {id:'main_py',    label:'main.py',           color:'#e3b341', desc:'FastAPI entry point. Runs sim tick in asyncio background task (1 tick/sec). WebSocket /ws streams: full viewport snapshot on connect, then delta patches of dirty chars/props each tick. Client sends {type:viewport,cx,cy,zoom} to filter.'},
+    {id:'view_api',   label:'api/view.py',       color:'#e3b341', desc:'Viewport-aware state queries. get_view() filters world entities to the client visible area using in_view(cx,cy,zoom). Serves the /api/state endpoint.'},
+    {id:'editor_api', label:'api/editor.py',     color:'#e3b341', desc:'World editor API. load_definitions() and save_definitions() manage prop/building templates stored as JSON. Used by the in-browser editor for placing and configuring props.'},
+    {id:'debug_api',  label:'api/debug.py',      color:'#e3b341', desc:'Stateless dev tools at GET /debug. Endpoints: /build-context (context inspector), /llm-test (live LLM call), /generate-schedule (schedule visualiser), /plan-activity (animation phase browser). Never touches live sim.'},
+    {id:'props_api',  label:'api/props.py',      color:'#e3b341', desc:'Prop CRUD API. Create, read, update, delete props in the live world. Used by the in-browser editor.'},
+    {id:'frontend',   label:'frontend/ (Three.js)',color:'#e3b341',desc:'Isometric 3D renderer in Three.js. Connects via WebSocket, applies delta patches to scene objects each tick. Shows character speech bubbles, animation states, prop states. Viewport synced to server for filtered updates.'},
+  ]
+},
+];
+
+// ── Scene Setup ───────────────────────────────────────────────────────────────
+const W = window.innerWidth, H = window.innerHeight;
+const renderer = new THREE.WebGLRenderer({antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.setSize(W,H);
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x020810);
+scene.fog = new THREE.FogExp2(0x020810, 0.00045);
+
+const camera = new THREE.PerspectiveCamera(55, W/H, 0.5, 8000);
+camera.position.set(80, 280, 820);
+
+const controls = new THREE.OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.06;
+controls.target.set(0, 40, 0);
+controls.minDistance = 120;
+controls.maxDistance = 2400;
+
+// Lights
+const ambient = new THREE.AmbientLight(0x111827, 1.2);
+scene.add(ambient);
+const sun = new THREE.DirectionalLight(0xffffff, 0.4);
+sun.position.set(200, 400, 100);
+scene.add(sun);
+
+// ── Stars ─────────────────────────────────────────────────────────────────────
+(function makeStars(){
+  const pos = new Float32Array(3000*3);
+  for(let i=0;i<3000;i++){
+    pos[i*3]   = (Math.random()-.5)*7000;
+    pos[i*3+1] = (Math.random()-.5)*7000;
+    pos[i*3+2] = (Math.random()-.5)*7000;
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos,3));
+  scene.add(new THREE.Points(geo, new THREE.PointsMaterial({color:0xffffff,size:1.1,transparent:true,opacity:.55})));
+})();
+
+// ── Label sprite ──────────────────────────────────────────────────────────────
+function makeSprite(text, color, size=14){
+  const c = document.createElement('canvas');
+  const ctx = c.getContext('2d');
+  ctx.font = `600 ${size}px 'Cascadia Code',monospace`;
+  const tw = ctx.measureText(text).width;
+  c.width = tw+20; c.height = size+14;
+  ctx.font = `600 ${size}px 'Cascadia Code',monospace`;
+  ctx.fillStyle = color;
+  ctx.globalAlpha = .9;
+  ctx.fillText(text, 10, size+1);
+  const tex = new THREE.CanvasTexture(c);
+  const mat = new THREE.SpriteMaterial({map:tex,transparent:true,depthWrite:false});
+  const sp = new THREE.Sprite(mat);
+  sp.scale.set((tw+20)/8, (size+14)/8, 1);
+  sp.userData.isLabel = true;
+  return sp;
+}
+
+// ── Fibonacci sphere distribution ─────────────────────────────────────────────
+function fibSphere(n, r){
+  const pts=[]; const gr=(1+Math.sqrt(5))/2;
+  for(let i=0;i<n;i++){
+    const th=2*Math.PI*i/gr, ph=Math.acos(1-2*(i+.5)/n);
+    pts.push([r*Math.sin(ph)*Math.cos(th), r*Math.cos(ph), r*Math.sin(ph)*Math.sin(th)]);
+  }
+  return pts;
+}
+
+// ── Build nodes ───────────────────────────────────────────────────────────────
+const groupMeshes={}, modMeshes={}, modTargets={}, modLabels={};
+const expandedGroups = new Set();
+const allInteractive = [];
+
+GROUPS.forEach(g=>{
+  // Group icosahedron
+  const geo = new THREE.IcosahedronGeometry(24,2);
+  const mat = new THREE.MeshPhongMaterial({
+    color: new THREE.Color(g.color),
+    emissive: new THREE.Color(g.color),
+    emissiveIntensity: .28,
+    transparent:true, opacity:.82, shininess:120
+  });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.position.set(...g.pos);
+  mesh.userData = {type:'group', group:g};
+  scene.add(mesh);
+  groupMeshes[g.id] = mesh;
+  allInteractive.push(mesh);
+
+  // Inner glow sphere
+  const glowGeo = new THREE.SphereGeometry(30,16,16);
+  const glowMat = new THREE.MeshBasicMaterial({
+    color: new THREE.Color(g.color), transparent:true, opacity:.06, side:THREE.BackSide
+  });
+  const glow = new THREE.Mesh(glowGeo, glowMat);
+  glow.position.set(...g.pos);
+  scene.add(glow);
+
+  // Group label
+  const lbl = makeSprite(g.label, g.color, 15);
+  lbl.position.set(g.pos[0], g.pos[1]+38, g.pos[2]);
+  scene.add(lbl);
+
+  // Module nodes
+  const orbitPositions = fibSphere(g.modules.length, 85);
+  g.modules.forEach((mod, i)=>{
+    const mgeo = new THREE.SphereGeometry(6,14,14);
+    const mmat = new THREE.MeshPhongMaterial({
+      color: new THREE.Color(g.color),
+      emissive: new THREE.Color(g.color),
+      emissiveIntensity:.2,
+      transparent:true, opacity:0, shininess:80
+    });
+    const mm = new THREE.Mesh(mgeo, mmat);
+    mm.position.set(...g.pos);
+    mm.scale.set(0,0,0);
+    mm.userData = {type:'module', group:g, module:mod};
+    mm.visible = false;
+    scene.add(mm);
+    modMeshes[mod.id] = mm;
+    mod._mesh = mm;
+    allInteractive.push(mm);
+
+    modTargets[mod.id] = new THREE.Vector3(
+      g.pos[0]+orbitPositions[i][0],
+      g.pos[1]+orbitPositions[i][1],
+      g.pos[2]+orbitPositions[i][2]
+    );
+
+    // Module label
+    const ml = makeSprite(mod.label, '#c9d1d9', 10);
+    ml.position.set(...g.pos);
+    ml.material.opacity = 0;
+    scene.add(ml);
+    modLabels[mod.id] = ml;
+    mod._label = ml;
+  });
+});
+
+// ── Connection lines ──────────────────────────────────────────────────────────
+const connLines=[];
+const added = new Set();
+GROUPS.forEach(g=>{
+  (g.connects_to||[]).forEach(tid=>{
+    const key = [g.id,tid].sort().join('->');
+    if(added.has(key)) return;
+    added.add(key);
+    const target = GROUPS.find(x=>x.id===tid);
+    if(!target) return;
+    const pts = [new THREE.Vector3(...g.pos), new THREE.Vector3(...target.pos)];
+    const geo = new THREE.BufferGeometry().setFromPoints(pts);
+    const c1 = new THREE.Color(g.color), c2 = new THREE.Color(target.color);
+    const blended = c1.clone().lerp(c2,.5);
+    const mat = new THREE.LineDashedMaterial({
+      color: blended, dashSize:12, gapSize:6,
+      transparent:true, opacity:.22
+    });
+    const line = new THREE.Line(geo, mat);
+    line.computeLineDistances();
+    scene.add(line);
+    connLines.push({line,mat});
+  });
+});
+
+// ── Legend ────────────────────────────────────────────────────────────────────
+const legend = document.getElementById('legend');
+GROUPS.forEach(g=>{
+  const el = document.createElement('div');
+  el.className='li';
+  el.innerHTML=`<div class="ld" style="background:${g.color}"></div>${g.label}`;
+  el.onclick = ()=>{ const m=groupMeshes[g.id]; if(m) toggleGroup(g,m); };
+  legend.appendChild(el);
+});
+
+// ── Info panel ────────────────────────────────────────────────────────────────
+const infoEl = document.getElementById('info');
+let lastShown = null;
+
+function showGroupInfo(g, expanded){
+  infoEl.classList.remove('hidden');
+  infoEl.innerHTML = `
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+      <div style="width:12px;height:12px;border-radius:50%;background:${g.color};flex-shrink:0"></div>
+      <h2>${g.label}</h2>
+    </div>
+    <div class="gtype">${g.modules.length} modules &middot; click to ${expanded?'collapse':'expand'}</div>
+    <div class="gdesc">${g.desc}</div>
+    <div>
+      ${g.modules.map(m=>`
+        <div class="mod">
+          <div class="mname" style="color:${g.color}">${m.label}</div>
+          <div class="mdesc">${m.desc}</div>
+        </div>`).join('')}
+    </div>`;
+}
+
+function showModuleInfo(g, mod){
+  infoEl.classList.remove('hidden');
+  infoEl.innerHTML = `
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+      <div style="width:8px;height:8px;border-radius:50%;background:${g.color};flex-shrink:0"></div>
+      <h2 style="color:${g.color}">${mod.label}</h2>
+    </div>
+    <div class="gtype">${g.label}</div>
+    <div class="gdesc">${mod.desc}</div>`;
+}
+
+// ── Expand / Collapse ─────────────────────────────────────────────────────────
+function toggleGroup(g, mesh){
+  const was = expandedGroups.has(g.id);
+  if(was){
+    expandedGroups.delete(g.id);
+    g.modules.forEach(mod=>{ mod._target=0; });
+  } else {
+    expandedGroups.add(g.id);
+    g.modules.forEach(mod=>{ mod._target=1; mod._mesh.visible=true; });
+  }
+  showGroupInfo(g, !was);
+}
+
+// ── Interaction ───────────────────────────────────────────────────────────────
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2(-9999,-9999);
+let hovered = null;
+
+renderer.domElement.addEventListener('mousemove', e=>{
+  mouse.x = (e.clientX/W)*2-1;
+  mouse.y = -(e.clientY/H)*2+1;
+});
+
+renderer.domElement.addEventListener('click', ()=>{
+  raycaster.setFromCamera(mouse, camera);
+  const hits = raycaster.intersectObjects(allInteractive.filter(m=>m.visible!==false&&m.userData.type==='group'));
+  if(hits.length){
+    const obj = hits[0].object;
+    toggleGroup(obj.userData.group, obj);
+  }
+});
+
+window.addEventListener('resize',()=>{
+  const nw=window.innerWidth, nh=window.innerHeight;
+  camera.aspect=nw/nh; camera.updateProjectionMatrix();
+  renderer.setSize(nw,nh);
+});
+
+// ── Animation loop ────────────────────────────────────────────────────────────
+const clock = new THREE.Clock();
+const _v3 = new THREE.Vector3();
+
+function animate(){
+  requestAnimationFrame(animate);
+  const t = clock.getElapsedTime();
+  controls.update();
+
+  // Animate dash offset
+  connLines.forEach(({mat})=>{ mat.dashOffset -= 0.014; });
+
+  // Pulse + rotate group nodes
+  GROUPS.forEach(g=>{
+    const mesh = groupMeshes[g.id];
+    const expanded = expandedGroups.has(g.id);
+    const baseEmit = expanded ? .55 : .28;
+    mesh.material.emissiveIntensity = baseEmit + Math.sin(t*1.8+g.pos[0]*.01)*.1;
+    mesh.rotation.y += 0.0035;
+    mesh.rotation.x += 0.0012;
+
+    // Animate module nodes
+    g.modules.forEach(mod=>{
+      const mm = mod._mesh;
+      const ml = mod._label;
+      const want = mod._target ?? 0;
+      const tgt = want>0 ? modTargets[mod.id] : new THREE.Vector3(...g.pos);
+      const tgtOpacity = want>0 ? .85 : 0;
+      const tgtScale = want>0 ? 1 : 0;
+
+      mm.position.lerp(tgt, .09);
+      const cs = mm.scale.x;
+      const ns = cs + (tgtScale-cs)*.09;
+      mm.scale.set(ns,ns,ns);
+      mm.material.opacity += (tgtOpacity - mm.material.opacity)*.09;
+      mm.material.emissiveIntensity = .2 + Math.sin(t*2+g.pos[0]*.02)*.08;
+
+      if(want<0.01 && mm.material.opacity < 0.01) mm.visible=false;
+
+      ml.position.copy(mm.position).add(_v3.set(0,11,0));
+      ml.material.opacity += ((tgtOpacity*.9) - ml.material.opacity)*.09;
+    });
+  });
+
+  // Hover detection
+  raycaster.setFromCamera(mouse, camera);
+  const pickable = allInteractive.filter(m=>{
+    if(!m.visible) return false;
+    if(m.userData.type==='module') return m.material.opacity>0.2;
+    return true;
+  });
+  const hits = raycaster.intersectObjects(pickable);
+  if(hits.length){
+    const obj = hits[0].object;
+    if(obj !== hovered){
+      if(hovered) hovered.material.emissiveIntensity = .28;
+      hovered = obj;
+      obj.material.emissiveIntensity = .9;
+      if(obj.userData.type==='module') showModuleInfo(obj.userData.group, obj.userData.module);
+      else if(obj.userData.type==='group') showGroupInfo(obj.userData.group, expandedGroups.has(obj.userData.group.id));
+    }
+  } else {
+    if(hovered){ hovered.material.emissiveIntensity=.28; hovered=null; }
+  }
+
+  renderer.render(scene, camera);
+}
+animate();
+</script>
+</body>
+</html>
