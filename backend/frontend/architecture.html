@@ -55,8 +55,8 @@ const GROUPS = [
     {id:'cache',       label:'cache.py',          color:'#58a6ff', desc:'Redis get/set wrappers for world and character objects. Keeps hot data in memory so the tick loop rarely hits Postgres.'},
     {id:'redis_queue', label:'redis_queue.py',    color:'#58a6ff', desc:'Job queue for the async LLM worker process. enqueue() pushes a job dict to Redis list; dequeue_batch() pops up to N jobs for the worker to process concurrently.'},
     {id:'definitions', label:'definitions.py',    color:'#58a6ff', desc:'Loads prop and building template definitions from JSON. Templates define base stats, interactions, and anchor points used at world-load time and by the editor.'},
-    {id:'schema_def',  label:'schema_defaults.py',color:'#58a6ff', desc:'Ensures safe zero-values for every world and character field before systems read them. Covers: world["stocks"], world["stock_sector_trends"], world["market"]["catalog"], world["service_contracts"], character["portfolio"], character["watched_stocks"], character["inventory"], character["worn"] (via ensure_worn). Called once on world load and again if new characters are added.'},
-    {id:'item_tpl',    label:'data/item_templates.py',color:'#58a6ff', desc:'Master dictionary of 60+ physical item templates. Each entry: {name, category, base_price, stackable, max_stack, dirty, consumable, uses, resource_type, storage_container, quantity}. Clothing entries add: slot, bone (Three.js skeleton bone name), model (.glb path), style, warmth, bilateral. Categories: hygiene, linen, cleaning, dishware, food, groceries, drink, clothing, electronics, assembly_box.'},
+    {id:'schema_def',  label:'schema_defaults.py',color:'#58a6ff', desc:'Ensures safe zero-values for every world and character field before systems read them. Covers: world["stocks"], world["stock_sector_trends"], world["market"]["catalog"], world["service_contracts"], world["walls"], character["portfolio"], character["watched_stocks"], character["inventory"], character["worn"] (via ensure_worn). Called once on world load and again if new characters are added.'},
+    {id:'item_tpl',    label:'data/item_templates.py',color:'#58a6ff', desc:'Master dictionary of 77 physical item templates. Each entry: {name, category, base_price, size, stackable, max_stack, dirty, consumable, uses, resource_type, storage_container, quantity}. The "size" field (default 1) is the per-unit slot cost in containers — stacks multiply (quantity × size). Clothing entries add: slot, bone, model, style, warmth, bilateral. Categories: hygiene, linen, cleaning, dishware, food, groceries, drink, clothing, electronics. Larger items: laptop=4, backpack=2, bath_towel=2, jacket_winter=2, groceries_*=3, shoes=2.'},
   ]
 },
 {
@@ -109,15 +109,15 @@ const GROUPS = [
 {
   id:'economy', label:'Economy', color:'#3fb950',
   pos:[-320,0,0],
-  desc:'Household finances, unified market catalog, stocks, investments, procurement, deliveries, hired services, and expense-driven scheduling. The market is the single price authority for all items, props, and floor materials. Hired services let characters commission work (reconstruction, repair, gardening, babysitting, or illicit drug/escort) — a temporary NPC worker is spawned and walks to the household door. Legitimate services bill via the mailbox at week-end; illicit services require upfront cash. All wealth deduction flows through apply_expenses or spend_cash only.',
+  desc:'Household finances, unified market catalog, stocks, investments, procurement, deliveries, hired services, and expense-driven scheduling. The market is the single price authority for all items, props, floor materials, and paint/wallpaper buckets. Characters can buy paint (9 colors, 3 finishes) or wallpaper (5 patterns) as buckets — each bucket gives 10 wall paint uses. Hired services let characters commission work (reconstruction, repair, gardening, babysitting, or illicit drug/escort). All wealth deduction flows through apply_expenses or spend_cash only.',
   connects_to:['physical','core','social'],
   modules:[
     {id:'economy_s',  label:'economy.py',           color:'#3fb950', desc:'apply_expenses() issues weekly bills on Monday 00:00. Splits into fixed_home (rent+utilities) + food (80×members×cost_of_living). Caches household["weekly_expenses"] for schedule generator.'},
-    {id:'market',     label:'market.py',            color:'#3fb950', desc:'Unified product catalog. init_market_catalog() seeds world["market"]["catalog"] from ITEM_TEMPLATES + prop_templates. Each entry: {type, name, category, base_price, current_price, requires_assembly, resource_type, storage_container}. update_market() drifts category multipliers (CATEGORY_VOLATILITY dict) and refreshes current_price. get_price(), browse_catalog(category, budget, item_type), apply_news_to_market() for event-driven price spikes.'},
+    {id:'market',     label:'market.py',            color:'#3fb950', desc:'Unified product catalog. init_market_catalog() seeds world["market"]["catalog"] from ITEM_TEMPLATES + prop_templates + floor material_templates + paint/wallpaper materials (as bucket_{material_id} entries). CATEGORY_VOLATILITY covers groceries/hygiene/clothing/electronics/flooring/paint/wallpaper (paint+wallpaper at 0.002). update_market() drifts category multipliers and refreshes current_price. get_price(), browse_catalog(category, budget, item_type), apply_news_to_market(). Bucket entries: {type:"container", sub_type:"bucket", material_id, bucket_uses:10, price = price_per_liter×10 for paint, price_per_roll for wallpaper}.'},
     {id:'stock_mkt',  label:'stock_market.py',      color:'#3fb950', desc:'40-company stock market simulation across 8 sectors. init_stocks() seeds world["stocks"] from data/stocks.py. update_stocks() applies random walk + sector drift + news spikes each MEDIUM tick. Maintains a 60-bar price history per ticker. SECTOR_TAGS maps sectors to news event tags. Helpers: get_stock_price(), top_movers(), sector_performance().'},
     {id:'stocks_d',   label:'data/stocks.py',       color:'#3fb950', desc:'40 fictional company definitions across 8 sectors: tech (NXVT, CYLX, DRVM, QRIX, VLTX, PRXM, MNTH, ELVN), retail (KRTN, VRDX, LMNR, HBTH, GRSL, SPKX), energy (OXFL, SLRV, WNDP, NUCX, GRDX), health (MRVX, BTRX, MDIQ, CLNX, VRTN, HSPX), finance (ARCB, VNTG, FNIX, ISLR, MRKF), consumer (DLVX, BVRG, TRVX, FDBK, ENTX), media (STRM, PBLX, ADVX), industrial (BLDX, MNFX, TRNS, CHMX). Each entry: ticker, name, sector, base_price, volatility, market_cap, news_sensitivity, description.'},
     {id:'invest',     label:'investments.py',       color:'#3fb950', desc:'Sim trading behavior. buy_stock / sell_stock / portfolio_value / position_pnl helpers. update_investment_behavior() runs on SLOW cadence: checks if character has computer/phone, discovers stocks from news, considers sell triggers (take-profit +25%, stop-loss -18%, panic on -5% tick drop) and buy signals (trending up, dip buying). MIN_INVESTABLE_WEALTH=500. Portfolio stored in c["portfolio"] as {ticker: {shares, avg_cost}}.'},
-    {id:'procurement',label:'procurement.py',       color:'#3fb950', desc:'Character purchasing system. choose_from_catalog() scores catalog entries by character traits (frugal→price weight, materialistic→quality weight). purchase_from_catalog() dispatches by entry type: resource_type set → add_household_resource; prop + requires_assembly → make_assembly_box() → character inventory; prop no assembly → schedule_delivery_prop(); item online → schedule_delivery_item(); item in-person → make_item() → character inventory.'},
+    {id:'procurement',label:'procurement.py',       color:'#3fb950', desc:'Character purchasing system. choose_from_catalog() scores catalog entries by character traits (frugal→price weight, materialistic→quality weight). purchase_from_catalog() dispatches by entry type: container (bucket/box) → create_bucket or create_container → inventory; resource_type set → add_household_resource; tile → make_tile_box → inventory; prop + requires_assembly → make_assembly_box → inventory; prop no assembly → schedule_delivery_prop; item online → schedule_delivery_item; item in-person → make_item → inventory.'},
     {id:'deliveries', label:'deliveries.py',        color:'#3fb950', desc:'Delivery queue processing. update_deliveries() polls arrivals each tick. New-format deliveries (catalog_id + type field) call _deliver_item or _deliver_prop from procurement. Legacy product-dict deliveries use _legacy_acquire fallback. Generates a delivery_arrived notification on the household on completion.'},
     {id:'jobs',       label:'jobs.py',              color:'#3fb950', desc:'Job listing generation, hiring, and firing. maybe_fire() emits character_fired → apply_for_job handler. process_interview() emits character_hired on success. generate_job_listings() refreshes market every 60 ticks.'},
     {id:'housing',    label:'housing.py',           color:'#3fb950', desc:'Home assignment and expense defaults. ensure_home_defaults() sets rent/electricity/water/gasoline/internet. weekly_home_expenses() sums them. assign_household_to_home() and vacate_home() manage occupancy.'},
@@ -132,7 +132,7 @@ const GROUPS = [
 {
   id:'physical', label:'Physical World', color:'#d29922',
   pos:[-160,-60,-260],
-  desc:'Character embodiment: location, actions, movement, and possessions. Activities are the unit of embodied action with a 6-phase lifecycle (start→walking→arriving→using→finishing→complete). Navigation uses A* between rooms. Characters carry a personal inventory (items, keys, wallet, phone), wear clothing attached to skeleton bones, and can assemble boxed furniture into placed world props. offgrid.py abstracts work/shopping/leisure that happens off-screen.',
+  desc:'Character embodiment: location, actions, movement, and possessions. Activities are the unit of embodied action with a 6-phase lifecycle (start→walking→arriving→using→finishing→complete). Navigation uses A* between rooms. Characters carry a personal inventory (items, keys, wallet, phone), wear clothing attached to skeleton bones, assemble boxed furniture into placed world props, and carry containers (buckets, boxes, backpacks) that hold other items. Walls are first-class world entities with load_bearing, orientation, and material (paint/wallpaper). offgrid.py abstracts work/shopping/leisure that happens off-screen.',
   connects_to:['brain','economy','core'],
   modules:[
     {id:'activities',  label:'activities.py',       color:'#d29922', desc:'Authoritative activity executor. execute_activity() advances the current phase. INTERACTION_ANIMATIONS maps interaction→{walking,using,finishing} animations. Manages reservations, IK anchor approach, prop anim states, and completion events.'},
@@ -148,6 +148,8 @@ const GROUPS = [
     {id:'personal_items',label:'personal_items.py', color:'#d29922', desc:'Personal inventory and essential item system. Factories: make_smartphone(), make_house_key(home_id, building_id), make_wallet(cash), make_id_card(). Inventory CRUD: has_item, get_item, add_item, remove_item. Key/door: has_key_for(c, home_id), can_unlock_door, lock_home, unlock_home. Wallet: wallet_cash, spend_cash, add_cash. make_item(template_id, quantity, **overrides) creates instances from ITEM_TEMPLATES. inventory_summary(c) for LLM context.'},
     {id:'clothing',    label:'clothing.py',         color:'#d29922', desc:'14-slot wearable clothing system. Slots: head/hair/neck/outerwear/torso/undershirt/legs/underwear/socks/feet/hands/wrist_l/wrist_r/accessory — each mapped to a Three.js skeleton bone name. put_on_clothing(c, world, item_id) places item in slot; if slot occupied the displaced item returns to inventory as a stackable item. take_off_clothing(c, world, slot) moves worn item back to inventory. undress_all() strips all slots. tick_clothing_dirty() gives each worn item ~1% chance to become dirty per SLOW tick. outfit_style_score() averages style values, dirty items at 0.4×.'},
     {id:'assembly',    label:'assembly.py',         color:'#d29922', desc:'Prop and tile assembly system. make_assembly_box(prop_template_id) creates a flat-pack box for furniture/appliances (stackable=False, uses=1); assemble_prop converts it into a placed world prop at the character\'s position. make_tile_box(material_id, quantity) creates a stackable tile box (tile_type="tile", max_stack=100); assemble_tile places one 1-sqm floor tile at the character\'s position and decrements quantity — box removed when exhausted. tile_boxes_in_inventory(c) and assembly_boxes_in_inventory(c) are the LLM context queries. action_router dispatches assemble_prop and assemble_tile as separate action types.'},
+    {id:'walls_s',     label:'walls.py',            color:'#d29922', desc:'Wall entities in world["walls"] keyed by wall_id. Schema: {id, building_id, x, y, orientation ("h"/"v"), load_bearing, material, walkable:False, interior}. create_wall() adds a wall; remove_wall() rejects load_bearing walls with reason="load_bearing". paint_wall(world, wall_id, material_id) applies a paint or wallpaper material_template to the wall. walls_near(world, x, y, radius) and walls_in_building() support context queries. Context builder surfaces nearby_walls (radius 3) and adds build_wall/remove_wall to action_types; paint_wall added when character has a non-empty bucket in inventory.'},
+    {id:'containers_s',label:'containers.py',       color:'#d29922', desc:'Generic container items with slot-based capacity. Items have a "size" field (default 1); stacks multiply: quantity × size = slots used. Container schema: {type:"container", sub_type, capacity, items:[], size, material}. Bucket sub-type holds liquid material (paint or wallpaper): {sub_type:"bucket", material:material_id, uses:N, capacity:10}. Functions: create_container, create_bucket(material_id, world, uses), add_to_container / remove_from_container (checks can_fit, no nesting), slots_used, use_bucket (decrements uses, returns True when empty), find_bucket_for_material(c, material_id), container_summary for LLM context. One nesting level only — containers cannot go inside other containers.'},
   ]
 },
 {
@@ -202,50 +204,4 @@ camera.position.set(80, 280, 820);
 const controls = new THREE.OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.dampingFactor = 0.06;
-controls.target.set(0, 40, 0);
-controls.minDistance = 120;
-controls.maxDistance = 2400;
-
-// Lights
-const ambient = new THREE.AmbientLight(0x111827, 1.2);
-scene.add(ambient);
-const sun = new THREE.DirectionalLight(0xffffff, 0.4);
-sun.position.set(200, 400, 100);
-scene.add(sun);
-
-// ── Stars ─────────────────────────────────────────────────────────────────────
-(function makeStars(){
-  const pos = new Float32Array(3000*3);
-  for(let i=0;i<3000;i++){
-    pos[i*3]   = (Math.random()-.5)*7000;
-    pos[i*3+1] = (Math.random()-.5)*7000;
-    pos[i*3+2] = (Math.random()-.5)*7000;
-  }
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.BufferAttribute(pos,3));
-  scene.add(new THREE.Points(geo, new THREE.PointsMaterial({color:0xffffff,size:1.1,transparent:true,opacity:.55})));
-})();
-
-// ── Label sprite ──────────────────────────────────────────────────────────────
-function makeSprite(text, color, size=14){
-  const c = document.createElement('canvas');
-  const ctx = c.getContext('2d');
-  ctx.font = `600 ${size}px 'Cascadia Code',monospace`;
-  const tw = ctx.measureText(text).width;
-  c.width = tw+20; c.height = size+14;
-  ctx.font = `600 ${size}px 'Cascadia Code',monospace`;
-  ctx.fillStyle = color;
-  ctx.globalAlpha = .9;
-  ctx.fillText(text, 10, size+1);
-  const tex = new THREE.CanvasTexture(c);
-  const mat = new THREE.SpriteMaterial({map:tex,transparent:true,depthWrite:false});
-  const sp = new THREE.Sprite(mat);
-  sp.scale.set((tw+20)/8, (size+14)/8, 1);
-  sp.userData.isLabel = true;
-  return sp;
-}
-
-// ── Fibonacci sphere distribution ─────────────────────────────────────────────
-function fibSphere(n, r){
-  const pts=[]; const gr=(1+Math.sqrt(5))/2;
-  for(let i=0;i<
+controls.target.set(0, 40, 0
