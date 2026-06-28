@@ -388,6 +388,10 @@ def ensure_character_defaults(c):
     c.setdefault("watched_stocks",           [])
     c.setdefault("last_stock_check",         0)
     c.setdefault("inventory",                [])
+    # Clothing worn on body — populated by clothing.ensure_worn on first use
+    if "worn" not in c:
+        from systems.clothing import ensure_worn
+        ensure_worn(c)
     c.setdefault("social_contract_ids",      [])
     c.setdefault("cold_shoulder_towards",    [])
     c.setdefault("_confrontation_emitted",   [])

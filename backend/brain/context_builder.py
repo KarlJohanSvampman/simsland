@@ -1,3 +1,4 @@
+from systems.clothing import worn_summary, outfit_style_score, ALL_SLOTS
 from systems.personal_items import inventory_summary, phone_actions, wallet_cash
 from brain.memory import (
     biased_recall
@@ -284,10 +285,29 @@ def build_available_actions(c, world):
         "text",
     ]
 
+    # Clothing in inventory — can put on
+    wearable_in_inventory = [
+        {"item_id": i["id"], "template_id": i.get("template_id"), "name": i.get("name"), "slot": i.get("slot")}
+        for i in c.get("inventory", [])
+        if i.get("slot")  # slot presence means it's wearable clothing
+    ]
+
+    # Occupied clothing slots — can take off
+    worn_slots = [
+        {"slot": slot, "name": item.get("name"), "template_id": item.get("template_id")}
+        for slot, item in c.get("worn", {}).items()
+        if item
+    ]
+
+    if wearable_in_inventory or worn_slots:
+        action_types.extend(["wear", "undress"])
+
     return {
-        "action_types":       action_types,
-        "interactable_props": interactable,
-        "nearby_characters":  nearby_people,
+        "action_types":          action_types,
+        "interactable_props":    interactable,
+        "nearby_characters":     nearby_people,
+        "wearable_items":        wearable_in_inventory,
+        "worn_slots":            worn_slots,
     }
 
 
@@ -468,6 +488,7 @@ def build_context(
         "grievances": build_grievance_context(c, world),
         "investments": build_investment_context(c, world),
         "inventory":   _build_inventory_context(c),
+        "worn":        _build_worn_context(c),
     }
 
     return context
@@ -1039,4 +1060,18 @@ def _build_inventory_context(c):
         "items":          items,
         "wallet_cash":    wallet_cash(c),
         "phone_actions":  phone_actions(c),
+    }
+
+
+# =========================================================
+# WORN CLOTHING CONTEXT
+# =========================================================
+
+def _build_worn_context(c):
+    summary = worn_summary(c)
+    if not summary:
+        return None
+    return {
+        "outfit":      summary,
+        "style_score": outfit_style_score(c),
     }

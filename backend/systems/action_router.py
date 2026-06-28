@@ -372,31 +372,29 @@ def _route_clean(c, world, action, definitions):
 
 # =========================================================
 # ROUTE WEAR / UNDRESS
-# Instantly equips or removes a clothing template on the character.
-# action = { "type": "wear",   "template": "jeans_blue", "slot": "pants" }
-# action = { "type": "undress","slot": "pants" }
+# Put on / take off clothing items from the character's personal inventory.
+# action = { "type": "wear",    "item_id": "item_tshirt_abc123" }
+# action = { "type": "undress", "slot": "torso" }   or omit slot to undress all
 # =========================================================
 
-def _route_wear(c, world, action, definitions):
-    slot     = action.get("slot")
-    template = action.get("template")
-    if not slot:
+def _route_wear(c, world, action, definitions=None):
+    from systems.clothing import put_on_clothing
+    item_id = action.get("item_id")
+    if not item_id:
         return
-    clothing_templates = definitions.get("clothing_templates", {})
-    if template and template not in clothing_templates:
-        return
-    equipped = c.setdefault("equipped", {})
-    equipped[slot] = template   # None clears the slot
+    result = put_on_clothing(c, world, item_id)
+    if result.get("swapped_off"):
+        # Old item already returned to inventory by put_on_clothing
+        pass
 
 
 def _route_undress(c, world, action):
+    from systems.clothing import take_off_clothing, undress_all
     slot = action.get("slot")
     if slot:
-        c.setdefault("equipped", {})[slot] = None
+        take_off_clothing(c, world, slot)
     else:
-        # undress all if no slot given
-        for k in c.get("equipped", {}):
-            c["equipped"][k] = None
+        undress_all(c, world)
 
 
 # =========================================================

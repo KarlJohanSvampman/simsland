@@ -13,6 +13,34 @@ Supported types:
 
 import uuid
 
+
+# =========================================================
+# ITEM FACTORY — create instances from templates
+# =========================================================
+
+def make_item(template_id, quantity=1, **overrides):
+    """
+    Create an item instance from a template.
+    Returns a dict with a unique id, all template fields, plus overrides.
+    """
+    from data.item_templates import ITEM_TEMPLATES
+    template = ITEM_TEMPLATES.get(template_id)
+    if not template:
+        raise ValueError(f"Unknown item template: {template_id!r}")
+    item = {
+        "id":          f"item_{template_id}_{uuid.uuid4().hex[:6]}",
+        "template_id": template_id,
+        "quantity":    quantity,
+        **template,
+        **overrides,
+    }
+    return item
+
+
+def make_item_stack(template_id, quantity, **overrides):
+    """Convenience: make_item with explicit quantity for stackable items."""
+    return make_item(template_id, quantity=quantity, **overrides)
+
 # =========================================================
 # PHONE ACTIONS
 # Things a smartphone enables that a plain phone doesn't
