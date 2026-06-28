@@ -1,3 +1,4 @@
+from systems.personal_items import unlock_home
 from systems.props import (
     find_nearest_anchor
 )
@@ -17,7 +18,23 @@ from systems.anchors import (
 # position so the movement system walks them there.
 # =========================================================
 
+
+def _auto_unlock_for_prop(c, world, prop):
+    """Unlock home doors when a character needs to enter their own home."""
+    prop_building = prop.get("building_id")
+    if not prop_building:
+        return
+    hid = c.get("household_id")
+    if not hid:
+        return
+    h = world.get("households", {}).get(hid, {})
+    if h.get("home_id") == prop_building:
+        unlock_home(c, world)
+
+
 def request_route_to_anchor(c, world, prop, anchor):
+    # If the target prop is inside the character's home, unlock it first
+    _auto_unlock_for_prop(c, world, prop)
     ax, ay = get_world_anchor_position(prop, anchor)
 
     c["move_target"] = {

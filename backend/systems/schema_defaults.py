@@ -387,6 +387,7 @@ def ensure_character_defaults(c):
     c.setdefault("portfolio",                {})
     c.setdefault("watched_stocks",           [])
     c.setdefault("last_stock_check",         0)
+    c.setdefault("inventory",                [])
     c.setdefault("social_contract_ids",      [])
     c.setdefault("cold_shoulder_towards",    [])
     c.setdefault("_confrontation_emitted",   [])

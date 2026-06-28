@@ -1,9 +1,24 @@
+from systems.personal_items import lock_home
 import math
 
 
 # =========================================================
 # UPDATE ROUTE MOVEMENT
 # =========================================================
+
+
+def _auto_lock_on_exit(c, world):
+    """Lock home when character transitions from their home building to outdoor."""
+    current_building = c.get("building_id")
+    if not current_building:
+        return
+    hid = c.get("household_id")
+    if not hid:
+        return
+    h = world.get("households", {}).get(hid, {})
+    if h.get("home_id") == current_building:
+        lock_home(c, world)
+
 
 def update_character_movement(
 
@@ -73,6 +88,8 @@ def update_character_movement(
 
             if next_segment["type"] == "outdoor":
 
+                # Lock home doors when character steps outside
+                _auto_lock_on_exit(c, world)
                 c["building_id"] = None
 
             elif next_segment["type"] == "indoor":

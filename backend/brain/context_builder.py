@@ -1,3 +1,4 @@
+from systems.personal_items import inventory_summary, phone_actions, wallet_cash
 from brain.memory import (
     biased_recall
 )
@@ -466,6 +467,7 @@ def build_context(
         "active_conflict": build_conflict_context(c, world),
         "grievances": build_grievance_context(c, world),
         "investments": build_investment_context(c, world),
+        "inventory":   _build_inventory_context(c),
     }
 
     return context
@@ -1023,3 +1025,18 @@ def build_investment_context(c, world):
         "watching":        watched[:4],
     }
 
+
+
+# =========================================================
+# INVENTORY CONTEXT
+# =========================================================
+
+def _build_inventory_context(c):
+    items = inventory_summary(c)
+    if not items:
+        return None
+    return {
+        "items":          items,
+        "wallet_cash":    wallet_cash(c),
+        "phone_actions":  phone_actions(c),
+    }

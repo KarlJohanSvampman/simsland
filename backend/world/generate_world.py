@@ -1,4 +1,5 @@
 from systems.stock_market import init_stocks
+from systems.personal_items import make_smartphone, make_house_key, make_wallet
 import time
 from datetime import datetime
 
@@ -314,7 +315,12 @@ def generate_initial_world():
 
                 "conversation_target": None,
 
-                "look_target": None
+                "look_target": None,
+
+                # ---------------------------------------------
+                # PERSONAL INVENTORY
+                # ---------------------------------------------
+                "inventory": []
             }
         },
 
@@ -382,6 +388,8 @@ def generate_initial_world():
 
                         "locked": False,
 
+                        "home_id": "house_1",
+
                         "busy": False,
 
                         "reserved_by": None,
@@ -396,4 +404,13 @@ def generate_initial_world():
     }
 
     init_stocks(world)
+
+    # Seed personal inventories
+    c1 = world["characters"]["c1"]
+    c1["inventory"] = [
+        make_smartphone(owner_id="c1"),
+        make_house_key(home_id="house_1", building_id="house_1", owner_id="c1"),
+        make_wallet(cash=100.0, owner_id="c1"),
+    ]
+
     return world
