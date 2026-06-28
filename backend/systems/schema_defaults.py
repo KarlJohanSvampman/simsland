@@ -32,10 +32,11 @@ def ensure_world_defaults(world):
         "vacant_homes",
         []
     )
-    world.setdefault("conflicts",        {})
-    world.setdefault("social_contracts", {})
-    world.setdefault("stocks",           {})
+    world.setdefault("conflicts",          {})
+    world.setdefault("social_contracts",   {})
+    world.setdefault("stocks",             {})
     world.setdefault("stock_sector_trends", {})
+    world.setdefault("service_contracts",  [])
 
 
     world.setdefault(
@@ -673,5 +674,4 @@ def ensure_household_defaults(h):
 
     h.setdefault("unopened_mail", [])
     h.setdefault("unpaid_bills", [])
-    h.setdefault("pending_responses", [])
-    h.setdefault("completed_documents", [])
+    h.setdefault("pending_respons

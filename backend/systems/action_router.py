@@ -426,6 +426,29 @@ def _route_assemble_tile(c, world, action):
 
 
 # =========================================================
+# HIRE SERVICE
+# action = {
+#   "type":         "hire_service",
+#   "service_type": "reconstruction",
+#   "subtype":      "floor_tiling",
+#   "details":      {"tiles": [{"x":1,"y":2,"material":"wood_floor_01"}, ...]},
+#   "quantity":     5
+# }
+# Legitimate services bill via mailbox; illicit deduct cash immediately.
+# =========================================================
+
+def _route_hire_service(c, world, action):
+    from systems.services import request_service
+    request_service(
+        c, world,
+        service_type=action.get("service_type"),
+        subtype=action.get("subtype"),
+        details=action.get("details", {}),
+        quantity=action.get("quantity", 1),
+    )
+
+
+# =========================================================
 # MAIN ROUTER
 # =========================================================
 
@@ -514,6 +537,9 @@ def route_action(c, world, action, speech, definitions=None):
     elif action_type == "assemble_tile":
         _route_assemble_tile(c, world, action)
 
+    elif action_type == "hire_service":
+        _route_hire_service(c, world, action)
+
     # "call" / "text" are future — for now just log
     elif action_type in ("call", "text"):
         c.setdefault("pending_comms", []).append(action)
@@ -522,25 +548,4 @@ def route_action(c, world, action, speech, definitions=None):
     # If the action maps to a hobby with requirements, build
     # the full prerequisite queue instead of starting directly.
     elif action_type in _HOBBY_ACTION_TYPES:
-        _route_hobby(c, world, action_type)
-        return  # planner sets c["activity_queue"]; queue processor takes it from here
-
-    # Set animation state — specific handlers set their own; only fall back for generic types
-    _NO_GENERIC_ANIM = {"interact", "examine", "search", "trash", "destroy",
-                        "carry", "clean", "wear", "undress"}
-    if action_type not in _NO_GENERIC_ANIM:
-        anim = _ACTION_ANIMATION.get(action_type, "idle")
-        c["animation_state"] = anim
-
-
-# =========================================================
-# HOBBY ROUTING
-# =========================================================
-
-from systems.hobby_requirements import ACTIVITY_TO_HOBBY
-
-_HOBBY_ACTION_TYPES = set(ACTIVITY_TO_HOBBY.keys())
-
-
-def _route_hobby(c, world, action_type):
-    """Intercept a hobby action and run the prereq
+       

@@ -62,6 +62,7 @@ from systems.appliance_degradation import update_appliance_degradation
 from systems.messaging  import deliver_messages
 from systems.migration  import check_migration_desires
 from systems.eviction   import check_household_for_eviction
+from systems.services   import update_services
 
 # -- Conflict / social drama ──────────────────────────────────────────────
 from systems.grievances        import update_grievances
@@ -171,8 +172,11 @@ def tick(world):
             update_attention(c, world)
 
     # -- Per-tick: agent brain ──────────────────────────────
+    # Skip service worker NPCs — they are driven by update_services, not LLM.
     dirty_char_ids = set()
     for c in characters:
+        if c.get("is_service_worker"):
+            continue
         update_item_knowledge(c, world)
         process_reaction_queue(c, t)
         update_agent(c, world)
@@ -237,6 +241,9 @@ def tick(world):
     if every(world, CADENCE["service_workers"], offset=14):
         update_service_vehicles(world)
 
+    if every(world, CADENCE["service_workers"], offset=18):
+        update_services(world)
+
     # World-level random incidents (character-level ones emitted in agent_loop)
     if every(world, CADENCE["arrests"], offset=15):
         trigger_incident(world, None)  # world-level random only
@@ -290,12 +297,4 @@ def tick(world):
         apply_public_figure_influence(world)
         apply_social_influence(world)
 
-    if every(world, CADENCE["hierarchy"], offset=23):
-        update_hierarchy(world)
-
-    # Story arcs are lightweight — keep per-tick
-    for c in characters:
-        update_story_arc(c)
-
-    # -- Flush event bus (runs all handlers for events emitted this tick)
-    flush_events(world)
+    if ever

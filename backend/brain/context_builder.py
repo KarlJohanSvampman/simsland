@@ -323,6 +323,9 @@ def build_available_actions(c, world):
     if t_boxes:
         action_types.append("assemble_tile")
 
+    # Hired services — always available (character decides if they can afford it)
+    action_types.append("hire_service")
+
     return {
         "action_types":          action_types,
         "interactable_props":    interactable,
@@ -509,9 +512,10 @@ def build_context(
         "social_models":build_social_model_context(c),
         "active_conflict": build_conflict_context(c, world),
         "grievances": build_grievance_context(c, world),
-        "investments": build_investment_context(c, world),
-        "inventory":   _build_inventory_context(c),
-        "worn":        _build_worn_context(c),
+        "investments":       build_investment_context(c, world),
+        "inventory":         _build_inventory_context(c),
+        "worn":              _build_worn_context(c),
+        "services":          _build_services_context(c, world),
     }
 
     return context
@@ -1080,4 +1084,52 @@ def _build_inventory_context(c):
     if not items:
         return None
     return {
-        "items": 
+        "items":          items,
+        "wallet_cash":    wallet_cash(c),
+        "phone_actions":  phone_actions(c),
+    }
+
+
+# =========================================================
+# WORN CLOTHING CONTEXT
+# =========================================================
+
+def _build_worn_context(c):
+    summary = worn_summary(c)
+    if not summary:
+        return None
+    return {
+        "outfit":      summary,
+        "style_score": outfit_style_score(c),
+    }
+
+
+# =========================================================
+# SERVICES CONTEXT
+# =========================================================
+
+def _build_services_context(c, world):
+    from systems.services import available_services, active_contracts_for_household
+    hid = None
+    for hh_id, h in world.get("households", {}).items():
+        if c["id"] in h.get("members", []):
+            hid = hh_id
+            break
+
+    active = active_contracts_for_household(world, hid) if hid else []
+    active_summary = [
+        {
+            "id":       con["id"],
+            "service":  con["service_type"],
+            "subtype":  con["subtype"],
+            "status":   con["status"],
+            "cost":     con["cost"],
+            "progress": f"{con['work_progress']}/{con['quantity']}",
+        }
+        for con in active
+    ]
+
+    return {
+        "available":       available_services(),
+        "active_contracts": active_summary,
+    }
