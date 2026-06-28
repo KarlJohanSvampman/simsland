@@ -384,16 +384,36 @@ def generate_initial_world():
                 "facing": "south",
 
                 # ---------------------------------------------
-                # NEEDS
+                # NEEDS  (social/psychological only — body handled by c["body"])
                 # ---------------------------------------------
                 "needs": {
-
-                    "energy": 0.8,
-                    "hunger": 0.5,
                     "social": 0.7,
-                    "fun": 0.6,
-                    "hygiene": 0.9
+                    "fun":    0.6,
                 },
+
+                # ---------------------------------------------
+                # BODY (physical simulation — 0-100)
+                # ---------------------------------------------
+                "body": {
+                    "hunger":             20,
+                    "hydration":          80,
+                    "bladder":            10,
+                    "bowels":              5,
+                    "fatigue":            20,
+                    "sleep_debt":          0,
+                    "hygiene":            85,
+                    "odor":                5,
+                    "mouth_hygiene":      90,
+                    "recent_intake":      30,
+                    "stomach_discomfort":  0,
+                    "pain":                0,
+                    "sickness":            0,
+                },
+
+                # ---------------------------------------------
+                # LONG-TERM NEEDS
+                # ---------------------------------------------
+                "lt_needs": {},
 
                 # ---------------------------------------------
                 # TRAITS
@@ -443,44 +463,4 @@ def generate_initial_world():
                     "upper": None
                 },
 
-                # ---------------------------------------------
-                # SOCIAL
-                # ---------------------------------------------
-                "last_utterance": "",
-
-                "conversation_target": None,
-
-                "look_target": None,
-
-                # ---------------------------------------------
-                # PERSONAL INVENTORY
-                # ---------------------------------------------
-                "inventory": []
-            }
-        },
-
-        # =====================================================
-        # PROP INSTANCES
-        # =====================================================
-        "props": [
-
-            {
-                "id": "prop_sofa_1",
-
-                "template": "modern_sofa",
-
-                "x": 5,
-                "y": 5,
-
-                "rotation": 0,
-
-                # runtime state only
-                "state": {
-
-                    "reserved_by": [],
-                    "dirty": False
-                }
-            }
-        ],
-
-       
+                # -------------------------------------------

@@ -261,17 +261,8 @@ def mark_message_read(
 
 def social_need_score(c):
 
-    social = c.get(
-        "needs",
-        {}
-    ).get(
-        "social",
-        1.0
-    )
-
-    loneliness = 1.0 - social
-
-    return loneliness
+    social = c.get("needs", {}).get("social", 1.0)
+    return 1.0 - social
 
 
 # =========================================================

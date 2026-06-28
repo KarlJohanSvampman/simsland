@@ -4013,5 +4013,329 @@
       ],
       "decay_per_week": 1
     }
+  },
+  "mood_templates": {
+    "content": {
+      "name": "Content",
+      "description": "A baseline state of satisfaction and ease.",
+      "emotional_temperature_range": [
+        0,
+        35
+      ],
+      "triggers": {
+        "stress_below": 30
+      },
+      "duration_ticks": 7200,
+      "behavior_flags": [
+        "content",
+        "cooperative"
+      ],
+      "need_modifiers": {
+        "social": 0.05,
+        "fun": 0.05
+      },
+      "polarity": "positive"
+    },
+    "cheerful": {
+      "name": "Cheerful",
+      "description": "Upbeat and positive \u2014 prone to jokes and warmth.",
+      "emotional_temperature_range": [
+        15,
+        40
+      ],
+      "triggers": {
+        "recent_positive_event": true
+      },
+      "duration_ticks": 5400,
+      "behavior_flags": [
+        "cheerful",
+        "talkative",
+        "cooperative"
+      ],
+      "need_modifiers": {
+        "social": 0.1,
+        "fun": 0.1
+      },
+      "polarity": "positive"
+    },
+    "playful": {
+      "name": "Playful",
+      "description": "Energetic and fun-seeking. Low threshold for goofing off.",
+      "emotional_temperature_range": [
+        20,
+        45
+      ],
+      "triggers": {
+        "fun_need_high": true
+      },
+      "duration_ticks": 3600,
+      "behavior_flags": [
+        "playful",
+        "distracted"
+      ],
+      "need_modifiers": {
+        "fun": 0.15
+      },
+      "polarity": "positive"
+    },
+    "focused": {
+      "name": "Focused",
+      "description": "Calm and productive. Less interested in socialising.",
+      "emotional_temperature_range": [
+        10,
+        30
+      ],
+      "triggers": {
+        "stress_below": 20,
+        "sleep_debt_below": 20
+      },
+      "duration_ticks": 5400,
+      "behavior_flags": [
+        "focused",
+        "productive"
+      ],
+      "need_modifiers": {
+        "social": -0.1
+      },
+      "polarity": "positive"
+    },
+    "romantic": {
+      "name": "Romantic",
+      "description": "Emotionally open, seeking connection and affection.",
+      "emotional_temperature_range": [
+        20,
+        45
+      ],
+      "triggers": {
+        "lt_need_romance_high": true
+      },
+      "duration_ticks": 7200,
+      "behavior_flags": [
+        "affectionate",
+        "romantic"
+      ],
+      "need_modifiers": {
+        "social": 0.1
+      },
+      "polarity": "positive"
+    },
+    "restless": {
+      "name": "Restless",
+      "description": "Cannot settle. Seeking stimulation or change.",
+      "emotional_temperature_range": [
+        35,
+        55
+      ],
+      "triggers": {
+        "fun_need_low": true,
+        "lt_need_adventure_high": true
+      },
+      "duration_ticks": 3600,
+      "behavior_flags": [
+        "restless",
+        "impulsive"
+      ],
+      "need_modifiers": {
+        "fun": -0.1,
+        "social": 0.05
+      },
+      "polarity": "neutral"
+    },
+    "lonely": {
+      "name": "Lonely",
+      "description": "Craving company and connection. May reach out or withdraw.",
+      "emotional_temperature_range": [
+        30,
+        55
+      ],
+      "triggers": {
+        "social_need_low": true,
+        "lt_need_socialize_high": true
+      },
+      "duration_ticks": 5400,
+      "behavior_flags": [
+        "lonely",
+        "withdrawn_or_clingy"
+      ],
+      "need_modifiers": {
+        "social": -0.15
+      },
+      "polarity": "negative"
+    },
+    "anxious": {
+      "name": "Anxious",
+      "description": "On edge. Overanalyses, second-guesses, may avoid social situations.",
+      "emotional_temperature_range": [
+        45,
+        65
+      ],
+      "triggers": {
+        "stress_above": 55
+      },
+      "duration_ticks": 3600,
+      "behavior_flags": [
+        "anxious",
+        "avoidant",
+        "indecisive"
+      ],
+      "need_modifiers": {
+        "social": -0.1
+      },
+      "polarity": "negative"
+    },
+    "irritable": {
+      "name": "Irritable",
+      "description": "Short-tempered. Small annoyances feel big.",
+      "emotional_temperature_range": [
+        50,
+        70
+      ],
+      "triggers": {
+        "stress_above": 50,
+        "sleep_debt_above": 30
+      },
+      "duration_ticks": 2700,
+      "behavior_flags": [
+        "irritable",
+        "conflict_prone"
+      ],
+      "need_modifiers": {
+        "social": -0.1,
+        "fun": -0.05
+      },
+      "polarity": "negative"
+    },
+    "sad": {
+      "name": "Sad",
+      "description": "Low energy and emotional flatness. May cry or withdraw.",
+      "emotional_temperature_range": [
+        30,
+        55
+      ],
+      "triggers": {
+        "negative_life_event": true
+      },
+      "duration_ticks": 10800,
+      "behavior_flags": [
+        "sad",
+        "withdrawn",
+        "unmotivated"
+      ],
+      "need_modifiers": {
+        "social": -0.1,
+        "fun": -0.15
+      },
+      "polarity": "negative"
+    },
+    "grieving": {
+      "name": "Grieving",
+      "description": "Intense emotional pain following loss. Needs support.",
+      "emotional_temperature_range": [
+        20,
+        60
+      ],
+      "triggers": {
+        "major_loss": true
+      },
+      "duration_ticks": 43200,
+      "behavior_flags": [
+        "grieving",
+        "withdrawn",
+        "needs_support"
+      ],
+      "need_modifiers": {
+        "social": 0.1,
+        "fun": -0.3
+      },
+      "polarity": "negative"
+    },
+    "depressed": {
+      "name": "Depressed",
+      "description": "Persistent low mood. Neglects hygiene, skips meals, avoids people.",
+      "emotional_temperature_range": [
+        15,
+        45
+      ],
+      "triggers": {
+        "multiple_lt_needs_unmet": true,
+        "stress_above": 60
+      },
+      "duration_ticks": 86400,
+      "behavior_flags": [
+        "depressed",
+        "neglects_hygiene",
+        "neglects_meals",
+        "avoidant"
+      ],
+      "need_modifiers": {
+        "social": -0.2,
+        "fun": -0.25
+      },
+      "polarity": "negative"
+    },
+    "furious": {
+      "name": "Furious",
+      "description": "Explosive anger. May say things they regret.",
+      "emotional_temperature_range": [
+        80,
+        100
+      ],
+      "triggers": {
+        "grievance_active": true,
+        "emotional_temperature_above": 75
+      },
+      "duration_ticks": 1800,
+      "behavior_flags": [
+        "furious",
+        "aggressive",
+        "impulsive"
+      ],
+      "need_modifiers": {
+        "social": -0.2
+      },
+      "polarity": "negative"
+    },
+    "embarrassed": {
+      "name": "Embarrassed",
+      "description": "Self-conscious and flustered. Wants to avoid the source of embarrassment.",
+      "emotional_temperature_range": [
+        40,
+        65
+      ],
+      "triggers": {
+        "social_failure": true
+      },
+      "duration_ticks": 1800,
+      "behavior_flags": [
+        "embarrassed",
+        "avoidant"
+      ],
+      "need_modifiers": {
+        "social": -0.15
+      },
+      "polarity": "negative"
+    },
+    "energized": {
+      "name": "Energized",
+      "description": "Rested and ready. More initiative, more productive.",
+      "emotional_temperature_range": [
+        10,
+        35
+      ],
+      "triggers": {
+        "fatigue_below": 20,
+        "sleep_debt_below": 10
+      },
+      "duration_ticks": 5400,
+      "behavior_flags": [
+        "energized",
+        "motivated"
+      ],
+      "need_modifiers": {
+        "fun": 0.1,
+        "social": 0.05
+      },
+      "polarity": "positive"
+    }
   }
 }

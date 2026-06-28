@@ -262,12 +262,24 @@ def build_available_actions(c, world):
     # -----------------------------------------------
     nearby_people = []
 
+    from systems.body import get_odor_label, get_breath_label
     for person in perception.get("visible_people", []):
-        nearby_people.append({
+        entry = {
             "id":       person["id"],
             "name":     person.get("name"),
             "distance": person.get("distance"),
-        })
+        }
+        # Surface odor/breath cues for characters within close range
+        dist = person.get("distance", 999)
+        other_body = person.get("body", {})
+        if dist < 4:
+            odor_label = get_odor_label(other_body.get("odor", 0))
+            if odor_label:
+                entry["smells"] = odor_label
+            breath_label = get_breath_label(other_body.get("mouth_hygiene", 100))
+            if breath_label and dist < 2:
+                entry["breath"] = breath_label
+        nearby_people.append(entry)
 
     # -----------------------------------------------
     # ACTION TYPES available this tick
@@ -415,28 +427,22 @@ def build_context(
         "internal_state": {
 
             "emotion":
-                c.get(
-                    "emotion",
-                    "neutral"
-                ),
+                c.get("emotion", "neutral"),
 
-            "needs":
-                c.get(
-                    "needs",
-                    {}
-                ),
+            "mood":
+                c.get("mood"),
 
             "stress":
-                c.get(
-                    "stress",
-                    0
-                ),
+                c.get("stress", 0),
 
-            "energy":
-                c.get(
-                    "energy",
-                    100
-                )
+            "social_need":
+                c.get("needs", {}).get("social", 0.7),
+
+            "fun_need":
+                c.get("needs", {}).get("fun", 0.6),
+
+            "sleep_debt":
+                c.get("body", {}).get("sleep_debt", 0),
         },
 
         # =====================================
@@ -538,6 +544,7 @@ def build_context(
         "self_model": build_self_model(c),
         "schedule": build_schedule_context(c),
         "body_state": build_body_context(c),
+        "lt_needs": _build_lt_need_context(c),
         "household_resources":build_household_resource_context( c,world),
         "cognitive_pressure": build_cognitive_pressure(c),
         "social": build_social_context(c,world),
@@ -845,39 +852,49 @@ def build_schedule_context(c):
 # =========================================================
 
 def build_body_context(c):
-
-    b = c.get(
-        "body",
-        {}
-    )
-
+    from systems.body import get_odor_label, get_breath_label
+    b = c.get("body", {})
     issues = []
 
     if b.get("bladder", 0) > 70:
+        issues.append("You urgently need to use a toilet.")
+    elif b.get("bowels", 0) > 75:
+        issues.append("You need to use the toilet.")
 
-        issues.append(
-            "You urgently need "
-            "to use a toilet."
-        )
+    if b.get("fatigue", 0) > 80:
+        issues.append("You feel exhausted.")
+    elif b.get("fatigue", 0) > 60:
+        issues.append("You feel tired.")
 
-    if b.get("fatigue", 0) > 70:
+    debt = b.get("sleep_debt", 0)
+    if debt > 50:
+        issues.append(f"You're running on poor sleep — feeling foggy and irritable (sleep debt: {int(debt)}%).")
+    elif debt > 25:
+        issues.append("You haven't been sleeping enough lately.")
 
-        issues.append(
-            "You feel exhausted."
-        )
+    if b.get("hygiene", 100) < 25:
+        issues.append("You feel dirty and socially uncomfortable.")
+    elif b.get("hygiene", 100) < 50:
+        issues.append("You could use a shower.")
 
-    if b.get("hygiene", 100) < 30:
+    odor_label = get_odor_label(b.get("odor", 0))
+    if odor_label:
+        issues.append(f"You smell {odor_label} — others around you may notice.")
 
-        issues.append(
-            "You feel dirty and "
-            "socially uncomfortable."
-        )
+    breath_label = get_breath_label(b.get("mouth_hygiene", 100))
+    if breath_label:
+        issues.append(f"You have {breath_label}.")
 
-    if b.get("hunger", 0) > 70:
+    if b.get("hunger", 0) > 75:
+        issues.append("You are very hungry.")
+    elif b.get("hunger", 0) > 55:
+        issues.append("You're feeling hungry.")
 
-        issues.append(
-            "You are very hungry."
-        )
+    if b.get("hydration", 100) < 30:
+        issues.append("You're dehydrated — you need something to drink.")
+
+    if b.get("stomach_discomfort", 0) > 50:
+        issues.append("Your stomach is hurting.")
 
     return issues
 
@@ -1076,49 +1093,12 @@ def build_investment_context(c, world):
 
     stocks = world.get("stocks", {})
     positions = []
-    for ticker, pos in portfolio.items():
-        stock = stocks.get(ticker, {})
-        price = stock.get("price", pos["avg_buy_price"])
-        _, pct = position_pnl(c, world, ticker)
-        positions.append({
-            "ticker":      ticker,
-            "name":        stock.get("name", ticker),
-            "shares":      pos["shares"],
-            "avg_cost":    pos["avg_buy_price"],
-            "current":     price,
-            "pnl_pct":     round(pct * 100, 1),
-            "change_today": stock.get("change_pct", 0.0),
-        })
-
-    watched = []
-    for ticker in c.get("watched_stocks", []):
-        stock = stocks.get(ticker, {})
-        if stock:
-            watched.append({
-                "ticker":  ticker,
-                "name":    stock.get("name", ticker),
-                "price":   stock.get("price"),
-                "change":  stock.get("change_pct", 0.0),
-            })
-
-    return {
-        "portfolio_value": portfolio_value(c, world),
-        "positions":       positions,
-        "watching":        watched[:4],
-    }
-
-
+    
 
 # =========================================================
-# INVENTORY CONTEXT
+# LONG-TERM NEED CONTEXT
 # =========================================================
 
-def _build_inventory_context(c):
-    from systems.containers import containers_in_inventory, container_summary
-    items = inventory_summary(c)
-    ctrs  = [container_summary(ct) for ct in containers_in_inventory(c)]
-    return {
-        "items":          items or [],
-        "containers":     ctrs or [],
-        "wallet_cash":    wallet_cash(c),
-        "phone_actio
+def _build_lt_need_context(c):
+    from systems.lt_needs import build_lt_need_context
+    return build_lt_need_context(c)

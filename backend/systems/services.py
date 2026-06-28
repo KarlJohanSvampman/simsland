@@ -186,9 +186,12 @@ def _spawn_worker(contract, world):
         "service_contract": contract["id"],
         "service_role":     trait,
         "animation_state":  "walk",
-        "needs": {
-            "energy": 1.0, "hunger": 0.5,
-            "social": 0.5, "fun":    0.5, "hygiene": 1.0,
+        "needs": {"social": 0.5, "fun": 0.5},
+        "body": {
+            "hunger": 20, "hydration": 80, "bladder": 5, "bowels": 5,
+            "fatigue": 10, "sleep_debt": 0, "hygiene": 95, "odor": 0,
+            "mouth_hygiene": 95, "recent_intake": 20,
+            "stomach_discomfort": 0, "pain": 0, "sickness": 0,
         },
         "traits":          [trait],
         "inventory":       [],
@@ -435,7 +438,9 @@ def _do_companionship(contract, world):
     if buyer:
         needs = buyer.setdefault("needs", {})
         for need, delta in effects.items():
-            needs[need] = min(1.0, needs.get(need, 0.5) + delta * 0.25)
+            # Only apply to psychological needs still in c["needs"]
+            if need in ("social", "fun"):
+                needs[need] = min(1.0, needs.get(need, 0.5) + delta * 0.25)
     contract["work_progress"] += 1
 
 
@@ -585,8 +590,3 @@ def available_services():
 def active_contracts_for_household(world, household_id):
     """Active contracts for a given household (not yet departed)."""
     return [
-        c for c in world.get("service_contracts", [])
-        if c["household_id"] == household_id
-        and c["status"] != PHASE_DEPARTED
-    ]
-                                                                                                                                                                        

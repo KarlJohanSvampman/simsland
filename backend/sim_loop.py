@@ -78,6 +78,8 @@ from systems.faction_ai import apply_faction_influence
 
 # -- Weekly ───────────────────────────────────────────────────────
 from systems.scheduling import generate_week_schedule, adjust_for_household
+from systems.lt_needs   import update_lt_needs, reset_weekly_counts, distribute_lt_needs
+from systems.social_odor import apply_odor_social_pressure
 from systems.story      import update_story_arc
 from systems.events     import maybe_generate_shared_event
 
@@ -161,6 +163,8 @@ def tick(world):
         for c in characters:
             c["schedule"] = generate_week_schedule(c, world)
             adjust_for_household(c, world)
+            reset_weekly_counts(c)
+            distribute_lt_needs(c, world=world)  # no-op if already distributed
 
     # -- Fast: perception + attention (÷5) ──────────────────
     if every(world, CADENCE["perception"]):
@@ -297,4 +301,21 @@ def tick(world):
         apply_public_figure_influence(world)
         apply_social_influence(world)
 
-    if ever
+    if every(world, CADENCE["hierarchy"], offset=23):
+        update_hierarchy(world)
+
+    # -- Body / lt_needs systems ────────────────────────────
+    if every(world, CADENCE["lt_needs"], offset=27):
+        for c in characters:
+            update_lt_needs(c, world)
+
+    if every(world, CADENCE["social_odor"], offset=28):
+        for c in characters:
+            apply_odor_social_pressure(c, world)
+
+    # Story arcs are lightweight — keep per-tick
+    for c in characters:
+        update_story_arc(c)
+
+    # -- Flush event bus (runs all handlers for events emitted this tick)
+    flush_events(world)

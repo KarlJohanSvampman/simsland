@@ -244,13 +244,8 @@ def resolve_social_strategy(
     if not target:
         return None
 
-    energy = c.get(
-        "needs",
-        {}
-    ).get(
-        "energy",
-        1
-    )
+    from systems.body import body_energy
+    energy = body_energy(c)
 
     insecurity = c.get(
         "insecurity",
@@ -313,25 +308,13 @@ def resolve_social_strategy(
 # =========================================================
 
 def resolve_hygiene_strategy(c):
+    from systems.body import body_hygiene_norm
+    hygiene = body_hygiene_norm(c)
 
-    hygiene = c.get(
-        "needs",
-        {}
-    ).get(
-        "hygiene",
-        1
-    )
-
-    if hygiene < 0.2:
-
+    if hygiene < 0.3:
         return "take_shower"
 
-    return random.choice([
-
-        "wash_hands",
-
-        "brush_teeth"
-    ])
+    return random.choice(["wash_hands", "brush_teeth"])
 
 
 # =========================================================
@@ -339,17 +322,10 @@ def resolve_hygiene_strategy(c):
 # =========================================================
 
 def resolve_energy_strategy(c):
-
-    energy = c.get(
-        "needs",
-        {}
-    ).get(
-        "energy",
-        1
-    )
+    from systems.body import body_energy
+    energy = body_energy(c)
 
     if energy < 0.15:
-
         return "sleep"
 
     return "nap"

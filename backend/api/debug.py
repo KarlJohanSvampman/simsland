@@ -62,8 +62,12 @@ _CHAR_SKELETON: Dict[str, Any] = {
     "energy": 80,
     "stress": 20,
     "wealth": 500.0,
-    "needs": {"hunger": 20, "bladder": 10, "fatigue": 15},
-    "body": {"bladder": 10, "fatigue": 15, "hygiene": 90, "hunger": 20},
+    "needs": {"social": 0.7, "fun": 0.6},
+    "body": {"hunger": 20, "hydration": 80, "bladder": 10, "bowels": 5,
+             "fatigue": 20, "sleep_debt": 0, "hygiene": 85, "odor": 5,
+             "mouth_hygiene": 90, "recent_intake": 30,
+             "stomach_discomfort": 0, "pain": 0, "sickness": 0},
+    "lt_needs": {},
     "relationships": {},
     "beliefs": {},
     "memories": [],
@@ -346,11 +350,4 @@ def plan_activity_ep(req: ActivityPlanReq):
             for phase, anim in phases.items()
         }
         for interaction, phases in INTERACTION_ANIMATIONS.items()
-    }
-
-    return {
-        "intention_type":   req.intention_type,
-        "prop_phases":      prop_phases,
-        "all_interactions": all_interactions,
-        "errors":           errors,
-    }
+    

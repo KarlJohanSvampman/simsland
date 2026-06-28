@@ -16,13 +16,10 @@ let definitions = {
   floorplan_templates: {},
   material_templates: {},
   recipe_templates: {},
-  product_templates: {},
-  appliance_templates: {},
   vehicle_templates: {},
   service_templates: {},
-  storage_templates: {},
-  social_templates: {},
   need_templates: {},
+  mood_templates: {},
   trait_templates: {},
   job_templates: {},
   company_templates: {}
@@ -34,6 +31,7 @@ const tabs = [
   "character_templates",
   "trait_templates",
   "need_templates",
+  "mood_templates",
   "activity_templates",
   "interaction_templates",
   "recipe_templates",
@@ -827,6 +825,17 @@ const DEFAULT_TEMPLATES = {
     decay_per_week: 1
   },
 
+  mood_templates: {
+    name: "New Mood",
+    description: "",
+    polarity: "neutral",
+    emotional_temperature_range: [30, 60],
+    triggers: {},
+    duration_ticks: 3600,
+    behavior_flags: [],
+    need_modifiers: {}
+  },
+
   trait_templates: {
     name: "New Trait",
     polarity: "positive",
@@ -958,11 +967,4 @@ function animate() {
   const delta = previewClock.getDelta();
   previewControls.update();
   if (previewMixer) previewMixer.update(delta);
-  previewRenderer.render(previewScene, previewCamera);
-}
-
-animate();
-
-// =====================================================
-// STARTUP
-// ============================================
+  previewRendere

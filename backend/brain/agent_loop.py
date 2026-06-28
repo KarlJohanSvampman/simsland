@@ -16,7 +16,8 @@ from brain.intentions import (
     sort_intentions
 )
 from systems.body import (
-    update_body_needs
+    update_body_needs,
+    ensure_body,
 )
 
 from systems.body_intentions import (
@@ -122,19 +123,27 @@ from systems.item_knowledge import (
 # URGENT NEED THRESHOLDS — beyond these, interrupt a hobby
 # Only activities flagged "interruptible" can be suspended.
 # =========================================================
-_INTERRUPT_THRESHOLDS = {
-    "bladder": 0.90,
-    "hunger":  0.88,
-    "energy":  0.87,
-    "hygiene": 0.93,
+# body thresholds that trigger interruption (0-100 scale)
+_BODY_INTERRUPT_THRESHOLDS = {
+    "bladder":  88,
+    "hunger":   82,
+    "fatigue":  90,
+    "hydration": 25,   # below this triggers (inverted: low hydration = urgent)
 }
 
 def _check_urgent_interruption(c):
     """Return a reason string if a body need is critical, else None."""
-    needs = c.get("needs", {})
-    for need, threshold in _INTERRUPT_THRESHOLDS.items():
-        if needs.get(need, 0) >= threshold:
-            return f"urgent_{need}"
+    body = c.get("body", {})
+    if body.get("bladder", 0) >= _BODY_INTERRUPT_THRESHOLDS["bladder"]:
+        return "urgent_bladder"
+    if body.get("bowels", 0) >= 88:
+        return "urgent_bowels"
+    if body.get("hunger", 0) >= _BODY_INTERRUPT_THRESHOLDS["hunger"]:
+        return "urgent_hunger"
+    if body.get("fatigue", 0) >= _BODY_INTERRUPT_THRESHOLDS["fatigue"]:
+        return "urgent_fatigue"
+    if body.get("hydration", 100) <= _BODY_INTERRUPT_THRESHOLDS["hydration"]:
+        return "urgent_thirst"
     return None
 
 
@@ -148,11 +157,15 @@ def update_internal_state(
 
     world
 ):
+    ensure_body(c)           # migrate old characters; no-op on new ones
     update_body_needs(c)
     update_emotion(
         c,
         world
     )
+    # Ensure lt_needs distributed (idempotent — no-op if already set)
+    from systems.lt_needs import distribute_lt_needs
+    distribute_lt_needs(c, world=world)
 
     clear_expired_speech(c, world)
 
@@ -560,20 +573,4 @@ def update_agent(
         # survival activities (sleep, toilet, eat) always run to completion.
         urgent = _check_urgent_interruption(c)
         if urgent and c.get("activity_queue"):
-            from systems.hobby_requirements import HOBBY_REQUIREMENTS
-            act_type = (c["activity"] or {}).get("type", "")
-            hobby_params = c.get("_active_hobby_params", {})
-            hobby_name   = hobby_params.get("hobby", "")
-            interruptible = HOBBY_REQUIREMENTS.get(hobby_name, {}).get("interruptible", False)
-            if interruptible:
-                suspend_activity_queue(c, world, reason=urgent)
-                # Fall through: no activity now, agent loop will address the urgent need
-            else:
-                execute_activity(c, world, c["activity"])
-                return
-        else:
-            execute_activity(c, world, c["activity"])
-            return
-
-    # =====================================
-    #
+            from systems.hobby_requirements

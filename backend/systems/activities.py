@@ -1386,35 +1386,49 @@ def complete_activity(
     # SLEEP
     # =====================================
 
-    if activity_type == "sleep":
+    from systems.body import (
+        on_sleep_complete, on_shower_complete, on_bath_complete,
+        on_brush_teeth_complete, on_wash_hands_complete,
+        on_eat_complete, on_drink_complete, on_toilet_complete,
+    )
 
-        c["needs"][
-            "energy"
-        ] = 1.0
+    if activity_type == "sleep":
+        duration = c.get("activity", {}).get("duration", 28800) / 60
+        on_sleep_complete(c, duration)
 
     # =====================================
     # TOILET
     # =====================================
 
-    elif activity_type == (
-        "use_toilet"
-    ):
-
-        c["needs"][
-            "bladder"
-        ] = 0
+    elif activity_type in ("use_toilet", "use_toilet_bowels"):
+        on_toilet_complete(c)
 
     # =====================================
-    # SHOWER
+    # SHOWER / BATH
     # =====================================
 
-    elif activity_type == (
-        "take_shower"
-    ):
+    elif activity_type == "take_shower":
+        on_shower_complete(c)
 
-        c["needs"][
-            "hygiene"
-        ] = 1.0
+    elif activity_type == "take_bath":
+        on_bath_complete(c)
+
+    # =====================================
+    # TEETH / HANDS
+    # =====================================
+
+    elif activity_type == "brush_teeth":
+        on_brush_teeth_complete(c)
+
+    elif activity_type == "wash_hands":
+        on_wash_hands_complete(c)
+
+    # =====================================
+    # DRINK
+    # =====================================
+
+    elif activity_type == "drink":
+        on_drink_complete(c, hydration_value=35)
 
     # =====================================
     # MEAL
@@ -1427,113 +1441,43 @@ def complete_activity(
             c.get("household_id")
         )
 
-    if household:
+        if household:
 
-        meal = find_household_resource(
-
-            household,
-
-            resource_type="MEAL"
-        )
-
-        if meal:
-
-            nutrition = meal.get(
-                "nutrition",
-                0.5
+            meal = find_household_resource(
+                household,
+                resource_type="MEAL"
             )
 
-            c["needs"]["hunger"] = max(
+            if meal:
+                nutrition = meal.get("nutrition", 0.5)
+                on_eat_complete(c, nutrition=nutrition)
+                meal["servings"] -= 1
+                if meal["servings"] <= 0:
+                    remove_household_resource(household, meal, 1)
+                elif meal["servings"] > 0:
+                    from systems.resource_runtime import convert_meal_to_leftovers
+                    convert_meal_to_leftovers(meal)
 
-                0,
-
-                c["needs"][
-                    "hunger"
-                ]
-
-                -
-
-                nutrition
-            )
-
-            meal["servings"] -= 1
-
-            if meal["servings"] <= 0:
-
-                remove_household_resource(
-
-                    household,
-
-                    meal,
-
-                    1
-                )
-            elif meal["servings"] > 0:
-
-                from systems.resource_runtime import (
-                    convert_meal_to_leftovers
-                )
-
-                convert_meal_to_leftovers(
-                    meal
-                )
     # =====================================
-    # MEAL
+    # COOK
     # =====================================
     elif activity_type == "cook_recipe":
 
-        from systems.cooking_process import (
-            start_cooking_process
-        )
+        from systems.cooking_process import start_cooking_process
 
-        household = world[
-            "households"
-        ].get(
-            c.get("household_id")
-        )
+        household = world["households"].get(c.get("household_id"))
 
         if household:
-
-            recipe_id = choose_recipe(
-
-                c,
-
-                household
-            )
-
+            recipe_id = choose_recipe(c, household)
             if recipe_id:
+                start_cooking_process(c, household, recipe_id, world)
 
-                start_cooking_process(
-
-                    c,
-
-                    household,
-
-                    recipe_id,
-
-                    world
-                )         
     # =====================================
     # SNACK
     # =====================================
 
-    elif activity_type == (
-        "eat_snack"
-    ):
-
-        c["needs"][
-            "hunger"
-        ] = max(
-
-            0,
-
-            c["needs"].get(
-                "hunger",
-                1
-            )
-
-            - 0.5
-        )
+    elif activity_type == "eat_snack":
+        on_eat_complete(c, nutrition=0.3)
     elif activity_type == "check_mail":
 
         household = world[
@@ -1553,6 +1497,4 @@ def complete_activity(
                 "mailbox"
             ][
                 "has_mail"
-            ] = False
-
-            c.se
+   

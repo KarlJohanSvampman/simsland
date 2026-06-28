@@ -39,7 +39,8 @@ def create_procurement_request(c, category, priority=0.5, budget=None, quantity=
 
 def choose_procurement_method(c, request):
     traits    = c.get("traits", [])
-    energy    = c.get("needs", {}).get("energy", 1)
+    from systems.body import body_energy
+    energy    = body_energy(c)
     category  = request.get("category")
 
     if category in ("furniture", "appliances"):
@@ -254,5 +255,4 @@ def _deliver_prop(household, catalog_id, world):
         "template":    catalog_id,
         "building_id": home_id,
         "x":           0,
-        "y":           0,
-        "rota
+        "y":       

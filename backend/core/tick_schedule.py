@@ -66,4 +66,8 @@ CADENCE = {
     "grievances":           15,
     "conflicts":             5,
     "contract_checks":      60,
+
+    # Body / needs
+    "lt_needs":             30,   # long-term need frustration update (~30 game-min)
+    "social_odor":          20,   # smell pressure scan
 }

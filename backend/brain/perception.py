@@ -1130,6 +1130,12 @@ def perceive(
             )
         )
 
+        # Include body snapshot so context_builder can surface odor/breath cues
+        enriched["body"] = {
+            "odor":          target.get("body", {}).get("odor", 0),
+            "mouth_hygiene": target.get("body", {}).get("mouth_hygiene", 100),
+        }
+
         visible_people.append(
             enriched
         )
@@ -1192,21 +1198,4 @@ def perceive(
         )
     )
 
-    c["perception"] = perception
-
-    c["last_perception_tick"] = (
-        world.get(
-            "tick",
-            0
-        )
-    )
-
-    c["recent_perception_memory"] = (
-
-        perception.get(
-            "visible_people",
-            []
-        )[:5]
-    )
-
-    return perception
+    c["perception"] =
