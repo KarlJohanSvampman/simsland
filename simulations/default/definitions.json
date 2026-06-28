@@ -1,345 +1,1621 @@
 {
   "prop_templates": {
-
     "chair_modern_a": {
       "category": "furniture",
       "model": "/resources/props/chair_modern_a.glb",
-      "footprint": [{ "dx": 0, "dy": 0 }],
-      "anchors": [{ "name": "anchor_sit", "interaction": "sit_chair" }],
+      "footprint": [
+        {
+          "dx": 0,
+          "dy": 0
+        }
+      ],
+      "anchors": [
+        {
+          "name": "anchor_sit",
+          "interaction": "sit_chair"
+        }
+      ],
       "storage": null
     },
-
     "fridge_a": {
       "category": "appliance",
       "model": "/resources/props/fridge_a.glb",
-      "footprint": [{ "dx": 0, "dy": 0 }, { "dx": 1, "dy": 0 }],
-      "anchors": [{ "name": "anchor_open", "interaction": "open_fridge" }],
-      "storage": { "slots": 40, "accepted_categories": ["food", "drink"] }
+      "footprint": [
+        {
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "dx": 1,
+          "dy": 0
+        }
+      ],
+      "anchors": [
+        {
+          "name": "anchor_open",
+          "interaction": "open_fridge"
+        }
+      ],
+      "storage": {
+        "slots": 40,
+        "accepted_categories": [
+          "food",
+          "drink"
+        ]
+      }
     }
   },
-
   "item_templates": {
-
     "plate_stack": {
       "category": "dishware",
       "model": "/resources/items/plate_stack.glb",
       "stackable": true,
       "max_stack": 8,
       "carry_slots": 1,
-      "usable_for": ["eat", "serve_food"]
+      "usable_for": [
+        "eat",
+        "serve_food"
+      ]
     },
-
     "vacuum_cleaner": {
       "category": "tool",
       "model": "/resources/items/vacuum.glb",
       "carry_slots": 2,
-      "usable_for": ["clean_floor"],
-      "animations": { "use": "vacuum_loop" }
+      "usable_for": [
+        "clean_floor"
+      ],
+      "animations": {
+        "use": "vacuum_loop"
+      }
     }
   },
-
   "character_templates": {
-
     "adult_male_a": {
       "model": "/resources/characters/adult_male_a.glb",
       "base_animations": {
-        "idle":  "idle",
-        "walk":  "walk",
-        "run":   "run",
-        "sit":   "sit_idle",
+        "idle": "idle",
+        "walk": "walk",
+        "run": "run",
+        "sit": "sit_idle",
         "sleep": "sleep_loop"
       },
       "inventory_slots": {
         "left_hand": 1,
         "right_hand": 1,
-        "back":       1,
-        "belt":       4,
-        "pockets":    4
+        "back": 1,
+        "belt": 4,
+        "pockets": 4
       }
     }
   },
-
   "interaction_templates": {
-
     "sit_chair": {
       "requires_free_hands": false,
       "animations": {
-        "start": ["sit_down_a", "sit_down_b"],
-        "loop":  ["sit_idle_a", "sit_idle_b"],
-        "stop":  ["stand_up_a"]
+        "start": [
+          "sit_down_a",
+          "sit_down_b"
+        ],
+        "loop": [
+          "sit_idle_a",
+          "sit_idle_b"
+        ],
+        "stop": [
+          "stand_up_a"
+        ]
       },
       "ik": {},
       "prop_animations": {}
     },
-
     "open_fridge": {
       "requires_free_hands": 1,
       "animations": {
-        "start": ["open_fridge"],
-        "loop":  [],
-        "stop":  ["close_fridge"]
+        "start": [
+          "open_fridge"
+        ],
+        "loop": [],
+        "stop": [
+          "close_fridge"
+        ]
       },
-      "prop_animations": { "start": "door_open", "stop": "door_close" },
-      "ik": { "right_hand": "ik_handle" }
+      "prop_animations": {
+        "start": "door_open",
+        "stop": "door_close"
+      },
+      "ik": {
+        "right_hand": "ik_handle"
+      }
     }
   },
-
   "activity_templates": {
-
     "eat_meal": {
-      "required_items":        ["plate_stack"],
-      "required_interaction":  "sit_chair",
-      "duration":              1200
+      "required_items": [
+        "plate_stack"
+      ],
+      "required_interaction": "sit_chair",
+      "duration": 1200
     }
   },
-
   "tile_templates": {
-
     "wood_floor": {
       "walk_speed": 1.0,
-      "buildable":  true,
-      "interior":   true,
-      "floor":      true
+      "buildable": true,
+      "interior": true,
+      "floor": true
     },
-
     "grass": {
       "walk_speed": 0.8,
-      "buildable":  false,
-      "interior":   false,
-      "floor":      false
+      "buildable": false,
+      "interior": false,
+      "floor": false
     },
-
     "road": {
       "walk_speed": 1.0,
-      "buildable":  false,
-      "interior":   false,
-      "floor":      false
+      "buildable": false,
+      "interior": false,
+      "floor": false
     },
-
     "wall": {
       "walk_speed": 0.0,
-      "buildable":  false,
-      "interior":   false,
-      "floor":      false
+      "buildable": false,
+      "interior": false,
+      "floor": false
     }
   },
-
   "material_templates": {
-
     "wood_floor_01": {
-      "name":          "Wood Floor",
-      "texture":       "/resources/textures/wood_floor.jpg",
-      "category":      "floor",
-      "interior":      true,
-      "floor":         true,
+      "name": "Wood Floor",
+      "texture": "/resources/textures/wood_floor.jpg",
+      "category": "floor",
+      "interior": true,
+      "floor": true,
       "price_per_sqm": 35.0
     },
-
     "wood_floor_dark_01": {
-      "name":          "Dark Wood Floor",
-      "texture":       "/resources/textures/wood_floor_dark.jpg",
-      "category":      "floor",
-      "interior":      true,
-      "floor":         true,
+      "name": "Dark Wood Floor",
+      "texture": "/resources/textures/wood_floor_dark.jpg",
+      "category": "floor",
+      "interior": true,
+      "floor": true,
       "price_per_sqm": 42.0
     },
-
     "tile_white_01": {
-      "name":          "White Tile",
-      "texture":       "/resources/textures/tile_white.jpg",
-      "category":      "floor",
-      "interior":      true,
-      "floor":         true,
+      "name": "White Tile",
+      "texture": "/resources/textures/tile_white.jpg",
+      "category": "floor",
+      "interior": true,
+      "floor": true,
       "price_per_sqm": 28.0
     },
-
     "tile_grey_01": {
-      "name":          "Grey Tile",
-      "texture":       "/resources/textures/tile_grey.jpg",
-      "category":      "floor",
-      "interior":      true,
-      "floor":         true,
+      "name": "Grey Tile",
+      "texture": "/resources/textures/tile_grey.jpg",
+      "category": "floor",
+      "interior": true,
+      "floor": true,
       "price_per_sqm": 24.0
     },
-
     "carpet_beige_01": {
-      "name":          "Beige Carpet",
-      "texture":       "/resources/textures/carpet_beige.jpg",
-      "category":      "floor",
-      "interior":      true,
-      "floor":         true,
+      "name": "Beige Carpet",
+      "texture": "/resources/textures/carpet_beige.jpg",
+      "category": "floor",
+      "interior": true,
+      "floor": true,
       "price_per_sqm": 18.0
     },
-
     "wallpaper_blue_01": {
-      "name":     "Blue Wallpaper",
-      "texture":  "/resources/textures/wallpaper_blue.jpg",
+      "name": "Blue Wallpaper",
+      "texture": "/resources/textures/wallpaper_blue.jpg",
       "category": "wall",
       "interior": true,
-      "floor":    false
+      "floor": false
     },
-
     "grass_01": {
-      "name":     "Grass",
-      "texture":  "/resources/textures/grass.jpg",
+      "name": "Grass",
+      "texture": "/resources/textures/grass.jpg",
       "category": "terrain",
       "interior": false,
-      "floor":    false
+      "floor": false
     },
-
     "paint_white_matt": {
-      "name":            "White Matt Paint",
-      "category":        "paint",
-      "color":           "#F5F5F5",
-      "finish":          "matt",
-      "interior":        true,
-      "floor":           false,
+      "name": "White Matt Paint",
+      "category": "paint",
+      "color": "#F5F5F5",
+      "finish": "matt",
+      "interior": true,
+      "floor": false,
       "price_per_liter": 8.0
     },
-
     "paint_white_gloss": {
-      "name":            "White Gloss Paint",
-      "category":        "paint",
-      "color":           "#FFFFFF",
-      "finish":          "gloss",
-      "interior":        true,
-      "floor":           false,
+      "name": "White Gloss Paint",
+      "category": "paint",
+      "color": "#FFFFFF",
+      "finish": "gloss",
+      "interior": true,
+      "floor": false,
       "price_per_liter": 10.0
     },
-
     "paint_grey_matt": {
-      "name":            "Grey Matt Paint",
-      "category":        "paint",
-      "color":           "#9E9E9E",
-      "finish":          "matt",
-      "interior":        true,
-      "floor":           false,
+      "name": "Grey Matt Paint",
+      "category": "paint",
+      "color": "#9E9E9E",
+      "finish": "matt",
+      "interior": true,
+      "floor": false,
       "price_per_liter": 8.0
     },
-
     "paint_red_satin": {
-      "name":            "Red Satin Paint",
-      "category":        "paint",
-      "color":           "#C62828",
-      "finish":          "satin",
-      "interior":        true,
-      "floor":           false,
+      "name": "Red Satin Paint",
+      "category": "paint",
+      "color": "#C62828",
+      "finish": "satin",
+      "interior": true,
+      "floor": false,
       "price_per_liter": 9.5
     },
-
     "paint_blue_satin": {
-      "name":            "Blue Satin Paint",
-      "category":        "paint",
-      "color":           "#1565C0",
-      "finish":          "satin",
-      "interior":        true,
-      "floor":           false,
+      "name": "Blue Satin Paint",
+      "category": "paint",
+      "color": "#1565C0",
+      "finish": "satin",
+      "interior": true,
+      "floor": false,
       "price_per_liter": 9.5
     },
-
     "paint_green_matt": {
-      "name":            "Green Matt Paint",
-      "category":        "paint",
-      "color":           "#2E7D32",
-      "finish":          "matt",
-      "interior":        true,
-      "floor":           false,
+      "name": "Green Matt Paint",
+      "category": "paint",
+      "color": "#2E7D32",
+      "finish": "matt",
+      "interior": true,
+      "floor": false,
       "price_per_liter": 8.5
     },
-
     "paint_yellow_gloss": {
-      "name":            "Yellow Gloss Paint",
-      "category":        "paint",
-      "color":           "#F9A825",
-      "finish":          "gloss",
-      "interior":        true,
-      "floor":           false,
+      "name": "Yellow Gloss Paint",
+      "category": "paint",
+      "color": "#F9A825",
+      "finish": "gloss",
+      "interior": true,
+      "floor": false,
       "price_per_liter": 9.0
     },
-
     "paint_black_gloss": {
-      "name":            "Black Gloss Paint",
-      "category":        "paint",
-      "color":           "#212121",
-      "finish":          "gloss",
-      "interior":        true,
-      "floor":           false,
+      "name": "Black Gloss Paint",
+      "category": "paint",
+      "color": "#212121",
+      "finish": "gloss",
+      "interior": true,
+      "floor": false,
       "price_per_liter": 10.0
     },
-
     "paint_beige_matt": {
-      "name":            "Beige Matt Paint",
-      "category":        "paint",
-      "color":           "#D7CCC8",
-      "finish":          "matt",
-      "interior":        true,
-      "floor":           false,
+      "name": "Beige Matt Paint",
+      "category": "paint",
+      "color": "#D7CCC8",
+      "finish": "matt",
+      "interior": true,
+      "floor": false,
       "price_per_liter": 8.0
     },
-
     "wallpaper_floral_01": {
-      "name":           "Floral Wallpaper",
-      "category":       "wallpaper",
-      "texture":        "/resources/textures/wallpaper_floral.jpg",
-      "pattern":        "floral",
-      "repeat":         "tile",
-      "interior":       true,
-      "floor":          false,
+      "name": "Floral Wallpaper",
+      "category": "wallpaper",
+      "texture": "/resources/textures/wallpaper_floral.jpg",
+      "pattern": "floral",
+      "repeat": "tile",
+      "interior": true,
+      "floor": false,
       "price_per_roll": 22.0
     },
-
     "wallpaper_stripe_01": {
-      "name":           "Stripe Wallpaper",
-      "category":       "wallpaper",
-      "texture":        "/resources/textures/wallpaper_stripe.jpg",
-      "pattern":        "stripe",
-      "repeat":         "tile",
-      "interior":       true,
-      "floor":          false,
+      "name": "Stripe Wallpaper",
+      "category": "wallpaper",
+      "texture": "/resources/textures/wallpaper_stripe.jpg",
+      "pattern": "stripe",
+      "repeat": "tile",
+      "interior": true,
+      "floor": false,
       "price_per_roll": 18.0
     },
-
     "wallpaper_plain_cream": {
-      "name":           "Cream Wallpaper",
-      "category":       "wallpaper",
-      "texture":        "/resources/textures/wallpaper_cream.jpg",
-      "pattern":        "plain",
-      "repeat":         "tile",
-      "interior":       true,
-      "floor":          false,
+      "name": "Cream Wallpaper",
+      "category": "wallpaper",
+      "texture": "/resources/textures/wallpaper_cream.jpg",
+      "pattern": "plain",
+      "repeat": "tile",
+      "interior": true,
+      "floor": false,
       "price_per_roll": 15.0
     },
-
     "wallpaper_geometric_01": {
-      "name":           "Geometric Wallpaper",
-      "category":       "wallpaper",
-      "texture":        "/resources/textures/wallpaper_geometric.jpg",
-      "pattern":        "geometric",
-      "repeat":         "tile",
-      "interior":       true,
-      "floor":          false,
+      "name": "Geometric Wallpaper",
+      "category": "wallpaper",
+      "texture": "/resources/textures/wallpaper_geometric.jpg",
+      "pattern": "geometric",
+      "repeat": "tile",
+      "interior": true,
+      "floor": false,
       "price_per_roll": 25.0
     },
-
     "wallpaper_brick_01": {
-      "name":           "Exposed Brick Wallpaper",
-      "category":       "wallpaper",
-      "texture":        "/resources/textures/wallpaper_brick.jpg",
-      "pattern":        "brick",
-      "repeat":         "tile",
-      "interior":       true,
-      "floor":          false,
+      "name": "Exposed Brick Wallpaper",
+      "category": "wallpaper",
+      "texture": "/resources/textures/wallpaper_brick.jpg",
+      "pattern": "brick",
+      "repeat": "tile",
+      "interior": true,
+      "floor": false,
       "price_per_roll": 28.0
     }
   },
-
   "floorplan_templates": {
-
     "small_house": {
       "tiles": {
-        "0,0": { "type": "floor", "interior": true, "floor": true },
-        "1,0": { "type": "floor", "interior": true, "floor": true }
+        "0,0": {
+          "type": "floor",
+          "interior": true,
+          "floor": true
+        },
+        "1,0": {
+          "type": "floor",
+          "interior": true,
+          "floor": true
+        }
       }
+    }
+  },
+  "trait_templates": {
+    "honest": {
+      "name": "Honest",
+      "polarity": "positive",
+      "description": "Tells the truth even when it is uncomfortable; avoids deception.",
+      "need_modifiers": {
+        "social": 0.05
+      },
+      "skill_modifiers": {
+        "charisma": 0.05
+      },
+      "behavior_flags": [
+        "honest"
+      ]
+    },
+    "loyal": {
+      "name": "Loyal",
+      "polarity": "positive",
+      "description": "Stays committed to friends and family; unlikely to betray trust.",
+      "need_modifiers": {
+        "social": 0.1
+      },
+      "skill_modifiers": {},
+      "behavior_flags": [
+        "loyal"
+      ]
+    },
+    "compassionate": {
+      "name": "Compassionate",
+      "polarity": "positive",
+      "description": "Deeply affected by others' suffering; quick to offer help.",
+      "need_modifiers": {
+        "social": 0.1,
+        "fun": -0.05
+      },
+      "skill_modifiers": {
+        "empathy": 0.1
+      },
+      "behavior_flags": [
+        "compassionate"
+      ]
+    },
+    "generous": {
+      "name": "Generous",
+      "polarity": "positive",
+      "description": "Freely shares money, time, and resources with others.",
+      "need_modifiers": {
+        "social": 0.05
+      },
+      "skill_modifiers": {},
+      "behavior_flags": [
+        "generous"
+      ]
+    },
+    "patient": {
+      "name": "Patient",
+      "polarity": "positive",
+      "description": "Tolerates delays and frustration without becoming agitated.",
+      "need_modifiers": {
+        "stress": -0.1
+      },
+      "skill_modifiers": {
+        "cooking": 0.05
+      },
+      "behavior_flags": [
+        "patient"
+      ]
+    },
+    "courageous": {
+      "name": "Courageous",
+      "polarity": "positive",
+      "description": "Acts despite fear; willing to take risks for the right reasons.",
+      "need_modifiers": {
+        "energy": 0.05
+      },
+      "skill_modifiers": {},
+      "behavior_flags": [
+        "courageous"
+      ]
+    },
+    "curious": {
+      "name": "Curious",
+      "polarity": "positive",
+      "description": "Driven to explore and learn; asks questions and investigates.",
+      "need_modifiers": {
+        "fun": 0.1
+      },
+      "skill_modifiers": {
+        "logic": 0.1,
+        "creativity": 0.05
+      },
+      "behavior_flags": [
+        "curious"
+      ]
+    },
+    "creative": {
+      "name": "Creative",
+      "polarity": "positive",
+      "description": "Generates novel ideas and finds unconventional solutions.",
+      "need_modifiers": {
+        "fun": 0.1
+      },
+      "skill_modifiers": {
+        "creativity": 0.15,
+        "cooking": 0.05
+      },
+      "behavior_flags": [
+        "creative"
+      ]
+    },
+    "diligent": {
+      "name": "Diligent",
+      "polarity": "positive",
+      "description": "Works steadily and carefully; completes tasks without cutting corners.",
+      "need_modifiers": {
+        "energy": -0.05
+      },
+      "skill_modifiers": {
+        "logic": 0.05,
+        "fitness": 0.05
+      },
+      "behavior_flags": [
+        "diligent"
+      ]
+    },
+    "optimistic": {
+      "name": "Optimistic",
+      "polarity": "positive",
+      "description": "Expects positive outcomes; maintains high spirits in adversity.",
+      "need_modifiers": {
+        "fun": 0.1,
+        "stress": -0.1
+      },
+      "skill_modifiers": {},
+      "behavior_flags": [
+        "optimistic"
+      ]
+    },
+    "humble": {
+      "name": "Humble",
+      "polarity": "positive",
+      "description": "Does not boast or seek status; acknowledges own limitations.",
+      "need_modifiers": {},
+      "skill_modifiers": {},
+      "behavior_flags": [
+        "humble"
+      ]
+    },
+    "forgiving": {
+      "name": "Forgiving",
+      "polarity": "positive",
+      "description": "Lets go of grudges and gives others second chances.",
+      "need_modifiers": {
+        "stress": -0.1
+      },
+      "skill_modifiers": {},
+      "behavior_flags": [
+        "forgiving"
+      ]
+    },
+    "disciplined": {
+      "name": "Disciplined",
+      "polarity": "positive",
+      "description": "Follows routines and resists impulses to stay on track.",
+      "need_modifiers": {
+        "energy": -0.05
+      },
+      "skill_modifiers": {
+        "fitness": 0.1,
+        "logic": 0.05
+      },
+      "behavior_flags": [
+        "disciplined"
+      ]
+    },
+    "responsible": {
+      "name": "Responsible",
+      "polarity": "positive",
+      "description": "Takes ownership of duties; reliably handles household obligations.",
+      "need_modifiers": {},
+      "skill_modifiers": {},
+      "behavior_flags": [
+        "responsible"
+      ]
+    },
+    "reliable": {
+      "name": "Reliable",
+      "polarity": "positive",
+      "description": "Consistently follows through on commitments and promises.",
+      "need_modifiers": {},
+      "skill_modifiers": {},
+      "behavior_flags": [
+        "reliable"
+      ]
+    },
+    "adaptable": {
+      "name": "Adaptable",
+      "polarity": "positive",
+      "description": "Adjusts quickly to new situations and changing circumstances.",
+      "need_modifiers": {
+        "stress": -0.05
+      },
+      "skill_modifiers": {},
+      "behavior_flags": [
+        "adaptable"
+      ]
+    },
+    "resourceful": {
+      "name": "Resourceful",
+      "polarity": "positive",
+      "description": "Finds clever solutions using whatever is available; improvises well.",
+      "need_modifiers": {},
+      "skill_modifiers": {
+        "logic": 0.05,
+        "creativity": 0.05
+      },
+      "behavior_flags": [
+        "resourceful"
+      ]
+    },
+    "perceptive": {
+      "name": "Perceptive",
+      "polarity": "positive",
+      "description": "Notices details others miss; reads situations and people accurately.",
+      "need_modifiers": {},
+      "skill_modifiers": {
+        "logic": 0.1
+      },
+      "behavior_flags": [
+        "perceptive"
+      ]
+    },
+    "ambitious": {
+      "name": "Ambitious",
+      "polarity": "positive",
+      "description": "Sets high goals and works hard to advance career and wealth.",
+      "need_modifiers": {
+        "energy": -0.1
+      },
+      "skill_modifiers": {},
+      "behavior_flags": [
+        "ambitious"
+      ]
+    },
+    "confident": {
+      "name": "Confident",
+      "polarity": "positive",
+      "description": "Believes in own abilities; acts decisively without excessive doubt.",
+      "need_modifiers": {
+        "social": 0.05
+      },
+      "skill_modifiers": {
+        "charisma": 0.1
+      },
+      "behavior_flags": [
+        "confident"
+      ]
+    },
+    "charismatic": {
+      "name": "Charismatic",
+      "polarity": "positive",
+      "description": "Naturally draws people in; persuasive and socially magnetic.",
+      "need_modifiers": {
+        "social": 0.1
+      },
+      "skill_modifiers": {
+        "charisma": 0.2
+      },
+      "behavior_flags": [
+        "charismatic"
+      ]
+    },
+    "polite": {
+      "name": "Polite",
+      "polarity": "positive",
+      "description": "Uses courteous language and manners in all interactions.",
+      "need_modifiers": {
+        "social": 0.05
+      },
+      "skill_modifiers": {
+        "charisma": 0.05
+      },
+      "behavior_flags": [
+        "polite"
+      ]
+    },
+    "tactful": {
+      "name": "Tactful",
+      "polarity": "positive",
+      "description": "Delivers difficult truths with care to avoid unnecessary offense.",
+      "need_modifiers": {},
+      "skill_modifiers": {
+        "charisma": 0.05
+      },
+      "behavior_flags": [
+        "tactful"
+      ]
+    },
+    "cooperative": {
+      "name": "Cooperative",
+      "polarity": "positive",
+      "description": "Works well with others; prioritises group success over personal gain.",
+      "need_modifiers": {
+        "social": 0.1
+      },
+      "skill_modifiers": {},
+      "behavior_flags": [
+        "cooperative"
+      ]
+    },
+    "protective": {
+      "name": "Protective",
+      "polarity": "positive",
+      "description": "Prioritises the safety of family and loved ones above other concerns.",
+      "need_modifiers": {
+        "social": 0.05
+      },
+      "skill_modifiers": {},
+      "behavior_flags": [
+        "protective"
+      ]
+    },
+    "independent": {
+      "name": "Independent",
+      "polarity": "positive",
+      "description": "Prefers self-reliance; does not need others' approval to act.",
+      "need_modifiers": {
+        "social": -0.1
+      },
+      "skill_modifiers": {},
+      "behavior_flags": [
+        "independent"
+      ]
+    },
+    "rational": {
+      "name": "Rational",
+      "polarity": "positive",
+      "description": "Bases decisions on logic and evidence rather than emotion.",
+      "need_modifiers": {
+        "stress": -0.05
+      },
+      "skill_modifiers": {
+        "logic": 0.15
+      },
+      "behavior_flags": [
+        "rational"
+      ]
+    },
+    "practical": {
+      "name": "Practical",
+      "polarity": "positive",
+      "description": "Focuses on what works; avoids over-complicating simple problems.",
+      "need_modifiers": {},
+      "skill_modifiers": {},
+      "behavior_flags": [
+        "practical"
+      ]
+    },
+    "calm": {
+      "name": "Calm",
+      "polarity": "positive",
+      "description": "Remains composed under pressure; rarely loses temper.",
+      "need_modifiers": {
+        "stress": -0.15
+      },
+      "skill_modifiers": {},
+      "behavior_flags": [
+        "calm"
+      ]
+    },
+    "resilient": {
+      "name": "Resilient",
+      "polarity": "positive",
+      "description": "Bounces back quickly from setbacks and hardship.",
+      "need_modifiers": {
+        "stress": -0.1,
+        "energy": 0.05
+      },
+      "skill_modifiers": {},
+      "behavior_flags": [
+        "resilient"
+      ]
+    },
+    "selfless": {
+      "name": "Selfless",
+      "polarity": "positive",
+      "description": "Puts others' needs before own; sacrifices personal comfort to help.",
+      "need_modifiers": {
+        "fun": -0.05,
+        "social": 0.05
+      },
+      "skill_modifiers": {},
+      "behavior_flags": [
+        "selfless"
+      ]
+    },
+    "fair": {
+      "name": "Fair",
+      "polarity": "positive",
+      "description": "Treats everyone by the same standard; resists favouritism.",
+      "need_modifiers": {},
+      "skill_modifiers": {},
+      "behavior_flags": [
+        "fair"
+      ]
+    },
+    "respectful": {
+      "name": "Respectful",
+      "polarity": "positive",
+      "description": "Acknowledges others' dignity and personal boundaries.",
+      "need_modifiers": {
+        "social": 0.05
+      },
+      "skill_modifiers": {},
+      "behavior_flags": [
+        "respectful"
+      ]
+    },
+    "organized": {
+      "name": "Organized",
+      "polarity": "positive",
+      "description": "Keeps living spaces tidy and schedules structured.",
+      "need_modifiers": {
+        "comfort": 0.05
+      },
+      "skill_modifiers": {},
+      "behavior_flags": [
+        "organized"
+      ]
+    },
+    "decisive": {
+      "name": "Decisive",
+      "polarity": "positive",
+      "description": "Makes choices quickly and commits to them without second-guessing.",
+      "need_modifiers": {},
+      "skill_modifiers": {},
+      "behavior_flags": [
+        "decisive"
+      ]
+    },
+    "determined": {
+      "name": "Determined",
+      "polarity": "positive",
+      "description": "Pursues goals with unwavering focus even when obstacles arise.",
+      "need_modifiers": {
+        "energy": -0.05
+      },
+      "skill_modifiers": {
+        "fitness": 0.05
+      },
+      "behavior_flags": [
+        "determined"
+      ]
+    },
+    "open_minded": {
+      "name": "Open-minded",
+      "polarity": "positive",
+      "description": "Considers opposing views seriously and updates beliefs when warranted.",
+      "need_modifiers": {},
+      "skill_modifiers": {
+        "logic": 0.05
+      },
+      "behavior_flags": [
+        "open_minded"
+      ]
+    },
+    "thoughtful": {
+      "name": "Thoughtful",
+      "polarity": "positive",
+      "description": "Considers consequences carefully before acting or speaking.",
+      "need_modifiers": {},
+      "skill_modifiers": {},
+      "behavior_flags": [
+        "thoughtful"
+      ]
+    },
+    "cheerful": {
+      "name": "Cheerful",
+      "polarity": "positive",
+      "description": "Maintains a bright, upbeat mood that lifts those around them.",
+      "need_modifiers": {
+        "fun": 0.1,
+        "stress": -0.1
+      },
+      "skill_modifiers": {
+        "charisma": 0.05
+      },
+      "behavior_flags": [
+        "cheerful"
+      ]
+    },
+    "empathetic": {
+      "name": "Empathetic",
+      "polarity": "positive",
+      "description": "Accurately senses what others feel and responds with care.",
+      "need_modifiers": {
+        "social": 0.1
+      },
+      "skill_modifiers": {
+        "empathy": 0.15,
+        "charisma": 0.05
+      },
+      "behavior_flags": [
+        "empathetic"
+      ]
+    },
+    "trustworthy": {
+      "name": "Trustworthy",
+      "polarity": "positive",
+      "description": "Keeps confidences and never breaks promises without good reason.",
+      "need_modifiers": {},
+      "skill_modifiers": {},
+      "behavior_flags": [
+        "trustworthy"
+      ]
+    },
+    "supportive": {
+      "name": "Supportive",
+      "polarity": "positive",
+      "description": "Encourages and assists others through difficult moments.",
+      "need_modifiers": {
+        "social": 0.05
+      },
+      "skill_modifiers": {},
+      "behavior_flags": [
+        "supportive"
+      ]
+    },
+    "innovative": {
+      "name": "Innovative",
+      "polarity": "positive",
+      "description": "Seeks new and better ways to do things; embraces change.",
+      "need_modifiers": {
+        "fun": 0.05
+      },
+      "skill_modifiers": {
+        "creativity": 0.1,
+        "logic": 0.05
+      },
+      "behavior_flags": [
+        "innovative"
+      ]
+    },
+    "frugal": {
+      "name": "Frugal",
+      "polarity": "positive",
+      "description": "Spends money carefully; avoids waste and seeks the best value.",
+      "need_modifiers": {},
+      "skill_modifiers": {},
+      "behavior_flags": [
+        "frugal"
+      ]
+    },
+    "adventurous": {
+      "name": "Adventurous",
+      "polarity": "positive",
+      "description": "Seeks new experiences; willing to leave comfort zones.",
+      "need_modifiers": {
+        "fun": 0.1
+      },
+      "skill_modifiers": {
+        "fitness": 0.05
+      },
+      "behavior_flags": [
+        "adventurous"
+      ]
+    },
+    "playful": {
+      "name": "Playful",
+      "polarity": "positive",
+      "description": "Brings levity and humour; enjoys games and light-hearted interaction.",
+      "need_modifiers": {
+        "fun": 0.15,
+        "social": 0.05
+      },
+      "skill_modifiers": {},
+      "behavior_flags": [
+        "playful"
+      ]
+    },
+    "persistent": {
+      "name": "Persistent",
+      "polarity": "positive",
+      "description": "Keeps trying despite repeated failure or resistance.",
+      "need_modifiers": {
+        "energy": -0.05
+      },
+      "skill_modifiers": {},
+      "behavior_flags": [
+        "persistent"
+      ]
+    },
+    "observant": {
+      "name": "Observant",
+      "polarity": "positive",
+      "description": "Notices unusual details in the environment and in people's behaviour.",
+      "need_modifiers": {},
+      "skill_modifiers": {
+        "logic": 0.05
+      },
+      "behavior_flags": [
+        "observant"
+      ]
+    },
+    "diplomatic": {
+      "name": "Diplomatic",
+      "polarity": "positive",
+      "description": "Navigates conflicts and disagreements to reach peaceful resolutions.",
+      "need_modifiers": {},
+      "skill_modifiers": {
+        "charisma": 0.1
+      },
+      "behavior_flags": [
+        "diplomatic"
+      ]
+    },
+    "wise": {
+      "name": "Wise",
+      "polarity": "positive",
+      "description": "Applies experience and judgement to make sound long-term decisions.",
+      "need_modifiers": {},
+      "skill_modifiers": {
+        "logic": 0.1
+      },
+      "behavior_flags": [
+        "wise"
+      ]
+    },
+    "dishonest": {
+      "name": "Dishonest",
+      "polarity": "negative",
+      "description": "Lies or conceals truth to serve self-interest.",
+      "need_modifiers": {},
+      "skill_modifiers": {},
+      "behavior_flags": [
+        "dishonest"
+      ]
+    },
+    "selfish": {
+      "name": "Selfish",
+      "polarity": "negative",
+      "description": "Prioritises personal gain over others' needs or feelings.",
+      "need_modifiers": {
+        "social": -0.1
+      },
+      "skill_modifiers": {},
+      "behavior_flags": [
+        "selfish"
+      ]
+    },
+    "arrogant": {
+      "name": "Arrogant",
+      "polarity": "negative",
+      "description": "Overestimates own abilities and dismisses others' input.",
+      "need_modifiers": {
+        "social": -0.1
+      },
+      "skill_modifiers": {},
+      "behavior_flags": [
+        "arrogant"
+      ]
+    },
+    "impulsive": {
+      "name": "Impulsive",
+      "polarity": "negative",
+      "description": "Acts without thinking; makes snap decisions that cause problems.",
+      "need_modifiers": {},
+      "skill_modifiers": {
+        "logic": -0.1
+      },
+      "behavior_flags": [
+        "impulsive"
+      ]
+    },
+    "lazy": {
+      "name": "Lazy",
+      "polarity": "negative",
+      "description": "Avoids effort; skips tasks and prefers rest over responsibility.",
+      "need_modifiers": {
+        "energy": 0.15
+      },
+      "skill_modifiers": {
+        "fitness": -0.1
+      },
+      "behavior_flags": [
+        "lazy"
+      ]
+    },
+    "cowardly": {
+      "name": "Cowardly",
+      "polarity": "negative",
+      "description": "Avoids risk and confrontation even when action is clearly needed.",
+      "need_modifiers": {
+        "stress": 0.1
+      },
+      "skill_modifiers": {},
+      "behavior_flags": [
+        "cowardly"
+      ]
+    },
+    "jealous": {
+      "name": "Jealous",
+      "polarity": "negative",
+      "description": "Resents others' success or attention; prone to envy-driven conflict.",
+      "need_modifiers": {
+        "social": -0.1,
+        "stress": 0.1
+      },
+      "skill_modifiers": {},
+      "behavior_flags": [
+        "jealous"
+      ]
+    },
+    "greedy": {
+      "name": "Greedy",
+      "polarity": "negative",
+      "description": "Accumulates wealth and resources far beyond personal need.",
+      "need_modifiers": {},
+      "skill_modifiers": {},
+      "behavior_flags": [
+        "greedy"
+      ]
+    },
+    "vindictive": {
+      "name": "Vindictive",
+      "polarity": "negative",
+      "description": "Seeks revenge and holds grudges long after an offence.",
+      "need_modifiers": {
+        "stress": 0.1
+      },
+      "skill_modifiers": {},
+      "behavior_flags": [
+        "vindictive"
+      ]
+    },
+    "cruel": {
+      "name": "Cruel",
+      "polarity": "negative",
+      "description": "Derives satisfaction from others' pain; acts with deliberate harshness.",
+      "need_modifiers": {
+        "social": -0.15
+      },
+      "skill_modifiers": {},
+      "behavior_flags": [
+        "cruel"
+      ]
+    },
+    "manipulative": {
+      "name": "Manipulative",
+      "polarity": "negative",
+      "description": "Uses deception and psychological pressure to control others.",
+      "need_modifiers": {},
+      "skill_modifiers": {
+        "charisma": 0.05
+      },
+      "behavior_flags": [
+        "manipulative"
+      ]
+    },
+    "cynical": {
+      "name": "Cynical",
+      "polarity": "negative",
+      "description": "Assumes selfish motives behind every action; distrusts goodwill.",
+      "need_modifiers": {
+        "social": -0.1
+      },
+      "skill_modifiers": {},
+      "behavior_flags": [
+        "cynical"
+      ]
+    },
+    "pessimistic": {
+      "name": "Pessimistic",
+      "polarity": "negative",
+      "description": "Expects the worst; defaults to negative interpretations of events.",
+      "need_modifiers": {
+        "fun": -0.1,
+        "stress": 0.1
+      },
+      "skill_modifiers": {},
+      "behavior_flags": [
+        "pessimistic"
+      ]
+    },
+    "stubborn": {
+      "name": "Stubborn",
+      "polarity": "negative",
+      "description": "Refuses to change position even when evidence demands it.",
+      "need_modifiers": {
+        "stress": 0.05
+      },
+      "skill_modifiers": {},
+      "behavior_flags": [
+        "stubborn"
+      ]
+    },
+    "reckless": {
+      "name": "Reckless",
+      "polarity": "negative",
+      "description": "Takes unnecessary risks with little regard for consequences.",
+      "need_modifiers": {
+        "stress": -0.05
+      },
+      "skill_modifiers": {},
+      "behavior_flags": [
+        "reckless"
+      ]
+    },
+    "naive": {
+      "name": "Naive",
+      "polarity": "negative",
+      "description": "Trusts others too easily and misses obvious red flags.",
+      "need_modifiers": {},
+      "skill_modifiers": {
+        "logic": -0.05
+      },
+      "behavior_flags": [
+        "naive"
+      ]
+    },
+    "paranoid": {
+      "name": "Paranoid",
+      "polarity": "negative",
+      "description": "Assumes hidden threats and malicious intent without evidence.",
+      "need_modifiers": {
+        "stress": 0.15,
+        "social": -0.1
+      },
+      "skill_modifiers": {},
+      "behavior_flags": [
+        "paranoid"
+      ]
+    },
+    "suspicious": {
+      "name": "Suspicious",
+      "polarity": "negative",
+      "description": "Slow to trust; questions others' motives before accepting help.",
+      "need_modifiers": {
+        "social": -0.05
+      },
+      "skill_modifiers": {},
+      "behavior_flags": [
+        "suspicious"
+      ]
+    },
+    "deceitful": {
+      "name": "Deceitful",
+      "polarity": "negative",
+      "description": "Actively creates false impressions to gain advantage.",
+      "need_modifiers": {},
+      "skill_modifiers": {},
+      "behavior_flags": [
+        "deceitful",
+        "dishonest"
+      ]
+    },
+    "rude": {
+      "name": "Rude",
+      "polarity": "negative",
+      "description": "Disregards social norms; speaks bluntly and offensively.",
+      "need_modifiers": {
+        "social": -0.1
+      },
+      "skill_modifiers": {
+        "charisma": -0.1
+      },
+      "behavior_flags": [
+        "rude"
+      ]
+    },
+    "aggressive": {
+      "name": "Aggressive",
+      "polarity": "negative",
+      "description": "Defaults to confrontation and hostility when challenged.",
+      "need_modifiers": {
+        "stress": 0.1
+      },
+      "skill_modifiers": {},
+      "behavior_flags": [
+        "aggressive"
+      ]
+    },
+    "controlling": {
+      "name": "Controlling",
+      "polarity": "negative",
+      "description": "Micromanages others and resents loss of authority.",
+      "need_modifiers": {
+        "stress": 0.1
+      },
+      "skill_modifiers": {},
+      "behavior_flags": [
+        "controlling"
+      ]
+    },
+    "possessive": {
+      "name": "Possessive",
+      "polarity": "negative",
+      "description": "Treats relationships as ownership; smothers partners or friends.",
+      "need_modifiers": {
+        "social": -0.05,
+        "stress": 0.05
+      },
+      "skill_modifiers": {},
+      "behavior_flags": [
+        "possessive"
+      ]
+    },
+    "judgmental": {
+      "name": "Judgmental",
+      "polarity": "negative",
+      "description": "Forms negative opinions about others quickly and voices them freely.",
+      "need_modifiers": {
+        "social": -0.05
+      },
+      "skill_modifiers": {},
+      "behavior_flags": [
+        "judgmental"
+      ]
+    },
+    "impatient": {
+      "name": "Impatient",
+      "polarity": "negative",
+      "description": "Cannot tolerate delay; becomes frustrated when things take time.",
+      "need_modifiers": {
+        "stress": 0.1
+      },
+      "skill_modifiers": {
+        "cooking": -0.05
+      },
+      "behavior_flags": [
+        "impatient"
+      ]
+    },
+    "moody": {
+      "name": "Moody",
+      "polarity": "negative",
+      "description": "Mood shifts unpredictably; hard to read and difficult to rely on emotionally.",
+      "need_modifiers": {
+        "fun": -0.05,
+        "stress": 0.1
+      },
+      "skill_modifiers": {},
+      "behavior_flags": [
+        "moody"
+      ]
+    },
+    "nervous": {
+      "name": "Nervous",
+      "polarity": "negative",
+      "description": "Experiences heightened anxiety in uncertain or social situations.",
+      "need_modifiers": {
+        "stress": 0.15,
+        "social": -0.05
+      },
+      "skill_modifiers": {},
+      "behavior_flags": [
+        "nervous"
+      ]
+    },
+    "indecisive": {
+      "name": "Indecisive",
+      "polarity": "negative",
+      "description": "Struggles to commit to choices; constantly second-guesses decisions.",
+      "need_modifiers": {
+        "stress": 0.05
+      },
+      "skill_modifiers": {
+        "logic": -0.05
+      },
+      "behavior_flags": [
+        "indecisive"
+      ]
+    },
+    "careless": {
+      "name": "Careless",
+      "polarity": "negative",
+      "description": "Neglects quality and detail; causes accidents through inattention.",
+      "need_modifiers": {},
+      "skill_modifiers": {},
+      "behavior_flags": [
+        "careless"
+      ]
+    },
+    "irresponsible": {
+      "name": "Irresponsible",
+      "polarity": "negative",
+      "description": "Fails to fulfil duties; avoids accountability for own actions.",
+      "need_modifiers": {},
+      "skill_modifiers": {},
+      "behavior_flags": [
+        "irresponsible"
+      ]
+    },
+    "inconsiderate": {
+      "name": "Inconsiderate",
+      "polarity": "negative",
+      "description": "Acts without regard for how actions affect those around them.",
+      "need_modifiers": {
+        "social": -0.05
+      },
+      "skill_modifiers": {},
+      "behavior_flags": [
+        "inconsiderate"
+      ]
+    },
+    "apathetic": {
+      "name": "Apathetic",
+      "polarity": "negative",
+      "description": "Lacks motivation or interest; indifferent to most outcomes.",
+      "need_modifiers": {
+        "fun": -0.15,
+        "energy": 0.1
+      },
+      "skill_modifiers": {
+        "fitness": -0.05
+      },
+      "behavior_flags": [
+        "apathetic",
+        "lazy"
+      ]
+    },
+    "obnoxious": {
+      "name": "Obnoxious",
+      "polarity": "negative",
+      "description": "Loud, intrusive behaviour that irritates and alienates others.",
+      "need_modifiers": {
+        "social": -0.1
+      },
+      "skill_modifiers": {
+        "charisma": -0.1
+      },
+      "behavior_flags": [
+        "obnoxious",
+        "rude"
+      ]
+    },
+    "vain": {
+      "name": "Vain",
+      "polarity": "negative",
+      "description": "Excessively concerned with own appearance and social image.",
+      "need_modifiers": {
+        "hygiene": 0.1
+      },
+      "skill_modifiers": {
+        "charisma": 0.05
+      },
+      "behavior_flags": [
+        "vain"
+      ]
+    },
+    "gullible": {
+      "name": "Gullible",
+      "polarity": "negative",
+      "description": "Accepts claims at face value; easily manipulated or deceived.",
+      "need_modifiers": {},
+      "skill_modifiers": {
+        "logic": -0.1
+      },
+      "behavior_flags": [
+        "gullible",
+        "naive"
+      ]
+    },
+    "secretive": {
+      "name": "Secretive",
+      "polarity": "negative",
+      "description": "Withholds information unnecessarily; hard to read or trust.",
+      "need_modifiers": {
+        "social": -0.1
+      },
+      "skill_modifiers": {},
+      "behavior_flags": [
+        "secretive"
+      ]
+    },
+    "overcritical": {
+      "name": "Overcritical",
+      "polarity": "negative",
+      "description": "Finds fault in everything and everyone; rarely satisfied.",
+      "need_modifiers": {
+        "social": -0.05
+      },
+      "skill_modifiers": {},
+      "behavior_flags": [
+        "overcritical"
+      ]
+    },
+    "short_tempered": {
+      "name": "Short-tempered",
+      "polarity": "negative",
+      "description": "Loses composure rapidly; small irritations trigger outsized reactions.",
+      "need_modifiers": {
+        "stress": 0.15
+      },
+      "skill_modifiers": {},
+      "behavior_flags": [
+        "short_tempered",
+        "aggressive"
+      ]
+    },
+    "materialistic": {
+      "name": "Materialistic",
+      "polarity": "negative",
+      "description": "Values wealth and possessions above relationships or principles.",
+      "need_modifiers": {},
+      "skill_modifiers": {},
+      "behavior_flags": [
+        "materialistic"
+      ]
+    },
+    "conforming": {
+      "name": "Conforming",
+      "polarity": "negative",
+      "description": "Follows the crowd; avoids standing out or challenging norms.",
+      "need_modifiers": {
+        "social": 0.05
+      },
+      "skill_modifiers": {
+        "creativity": -0.1
+      },
+      "behavior_flags": [
+        "conforming"
+      ]
+    },
+    "distrustful": {
+      "name": "Distrustful",
+      "polarity": "negative",
+      "description": "Rarely trusts others' intentions; withholds cooperation.",
+      "need_modifiers": {
+        "social": -0.1
+      },
+      "skill_modifiers": {},
+      "behavior_flags": [
+        "distrustful",
+        "suspicious"
+      ]
+    },
+    "fanatical": {
+      "name": "Fanatical",
+      "polarity": "negative",
+      "description": "Pursues beliefs or causes regardless of rational objection or cost.",
+      "need_modifiers": {
+        "stress": 0.1
+      },
+      "skill_modifiers": {},
+      "behavior_flags": [
+        "fanatical"
+      ]
+    },
+    "deceptive": {
+      "name": "Deceptive",
+      "polarity": "negative",
+      "description": "Constructs false narratives to mislead others for personal gain.",
+      "need_modifiers": {},
+      "skill_modifiers": {},
+      "behavior_flags": [
+        "deceptive",
+        "dishonest"
+      ]
+    },
+    "entitled": {
+      "name": "Entitled",
+      "polarity": "negative",
+      "description": "Expects special treatment and resents being held to normal standards.",
+      "need_modifiers": {},
+      "skill_modifiers": {},
+      "behavior_flags": [
+        "entitled"
+      ]
+    },
+    "ruthless": {
+      "name": "Ruthless",
+      "polarity": "negative",
+      "description": "Pursues goals without moral restraint; disregards collateral harm.",
+      "need_modifiers": {
+        "social": -0.1
+      },
+      "skill_modifiers": {},
+      "behavior_flags": [
+        "ruthless",
+        "selfish"
+      ]
+    },
+    "spiteful": {
+      "name": "Spiteful",
+      "polarity": "negative",
+      "description": "Acts to harm others even at personal cost just to cause pain.",
+      "need_modifiers": {
+        "stress": 0.1
+      },
+      "skill_modifiers": {},
+      "behavior_flags": [
+        "spiteful",
+        "vindictive"
+      ]
+    },
+    "obsessive": {
+      "name": "Obsessive",
+      "polarity": "negative",
+      "description": "Fixates on people or ideas to the detriment of balance and wellbeing.",
+      "need_modifiers": {
+        "stress": 0.1,
+        "fun": -0.1
+      },
+      "skill_modifiers": {},
+      "behavior_flags": [
+        "obsessive"
+      ]
+    },
+    "defeatist": {
+      "name": "Defeatist",
+      "polarity": "negative",
+      "description": "Gives up easily; assumes failure before properly attempting a task.",
+      "need_modifiers": {
+        "fun": -0.1
+      },
+      "skill_modifiers": {
+        "fitness": -0.05
+      },
+      "behavior_flags": [
+        "defeatist",
+        "pessimistic"
+      ]
+    },
+    "passive": {
+      "name": "Passive",
+      "polarity": "negative",
+      "description": "Avoids asserting needs or opinions; lets others dictate outcomes.",
+      "need_modifiers": {
+        "social": -0.05
+      },
+      "skill_modifiers": {},
+      "behavior_flags": [
+        "passive"
+      ]
+    },
+    "egotistical": {
+      "name": "Egotistical",
+      "polarity": "negative",
+      "description": "Everything revolves around self; cannot genuinely consider others.",
+      "need_modifiers": {
+        "social": -0.1
+      },
+      "skill_modifiers": {
+        "charisma": -0.1
+      },
+      "behavior_flags": [
+        "egotistical",
+        "arrogant",
+        "selfish"
+      ]
     }
   }
 }
