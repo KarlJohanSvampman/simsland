@@ -187,21 +187,350 @@ const GROUPS = [
 },
 ];
 
-// ── Scene Setup ───────────────────────────────────────────────────────────────
-const W = window.innerWidth, H = window.innerHeight;
-const renderer = new THREE.WebGLRenderer({antialias:true});
-renderer.setPixelRatio(Math.min(devicePixelRatio,2));
-renderer.setSize(W,H);
-document.body.appendChild(renderer.domElement);
-
-const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x020810);
-scene.fog = new THREE.FogExp2(0x020810, 0.00045);
-
-const camera = new THREE.PerspectiveCamera(55, W/H, 0.5, 8000);
-camera.position.set(80, 280, 820);
-
 const controls = new THREE.OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.dampingFactor = 0.06;
-controls.target.set(0, 40, 0
+controls.target.set(0, 40, 0);
+controls.minDistance = 120;
+controls.maxDistance = 2400;
+
+// Lights
+const ambient = new THREE.AmbientLight(0x111827, 1.2);
+scene.add(ambient);
+const sun = new THREE.DirectionalLight(0xffffff, 0.4);
+sun.position.set(200, 400, 100);
+scene.add(sun);
+
+// ── Stars ─────────────────────────────────────────────────────────────────────
+(function makeStars(){
+  const pos = new Float32Array(3000*3);
+  for(let i=0;i<3000;i++){
+    pos[i*3]   = (Math.random()-.5)*7000;
+    pos[i*3+1] = (Math.random()-.5)*7000;
+    pos[i*3+2] = (Math.random()-.5)*7000;
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos,3));
+  scene.add(new THREE.Points(geo, new THREE.PointsMaterial({color:0xffffff,size:1.1,transparent:true,opacity:.55})));
+})();
+
+// ── Label sprite ──────────────────────────────────────────────────────────────
+function makeSprite(text, color, size=14){
+  const c = document.createElement('canvas');
+  const ctx = c.getContext('2d');
+  ctx.font = `600 ${size}px 'Cascadia Code',monospace`;
+  const tw = ctx.measureText(text).width;
+  c.width = tw+20; c.height = size+14;
+  ctx.font = `600 ${size}px 'Cascadia Code',monospace`;
+  ctx.fillStyle = color;
+  ctx.globalAlpha = .9;
+  ctx.fillText(text, 10, size+1);
+  const tex = new THREE.CanvasTexture(c);
+  const mat = new THREE.SpriteMaterial({map:tex,transparent:true,depthWrite:false});
+  const sp = new THREE.Sprite(mat);
+  sp.scale.set((tw+20)/8, (size+14)/8, 1);
+  sp.userData.isLabel = true;
+  return sp;
+}
+
+// ── Fibonacci sphere distribution ─────────────────────────────────────────────
+function fibSphere(n, r){
+  const pts=[]; const gr=(1+Math.sqrt(5))/2;
+  for(let i=0;i<n;i++){
+    const th=2*Math.PI*i/gr, ph=Math.acos(1-2*(i+.5)/n);
+    pts.push([r*Math.sin(ph)*Math.cos(th), r*Math.cos(ph), r*Math.sin(ph)*Math.sin(th)]);
+  }
+  return pts;
+}
+
+// ── Build nodes ───────────────────────────────────────────────────────────────
+const groupMeshes={}, modMeshes={}, modTargets={}, modLabels={};
+const expandedGroups = new Set();
+const allInteractive = [];
+
+GROUPS.forEach(g=>{
+  // Group icosahedron
+  const geo = new THREE.IcosahedronGeometry(24,2);
+  const mat = new THREE.MeshPhongMaterial({
+    color: new THREE.Color(g.color),
+    emissive: new THREE.Color(g.color),
+    emissiveIntensity: .28,
+    transparent:true, opacity:.82, shininess:120
+  });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.position.set(...g.pos);
+  mesh.userData = {type:'group', group:g};
+  scene.add(mesh);
+  groupMeshes[g.id] = mesh;
+  allInteractive.push(mesh);
+
+  // Inner glow sphere
+  const glowGeo = new THREE.SphereGeometry(30,16,16);
+  const glowMat = new THREE.MeshBasicMaterial({
+    color: new THREE.Color(g.color), transparent:true, opacity:.06, side:THREE.BackSide
+  });
+  const glow = new THREE.Mesh(glowGeo, glowMat);
+  glow.position.set(...g.pos);
+  scene.add(glow);
+
+  // Group label
+  const lbl = makeSprite(g.label, g.color, 15);
+  lbl.position.set(g.pos[0], g.pos[1]+38, g.pos[2]);
+  scene.add(lbl);
+
+  // Module nodes
+  const orbitPositions = fibSphere(g.modules.length, 85);
+  g.modules.forEach((mod, i)=>{
+    const mgeo = new THREE.SphereGeometry(6,14,14);
+    const mmat = new THREE.MeshPhongMaterial({
+      color: new THREE.Color(g.color),
+      emissive: new THREE.Color(g.color),
+      emissiveIntensity:.2,
+      transparent:true, opacity:0, shininess:80
+    });
+    const mm = new THREE.Mesh(mgeo, mmat);
+    mm.position.set(...g.pos);
+    mm.scale.set(0,0,0);
+    mm.userData = {type:'module', group:g, module:mod};
+    mm.visible = false;
+    scene.add(mm);
+    modMeshes[mod.id] = mm;
+    mod._mesh = mm;
+    allInteractive.push(mm);
+
+    modTargets[mod.id] = new THREE.Vector3(
+      g.pos[0]+orbitPositions[i][0],
+      g.pos[1]+orbitPositions[i][1],
+      g.pos[2]+orbitPositions[i][2]
+    );
+
+    // Module label
+    const ml = makeSprite(mod.label, '#c9d1d9', 10);
+    ml.position.set(...g.pos);
+    ml.material.opacity = 0;
+    scene.add(ml);
+    modLabels[mod.id] = ml;
+    mod._label = ml;
+  });
+});
+
+// ── Connection lines ──────────────────────────────────────────────────────────
+const connLines=[];
+const added = new Set();
+GROUPS.forEach(g=>{
+  (g.connects_to||[]).forEach(tid=>{
+    const key = [g.id,tid].sort().join('->');
+    if(added.has(key)) return;
+    added.add(key);
+    const target = GROUPS.find(x=>x.id===tid);
+    if(!target) return;
+    const pts = [new THREE.Vector3(...g.pos), new THREE.Vector3(...target.pos)];
+    const geo = new THREE.BufferGeometry().setFromPoints(pts);
+    const c1 = new THREE.Color(g.color), c2 = new THREE.Color(target.color);
+    const blended = c1.clone().lerp(c2,.5);
+    const mat = new THREE.LineDashedMaterial({
+      color: blended, dashSize:12, gapSize:6,
+      transparent:true, opacity:.22
+    });
+    const line = new THREE.Line(geo, mat);
+    line.computeLineDistances();
+    scene.add(line);
+    connLines.push({line,mat});
+  });
+});
+
+// ── Legend ────────────────────────────────────────────────────────────────────
+const legend = document.getElementById('legend');
+GROUPS.forEach(g=>{
+  const el = document.createElement('div');
+  el.className='li';
+  el.innerHTML=`<div class="ld" style="background:${g.color}"></div>${g.label}`;
+  el.onclick = ()=>{ const m=groupMeshes[g.id]; if(m) toggleGroup(g,m); };
+  legend.appendChild(el);
+});
+
+// ── Info panel ────────────────────────────────────────────────────────────────
+const infoEl = document.getElementById('info');
+let lastShown = null;
+
+function showGroupInfo(g, expanded){
+  infoEl.classList.remove('hidden');
+  infoEl.innerHTML = `
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+      <div style="width:12px;height:12px;border-radius:50%;background:${g.color};flex-shrink:0"></div>
+      <h2>${g.label}</h2>
+    </div>
+    <div class="gtype">${g.modules.length} modules &middot; click to ${expanded?'collapse':'expand'}</div>
+    <div class="gdesc">${g.desc}</div>
+    <div>
+      ${g.modules.map(m=>`
+        <div class="mod">
+          <div class="mname" style="color:${g.color}">${m.label}</div>
+          <div class="mdesc">${m.desc}</div>
+        </div>`).join('')}
+    </div>`;
+}
+
+function showModuleInfo(g, mod){
+  infoEl.classList.remove('hidden');
+  infoEl.innerHTML = `
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+      <div style="width:8px;height:8px;border-radius:50%;background:${g.color};flex-shrink:0"></div>
+      <h2 style="color:${g.color}">${mod.label}</h2>
+    </div>
+    <div class="gtype">${g.label}</div>
+    <div class="gdesc">${mod.desc}</div>`;
+}
+
+// ── Expand / Collapse ─────────────────────────────────────────────────────────
+function toggleGroup(g, mesh){
+  const was = expandedGroups.has(g.id);
+  if(was){
+    expandedGroups.delete(g.id);
+    g.modules.forEach(mod=>{ mod._target=0; });
+  } else {
+    expandedGroups.add(g.id);
+    g.modules.forEach(mod=>{ mod._target=1; mod._mesh.visible=true; });
+  }
+  showGroupInfo(g, !was);
+}
+
+// ── Camera focus ──────────────────────────────────────────────────────────────
+// Smoothly re-target the orbit controls on a clicked group node.
+const camGoalTarget = new THREE.Vector3(0, 40, 0);
+const camGoalPos    = new THREE.Vector3(80, 280, 820);
+let   camAnimating  = false;
+
+function focusGroup(g){
+  const gpos = new THREE.Vector3(...g.pos);
+  // Keep the same viewing direction but re-anchor orbit to this group.
+  const currentDir = camera.position.clone().sub(controls.target);
+  const dist = Math.min(Math.max(currentDir.length(), 280), 420);
+  currentDir.normalize().multiplyScalar(dist);
+  camGoalTarget.copy(gpos);
+  camGoalPos.copy(gpos).add(currentDir);
+  camAnimating = true;
+}
+
+// ── Interaction ───────────────────────────────────────────────────────────────
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2(-9999,-9999);
+let hovered = null;
+const mouseDownPos = new THREE.Vector2();
+
+renderer.domElement.addEventListener('mousedown', e=>{
+  mouseDownPos.set(e.clientX, e.clientY);
+});
+
+renderer.domElement.addEventListener('mousemove', e=>{
+  mouse.x = (e.clientX/W)*2-1;
+  mouse.y = -(e.clientY/H)*2+1;
+});
+
+renderer.domElement.addEventListener('click', e=>{
+  // Ignore orbit drags
+  const dx = e.clientX - mouseDownPos.x, dy = e.clientY - mouseDownPos.y;
+  if(Math.sqrt(dx*dx+dy*dy) > 5) return;
+  raycaster.setFromCamera(mouse, camera);
+  const hits = raycaster.intersectObjects(allInteractive.filter(m=>m.visible!==false&&m.userData.type==='group'));
+  if(hits.length){
+    const obj = hits[0].object;
+    const g = obj.userData.group;
+    toggleGroup(g, obj);
+    focusGroup(g);
+  }
+});
+
+// Cancel camera animation when user manually drags
+renderer.domElement.addEventListener('pointerdown', ()=>{ camAnimating = false; });
+
+window.addEventListener('resize',()=>{
+  const nw=window.innerWidth, nh=window.innerHeight;
+  camera.aspect=nw/nh; camera.updateProjectionMatrix();
+  renderer.setSize(nw,nh);
+});
+
+// ── Animation loop ────────────────────────────────────────────────────────────
+const clock = new THREE.Clock();
+const _v3 = new THREE.Vector3();
+
+function animate(){
+  requestAnimationFrame(animate);
+  const t = clock.getElapsedTime();
+
+  // Smooth camera focus transition
+  if(camAnimating){
+    camera.position.lerp(camGoalPos, 0.055);
+    controls.target.lerp(camGoalTarget, 0.055);
+    if(camera.position.distanceTo(camGoalPos) < 2 &&
+       controls.target.distanceTo(camGoalTarget) < 2){
+      camera.position.copy(camGoalPos);
+      controls.target.copy(camGoalTarget);
+      camAnimating = false;
+    }
+  }
+
+  controls.update();
+
+  // Animate dash offset
+  connLines.forEach(({mat})=>{ mat.dashOffset -= 0.014; });
+
+  // Pulse + rotate group nodes
+  GROUPS.forEach(g=>{
+    const mesh = groupMeshes[g.id];
+    const expanded = expandedGroups.has(g.id);
+    const baseEmit = expanded ? .55 : .28;
+    mesh.material.emissiveIntensity = baseEmit + Math.sin(t*1.8+g.pos[0]*.01)*.1;
+    mesh.rotation.y += 0.0035;
+    mesh.rotation.x += 0.0012;
+
+    // Animate module nodes
+    g.modules.forEach(mod=>{
+      const mm = mod._mesh;
+      const ml = mod._label;
+      const want = mod._target ?? 0;
+      const tgt = want>0 ? modTargets[mod.id] : new THREE.Vector3(...g.pos);
+      const tgtOpacity = want>0 ? .85 : 0;
+      const tgtScale = want>0 ? 1 : 0;
+
+      mm.position.lerp(tgt, .09);
+      const cs = mm.scale.x;
+      const ns = cs + (tgtScale-cs)*.09;
+      mm.scale.set(ns,ns,ns);
+      mm.material.opacity += (tgtOpacity - mm.material.opacity)*.09;
+      mm.material.emissiveIntensity = .2 + Math.sin(t*2+g.pos[0]*.02)*.08;
+
+      if(want<0.01 && mm.material.opacity < 0.01) mm.visible=false;
+
+      ml.position.copy(mm.position).add(_v3.set(0,11,0));
+      ml.material.opacity += ((tgtOpacity*.9) - ml.material.opacity)*.09;
+    });
+  });
+
+  // Hover detection
+  raycaster.setFromCamera(mouse, camera);
+  const pickable = allInteractive.filter(m=>{
+    if(!m.visible) return false;
+    if(m.userData.type==='module') return m.material.opacity>0.2;
+    return true;
+  });
+  const hits = raycaster.intersectObjects(pickable);
+  if(hits.length){
+    const obj = hits[0].object;
+    if(obj !== hovered){
+      if(hovered) hovered.material.emissiveIntensity = .28;
+      hovered = obj;
+      obj.material.emissiveIntensity = .9;
+      if(obj.userData.type==='module') showModuleInfo(obj.userData.group, obj.userData.module);
+      else if(obj.userData.type==='group') showGroupInfo(obj.userData.group, expandedGroups.has(obj.userData.group.id));
+    }
+  } else {
+    if(hovered){ hovered.material.emissiveIntensity=.28; hovered=null; }
+  }
+
+  renderer.render(scene, camera);
+}
+animate();
+</script>
+</body>
+</html>
