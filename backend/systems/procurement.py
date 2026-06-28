@@ -103,6 +103,7 @@ def purchase_from_catalog(c, household, world, catalog_id, method="in_person"):
       type == "prop" + not requires_assembly → schedule_delivery_prop()
     """
     from systems.assembly import make_assembly_box, make_tile_box
+    from systems.containers import create_bucket, create_container
 
     catalog = world.get("market", {}).get("catalog", {})
     entry   = catalog.get(catalog_id)
@@ -114,6 +115,17 @@ def purchase_from_catalog(c, household, world, catalog_id, method="in_person"):
         return False
 
     c["money"] = round(c["money"] - price, 2)
+
+    # --- Container (paint bucket, generic box, backpack, etc.) ---
+    if entry["type"] == "container":
+        sub_type = entry.get("sub_type", "cardboard_box")
+        if sub_type == "bucket":
+            item = create_bucket(entry["material_id"], world, uses=entry.get("bucket_uses", 10))
+        else:
+            item = create_container(sub_type=sub_type)
+        if item:
+            add_item(c, item)
+        return True
 
     # --- Resource consumable (groceries, hygiene, bulk drinks) ---
     if entry.get("resource_type"):
@@ -243,17 +255,4 @@ def _deliver_prop(household, catalog_id, world):
         "building_id": home_id,
         "x":           0,
         "y":           0,
-        "rotation":    0,
-        "state":       {"reserved_by": [], "dirty": False},
-    })
-
-
-# =========================================================
-# LEGACY COMPAT — determine_container still used internally
-# =========================================================
-
-def determine_container(resource_type):
-    if resource_type in ("FOOD_PROTEIN", "FOOD_VEGETABLE", "MEAL",
-                         "STORED_MEAL", "PROCESSED_MEAL", "DRINK_MILK"):
-        return "fridge"
-    if resource_type in ("FO
+        "rota

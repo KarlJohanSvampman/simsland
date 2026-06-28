@@ -315,6 +315,7 @@ def _do_floor_tiling(contract, world):
 
 
 def _do_paint_wall(contract, world):
+    from systems.walls import paint_wall as _paint_wall
     walls = contract["details"].get("walls", [])
     prog  = contract["work_progress"]
     if prog >= len(walls):
@@ -323,48 +324,41 @@ def _do_paint_wall(contract, world):
     w   = walls[prog]
     wid = w.get("wall_id")
     mat = w.get("material")
-    if wid:
-        for prop in world.get("props", []):
-            if prop.get("id") == wid:
-                prop.setdefault("state", {})["material"] = mat
-                break
-        # Also check tiles
-        tile = world.get("tiles", {}).get(wid)
-        if tile:
-            tile["material"] = mat
+    if wid and mat:
+        _paint_wall(world, wid, mat)
     contract["work_progress"] += 1
 
 
 def _do_build_wall(contract, world):
+    from systems.walls import create_wall
     positions = contract["details"].get("positions", [])
     prog      = contract["work_progress"]
     if prog >= len(positions):
         contract["work_progress"] = contract["quantity"]
         return
-    pos = positions[prog]
-    x, y = int(pos.get("x", 0)), int(pos.get("y", 0))
-    world.setdefault("tiles", {})[f"{x},{y}"] = {
-        "x":           x,
-        "y":           y,
-        "type":        "wall",
-        "interior":    True,
-        "floor":       False,
-        "walkable":    False,
-        "material":    pos.get("material", "wall_default"),
-        "placed_by":   contract["worker_id"],
-        "building_id": _home_id(contract, world),
-    }
+    pos         = positions[prog]
+    x           = int(pos.get("x", 0))
+    y           = int(pos.get("y", 0))
+    orientation = pos.get("orientation", "v")
+    material    = pos.get("material", "paint_white_matt")
+    create_wall(
+        world, x, y, orientation,
+        building_id=_home_id(contract, world),
+        load_bearing=False,
+        material=material,
+        interior=True,
+    )
     contract["work_progress"] += 1
 
 
 def _do_remove_wall(contract, world):
-    wall_keys = contract["details"].get("wall_ids", [])
-    prog      = contract["work_progress"]
-    if prog >= len(wall_keys):
+    from systems.walls import remove_wall
+    wall_ids = contract["details"].get("wall_ids", [])
+    prog     = contract["work_progress"]
+    if prog >= len(wall_ids):
         contract["work_progress"] = contract["quantity"]
         return
-    key = wall_keys[prog]
-    world.get("tiles", {}).pop(key, None)
+    remove_wall(world, wall_ids[prog])   # silently skips load_bearing walls
     contract["work_progress"] += 1
 
 
@@ -595,3 +589,4 @@ def active_contracts_for_household(world, household_id):
         if c["household_id"] == household_id
         and c["status"] != PHASE_DEPARTED
     ]
+                                                                                                                                                                        

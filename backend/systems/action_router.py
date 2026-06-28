@@ -540,12 +540,84 @@ def route_action(c, world, action, speech, definitions=None):
     elif action_type == "hire_service":
         _route_hire_service(c, world, action)
 
+    elif action_type == "build_wall":
+        _route_build_wall(c, world, action)
+
+    elif action_type == "remove_wall":
+        _route_remove_wall(c, world, action)
+
+    elif action_type == "paint_wall":
+        _route_paint_wall(c, world, action)
+
     # "call" / "text" are future — for now just log
     elif action_type in ("call", "text"):
         c.setdefault("pending_comms", []).append(action)
 
-    # ── Hobby actions: run the planner first ──────────────
-    # If the action maps to a hobby with requirements, build
-    # the full prerequisite queue instead of starting directly.
-    elif action_type in _HOBBY_ACTION_TYPES:
-       
+    # ── Hobby 
+
+# =========================================================
+# BUILD WALL
+# action = {
+#   "type":        "build_wall",
+#   "x":           3,
+#   "y":           5,
+#   "orientation": "v",          # "h" or "v"
+#   "material":    "paint_white_matt"
+# }
+# =========================================================
+
+def _route_build_wall(c, world, action):
+    from systems.walls import create_wall
+    x           = int(action.get("x", int(c.get("x", 0))))
+    y           = int(action.get("y", int(c.get("y", 0))))
+    orientation = action.get("orientation", "v")
+    material    = action.get("material", "paint_white_matt")
+    bid         = c.get("building_id")
+    create_wall(world, x, y, orientation, building_id=bid,
+                load_bearing=False, material=material, interior=True)
+
+
+# =========================================================
+# REMOVE WALL
+# action = { "type": "remove_wall", "wall_id": "wall_house_1_3_5_v" }
+# Silently blocked if wall is load_bearing.
+# =========================================================
+
+def _route_remove_wall(c, world, action):
+    from systems.walls import remove_wall
+    wall_id = action.get("wall_id")
+    if wall_id:
+        remove_wall(world, wall_id)
+
+
+# =========================================================
+# PAINT WALL
+# action = {
+#   "type":        "paint_wall",
+#   "wall_id":     "wall_house_1_3_5_v",
+#   "material_id": "paint_red_satin"    # or wallpaper_floral_01 etc.
+# }
+# Character must have a paint bucket with matching material_id in inventory.
+# Each call consumes one use from the bucket; bucket removed when empty.
+# =========================================================
+
+def _route_paint_wall(c, world, action):
+    from systems.walls import paint_wall
+    from systems.containers import find_bucket_for_material, use_bucket
+    from systems.personal_items import remove_item
+
+    wall_id     = action.get("wall_id")
+    material_id = action.get("material_id")
+    if not wall_id or not material_id:
+        return
+
+    # Must have a bucket with this material
+    bucket = find_bucket_for_material(c, material_id)
+    if not bucket:
+        return
+
+    result = paint_wall(world, wall_id, material_id)
+    if result["success"]:
+        empty = use_bucket(bucket)
+        if empty:
+            remove_item(c, bucket["id"])

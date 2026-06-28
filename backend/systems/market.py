@@ -43,6 +43,8 @@ CATEGORY_VOLATILITY = {
     "drink":       0.003,
     "food":        0.004,
     "flooring":    0.003,
+    "paint":       0.002,
+    "wallpaper":   0.002,
 }
 
 REVERSION_STRENGTH = 0.005
@@ -113,6 +115,35 @@ def init_market_catalog(world):
             "material_template": mid,
             "interior":          mt.get("interior", True),
             "floor":             mt.get("floor", True),
+        }
+
+    # Paint and wallpaper — sold as buckets (type: "container", sub_type: "bucket")
+    # Each bucket gives 10 uses (one use per wall painted).
+    BUCKET_USES = 10
+    for mid, mt in material_templates.items():
+        cat = mt.get("category")
+        if cat not in ("paint", "wallpaper"):
+            continue
+        entry_id = f"bucket_{mid}"
+        if entry_id in catalog:
+            continue
+        if cat == "paint":
+            bp = float(mt.get("price_per_liter", 9.0)) * BUCKET_USES
+        else:
+            bp = float(mt.get("price_per_roll", 20.0))
+        catalog[entry_id] = {
+            "type":           "container",
+            "sub_type":       "bucket",
+            "name":           f"{mt.get('name', mid)} (Bucket)",
+            "category":       cat,
+            "base_price":     bp,
+            "current_price":  round(bp * mults.get(cat, 1.0), 2),
+            "material_id":    mid,
+            "bucket_uses":    BUCKET_USES,
+            "requires_assembly": False,
+            "resource_type":  None,
+            "storage_container": None,
+            "quantity":       1,
         }
 
     # Prop templates
@@ -194,37 +225,4 @@ def browse_catalog(world, category=None, budget=None, item_type=None):
 
 # =========================================================
 # UPDATE MARKET (called each MEDIUM tick)
-# =========================================================
-
-def update_market(world):
-    market = world.setdefault("market", {})
-    ensure_market_defaults(market)
-    mults   = market["category_multipliers"]
-    catalog = market.get("catalog", {})
-
-    # Drift category multipliers
-    for cat in CATEGORY_VOLATILITY:
-        if cat not in mults:
-            mults[cat] = 1.0
-        vol  = CATEGORY_VOLATILITY.get(cat, 0.004)
-        step = random.gauss(0, vol)
-        step -= REVERSION_STRENGTH * (mults[cat] - 1.0)
-        mults[cat] = round(max(0.5, min(2.5, mults[cat] + step)), 4)
-
-    # Refresh current_price in catalog
-    for entry in catalog.values():
-        cat  = entry.get("category", "misc")
-        mult = mults.get(cat, 1.0)
-        entry["current_price"] = round(entry["base_price"] * mult, 2)
-
-    # Update cost_of_living_index via groceries multiplier
-    grocery_mult = mults.get("groceries", 1.0)
-    market["food"]["price"] = round(10.0 * grocery_mult, 2)
-    world["environment"]["cost_of_living_index"] = max(
-        0.5, min(2.0, grocery_mult)
-    )
-
-
-# =========================================================
-# NEWS → MARKET REACTION
-# ==========================================
+# ===========================================

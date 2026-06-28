@@ -40,6 +40,7 @@ ITEM_TEMPLATES = {
     "toilet_paper_roll": {
         "name":               "Toilet Paper Roll",
         "category":           "hygiene",
+        "size":      1,
         "base_price":         2.0,
         "stackable":          True,
         "max_stack":          24,
@@ -53,6 +54,7 @@ ITEM_TEMPLATES = {
     "bath_towel": {
         "name":       "Bath Towel",
         "category":   "hygiene",
+        "size":      2,
         "base_price": 18.0,
         "stackable":  True,
         "max_stack":  4,
@@ -63,6 +65,7 @@ ITEM_TEMPLATES = {
     "hand_towel": {
         "name":       "Hand Towel",
         "category":   "hygiene",
+        "size":      1,
         "base_price": 10.0,
         "stackable":  True,
         "max_stack":  6,
@@ -73,6 +76,7 @@ ITEM_TEMPLATES = {
     "soap_bar": {
         "name":               "Soap Bar",
         "category":           "hygiene",
+        "size":      1,
         "base_price":         3.0,
         "stackable":          True,
         "max_stack":          6,
@@ -90,6 +94,7 @@ ITEM_TEMPLATES = {
     "bed_sheet": {
         "name":       "Bed Sheet",
         "category":   "linen",
+        "size":      2,
         "base_price": 25.0,
         "stackable":  True,
         "max_stack":  4,
@@ -100,6 +105,7 @@ ITEM_TEMPLATES = {
     "pillow": {
         "name":       "Pillow",
         "category":   "linen",
+        "size":      2,
         "base_price": 20.0,
         "stackable":  True,
         "max_stack":  4,
@@ -110,6 +116,7 @@ ITEM_TEMPLATES = {
     "duvet": {
         "name":       "Duvet",
         "category":   "linen",
+        "size":      3,
         "base_price": 80.0,
         "stackable":  False,
         "dirty":      False,
@@ -123,6 +130,7 @@ ITEM_TEMPLATES = {
     "cleaning_spray": {
         "name":               "Cleaning Spray",
         "category":           "cleaning",
+        "size":      1,
         "base_price":         5.0,
         "stackable":          True,
         "max_stack":          4,
@@ -140,6 +148,7 @@ ITEM_TEMPLATES = {
     "plate_ceramic": {
         "name":       "Plate",
         "category":   "dishware",
+        "size":      1,
         "base_price": 6.0,
         "stackable":  True,
         "max_stack":  12,
@@ -150,6 +159,7 @@ ITEM_TEMPLATES = {
     "bowl_ceramic": {
         "name":       "Bowl",
         "category":   "dishware",
+        "size":      1,
         "base_price": 5.0,
         "stackable":  True,
         "max_stack":  8,
@@ -160,6 +170,7 @@ ITEM_TEMPLATES = {
     "mug_ceramic": {
         "name":       "Mug",
         "category":   "dishware",
+        "size":      1,
         "base_price": 8.0,
         "stackable":  True,
         "max_stack":  6,
@@ -170,6 +181,7 @@ ITEM_TEMPLATES = {
     "glass_water": {
         "name":       "Water Glass",
         "category":   "dishware",
+        "size":      1,
         "base_price": 5.0,
         "stackable":  True,
         "max_stack":  8,
@@ -180,6 +192,7 @@ ITEM_TEMPLATES = {
     "glass_wine": {
         "name":       "Wine Glass",
         "category":   "dishware",
+        "size":      1,
         "base_price": 9.0,
         "stackable":  True,
         "max_stack":  6,
@@ -190,6 +203,7 @@ ITEM_TEMPLATES = {
     "glass_rocks": {
         "name":       "Rocks Glass",
         "category":   "dishware",
+        "size":      1,
         "base_price": 7.0,
         "stackable":  True,
         "max_stack":  6,
@@ -200,6 +214,7 @@ ITEM_TEMPLATES = {
     "fork": {
         "name":       "Fork",
         "category":   "dishware",
+        "size":      1,
         "base_price": 3.0,
         "stackable":  True,
         "max_stack":  12,
@@ -210,6 +225,7 @@ ITEM_TEMPLATES = {
     "knife_table": {
         "name":       "Table Knife",
         "category":   "dishware",
+        "size":      1,
         "base_price": 3.0,
         "stackable":  True,
         "max_stack":  12,
@@ -220,6 +236,7 @@ ITEM_TEMPLATES = {
     "spoon": {
         "name":       "Spoon",
         "category":   "dishware",
+        "size":      1,
         "base_price": 3.0,
         "stackable":  True,
         "max_stack":  12,
@@ -230,6 +247,7 @@ ITEM_TEMPLATES = {
     "teaspoon": {
         "name":       "Teaspoon",
         "category":   "dishware",
+        "size":      1,
         "base_price": 2.0,
         "stackable":  True,
         "max_stack":  12,
@@ -244,6 +262,7 @@ ITEM_TEMPLATES = {
     "plate_of_pasta": {
         "name":            "Plate of Pasta",
         "category":        "food",
+        "size":      1,
         "stackable":       False,
         "dirty":           False,
         "consumable":      True,
@@ -255,6 +274,7 @@ ITEM_TEMPLATES = {
     "plate_of_rice": {
         "name":            "Plate of Rice",
         "category":        "food",
+        "size":      1,
         "stackable":       False,
         "dirty":           False,
         "consumable":      True,
@@ -266,6 +286,7 @@ ITEM_TEMPLATES = {
     "bowl_of_cereal": {
         "name":            "Bowl of Cereal",
         "category":        "food",
+        "size":      1,
         "stackable":       False,
         "dirty":           False,
         "consumable":      True,
@@ -277,6 +298,7 @@ ITEM_TEMPLATES = {
     "sandwich": {
         "name":            "Sandwich",
         "category":        "food",
+        "size":      1,
         "stackable":       False,
         "consumable":      True,
         "uses":            1,
@@ -287,6 +309,7 @@ ITEM_TEMPLATES = {
     "slice_of_toast": {
         "name":            "Toast",
         "category":        "food",
+        "size":      1,
         "stackable":       True,
         "max_stack":       4,
         "consumable":      True,
@@ -298,6 +321,7 @@ ITEM_TEMPLATES = {
     "apple": {
         "name":            "Apple",
         "category":        "food",
+        "size":      1,
         "base_price":      1.5,
         "stackable":       True,
         "max_stack":       6,
@@ -310,6 +334,7 @@ ITEM_TEMPLATES = {
     "banana": {
         "name":            "Banana",
         "category":        "food",
+        "size":      1,
         "base_price":      0.8,
         "stackable":       True,
         "max_stack":       6,
@@ -322,6 +347,7 @@ ITEM_TEMPLATES = {
     "bag_of_chips_open": {
         "name":            "Bag of Chips",
         "category":        "food",
+        "size":      1,
         "base_price":      3.0,
         "stackable":       False,
         "consumable":      True,
@@ -334,6 +360,7 @@ ITEM_TEMPLATES = {
     "groceries_basic": {
         "name":               "Groceries (Basic)",
         "category":           "groceries",
+        "size":      3,
         "base_price":         40.0,
         "stackable":          False,
         "consumable":         True,
@@ -346,6 +373,7 @@ ITEM_TEMPLATES = {
     "groceries_protein": {
         "name":               "Groceries (Protein)",
         "category":           "groceries",
+        "size":      3,
         "base_price":         55.0,
         "stackable":          False,
         "consumable":         True,
@@ -362,6 +390,7 @@ ITEM_TEMPLATES = {
     "cup_of_coffee": {
         "name":               "Cup of Coffee",
         "category":           "drink",
+        "size":      1,
         "stackable":          False,
         "dirty":              False,
         "consumable":         True,
@@ -374,6 +403,7 @@ ITEM_TEMPLATES = {
     "cup_of_tea": {
         "name":               "Cup of Tea",
         "category":           "drink",
+        "size":      1,
         "stackable":          False,
         "dirty":              False,
         "consumable":         True,
@@ -386,6 +416,7 @@ ITEM_TEMPLATES = {
     "glass_of_water": {
         "name":               "Glass of Water",
         "category":           "drink",
+        "size":      1,
         "stackable":          False,
         "dirty":              False,
         "consumable":         True,
@@ -396,6 +427,7 @@ ITEM_TEMPLATES = {
     "can_of_soda": {
         "name":               "Can of Soda",
         "category":           "drink",
+        "size":      1,
         "base_price":         2.5,
         "stackable":          True,
         "max_stack":          6,
@@ -412,6 +444,7 @@ ITEM_TEMPLATES = {
     "can_of_energy_drink": {
         "name":               "Energy Drink",
         "category":           "drink",
+        "size":      1,
         "base_price":         3.5,
         "stackable":          True,
         "max_stack":          6,
@@ -426,6 +459,7 @@ ITEM_TEMPLATES = {
     "bottle_of_beer": {
         "name":               "Beer",
         "category":           "drink",
+        "size":      1,
         "base_price":         3.0,
         "stackable":          True,
         "max_stack":          12,
@@ -442,6 +476,7 @@ ITEM_TEMPLATES = {
     "glass_of_red_wine": {
         "name":               "Glass of Red Wine",
         "category":           "drink",
+        "size":      1,
         "stackable":          False,
         "dirty":              False,
         "consumable":         True,
@@ -453,6 +488,7 @@ ITEM_TEMPLATES = {
     "glass_of_white_wine": {
         "name":               "Glass of White Wine",
         "category":           "drink",
+        "size":      1,
         "stackable":          False,
         "dirty":              False,
         "consumable":         True,
@@ -464,6 +500,7 @@ ITEM_TEMPLATES = {
     "glass_of_spirits": {
         "name":               "Glass of Spirits",
         "category":           "drink",
+        "size":      1,
         "stackable":          False,
         "dirty":              False,
         "consumable":         True,
@@ -475,6 +512,7 @@ ITEM_TEMPLATES = {
     "shot_of_spirits": {
         "name":               "Shot",
         "category":           "drink",
+        "size":      1,
         "stackable":          False,
         "consumable":         True,
         "uses":               1,
@@ -486,6 +524,7 @@ ITEM_TEMPLATES = {
     "wine_bottle_red": {
         "name":               "Bottle of Red Wine",
         "category":           "drink",
+        "size":      1,
         "base_price":         18.0,
         "stackable":          True,
         "max_stack":          6,
@@ -498,6 +537,7 @@ ITEM_TEMPLATES = {
     "wine_bottle_white": {
         "name":               "Bottle of White Wine",
         "category":           "drink",
+        "size":      1,
         "base_price":         16.0,
         "stackable":          True,
         "max_stack":          6,
@@ -510,6 +550,7 @@ ITEM_TEMPLATES = {
     "spirits_bottle": {
         "name":               "Bottle of Spirits",
         "category":           "drink",
+        "size":      1,
         "base_price":         32.0,
         "stackable":          True,
         "max_stack":          4,
@@ -530,6 +571,7 @@ ITEM_TEMPLATES = {
         "model": "/resources/clothing/baseball_cap.glb",
         "base_price": 22.0, "dirty": False,
         "stackable": True, "max_stack": 4, "style": 0.45,
+        "size": 1,
     },
     "beanie": {
         "name": "Beanie", "category": "clothing",
@@ -537,6 +579,7 @@ ITEM_TEMPLATES = {
         "model": "/resources/clothing/beanie.glb",
         "base_price": 18.0, "dirty": False,
         "stackable": True, "max_stack": 4, "style": 0.5,
+        "size": 1,
     },
 
     # --- HAIR ---
@@ -545,12 +588,14 @@ ITEM_TEMPLATES = {
         "slot": "hair", "bone": "Head",
         "model": "/resources/clothing/hair_short_brown.glb",
         "dirty": False, "stackable": False, "style": 0.6,
+        "size": 1,
     },
     "hair_long_black": {
         "name": "Long Black Hair", "category": "clothing",
         "slot": "hair", "bone": "Head",
         "model": "/resources/clothing/hair_long_black.glb",
         "dirty": False, "stackable": False, "style": 0.7,
+        "size": 1,
     },
 
     # --- NECK ---
@@ -560,6 +605,7 @@ ITEM_TEMPLATES = {
         "model": "/resources/clothing/scarf_knit.glb",
         "base_price": 25.0, "dirty": False,
         "stackable": True, "max_stack": 2, "style": 0.55,
+        "size": 1,
     },
 
     # --- OUTERWEAR ---
@@ -569,6 +615,7 @@ ITEM_TEMPLATES = {
         "model": "/resources/clothing/hoodie.glb",
         "base_price": 55.0, "dirty": False,
         "stackable": True, "max_stack": 3, "style": 0.55, "warmth": 0.6,
+        "size": 2,
     },
     "jacket_denim": {
         "name": "Denim Jacket", "category": "clothing",
@@ -576,6 +623,7 @@ ITEM_TEMPLATES = {
         "model": "/resources/clothing/jacket_denim.glb",
         "base_price": 90.0, "dirty": False,
         "stackable": True, "max_stack": 2, "style": 0.75, "warmth": 0.5,
+        "size": 2,
     },
     "jacket_winter": {
         "name": "Winter Coat", "category": "clothing",
@@ -583,6 +631,7 @@ ITEM_TEMPLATES = {
         "model": "/resources/clothing/jacket_winter.glb",
         "base_price": 180.0, "dirty": False,
         "stackable": False, "style": 0.6, "warmth": 0.95,
+        "size": 2,
     },
 
     # --- TORSO ---
@@ -592,6 +641,7 @@ ITEM_TEMPLATES = {
         "model": "/resources/clothing/tshirt_white.glb",
         "base_price": 15.0, "dirty": False,
         "stackable": True, "max_stack": 6, "style": 0.4,
+        "size": 1,
     },
     "tshirt_black": {
         "name": "Black T-Shirt", "category": "clothing",
@@ -599,6 +649,7 @@ ITEM_TEMPLATES = {
         "model": "/resources/clothing/tshirt_black.glb",
         "base_price": 15.0, "dirty": False,
         "stackable": True, "max_stack": 6, "style": 0.5,
+        "size": 1,
     },
     "shirt_flannel": {
         "name": "Flannel Shirt", "category": "clothing",
@@ -606,6 +657,7 @@ ITEM_TEMPLATES = {
         "model": "/resources/clothing/shirt_flannel.glb",
         "base_price": 45.0, "dirty": False,
         "stackable": True, "max_stack": 4, "style": 0.55,
+        "size": 1,
     },
     "shirt_dress": {
         "name": "Dress Shirt", "category": "clothing",
@@ -613,6 +665,7 @@ ITEM_TEMPLATES = {
         "model": "/resources/clothing/shirt_dress.glb",
         "base_price": 70.0, "dirty": False,
         "stackable": True, "max_stack": 4, "style": 0.85,
+        "size": 1,
     },
     "top_crop": {
         "name": "Crop Top", "category": "clothing",
@@ -620,6 +673,7 @@ ITEM_TEMPLATES = {
         "model": "/resources/clothing/top_crop.glb",
         "base_price": 30.0, "dirty": False,
         "stackable": True, "max_stack": 4, "style": 0.7,
+        "size": 1,
     },
 
     # --- UNDERSHIRT ---
@@ -629,6 +683,7 @@ ITEM_TEMPLATES = {
         "model": "/resources/clothing/tank_top.glb",
         "base_price": 12.0, "dirty": False,
         "stackable": True, "max_stack": 6, "style": 0.35,
+        "size": 1,
     },
 
     # --- LEGS ---
@@ -638,6 +693,7 @@ ITEM_TEMPLATES = {
         "model": "/resources/clothing/jeans_blue.glb",
         "base_price": 65.0, "dirty": False,
         "stackable": True, "max_stack": 3, "style": 0.65,
+        "size": 2,
     },
     "jeans_black": {
         "name": "Black Jeans", "category": "clothing",
@@ -645,6 +701,7 @@ ITEM_TEMPLATES = {
         "model": "/resources/clothing/jeans_black.glb",
         "base_price": 65.0, "dirty": False,
         "stackable": True, "max_stack": 3, "style": 0.7,
+        "size": 2,
     },
     "sweatpants": {
         "name": "Sweatpants", "category": "clothing",
@@ -652,6 +709,7 @@ ITEM_TEMPLATES = {
         "model": "/resources/clothing/sweatpants.glb",
         "base_price": 35.0, "dirty": False,
         "stackable": True, "max_stack": 3, "style": 0.3,
+        "size": 2,
     },
     "shorts_casual": {
         "name": "Casual Shorts", "category": "clothing",
@@ -659,6 +717,7 @@ ITEM_TEMPLATES = {
         "model": "/resources/clothing/shorts_casual.glb",
         "base_price": 28.0, "dirty": False,
         "stackable": True, "max_stack": 4, "style": 0.4,
+        "size": 1,
     },
     "dress_casual": {
         "name": "Casual Dress", "category": "clothing",
@@ -666,6 +725,7 @@ ITEM_TEMPLATES = {
         "model": "/resources/clothing/dress_casual.glb",
         "base_price": 85.0, "dirty": False,
         "stackable": False, "style": 0.8,
+        "size": 2,
     },
     "suit_trousers": {
         "name": "Suit Trousers", "category": "clothing",
@@ -673,6 +733,7 @@ ITEM_TEMPLATES = {
         "model": "/resources/clothing/suit_trousers.glb",
         "base_price": 120.0, "dirty": False,
         "stackable": True, "max_stack": 2, "style": 0.9,
+        "size": 2,
     },
     "pyjama_bottoms": {
         "name": "Pyjama Bottoms", "category": "clothing",
@@ -680,6 +741,7 @@ ITEM_TEMPLATES = {
         "model": "/resources/clothing/pyjama_bottoms.glb",
         "base_price": 22.0, "dirty": False,
         "stackable": True, "max_stack": 3, "style": 0.2,
+        "size": 2,
     },
 
     # --- UNDERWEAR ---
@@ -689,6 +751,7 @@ ITEM_TEMPLATES = {
         "model": "/resources/clothing/underwear_basic.glb",
         "base_price": 8.0, "dirty": False,
         "stackable": True, "max_stack": 7, "style": 0.3,
+        "size": 1,
     },
     "boxer_shorts": {
         "name": "Boxer Shorts", "category": "clothing",
@@ -696,6 +759,7 @@ ITEM_TEMPLATES = {
         "model": "/resources/clothing/boxer_shorts.glb",
         "base_price": 9.0, "dirty": False,
         "stackable": True, "max_stack": 7, "style": 0.3,
+        "size": 1,
     },
 
     # --- SOCKS ---
@@ -705,6 +769,7 @@ ITEM_TEMPLATES = {
         "model": "/resources/clothing/socks_white.glb",
         "base_price": 5.0, "dirty": False,
         "stackable": True, "max_stack": 7, "style": 0.25, "bilateral": True,
+        "size": 1,
     },
     "socks_ankle": {
         "name": "Ankle Socks", "category": "clothing",
@@ -712,6 +777,7 @@ ITEM_TEMPLATES = {
         "model": "/resources/clothing/socks_ankle.glb",
         "base_price": 5.0, "dirty": False,
         "stackable": True, "max_stack": 7, "style": 0.3, "bilateral": True,
+        "size": 1,
     },
 
     # --- FEET ---
@@ -721,6 +787,7 @@ ITEM_TEMPLATES = {
         "model": "/resources/clothing/sneakers_white.glb",
         "base_price": 90.0, "dirty": False,
         "stackable": False, "style": 0.7, "bilateral": True,
+        "size": 2,
     },
     "shoes_casual": {
         "name": "Casual Shoes", "category": "clothing",
@@ -728,6 +795,7 @@ ITEM_TEMPLATES = {
         "model": "/resources/clothing/shoes_casual.glb",
         "base_price": 70.0, "dirty": False,
         "stackable": False, "style": 0.6, "bilateral": True,
+        "size": 2,
     },
     "shoes_dress": {
         "name": "Dress Shoes", "category": "clothing",
@@ -735,6 +803,7 @@ ITEM_TEMPLATES = {
         "model": "/resources/clothing/shoes_dress.glb",
         "base_price": 160.0, "dirty": False,
         "stackable": False, "style": 0.9, "bilateral": True,
+        "size": 2,
     },
     "slippers": {
         "name": "Slippers", "category": "clothing",
@@ -742,6 +811,7 @@ ITEM_TEMPLATES = {
         "model": "/resources/clothing/slippers.glb",
         "base_price": 20.0, "dirty": False,
         "stackable": False, "style": 0.15, "bilateral": True,
+        "size": 1,
     },
 
     # --- HANDS / WRISTS ---
@@ -751,6 +821,7 @@ ITEM_TEMPLATES = {
         "model": "/resources/clothing/gloves_winter.glb",
         "base_price": 30.0, "dirty": False,
         "stackable": False, "style": 0.5, "bilateral": True, "warmth": 0.7,
+        "size": 1,
     },
     "watch_casual": {
         "name": "Casual Watch", "category": "clothing",
@@ -758,6 +829,7 @@ ITEM_TEMPLATES = {
         "model": "/resources/clothing/watch_casual.glb",
         "base_price": 80.0, "dirty": False,
         "stackable": False, "style": 0.7,
+        "size": 1,
     },
 
     # --- ACCESSORY ---
@@ -767,6 +839,7 @@ ITEM_TEMPLATES = {
         "model": "/resources/clothing/backpack.glb",
         "base_price": 60.0, "dirty": False,
         "stackable": False, "style": 0.5,
+        "size": 2,
     },
 
     # =========================================================
@@ -776,6 +849,7 @@ ITEM_TEMPLATES = {
     "smartphone_budget": {
         "name":       "Budget Smartphone",
         "category":   "electronics",
+        "size":      3,
         "base_price": 250.0,
         "stackable":  False,
         "consumable": False,
@@ -788,6 +862,7 @@ ITEM_TEMPLATES = {
     "smartphone_premium": {
         "name":       "Premium Smartphone",
         "category":   "electronics",
+        "size":      3,
         "base_price": 900.0,
         "stackable":  False,
         "consumable": False,
@@ -801,6 +876,7 @@ ITEM_TEMPLATES = {
     "laptop_basic": {
         "name":       "Basic Laptop",
         "category":   "electronics",
+        "size":      4,
         "base_price": 700.0,
         "stackable":  False,
         "consumable": False,
@@ -811,6 +887,7 @@ ITEM_TEMPLATES = {
     "laptop_gaming": {
         "name":       "Gaming Laptop",
         "category":   "electronics",
+        "size":      4,
         "base_price": 1800.0,
         "stackable":  False,
         "consumable": False,

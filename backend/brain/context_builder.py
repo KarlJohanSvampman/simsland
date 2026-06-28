@@ -326,6 +326,38 @@ def build_available_actions(c, world):
     # Hired services — always available (character decides if they can afford it)
     action_types.append("hire_service")
 
+    # Wall actions — always contextually available
+    action_types.extend(["build_wall", "remove_wall"])
+
+    # Paint buckets in inventory → paint_wall action
+    from systems.containers import containers_in_inventory
+    paint_buckets = [
+        {
+            "item_id":     ct["id"],
+            "name":        ct["name"],
+            "material_id": ct.get("material"),
+            "uses":        ct.get("uses", 0),
+        }
+        for ct in containers_in_inventory(c)
+        if ct.get("sub_type") == "bucket" and ct.get("uses", 0) > 0
+    ]
+    if paint_buckets:
+        action_types.append("paint_wall")
+
+    # Nearby walls for context
+    from systems.walls import walls_near
+    nearby_walls = [
+        {
+            "wall_id":      w["id"],
+            "x":            w["x"],
+            "y":            w["y"],
+            "orientation":  w["orientation"],
+            "load_bearing": w["load_bearing"],
+            "material":     w["material"],
+        }
+        for w in walls_near(world, int(c.get("x", 0)), int(c.get("y", 0)), radius=3)
+    ]
+
     return {
         "action_types":          action_types,
         "interactable_props":    interactable,
@@ -334,6 +366,8 @@ def build_available_actions(c, world):
         "worn_slots":            worn_slots,
         "assembly_boxes":        prop_boxes,
         "tile_boxes":            t_boxes,
+        "paint_buckets":         paint_buckets,
+        "nearby_walls":          nearby_walls,
     }
 
 
@@ -1080,56 +1114,11 @@ def build_investment_context(c, world):
 # =========================================================
 
 def _build_inventory_context(c):
+    from systems.containers import containers_in_inventory, container_summary
     items = inventory_summary(c)
-    if not items:
-        return None
+    ctrs  = [container_summary(ct) for ct in containers_in_inventory(c)]
     return {
-        "items":          items,
+        "items":          items or [],
+        "containers":     ctrs or [],
         "wallet_cash":    wallet_cash(c),
-        "phone_actions":  phone_actions(c),
-    }
-
-
-# =========================================================
-# WORN CLOTHING CONTEXT
-# =========================================================
-
-def _build_worn_context(c):
-    summary = worn_summary(c)
-    if not summary:
-        return None
-    return {
-        "outfit":      summary,
-        "style_score": outfit_style_score(c),
-    }
-
-
-# =========================================================
-# SERVICES CONTEXT
-# =========================================================
-
-def _build_services_context(c, world):
-    from systems.services import available_services, active_contracts_for_household
-    hid = None
-    for hh_id, h in world.get("households", {}).items():
-        if c["id"] in h.get("members", []):
-            hid = hh_id
-            break
-
-    active = active_contracts_for_household(world, hid) if hid else []
-    active_summary = [
-        {
-            "id":       con["id"],
-            "service":  con["service_type"],
-            "subtype":  con["subtype"],
-            "status":   con["status"],
-            "cost":     con["cost"],
-            "progress": f"{con['work_progress']}/{con['quantity']}",
-        }
-        for con in active
-    ]
-
-    return {
-        "available":       available_services(),
-        "active_contracts": active_summary,
-    }
+        "phone_actio

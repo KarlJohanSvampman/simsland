@@ -37,6 +37,7 @@ def ensure_world_defaults(world):
     world.setdefault("stocks",             {})
     world.setdefault("stock_sector_trends", {})
     world.setdefault("service_contracts",  [])
+    world.setdefault("walls",              {})
 
 
     world.setdefault(
@@ -673,5 +674,4 @@ def ensure_household_defaults(h):
     })
 
     h.setdefault("unopened_mail", [])
-    h.setdefault("unpaid_bills", [])
-    h.setdefault("pending_respons
+    h.setdefault("unpai

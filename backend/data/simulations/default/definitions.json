@@ -2,121 +2,59 @@
   "prop_templates": {
 
     "chair_modern_a": {
-
       "category": "furniture",
-
       "model": "/resources/props/chair_modern_a.glb",
-
-      "footprint": [
-        { "dx": 0, "dy": 0 }
-      ],
-
-      "anchors": [
-        {
-          "name": "anchor_sit",
-          "interaction": "sit_chair"
-        }
-      ],
-
+      "footprint": [{ "dx": 0, "dy": 0 }],
+      "anchors": [{ "name": "anchor_sit", "interaction": "sit_chair" }],
       "storage": null
     },
 
     "fridge_a": {
-
       "category": "appliance",
-
       "model": "/resources/props/fridge_a.glb",
-
-      "footprint": [
-        { "dx": 0, "dy": 0 },
-        { "dx": 1, "dy": 0 }
-      ],
-
-      "anchors": [
-        {
-          "name": "anchor_open",
-          "interaction": "open_fridge"
-        }
-      ],
-
-      "storage": {
-        "slots": 40,
-        "accepted_categories": [
-          "food",
-          "drink"
-        ]
-      }
+      "footprint": [{ "dx": 0, "dy": 0 }, { "dx": 1, "dy": 0 }],
+      "anchors": [{ "name": "anchor_open", "interaction": "open_fridge" }],
+      "storage": { "slots": 40, "accepted_categories": ["food", "drink"] }
     }
   },
 
   "item_templates": {
 
     "plate_stack": {
-
       "category": "dishware",
-
       "model": "/resources/items/plate_stack.glb",
-
       "stackable": true,
-
       "max_stack": 8,
-
       "carry_slots": 1,
-
-      "usable_for": [
-        "eat",
-        "serve_food"
-      ]
+      "usable_for": ["eat", "serve_food"]
     },
 
     "vacuum_cleaner": {
-
       "category": "tool",
-
       "model": "/resources/items/vacuum.glb",
-
       "carry_slots": 2,
-
-      "usable_for": [
-        "clean_floor"
-      ],
-
-      "animations": {
-        "use": "vacuum_loop"
-      }
+      "usable_for": ["clean_floor"],
+      "animations": { "use": "vacuum_loop" }
     }
   },
 
   "character_templates": {
 
     "adult_male_a": {
-
       "model": "/resources/characters/adult_male_a.glb",
-
       "base_animations": {
-
-        "idle": "idle",
-
-        "walk": "walk",
-
-        "run": "run",
-
-        "sit": "sit_idle",
-
+        "idle":  "idle",
+        "walk":  "walk",
+        "run":   "run",
+        "sit":   "sit_idle",
         "sleep": "sleep_loop"
       },
-
       "inventory_slots": {
-
         "left_hand": 1,
-
         "right_hand": 1,
-
-        "back": 1,
-
-        "belt": 4,
-
-        "pockets": 4
+        "back":       1,
+        "belt":       4,
+        "pockets":    4
       }
     }
   },
@@ -124,73 +62,34 @@
   "interaction_templates": {
 
     "sit_chair": {
-
       "requires_free_hands": false,
-
       "animations": {
-
-        "start": [
-          "sit_down_a",
-          "sit_down_b"
-        ],
-
-        "loop": [
-          "sit_idle_a",
-          "sit_idle_b"
-        ],
-
-        "stop": [
-          "stand_up_a"
-        ]
+        "start": ["sit_down_a", "sit_down_b"],
+        "loop":  ["sit_idle_a", "sit_idle_b"],
+        "stop":  ["stand_up_a"]
       },
-
       "ik": {},
-
       "prop_animations": {}
     },
 
     "open_fridge": {
-
       "requires_free_hands": 1,
-
       "animations": {
-
-        "start": [
-          "open_fridge"
-        ],
-
-        "loop": [],
-
-        "stop": [
-          "close_fridge"
-        ]
+        "start": ["open_fridge"],
+        "loop":  [],
+        "stop":  ["close_fridge"]
       },
-
-      "prop_animations": {
-
-        "start": "door_open",
-
-        "stop": "door_close"
-      },
-
-      "ik": {
-
-        "right_hand": "ik_handle"
-      }
+      "prop_animations": { "start": "door_open", "stop": "door_close" },
+      "ik": { "right_hand": "ik_handle" }
     }
   },
 
   "activity_templates": {
 
     "eat_meal": {
-
-      "required_items": [
-        "plate_stack"
-      ],
-
-      "required_interaction": "sit_chair",
-
-      "duration": 1200
+      "required_items":        ["plate_stack"],
+      "required_interaction":  "sit_chair",
+      "duration":              1200
     }
   },
 
@@ -286,28 +185,161 @@
       "category": "terrain",
       "interior": false,
       "floor":    false
+    },
+
+    "paint_white_matt": {
+      "name":            "White Matt Paint",
+      "category":        "paint",
+      "color":           "#F5F5F5",
+      "finish":          "matt",
+      "interior":        true,
+      "floor":           false,
+      "price_per_liter": 8.0
+    },
+
+    "paint_white_gloss": {
+      "name":            "White Gloss Paint",
+      "category":        "paint",
+      "color":           "#FFFFFF",
+      "finish":          "gloss",
+      "interior":        true,
+      "floor":           false,
+      "price_per_liter": 10.0
+    },
+
+    "paint_grey_matt": {
+      "name":            "Grey Matt Paint",
+      "category":        "paint",
+      "color":           "#9E9E9E",
+      "finish":          "matt",
+      "interior":        true,
+      "floor":           false,
+      "price_per_liter": 8.0
+    },
+
+    "paint_red_satin": {
+      "name":            "Red Satin Paint",
+      "category":        "paint",
+      "color":           "#C62828",
+      "finish":          "satin",
+      "interior":        true,
+      "floor":           false,
+      "price_per_liter": 9.5
+    },
+
+    "paint_blue_satin": {
+      "name":            "Blue Satin Paint",
+      "category":        "paint",
+      "color":           "#1565C0",
+      "finish":          "satin",
+      "interior":        true,
+      "floor":           false,
+      "price_per_liter": 9.5
+    },
+
+    "paint_green_matt": {
+      "name":            "Green Matt Paint",
+      "category":        "paint",
+      "color":           "#2E7D32",
+      "finish":          "matt",
+      "interior":        true,
+      "floor":           false,
+      "price_per_liter": 8.5
+    },
+
+    "paint_yellow_gloss": {
+      "name":            "Yellow Gloss Paint",
+      "category":        "paint",
+      "color":           "#F9A825",
+      "finish":          "gloss",
+      "interior":        true,
+      "floor":           false,
+      "price_per_liter": 9.0
+    },
+
+    "paint_black_gloss": {
+      "name":            "Black Gloss Paint",
+      "category":        "paint",
+      "color":           "#212121",
+      "finish":          "gloss",
+      "interior":        true,
+      "floor":           false,
+      "price_per_liter": 10.0
+    },
+
+    "paint_beige_matt": {
+      "name":            "Beige Matt Paint",
+      "category":        "paint",
+      "color":           "#D7CCC8",
+      "finish":          "matt",
+      "interior":        true,
+      "floor":           false,
+      "price_per_liter": 8.0
+    },
+
+    "wallpaper_floral_01": {
+      "name":           "Floral Wallpaper",
+      "category":       "wallpaper",
+      "texture":        "/resources/textures/wallpaper_floral.jpg",
+      "pattern":        "floral",
+      "repeat":         "tile",
+      "interior":       true,
+      "floor":          false,
+      "price_per_roll": 22.0
+    },
+
+    "wallpaper_stripe_01": {
+      "name":           "Stripe Wallpaper",
+      "category":       "wallpaper",
+      "texture":        "/resources/textures/wallpaper_stripe.jpg",
+      "pattern":        "stripe",
+      "repeat":         "tile",
+      "interior":       true,
+      "floor":          false,
+      "price_per_roll": 18.0
+    },
+
+    "wallpaper_plain_cream": {
+      "name":           "Cream Wallpaper",
+      "category":       "wallpaper",
+      "texture":        "/resources/textures/wallpaper_cream.jpg",
+      "pattern":        "plain",
+      "repeat":         "tile",
+      "interior":       true,
+      "floor":          false,
+      "price_per_roll": 15.0
+    },
+
+    "wallpaper_geometric_01": {
+      "name":           "Geometric Wallpaper",
+      "category":       "wallpaper",
+      "texture":        "/resources/textures/wallpaper_geometric.jpg",
+      "pattern":        "geometric",
+      "repeat":         "tile",
+      "interior":       true,
+      "floor":          false,
+      "price_per_roll": 25.0
+    },
+
+    "wallpaper_brick_01": {
+      "name":           "Exposed Brick Wallpaper",
+      "category":       "wallpaper",
+      "texture":        "/resources/textures/wallpaper_brick.jpg",
+      "pattern":        "brick",
+      "repeat":         "tile",
+      "interior":       true,
+      "floor":          false,
+      "price_per_roll": 28.0
     }
   },
 
   "floorplan_templates": {
 
     "small_house": {
-
       "tiles": {
-
-        "0,0": {
-          "type":     "floor",
-          "interior": true,
-          "floor":    true
-        },
-
-        "1,0": {
-          "type":     "floor",
-          "interior": true,
-          "floor":    true
-        }
+        "0,0": { "type": "floor", "interior": true, "floor": true },
+        "1,0": { "type": "floor", "interior": true, "floor": true }
       }
     }
   }
-
 }

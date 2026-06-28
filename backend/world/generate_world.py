@@ -335,6 +335,35 @@ def generate_initial_world():
         "tiles": {},
 
         # =====================================================
+        # WALLS  (keyed by wall_id — see systems/walls.py)
+        # load_bearing=True walls cannot be removed
+        # =====================================================
+        "walls": {
+            "wall_house_1_6_0_v": {
+                "id":           "wall_house_1_6_0_v",
+                "building_id":  "house_1",
+                "x":            6,
+                "y":            0,
+                "orientation":  "v",
+                "load_bearing": True,
+                "material":     "paint_white_matt",
+                "walkable":     False,
+                "interior":     True,
+            },
+            "wall_house_1_6_3_v": {
+                "id":           "wall_house_1_6_3_v",
+                "building_id":  "house_1",
+                "x":            6,
+                "y":            3,
+                "orientation":  "v",
+                "load_bearing": False,
+                "material":     "paint_white_matt",
+                "walkable":     False,
+                "interior":     True,
+            },
+        },
+
+        # =====================================================
         # CHARACTERS
         # =====================================================
         "characters": {
@@ -454,51 +483,4 @@ def generate_initial_world():
             }
         ],
 
-        # =====================================================
-        # BUILDINGS
-        # =====================================================
-        "buildings": [
-
-            {
-                "id": "house_1",
-
-                "rooms": [
-
-                    {
-                        "id": "living_room",
-
-                        "type": "living_room",
-
-                        "bounds": {
-                            "x1": 0,
-                            "y1": 0,
-                            "x2": 6,
-                            "y2": 6
-                        }
-                    }
-                ],
-
-                "doors": [
-
-                    {
-                        "id": "door_1",
-
-                        "template": "basic_door",
-
-                        "x": 6,
-                        "y": 3,
-
-                        "rotation": 0,
-
-                        "state": "closed",
-
-                        "locked": False,
-
-                        "home_id": "house_1",
-
-                        "busy": False,
-
-                        "reserved_by": None,
-
-                        "connects": [
-     
+       
