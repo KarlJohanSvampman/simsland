@@ -1,247 +1,345 @@
 {
   "prop_templates": {
-    "Television": {
-      "television": {
-        "name": "Television",
-        "category": "electronics",
-        "model": "tv_01",
-        "tags": ["electronics", "screen"],
-        "carryable": false,
-        "interactions": ["watch_tv", "examine"]
-      },
-      "model": "television"
+
+    "chair_modern_a": {
+      "category": "furniture",
+      "model": "/resources/props/chair_modern_a.glb",
+      "footprint": [{ "dx": 0, "dy": 0 }],
+      "anchors": [{ "name": "anchor_sit", "interaction": "sit_chair" }],
+      "storage": null
     },
-    "Sofa": {
-      "sofa": {
-        "name": "Sofa",
-        "category": "furniture",
-        "model": "sofa_a",
-        "tags": ["furniture", "surface", "seatable"],
-        "carryable": false,
-        "interactions": ["sit", "lie_down", "examine", "clean"]
-      },
-      "model": "sofa_a"
+
+    "fridge_a": {
+      "category": "appliance",
+      "model": "/resources/props/fridge_a.glb",
+      "footprint": [{ "dx": 0, "dy": 0 }, { "dx": 1, "dy": 0 }],
+      "anchors": [{ "name": "anchor_open", "interaction": "open_fridge" }],
+      "storage": { "slots": 40, "accepted_categories": ["food", "drink"] }
     }
   },
-  "item_templates": {},
+
+  "item_templates": {
+
+    "plate_stack": {
+      "category": "dishware",
+      "model": "/resources/items/plate_stack.glb",
+      "stackable": true,
+      "max_stack": 8,
+      "carry_slots": 1,
+      "usable_for": ["eat", "serve_food"]
+    },
+
+    "vacuum_cleaner": {
+      "category": "tool",
+      "model": "/resources/items/vacuum.glb",
+      "carry_slots": 2,
+      "usable_for": ["clean_floor"],
+      "animations": { "use": "vacuum_loop" }
+    }
+  },
+
   "character_templates": {
-    "Miles_Evans": {
-      "miles_evans": {
-        "name": "Miles Evans",
-        "age_range": [
-          25,
-          40
-        ],
-        "traits": [],
-        "needs": {
-          "hunger": 100,
-          "energy": 100,
-          "hygiene": 100,
-          "social": 100,
-          "fun": 100
-        },
-        "skills": {
-          "cooking": 20,
-          "cleaning": 30,
-          "repair": 10,
-          "social": 40
-        },
-        "employment": {
-          "job": "office_worker",
-          "salary": 3200
-        },
-        "daily_schedule": {
-          "sleep": [
-            22,
-            6
-          ],
-          "work": [
-            8,
-            17
-          ]
-        },
-        "starting_inventory": [
-          "wallet",
-          "phone"
-        ]
+
+    "adult_male_a": {
+      "model": "/resources/characters/adult_male_a.glb",
+      "base_animations": {
+        "idle":  "idle",
+        "walk":  "walk",
+        "run":   "run",
+        "sit":   "sit_idle",
+        "sleep": "sleep_loop"
       },
-      "bone_slots": {
-        "head": "mixamorigHead",
-        "neck": "mixamorigNeck",
-        "right_hand": "mixamorigRightHand",
-        "left_hand": "mixamorigLeftHand",
-        "spine": "mixamorigSpine2",
-        "pelvis": "mixamorigHips",
-        "right_foot": "mixamorigRightFoot",
-        "left_foot": "mixamorigLeftFoot"
-      },
-      "model": "adult_male"
+      "inventory_slots": {
+        "left_hand": 1,
+        "right_hand": 1,
+        "back":       1,
+        "belt":       4,
+        "pockets":    4
+      }
     }
   },
+
   "interaction_templates": {
-    "Eat_Meal": {
-      "eat_meal": {
-        "name": "Eat Meal",
-        "duration": 1800,
-        "required_prop_tags": [
-          "table"
-        ],
-        "need_changes": {
-          "hunger": 40,
-          "social": 5
-        },
-        "animation": "sit_eat",
-        "priority": 80
-      }
-    },
-    "Watch_TV": {
-      "watch_tv": {
-        "name": "Watch TV",
-        "duration": 3600,
-        "required_prop_tags": [
-          "television"
-        ],
-        "need_changes": {
-          "fun": 35,
-          "energy": -5
-        },
-        "animation": "sit_watch",
-        "priority": 50
-      }
-    }
-  },
-  "activity_templates": {
-    "Have_Breakfast": {
-      "have_breakfast": {
-        "name": "Have Breakfast",
-        "priority": 70,
-        "conditions": {
-          "hunger_below": 60,
-          "hour_range": [
-            6,
-            10
-          ]
-        },
-        "steps": [
-          "find_food",
-          "eat_meal"
-        ]
-      }
-    },
-    "Relax": {
-      "relax": {
-        "priority": 40,
-        "conditions": {
-          "fun_below": 70,
-          "hour_range": [
-            18,
-            23
-          ]
-        },
-        "steps": [
-          "watch_tv"
-        ]
-      }
-    }
-  },
-  "tile_templates": {
-    "Grass": {
-      "grass": {
-        "name": "Grass",
-        "category": "terrain",
-        "material": "grass",
-        "walkable": true,
-        "vehicle_access": false,
-        "movement_cost": 1,
-        "blocks_los": false,
-        "buildable": true
-      }
-    }
-  },
-  "floorplan_templates": {},
-  "material_templates": {
-    "Grass": {
-      "grass": {
-        "name": "Grass",
-        "texture": "/resources/tiles/grass.jpg",
-        "editor_color": "#4f8f4f",
-        "roughness": 1,
-        "metalness": 0
+
+    "sit_chair": {
+      "requires_free_hands": false,
+      "animations": {
+        "start": ["sit_down_a", "sit_down_b"],
+        "loop":  ["sit_idle_a", "sit_idle_b"],
+        "stop":  ["stand_up_a"]
       },
-      "texture": "/resources/tiles/grass.jpg"
+      "ik": {},
+      "prop_animations": {}
+    },
+
+    "open_fridge": {
+      "requires_free_hands": 1,
+      "animations": {
+        "start": ["open_fridge"],
+        "loop":  [],
+        "stop":  ["close_fridge"]
+      },
+      "prop_animations": { "start": "door_open", "stop": "door_close" },
+      "ik": { "right_hand": "ik_handle" }
     }
   },
-  "clothing_templates": {
-    "basic_tshirt": {
-      "name": "Basic T-Shirt",
-      "slot": "upper_layer1",
-      "model": "clothing/tshirt_basic",
-      "shared_skeleton": true,
-      "tags": ["clothing", "upper", "casual"],
-      "color": "#ffffff"
-    },
-    "casual_jacket": {
-      "name": "Casual Jacket",
-      "slot": "upper_layer2",
-      "model": "clothing/jacket_casual",
-      "shared_skeleton": true,
-      "tags": ["clothing", "upper", "casual"],
-      "color": "#3a3a3a"
-    },
-    "jeans_blue": {
-      "name": "Blue Jeans",
-      "slot": "pants",
-      "model": "clothing/jeans_basic",
-      "shared_skeleton": true,
-      "tags": ["clothing", "legs", "casual"],
-      "color": "#2255aa"
-    },
-    "sneakers_white": {
-      "name": "White Sneakers",
-      "slot": "shoes",
-      "model": "clothing/sneakers_basic",
-      "shared_skeleton": false,
-      "offset": { "x": 0, "y": 0, "z": 0 },
-      "scale": 1.0,
-      "tags": ["clothing", "feet", "casual"]
-    },
-    "baseball_cap": {
-      "name": "Baseball Cap",
-      "slot": "hat",
-      "model": "clothing/cap_baseball",
-      "shared_skeleton": false,
-      "offset": { "x": 0, "y": 0.05, "z": 0 },
-      "scale": 1.0,
-      "tags": ["clothing", "head", "casual"]
-    },
-    "work_shirt": {
-      "name": "Work Shirt",
-      "slot": "upper_layer1",
-      "model": "clothing/shirt_work",
-      "shared_skeleton": true,
-      "tags": ["clothing", "upper", "formal"],
-      "color": "#ccddff"
-    },
-    "work_trousers": {
-      "name": "Work Trousers",
-      "slot": "pants",
-      "model": "clothing/trousers_work",
-      "shared_skeleton": true,
-      "tags": ["clothing", "legs", "formal"],
-      "color": "#222244"
+
+  "activity_templates": {
+
+    "eat_meal": {
+      "required_items":        ["plate_stack"],
+      "required_interaction":  "sit_chair",
+      "duration":              1200
     }
   },
-  "recipe_templates": {},
-  "product_templates": {},
-  "appliance_templates": {},
-  "vehicle_templates": {},
-  "service_templates": {},
-  "storage_templates": {},
-  "social_templates": {},
-  "need_templates": {},
-  "trait_templates": {},
-  "job_templates": {
-    "Insurance_Salesman": {}
+
+  "tile_templates": {
+
+    "wood_floor": {
+      "walk_speed": 1.0,
+      "buildable":  true,
+      "interior":   true,
+      "floor":      true
+    },
+
+    "grass": {
+      "walk_speed": 0.8,
+      "buildable":  false,
+      "interior":   false,
+      "floor":      false
+    },
+
+    "road": {
+      "walk_speed": 1.0,
+      "buildable":  false,
+      "interior":   false,
+      "floor":      false
+    },
+
+    "wall": {
+      "walk_speed": 0.0,
+      "buildable":  false,
+      "interior":   false,
+      "floor":      false
+    }
   },
-  "company_templates": {}
+
+  "material_templates": {
+
+    "wood_floor_01": {
+      "name":          "Wood Floor",
+      "texture":       "/resources/textures/wood_floor.jpg",
+      "category":      "floor",
+      "interior":      true,
+      "floor":         true,
+      "price_per_sqm": 35.0
+    },
+
+    "wood_floor_dark_01": {
+      "name":          "Dark Wood Floor",
+      "texture":       "/resources/textures/wood_floor_dark.jpg",
+      "category":      "floor",
+      "interior":      true,
+      "floor":         true,
+      "price_per_sqm": 42.0
+    },
+
+    "tile_white_01": {
+      "name":          "White Tile",
+      "texture":       "/resources/textures/tile_white.jpg",
+      "category":      "floor",
+      "interior":      true,
+      "floor":         true,
+      "price_per_sqm": 28.0
+    },
+
+    "tile_grey_01": {
+      "name":          "Grey Tile",
+      "texture":       "/resources/textures/tile_grey.jpg",
+      "category":      "floor",
+      "interior":      true,
+      "floor":         true,
+      "price_per_sqm": 24.0
+    },
+
+    "carpet_beige_01": {
+      "name":          "Beige Carpet",
+      "texture":       "/resources/textures/carpet_beige.jpg",
+      "category":      "floor",
+      "interior":      true,
+      "floor":         true,
+      "price_per_sqm": 18.0
+    },
+
+    "wallpaper_blue_01": {
+      "name":     "Blue Wallpaper",
+      "texture":  "/resources/textures/wallpaper_blue.jpg",
+      "category": "wall",
+      "interior": true,
+      "floor":    false
+    },
+
+    "grass_01": {
+      "name":     "Grass",
+      "texture":  "/resources/textures/grass.jpg",
+      "category": "terrain",
+      "interior": false,
+      "floor":    false
+    },
+
+    "paint_white_matt": {
+      "name":            "White Matt Paint",
+      "category":        "paint",
+      "color":           "#F5F5F5",
+      "finish":          "matt",
+      "interior":        true,
+      "floor":           false,
+      "price_per_liter": 8.0
+    },
+
+    "paint_white_gloss": {
+      "name":            "White Gloss Paint",
+      "category":        "paint",
+      "color":           "#FFFFFF",
+      "finish":          "gloss",
+      "interior":        true,
+      "floor":           false,
+      "price_per_liter": 10.0
+    },
+
+    "paint_grey_matt": {
+      "name":            "Grey Matt Paint",
+      "category":        "paint",
+      "color":           "#9E9E9E",
+      "finish":          "matt",
+      "interior":        true,
+      "floor":           false,
+      "price_per_liter": 8.0
+    },
+
+    "paint_red_satin": {
+      "name":            "Red Satin Paint",
+      "category":        "paint",
+      "color":           "#C62828",
+      "finish":          "satin",
+      "interior":        true,
+      "floor":           false,
+      "price_per_liter": 9.5
+    },
+
+    "paint_blue_satin": {
+      "name":            "Blue Satin Paint",
+      "category":        "paint",
+      "color":           "#1565C0",
+      "finish":          "satin",
+      "interior":        true,
+      "floor":           false,
+      "price_per_liter": 9.5
+    },
+
+    "paint_green_matt": {
+      "name":            "Green Matt Paint",
+      "category":        "paint",
+      "color":           "#2E7D32",
+      "finish":          "matt",
+      "interior":        true,
+      "floor":           false,
+      "price_per_liter": 8.5
+    },
+
+    "paint_yellow_gloss": {
+      "name":            "Yellow Gloss Paint",
+      "category":        "paint",
+      "color":           "#F9A825",
+      "finish":          "gloss",
+      "interior":        true,
+      "floor":           false,
+      "price_per_liter": 9.0
+    },
+
+    "paint_black_gloss": {
+      "name":            "Black Gloss Paint",
+      "category":        "paint",
+      "color":           "#212121",
+      "finish":          "gloss",
+      "interior":        true,
+      "floor":           false,
+      "price_per_liter": 10.0
+    },
+
+    "paint_beige_matt": {
+      "name":            "Beige Matt Paint",
+      "category":        "paint",
+      "color":           "#D7CCC8",
+      "finish":          "matt",
+      "interior":        true,
+      "floor":           false,
+      "price_per_liter": 8.0
+    },
+
+    "wallpaper_floral_01": {
+      "name":           "Floral Wallpaper",
+      "category":       "wallpaper",
+      "texture":        "/resources/textures/wallpaper_floral.jpg",
+      "pattern":        "floral",
+      "repeat":         "tile",
+      "interior":       true,
+      "floor":          false,
+      "price_per_roll": 22.0
+    },
+
+    "wallpaper_stripe_01": {
+      "name":           "Stripe Wallpaper",
+      "category":       "wallpaper",
+      "texture":        "/resources/textures/wallpaper_stripe.jpg",
+      "pattern":        "stripe",
+      "repeat":         "tile",
+      "interior":       true,
+      "floor":          false,
+      "price_per_roll": 18.0
+    },
+
+    "wallpaper_plain_cream": {
+      "name":           "Cream Wallpaper",
+      "category":       "wallpaper",
+      "texture":        "/resources/textures/wallpaper_cream.jpg",
+      "pattern":        "plain",
+      "repeat":         "tile",
+      "interior":       true,
+      "floor":          false,
+      "price_per_roll": 15.0
+    },
+
+    "wallpaper_geometric_01": {
+      "name":           "Geometric Wallpaper",
+      "category":       "wallpaper",
+      "texture":        "/resources/textures/wallpaper_geometric.jpg",
+      "pattern":        "geometric",
+      "repeat":         "tile",
+      "interior":       true,
+      "floor":          false,
+      "price_per_roll": 25.0
+    },
+
+    "wallpaper_brick_01": {
+      "name":           "Exposed Brick Wallpaper",
+      "category":       "wallpaper",
+      "texture":        "/resources/textures/wallpaper_brick.jpg",
+      "pattern":        "brick",
+      "repeat":         "tile",
+      "interior":       true,
+      "floor":          false,
+      "price_per_roll": 28.0
+    }
+  },
+
+  "floorplan_templates": {
+
+    "small_house": {
+      "tiles": {
+        "0,0": { "type": "floor", "interior": true, "floor": true },
+        "1,0": { "type": "floor", "interior": true, "floor": true }
+      }
+    }
+  }
 }
