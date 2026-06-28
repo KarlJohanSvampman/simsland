@@ -236,9 +236,13 @@ def load_world(sim_id):
 
     if default_floorplan:
 
+        # Floorplan templates are position-less; inject world-origin defaults
+        # so world_to_local can compute local coords (buildings start at 0,0).
+        building_ctx = {"x": 0, "y": 0, "rotation": 0, **default_floorplan}
+
         assign_prop_rooms(
 
-            default_floorplan,
+            building_ctx,
 
             world.get(
                 "props",
@@ -470,9 +474,4 @@ def load_character(
 
 def update_world_tick(sim_id, tick):
     with conn:
-        with conn.cursor() as cur:
-            cur.execute("""
-                UPDATE world
-                SET data = jsonb_set(data, '{tick}', to_jsonb(%s::int))
-                WHERE simulation_id=%s
-            """, (tick, sim_id))
+      
