@@ -44,10 +44,10 @@ const GROUPS = [
 {
   id:'core', label:'Core', color:'#58a6ff',
   pos:[0,0,0],
-  desc:'Heartbeat of the simulation. sim_loop.py drives every other system on a cadence schedule. event_bus.py decouples systems via synchronous pub/sub. db.py persists the single world dict to PostgreSQL with Redis as a write-through cache. schema_defaults.py ensures every new field has a safe zero-value before systems read it. Everything else is called from here.',
+  desc:'Heartbeat of the simulation. sim_loop.py drives every other system on a cadence schedule. event_bus.py decouples systems via synchronous pub/sub. db.py persists the single world dict to PostgreSQL with Redis as a write-through cache. schema_defaults.py ensures every new field has a safe zero-value before systems read it. Service worker NPCs (is_service_worker=True) are skipped in the LLM agent loop and driven instead by update_services on SLOW cadence. Everything else is called from here.',
   connects_to:['brain','social','economy','physical','society','api'],
   modules:[
-    {id:'sim_loop',    label:'sim_loop.py',      color:'#58a6ff', desc:'Main tick function. Calls every system on its CADENCE slot (update_market + update_stocks on MEDIUM/offset=9, update_investment_behavior per character on SLOW/offset=20, update_deliveries on offset=6), advances the wall-clock calendar, then flushes the event bus. The only place that decides WHEN systems run.'},
+    {id:'sim_loop',    label:'sim_loop.py',      color:'#58a6ff', desc:'Main tick function. Calls every system on its CADENCE slot (update_market + update_stocks on MEDIUM/offset=9, update_investment_behavior per character on SLOW/offset=20, update_deliveries on offset=6, update_services on SLOW/offset=18). Per-tick agent loop skips characters with is_service_worker=True — those NPCs are driven entirely by update_services. Advances the wall-clock calendar, then flushes the event bus. The only place that decides WHEN systems run.'},
     {id:'event_bus',   label:'event_bus.py',      color:'#58a6ff', desc:'In-process pub/sub. emit() queues events; flush() delivers to all subscribers once per tick. Handlers may emit new events (one recursive level). Replaces "run every tick just in case" polling.'},
     {id:'event_handlers',label:'event_handlers.py',color:'#58a6ff',desc:'All subscriptions wired at import time. Maps event types to handlers: bills_overdue→evict, incident_created→auto_report, character_fired→apply_for_job, confrontation_desired→start_conflict, etc.'},
     {id:'tick_sched',  label:'tick_schedule.py',  color:'#58a6ff', desc:'every(world, n, offset) helper + CADENCE dict. All cadence numbers live here. Offsets stagger systems so nothing fires simultaneously. FAST=5, MEDIUM=15-20, SLOW=30-60, VERY_SLOW=300.'},
@@ -55,18 +55,18 @@ const GROUPS = [
     {id:'cache',       label:'cache.py',          color:'#58a6ff', desc:'Redis get/set wrappers for world and character objects. Keeps hot data in memory so the tick loop rarely hits Postgres.'},
     {id:'redis_queue', label:'redis_queue.py',    color:'#58a6ff', desc:'Job queue for the async LLM worker process. enqueue() pushes a job dict to Redis list; dequeue_batch() pops up to N jobs for the worker to process concurrently.'},
     {id:'definitions', label:'definitions.py',    color:'#58a6ff', desc:'Loads prop and building template definitions from JSON. Templates define base stats, interactions, and anchor points used at world-load time and by the editor.'},
-    {id:'schema_def',  label:'schema_defaults.py',color:'#58a6ff', desc:'Ensures safe zero-values for every world and character field before systems read them. Covers: world["stocks"], world["stock_sector_trends"], world["market"]["catalog"], character["portfolio"], character["watched_stocks"], character["inventory"], character["worn"] (via ensure_worn). Called once on world load and again if new characters are added.'},
+    {id:'schema_def',  label:'schema_defaults.py',color:'#58a6ff', desc:'Ensures safe zero-values for every world and character field before systems read them. Covers: world["stocks"], world["stock_sector_trends"], world["market"]["catalog"], world["service_contracts"], character["portfolio"], character["watched_stocks"], character["inventory"], character["worn"] (via ensure_worn). Called once on world load and again if new characters are added.'},
     {id:'item_tpl',    label:'data/item_templates.py',color:'#58a6ff', desc:'Master dictionary of 60+ physical item templates. Each entry: {name, category, base_price, stackable, max_stack, dirty, consumable, uses, resource_type, storage_container, quantity}. Clothing entries add: slot, bone (Three.js skeleton bone name), model (.glb path), style, warmth, bilateral. Categories: hygiene, linen, cleaning, dishware, food, groceries, drink, clothing, electronics, assembly_box.'},
   ]
 },
 {
   id:'brain', label:'Brain / Cognition', color:'#bc8cff',
   pos:[320,80,0],
-  desc:'Character AI. Each tick, agent_loop orchestrates: update body → generate intentions → build LLM context → call LLM → route the action → store memory → update emotion. All subjective reasoning, memory, relationships, and emotion live here. context_builder.py is the bridge between the simulation state and the LLM — it now surfaces inventory, worn clothing, investment portfolio, wearable_items, worn_slots, and assembly_boxes as available actions.',
+  desc:'Character AI. Each tick, agent_loop orchestrates: update body → generate intentions → build LLM context → call LLM → route the action → store memory → update emotion. All subjective reasoning, memory, relationships, and emotion live here. context_builder.py is the bridge between the simulation state and the LLM — it now surfaces inventory, worn clothing, investment portfolio, wearable_items, worn_slots, assembly_boxes (prop + tile), active service contracts, and the full available_services catalog as context and actions.',
   connects_to:['llm','social','physical'],
   modules:[
     {id:'agent_loop',    label:'agent_loop.py',     color:'#bc8cff', desc:'Per-character update called every tick. Full pipeline: body needs → generate_body_intentions → strategy → schedule → offgrid check → LLM think → action_router → memory store → update_emotion(c, world). Calls put_on_clothing / take_off_clothing / assemble_prop via action_router.'},
-    {id:'ctx_builder',   label:'context_builder.py',color:'#bc8cff', desc:'Assembles the JSON context dict fed to the LLM. Pulls memory, relationships, conflicts, grievances, perception, schedule, body state, beliefs, social models, cognitive pressure, inventory summary, worn clothing summary, outfit style score, investment portfolio, and available actions into one object. Available actions include wearable_items (clothing in inventory with a slot), worn_slots (occupied clothing slots), and assembly_boxes (unassembled prop boxes).'},
+    {id:'ctx_builder',   label:'context_builder.py',color:'#bc8cff', desc:'Assembles the JSON context dict fed to the LLM. Pulls memory, relationships, conflicts, grievances, perception, schedule, body state, beliefs, social models, cognitive pressure, inventory summary, worn clothing summary, outfit style score, investment portfolio, and available actions. Action types include: wearable_items (clothing with a slot), worn_slots (occupied clothing slots), assembly_boxes (prop boxes), tile_boxes (stackable floor tile boxes → assemble_tile), and hire_service (always present). The "services" key surfaces available_services() catalog and active_contracts_for_household() so the LLM can reason about pending and available hired work.'},
     {id:'llm_brain',     label:'llm_brain.py',      color:'#bc8cff', desc:'System prompt, build_prompt(), validate_response(), fallback_response(). Defines the strict JSON output schema the model must produce: thought, emotion, intention, goal, action, speech, reflection, confidence.'},
     {id:'memory',        label:'memory.py',         color:'#bc8cff', desc:'Episodic memory: store_memory() adds entries weighted by importance. biased_recall() returns most relevant recent memories using recency + importance scoring. decay_memories() runs at MEDIUM cadence.'},
     {id:'emotion',       label:'emotion.py',        color:'#bc8cff', desc:'Updates character emotion each tick based on recent events, body state, and interaction outcomes. Produces a single emotion label surfaced in context and speech bubbles.'},
@@ -109,7 +109,7 @@ const GROUPS = [
 {
   id:'economy', label:'Economy', color:'#3fb950',
   pos:[-320,0,0],
-  desc:'Household finances, unified market catalog, stocks, investments, procurement, and expense-driven scheduling. The market is the single price authority for all items and props. Weekly bills are calculated from real home costs (rent, utilities, gasoline, internet) plus food. Minimum work hours = expenses ÷ wage. Social contract recurring blocks are reserved before leisure. All wealth deduction flows through apply_expenses only.',
+  desc:'Household finances, unified market catalog, stocks, investments, procurement, deliveries, hired services, and expense-driven scheduling. The market is the single price authority for all items, props, and floor materials. Hired services let characters commission work (reconstruction, repair, gardening, babysitting, or illicit drug/escort) — a temporary NPC worker is spawned and walks to the household door. Legitimate services bill via the mailbox at week-end; illicit services require upfront cash. All wealth deduction flows through apply_expenses or spend_cash only.',
   connects_to:['physical','core','social'],
   modules:[
     {id:'economy_s',  label:'economy.py',           color:'#3fb950', desc:'apply_expenses() issues weekly bills on Monday 00:00. Splits into fixed_home (rent+utilities) + food (80×members×cost_of_living). Caches household["weekly_expenses"] for schedule generator.'},
@@ -125,6 +125,8 @@ const GROUPS = [
     {id:'mail',       label:'mail.py',              color:'#3fb950', desc:'Mailbox, bill payment, and form requests. sort_household_mail() routes items from mailbox["items"]. attempt_pay_bills() deducts from household wealth against bills_due list. respond_to_mail() handles form responses.'},
     {id:'eviction',   label:'eviction.py',          color:'#3fb950', desc:'check_household_for_eviction() emits bills_overdue when overdue bills cross threshold. Event handler calls evict_household() to vacate home and update household status.'},
     {id:'hh_monitor', label:'household_monitoring.py',color:'#3fb950',desc:'Monitors appliance durability and home state each 20 ticks. Importance scales with urgency: 0.6 at ≤25% durability, 0.9 near failure (≤10%). Triggers alerts and repair intentions.'},
+    {id:'services_d', label:'data/services.py',      color:'#3fb950', desc:'Hired services catalog. SERVICE_CATALOG defines 6 service types — reconstruction (floor_tiling, paint_wall, build_wall, remove_wall, insert_door, insert_window), repair (appliance_repair), gardening, babysitting, drug_dealer (cannabis, stimulants, downers), escort (companionship). Each subtype specifies: price_mode (per_tile/per_wall/per_unit/hourly), labor_rate, material_rate, duration_per_unit, and worker_trait. WORKER_NAMES maps trait→name pool. ILLICIT_MIN_CASH tracks minimum cash required for illicit subtypes. TICKS_PER_HOUR = 3600.'},
+    {id:'services_s', label:'systems/services.py',   color:'#3fb950', desc:'Hired service engine. request_service(c, world, service_type, subtype, details, quantity) creates a contract in world["service_contracts"]; illicit services deduct cash immediately. update_services(world) drives the contract state machine: spawned→en_route→at_door→working→done→departed. _spawn_worker creates a temporary NPC (is_service_worker=True) in world["characters"] near the household door. At at_door the NPC is auto-admitted inside. _advance_working dispatches to work executors: _do_floor_tiling (writes tiles), _do_paint_wall (updates material on wall/tile), _do_build_wall / _do_remove_wall (modifies world["tiles"]), _do_insert_opening (adds door/window prop), _do_repair (resets durability+broken flag), _do_drug_deal (adds consumable item to buyer), _do_companionship (applies need deltas). On done: legitimate services call _bill_household() adding a bill to mailbox["items"] and bills_due; then NPC is removed. Helpers: available_services(), active_contracts_for_household() for LLM context.'},
   ]
 },
 {
@@ -145,7 +147,7 @@ const GROUPS = [
     {id:'transforms',  label:'transforms.py',       color:'#d29922', desc:'Authoritative coordinate math: local↔world conversion, rotation, footprint projection, anchor projection. No other system should implement rotation math.'},
     {id:'personal_items',label:'personal_items.py', color:'#d29922', desc:'Personal inventory and essential item system. Factories: make_smartphone(), make_house_key(home_id, building_id), make_wallet(cash), make_id_card(). Inventory CRUD: has_item, get_item, add_item, remove_item. Key/door: has_key_for(c, home_id), can_unlock_door, lock_home, unlock_home. Wallet: wallet_cash, spend_cash, add_cash. make_item(template_id, quantity, **overrides) creates instances from ITEM_TEMPLATES. inventory_summary(c) for LLM context.'},
     {id:'clothing',    label:'clothing.py',         color:'#d29922', desc:'14-slot wearable clothing system. Slots: head/hair/neck/outerwear/torso/undershirt/legs/underwear/socks/feet/hands/wrist_l/wrist_r/accessory — each mapped to a Three.js skeleton bone name. put_on_clothing(c, world, item_id) places item in slot; if slot occupied the displaced item returns to inventory as a stackable item. take_off_clothing(c, world, slot) moves worn item back to inventory. undress_all() strips all slots. tick_clothing_dirty() gives each worn item ~1% chance to become dirty per SLOW tick. outfit_style_score() averages style values, dirty items at 0.4×.'},
-    {id:'assembly',    label:'assembly.py',         color:'#d29922', desc:'Prop assembly system. When a prop with requires_assembly=True is purchased, procurement calls make_assembly_box(prop_template_id) to create a box item in the character\'s inventory. The character can then perform the assemble_prop action: the box is removed from inventory and a new prop instance is placed in world["props"] at the character\'s current position. assembly_boxes_in_inventory(c) returns all pending boxes for LLM context.'},
+    {id:'assembly',    label:'assembly.py',         color:'#d29922', desc:'Prop and tile assembly system. make_assembly_box(prop_template_id) creates a flat-pack box for furniture/appliances (stackable=False, uses=1); assemble_prop converts it into a placed world prop at the character\'s position. make_tile_box(material_id, quantity) creates a stackable tile box (tile_type="tile", max_stack=100); assemble_tile places one 1-sqm floor tile at the character\'s position and decrements quantity — box removed when exhausted. tile_boxes_in_inventory(c) and assembly_boxes_in_inventory(c) are the LLM context queries. action_router dispatches assemble_prop and assemble_tile as separate action types.'},
   ]
 },
 {
@@ -246,82 +248,4 @@ function makeSprite(text, color, size=14){
 // ── Fibonacci sphere distribution ─────────────────────────────────────────────
 function fibSphere(n, r){
   const pts=[]; const gr=(1+Math.sqrt(5))/2;
-  for(let i=0;i<n;i++){
-    const th=2*Math.PI*i/gr, ph=Math.acos(1-2*(i+.5)/n);
-    pts.push([r*Math.sin(ph)*Math.cos(th), r*Math.cos(ph), r*Math.sin(ph)*Math.sin(th)]);
-  }
-  return pts;
-}
-
-// ── Build nodes ───────────────────────────────────────────────────────────────
-const groupMeshes={}, modMeshes={}, modTargets={}, modLabels={};
-const expandedGroups = new Set();
-const allInteractive = [];
-
-GROUPS.forEach(g=>{
-  // Group icosahedron
-  const geo = new THREE.IcosahedronGeometry(24,2);
-  const mat = new THREE.MeshPhongMaterial({
-    color: new THREE.Color(g.color),
-    emissive: new THREE.Color(g.color),
-    emissiveIntensity: .28,
-    transparent:true, opacity:.82, shininess:120
-  });
-  const mesh = new THREE.Mesh(geo, mat);
-  mesh.position.set(...g.pos);
-  mesh.userData = {type:'group', group:g};
-  scene.add(mesh);
-  groupMeshes[g.id] = mesh;
-  allInteractive.push(mesh);
-
-  // Inner glow sphere
-  const glowGeo = new THREE.SphereGeometry(30,16,16);
-  const glowMat = new THREE.MeshBasicMaterial({
-    color: new THREE.Color(g.color), transparent:true, opacity:.06, side:THREE.BackSide
-  });
-  const glow = new THREE.Mesh(glowGeo, glowMat);
-  glow.position.set(...g.pos);
-  scene.add(glow);
-
-  // Group label
-  const lbl = makeSprite(g.label, g.color, 15);
-  lbl.position.set(g.pos[0], g.pos[1]+38, g.pos[2]);
-  scene.add(lbl);
-
-  // Module nodes
-  const orbitPositions = fibSphere(g.modules.length, 85);
-  g.modules.forEach((mod, i)=>{
-    const mgeo = new THREE.SphereGeometry(6,14,14);
-    const mmat = new THREE.MeshPhongMaterial({
-      color: new THREE.Color(g.color),
-      emissive: new THREE.Color(g.color),
-      emissiveIntensity:.2,
-      transparent:true, opacity:0, shininess:80
-    });
-    const mm = new THREE.Mesh(mgeo, mmat);
-    mm.position.set(...g.pos);
-    mm.scale.set(0,0,0);
-    mm.userData = {type:'module', group:g, module:mod};
-    mm.visible = false;
-    scene.add(mm);
-    modMeshes[mod.id] = mm;
-    mod._mesh = mm;
-    allInteractive.push(mm);
-
-    modTargets[mod.id] = new THREE.Vector3(
-      g.pos[0]+orbitPositions[i][0],
-      g.pos[1]+orbitPositions[i][1],
-      g.pos[2]+orbitPositions[i][2]
-    );
-
-    // Module label
-    const ml = makeSprite(mod.label, '#c9d1d9', 10);
-    ml.position.set(...g.pos);
-    ml.material.opacity = 0;
-    scene.add(ml);
-    modLabels[mod.id] = ml;
-    mod._label = ml;
-  });
-});
-
-// ── Connection lines ────────────────────────────────────────────────�
+  for(let i=0;i<
