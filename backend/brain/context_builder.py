@@ -302,14 +302,26 @@ def build_available_actions(c, world):
     if wearable_in_inventory or worn_slots:
         action_types.extend(["wear", "undress"])
 
-    # Assembly boxes — can assemble into props
-    from systems.assembly import assembly_boxes_in_inventory
-    assembly_boxes = [
+    # Assembly boxes — prop boxes and tile boxes
+    from systems.assembly import assembly_boxes_in_inventory, tile_boxes_in_inventory
+    prop_boxes = [
         {"item_id": i["id"], "name": i.get("name"), "prop_template": i.get("prop_template")}
         for i in assembly_boxes_in_inventory(c)
+        if i.get("tile_type") != "tile"
     ]
-    if assembly_boxes:
+    t_boxes = [
+        {
+            "item_id":           i["id"],
+            "name":              i.get("name"),
+            "material_template": i.get("material_template"),
+            "quantity":          i.get("quantity", 1),
+        }
+        for i in tile_boxes_in_inventory(c)
+    ]
+    if prop_boxes:
         action_types.append("assemble_prop")
+    if t_boxes:
+        action_types.append("assemble_tile")
 
     return {
         "action_types":          action_types,
@@ -317,7 +329,8 @@ def build_available_actions(c, world):
         "nearby_characters":     nearby_people,
         "wearable_items":        wearable_in_inventory,
         "worn_slots":            worn_slots,
-        "assembly_boxes":        assembly_boxes,
+        "assembly_boxes":        prop_boxes,
+        "tile_boxes":            t_boxes,
     }
 
 
@@ -1067,21 +1080,4 @@ def _build_inventory_context(c):
     if not items:
         return None
     return {
-        "items":          items,
-        "wallet_cash":    wallet_cash(c),
-        "phone_actions":  phone_actions(c),
-    }
-
-
-# =========================================================
-# WORN CLOTHING CONTEXT
-# =========================================================
-
-def _build_worn_context(c):
-    summary = worn_summary(c)
-    if not summary:
-        return None
-    return {
-        "outfit":      summary,
-        "style_score": outfit_style_score(c),
-    }
+        "items": 

@@ -42,6 +42,7 @@ CATEGORY_VOLATILITY = {
     "linen":       0.003,
     "drink":       0.003,
     "food":        0.004,
+    "flooring":    0.003,
 }
 
 REVERSION_STRENGTH = 0.005
@@ -85,6 +86,33 @@ def init_market_catalog(world):
             "resource_type":     t.get("resource_type"),
             "storage_container": t.get("storage_container"),
             "quantity":          t.get("quantity", 1),
+        }
+
+    # Floor material templates (tile_white_01, wood_floor_01, etc.)
+    # Each floor material becomes a stackable tile assembly box in the catalog.
+    material_templates = (
+        world.get("definitions", {})
+             .get("material_templates", {})
+    )
+    for mid, mt in material_templates.items():
+        if mt.get("category") != "floor":
+            continue
+        if mid in catalog:
+            continue
+        bp = float(mt.get("price_per_sqm", 20.0))
+        catalog[mid] = {
+            "type":              "tile",
+            "name":              mt.get("name", mid),
+            "category":         "flooring",
+            "base_price":        bp,
+            "current_price":     round(bp * mults.get("flooring", 1.0), 2),
+            "requires_assembly": True,
+            "resource_type":     None,
+            "storage_container": None,
+            "quantity":          1,      # price is per tile; buyer chooses how many
+            "material_template": mid,
+            "interior":          mt.get("interior", True),
+            "floor":             mt.get("floor", True),
         }
 
     # Prop templates
@@ -199,38 +227,4 @@ def update_market(world):
 
 # =========================================================
 # NEWS → MARKET REACTION
-# =========================================================
-
-NEWS_TAG_TO_CATEGORY = {
-    "consumer":       ["groceries", "clothing"],
-    "trade":          ["electronics", "appliances"],
-    "economy":        ["furniture", "appliances", "electronics"],
-    "environment":    ["appliances"],
-    "technology":     ["electronics"],
-    "infrastructure": ["appliances", "furniture"],
-    "labor":          ["appliances", "furniture", "clothing"],
-}
-
-def apply_news_to_market(world, news_tags, sentiment):
-    mults  = world.get("market", {}).get("category_multipliers", {})
-    direction = 1 if sentiment == "positive" else -1 if sentiment == "negative" else 0
-    if direction == 0:
-        return
-    for tag in news_tags:
-        for cat in NEWS_TAG_TO_CATEGORY.get(tag, []):
-            if cat in mults:
-                mults[cat] = round(
-                    max(0.5, min(2.5, mults[cat] + direction * random.uniform(0.01, 0.04))),
-                    4
-                )
-
-
-# =========================================================
-# LEGACY STUBS
-# =========================================================
-
-def produce(world):
-    pass
-
-def consume_households(world):
-    pass
+# ==========================================

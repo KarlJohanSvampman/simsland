@@ -197,48 +197,98 @@
   "tile_templates": {
 
     "wood_floor": {
-
       "walk_speed": 1.0,
-
-      "buildable": true
+      "buildable":  true,
+      "interior":   true,
+      "floor":      true
     },
 
     "grass": {
-
       "walk_speed": 0.8,
+      "buildable":  false,
+      "interior":   false,
+      "floor":      false
+    },
 
-      "buildable": false
+    "road": {
+      "walk_speed": 1.0,
+      "buildable":  false,
+      "interior":   false,
+      "floor":      false
+    },
+
+    "wall": {
+      "walk_speed": 0.0,
+      "buildable":  false,
+      "interior":   false,
+      "floor":      false
     }
   },
 
-  {
   "material_templates": {
 
     "wood_floor_01": {
-      "name": "Wood Floor",
-      "texture": "/resources/textures/wood_floor.jpg",
-      "category": "floor"
+      "name":          "Wood Floor",
+      "texture":       "/resources/textures/wood_floor.jpg",
+      "category":      "floor",
+      "interior":      true,
+      "floor":         true,
+      "price_per_sqm": 35.0
+    },
+
+    "wood_floor_dark_01": {
+      "name":          "Dark Wood Floor",
+      "texture":       "/resources/textures/wood_floor_dark.jpg",
+      "category":      "floor",
+      "interior":      true,
+      "floor":         true,
+      "price_per_sqm": 42.0
     },
 
     "tile_white_01": {
-      "name": "White Tile",
-      "texture": "/resources/textures/tile_white.jpg",
-      "category": "floor"
+      "name":          "White Tile",
+      "texture":       "/resources/textures/tile_white.jpg",
+      "category":      "floor",
+      "interior":      true,
+      "floor":         true,
+      "price_per_sqm": 28.0
+    },
+
+    "tile_grey_01": {
+      "name":          "Grey Tile",
+      "texture":       "/resources/textures/tile_grey.jpg",
+      "category":      "floor",
+      "interior":      true,
+      "floor":         true,
+      "price_per_sqm": 24.0
+    },
+
+    "carpet_beige_01": {
+      "name":          "Beige Carpet",
+      "texture":       "/resources/textures/carpet_beige.jpg",
+      "category":      "floor",
+      "interior":      true,
+      "floor":         true,
+      "price_per_sqm": 18.0
     },
 
     "wallpaper_blue_01": {
-      "name": "Blue Wallpaper",
-      "texture": "/resources/textures/wallpaper_blue.jpg",
-      "category": "wall"
+      "name":     "Blue Wallpaper",
+      "texture":  "/resources/textures/wallpaper_blue.jpg",
+      "category": "wall",
+      "interior": true,
+      "floor":    false
     },
 
     "grass_01": {
-      "name": "Grass",
-      "texture": "/resources/textures/grass.jpg",
-      "category": "terrain"
+      "name":     "Grass",
+      "texture":  "/resources/textures/grass.jpg",
+      "category": "terrain",
+      "interior": false,
+      "floor":    false
     }
   },
-{
+
   "floorplan_templates": {
 
     "small_house": {
@@ -246,20 +296,18 @@
       "tiles": {
 
         "0,0": {
-          "floor": {
-            "type": "floor"
-          }
+          "type":     "floor",
+          "interior": true,
+          "floor":    true
         },
 
         "1,0": {
-          "floor": {
-            "type": "floor"
-          }
+          "type":     "floor",
+          "interior": true,
+          "floor":    true
         }
       }
     }
   }
-}
-
 
 }

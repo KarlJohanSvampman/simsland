@@ -53,6 +53,12 @@ def instantiate_floorplan(
         projected["x"] = wx
         projected["y"] = wy
 
+        # All tiles from a floorplan are interior by definition;
+        # floor=True for any tile whose type is "floor"
+        tile_type = tile.get("type", "")
+        projected.setdefault("interior", True)
+        projected.setdefault("floor", tile_type == "floor")
+
         result["tiles"].append(
             projected
         )
@@ -127,19 +133,4 @@ def instantiate_floorplan(
         []
     ):
 
-        projected = deepcopy(window)
-
-        wx, wy = local_to_world(
-            building,
-            window["x"],
-            window["y"]
-        )
-
-        projected["x"] = wx
-        projected["y"] = wy
-
-        result["windows"].append(
-            projected
-        )
-
-    return result
+        projected = deep

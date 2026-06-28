@@ -412,6 +412,20 @@ def _route_assemble_prop(c, world, action):
 
 
 # =========================================================
+# ASSEMBLE TILE
+# action = { "type": "assemble_tile", "item_id": "item_box_wood_floor_01_abc" }
+# Places one tile at character's current position; decrements box quantity.
+# =========================================================
+
+def _route_assemble_tile(c, world, action):
+    from systems.assembly import assemble_tile
+    item_id = action.get("item_id")
+    if not item_id:
+        return
+    assemble_tile(c, world, item_id)
+
+
+# =========================================================
 # MAIN ROUTER
 # =========================================================
 
@@ -497,6 +511,9 @@ def route_action(c, world, action, speech, definitions=None):
     elif action_type == "assemble_prop":
         _route_assemble_prop(c, world, action)
 
+    elif action_type == "assemble_tile":
+        _route_assemble_tile(c, world, action)
+
     # "call" / "text" are future — for now just log
     elif action_type in ("call", "text"):
         c.setdefault("pending_comms", []).append(action)
@@ -526,19 +543,4 @@ _HOBBY_ACTION_TYPES = set(ACTIVITY_TO_HOBBY.keys())
 
 
 def _route_hobby(c, world, action_type):
-    """Intercept a hobby action and run the prerequisite planner."""
-    from systems.hobby_planner import plan_hobby
-
-    hobby_name = ACTIVITY_TO_HOBBY.get(action_type)
-    if not hobby_name:
-        # No special requirements — fall through to direct start
-        from systems.activities import start_activity
-        start_activity(c, world, action_type)
-        return
-
-    # Clear any stale queue before planning
-    if not c.get("activity_queue"):
-        queued = plan_hobby(c, world, hobby_name)
-        if not queued:
-            # Planner couldn't build queue (e.g. missing prop); desires already added
-            pass
+    """Intercept a hobby action and run the prereq

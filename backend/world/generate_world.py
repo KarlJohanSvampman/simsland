@@ -298,19 +298,33 @@ def generate_initial_world():
             "tile_types": {
 
                 "grass": {
-                    "walkable": True
+                    "walkable": True,
+                    "interior": False,
+                    "floor":    False
                 },
 
                 "road": {
-                    "walkable": True
+                    "walkable": True,
+                    "interior": False,
+                    "floor":    False
                 },
 
                 "wall": {
-                    "walkable": False
+                    "walkable": False,
+                    "interior": False,
+                    "floor":    False
                 },
 
                 "water": {
-                    "walkable": False
+                    "walkable": False,
+                    "interior": False,
+                    "floor":    False
+                },
+
+                "floor": {
+                    "walkable": True,
+                    "interior": True,
+                    "floor":    True
                 }
             }
         },
@@ -487,23 +501,4 @@ def generate_initial_world():
                         "reserved_by": None,
 
                         "connects": [
-                            "living_room"
-                        ]
-                    }
-                ]
-            }
-        ]
-    }
-
-    init_stocks(world)
-    init_market_catalog(world)
-
-    # Seed personal inventories
-    c1 = world["characters"]["c1"]
-    c1["inventory"] = [
-        make_smartphone(owner_id="c1"),
-        make_house_key(home_id="house_1", building_id="house_1", owner_id="c1"),
-        make_wallet(cash=100.0, owner_id="c1"),
-    ]
-
-    return world
+     

@@ -102,7 +102,7 @@ def purchase_from_catalog(c, household, world, catalog_id, method="in_person"):
       type == "prop" + requires_assembly → make_assembly_box() → c["inventory"]
       type == "prop" + not requires_assembly → schedule_delivery_prop()
     """
-    from systems.assembly import make_assembly_box
+    from systems.assembly import make_assembly_box, make_tile_box
 
     catalog = world.get("market", {}).get("catalog", {})
     entry   = catalog.get(catalog_id)
@@ -124,6 +124,13 @@ def purchase_from_catalog(c, household, world, catalog_id, method="in_person"):
             container=entry.get("storage_container", "storage"),
         )
         add_household_resource(household, resource)
+        return True
+
+    # --- Floor tile material → stackable tile assembly box ---
+    if entry["type"] == "tile":
+        quantity = entry.get("quantity", 1)
+        box = make_tile_box(entry["material_template"], world, quantity=quantity)
+        add_item(c, box)
         return True
 
     # --- Prop ---
@@ -249,10 +256,4 @@ def determine_container(resource_type):
     if resource_type in ("FOOD_PROTEIN", "FOOD_VEGETABLE", "MEAL",
                          "STORED_MEAL", "PROCESSED_MEAL", "DRINK_MILK"):
         return "fridge"
-    if resource_type in ("FOOD_CARB", "FOOD_SNACK", "FOOD_SPICE",
-                         "DRINK_COFFEE", "DRINK_TEA", "DRINK_SOFT",
-                         "DRINK_ALCOHOL"):
-        return "pantry"
-    if resource_type in ("HYGIENE", "TOILET_PAPER", "CLEANING"):
-        return "bathroom"
-    return "storage"
+    if resource_type in ("FO
