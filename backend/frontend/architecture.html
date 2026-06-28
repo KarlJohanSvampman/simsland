@@ -44,10 +44,10 @@ const GROUPS = [
 {
   id:'core', label:'Core', color:'#58a6ff',
   pos:[0,0,0],
-  desc:'Heartbeat of the simulation. sim_loop.py drives every other system on a cadence schedule. event_bus.py decouples systems via synchronous pub/sub. db.py persists the single world dict to PostgreSQL with Redis as a write-through cache. Everything else is called from here.',
+  desc:'Heartbeat of the simulation. sim_loop.py drives every other system on a cadence schedule. event_bus.py decouples systems via synchronous pub/sub. db.py persists the single world dict to PostgreSQL with Redis as a write-through cache. schema_defaults.py ensures every new field has a safe zero-value before systems read it. Everything else is called from here.',
   connects_to:['brain','social','economy','physical','society','api'],
   modules:[
-    {id:'sim_loop',    label:'sim_loop.py',      color:'#58a6ff', desc:'Main tick function. Calls every system on its CADENCE slot, advances the wall-clock calendar, then flushes the event bus. The only place that decides WHEN systems run.'},
+    {id:'sim_loop',    label:'sim_loop.py',      color:'#58a6ff', desc:'Main tick function. Calls every system on its CADENCE slot (update_market + update_stocks on MEDIUM/offset=9, update_investment_behavior per character on SLOW/offset=20, update_deliveries on offset=6), advances the wall-clock calendar, then flushes the event bus. The only place that decides WHEN systems run.'},
     {id:'event_bus',   label:'event_bus.py',      color:'#58a6ff', desc:'In-process pub/sub. emit() queues events; flush() delivers to all subscribers once per tick. Handlers may emit new events (one recursive level). Replaces "run every tick just in case" polling.'},
     {id:'event_handlers',label:'event_handlers.py',color:'#58a6ff',desc:'All subscriptions wired at import time. Maps event types to handlers: bills_overdue→evict, incident_created→auto_report, character_fired→apply_for_job, confrontation_desired→start_conflict, etc.'},
     {id:'tick_sched',  label:'tick_schedule.py',  color:'#58a6ff', desc:'every(world, n, offset) helper + CADENCE dict. All cadence numbers live here. Offsets stagger systems so nothing fires simultaneously. FAST=5, MEDIUM=15-20, SLOW=30-60, VERY_SLOW=300.'},
@@ -55,16 +55,18 @@ const GROUPS = [
     {id:'cache',       label:'cache.py',          color:'#58a6ff', desc:'Redis get/set wrappers for world and character objects. Keeps hot data in memory so the tick loop rarely hits Postgres.'},
     {id:'redis_queue', label:'redis_queue.py',    color:'#58a6ff', desc:'Job queue for the async LLM worker process. enqueue() pushes a job dict to Redis list; dequeue_batch() pops up to N jobs for the worker to process concurrently.'},
     {id:'definitions', label:'definitions.py',    color:'#58a6ff', desc:'Loads prop and building template definitions from JSON. Templates define base stats, interactions, and anchor points used at world-load time and by the editor.'},
+    {id:'schema_def',  label:'schema_defaults.py',color:'#58a6ff', desc:'Ensures safe zero-values for every world and character field before systems read them. Covers: world["stocks"], world["stock_sector_trends"], world["market"]["catalog"], character["portfolio"], character["watched_stocks"], character["inventory"], character["worn"] (via ensure_worn). Called once on world load and again if new characters are added.'},
+    {id:'item_tpl',    label:'data/item_templates.py',color:'#58a6ff', desc:'Master dictionary of 60+ physical item templates. Each entry: {name, category, base_price, stackable, max_stack, dirty, consumable, uses, resource_type, storage_container, quantity}. Clothing entries add: slot, bone (Three.js skeleton bone name), model (.glb path), style, warmth, bilateral. Categories: hygiene, linen, cleaning, dishware, food, groceries, drink, clothing, electronics, assembly_box.'},
   ]
 },
 {
   id:'brain', label:'Brain / Cognition', color:'#bc8cff',
   pos:[320,80,0],
-  desc:'Character AI. Each tick, agent_loop orchestrates: update body → generate intentions → build LLM context → call LLM → route the action → store memory → update emotion. All subjective reasoning, memory, relationships, and emotion live here. context_builder.py is the bridge between the simulation state and the LLM.',
+  desc:'Character AI. Each tick, agent_loop orchestrates: update body → generate intentions → build LLM context → call LLM → route the action → store memory → update emotion. All subjective reasoning, memory, relationships, and emotion live here. context_builder.py is the bridge between the simulation state and the LLM — it now surfaces inventory, worn clothing, investment portfolio, wearable_items, worn_slots, and assembly_boxes as available actions.',
   connects_to:['llm','social','physical'],
   modules:[
-    {id:'agent_loop',    label:'agent_loop.py',     color:'#bc8cff', desc:'Per-character update called every tick. Full pipeline: body needs → body_intentions → strategy → schedule → offgrid check → LLM think → action_router → memory store → emotion update.'},
-    {id:'ctx_builder',   label:'context_builder.py',color:'#bc8cff', desc:'Assembles the JSON context dict fed to the LLM. Pulls memory, relationships, conflicts, grievances, perception, schedule, body state, beliefs, social models, cognitive pressure, and available actions into one object.'},
+    {id:'agent_loop',    label:'agent_loop.py',     color:'#bc8cff', desc:'Per-character update called every tick. Full pipeline: body needs → generate_body_intentions → strategy → schedule → offgrid check → LLM think → action_router → memory store → update_emotion(c, world). Calls put_on_clothing / take_off_clothing / assemble_prop via action_router.'},
+    {id:'ctx_builder',   label:'context_builder.py',color:'#bc8cff', desc:'Assembles the JSON context dict fed to the LLM. Pulls memory, relationships, conflicts, grievances, perception, schedule, body state, beliefs, social models, cognitive pressure, inventory summary, worn clothing summary, outfit style score, investment portfolio, and available actions into one object. Available actions include wearable_items (clothing in inventory with a slot), worn_slots (occupied clothing slots), and assembly_boxes (unassembled prop boxes).'},
     {id:'llm_brain',     label:'llm_brain.py',      color:'#bc8cff', desc:'System prompt, build_prompt(), validate_response(), fallback_response(). Defines the strict JSON output schema the model must produce: thought, emotion, intention, goal, action, speech, reflection, confidence.'},
     {id:'memory',        label:'memory.py',         color:'#bc8cff', desc:'Episodic memory: store_memory() adds entries weighted by importance. biased_recall() returns most relevant recent memories using recency + importance scoring. decay_memories() runs at MEDIUM cadence.'},
     {id:'emotion',       label:'emotion.py',        color:'#bc8cff', desc:'Updates character emotion each tick based on recent events, body state, and interaction outcomes. Produces a single emotion label surfaced in context and speech bubbles.'},
@@ -107,11 +109,16 @@ const GROUPS = [
 {
   id:'economy', label:'Economy', color:'#3fb950',
   pos:[-320,0,0],
-  desc:'Household finances, market, jobs, and expense-driven scheduling. Weekly bills are calculated from real home costs (rent, utilities, gasoline, internet) plus food. Minimum work hours = expenses ÷ wage. Social contract recurring blocks are reserved before leisure. All wealth deduction flows through apply_expenses only.',
+  desc:'Household finances, unified market catalog, stocks, investments, procurement, and expense-driven scheduling. The market is the single price authority for all items and props. Weekly bills are calculated from real home costs (rent, utilities, gasoline, internet) plus food. Minimum work hours = expenses ÷ wage. Social contract recurring blocks are reserved before leisure. All wealth deduction flows through apply_expenses only.',
   connects_to:['physical','core','social'],
   modules:[
     {id:'economy_s',  label:'economy.py',           color:'#3fb950', desc:'apply_expenses() issues weekly bills on Monday 00:00. Splits into fixed_home (rent+utilities) + food (80×members×cost_of_living). Caches household["weekly_expenses"] for schedule generator.'},
-    {id:'market',     label:'market.py',            color:'#3fb950', desc:'Supply/demand simulation. produce() generates goods each 20 ticks. consume_households() tracks demand. Prices adjust to supply/demand ratio. Wealth deduction handled by economy.py only, not here.'},
+    {id:'market',     label:'market.py',            color:'#3fb950', desc:'Unified product catalog. init_market_catalog() seeds world["market"]["catalog"] from ITEM_TEMPLATES + prop_templates. Each entry: {type, name, category, base_price, current_price, requires_assembly, resource_type, storage_container}. update_market() drifts category multipliers (CATEGORY_VOLATILITY dict) and refreshes current_price. get_price(), browse_catalog(category, budget, item_type), apply_news_to_market() for event-driven price spikes.'},
+    {id:'stock_mkt',  label:'stock_market.py',      color:'#3fb950', desc:'40-company stock market simulation across 8 sectors. init_stocks() seeds world["stocks"] from data/stocks.py. update_stocks() applies random walk + sector drift + news spikes each MEDIUM tick. Maintains a 60-bar price history per ticker. SECTOR_TAGS maps sectors to news event tags. Helpers: get_stock_price(), top_movers(), sector_performance().'},
+    {id:'stocks_d',   label:'data/stocks.py',       color:'#3fb950', desc:'40 fictional company definitions across 8 sectors: tech (NXVT, CYLX, DRVM, QRIX, VLTX, PRXM, MNTH, ELVN), retail (KRTN, VRDX, LMNR, HBTH, GRSL, SPKX), energy (OXFL, SLRV, WNDP, NUCX, GRDX), health (MRVX, BTRX, MDIQ, CLNX, VRTN, HSPX), finance (ARCB, VNTG, FNIX, ISLR, MRKF), consumer (DLVX, BVRG, TRVX, FDBK, ENTX), media (STRM, PBLX, ADVX), industrial (BLDX, MNFX, TRNS, CHMX). Each entry: ticker, name, sector, base_price, volatility, market_cap, news_sensitivity, description.'},
+    {id:'invest',     label:'investments.py',       color:'#3fb950', desc:'Sim trading behavior. buy_stock / sell_stock / portfolio_value / position_pnl helpers. update_investment_behavior() runs on SLOW cadence: checks if character has computer/phone, discovers stocks from news, considers sell triggers (take-profit +25%, stop-loss -18%, panic on -5% tick drop) and buy signals (trending up, dip buying). MIN_INVESTABLE_WEALTH=500. Portfolio stored in c["portfolio"] as {ticker: {shares, avg_cost}}.'},
+    {id:'procurement',label:'procurement.py',       color:'#3fb950', desc:'Character purchasing system. choose_from_catalog() scores catalog entries by character traits (frugal→price weight, materialistic→quality weight). purchase_from_catalog() dispatches by entry type: resource_type set → add_household_resource; prop + requires_assembly → make_assembly_box() → character inventory; prop no assembly → schedule_delivery_prop(); item online → schedule_delivery_item(); item in-person → make_item() → character inventory.'},
+    {id:'deliveries', label:'deliveries.py',        color:'#3fb950', desc:'Delivery queue processing. update_deliveries() polls arrivals each tick. New-format deliveries (catalog_id + type field) call _deliver_item or _deliver_prop from procurement. Legacy product-dict deliveries use _legacy_acquire fallback. Generates a delivery_arrived notification on the household on completion.'},
     {id:'jobs',       label:'jobs.py',              color:'#3fb950', desc:'Job listing generation, hiring, and firing. maybe_fire() emits character_fired → apply_for_job handler. process_interview() emits character_hired on success. generate_job_listings() refreshes market every 60 ticks.'},
     {id:'housing',    label:'housing.py',           color:'#3fb950', desc:'Home assignment and expense defaults. ensure_home_defaults() sets rent/electricity/water/gasoline/internet. weekly_home_expenses() sums them. assign_household_to_home() and vacate_home() manage occupancy.'},
     {id:'scheduling', label:'scheduling.py',        color:'#3fb950', desc:'Expense-driven weekly schedule generator. Priority: sleep → contract blocks → work (hours=expenses/wage) → meals → leisure. adjust_for_household() staggers housemates. Contract recurring_activity terms reserved as fixed slots.'},
@@ -123,19 +130,22 @@ const GROUPS = [
 {
   id:'physical', label:'Physical World', color:'#d29922',
   pos:[-160,-60,-260],
-  desc:'Character embodiment: location, actions, and movement. Activities are the unit of embodied action with a 6-phase lifecycle (start→walking→arriving→using→finishing→complete). Navigation uses A* between rooms. offgrid.py abstracts work/shopping/leisure that happens off-screen.',
+  desc:'Character embodiment: location, actions, movement, and possessions. Activities are the unit of embodied action with a 6-phase lifecycle (start→walking→arriving→using→finishing→complete). Navigation uses A* between rooms. Characters carry a personal inventory (items, keys, wallet, phone), wear clothing attached to skeleton bones, and can assemble boxed furniture into placed world props. offgrid.py abstracts work/shopping/leisure that happens off-screen.',
   connects_to:['brain','economy','core'],
   modules:[
     {id:'activities',  label:'activities.py',       color:'#d29922', desc:'Authoritative activity executor. execute_activity() advances the current phase. INTERACTION_ANIMATIONS maps interaction→{walking,using,finishing} animations. Manages reservations, IK anchor approach, prop anim states, and completion events.'},
     {id:'act_queue',   label:'activity_queue.py',   color:'#d29922', desc:'Ordered task queue with dependency graph. queue_task() appends with depends_on list. Tasks: pending→active→done. Suspended sessions serialised when higher-priority activity interrupts.'},
-    {id:'movement',    label:'movement.py',         color:'#d29922', desc:'Route traversal and interpolation. update_character_movement() advances along route segment-by-segment. Handles arrival detection. Does NOT choose destinations — that is navigation.py and agent_loop.'},
-    {id:'navigation',  label:'navigation.py',       color:'#d29922', desc:'A* pathfinding within buildings. Room connectivity graph + NAV_CACHE avoids recomputing identical routes. world_to_local / local_to_world conversions via transforms.py.'},
+    {id:'movement',    label:'movement.py',         color:'#d29922', desc:'Route traversal and interpolation. update_character_movement() advances along route segment-by-segment. Handles arrival detection and _auto_lock_on_exit() — locks home door when a character transitions indoor→outdoor from their home building. Does NOT choose destinations — that is navigation.py and agent_loop.'},
+    {id:'navigation',  label:'navigation.py',       color:'#d29922', desc:'A* pathfinding within buildings. Room connectivity graph + NAV_CACHE avoids recomputing identical routes. world_to_local / local_to_world conversions via transforms.py. _auto_unlock_for_prop() is called at route start — if the destination prop is in the character\'s home building, unlock_home() is called automatically.'},
     {id:'outdoor_nav', label:'outdoor_navigation.py',color:'#d29922',desc:'Between-building navigation. Connects building exits to road network. Finds multi-hop paths across the world tile map for characters traveling between locations.'},
     {id:'anchors',     label:'anchors.py',          color:'#d29922', desc:'Prop interaction anchor points. Defined in local-space in templates, projected to world-space at runtime via transforms.py. Characters walk to the anchor position before starting an interaction.'},
     {id:'occupancy',   label:'occupancy.py',        color:'#d29922', desc:'Prop reservation system. Characters reserve anchors before approaching. release_anchor() and release_reservation() called on completion or interruption. Prevents two sims sitting on the same chair.'},
     {id:'props_sys',   label:'props.py',            color:'#d29922', desc:'Prop lookup, get_prop_by_id(), find_nearest_anchor(). Central prop query interface used by activities, navigation, and context builder.'},
     {id:'offgrid',     label:'offgrid.py',          color:'#d29922', desc:'Abstracts off-screen life. send_offgrid() removes character for N ticks. process_return() generates a story arc summary (random events modulated by environment risk) and applies outcomes: money earned, stress changes.'},
     {id:'transforms',  label:'transforms.py',       color:'#d29922', desc:'Authoritative coordinate math: local↔world conversion, rotation, footprint projection, anchor projection. No other system should implement rotation math.'},
+    {id:'personal_items',label:'personal_items.py', color:'#d29922', desc:'Personal inventory and essential item system. Factories: make_smartphone(), make_house_key(home_id, building_id), make_wallet(cash), make_id_card(). Inventory CRUD: has_item, get_item, add_item, remove_item. Key/door: has_key_for(c, home_id), can_unlock_door, lock_home, unlock_home. Wallet: wallet_cash, spend_cash, add_cash. make_item(template_id, quantity, **overrides) creates instances from ITEM_TEMPLATES. inventory_summary(c) for LLM context.'},
+    {id:'clothing',    label:'clothing.py',         color:'#d29922', desc:'14-slot wearable clothing system. Slots: head/hair/neck/outerwear/torso/undershirt/legs/underwear/socks/feet/hands/wrist_l/wrist_r/accessory — each mapped to a Three.js skeleton bone name. put_on_clothing(c, world, item_id) places item in slot; if slot occupied the displaced item returns to inventory as a stackable item. take_off_clothing(c, world, slot) moves worn item back to inventory. undress_all() strips all slots. tick_clothing_dirty() gives each worn item ~1% chance to become dirty per SLOW tick. outfit_style_score() averages style values, dirty items at 0.4×.'},
+    {id:'assembly',    label:'assembly.py',         color:'#d29922', desc:'Prop assembly system. When a prop with requires_assembly=True is purchased, procurement calls make_assembly_box(prop_template_id) to create a box item in the character\'s inventory. The character can then perform the assemble_prop action: the box is removed from inventory and a new prop instance is placed in world["props"] at the character\'s current position. assembly_boxes_in_inventory(c) returns all pending boxes for LLM context.'},
   ]
 },
 {
@@ -166,7 +176,7 @@ const GROUPS = [
     {id:'main_py',    label:'main.py',           color:'#e3b341', desc:'FastAPI entry point. Runs sim tick in asyncio background task (1 tick/sec). WebSocket /ws streams: full viewport snapshot on connect, then delta patches of dirty chars/props each tick. Client sends {type:viewport,cx,cy,zoom} to filter.'},
     {id:'view_api',   label:'api/view.py',       color:'#e3b341', desc:'Viewport-aware state queries. get_view() filters world entities to the client visible area using in_view(cx,cy,zoom). Serves the /api/state endpoint.'},
     {id:'editor_api', label:'api/editor.py',     color:'#e3b341', desc:'World editor API. load_definitions() and save_definitions() manage prop/building templates stored as JSON. Used by the in-browser editor for placing and configuring props.'},
-    {id:'debug_api',  label:'api/debug.py',      color:'#e3b341', desc:'Stateless dev tools at GET /debug. Endpoints: /build-context (context inspector), /llm-test (live LLM call), /generate-schedule (schedule visualiser), /plan-activity (animation phase browser). Never touches live sim.'},
+    {id:'debug_api',  label:'api/debug.py',      color:'#e3b341', desc:'Stateless dev tools at GET /debug/*. Endpoints: /build-context (full LLM context inspector for any character), /llm-test (live Ollama call with custom prompt), /generate-schedule (weekly schedule visualiser), /plan-activity (animation phase browser), /architecture (this map). All endpoints are read-only — never touch or mutate the live simulation state.'},
     {id:'props_api',  label:'api/props.py',      color:'#e3b341', desc:'Prop CRUD API. Create, read, update, delete props in the live world. Used by the in-browser editor.'},
     {id:'frontend',   label:'frontend/ (Three.js)',color:'#e3b341',desc:'Isometric 3D renderer in Three.js. Connects via WebSocket, applies delta patches to scene objects each tick. Shows character speech bubbles, animation states, prop states. Viewport synced to server for filtered updates.'},
   ]
@@ -314,180 +324,4 @@ GROUPS.forEach(g=>{
   });
 });
 
-// ── Connection lines ──────────────────────────────────────────────────────────
-const connLines=[];
-const added = new Set();
-GROUPS.forEach(g=>{
-  (g.connects_to||[]).forEach(tid=>{
-    const key = [g.id,tid].sort().join('->');
-    if(added.has(key)) return;
-    added.add(key);
-    const target = GROUPS.find(x=>x.id===tid);
-    if(!target) return;
-    const pts = [new THREE.Vector3(...g.pos), new THREE.Vector3(...target.pos)];
-    const geo = new THREE.BufferGeometry().setFromPoints(pts);
-    const c1 = new THREE.Color(g.color), c2 = new THREE.Color(target.color);
-    const blended = c1.clone().lerp(c2,.5);
-    const mat = new THREE.LineDashedMaterial({
-      color: blended, dashSize:12, gapSize:6,
-      transparent:true, opacity:.22
-    });
-    const line = new THREE.Line(geo, mat);
-    line.computeLineDistances();
-    scene.add(line);
-    connLines.push({line,mat});
-  });
-});
-
-// ── Legend ────────────────────────────────────────────────────────────────────
-const legend = document.getElementById('legend');
-GROUPS.forEach(g=>{
-  const el = document.createElement('div');
-  el.className='li';
-  el.innerHTML=`<div class="ld" style="background:${g.color}"></div>${g.label}`;
-  el.onclick = ()=>{ const m=groupMeshes[g.id]; if(m) toggleGroup(g,m); };
-  legend.appendChild(el);
-});
-
-// ── Info panel ────────────────────────────────────────────────────────────────
-const infoEl = document.getElementById('info');
-let lastShown = null;
-
-function showGroupInfo(g, expanded){
-  infoEl.classList.remove('hidden');
-  infoEl.innerHTML = `
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
-      <div style="width:12px;height:12px;border-radius:50%;background:${g.color};flex-shrink:0"></div>
-      <h2>${g.label}</h2>
-    </div>
-    <div class="gtype">${g.modules.length} modules &middot; click to ${expanded?'collapse':'expand'}</div>
-    <div class="gdesc">${g.desc}</div>
-    <div>
-      ${g.modules.map(m=>`
-        <div class="mod">
-          <div class="mname" style="color:${g.color}">${m.label}</div>
-          <div class="mdesc">${m.desc}</div>
-        </div>`).join('')}
-    </div>`;
-}
-
-function showModuleInfo(g, mod){
-  infoEl.classList.remove('hidden');
-  infoEl.innerHTML = `
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
-      <div style="width:8px;height:8px;border-radius:50%;background:${g.color};flex-shrink:0"></div>
-      <h2 style="color:${g.color}">${mod.label}</h2>
-    </div>
-    <div class="gtype">${g.label}</div>
-    <div class="gdesc">${mod.desc}</div>`;
-}
-
-// ── Expand / Collapse ─────────────────────────────────────────────────────────
-function toggleGroup(g, mesh){
-  const was = expandedGroups.has(g.id);
-  if(was){
-    expandedGroups.delete(g.id);
-    g.modules.forEach(mod=>{ mod._target=0; });
-  } else {
-    expandedGroups.add(g.id);
-    g.modules.forEach(mod=>{ mod._target=1; mod._mesh.visible=true; });
-  }
-  showGroupInfo(g, !was);
-}
-
-// ── Interaction ───────────────────────────────────────────────────────────────
-const raycaster = new THREE.Raycaster();
-const mouse = new THREE.Vector2(-9999,-9999);
-let hovered = null;
-
-renderer.domElement.addEventListener('mousemove', e=>{
-  mouse.x = (e.clientX/W)*2-1;
-  mouse.y = -(e.clientY/H)*2+1;
-});
-
-renderer.domElement.addEventListener('click', ()=>{
-  raycaster.setFromCamera(mouse, camera);
-  const hits = raycaster.intersectObjects(allInteractive.filter(m=>m.visible!==false&&m.userData.type==='group'));
-  if(hits.length){
-    const obj = hits[0].object;
-    toggleGroup(obj.userData.group, obj);
-  }
-});
-
-window.addEventListener('resize',()=>{
-  const nw=window.innerWidth, nh=window.innerHeight;
-  camera.aspect=nw/nh; camera.updateProjectionMatrix();
-  renderer.setSize(nw,nh);
-});
-
-// ── Animation loop ────────────────────────────────────────────────────────────
-const clock = new THREE.Clock();
-const _v3 = new THREE.Vector3();
-
-function animate(){
-  requestAnimationFrame(animate);
-  const t = clock.getElapsedTime();
-  controls.update();
-
-  // Animate dash offset
-  connLines.forEach(({mat})=>{ mat.dashOffset -= 0.014; });
-
-  // Pulse + rotate group nodes
-  GROUPS.forEach(g=>{
-    const mesh = groupMeshes[g.id];
-    const expanded = expandedGroups.has(g.id);
-    const baseEmit = expanded ? .55 : .28;
-    mesh.material.emissiveIntensity = baseEmit + Math.sin(t*1.8+g.pos[0]*.01)*.1;
-    mesh.rotation.y += 0.0035;
-    mesh.rotation.x += 0.0012;
-
-    // Animate module nodes
-    g.modules.forEach(mod=>{
-      const mm = mod._mesh;
-      const ml = mod._label;
-      const want = mod._target ?? 0;
-      const tgt = want>0 ? modTargets[mod.id] : new THREE.Vector3(...g.pos);
-      const tgtOpacity = want>0 ? .85 : 0;
-      const tgtScale = want>0 ? 1 : 0;
-
-      mm.position.lerp(tgt, .09);
-      const cs = mm.scale.x;
-      const ns = cs + (tgtScale-cs)*.09;
-      mm.scale.set(ns,ns,ns);
-      mm.material.opacity += (tgtOpacity - mm.material.opacity)*.09;
-      mm.material.emissiveIntensity = .2 + Math.sin(t*2+g.pos[0]*.02)*.08;
-
-      if(want<0.01 && mm.material.opacity < 0.01) mm.visible=false;
-
-      ml.position.copy(mm.position).add(_v3.set(0,11,0));
-      ml.material.opacity += ((tgtOpacity*.9) - ml.material.opacity)*.09;
-    });
-  });
-
-  // Hover detection
-  raycaster.setFromCamera(mouse, camera);
-  const pickable = allInteractive.filter(m=>{
-    if(!m.visible) return false;
-    if(m.userData.type==='module') return m.material.opacity>0.2;
-    return true;
-  });
-  const hits = raycaster.intersectObjects(pickable);
-  if(hits.length){
-    const obj = hits[0].object;
-    if(obj !== hovered){
-      if(hovered) hovered.material.emissiveIntensity = .28;
-      hovered = obj;
-      obj.material.emissiveIntensity = .9;
-      if(obj.userData.type==='module') showModuleInfo(obj.userData.group, obj.userData.module);
-      else if(obj.userData.type==='group') showGroupInfo(obj.userData.group, expandedGroups.has(obj.userData.group.id));
-    }
-  } else {
-    if(hovered){ hovered.material.emissiveIntensity=.28; hovered=null; }
-  }
-
-  renderer.render(scene, camera);
-}
-animate();
-</script>
-</body>
-</html>
+// ── Connection lines ────────────────────────────────────────────────�
