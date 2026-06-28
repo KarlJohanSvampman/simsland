@@ -302,12 +302,22 @@ def build_available_actions(c, world):
     if wearable_in_inventory or worn_slots:
         action_types.extend(["wear", "undress"])
 
+    # Assembly boxes — can assemble into props
+    from systems.assembly import assembly_boxes_in_inventory
+    assembly_boxes = [
+        {"item_id": i["id"], "name": i.get("name"), "prop_template": i.get("prop_template")}
+        for i in assembly_boxes_in_inventory(c)
+    ]
+    if assembly_boxes:
+        action_types.append("assemble_prop")
+
     return {
         "action_types":          action_types,
         "interactable_props":    interactable,
         "nearby_characters":     nearby_people,
         "wearable_items":        wearable_in_inventory,
         "worn_slots":            worn_slots,
+        "assembly_boxes":        assembly_boxes,
     }
 
 

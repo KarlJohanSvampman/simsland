@@ -1,4 +1,5 @@
 from systems.stock_market import init_stocks
+from systems.market import init_market_catalog
 from systems.personal_items import make_smartphone, make_house_key, make_wallet
 import time
 from datetime import datetime
@@ -40,57 +41,148 @@ def generate_initial_world():
             # -------------------------------------------------
             "prop_templates": {
 
+                # ---- SEATING ----
                 "modern_sofa": {
-
                     "name": "Modern Sofa",
-
-                    "category": "seating",
-
+                    "category": "furniture",
+                    "base_price": 1200.0,
+                    "requires_assembly": True,
                     "model": "/resources/props/sofa_modern_a.glb",
-
-                    "footprint": [
-                        {"dx": 0, "dy": 0},
-                        {"dx": 1, "dy": 0},
-                        {"dx": 2, "dy": 0}
-                    ],
-
-                    "interactions": [
-                        "sit",
-                        "lie"
-                    ],
-
+                    "footprint": [{"dx": 0, "dy": 0}, {"dx": 1, "dy": 0}, {"dx": 2, "dy": 0}],
+                    "interactions": ["sit", "lie"],
                     "anchors": [
-                        {
-                            "name": "anchor_seat_left",
-                            "interaction": "sit"
-                        },
-                        {
-                            "name": "anchor_seat_right",
-                            "interaction": "sit"
-                        },
-                        {
-                            "name": "anchor_lie",
-                            "interaction": "lie"
-                        }
+                        {"name": "anchor_seat_left",  "interaction": "sit"},
+                        {"name": "anchor_seat_right", "interaction": "sit"},
+                        {"name": "anchor_lie",        "interaction": "lie"},
                     ]
                 },
 
+                "armchair": {
+                    "name": "Armchair",
+                    "category": "furniture",
+                    "base_price": 450.0,
+                    "requires_assembly": True,
+                    "model": "/resources/props/armchair.glb",
+                    "footprint": [{"dx": 0, "dy": 0}],
+                    "interactions": ["sit"],
+                    "anchors": [{"name": "anchor_seat", "interaction": "sit"}]
+                },
+
+                # ---- BEDS ----
+                "bed_single": {
+                    "name": "Single Bed",
+                    "category": "furniture",
+                    "base_price": 450.0,
+                    "requires_assembly": True,
+                    "model": "/resources/props/bed_single.glb",
+                    "footprint": [{"dx": 0, "dy": 0}, {"dx": 0, "dy": 1}, {"dx": 1, "dy": 0}, {"dx": 1, "dy": 1}],
+                    "interactions": ["sleep", "lie"],
+                    "anchors": [{"name": "anchor_sleep", "interaction": "sleep"}]
+                },
+
+                "bed_double": {
+                    "name": "Double Bed",
+                    "category": "furniture",
+                    "base_price": 850.0,
+                    "requires_assembly": True,
+                    "model": "/resources/props/bed_double.glb",
+                    "footprint": [{"dx": 0, "dy": 0}, {"dx": 1, "dy": 0}, {"dx": 0, "dy": 1}, {"dx": 1, "dy": 1}],
+                    "interactions": ["sleep", "lie"],
+                    "anchors": [
+                        {"name": "anchor_sleep_left",  "interaction": "sleep"},
+                        {"name": "anchor_sleep_right", "interaction": "sleep"},
+                    ]
+                },
+
+                # ---- TABLES / STORAGE ----
+                "coffee_table": {
+                    "name": "Coffee Table",
+                    "category": "furniture",
+                    "base_price": 280.0,
+                    "requires_assembly": True,
+                    "model": "/resources/props/coffee_table.glb",
+                    "footprint": [{"dx": 0, "dy": 0}, {"dx": 1, "dy": 0}],
+                    "interactions": ["place_item", "pick_up_item"],
+                    "anchors": [{"name": "anchor_surface", "interaction": "place_item"}]
+                },
+
+                "bookshelf": {
+                    "name": "Bookshelf",
+                    "category": "furniture",
+                    "base_price": 200.0,
+                    "requires_assembly": True,
+                    "model": "/resources/props/bookshelf.glb",
+                    "footprint": [{"dx": 0, "dy": 0}],
+                    "interactions": ["browse", "place_item"],
+                    "anchors": [{"name": "anchor_browse", "interaction": "browse"}]
+                },
+
+                "desk": {
+                    "name": "Desk",
+                    "category": "furniture",
+                    "base_price": 320.0,
+                    "requires_assembly": True,
+                    "model": "/resources/props/desk.glb",
+                    "footprint": [{"dx": 0, "dy": 0}, {"dx": 1, "dy": 0}],
+                    "interactions": ["work", "use_computer"],
+                    "anchors": [{"name": "anchor_sit", "interaction": "work"}]
+                },
+
+                # ---- APPLIANCES ----
+                "television": {
+                    "name": "Television",
+                    "category": "appliances",
+                    "base_price": 600.0,
+                    "requires_assembly": False,
+                    "model": "/resources/props/television.glb",
+                    "footprint": [{"dx": 0, "dy": 0}, {"dx": 1, "dy": 0}],
+                    "interactions": ["watch_tv"],
+                    "anchors": [
+                        {"name": "anchor_watch_left",  "interaction": "watch_tv"},
+                        {"name": "anchor_watch_right", "interaction": "watch_tv"},
+                    ]
+                },
+
+                "microwave": {
+                    "name": "Microwave",
+                    "category": "appliances",
+                    "base_price": 120.0,
+                    "requires_assembly": False,
+                    "model": "/resources/props/microwave.glb",
+                    "footprint": [{"dx": 0, "dy": 0}],
+                    "interactions": ["use_microwave"],
+                    "anchors": [{"name": "anchor_use", "interaction": "use_microwave"}]
+                },
+
+                "fridge": {
+                    "name": "Fridge",
+                    "category": "appliances",
+                    "base_price": 700.0,
+                    "requires_assembly": False,
+                    "model": "/resources/props/fridge.glb",
+                    "footprint": [{"dx": 0, "dy": 0}],
+                    "interactions": ["get_food", "store_food"],
+                    "anchors": [{"name": "anchor_use", "interaction": "get_food"}]
+                },
+
+                "washing_machine": {
+                    "name": "Washing Machine",
+                    "category": "appliances",
+                    "base_price": 550.0,
+                    "requires_assembly": False,
+                    "model": "/resources/props/washing_machine.glb",
+                    "footprint": [{"dx": 0, "dy": 0}],
+                    "interactions": ["do_laundry"],
+                    "anchors": [{"name": "anchor_use", "interaction": "do_laundry"}]
+                },
+
+                # ---- DOORS ----
                 "basic_door": {
-
                     "name": "Basic Door",
-
                     "category": "doors",
-
                     "model": "/resources/props/basic_door.glb",
-
-                    "footprint": [
-                        {"dx": 0, "dy": 0}
-                    ],
-
-                    "interactions": [
-                        "open_door"
-                    ],
-
+                    "footprint": [{"dx": 0, "dy": 0}],
+                    "interactions": ["open_door"],
                     "is_door": True
                 }
             },
@@ -404,6 +496,7 @@ def generate_initial_world():
     }
 
     init_stocks(world)
+    init_market_catalog(world)
 
     # Seed personal inventories
     c1 = world["characters"]["c1"]

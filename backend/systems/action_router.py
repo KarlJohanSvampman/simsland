@@ -397,6 +397,20 @@ def _route_undress(c, world, action):
         undress_all(c, world)
 
 
+
+# =========================================================
+# ASSEMBLE PROP
+# action = { "type": "assemble_prop", "item_id": "item_box_modern_sofa_abc" }
+# =========================================================
+
+def _route_assemble_prop(c, world, action):
+    from systems.assembly import assemble_prop
+    item_id = action.get("item_id")
+    if not item_id:
+        return
+    assemble_prop(c, world, item_id)
+
+
 # =========================================================
 # MAIN ROUTER
 # =========================================================
@@ -479,6 +493,9 @@ def route_action(c, world, action, speech, definitions=None):
 
     elif action_type == "undress":
         _route_undress(c, world, action)
+
+    elif action_type == "assemble_prop":
+        _route_assemble_prop(c, world, action)
 
     # "call" / "text" are future — for now just log
     elif action_type in ("call", "text"):

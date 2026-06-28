@@ -1,495 +1,258 @@
+"""
+Procurement system.
+
+Characters buy things from the market catalog:
+  - consumable resource items (groceries, hygiene) → household storage
+  - discrete items (clothing, electronics, dishware) → make_item() → c["inventory"]
+  - props requiring assembly → make_assembly_box() → c["inventory"]
+  - props not requiring assembly → scheduled delivery → placed in world
+"""
+
 import random
 
-from data.products import (
-    PRODUCTS,
-    affordable_products
-)
-
-from systems.household_storage import (
-    add_household_resource
-)
-
-from systems.resource_runtime import (
-    create_resource
-)
+from systems.market import browse_catalog, get_price
+from systems.household_storage import add_household_resource
+from systems.resource_runtime import create_resource
+from systems.personal_items import add_item, make_item
 
 
 # =========================================================
 # PROCUREMENT METHODS
 # =========================================================
 
-PROCUREMENT_METHODS = [
-
-    "in_person",
-
-    "online"
-]
+PROCUREMENT_METHODS = ["in_person", "online"]
 
 
-# =========================================================
-# CREATE PROCUREMENT REQUEST
-# =========================================================
-
-def create_procurement_request(
-
-    c,
-
-    category,
-
-    priority=0.5,
-
-    budget=None,
-
-    quantity=1
-):
-
+def create_procurement_request(c, category, priority=0.5, budget=None, quantity=1):
     return {
-
-        "category": category,
-
-        "priority": priority,
-
-        "budget": budget,
-
-        "quantity": quantity,
-
-        "created_by": c["id"]
+        "category":   category,
+        "priority":   priority,
+        "budget":     budget,
+        "quantity":   quantity,
+        "created_by": c["id"],
     }
 
 
 # =========================================================
-# CHOOSE PROCUREMENT METHOD
+# CHOOSE METHOD
 # =========================================================
 
-def choose_procurement_method(
+def choose_procurement_method(c, request):
+    traits    = c.get("traits", [])
+    energy    = c.get("needs", {}).get("energy", 1)
+    category  = request.get("category")
 
-    c,
-
-    request
-):
-
-    traits = c.get(
-        "traits",
-        []
-    )
-
-    laziness = c.get(
-        "laziness",
-        0
-    )
-
-    energy = c.get(
-        "needs",
-        {}
-    ).get(
-        "energy",
-        1
-    )
-
-    category = request.get(
-        "category"
-    )
-
-    # =====================================================
-    # LARGE ITEMS
-    # =====================================================
-
-    if category in [
-
-        "furniture",
-
-        "appliances"
-    ]:
-
+    if category in ("furniture", "appliances"):
         return "online"
-
-    # =====================================================
-    # LOW ENERGY
-    # =====================================================
-
     if energy < 0.25:
-
         return "online"
-
-    # =====================================================
-    # LAZY
-    # =====================================================
-
-    if (
-
-        "lazy" in traits
-
-        or
-
-        laziness > 0.6
-    ):
-
-        if random.random() < 0.7:
-
-            return "online"
-
-    # =====================================================
-    # DEFAULT
-    # =====================================================
-
-    return random.choice([
-
-        "in_person",
-
-        "online"
-    ])
+    if "lazy" in traits and random.random() < 0.7:
+        return "online"
+    return random.choice(["in_person", "online"])
 
 
 # =========================================================
-# CHOOSE PRODUCT
+# CHOOSE FROM CATALOG
 # =========================================================
 
-def choose_product(
-
-    c,
-
-    category,
-
-    budget=None
-):
-
-    money = c.get(
-        "money",
-        0
-    )
-
+def choose_from_catalog(c, world, category, budget=None, item_type=None):
+    """
+    Pick the best catalog entry within budget, scored by character traits.
+    Returns the full catalog entry dict (with 'id' key), or None.
+    """
+    money = c.get("money", 0)
     if budget is None:
         budget = money
 
-    products = affordable_products(
-
-        category,
-
-        budget
-    )
-
-    if not products:
+    candidates = browse_catalog(world, category=category, budget=budget, item_type=item_type)
+    if not candidates:
         return None
 
-    traits = c.get(
-        "traits",
-        []
-    )
-
+    traits = c.get("traits", [])
     scored = []
 
-    for pid, product in products:
-
-        score = 1.0
-
-        quality = product.get(
-            "quality",
-            0.5
-        )
-
-        price = product.get(
-            "price",
-            0
-        )
-
-        # =================================================
-        # TRAITS
-        # =================================================
+    for entry in candidates:
+        score   = 1.0
+        price   = entry["current_price"]
+        quality = 0.5  # catalog entries don't have quality; use price as proxy
 
         if "frugal" in traits:
-
-            score += (
-                1.0 / max(1, price)
-            ) * 100
-
-        if "foodie" in traits:
-
-            score += (
-                quality * 3
-            )
-
+            score += 100.0 / max(1.0, price)
         if "materialistic" in traits:
+            score += price / 500.0
 
-            score += (
-                quality * 2
-            )
+        score += random.uniform(-0.3, 0.3)
+        scored.append((entry, score))
 
-        if "lazy" in traits:
-
-            if product.get(
-                "delivery_supported"
-            ):
-
-                score += 1.5
-
-        score += random.uniform(
-            -0.5,
-            0.5
-        )
-
-        scored.append((
-
-            pid,
-
-            product,
-
-            score
-        ))
-
-    scored.sort(
-
-        key=lambda x: x[2],
-
-        reverse=True
-    )
-
-    return scored[0][1]
+    scored.sort(key=lambda x: x[1], reverse=True)
+    return scored[0][0]
 
 
 # =========================================================
-# PURCHASE PRODUCT
+# PURCHASE FROM CATALOG
 # =========================================================
 
-def purchase_product(
+def purchase_from_catalog(c, household, world, catalog_id, method="in_person"):
+    """
+    Buy one unit of catalog_id.
 
-    c,
+    Outcome depends on entry type:
+      resource_type set → deposits resource into household storage
+      type == "item" (no resource_type) → make_item() → c["inventory"]
+      type == "prop" + requires_assembly → make_assembly_box() → c["inventory"]
+      type == "prop" + not requires_assembly → schedule_delivery_prop()
+    """
+    from systems.assembly import make_assembly_box
 
-    household,
-
-    product,
-
-    world,
-
-    method="in_person"
-):
-
-    if not product:
+    catalog = world.get("market", {}).get("catalog", {})
+    entry   = catalog.get(catalog_id)
+    if not entry:
         return False
 
-    price = product.get(
-        "price",
-        0
-    )
-
-    if c.get(
-        "money",
-        0
-    ) < price:
-
+    price = entry["current_price"]
+    if c.get("money", 0) < price:
         return False
 
-    c["money"] -= price
+    c["money"] = round(c["money"] - price, 2)
 
-    # =====================================================
-    # ONLINE
-    # =====================================================
-
-    if method == "online":
-
-        schedule_delivery(
-
-            household,
-
-            product,
-
-            world
+    # --- Resource consumable (groceries, hygiene, bulk drinks) ---
+    if entry.get("resource_type"):
+        resource = create_resource(
+            entry["resource_type"],
+            quantity=entry.get("quantity", 1),
+            quality=0.6,
+            container=entry.get("storage_container", "storage"),
         )
-
+        add_household_resource(household, resource)
         return True
 
-    # =====================================================
-    # IMMEDIATE ACQUISITION
-    # =====================================================
+    # --- Prop ---
+    if entry["type"] == "prop":
+        if entry.get("requires_assembly"):
+            box = make_assembly_box(catalog_id, world)
+            add_item(c, box)
+        else:
+            schedule_delivery_prop(household, catalog_id, world)
+        return True
 
-    acquire_product(
-
-        household,
-
-        product
-    )
+    # --- Discrete item ---
+    if method == "online":
+        schedule_delivery_item(household, catalog_id, world)
+    else:
+        item = make_item(catalog_id)
+        add_item(c, item)
 
     return True
 
 
 # =========================================================
-# ACQUIRE PRODUCT
+# DELIVERY SCHEDULING
 # =========================================================
 
-def acquire_product(
+def schedule_delivery_item(household, catalog_id, world):
+    world.setdefault("deliveries", []).append({
+        "household_id": household["id"],
+        "type":         "item",
+        "catalog_id":   catalog_id,
+        "arrival_tick": world["tick"] + random.randint(12, 48) * 3600,
+        "status":       "in_transit",
+    })
 
-    household,
 
-    product
-):
+def schedule_delivery_prop(household, catalog_id, world):
+    world.setdefault("deliveries", []).append({
+        "household_id": household["id"],
+        "type":         "prop",
+        "catalog_id":   catalog_id,
+        "arrival_tick": world["tick"] + random.randint(24, 72) * 3600,
+        "status":       "in_transit",
+    })
 
-    # =====================================================
-    # RESOURCE PRODUCTS
-    # =====================================================
 
-    if "resource_type" in product:
+# =========================================================
+# DELIVERY PROCESSING  (called each SLOW tick)
+# =========================================================
 
-        resource = create_resource(
+def process_deliveries(world):
+    tick      = world.get("tick", 0)
+    pending   = world.get("deliveries", [])
+    remaining = []
 
-            product[
-                "resource_type"
-            ],
+    for delivery in pending:
+        if delivery.get("arrival_tick", 0) > tick:
+            remaining.append(delivery)
+            continue
 
-            quantity=product.get(
-                "quantity",
-                1
-            ),
+        hid   = delivery.get("household_id")
+        h     = world.get("households", {}).get(hid)
+        if not h:
+            continue
 
-            quality=product.get(
-                "quality",
-                0.5
-            ),
+        cid   = delivery.get("catalog_id")
+        dtype = delivery.get("type")
 
-            container=
-                determine_container(
-                    product
-                )
-        )
+        if dtype == "item":
+            _deliver_item(h, cid, world)
+        elif dtype == "prop":
+            _deliver_prop(h, cid, world)
 
-        add_household_resource(
+    world["deliveries"] = remaining
 
-            household,
 
-            resource
-        )
+def _deliver_item(household, catalog_id, world):
+    """Deposit delivered item into the household owner's inventory."""
+    from systems.personal_items import add_item, make_item
+    members = household.get("members", [])
+    if not members:
+        return
+    # Give to first available member
+    chars = world.get("characters", {})
+    for cid in members:
+        c = chars.get(cid)
+        if c:
+            item = make_item(catalog_id)
+            add_item(c, item)
+            return
 
+
+def _deliver_prop(household, catalog_id, world):
+    """Place delivered prop in the household's home building."""
+    home_id = household.get("home_id")
+    if not home_id:
         return
 
-    # =====================================================
-    # OBJECT PRODUCTS
-    # =====================================================
-
-    household.setdefault(
-        "owned_objects",
-        []
+    prop_templates = (
+        world.get("definitions", {})
+             .get("prop_templates", {})
     )
+    template = prop_templates.get(catalog_id)
+    if not template:
+        return
 
-    household[
-        "owned_objects"
-    ].append({
-
-        "object_type":
-            product.get(
-                "object_type"
-            ),
-
-        "quality":
-            product.get(
-                "quality",
-                0.5
-            ),
-
-        "product":
-            product
+    import uuid
+    world.setdefault("props", []).append({
+        "id":          f"prop_{catalog_id}_{uuid.uuid4().hex[:6]}",
+        "template":    catalog_id,
+        "building_id": home_id,
+        "x":           0,
+        "y":           0,
+        "rotation":    0,
+        "state":       {"reserved_by": [], "dirty": False},
     })
 
 
 # =========================================================
-# DELIVERY
+# LEGACY COMPAT — determine_container still used internally
 # =========================================================
 
-def schedule_delivery(
-
-    household,
-
-    product,
-
-    world
-):
-
-    world.setdefault(
-        "deliveries",
-        []
-    )
-
-    delay_hours = random.randint(
-        12,
-        48
-    )
-
-    arrival_tick = (
-
-        world["tick"]
-
-        +
-
-        delay_hours * 3600
-    )
-
-    world[
-        "deliveries"
-    ].append({
-
-        "household_id":
-            household["id"],
-
-        "product":
-            product,
-
-        "arrival_tick":
-            arrival_tick,
-
-        "status":
-            "in_transit"
-    })
-
-
-# =========================================================
-# CONTAINER
-# =========================================================
-
-def determine_container(
-
-    product
-):
-
-    rt = product.get(
-        "resource_type"
-    )
-
-    if rt in [
-
-        "FOOD_PROTEIN",
-
-        "FOOD_VEGETABLE",
-
-        "MEAL",
-
-        "STORED_MEAL",
-
-        "PROCESSED_MEAL",
-
-        "DRINK_MILK"
-    ]:
-
+def determine_container(resource_type):
+    if resource_type in ("FOOD_PROTEIN", "FOOD_VEGETABLE", "MEAL",
+                         "STORED_MEAL", "PROCESSED_MEAL", "DRINK_MILK"):
         return "fridge"
-
-    if rt in [
-
-        "FOOD_CARB",
-
-        "FOOD_SNACK",
-
-        "FOOD_SPICE",
-
-        "DRINK_COFFEE",
-
-        "DRINK_TEA"
-    ]:
-
+    if resource_type in ("FOOD_CARB", "FOOD_SNACK", "FOOD_SPICE",
+                         "DRINK_COFFEE", "DRINK_TEA", "DRINK_SOFT",
+                         "DRINK_ALCOHOL"):
         return "pantry"
-
-    if rt in [
-
-        "HYGIENE",
-
-        "TOILET_PAPER"
-    ]:
-
+    if resource_type in ("HYGIENE", "TOILET_PAPER", "CLEANING"):
         return "bathroom"
-
     return "storage"

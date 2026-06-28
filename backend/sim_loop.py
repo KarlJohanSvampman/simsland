@@ -44,6 +44,7 @@ from brain.beliefs      import polarization_drift, compute_alignment
 from brain.relationships import first_impression, update_relationship_state
 from systems.cooking_process import update_cooking_process
 from systems.market     import update_market, produce, consume_households
+from systems.procurement  import process_deliveries
 from systems.stock_market  import update_stocks, init_stocks
 from systems.investments   import update_investment_behavior
 from systems.deliveries import update_deliveries
@@ -256,6 +257,9 @@ def tick(world):
     if every(world, CADENCE["job_market"], offset=20):
         for c in characters:
             update_investment_behavior(c, world)
+
+    if every(world, CADENCE["postal"], offset=21):
+        process_deliveries(world)
 
     # Eviction / migration: emit events when thresholds crossed
     if every(world, CADENCE["evictions"], offset=18):
