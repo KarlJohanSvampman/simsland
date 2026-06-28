@@ -2,7 +2,7 @@
 body.py — unified physical body simulation
 
 c["body"] is the single source of truth for all physical needs.
-c["needs"] retains only psychological/social dimensions (social, fun).
+Long-term psychological drives (socialize, play, romance, …) live in c["lt_needs"].
 
 Body fields (all 0-100):
   hunger            0=full,        100=starving
@@ -53,13 +53,8 @@ def ensure_body(c):
     body = c.setdefault("body", {})
     for k, v in _BODY_DEFAULTS.items():
         body.setdefault(k, v)
-    # Psychological needs stay separate
-    needs = c.setdefault("needs", {})
-    needs.setdefault("social", 0.7)
-    needs.setdefault("fun",    0.6)
-    # Remove legacy fields that are now in body
-    for stale in ("energy", "hunger", "hygiene"):
-        needs.pop(stale, None)
+    # Remove legacy c["needs"] entirely — long-term drives live in c["lt_needs"]
+    c.pop("needs", None)
 
 
 # ── helpers ───────────────────────────────────────────────────────────────────
@@ -270,4 +265,4 @@ def _check_health_thresholds(c):
             emit("health_threshold_crossed",
                  {"character_id": c["id"], "need": need, "value": val})
         elif val < threshold * 0.7:
-            fired.discard(key)
+            fire

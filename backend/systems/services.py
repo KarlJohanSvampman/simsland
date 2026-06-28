@@ -186,7 +186,6 @@ def _spawn_worker(contract, world):
         "service_contract": contract["id"],
         "service_role":     trait,
         "animation_state":  "walk",
-        "needs": {"social": 0.5, "fun": 0.5},
         "body": {
             "hunger": 20, "hydration": 80, "bladder": 5, "bowels": 5,
             "fatigue": 10, "sleep_debt": 0, "hygiene": 95, "odor": 0,
@@ -431,16 +430,12 @@ def _do_drug_deal(contract, world):
 
 
 def _do_companionship(contract, world):
-    """Apply social/fun effect to requesting character each work tick."""
-    sub     = SERVICE_CATALOG["escort"]["subtypes"]["companionship"]
-    effects = sub.get("item_effects", {})
-    buyer   = world.get("characters", {}).get(contract["requested_by"])
+    """Satisfy socialize/play lt_needs for the buyer each work tick."""
+    from systems.lt_needs import satisfy_lt_need
+    buyer = world.get("characters", {}).get(contract["requested_by"])
     if buyer:
-        needs = buyer.setdefault("needs", {})
-        for need, delta in effects.items():
-            # Only apply to psychological needs still in c["needs"]
-            if need in ("social", "fun"):
-                needs[need] = min(1.0, needs.get(need, 0.5) + delta * 0.25)
+        satisfy_lt_need(buyer, "socialize", world)
+        satisfy_lt_need(buyer, "play", world)
     contract["work_progress"] += 1
 
 
@@ -590,3 +585,8 @@ def available_services():
 def active_contracts_for_household(world, household_id):
     """Active contracts for a given household (not yet departed)."""
     return [
+        c for c in world.get("service_contracts", [])
+        if c["household_id"] == household_id
+        and c["status"] != PHASE_DEPARTED
+    ]
+                                              
