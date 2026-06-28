@@ -1,3 +1,4 @@
+from systems.stock_market import init_stocks
 import time
 from datetime import datetime
 
@@ -394,4 +395,5 @@ def generate_initial_world():
         ]
     }
 
+    init_stocks(world)
     return world

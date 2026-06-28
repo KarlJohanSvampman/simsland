@@ -44,6 +44,8 @@ from brain.beliefs      import polarization_drift, compute_alignment
 from brain.relationships import first_impression, update_relationship_state
 from systems.cooking_process import update_cooking_process
 from systems.market     import update_market, produce, consume_households
+from systems.stock_market  import update_stocks, init_stocks
+from systems.investments   import update_investment_behavior
 from systems.deliveries import update_deliveries
 from systems.service_worker_runtime import update_service_workers
 from systems.household_monitoring   import update_household_monitoring
@@ -60,6 +62,11 @@ from systems.appliance_degradation import update_appliance_degradation
 from systems.messaging  import deliver_messages
 from systems.migration  import check_migration_desires
 from systems.eviction   import check_household_for_eviction
+
+# -- Conflict / social drama ──────────────────────────────────────────────
+from systems.grievances        import update_grievances
+from systems.conflict_pipeline import process_conflicts
+from systems.social_contracts  import check_contract_violations
 
 # -- Very slow (÷300) ─────────────────────────────────────────────
 from systems.crisis     import check_crises, process_crises
@@ -205,6 +212,7 @@ def tick(world):
     # -- Medium: market (÷20) ───────────────────────────────
     if every(world, CADENCE["market"], offset=9):
         update_market(world)
+        update_stocks(world)
         produce(world)
         consume_households(world)
 
@@ -245,6 +253,10 @@ def tick(world):
         generate_news(world)
         maybe_generate_shared_event(world)
 
+    if every(world, CADENCE["job_market"], offset=20):
+        for c in characters:
+            update_investment_behavior(c, world)
+
     # Eviction / migration: emit events when thresholds crossed
     if every(world, CADENCE["evictions"], offset=18):
         for hh in world.get("households", {}).values():
@@ -252,6 +264,16 @@ def tick(world):
 
     if every(world, CADENCE["migration"], offset=19):
         check_migration_desires(world)               # emits household_wants_to_move
+
+    # -- Conflict / social drama ────────────────────────────────────────
+    if every(world, CADENCE["conflicts"], offset=24):
+        process_conflicts(world)
+
+    if every(world, CADENCE["grievances"], offset=25):
+        update_grievances(world)    # decay + emit confrontation_desired
+
+    if every(world, CADENCE["contract_checks"], offset=26):
+        check_contract_violations(world)  # emits contract_violated
 
     # -- Very slow (÷300) ───────────────────────────────────
     if every(world, CADENCE["crisis"], offset=20):

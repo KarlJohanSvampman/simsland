@@ -465,6 +465,7 @@ def build_context(
         "social_models":build_social_model_context(c),
         "active_conflict": build_conflict_context(c, world),
         "grievances": build_grievance_context(c, world),
+        "investments": build_investment_context(c, world),
     }
 
     return context
@@ -976,3 +977,49 @@ def build_grievance_context(c, world):
 
     results.sort(key=lambda x: x["score"], reverse=True)
     return results[:5]
+
+
+# =========================================================
+# INVESTMENT CONTEXT
+# =========================================================
+
+def build_investment_context(c, world):
+    from systems.investments import portfolio_value, position_pnl
+
+    portfolio = c.get("portfolio", {})
+    if not portfolio:
+        return None
+
+    stocks = world.get("stocks", {})
+    positions = []
+    for ticker, pos in portfolio.items():
+        stock = stocks.get(ticker, {})
+        price = stock.get("price", pos["avg_buy_price"])
+        _, pct = position_pnl(c, world, ticker)
+        positions.append({
+            "ticker":      ticker,
+            "name":        stock.get("name", ticker),
+            "shares":      pos["shares"],
+            "avg_cost":    pos["avg_buy_price"],
+            "current":     price,
+            "pnl_pct":     round(pct * 100, 1),
+            "change_today": stock.get("change_pct", 0.0),
+        })
+
+    watched = []
+    for ticker in c.get("watched_stocks", []):
+        stock = stocks.get(ticker, {})
+        if stock:
+            watched.append({
+                "ticker":  ticker,
+                "name":    stock.get("name", ticker),
+                "price":   stock.get("price"),
+                "change":  stock.get("change_pct", 0.0),
+            })
+
+    return {
+        "portfolio_value": portfolio_value(c, world),
+        "positions":       positions,
+        "watching":        watched[:4],
+    }
+

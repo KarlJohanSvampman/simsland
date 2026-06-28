@@ -36,4 +36,6 @@ export function generateNavigationGrid(floorplan) {
     }
   }
 
-  floorplan.navigation = { walkable, blocked, wallE
+  floorplan.navigation = { walkable, blocked, wallEdges };
+  return floorplan.navigation;
+}

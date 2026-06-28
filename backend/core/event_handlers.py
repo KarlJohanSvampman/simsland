@@ -115,3 +115,44 @@ def _on_wants_to_move(data, world):
         _do_migrate(hh, world)
 
 subscribe("household_wants_to_move", _on_wants_to_move)
+
+
+# ── Conflict pipeline ─────────────────────────────────────
+
+def _on_confrontation_desired(data, world):
+    """Start a conflict when a character's grievances hit threshold."""
+    from systems.conflict_pipeline import start_conflict
+    initiator = world.get("characters", {}).get(data["initiator_id"])
+    target    = world.get("characters", {}).get(data["target_id"])
+    if not initiator or not target:
+        return
+    # Only start if they're in the same room or building
+    same_room     = initiator.get("room_id")     and initiator.get("room_id")     == target.get("room_id")
+    same_building = initiator.get("building_id") and initiator.get("building_id") == target.get("building_id")
+    if same_room or same_building:
+        start_conflict(data["initiator_id"], data["target_id"], world)
+
+subscribe("confrontation_desired", _on_confrontation_desired)
+
+
+def _on_contract_violated(data, world):
+    """Feed a contract violation back into the grievance system."""
+    from systems.grievances import add_grievance
+    victim = world.get("characters", {}).get(data["victim_id"])
+    if victim:
+        add_grievance(victim, data["violator_id"], "contract_violated", world,
+                      details={"commitment": data.get("commitment")})
+
+subscribe("contract_violated", _on_contract_violated)
+
+
+def _on_fight_physical(data, world):
+    """Physical altercation — trigger the emergency/law pipeline."""
+    from systems.emergency import trigger_incident
+    for pid in data.get("parties", []):
+        c = world.get("characters", {}).get(pid)
+        if c:
+            trigger_incident(world, c)
+            break  # one incident per fight is enough
+
+subscribe("fight_physical", _on_fight_physical)

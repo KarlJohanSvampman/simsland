@@ -379,3 +379,86 @@ def _dispatch_return(c, world, task):
     c["activity"]     = act
     c["_queue_task_id"]= task["id"]
     return True
+
+
+def _dispatch_carry_seat(c, world, task):
+    """
+    Carry a seat prop to a position in front of the target prop.
+    Reuses the existing carry activity phases (walking → picking_up →
+    delivering → put_down).
+    """
+    from systems.action_router import _scaffold
+    from systems.props         import get_prop_by_id
+
+    p            = task.get("params", {})
+    seat_prop_id = p.get("seat_prop_id")
+    if not seat_prop_id:
+        return False
+
+    seat_prop = get_prop_by_id(world, seat_prop_id)
+    if not seat_prop:
+        return False
+
+    act                  = _scaffold(c, world, "carry",
+                                     target_id=seat_prop_id,
+                                     interaction="carry",
+                                     duration=0)
+    act["phase"]         = "walking"
+    act["destination"]   = {
+        "x":             p.get("dest_x", seat_prop["x"]),
+        "y":             p.get("dest_y", seat_prop["y"]),
+        "target_prop_id": p.get("target_prop_id"),   # so put_down can orient the chair
+    }
+    act["phase_started_tick"] = world.get("tick", 0)
+    act["is_seat_carry"] = True   # flag so put_down knows to leave it oriented toward target
+
+    # Route character to the seat's current position
+    c["move_target"]     = {"x": seat_prop["x"], "y": seat_prop["y"],
+                             "target_id": seat_prop_id, "target_type": "prop"}
+    c["is_moving"]       = True
+    c["activity"]        = act
+    c["animation_state"] = "walk"
+    c["_queue_task_id"]  = task["id"]
+    return True
+
+
+def _dispatch_use_seat(c, world, task):
+    """
+    Walk the character to the seat prop and sit down, setting
+    seat_prop_id on the character so the frontend anchors them
+    to the seat instead of the activity target.
+    """
+    from systems.action_router import _scaffold
+    from systems.props         import get_prop_by_id
+    from systems.occupancy     import find_free_anchor, reserve_anchor
+
+    p            = task.get("params", {})
+    seat_prop_id = p.get("seat_prop_id")
+    if not seat_prop_id:
+        return False
+
+    seat_prop = get_prop_by_id(world, seat_prop_id)
+    if not seat_prop:
+        return False
+
+    # Find and reserve the sit anchor on the chair
+    anchor = find_free_anchor(seat_prop, "sit")
+    if anchor:
+        reserve_anchor(c, seat_prop, anchor)
+
+    act                    = _scaffold(c, world, "use_seat",
+                                       target_id=seat_prop_id,
+                                       interaction="sit",
+                                       duration=0)
+    act["phase"]           = "walking"
+    act["seat_prop_id"]    = seat_prop_id
+    act["view_target_id"]  = p.get("target_prop_id")  # prop the character should face while seated
+    act["phase_started_tick"] = world.get("tick", 0)
+
+    c["move_target"]       = {"x": seat_prop["x"], "y": seat_prop["y"],
+                               "target_id": seat_prop_id, "target_type": "prop"}
+    c["is_moving"]         = True
+    c["activity"]          = act
+    c["animation_state"]   = "walk"
+    c["_queue_task_id"]    = task["id"]
+    return True

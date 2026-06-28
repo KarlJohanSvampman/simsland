@@ -34,6 +34,8 @@ def ensure_world_defaults(world):
     )
     world.setdefault("conflicts",        {})
     world.setdefault("social_contracts", {})
+    world.setdefault("stocks",           {})
+    world.setdefault("stock_sector_trends", {})
 
 
     world.setdefault(
@@ -324,47 +326,9 @@ def ensure_world_defaults(world):
 # =========================================================
 
 def ensure_market_defaults(market):
-
-    defaults = {
-
-        "food": 10.0,
-
-        "medicine": 25.0,
-
-        "housing": 1000.0,
-
-        "electronics": 500.0,
-
-        "furniture": 200.0,
-
-        "clothing": 50.0,
-
-        "fuel": 5.0,
-
-        "utilities": 100.0
-    }
-
-    for key, price in defaults.items():
-
-        item = market.setdefault(
-            key,
-            {}
-        )
-
-        item.setdefault(
-            "price",
-            price
-        )
-
-        item.setdefault(
-            "supply",
-            1.0
-        )
-
-        item.setdefault(
-            "demand",
-            1.0
-        )
+    # Delegate to market.py which owns the full category-multiplier model
+    from systems.market import ensure_market_defaults as _ensure
+    _ensure(market)
 
 
 # =========================================================
@@ -420,6 +384,9 @@ def ensure_character_defaults(c):
 
     # Social conflict system
     c.setdefault("grievances",               [])
+    c.setdefault("portfolio",                {})
+    c.setdefault("watched_stocks",           [])
+    c.setdefault("last_stock_check",         0)
     c.setdefault("social_contract_ids",      [])
     c.setdefault("cold_shoulder_towards",    [])
     c.setdefault("_confrontation_emitted",   [])

@@ -41,3 +41,61 @@ function edgeBlocked(tiles, x, y, side) {
   const nTile = tiles[nKey];
   const inWall = nTile?.walls?.[OPPOSITE[side]];
   if (inWall?.type === "wall") return true;
+
+  return false;
+}
+
+export function detectRooms(floorplan) {
+  const tiles   = floorplan.tiles || {};
+  const visited = new Set();
+  const rooms   = [];
+
+  function floodFill(startX, startY) {
+    const queue     = [[startX, startY]];
+    const roomTiles = [];
+    visited.add(`${startX},${startY}`);
+
+    while (queue.length) {
+      const [x, y] = queue.shift();
+      roomTiles.push({ x, y });
+
+      for (const [side, [dx, dy]] of Object.entries(NEIGHBOR_DELTA)) {
+        const nx   = x + dx;
+        const ny   = y + dy;
+        const nKey = `${nx},${ny}`;
+
+        if (visited.has(nKey)) continue;
+        if (!tiles[nKey]?.floor) continue;          // neighbor has no floor
+        if (edgeBlocked(tiles, x, y, side)) {
+          visited.add(nKey);                         // wall blocks — don't cross but mark visited
+          continue;
+        }
+
+        visited.add(nKey);
+        queue.push([nx, ny]);
+      }
+    }
+
+    return roomTiles;
+  }
+
+  for (const key in tiles) {
+    if (visited.has(key)) continue;
+    if (!tiles[key]?.floor) continue;
+
+    const [x, y] = key.split(",").map(Number);
+    const roomTiles = floodFill(x, y);
+
+    if (roomTiles.length < 2) continue;
+
+    rooms.push({
+      id:    crypto.randomUUID(),
+      type:  "room",
+      tiles: roomTiles,
+      tags:  [],
+    });
+  }
+
+  floorplan.rooms = rooms;
+  return rooms;
+}

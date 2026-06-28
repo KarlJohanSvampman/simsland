@@ -490,4 +490,332 @@ function renderWalls() {
     const px     = x * TILE_SIZE;
     const py     = y * TILE_SIZE;
 
-    for (const [side,
+    for (const [side, wall] of Object.entries(tile.walls || {})) {
+      if (!wall) continue;
+      ctx.strokeStyle = WALL_COLORS[wall.type] ?? "#ddd";
+      ctx.lineWidth   = wall.type === "wall" ? 3 : 2;
+      ctx.beginPath();
+      switch (side) {
+        case "north": ctx.moveTo(px,            py);            ctx.lineTo(px + TILE_SIZE, py           ); break;
+        case "south": ctx.moveTo(px,            py + TILE_SIZE); ctx.lineTo(px + TILE_SIZE, py + TILE_SIZE); break;
+        case "west":  ctx.moveTo(px,            py);            ctx.lineTo(px,             py + TILE_SIZE); break;
+        case "east":  ctx.moveTo(px + TILE_SIZE, py);           ctx.lineTo(px + TILE_SIZE, py + TILE_SIZE); break;
+      }
+      ctx.stroke();
+    }
+  }
+}
+
+function renderHoverEdge() {
+  if (!hoverInfo || !inBounds(hoverInfo.x, hoverInfo.y)) return;
+  if (!["wall", "door", "window"].includes(currentTool)) return;
+
+  const { x, y, side } = hoverInfo;
+  const px = x * TILE_SIZE;
+  const py = y * TILE_SIZE;
+
+  ctx.save();
+  ctx.setLineDash([4, 4]);
+  ctx.strokeStyle = WALL_COLORS[currentTool] ?? "#fff";
+  ctx.lineWidth   = 3;
+  ctx.globalAlpha = 0.7;
+  ctx.beginPath();
+
+  switch (side) {
+    case "north": ctx.moveTo(px,            py);             ctx.lineTo(px + TILE_SIZE, py            ); break;
+    case "south": ctx.moveTo(px,            py + TILE_SIZE); ctx.lineTo(px + TILE_SIZE, py + TILE_SIZE); break;
+    case "west":  ctx.moveTo(px,            py);             ctx.lineTo(px,             py + TILE_SIZE); break;
+    case "east":  ctx.moveTo(px + TILE_SIZE, py);            ctx.lineTo(px + TILE_SIZE, py + TILE_SIZE); break;
+  }
+  ctx.stroke();
+  ctx.restore();
+}
+
+// =========================================================
+// UI UPDATES
+// =========================================================
+
+function updateSelectionInfo() {
+  document.getElementById("selectionInfo").textContent =
+    selectedTiles.size > 0 ? `${selectedTiles.size} tile(s) selected` : "None";
+  // Show room create form only when tiles are selected and room mode is active
+  document.getElementById("roomCreateForm").style.display =
+    (roomMode && selectedTiles.size > 0) ? "block" : "none";
+}
+
+function updateRoomList() {
+  const el = document.getElementById("roomList");
+  el.innerHTML = "";
+  for (const room of floorplan.rooms) {
+    const div = document.createElement("div");
+    div.className = "roomRow";
+
+    const typeLabel = room.type.replace(/_/g, " ");
+    div.innerHTML = `
+      <strong>${typeLabel}</strong>
+      <div class="roomRowType">${room.id} · ${room.tiles.length} tiles</div>
+      <button data-rid="${room.id}" class="deleteRoomBtn">Remove</button>
+    `;
+    div.querySelector(".deleteRoomBtn").onclick = () => {
+      floorplan.rooms = floorplan.rooms.filter(r => r.id !== room.id);
+      invalidateNavigation();
+      updateRoomList();
+      render();
+    };
+    el.appendChild(div);
+  }
+}
+
+function updatePropSpawnList() {
+  const el = document.getElementById("propSpawnList");
+  el.innerHTML = "";
+  for (const ps of floorplan.prop_spawns || []) {
+    const div = document.createElement("div");
+    div.className = "propSpawnRow";
+    div.innerHTML = `
+      <span>${ps.template} <small style="color:#888">(${ps.x},${ps.y}) r${ps.rotation}</small></span>
+      <button data-pid="${ps.id}">✕</button>
+    `;
+    div.querySelector("button").onclick = () => {
+      floorplan.prop_spawns = floorplan.prop_spawns.filter(p => p.id !== ps.id);
+      updatePropSpawnList();
+      render();
+    };
+    el.appendChild(div);
+  }
+  if (floorplan.prop_spawns.length === 0) {
+    el.textContent = "None";
+  }
+}
+
+function setStatus(text) {
+  document.getElementById("status").textContent = text;
+}
+
+// =========================================================
+// DEFINITIONS / POPULATION
+// =========================================================
+
+async function loadDefinitions() {
+  const res    = await fetch("/api/editor/definitions?sim_id=default");
+  definitions  = await res.json();
+  populateMaterials();
+  populateTileTemplates();
+  populatePropTemplates();
+}
+
+function populateMaterials() {
+  const select = document.getElementById("materialSelect");
+  select.innerHTML = "";
+  for (const [id, mat] of Object.entries(definitions.material_templates || {})) {
+    const opt   = document.createElement("option");
+    opt.value   = id;
+    opt.textContent = mat.name || id;
+    select.appendChild(opt);
+  }
+  select.onchange = () => { currentMaterial = select.value; };
+  if (select.value) currentMaterial = select.value;
+}
+
+function populateTileTemplates() {
+  const select = document.getElementById("tileTemplateSelect");
+  if (!select) return;
+  select.innerHTML = "";
+  for (const [id, tpl] of Object.entries(definitions.tile_templates || {})) {
+    const opt   = document.createElement("option");
+    opt.value   = id;
+    opt.textContent = tpl.name || id;
+    select.appendChild(opt);
+  }
+  if (select.options.length) currentTileTemplate = select.options[0].value;
+  select.onchange = () => { currentTileTemplate = select.value; };
+}
+
+function populatePropTemplates() {
+  const select = document.getElementById("propTemplateSelect");
+  select.innerHTML = "<option value=''>-- select --</option>";
+  for (const [id, tpl] of Object.entries(definitions.prop_templates || {})) {
+    const opt       = document.createElement("option");
+    opt.value       = id;
+    opt.textContent = tpl.name || id;
+    select.appendChild(opt);
+  }
+  select.onchange = () => {
+    currentPropTemplate = select.value;
+  };
+}
+
+// =========================================================
+// SAVE / LOAD / REBUILD
+// =========================================================
+
+function rebuildCaches() {
+  if (FLOORPLAN_CACHE.roomsDirty) {
+    // Keep manually created rooms; only auto-detect if rooms array is empty
+    if (floorplan.rooms.length === 0) detectRooms(floorplan);
+    FLOORPLAN_CACHE.roomsDirty = false;
+  }
+  if (FLOORPLAN_CACHE.graphDirty) {
+    generateRoomGraph(floorplan);
+    FLOORPLAN_CACHE.graphDirty = false;
+  }
+  if (FLOORPLAN_CACHE.navDirty) {
+    generateNavigationGrid(floorplan);
+    FLOORPLAN_CACHE.navDirty = false;
+  }
+}
+
+async function saveDefinitions(defs) {
+  await fetch("/api/editor/definitions?sim_id=default", {
+    method:  "POST",
+    headers: { "Content-Type": "application/json" },
+    body:    JSON.stringify(defs),
+  });
+}
+
+async function saveFloorplan() {
+  rebuildCaches();
+  const defs = definitions;
+  defs.floorplan_templates = defs.floorplan_templates || {};
+  defs.floorplan_templates[floorplan.id] = floorplan;
+  await saveDefinitions(defs);
+  setStatus(`Saved ${floorplan.id}`);
+}
+
+async function loadFloorplan() {
+  const id = prompt("Floorplan template ID to load:");
+  if (!id) return;
+  const fp = definitions?.floorplan_templates?.[id];
+  if (!fp) { setStatus(`Not found: ${id}`); return; }
+  floorplan = structuredClone(fp);
+  floorplan.prop_spawns = floorplan.prop_spawns || [];
+  invalidateNavigation();
+  updateRoomList();
+  updatePropSpawnList();
+  render();
+  setStatus(`Loaded ${id}`);
+}
+
+// =========================================================
+// TOOL BUTTONS
+// =========================================================
+
+document.querySelectorAll(".toolBtn").forEach(btn => {
+  btn.onclick = () => {
+    document.querySelectorAll(".toolBtn").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    currentTool = btn.dataset.tool;
+    roomMode    = false;
+    document.getElementById("roomModeIndicator").classList.remove("active");
+    document.getElementById("propSpawnForm").style.display =
+      currentTool === "prop" ? "block" : "none";
+    updateSelectionInfo();
+  };
+});
+
+// Prop rotation
+document.getElementById("propRotationSelect").onchange = e => {
+  currentPropRotation = parseInt(e.target.value);
+};
+
+// =========================================================
+// ROOM MODE
+// =========================================================
+
+document.getElementById("roomModeBtn").onclick = () => {
+  roomMode = !roomMode;
+  const indicator = document.getElementById("roomModeIndicator");
+  indicator.classList.toggle("active", roomMode);
+  document.getElementById("roomModeBtn").classList.toggle("active", roomMode);
+  if (!roomMode) {
+    selectedTiles.clear();
+    document.getElementById("roomCreateForm").style.display = "none";
+    render();
+  }
+  updateSelectionInfo();
+};
+
+document.getElementById("autoDetectRoomsBtn").onclick = () => {
+  floorplan.rooms = [];
+  detectRooms(floorplan);
+  generateRoomGraph(floorplan);
+  generateNavigationGrid(floorplan);
+  FLOORPLAN_CACHE.roomsDirty  = false;
+  FLOORPLAN_CACHE.graphDirty  = false;
+  FLOORPLAN_CACHE.navDirty    = false;
+  updateRoomList();
+  render();
+  setStatus(`Auto-detected ${floorplan.rooms.length} room(s)`);
+};
+
+// =========================================================
+// ROOM CREATE FORM
+// =========================================================
+
+document.getElementById("confirmRoomBtn").onclick = () => {
+  if (selectedTiles.size === 0) return;
+  invalidateNavigation();
+
+  const type = document.getElementById("roomTypeSelect").value;
+  const tags = (document.getElementById("roomTagsInput").value || "")
+    .split(",").map(t => t.trim()).filter(Boolean);
+  const id   = `${type}_${floorplan.rooms.length}`;
+
+  const tiles = [...selectedTiles].map(k => {
+    const [x, y] = k.split(",").map(Number);
+    return { x, y };
+  });
+
+  floorplan.rooms.push({ id, type, tags, tiles });
+
+  selectedTiles.clear();
+  document.getElementById("roomTagsInput").value = "";
+  document.getElementById("roomCreateForm").style.display = "none";
+  updateSelectionInfo();
+  updateRoomList();
+  rebuildCaches();
+  render();
+  setStatus(`Created room: ${id}`);
+};
+
+document.getElementById("cancelRoomBtn").onclick = () => {
+  selectedTiles.clear();
+  document.getElementById("roomCreateForm").style.display = "none";
+  updateSelectionInfo();
+  render();
+};
+
+// =========================================================
+// NEW / SAVE / LOAD BUTTONS
+// =========================================================
+
+document.getElementById("newFloorplanBtn").onclick = () => {
+  const id = document.getElementById("floorplanId").value   || "new_floorplan";
+  const w  = parseInt(document.getElementById("floorplanWidth").value)  || 20;
+  const h  = parseInt(document.getElementById("floorplanHeight").value) || 20;
+
+  floorplan = {
+    id, category: "residential", tags: [],
+    width: w, height: h,
+    tiles: {}, rooms: [], roomGraph: {}, navigation: {},
+    prop_spawns: [],
+  };
+  invalidateNavigation();
+  updateRoomList();
+  updatePropSpawnList();
+  render();
+  setStatus(`New floorplan: ${id} (${w}×${h})`);
+};
+
+document.getElementById("saveFloorplanBtn").onclick = saveFloorplan;
+document.getElementById("loadFloorplanBtn").onclick = loadFloorplan;
+
+// =========================================================
+// INIT
+// =========================================================
+
+loadDefinitions().then(() => {
+  updatePropSpawnList();
+  render();
+  setStatus("Ready — scroll to zoom, middle-drag to pan");
+});

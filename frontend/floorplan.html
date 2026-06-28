@@ -204,4 +204,136 @@ canvas {
 
 hr { border-color: #333; margin: 12px 0; }
 
-h2 { font-size: 15px; margin: 
+h2 { font-size: 15px; margin: 0 0 10px 0; }
+</style>
+</head>
+<body>
+
+<div id="root">
+
+  <!-- ===== LEFT TOOLBAR ===== -->
+  <div id="toolbar">
+
+    <div class="section">
+      <h3>Paint Tools</h3>
+
+      <button class="toolBtn active" data-tool="tile">🔲 Tile</button>
+      <select id="tileTemplateSelect"></select>
+
+      <button class="toolBtn" data-tool="wall">🧱 Wall</button>
+      <button class="toolBtn" data-tool="door">🚪 Door</button>
+      <button class="toolBtn" data-tool="window">🪟 Window</button>
+      <button class="toolBtn" data-tool="staircase">🪜 Staircase</button>
+      <button class="toolBtn" data-tool="erase">🗑 Erase</button>
+    </div>
+
+    <div class="section">
+      <h3>Wall Material</h3>
+      <select id="materialSelect"></select>
+    </div>
+
+    <div class="section">
+      <h3>Prop Spawns</h3>
+      <button class="toolBtn" data-tool="prop">📦 Place Prop</button>
+
+      <div id="propSpawnForm">
+        <label>Prop Template</label>
+        <select id="propTemplateSelect"></select>
+        <label>Rotation (0–3 quarter turns)</label>
+        <select id="propRotationSelect">
+          <option value="0">0° North</option>
+          <option value="1">90° East</option>
+          <option value="2">180° South</option>
+          <option value="3">270° West</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="section">
+      <h3>Room Tools</h3>
+
+      <button id="roomModeBtn">☑ Room Select Mode</button>
+      <button id="autoDetectRoomsBtn">⚡ Auto-Detect Rooms</button>
+    </div>
+
+    <div class="section">
+      <h3>Floorplan</h3>
+
+      <label style="font-size:11px;color:#889">Template ID</label>
+      <input id="floorplanId" placeholder="starter_house" value="starter_house" />
+
+      <label style="font-size:11px;color:#889">Width (tiles)</label>
+      <input id="floorplanWidth" type="number" value="20" min="4" max="200" />
+
+      <label style="font-size:11px;color:#889">Height (tiles)</label>
+      <input id="floorplanHeight" type="number" value="20" min="4" max="200" />
+
+      <button id="newFloorplanBtn">New Floorplan</button>
+      <button id="saveFloorplanBtn">💾 Save</button>
+      <button id="loadFloorplanBtn">📂 Load</button>
+    </div>
+
+    <div id="status">Ready</div>
+
+  </div>
+
+  <!-- ===== CANVAS ===== -->
+  <div id="canvasContainer">
+    <canvas id="floorCanvas"></canvas>
+    <div id="canvasHint">Scroll to zoom · Middle-drag or Right-drag to pan · Right-click erases</div>
+  </div>
+
+  <!-- ===== SIDE PANEL ===== -->
+  <div id="sidepanel">
+
+    <div id="roomModeIndicator">Room Select Mode — click tiles</div>
+
+    <!-- Room creation form (shown in room mode) -->
+    <div id="roomCreateForm">
+      <h4>Create Room from Selection</h4>
+
+      <label>Room Type</label>
+      <select id="roomTypeSelect">
+        <option value="living_room">Living Room</option>
+        <option value="bedroom">Bedroom</option>
+        <option value="kitchen">Kitchen</option>
+        <option value="dining_room">Dining Room</option>
+        <option value="restroom">Restroom / Bathroom</option>
+        <option value="home_office">Home Office</option>
+        <option value="corridor">Corridor / Hallway</option>
+        <option value="main_entrance">Main Entrance</option>
+        <option value="secondary_exit">Secondary Exit</option>
+        <option value="storage">Storage</option>
+        <option value="garage">Garage</option>
+        <option value="laundry">Laundry</option>
+        <option value="room">Generic Room</option>
+      </select>
+
+      <label>Tags (comma separated)</label>
+      <input id="roomTagsInput" type="text" placeholder="private, ground_floor" />
+
+      <button id="confirmRoomBtn">✔ Confirm Room</button>
+      <button id="cancelRoomBtn" class="danger">✕ Cancel</button>
+    </div>
+
+    <h2>Rooms</h2>
+    <div id="roomList"></div>
+
+    <hr />
+
+    <h2>Selection</h2>
+    <div id="selectionInfo">None</div>
+
+    <hr />
+
+    <h2>Prop Spawns</h2>
+    <div id="propSpawnList"></div>
+
+  </div>
+
+</div>
+
+<script type="module" src="/src/floorplan.js"></script>
+
+</body>
+</html>

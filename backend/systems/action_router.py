@@ -491,4 +491,39 @@ def route_action(c, world, action, speech, definitions=None):
     # the full prerequisite queue instead of starting directly.
     elif action_type in _HOBBY_ACTION_TYPES:
         _route_hobby(c, world, action_type)
-        return  # planner sets c["activity_queue"]; queue process
+        return  # planner sets c["activity_queue"]; queue processor takes it from here
+
+    # Set animation state — specific handlers set their own; only fall back for generic types
+    _NO_GENERIC_ANIM = {"interact", "examine", "search", "trash", "destroy",
+                        "carry", "clean", "wear", "undress"}
+    if action_type not in _NO_GENERIC_ANIM:
+        anim = _ACTION_ANIMATION.get(action_type, "idle")
+        c["animation_state"] = anim
+
+
+# =========================================================
+# HOBBY ROUTING
+# =========================================================
+
+from systems.hobby_requirements import ACTIVITY_TO_HOBBY
+
+_HOBBY_ACTION_TYPES = set(ACTIVITY_TO_HOBBY.keys())
+
+
+def _route_hobby(c, world, action_type):
+    """Intercept a hobby action and run the prerequisite planner."""
+    from systems.hobby_planner import plan_hobby
+
+    hobby_name = ACTIVITY_TO_HOBBY.get(action_type)
+    if not hobby_name:
+        # No special requirements — fall through to direct start
+        from systems.activities import start_activity
+        start_activity(c, world, action_type)
+        return
+
+    # Clear any stale queue before planning
+    if not c.get("activity_queue"):
+        queued = plan_hobby(c, world, hobby_name)
+        if not queued:
+            # Planner couldn't build queue (e.g. missing prop); desires already added
+            pass
