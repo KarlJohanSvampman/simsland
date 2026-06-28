@@ -18,13 +18,17 @@ import uuid
 # ITEM FACTORY — create instances from templates
 # =========================================================
 
-def make_item(template_id, quantity=1, **overrides):
+def make_item(template_id, quantity=1, world=None, **overrides):
     """
     Create an item instance from a template.
-    Returns a dict with a unique id, all template fields, plus overrides.
+    Prefers world["definitions"]["item_templates"] (JSON), falls back to Python dict.
     """
-    from data.item_templates import ITEM_TEMPLATES
-    template = ITEM_TEMPLATES.get(template_id)
+    from data.item_templates import ITEM_TEMPLATES as _PY_TEMPLATES
+    templates = (
+        (world or {}).get("definitions", {}).get("item_templates")
+        or _PY_TEMPLATES
+    )
+    template = templates.get(template_id)
     if not template:
         raise ValueError(f"Unknown item template: {template_id!r}")
     item = {
@@ -329,8 +333,4 @@ def inventory_summary(c):
         elif t == "id_card":
             result.append({
                 "type": "id_card",
-                "name": item.get("char_name"),
-            })
-        else:
-            result.append({"type": t, "name": item.get("name", t)})
-    return result
+          

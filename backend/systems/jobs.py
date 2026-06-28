@@ -1,15 +1,26 @@
 import random, uuid
-from data.professions import PROFESSIONS
+from data.professions import PROFESSIONS as _PY_PROFESSIONS
 from brain.memory import store_memory
 from core.event_bus import emit
+
+
+def _get_professions(world):
+    """Return job list from definitions.json if available, else Python list."""
+    job_tmpl = world.get("definitions", {}).get("job_templates", {})
+    if job_tmpl:
+        return [{"id": k, "title": v["name"], "hourly_wage": v.get("hourly_wage", v.get("salary", 0) / 160),
+                 "degree_required": v.get("degree_required"), "tags": v.get("tags", [])}
+                for k, v in job_tmpl.items()]
+    return _PY_PROFESSIONS
 
 
 def generate_job_listings(world):
     if world.get("job_listings"):
         return
+    professions = _get_professions(world)
     count = max(4, int(12 * (1 - world["environment"].get("unemployment_rate", .1))))
     for _ in range(count):
-        p    = random.choice(PROFESSIONS)
+        p    = random.choice(professions)
         wage = p["hourly_wage"] * world["environment"].get("average_salary_index", 1) * random.uniform(.85, 1.15)
         world["job_listings"].append({
             "id":               f"job_{uuid.uuid4().hex[:6]}",
@@ -71,12 +82,4 @@ def process_interview(c, world):
         c["job_searching"] = False
         c["job_id"]        = job["id"]
         c["profession"]    = job["profession"]
-        c["hourly_wage"]   = job["hourly_wage"]
-        job["open"]        = False
-        store_memory(c, f"Got hired as {job['title']}.", .8, ["job", "success"], "job", world["tick"])
-        emit("character_hired", {"character_id": c["id"], "job_id": job["id"], "title": job["title"]})
-    else:
-        store_memory(c, f"Failed the interview for {job['title']}.", .7,
-                     ["job", "rejection", "stress"], "job", world["tick"])
-        emit("interview_failed", {"character_id": c["id"], "job_id": job["id"]})
-    c["interview"] = None
+        c["hourly_wage"] 

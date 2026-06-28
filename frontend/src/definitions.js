@@ -30,24 +30,20 @@ let definitions = {
 
 const tabs = [
   "prop_templates",
-  "character_templates",
-  "floorplan_templates",
-  "interaction_templates",
-  "activity_templates",
-  "recipe_templates",
-  "product_templates",
-  "appliance_templates",
-  "vehicle_templates",
-  "service_templates",
-  "storage_templates",
-  "material_templates",
-  "tile_templates",
   "item_templates",
-  "social_templates",
-  "need_templates",
+  "character_templates",
   "trait_templates",
+  "need_templates",
+  "activity_templates",
+  "interaction_templates",
+  "recipe_templates",
+  "service_templates",
   "job_templates",
-  "company_templates"
+  "company_templates",
+  "vehicle_templates",
+  "floorplan_templates",
+  "tile_templates",
+  "material_templates",
 ];
 
 let meshbank = {};
@@ -722,13 +718,24 @@ const DEFAULT_TEMPLATES = {
     priority: 50
   },
 
+  // Activity = intention the LLM picks; engine runs steps automatically.
+  // Each step: find nearest prop matching target_interaction, move there, execute.
+  // requires: [] lists step ids that must complete first.
   activity_templates: {
     name: "New Activity",
-    priority: 50,
-    conditions: {
-      hour_range: [0, 24]
-    },
-    steps: []
+    category: "misc",
+    interruptible: true,
+    satisfies_needs: [],
+    steps: [
+      {
+        id: "step_1",
+        interaction: "",
+        target_interaction: "",
+        target_tags: [],
+        duration_minutes: 5,
+        requires: []
+      }
+    ]
   },
 
   tile_templates: {
@@ -767,74 +774,18 @@ const DEFAULT_TEMPLATES = {
     result_quantity: 1,
     skill_required: "cooking",
     skill_level: 0,
-    duration: 300
+    duration_minutes: 30
   },
 
-  product_templates: {
-    name: "New Product",
-    category: "misc",
-    base_price: 1.0,
-    tags: [],
-    perishable: false
-  },
-
-  appliance_templates: {
-    name: "New Appliance",
-    category: "kitchen",
-    model: "",
-    power_consumption: 0,
-    interactions: [],
-    durability: 100
-  },
-
-  vehicle_templates: {
-    name: "New Vehicle",
-    model: "",
-    max_speed: 60,
-    seats: 4,
-    fuel_type: "petrol",
-    fuel_capacity: 50,
-    tags: []
-  },
-
+  // Service catalog entry — what hired service workers offer
   service_templates: {
     name: "New Service",
-    category: "utility",
-    cost_per_tick: 0,
-    satisfaction_gain: 0,
-    tags: []
-  },
-
-  storage_templates: {
-    name: "New Storage",
-    model: "",
-    capacity: 10,
-    allowed_tags: [],
-    tags: []
-  },
-
-  social_templates: {
-    name: "New Social Event",
-    relationship_change: 0,
-    mood_change: 0,
-    required_relationship: 0,
-    tags: []
-  },
-
-  need_templates: {
-    name: "New Need",
-    max: 100,
-    decay_per_tick: 0.1,
-    critical_threshold: 20,
-    tags: []
-  },
-
-  trait_templates: {
-    name: "New Trait",
-    description: "",
-    need_modifiers: {},
-    skill_modifiers: {},
-    behavior_flags: []
+    category: "reconstruction",
+    base_cost: 100,
+    duration_hours: 2,
+    worker_trait: "handyman",
+    illicit: false,
+    description: ""
   },
 
   job_templates: {
@@ -853,6 +804,36 @@ const DEFAULT_TEMPLATES = {
     job_slots: [],
     starting_funds: 10000,
     tags: []
+  },
+
+  vehicle_templates: {
+    name: "New Vehicle",
+    model: "",
+    max_speed: 60,
+    seats: 4,
+    fuel_type: "petrol",
+    fuel_capacity: 50,
+    tags: []
+  },
+
+  // Long-term weekly drives. Characters have 100 points distributed across
+  // active needs. 0 points = need doesn't apply to this character.
+  need_templates: {
+    name: "New Long-term Need",
+    description: "",
+    category: "social",
+    weekly_target: 1,
+    satisfying_activities: [],
+    decay_per_week: 1
+  },
+
+  trait_templates: {
+    name: "New Trait",
+    polarity: "positive",
+    description: "",
+    need_modifiers: {},
+    skill_modifiers: {},
+    behavior_flags: []
   }
 };
 
@@ -984,9 +965,4 @@ animate();
 
 // =====================================================
 // STARTUP
-// =====================================================
-
-(async () => {
-  await loadMeshbank();
-  await loadDefinitions();
-})();
+// ============================================

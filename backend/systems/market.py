@@ -70,8 +70,9 @@ def init_market_catalog(world):
     for cat in all_categories:
         mults.setdefault(cat, 1.0)
 
-    # Item templates
-    for tid, t in ITEM_TEMPLATES.items():
+    # Item templates — prefer definitions.json, fall back to Python dict
+    _item_tmpl_src = world.get("definitions", {}).get("item_templates") or ITEM_TEMPLATES
+    for tid, t in _item_tmpl_src.items():
         if "base_price" not in t:
             continue
         if tid in catalog:
@@ -223,6 +224,4 @@ def browse_catalog(world, category=None, budget=None, item_type=None):
     return results
 
 
-# =========================================================
-# UPDATE MARKET (called each MEDIUM tick)
-# ===========================================
+# =

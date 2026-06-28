@@ -1,8 +1,10 @@
 import random
 
-from data.recipes import (
-    RECIPES
-)
+from data.recipes import RECIPES as _PY_RECIPES
+
+def _get_recipes(world=None):
+    """Prefer definitions.json, fall back to Python dict."""
+    return (world or {}).get("definitions", {}).get("recipe_templates") or _PY_RECIPES
 
 from systems.household_storage import (
     find_household_resource,
@@ -30,7 +32,7 @@ def start_cooking_process(
     world
 ):
 
-    recipe = RECIPES.get(
+    recipe = _get_recipes(world).get(
         recipe_id
     )
 
@@ -86,7 +88,7 @@ def begin_stage(
     world
 ):
 
-    recipe = RECIPES[
+    recipe = _get_recipes(world)[
         process[
             "recipe_id"
         ]
@@ -197,7 +199,7 @@ def update_cooking_process(
 
         return False
 
-    recipe = RECIPES[
+    recipe = _get_recipes(world)[
         process[
             "recipe_id"
         ]
@@ -267,7 +269,7 @@ def finish_recipe(
     world
 ):
 
-    recipe = RECIPES[
+    recipe = _get_recipes(world)[
         process[
             "recipe_id"
         ]
@@ -399,20 +401,4 @@ def calculate_taste(
     taste = quality
 
     if "foodie" in c.get(
-        "traits",
-        []
-    ):
-
-        taste += 0.1
-
-    if "lazy" in c.get(
-        "traits",
-        []
-    ):
-
-        taste -= 0.05
-
-    return max(
-        0,
-        min(1.0, taste)
-    )
+        "trai

@@ -46,27 +46,938 @@
     }
   },
   "item_templates": {
-    "plate_stack": {
+    "toilet_paper_roll": {
+      "name": "Toilet Paper Roll",
+      "category": "hygiene",
+      "size": 1,
+      "base_price": 2.0,
+      "stackable": true,
+      "max_stack": 24,
+      "consumable": true,
+      "uses": 1,
+      "resource_type": "TOILET_PAPER",
+      "storage_container": "bathroom",
+      "quantity": 4
+    },
+    "bath_towel": {
+      "name": "Bath Towel",
+      "category": "hygiene",
+      "size": 2,
+      "base_price": 18.0,
+      "stackable": true,
+      "max_stack": 4,
+      "dirty": false,
+      "consumable": false
+    },
+    "hand_towel": {
+      "name": "Hand Towel",
+      "category": "hygiene",
+      "size": 1,
+      "base_price": 10.0,
+      "stackable": true,
+      "max_stack": 6,
+      "dirty": false,
+      "consumable": false
+    },
+    "soap_bar": {
+      "name": "Soap Bar",
+      "category": "hygiene",
+      "size": 1,
+      "base_price": 3.0,
+      "stackable": true,
+      "max_stack": 6,
+      "consumable": true,
+      "uses": 20,
+      "resource_type": "HYGIENE",
+      "storage_container": "bathroom",
+      "quantity": 3
+    },
+    "bed_sheet": {
+      "name": "Bed Sheet",
+      "category": "linen",
+      "size": 2,
+      "base_price": 25.0,
+      "stackable": true,
+      "max_stack": 4,
+      "dirty": false,
+      "consumable": false
+    },
+    "pillow": {
+      "name": "Pillow",
+      "category": "linen",
+      "size": 2,
+      "base_price": 20.0,
+      "stackable": true,
+      "max_stack": 4,
+      "dirty": false,
+      "consumable": false
+    },
+    "duvet": {
+      "name": "Duvet",
+      "category": "linen",
+      "size": 3,
+      "base_price": 80.0,
+      "stackable": false,
+      "dirty": false,
+      "consumable": false
+    },
+    "cleaning_spray": {
+      "name": "Cleaning Spray",
+      "category": "cleaning",
+      "size": 1,
+      "base_price": 5.0,
+      "stackable": true,
+      "max_stack": 4,
+      "consumable": true,
+      "uses": 10,
+      "resource_type": "CLEANING",
+      "storage_container": "storage",
+      "quantity": 5
+    },
+    "plate_ceramic": {
+      "name": "Plate",
       "category": "dishware",
-      "model": "/resources/items/plate_stack.glb",
+      "size": 1,
+      "base_price": 6.0,
+      "stackable": true,
+      "max_stack": 12,
+      "dirty": false,
+      "consumable": false
+    },
+    "bowl_ceramic": {
+      "name": "Bowl",
+      "category": "dishware",
+      "size": 1,
+      "base_price": 5.0,
       "stackable": true,
       "max_stack": 8,
-      "carry_slots": 1,
-      "usable_for": [
-        "eat",
-        "serve_food"
-      ]
+      "dirty": false,
+      "consumable": false
     },
-    "vacuum_cleaner": {
-      "category": "tool",
-      "model": "/resources/items/vacuum.glb",
-      "carry_slots": 2,
-      "usable_for": [
-        "clean_floor"
+    "mug_ceramic": {
+      "name": "Mug",
+      "category": "dishware",
+      "size": 1,
+      "base_price": 8.0,
+      "stackable": true,
+      "max_stack": 6,
+      "dirty": false,
+      "consumable": false
+    },
+    "glass_water": {
+      "name": "Water Glass",
+      "category": "dishware",
+      "size": 1,
+      "base_price": 5.0,
+      "stackable": true,
+      "max_stack": 8,
+      "dirty": false,
+      "consumable": false
+    },
+    "glass_wine": {
+      "name": "Wine Glass",
+      "category": "dishware",
+      "size": 1,
+      "base_price": 9.0,
+      "stackable": true,
+      "max_stack": 6,
+      "dirty": false,
+      "consumable": false
+    },
+    "glass_rocks": {
+      "name": "Rocks Glass",
+      "category": "dishware",
+      "size": 1,
+      "base_price": 7.0,
+      "stackable": true,
+      "max_stack": 6,
+      "dirty": false,
+      "consumable": false
+    },
+    "fork": {
+      "name": "Fork",
+      "category": "dishware",
+      "size": 1,
+      "base_price": 3.0,
+      "stackable": true,
+      "max_stack": 12,
+      "dirty": false,
+      "consumable": false
+    },
+    "knife_table": {
+      "name": "Table Knife",
+      "category": "dishware",
+      "size": 1,
+      "base_price": 3.0,
+      "stackable": true,
+      "max_stack": 12,
+      "dirty": false,
+      "consumable": false
+    },
+    "spoon": {
+      "name": "Spoon",
+      "category": "dishware",
+      "size": 1,
+      "base_price": 3.0,
+      "stackable": true,
+      "max_stack": 12,
+      "dirty": false,
+      "consumable": false
+    },
+    "teaspoon": {
+      "name": "Teaspoon",
+      "category": "dishware",
+      "size": 1,
+      "base_price": 2.0,
+      "stackable": true,
+      "max_stack": 12,
+      "dirty": false,
+      "consumable": false
+    },
+    "plate_of_pasta": {
+      "name": "Plate of Pasta",
+      "category": "food",
+      "size": 1,
+      "stackable": false,
+      "dirty": false,
+      "consumable": true,
+      "uses": 1,
+      "nutrition": 0.75,
+      "hunger_restore": 60
+    },
+    "plate_of_rice": {
+      "name": "Plate of Rice",
+      "category": "food",
+      "size": 1,
+      "stackable": false,
+      "dirty": false,
+      "consumable": true,
+      "uses": 1,
+      "nutrition": 0.6,
+      "hunger_restore": 50
+    },
+    "bowl_of_cereal": {
+      "name": "Bowl of Cereal",
+      "category": "food",
+      "size": 1,
+      "stackable": false,
+      "dirty": false,
+      "consumable": true,
+      "uses": 1,
+      "nutrition": 0.5,
+      "hunger_restore": 35
+    },
+    "sandwich": {
+      "name": "Sandwich",
+      "category": "food",
+      "size": 1,
+      "stackable": false,
+      "consumable": true,
+      "uses": 1,
+      "nutrition": 0.55,
+      "hunger_restore": 40
+    },
+    "slice_of_toast": {
+      "name": "Toast",
+      "category": "food",
+      "size": 1,
+      "stackable": true,
+      "max_stack": 4,
+      "consumable": true,
+      "uses": 1,
+      "nutrition": 0.3,
+      "hunger_restore": 20
+    },
+    "apple": {
+      "name": "Apple",
+      "category": "food",
+      "size": 1,
+      "base_price": 1.5,
+      "stackable": true,
+      "max_stack": 6,
+      "consumable": true,
+      "uses": 1,
+      "nutrition": 0.65,
+      "hunger_restore": 18
+    },
+    "banana": {
+      "name": "Banana",
+      "category": "food",
+      "size": 1,
+      "base_price": 0.8,
+      "stackable": true,
+      "max_stack": 6,
+      "consumable": true,
+      "uses": 1,
+      "nutrition": 0.6,
+      "hunger_restore": 22
+    },
+    "bag_of_chips_open": {
+      "name": "Bag of Chips",
+      "category": "food",
+      "size": 1,
+      "base_price": 3.0,
+      "stackable": false,
+      "consumable": true,
+      "uses": 3,
+      "nutrition": 0.2,
+      "hunger_restore": 12
+    },
+    "groceries_basic": {
+      "name": "Groceries (Basic)",
+      "category": "groceries",
+      "size": 3,
+      "base_price": 40.0,
+      "stackable": false,
+      "consumable": true,
+      "uses": 1,
+      "resource_type": "FOOD_CARB",
+      "storage_container": "pantry",
+      "quantity": 8
+    },
+    "groceries_protein": {
+      "name": "Groceries (Protein)",
+      "category": "groceries",
+      "size": 3,
+      "base_price": 55.0,
+      "stackable": false,
+      "consumable": true,
+      "uses": 1,
+      "resource_type": "FOOD_PROTEIN",
+      "storage_container": "fridge",
+      "quantity": 6
+    },
+    "cup_of_coffee": {
+      "name": "Cup of Coffee",
+      "category": "drink",
+      "size": 1,
+      "stackable": false,
+      "dirty": false,
+      "consumable": true,
+      "uses": 1,
+      "energy_restore": 20,
+      "hydration_restore": 10,
+      "caffeine": true
+    },
+    "cup_of_tea": {
+      "name": "Cup of Tea",
+      "category": "drink",
+      "size": 1,
+      "stackable": false,
+      "dirty": false,
+      "consumable": true,
+      "uses": 1,
+      "energy_restore": 10,
+      "hydration_restore": 15,
+      "caffeine": true
+    },
+    "glass_of_water": {
+      "name": "Glass of Water",
+      "category": "drink",
+      "size": 1,
+      "stackable": false,
+      "dirty": false,
+      "consumable": true,
+      "uses": 1,
+      "hydration_restore": 35
+    },
+    "can_of_soda": {
+      "name": "Can of Soda",
+      "category": "drink",
+      "size": 1,
+      "base_price": 2.5,
+      "stackable": true,
+      "max_stack": 6,
+      "consumable": true,
+      "uses": 1,
+      "hydration_restore": 20,
+      "energy_restore": 8,
+      "caffeine": true,
+      "resource_type": "DRINK_SOFT",
+      "storage_container": "pantry",
+      "quantity": 6
+    },
+    "can_of_energy_drink": {
+      "name": "Energy Drink",
+      "category": "drink",
+      "size": 1,
+      "base_price": 3.5,
+      "stackable": true,
+      "max_stack": 6,
+      "consumable": true,
+      "uses": 1,
+      "energy_restore": 35,
+      "hydration_restore": 5,
+      "caffeine": true,
+      "caffeine_strength": "high"
+    },
+    "bottle_of_beer": {
+      "name": "Beer",
+      "category": "drink",
+      "size": 1,
+      "base_price": 3.0,
+      "stackable": true,
+      "max_stack": 12,
+      "consumable": true,
+      "uses": 1,
+      "hydration_restore": 5,
+      "alcohol": true,
+      "alcohol_units": 1.0,
+      "resource_type": "DRINK_ALCOHOL",
+      "storage_container": "pantry",
+      "quantity": 6
+    },
+    "glass_of_red_wine": {
+      "name": "Glass of Red Wine",
+      "category": "drink",
+      "size": 1,
+      "stackable": false,
+      "dirty": false,
+      "consumable": true,
+      "uses": 1,
+      "alcohol": true,
+      "alcohol_units": 1.5
+    },
+    "glass_of_white_wine": {
+      "name": "Glass of White Wine",
+      "category": "drink",
+      "size": 1,
+      "stackable": false,
+      "dirty": false,
+      "consumable": true,
+      "uses": 1,
+      "alcohol": true,
+      "alcohol_units": 1.5
+    },
+    "glass_of_spirits": {
+      "name": "Glass of Spirits",
+      "category": "drink",
+      "size": 1,
+      "stackable": false,
+      "dirty": false,
+      "consumable": true,
+      "uses": 1,
+      "alcohol": true,
+      "alcohol_units": 2.5
+    },
+    "shot_of_spirits": {
+      "name": "Shot",
+      "category": "drink",
+      "size": 1,
+      "stackable": false,
+      "consumable": true,
+      "uses": 1,
+      "alcohol": true,
+      "alcohol_units": 1.0
+    },
+    "wine_bottle_red": {
+      "name": "Bottle of Red Wine",
+      "category": "drink",
+      "size": 1,
+      "base_price": 18.0,
+      "stackable": true,
+      "max_stack": 6,
+      "consumable": true,
+      "uses": 5,
+      "alcohol": true,
+      "alcohol_units": 1.5
+    },
+    "wine_bottle_white": {
+      "name": "Bottle of White Wine",
+      "category": "drink",
+      "size": 1,
+      "base_price": 16.0,
+      "stackable": true,
+      "max_stack": 6,
+      "consumable": true,
+      "uses": 5,
+      "alcohol": true,
+      "alcohol_units": 1.5
+    },
+    "spirits_bottle": {
+      "name": "Bottle of Spirits",
+      "category": "drink",
+      "size": 1,
+      "base_price": 32.0,
+      "stackable": true,
+      "max_stack": 4,
+      "consumable": true,
+      "uses": 20,
+      "alcohol": true,
+      "alcohol_units": 1.0
+    },
+    "baseball_cap": {
+      "name": "Baseball Cap",
+      "category": "clothing",
+      "slot": "head",
+      "bone": "Head",
+      "model": "/resources/clothing/baseball_cap.glb",
+      "base_price": 22.0,
+      "dirty": false,
+      "stackable": true,
+      "max_stack": 4,
+      "style": 0.45,
+      "size": 1
+    },
+    "beanie": {
+      "name": "Beanie",
+      "category": "clothing",
+      "slot": "head",
+      "bone": "Head",
+      "model": "/resources/clothing/beanie.glb",
+      "base_price": 18.0,
+      "dirty": false,
+      "stackable": true,
+      "max_stack": 4,
+      "style": 0.5,
+      "size": 1
+    },
+    "hair_short_brown": {
+      "name": "Short Brown Hair",
+      "category": "clothing",
+      "slot": "hair",
+      "bone": "Head",
+      "model": "/resources/clothing/hair_short_brown.glb",
+      "dirty": false,
+      "stackable": false,
+      "style": 0.6,
+      "size": 1
+    },
+    "hair_long_black": {
+      "name": "Long Black Hair",
+      "category": "clothing",
+      "slot": "hair",
+      "bone": "Head",
+      "model": "/resources/clothing/hair_long_black.glb",
+      "dirty": false,
+      "stackable": false,
+      "style": 0.7,
+      "size": 1
+    },
+    "scarf_knit": {
+      "name": "Knit Scarf",
+      "category": "clothing",
+      "slot": "neck",
+      "bone": "Neck",
+      "model": "/resources/clothing/scarf_knit.glb",
+      "base_price": 25.0,
+      "dirty": false,
+      "stackable": true,
+      "max_stack": 2,
+      "style": 0.55,
+      "size": 1
+    },
+    "jacket_hoodie": {
+      "name": "Hoodie",
+      "category": "clothing",
+      "slot": "outerwear",
+      "bone": "Spine2",
+      "model": "/resources/clothing/hoodie.glb",
+      "base_price": 55.0,
+      "dirty": false,
+      "stackable": true,
+      "max_stack": 3,
+      "style": 0.55,
+      "warmth": 0.6,
+      "size": 2
+    },
+    "jacket_denim": {
+      "name": "Denim Jacket",
+      "category": "clothing",
+      "slot": "outerwear",
+      "bone": "Spine2",
+      "model": "/resources/clothing/jacket_denim.glb",
+      "base_price": 90.0,
+      "dirty": false,
+      "stackable": true,
+      "max_stack": 2,
+      "style": 0.75,
+      "warmth": 0.5,
+      "size": 2
+    },
+    "jacket_winter": {
+      "name": "Winter Coat",
+      "category": "clothing",
+      "slot": "outerwear",
+      "bone": "Spine2",
+      "model": "/resources/clothing/jacket_winter.glb",
+      "base_price": 180.0,
+      "dirty": false,
+      "stackable": false,
+      "style": 0.6,
+      "warmth": 0.95,
+      "size": 2
+    },
+    "tshirt_white": {
+      "name": "White T-Shirt",
+      "category": "clothing",
+      "slot": "torso",
+      "bone": "Spine1",
+      "model": "/resources/clothing/tshirt_white.glb",
+      "base_price": 15.0,
+      "dirty": false,
+      "stackable": true,
+      "max_stack": 6,
+      "style": 0.4,
+      "size": 1
+    },
+    "tshirt_black": {
+      "name": "Black T-Shirt",
+      "category": "clothing",
+      "slot": "torso",
+      "bone": "Spine1",
+      "model": "/resources/clothing/tshirt_black.glb",
+      "base_price": 15.0,
+      "dirty": false,
+      "stackable": true,
+      "max_stack": 6,
+      "style": 0.5,
+      "size": 1
+    },
+    "shirt_flannel": {
+      "name": "Flannel Shirt",
+      "category": "clothing",
+      "slot": "torso",
+      "bone": "Spine1",
+      "model": "/resources/clothing/shirt_flannel.glb",
+      "base_price": 45.0,
+      "dirty": false,
+      "stackable": true,
+      "max_stack": 4,
+      "style": 0.55,
+      "size": 1
+    },
+    "shirt_dress": {
+      "name": "Dress Shirt",
+      "category": "clothing",
+      "slot": "torso",
+      "bone": "Spine1",
+      "model": "/resources/clothing/shirt_dress.glb",
+      "base_price": 70.0,
+      "dirty": false,
+      "stackable": true,
+      "max_stack": 4,
+      "style": 0.85,
+      "size": 1
+    },
+    "top_crop": {
+      "name": "Crop Top",
+      "category": "clothing",
+      "slot": "torso",
+      "bone": "Spine1",
+      "model": "/resources/clothing/top_crop.glb",
+      "base_price": 30.0,
+      "dirty": false,
+      "stackable": true,
+      "max_stack": 4,
+      "style": 0.7,
+      "size": 1
+    },
+    "tank_top": {
+      "name": "Tank Top",
+      "category": "clothing",
+      "slot": "undershirt",
+      "bone": "Spine1",
+      "model": "/resources/clothing/tank_top.glb",
+      "base_price": 12.0,
+      "dirty": false,
+      "stackable": true,
+      "max_stack": 6,
+      "style": 0.35,
+      "size": 1
+    },
+    "jeans_blue": {
+      "name": "Blue Jeans",
+      "category": "clothing",
+      "slot": "legs",
+      "bone": "Hips",
+      "model": "/resources/clothing/jeans_blue.glb",
+      "base_price": 65.0,
+      "dirty": false,
+      "stackable": true,
+      "max_stack": 3,
+      "style": 0.65,
+      "size": 2
+    },
+    "jeans_black": {
+      "name": "Black Jeans",
+      "category": "clothing",
+      "slot": "legs",
+      "bone": "Hips",
+      "model": "/resources/clothing/jeans_black.glb",
+      "base_price": 65.0,
+      "dirty": false,
+      "stackable": true,
+      "max_stack": 3,
+      "style": 0.7,
+      "size": 2
+    },
+    "sweatpants": {
+      "name": "Sweatpants",
+      "category": "clothing",
+      "slot": "legs",
+      "bone": "Hips",
+      "model": "/resources/clothing/sweatpants.glb",
+      "base_price": 35.0,
+      "dirty": false,
+      "stackable": true,
+      "max_stack": 3,
+      "style": 0.3,
+      "size": 2
+    },
+    "shorts_casual": {
+      "name": "Casual Shorts",
+      "category": "clothing",
+      "slot": "legs",
+      "bone": "Hips",
+      "model": "/resources/clothing/shorts_casual.glb",
+      "base_price": 28.0,
+      "dirty": false,
+      "stackable": true,
+      "max_stack": 4,
+      "style": 0.4,
+      "size": 1
+    },
+    "dress_casual": {
+      "name": "Casual Dress",
+      "category": "clothing",
+      "slot": "legs",
+      "bone": "Hips",
+      "model": "/resources/clothing/dress_casual.glb",
+      "base_price": 85.0,
+      "dirty": false,
+      "stackable": false,
+      "style": 0.8,
+      "size": 2
+    },
+    "suit_trousers": {
+      "name": "Suit Trousers",
+      "category": "clothing",
+      "slot": "legs",
+      "bone": "Hips",
+      "model": "/resources/clothing/suit_trousers.glb",
+      "base_price": 120.0,
+      "dirty": false,
+      "stackable": true,
+      "max_stack": 2,
+      "style": 0.9,
+      "size": 2
+    },
+    "pyjama_bottoms": {
+      "name": "Pyjama Bottoms",
+      "category": "clothing",
+      "slot": "legs",
+      "bone": "Hips",
+      "model": "/resources/clothing/pyjama_bottoms.glb",
+      "base_price": 22.0,
+      "dirty": false,
+      "stackable": true,
+      "max_stack": 3,
+      "style": 0.2,
+      "size": 2
+    },
+    "underwear_basic": {
+      "name": "Underwear",
+      "category": "clothing",
+      "slot": "underwear",
+      "bone": "Hips",
+      "model": "/resources/clothing/underwear_basic.glb",
+      "base_price": 8.0,
+      "dirty": false,
+      "stackable": true,
+      "max_stack": 7,
+      "style": 0.3,
+      "size": 1
+    },
+    "boxer_shorts": {
+      "name": "Boxer Shorts",
+      "category": "clothing",
+      "slot": "underwear",
+      "bone": "Hips",
+      "model": "/resources/clothing/boxer_shorts.glb",
+      "base_price": 9.0,
+      "dirty": false,
+      "stackable": true,
+      "max_stack": 7,
+      "style": 0.3,
+      "size": 1
+    },
+    "socks_white": {
+      "name": "White Socks",
+      "category": "clothing",
+      "slot": "socks",
+      "bone": "LeftFoot",
+      "model": "/resources/clothing/socks_white.glb",
+      "base_price": 5.0,
+      "dirty": false,
+      "stackable": true,
+      "max_stack": 7,
+      "style": 0.25,
+      "bilateral": true,
+      "size": 1
+    },
+    "socks_ankle": {
+      "name": "Ankle Socks",
+      "category": "clothing",
+      "slot": "socks",
+      "bone": "LeftFoot",
+      "model": "/resources/clothing/socks_ankle.glb",
+      "base_price": 5.0,
+      "dirty": false,
+      "stackable": true,
+      "max_stack": 7,
+      "style": 0.3,
+      "bilateral": true,
+      "size": 1
+    },
+    "sneakers_white": {
+      "name": "White Sneakers",
+      "category": "clothing",
+      "slot": "feet",
+      "bone": "LeftFoot",
+      "model": "/resources/clothing/sneakers_white.glb",
+      "base_price": 90.0,
+      "dirty": false,
+      "stackable": false,
+      "style": 0.7,
+      "bilateral": true,
+      "size": 2
+    },
+    "shoes_casual": {
+      "name": "Casual Shoes",
+      "category": "clothing",
+      "slot": "feet",
+      "bone": "LeftFoot",
+      "model": "/resources/clothing/shoes_casual.glb",
+      "base_price": 70.0,
+      "dirty": false,
+      "stackable": false,
+      "style": 0.6,
+      "bilateral": true,
+      "size": 2
+    },
+    "shoes_dress": {
+      "name": "Dress Shoes",
+      "category": "clothing",
+      "slot": "feet",
+      "bone": "LeftFoot",
+      "model": "/resources/clothing/shoes_dress.glb",
+      "base_price": 160.0,
+      "dirty": false,
+      "stackable": false,
+      "style": 0.9,
+      "bilateral": true,
+      "size": 2
+    },
+    "slippers": {
+      "name": "Slippers",
+      "category": "clothing",
+      "slot": "feet",
+      "bone": "LeftFoot",
+      "model": "/resources/clothing/slippers.glb",
+      "base_price": 20.0,
+      "dirty": false,
+      "stackable": false,
+      "style": 0.15,
+      "bilateral": true,
+      "size": 1
+    },
+    "gloves_winter": {
+      "name": "Winter Gloves",
+      "category": "clothing",
+      "slot": "hands",
+      "bone": "LeftHand",
+      "model": "/resources/clothing/gloves_winter.glb",
+      "base_price": 30.0,
+      "dirty": false,
+      "stackable": false,
+      "style": 0.5,
+      "bilateral": true,
+      "warmth": 0.7,
+      "size": 1
+    },
+    "watch_casual": {
+      "name": "Casual Watch",
+      "category": "clothing",
+      "slot": "wrist_l",
+      "bone": "LeftForeArm",
+      "model": "/resources/clothing/watch_casual.glb",
+      "base_price": 80.0,
+      "dirty": false,
+      "stackable": false,
+      "style": 0.7,
+      "size": 1
+    },
+    "backpack": {
+      "name": "Backpack",
+      "category": "clothing",
+      "slot": "accessory",
+      "bone": "Spine2",
+      "model": "/resources/clothing/backpack.glb",
+      "base_price": 60.0,
+      "dirty": false,
+      "stackable": false,
+      "style": 0.5,
+      "size": 2
+    },
+    "smartphone_budget": {
+      "name": "Budget Smartphone",
+      "category": "electronics",
+      "size": 3,
+      "base_price": 250.0,
+      "stackable": false,
+      "consumable": false,
+      "object_type": "phone",
+      "apps": [
+        "send_message",
+        "call_contact",
+        "check_stocks",
+        "browse_news",
+        "order_delivery",
+        "open_banking_app",
+        "use_rideshare"
       ],
-      "animations": {
-        "use": "vacuum_loop"
-      }
+      "battery": 1.0
+    },
+    "smartphone_premium": {
+      "name": "Premium Smartphone",
+      "category": "electronics",
+      "size": 3,
+      "base_price": 900.0,
+      "stackable": false,
+      "consumable": false,
+      "object_type": "phone",
+      "apps": [
+        "send_message",
+        "call_contact",
+        "check_stocks",
+        "browse_news",
+        "order_delivery",
+        "open_banking_app",
+        "use_rideshare"
+      ],
+      "battery": 1.0,
+      "quality": 0.95
+    },
+    "laptop_basic": {
+      "name": "Basic Laptop",
+      "category": "electronics",
+      "size": 4,
+      "base_price": 700.0,
+      "stackable": false,
+      "consumable": false,
+      "object_type": "computer",
+      "quality": 0.55
+    },
+    "laptop_gaming": {
+      "name": "Gaming Laptop",
+      "category": "electronics",
+      "size": 4,
+      "base_price": 1800.0,
+      "stackable": false,
+      "consumable": false,
+      "object_type": "computer",
+      "quality": 0.92
     }
   },
   "character_templates": {
@@ -128,12 +1039,684 @@
     }
   },
   "activity_templates": {
-    "eat_meal": {
-      "required_items": [
-        "plate_stack"
+    "eat_breakfast": {
+      "name": "Eat Breakfast",
+      "category": "food",
+      "interruptible": false,
+      "satisfies_needs": [],
+      "steps": [
+        {
+          "id": "get_food",
+          "interaction": "open_fridge",
+          "target_interaction": "open_fridge",
+          "target_tags": [
+            "fridge"
+          ],
+          "duration_minutes": 2,
+          "requires": []
+        },
+        {
+          "id": "heat",
+          "interaction": "use_microwave",
+          "target_interaction": "use_microwave",
+          "target_tags": [
+            "microwave"
+          ],
+          "duration_minutes": 4,
+          "requires": [
+            "get_food"
+          ]
+        },
+        {
+          "id": "eat",
+          "interaction": "eat",
+          "target_interaction": "eat",
+          "target_tags": [
+            "table",
+            "chair",
+            "sofa"
+          ],
+          "duration_minutes": 15,
+          "requires": [
+            "heat"
+          ]
+        }
+      ]
+    },
+    "cook_meal": {
+      "name": "Cook a Meal",
+      "category": "food",
+      "interruptible": false,
+      "satisfies_needs": [
+        "creative"
       ],
-      "required_interaction": "sit_chair",
-      "duration": 1200
+      "steps": [
+        {
+          "id": "prep",
+          "interaction": "open_fridge",
+          "target_interaction": "open_fridge",
+          "target_tags": [
+            "fridge"
+          ],
+          "duration_minutes": 3,
+          "requires": []
+        },
+        {
+          "id": "cook",
+          "interaction": "cook",
+          "target_interaction": "cook",
+          "target_tags": [
+            "stove"
+          ],
+          "duration_minutes": 30,
+          "requires": [
+            "prep"
+          ]
+        },
+        {
+          "id": "eat",
+          "interaction": "eat",
+          "target_interaction": "eat",
+          "target_tags": [
+            "table"
+          ],
+          "duration_minutes": 20,
+          "requires": [
+            "cook"
+          ]
+        },
+        {
+          "id": "wash_up",
+          "interaction": "wash_dishes",
+          "target_interaction": "wash_dishes",
+          "target_tags": [
+            "sink"
+          ],
+          "duration_minutes": 10,
+          "requires": [
+            "eat"
+          ]
+        }
+      ]
+    },
+    "heat_meal": {
+      "name": "Heat a Meal",
+      "category": "food",
+      "interruptible": false,
+      "satisfies_needs": [],
+      "steps": [
+        {
+          "id": "get_food",
+          "interaction": "open_fridge",
+          "target_interaction": "open_fridge",
+          "target_tags": [
+            "fridge"
+          ],
+          "duration_minutes": 2,
+          "requires": []
+        },
+        {
+          "id": "heat",
+          "interaction": "use_microwave",
+          "target_interaction": "use_microwave",
+          "target_tags": [
+            "microwave"
+          ],
+          "duration_minutes": 5,
+          "requires": [
+            "get_food"
+          ]
+        },
+        {
+          "id": "eat",
+          "interaction": "eat",
+          "target_interaction": "eat",
+          "target_tags": [
+            "table"
+          ],
+          "duration_minutes": 15,
+          "requires": [
+            "heat"
+          ]
+        }
+      ]
+    },
+    "get_snack": {
+      "name": "Get a Snack",
+      "category": "food",
+      "interruptible": true,
+      "satisfies_needs": [],
+      "steps": [
+        {
+          "id": "get",
+          "interaction": "open_fridge",
+          "target_interaction": "open_fridge",
+          "target_tags": [
+            "fridge"
+          ],
+          "duration_minutes": 2,
+          "requires": []
+        },
+        {
+          "id": "eat",
+          "interaction": "eat",
+          "target_interaction": "eat",
+          "target_tags": [
+            "table",
+            "sofa"
+          ],
+          "duration_minutes": 10,
+          "requires": [
+            "get"
+          ]
+        }
+      ]
+    },
+    "take_shower": {
+      "name": "Take a Shower",
+      "category": "hygiene",
+      "interruptible": false,
+      "satisfies_needs": [],
+      "steps": [
+        {
+          "id": "undress",
+          "interaction": "undress",
+          "target_interaction": null,
+          "target_tags": [
+            "bathroom"
+          ],
+          "duration_minutes": 2,
+          "requires": []
+        },
+        {
+          "id": "shower",
+          "interaction": "take_shower",
+          "target_interaction": "take_shower",
+          "target_tags": [
+            "shower"
+          ],
+          "duration_minutes": 12,
+          "requires": [
+            "undress"
+          ]
+        },
+        {
+          "id": "dress",
+          "interaction": "get_dressed",
+          "target_interaction": null,
+          "target_tags": [
+            "bathroom"
+          ],
+          "duration_minutes": 3,
+          "requires": [
+            "shower"
+          ]
+        }
+      ]
+    },
+    "brush_teeth": {
+      "name": "Brush Teeth",
+      "category": "hygiene",
+      "interruptible": true,
+      "satisfies_needs": [],
+      "steps": [
+        {
+          "id": "brush",
+          "interaction": "brush_teeth",
+          "target_interaction": "brush_teeth",
+          "target_tags": [
+            "sink",
+            "bathroom"
+          ],
+          "duration_minutes": 3,
+          "requires": []
+        }
+      ]
+    },
+    "use_toilet": {
+      "name": "Use Toilet",
+      "category": "hygiene",
+      "interruptible": false,
+      "satisfies_needs": [],
+      "steps": [
+        {
+          "id": "toilet",
+          "interaction": "use_toilet",
+          "target_interaction": "use_toilet",
+          "target_tags": [
+            "toilet"
+          ],
+          "duration_minutes": 5,
+          "requires": []
+        },
+        {
+          "id": "wash",
+          "interaction": "wash_hands",
+          "target_interaction": "wash_hands",
+          "target_tags": [
+            "sink"
+          ],
+          "duration_minutes": 1,
+          "requires": [
+            "toilet"
+          ]
+        }
+      ]
+    },
+    "go_to_sleep": {
+      "name": "Go to Sleep",
+      "category": "rest",
+      "interruptible": false,
+      "satisfies_needs": [],
+      "steps": [
+        {
+          "id": "undress",
+          "interaction": "undress",
+          "target_interaction": null,
+          "target_tags": [
+            "bedroom"
+          ],
+          "duration_minutes": 5,
+          "requires": []
+        },
+        {
+          "id": "sleep",
+          "interaction": "sleep",
+          "target_interaction": "sleep",
+          "target_tags": [
+            "bed"
+          ],
+          "duration_minutes": 480,
+          "requires": [
+            "undress"
+          ]
+        },
+        {
+          "id": "wake",
+          "interaction": "wake_up",
+          "target_interaction": null,
+          "target_tags": [
+            "bed"
+          ],
+          "duration_minutes": 5,
+          "requires": [
+            "sleep"
+          ]
+        }
+      ]
+    },
+    "take_nap": {
+      "name": "Take a Nap",
+      "category": "rest",
+      "interruptible": true,
+      "satisfies_needs": [],
+      "steps": [
+        {
+          "id": "nap",
+          "interaction": "lie_down",
+          "target_interaction": "lie_down",
+          "target_tags": [
+            "bed",
+            "sofa"
+          ],
+          "duration_minutes": 60,
+          "requires": []
+        }
+      ]
+    },
+    "hangout": {
+      "name": "Hang Out",
+      "category": "social",
+      "interruptible": true,
+      "satisfies_needs": [
+        "socialize"
+      ],
+      "steps": [
+        {
+          "id": "socialize",
+          "interaction": "socialize",
+          "target_interaction": "socialize",
+          "target_tags": [
+            "sofa",
+            "chair",
+            "table"
+          ],
+          "duration_minutes": 90,
+          "requires": []
+        }
+      ]
+    },
+    "call_person": {
+      "name": "Call Someone",
+      "category": "social",
+      "interruptible": true,
+      "satisfies_needs": [
+        "socialize"
+      ],
+      "steps": [
+        {
+          "id": "call",
+          "interaction": "phone",
+          "target_interaction": null,
+          "target_tags": [],
+          "duration_minutes": 15,
+          "requires": []
+        }
+      ]
+    },
+    "text_person": {
+      "name": "Text Someone",
+      "category": "social",
+      "interruptible": true,
+      "satisfies_needs": [
+        "socialize"
+      ],
+      "steps": [
+        {
+          "id": "text",
+          "interaction": "phone",
+          "target_interaction": null,
+          "target_tags": [],
+          "duration_minutes": 3,
+          "requires": []
+        }
+      ]
+    },
+    "gossip": {
+      "name": "Gossip",
+      "category": "social",
+      "interruptible": true,
+      "satisfies_needs": [
+        "socialize"
+      ],
+      "steps": [
+        {
+          "id": "chat",
+          "interaction": "socialize",
+          "target_interaction": "socialize",
+          "target_tags": [],
+          "duration_minutes": 20,
+          "requires": []
+        }
+      ]
+    },
+    "watch_tv": {
+      "name": "Watch TV",
+      "category": "entertainment",
+      "interruptible": true,
+      "satisfies_needs": [
+        "play"
+      ],
+      "steps": [
+        {
+          "id": "sit",
+          "interaction": "sit",
+          "target_interaction": "sit",
+          "target_tags": [
+            "sofa",
+            "chair"
+          ],
+          "duration_minutes": 5,
+          "requires": []
+        },
+        {
+          "id": "watch",
+          "interaction": "watch_tv",
+          "target_interaction": "watch_tv",
+          "target_tags": [
+            "television"
+          ],
+          "duration_minutes": 60,
+          "requires": [
+            "sit"
+          ]
+        }
+      ]
+    },
+    "use_computer": {
+      "name": "Use Computer",
+      "category": "entertainment",
+      "interruptible": true,
+      "satisfies_needs": [
+        "play",
+        "learning"
+      ],
+      "steps": [
+        {
+          "id": "use",
+          "interaction": "use_computer",
+          "target_interaction": "use_computer",
+          "target_tags": [
+            "computer",
+            "desk"
+          ],
+          "duration_minutes": 60,
+          "requires": []
+        }
+      ]
+    },
+    "read_book": {
+      "name": "Read a Book",
+      "category": "entertainment",
+      "interruptible": true,
+      "satisfies_needs": [
+        "learning",
+        "solitude"
+      ],
+      "steps": [
+        {
+          "id": "sit",
+          "interaction": "sit",
+          "target_interaction": "sit",
+          "target_tags": [
+            "chair",
+            "sofa"
+          ],
+          "duration_minutes": 3,
+          "requires": []
+        },
+        {
+          "id": "read",
+          "interaction": "read",
+          "target_interaction": "read",
+          "target_tags": [
+            "bookshelf",
+            "book"
+          ],
+          "duration_minutes": 60,
+          "requires": [
+            "sit"
+          ]
+        }
+      ]
+    },
+    "work_from_home": {
+      "name": "Work from Home",
+      "category": "work",
+      "interruptible": false,
+      "satisfies_needs": [
+        "purpose"
+      ],
+      "steps": [
+        {
+          "id": "work",
+          "interaction": "use_computer",
+          "target_interaction": "use_computer",
+          "target_tags": [
+            "computer",
+            "desk"
+          ],
+          "duration_minutes": 480,
+          "requires": []
+        }
+      ]
+    },
+    "workout": {
+      "name": "Work Out",
+      "category": "health",
+      "interruptible": true,
+      "satisfies_needs": [
+        "exercise"
+      ],
+      "steps": [
+        {
+          "id": "exercise",
+          "interaction": "exercise",
+          "target_interaction": "exercise",
+          "target_tags": [
+            "gym",
+            "exercise_equipment"
+          ],
+          "duration_minutes": 45,
+          "requires": []
+        }
+      ]
+    },
+    "jog": {
+      "name": "Go for a Jog",
+      "category": "health",
+      "interruptible": true,
+      "satisfies_needs": [
+        "exercise",
+        "nature"
+      ],
+      "steps": [
+        {
+          "id": "jog",
+          "interaction": "jog",
+          "target_interaction": null,
+          "target_tags": [
+            "outdoor"
+          ],
+          "duration_minutes": 30,
+          "requires": []
+        }
+      ]
+    },
+    "do_laundry": {
+      "name": "Do Laundry",
+      "category": "chores",
+      "interruptible": true,
+      "satisfies_needs": [],
+      "steps": [
+        {
+          "id": "load",
+          "interaction": "do_laundry",
+          "target_interaction": "do_laundry",
+          "target_tags": [
+            "washing_machine"
+          ],
+          "duration_minutes": 5,
+          "requires": []
+        },
+        {
+          "id": "wait",
+          "interaction": "wait",
+          "target_interaction": null,
+          "target_tags": [],
+          "duration_minutes": 55,
+          "requires": [
+            "load"
+          ]
+        },
+        {
+          "id": "unload",
+          "interaction": "unload_laundry",
+          "target_interaction": "unload_laundry",
+          "target_tags": [
+            "washing_machine"
+          ],
+          "duration_minutes": 5,
+          "requires": [
+            "wait"
+          ]
+        }
+      ]
+    },
+    "clean_house": {
+      "name": "Clean the House",
+      "category": "chores",
+      "interruptible": true,
+      "satisfies_needs": [],
+      "steps": [
+        {
+          "id": "clean",
+          "interaction": "clean",
+          "target_interaction": "clean",
+          "target_tags": [
+            "floor",
+            "surface"
+          ],
+          "duration_minutes": 60,
+          "requires": []
+        }
+      ]
+    },
+    "date_night": {
+      "name": "Date Night",
+      "category": "romance",
+      "interruptible": false,
+      "satisfies_needs": [
+        "romance",
+        "socialize"
+      ],
+      "steps": [
+        {
+          "id": "get_ready",
+          "interaction": "mirror",
+          "target_interaction": "mirror",
+          "target_tags": [
+            "mirror"
+          ],
+          "duration_minutes": 20,
+          "requires": []
+        },
+        {
+          "id": "dine",
+          "interaction": "eat",
+          "target_interaction": "eat",
+          "target_tags": [
+            "table"
+          ],
+          "duration_minutes": 60,
+          "requires": [
+            "get_ready"
+          ]
+        },
+        {
+          "id": "talk",
+          "interaction": "socialize",
+          "target_interaction": "socialize",
+          "target_tags": [
+            "sofa"
+          ],
+          "duration_minutes": 60,
+          "requires": [
+            "dine"
+          ]
+        }
+      ]
+    },
+    "be_intimate": {
+      "name": "Be Intimate",
+      "category": "romance",
+      "interruptible": false,
+      "satisfies_needs": [
+        "intimacy",
+        "romance"
+      ],
+      "steps": [
+        {
+          "id": "intimate",
+          "interaction": "be_intimate",
+          "target_interaction": "be_intimate",
+          "target_tags": [
+            "bed"
+          ],
+          "duration_minutes": 30,
+          "requires": []
+        }
+      ]
     }
   },
   "tile_templates": {
@@ -1616,6 +3199,819 @@
         "arrogant",
         "selfish"
       ]
+    }
+  },
+  "recipe_templates": {
+    "simple_pasta": {
+      "difficulty": 0.3,
+      "time_minutes": 25,
+      "nutrition": 0.7,
+      "stages": [
+        {
+          "name": "boil_water",
+          "duration": 5,
+          "active": false
+        },
+        {
+          "name": "cook_carbs",
+          "inputs": {
+            "FOOD_CARB": 1
+          },
+          "duration": 12,
+          "active": false
+        },
+        {
+          "name": "prepare_sauce",
+          "inputs": {
+            "FOOD_VEGETABLE": 1,
+            "FOOD_SPICE": 1
+          },
+          "duration": 8,
+          "active": true
+        }
+      ],
+      "output": {
+        "resource_type": "MEAL",
+        "servings": 3
+      }
+    },
+    "protein_plate": {
+      "difficulty": 0.5,
+      "time_minutes": 40,
+      "nutrition": 0.9,
+      "stages": [
+        {
+          "name": "roast_protein",
+          "inputs": {
+            "FOOD_PROTEIN": 1
+          },
+          "duration": 30,
+          "active": false
+        },
+        {
+          "name": "cook_vegetables",
+          "inputs": {
+            "FOOD_VEGETABLE": 1
+          },
+          "duration": 12,
+          "active": true
+        },
+        {
+          "name": "prepare_carbs",
+          "inputs": {
+            "FOOD_CARB": 1
+          },
+          "duration": 15,
+          "active": false
+        }
+      ],
+      "output": {
+        "resource_type": "MEAL",
+        "servings": 4
+      }
+    }
+  },
+  "service_templates": {
+    "floor_tiling": {
+      "name": "Floor Tiling",
+      "provider": "reconstruction",
+      "provider_name": "Renovation Firm",
+      "price_mode": "per_tile",
+      "labor_rate": 8.0,
+      "material_rate": 0,
+      "duration_per_unit": 1800,
+      "worker_trait": "contractor",
+      "illicit": false
+    },
+    "paint_wall": {
+      "name": "Wall Painting / Wallpaper",
+      "provider": "reconstruction",
+      "provider_name": "Renovation Firm",
+      "price_mode": "per_wall",
+      "labor_rate": 25.0,
+      "material_rate": 15.0,
+      "duration_per_unit": 3600,
+      "worker_trait": "contractor",
+      "illicit": false
+    },
+    "build_wall": {
+      "name": "Wall Construction",
+      "provider": "reconstruction",
+      "provider_name": "Renovation Firm",
+      "price_mode": "per_wall",
+      "labor_rate": 120.0,
+      "material_rate": 60.0,
+      "duration_per_unit": 7200,
+      "worker_trait": "contractor",
+      "illicit": false
+    },
+    "remove_wall": {
+      "name": "Wall Removal / Demolition",
+      "provider": "reconstruction",
+      "provider_name": "Renovation Firm",
+      "price_mode": "per_wall",
+      "labor_rate": 80.0,
+      "material_rate": 0.0,
+      "duration_per_unit": 5400,
+      "worker_trait": "contractor",
+      "illicit": false
+    },
+    "insert_door": {
+      "name": "Door Installation",
+      "provider": "reconstruction",
+      "provider_name": "Renovation Firm",
+      "price_mode": "per_unit",
+      "labor_rate": 150.0,
+      "material_rate": 80.0,
+      "duration_per_unit": 10800,
+      "worker_trait": "contractor",
+      "illicit": false
+    },
+    "insert_window": {
+      "name": "Window Installation",
+      "provider": "reconstruction",
+      "provider_name": "Renovation Firm",
+      "price_mode": "per_unit",
+      "labor_rate": 130.0,
+      "material_rate": 90.0,
+      "duration_per_unit": 10800,
+      "worker_trait": "contractor",
+      "illicit": false
+    },
+    "appliance_repair": {
+      "name": "Appliance / Prop Repair",
+      "provider": "repair",
+      "provider_name": "Repair Service",
+      "price_mode": "per_unit",
+      "labor_rate": 65.0,
+      "material_rate": 30.0,
+      "duration_per_unit": 5400,
+      "worker_trait": "repairman",
+      "illicit": false
+    },
+    "garden_maintenance": {
+      "name": "Garden Maintenance",
+      "provider": "gardening",
+      "provider_name": "Gardening Service",
+      "price_mode": "hourly",
+      "labor_rate": 0,
+      "material_rate": 0,
+      "duration_per_unit": 3600,
+      "worker_trait": "gardener",
+      "illicit": false
+    },
+    "childcare": {
+      "name": "Childcare",
+      "provider": "babysitting",
+      "provider_name": "Babysitting",
+      "price_mode": "hourly",
+      "labor_rate": 0,
+      "material_rate": 0,
+      "duration_per_unit": 3600,
+      "worker_trait": "caregiver",
+      "illicit": false
+    },
+    "cannabis": {
+      "name": "Cannabis",
+      "provider": "drug_dealer",
+      "provider_name": "Street Dealer",
+      "price_mode": "per_unit",
+      "labor_rate": 0,
+      "material_rate": 0,
+      "duration_per_unit": 300,
+      "worker_trait": "dealer",
+      "illicit": true
+    },
+    "stimulants": {
+      "name": "Stimulants",
+      "provider": "drug_dealer",
+      "provider_name": "Street Dealer",
+      "price_mode": "per_unit",
+      "labor_rate": 0,
+      "material_rate": 0,
+      "duration_per_unit": 300,
+      "worker_trait": "dealer",
+      "illicit": true
+    },
+    "downers": {
+      "name": "Downers",
+      "provider": "drug_dealer",
+      "provider_name": "Street Dealer",
+      "price_mode": "per_unit",
+      "labor_rate": 0,
+      "material_rate": 0,
+      "duration_per_unit": 300,
+      "worker_trait": "dealer",
+      "illicit": true
+    },
+    "companionship": {
+      "name": "Companionship",
+      "provider": "escort",
+      "provider_name": "Escort",
+      "price_mode": "hourly",
+      "labor_rate": 0,
+      "material_rate": 0,
+      "duration_per_unit": 3600,
+      "worker_trait": "escort",
+      "illicit": true
+    }
+  },
+  "job_templates": {
+    "doctor": {
+      "name": "Doctor",
+      "sector": "health",
+      "hourly_wage": 60,
+      "salary": 9600,
+      "work_hours": [
+        8,
+        17
+      ],
+      "work_days": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "degree_required": "medicine",
+      "skill_requirements": {},
+      "promotion_path": [],
+      "tags": [
+        "health",
+        "science",
+        "high_status"
+      ]
+    },
+    "lawyer": {
+      "name": "Lawyer",
+      "sector": "law",
+      "hourly_wage": 50,
+      "salary": 8000,
+      "work_hours": [
+        8,
+        17
+      ],
+      "work_days": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "degree_required": "law",
+      "skill_requirements": {},
+      "promotion_path": [],
+      "tags": [
+        "law",
+        "argument",
+        "high_status"
+      ]
+    },
+    "software_engineer": {
+      "name": "Software Engineer",
+      "sector": "tech",
+      "hourly_wage": 42,
+      "salary": 6720,
+      "work_hours": [
+        8,
+        17
+      ],
+      "work_days": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "degree_required": "computer_science",
+      "skill_requirements": {},
+      "promotion_path": [],
+      "tags": [
+        "tech",
+        "logic"
+      ]
+    },
+    "teacher": {
+      "name": "Teacher",
+      "sector": "education",
+      "hourly_wage": 28,
+      "salary": 4480,
+      "work_hours": [
+        8,
+        17
+      ],
+      "work_days": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "degree_required": "education",
+      "skill_requirements": {},
+      "promotion_path": [],
+      "tags": [
+        "education",
+        "social"
+      ]
+    },
+    "engineer": {
+      "name": "Engineer",
+      "sector": "engineering",
+      "hourly_wage": 40,
+      "salary": 6400,
+      "work_hours": [
+        8,
+        17
+      ],
+      "work_days": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "degree_required": "engineering",
+      "skill_requirements": {},
+      "promotion_path": [],
+      "tags": [
+        "engineering",
+        "technical"
+      ]
+    },
+    "accountant": {
+      "name": "Accountant",
+      "sector": "money",
+      "hourly_wage": 32,
+      "salary": 5120,
+      "work_hours": [
+        8,
+        17
+      ],
+      "work_days": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "degree_required": "business",
+      "skill_requirements": {},
+      "promotion_path": [],
+      "tags": [
+        "money",
+        "office"
+      ]
+    },
+    "retail_worker": {
+      "name": "Retail Worker",
+      "sector": "service",
+      "hourly_wage": 15,
+      "salary": 2400,
+      "work_hours": [
+        8,
+        17
+      ],
+      "work_days": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "degree_required": null,
+      "skill_requirements": {},
+      "promotion_path": [],
+      "tags": [
+        "service",
+        "store"
+      ]
+    },
+    "delivery_driver": {
+      "name": "Delivery Driver",
+      "sector": "transport",
+      "hourly_wage": 18,
+      "salary": 2880,
+      "work_hours": [
+        8,
+        17
+      ],
+      "work_days": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "degree_required": null,
+      "skill_requirements": {},
+      "promotion_path": [],
+      "tags": [
+        "transport",
+        "traffic"
+      ]
+    },
+    "construction_worker": {
+      "name": "Construction Worker",
+      "sector": "manual",
+      "hourly_wage": 24,
+      "salary": 3840,
+      "work_hours": [
+        8,
+        17
+      ],
+      "work_days": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "degree_required": null,
+      "skill_requirements": {},
+      "promotion_path": [],
+      "tags": [
+        "manual",
+        "physical"
+      ]
+    },
+    "cleaner": {
+      "name": "Cleaner",
+      "sector": "manual",
+      "hourly_wage": 14,
+      "salary": 2240,
+      "work_hours": [
+        8,
+        17
+      ],
+      "work_days": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "degree_required": null,
+      "skill_requirements": {},
+      "promotion_path": [],
+      "tags": [
+        "manual",
+        "service"
+      ]
+    },
+    "barista": {
+      "name": "Barista",
+      "sector": "cafe",
+      "hourly_wage": 16,
+      "salary": 2560,
+      "work_hours": [
+        8,
+        17
+      ],
+      "work_days": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "degree_required": null,
+      "skill_requirements": {},
+      "promotion_path": [],
+      "tags": [
+        "cafe",
+        "social"
+      ]
+    },
+    "security_guard": {
+      "name": "Security Guard",
+      "sector": "security",
+      "hourly_wage": 19,
+      "salary": 3040,
+      "work_hours": [
+        8,
+        17
+      ],
+      "work_days": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "degree_required": null,
+      "skill_requirements": {},
+      "promotion_path": [],
+      "tags": [
+        "security",
+        "crime"
+      ]
+    }
+  },
+  "company_templates": {
+    "hospital": {
+      "name": "City Hospital",
+      "sector": "health",
+      "job_slots": [
+        "doctor"
+      ],
+      "starting_funds": 500000,
+      "tags": [
+        "health",
+        "public"
+      ]
+    },
+    "law_firm": {
+      "name": "Downtown Law Firm",
+      "sector": "law",
+      "job_slots": [
+        "lawyer"
+      ],
+      "starting_funds": 200000,
+      "tags": [
+        "law",
+        "office"
+      ]
+    },
+    "tech_company": {
+      "name": "Tech Startup",
+      "sector": "tech",
+      "job_slots": [
+        "software_engineer"
+      ],
+      "starting_funds": 300000,
+      "tags": [
+        "tech",
+        "office"
+      ]
+    },
+    "school": {
+      "name": "Public School",
+      "sector": "education",
+      "job_slots": [
+        "teacher"
+      ],
+      "starting_funds": 100000,
+      "tags": [
+        "education",
+        "public"
+      ]
+    },
+    "engineering_firm": {
+      "name": "Engineering Firm",
+      "sector": "engineering",
+      "job_slots": [
+        "engineer"
+      ],
+      "starting_funds": 250000,
+      "tags": [
+        "engineering",
+        "office"
+      ]
+    },
+    "accounting_firm": {
+      "name": "Accounting Office",
+      "sector": "money",
+      "job_slots": [
+        "accountant"
+      ],
+      "starting_funds": 150000,
+      "tags": [
+        "money",
+        "office"
+      ]
+    },
+    "retail_store": {
+      "name": "Retail Store",
+      "sector": "service",
+      "job_slots": [
+        "retail_worker"
+      ],
+      "starting_funds": 50000,
+      "tags": [
+        "store",
+        "service"
+      ]
+    },
+    "logistics_co": {
+      "name": "Logistics Company",
+      "sector": "transport",
+      "job_slots": [
+        "delivery_driver"
+      ],
+      "starting_funds": 80000,
+      "tags": [
+        "transport",
+        "traffic"
+      ]
+    },
+    "construction_co": {
+      "name": "Construction Company",
+      "sector": "manual",
+      "job_slots": [
+        "construction_worker"
+      ],
+      "starting_funds": 120000,
+      "tags": [
+        "manual",
+        "physical"
+      ]
+    },
+    "cleaning_co": {
+      "name": "Cleaning Services",
+      "sector": "service",
+      "job_slots": [
+        "cleaner"
+      ],
+      "starting_funds": 30000,
+      "tags": [
+        "service",
+        "manual"
+      ]
+    },
+    "cafe": {
+      "name": "Local Caf\u00e9",
+      "sector": "cafe",
+      "job_slots": [
+        "barista"
+      ],
+      "starting_funds": 40000,
+      "tags": [
+        "cafe",
+        "social"
+      ]
+    },
+    "security_firm": {
+      "name": "Security Firm",
+      "sector": "security",
+      "job_slots": [
+        "security_guard"
+      ],
+      "starting_funds": 60000,
+      "tags": [
+        "security",
+        "crime"
+      ]
+    }
+  },
+  "need_templates": {
+    "socialize": {
+      "name": "Socialise",
+      "description": "Spend quality time with other people \u2014 friends, neighbours, or family.",
+      "category": "social",
+      "weekly_target": 1,
+      "satisfying_activities": [
+        "hangout",
+        "visit_person",
+        "gossip",
+        "host_dinner",
+        "attend_party"
+      ],
+      "decay_per_week": 1
+    },
+    "nature": {
+      "name": "Time in Nature",
+      "description": "Spend time outdoors, in parks, gardens, or natural surroundings.",
+      "category": "wellbeing",
+      "weekly_target": 1,
+      "satisfying_activities": [
+        "go_for_walk",
+        "garden",
+        "jog_outside",
+        "sit_in_park"
+      ],
+      "decay_per_week": 1
+    },
+    "exercise": {
+      "name": "Physical Exercise",
+      "description": "Engage in physical activity \u2014 gym, running, sports, or home workout.",
+      "category": "health",
+      "weekly_target": 2,
+      "satisfying_activities": [
+        "workout",
+        "jog",
+        "swim",
+        "play_sport",
+        "yoga"
+      ],
+      "decay_per_week": 1
+    },
+    "creative": {
+      "name": "Creative Outlet",
+      "description": "Engage in a creative activity \u2014 art, music, writing, cooking, or crafting.",
+      "category": "self_expression",
+      "weekly_target": 1,
+      "satisfying_activities": [
+        "paint",
+        "play_music",
+        "write",
+        "cook_elaborate_meal",
+        "craft"
+      ],
+      "decay_per_week": 1
+    },
+    "romance": {
+      "name": "Romance",
+      "description": "Seek or maintain a romantic relationship \u2014 quality one-on-one time with a partner, dating, or pursuing new connections.",
+      "category": "relationships",
+      "weekly_target": 1,
+      "satisfying_activities": [
+        "date_night",
+        "romantic_evening",
+        "use_dating_app",
+        "flirt"
+      ],
+      "decay_per_week": 1
+    },
+    "intimacy": {
+      "name": "Intimacy",
+      "description": "Physical and emotional closeness with a partner or romantic interest.",
+      "category": "relationships",
+      "weekly_target": 1,
+      "satisfying_activities": [
+        "be_intimate",
+        "cuddle",
+        "romantic_evening"
+      ],
+      "decay_per_week": 1
+    },
+    "learning": {
+      "name": "Learning",
+      "description": "Stimulate the mind by acquiring new knowledge or skills.",
+      "category": "self_improvement",
+      "weekly_target": 1,
+      "satisfying_activities": [
+        "read_book",
+        "take_online_course",
+        "research",
+        "watch_documentary"
+      ],
+      "decay_per_week": 1
+    },
+    "solitude": {
+      "name": "Solitude",
+      "description": "Spend meaningful alone time to recharge and reflect.",
+      "category": "wellbeing",
+      "weekly_target": 1,
+      "satisfying_activities": [
+        "meditate",
+        "read_alone",
+        "take_long_bath",
+        "journal"
+      ],
+      "decay_per_week": 1
+    },
+    "spirituality": {
+      "name": "Spirituality",
+      "description": "Practice faith, meditation, or personal philosophy.",
+      "category": "meaning",
+      "weekly_target": 1,
+      "satisfying_activities": [
+        "pray",
+        "meditate",
+        "attend_service",
+        "journal"
+      ],
+      "decay_per_week": 1
+    },
+    "purpose": {
+      "name": "Sense of Purpose",
+      "description": "Engage in work, volunteering, or projects that feel meaningful.",
+      "category": "meaning",
+      "weekly_target": 1,
+      "satisfying_activities": [
+        "volunteer",
+        "work_on_project",
+        "mentor_someone",
+        "career_milestone"
+      ],
+      "decay_per_week": 1
+    },
+    "adventure": {
+      "name": "Adventure",
+      "description": "Seek new experiences, travel, or excitement beyond daily routine.",
+      "category": "stimulation",
+      "weekly_target": 1,
+      "satisfying_activities": [
+        "travel",
+        "try_new_restaurant",
+        "spontaneous_outing",
+        "explore_area"
+      ],
+      "decay_per_week": 1
+    },
+    "play": {
+      "name": "Play",
+      "description": "Engage in games, fun activities, or lighthearted entertainment.",
+      "category": "stimulation",
+      "weekly_target": 2,
+      "satisfying_activities": [
+        "play_video_games",
+        "board_game",
+        "watch_movie",
+        "play_sport"
+      ],
+      "decay_per_week": 1
     }
   }
 }
