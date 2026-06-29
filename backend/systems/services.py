@@ -589,4 +589,3 @@ def active_contracts_for_household(world, household_id):
         if c["household_id"] == household_id
         and c["status"] != PHASE_DEPARTED
     ]
-                                              

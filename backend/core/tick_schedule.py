@@ -71,3 +71,6 @@ CADENCE = {
     "lt_needs":             30,   # long-term need frustration update (~30 game-min)
     "social_odor":          20,   # smell pressure scan
 }
+
+# Phone battery drain — every tick but gated by cadence to spread load
+CADENCE["phone_battery"] = 1    # every tick

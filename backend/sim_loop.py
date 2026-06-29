@@ -80,6 +80,7 @@ from systems.faction_ai import apply_faction_influence
 from systems.scheduling import generate_week_schedule, adjust_for_household
 from systems.lt_needs   import update_lt_needs, reset_weekly_counts, distribute_lt_needs
 from systems.social_odor import apply_odor_social_pressure
+from systems.phone      import update_phone_battery, charge_phone
 from systems.story      import update_story_arc
 from systems.events     import maybe_generate_shared_event
 
@@ -268,7 +269,6 @@ def tick(world):
         for c in characters:
             update_investment_behavior(c, world)
 
-
     # Eviction / migration: emit events when thresholds crossed
     if every(world, CADENCE["evictions"], offset=18):
         for hh in world.get("households", {}).values():
@@ -312,6 +312,15 @@ def tick(world):
     if every(world, CADENCE["social_odor"], offset=28):
         for c in characters:
             apply_odor_social_pressure(c, world)
+
+    # -- Phone battery drain + charging (÷5) ───────────────
+    if every(world, CADENCE["phone_battery"], offset=29):
+        for c in characters:
+            act = c.get("activity") or {}
+            if act.get("interaction") == "charge":
+                charge_phone(c, world)
+            else:
+                update_phone_battery(c)
 
     # Story arcs are lightweight — keep per-tick
     for c in characters:

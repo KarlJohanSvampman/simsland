@@ -557,6 +557,7 @@ def build_context(
         "inventory":         _build_inventory_context(c),
         "worn":              _build_worn_context(c),
         "services":          _build_services_context(c, world),
+        "phone":             _build_phone_context(c),
     }
 
     return context
@@ -1102,3 +1103,12 @@ def build_investment_context(c, world):
 def _build_lt_need_context(c):
     from systems.lt_needs import build_lt_need_context
     return build_lt_need_context(c)
+
+
+# =========================================================
+# PHONE CONTEXT
+# =========================================================
+
+def _build_phone_context(c):
+    from systems.phone import phone_context
+    return phone_context(c)

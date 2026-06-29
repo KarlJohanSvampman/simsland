@@ -15,7 +15,11 @@
           "interaction": "sit_chair"
         }
       ],
-      "storage": null
+      "storage": null,
+      "tags": [
+        "seat",
+        "chair"
+      ]
     },
     "fridge_a": {
       "category": "appliance",
@@ -42,7 +46,210 @@
           "food",
           "drink"
         ]
+      },
+      "tags": [
+        "appliance",
+        "fridge",
+        "food_storage"
+      ]
+    },
+    "wall_socket": {
+      "category": "electrical",
+      "model": "/resources/props/wall_socket.glb",
+      "footprint": [
+        {
+          "dx": 0,
+          "dy": 0
+        }
+      ],
+      "anchors": [
+        {
+          "name": "anchor_charge",
+          "interaction": "charge"
+        }
+      ],
+      "tags": [
+        "wall_socket",
+        "electrical"
+      ],
+      "storage": null
+    },
+    "bed_double_a": {
+      "category": "furniture",
+      "model": "/resources/props/bed_double_a.glb",
+      "footprint": [
+        {
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "dx": 1,
+          "dy": 0
+        },
+        {
+          "dx": 0,
+          "dy": 1
+        },
+        {
+          "dx": 1,
+          "dy": 1
+        }
+      ],
+      "anchors": [
+        {
+          "name": "anchor_sleep",
+          "interaction": "sleep"
+        },
+        {
+          "name": "anchor_lie",
+          "interaction": "lie_down"
+        }
+      ],
+      "tags": [
+        "bed",
+        "sleepable"
+      ],
+      "storage": null
+    },
+    "sofa_a": {
+      "category": "furniture",
+      "model": "/resources/props/sofa_a.glb",
+      "footprint": [
+        {
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "dx": 1,
+          "dy": 0
+        }
+      ],
+      "anchors": [
+        {
+          "name": "anchor_sit",
+          "interaction": "sit_down_seat"
+        },
+        {
+          "name": "anchor_lie",
+          "interaction": "lie_down"
+        }
+      ],
+      "tags": [
+        "seat",
+        "sofa",
+        "sleepable"
+      ],
+      "storage": null
+    },
+    "toilet_a": {
+      "category": "bathroom",
+      "model": "/resources/props/toilet_a.glb",
+      "footprint": [
+        {
+          "dx": 0,
+          "dy": 0
+        }
+      ],
+      "anchors": [
+        {
+          "name": "anchor_use",
+          "interaction": "use_toilet"
+        },
+        {
+          "name": "anchor_flush",
+          "interaction": "flush_toilet"
+        }
+      ],
+      "tags": [
+        "toilet",
+        "bathroom"
+      ],
+      "storage": null
+    },
+    "desk_computer_a": {
+      "category": "electronics",
+      "model": "/resources/props/desk_computer_a.glb",
+      "footprint": [
+        {
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "dx": 1,
+          "dy": 0
+        }
+      ],
+      "anchors": [
+        {
+          "name": "anchor_use",
+          "interaction": "computer_use"
+        }
+      ],
+      "tags": [
+        "computer",
+        "desktop",
+        "electronics"
+      ],
+      "storage": null
+    },
+    "car_sedan_a": {
+      "category": "vehicle",
+      "model": "/resources/props/car_sedan_a.glb",
+      "footprint": [
+        {
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "dx": 1,
+          "dy": 0
+        },
+        {
+          "dx": 2,
+          "dy": 0
+        }
+      ],
+      "anchors": [
+        {
+          "name": "anchor_drive",
+          "interaction": "drive_car_to"
+        }
+      ],
+      "tags": [
+        "vehicle",
+        "car"
+      ],
+      "storage": {
+        "slots": 20,
+        "accepted_categories": [
+          "*"
+        ]
       }
+    },
+    "dining_table_a": {
+      "category": "furniture",
+      "model": "/resources/props/dining_table_a.glb",
+      "footprint": [
+        {
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "dx": 1,
+          "dy": 0
+        }
+      ],
+      "anchors": [
+        {
+          "name": "anchor_eat",
+          "interaction": "eat_meal"
+        }
+      ],
+      "tags": [
+        "table",
+        "dining"
+      ],
+      "storage": null
     }
   },
   "item_templates": {
@@ -937,7 +1144,14 @@
         "open_banking_app",
         "use_rideshare"
       ],
-      "battery": 1.0
+      "model": "/resources/items/smartphone_budget.glb",
+      "placeable": true,
+      "initial_states": {
+        "battery": 100,
+        "powered_on": true
+      },
+      "battery_drain_idle": 0.05,
+      "battery_drain_in_use": 0.3
     },
     "smartphone_premium": {
       "name": "Premium Smartphone",
@@ -956,8 +1170,15 @@
         "open_banking_app",
         "use_rideshare"
       ],
-      "battery": 1.0,
-      "quality": 0.95
+      "quality": 0.95,
+      "model": "/resources/items/smartphone_premium.glb",
+      "placeable": true,
+      "initial_states": {
+        "battery": 100,
+        "powered_on": true
+      },
+      "battery_drain_idle": 0.05,
+      "battery_drain_in_use": 0.3
     },
     "laptop_basic": {
       "name": "Basic Laptop",
@@ -967,7 +1188,14 @@
       "stackable": false,
       "consumable": false,
       "object_type": "computer",
-      "quality": 0.55
+      "quality": 0.55,
+      "model": "/resources/items/laptop_basic.glb",
+      "placeable": true,
+      "initial_states": {
+        "battery": 100,
+        "powered_on": true
+      },
+      "battery_drain_idle": 0.03
     },
     "laptop_gaming": {
       "name": "Gaming Laptop",
@@ -977,7 +1205,27 @@
       "stackable": false,
       "consumable": false,
       "object_type": "computer",
-      "quality": 0.92
+      "quality": 0.92,
+      "model": "/resources/items/laptop_gaming.glb",
+      "placeable": true,
+      "initial_states": {
+        "battery": 100,
+        "powered_on": true
+      },
+      "battery_drain_idle": 0.03
+    },
+    "phone_charger": {
+      "name": "Phone Charger",
+      "category": "electronics",
+      "object_type": "charger",
+      "size": 1,
+      "base_price": 25.0,
+      "stackable": false,
+      "consumable": false,
+      "model": "/resources/items/phone_charger.glb",
+      "placeable": true,
+      "initial_states": {},
+      "charges_per_tick": 0.8
     }
   },
   "character_templates": {
@@ -1035,6 +1283,815 @@
       },
       "ik": {
         "right_hand": "ik_handle"
+      }
+    },
+    "sit_down_seat": {
+      "name": "Sit Down",
+      "description": "Sit in a seat or chair",
+      "category": "basic",
+      "duration_ticks": 2,
+      "requires_prop_tags": [
+        "seat"
+      ],
+      "body_effects": {
+        "fatigue": -1
+      },
+      "stress_delta": -1,
+      "satisfies_lt_needs": [],
+      "handler": "sit_down_seat",
+      "animations": {
+        "start": [
+          "sit_down_a",
+          "sit_down_b"
+        ],
+        "loop": [
+          "sit_idle_a",
+          "sit_idle_b"
+        ],
+        "stop": [
+          "stand_up_a"
+        ]
+      }
+    },
+    "stand_up": {
+      "name": "Stand Up",
+      "description": "Stand up from a seated or lying position",
+      "category": "basic",
+      "duration_ticks": 1,
+      "requires_prop_tags": [],
+      "body_effects": {},
+      "handler": "stand_up",
+      "animations": {
+        "start": [
+          "stand_up_a"
+        ],
+        "loop": [],
+        "stop": []
+      }
+    },
+    "lie_down": {
+      "name": "Lie Down",
+      "description": "Lie down on a bed or sofa",
+      "category": "basic",
+      "duration_ticks": 2,
+      "requires_prop_tags": [
+        "sleepable"
+      ],
+      "body_effects": {
+        "fatigue": -5
+      },
+      "stress_delta": -3,
+      "handler": "lie_down",
+      "animations": {
+        "start": [
+          "lie_down_a"
+        ],
+        "loop": [
+          "lie_idle_a"
+        ],
+        "stop": [
+          "stand_up_a"
+        ]
+      }
+    },
+    "eat_meal": {
+      "name": "Eat a Meal",
+      "description": "Eat a meal from a table or surface",
+      "category": "food",
+      "duration_ticks": 30,
+      "requires_prop_tags": [
+        "table",
+        "counter"
+      ],
+      "body_effects": {
+        "hunger": -40,
+        "hydration": 5,
+        "recent_intake": 50
+      },
+      "stress_delta": -4,
+      "satisfies_lt_needs": [],
+      "handler": "eat_meal",
+      "animations": {
+        "start": [
+          "sit_down_a"
+        ],
+        "loop": [
+          "eat_a",
+          "eat_b"
+        ],
+        "stop": [
+          "stand_up_a"
+        ]
+      }
+    },
+    "sleep": {
+      "name": "Sleep",
+      "description": "Sleep in a bed",
+      "category": "rest",
+      "duration_ticks": 480,
+      "requires_prop_tags": [
+        "bed"
+      ],
+      "body_effects": {
+        "fatigue": -90,
+        "sleep_debt": -20
+      },
+      "stress_delta": -10,
+      "satisfies_lt_needs": [],
+      "handler": "sleep",
+      "animations": {
+        "start": [
+          "lie_down_a"
+        ],
+        "loop": [
+          "sleep_idle_a"
+        ],
+        "stop": [
+          "stand_up_a"
+        ]
+      }
+    },
+    "use_toilet": {
+      "name": "Use Toilet",
+      "description": "Relieve bladder and/or bowels",
+      "category": "hygiene",
+      "duration_ticks": 8,
+      "requires_prop_tags": [
+        "toilet"
+      ],
+      "body_effects": {
+        "bladder": -85,
+        "bowels": -70
+      },
+      "handler": "use_toilet",
+      "animations": {
+        "start": [
+          "toilet_sit_a"
+        ],
+        "loop": [
+          "toilet_idle_a"
+        ],
+        "stop": [
+          "toilet_stand_a"
+        ]
+      }
+    },
+    "flush_toilet": {
+      "name": "Flush Toilet",
+      "description": "Flush the toilet",
+      "category": "hygiene",
+      "duration_ticks": 1,
+      "requires_prop_tags": [
+        "toilet"
+      ],
+      "body_effects": {},
+      "handler": "flush_toilet",
+      "animations": {
+        "start": [
+          "flush_a"
+        ],
+        "loop": [],
+        "stop": []
+      }
+    },
+    "drive_car_to": {
+      "name": "Drive Car",
+      "description": "Drive to a destination. Goes offgrid for the journey.",
+      "category": "transport",
+      "duration_ticks": 120,
+      "requires_prop_tags": [
+        "car"
+      ],
+      "args": {
+        "destination": "string"
+      },
+      "offgrid": true,
+      "body_effects": {
+        "fatigue": 3
+      },
+      "handler": "drive_car_to",
+      "animations": {
+        "start": [
+          "car_enter_a"
+        ],
+        "loop": [
+          "car_drive_a"
+        ],
+        "stop": [
+          "car_exit_a"
+        ]
+      }
+    },
+    "phone_call": {
+      "name": "Make a Phone Call",
+      "description": "Call someone. Requires a charged phone in pocket.",
+      "category": "phone",
+      "duration_ticks": 20,
+      "requires_item_object_type": "phone",
+      "requires_item_state": {
+        "battery": {
+          "min": 5
+        }
+      },
+      "args": {
+        "target_id": "string"
+      },
+      "satisfies_lt_needs": [
+        "socialize"
+      ],
+      "stress_delta": -5,
+      "handler": "phone_call",
+      "animations": {
+        "start": [],
+        "loop": [
+          "phone_a",
+          "phone_b"
+        ],
+        "stop": []
+      }
+    },
+    "phone_answer": {
+      "name": "Answer Phone Call",
+      "description": "Answer an incoming call",
+      "category": "phone",
+      "duration_ticks": 20,
+      "requires_item_object_type": "phone",
+      "requires_item_state": {
+        "battery": {
+          "min": 1
+        }
+      },
+      "satisfies_lt_needs": [
+        "socialize"
+      ],
+      "stress_delta": -3,
+      "handler": "phone_answer",
+      "animations": {
+        "start": [],
+        "loop": [
+          "phone_a"
+        ],
+        "stop": []
+      }
+    },
+    "phone_send_text": {
+      "name": "Send a Text",
+      "description": "Send a text message to someone",
+      "category": "phone",
+      "duration_ticks": 5,
+      "requires_item_object_type": "phone",
+      "requires_item_state": {
+        "battery": {
+          "min": 2
+        }
+      },
+      "args": {
+        "target_id": "string",
+        "message": "string"
+      },
+      "satisfies_lt_needs": [
+        "socialize"
+      ],
+      "handler": "phone_send_text",
+      "animations": {
+        "start": [],
+        "loop": [
+          "phone_text_a"
+        ],
+        "stop": []
+      }
+    },
+    "phone_check": {
+      "name": "Check Phone",
+      "description": "Check missed calls and messages",
+      "category": "phone",
+      "duration_ticks": 3,
+      "requires_item_object_type": "phone",
+      "requires_item_state": {
+        "battery": {
+          "min": 1
+        }
+      },
+      "handler": "phone_check",
+      "animations": {
+        "start": [],
+        "loop": [
+          "phone_scroll_a"
+        ],
+        "stop": []
+      }
+    },
+    "phone_read_text": {
+      "name": "Read a Text",
+      "description": "Read a received text message",
+      "category": "phone",
+      "duration_ticks": 3,
+      "requires_item_object_type": "phone",
+      "requires_item_state": {
+        "battery": {
+          "min": 1
+        }
+      },
+      "args": {
+        "message_id": "string"
+      },
+      "handler": "phone_read_text",
+      "animations": {
+        "start": [],
+        "loop": [
+          "phone_scroll_a"
+        ],
+        "stop": []
+      }
+    },
+    "charge": {
+      "name": "Charge Device",
+      "description": "Charge a phone or laptop. Requires charger item and wall socket prop.",
+      "category": "electronics",
+      "duration_ticks": 60,
+      "requires_prop_tags": [
+        "wall_socket",
+        "electrical"
+      ],
+      "requires_item_object_type": "charger",
+      "charges_target_object_type": "phone",
+      "handler": "charge_device",
+      "animations": {
+        "start": [],
+        "loop": [
+          "sit_idle_a"
+        ],
+        "stop": []
+      }
+    },
+    "computer_use": {
+      "name": "Use Computer",
+      "description": "General computer use",
+      "category": "computer",
+      "duration_ticks": 30,
+      "requires_prop_tags": [
+        "computer"
+      ],
+      "handler": "computer_use",
+      "animations": {
+        "start": [
+          "sit_down_a"
+        ],
+        "loop": [
+          "computer_type_a",
+          "computer_scroll_a"
+        ],
+        "stop": [
+          "stand_up_a"
+        ]
+      }
+    },
+    "computer_social_media": {
+      "name": "Browse Social Media",
+      "description": "Scroll social feeds \u2014 mild fun boost, some stress relief",
+      "category": "computer",
+      "duration_ticks": 20,
+      "requires_prop_tags": [
+        "computer"
+      ],
+      "satisfies_lt_needs": [
+        "socialize"
+      ],
+      "stress_delta": -3,
+      "body_effects": {
+        "fatigue": 1
+      },
+      "handler": "computer_social_media",
+      "animations": {
+        "start": [
+          "sit_down_a"
+        ],
+        "loop": [
+          "computer_scroll_a"
+        ],
+        "stop": [
+          "stand_up_a"
+        ]
+      }
+    },
+    "computer_videos": {
+      "name": "Watch Videos",
+      "description": "Watch videos online",
+      "category": "computer",
+      "duration_ticks": 40,
+      "requires_prop_tags": [
+        "computer"
+      ],
+      "satisfies_lt_needs": [
+        "play"
+      ],
+      "stress_delta": -6,
+      "handler": "computer_videos",
+      "animations": {
+        "start": [
+          "sit_down_a"
+        ],
+        "loop": [
+          "computer_watch_a"
+        ],
+        "stop": [
+          "stand_up_a"
+        ]
+      }
+    },
+    "computer_game": {
+      "name": "Play a Computer Game",
+      "description": "Play a video game",
+      "category": "computer",
+      "duration_ticks": 60,
+      "requires_prop_tags": [
+        "computer"
+      ],
+      "satisfies_lt_needs": [
+        "play"
+      ],
+      "stress_delta": -8,
+      "handler": "computer_game",
+      "animations": {
+        "start": [
+          "sit_down_a"
+        ],
+        "loop": [
+          "computer_game_a",
+          "computer_game_b"
+        ],
+        "stop": [
+          "stand_up_a"
+        ]
+      }
+    },
+    "computer_wiki_research": {
+      "name": "Research on Wikipedia",
+      "description": "Look up information. Makes a live Wikipedia API call.",
+      "category": "computer",
+      "duration_ticks": 20,
+      "requires_prop_tags": [
+        "computer"
+      ],
+      "args": {
+        "keyword": "string"
+      },
+      "satisfies_lt_needs": [
+        "learning"
+      ],
+      "stress_delta": 0,
+      "handler": "computer_wiki_research",
+      "animations": {
+        "start": [
+          "sit_down_a"
+        ],
+        "loop": [
+          "computer_type_a"
+        ],
+        "stop": [
+          "stand_up_a"
+        ]
+      }
+    },
+    "computer_window_shopping": {
+      "name": "Browse Online Stores",
+      "description": "Window-shop online",
+      "category": "computer",
+      "duration_ticks": 25,
+      "requires_prop_tags": [
+        "computer"
+      ],
+      "satisfies_lt_needs": [],
+      "stress_delta": -2,
+      "handler": "computer_window_shopping",
+      "animations": {
+        "start": [
+          "sit_down_a"
+        ],
+        "loop": [
+          "computer_scroll_a"
+        ],
+        "stop": [
+          "stand_up_a"
+        ]
+      }
+    },
+    "computer_dating": {
+      "name": "Browse Dating App",
+      "description": "Browse profiles on a dating app",
+      "category": "computer",
+      "duration_ticks": 30,
+      "requires_prop_tags": [
+        "computer"
+      ],
+      "satisfies_lt_needs": [
+        "romance"
+      ],
+      "stress_delta": -2,
+      "handler": "computer_dating",
+      "animations": {
+        "start": [
+          "sit_down_a"
+        ],
+        "loop": [
+          "computer_scroll_a"
+        ],
+        "stop": [
+          "stand_up_a"
+        ]
+      }
+    },
+    "computer_job_search": {
+      "name": "Search for Jobs",
+      "description": "Browse current job listings",
+      "category": "computer",
+      "duration_ticks": 30,
+      "requires_prop_tags": [
+        "computer"
+      ],
+      "satisfies_lt_needs": [
+        "purpose"
+      ],
+      "handler": "computer_job_search",
+      "animations": {
+        "start": [
+          "sit_down_a"
+        ],
+        "loop": [
+          "computer_type_a"
+        ],
+        "stop": [
+          "stand_up_a"
+        ]
+      }
+    },
+    "computer_apply_for_job": {
+      "name": "Apply for a Job",
+      "description": "Submit a job application",
+      "category": "computer",
+      "duration_ticks": 40,
+      "requires_prop_tags": [
+        "computer"
+      ],
+      "args": {
+        "job_id": "string"
+      },
+      "satisfies_lt_needs": [
+        "purpose"
+      ],
+      "handler": "computer_apply_for_job",
+      "animations": {
+        "start": [
+          "sit_down_a"
+        ],
+        "loop": [
+          "computer_type_a"
+        ],
+        "stop": [
+          "stand_up_a"
+        ]
+      }
+    },
+    "computer_send_email": {
+      "name": "Send Email",
+      "description": "Compose and send an email",
+      "category": "computer",
+      "duration_ticks": 15,
+      "requires_prop_tags": [
+        "computer"
+      ],
+      "args": {
+        "to": "string",
+        "subject": "string",
+        "body": "string"
+      },
+      "satisfies_lt_needs": [
+        "socialize"
+      ],
+      "handler": "computer_send_email",
+      "animations": {
+        "start": [
+          "sit_down_a"
+        ],
+        "loop": [
+          "computer_type_a"
+        ],
+        "stop": [
+          "stand_up_a"
+        ]
+      }
+    },
+    "computer_respond_email": {
+      "name": "Respond to Email",
+      "description": "Reply to a received email",
+      "category": "computer",
+      "duration_ticks": 12,
+      "requires_prop_tags": [
+        "computer"
+      ],
+      "args": {
+        "email_id": "string"
+      },
+      "handler": "computer_respond_email",
+      "animations": {
+        "start": [
+          "sit_down_a"
+        ],
+        "loop": [
+          "computer_type_a"
+        ],
+        "stop": [
+          "stand_up_a"
+        ]
+      }
+    },
+    "computer_check_email": {
+      "name": "Check Email",
+      "description": "Read new emails",
+      "category": "computer",
+      "duration_ticks": 8,
+      "requires_prop_tags": [
+        "computer"
+      ],
+      "handler": "computer_check_email",
+      "animations": {
+        "start": [
+          "sit_down_a"
+        ],
+        "loop": [
+          "computer_scroll_a"
+        ],
+        "stop": [
+          "stand_up_a"
+        ]
+      }
+    },
+    "computer_list_stocks": {
+      "name": "Check Stock Portfolio",
+      "description": "View current stock prices and portfolio",
+      "category": "computer",
+      "duration_ticks": 6,
+      "requires_prop_tags": [
+        "computer"
+      ],
+      "handler": "computer_list_stocks",
+      "animations": {
+        "start": [
+          "sit_down_a"
+        ],
+        "loop": [
+          "computer_scroll_a"
+        ],
+        "stop": [
+          "stand_up_a"
+        ]
+      }
+    },
+    "computer_buy_stock": {
+      "name": "Buy Stock",
+      "description": "Purchase shares of a company",
+      "category": "computer",
+      "duration_ticks": 5,
+      "requires_prop_tags": [
+        "computer"
+      ],
+      "args": {
+        "ticker": "string",
+        "shares": "number"
+      },
+      "handler": "computer_buy_stock",
+      "animations": {
+        "start": [
+          "sit_down_a"
+        ],
+        "loop": [
+          "computer_type_a"
+        ],
+        "stop": [
+          "stand_up_a"
+        ]
+      }
+    },
+    "computer_sell_stock": {
+      "name": "Sell Stock",
+      "description": "Sell shares of a company",
+      "category": "computer",
+      "duration_ticks": 5,
+      "requires_prop_tags": [
+        "computer"
+      ],
+      "args": {
+        "ticker": "string",
+        "shares": "number"
+      },
+      "handler": "computer_sell_stock",
+      "animations": {
+        "start": [
+          "sit_down_a"
+        ],
+        "loop": [
+          "computer_type_a"
+        ],
+        "stop": [
+          "stand_up_a"
+        ]
+      }
+    },
+    "computer_check_stock_value": {
+      "name": "Check Stock Value",
+      "description": "Look up current price of a specific stock",
+      "category": "computer",
+      "duration_ticks": 3,
+      "requires_prop_tags": [
+        "computer"
+      ],
+      "args": {
+        "ticker": "string"
+      },
+      "handler": "computer_check_stock_value",
+      "animations": {
+        "start": [
+          "sit_down_a"
+        ],
+        "loop": [
+          "computer_scroll_a"
+        ],
+        "stop": [
+          "stand_up_a"
+        ]
+      }
+    },
+    "computer_order_item": {
+      "name": "Order Item Online",
+      "description": "Purchase an item from the online store \u2014 delivered to home",
+      "category": "computer",
+      "duration_ticks": 8,
+      "requires_prop_tags": [
+        "computer"
+      ],
+      "args": {
+        "template_id": "string",
+        "quantity": "number"
+      },
+      "handler": "computer_order_item",
+      "animations": {
+        "start": [
+          "sit_down_a"
+        ],
+        "loop": [
+          "computer_type_a"
+        ],
+        "stop": [
+          "stand_up_a"
+        ]
+      }
+    },
+    "computer_order_service": {
+      "name": "Book a Service",
+      "description": "Hire a service worker",
+      "category": "computer",
+      "duration_ticks": 10,
+      "requires_prop_tags": [
+        "computer"
+      ],
+      "args": {
+        "service_id": "string"
+      },
+      "handler": "computer_order_service",
+      "animations": {
+        "start": [
+          "sit_down_a"
+        ],
+        "loop": [
+          "computer_type_a"
+        ],
+        "stop": [
+          "stand_up_a"
+        ]
+      }
+    },
+    "computer_list_hired_service_options": {
+      "name": "Browse Service Listings",
+      "description": "View available hired services, optionally filtered by type. Types: reconstruction, remodelling, escort, gardener, plumber, movers, electrician, lawyer, babysitter, dogwalker, private_healthcare, private_detective, threat (illegal), maid",
+      "category": "computer",
+      "duration_ticks": 5,
+      "requires_prop_tags": [
+        "computer"
+      ],
+      "args": {
+        "service_type": "string|null"
+      },
+      "handler": "computer_list_service_options",
+      "animations": {
+        "start": [
+          "sit_down_a"
+        ],
+        "loop": [
+          "computer_scroll_a"
+        ],
+        "stop": [
+          "stand_up_a"
+        ]
       }
     }
   },

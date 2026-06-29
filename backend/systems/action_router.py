@@ -549,75 +549,371 @@ def route_action(c, world, action, speech, definitions=None):
     elif action_type == "paint_wall":
         _route_paint_wall(c, world, action)
 
-    # "call" / "text" are future — for now just log
-    elif action_type in ("call", "text"):
-        c.setdefault("pending_comms", []).append(action)
+    # ── Phone ──────────────────────────────────────────────────────────────────
+    elif action_type == "phone_call":
+        _route_phone_call(c, world, action)
+    elif action_type == "phone_answer":
+        _route_phone_answer(c, world, action)
+    elif action_type == "phone_send_text":
+        _route_phone_send_text(c, world, action)
+    elif action_type in ("phone_check", "call", "text"):
+        _route_phone_check(c, world, action)
+    elif action_type == "phone_read_text":
+        _route_phone_read_text(c, world, action)
 
-    # ── Hobby 
+    # ── Computer ───────────────────────────────────────────────────────────────
+    elif action_type == "computer_social_media":
+        _route_computer(c, world, action, "computer_social_media")
+    elif action_type == "computer_videos":
+        _route_computer(c, world, action, "computer_videos")
+    elif action_type == "computer_game":
+        _route_computer(c, world, action, "computer_game")
+    elif action_type == "computer_wiki_research":
+        _route_computer_wiki_research(c, world, action)
+    elif action_type == "computer_window_shopping":
+        _route_computer(c, world, action, "computer_window_shopping")
+    elif action_type == "computer_dating":
+        _route_computer(c, world, action, "computer_dating")
+    elif action_type == "computer_job_search":
+        _route_computer_job_search(c, world, action)
+    elif action_type == "computer_apply_for_job":
+        _route_computer_apply_for_job(c, world, action)
+    elif action_type in ("computer_send_email", "computer_respond_email", "computer_check_email"):
+        _route_computer_email(c, world, action)
+    elif action_type == "computer_list_stocks":
+        _route_computer_list_stocks(c, world, action)
+    elif action_type == "computer_buy_stock":
+        _route_computer_buy_stock(c, world, action)
+    elif action_type == "computer_sell_stock":
+        _route_computer_sell_stock(c, world, action)
+    elif action_type == "computer_check_stock_value":
+        _route_computer_check_stock_value(c, world, action)
+    elif action_type == "computer_order_item":
+        _route_computer_order_item(c, world, action)
+    elif action_type == "computer_order_service":
+        _route_computer_order_ser
 
 # =========================================================
-# BUILD WALL
-# action = {
-#   "type":        "build_wall",
-#   "x":           3,
-#   "y":           5,
-#   "orientation": "v",          # "h" or "v"
-#   "material":    "paint_white_matt"
-# }
+# PHONE HANDLERS
 # =========================================================
 
-def _route_build_wall(c, world, action):
-    from systems.walls import create_wall
-    x           = int(action.get("x", int(c.get("x", 0))))
-    y           = int(action.get("y", int(c.get("y", 0))))
-    orientation = action.get("orientation", "v")
-    material    = action.get("material", "paint_white_matt")
-    bid         = c.get("building_id")
-    create_wall(world, x, y, orientation, building_id=bid,
-                load_bearing=False, material=material, interior=True)
+def _require_phone(c):
+    """Return phone item if usable, else None."""
+    from systems.personal_items import get_phone, phone_is_usable
+    phone = get_phone(c)
+    if not phone or not phone_is_usable(c):
+        return None
+    return phone
+
+
+def _route_phone_call(c, world, action):
+    phone = _require_phone(c)
+    if not phone:
+        return
+    target_id = action.get("target_id") or action.get("target")
+    c["activity"] = _scaffold(c, world, "phone_call",
+                               target_id=target_id, interaction="phone_call")
+
+
+def _route_phone_answer(c, world, action):
+    phone = _require_phone(c)
+    if not phone:
+        return
+    c["activity"] = _scaffold(c, world, "phone_answer", interaction="phone_answer")
+
+
+def _route_phone_send_text(c, world, action):
+    phone = _require_phone(c)
+    if not phone:
+        return
+    target_id = action.get("target_id") or action.get("target")
+    message   = action.get("message", "")
+    if target_id and message:
+        from systems.social import send_message
+        target = world.get("characters", {}).get(target_id)
+        if target:
+            send_message(c, target, message, world)
+    c["activity"] = _scaffold(c, world, "phone_send_text", interaction="phone_send_text")
+
+
+def _route_phone_check(c, world, action):
+    phone = _require_phone(c)
+    if not phone:
+        return
+    c["activity"] = _scaffold(c, world, "phone_check", interaction="phone_check")
+    # Expose missed calls/messages count in activity data
+    missed = len(c.get("social", {}).get("missed_calls", []))
+    unread = sum(1 for m in world.get("messages", [])
+                 if m.get("to_id") == c["id"] and not m.get("read"))
+    c["activity"]["phone_check_result"] = {"missed_calls": missed, "unread_messages": unread}
+
+
+def _route_phone_read_text(c, world, action):
+    phone = _require_phone(c)
+    if not phone:
+        return
+    msg_id = action.get("message_id") or action.get("target")
+    if msg_id:
+        for m in world.get("messages", []):
+            if m.get("id") == msg_id and m.get("to_id") == c["id"]:
+                m["read"] = True
+    c["activity"] = _scaffold(c, world, "phone_read_text", interaction="phone_read_text")
 
 
 # =========================================================
-# REMOVE WALL
-# action = { "type": "remove_wall", "wall_id": "wall_house_1_3_5_v" }
-# Silently blocked if wall is load_bearing.
+# DEVICE CHARGING
 # =========================================================
 
-def _route_remove_wall(c, world, action):
-    from systems.walls import remove_wall
-    wall_id = action.get("wall_id")
-    if wall_id:
-        remove_wall(world, wall_id)
+def _route_charge_device(c, world, action):
+    """
+    Start charging. The phone.charge_phone() is called each tick by phone.py
+    while activity interaction == "charge". Requires phone_charger in inventory.
+    """
+    from systems.personal_items import has_item_template
+    if not has_item_template(c, "phone_charger"):
+        return
+    target_prop_id = action.get("target") or action.get("prop_id")
+    c["activity"] = _scaffold(c, world, "charge", target_id=target_prop_id,
+                               interaction="charge",
+                               duration=_INTERACTION_DURATIONS.get("charge", 60))
 
 
 # =========================================================
-# PAINT WALL
-# action = {
-#   "type":        "paint_wall",
-#   "wall_id":     "wall_house_1_3_5_v",
-#   "material_id": "paint_red_satin"    # or wallpaper_floral_01 etc.
-# }
-# Character must have a paint bucket with matching material_id in inventory.
-# Each call consumes one use from the bucket; bucket removed when empty.
+# POSTURE
 # =========================================================
 
-def _route_paint_wall(c, world, action):
-    from systems.walls import paint_wall
-    from systems.containers import find_bucket_for_material, use_bucket
-    from systems.personal_items import remove_item
+def _route_sit_down(c, world, action):
+    c["activity"] = _scaffold(c, world, "sit_down_seat",
+                               target_id=action.get("target"),
+                               interaction="sit_down_seat")
+    c["posture"] = "sitting"
 
-    wall_id     = action.get("wall_id")
-    material_id = action.get("material_id")
-    if not wall_id or not material_id:
+
+def _route_stand_up(c, world, action):
+    c["posture"] = "standing"
+    act = c.get("activity", {})
+    if act.get("interaction") in ("sit_down_seat", "lie_down", "sleep"):
+        c["activity"] = None
+
+
+def _route_lie_down(c, world, action):
+    c["activity"] = _scaffold(c, world, "lie_down",
+                               target_id=action.get("target"),
+                               interaction="lie_down")
+    c["posture"] = "lying"
+
+
+# =========================================================
+# TRANSPORT
+# =========================================================
+
+def _route_drive_car_to(c, world, action):
+    destination = action.get("destination") or action.get("target")
+    c["activity"] = _scaffold(c, world, "drive_car_to",
+                               target_id=action.get("target"),
+                               interaction="drive_car_to",
+                               duration=_INTERACTION_DURATIONS.get("drive", 120))
+    c["activity"]["destination"] = destination
+    # Mark as offgrid so sim_loop can skip position updates
+    c["offgrid"] = True
+    c["offgrid_destination"] = destination
+
+
+# =========================================================
+# COMPUTER — generic scaffold
+# =========================================================
+
+def _route_computer(c, world, action, interaction_id):
+    c["activity"] = _scaffold(c, world, interaction_id,
+                               target_id=action.get("target"),
+                               interaction=interaction_id)
+
+
+# ─── wikipedia research ───────────────────────────────────────────────────────
+
+def _route_computer_wiki_research(c, world, action):
+    keyword = action.get("keyword") or action.get("args", {}).get("keyword", "")
+    c["activity"] = _scaffold(c, world, "computer_wiki_research",
+                               interaction="computer_wiki_research")
+    c["activity"]["research_keyword"] = keyword
+
+    if not keyword:
         return
 
-    # Must have a bucket with this material
-    bucket = find_bucket_for_material(c, material_id)
-    if not bucket:
-        return
+    # Live Wikipedia API call — store result in character memory
+    try:
+        import urllib.request, urllib.parse, json as _json
+        params  = urllib.parse.urlencode({
+            "action": "query", "format": "json", "prop": "extracts",
+            "exintro": True, "explaintext": True, "redirects": True,
+            "titles": keyword,
+        })
+        url = f"https://en.wikipedia.org/w/api.php?{params}"
+        req = urllib.request.Request(url, headers={"User-Agent": "Holosims/1.0"})
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            data = _json.loads(resp.read())
+        pages = data.get("query", {}).get("pages", {})
+        page  = next(iter(pages.values()), {})
+        extract = (page.get("extract") or "")[:800]
+        if extract:
+            c.setdefault("knowledge", []).append({
+                "topic":   keyword,
+                "summary": extract,
+                "tick":    world.get("tick", 0),
+            })
+            c["knowledge"] = c["knowledge"][-30:]
+            c["activity"]["research_result"] = extract[:200]
+    except Exception:
+        pass   # silently ignore network failures in sim tick
 
-    result = paint_wall(world, wall_id, material_id)
-    if result["success"]:
-        empty = use_bucket(bucket)
-        if empty:
-            remove_item(c, bucket["id"])
+
+# ─── job search / apply ───────────────────────────────────────────────────────
+
+def _route_computer_job_search(c, world, action):
+    listings = world.get("job_listings", [])
+    c["activity"] = _scaffold(c, world, "computer_job_search", interaction="computer_job_search")
+    c["activity"]["job_listings"] = listings[:10]
+
+
+def _route_computer_apply_for_job(c, world, action):
+    from systems.jobs import apply_for_job
+    job_id = action.get("job_id") or action.get("target")
+    c["activity"] = _scaffold(c, world, "computer_apply_for_job",
+                               interaction="computer_apply_for_job")
+    if job_id:
+        apply_for_job(c, job_id, world)
+
+
+# ─── email ────────────────────────────────────────────────────────────────────
+
+def _route_computer_email(c, world, action):
+    atype = action.get("type", "computer_check_email")
+    c["activity"] = _scaffold(c, world, atype, interaction=atype)
+    if atype == "computer_send_email":
+        # Queue email as a world message
+        to   = action.get("to", "")
+        subj = action.get("subject", "")
+        body = action.get("body", "")
+        world.setdefault("emails", []).append({
+            "from_id":  c["id"],
+            "to":       to,
+            "subject":  subj,
+            "body":     body,
+            "tick":     world.get("tick", 0),
+            "read":     False,
+        })
+
+
+# ─── stocks ───────────────────────────────────────────────────────────────────
+
+def _route_computer_list_stocks(c, world, action):
+    portfolio = c.get("portfolio", {})
+    from systems.stock_market import get_stock_price
+    summary = {}
+    for ticker, pos in portfolio.items():
+        price = get_stock_price(world, ticker)
+        shares = pos.get("shares", 0)
+        avg    = pos.get("avg_buy_price", price)
+        summary[ticker] = {
+            "shares": shares,
+            "current_price": price,
+            "avg_buy_price": avg,
+            "gain_pct": round((price - avg) / avg * 100, 1) if avg else 0,
+            "value": round(shares * price, 2),
+        }
+    c["activity"] = _scaffold(c, world, "computer_list_stocks",
+                               interaction="computer_list_stocks")
+    c["activity"]["portfolio"] = summary
+
+
+def _route_computer_buy_stock(c, world, action):
+    from systems.investments import buy_stock
+    from systems.stock_market import get_stock_price
+    ticker     = (action.get("ticker") or action.get("target", "")).upper()
+    shares     = int(action.get("shares", 1))
+    c["activity"] = _scaffold(c, world, "computer_buy_stock",
+                               interaction="computer_buy_stock")
+    if ticker:
+        price      = get_stock_price(world, ticker)
+        cash_amount = shares * price
+        result     = buy_stock(c, world, ticker, cash_amount)
+        c["activity"]["transaction_result"] = result
+
+
+def _route_computer_sell_stock(c, world, action):
+    from systems.investments import sell_stock
+    ticker = (action.get("ticker") or action.get("target", "")).upper()
+    shares = int(action.get("shares", 0)) or None
+    c["activity"] = _scaffold(c, world, "computer_sell_stock",
+                               interaction="computer_sell_stock")
+    if ticker:
+        result = sell_stock(c, world, ticker, shares)
+        c["activity"]["transaction_result"] = result
+
+
+def _route_computer_check_stock_value(c, world, action):
+    from systems.stock_market import get_stock_price
+    ticker = (action.get("ticker") or action.get("target", "")).upper()
+    c["activity"] = _scaffold(c, world, "computer_check_stock_value",
+                               interaction="computer_check_stock_value")
+    if ticker:
+        price = get_stock_price(world, ticker)
+        c["activity"]["stock_price"] = {"ticker": ticker, "price": price}
+
+
+# ─── order item / service ─────────────────────────────────────────────────────
+
+def _route_computer_order_item(c, world, action):
+    template_id = action.get("template_id") or action.get("target", "")
+    quantity    = int(action.get("quantity", 1))
+    c["activity"] = _scaffold(c, world, "computer_order_item",
+                               interaction="computer_order_item")
+    if template_id:
+        # Use schedule_delivery_item via catalog_id lookup
+        from systems.procurement import schedule_delivery_item
+        household = world.get("households", {}).get(c.get("household_id"))
+        if household:
+            try:
+                schedule_delivery_item(household, template_id, world)
+                c["activity"]["order_result"] = {"success": True, "template_id": template_id}
+            except Exception as e:
+                c["activity"]["order_result"] = {"success": False, "error": str(e)}
+
+
+def _route_computer_order_service(c, world, action):
+    # service_id maps to service_type; use first subtype by default
+    service_type = action.get("service_id") or action.get("service_type") or action.get("target", "")
+    c["activity"] = _scaffold(c, world, "computer_order_service",
+                               interaction="computer_order_service")
+    if service_type:
+        from systems.services import request_service
+        # request_service(c, world, service_type, subtype, details, quantity=1)
+        subtype = action.get("subtype", "")
+        details = action.get("details", {})
+        try:
+            result = request_service(c, world, service_type, subtype, details)
+            c["activity"]["service_result"] = result
+        except Exception as e:
+            c["activity"]["service_result"] = {"success": False, "error": str(e)}
+
+
+def _route_computer_list_service_options(c, world, action):
+    from data.services import SERVICE_CATALOG
+    service_type = (action.get("service_type") or action.get("args", {}).get("service_type") or "").lower()
+    c["activity"] = _scaffold(c, world, "computer_list_service_options",
+                               interaction="computer_list_service_options")
+    options = {}
+    for sid, svc in SERVICE_CATALOG.items():
+        if not service_type or service_type in sid or service_type in svc.get("category","").lower():
+            options[sid] = {"name": svc.get("name", sid), "price": svc.get("price_per_hour", 0)}
+    c["activity"]["service_options"] = options
+
+
+# =========================================================
+# UNIVERSAL ITEM ACTIONS
+# =========================================================
+
+def _route_drop_item(c, world, action):
+    """Drop an item at the character's current position."""
+    from systems.personal_items import drop_item, get_item_by_id, get_phone
+    item_id = action.get("item_id") or action.get("target")
