@@ -23,6 +23,7 @@ See core/event_handlers.py for all subscriptions.
 
 from datetime import datetime
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import core.event_handlers  # noqa: F401 — registers all subscriptions on import
 
@@ -83,6 +84,24 @@ from systems.social_odor import apply_odor_social_pressure
 from systems.phone      import update_phone_battery, charge_phone
 from systems.story      import update_story_arc
 from systems.events     import maybe_generate_shared_event
+
+
+# =========================================================
+# AGENT THREAD POOL
+# LLM calls are I/O-bound — threads release the GIL during network waits,
+# giving real parallelism even under CPython.
+# =========================================================
+
+_AGENT_WORKERS = 8
+_agent_pool = ThreadPoolExecutor(max_workers=_AGENT_WORKERS, thread_name_prefix="agent")
+
+
+def _run_agent(c, world, t):
+    """Run one character's agent tick. Called from a worker thread."""
+    update_item_knowledge(c, world)
+    process_reaction_queue(c, t)
+    update_agent(c, world)
+    return c["id"]
 
 
 # =========================================================
@@ -176,16 +195,19 @@ def tick(world):
         for c in characters:
             update_attention(c, world)
 
-    # -- Per-tick: agent brain ──────────────────────────────
-    # Skip service worker NPCs — they are driven by update_services, not LLM.
+    # -- Per-tick: agent brain (parallel) ─────────────────
+    # Service worker NPCs are driven by update_services, not LLM — skip them.
+    # Each character's LLM call is I/O-bound; workers release the GIL while
+    # waiting for the network, so this gives real throughput scaling.
+    agent_chars = [c for c in characters if not c.get("is_service_worker")]
+    futs = {_agent_pool.submit(_run_agent, c, world, t): c for c in agent_chars}
     dirty_char_ids = set()
-    for c in characters:
-        if c.get("is_service_worker"):
-            continue
-        update_item_knowledge(c, world)
-        process_reaction_queue(c, t)
-        update_agent(c, world)
-        dirty_char_ids.add(c["id"])
+    for fut in as_completed(futs):
+        try:
+            dirty_char_ids.add(fut.result())
+        except Exception as exc:
+            c = futs[fut]
+            print(f"[sim_loop] agent error for {c.get('id')}: {exc}")
     _mark_dirty(world, char_ids=dirty_char_ids)
 
     # -- Medium: memory / beliefs / relationships (÷15) ─────

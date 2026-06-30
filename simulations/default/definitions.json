@@ -2774,6 +2774,1104 @@
           "requires": []
         }
       ]
+    },
+    "morning_routine": {
+      "name": "Morning Routine",
+      "category": "hygiene",
+      "interruptible": false,
+      "satisfies_needs": [],
+      "steps": [
+        {
+          "id": "toilet",
+          "interaction": "use_toilet",
+          "target_tags": [
+            "toilet"
+          ],
+          "duration_minutes": 8,
+          "requires": []
+        },
+        {
+          "id": "flush",
+          "interaction": "flush_toilet",
+          "target_tags": [
+            "toilet"
+          ],
+          "duration_minutes": 1,
+          "requires": [
+            "toilet"
+          ]
+        },
+        {
+          "id": "shower",
+          "interaction": "take_shower",
+          "target_tags": [
+            "shower"
+          ],
+          "duration_minutes": 12,
+          "requires": [
+            "flush"
+          ]
+        },
+        {
+          "id": "teeth",
+          "interaction": "brush_teeth",
+          "target_tags": [
+            "sink"
+          ],
+          "duration_minutes": 3,
+          "requires": [
+            "shower"
+          ]
+        }
+      ]
+    },
+    "wind_down": {
+      "name": "Wind Down for Bed",
+      "category": "rest",
+      "interruptible": true,
+      "satisfies_needs": [
+        "solitude"
+      ],
+      "steps": [
+        {
+          "id": "sit",
+          "interaction": "sit_down_seat",
+          "target_tags": [
+            "seat"
+          ],
+          "duration_minutes": 10,
+          "requires": []
+        },
+        {
+          "id": "check_phone",
+          "interaction": "phone_check",
+          "target_tags": [],
+          "duration_minutes": 5,
+          "requires": [
+            "sit"
+          ]
+        },
+        {
+          "id": "read",
+          "interaction": "read",
+          "target_tags": [
+            "seat",
+            "sofa"
+          ],
+          "duration_minutes": 20,
+          "requires": [
+            "sit"
+          ]
+        },
+        {
+          "id": "lie",
+          "interaction": "lie_down",
+          "target_tags": [
+            "bed",
+            "sofa"
+          ],
+          "duration_minutes": 5,
+          "requires": [
+            "sit"
+          ]
+        },
+        {
+          "id": "sleep",
+          "interaction": "sleep",
+          "target_tags": [
+            "bed"
+          ],
+          "duration_minutes": 480,
+          "requires": [
+            "lie"
+          ]
+        }
+      ]
+    },
+    "toilet_break": {
+      "name": "Toilet Break",
+      "category": "hygiene",
+      "interruptible": false,
+      "satisfies_needs": [],
+      "steps": [
+        {
+          "id": "use",
+          "interaction": "use_toilet",
+          "target_tags": [
+            "toilet"
+          ],
+          "duration_minutes": 6,
+          "requires": []
+        },
+        {
+          "id": "flush",
+          "interaction": "flush_toilet",
+          "target_tags": [
+            "toilet"
+          ],
+          "duration_minutes": 1,
+          "requires": [
+            "use"
+          ]
+        }
+      ]
+    },
+    "check_phone": {
+      "name": "Check Phone",
+      "category": "social",
+      "interruptible": true,
+      "satisfies_needs": [
+        "socialize"
+      ],
+      "steps": [
+        {
+          "id": "sit",
+          "interaction": "sit_down_seat",
+          "target_tags": [
+            "seat",
+            "sofa"
+          ],
+          "duration_minutes": 2,
+          "requires": []
+        },
+        {
+          "id": "check",
+          "interaction": "phone_check",
+          "target_tags": [],
+          "duration_minutes": 5,
+          "requires": [
+            "sit"
+          ]
+        },
+        {
+          "id": "read",
+          "interaction": "phone_read_text",
+          "target_tags": [],
+          "duration_minutes": 5,
+          "requires": [
+            "check"
+          ]
+        }
+      ]
+    },
+    "make_phone_call": {
+      "name": "Make a Phone Call",
+      "category": "social",
+      "interruptible": true,
+      "satisfies_needs": [
+        "socialize"
+      ],
+      "steps": [
+        {
+          "id": "sit",
+          "interaction": "sit_down_seat",
+          "target_tags": [
+            "seat",
+            "sofa"
+          ],
+          "duration_minutes": 2,
+          "requires": []
+        },
+        {
+          "id": "call",
+          "interaction": "phone_call",
+          "target_tags": [],
+          "duration_minutes": 20,
+          "requires": [
+            "sit"
+          ]
+        }
+      ]
+    },
+    "send_texts": {
+      "name": "Send Texts",
+      "category": "social",
+      "interruptible": true,
+      "satisfies_needs": [
+        "socialize"
+      ],
+      "steps": [
+        {
+          "id": "sit",
+          "interaction": "sit_down_seat",
+          "target_tags": [
+            "seat",
+            "sofa"
+          ],
+          "duration_minutes": 2,
+          "requires": []
+        },
+        {
+          "id": "read",
+          "interaction": "phone_read_text",
+          "target_tags": [],
+          "duration_minutes": 5,
+          "requires": [
+            "sit"
+          ]
+        },
+        {
+          "id": "reply",
+          "interaction": "phone_send_text",
+          "target_tags": [],
+          "duration_minutes": 8,
+          "requires": [
+            "read"
+          ]
+        }
+      ]
+    },
+    "charge_devices": {
+      "name": "Charge Phone",
+      "category": "chore",
+      "interruptible": true,
+      "satisfies_needs": [],
+      "steps": [
+        {
+          "id": "plug",
+          "interaction": "charge",
+          "target_tags": [
+            "wall_socket"
+          ],
+          "duration_minutes": 60,
+          "requires": []
+        }
+      ]
+    },
+    "browse_social_media": {
+      "name": "Browse Social Media",
+      "category": "leisure",
+      "interruptible": true,
+      "satisfies_needs": [
+        "socialize",
+        "play"
+      ],
+      "steps": [
+        {
+          "id": "sit",
+          "interaction": "sit_down_seat",
+          "target_tags": [
+            "seat",
+            "chair"
+          ],
+          "duration_minutes": 2,
+          "requires": []
+        },
+        {
+          "id": "open",
+          "interaction": "computer_social_media",
+          "target_tags": [
+            "computer",
+            "desktop",
+            "electronics"
+          ],
+          "duration_minutes": 40,
+          "requires": [
+            "sit"
+          ]
+        }
+      ]
+    },
+    "watch_videos_online": {
+      "name": "Watch Videos Online",
+      "category": "leisure",
+      "interruptible": true,
+      "satisfies_needs": [
+        "play"
+      ],
+      "steps": [
+        {
+          "id": "sit",
+          "interaction": "sit_down_seat",
+          "target_tags": [
+            "seat",
+            "sofa",
+            "chair"
+          ],
+          "duration_minutes": 2,
+          "requires": []
+        },
+        {
+          "id": "watch",
+          "interaction": "computer_videos",
+          "target_tags": [
+            "computer",
+            "desktop"
+          ],
+          "duration_minutes": 60,
+          "requires": [
+            "sit"
+          ]
+        }
+      ]
+    },
+    "play_computer_game": {
+      "name": "Play Computer Game",
+      "category": "leisure",
+      "interruptible": true,
+      "satisfies_needs": [
+        "play"
+      ],
+      "steps": [
+        {
+          "id": "sit",
+          "interaction": "sit_down_seat",
+          "target_tags": [
+            "seat",
+            "chair"
+          ],
+          "duration_minutes": 2,
+          "requires": []
+        },
+        {
+          "id": "play",
+          "interaction": "computer_game",
+          "target_tags": [
+            "computer",
+            "desktop",
+            "electronics"
+          ],
+          "duration_minutes": 90,
+          "requires": [
+            "sit"
+          ]
+        }
+      ]
+    },
+    "do_research": {
+      "name": "Research a Topic",
+      "category": "learning",
+      "interruptible": true,
+      "satisfies_needs": [
+        "learning"
+      ],
+      "args": {
+        "keyword": ""
+      },
+      "steps": [
+        {
+          "id": "sit",
+          "interaction": "sit_down_seat",
+          "target_tags": [
+            "seat",
+            "chair"
+          ],
+          "duration_minutes": 2,
+          "requires": []
+        },
+        {
+          "id": "search",
+          "interaction": "computer_wiki_research",
+          "target_tags": [
+            "computer",
+            "desktop"
+          ],
+          "duration_minutes": 30,
+          "requires": [
+            "sit"
+          ],
+          "args": {
+            "keyword": "{{keyword}}"
+          }
+        }
+      ]
+    },
+    "window_shop_online": {
+      "name": "Window Shop Online",
+      "category": "leisure",
+      "interruptible": true,
+      "satisfies_needs": [
+        "play"
+      ],
+      "steps": [
+        {
+          "id": "sit",
+          "interaction": "sit_down_seat",
+          "target_tags": [
+            "seat",
+            "chair"
+          ],
+          "duration_minutes": 2,
+          "requires": []
+        },
+        {
+          "id": "shop",
+          "interaction": "computer_window_shopping",
+          "target_tags": [
+            "computer",
+            "desktop"
+          ],
+          "duration_minutes": 25,
+          "requires": [
+            "sit"
+          ]
+        }
+      ]
+    },
+    "online_dating": {
+      "name": "Browse Dating Apps",
+      "category": "romance",
+      "interruptible": true,
+      "satisfies_needs": [
+        "romance",
+        "socialize"
+      ],
+      "steps": [
+        {
+          "id": "sit",
+          "interaction": "sit_down_seat",
+          "target_tags": [
+            "seat",
+            "sofa",
+            "chair"
+          ],
+          "duration_minutes": 2,
+          "requires": []
+        },
+        {
+          "id": "date",
+          "interaction": "computer_dating",
+          "target_tags": [
+            "computer",
+            "desktop"
+          ],
+          "duration_minutes": 40,
+          "requires": [
+            "sit"
+          ]
+        }
+      ]
+    },
+    "job_search": {
+      "name": "Search for Jobs",
+      "category": "career",
+      "interruptible": true,
+      "satisfies_needs": [
+        "purpose"
+      ],
+      "steps": [
+        {
+          "id": "sit",
+          "interaction": "sit_down_seat",
+          "target_tags": [
+            "seat",
+            "chair"
+          ],
+          "duration_minutes": 2,
+          "requires": []
+        },
+        {
+          "id": "browse",
+          "interaction": "computer_job_search",
+          "target_tags": [
+            "computer",
+            "desktop"
+          ],
+          "duration_minutes": 30,
+          "requires": [
+            "sit"
+          ]
+        },
+        {
+          "id": "apply",
+          "interaction": "computer_apply_for_job",
+          "target_tags": [
+            "computer",
+            "desktop"
+          ],
+          "duration_minutes": 20,
+          "requires": [
+            "browse"
+          ]
+        }
+      ]
+    },
+    "manage_emails": {
+      "name": "Manage Emails",
+      "category": "work",
+      "interruptible": true,
+      "satisfies_needs": [
+        "purpose"
+      ],
+      "steps": [
+        {
+          "id": "sit",
+          "interaction": "sit_down_seat",
+          "target_tags": [
+            "seat",
+            "chair"
+          ],
+          "duration_minutes": 2,
+          "requires": []
+        },
+        {
+          "id": "check",
+          "interaction": "computer_check_email",
+          "target_tags": [
+            "computer",
+            "desktop"
+          ],
+          "duration_minutes": 10,
+          "requires": [
+            "sit"
+          ]
+        },
+        {
+          "id": "reply",
+          "interaction": "computer_respond_email",
+          "target_tags": [
+            "computer",
+            "desktop"
+          ],
+          "duration_minutes": 20,
+          "requires": [
+            "check"
+          ]
+        }
+      ]
+    },
+    "send_email": {
+      "name": "Write and Send Email",
+      "category": "work",
+      "interruptible": true,
+      "satisfies_needs": [],
+      "steps": [
+        {
+          "id": "sit",
+          "interaction": "sit_down_seat",
+          "target_tags": [
+            "seat",
+            "chair"
+          ],
+          "duration_minutes": 2,
+          "requires": []
+        },
+        {
+          "id": "write",
+          "interaction": "computer_send_email",
+          "target_tags": [
+            "computer",
+            "desktop"
+          ],
+          "duration_minutes": 15,
+          "requires": [
+            "sit"
+          ]
+        }
+      ]
+    },
+    "check_stocks": {
+      "name": "Check Stock Portfolio",
+      "category": "finance",
+      "interruptible": true,
+      "satisfies_needs": [],
+      "steps": [
+        {
+          "id": "sit",
+          "interaction": "sit_down_seat",
+          "target_tags": [
+            "seat",
+            "chair"
+          ],
+          "duration_minutes": 2,
+          "requires": []
+        },
+        {
+          "id": "list",
+          "interaction": "computer_list_stocks",
+          "target_tags": [
+            "computer",
+            "desktop"
+          ],
+          "duration_minutes": 5,
+          "requires": [
+            "sit"
+          ]
+        },
+        {
+          "id": "check",
+          "interaction": "computer_check_stock_value",
+          "target_tags": [
+            "computer",
+            "desktop"
+          ],
+          "duration_minutes": 10,
+          "requires": [
+            "list"
+          ]
+        }
+      ]
+    },
+    "trade_stocks": {
+      "name": "Trade Stocks",
+      "category": "finance",
+      "interruptible": true,
+      "satisfies_needs": [],
+      "steps": [
+        {
+          "id": "sit",
+          "interaction": "sit_down_seat",
+          "target_tags": [
+            "seat",
+            "chair"
+          ],
+          "duration_minutes": 2,
+          "requires": []
+        },
+        {
+          "id": "list",
+          "interaction": "computer_list_stocks",
+          "target_tags": [
+            "computer",
+            "desktop"
+          ],
+          "duration_minutes": 5,
+          "requires": [
+            "sit"
+          ]
+        },
+        {
+          "id": "buy",
+          "interaction": "computer_buy_stock",
+          "target_tags": [
+            "computer",
+            "desktop"
+          ],
+          "duration_minutes": 10,
+          "requires": [
+            "list"
+          ]
+        }
+      ]
+    },
+    "order_groceries_online": {
+      "name": "Order Groceries Online",
+      "category": "domestic",
+      "interruptible": true,
+      "satisfies_needs": [],
+      "steps": [
+        {
+          "id": "sit",
+          "interaction": "sit_down_seat",
+          "target_tags": [
+            "seat",
+            "chair"
+          ],
+          "duration_minutes": 2,
+          "requires": []
+        },
+        {
+          "id": "order",
+          "interaction": "computer_order_item",
+          "target_tags": [
+            "computer",
+            "desktop"
+          ],
+          "duration_minutes": 15,
+          "requires": [
+            "sit"
+          ]
+        }
+      ]
+    },
+    "hire_service": {
+      "name": "Hire a Home Service",
+      "category": "domestic",
+      "interruptible": true,
+      "satisfies_needs": [],
+      "steps": [
+        {
+          "id": "sit",
+          "interaction": "sit_down_seat",
+          "target_tags": [
+            "seat",
+            "chair"
+          ],
+          "duration_minutes": 2,
+          "requires": []
+        },
+        {
+          "id": "browse",
+          "interaction": "computer_list_hired_service_options",
+          "target_tags": [
+            "computer",
+            "desktop"
+          ],
+          "duration_minutes": 10,
+          "requires": [
+            "sit"
+          ]
+        },
+        {
+          "id": "book",
+          "interaction": "computer_order_service",
+          "target_tags": [
+            "computer",
+            "desktop"
+          ],
+          "duration_minutes": 10,
+          "requires": [
+            "browse"
+          ]
+        }
+      ]
+    },
+    "relax_on_sofa": {
+      "name": "Relax on the Sofa",
+      "category": "rest",
+      "interruptible": true,
+      "satisfies_needs": [
+        "solitude"
+      ],
+      "steps": [
+        {
+          "id": "sit",
+          "interaction": "sit_down_seat",
+          "target_tags": [
+            "sofa",
+            "seat"
+          ],
+          "duration_minutes": 5,
+          "requires": []
+        },
+        {
+          "id": "lie",
+          "interaction": "lie_down",
+          "target_tags": [
+            "sofa"
+          ],
+          "duration_minutes": 30,
+          "requires": [
+            "sit"
+          ]
+        },
+        {
+          "id": "rise",
+          "interaction": "stand_up",
+          "target_tags": [],
+          "duration_minutes": 1,
+          "requires": [
+            "lie"
+          ]
+        }
+      ]
+    },
+    "sit_and_think": {
+      "name": "Sit and Reflect",
+      "category": "rest",
+      "interruptible": true,
+      "satisfies_needs": [
+        "solitude",
+        "purpose"
+      ],
+      "steps": [
+        {
+          "id": "sit",
+          "interaction": "sit_down_seat",
+          "target_tags": [
+            "seat",
+            "sofa",
+            "chair"
+          ],
+          "duration_minutes": 15,
+          "requires": []
+        },
+        {
+          "id": "rise",
+          "interaction": "stand_up",
+          "target_tags": [],
+          "duration_minutes": 1,
+          "requires": [
+            "sit"
+          ]
+        }
+      ]
+    },
+    "sit_down_for_meal": {
+      "name": "Sit Down for a Meal",
+      "category": "food",
+      "interruptible": false,
+      "satisfies_needs": [],
+      "steps": [
+        {
+          "id": "sit",
+          "interaction": "sit_down_seat",
+          "target_tags": [
+            "chair",
+            "dining"
+          ],
+          "duration_minutes": 2,
+          "requires": []
+        },
+        {
+          "id": "eat",
+          "interaction": "eat_meal",
+          "target_tags": [
+            "table",
+            "dining"
+          ],
+          "duration_minutes": 20,
+          "requires": [
+            "sit"
+          ]
+        },
+        {
+          "id": "rise",
+          "interaction": "stand_up",
+          "target_tags": [],
+          "duration_minutes": 1,
+          "requires": [
+            "eat"
+          ]
+        }
+      ]
+    },
+    "drive_to_work": {
+      "name": "Drive to Work",
+      "category": "transport",
+      "interruptible": false,
+      "satisfies_needs": [],
+      "steps": [
+        {
+          "id": "drive",
+          "interaction": "drive_car_to",
+          "target_tags": [
+            "vehicle",
+            "car"
+          ],
+          "duration_minutes": 20,
+          "requires": [],
+          "args": {
+            "destination": "work"
+          }
+        }
+      ]
+    },
+    "drive_to_store": {
+      "name": "Drive to Store",
+      "category": "transport",
+      "interruptible": true,
+      "satisfies_needs": [],
+      "steps": [
+        {
+          "id": "drive",
+          "interaction": "drive_car_to",
+          "target_tags": [
+            "vehicle",
+            "car"
+          ],
+          "duration_minutes": 15,
+          "requires": [],
+          "args": {
+            "destination": "store"
+          }
+        }
+      ]
+    },
+    "drive_home": {
+      "name": "Drive Home",
+      "category": "transport",
+      "interruptible": false,
+      "satisfies_needs": [],
+      "steps": [
+        {
+          "id": "drive",
+          "interaction": "drive_car_to",
+          "target_tags": [
+            "vehicle",
+            "car"
+          ],
+          "duration_minutes": 20,
+          "requires": [],
+          "args": {
+            "destination": "home"
+          }
+        }
+      ]
+    },
+    "work_from_home_session": {
+      "name": "Work from Home Session",
+      "category": "work",
+      "interruptible": true,
+      "satisfies_needs": [
+        "purpose"
+      ],
+      "steps": [
+        {
+          "id": "sit",
+          "interaction": "sit_down_seat",
+          "target_tags": [
+            "seat",
+            "chair"
+          ],
+          "duration_minutes": 2,
+          "requires": []
+        },
+        {
+          "id": "email",
+          "interaction": "computer_check_email",
+          "target_tags": [
+            "computer",
+            "desktop"
+          ],
+          "duration_minutes": 10,
+          "requires": [
+            "sit"
+          ]
+        },
+        {
+          "id": "reply",
+          "interaction": "computer_respond_email",
+          "target_tags": [
+            "computer",
+            "desktop"
+          ],
+          "duration_minutes": 20,
+          "requires": [
+            "email"
+          ]
+        },
+        {
+          "id": "break",
+          "interaction": "stand_up",
+          "target_tags": [],
+          "duration_minutes": 2,
+          "requires": [
+            "reply"
+          ]
+        },
+        {
+          "id": "return",
+          "interaction": "sit_down_seat",
+          "target_tags": [
+            "seat",
+            "chair"
+          ],
+          "duration_minutes": 1,
+          "requires": [
+            "break"
+          ]
+        },
+        {
+          "id": "task",
+          "interaction": "computer_send_email",
+          "target_tags": [
+            "computer",
+            "desktop"
+          ],
+          "duration_minutes": 15,
+          "requires": [
+            "return"
+          ]
+        }
+      ]
+    },
+    "evening_social": {
+      "name": "Evening Social Check",
+      "category": "social",
+      "interruptible": true,
+      "satisfies_needs": [
+        "socialize"
+      ],
+      "steps": [
+        {
+          "id": "sit",
+          "interaction": "sit_down_seat",
+          "target_tags": [
+            "sofa",
+            "seat"
+          ],
+          "duration_minutes": 2,
+          "requires": []
+        },
+        {
+          "id": "check",
+          "interaction": "phone_check",
+          "target_tags": [],
+          "duration_minutes": 5,
+          "requires": [
+            "sit"
+          ]
+        },
+        {
+          "id": "read",
+          "interaction": "phone_read_text",
+          "target_tags": [],
+          "duration_minutes": 5,
+          "requires": [
+            "check"
+          ]
+        },
+        {
+          "id": "reply",
+          "interaction": "phone_send_text",
+          "target_tags": [],
+          "duration_minutes": 8,
+          "requires": [
+            "read"
+          ]
+        },
+        {
+          "id": "scroll",
+          "interaction": "computer_social_media",
+          "target_tags": [
+            "computer",
+            "desktop"
+          ],
+          "duration_minutes": 20,
+          "requires": [
+            "reply"
+          ]
+        }
+      ]
+    },
+    "creative_project": {
+      "name": "Work on Creative Project",
+      "category": "creative",
+      "interruptible": true,
+      "satisfies_needs": [
+        "creative",
+        "purpose"
+      ],
+      "steps": [
+        {
+          "id": "sit",
+          "interaction": "sit_down_seat",
+          "target_tags": [
+            "seat",
+            "chair"
+          ],
+          "duration_minutes": 2,
+          "requires": []
+        },
+        {
+          "id": "research",
+          "interaction": "computer_wiki_research",
+          "target_tags": [
+            "computer",
+            "desktop"
+          ],
+          "duration_minutes": 20,
+          "requires": [
+            "sit"
+          ],
+          "args": {
+            "keyword": "{{topic}}"
+          }
+        },
+        {
+          "id": "work",
+          "interaction": "computer_send_email",
+          "target_tags": [
+            "computer",
+            "desktop"
+          ],
+          "duration_minutes": 45,
+          "requires": [
+            "research"
+          ]
+        }
+      ]
     }
   },
   "tile_templates": {
@@ -4490,13 +5588,113 @@
         4,
         5
       ],
-      "degree_required": "medicine",
+      "degree_required": "medical",
+      "skill_requirements": {},
+      "promotion_path": [
+        "chief_physician"
+      ],
+      "tags": [
+        "health",
+        "clinic",
+        "hospital"
+      ]
+    },
+    "nurse": {
+      "name": "Nurse",
+      "sector": "health",
+      "hourly_wage": 28,
+      "salary": 4480,
+      "work_hours": [
+        7,
+        15
+      ],
+      "work_days": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "degree_required": "nursing",
+      "skill_requirements": {},
+      "promotion_path": [
+        "head_nurse"
+      ],
+      "tags": [
+        "health",
+        "clinic",
+        "hospital"
+      ]
+    },
+    "paramedic": {
+      "name": "Paramedic",
+      "sector": "health",
+      "hourly_wage": 22,
+      "salary": 3520,
+      "work_hours": [
+        6,
+        18
+      ],
+      "work_days": [
+        1,
+        2,
+        3,
+        5
+      ],
+      "degree_required": null,
       "skill_requirements": {},
       "promotion_path": [],
       "tags": [
         "health",
-        "science",
-        "high_status"
+        "emergency"
+      ]
+    },
+    "pharmacist": {
+      "name": "Pharmacist",
+      "sector": "health",
+      "hourly_wage": 52,
+      "salary": 8320,
+      "work_hours": [
+        9,
+        18
+      ],
+      "work_days": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "degree_required": "pharmacy",
+      "skill_requirements": {},
+      "promotion_path": [],
+      "tags": [
+        "health",
+        "retail"
+      ]
+    },
+    "therapist": {
+      "name": "Therapist",
+      "sector": "health",
+      "hourly_wage": 45,
+      "salary": 7200,
+      "work_hours": [
+        9,
+        17
+      ],
+      "work_days": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "degree_required": "psychology",
+      "skill_requirements": {},
+      "promotion_path": [],
+      "tags": [
+        "health",
+        "office"
       ]
     },
     "lawyer": {
@@ -4517,16 +5715,43 @@
       ],
       "degree_required": "law",
       "skill_requirements": {},
-      "promotion_path": [],
+      "promotion_path": [
+        "partner"
+      ],
       "tags": [
         "law",
-        "argument",
-        "high_status"
+        "office"
       ]
     },
-    "software_engineer": {
-      "name": "Software Engineer",
-      "sector": "tech",
+    "paralegal": {
+      "name": "Paralegal",
+      "sector": "law",
+      "hourly_wage": 22,
+      "salary": 3520,
+      "work_hours": [
+        9,
+        17
+      ],
+      "work_days": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "degree_required": null,
+      "skill_requirements": {},
+      "promotion_path": [
+        "lawyer"
+      ],
+      "tags": [
+        "law",
+        "office"
+      ]
+    },
+    "accountant": {
+      "name": "Accountant",
+      "sector": "finance",
       "hourly_wage": 42,
       "salary": 6720,
       "work_hours": [
@@ -4540,19 +5765,126 @@
         4,
         5
       ],
-      "degree_required": "computer_science",
+      "degree_required": "accounting",
       "skill_requirements": {},
-      "promotion_path": [],
+      "promotion_path": [
+        "senior_accountant"
+      ],
       "tags": [
-        "tech",
-        "logic"
+        "finance",
+        "office"
       ]
     },
-    "teacher": {
-      "name": "Teacher",
-      "sector": "education",
-      "hourly_wage": 28,
-      "salary": 4480,
+    "financial_analyst": {
+      "name": "Financial Analyst",
+      "sector": "finance",
+      "hourly_wage": 48,
+      "salary": 7680,
+      "work_hours": [
+        8,
+        18
+      ],
+      "work_days": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "degree_required": "finance",
+      "skill_requirements": {},
+      "promotion_path": [
+        "portfolio_manager"
+      ],
+      "tags": [
+        "finance",
+        "office"
+      ]
+    },
+    "bank_teller": {
+      "name": "Bank Teller",
+      "sector": "finance",
+      "hourly_wage": 18,
+      "salary": 2880,
+      "work_hours": [
+        9,
+        17
+      ],
+      "work_days": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "degree_required": null,
+      "skill_requirements": {},
+      "promotion_path": [
+        "accountant"
+      ],
+      "tags": [
+        "finance",
+        "bank"
+      ]
+    },
+    "software_engineer": {
+      "name": "Software Engineer",
+      "sector": "tech",
+      "hourly_wage": 55,
+      "salary": 8800,
+      "work_hours": [
+        9,
+        18
+      ],
+      "work_days": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "degree_required": "cs",
+      "skill_requirements": {},
+      "promotion_path": [
+        "senior_engineer",
+        "tech_lead"
+      ],
+      "tags": [
+        "tech",
+        "office"
+      ]
+    },
+    "data_scientist": {
+      "name": "Data Scientist",
+      "sector": "tech",
+      "hourly_wage": 58,
+      "salary": 9280,
+      "work_hours": [
+        9,
+        18
+      ],
+      "work_days": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "degree_required": "math",
+      "skill_requirements": {},
+      "promotion_path": [
+        "ml_engineer"
+      ],
+      "tags": [
+        "tech",
+        "office"
+      ]
+    },
+    "it_support": {
+      "name": "IT Support",
+      "sector": "tech",
+      "hourly_wage": 20,
+      "salary": 3200,
       "work_hours": [
         8,
         17
@@ -4564,19 +5896,147 @@
         4,
         5
       ],
+      "degree_required": null,
+      "skill_requirements": {},
+      "promotion_path": [
+        "software_engineer"
+      ],
+      "tags": [
+        "tech",
+        "office"
+      ]
+    },
+    "ux_designer": {
+      "name": "UX Designer",
+      "sector": "tech",
+      "hourly_wage": 40,
+      "salary": 6400,
+      "work_hours": [
+        9,
+        17
+      ],
+      "work_days": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "degree_required": null,
+      "skill_requirements": {},
+      "promotion_path": [],
+      "tags": [
+        "tech",
+        "office",
+        "creative"
+      ]
+    },
+    "network_admin": {
+      "name": "Network Admin",
+      "sector": "tech",
+      "hourly_wage": 36,
+      "salary": 5760,
+      "work_hours": [
+        8,
+        17
+      ],
+      "work_days": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "degree_required": null,
+      "skill_requirements": {},
+      "promotion_path": [
+        "systems_architect"
+      ],
+      "tags": [
+        "tech",
+        "office"
+      ]
+    },
+    "teacher": {
+      "name": "Teacher",
+      "sector": "education",
+      "hourly_wage": 25,
+      "salary": 4000,
+      "work_hours": [
+        7,
+        15
+      ],
+      "work_days": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
       "degree_required": "education",
+      "skill_requirements": {},
+      "promotion_path": [
+        "principal"
+      ],
+      "tags": [
+        "education",
+        "school"
+      ]
+    },
+    "professor": {
+      "name": "Professor",
+      "sector": "education",
+      "hourly_wage": 50,
+      "salary": 8000,
+      "work_hours": [
+        9,
+        17
+      ],
+      "work_days": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "degree_required": "phd",
       "skill_requirements": {},
       "promotion_path": [],
       "tags": [
         "education",
-        "social"
+        "university"
       ]
+    },
+    "tutor": {
+      "name": "Tutor",
+      "sector": "education",
+      "hourly_wage": 20,
+      "salary": 1600,
+      "work_hours": [
+        14,
+        20
+      ],
+      "work_days": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "degree_required": null,
+      "skill_requirements": {},
+      "promotion_path": [],
+      "tags": [
+        "education",
+        "freelance"
+      ],
+      "part_time": true
     },
     "engineer": {
       "name": "Engineer",
       "sector": "engineering",
-      "hourly_wage": 40,
-      "salary": 6400,
+      "hourly_wage": 45,
+      "salary": 7200,
       "work_hours": [
         8,
         17
@@ -4590,17 +6050,96 @@
       ],
       "degree_required": "engineering",
       "skill_requirements": {},
-      "promotion_path": [],
+      "promotion_path": [
+        "senior_engineer"
+      ],
       "tags": [
         "engineering",
-        "technical"
+        "office"
       ]
     },
-    "accountant": {
-      "name": "Accountant",
-      "sector": "money",
-      "hourly_wage": 32,
-      "salary": 5120,
+    "construction_worker": {
+      "name": "Construction Worker",
+      "sector": "trades",
+      "hourly_wage": 22,
+      "salary": 3520,
+      "work_hours": [
+        6,
+        15
+      ],
+      "work_days": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "degree_required": null,
+      "skill_requirements": {},
+      "promotion_path": [
+        "foreman"
+      ],
+      "tags": [
+        "trades",
+        "outdoor",
+        "construction"
+      ]
+    },
+    "electrician": {
+      "name": "Electrician",
+      "sector": "trades",
+      "hourly_wage": 30,
+      "salary": 4800,
+      "work_hours": [
+        7,
+        16
+      ],
+      "work_days": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "degree_required": null,
+      "skill_requirements": {},
+      "promotion_path": [
+        "master_electrician"
+      ],
+      "tags": [
+        "trades",
+        "outdoor"
+      ]
+    },
+    "plumber": {
+      "name": "Plumber",
+      "sector": "trades",
+      "hourly_wage": 28,
+      "salary": 4480,
+      "work_hours": [
+        7,
+        16
+      ],
+      "work_days": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "degree_required": null,
+      "skill_requirements": {},
+      "promotion_path": [],
+      "tags": [
+        "trades",
+        "outdoor"
+      ]
+    },
+    "mechanic": {
+      "name": "Mechanic",
+      "sector": "trades",
+      "hourly_wage": 24,
+      "salary": 3840,
       "work_hours": [
         8,
         17
@@ -4612,12 +6151,36 @@
         4,
         5
       ],
-      "degree_required": "business",
+      "degree_required": null,
       "skill_requirements": {},
       "promotion_path": [],
       "tags": [
-        "money",
-        "office"
+        "trades",
+        "garage"
+      ]
+    },
+    "welder": {
+      "name": "Welder",
+      "sector": "trades",
+      "hourly_wage": 26,
+      "salary": 4160,
+      "work_hours": [
+        6,
+        14
+      ],
+      "work_days": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "degree_required": null,
+      "skill_requirements": {},
+      "promotion_path": [],
+      "tags": [
+        "trades",
+        "factory"
       ]
     },
     "retail_worker": {
@@ -4638,44 +6201,128 @@
       ],
       "degree_required": null,
       "skill_requirements": {},
-      "promotion_path": [],
+      "promotion_path": [
+        "store_manager"
+      ],
       "tags": [
         "service",
         "store"
       ]
     },
-    "delivery_driver": {
-      "name": "Delivery Driver",
-      "sector": "transport",
-      "hourly_wage": 18,
-      "salary": 2880,
-      "work_hours": [
-        8,
-        17
-      ],
-      "work_days": [
-        1,
-        2,
-        3,
-        4,
-        5
-      ],
-      "degree_required": null,
-      "skill_requirements": {},
-      "promotion_path": [],
-      "tags": [
-        "transport",
-        "traffic"
-      ]
-    },
-    "construction_worker": {
-      "name": "Construction Worker",
-      "sector": "manual",
+    "store_manager": {
+      "name": "Store Manager",
+      "sector": "service",
       "hourly_wage": 24,
       "salary": 3840,
       "work_hours": [
         8,
-        17
+        18
+      ],
+      "work_days": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "degree_required": null,
+      "skill_requirements": {},
+      "promotion_path": [
+        "district_manager"
+      ],
+      "tags": [
+        "service",
+        "store"
+      ]
+    },
+    "barista": {
+      "name": "Barista",
+      "sector": "food",
+      "hourly_wage": 14,
+      "salary": 2240,
+      "work_hours": [
+        6,
+        14
+      ],
+      "work_days": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "degree_required": null,
+      "skill_requirements": {},
+      "promotion_path": [
+        "cafe_manager"
+      ],
+      "tags": [
+        "food",
+        "cafe"
+      ]
+    },
+    "waiter": {
+      "name": "Waiter",
+      "sector": "food",
+      "hourly_wage": 12,
+      "salary": 1920,
+      "work_hours": [
+        11,
+        22
+      ],
+      "work_days": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "degree_required": null,
+      "skill_requirements": {},
+      "promotion_path": [
+        "head_waiter"
+      ],
+      "tags": [
+        "food",
+        "restaurant"
+      ]
+    },
+    "chef": {
+      "name": "Chef",
+      "sector": "food",
+      "hourly_wage": 22,
+      "salary": 3520,
+      "work_hours": [
+        10,
+        22
+      ],
+      "work_days": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "degree_required": null,
+      "skill_requirements": {},
+      "promotion_path": [
+        "head_chef"
+      ],
+      "tags": [
+        "food",
+        "restaurant"
+      ]
+    },
+    "delivery_driver": {
+      "name": "Delivery Driver",
+      "sector": "service",
+      "hourly_wage": 16,
+      "salary": 2560,
+      "work_hours": [
+        9,
+        18
       ],
       "work_days": [
         1,
@@ -4688,15 +6335,115 @@
       "skill_requirements": {},
       "promotion_path": [],
       "tags": [
-        "manual",
-        "physical"
+        "service",
+        "driving"
       ]
     },
-    "cleaner": {
-      "name": "Cleaner",
-      "sector": "manual",
-      "hourly_wage": 14,
-      "salary": 2240,
+    "taxi_driver": {
+      "name": "Taxi Driver",
+      "sector": "service",
+      "hourly_wage": 15,
+      "salary": 2400,
+      "work_hours": [
+        6,
+        22
+      ],
+      "work_days": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "degree_required": null,
+      "skill_requirements": {},
+      "promotion_path": [],
+      "tags": [
+        "service",
+        "driving"
+      ]
+    },
+    "police_officer": {
+      "name": "Police Officer",
+      "sector": "public_safety",
+      "hourly_wage": 25,
+      "salary": 4000,
+      "work_hours": [
+        6,
+        18
+      ],
+      "work_days": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "degree_required": null,
+      "skill_requirements": {},
+      "promotion_path": [
+        "detective",
+        "sergeant"
+      ],
+      "tags": [
+        "safety",
+        "outdoor"
+      ]
+    },
+    "firefighter": {
+      "name": "Firefighter",
+      "sector": "public_safety",
+      "hourly_wage": 28,
+      "salary": 4480,
+      "work_hours": [
+        6,
+        18
+      ],
+      "work_days": [
+        1,
+        2,
+        4
+      ],
+      "degree_required": null,
+      "skill_requirements": {},
+      "promotion_path": [
+        "fire_captain"
+      ],
+      "tags": [
+        "safety",
+        "outdoor"
+      ]
+    },
+    "security_guard": {
+      "name": "Security Guard",
+      "sector": "service",
+      "hourly_wage": 16,
+      "salary": 2560,
+      "work_hours": [
+        22,
+        6
+      ],
+      "work_days": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "degree_required": null,
+      "skill_requirements": {},
+      "promotion_path": [],
+      "tags": [
+        "safety",
+        "office"
+      ]
+    },
+    "social_worker": {
+      "name": "Social Worker",
+      "sector": "public",
+      "hourly_wage": 22,
+      "salary": 3520,
       "work_hours": [
         8,
         17
@@ -4708,17 +6455,221 @@
         4,
         5
       ],
+      "degree_required": "social_work",
+      "skill_requirements": {},
+      "promotion_path": [],
+      "tags": [
+        "public",
+        "office"
+      ]
+    },
+    "journalist": {
+      "name": "Journalist",
+      "sector": "media",
+      "hourly_wage": 24,
+      "salary": 3840,
+      "work_hours": [
+        9,
+        18
+      ],
+      "work_days": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "degree_required": null,
+      "skill_requirements": {},
+      "promotion_path": [
+        "editor"
+      ],
+      "tags": [
+        "media",
+        "office",
+        "creative"
+      ]
+    },
+    "graphic_designer": {
+      "name": "Graphic Designer",
+      "sector": "creative",
+      "hourly_wage": 28,
+      "salary": 4480,
+      "work_hours": [
+        9,
+        17
+      ],
+      "work_days": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
       "degree_required": null,
       "skill_requirements": {},
       "promotion_path": [],
       "tags": [
-        "manual",
-        "service"
+        "creative",
+        "office"
+      ],
+      "can_freelance": true
+    },
+    "photographer": {
+      "name": "Photographer",
+      "sector": "creative",
+      "hourly_wage": 25,
+      "salary": 2000,
+      "work_hours": [
+        10,
+        18
+      ],
+      "work_days": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "degree_required": null,
+      "skill_requirements": {},
+      "promotion_path": [],
+      "tags": [
+        "creative",
+        "outdoor"
+      ],
+      "can_freelance": true,
+      "part_time": true
+    },
+    "musician": {
+      "name": "Musician",
+      "sector": "creative",
+      "hourly_wage": 18,
+      "salary": 1440,
+      "work_hours": [
+        18,
+        23
+      ],
+      "work_days": [
+        4,
+        5,
+        6
+      ],
+      "degree_required": null,
+      "skill_requirements": {},
+      "promotion_path": [],
+      "tags": [
+        "creative",
+        "venue"
+      ],
+      "can_freelance": true,
+      "part_time": true
+    },
+    "actor": {
+      "name": "Actor",
+      "sector": "creative",
+      "hourly_wage": 20,
+      "salary": 1600,
+      "work_hours": [
+        10,
+        20
+      ],
+      "work_days": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "degree_required": null,
+      "skill_requirements": {},
+      "promotion_path": [],
+      "tags": [
+        "creative",
+        "venue"
+      ],
+      "can_freelance": true,
+      "part_time": true
+    },
+    "cleaner": {
+      "name": "Cleaner",
+      "sector": "service",
+      "hourly_wage": 13,
+      "salary": 2080,
+      "work_hours": [
+        6,
+        14
+      ],
+      "work_days": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "degree_required": null,
+      "skill_requirements": {},
+      "promotion_path": [],
+      "tags": [
+        "service",
+        "indoor"
       ]
     },
-    "barista": {
-      "name": "Barista",
-      "sector": "cafe",
+    "gardener": {
+      "name": "Gardener",
+      "sector": "service",
+      "hourly_wage": 15,
+      "salary": 2400,
+      "work_hours": [
+        7,
+        15
+      ],
+      "work_days": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "degree_required": null,
+      "skill_requirements": {},
+      "promotion_path": [],
+      "tags": [
+        "service",
+        "outdoor"
+      ]
+    },
+    "warehouse_worker": {
+      "name": "Warehouse Worker",
+      "sector": "logistics",
+      "hourly_wage": 16,
+      "salary": 2560,
+      "work_hours": [
+        6,
+        14
+      ],
+      "work_days": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "degree_required": null,
+      "skill_requirements": {},
+      "promotion_path": [
+        "warehouse_supervisor"
+      ],
+      "tags": [
+        "logistics",
+        "warehouse"
+      ]
+    },
+    "receptionist": {
+      "name": "Receptionist",
+      "sector": "service",
       "hourly_wage": 16,
       "salary": 2560,
       "work_hours": [
@@ -4736,17 +6687,44 @@
       "skill_requirements": {},
       "promotion_path": [],
       "tags": [
-        "cafe",
-        "social"
+        "service",
+        "office"
       ]
     },
-    "security_guard": {
-      "name": "Security Guard",
-      "sector": "security",
-      "hourly_wage": 19,
-      "salary": 3040,
+    "real_estate_agent": {
+      "name": "Real Estate Agent",
+      "sector": "property",
+      "hourly_wage": 35,
+      "salary": 5600,
       "work_hours": [
-        8,
+        9,
+        18
+      ],
+      "work_days": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "degree_required": null,
+      "skill_requirements": {},
+      "promotion_path": [],
+      "tags": [
+        "property",
+        "office",
+        "driving"
+      ],
+      "commission_based": true
+    },
+    "insurance_agent": {
+      "name": "Insurance Agent",
+      "sector": "finance",
+      "hourly_wage": 28,
+      "salary": 4480,
+      "work_hours": [
+        9,
         17
       ],
       "work_days": [
@@ -4760,8 +6738,75 @@
       "skill_requirements": {},
       "promotion_path": [],
       "tags": [
-        "security",
-        "crime"
+        "finance",
+        "office"
+      ],
+      "commission_based": true
+    },
+    "personal_trainer": {
+      "name": "Personal Trainer",
+      "sector": "wellness",
+      "hourly_wage": 30,
+      "salary": 2400,
+      "work_hours": [
+        6,
+        20
+      ],
+      "work_days": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "degree_required": null,
+      "skill_requirements": {},
+      "promotion_path": [],
+      "tags": [
+        "wellness",
+        "gym"
+      ],
+      "can_freelance": true,
+      "part_time": true
+    },
+    "hair_stylist": {
+      "name": "Hair Stylist",
+      "sector": "wellness",
+      "hourly_wage": 18,
+      "salary": 2880,
+      "work_hours": [
+        9,
+        18
+      ],
+      "work_days": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "degree_required": null,
+      "skill_requirements": {},
+      "promotion_path": [],
+      "tags": [
+        "wellness",
+        "salon"
+      ]
+    },
+    "unemployed": {
+      "name": "Unemployed",
+      "sector": "none",
+      "hourly_wage": 0,
+      "salary": 0,
+      "work_hours": [],
+      "work_days": [],
+      "degree_required": null,
+      "skill_requirements": {},
+      "promotion_path": [],
+      "tags": [
+        "unemployed"
       ]
     }
   },

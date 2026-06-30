@@ -347,7 +347,9 @@ function openTemplate(id) {
   renderBoneSlotEditor();
 
   // Choose preview type based on tab
-  if (currentTab === 'material_templates') {
+  if (currentTab === 'activity_templates') {
+    loadActivityTimeline(data);
+  } else if (currentTab === 'material_templates') {
     loadMaterialPreview(data);
   } else if (currentTab === 'tile_templates') {
     loadTilePreview(data);
@@ -967,4 +969,276 @@ function animate() {
   const delta = previewClock.getDelta();
   previewControls.update();
   if (previewMixer) previewMixer.update(delta);
-  previewRendere
+  previewRenderer.render(previewScene, previewCamera);
+}
+
+animate();
+
+// =====================================================
+// STARTUP
+// =====================================================
+
+(async () => {
+  await loadMeshbank();
+  await loadDefinitions();
+})();
+
+// =====================================================
+// ACTIVITY STEP TIMELINE  (Three.js per-step mini previews)
+// =====================================================
+
+// Each step gets its own WebGLRenderer + scene for independence.
+// We reuse a pool so we don't create/destroy renderers on every open.
+const _stepRenderers = [];   // pool of {renderer, scene, camera, controls, anim}
+const _stepCanvases  = [];   // pool of canvas wrappers
+
+const STEP_SIZE = 160;  // px for each step card canvas
+
+function _getStepRenderer(idx) {
+  if (_stepRenderers[idx]) return _stepRenderers[idx];
+
+  const scene    = new THREE.Scene();
+  scene.background = new THREE.Color(0x1a1e24);
+
+  const ambLight = new THREE.AmbientLight(0xffffff, 0.6);
+  scene.add(ambLight);
+  const dirLight = new THREE.DirectionalLight(0xffffff, 1.0);
+  dirLight.position.set(3, 5, 3);
+  scene.add(dirLight);
+
+  const camera   = new THREE.PerspectiveCamera(45, 1, 0.1, 200);
+  camera.position.set(2.5, 2, 2.5);
+  camera.lookAt(0, 0.5, 0);
+
+  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setPixelRatio(window.devicePixelRatio);
+  renderer.setSize(STEP_SIZE, STEP_SIZE);
+
+  const controls = new OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.1;
+  controls.autoRotate    = true;
+  controls.autoRotateSpeed = 1.5;
+
+  let model  = null;
+  let mixer  = null;
+  let active = false;
+
+  function animLoop() {
+    if (!active) return;
+    requestAnimationFrame(animLoop);
+    controls.update();
+    if (mixer) mixer.update(0.016);
+    renderer.render(scene, camera);
+  }
+
+  const entry = { scene, camera, renderer, controls, model: null, mixer: null, active: false, animLoop };
+  _stepRenderers[idx] = entry;
+  return entry;
+}
+
+function _clearStepRenderer(entry) {
+  if (entry.model) {
+    entry.scene.remove(entry.model);
+    entry.model = null;
+  }
+  entry.mixer  = null;
+  entry.active = false;
+}
+
+// Find the first prop_template whose tags overlap the step's target_tags
+function _findPropForStep(step) {
+  const tags = step.target_tags || [];
+  if (!tags.length) return null;
+  const props = definitions.prop_templates || {};
+  for (const [, prop] of Object.entries(props)) {
+    const ptags = prop.tags || [];
+    if (tags.some(t => ptags.includes(t)) && prop.model) return prop;
+  }
+  // Try items too
+  const items = definitions.item_templates || {};
+  for (const [, item] of Object.entries(items)) {
+    if (item.model) {
+      const otype = item.object_type || '';
+      if (tags.some(t => t === otype || t === 'computer' && otype === 'computer')) return item;
+    }
+  }
+  return null;
+}
+
+function _loadModelIntoStep(entry, modelRef, onDone) {
+  const path = (() => {
+    const asset = meshbank[modelRef];
+    if (asset?.mesh) return asset.mesh;
+    if (modelRef?.startsWith('/') || modelRef?.includes('.glb')) return modelRef;
+    return null;
+  })();
+
+  if (!path) { onDone && onDone(false); return; }
+
+  const loader = previewLoader; // reuse the same GLTFLoader
+  loader.load(path, (gltf) => {
+    _clearStepRenderer(entry);
+    entry.model = gltf.scene;
+    entry.scene.add(entry.model);
+
+    // Auto-frame
+    const box  = new THREE.Box3().setFromObject(entry.model);
+    const size = box.getSize(new THREE.Vector3());
+    const cent = box.getCenter(new THREE.Vector3());
+    const maxD = Math.max(size.x, size.y, size.z);
+    const dist = maxD * 1.8;
+    entry.camera.position.set(cent.x + dist*0.6, cent.y + dist*0.7, cent.z + dist*0.6);
+    entry.controls.target.copy(cent);
+    entry.controls.update();
+
+    if (gltf.animations?.length) {
+      entry.mixer = new THREE.AnimationMixer(entry.model);
+      const action = entry.mixer.clipAction(gltf.animations[0]);
+      action.play();
+    }
+
+    entry.active = true;
+    entry.animLoop();
+    onDone && onDone(true);
+  }, undefined, () => { onDone && onDone(false); });
+}
+
+// ── HTML/CSS for the timeline injected into #modelPreview ──────────────────
+
+const _TIMELINE_STYLE = `
+  <style>
+    #activityTimeline {
+      display: flex; flex-direction: column; height: 100%;
+      overflow: hidden; padding: 0;
+    }
+    #activityTimelineHeader {
+      padding: 8px 10px; font-size: 12px; color: #7ab4f5;
+      background: #1d2229; border-bottom: 1px solid #444;
+      flex-shrink: 0;
+    }
+    #activityTimelineScroll {
+      flex: 1; overflow-x: auto; overflow-y: hidden;
+      display: flex; align-items: flex-start;
+      padding: 12px 10px; gap: 10px;
+    }
+    .stepCard {
+      flex-shrink: 0; width: ${STEP_SIZE}px;
+      background: #252b33; border: 1px solid #444;
+      border-radius: 4px; overflow: hidden;
+      display: flex; flex-direction: column;
+    }
+    .stepCard.hasModel { border-color: #4a7fa8; }
+    .stepCardCanvas { width: ${STEP_SIZE}px; height: ${STEP_SIZE}px; display: block; }
+    .stepCardNoModel {
+      width: ${STEP_SIZE}px; height: ${STEP_SIZE}px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 28px; color: #445; background: #1a1e24;
+    }
+    .stepCardBody { padding: 6px 8px; }
+    .stepCardNum { font-size: 10px; color: #6699cc; margin-bottom: 2px; }
+    .stepCardName { font-size: 12px; color: #ddeeff; font-weight: bold; margin-bottom: 2px; }
+    .stepCardDur { font-size: 10px; color: #888; }
+    .stepCardTags { font-size: 10px; color: #667; margin-top: 3px; }
+    .stepArrow {
+      flex-shrink: 0; align-self: center; font-size: 18px; color: #445;
+    }
+  </style>
+`;
+
+let _timelineActive = false;
+
+function loadActivityTimeline(data) {
+  // Stop any running step renderers
+  _stepRenderers.forEach(e => { if (e) e.active = false; });
+  _timelineActive = false;
+
+  const steps = data?.steps || [];
+  const mount  = document.getElementById('modelPreview');
+
+  mount.innerHTML = _TIMELINE_STYLE + `
+    <div id="activityTimeline">
+      <div id="activityTimelineHeader">
+        ▶ Activity Steps (${steps.length})
+        — drag each card to orbit the model
+      </div>
+      <div id="activityTimelineScroll" id="tlScroll"></div>
+    </div>
+  `;
+
+  const scroll = mount.querySelector('#activityTimelineScroll');
+  _timelineActive = true;
+
+  steps.forEach((step, idx) => {
+    // Arrow between cards
+    if (idx > 0) {
+      const arrow = document.createElement('div');
+      arrow.className = 'stepArrow';
+      arrow.textContent = '→';
+      scroll.appendChild(arrow);
+    }
+
+    const card = document.createElement('div');
+    card.className = 'stepCard';
+
+    const prop = _findPropForStep(step);
+
+    // Body first so we can append canvas/placeholder later
+    const body = document.createElement('div');
+    body.className = 'stepCardBody';
+    body.innerHTML = `
+      <div class="stepCardNum">Step ${idx + 1}</div>
+      <div class="stepCardName">${step.interaction || step.id || '?'}</div>
+      <div class="stepCardDur">${step.duration_minutes ?? '?'} min</div>
+      ${step.target_tags?.length ? `<div class="stepCardTags">${step.target_tags.join(', ')}</div>` : ''}
+    `;
+
+    if (prop?.model) {
+      card.classList.add('hasModel');
+
+      const entry = _getStepRenderer(idx);
+      _clearStepRenderer(entry);
+
+      // Placeholder canvas slot while loading
+      const canvasSlot = document.createElement('div');
+      canvasSlot.style.cssText = `width:${STEP_SIZE}px;height:${STEP_SIZE}px;background:#111;display:flex;align-items:center;justify-content:center;font-size:11px;color:#555`;
+      canvasSlot.textContent = 'loading…';
+      card.appendChild(canvasSlot);
+      card.appendChild(body);
+      scroll.appendChild(card);
+
+      _loadModelIntoStep(entry, prop.model, (ok) => {
+        if (!_timelineActive) return;
+        if (ok) {
+          card.replaceChild(entry.renderer.domElement, canvasSlot);
+          entry.renderer.domElement.className = 'stepCardCanvas';
+        } else {
+          canvasSlot.textContent = '(no model)';
+        }
+      });
+
+    } else {
+      // Emoji placeholder
+      const icons = { toilet:'🚽', sit_down_seat:'🪑', lie_down:'🛌', stand_up:'🧍',
+        sleep:'😴', eat_meal:'🍽️', use_toilet:'🚽', flush_toilet:'🚽',
+        drive_car_to:'🚗', phone_call:'📞', phone_send_text:'💬', phone_check:'📱',
+        phone_read_text:'📱', charge:'🔌', computer_social_media:'💻', computer_videos:'▶️',
+        computer_game:'🎮', computer_wiki_research:'🔍', computer_order_item:'🛒',
+        computer_buy_stock:'📈', computer_send_email:'📧', computer_check_email:'📧',
+        computer_job_search:'💼', computer_dating:'❤️',
+      };
+      const ico = icons[step.interaction] || '⬜';
+      const placeholder = document.createElement('div');
+      placeholder.className = 'stepCardNoModel';
+      placeholder.textContent = ico;
+      card.appendChild(placeholder);
+      card.appendChild(body);
+      scroll.appendChild(card);
+    }
+  });
+
+  // Clear animation list and bone panel — not relevant for activities
+  animationList.innerHTML = '';
+  document.getElementById('boneSlotEditor').innerHTML = '';
+}
+
