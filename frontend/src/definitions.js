@@ -1066,7 +1066,28 @@ function _findPropForStep(step) {
   return null;
 }
 
-function _loadModelIntoStep(entry, modelRef, onDone) {
+// Play a named clip on a step renderer entry.
+// Phases are tried in order: loop → start → first available
+function _playStepClip(entry, clipName) {
+  if (!entry.mixer || !entry._clips) return;
+  const clip = entry._clips.find(c => c.name === clipName);
+  if (!clip) return;
+  entry.mixer.stopAllAction();
+  const action = entry.mixer.clipAction(clip);
+  action.reset().fadeIn(0.15).play();
+  entry._currentClip = clipName;
+}
+
+function _pickDefaultClip(animations, gltfClips) {
+  // Prefer loop[0], then start[0], then first available gltf clip
+  const names = [...(animations?.loop || []), ...(animations?.start || [])];
+  for (const name of names) {
+    if (gltfClips.find(c => c.name === name)) return name;
+  }
+  return gltfClips[0]?.name || null;
+}
+
+function _loadModelIntoStep(entry, modelRef, animations, onDone) {
   const path = (() => {
     const asset = meshbank[modelRef];
     if (asset?.mesh) return asset.mesh;
@@ -1074,34 +1095,35 @@ function _loadModelIntoStep(entry, modelRef, onDone) {
     return null;
   })();
 
-  if (!path) { onDone && onDone(false); return; }
+  if (!path) { onDone && onDone(false, []); return; }
 
-  const loader = previewLoader; // reuse the same GLTFLoader
-  loader.load(path, (gltf) => {
+  previewLoader.load(path, (gltf) => {
     _clearStepRenderer(entry);
-    entry.model = gltf.scene;
+    entry.model  = gltf.scene;
+    entry._clips = gltf.animations || [];
+    entry._animPhases = animations || {};
+    entry._currentClip = null;
     entry.scene.add(entry.model);
 
     // Auto-frame
     const box  = new THREE.Box3().setFromObject(entry.model);
-    const size = box.getSize(new THREE.Vector3());
     const cent = box.getCenter(new THREE.Vector3());
-    const maxD = Math.max(size.x, size.y, size.z);
+    const maxD = Math.max(...box.getSize(new THREE.Vector3()).toArray());
     const dist = maxD * 1.8;
     entry.camera.position.set(cent.x + dist*0.6, cent.y + dist*0.7, cent.z + dist*0.6);
     entry.controls.target.copy(cent);
     entry.controls.update();
 
-    if (gltf.animations?.length) {
+    if (entry._clips.length) {
       entry.mixer = new THREE.AnimationMixer(entry.model);
-      const action = entry.mixer.clipAction(gltf.animations[0]);
-      action.play();
+      const defaultClip = _pickDefaultClip(animations, entry._clips);
+      if (defaultClip) _playStepClip(entry, defaultClip);
     }
 
     entry.active = true;
     entry.animLoop();
-    onDone && onDone(true);
-  }, undefined, () => { onDone && onDone(false); });
+    onDone && onDone(true, entry._clips);
+  }, undefined, () => { onDone && onDone(false, []); });
 }
 
 // ── HTML/CSS for the timeline injected into #modelPreview ──────────────────
@@ -1143,6 +1165,19 @@ const _TIMELINE_STYLE = `
     .stepArrow {
       flex-shrink: 0; align-self: center; font-size: 18px; color: #445;
     }
+    .stepAnimBar {
+      display: flex; flex-wrap: wrap; gap: 3px;
+      padding: 4px 6px; border-top: 1px solid #333;
+      background: #1a1e24; min-height: 24px;
+    }
+    .stepAnimBtn {
+      padding: 2px 6px; font-size: 10px; background: #2a3340;
+      color: #99bbdd; border: 1px solid #3a4555; cursor: pointer;
+      border-radius: 2px; white-space: nowrap;
+    }
+    .stepAnimBtn:hover { background: #3a4e64; }
+    .stepAnimBtn.active { background: #1e4a7a; border-color: #5599cc; color: #fff; }
+    .stepAnimBtnRaw { color: #7799aa; }
   </style>
 `;
 
@@ -1159,10 +1194,9 @@ function loadActivityTimeline(data) {
   mount.innerHTML = _TIMELINE_STYLE + `
     <div id="activityTimeline">
       <div id="activityTimelineHeader">
-        ▶ Activity Steps (${steps.length})
-        — drag each card to orbit the model
+        ▶ Activity Steps (${steps.length}) — drag to orbit · click phase buttons to preview animations
       </div>
-      <div id="activityTimelineScroll" id="tlScroll"></div>
+      <div id="activityTimelineScroll"></div>
     </div>
   `;
 
@@ -1170,7 +1204,6 @@ function loadActivityTimeline(data) {
   _timelineActive = true;
 
   steps.forEach((step, idx) => {
-    // Arrow between cards
     if (idx > 0) {
       const arrow = document.createElement('div');
       arrow.className = 'stepArrow';
@@ -1183,7 +1216,10 @@ function loadActivityTimeline(data) {
 
     const prop = _findPropForStep(step);
 
-    // Body first so we can append canvas/placeholder later
+    // Look up interaction_template to get named animations
+    const itpl   = definitions.interaction_templates?.[step.interaction] || {};
+    const phases = itpl.animations || {};  // { start:[…], loop:[…], stop:[…] }
+
     const body = document.createElement('div');
     body.className = 'stepCardBody';
     body.innerHTML = `
@@ -1193,32 +1229,90 @@ function loadActivityTimeline(data) {
       ${step.target_tags?.length ? `<div class="stepCardTags">${step.target_tags.join(', ')}</div>` : ''}
     `;
 
+    // Animation phase buttons — built after model loads so we know which clips exist
+    const animBar = document.createElement('div');
+    animBar.className = 'stepAnimBar';
+
+    function buildAnimButtons(entry, gltfClips) {
+      animBar.innerHTML = '';
+      if (!gltfClips.length) return;
+
+      // Phase buttons (start / loop / stop) — only phases that have ≥1 matching clip
+      const phaseOrder = ['start', 'loop', 'stop'];
+      phaseOrder.forEach(phase => {
+        const clips = (phases[phase] || []).filter(n => gltfClips.find(c => c.name === n));
+        if (!clips.length) return;
+        // Cycle through clips in that phase on repeated click
+        let ci = 0;
+        const btn = document.createElement('button');
+        btn.className = 'stepAnimBtn';
+        btn.title     = clips.join(' / ');
+        btn.textContent = phase;
+        btn.onclick = () => {
+          const name = clips[ci % clips.length];
+          ci++;
+          _playStepClip(entry, name);
+          // highlight active button
+          animBar.querySelectorAll('.stepAnimBtn').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+        };
+        animBar.appendChild(btn);
+      });
+
+      // Also a "•" button per raw GLTF clip not covered by phases
+      const coveredNames = new Set(Object.values(phases).flat());
+      gltfClips.forEach(clip => {
+        if (coveredNames.has(clip.name)) return;
+        const btn = document.createElement('button');
+        btn.className   = 'stepAnimBtn stepAnimBtnRaw';
+        btn.title       = clip.name;
+        btn.textContent = clip.name.length > 10 ? clip.name.slice(0,9)+'…' : clip.name;
+        btn.onclick = () => {
+          _playStepClip(entry, clip.name);
+          animBar.querySelectorAll('.stepAnimBtn').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+        };
+        animBar.appendChild(btn);
+      });
+
+      // Mark the currently-playing button
+      if (entry._currentClip) {
+        animBar.querySelectorAll('.stepAnimBtn').forEach(btn => {
+          if (btn.title.split(' / ').includes(entry._currentClip) ||
+              btn.title === entry._currentClip) {
+            btn.classList.add('active');
+          }
+        });
+      }
+    }
+
     if (prop?.model) {
       card.classList.add('hasModel');
 
       const entry = _getStepRenderer(idx);
       _clearStepRenderer(entry);
 
-      // Placeholder canvas slot while loading
       const canvasSlot = document.createElement('div');
       canvasSlot.style.cssText = `width:${STEP_SIZE}px;height:${STEP_SIZE}px;background:#111;display:flex;align-items:center;justify-content:center;font-size:11px;color:#555`;
       canvasSlot.textContent = 'loading…';
+
       card.appendChild(canvasSlot);
       card.appendChild(body);
+      card.appendChild(animBar);
       scroll.appendChild(card);
 
-      _loadModelIntoStep(entry, prop.model, (ok) => {
+      _loadModelIntoStep(entry, prop.model, phases, (ok, gltfClips) => {
         if (!_timelineActive) return;
         if (ok) {
           card.replaceChild(entry.renderer.domElement, canvasSlot);
           entry.renderer.domElement.className = 'stepCardCanvas';
+          buildAnimButtons(entry, gltfClips);
         } else {
           canvasSlot.textContent = '(no model)';
         }
       });
 
     } else {
-      // Emoji placeholder
       const icons = { toilet:'🚽', sit_down_seat:'🪑', lie_down:'🛌', stand_up:'🧍',
         sleep:'😴', eat_meal:'🍽️', use_toilet:'🚽', flush_toilet:'🚽',
         drive_car_to:'🚗', phone_call:'📞', phone_send_text:'💬', phone_check:'📱',
@@ -1227,17 +1321,15 @@ function loadActivityTimeline(data) {
         computer_buy_stock:'📈', computer_send_email:'📧', computer_check_email:'📧',
         computer_job_search:'💼', computer_dating:'❤️',
       };
-      const ico = icons[step.interaction] || '⬜';
       const placeholder = document.createElement('div');
       placeholder.className = 'stepCardNoModel';
-      placeholder.textContent = ico;
+      placeholder.textContent = icons[step.interaction] || '⬜';
       card.appendChild(placeholder);
       card.appendChild(body);
       scroll.appendChild(card);
     }
   });
 
-  // Clear animation list and bone panel — not relevant for activities
   animationList.innerHTML = '';
   document.getElementById('boneSlotEditor').innerHTML = '';
 }
