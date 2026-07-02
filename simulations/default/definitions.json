@@ -15854,6 +15854,12 @@
       "requires_target": false
     },
     {
+      "id": "drop",
+      "label": "Drop",
+      "requires_target": false,
+      "note": "Places item on the ground at character's current position"
+    },
+    {
       "id": "put_in",
       "label": "Place / Put In",
       "requires_target": true,
