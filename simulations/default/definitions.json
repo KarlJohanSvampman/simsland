@@ -567,10 +567,7 @@
       ],
       "storage": {
         "slots": 4,
-        "accepted_categories": [
-          "misc",
-          "electronics"
-        ]
+        "accepted_categories": []
       },
       "tags": [
         "furniture",
@@ -691,7 +688,10 @@
         }
       ],
       "anchors": [],
-      "storage": null,
+      "storage": {
+        "slots": 6,
+        "accepted_categories": []
+      },
       "tags": [
         "furniture",
         "table",
@@ -710,7 +710,10 @@
         }
       ],
       "anchors": [],
-      "storage": null,
+      "storage": {
+        "slots": 4,
+        "accepted_categories": []
+      },
       "tags": [
         "furniture",
         "table"
@@ -1648,7 +1651,10 @@
           "interaction": "eat_meal"
         }
       ],
-      "storage": null,
+      "storage": {
+        "slots": 8,
+        "accepted_categories": []
+      },
       "tags": [
         "outdoor",
         "furniture",
@@ -2375,7 +2381,7 @@
       ],
       "anchors": [],
       "storage": {
-        "slots": 4,
+        "slots": 6,
         "accepted_categories": []
       },
       "tags": [
@@ -4117,6 +4123,74 @@
         "furniture",
         "storage",
         "hallway"
+      ]
+    },
+    "dining_table": {
+      "name": "Dining Table",
+      "category": "furniture",
+      "model": null,
+      "footprint": [
+        {
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "dx": 1,
+          "dy": 0
+        },
+        {
+          "dx": 2,
+          "dy": 0
+        },
+        {
+          "dx": 0,
+          "dy": 1
+        },
+        {
+          "dx": 1,
+          "dy": 1
+        },
+        {
+          "dx": 2,
+          "dy": 1
+        }
+      ],
+      "anchors": [
+        {
+          "name": "anchor_eat_1",
+          "interaction": "eat_meal"
+        },
+        {
+          "name": "anchor_eat_2",
+          "interaction": "eat_meal"
+        },
+        {
+          "name": "anchor_eat_3",
+          "interaction": "eat_meal"
+        },
+        {
+          "name": "anchor_eat_4",
+          "interaction": "eat_meal"
+        },
+        {
+          "name": "anchor_eat_5",
+          "interaction": "eat_meal"
+        },
+        {
+          "name": "anchor_eat_6",
+          "interaction": "eat_meal"
+        }
+      ],
+      "storage": {
+        "slots": 12,
+        "accepted_categories": []
+      },
+      "isSurface": true,
+      "tags": [
+        "furniture",
+        "table",
+        "kitchen",
+        "dining"
       ]
     }
   },
@@ -15780,16 +15854,11 @@
       "requires_target": false
     },
     {
-      "id": "put_down",
-      "label": "Put Down",
-      "requires_target": true,
-      "target_type": "surface"
-    },
-    {
       "id": "put_in",
-      "label": "Put In",
+      "label": "Place / Put In",
       "requires_target": true,
-      "target_type": "container"
+      "target_type": "container",
+      "note": "isSurface=true props render items on top; others hide them inside"
     },
     {
       "id": "put_in_pocket",
