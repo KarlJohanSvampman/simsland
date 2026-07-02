@@ -7605,6 +7605,7 @@
       "min_days": null,
       "max_days": null,
       "min_participants": 1,
+      "max_participants": 1,
       "location": null,
       "suggest_to_household": false,
       "annual_cost": 300
@@ -7622,6 +7623,7 @@
       "min_days": null,
       "max_days": null,
       "min_participants": 1,
+      "max_participants": 4,
       "location": "outdoors",
       "suggest_to_household": false,
       "annual_cost": 500
@@ -7631,13 +7633,15 @@
       "category": "art",
       "required_props": [],
       "required_items": [
-        "spray_paint"
+        "spray_paint",
+        "stencils"
       ],
       "off_grid": true,
       "overnight": false,
       "min_days": null,
       "max_days": null,
       "min_participants": 1,
+      "max_participants": 4,
       "location": "urban_area",
       "suggest_to_household": false,
       "annual_cost": 200
@@ -7652,6 +7656,7 @@
       "min_days": null,
       "max_days": null,
       "min_participants": 1,
+      "max_participants": null,
       "location": "museum",
       "suggest_to_household": false,
       "annual_cost": 150
@@ -7666,6 +7671,7 @@
       "min_days": 1,
       "max_days": 3,
       "min_participants": 1,
+      "max_participants": null,
       "location": "festival_grounds",
       "suggest_to_household": false,
       "annual_cost": 400
@@ -7683,6 +7689,7 @@
       "min_days": null,
       "max_days": null,
       "min_participants": 1,
+      "max_participants": 6,
       "location": null,
       "suggest_to_household": false,
       "home_props_any": [
@@ -7700,6 +7707,7 @@
       "min_days": null,
       "max_days": null,
       "min_participants": 1,
+      "max_participants": 2,
       "location": null,
       "suggest_to_household": false,
       "home_props_any": [
@@ -7720,6 +7728,7 @@
       "min_days": null,
       "max_days": null,
       "min_participants": 1,
+      "max_participants": 1,
       "location": null,
       "suggest_to_household": false,
       "home_props_any": [
@@ -7733,13 +7742,15 @@
       "required_props": [],
       "required_items": [
         "violin",
-        "bow"
+        "bow",
+        "rosin"
       ],
       "off_grid": false,
       "overnight": false,
       "min_days": null,
       "max_days": null,
       "min_participants": 1,
+      "max_participants": 4,
       "location": null,
       "suggest_to_household": false,
       "annual_cost": 300
@@ -7749,13 +7760,15 @@
       "category": "music",
       "required_props": [],
       "required_items": [
-        "bass_guitar"
+        "bass_guitar",
+        "guitar_pick"
       ],
       "off_grid": false,
       "overnight": false,
       "min_days": null,
       "max_days": null,
       "min_participants": 1,
+      "max_participants": 6,
       "location": null,
       "suggest_to_household": false,
       "annual_cost": 150
@@ -7772,6 +7785,7 @@
       "min_days": null,
       "max_days": null,
       "min_participants": 1,
+      "max_participants": 8,
       "location": null,
       "suggest_to_household": false,
       "home_props_any": [
@@ -7789,6 +7803,7 @@
       "min_days": null,
       "max_days": null,
       "min_participants": 1,
+      "max_participants": null,
       "location": "venue",
       "suggest_to_household": false,
       "annual_cost": 600
@@ -7797,12 +7812,16 @@
       "name": "Music Festivals",
       "category": "music",
       "required_props": [],
-      "required_items": [],
+      "required_items": [
+        "tent",
+        "sleeping_bag"
+      ],
       "off_grid": true,
       "overnight": true,
       "min_days": 1,
       "max_days": 4,
       "min_participants": 1,
+      "max_participants": null,
       "location": "festival_grounds",
       "suggest_to_household": false,
       "annual_cost": 800
@@ -7817,6 +7836,7 @@
       "min_days": null,
       "max_days": null,
       "min_participants": 1,
+      "max_participants": null,
       "location": "theater",
       "suggest_to_household": false,
       "annual_cost": 400
@@ -7831,6 +7851,7 @@
       "min_days": null,
       "max_days": null,
       "min_participants": 1,
+      "max_participants": null,
       "location": "opera_house",
       "suggest_to_household": false,
       "annual_cost": 600
@@ -7845,6 +7866,7 @@
       "min_days": null,
       "max_days": null,
       "min_participants": 1,
+      "max_participants": 8,
       "location": null,
       "suggest_to_household": false,
       "home_props_any": [
@@ -7859,13 +7881,15 @@
       "required_props": [],
       "required_items": [
         "camera",
-        "tripod"
+        "tripod",
+        "microphone"
       ],
       "off_grid": true,
       "overnight": false,
       "min_days": null,
       "max_days": null,
       "min_participants": 2,
+      "max_participants": 10,
       "location": "various",
       "suggest_to_household": true,
       "annual_cost": 300
@@ -7877,13 +7901,15 @@
         "desk"
       ],
       "required_items": [
-        "microphone"
+        "microphone",
+        "headphones"
       ],
       "off_grid": false,
       "overnight": false,
       "min_days": null,
       "max_days": null,
       "min_participants": 1,
+      "max_participants": 3,
       "location": null,
       "suggest_to_household": false,
       "annual_cost": 100
@@ -7894,13 +7920,15 @@
       "required_props": [],
       "required_items": [
         "hiking_boots",
-        "backpack"
+        "backpack",
+        "water_bottle"
       ],
       "off_grid": true,
       "overnight": false,
       "min_days": null,
       "max_days": null,
       "min_participants": 1,
+      "max_participants": 10,
       "location": "trail",
       "suggest_to_household": false,
       "annual_cost": 200
@@ -7911,13 +7939,16 @@
       "required_props": [],
       "required_items": [
         "tent",
-        "sleeping_bag"
+        "sleeping_bag",
+        "camping_stove",
+        "backpack"
       ],
       "off_grid": true,
       "overnight": true,
       "min_days": 1,
       "max_days": 7,
       "min_participants": 1,
+      "max_participants": 8,
       "location": "campsite",
       "suggest_to_household": false,
       "annual_cost": 400
@@ -7928,13 +7959,15 @@
       "required_props": [],
       "required_items": [
         "fishing_rod",
-        "tackle"
+        "tackle",
+        "fishing_license"
       ],
       "off_grid": true,
       "overnight": false,
       "min_days": null,
       "max_days": null,
       "min_participants": 1,
+      "max_participants": 4,
       "location": "lake",
       "suggest_to_household": false,
       "annual_cost": 300
@@ -7945,13 +7978,16 @@
       "required_props": [],
       "required_items": [
         "rifle",
-        "hunting_license"
+        "hunting_license",
+        "hunting_gear",
+        "ammunition"
       ],
       "off_grid": true,
       "overnight": true,
       "min_days": 1,
       "max_days": 3,
       "min_participants": 1,
+      "max_participants": 4,
       "location": "wilderness",
       "suggest_to_household": false,
       "annual_cost": 800
@@ -7962,13 +7998,15 @@
       "required_props": [],
       "required_items": [
         "camera",
-        "telephoto_lens"
+        "telephoto_lens",
+        "binoculars"
       ],
       "off_grid": true,
       "overnight": false,
       "min_days": null,
       "max_days": null,
       "min_participants": 1,
+      "max_participants": 4,
       "location": "nature_reserve",
       "suggest_to_household": false,
       "annual_cost": 400
@@ -7980,13 +8018,16 @@
         "garden"
       ],
       "required_items": [
-        "gardening_tools"
+        "gardening_tools",
+        "seeds",
+        "gloves"
       ],
       "off_grid": false,
       "overnight": false,
       "min_days": null,
       "max_days": null,
       "min_participants": 1,
+      "max_participants": 4,
       "location": null,
       "suggest_to_household": false,
       "annual_cost": 300
@@ -7996,13 +8037,15 @@
       "category": "nature",
       "required_props": [],
       "required_items": [
-        "telescope"
+        "telescope",
+        "star_map"
       ],
       "off_grid": false,
       "overnight": false,
       "min_days": null,
       "max_days": null,
       "min_participants": 1,
+      "max_participants": 4,
       "location": null,
       "suggest_to_household": false,
       "home_props_any": [
@@ -8017,13 +8060,16 @@
       "required_items": [
         "climbing_gear",
         "harness",
-        "helmet"
+        "helmet",
+        "rope",
+        "carabiners"
       ],
       "off_grid": true,
       "overnight": true,
       "min_days": 1,
       "max_days": 5,
       "min_participants": 2,
+      "max_participants": 6,
       "location": "mountain",
       "suggest_to_household": true,
       "annual_cost": 1000
@@ -8038,6 +8084,7 @@
       "min_days": null,
       "max_days": null,
       "min_participants": 1,
+      "max_participants": null,
       "location": "gym",
       "suggest_to_household": false,
       "home_props_any": [
@@ -8051,12 +8098,15 @@
       "name": "CrossFit",
       "category": "exercise",
       "required_props": [],
-      "required_items": [],
+      "required_items": [
+        "gym_shoes"
+      ],
       "off_grid": true,
       "overnight": false,
       "min_days": null,
       "max_days": null,
       "min_participants": 1,
+      "max_participants": null,
       "location": "gym",
       "suggest_to_household": false,
       "annual_cost": 1500
@@ -8073,6 +8123,7 @@
       "min_days": null,
       "max_days": null,
       "min_participants": 1,
+      "max_participants": 10,
       "location": "park",
       "suggest_to_household": false,
       "annual_cost": 200
@@ -8083,13 +8134,15 @@
       "required_props": [],
       "required_items": [
         "bicycle",
-        "helmet"
+        "helmet",
+        "water_bottle"
       ],
       "off_grid": true,
       "overnight": false,
       "min_days": null,
       "max_days": null,
       "min_participants": 1,
+      "max_participants": 10,
       "location": "road",
       "suggest_to_household": false,
       "annual_cost": 400
@@ -8099,13 +8152,16 @@
       "category": "exercise",
       "required_props": [],
       "required_items": [
-        "swimwear"
+        "swimwear",
+        "goggles",
+        "swim_cap"
       ],
       "off_grid": true,
       "overnight": false,
       "min_days": null,
       "max_days": null,
       "min_participants": 1,
+      "max_participants": null,
       "location": "pool",
       "suggest_to_household": false,
       "annual_cost": 500
@@ -8122,6 +8178,7 @@
       "min_days": null,
       "max_days": null,
       "min_participants": 1,
+      "max_participants": 20,
       "location": null,
       "suggest_to_household": false,
       "home_props_any": [
@@ -8139,6 +8196,7 @@
       "min_days": null,
       "max_days": null,
       "min_participants": 1,
+      "max_participants": 20,
       "location": null,
       "suggest_to_household": false,
       "annual_cost": 600
@@ -8147,14 +8205,19 @@
       "name": "Martial Arts",
       "category": "exercise",
       "required_props": [],
-      "required_items": [],
+      "required_items": [
+        "gi",
+        "belt",
+        "mouthguard"
+      ],
       "off_grid": true,
       "overnight": false,
       "min_days": null,
       "max_days": null,
-      "min_participants": 1,
+      "min_participants": 2,
+      "max_participants": 20,
       "location": "dojo",
-      "suggest_to_household": false,
+      "suggest_to_household": true,
       "annual_cost": 800
     },
     "coin_collecting": {
@@ -8162,13 +8225,15 @@
       "category": "collections",
       "required_props": [],
       "required_items": [
-        "coin_album"
+        "coin_album",
+        "magnifying_glass"
       ],
       "off_grid": false,
       "overnight": false,
       "min_days": null,
       "max_days": null,
       "min_participants": 1,
+      "max_participants": 1,
       "location": null,
       "suggest_to_household": false,
       "annual_cost": 500
@@ -8178,13 +8243,16 @@
       "category": "collections",
       "required_props": [],
       "required_items": [
-        "stamp_album"
+        "stamp_album",
+        "tweezers",
+        "magnifying_glass"
       ],
       "off_grid": false,
       "overnight": false,
       "min_days": null,
       "max_days": null,
       "min_participants": 1,
+      "max_participants": 1,
       "location": null,
       "suggest_to_household": false,
       "annual_cost": 200
@@ -8194,13 +8262,15 @@
       "category": "collections",
       "required_props": [],
       "required_items": [
-        "card_binder"
+        "card_binder",
+        "card_sleeves"
       ],
       "off_grid": false,
       "overnight": false,
       "min_days": null,
       "max_days": null,
       "min_participants": 1,
+      "max_participants": 4,
       "location": null,
       "suggest_to_household": false,
       "annual_cost": 400
@@ -8209,12 +8279,15 @@
       "name": "Comic Books",
       "category": "collections",
       "required_props": [],
-      "required_items": [],
+      "required_items": [
+        "comic_storage_box"
+      ],
       "off_grid": false,
       "overnight": false,
       "min_days": null,
       "max_days": null,
       "min_participants": 1,
+      "max_participants": 1,
       "location": null,
       "suggest_to_household": false,
       "annual_cost": 300
@@ -8231,6 +8304,7 @@
       "min_days": null,
       "max_days": null,
       "min_participants": 1,
+      "max_participants": 1,
       "location": null,
       "suggest_to_household": false,
       "annual_cost": 300
@@ -8241,12 +8315,16 @@
       "required_props": [
         "record_player"
       ],
-      "required_items": [],
+      "required_items": [
+        "record_sleeve",
+        "record_cleaner"
+      ],
       "off_grid": false,
       "overnight": false,
       "min_days": null,
       "max_days": null,
       "min_participants": 1,
+      "max_participants": 6,
       "location": null,
       "suggest_to_household": false,
       "annual_cost": 600
@@ -8255,12 +8333,15 @@
       "name": "Video Game Collecting",
       "category": "collections",
       "required_props": [],
-      "required_items": [],
+      "required_items": [
+        "storage_shelf"
+      ],
       "off_grid": false,
       "overnight": false,
       "min_days": null,
       "max_days": null,
       "min_participants": 1,
+      "max_participants": 1,
       "location": null,
       "suggest_to_household": false,
       "annual_cost": 500
@@ -8269,12 +8350,15 @@
       "name": "Action Figures",
       "category": "collections",
       "required_props": [],
-      "required_items": [],
+      "required_items": [
+        "display_case"
+      ],
       "off_grid": false,
       "overnight": false,
       "min_days": null,
       "max_days": null,
       "min_participants": 1,
+      "max_participants": 1,
       "location": null,
       "suggest_to_household": false,
       "annual_cost": 400
@@ -8285,12 +8369,16 @@
       "required_props": [
         "model_train_set"
       ],
-      "required_items": [],
+      "required_items": [
+        "track_sections",
+        "model_buildings"
+      ],
       "off_grid": false,
       "overnight": false,
       "min_days": null,
       "max_days": null,
       "min_participants": 1,
+      "max_participants": 4,
       "location": null,
       "suggest_to_household": false,
       "annual_cost": 500
@@ -8301,13 +8389,16 @@
       "required_props": [],
       "required_items": [
         "golf_clubs",
-        "golf_balls"
+        "golf_balls",
+        "golf_glove",
+        "tees"
       ],
       "off_grid": true,
       "overnight": false,
       "min_days": null,
       "max_days": null,
       "min_participants": 1,
+      "max_participants": 4,
       "location": "golf_course",
       "suggest_to_household": false,
       "annual_cost": 2000
@@ -8319,13 +8410,16 @@
       "required_items": [
         "hockey_stick",
         "skates",
-        "pads"
+        "helmet",
+        "pads",
+        "puck"
       ],
       "off_grid": true,
       "overnight": false,
       "min_days": null,
       "max_days": null,
       "min_participants": 12,
+      "max_participants": 22,
       "location": "ice_rink",
       "suggest_to_household": true,
       "annual_cost": 1500
@@ -8336,13 +8430,16 @@
       "required_props": [],
       "required_items": [
         "boxing_gloves",
-        "mouthguard"
+        "mouthguard",
+        "hand_wraps",
+        "headguard"
       ],
       "off_grid": true,
       "overnight": false,
       "min_days": null,
       "max_days": null,
       "min_participants": 2,
+      "max_participants": 2,
       "location": "gym",
       "suggest_to_household": true,
       "annual_cost": 800
@@ -8354,13 +8451,15 @@
       "required_items": [
         "foil",
         "fencing_mask",
-        "jacket"
+        "jacket",
+        "glove"
       ],
       "off_grid": true,
       "overnight": false,
       "min_days": null,
       "max_days": null,
       "min_participants": 2,
+      "max_participants": 2,
       "location": "fencing_club",
       "suggest_to_household": true,
       "annual_cost": 600
@@ -8371,13 +8470,16 @@
       "required_props": [],
       "required_items": [
         "bow",
-        "arrows"
+        "arrows",
+        "arm_guard",
+        "quiver"
       ],
       "off_grid": true,
       "overnight": false,
       "min_days": null,
       "max_days": null,
       "min_participants": 1,
+      "max_participants": 10,
       "location": "archery_range",
       "suggest_to_household": false,
       "annual_cost": 400
@@ -8389,13 +8491,16 @@
       "required_items": [
         "snowboard",
         "boots",
-        "helmet"
+        "helmet",
+        "goggles",
+        "snow_jacket"
       ],
       "off_grid": true,
       "overnight": true,
       "min_days": 1,
       "max_days": 7,
       "min_participants": 1,
+      "max_participants": 8,
       "location": "ski_resort",
       "suggest_to_household": false,
       "annual_cost": 1500
@@ -8406,13 +8511,16 @@
       "required_props": [],
       "required_items": [
         "surfboard",
-        "wetsuit"
+        "wetsuit",
+        "surf_wax",
+        "leash"
       ],
       "off_grid": true,
       "overnight": false,
       "min_days": null,
       "max_days": null,
       "min_participants": 1,
+      "max_participants": null,
       "location": "beach",
       "suggest_to_household": false,
       "annual_cost": 300
@@ -8423,6 +8531,7 @@
       "required_props": [],
       "required_items": [
         "firearm",
+        "ammunition",
         "ear_protection",
         "eye_protection"
       ],
@@ -8431,6 +8540,7 @@
       "min_days": null,
       "max_days": null,
       "min_participants": 1,
+      "max_participants": 6,
       "location": "shooting_range",
       "suggest_to_household": false,
       "annual_cost": 800
@@ -8440,13 +8550,15 @@
       "category": "sports",
       "required_props": [],
       "required_items": [
-        "bowling_shoes"
+        "bowling_shoes",
+        "bowling_ball"
       ],
       "off_grid": true,
       "overnight": false,
       "min_days": null,
       "max_days": null,
       "min_participants": 1,
+      "max_participants": 6,
       "location": "bowling_alley",
       "suggest_to_household": false,
       "annual_cost": 500
@@ -8457,13 +8569,16 @@
       "required_props": [],
       "required_items": [
         "football",
-        "cleats"
+        "cleats",
+        "shin_guards",
+        "socks"
       ],
       "off_grid": true,
       "overnight": false,
       "min_days": null,
       "max_days": null,
       "min_participants": 10,
+      "max_participants": 22,
       "location": "sports_ground",
       "suggest_to_household": true,
       "annual_cost": 300
@@ -8475,13 +8590,16 @@
       "required_items": [
         "football",
         "helmet",
-        "pads"
+        "pads",
+        "cleats",
+        "mouthguard"
       ],
       "off_grid": true,
       "overnight": false,
       "min_days": null,
       "max_days": null,
       "min_participants": 12,
+      "max_participants": 22,
       "location": "sports_ground",
       "suggest_to_household": true,
       "annual_cost": 400
@@ -8493,13 +8611,16 @@
       "required_items": [
         "bat",
         "glove",
-        "baseball"
+        "baseball",
+        "helmet",
+        "cleats"
       ],
       "off_grid": true,
       "overnight": false,
       "min_days": null,
       "max_days": null,
       "min_participants": 10,
+      "max_participants": 18,
       "location": "baseball_field",
       "suggest_to_household": true,
       "annual_cost": 300
@@ -8509,13 +8630,15 @@
       "category": "sports",
       "required_props": [],
       "required_items": [
-        "basketball"
+        "basketball",
+        "basketball_shoes"
       ],
       "off_grid": true,
       "overnight": false,
       "min_days": null,
       "max_days": null,
       "min_participants": 4,
+      "max_participants": 10,
       "location": "court",
       "suggest_to_household": true,
       "annual_cost": 200
@@ -8525,13 +8648,15 @@
       "category": "sports",
       "required_props": [],
       "required_items": [
-        "volleyball"
+        "volleyball",
+        "knee_pads"
       ],
       "off_grid": true,
       "overnight": false,
       "min_days": null,
       "max_days": null,
       "min_participants": 6,
+      "max_participants": 12,
       "location": "court",
       "suggest_to_household": true,
       "annual_cost": 200
@@ -8542,13 +8667,15 @@
       "required_props": [],
       "required_items": [
         "tennis_racket",
-        "tennis_balls"
+        "tennis_balls",
+        "tennis_shoes"
       ],
       "off_grid": true,
       "overnight": false,
       "min_days": null,
       "max_days": null,
       "min_participants": 2,
+      "max_participants": 4,
       "location": "tennis_court",
       "suggest_to_household": true,
       "annual_cost": 600
@@ -8558,13 +8685,16 @@
       "category": "history",
       "required_props": [],
       "required_items": [
-        "period_costume"
+        "period_costume",
+        "period_weapon",
+        "camp_equipment"
       ],
       "off_grid": true,
       "overnight": true,
       "min_days": 1,
       "max_days": 3,
       "min_participants": 5,
+      "max_participants": 100,
       "location": "event_grounds",
       "suggest_to_household": true,
       "annual_cost": 800
@@ -8576,13 +8706,16 @@
       "required_items": [
         "trowel",
         "brush",
-        "field_notebook"
+        "field_notebook",
+        "sieve",
+        "measuring_tape"
       ],
       "off_grid": true,
       "overnight": true,
       "min_days": 2,
       "max_days": 14,
       "min_participants": 2,
+      "max_participants": 20,
       "location": "dig_site",
       "suggest_to_household": true,
       "annual_cost": 600
@@ -8597,6 +8730,7 @@
       "min_days": null,
       "max_days": null,
       "min_participants": 1,
+      "max_participants": null,
       "location": "museum",
       "suggest_to_household": false,
       "annual_cost": 200
@@ -8607,12 +8741,16 @@
       "required_props": [
         "desk"
       ],
-      "required_items": [],
+      "required_items": [
+        "notebook",
+        "reference_books"
+      ],
       "off_grid": false,
       "overnight": false,
       "min_days": null,
       "max_days": null,
       "min_participants": 1,
+      "max_participants": 1,
       "location": null,
       "suggest_to_household": false,
       "annual_cost": 100
@@ -8623,12 +8761,16 @@
       "required_props": [
         "desk"
       ],
-      "required_items": [],
+      "required_items": [
+        "notebook",
+        "reference_books"
+      ],
       "off_grid": false,
       "overnight": false,
       "min_days": null,
       "max_days": null,
       "min_participants": 1,
+      "max_participants": 1,
       "location": null,
       "suggest_to_household": false,
       "annual_cost": 50
@@ -8643,6 +8785,7 @@
       "min_days": null,
       "max_days": null,
       "min_participants": 1,
+      "max_participants": 1,
       "location": null,
       "suggest_to_household": false,
       "annual_cost": 150
@@ -8660,6 +8803,7 @@
       "min_days": null,
       "max_days": null,
       "min_participants": 3,
+      "max_participants": 10,
       "location": null,
       "suggest_to_household": true,
       "home_props_any": [
@@ -8677,6 +8821,7 @@
       "min_days": null,
       "max_days": null,
       "min_participants": 1,
+      "max_participants": 7,
       "location": "casino",
       "suggest_to_household": false,
       "annual_cost": 800
@@ -8691,6 +8836,7 @@
       "min_days": null,
       "max_days": null,
       "min_participants": 1,
+      "max_participants": 8,
       "location": "casino",
       "suggest_to_household": false,
       "annual_cost": 600
@@ -8705,6 +8851,7 @@
       "min_days": null,
       "max_days": null,
       "min_participants": 1,
+      "max_participants": 1,
       "location": "casino",
       "suggest_to_household": false,
       "annual_cost": 600
@@ -8719,6 +8866,7 @@
       "min_days": null,
       "max_days": null,
       "min_participants": 1,
+      "max_participants": 1,
       "location": null,
       "suggest_to_household": false,
       "annual_cost": 500
@@ -8733,6 +8881,7 @@
       "min_days": null,
       "max_days": null,
       "min_participants": 1,
+      "max_participants": null,
       "location": "racecourse",
       "suggest_to_household": false,
       "annual_cost": 400
@@ -8747,6 +8896,7 @@
       "min_days": null,
       "max_days": null,
       "min_participants": 1,
+      "max_participants": 1,
       "location": null,
       "suggest_to_household": false,
       "annual_cost": 200
@@ -8761,6 +8911,7 @@
       "min_days": null,
       "max_days": null,
       "min_participants": 5,
+      "max_participants": null,
       "location": "bingo_hall",
       "suggest_to_household": true,
       "annual_cost": 200
@@ -8775,6 +8926,7 @@
       "min_days": null,
       "max_days": null,
       "min_participants": 1,
+      "max_participants": 4,
       "location": null,
       "suggest_to_household": false,
       "home_props_any": [
@@ -8796,6 +8948,7 @@
       "min_days": null,
       "max_days": null,
       "min_participants": 2,
+      "max_participants": 6,
       "location": null,
       "suggest_to_household": true,
       "annual_cost": 200
@@ -8805,13 +8958,16 @@
       "category": "games",
       "required_props": [],
       "required_items": [
-        "pictionary_set"
+        "pictionary_set",
+        "whiteboard",
+        "markers"
       ],
       "off_grid": false,
       "overnight": false,
       "min_days": null,
       "max_days": null,
       "min_participants": 4,
+      "max_participants": 12,
       "location": null,
       "suggest_to_household": true,
       "annual_cost": 50
@@ -8820,12 +8976,15 @@
       "name": "Quiz Games",
       "category": "games",
       "required_props": [],
-      "required_items": [],
+      "required_items": [
+        "quiz_cards"
+      ],
       "off_grid": false,
       "overnight": false,
       "min_days": null,
       "max_days": null,
       "min_participants": 2,
+      "max_participants": 10,
       "location": null,
       "suggest_to_household": true,
       "annual_cost": 100
@@ -8834,12 +8993,17 @@
       "name": "Esports",
       "category": "games",
       "required_props": [],
-      "required_items": [],
+      "required_items": [
+        "gaming_headset",
+        "gaming_mouse",
+        "gaming_keyboard"
+      ],
       "off_grid": false,
       "overnight": false,
       "min_days": null,
       "max_days": null,
       "min_participants": 1,
+      "max_participants": 5,
       "location": null,
       "suggest_to_household": false,
       "home_props_any": [
