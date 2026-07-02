@@ -265,4 +265,4 @@ def _check_health_thresholds(c):
             emit("health_threshold_crossed",
                  {"character_id": c["id"], "need": need, "value": val})
         elif val < threshold * 0.7:
-            fire
+            fired.discard(key)

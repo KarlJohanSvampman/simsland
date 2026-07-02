@@ -674,4 +674,6 @@ def ensure_household_defaults(h):
     })
 
     h.setdefault("unopened_mail", [])
-    h.setdefault("unpai
+    h.setdefault("unpaid_bills", [])
+    h.setdefault("pending_responses", [])
+    h.setdefault("completed_documents", [])

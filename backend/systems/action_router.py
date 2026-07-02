@@ -591,7 +591,17 @@ def route_action(c, world, action, speech, definitions=None):
     elif action_type == "computer_order_item":
         _route_computer_order_item(c, world, action)
     elif action_type == "computer_order_service":
-        _route_computer_order_ser
+        _route_computer_order_service(c, world, action)
+    elif action_type == "social_browse_events":
+        _route_social_browse_events(c, world, action)
+    elif action_type == "social_event_rsvp":
+        _route_social_event_rsvp(c, world, action)
+    elif action_type == "social_event_comment":
+        _route_social_event_comment(c, world, action)
+    elif action_type == "social_event_attend":
+        _route_social_event_attend(c, world, action)
+    elif action_type == "social_event_plan":
+        _route_social_event_plan(c, world, action)
 
 # =========================================================
 # PHONE HANDLERS
@@ -917,3 +927,140 @@ def _route_drop_item(c, world, action):
     """Drop an item at the character's current position."""
     from systems.personal_items import drop_item, get_item_by_id, get_phone
     item_id = action.get("item_id") or action.get("target")
+    if not item_id:
+        return
+    drop_item(c, item_id, world)
+
+
+def _route_put_down_item(c, world, action):
+    """Place an item at a specific position."""
+    from systems.personal_items import place_item
+    item_id = action.get("item_id") or action.get("target")
+    x = int(action.get("x", c.get("x", 0)))
+    y = int(action.get("y", c.get("y", 0)))
+    if item_id:
+        place_item(c, item_id, x, y, world)
+
+
+def _route_give_item(c, world, action):
+    """Give an item to another character."""
+    from systems.personal_items import give_item
+    item_id   = action.get("item_id") or action.get("item")
+    target_id = action.get("target")
+    receiver  = world.get("characters", {}).get(target_id)
+    if item_id and receiver:
+        give_item(c, receiver, item_id, world)
+
+
+def _route_pick_up_item(c, world, action):
+    """Pick up an item that is placed in the world."""
+    from systems.personal_items import pick_up_item
+    item_id = action.get("item_id") or action.get("target")
+    if item_id:
+        pick_up_item(c, item_id, world)
+
+
+def _route_break_item(c, world, action):
+    """Destroy an item — removes from inventory or world."""
+    from systems.personal_items import break_item
+    item_id = action.get("item_id") or action.get("target")
+    if item_id:
+        break_item(c, item_id, world)
+
+
+# =========================================================
+
+# =========================================================
+# SOCIAL EVENTS
+# =========================================================
+
+def _route_social_browse_events(c, world, action):
+    """Discover events while browsing social media or scrolling phone."""
+    from systems.social_events import maybe_discover_events
+    channel = action.get("channel", "social_media")
+    found   = maybe_discover_events(c, world, channel=channel)
+    if found:
+        c["last_discovered_events"] = found
+
+
+def _route_social_event_rsvp(c, world, action):
+    """RSVP to an event: yes / no / maybe."""
+    from systems.social_events import rsvp
+    event_id  = action.get("event_id") or action.get("args", {}).get("event_id")
+    response  = action.get("response") or action.get("args", {}).get("response", "yes")
+    decide_ts = action.get("decide_ts") or action.get("args", {}).get("decide_ts")
+    if event_id and response in ("yes", "no", "maybe"):
+        rsvp(c, world, event_id, response, decide_ts=decide_ts)
+
+
+def _route_social_event_comment(c, world, action):
+    """Comment or react to an event post."""
+    from systems.social_events import add_comment, react_comment, get_event
+    event_id = action.get("event_id") or action.get("args", {}).get("event_id")
+    text     = action.get("text") or action.get("args", {}).get("text", "")
+    reaction = action.get("reaction") or action.get("args", {}).get("reaction")
+    if not event_id:
+        return
+    if text:
+        add_comment(c, world, event_id, text)
+    if reaction in ("like", "dislike"):
+        evt = get_event(world, event_id)
+        if evt and evt.get("comments"):
+            idx = action.get("comment_idx", len(evt["comments"]) - 1)
+            react_comment(c, world, event_id, idx, reaction)
+
+
+def _route_social_event_attend(c, world, action):
+    """Character attends an event — goes off-grid for the event duration."""
+    import time
+    from systems.social_events import get_event, rsvp
+    event_id = action.get("event_id") or action.get("args", {}).get("event_id")
+    if not event_id:
+        return
+    evt = get_event(world, event_id)
+    if not evt or evt["status"] != "published":
+        return
+    cost = evt.get("cost_per_person", 0.0)
+    if cost > 0:
+        for item in c.get("inventory", []):
+            if item.get("object_type") == "wallet":
+                cash = item.get("cash", 0.0)
+                if cash < cost:
+                    c.setdefault("notifications", []).append({
+                        "type": "event_cant_afford",
+                        "event_id": event_id,
+                        "title": evt["title"],
+                        "cost": cost,
+                        "ts": time.time(),
+                    })
+                    return
+                item["cash"] = round(cash - cost, 2)
+                break
+    rsvp(c, world, event_id, "yes")
+    c["off_grid"]       = True
+    c["off_grid_reason"] = f"event:{event_id}"
+    c["off_grid_until"] = evt.get("end_ts") or (evt.get("start_ts", time.time()) + 3 * 3600)
+
+
+def _route_social_event_plan(c, world, action):
+    """Create a new social event draft."""
+    from systems.social_events import create_event_draft
+    args = action.get("args") or action
+    create_event_draft(
+        c, world,
+        title           = args.get("title", "My Event"),
+        category        = args.get("category", "party"),
+        description     = args.get("description", ""),
+        location        = args.get("location", ""),
+        location_type   = args.get("location_type", "venue"),
+        start_ts        = args.get("start_ts"),
+        end_ts          = args.get("end_ts"),
+        co_organizers   = args.get("co_organizers") or [],
+        max_attendees   = args.get("max_attendees"),
+        cost_per_person = float(args.get("cost_per_person", 0.0)),
+        min_age         = args.get("min_age"),
+        max_age         = args.get("max_age"),
+        popularity      = int(args.get("popularity", 50)),
+        tags            = args.get("tags") or [],
+        visible_to      = args.get("visible_to") or [],
+    )

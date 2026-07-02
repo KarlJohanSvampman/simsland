@@ -261,8 +261,9 @@ def mark_message_read(
 
 def social_need_score(c):
 
-    social = c.get("needs", {}).get("social", 1.0)
-    return 1.0 - social
+    # Social drive = frustration of the "socialize" long-term need (0-1)
+    frustration = c.get("lt_needs", {}).get("socialize", {}).get("frustration", 0.0)
+    return frustration
 
 
 # =========================================================

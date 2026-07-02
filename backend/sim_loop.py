@@ -82,6 +82,9 @@ from systems.scheduling import generate_week_schedule, adjust_for_household
 from systems.lt_needs   import update_lt_needs, reset_weekly_counts, distribute_lt_needs
 from systems.social_odor import apply_odor_social_pressure
 from systems.phone      import update_phone_battery, charge_phone
+from systems.social_events import (
+    check_event_completions, check_maybe_deadlines, generate_world_events
+)
 from systems.story      import update_story_arc
 from systems.events     import maybe_generate_shared_event
 
@@ -343,6 +346,15 @@ def tick(world):
                 charge_phone(c, world)
             else:
                 update_phone_battery(c)
+
+    # -- Social events: completions + new event generation ──────────
+    if every(world, CADENCE["social_events"], offset=30):
+        check_event_completions(world)
+        generate_world_events(world)
+
+    # -- Maybe-RSVP deadline nudges ──────────────────────────────
+    if every(world, CADENCE["maybe_deadlines"], offset=31):
+        check_maybe_deadlines(world)
 
     # Story arcs are lightweight — keep per-tick
     for c in characters:

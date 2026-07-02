@@ -2093,6 +2093,153 @@
           "stand_up_a"
         ]
       }
+    },
+    "social_browse_events": {
+      "name": "Browse Social Events",
+      "description": "Scroll through upcoming events posted by your network",
+      "category": "social",
+      "duration_ticks": 6,
+      "requires_prop_tags": [],
+      "requires_item_object_type": null,
+      "satisfies_lt_needs": [
+        "socialize",
+        "play"
+      ],
+      "body_effects": {},
+      "stress_delta": -3,
+      "animations": {
+        "start": [
+          "sit_down_a"
+        ],
+        "loop": [
+          "sit_idle_a"
+        ],
+        "stop": [
+          "stand_up_a"
+        ]
+      }
+    },
+    "social_event_rsvp": {
+      "name": "RSVP to Event",
+      "description": "Respond to an event invitation with yes, no, or maybe",
+      "category": "social",
+      "duration_ticks": 2,
+      "requires_prop_tags": [],
+      "requires_item_object_type": null,
+      "args": {
+        "event_id": "",
+        "response": "yes"
+      },
+      "satisfies_lt_needs": [
+        "socialize"
+      ],
+      "body_effects": {},
+      "stress_delta": 0,
+      "animations": {
+        "start": [],
+        "loop": [
+          "sit_idle_a"
+        ],
+        "stop": []
+      }
+    },
+    "social_event_comment": {
+      "name": "Comment on Event",
+      "description": "Leave a comment, like or dislike on a social event post",
+      "category": "social",
+      "duration_ticks": 3,
+      "requires_prop_tags": [],
+      "requires_item_object_type": null,
+      "args": {
+        "event_id": "",
+        "text": "",
+        "reaction": "like"
+      },
+      "satisfies_lt_needs": [
+        "socialize"
+      ],
+      "body_effects": {},
+      "stress_delta": -1,
+      "animations": {
+        "start": [],
+        "loop": [
+          "sit_idle_a"
+        ],
+        "stop": []
+      }
+    },
+    "social_event_attend": {
+      "name": "Attend Social Event",
+      "description": "Go off-grid to attend a social event",
+      "category": "social",
+      "duration_ticks": 180,
+      "requires_prop_tags": [],
+      "requires_item_object_type": null,
+      "args": {
+        "event_id": ""
+      },
+      "satisfies_lt_needs": [
+        "socialize",
+        "play",
+        "adventure"
+      ],
+      "body_effects": {
+        "fatigue": 15
+      },
+      "stress_delta": -10,
+      "animations": {
+        "start": [
+          "walk"
+        ],
+        "loop": [
+          "talk",
+          "talk_gesture_a"
+        ],
+        "stop": [
+          "idle"
+        ]
+      }
+    },
+    "social_event_plan": {
+      "name": "Plan a Social Event",
+      "description": "Organise and publish a social event",
+      "category": "social",
+      "duration_ticks": 10,
+      "requires_prop_tags": [],
+      "requires_item_object_type": null,
+      "args": {
+        "title": "",
+        "category": "party",
+        "description": "",
+        "location": "",
+        "location_type": "venue",
+        "start_ts": null,
+        "end_ts": null,
+        "max_attendees": null,
+        "cost_per_person": 0.0,
+        "min_age": null,
+        "max_age": null,
+        "popularity": 50,
+        "co_organizers": []
+      },
+      "satisfies_lt_needs": [
+        "purpose",
+        "socialize"
+      ],
+      "body_effects": {},
+      "stress_delta": 5,
+      "animations": {
+        "start": [
+          "sit_down_a"
+        ],
+        "loop": [
+          "work",
+          "work_type"
+        ],
+        "stop": [
+          "stand_up_a"
+        ]
+      }
     }
   },
   "activity_templates": {

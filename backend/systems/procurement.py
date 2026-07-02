@@ -255,4 +255,24 @@ def _deliver_prop(household, catalog_id, world):
         "template":    catalog_id,
         "building_id": home_id,
         "x":           0,
-        "y":       
+        "y":           0,
+        "rotation":    0,
+        "state":       {"reserved_by": [], "dirty": False},
+    })
+
+
+# =========================================================
+# LEGACY COMPAT — determine_container still used internally
+# =========================================================
+
+def determine_container(resource_type):
+    if resource_type in ("FOOD_PROTEIN", "FOOD_VEGETABLE", "MEAL",
+                         "STORED_MEAL", "PROCESSED_MEAL", "DRINK_MILK"):
+        return "fridge"
+    if resource_type in ("FOOD_CARB", "FOOD_SNACK", "FOOD_SPICE",
+                         "DRINK_COFFEE", "DRINK_TEA", "DRINK_SOFT",
+                         "DRINK_ALCOHOL"):
+        return "pantry"
+    if resource_type in ("HYGIENE", "TOILET_PAPER", "CLEANING"):
+        return "bathroom"
+    return "storage"

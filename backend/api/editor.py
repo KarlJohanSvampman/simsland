@@ -175,10 +175,6 @@ async def spawn_character(request: Request):
         "y":        y,
         "rotation": 0,
         "facing":   "south",
-        "needs": {
-            "social": 0.7,
-            "fun":    0.6,
-        },
         "body": {
             "hunger":             20,
             "hydration":          80,
@@ -201,4 +197,17 @@ async def spawn_character(request: Request):
         "task_queue":           [],
         "current_task":         None,
         "activity":             None,
-        "secondary_activity":   N
+        "secondary_activity":   None,
+        "reservations":         [],
+        "path":                 [],
+        "destination":          None,
+        "animation_state":      {"base": "idle", "upper": None},
+        "last_utterance":       "",
+        "conversation_target":  None,
+        "look_target":          None
+    }
+
+    world.setdefault("characters", {})[cid] = character
+    save_world(sim_id, world)
+
+    return {"ok": True, "id": cid, "name": name}

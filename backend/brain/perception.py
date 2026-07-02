@@ -1198,4 +1198,21 @@ def perceive(
         )
     )
 
-    c["perception"] =
+    c["perception"] = perception
+
+    c["last_perception_tick"] = (
+        world.get(
+            "tick",
+            0
+        )
+    )
+
+    c["recent_perception_memory"] = (
+
+        perception.get(
+            "visible_people",
+            []
+        )[:5]
+    )
+
+    return perception

@@ -474,4 +474,9 @@ def load_character(
 
 def update_world_tick(sim_id, tick):
     with conn:
-      
+        with conn.cursor() as cur:
+            cur.execute("""
+                UPDATE world
+                SET data = jsonb_set(data, '{tick}', to_jsonb(%s::int))
+                WHERE simulation_id=%s
+            """, (tick, sim_id))

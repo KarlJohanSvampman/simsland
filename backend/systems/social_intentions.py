@@ -83,7 +83,8 @@ def generate_social_intentions(
     # SOCIAL NEEDS
     # =====================================================
 
-    loneliness = 1.0 - c.get("needs", {}).get("social", 1.0)
+    # Loneliness = frustration of the socialize lt_need (0-1)
+    loneliness = c.get("lt_needs", {}).get("socialize", {}).get("frustration", 0.0)
 
     from systems.body import body_energy
     energy = body_energy(c)

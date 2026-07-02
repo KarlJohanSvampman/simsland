@@ -82,4 +82,12 @@ def process_interview(c, world):
         c["job_searching"] = False
         c["job_id"]        = job["id"]
         c["profession"]    = job["profession"]
-        c["hourly_wage"] 
+        c["hourly_wage"]   = job["hourly_wage"]
+        job["open"]        = False
+        store_memory(c, f"Got hired as {job['title']}.", .8, ["job", "success"], "job", world["tick"])
+        emit("character_hired", {"character_id": c["id"], "job_id": job["id"], "title": job["title"]})
+    else:
+        store_memory(c, f"Failed the interview for {job['title']}.", .7,
+                     ["job", "rejection", "stress"], "job", world["tick"])
+        emit("interview_failed", {"character_id": c["id"], "job_id": job["id"]})
+    c["interview"] = None

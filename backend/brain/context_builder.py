@@ -558,6 +558,7 @@ def build_context(
         "worn":              _build_worn_context(c),
         "services":          _build_services_context(c, world),
         "phone":             _build_phone_context(c),
+        "social_events":     _build_events_context(c, world),
     }
 
     return context
@@ -1112,3 +1113,12 @@ def _build_lt_need_context(c):
 def _build_phone_context(c):
     from systems.phone import phone_context
     return phone_context(c)
+
+
+# =========================================================
+# SOCIAL EVENTS CONTEXT
+# =========================================================
+
+def _build_events_context(c, world):
+    from systems.social_events import build_events_context
+    return build_events_context(c, world)

@@ -133,4 +133,19 @@ def instantiate_floorplan(
         []
     ):
 
-        projected = deep
+        projected = deepcopy(window)
+
+        wx, wy = local_to_world(
+            building,
+            window["x"],
+            window["y"]
+        )
+
+        projected["x"] = wx
+        projected["y"] = wy
+
+        result["windows"].append(
+            projected
+        )
+
+    return result

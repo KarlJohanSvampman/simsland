@@ -224,4 +224,73 @@ def browse_catalog(world, category=None, budget=None, item_type=None):
     return results
 
 
-# =
+# =========================================================
+# UPDATE MARKET (called each MEDIUM tick)
+# =========================================================
+
+def update_market(world):
+    market = world.setdefault("market", {})
+    ensure_market_defaults(market)
+    mults   = market["category_multipliers"]
+    catalog = market.get("catalog", {})
+
+    # Drift category multipliers
+    for cat in CATEGORY_VOLATILITY:
+        if cat not in mults:
+            mults[cat] = 1.0
+        vol  = CATEGORY_VOLATILITY.get(cat, 0.004)
+        step = random.gauss(0, vol)
+        step -= REVERSION_STRENGTH * (mults[cat] - 1.0)
+        mults[cat] = round(max(0.5, min(2.5, mults[cat] + step)), 4)
+
+    # Refresh current_price in catalog
+    for entry in catalog.values():
+        cat  = entry.get("category", "misc")
+        mult = mults.get(cat, 1.0)
+        entry["current_price"] = round(entry["base_price"] * mult, 2)
+
+    # Update cost_of_living_index via groceries multiplier
+    grocery_mult = mults.get("groceries", 1.0)
+    market["food"]["price"] = round(10.0 * grocery_mult, 2)
+    world["environment"]["cost_of_living_index"] = max(
+        0.5, min(2.0, grocery_mult)
+    )
+
+
+# =========================================================
+# NEWS → MARKET REACTION
+# =========================================================
+
+NEWS_TAG_TO_CATEGORY = {
+    "consumer":       ["groceries", "clothing"],
+    "trade":          ["electronics", "appliances"],
+    "economy":        ["furniture", "appliances", "electronics"],
+    "environment":    ["appliances"],
+    "technology":     ["electronics"],
+    "infrastructure": ["appliances", "furniture"],
+    "labor":          ["appliances", "furniture", "clothing"],
+}
+
+def apply_news_to_market(world, news_tags, sentiment):
+    mults  = world.get("market", {}).get("category_multipliers", {})
+    direction = 1 if sentiment == "positive" else -1 if sentiment == "negative" else 0
+    if direction == 0:
+        return
+    for tag in news_tags:
+        for cat in NEWS_TAG_TO_CATEGORY.get(tag, []):
+            if cat in mults:
+                mults[cat] = round(
+                    max(0.5, min(2.5, mults[cat] + direction * random.uniform(0.01, 0.04))),
+                    4
+                )
+
+
+# =========================================================
+# LEGACY STUBS
+# =========================================================
+
+def produce(world):
+    pass
+
+def consume_households(world):
+    pass

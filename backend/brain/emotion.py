@@ -140,12 +140,11 @@ def _maybe_trigger_mood(c, world):
     stress     = float(c.get("stress", 0))
     temp       = float(c.get("emotional_temperature", 20))
     lt_needs   = c.get("lt_needs", {})
-    needs      = c.get("needs", {})
 
     candidates = []
     for mood_id, tmpl in templates.items():
         triggers = tmpl.get("triggers", {})
-        if not _check_triggers(triggers, stress, temp, body, lt_needs, needs, c):
+        if not _check_triggers(triggers, stress, temp, body, lt_needs, c):
             continue
         candidates.append((mood_id, tmpl))
 
@@ -174,7 +173,7 @@ def _maybe_trigger_mood(c, world):
     _apply_mood_need_modifiers(c)
 
 
-def _check_triggers(triggers, stress, temp, body, lt_needs, needs, c):
+def _check_triggers(triggers, stress, temp, body, lt_needs, c):
     for key, value in triggers.items():
         if key == "stress_above"          and stress <= value:          return False
         if key == "stress_below"          and stress >= value:          return False
@@ -182,9 +181,15 @@ def _check_triggers(triggers, stress, temp, body, lt_needs, needs, c):
         if key == "sleep_debt_below"      and body.get("sleep_debt", 0) >= value: return False
         if key == "fatigue_below"         and body.get("fatigue", 0) >= value:    return False
         if key == "emotional_temperature_above" and temp <= value:      return False
-        if key == "fun_need_low"          and needs.get("fun", 1.0) >= 0.35:      return False
-        if key == "fun_need_high"         and needs.get("fun", 0.0) < 0.6:        return False
-        if key == "social_need_low"       and needs.get("social", 1.0) >= 0.35:   return False
+        # fun_need_low = play lt_need frustration > 0.65 (unsatisfied)
+        if key == "fun_need_low":
+            if lt_needs.get("play", {}).get("frustration", 0) <= 0.65: return False
+        # fun_need_high = play lt_need frustration < 0.4 (well satisfied)
+        if key == "fun_need_high":
+            if lt_needs.get("play", {}).get("frustration", 1) >= 0.4:  return False
+        # social_need_low = socialize lt_need frustration > 0.65
+        if key == "social_need_low":
+            if lt_needs.get("socialize", {}).get("frustration", 0) <= 0.65: return False
         if key == "lt_need_romance_high":
             nd = lt_needs.get("romance", {})
             if nd.get("frustration", 0) < 0.4:                         return False
@@ -207,13 +212,22 @@ def _check_triggers(triggers, stress, temp, body, lt_needs, needs, c):
 
 
 def _apply_mood_need_modifiers(c):
-    """Shift social/fun needs by mood modifiers."""
+    """
+    Mood need_modifiers shift lt_need frustration.
+    Keys: "social" → "socialize", "fun" → "play".
+    Positive delta in template = more satisfying → frustration goes DOWN.
+    """
     mood = c.get("mood")
     if not mood:
         return
+    _KEY_MAP = {"social": "socialize", "fun": "play"}
+    lt_needs = c.setdefault("lt_needs", {})
     for need_key, delta in mood.get("need_modifiers", {}).items():
-        current = c.get("needs", {}).get(need_key, 0.5)
-        c.setdefault("needs", {})[need_key] = max(0.0, min(1.0, current + delta))
+        lt_key = _KEY_MAP.get(need_key, need_key)
+        nd = lt_needs.get(lt_key)
+        if nd is not None:
+            # positive old-style delta means more satisfaction → lower frustration
+            nd["frustration"] = max(0.0, min(1.0, nd["frustration"] - delta))
 
 
 def get_emotion_label(c):

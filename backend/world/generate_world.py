@@ -384,15 +384,8 @@ def generate_initial_world():
                 "facing": "south",
 
                 # ---------------------------------------------
-                # NEEDS  (social/psychological only — body handled by c["body"])
-                # ---------------------------------------------
-                "needs": {
-                    "social": 0.7,
-                    "fun":    0.6,
-                },
-
-                # ---------------------------------------------
                 # BODY (physical simulation — 0-100)
+                # Long-term need weights live in c["lt_needs"]
                 # ---------------------------------------------
                 "body": {
                     "hunger":             20,
@@ -463,4 +456,115 @@ def generate_initial_world():
                     "upper": None
                 },
 
-                # -------------------------------------------
+                # ---------------------------------------------
+                # SOCIAL
+                # ---------------------------------------------
+                "last_utterance": "",
+
+                "conversation_target": None,
+
+                "look_target": None,
+
+                # ---------------------------------------------
+                # PERSONAL INVENTORY
+                # ---------------------------------------------
+                "inventory": []
+            }
+        },
+
+        # =====================================================
+        # PROP INSTANCES
+        # =====================================================
+        "props": [
+
+            {
+                "id": "prop_sofa_1",
+
+                "template": "modern_sofa",
+
+                "x": 5,
+                "y": 5,
+
+                "rotation": 0,
+
+                # runtime state only
+                "state": {
+
+                    "reserved_by": [],
+                    "dirty": False
+                }
+            }
+        ],
+
+        # =====================================================
+        # BUILDINGS
+        # =====================================================
+        "buildings": [
+
+            {
+                "id": "house_1",
+
+                "rooms": [
+
+                    {
+                        "id": "living_room",
+
+                        "type": "living_room",
+
+                        "bounds": {
+                            "x1": 0,
+                            "y1": 0,
+                            "x2": 6,
+                            "y2": 6
+                        }
+                    }
+                ],
+
+                "doors": [
+
+                    {
+                        "id": "door_1",
+
+                        "template": "basic_door",
+
+                        "x": 6,
+                        "y": 3,
+
+                        "rotation": 0,
+
+                        "state": "closed",
+
+                        "locked": False,
+
+                        "home_id": "house_1",
+
+                        "busy": False,
+
+                        "reserved_by": None,
+
+                        "connects": [
+                            "living_room"
+                        ]
+                    }
+                ]
+            }
+        ]
+    }
+
+    init_stocks(world)
+    init_market_catalog(world)
+
+    # Seed personal inventories
+    c1 = world["characters"]["c1"]
+    c1["inventory"] = [
+        make_smartphone(owner_id="c1"),
+        make_house_key(home_id="house_1", building_id="house_1", owner_id="c1"),
+        make_wallet(cash=100.0, owner_id="c1"),
+    ]
+
+    # Social events — seed initial world events
+    from systems.social_events import generate_world_events
+    world["social_events"] = {}
+    generate_world_events(world)
+
+    return world
