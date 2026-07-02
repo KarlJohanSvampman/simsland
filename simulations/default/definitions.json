@@ -4660,6 +4660,64 @@
       "base_price": 25.0,
       "stackable": false,
       "consumable": false
+    },
+    "trumpet": {
+      "name": "Trumpet",
+      "category": "music_instrument",
+      "size": 2,
+      "base_price": 400.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "saxophone": {
+      "name": "Saxophone",
+      "category": "music_instrument",
+      "size": 2,
+      "base_price": 600.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "saxophone_reed": {
+      "name": "Saxophone Reed",
+      "category": "music_instrument",
+      "size": 1,
+      "base_price": 10.0,
+      "stackable": true,
+      "max_stack": 10,
+      "consumable": true,
+      "uses": 20
+    },
+    "flute": {
+      "name": "Flute",
+      "category": "music_instrument",
+      "size": 2,
+      "base_price": 300.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "riding_helmet": {
+      "name": "Riding Helmet",
+      "category": "sports_equipment",
+      "size": 2,
+      "base_price": 80.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "riding_boots": {
+      "name": "Riding Boots",
+      "category": "clothing",
+      "size": 2,
+      "base_price": 150.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "riding_gear": {
+      "name": "Riding Gear",
+      "category": "clothing",
+      "size": 2,
+      "base_price": 200.0,
+      "stackable": false,
+      "consumable": false
     }
   },
   "character_templates": {
@@ -12445,6 +12503,152 @@
         "gaming_console"
       ],
       "annual_cost": 300
+    },
+    "cooking": {
+      "name": "Cooking",
+      "category": "culinary",
+      "required_props": [
+        "kitchen_counter",
+        "oven_stove"
+      ],
+      "required_items": [
+        "pot",
+        "pan",
+        "knife",
+        "cutting_board"
+      ],
+      "off_grid": false,
+      "overnight": false,
+      "min_days": null,
+      "max_days": null,
+      "min_participants": 1,
+      "max_participants": 4,
+      "location": null,
+      "suggest_to_household": false,
+      "annual_cost": 800
+    },
+    "baking": {
+      "name": "Baking",
+      "category": "culinary",
+      "required_props": [
+        "kitchen_counter",
+        "oven_stove"
+      ],
+      "required_items": [
+        "baking_tray",
+        "mixing_bowl",
+        "oven_mitt"
+      ],
+      "off_grid": false,
+      "overnight": false,
+      "min_days": null,
+      "max_days": null,
+      "min_participants": 1,
+      "max_participants": 4,
+      "location": null,
+      "suggest_to_household": false,
+      "annual_cost": 400
+    },
+    "reading": {
+      "name": "Reading",
+      "category": "literary",
+      "required_props": [],
+      "required_items": [],
+      "off_grid": false,
+      "overnight": false,
+      "min_days": null,
+      "max_days": null,
+      "min_participants": 1,
+      "max_participants": 1,
+      "location": null,
+      "suggest_to_household": false,
+      "annual_cost": 200
+    },
+    "book_club": {
+      "name": "Book Club",
+      "category": "literary",
+      "required_props": [],
+      "required_items": [],
+      "off_grid": false,
+      "overnight": false,
+      "min_days": null,
+      "max_days": null,
+      "min_participants": 3,
+      "max_participants": 12,
+      "location": null,
+      "suggest_to_household": true,
+      "annual_cost": 150
+    },
+    "horseback_riding": {
+      "name": "Horseback Riding",
+      "category": "sports",
+      "required_props": [],
+      "required_items": [
+        "riding_helmet",
+        "riding_boots",
+        "riding_gear"
+      ],
+      "off_grid": true,
+      "overnight": false,
+      "min_days": null,
+      "max_days": null,
+      "min_participants": 1,
+      "max_participants": 10,
+      "location": "stable",
+      "suggest_to_household": false,
+      "annual_cost": 3600
+    },
+    "trumpet": {
+      "name": "Trumpet",
+      "category": "music",
+      "required_props": [],
+      "required_items": [
+        "trumpet"
+      ],
+      "off_grid": false,
+      "overnight": false,
+      "min_days": null,
+      "max_days": null,
+      "min_participants": 1,
+      "max_participants": 6,
+      "location": null,
+      "suggest_to_household": false,
+      "annual_cost": 300
+    },
+    "saxophone": {
+      "name": "Saxophone",
+      "category": "music",
+      "required_props": [],
+      "required_items": [
+        "saxophone",
+        "saxophone_reed"
+      ],
+      "off_grid": false,
+      "overnight": false,
+      "min_days": null,
+      "max_days": null,
+      "min_participants": 1,
+      "max_participants": 6,
+      "location": null,
+      "suggest_to_household": false,
+      "annual_cost": 400
+    },
+    "flute": {
+      "name": "Flute",
+      "category": "music",
+      "required_props": [],
+      "required_items": [
+        "flute"
+      ],
+      "off_grid": false,
+      "overnight": false,
+      "min_days": null,
+      "max_days": null,
+      "min_participants": 1,
+      "max_participants": 4,
+      "location": null,
+      "suggest_to_household": false,
+      "annual_cost": 200
     }
   }
 }
