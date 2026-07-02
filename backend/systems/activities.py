@@ -1497,4 +1497,14 @@ def complete_activity(
                 "mailbox"
             ][
                 "has_mail"
-   
+               ] = False
+
+            sort_household_mail(household)
+
+    # =====================================
+    # RECORD HABIT
+    # Every completed activity reinforces a time-of-day habit so future
+    # intention sorting will slightly prefer it at the same hour.
+    # =====================================
+    from systems.habits import record_habit
+    record_habit(c, activity_type, world)

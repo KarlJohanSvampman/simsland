@@ -554,6 +554,10 @@ def update_agent(
 
     clean_intentions(c)
 
+    # Boost priorities for activities the character habitually does at this hour
+    from systems.habits import apply_habit_bias_to_intentions
+    apply_habit_bias_to_intentions(c, world)
+
     sort_intentions(c)
 
     # =====================================
@@ -573,4 +577,20 @@ def update_agent(
         # survival activities (sleep, toilet, eat) always run to completion.
         urgent = _check_urgent_interruption(c)
         if urgent and c.get("activity_queue"):
-            from systems.hobby_requirements
+            from systems.hobby_requirements import HOBBY_REQUIREMENTS
+            act_type = (c["activity"] or {}).get("type", "")
+            hobby_params = c.get("_active_hobby_params", {})
+            hobby_name   = hobby_params.get("hobby", "")
+            interruptible = HOBBY_REQUIREMENTS.get(hobby_name, {}).get("interruptible", False)
+            if interruptible:
+                suspend_activity_queue(c, world, reason=urgent)
+                # Fall through: no activity now, agent loop will address the urgent need
+            else:
+                execute_activity(c, world, c["activity"])
+                return
+        else:
+            execute_activity(c, world, c["activity"])
+            return
+
+    # =====================================
+    #
