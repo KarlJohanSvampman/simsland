@@ -42,6 +42,7 @@ const tabs = [
   "floorplan_templates",
   "tile_templates",
   "material_templates",
+  "hobby_templates",
 ];
 
 let meshbank = {};
@@ -100,6 +101,14 @@ let previewModel = null;
 let previewMixer = null;
 let previewBones = [];
 let previewMesh = null;   // for tile / material previews
+
+// ── Interaction preview state ─────────────────────────────────────────────────
+let _ixActive = false;
+let _ixCharKey = null;
+let _ixClips = [];
+let _ixPhases = {};
+let _ixHeldMeshes = {};    // slot -> Three.Mesh
+let _ixPlayTimeout = null;
 
 // =====================================================
 // MODEL RESOLUTION  (meshbank ID → actual mesh path)
@@ -347,8 +356,11 @@ function openTemplate(id) {
   renderBoneSlotEditor();
 
   // Choose preview type based on tab
+  _ixActive = false;  // deactivate interaction preview whenever we switch away
   if (currentTab === 'activity_templates') {
     loadActivityTimeline(data);
+  } else if (currentTab === 'interaction_templates') {
+    loadInteractionPreview(data);
   } else if (currentTab === 'material_templates') {
     loadMaterialPreview(data);
   } else if (currentTab === 'tile_templates') {
@@ -1318,7 +1330,7 @@ function loadActivityTimeline(data) {
         drive_car_to:'🚗', phone_call:'📞', phone_send_text:'💬', phone_check:'📱',
         phone_read_text:'📱', charge:'🔌', computer_social_media:'💻', computer_videos:'▶️',
         computer_game:'🎮', computer_wiki_research:'🔍', computer_order_item:'🛒',
-        computer_buy_stock:'📈', computer_send_email:'📧', computer_check_email:'📧',
+              computer_buy_stock:'📈', computer_send_email:'📧', computer_check_email:'📧',
         computer_job_search:'💼', computer_dating:'❤️',
       };
       const placeholder = document.createElement('div');
@@ -1334,3 +1346,332 @@ function loadActivityTimeline(data) {
   document.getElementById('boneSlotEditor').innerHTML = '';
 }
 
+// =====================================================
+// INTERACTION PREVIEW
+// =====================================================
+
+const _IX_STYLE = `<style>
+#ixWrap{display:flex;flex-direction:column;height:100%;background:#1a1e24;overflow:hidden}
+#ixCharBar{display:flex;align-items:center;gap:6px;padding:6px 8px;background:#1d2229;border-bottom:1px solid #333;flex-shrink:0}
+#ixCharBar label{font-size:11px;color:#888;white-space:nowrap}
+#ixCharSelect{background:#2a2f38;color:#fff;border:1px solid #555;padding:3px 6px;font-size:11px;flex:1;min-width:0}
+#ixCanvas{flex:1;min-height:0;overflow:hidden;background:#111}
+#ixPhaseBar{display:flex;gap:4px;padding:6px 8px;background:#1d2229;border-top:1px solid #333;flex-shrink:0;flex-wrap:wrap;align-items:center}
+.ixPhaseBtn{padding:4px 10px;font-size:11px;background:#2a3340;color:#cde;border:none;cursor:pointer;border-radius:2px;transition:background .12s}
+.ixPhaseBtn:hover:not(:disabled){background:#3a4f60}
+.ixPhaseBtn.active{background:#4a7fa0;color:#fff}
+.ixPhaseBtn:disabled{opacity:.35;cursor:default}
+.ixPlayAll{background:#2a4a2a !important}
+.ixPlayAll:hover:not(:disabled){background:#3a6a3a !important}
+#ixIdleBtn{margin-left:auto}
+#ixInfoPanel{flex-shrink:0;padding:6px 10px;border-top:1px solid #333;background:#1b1f25;max-height:190px;overflow-y:auto}
+.ixSection{margin-bottom:8px}
+.ixSectionTitle{font-size:10px;color:#6699cc;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px;border-bottom:1px solid #2a3340;padding-bottom:2px}
+.ixChips{display:flex;flex-wrap:wrap;gap:4px}
+.ixChip{padding:2px 8px;background:#2a3a4a;color:#adc;font-size:11px;border-radius:10px}
+.ixChip.missing{background:#4a2a2a;color:#f99}
+.ixItemRow{display:flex;align-items:center;gap:6px;padding:3px 0;border-bottom:1px solid #222}
+.ixItemRow:last-child{border-bottom:none}
+.ixItemLabel{font-size:11px;color:#ccc;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ixHoldBtn{padding:2px 8px;font-size:10px;background:#333a44;border:none;color:#aaa;cursor:pointer;border-radius:2px;transition:background .1s}
+.ixHoldBtn:hover{background:#404a58}
+.ixHoldBtn.held{background:#2a5a2a;color:#9f9}
+.ixOffGrid{font-size:11px;color:#f0a060;padding:2px 0;margin-bottom:4px}
+.ixEmptyNote{font-size:11px;color:#555;padding:4px 0}
+</style>`;
+
+function loadInteractionPreview(data) {
+  _ixActive = true;
+  _ixPhases  = data.animations || {};
+  _ixHeldMeshes = {};
+  if (_ixPlayTimeout) { clearTimeout(_ixPlayTimeout); _ixPlayTimeout = null; }
+
+  const charTemplates = definitions.character_templates || {};
+  const charKeys = Object.keys(charTemplates);
+  if (!_ixCharKey || !charTemplates[_ixCharKey]) _ixCharKey = charKeys[0] || null;
+
+  const reqProps   = data.requires_prop_tags   || [];
+  const reqItemCat = data.requires_item_category || null;
+  const offGrid    = !!data.off_grid;
+
+  const propChips = reqProps.map(tag => {
+    const hit = Object.entries(definitions.prop_templates || {})
+      .find(([, p]) => (p.tags || []).includes(tag));
+    return { tag, name: hit ? hit[1].name : tag, found: !!hit };
+  });
+
+  const matchItems = reqItemCat
+    ? Object.entries(definitions.item_templates || {})
+        .filter(([, v]) => v.category === reqItemCat)
+        .slice(0, 10)
+    : [];
+
+  const charOptions = charKeys.map(k =>
+    `<option value="${k}" ${k === _ixCharKey ? 'selected' : ''}>${k}</option>`
+  ).join('') || '<option value="">— no character templates —</option>';
+
+  const phaseHasClips = phase => (_ixPhases[phase] || []).length > 0;
+
+  document.getElementById('modelPreview').innerHTML = _IX_STYLE + `
+<div id="ixWrap">
+  <div id="ixCharBar">
+    <label>Character</label>
+    <select id="ixCharSelect">${charOptions}</select>
+  </div>
+  <div id="ixCanvas"></div>
+  <div id="ixPhaseBar">
+    <button class="ixPhaseBtn ixPlayAll" onclick="window._ixPlayAll()" title="Run start then loop (3s) then stop then idle">\u25b6 Play All</button>
+    <button class="ixPhaseBtn" id="ixBtnStart" onclick="window._ixPlayPhase('start')"
+      ${phaseHasClips('start') ? '' : 'disabled'} title="${(_ixPhases.start||[]).join(', ')||'(none)'}">\u25b6 Start</button>
+    <button class="ixPhaseBtn" id="ixBtnLoop" onclick="window._ixPlayPhase('loop')"
+      ${phaseHasClips('loop') ? '' : 'disabled'} title="${(_ixPhases.loop||[]).join(', ')||'(none)'}">\u21ba Loop</button>
+    <button class="ixPhaseBtn" id="ixBtnStop" onclick="window._ixPlayPhase('stop')"
+      ${phaseHasClips('stop') ? '' : 'disabled'} title="${(_ixPhases.stop||[]).join(', ')||'(none)'}">\u25a0 Stop</button>
+    <button class="ixPhaseBtn" id="ixIdleBtn" onclick="window._ixPlayPhase('idle')">\u2b1c Idle</button>
+  </div>
+  <div id="ixInfoPanel">
+    ${offGrid ? '<div class="ixOffGrid">\u2b1b Off-grid \u2014 no prop placement needed</div>' : ''}
+    ${propChips.length ? `
+    <div class="ixSection">
+      <div class="ixSectionTitle">Required Props</div>
+      <div class="ixChips">
+        ${propChips.map(p => `<span class="ixChip${p.found ? '' : ' missing'}" title="${p.found ? 'found in prop_templates' : 'no prop with this tag'}">${p.name}</span>`).join('')}
+      </div>
+    </div>` : ''}
+    ${reqItemCat ? `
+    <div class="ixSection">
+      <div class="ixSectionTitle">Required Item \u2014 ${reqItemCat}</div>
+      ${matchItems.length ? matchItems.map(([id, item]) => `
+      <div class="ixItemRow">
+        <span class="ixItemLabel" title="${id}">${item.name}</span>
+        <button class="ixHoldBtn" id="ixHR_${id}" onclick="window._ixToggleHold('${id}','right_hand')">Hold R</button>
+        <button class="ixHoldBtn" id="ixHL_${id}" onclick="window._ixToggleHold('${id}','left_hand')">Hold L</button>
+      </div>`).join('') : `<div class="ixEmptyNote">No items found for category "${reqItemCat}"</div>`}
+    </div>` : (!reqProps.length && !offGrid ? '<div class="ixEmptyNote">No prop or item requirements</div>' : '')}
+  </div>
+</div>`;
+
+  const slot = document.getElementById('ixCanvas');
+  previewRenderer.setSize(slot.clientWidth || 400, slot.clientHeight || 240);
+  slot.appendChild(previewRenderer.domElement);
+
+  const ro = new ResizeObserver(entries => {
+    const e = entries[0];
+    if (!_ixActive) { ro.disconnect(); return; }
+    previewRenderer.setSize(e.contentRect.width, e.contentRect.height);
+    previewCamera.aspect = e.contentRect.width / (e.contentRect.height || 1);
+    previewCamera.updateProjectionMatrix();
+  });
+  ro.observe(slot);
+
+  const sel = document.getElementById('ixCharSelect');
+  if (sel) sel.onchange = e => {
+    _ixCharKey = e.target.value;
+    _ixClearHeld();
+    _ixLoadChar();
+  };
+
+  _ixLoadChar();
+}
+
+function _ixLoadChar() {
+  if (!_ixActive) return;
+  const tmpl = (definitions.character_templates || {})[_ixCharKey];
+  if (!tmpl?.model) { setStatus('Character template has no model path'); return; }
+
+  if (previewModel) { previewScene.remove(previewModel); previewModel = null; }
+  if (previewMixer) { previewMixer.stopAllAction(); previewMixer = null; }
+  _ixClips = [];
+  _ixClearHeld();
+
+  setStatus('Loading character\u2026');
+  previewLoader.load(tmpl.model, gltf => {
+    if (!_ixActive) return;
+    previewModel = gltf.scene;
+    previewScene.add(previewModel);
+    framePreviewCamera(previewModel);
+
+    _ixClips = gltf.animations || [];
+    previewMixer = new THREE.AnimationMixer(previewModel);
+    previewBones = [];
+    previewModel.traverse(o => { if (o.isBone) previewBones.push(o); });
+
+    const idleClip = _ixFindClip(tmpl.base_animations?.idle || 'idle');
+    if (idleClip) previewMixer.clipAction(idleClip).play();
+
+    _ixRefreshPhaseBtns();
+    setStatus(`${_ixCharKey} \u2014 ${_ixClips.length} animation clip(s) loaded`);
+  }, undefined, err => setStatus('Character load error: ' + (err.message || err)));
+}
+
+function _ixFindClip(name) {
+  if (!name || !_ixClips.length) return null;
+  return _ixClips.find(c => c.name === name)
+    || _ixClips.find(c => c.name.toLowerCase() === name.toLowerCase())
+    || null;
+}
+
+function _ixRefreshPhaseBtns() {
+  ['start', 'loop', 'stop'].forEach(phase => {
+    const btn = document.getElementById('ixBtn' + phase.charAt(0).toUpperCase() + phase.slice(1));
+    if (!btn) return;
+    const clips = (_ixPhases[phase] || []).map(_ixFindClip).filter(Boolean);
+    btn.disabled = !clips.length;
+    btn.style.opacity = clips.length ? '1' : '';
+    btn.title = clips.length ? clips.map(c => c.name).join(', ') : `No matching clips for "${phase}"`;
+  });
+}
+
+function _ixClearHeld() {
+  Object.values(_ixHeldMeshes).forEach(m => { if (m.parent) m.parent.remove(m); });
+  _ixHeldMeshes = {};
+  document.querySelectorAll('.ixHoldBtn').forEach(b => b.classList.remove('held'));
+}
+
+window._ixPlayPhase = function(phase) {
+  if (!previewMixer || !_ixActive) return;
+  previewMixer.stopAllAction();
+  document.querySelectorAll('.ixPhaseBtn').forEach(b => b.classList.remove('active'));
+
+  if (phase === 'idle') {
+    const tmpl = (definitions.character_templates || {})[_ixCharKey];
+    const clip = _ixFindClip(tmpl?.base_animations?.idle || 'idle');
+    if (clip) previewMixer.clipAction(clip).play();
+    document.getElementById('ixIdleBtn')?.classList.add('active');
+    return;
+  }
+
+  const clips = (_ixPhases[phase] || []).map(_ixFindClip).filter(Boolean);
+  if (!clips.length) { setStatus(`No clips found for "${phase}" phase`); return; }
+
+  const action = previewMixer.clipAction(clips[0]);
+  action.setLoop(phase === 'loop' ? THREE.LoopRepeat : THREE.LoopOnce, Infinity);
+  action.clampWhenFinished = (phase !== 'loop');
+  action.reset().play();
+
+  const btnId = 'ixBtn' + phase.charAt(0).toUpperCase() + phase.slice(1);
+  document.getElementById(btnId)?.classList.add('active');
+  setStatus(`\u25b6 ${phase}: "${clips[0].name}"`);
+};
+
+window._ixPlayAll = function() {
+  if (!previewMixer || !_ixActive) return;
+  if (_ixPlayTimeout) { clearTimeout(_ixPlayTimeout); _ixPlayTimeout = null; }
+  previewMixer.stopAllAction();
+  document.querySelectorAll('.ixPhaseBtn').forEach(b => b.classList.remove('active'));
+
+  const startClips = (_ixPhases.start || []).map(_ixFindClip).filter(Boolean);
+  const loopClips  = (_ixPhases.loop  || []).map(_ixFindClip).filter(Boolean);
+  const stopClips  = (_ixPhases.stop  || []).map(_ixFindClip).filter(Boolean);
+
+  function playClip(clip, loop) {
+    if (!previewMixer) return clip.duration;
+    previewMixer.stopAllAction();
+    const a = previewMixer.clipAction(clip);
+    a.setLoop(loop ? THREE.LoopRepeat : THREE.LoopOnce, Infinity);
+    a.clampWhenFinished = !loop;
+    a.reset().play();
+    return clip.duration;
+  }
+
+  let delay = 0;
+
+  if (startClips.length) {
+    const dur = playClip(startClips[0], false) * 1000;
+    document.getElementById('ixBtnStart')?.classList.add('active');
+    delay += dur;
+    setStatus('\u25b6 Playing start phase\u2026');
+  }
+
+  const afterStart = delay;
+
+  if (loopClips.length) {
+    _ixPlayTimeout = setTimeout(() => {
+      if (!_ixActive) return;
+      document.querySelectorAll('.ixPhaseBtn').forEach(b => b.classList.remove('active'));
+      document.getElementById('ixBtnLoop')?.classList.add('active');
+      playClip(loopClips[0], true);
+      setStatus('\u21ba Playing loop phase\u2026');
+
+      _ixPlayTimeout = setTimeout(() => {
+        if (!_ixActive) return;
+        document.querySelectorAll('.ixPhaseBtn').forEach(b => b.classList.remove('active'));
+        if (stopClips.length) {
+          document.getElementById('ixBtnStop')?.classList.add('active');
+          const dur = playClip(stopClips[0], false) * 1000;
+          setStatus('\u25a0 Playing stop phase\u2026');
+          _ixPlayTimeout = setTimeout(() => {
+            if (!_ixActive) return;
+            window._ixPlayPhase('idle');
+            setStatus('Done \u2014 returned to idle');
+          }, dur);
+        } else {
+          window._ixPlayPhase('idle');
+          setStatus('Done \u2014 returned to idle');
+        }
+      }, 3000);
+    }, afterStart);
+
+  } else if (stopClips.length) {
+    _ixPlayTimeout = setTimeout(() => {
+      if (!_ixActive) return;
+      document.querySelectorAll('.ixPhaseBtn').forEach(b => b.classList.remove('active'));
+      document.getElementById('ixBtnStop')?.classList.add('active');
+      const dur = playClip(stopClips[0], false) * 1000;
+      setStatus('\u25a0 Playing stop phase\u2026');
+      _ixPlayTimeout = setTimeout(() => {
+        if (!_ixActive) return;
+        window._ixPlayPhase('idle');
+        setStatus('Done \u2014 returned to idle');
+      }, dur);
+    }, afterStart);
+  } else if (!startClips.length) {
+    setStatus('No animation clips defined on this interaction');
+  }
+};
+
+window._ixToggleHold = function(itemId, slot) {
+  if (!previewModel) { setStatus('Load a character first'); return; }
+
+  const btnId  = slot === 'right_hand' ? `ixHR_${itemId}` : `ixHL_${itemId}`;
+  const btn    = document.getElementById(btnId);
+  const isHeld = btn?.classList.contains('held');
+
+  if (_ixHeldMeshes[slot]) {
+    const old = _ixHeldMeshes[slot];
+    if (old.parent) old.parent.remove(old);
+    delete _ixHeldMeshes[slot];
+    document.querySelectorAll('.ixHoldBtn').forEach(b => {
+      if (b.dataset.ixSlot === slot) b.classList.remove('held');
+    });
+  }
+
+  if (!isHeld) {
+    const rightNames = ['hand_r','Hand_R','RightHand','Bip01_R_Hand','mixamorig:RightHand','r_hand','Right_Hand'];
+    const leftNames  = ['hand_l','Hand_L','LeftHand','Bip01_L_Hand','mixamorig:LeftHand','l_hand','Left_Hand'];
+    const targets    = slot === 'right_hand' ? rightNames : leftNames;
+
+    let bone = null;
+    previewModel.traverse(o => {
+      if (!bone && targets.some(n => o.name.toLowerCase() === n.toLowerCase())) bone = o;
+    });
+
+    if (!bone) {
+      setStatus(`Bone not found for "${slot}". Expected: ${targets.slice(0,4).join(', ')}\u2026`);
+      return;
+    }
+
+    const mesh = new THREE.Mesh(
+      new THREE.BoxGeometry(0.05, 0.05, 0.18),
+      new THREE.MeshStandardMaterial({ color: slot === 'right_hand' ? 0x88aacc : 0xcc8855, roughness: 0.5 })
+    );
+    mesh.name = `held_${itemId}_${slot}`;
+    mesh.position.set(0, 0, 0.1);
+    bone.add(mesh);
+    _ixHeldMeshes[slot] = mesh;
+
+    if (btn) { btn.classList.add('held'); btn.dataset.ixSlot = slot; }
+    const itemName = (definitions.item_templates || {})[itemId]?.name || itemId;
+    setStatus(`Holding "${itemName}" in ${slot}`);
+  }
+};
