@@ -85,6 +85,7 @@ from systems.phone      import update_phone_battery, charge_phone
 from systems.social_events import (
     check_event_completions, check_maybe_deadlines, generate_world_events
 )
+from systems.calendar_events import check_calendar_reminders
 from systems.story      import update_story_arc
 from systems.events     import maybe_generate_shared_event
 
@@ -356,9 +357,9 @@ def tick(world):
     if every(world, CADENCE["maybe_deadlines"], offset=31):
         check_maybe_deadlines(world)
 
+    if every(world, CADENCE["calendar_events"], offset=32):
+        check_calendar_reminders(world)
+
     # Story arcs are lightweight — keep per-tick
     for c in characters:
         update_story_arc(c)
-
-    # -- Flush event bus (runs all handlers for events emitted this tick)
-    flush_events(world)

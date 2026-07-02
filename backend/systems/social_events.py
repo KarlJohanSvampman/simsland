@@ -89,11 +89,18 @@ def create_event_draft(c, world, title, category="other", description="",
                        cost_per_person=0.0,
                        min_age=None, max_age=None,
                        popularity=50,
+                       dress_code=None,
+                       prep_requirements=None,
                        tags=None, visible_to=None):
     """
     Initiator creates a draft event. If co_organizers are listed the event
     stays in status="draft" until all approve. Otherwise it goes straight
     to "published" on creation.
+
+    dress_code: None | "casual" | "smart_casual" | "formal" | "black_tie" |
+                "costume" | "athletic" | "themed:<theme>"
+    prep_requirements: list of prep types attendees should do beforehand
+        e.g. ["buy_supplies", "book_transport", "get_outfit"]
     """
     cid  = c["id"]
     eid  = _event_id()
@@ -116,13 +123,15 @@ def create_event_draft(c, world, title, category="other", description="",
         "pending_changes":  [],
         "location":         location,
         "location_type":    location_type,
-        "start_ts":         start_ts or (now + 7 * 86400),   # default: 1 week away
+        "start_ts":         start_ts or (now + 7 * 86400),
         "end_ts":           end_ts,
         "max_attendees":    max_attendees,
         "cost_per_person":  cost_per_person,
         "min_age":          min_age,
         "max_age":          max_age,
         "popularity":       popularity,
+        "dress_code":       dress_code,
+        "prep_requirements": prep_requirements or [],
         "tags":             tags or [],
         "invited":          list(orgs),
         "attendees":        {cid: "yes"},
@@ -612,35 +621,61 @@ def build_events_context(c, world, limit=8):
 # =========================================================
 
 _EVENT_TEMPLATES = [
-    # category, title_patterns, tags, location_type, cost_range, duration_h, description_template
-    # (category, titles, tags, loc_type, cost_range, dur_h, desc, min_age, max_age, popularity_range)
-    ("party",       ["House Party", "Birthday Bash", "Block Party", "Garden Party"],
-     ["social","alcohol","music"], "home", (0, 20), 4,
-     "A casual gathering with drinks, music and good company.", 18, None, (30, 70)),
-    ("dinner",      ["Dinner Night", "Potluck Dinner", "BBQ Night", "Wine & Dine"],
-     ["food","wine","social"], "home", (0, 40), 3,
-     "An intimate dinner get-together. Bring your appetite.", None, None, (20, 60)),
-    ("concert",     ["Live Music Night", "Open Mic", "Jazz Evening", "DJ Set"],
-     ["music","nightlife"], "venue", (10, 80), 3,
-     "Live performances from local and visiting artists.", 18, None, (40, 90)),
-    ("sports",      ["Football Match", "Tennis Doubles", "Running Club", "Pickup Basketball"],
-     ["sports","fitness","outdoor"], "outdoor", (0, 15), 2,
-     "Friendly match — all skill levels welcome.", None, None, (20, 55)),
-    ("meetup",      ["Neighbourhood Meetup", "Book Club", "Tech Talk", "Startup Night"],
-     ["networking","community"], "venue", (0, 25), 2,
-     "Connect with like-minded people in the area.", None, None, (10, 40)),
-    ("festival",    ["Street Food Festival", "Craft Beer Fest", "Art Market", "Film Screening"],
-     ["culture","outdoor","food"], "outdoor", (0, 30), 6,
-     "A public event celebrating local culture and community.", None, None, (50, 95)),
-    ("exhibition",  ["Gallery Opening", "Photography Show", "Art Exhibition"],
-     ["art","culture"], "venue", (0, 20), 3,
-     "Opening night for a new collection. Free drinks on arrival.", None, None, (20, 60)),
-    ("online_event",["Webinar", "Virtual Game Night", "Online Quiz", "Watch Party"],
-     ["online","tech","social"], "online", (0, 10), 2,
-     "Join from home — link shared in the event details.", None, None, (15, 50)),
-    ("trip",        ["Day Trip", "Hiking Excursion", "Beach Day", "Road Trip"],
-     ["outdoor","adventure","travel"], "outdoor", (10, 60), 8,
-     "A group outing — meet at the departure point.", None, None, (25, 65)),
+    # (category, titles, tags, loc_type, cost_range, dur_h, desc,
+    #  min_age, max_age, popularity_range, dress_code, prep_requirements)
+    ("party",
+     ["House Party", "Birthday Bash", "Block Party", "Garden Party"],
+     ["social", "alcohol", "music"], "home", (0, 20), 4,
+     "A casual gathering with drinks, music and good company.",
+     18, None, (30, 70), "casual", ["buy_supplies"]),
+
+    ("dinner",
+     ["Dinner Night", "Potluck Dinner", "BBQ Night", "Wine & Dine"],
+     ["food", "wine", "social"], "home", (0, 40), 3,
+     "An intimate dinner get-together. Bring your appetite.",
+     None, None, (20, 60), "smart_casual", ["cook_meal", "buy_supplies"]),
+
+    ("concert",
+     ["Live Music Night", "Open Mic", "Jazz Evening", "DJ Set"],
+     ["music", "nightlife"], "venue", (10, 80), 3,
+     "Live performances from local and visiting artists.",
+     18, None, (40, 90), "smart_casual", ["book_transport", "get_outfit"]),
+
+    ("sports",
+     ["Football Match", "Tennis Doubles", "Running Club", "Pickup Basketball"],
+     ["sports", "fitness", "outdoor"], "outdoor", (0, 15), 2,
+     "Friendly match — all skill levels welcome.",
+     None, None, (20, 55), "athletic", []),
+
+    ("meetup",
+     ["Neighbourhood Meetup", "Book Club", "Tech Talk", "Startup Night"],
+     ["networking", "community"], "venue", (0, 25), 2,
+     "Connect with like-minded people in the area.",
+     None, None, (10, 40), "casual", []),
+
+    ("festival",
+     ["Street Food Festival", "Craft Beer Fest", "Art Market", "Film Screening"],
+     ["culture", "outdoor", "food"], "outdoor", (0, 30), 6,
+     "A public event celebrating local culture and community.",
+     None, None, (50, 95), "casual", ["buy_supplies"]),
+
+    ("exhibition",
+     ["Gallery Opening", "Photography Show", "Art Exhibition"],
+     ["art", "culture"], "venue", (0, 20), 3,
+     "Opening night for a new collection. Free drinks on arrival.",
+     None, None, (20, 60), "smart_casual", ["get_outfit"]),
+
+    ("online_event",
+     ["Webinar", "Virtual Game Night", "Online Quiz", "Watch Party"],
+     ["online", "tech", "social"], "online", (0, 10), 2,
+     "Join from home — link shared in the event details.",
+     None, None, (15, 50), None, []),
+
+    ("trip",
+     ["Day Trip", "Hiking Excursion", "Beach Day", "Road Trip"],
+     ["outdoor", "adventure", "travel"], "outdoor", (10, 60), 8,
+     "A group outing — meet at the departure point.",
+     None, None, (25, 65), "casual", ["book_transport", "buy_supplies"]),
 ]
 
 _MAX_WORLD_EVENTS = 12   # never generate more than this many published events at once
@@ -669,7 +704,7 @@ def generate_world_events(world):
         # Weight selection by popularity_range upper bound so high-pop events appear more
         weights = [t[9][1] for t in _EVENT_TEMPLATES]
         tmpl = random.choices(_EVENT_TEMPLATES, weights=weights, k=1)[0]
-        cat, titles, tags, loc_type, cost_range, dur_h, desc, min_age, max_age, pop_range = tmpl
+        cat, titles, tags, loc_type, cost_range, dur_h, desc, min_age, max_age, pop_range, dress_code, prep_req = tmpl
 
         organiser_id = random.choice(char_ids)
         organiser    = chars[organiser_id]
@@ -703,6 +738,11 @@ def generate_world_events(world):
             "end_ts":           end_ts,
             "max_attendees":    random.choice([None, 10, 20, 30, 50, 100]),
             "cost_per_person":  cost,
+            "min_age":          min_age,
+            "max_age":          max_age,
+            "popularity":       random.randint(*pop_range),
+            "dress_code":       dress_code,
+            "prep_requirements": list(prep_req),
             "tags":             tags + [cat],
             "invited":          [organiser_id],
             "attendees":        {organiser_id: "yes"},

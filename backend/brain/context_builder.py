@@ -559,6 +559,7 @@ def build_context(
         "services":          _build_services_context(c, world),
         "phone":             _build_phone_context(c),
         "social_events":     _build_events_context(c, world),
+        "upcoming_calendar_events": _build_calendar_context(c, world),
     }
 
     return context
@@ -1122,3 +1123,19 @@ def _build_phone_context(c):
 def _build_events_context(c, world):
     from systems.social_events import build_events_context
     return build_events_context(c, world)
+
+
+def _build_calendar_context(c, world):
+    from systems.calendar_events import get_upcoming_events
+    upcoming = get_upcoming_events(c, world, horizon_days=60)
+    if not upcoming:
+        return None
+    items = []
+    for ev in upcoming[:8]:
+        n = ev["days_until"]
+        when = "today" if n == 0 else ("tomorrow" if n == 1 else "in {} days".format(n))
+        line = "{} {} ({})".format(ev["emoji"], ev["name"], when)
+        if ev.get("prep_requirements"):
+            line += " — prep: " + ", ".join(ev["prep_requirements"])
+        items.append(line)
+    return items
