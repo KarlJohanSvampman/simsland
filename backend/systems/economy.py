@@ -24,7 +24,19 @@ def apply_expenses(world):
         # Variable: food scales with household size and market price
         food = 80.0 * n_members * env.get("cost_of_living_index", 1.0)
 
-        total = round(fixed + food, 2)
+        # Hobbies: each member's hobbies contribute annual_cost / 52 per week
+        hobby_templates = world.get("definitions", {}).get("hobby_templates", {})
+        hobbies_weekly = 0.0
+        for cid in h.get("members", []):
+            c = world.get("characters", {}).get(cid)
+            if not c:
+                continue
+            for hid in c.get("hobbies", []):
+                tmpl = hobby_templates.get(hid)
+                if tmpl:
+                    hobbies_weekly += tmpl.get("annual_cost", 0) / 52.0
+
+        total = round(fixed + food + hobbies_weekly, 2)
 
         h.setdefault("bills_due", []).append({
             "type":         "weekly",
@@ -34,6 +46,7 @@ def apply_expenses(world):
             "breakdown": {
                 "fixed_home": round(fixed, 2),
                 "food":       round(food, 2),
+                "hobbies":    round(hobbies_weekly, 2),
             },
         })
 
@@ -53,6 +66,5 @@ def household_economy(world, household_id):
     return {
         **h,
         "members":    [m["name"] for m in members],
-        "tax_rate":   world["environment"].get("tax_rate"),
         "market":     world.get("market"),
     }
