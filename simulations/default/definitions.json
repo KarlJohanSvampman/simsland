@@ -563,10 +563,6 @@
         {
           "name": "anchor_open_storage",
           "interaction": "open_storage"
-        },
-        {
-          "name": "anchor_grab_item",
-          "interaction": "grab_item"
         }
       ],
       "storage": {
@@ -580,7 +576,8 @@
         "furniture",
         "storage",
         "bedroom"
-      ]
+      ],
+      "isSurface": true
     },
     "cabinet": {
       "name": "Storage Cabinet",
@@ -693,22 +690,14 @@
           "dy": 0
         }
       ],
-      "anchors": [
-        {
-          "name": "anchor_place_item",
-          "interaction": "place_item"
-        },
-        {
-          "name": "anchor_pick_up_item",
-          "interaction": "pick_up_item"
-        }
-      ],
+      "anchors": [],
       "storage": null,
       "tags": [
         "furniture",
         "table",
         "living_room"
-      ]
+      ],
+      "isSurface": true
     },
     "side_table": {
       "name": "Side Table",
@@ -720,21 +709,13 @@
           "dy": 0
         }
       ],
-      "anchors": [
-        {
-          "name": "anchor_place_item",
-          "interaction": "place_item"
-        },
-        {
-          "name": "anchor_pick_up_item",
-          "interaction": "pick_up_item"
-        }
-      ],
+      "anchors": [],
       "storage": null,
       "tags": [
         "furniture",
         "table"
-      ]
+      ],
+      "isSurface": true
     },
     "tv_stand": {
       "name": "TV Stand",
@@ -1665,10 +1646,6 @@
         {
           "name": "anchor_eat_meal",
           "interaction": "eat_meal"
-        },
-        {
-          "name": "anchor_place_item",
-          "interaction": "place_item"
         }
       ],
       "storage": null,
@@ -1676,7 +1653,8 @@
         "outdoor",
         "furniture",
         "table"
-      ]
+      ],
+      "isSurface": true
     },
     "outdoor_chair": {
       "name": "Outdoor Chair",
@@ -2395,16 +2373,7 @@
           "dy": 0
         }
       ],
-      "anchors": [
-        {
-          "name": "anchor_place_item",
-          "interaction": "place_item"
-        },
-        {
-          "name": "anchor_pick_up_item",
-          "interaction": "pick_up_item"
-        }
-      ],
+      "anchors": [],
       "storage": {
         "slots": 4,
         "accepted_categories": []
@@ -2413,7 +2382,8 @@
         "furniture",
         "table",
         "hallway"
-      ]
+      ],
+      "isSurface": true
     },
     "room_divider": {
       "name": "Room Divider",
@@ -15802,5 +15772,56 @@
       "suggest_to_household": false,
       "annual_cost": 200
     }
-  }
+  },
+  "default_item_interactions": [
+    {
+      "id": "pick_up",
+      "label": "Pick Up",
+      "requires_target": false
+    },
+    {
+      "id": "put_down",
+      "label": "Put Down",
+      "requires_target": true,
+      "target_type": "surface"
+    },
+    {
+      "id": "put_in",
+      "label": "Put In",
+      "requires_target": true,
+      "target_type": "container"
+    },
+    {
+      "id": "put_in_pocket",
+      "label": "Pocket",
+      "requires_target": false
+    },
+    {
+      "id": "retrieve_from_pocket",
+      "label": "Retrieve from Pocket",
+      "requires_target": false
+    },
+    {
+      "id": "give",
+      "label": "Give",
+      "requires_target": true,
+      "target_type": "character"
+    },
+    {
+      "id": "take",
+      "label": "Take",
+      "requires_target": false
+    },
+    {
+      "id": "throw",
+      "label": "Throw",
+      "requires_target": true,
+      "target_type": "position_or_character"
+    },
+    {
+      "id": "destroy",
+      "label": "Destroy",
+      "requires_target": false
+    }
+  ]
 }
