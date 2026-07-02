@@ -250,6 +250,1773 @@
         "dining"
       ],
       "storage": null
+    },
+    "easel": {
+      "name": "Easel",
+      "category": "furniture",
+      "model": null,
+      "footprint": [
+        {
+          "dx": 0,
+          "dy": 0
+        }
+      ],
+      "anchors": [],
+      "storage": null,
+      "tags": [
+        "art",
+        "easel"
+      ]
+    },
+    "art_station": {
+      "name": "Art Station",
+      "category": "furniture",
+      "model": null,
+      "footprint": [
+        {
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "dx": 1,
+          "dy": 0
+        }
+      ],
+      "anchors": [
+        {
+          "name": "anchor_work",
+          "interaction": "paint"
+        }
+      ],
+      "storage": {
+        "slots": 10,
+        "accepted_categories": [
+          "art_supplies"
+        ]
+      },
+      "tags": [
+        "art",
+        "table",
+        "hobby"
+      ]
+    },
+    "bookshelf": {
+      "name": "Bookshelf",
+      "category": "furniture",
+      "model": null,
+      "footprint": [
+        {
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "dx": 1,
+          "dy": 0
+        }
+      ],
+      "anchors": [
+        {
+          "name": "anchor_browse",
+          "interaction": "browse"
+        }
+      ],
+      "storage": {
+        "slots": 20,
+        "accepted_categories": [
+          "books_media",
+          "hobby_supplies"
+        ]
+      },
+      "tags": [
+        "furniture",
+        "storage",
+        "books"
+      ]
+    },
+    "desk": {
+      "name": "Desk",
+      "category": "furniture",
+      "model": null,
+      "footprint": [
+        {
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "dx": 1,
+          "dy": 0
+        }
+      ],
+      "anchors": [
+        {
+          "name": "anchor_sit",
+          "interaction": "work"
+        }
+      ],
+      "storage": {
+        "slots": 6,
+        "accepted_categories": [
+          "office_supplies",
+          "electronics"
+        ]
+      },
+      "tags": [
+        "furniture",
+        "desk",
+        "work"
+      ]
+    },
+    "record_player": {
+      "name": "Record Player",
+      "category": "appliance",
+      "model": null,
+      "footprint": [
+        {
+          "dx": 0,
+          "dy": 0
+        }
+      ],
+      "anchors": [
+        {
+          "name": "anchor_use",
+          "interaction": "play_music"
+        }
+      ],
+      "storage": null,
+      "tags": [
+        "music",
+        "appliance",
+        "vinyl"
+      ]
+    },
+    "model_train_set": {
+      "name": "Model Train Set",
+      "category": "furniture",
+      "model": null,
+      "footprint": [
+        {
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "dx": 1,
+          "dy": 0
+        },
+        {
+          "dx": 0,
+          "dy": 1
+        },
+        {
+          "dx": 1,
+          "dy": 1
+        }
+      ],
+      "anchors": [
+        {
+          "name": "anchor_operate",
+          "interaction": "operate_trains"
+        }
+      ],
+      "storage": null,
+      "tags": [
+        "hobby",
+        "trains",
+        "model"
+      ]
+    },
+    "garden": {
+      "name": "Garden",
+      "category": "outdoor",
+      "model": null,
+      "footprint": [
+        {
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "dx": 1,
+          "dy": 0
+        },
+        {
+          "dx": 0,
+          "dy": 1
+        },
+        {
+          "dx": 1,
+          "dy": 1
+        }
+      ],
+      "anchors": [
+        {
+          "name": "anchor_tend",
+          "interaction": "garden"
+        }
+      ],
+      "storage": {
+        "slots": 8,
+        "accepted_categories": [
+          "outdoor_gear"
+        ]
+      },
+      "tags": [
+        "outdoor",
+        "garden",
+        "nature"
+      ]
+    },
+    "wardrobe": {
+      "name": "Wardrobe",
+      "category": "furniture",
+      "model": null,
+      "footprint": [
+        {
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "dx": 1,
+          "dy": 0
+        },
+        {
+          "dx": 2,
+          "dy": 0
+        }
+      ],
+      "anchors": [],
+      "storage": {
+        "slots": 30,
+        "accepted_categories": [
+          "clothing"
+        ]
+      },
+      "tags": [
+        "furniture",
+        "storage",
+        "clothing"
+      ]
+    },
+    "dresser": {
+      "name": "Dresser",
+      "category": "furniture",
+      "model": null,
+      "footprint": [
+        {
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "dx": 1,
+          "dy": 0
+        }
+      ],
+      "anchors": [],
+      "storage": {
+        "slots": 20,
+        "accepted_categories": [
+          "clothing"
+        ]
+      },
+      "tags": [
+        "furniture",
+        "storage",
+        "clothing"
+      ]
+    },
+    "nightstand": {
+      "name": "Nightstand",
+      "category": "furniture",
+      "model": null,
+      "footprint": [
+        {
+          "dx": 0,
+          "dy": 0
+        }
+      ],
+      "anchors": [],
+      "storage": {
+        "slots": 4,
+        "accepted_categories": [
+          "misc",
+          "electronics"
+        ]
+      },
+      "tags": [
+        "furniture",
+        "storage",
+        "bedroom"
+      ]
+    },
+    "cabinet": {
+      "name": "Storage Cabinet",
+      "category": "furniture",
+      "model": null,
+      "footprint": [
+        {
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "dx": 1,
+          "dy": 0
+        }
+      ],
+      "anchors": [],
+      "storage": {
+        "slots": 15,
+        "accepted_categories": []
+      },
+      "tags": [
+        "furniture",
+        "storage"
+      ]
+    },
+    "shoe_rack": {
+      "name": "Shoe Rack",
+      "category": "furniture",
+      "model": null,
+      "footprint": [
+        {
+          "dx": 0,
+          "dy": 0
+        }
+      ],
+      "anchors": [],
+      "storage": {
+        "slots": 10,
+        "accepted_categories": [
+          "clothing"
+        ]
+      },
+      "tags": [
+        "furniture",
+        "storage",
+        "shoes"
+      ]
+    },
+    "coat_rack": {
+      "name": "Coat Rack",
+      "category": "furniture",
+      "model": null,
+      "footprint": [
+        {
+          "dx": 0,
+          "dy": 0
+        }
+      ],
+      "anchors": [],
+      "storage": {
+        "slots": 6,
+        "accepted_categories": [
+          "clothing"
+        ]
+      },
+      "tags": [
+        "furniture",
+        "storage",
+        "clothing"
+      ]
+    },
+    "coffee_table": {
+      "name": "Coffee Table",
+      "category": "furniture",
+      "model": null,
+      "footprint": [
+        {
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "dx": 1,
+          "dy": 0
+        }
+      ],
+      "anchors": [],
+      "storage": null,
+      "tags": [
+        "furniture",
+        "table",
+        "living_room"
+      ]
+    },
+    "side_table": {
+      "name": "Side Table",
+      "category": "furniture",
+      "model": null,
+      "footprint": [
+        {
+          "dx": 0,
+          "dy": 0
+        }
+      ],
+      "anchors": [],
+      "storage": null,
+      "tags": [
+        "furniture",
+        "table"
+      ]
+    },
+    "tv_stand": {
+      "name": "TV Stand",
+      "category": "furniture",
+      "model": null,
+      "footprint": [
+        {
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "dx": 1,
+          "dy": 0
+        },
+        {
+          "dx": 2,
+          "dy": 0
+        }
+      ],
+      "anchors": [],
+      "storage": {
+        "slots": 6,
+        "accepted_categories": [
+          "electronics"
+        ]
+      },
+      "tags": [
+        "furniture",
+        "storage",
+        "entertainment"
+      ]
+    },
+    "armchair": {
+      "name": "Armchair",
+      "category": "furniture",
+      "model": null,
+      "footprint": [
+        {
+          "dx": 0,
+          "dy": 0
+        }
+      ],
+      "anchors": [
+        {
+          "name": "anchor_sit",
+          "interaction": "sit"
+        }
+      ],
+      "storage": null,
+      "tags": [
+        "furniture",
+        "seating"
+      ]
+    },
+    "sofa_large": {
+      "name": "Large Sofa",
+      "category": "furniture",
+      "model": null,
+      "footprint": [
+        {
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "dx": 1,
+          "dy": 0
+        },
+        {
+          "dx": 2,
+          "dy": 0
+        },
+        {
+          "dx": 3,
+          "dy": 0
+        }
+      ],
+      "anchors": [
+        {
+          "name": "anchor_sit_1",
+          "interaction": "sit"
+        },
+        {
+          "name": "anchor_sit_2",
+          "interaction": "sit"
+        },
+        {
+          "name": "anchor_lie",
+          "interaction": "lie"
+        }
+      ],
+      "storage": null,
+      "tags": [
+        "furniture",
+        "seating",
+        "sofa"
+      ]
+    },
+    "bed_single": {
+      "name": "Single Bed",
+      "category": "furniture",
+      "model": null,
+      "footprint": [
+        {
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "dx": 0,
+          "dy": 1
+        },
+        {
+          "dx": 1,
+          "dy": 0
+        },
+        {
+          "dx": 1,
+          "dy": 1
+        }
+      ],
+      "anchors": [
+        {
+          "name": "anchor_sleep",
+          "interaction": "sleep"
+        }
+      ],
+      "storage": null,
+      "tags": [
+        "furniture",
+        "bed",
+        "bedroom"
+      ]
+    },
+    "bunk_bed": {
+      "name": "Bunk Bed",
+      "category": "furniture",
+      "model": null,
+      "footprint": [
+        {
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "dx": 0,
+          "dy": 1
+        },
+        {
+          "dx": 1,
+          "dy": 0
+        },
+        {
+          "dx": 1,
+          "dy": 1
+        }
+      ],
+      "anchors": [
+        {
+          "name": "anchor_sleep_bottom",
+          "interaction": "sleep"
+        },
+        {
+          "name": "anchor_sleep_top",
+          "interaction": "sleep"
+        }
+      ],
+      "storage": null,
+      "tags": [
+        "furniture",
+        "bed",
+        "bedroom"
+      ]
+    },
+    "bench": {
+      "name": "Bench",
+      "category": "furniture",
+      "model": null,
+      "footprint": [
+        {
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "dx": 1,
+          "dy": 0
+        }
+      ],
+      "anchors": [
+        {
+          "name": "anchor_sit_1",
+          "interaction": "sit"
+        },
+        {
+          "name": "anchor_sit_2",
+          "interaction": "sit"
+        }
+      ],
+      "storage": null,
+      "tags": [
+        "furniture",
+        "seating"
+      ]
+    },
+    "kitchen_counter": {
+      "name": "Kitchen Counter",
+      "category": "furniture",
+      "model": null,
+      "footprint": [
+        {
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "dx": 1,
+          "dy": 0
+        }
+      ],
+      "anchors": [
+        {
+          "name": "anchor_prep",
+          "interaction": "prepare_food"
+        }
+      ],
+      "storage": {
+        "slots": 10,
+        "accepted_categories": [
+          "kitchenware",
+          "food",
+          "cleaning"
+        ]
+      },
+      "tags": [
+        "furniture",
+        "kitchen",
+        "counter"
+      ]
+    },
+    "kitchen_cabinet": {
+      "name": "Kitchen Cabinet",
+      "category": "furniture",
+      "model": null,
+      "footprint": [
+        {
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "dx": 1,
+          "dy": 0
+        }
+      ],
+      "anchors": [],
+      "storage": {
+        "slots": 15,
+        "accepted_categories": [
+          "kitchenware",
+          "food",
+          "cleaning"
+        ]
+      },
+      "tags": [
+        "furniture",
+        "kitchen",
+        "storage"
+      ]
+    },
+    "kitchen_island": {
+      "name": "Kitchen Island",
+      "category": "furniture",
+      "model": null,
+      "footprint": [
+        {
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "dx": 1,
+          "dy": 0
+        },
+        {
+          "dx": 0,
+          "dy": 1
+        },
+        {
+          "dx": 1,
+          "dy": 1
+        }
+      ],
+      "anchors": [
+        {
+          "name": "anchor_prep",
+          "interaction": "prepare_food"
+        },
+        {
+          "name": "anchor_sit_1",
+          "interaction": "sit"
+        },
+        {
+          "name": "anchor_sit_2",
+          "interaction": "sit"
+        }
+      ],
+      "storage": {
+        "slots": 8,
+        "accepted_categories": [
+          "kitchenware",
+          "food"
+        ]
+      },
+      "tags": [
+        "furniture",
+        "kitchen",
+        "counter",
+        "seating"
+      ]
+    },
+    "oven_stove": {
+      "name": "Oven / Stove",
+      "category": "appliance",
+      "model": null,
+      "footprint": [
+        {
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "dx": 1,
+          "dy": 0
+        }
+      ],
+      "anchors": [
+        {
+          "name": "anchor_cook",
+          "interaction": "cook"
+        }
+      ],
+      "storage": null,
+      "tags": [
+        "appliance",
+        "kitchen",
+        "cooking"
+      ]
+    },
+    "dishwasher": {
+      "name": "Dishwasher",
+      "category": "appliance",
+      "model": null,
+      "footprint": [
+        {
+          "dx": 0,
+          "dy": 0
+        }
+      ],
+      "anchors": [
+        {
+          "name": "anchor_load",
+          "interaction": "load_dishwasher"
+        }
+      ],
+      "storage": {
+        "slots": 12,
+        "accepted_categories": [
+          "dishware",
+          "kitchenware"
+        ]
+      },
+      "tags": [
+        "appliance",
+        "kitchen",
+        "cleaning"
+      ]
+    },
+    "microwave": {
+      "name": "Microwave",
+      "category": "appliance",
+      "model": null,
+      "footprint": [
+        {
+          "dx": 0,
+          "dy": 0
+        }
+      ],
+      "anchors": [
+        {
+          "name": "anchor_use",
+          "interaction": "use_microwave"
+        }
+      ],
+      "storage": null,
+      "tags": [
+        "appliance",
+        "kitchen",
+        "cooking"
+      ]
+    },
+    "coffee_maker": {
+      "name": "Coffee Maker",
+      "category": "appliance",
+      "model": null,
+      "footprint": [
+        {
+          "dx": 0,
+          "dy": 0
+        }
+      ],
+      "anchors": [
+        {
+          "name": "anchor_use",
+          "interaction": "make_coffee"
+        }
+      ],
+      "storage": null,
+      "tags": [
+        "appliance",
+        "kitchen",
+        "drinks"
+      ]
+    },
+    "kitchen_sink": {
+      "name": "Kitchen Sink",
+      "category": "fixture",
+      "model": null,
+      "footprint": [
+        {
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "dx": 1,
+          "dy": 0
+        }
+      ],
+      "anchors": [
+        {
+          "name": "anchor_wash",
+          "interaction": "wash_dishes"
+        }
+      ],
+      "storage": null,
+      "tags": [
+        "fixture",
+        "kitchen",
+        "cleaning"
+      ]
+    },
+    "shower": {
+      "name": "Shower",
+      "category": "fixture",
+      "model": null,
+      "footprint": [
+        {
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "dx": 1,
+          "dy": 0
+        }
+      ],
+      "anchors": [
+        {
+          "name": "anchor_shower",
+          "interaction": "shower"
+        }
+      ],
+      "storage": null,
+      "tags": [
+        "fixture",
+        "bathroom",
+        "hygiene"
+      ]
+    },
+    "bathtub": {
+      "name": "Bathtub",
+      "category": "fixture",
+      "model": null,
+      "footprint": [
+        {
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "dx": 1,
+          "dy": 0
+        },
+        {
+          "dx": 0,
+          "dy": 1
+        },
+        {
+          "dx": 1,
+          "dy": 1
+        }
+      ],
+      "anchors": [
+        {
+          "name": "anchor_bathe",
+          "interaction": "bathe"
+        }
+      ],
+      "storage": null,
+      "tags": [
+        "fixture",
+        "bathroom",
+        "hygiene"
+      ]
+    },
+    "bathroom_cabinet": {
+      "name": "Bathroom Cabinet",
+      "category": "furniture",
+      "model": null,
+      "footprint": [
+        {
+          "dx": 0,
+          "dy": 0
+        }
+      ],
+      "anchors": [],
+      "storage": {
+        "slots": 10,
+        "accepted_categories": [
+          "hygiene",
+          "medicine"
+        ]
+      },
+      "tags": [
+        "furniture",
+        "bathroom",
+        "storage"
+      ]
+    },
+    "bathroom_sink": {
+      "name": "Bathroom Sink",
+      "category": "fixture",
+      "model": null,
+      "footprint": [
+        {
+          "dx": 0,
+          "dy": 0
+        }
+      ],
+      "anchors": [
+        {
+          "name": "anchor_wash",
+          "interaction": "wash_hands"
+        },
+        {
+          "name": "anchor_brush",
+          "interaction": "brush_teeth"
+        }
+      ],
+      "storage": null,
+      "tags": [
+        "fixture",
+        "bathroom",
+        "hygiene"
+      ]
+    },
+    "towel_rail": {
+      "name": "Towel Rail",
+      "category": "fixture",
+      "model": null,
+      "footprint": [
+        {
+          "dx": 0,
+          "dy": 0
+        }
+      ],
+      "anchors": [],
+      "storage": {
+        "slots": 4,
+        "accepted_categories": [
+          "hygiene"
+        ]
+      },
+      "tags": [
+        "fixture",
+        "bathroom",
+        "storage"
+      ]
+    },
+    "bath_mat": {
+      "name": "Bath Mat",
+      "category": "decor",
+      "model": null,
+      "footprint": [
+        {
+          "dx": 0,
+          "dy": 0
+        }
+      ],
+      "anchors": [],
+      "storage": null,
+      "tags": [
+        "decor",
+        "bathroom"
+      ]
+    },
+    "washing_machine": {
+      "name": "Washing Machine",
+      "category": "appliance",
+      "model": null,
+      "footprint": [
+        {
+          "dx": 0,
+          "dy": 0
+        }
+      ],
+      "anchors": [
+        {
+          "name": "anchor_load",
+          "interaction": "do_laundry"
+        }
+      ],
+      "storage": {
+        "slots": 8,
+        "accepted_categories": [
+          "clothing",
+          "linen"
+        ]
+      },
+      "tags": [
+        "appliance",
+        "laundry"
+      ]
+    },
+    "dryer": {
+      "name": "Dryer",
+      "category": "appliance",
+      "model": null,
+      "footprint": [
+        {
+          "dx": 0,
+          "dy": 0
+        }
+      ],
+      "anchors": [
+        {
+          "name": "anchor_load",
+          "interaction": "dry_laundry"
+        }
+      ],
+      "storage": {
+        "slots": 8,
+        "accepted_categories": [
+          "clothing",
+          "linen"
+        ]
+      },
+      "tags": [
+        "appliance",
+        "laundry"
+      ]
+    },
+    "laundry_basket": {
+      "name": "Laundry Basket",
+      "category": "misc",
+      "model": null,
+      "footprint": [
+        {
+          "dx": 0,
+          "dy": 0
+        }
+      ],
+      "anchors": [],
+      "storage": {
+        "slots": 12,
+        "accepted_categories": [
+          "clothing",
+          "linen"
+        ]
+      },
+      "tags": [
+        "misc",
+        "laundry",
+        "storage"
+      ]
+    },
+    "ironing_board": {
+      "name": "Ironing Board",
+      "category": "misc",
+      "model": null,
+      "footprint": [
+        {
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "dx": 1,
+          "dy": 0
+        }
+      ],
+      "anchors": [
+        {
+          "name": "anchor_iron",
+          "interaction": "iron_clothes"
+        }
+      ],
+      "storage": null,
+      "tags": [
+        "misc",
+        "laundry"
+      ]
+    },
+    "floor_lamp": {
+      "name": "Floor Lamp",
+      "category": "lighting",
+      "model": null,
+      "footprint": [
+        {
+          "dx": 0,
+          "dy": 0
+        }
+      ],
+      "anchors": [],
+      "storage": null,
+      "tags": [
+        "lighting",
+        "decor"
+      ]
+    },
+    "desk_lamp": {
+      "name": "Desk Lamp",
+      "category": "lighting",
+      "model": null,
+      "footprint": [
+        {
+          "dx": 0,
+          "dy": 0
+        }
+      ],
+      "anchors": [],
+      "storage": null,
+      "tags": [
+        "lighting",
+        "decor",
+        "desk"
+      ]
+    },
+    "ceiling_light": {
+      "name": "Ceiling Light",
+      "category": "lighting",
+      "model": null,
+      "footprint": [
+        {
+          "dx": 0,
+          "dy": 0
+        }
+      ],
+      "anchors": [],
+      "storage": null,
+      "tags": [
+        "lighting"
+      ]
+    },
+    "trash_can": {
+      "name": "Trash Can",
+      "category": "misc",
+      "model": null,
+      "footprint": [
+        {
+          "dx": 0,
+          "dy": 0
+        }
+      ],
+      "anchors": [],
+      "storage": {
+        "slots": 6,
+        "accepted_categories": []
+      },
+      "tags": [
+        "misc",
+        "cleaning",
+        "storage"
+      ]
+    },
+    "storage_box": {
+      "name": "Storage Box",
+      "category": "misc",
+      "model": null,
+      "footprint": [
+        {
+          "dx": 0,
+          "dy": 0
+        }
+      ],
+      "anchors": [],
+      "storage": {
+        "slots": 10,
+        "accepted_categories": []
+      },
+      "tags": [
+        "misc",
+        "storage"
+      ]
+    },
+    "bbq_grill": {
+      "name": "BBQ Grill",
+      "category": "outdoor",
+      "model": null,
+      "footprint": [
+        {
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "dx": 1,
+          "dy": 0
+        }
+      ],
+      "anchors": [
+        {
+          "name": "anchor_grill",
+          "interaction": "grill_food"
+        }
+      ],
+      "storage": null,
+      "tags": [
+        "outdoor",
+        "cooking",
+        "appliance"
+      ]
+    },
+    "outdoor_table": {
+      "name": "Outdoor Table",
+      "category": "outdoor",
+      "model": null,
+      "footprint": [
+        {
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "dx": 1,
+          "dy": 0
+        }
+      ],
+      "anchors": [],
+      "storage": null,
+      "tags": [
+        "outdoor",
+        "furniture",
+        "table"
+      ]
+    },
+    "outdoor_chair": {
+      "name": "Outdoor Chair",
+      "category": "outdoor",
+      "model": null,
+      "footprint": [
+        {
+          "dx": 0,
+          "dy": 0
+        }
+      ],
+      "anchors": [
+        {
+          "name": "anchor_sit",
+          "interaction": "sit"
+        }
+      ],
+      "storage": null,
+      "tags": [
+        "outdoor",
+        "furniture",
+        "seating"
+      ]
+    },
+    "garden_shed": {
+      "name": "Garden Shed",
+      "category": "outdoor",
+      "model": null,
+      "footprint": [
+        {
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "dx": 1,
+          "dy": 0
+        },
+        {
+          "dx": 0,
+          "dy": 1
+        },
+        {
+          "dx": 1,
+          "dy": 1
+        }
+      ],
+      "anchors": [],
+      "storage": {
+        "slots": 30,
+        "accepted_categories": [
+          "tools",
+          "outdoor_gear",
+          "sports_equipment"
+        ]
+      },
+      "tags": [
+        "outdoor",
+        "storage",
+        "building"
+      ]
+    },
+    "mailbox": {
+      "name": "Mailbox",
+      "category": "outdoor",
+      "model": null,
+      "footprint": [
+        {
+          "dx": 0,
+          "dy": 0
+        }
+      ],
+      "anchors": [
+        {
+          "name": "anchor_check",
+          "interaction": "check_mail"
+        }
+      ],
+      "storage": {
+        "slots": 5,
+        "accepted_categories": [
+          "documents"
+        ]
+      },
+      "tags": [
+        "outdoor",
+        "mail"
+      ]
+    },
+    "piano": {
+      "name": "Piano",
+      "category": "music",
+      "model": null,
+      "footprint": [
+        {
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "dx": 1,
+          "dy": 0
+        },
+        {
+          "dx": 2,
+          "dy": 0
+        }
+      ],
+      "anchors": [
+        {
+          "name": "anchor_play",
+          "interaction": "play_piano"
+        }
+      ],
+      "storage": null,
+      "tags": [
+        "music",
+        "instrument",
+        "furniture"
+      ]
+    },
+    "keyboard": {
+      "name": "Keyboard",
+      "category": "music",
+      "model": null,
+      "footprint": [
+        {
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "dx": 1,
+          "dy": 0
+        }
+      ],
+      "anchors": [
+        {
+          "name": "anchor_play",
+          "interaction": "play_keyboard"
+        }
+      ],
+      "storage": null,
+      "tags": [
+        "music",
+        "instrument"
+      ]
+    },
+    "drum_kit": {
+      "name": "Drum Kit",
+      "category": "music",
+      "model": null,
+      "footprint": [
+        {
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "dx": 1,
+          "dy": 0
+        },
+        {
+          "dx": 0,
+          "dy": 1
+        },
+        {
+          "dx": 1,
+          "dy": 1
+        }
+      ],
+      "anchors": [
+        {
+          "name": "anchor_play",
+          "interaction": "play_drums"
+        }
+      ],
+      "storage": null,
+      "tags": [
+        "music",
+        "instrument"
+      ]
+    },
+    "karaoke_machine": {
+      "name": "Karaoke Machine",
+      "category": "appliance",
+      "model": null,
+      "footprint": [
+        {
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "dx": 1,
+          "dy": 0
+        }
+      ],
+      "anchors": [
+        {
+          "name": "anchor_sing",
+          "interaction": "sing_karaoke"
+        }
+      ],
+      "storage": null,
+      "tags": [
+        "music",
+        "entertainment",
+        "appliance"
+      ]
+    },
+    "gaming_setup": {
+      "name": "Gaming Setup",
+      "category": "furniture",
+      "model": null,
+      "footprint": [
+        {
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "dx": 1,
+          "dy": 0
+        },
+        {
+          "dx": 2,
+          "dy": 0
+        }
+      ],
+      "anchors": [
+        {
+          "name": "anchor_game",
+          "interaction": "play_games"
+        }
+      ],
+      "storage": {
+        "slots": 6,
+        "accepted_categories": [
+          "electronics",
+          "games"
+        ]
+      },
+      "tags": [
+        "gaming",
+        "furniture",
+        "desk"
+      ]
+    },
+    "computer": {
+      "name": "Desktop Computer",
+      "category": "appliance",
+      "model": null,
+      "footprint": [
+        {
+          "dx": 0,
+          "dy": 0
+        }
+      ],
+      "anchors": [
+        {
+          "name": "anchor_use",
+          "interaction": "use_computer"
+        }
+      ],
+      "storage": null,
+      "tags": [
+        "electronics",
+        "computer"
+      ]
+    },
+    "gaming_console": {
+      "name": "Gaming Console",
+      "category": "appliance",
+      "model": null,
+      "footprint": [
+        {
+          "dx": 0,
+          "dy": 0
+        }
+      ],
+      "anchors": [
+        {
+          "name": "anchor_use",
+          "interaction": "play_games"
+        }
+      ],
+      "storage": null,
+      "tags": [
+        "electronics",
+        "gaming"
+      ]
+    },
+    "projector": {
+      "name": "Projector",
+      "category": "appliance",
+      "model": null,
+      "footprint": [
+        {
+          "dx": 0,
+          "dy": 0
+        }
+      ],
+      "anchors": [],
+      "storage": null,
+      "tags": [
+        "electronics",
+        "entertainment"
+      ]
+    },
+    "telescope_stand": {
+      "name": "Telescope Stand",
+      "category": "outdoor",
+      "model": null,
+      "footprint": [
+        {
+          "dx": 0,
+          "dy": 0
+        }
+      ],
+      "anchors": [
+        {
+          "name": "anchor_observe",
+          "interaction": "stargaze"
+        }
+      ],
+      "storage": null,
+      "tags": [
+        "outdoor",
+        "hobby",
+        "astronomy"
+      ]
+    },
+    "weights": {
+      "name": "Weight Rack",
+      "category": "fitness",
+      "model": null,
+      "footprint": [
+        {
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "dx": 1,
+          "dy": 0
+        }
+      ],
+      "anchors": [
+        {
+          "name": "anchor_lift",
+          "interaction": "lift_weights"
+        }
+      ],
+      "storage": {
+        "slots": 8,
+        "accepted_categories": [
+          "sports_equipment"
+        ]
+      },
+      "tags": [
+        "fitness",
+        "gym",
+        "equipment"
+      ]
+    },
+    "gym_equipment": {
+      "name": "Gym Equipment",
+      "category": "fitness",
+      "model": null,
+      "footprint": [
+        {
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "dx": 1,
+          "dy": 0
+        },
+        {
+          "dx": 0,
+          "dy": 1
+        },
+        {
+          "dx": 1,
+          "dy": 1
+        }
+      ],
+      "anchors": [
+        {
+          "name": "anchor_use",
+          "interaction": "exercise"
+        }
+      ],
+      "storage": null,
+      "tags": [
+        "fitness",
+        "gym",
+        "equipment"
+      ]
+    },
+    "yoga_area": {
+      "name": "Yoga Area",
+      "category": "fitness",
+      "model": null,
+      "footprint": [
+        {
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "dx": 1,
+          "dy": 0
+        }
+      ],
+      "anchors": [
+        {
+          "name": "anchor_yoga",
+          "interaction": "do_yoga"
+        }
+      ],
+      "storage": null,
+      "tags": [
+        "fitness",
+        "yoga",
+        "mat"
+      ]
+    },
+    "card_table": {
+      "name": "Card Table",
+      "category": "furniture",
+      "model": null,
+      "footprint": [
+        {
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "dx": 1,
+          "dy": 0
+        }
+      ],
+      "anchors": [
+        {
+          "name": "anchor_sit_1",
+          "interaction": "sit"
+        },
+        {
+          "name": "anchor_sit_2",
+          "interaction": "sit"
+        },
+        {
+          "name": "anchor_sit_3",
+          "interaction": "sit"
+        },
+        {
+          "name": "anchor_sit_4",
+          "interaction": "sit"
+        }
+      ],
+      "storage": null,
+      "tags": [
+        "furniture",
+        "games",
+        "gambling"
+      ]
+    },
+    "barbell": {
+      "name": "Barbell",
+      "category": "fitness",
+      "model": null,
+      "footprint": [
+        {
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "dx": 1,
+          "dy": 0
+        }
+      ],
+      "anchors": [
+        {
+          "name": "anchor_lift",
+          "interaction": "lift_weights"
+        }
+      ],
+      "storage": null,
+      "tags": [
+        "fitness",
+        "gym",
+        "weights"
+      ]
+    },
+    "music_room": {
+      "name": "Music Room Setup",
+      "category": "music",
+      "model": null,
+      "footprint": [
+        {
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "dx": 1,
+          "dy": 0
+        },
+        {
+          "dx": 0,
+          "dy": 1
+        },
+        {
+          "dx": 1,
+          "dy": 1
+        }
+      ],
+      "anchors": [],
+      "storage": {
+        "slots": 10,
+        "accepted_categories": [
+          "music_instrument"
+        ]
+      },
+      "tags": [
+        "music",
+        "room",
+        "instrument"
+      ]
     }
   },
   "item_templates": {
@@ -1226,6 +2993,1673 @@
       "placeable": true,
       "initial_states": {},
       "charges_per_tick": 0.8
+    },
+    "brush": {
+      "name": "Brush",
+      "category": "art_supplies",
+      "size": 1,
+      "base_price": 15.0,
+      "stackable": true,
+      "max_stack": 12,
+      "consumable": false
+    },
+    "canvas": {
+      "name": "Canvas",
+      "category": "art_supplies",
+      "size": 2,
+      "base_price": 12.0,
+      "stackable": true,
+      "max_stack": 10,
+      "consumable": true,
+      "uses": 1
+    },
+    "paint_set": {
+      "name": "Paint Set",
+      "category": "art_supplies",
+      "size": 2,
+      "base_price": 40.0,
+      "stackable": false,
+      "consumable": true,
+      "uses": 30
+    },
+    "spray_paint": {
+      "name": "Spray Paint",
+      "category": "art_supplies",
+      "size": 1,
+      "base_price": 8.0,
+      "stackable": true,
+      "max_stack": 12,
+      "consumable": true,
+      "uses": 1
+    },
+    "stencils": {
+      "name": "Stencils",
+      "category": "art_supplies",
+      "size": 1,
+      "base_price": 12.0,
+      "stackable": true,
+      "max_stack": 10,
+      "consumable": false
+    },
+    "markers": {
+      "name": "Markers",
+      "category": "art_supplies",
+      "size": 1,
+      "base_price": 10.0,
+      "stackable": true,
+      "max_stack": 6,
+      "consumable": true,
+      "uses": 50
+    },
+    "whiteboard": {
+      "name": "Whiteboard",
+      "category": "art_supplies",
+      "size": 3,
+      "base_price": 40.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "guitar": {
+      "name": "Guitar",
+      "category": "music_instrument",
+      "size": 3,
+      "base_price": 300.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "guitar_pick": {
+      "name": "Guitar Pick",
+      "category": "music_instrument",
+      "size": 1,
+      "base_price": 5.0,
+      "stackable": true,
+      "max_stack": 20,
+      "consumable": true,
+      "uses": 10
+    },
+    "bass_guitar": {
+      "name": "Bass Guitar",
+      "category": "music_instrument",
+      "size": 3,
+      "base_price": 400.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "drumsticks": {
+      "name": "Drumsticks",
+      "category": "music_instrument",
+      "size": 1,
+      "base_price": 15.0,
+      "stackable": true,
+      "max_stack": 6,
+      "consumable": true,
+      "uses": 200
+    },
+    "violin": {
+      "name": "Violin",
+      "category": "music_instrument",
+      "size": 3,
+      "base_price": 500.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "bow": {
+      "name": "Archery Bow",
+      "category": "sports_equipment",
+      "size": 3,
+      "base_price": 150.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "rosin": {
+      "name": "Rosin",
+      "category": "music_instrument",
+      "size": 1,
+      "base_price": 10.0,
+      "stackable": true,
+      "max_stack": 4,
+      "consumable": true,
+      "uses": 100
+    },
+    "microphone": {
+      "name": "Microphone",
+      "category": "electronics",
+      "size": 1,
+      "base_price": 80.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "headphones": {
+      "name": "Headphones",
+      "category": "electronics",
+      "size": 1,
+      "base_price": 80.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "hiking_boots": {
+      "name": "Hiking Boots",
+      "category": "clothing",
+      "size": 2,
+      "base_price": 120.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "water_bottle": {
+      "name": "Water Bottle",
+      "category": "misc",
+      "size": 1,
+      "base_price": 20.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "tent": {
+      "name": "Tent",
+      "category": "outdoor_gear",
+      "size": 3,
+      "base_price": 150.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "sleeping_bag": {
+      "name": "Sleeping Bag",
+      "category": "outdoor_gear",
+      "size": 3,
+      "base_price": 80.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "camping_stove": {
+      "name": "Camping Stove",
+      "category": "outdoor_gear",
+      "size": 2,
+      "base_price": 60.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "camp_equipment": {
+      "name": "Camp Equipment",
+      "category": "outdoor_gear",
+      "size": 3,
+      "base_price": 100.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "fishing_rod": {
+      "name": "Fishing Rod",
+      "category": "sports_equipment",
+      "size": 3,
+      "base_price": 80.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "tackle": {
+      "name": "Fishing Tackle",
+      "category": "sports_equipment",
+      "size": 2,
+      "base_price": 40.0,
+      "stackable": false,
+      "consumable": true,
+      "uses": 20
+    },
+    "fishing_license": {
+      "name": "Fishing License",
+      "category": "documents",
+      "size": 1,
+      "base_price": 30.0,
+      "stackable": false,
+      "consumable": true,
+      "uses": 1
+    },
+    "rifle": {
+      "name": "Rifle",
+      "category": "sports_equipment",
+      "size": 4,
+      "base_price": 800.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "ammunition": {
+      "name": "Ammunition",
+      "category": "sports_equipment",
+      "size": 1,
+      "base_price": 25.0,
+      "stackable": true,
+      "max_stack": 10,
+      "consumable": true,
+      "uses": 50
+    },
+    "hunting_license": {
+      "name": "Hunting License",
+      "category": "documents",
+      "size": 1,
+      "base_price": 50.0,
+      "stackable": false,
+      "consumable": true,
+      "uses": 1
+    },
+    "hunting_gear": {
+      "name": "Hunting Gear",
+      "category": "outdoor_gear",
+      "size": 3,
+      "base_price": 150.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "camera": {
+      "name": "Camera",
+      "category": "electronics",
+      "size": 2,
+      "base_price": 500.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "memory_card": {
+      "name": "Memory Card",
+      "category": "electronics",
+      "size": 1,
+      "base_price": 20.0,
+      "stackable": true,
+      "max_stack": 6,
+      "consumable": false
+    },
+    "telephoto_lens": {
+      "name": "Telephoto Lens",
+      "category": "electronics",
+      "size": 2,
+      "base_price": 400.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "binoculars": {
+      "name": "Binoculars",
+      "category": "outdoor_gear",
+      "size": 2,
+      "base_price": 80.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "telescope": {
+      "name": "Telescope",
+      "category": "outdoor_gear",
+      "size": 3,
+      "base_price": 200.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "star_map": {
+      "name": "Star Map",
+      "category": "books_media",
+      "size": 1,
+      "base_price": 15.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "gardening_tools": {
+      "name": "Gardening Tools",
+      "category": "tools",
+      "size": 3,
+      "base_price": 50.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "seeds": {
+      "name": "Seeds",
+      "category": "outdoor_gear",
+      "size": 1,
+      "base_price": 5.0,
+      "stackable": true,
+      "max_stack": 20,
+      "consumable": true,
+      "uses": 1
+    },
+    "gloves": {
+      "name": "Gloves",
+      "category": "clothing",
+      "size": 1,
+      "base_price": 20.0,
+      "stackable": true,
+      "max_stack": 4,
+      "consumable": false
+    },
+    "climbing_gear": {
+      "name": "Climbing Gear",
+      "category": "outdoor_gear",
+      "size": 3,
+      "base_price": 200.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "harness": {
+      "name": "Climbing Harness",
+      "category": "outdoor_gear",
+      "size": 2,
+      "base_price": 100.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "helmet": {
+      "name": "Helmet",
+      "category": "sports_equipment",
+      "size": 2,
+      "base_price": 50.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "rope": {
+      "name": "Rope",
+      "category": "outdoor_gear",
+      "size": 3,
+      "base_price": 80.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "carabiners": {
+      "name": "Carabiners",
+      "category": "outdoor_gear",
+      "size": 1,
+      "base_price": 20.0,
+      "stackable": true,
+      "max_stack": 10,
+      "consumable": false
+    },
+    "tripod": {
+      "name": "Tripod",
+      "category": "electronics",
+      "size": 3,
+      "base_price": 80.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "boxing_gloves": {
+      "name": "Boxing Gloves",
+      "category": "sports_equipment",
+      "size": 2,
+      "base_price": 50.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "hand_wraps": {
+      "name": "Hand Wraps",
+      "category": "sports_equipment",
+      "size": 1,
+      "base_price": 15.0,
+      "stackable": true,
+      "max_stack": 4,
+      "consumable": false
+    },
+    "headguard": {
+      "name": "Head Guard",
+      "category": "sports_equipment",
+      "size": 2,
+      "base_price": 40.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "mouthguard": {
+      "name": "Mouthguard",
+      "category": "sports_equipment",
+      "size": 1,
+      "base_price": 10.0,
+      "stackable": true,
+      "max_stack": 4,
+      "consumable": false
+    },
+    "gi": {
+      "name": "Gi (Martial Arts Uniform)",
+      "category": "clothing",
+      "size": 2,
+      "base_price": 60.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "belt": {
+      "name": "Martial Arts Belt",
+      "category": "clothing",
+      "size": 1,
+      "base_price": 15.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "foil": {
+      "name": "Fencing Foil",
+      "category": "sports_equipment",
+      "size": 3,
+      "base_price": 100.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "fencing_mask": {
+      "name": "Fencing Mask",
+      "category": "sports_equipment",
+      "size": 2,
+      "base_price": 80.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "jacket": {
+      "name": "Fencing Jacket",
+      "category": "sports_equipment",
+      "size": 2,
+      "base_price": 80.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "arrows": {
+      "name": "Arrows",
+      "category": "sports_equipment",
+      "size": 2,
+      "base_price": 40.0,
+      "stackable": true,
+      "max_stack": 3,
+      "consumable": false
+    },
+    "arm_guard": {
+      "name": "Arm Guard",
+      "category": "sports_equipment",
+      "size": 1,
+      "base_price": 20.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "quiver": {
+      "name": "Quiver",
+      "category": "sports_equipment",
+      "size": 2,
+      "base_price": 40.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "snowboard": {
+      "name": "Snowboard",
+      "category": "sports_equipment",
+      "size": 4,
+      "base_price": 400.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "boots": {
+      "name": "Snowboard Boots",
+      "category": "clothing",
+      "size": 2,
+      "base_price": 200.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "goggles": {
+      "name": "Goggles",
+      "category": "sports_equipment",
+      "size": 1,
+      "base_price": 30.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "snow_jacket": {
+      "name": "Snow Jacket",
+      "category": "clothing",
+      "size": 2,
+      "base_price": 200.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "surfboard": {
+      "name": "Surfboard",
+      "category": "sports_equipment",
+      "size": 4,
+      "base_price": 400.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "wetsuit": {
+      "name": "Wetsuit",
+      "category": "clothing",
+      "size": 2,
+      "base_price": 150.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "surf_wax": {
+      "name": "Surf Wax",
+      "category": "sports_equipment",
+      "size": 1,
+      "base_price": 5.0,
+      "stackable": true,
+      "max_stack": 10,
+      "consumable": true,
+      "uses": 3
+    },
+    "leash": {
+      "name": "Surfboard Leash",
+      "category": "sports_equipment",
+      "size": 1,
+      "base_price": 20.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "firearm": {
+      "name": "Firearm",
+      "category": "sports_equipment",
+      "size": 3,
+      "base_price": 600.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "ear_protection": {
+      "name": "Ear Protection",
+      "category": "sports_equipment",
+      "size": 1,
+      "base_price": 20.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "eye_protection": {
+      "name": "Eye Protection",
+      "category": "sports_equipment",
+      "size": 1,
+      "base_price": 15.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "bowling_ball": {
+      "name": "Bowling Ball",
+      "category": "sports_equipment",
+      "size": 2,
+      "base_price": 80.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "bowling_shoes": {
+      "name": "Bowling Shoes",
+      "category": "clothing",
+      "size": 2,
+      "base_price": 30.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "football": {
+      "name": "Football",
+      "category": "sports_equipment",
+      "size": 2,
+      "base_price": 25.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "cleats": {
+      "name": "Cleats",
+      "category": "clothing",
+      "size": 2,
+      "base_price": 60.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "shin_guards": {
+      "name": "Shin Guards",
+      "category": "sports_equipment",
+      "size": 1,
+      "base_price": 20.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "socks": {
+      "name": "Sports Socks",
+      "category": "clothing",
+      "size": 1,
+      "base_price": 10.0,
+      "stackable": true,
+      "max_stack": 8,
+      "consumable": false
+    },
+    "pads": {
+      "name": "Protective Pads",
+      "category": "sports_equipment",
+      "size": 3,
+      "base_price": 80.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "baseball": {
+      "name": "Baseball",
+      "category": "sports_equipment",
+      "size": 1,
+      "base_price": 10.0,
+      "stackable": true,
+      "max_stack": 6,
+      "consumable": false
+    },
+    "bat": {
+      "name": "Baseball Bat",
+      "category": "sports_equipment",
+      "size": 3,
+      "base_price": 50.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "glove": {
+      "name": "Baseball Glove",
+      "category": "sports_equipment",
+      "size": 1,
+      "base_price": 40.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "basketball": {
+      "name": "Basketball",
+      "category": "sports_equipment",
+      "size": 2,
+      "base_price": 30.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "basketball_shoes": {
+      "name": "Basketball Shoes",
+      "category": "clothing",
+      "size": 2,
+      "base_price": 80.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "volleyball": {
+      "name": "Volleyball",
+      "category": "sports_equipment",
+      "size": 2,
+      "base_price": 25.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "knee_pads": {
+      "name": "Knee Pads",
+      "category": "sports_equipment",
+      "size": 1,
+      "base_price": 25.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "tennis_racket": {
+      "name": "Tennis Racket",
+      "category": "sports_equipment",
+      "size": 3,
+      "base_price": 80.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "tennis_balls": {
+      "name": "Tennis Balls",
+      "category": "sports_equipment",
+      "size": 1,
+      "base_price": 10.0,
+      "stackable": true,
+      "max_stack": 4,
+      "consumable": true,
+      "uses": 20
+    },
+    "tennis_shoes": {
+      "name": "Tennis Shoes",
+      "category": "clothing",
+      "size": 2,
+      "base_price": 80.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "golf_clubs": {
+      "name": "Golf Clubs",
+      "category": "sports_equipment",
+      "size": 4,
+      "base_price": 400.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "golf_balls": {
+      "name": "Golf Balls",
+      "category": "sports_equipment",
+      "size": 1,
+      "base_price": 20.0,
+      "stackable": true,
+      "max_stack": 4,
+      "consumable": true,
+      "uses": 10
+    },
+    "golf_glove": {
+      "name": "Golf Glove",
+      "category": "clothing",
+      "size": 1,
+      "base_price": 20.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "tees": {
+      "name": "Golf Tees",
+      "category": "sports_equipment",
+      "size": 1,
+      "base_price": 5.0,
+      "stackable": true,
+      "max_stack": 4,
+      "consumable": true,
+      "uses": 20
+    },
+    "hockey_stick": {
+      "name": "Hockey Stick",
+      "category": "sports_equipment",
+      "size": 3,
+      "base_price": 80.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "skates": {
+      "name": "Ice Skates",
+      "category": "sports_equipment",
+      "size": 2,
+      "base_price": 150.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "puck": {
+      "name": "Hockey Puck",
+      "category": "sports_equipment",
+      "size": 1,
+      "base_price": 5.0,
+      "stackable": true,
+      "max_stack": 10,
+      "consumable": false
+    },
+    "bicycle": {
+      "name": "Bicycle",
+      "category": "sports_equipment",
+      "size": 4,
+      "base_price": 500.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "swimwear": {
+      "name": "Swimwear",
+      "category": "clothing",
+      "size": 2,
+      "base_price": 40.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "swim_cap": {
+      "name": "Swim Cap",
+      "category": "clothing",
+      "size": 1,
+      "base_price": 10.0,
+      "stackable": true,
+      "max_stack": 4,
+      "consumable": false
+    },
+    "running_shoes": {
+      "name": "Running Shoes",
+      "category": "clothing",
+      "size": 2,
+      "base_price": 100.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "gym_shoes": {
+      "name": "Gym Shoes",
+      "category": "clothing",
+      "size": 2,
+      "base_price": 70.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "yoga_mat": {
+      "name": "Yoga Mat",
+      "category": "sports_equipment",
+      "size": 2,
+      "base_price": 30.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "board_game": {
+      "name": "Board Game",
+      "category": "games",
+      "size": 2,
+      "base_price": 30.0,
+      "stackable": true,
+      "max_stack": 6,
+      "consumable": false
+    },
+    "playing_cards": {
+      "name": "Playing Cards",
+      "category": "games",
+      "size": 1,
+      "base_price": 5.0,
+      "stackable": true,
+      "max_stack": 6,
+      "consumable": false
+    },
+    "poker_chips": {
+      "name": "Poker Chips",
+      "category": "games",
+      "size": 2,
+      "base_price": 40.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "pictionary_set": {
+      "name": "Pictionary Set",
+      "category": "games",
+      "size": 2,
+      "base_price": 25.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "quiz_cards": {
+      "name": "Quiz Cards",
+      "category": "games",
+      "size": 2,
+      "base_price": 20.0,
+      "stackable": true,
+      "max_stack": 4,
+      "consumable": false
+    },
+    "gaming_headset": {
+      "name": "Gaming Headset",
+      "category": "electronics",
+      "size": 2,
+      "base_price": 80.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "gaming_keyboard": {
+      "name": "Gaming Keyboard",
+      "category": "electronics",
+      "size": 2,
+      "base_price": 100.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "gaming_mouse": {
+      "name": "Gaming Mouse",
+      "category": "electronics",
+      "size": 1,
+      "base_price": 60.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "card_binder": {
+      "name": "Card Binder",
+      "category": "hobby_supplies",
+      "size": 1,
+      "base_price": 15.0,
+      "stackable": true,
+      "max_stack": 6,
+      "consumable": false
+    },
+    "card_sleeves": {
+      "name": "Card Sleeves",
+      "category": "hobby_supplies",
+      "size": 1,
+      "base_price": 5.0,
+      "stackable": true,
+      "max_stack": 20,
+      "consumable": true,
+      "uses": 100
+    },
+    "coin_album": {
+      "name": "Coin Album",
+      "category": "hobby_supplies",
+      "size": 2,
+      "base_price": 20.0,
+      "stackable": true,
+      "max_stack": 4,
+      "consumable": false
+    },
+    "stamp_album": {
+      "name": "Stamp Album",
+      "category": "hobby_supplies",
+      "size": 2,
+      "base_price": 25.0,
+      "stackable": true,
+      "max_stack": 4,
+      "consumable": false
+    },
+    "comic_storage_box": {
+      "name": "Comic Storage Box",
+      "category": "hobby_supplies",
+      "size": 3,
+      "base_price": 20.0,
+      "stackable": true,
+      "max_stack": 4,
+      "consumable": false
+    },
+    "display_case": {
+      "name": "Display Case",
+      "category": "hobby_supplies",
+      "size": 2,
+      "base_price": 40.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "storage_shelf": {
+      "name": "Storage Shelf",
+      "category": "hobby_supplies",
+      "size": 3,
+      "base_price": 60.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "record_sleeve": {
+      "name": "Record Sleeve",
+      "category": "hobby_supplies",
+      "size": 1,
+      "base_price": 10.0,
+      "stackable": true,
+      "max_stack": 20,
+      "consumable": false
+    },
+    "record_cleaner": {
+      "name": "Record Cleaner",
+      "category": "hobby_supplies",
+      "size": 1,
+      "base_price": 30.0,
+      "stackable": false,
+      "consumable": true,
+      "uses": 50
+    },
+    "track_sections": {
+      "name": "Model Train Track",
+      "category": "hobby_supplies",
+      "size": 2,
+      "base_price": 20.0,
+      "stackable": true,
+      "max_stack": 10,
+      "consumable": false
+    },
+    "model_buildings": {
+      "name": "Model Buildings",
+      "category": "hobby_supplies",
+      "size": 2,
+      "base_price": 30.0,
+      "stackable": true,
+      "max_stack": 8,
+      "consumable": false
+    },
+    "magnifying_glass": {
+      "name": "Magnifying Glass",
+      "category": "tools",
+      "size": 1,
+      "base_price": 15.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "tweezers": {
+      "name": "Tweezers",
+      "category": "tools",
+      "size": 1,
+      "base_price": 10.0,
+      "stackable": true,
+      "max_stack": 4,
+      "consumable": false
+    },
+    "period_costume": {
+      "name": "Period Costume",
+      "category": "clothing",
+      "size": 3,
+      "base_price": 200.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "period_weapon": {
+      "name": "Period Weapon (Replica)",
+      "category": "hobby_supplies",
+      "size": 3,
+      "base_price": 150.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "trowel": {
+      "name": "Trowel",
+      "category": "tools",
+      "size": 1,
+      "base_price": 20.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "sieve": {
+      "name": "Sieve",
+      "category": "tools",
+      "size": 2,
+      "base_price": 30.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "measuring_tape": {
+      "name": "Measuring Tape",
+      "category": "tools",
+      "size": 1,
+      "base_price": 10.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "field_notebook": {
+      "name": "Field Notebook",
+      "category": "office_supplies",
+      "size": 1,
+      "base_price": 10.0,
+      "stackable": true,
+      "max_stack": 10,
+      "consumable": true,
+      "uses": 1
+    },
+    "notebook": {
+      "name": "Notebook",
+      "category": "office_supplies",
+      "size": 1,
+      "base_price": 5.0,
+      "stackable": true,
+      "max_stack": 10,
+      "consumable": true,
+      "uses": 1
+    },
+    "reference_books": {
+      "name": "Reference Books",
+      "category": "books_media",
+      "size": 2,
+      "base_price": 30.0,
+      "stackable": true,
+      "max_stack": 6,
+      "consumable": false
+    },
+    "pot": {
+      "name": "Pot",
+      "category": "kitchenware",
+      "size": 2,
+      "base_price": 30.0,
+      "stackable": true,
+      "max_stack": 4,
+      "consumable": false
+    },
+    "pan": {
+      "name": "Frying Pan",
+      "category": "kitchenware",
+      "size": 2,
+      "base_price": 25.0,
+      "stackable": true,
+      "max_stack": 4,
+      "consumable": false
+    },
+    "cutting_board": {
+      "name": "Cutting Board",
+      "category": "kitchenware",
+      "size": 2,
+      "base_price": 20.0,
+      "stackable": true,
+      "max_stack": 3,
+      "consumable": false
+    },
+    "knife": {
+      "name": "Kitchen Knife",
+      "category": "kitchenware",
+      "size": 1,
+      "base_price": 30.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "spatula": {
+      "name": "Spatula",
+      "category": "kitchenware",
+      "size": 1,
+      "base_price": 8.0,
+      "stackable": true,
+      "max_stack": 4,
+      "consumable": false
+    },
+    "wooden_spoon": {
+      "name": "Wooden Spoon",
+      "category": "kitchenware",
+      "size": 1,
+      "base_price": 5.0,
+      "stackable": true,
+      "max_stack": 4,
+      "consumable": false
+    },
+    "colander": {
+      "name": "Colander",
+      "category": "kitchenware",
+      "size": 2,
+      "base_price": 20.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "mixing_bowl": {
+      "name": "Mixing Bowl",
+      "category": "kitchenware",
+      "size": 2,
+      "base_price": 15.0,
+      "stackable": true,
+      "max_stack": 3,
+      "consumable": false
+    },
+    "baking_tray": {
+      "name": "Baking Tray",
+      "category": "kitchenware",
+      "size": 2,
+      "base_price": 20.0,
+      "stackable": true,
+      "max_stack": 4,
+      "consumable": false
+    },
+    "oven_mitt": {
+      "name": "Oven Mitt",
+      "category": "kitchenware",
+      "size": 1,
+      "base_price": 10.0,
+      "stackable": true,
+      "max_stack": 4,
+      "consumable": false
+    },
+    "can_opener": {
+      "name": "Can Opener",
+      "category": "kitchenware",
+      "size": 1,
+      "base_price": 10.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "peeler": {
+      "name": "Vegetable Peeler",
+      "category": "kitchenware",
+      "size": 1,
+      "base_price": 5.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "grater": {
+      "name": "Grater",
+      "category": "kitchenware",
+      "size": 1,
+      "base_price": 10.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "kettle": {
+      "name": "Kettle",
+      "category": "kitchenware",
+      "size": 2,
+      "base_price": 40.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "toaster": {
+      "name": "Toaster",
+      "category": "kitchenware",
+      "size": 2,
+      "base_price": 35.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "blender": {
+      "name": "Blender",
+      "category": "kitchenware",
+      "size": 2,
+      "base_price": 50.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "shampoo": {
+      "name": "Shampoo",
+      "category": "hygiene",
+      "size": 1,
+      "base_price": 8.0,
+      "stackable": true,
+      "max_stack": 4,
+      "consumable": true,
+      "uses": 30
+    },
+    "conditioner": {
+      "name": "Conditioner",
+      "category": "hygiene",
+      "size": 1,
+      "base_price": 8.0,
+      "stackable": true,
+      "max_stack": 4,
+      "consumable": true,
+      "uses": 30
+    },
+    "body_wash": {
+      "name": "Body Wash",
+      "category": "hygiene",
+      "size": 1,
+      "base_price": 6.0,
+      "stackable": true,
+      "max_stack": 4,
+      "consumable": true,
+      "uses": 30
+    },
+    "toothbrush": {
+      "name": "Toothbrush",
+      "category": "hygiene",
+      "size": 1,
+      "base_price": 3.0,
+      "stackable": true,
+      "max_stack": 6,
+      "consumable": true,
+      "uses": 90
+    },
+    "toothpaste": {
+      "name": "Toothpaste",
+      "category": "hygiene",
+      "size": 1,
+      "base_price": 4.0,
+      "stackable": true,
+      "max_stack": 4,
+      "consumable": true,
+      "uses": 60
+    },
+    "razor": {
+      "name": "Razor",
+      "category": "hygiene",
+      "size": 1,
+      "base_price": 5.0,
+      "stackable": true,
+      "max_stack": 6,
+      "consumable": true,
+      "uses": 10
+    },
+    "deodorant": {
+      "name": "Deodorant",
+      "category": "hygiene",
+      "size": 1,
+      "base_price": 4.0,
+      "stackable": true,
+      "max_stack": 4,
+      "consumable": true,
+      "uses": 60
+    },
+    "lotion": {
+      "name": "Body Lotion",
+      "category": "hygiene",
+      "size": 1,
+      "base_price": 6.0,
+      "stackable": true,
+      "max_stack": 4,
+      "consumable": true,
+      "uses": 40
+    },
+    "hair_dryer": {
+      "name": "Hair Dryer",
+      "category": "electronics",
+      "size": 1,
+      "base_price": 30.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "nail_clippers": {
+      "name": "Nail Clippers",
+      "category": "hygiene",
+      "size": 1,
+      "base_price": 5.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "hair_brush": {
+      "name": "Hair Brush",
+      "category": "hygiene",
+      "size": 1,
+      "base_price": 10.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "comb": {
+      "name": "Comb",
+      "category": "hygiene",
+      "size": 1,
+      "base_price": 5.0,
+      "stackable": true,
+      "max_stack": 4,
+      "consumable": false
+    },
+    "perfume": {
+      "name": "Perfume",
+      "category": "hygiene",
+      "size": 1,
+      "base_price": 50.0,
+      "stackable": true,
+      "max_stack": 3,
+      "consumable": true,
+      "uses": 100
+    },
+    "cotton_swabs": {
+      "name": "Cotton Swabs",
+      "category": "hygiene",
+      "size": 1,
+      "base_price": 3.0,
+      "stackable": true,
+      "max_stack": 6,
+      "consumable": true,
+      "uses": 100
+    },
+    "dental_floss": {
+      "name": "Dental Floss",
+      "category": "hygiene",
+      "size": 1,
+      "base_price": 3.0,
+      "stackable": true,
+      "max_stack": 4,
+      "consumable": true,
+      "uses": 60
+    },
+    "mop": {
+      "name": "Mop",
+      "category": "cleaning",
+      "size": 3,
+      "base_price": 25.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "broom": {
+      "name": "Broom",
+      "category": "cleaning",
+      "size": 3,
+      "base_price": 15.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "dustpan": {
+      "name": "Dustpan",
+      "category": "cleaning",
+      "size": 2,
+      "base_price": 8.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "sponge": {
+      "name": "Sponge",
+      "category": "cleaning",
+      "size": 1,
+      "base_price": 3.0,
+      "stackable": true,
+      "max_stack": 10,
+      "consumable": true,
+      "uses": 30
+    },
+    "dish_soap": {
+      "name": "Dish Soap",
+      "category": "cleaning",
+      "size": 1,
+      "base_price": 3.0,
+      "stackable": true,
+      "max_stack": 4,
+      "consumable": true,
+      "uses": 50
+    },
+    "laundry_detergent": {
+      "name": "Laundry Detergent",
+      "category": "cleaning",
+      "size": 2,
+      "base_price": 12.0,
+      "stackable": true,
+      "max_stack": 4,
+      "consumable": true,
+      "uses": 30
+    },
+    "trash_bag": {
+      "name": "Trash Bags",
+      "category": "cleaning",
+      "size": 1,
+      "base_price": 8.0,
+      "stackable": true,
+      "max_stack": 6,
+      "consumable": true,
+      "uses": 20
+    },
+    "rubber_gloves": {
+      "name": "Rubber Gloves",
+      "category": "cleaning",
+      "size": 1,
+      "base_price": 5.0,
+      "stackable": true,
+      "max_stack": 4,
+      "consumable": false
+    },
+    "duster": {
+      "name": "Duster",
+      "category": "cleaning",
+      "size": 2,
+      "base_price": 10.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "blanket": {
+      "name": "Blanket",
+      "category": "linen",
+      "size": 2,
+      "base_price": 30.0,
+      "stackable": true,
+      "max_stack": 4,
+      "consumable": false
+    },
+    "alarm_clock": {
+      "name": "Alarm Clock",
+      "category": "electronics",
+      "size": 1,
+      "base_price": 20.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "picture_frame": {
+      "name": "Picture Frame",
+      "category": "decor",
+      "size": 2,
+      "base_price": 15.0,
+      "stackable": true,
+      "max_stack": 6,
+      "consumable": false
+    },
+    "candle": {
+      "name": "Candle",
+      "category": "decor",
+      "size": 1,
+      "base_price": 10.0,
+      "stackable": true,
+      "max_stack": 8,
+      "consumable": true,
+      "uses": 20
+    },
+    "vase": {
+      "name": "Vase",
+      "category": "decor",
+      "size": 2,
+      "base_price": 20.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "pen": {
+      "name": "Pen",
+      "category": "office_supplies",
+      "size": 1,
+      "base_price": 2.0,
+      "stackable": true,
+      "max_stack": 20,
+      "consumable": true,
+      "uses": 1
+    },
+    "pencil": {
+      "name": "Pencil",
+      "category": "office_supplies",
+      "size": 1,
+      "base_price": 1.0,
+      "stackable": true,
+      "max_stack": 20,
+      "consumable": true,
+      "uses": 1
+    },
+    "scissors": {
+      "name": "Scissors",
+      "category": "office_supplies",
+      "size": 1,
+      "base_price": 8.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "stapler": {
+      "name": "Stapler",
+      "category": "office_supplies",
+      "size": 1,
+      "base_price": 10.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "tape": {
+      "name": "Tape",
+      "category": "office_supplies",
+      "size": 1,
+      "base_price": 3.0,
+      "stackable": true,
+      "max_stack": 6,
+      "consumable": true,
+      "uses": 1
+    },
+    "envelope": {
+      "name": "Envelope",
+      "category": "office_supplies",
+      "size": 1,
+      "base_price": 5.0,
+      "stackable": true,
+      "max_stack": 10,
+      "consumable": true,
+      "uses": 1
+    },
+    "folder": {
+      "name": "Folder",
+      "category": "office_supplies",
+      "size": 1,
+      "base_price": 2.0,
+      "stackable": true,
+      "max_stack": 20,
+      "consumable": false
+    },
+    "printer_paper": {
+      "name": "Printer Paper",
+      "category": "office_supplies",
+      "size": 2,
+      "base_price": 8.0,
+      "stackable": true,
+      "max_stack": 6,
+      "consumable": true,
+      "uses": 500
+    },
+    "eraser": {
+      "name": "Eraser",
+      "category": "office_supplies",
+      "size": 1,
+      "base_price": 1.0,
+      "stackable": true,
+      "max_stack": 10,
+      "consumable": true,
+      "uses": 50
+    },
+    "remote_control": {
+      "name": "Remote Control",
+      "category": "electronics",
+      "size": 1,
+      "base_price": 15.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "extension_cord": {
+      "name": "Extension Cord",
+      "category": "electronics",
+      "size": 1,
+      "base_price": 15.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "earbuds": {
+      "name": "Earbuds",
+      "category": "electronics",
+      "size": 1,
+      "base_price": 40.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "batteries": {
+      "name": "Batteries",
+      "category": "electronics",
+      "size": 1,
+      "base_price": 8.0,
+      "stackable": true,
+      "max_stack": 6,
+      "consumable": true,
+      "uses": 1
+    },
+    "usb_cable": {
+      "name": "USB Cable",
+      "category": "electronics",
+      "size": 1,
+      "base_price": 10.0,
+      "stackable": true,
+      "max_stack": 6,
+      "consumable": false
+    },
+    "umbrella": {
+      "name": "Umbrella",
+      "category": "misc",
+      "size": 2,
+      "base_price": 20.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "shopping_bag": {
+      "name": "Shopping Bag",
+      "category": "misc",
+      "size": 1,
+      "base_price": 2.0,
+      "stackable": true,
+      "max_stack": 10,
+      "consumable": false
+    },
+    "first_aid_kit": {
+      "name": "First Aid Kit",
+      "category": "misc",
+      "size": 2,
+      "base_price": 30.0,
+      "stackable": false,
+      "consumable": true,
+      "uses": 10
+    },
+    "matches": {
+      "name": "Matches",
+      "category": "misc",
+      "size": 1,
+      "base_price": 3.0,
+      "stackable": true,
+      "max_stack": 6,
+      "consumable": true,
+      "uses": 50
+    },
+    "flashlight": {
+      "name": "Flashlight",
+      "category": "misc",
+      "size": 1,
+      "base_price": 15.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "toolbox": {
+      "name": "Toolbox",
+      "category": "tools",
+      "size": 3,
+      "base_price": 50.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "hammer": {
+      "name": "Hammer",
+      "category": "tools",
+      "size": 2,
+      "base_price": 20.0,
+      "stackable": false,
+      "consumable": false
+    },
+    "screwdriver_set": {
+      "name": "Screwdriver Set",
+      "category": "tools",
+      "size": 2,
+      "base_price": 25.0,
+      "stackable": false,
+      "consumable": false
     }
   },
   "character_templates": {
