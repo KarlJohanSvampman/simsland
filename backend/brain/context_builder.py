@@ -560,6 +560,7 @@ def build_context(
         "phone":             _build_phone_context(c),
         "social_events":     _build_events_context(c, world),
         "upcoming_calendar_events": _build_calendar_context(c, world),
+        "hobbies":           _build_hobbies_context(c, world),
     }
 
     return context
@@ -1123,6 +1124,11 @@ def _build_phone_context(c):
 def _build_events_context(c, world):
     from systems.social_events import build_events_context
     return build_events_context(c, world)
+
+
+def _build_hobbies_context(c, world):
+    from systems.hobbies import build_hobby_context
+    return build_hobby_context(c, world) or None
 
 
 def _build_calendar_context(c, world):

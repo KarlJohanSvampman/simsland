@@ -7586,5 +7586,1269 @@
       },
       "polarity": "positive"
     }
+  },
+  "hobby_templates": {
+    "drawing": {
+      "name": "Drawing",
+      "category": "art",
+      "required_props": [
+        "desk",
+        "art_station"
+      ],
+      "required_items": [
+        "sketchbook",
+        "pencil"
+      ],
+      "off_grid": false,
+      "overnight": false,
+      "min_days": null,
+      "max_days": null,
+      "min_participants": 1,
+      "location": null,
+      "suggest_to_household": false
+    },
+    "painting": {
+      "name": "Painting",
+      "category": "art",
+      "required_props": [
+        "easel",
+        "art_station"
+      ],
+      "required_items": [
+        "paint_set",
+        "canvas",
+        "brush"
+      ],
+      "off_grid": false,
+      "overnight": false,
+      "min_days": null,
+      "max_days": null,
+      "min_participants": 1,
+      "location": null,
+      "suggest_to_household": false
+    },
+    "photography": {
+      "name": "Photography",
+      "category": "art",
+      "required_props": [],
+      "required_items": [
+        "camera",
+        "lens",
+        "memory_card"
+      ],
+      "off_grid": true,
+      "overnight": false,
+      "min_days": null,
+      "max_days": null,
+      "min_participants": 1,
+      "location": "outdoors",
+      "suggest_to_household": false
+    },
+    "digital_art": {
+      "name": "Digital Art",
+      "category": "art",
+      "required_props": [
+        "computer",
+        "desk"
+      ],
+      "required_items": [
+        "graphics_tablet",
+        "stylus"
+      ],
+      "off_grid": false,
+      "overnight": false,
+      "min_days": null,
+      "max_days": null,
+      "min_participants": 1,
+      "location": null,
+      "suggest_to_household": false
+    },
+    "knitting": {
+      "name": "Knitting",
+      "category": "art",
+      "required_props": [
+        "armchair",
+        "sofa"
+      ],
+      "required_items": [
+        "yarn",
+        "knitting_needles"
+      ],
+      "off_grid": false,
+      "overnight": false,
+      "min_days": null,
+      "max_days": null,
+      "min_participants": 1,
+      "location": null,
+      "suggest_to_household": false
+    },
+    "pottery": {
+      "name": "Pottery",
+      "category": "art",
+      "required_props": [
+        "pottery_wheel",
+        "workbench"
+      ],
+      "required_items": [
+        "clay",
+        "pottery_tools"
+      ],
+      "off_grid": false,
+      "overnight": false,
+      "min_days": null,
+      "max_days": null,
+      "min_participants": 1,
+      "location": null,
+      "suggest_to_household": false
+    },
+    "jewelry_making": {
+      "name": "Jewelry Making",
+      "category": "art",
+      "required_props": [
+        "workbench"
+      ],
+      "required_items": [
+        "jewelry_tools",
+        "metal_wire",
+        "beads"
+      ],
+      "off_grid": false,
+      "overnight": false,
+      "min_days": null,
+      "max_days": null,
+      "min_participants": 1,
+      "location": null,
+      "suggest_to_household": false
+    },
+    "guitar": {
+      "name": "Guitar",
+      "category": "music",
+      "required_props": [
+        "guitar_stand",
+        "instrument_stand"
+      ],
+      "required_items": [
+        "guitar",
+        "guitar_pick"
+      ],
+      "off_grid": false,
+      "overnight": false,
+      "min_days": null,
+      "max_days": null,
+      "min_participants": 1,
+      "location": null,
+      "suggest_to_household": false
+    },
+    "piano": {
+      "name": "Piano",
+      "category": "music",
+      "required_props": [
+        "piano",
+        "keyboard_stand"
+      ],
+      "required_items": [
+        "piano_keyboard",
+        "sheet_music"
+      ],
+      "off_grid": false,
+      "overnight": false,
+      "min_days": null,
+      "max_days": null,
+      "min_participants": 1,
+      "location": null,
+      "suggest_to_household": false
+    },
+    "singing": {
+      "name": "Singing",
+      "category": "music",
+      "required_props": [],
+      "required_items": [
+        "microphone"
+      ],
+      "off_grid": false,
+      "overnight": false,
+      "min_days": null,
+      "max_days": null,
+      "min_participants": 1,
+      "location": null,
+      "suggest_to_household": false
+    },
+    "music_production": {
+      "name": "Music Production",
+      "category": "music",
+      "required_props": [
+        "computer",
+        "desk"
+      ],
+      "required_items": [
+        "audio_interface",
+        "midi_keyboard",
+        "headphones"
+      ],
+      "off_grid": false,
+      "overnight": false,
+      "min_days": null,
+      "max_days": null,
+      "min_participants": 1,
+      "location": null,
+      "suggest_to_household": false
+    },
+    "djing": {
+      "name": "DJing",
+      "category": "music",
+      "required_props": [
+        "dj_setup",
+        "desk"
+      ],
+      "required_items": [
+        "dj_controller",
+        "headphones",
+        "vinyl_record"
+      ],
+      "off_grid": false,
+      "overnight": false,
+      "min_days": null,
+      "max_days": null,
+      "min_participants": 1,
+      "location": null,
+      "suggest_to_household": false
+    },
+    "listening_to_vinyl": {
+      "name": "Listening to Vinyl",
+      "category": "music",
+      "required_props": [
+        "record_player",
+        "armchair"
+      ],
+      "required_items": [
+        "vinyl_record",
+        "record_player"
+      ],
+      "off_grid": false,
+      "overnight": false,
+      "min_days": null,
+      "max_days": null,
+      "min_participants": 1,
+      "location": null,
+      "suggest_to_household": false
+    },
+    "hiking": {
+      "name": "Hiking",
+      "category": "nature",
+      "required_props": [],
+      "required_items": [
+        "hiking_boots",
+        "backpack",
+        "water_bottle"
+      ],
+      "off_grid": true,
+      "overnight": false,
+      "min_days": null,
+      "max_days": null,
+      "min_participants": 1,
+      "location": "trail",
+      "suggest_to_household": false
+    },
+    "camping": {
+      "name": "Camping",
+      "category": "nature",
+      "required_props": [],
+      "required_items": [
+        "tent",
+        "sleeping_bag",
+        "camping_stove",
+        "backpack"
+      ],
+      "off_grid": true,
+      "overnight": true,
+      "min_days": 1,
+      "max_days": 3,
+      "min_participants": 1,
+      "location": "campsite",
+      "suggest_to_household": false
+    },
+    "fishing": {
+      "name": "Fishing",
+      "category": "nature",
+      "required_props": [],
+      "required_items": [
+        "fishing_rod",
+        "tackle_box",
+        "bait"
+      ],
+      "off_grid": true,
+      "overnight": false,
+      "min_days": null,
+      "max_days": null,
+      "min_participants": 1,
+      "location": "lake",
+      "suggest_to_household": false
+    },
+    "birdwatching": {
+      "name": "Birdwatching",
+      "category": "nature",
+      "required_props": [],
+      "required_items": [
+        "binoculars",
+        "field_guide",
+        "notebook"
+      ],
+      "off_grid": true,
+      "overnight": false,
+      "min_days": null,
+      "max_days": null,
+      "min_participants": 1,
+      "location": "nature_reserve",
+      "suggest_to_household": false
+    },
+    "gardening": {
+      "name": "Gardening",
+      "category": "nature",
+      "required_props": [
+        "garden"
+      ],
+      "required_items": [
+        "gardening_tools",
+        "seeds",
+        "gloves",
+        "watering_can"
+      ],
+      "off_grid": false,
+      "overnight": false,
+      "min_days": null,
+      "max_days": null,
+      "min_participants": 1,
+      "location": null,
+      "suggest_to_household": false
+    },
+    "backpacking": {
+      "name": "Backpacking",
+      "category": "nature",
+      "required_props": [],
+      "required_items": [
+        "backpack",
+        "tent",
+        "sleeping_bag",
+        "hiking_boots"
+      ],
+      "off_grid": true,
+      "overnight": true,
+      "min_days": 2,
+      "max_days": 7,
+      "min_participants": 1,
+      "location": "wilderness",
+      "suggest_to_household": false
+    },
+    "astronomy": {
+      "name": "Astronomy",
+      "category": "nature",
+      "required_props": [],
+      "required_items": [
+        "telescope",
+        "star_chart",
+        "notebook"
+      ],
+      "off_grid": true,
+      "overnight": false,
+      "min_days": null,
+      "max_days": null,
+      "min_participants": 1,
+      "location": "dark_sky_area",
+      "suggest_to_household": false
+    },
+    "weightlifting": {
+      "name": "Weightlifting",
+      "category": "exercise",
+      "required_props": [
+        "weight_bench",
+        "barbell_rack"
+      ],
+      "required_items": [
+        "barbell",
+        "weights",
+        "gym_gloves"
+      ],
+      "off_grid": false,
+      "overnight": false,
+      "min_days": null,
+      "max_days": null,
+      "min_participants": 1,
+      "location": "gym",
+      "home_props_any": [
+        "weight_bench",
+        "barbell_rack",
+        "gym_equipment"
+      ],
+      "suggest_to_household": false
+    },
+    "running": {
+      "name": "Running",
+      "category": "exercise",
+      "required_props": [],
+      "required_items": [
+        "running_shoes",
+        "fitness_tracker"
+      ],
+      "off_grid": false,
+      "overnight": false,
+      "min_days": null,
+      "max_days": null,
+      "min_participants": 1,
+      "location": "street",
+      "home_props_any": [
+        "treadmill"
+      ],
+      "suggest_to_household": false
+    },
+    "yoga": {
+      "name": "Yoga",
+      "category": "exercise",
+      "required_props": [
+        "yoga_mat"
+      ],
+      "required_items": [
+        "yoga_mat",
+        "yoga_block"
+      ],
+      "off_grid": false,
+      "overnight": false,
+      "min_days": null,
+      "max_days": null,
+      "min_participants": 1,
+      "location": "yoga_studio",
+      "home_props_any": [
+        "yoga_mat"
+      ],
+      "suggest_to_household": false
+    },
+    "meditation": {
+      "name": "Meditation",
+      "category": "exercise",
+      "required_props": [
+        "armchair",
+        "sofa",
+        "yoga_mat"
+      ],
+      "required_items": [
+        "meditation_cushion"
+      ],
+      "off_grid": false,
+      "overnight": false,
+      "min_days": null,
+      "max_days": null,
+      "min_participants": 1,
+      "location": null,
+      "home_props_any": [
+        "yoga_mat",
+        "armchair",
+        "sofa"
+      ],
+      "suggest_to_household": false
+    },
+    "swimming": {
+      "name": "Swimming",
+      "category": "exercise",
+      "required_props": [],
+      "required_items": [
+        "swimsuit",
+        "goggles",
+        "swim_cap"
+      ],
+      "off_grid": false,
+      "overnight": false,
+      "min_days": null,
+      "max_days": null,
+      "min_participants": 1,
+      "location": "pool",
+      "home_props_any": [
+        "pool"
+      ],
+      "suggest_to_household": false
+    },
+    "cycling": {
+      "name": "Cycling",
+      "category": "exercise",
+      "required_props": [],
+      "required_items": [
+        "bicycle",
+        "helmet",
+        "cycling_gloves"
+      ],
+      "off_grid": false,
+      "overnight": false,
+      "min_days": null,
+      "max_days": null,
+      "min_participants": 1,
+      "location": "street",
+      "home_props_any": [
+        "exercise_bike"
+      ],
+      "suggest_to_household": false
+    },
+    "martial_arts": {
+      "name": "Martial Arts",
+      "category": "exercise",
+      "required_props": [
+        "training_mat"
+      ],
+      "required_items": [
+        "gi",
+        "martial_arts_gloves",
+        "mouthguard"
+      ],
+      "off_grid": false,
+      "overnight": false,
+      "min_days": null,
+      "max_days": null,
+      "min_participants": 2,
+      "location": "martial_arts_gym",
+      "home_props_any": [
+        "training_mat"
+      ],
+      "suggest_to_household": true
+    },
+    "vinyl_records": {
+      "name": "Vinyl Records",
+      "category": "collections",
+      "required_props": [
+        "record_player",
+        "display_case"
+      ],
+      "required_items": [
+        "vinyl_record",
+        "record_cleaner"
+      ],
+      "off_grid": false,
+      "overnight": false,
+      "min_days": null,
+      "max_days": null,
+      "min_participants": 1,
+      "location": null,
+      "suggest_to_household": false
+    },
+    "books_collecting": {
+      "name": "Books",
+      "category": "collections",
+      "required_props": [
+        "bookshelf"
+      ],
+      "required_items": [
+        "book"
+      ],
+      "off_grid": false,
+      "overnight": false,
+      "min_days": null,
+      "max_days": null,
+      "min_participants": 1,
+      "location": null,
+      "suggest_to_household": false
+    },
+    "trading_cards": {
+      "name": "Trading Cards",
+      "category": "collections",
+      "required_props": [
+        "desk",
+        "display_case"
+      ],
+      "required_items": [
+        "card_binder",
+        "card_sleeves"
+      ],
+      "off_grid": false,
+      "overnight": false,
+      "min_days": null,
+      "max_days": null,
+      "min_participants": 1,
+      "location": null,
+      "suggest_to_household": false
+    },
+    "sneakers": {
+      "name": "Sneakers",
+      "category": "collections",
+      "required_props": [
+        "display_case",
+        "shoe_rack"
+      ],
+      "required_items": [
+        "sneakers",
+        "shoe_cleaner"
+      ],
+      "off_grid": false,
+      "overnight": false,
+      "min_days": null,
+      "max_days": null,
+      "min_participants": 1,
+      "location": null,
+      "suggest_to_household": false
+    },
+    "cameras_collecting": {
+      "name": "Cameras",
+      "category": "collections",
+      "required_props": [
+        "display_case",
+        "shelf"
+      ],
+      "required_items": [
+        "camera",
+        "cleaning_kit"
+      ],
+      "off_grid": false,
+      "overnight": false,
+      "min_days": null,
+      "max_days": null,
+      "min_participants": 1,
+      "location": null,
+      "suggest_to_household": false
+    },
+    "miniatures_collecting": {
+      "name": "Miniatures",
+      "category": "collections",
+      "required_props": [
+        "display_case",
+        "desk"
+      ],
+      "required_items": [
+        "miniature",
+        "display_stand"
+      ],
+      "off_grid": false,
+      "overnight": false,
+      "min_days": null,
+      "max_days": null,
+      "min_participants": 1,
+      "location": null,
+      "suggest_to_household": false
+    },
+    "football_soccer": {
+      "name": "Football (Soccer)",
+      "category": "sports",
+      "required_props": [],
+      "required_items": [
+        "football",
+        "shin_guards",
+        "football_boots"
+      ],
+      "off_grid": true,
+      "overnight": false,
+      "min_days": null,
+      "max_days": null,
+      "min_participants": 6,
+      "location": "sports_pitch",
+      "suggest_to_household": true
+    },
+    "basketball": {
+      "name": "Basketball",
+      "category": "sports",
+      "required_props": [],
+      "required_items": [
+        "basketball",
+        "basketball_shoes"
+      ],
+      "off_grid": true,
+      "overnight": false,
+      "min_days": null,
+      "max_days": null,
+      "min_participants": 4,
+      "location": "sports_court",
+      "suggest_to_household": true
+    },
+    "tennis": {
+      "name": "Tennis",
+      "category": "sports",
+      "required_props": [],
+      "required_items": [
+        "tennis_racket",
+        "tennis_balls",
+        "tennis_shoes"
+      ],
+      "off_grid": true,
+      "overnight": false,
+      "min_days": null,
+      "max_days": null,
+      "min_participants": 2,
+      "location": "tennis_court",
+      "suggest_to_household": true
+    },
+    "skiing": {
+      "name": "Skiing",
+      "category": "sports",
+      "required_props": [],
+      "required_items": [
+        "skis",
+        "ski_boots",
+        "ski_poles",
+        "ski_jacket",
+        "goggles"
+      ],
+      "off_grid": true,
+      "overnight": true,
+      "min_days": 2,
+      "max_days": 5,
+      "min_participants": 1,
+      "location": "ski_resort",
+      "suggest_to_household": false
+    },
+    "surfing": {
+      "name": "Surfing",
+      "category": "sports",
+      "required_props": [],
+      "required_items": [
+        "surfboard",
+        "wetsuit",
+        "surf_wax"
+      ],
+      "off_grid": true,
+      "overnight": false,
+      "min_days": null,
+      "max_days": null,
+      "min_participants": 1,
+      "location": "beach",
+      "suggest_to_household": false
+    },
+    "climbing": {
+      "name": "Climbing",
+      "category": "sports",
+      "required_props": [],
+      "required_items": [
+        "climbing_shoes",
+        "harness",
+        "chalk_bag",
+        "belay_device"
+      ],
+      "off_grid": true,
+      "overnight": false,
+      "min_days": null,
+      "max_days": null,
+      "min_participants": 2,
+      "location": "climbing_area",
+      "suggest_to_household": true
+    },
+    "fps_competitions": {
+      "name": "FPS Competitions",
+      "category": "esports",
+      "required_props": [
+        "computer",
+        "gaming_setup"
+      ],
+      "required_items": [
+        "gaming_mouse",
+        "headset",
+        "gaming_keyboard"
+      ],
+      "off_grid": true,
+      "overnight": false,
+      "min_days": null,
+      "max_days": null,
+      "min_participants": 2,
+      "location": "esports_venue",
+      "suggest_to_household": true
+    },
+    "mmorpg_raiding": {
+      "name": "MMORPG Raiding",
+      "category": "esports",
+      "required_props": [
+        "computer",
+        "gaming_setup"
+      ],
+      "required_items": [
+        "gaming_mouse",
+        "headset"
+      ],
+      "off_grid": false,
+      "overnight": false,
+      "min_days": null,
+      "max_days": null,
+      "min_participants": 5,
+      "location": null,
+      "suggest_to_household": true
+    },
+    "speedrunning": {
+      "name": "Speedrunning",
+      "category": "esports",
+      "required_props": [
+        "computer",
+        "gaming_setup"
+      ],
+      "required_items": [
+        "game_controller",
+        "capture_card"
+      ],
+      "off_grid": false,
+      "overnight": false,
+      "min_days": null,
+      "max_days": null,
+      "min_participants": 1,
+      "location": null,
+      "suggest_to_household": false
+    },
+    "genealogy": {
+      "name": "Genealogy",
+      "category": "history",
+      "required_props": [
+        "computer",
+        "desk"
+      ],
+      "required_items": [
+        "notebook",
+        "archive_subscription"
+      ],
+      "off_grid": false,
+      "overnight": false,
+      "min_days": null,
+      "max_days": null,
+      "min_participants": 1,
+      "location": null,
+      "suggest_to_household": false
+    },
+    "historical_reenactment": {
+      "name": "Historical Reenactment",
+      "category": "history",
+      "required_props": [],
+      "required_items": [
+        "period_costume",
+        "weapons_replica"
+      ],
+      "off_grid": true,
+      "overnight": true,
+      "min_days": 1,
+      "max_days": 3,
+      "min_participants": 4,
+      "location": "event_grounds",
+      "suggest_to_household": true
+    },
+    "museum_visits": {
+      "name": "Museum Visits",
+      "category": "history",
+      "required_props": [],
+      "required_items": [
+        "notebook",
+        "museum_guide"
+      ],
+      "off_grid": true,
+      "overnight": false,
+      "min_days": null,
+      "max_days": null,
+      "min_participants": 1,
+      "location": "museum",
+      "suggest_to_household": false
+    },
+    "antique_restoration": {
+      "name": "Antique Restoration",
+      "category": "history",
+      "required_props": [
+        "workbench"
+      ],
+      "required_items": [
+        "restoration_tools",
+        "wood_stain",
+        "sandpaper",
+        "varnish"
+      ],
+      "off_grid": false,
+      "overnight": false,
+      "min_days": null,
+      "max_days": null,
+      "min_participants": 1,
+      "location": null,
+      "suggest_to_household": false
+    },
+    "eurogames": {
+      "name": "Eurogames",
+      "category": "board_games",
+      "required_props": [
+        "gaming_table",
+        "dining_table"
+      ],
+      "required_items": [
+        "board_game"
+      ],
+      "off_grid": false,
+      "overnight": false,
+      "min_days": null,
+      "max_days": null,
+      "min_participants": 2,
+      "location": null,
+      "suggest_to_household": true
+    },
+    "cooperative_games": {
+      "name": "Cooperative Games",
+      "category": "board_games",
+      "required_props": [
+        "gaming_table",
+        "dining_table"
+      ],
+      "required_items": [
+        "board_game"
+      ],
+      "off_grid": false,
+      "overnight": false,
+      "min_days": null,
+      "max_days": null,
+      "min_participants": 2,
+      "location": null,
+      "suggest_to_household": true
+    },
+    "party_games": {
+      "name": "Party Games",
+      "category": "board_games",
+      "required_props": [
+        "dining_table",
+        "living_room"
+      ],
+      "required_items": [
+        "board_game"
+      ],
+      "off_grid": false,
+      "overnight": false,
+      "min_days": null,
+      "max_days": null,
+      "min_participants": 4,
+      "location": null,
+      "suggest_to_household": true
+    },
+    "poker": {
+      "name": "Poker",
+      "category": "card_games",
+      "required_props": [
+        "table"
+      ],
+      "required_items": [
+        "poker_set",
+        "poker_chips",
+        "deck_of_cards"
+      ],
+      "off_grid": false,
+      "overnight": false,
+      "min_days": null,
+      "max_days": null,
+      "min_participants": 3,
+      "location": null,
+      "suggest_to_household": true
+    },
+    "trading_card_games": {
+      "name": "Trading Card Games",
+      "category": "card_games",
+      "required_props": [
+        "gaming_table",
+        "desk"
+      ],
+      "required_items": [
+        "card_deck",
+        "card_sleeves",
+        "card_binder"
+      ],
+      "off_grid": false,
+      "overnight": false,
+      "min_days": null,
+      "max_days": null,
+      "min_participants": 2,
+      "location": null,
+      "suggest_to_household": true
+    },
+    "bridge": {
+      "name": "Bridge",
+      "category": "card_games",
+      "required_props": [
+        "table"
+      ],
+      "required_items": [
+        "deck_of_cards",
+        "score_pad"
+      ],
+      "off_grid": false,
+      "overnight": false,
+      "min_days": null,
+      "max_days": null,
+      "min_participants": 4,
+      "location": null,
+      "suggest_to_household": true
+    },
+    "miniature_wargaming": {
+      "name": "Miniature Wargaming",
+      "category": "wargames",
+      "required_props": [
+        "gaming_table",
+        "workbench"
+      ],
+      "required_items": [
+        "miniatures",
+        "dice_set",
+        "rulebook"
+      ],
+      "off_grid": false,
+      "overnight": false,
+      "min_days": null,
+      "max_days": null,
+      "min_participants": 2,
+      "location": null,
+      "suggest_to_household": true
+    },
+    "army_painting": {
+      "name": "Army Painting",
+      "category": "wargames",
+      "required_props": [
+        "desk",
+        "workbench"
+      ],
+      "required_items": [
+        "miniature_paint",
+        "brush",
+        "primer",
+        "miniatures"
+      ],
+      "off_grid": false,
+      "overnight": false,
+      "min_days": null,
+      "max_days": null,
+      "min_participants": 1,
+      "location": null,
+      "suggest_to_household": false
+    },
+    "terrain_building": {
+      "name": "Terrain Building",
+      "category": "wargames",
+      "required_props": [
+        "workbench",
+        "desk"
+      ],
+      "required_items": [
+        "terrain_materials",
+        "craft_tools",
+        "paint"
+      ],
+      "off_grid": false,
+      "overnight": false,
+      "min_days": null,
+      "max_days": null,
+      "min_participants": 1,
+      "location": null,
+      "suggest_to_household": false
+    },
+    "tabletop_rpgs": {
+      "name": "Tabletop RPGs",
+      "category": "roleplaying_games",
+      "required_props": [
+        "gaming_table"
+      ],
+      "required_items": [
+        "rulebook",
+        "dice_set",
+        "character_sheet",
+        "pencil"
+      ],
+      "off_grid": false,
+      "overnight": false,
+      "min_days": null,
+      "max_days": null,
+      "min_participants": 3,
+      "location": null,
+      "suggest_to_household": true
+    },
+    "larp": {
+      "name": "LARP",
+      "category": "roleplaying_games",
+      "required_props": [],
+      "required_items": [
+        "larp_costume",
+        "larp_weapons",
+        "character_sheet"
+      ],
+      "off_grid": true,
+      "overnight": true,
+      "min_days": 1,
+      "max_days": 3,
+      "min_participants": 6,
+      "location": "event_grounds",
+      "suggest_to_household": true
+    },
+    "worldbuilding": {
+      "name": "Worldbuilding",
+      "category": "roleplaying_games",
+      "required_props": [
+        "desk",
+        "computer"
+      ],
+      "required_items": [
+        "notebook",
+        "maps",
+        "sketchbook"
+      ],
+      "off_grid": false,
+      "overnight": false,
+      "min_days": null,
+      "max_days": null,
+      "min_participants": 1,
+      "location": null,
+      "suggest_to_household": false
+    },
+    "strategy_games": {
+      "name": "Strategy Games",
+      "category": "video_games",
+      "required_props": [
+        "computer",
+        "gaming_setup"
+      ],
+      "required_items": [
+        "gaming_mouse",
+        "gaming_keyboard"
+      ],
+      "off_grid": false,
+      "overnight": false,
+      "min_days": null,
+      "max_days": null,
+      "min_participants": 1,
+      "location": null,
+      "suggest_to_household": false
+    },
+    "rpgs_videogames": {
+      "name": "RPGs",
+      "category": "video_games",
+      "required_props": [
+        "computer",
+        "gaming_setup",
+        "tv"
+      ],
+      "required_items": [
+        "game_controller"
+      ],
+      "off_grid": false,
+      "overnight": false,
+      "min_days": null,
+      "max_days": null,
+      "min_participants": 1,
+      "location": null,
+      "suggest_to_household": false
+    },
+    "vr_gaming": {
+      "name": "VR Gaming",
+      "category": "video_games",
+      "required_props": [
+        "vr_space"
+      ],
+      "required_items": [
+        "vr_headset",
+        "motion_controllers"
+      ],
+      "off_grid": false,
+      "overnight": false,
+      "min_days": null,
+      "max_days": null,
+      "min_participants": 1,
+      "location": null,
+      "suggest_to_household": false
+    },
+    "game_development": {
+      "name": "Game Development",
+      "category": "video_games",
+      "required_props": [
+        "computer",
+        "desk"
+      ],
+      "required_items": [
+        "notebook"
+      ],
+      "off_grid": false,
+      "overnight": false,
+      "min_days": null,
+      "max_days": null,
+      "min_participants": 1,
+      "location": null,
+      "suggest_to_household": false
+    },
+    "chess": {
+      "name": "Chess",
+      "category": "mind_games",
+      "required_props": [
+        "desk",
+        "table"
+      ],
+      "required_items": [
+        "chess_set",
+        "chess_clock"
+      ],
+      "off_grid": false,
+      "overnight": false,
+      "min_days": null,
+      "max_days": null,
+      "min_participants": 2,
+      "location": null,
+      "suggest_to_household": true
+    },
+    "jigsaw_puzzles": {
+      "name": "Jigsaw Puzzles",
+      "category": "mind_games",
+      "required_props": [
+        "table",
+        "desk"
+      ],
+      "required_items": [
+        "jigsaw_puzzle"
+      ],
+      "off_grid": false,
+      "overnight": false,
+      "min_days": null,
+      "max_days": null,
+      "min_participants": 1,
+      "location": null,
+      "suggest_to_household": false
+    },
+    "escape_rooms": {
+      "name": "Escape Rooms",
+      "category": "mind_games",
+      "required_props": [],
+      "required_items": [],
+      "off_grid": true,
+      "overnight": false,
+      "min_days": null,
+      "max_days": null,
+      "min_participants": 2,
+      "location": "escape_room_venue",
+      "suggest_to_household": true
+    },
+    "casino_poker": {
+      "name": "Poker (Casino)",
+      "category": "gambling",
+      "required_props": [],
+      "required_items": [
+        "cash"
+      ],
+      "off_grid": true,
+      "overnight": false,
+      "min_days": null,
+      "max_days": null,
+      "min_participants": 3,
+      "location": "casino",
+      "suggest_to_household": true
+    },
+    "sports_betting": {
+      "name": "Sports Betting",
+      "category": "gambling",
+      "required_props": [
+        "computer"
+      ],
+      "required_items": [],
+      "off_grid": false,
+      "overnight": false,
+      "min_days": null,
+      "max_days": null,
+      "min_participants": 1,
+      "location": null,
+      "suggest_to_household": false
+    },
+    "lottery": {
+      "name": "Lottery",
+      "category": "gambling",
+      "required_props": [],
+      "required_items": [
+        "lottery_ticket"
+      ],
+      "off_grid": false,
+      "overnight": false,
+      "min_days": null,
+      "max_days": null,
+      "min_participants": 1,
+      "location": null,
+      "suggest_to_household": false
+    }
   }
 }

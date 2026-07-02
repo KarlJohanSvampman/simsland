@@ -417,6 +417,13 @@ def generate_initial_world():
                 ],
 
                 # ---------------------------------------------
+                # HOBBIES
+                # List of hobby_template IDs this character practices.
+                # Populated by assign_hobbies() on world generation.
+                # ---------------------------------------------
+                "hobbies": [],
+
+                # ---------------------------------------------
                 # AI
                 # ---------------------------------------------
                 "goal": {
@@ -557,10 +564,18 @@ def generate_initial_world():
     # Seed personal inventories
     c1 = world["characters"]["c1"]
     c1["inventory"] = [
-        make_smartphone(owner_id="c1"),
         make_house_key(home_id="house_1", building_id="house_1", owner_id="c1"),
         make_wallet(cash=100.0, owner_id="c1"),
     ]
+
+    # Assign birthdays and starting hobbies to all characters
+    from systems.calendar_events import assign_birthday
+    from systems.hobbies import assign_hobbies
+    for c in world["characters"].values():
+        if not c.get("birthday"):
+            assign_birthday(c, world)
+        if not c.get("hobbies"):
+            assign_hobbies(c, world)
 
     # Social events — seed initial world events
     from systems.social_events import generate_world_events

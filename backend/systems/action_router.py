@@ -602,6 +602,10 @@ def route_action(c, world, action, speech, definitions=None):
         _route_social_event_attend(c, world, action)
     elif action_type == "social_event_plan":
         _route_social_event_plan(c, world, action)
+    elif action_type == "organize_hobby_session":
+        _route_organize_hobby_session(c, world, action)
+    elif action_type == "plan_hobby_session":
+        _route_plan_hobby_session(c, world, action)
 
 # =========================================================
 # PHONE HANDLERS
@@ -1064,3 +1068,39 @@ def _route_social_event_plan(c, world, action):
         tags            = args.get("tags") or [],
         visible_to      = args.get("visible_to") or [],
     )
+
+def _route_organize_hobby_session(c, world, action):
+    """
+    Character goes to computer or phone to organise a hobby session.
+    Surfaces hobby-compatible contacts so the LLM can decide who to invite.
+    This is the 'browsing/outreach' step before plan_hobby_session.
+    """
+    from systems.hobbies import find_hobby_contacts, inject_organize_intention
+    hobby_id = action.get("hobby_id") or action.get("args", {}).get("hobby_id")
+    if not hobby_id:
+        return
+    contacts = find_hobby_contacts(c, world, hobby_id, max_results=8)
+    chars    = world.get("characters", {})
+    c.setdefault("hobby_contacts_found", {})[hobby_id] = [
+        {"id": cid, "name": chars[cid]["name"]}
+        for cid in contacts if cid in chars
+    ]
+
+
+def _route_plan_hobby_session(c, world, action):
+    """
+    Create a social event for a group hobby session.
+    Guests who share the hobby are invited first; if location_type==home
+    and the event is published, guests will be spawned as temporary NPCs.
+    """
+    from systems.hobbies import plan_hobby_session
+    hobby_id = (
+        action.get("hobby_id")
+        or action.get("args", {}).get("hobby_id")
+    )
+    start_offset = int(
+        action.get("start_offset_hours")
+        or action.get("args", {}).get("start_offset_hours", 48)
+    )
+    if hobby_id:
+        plan_hobby_session(c, world, hobby_id, start_offset_hours=start_offset)
