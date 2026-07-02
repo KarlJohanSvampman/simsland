@@ -401,4 +401,8 @@ def calculate_taste(
     taste = quality
 
     if "foodie" in c.get(
-        "trai
+        "traits", []
+    ):
+        taste = min(1.0, taste + 0.1)
+
+    return max(0.0, min(1.0, taste))
