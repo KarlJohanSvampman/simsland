@@ -8928,6 +8928,2040 @@
           "stand_up_a"
         ]
       }
+    },
+    "paint": {
+      "name": "Paint",
+      "description": "Paint on a canvas at an easel",
+      "category": "art",
+      "duration_ticks": 60,
+      "requires_prop_tags": [
+        "easel"
+      ],
+      "requires_item_category": "art_supplies",
+      "body_effects": {
+        "fatigue": 3
+      },
+      "stress_delta": -8,
+      "satisfies_lt_needs": [
+        "creative",
+        "mastery"
+      ],
+      "handler": "paint",
+      "animations": {
+        "start": [
+          "stand_idle_a"
+        ],
+        "loop": [
+          "paint_a",
+          "paint_b"
+        ],
+        "stop": [
+          "idle_a"
+        ]
+      }
+    },
+    "sketch": {
+      "name": "Sketch / Draw",
+      "description": "Sketch or draw at a desk or easel",
+      "category": "art",
+      "duration_ticks": 45,
+      "requires_prop_tags": [
+        "desk",
+        "easel"
+      ],
+      "body_effects": {
+        "fatigue": 2
+      },
+      "stress_delta": -6,
+      "satisfies_lt_needs": [
+        "creative"
+      ],
+      "handler": "sketch",
+      "animations": {
+        "start": [
+          "sit_down_a"
+        ],
+        "loop": [
+          "write_a",
+          "write_b"
+        ],
+        "stop": [
+          "stand_up_a"
+        ]
+      }
+    },
+    "take_photo": {
+      "name": "Take Photo",
+      "description": "Take photos with a camera",
+      "category": "art",
+      "duration_ticks": 20,
+      "requires_prop_tags": [],
+      "requires_item_category": "camera",
+      "body_effects": {
+        "fatigue": 2
+      },
+      "stress_delta": -4,
+      "satisfies_lt_needs": [
+        "creative",
+        "mastery"
+      ],
+      "handler": "take_photo",
+      "animations": {
+        "start": [
+          "stand_idle_a"
+        ],
+        "loop": [
+          "camera_shoot_a",
+          "camera_look_a"
+        ],
+        "stop": [
+          "idle_a"
+        ]
+      }
+    },
+    "edit_photos": {
+      "name": "Edit Photos",
+      "description": "Edit photos on a computer",
+      "category": "art",
+      "duration_ticks": 60,
+      "requires_prop_tags": [
+        "computer"
+      ],
+      "body_effects": {
+        "fatigue": 5
+      },
+      "stress_delta": -3,
+      "satisfies_lt_needs": [
+        "creative",
+        "mastery"
+      ],
+      "handler": "edit_photos",
+      "animations": {
+        "start": [
+          "sit_down_a"
+        ],
+        "loop": [
+          "computer_type_a",
+          "computer_scroll_a"
+        ],
+        "stop": [
+          "stand_up_a"
+        ]
+      }
+    },
+    "sculpt": {
+      "name": "Sculpt",
+      "description": "Work on a sculpture at a workbench",
+      "category": "art",
+      "duration_ticks": 60,
+      "requires_prop_tags": [
+        "workbench"
+      ],
+      "requires_item_category": "art_supplies",
+      "body_effects": {
+        "fatigue": 8
+      },
+      "stress_delta": -7,
+      "satisfies_lt_needs": [
+        "creative",
+        "mastery"
+      ],
+      "handler": "sculpt",
+      "animations": {
+        "start": [
+          "stand_idle_a"
+        ],
+        "loop": [
+          "craft_a",
+          "craft_b"
+        ],
+        "stop": [
+          "idle_a"
+        ]
+      }
+    },
+    "spray_paint": {
+      "name": "Spray Paint",
+      "description": "Create street art with spray paint",
+      "category": "art",
+      "duration_ticks": 45,
+      "requires_prop_tags": [
+        "wall"
+      ],
+      "requires_item_category": "art_supplies",
+      "body_effects": {
+        "fatigue": 5
+      },
+      "stress_delta": -6,
+      "satisfies_lt_needs": [
+        "creative",
+        "self_expression"
+      ],
+      "handler": "spray_paint",
+      "animations": {
+        "start": [
+          "stand_idle_a"
+        ],
+        "loop": [
+          "paint_wall_a",
+          "paint_wall_b"
+        ],
+        "stop": [
+          "idle_a"
+        ]
+      }
+    },
+    "play_guitar": {
+      "name": "Play Guitar",
+      "description": "Play the guitar",
+      "category": "music",
+      "duration_ticks": 60,
+      "requires_prop_tags": [
+        "guitar"
+      ],
+      "body_effects": {
+        "fatigue": 4
+      },
+      "stress_delta": -8,
+      "satisfies_lt_needs": [
+        "creative",
+        "mastery"
+      ],
+      "handler": "play_instrument",
+      "animations": {
+        "start": [
+          "sit_down_a"
+        ],
+        "loop": [
+          "guitar_play_a",
+          "guitar_play_b"
+        ],
+        "stop": [
+          "stand_up_a"
+        ]
+      }
+    },
+    "play_piano": {
+      "name": "Play Piano",
+      "description": "Play the piano",
+      "category": "music",
+      "duration_ticks": 60,
+      "requires_prop_tags": [
+        "piano"
+      ],
+      "body_effects": {
+        "fatigue": 3
+      },
+      "stress_delta": -9,
+      "satisfies_lt_needs": [
+        "creative",
+        "mastery"
+      ],
+      "handler": "play_instrument",
+      "animations": {
+        "start": [
+          "sit_down_a"
+        ],
+        "loop": [
+          "piano_play_a",
+          "piano_play_b"
+        ],
+        "stop": [
+          "stand_up_a"
+        ]
+      }
+    },
+    "play_violin": {
+      "name": "Play Violin",
+      "description": "Play the violin",
+      "category": "music",
+      "duration_ticks": 60,
+      "requires_prop_tags": [
+        "violin"
+      ],
+      "body_effects": {
+        "fatigue": 4
+      },
+      "stress_delta": -8,
+      "satisfies_lt_needs": [
+        "creative",
+        "mastery"
+      ],
+      "handler": "play_instrument",
+      "animations": {
+        "start": [
+          "stand_idle_a"
+        ],
+        "loop": [
+          "violin_play_a",
+          "violin_play_b"
+        ],
+        "stop": [
+          "idle_a"
+        ]
+      }
+    },
+    "play_drums": {
+      "name": "Play Drums",
+      "description": "Play the drum kit",
+      "category": "music",
+      "duration_ticks": 45,
+      "requires_prop_tags": [
+        "drums"
+      ],
+      "body_effects": {
+        "fatigue": 12
+      },
+      "stress_delta": -10,
+      "satisfies_lt_needs": [
+        "creative",
+        "mastery",
+        "exercise"
+      ],
+      "handler": "play_instrument",
+      "animations": {
+        "start": [
+          "sit_down_a"
+        ],
+        "loop": [
+          "drums_play_a",
+          "drums_play_b"
+        ],
+        "stop": [
+          "stand_up_a"
+        ]
+      }
+    },
+    "play_bass": {
+      "name": "Play Bass Guitar",
+      "description": "Play the bass guitar",
+      "category": "music",
+      "duration_ticks": 60,
+      "requires_prop_tags": [
+        "bass_guitar"
+      ],
+      "body_effects": {
+        "fatigue": 4
+      },
+      "stress_delta": -7,
+      "satisfies_lt_needs": [
+        "creative",
+        "mastery"
+      ],
+      "handler": "play_instrument",
+      "animations": {
+        "start": [
+          "stand_idle_a"
+        ],
+        "loop": [
+          "guitar_play_a",
+          "guitar_play_b"
+        ],
+        "stop": [
+          "idle_a"
+        ]
+      }
+    },
+    "play_ukulele": {
+      "name": "Play Ukulele",
+      "description": "Play the ukulele",
+      "category": "music",
+      "duration_ticks": 45,
+      "requires_prop_tags": [
+        "ukulele"
+      ],
+      "body_effects": {
+        "fatigue": 2
+      },
+      "stress_delta": -7,
+      "satisfies_lt_needs": [
+        "creative",
+        "mastery"
+      ],
+      "handler": "play_instrument",
+      "animations": {
+        "start": [
+          "sit_down_a"
+        ],
+        "loop": [
+          "guitar_play_a",
+          "guitar_play_b"
+        ],
+        "stop": [
+          "stand_up_a"
+        ]
+      }
+    },
+    "play_trumpet": {
+      "name": "Play Trumpet",
+      "description": "Play the trumpet",
+      "category": "music",
+      "duration_ticks": 45,
+      "requires_prop_tags": [
+        "trumpet"
+      ],
+      "body_effects": {
+        "fatigue": 6
+      },
+      "stress_delta": -7,
+      "satisfies_lt_needs": [
+        "creative",
+        "mastery"
+      ],
+      "handler": "play_instrument",
+      "animations": {
+        "start": [
+          "stand_idle_a"
+        ],
+        "loop": [
+          "trumpet_play_a",
+          "trumpet_play_b"
+        ],
+        "stop": [
+          "idle_a"
+        ]
+      }
+    },
+    "play_saxophone": {
+      "name": "Play Saxophone",
+      "description": "Play the saxophone",
+      "category": "music",
+      "duration_ticks": 45,
+      "requires_prop_tags": [
+        "saxophone"
+      ],
+      "body_effects": {
+        "fatigue": 5
+      },
+      "stress_delta": -8,
+      "satisfies_lt_needs": [
+        "creative",
+        "mastery"
+      ],
+      "handler": "play_instrument",
+      "animations": {
+        "start": [
+          "stand_idle_a"
+        ],
+        "loop": [
+          "saxophone_play_a",
+          "saxophone_play_b"
+        ],
+        "stop": [
+          "idle_a"
+        ]
+      }
+    },
+    "play_flute": {
+      "name": "Play Flute",
+      "description": "Play the flute",
+      "category": "music",
+      "duration_ticks": 45,
+      "requires_prop_tags": [
+        "flute"
+      ],
+      "body_effects": {
+        "fatigue": 3
+      },
+      "stress_delta": -7,
+      "satisfies_lt_needs": [
+        "creative",
+        "mastery"
+      ],
+      "handler": "play_instrument",
+      "animations": {
+        "start": [
+          "stand_idle_a"
+        ],
+        "loop": [
+          "flute_play_a",
+          "flute_play_b"
+        ],
+        "stop": [
+          "idle_a"
+        ]
+      }
+    },
+    "sing": {
+      "name": "Sing",
+      "description": "Sing alone or in a group",
+      "category": "music",
+      "duration_ticks": 30,
+      "requires_prop_tags": [],
+      "body_effects": {
+        "fatigue": 3
+      },
+      "stress_delta": -8,
+      "satisfies_lt_needs": [
+        "creative",
+        "self_expression"
+      ],
+      "handler": "sing",
+      "animations": {
+        "start": [
+          "stand_idle_a"
+        ],
+        "loop": [
+          "sing_a",
+          "sing_b"
+        ],
+        "stop": [
+          "idle_a"
+        ]
+      }
+    },
+    "sing_karaoke": {
+      "name": "Sing Karaoke",
+      "description": "Sing karaoke at a machine",
+      "category": "music",
+      "duration_ticks": 30,
+      "requires_prop_tags": [
+        "karaoke_machine"
+      ],
+      "body_effects": {
+        "fatigue": 4
+      },
+      "stress_delta": -10,
+      "satisfies_lt_needs": [
+        "creative",
+        "social",
+        "fun"
+      ],
+      "handler": "sing_karaoke",
+      "animations": {
+        "start": [
+          "stand_idle_a"
+        ],
+        "loop": [
+          "sing_a",
+          "sing_b"
+        ],
+        "stop": [
+          "idle_a"
+        ]
+      }
+    },
+    "tune_instrument": {
+      "name": "Tune Instrument",
+      "description": "Tune a musical instrument",
+      "category": "music",
+      "duration_ticks": 5,
+      "requires_prop_tags": [
+        "instrument"
+      ],
+      "body_effects": {},
+      "stress_delta": 0,
+      "satisfies_lt_needs": [],
+      "handler": "tune_instrument",
+      "animations": {
+        "start": [
+          "stand_idle_a"
+        ],
+        "loop": [
+          "inspect_a"
+        ],
+        "stop": [
+          "idle_a"
+        ]
+      }
+    },
+    "rehearse_lines": {
+      "name": "Rehearse Lines",
+      "description": "Rehearse lines for a performance",
+      "category": "performing_arts",
+      "duration_ticks": 45,
+      "requires_prop_tags": [],
+      "body_effects": {
+        "fatigue": 4
+      },
+      "stress_delta": -4,
+      "satisfies_lt_needs": [
+        "creative",
+        "mastery"
+      ],
+      "handler": "rehearse_lines",
+      "animations": {
+        "start": [
+          "stand_idle_a"
+        ],
+        "loop": [
+          "talk_a",
+          "gesture_a"
+        ],
+        "stop": [
+          "idle_a"
+        ]
+      }
+    },
+    "dance": {
+      "name": "Dance",
+      "description": "Dance in an open space",
+      "category": "performing_arts",
+      "duration_ticks": 30,
+      "requires_prop_tags": [],
+      "body_effects": {
+        "fatigue": 15
+      },
+      "stress_delta": -10,
+      "satisfies_lt_needs": [
+        "creative",
+        "exercise",
+        "fun"
+      ],
+      "handler": "dance",
+      "animations": {
+        "start": [
+          "stand_idle_a"
+        ],
+        "loop": [
+          "dance_a",
+          "dance_b",
+          "dance_c"
+        ],
+        "stop": [
+          "idle_a"
+        ]
+      }
+    },
+    "perform_on_stage": {
+      "name": "Perform on Stage",
+      "description": "Perform live on a stage",
+      "category": "performing_arts",
+      "duration_ticks": 90,
+      "requires_prop_tags": [
+        "stage"
+      ],
+      "body_effects": {
+        "fatigue": 20
+      },
+      "stress_delta": -5,
+      "satisfies_lt_needs": [
+        "creative",
+        "social",
+        "recognition"
+      ],
+      "handler": "perform_on_stage",
+      "animations": {
+        "start": [
+          "stand_idle_a"
+        ],
+        "loop": [
+          "perform_a",
+          "gesture_a",
+          "talk_a"
+        ],
+        "stop": [
+          "idle_a"
+        ]
+      }
+    },
+    "watch_screen": {
+      "name": "Watch Screen",
+      "description": "Watch a movie or show on a TV or cinema screen",
+      "category": "entertainment",
+      "duration_ticks": 120,
+      "requires_prop_tags": [
+        "screen",
+        "tv"
+      ],
+      "body_effects": {
+        "fatigue": -5
+      },
+      "stress_delta": -6,
+      "satisfies_lt_needs": [
+        "entertainment",
+        "relaxation"
+      ],
+      "handler": "watch_screen",
+      "animations": {
+        "start": [
+          "sit_down_a"
+        ],
+        "loop": [
+          "watch_tv_a",
+          "watch_tv_b"
+        ],
+        "stop": [
+          "stand_up_a"
+        ]
+      }
+    },
+    "record_podcast": {
+      "name": "Record Podcast",
+      "description": "Record a podcast episode at a microphone",
+      "category": "media",
+      "duration_ticks": 60,
+      "requires_prop_tags": [
+        "microphone"
+      ],
+      "body_effects": {
+        "fatigue": 6
+      },
+      "stress_delta": -4,
+      "satisfies_lt_needs": [
+        "creative",
+        "self_expression",
+        "recognition"
+      ],
+      "handler": "record_podcast",
+      "animations": {
+        "start": [
+          "sit_down_a"
+        ],
+        "loop": [
+          "talk_a",
+          "talk_b"
+        ],
+        "stop": [
+          "stand_up_a"
+        ]
+      }
+    },
+    "edit_video": {
+      "name": "Edit Video",
+      "description": "Edit video footage on a computer",
+      "category": "media",
+      "duration_ticks": 90,
+      "requires_prop_tags": [
+        "computer"
+      ],
+      "body_effects": {
+        "fatigue": 8
+      },
+      "stress_delta": -3,
+      "satisfies_lt_needs": [
+        "creative",
+        "mastery"
+      ],
+      "handler": "edit_video",
+      "animations": {
+        "start": [
+          "sit_down_a"
+        ],
+        "loop": [
+          "computer_type_a",
+          "computer_scroll_a"
+        ],
+        "stop": [
+          "stand_up_a"
+        ]
+      }
+    },
+    "film_scene": {
+      "name": "Film Scene",
+      "description": "Film a scene or video with a camera",
+      "category": "media",
+      "duration_ticks": 45,
+      "requires_prop_tags": [],
+      "requires_item_category": "camera",
+      "body_effects": {
+        "fatigue": 8
+      },
+      "stress_delta": -3,
+      "satisfies_lt_needs": [
+        "creative",
+        "mastery"
+      ],
+      "handler": "film_scene",
+      "animations": {
+        "start": [
+          "stand_idle_a"
+        ],
+        "loop": [
+          "camera_shoot_a",
+          "camera_look_a"
+        ],
+        "stop": [
+          "idle_a"
+        ]
+      }
+    },
+    "hike": {
+      "name": "Hike",
+      "description": "Hike outdoors on trails",
+      "category": "nature",
+      "duration_ticks": 120,
+      "requires_prop_tags": [],
+      "off_grid": true,
+      "body_effects": {
+        "fatigue": 25,
+        "hydration": -10
+      },
+      "stress_delta": -12,
+      "satisfies_lt_needs": [
+        "exercise",
+        "nature",
+        "adventure"
+      ],
+      "handler": "hike",
+      "animations": {
+        "start": [
+          "stand_idle_a"
+        ],
+        "loop": [
+          "walk_a",
+          "walk_b"
+        ],
+        "stop": [
+          "idle_a"
+        ]
+      }
+    },
+    "cast_fishing_rod": {
+      "name": "Cast Fishing Rod",
+      "description": "Cast and wait for a catch",
+      "category": "nature",
+      "duration_ticks": 60,
+      "requires_prop_tags": [],
+      "requires_item_category": "fishing_gear",
+      "off_grid": true,
+      "body_effects": {
+        "fatigue": 3
+      },
+      "stress_delta": -10,
+      "satisfies_lt_needs": [
+        "nature",
+        "relaxation"
+      ],
+      "handler": "cast_fishing_rod",
+      "animations": {
+        "start": [
+          "stand_idle_a"
+        ],
+        "loop": [
+          "fish_cast_a",
+          "fish_wait_a"
+        ],
+        "stop": [
+          "idle_a"
+        ]
+      }
+    },
+    "reel_in_fish": {
+      "name": "Reel In Fish",
+      "description": "Reel in a caught fish",
+      "category": "nature",
+      "duration_ticks": 5,
+      "requires_prop_tags": [],
+      "requires_item_category": "fishing_gear",
+      "off_grid": true,
+      "body_effects": {
+        "fatigue": 2
+      },
+      "stress_delta": -5,
+      "satisfies_lt_needs": [
+        "nature",
+        "mastery"
+      ],
+      "handler": "reel_in_fish",
+      "animations": {
+        "start": [
+          "stand_idle_a"
+        ],
+        "loop": [
+          "fish_reel_a"
+        ],
+        "stop": [
+          "idle_a"
+        ]
+      }
+    },
+    "observe_birds": {
+      "name": "Observe Birds",
+      "description": "Watch and identify birds in nature",
+      "category": "nature",
+      "duration_ticks": 60,
+      "requires_prop_tags": [],
+      "off_grid": true,
+      "body_effects": {
+        "fatigue": 2
+      },
+      "stress_delta": -8,
+      "satisfies_lt_needs": [
+        "learning",
+        "nature",
+        "relaxation"
+      ],
+      "handler": "observe_birds",
+      "animations": {
+        "start": [
+          "stand_idle_a"
+        ],
+        "loop": [
+          "look_around_a",
+          "use_binoculars_a"
+        ],
+        "stop": [
+          "idle_a"
+        ]
+      }
+    },
+    "plant_seeds": {
+      "name": "Plant Seeds",
+      "description": "Plant seeds in a garden bed or planter",
+      "category": "nature",
+      "duration_ticks": 20,
+      "requires_prop_tags": [
+        "garden_bed",
+        "planter"
+      ],
+      "body_effects": {
+        "fatigue": 5
+      },
+      "stress_delta": -6,
+      "satisfies_lt_needs": [
+        "nature",
+        "creative",
+        "nurture"
+      ],
+      "handler": "plant_seeds",
+      "animations": {
+        "start": [
+          "kneel_a"
+        ],
+        "loop": [
+          "dig_a",
+          "plant_a"
+        ],
+        "stop": [
+          "stand_up_a"
+        ]
+      }
+    },
+    "water_plants": {
+      "name": "Water Plants",
+      "description": "Water plants in a garden or planter",
+      "category": "nature",
+      "duration_ticks": 15,
+      "requires_prop_tags": [
+        "garden_bed",
+        "planter"
+      ],
+      "body_effects": {
+        "fatigue": 3
+      },
+      "stress_delta": -5,
+      "satisfies_lt_needs": [
+        "nature",
+        "nurture"
+      ],
+      "handler": "water_plants",
+      "animations": {
+        "start": [
+          "stand_idle_a"
+        ],
+        "loop": [
+          "water_a"
+        ],
+        "stop": [
+          "idle_a"
+        ]
+      }
+    },
+    "harvest_crops": {
+      "name": "Harvest Crops",
+      "description": "Harvest grown crops from a garden",
+      "category": "nature",
+      "duration_ticks": 20,
+      "requires_prop_tags": [
+        "garden_bed"
+      ],
+      "body_effects": {
+        "fatigue": 8
+      },
+      "stress_delta": -7,
+      "satisfies_lt_needs": [
+        "nature",
+        "nurture",
+        "mastery"
+      ],
+      "handler": "harvest_crops",
+      "animations": {
+        "start": [
+          "kneel_a"
+        ],
+        "loop": [
+          "pick_a",
+          "harvest_a"
+        ],
+        "stop": [
+          "stand_up_a"
+        ]
+      }
+    },
+    "use_telescope": {
+      "name": "Use Telescope",
+      "description": "Observe stars and planets through a telescope",
+      "category": "nature",
+      "duration_ticks": 60,
+      "requires_prop_tags": [
+        "telescope"
+      ],
+      "body_effects": {
+        "fatigue": 2
+      },
+      "stress_delta": -8,
+      "satisfies_lt_needs": [
+        "learning",
+        "nature",
+        "wonder"
+      ],
+      "handler": "use_telescope",
+      "animations": {
+        "start": [
+          "stand_idle_a"
+        ],
+        "loop": [
+          "look_through_a",
+          "adjust_a"
+        ],
+        "stop": [
+          "idle_a"
+        ]
+      }
+    },
+    "rock_climb": {
+      "name": "Rock Climb",
+      "description": "Climb a rock face or climbing wall",
+      "category": "nature",
+      "duration_ticks": 60,
+      "requires_prop_tags": [
+        "climbing_wall"
+      ],
+      "off_grid": true,
+      "body_effects": {
+        "fatigue": 30
+      },
+      "stress_delta": -10,
+      "satisfies_lt_needs": [
+        "exercise",
+        "adventure",
+        "mastery"
+      ],
+      "handler": "rock_climb",
+      "animations": {
+        "start": [
+          "stand_idle_a"
+        ],
+        "loop": [
+          "climb_a",
+          "climb_b"
+        ],
+        "stop": [
+          "idle_a"
+        ]
+      }
+    },
+    "run_treadmill": {
+      "name": "Run on Treadmill",
+      "description": "Run on a treadmill",
+      "category": "exercise",
+      "duration_ticks": 30,
+      "requires_prop_tags": [
+        "treadmill"
+      ],
+      "body_effects": {
+        "fatigue": 20
+      },
+      "stress_delta": -8,
+      "satisfies_lt_needs": [
+        "exercise"
+      ],
+      "handler": "run_treadmill",
+      "animations": {
+        "start": [
+          "stand_idle_a"
+        ],
+        "loop": [
+          "run_a",
+          "run_b"
+        ],
+        "stop": [
+          "idle_a"
+        ]
+      }
+    },
+    "run_outdoors": {
+      "name": "Run Outdoors",
+      "description": "Go for a run outside",
+      "category": "exercise",
+      "duration_ticks": 45,
+      "requires_prop_tags": [],
+      "off_grid": true,
+      "body_effects": {
+        "fatigue": 20,
+        "hydration": -8
+      },
+      "stress_delta": -10,
+      "satisfies_lt_needs": [
+        "exercise",
+        "nature"
+      ],
+      "handler": "run_outdoors",
+      "animations": {
+        "start": [
+          "stand_idle_a"
+        ],
+        "loop": [
+          "run_a",
+          "run_b"
+        ],
+        "stop": [
+          "idle_a"
+        ]
+      }
+    },
+    "do_yoga": {
+      "name": "Do Yoga",
+      "description": "Practice yoga on a mat",
+      "category": "exercise",
+      "duration_ticks": 45,
+      "requires_prop_tags": [
+        "yoga_mat"
+      ],
+      "body_effects": {
+        "fatigue": 8
+      },
+      "stress_delta": -12,
+      "satisfies_lt_needs": [
+        "exercise",
+        "relaxation",
+        "mindfulness"
+      ],
+      "handler": "do_yoga",
+      "animations": {
+        "start": [
+          "kneel_a"
+        ],
+        "loop": [
+          "yoga_a",
+          "yoga_b",
+          "yoga_c"
+        ],
+        "stop": [
+          "stand_up_a"
+        ]
+      }
+    },
+    "lift_weights": {
+      "name": "Lift Weights",
+      "description": "Lift weights at a rack or bench",
+      "category": "exercise",
+      "duration_ticks": 45,
+      "requires_prop_tags": [
+        "weight_rack",
+        "weight_bench"
+      ],
+      "body_effects": {
+        "fatigue": 25
+      },
+      "stress_delta": -8,
+      "satisfies_lt_needs": [
+        "exercise",
+        "mastery"
+      ],
+      "handler": "lift_weights",
+      "animations": {
+        "start": [
+          "stand_idle_a"
+        ],
+        "loop": [
+          "lift_a",
+          "lift_b"
+        ],
+        "stop": [
+          "idle_a"
+        ]
+      }
+    },
+    "swim": {
+      "name": "Swim",
+      "description": "Swim laps in a pool or open water",
+      "category": "exercise",
+      "duration_ticks": 45,
+      "requires_prop_tags": [
+        "pool"
+      ],
+      "off_grid": true,
+      "body_effects": {
+        "fatigue": 20
+      },
+      "stress_delta": -10,
+      "satisfies_lt_needs": [
+        "exercise"
+      ],
+      "handler": "swim",
+      "animations": {
+        "start": [
+          "stand_idle_a"
+        ],
+        "loop": [
+          "swim_a",
+          "swim_b"
+        ],
+        "stop": [
+          "idle_a"
+        ]
+      }
+    },
+    "cycle_stationary": {
+      "name": "Cycle Stationary",
+      "description": "Ride a stationary exercise bike",
+      "category": "exercise",
+      "duration_ticks": 30,
+      "requires_prop_tags": [
+        "exercise_bike"
+      ],
+      "body_effects": {
+        "fatigue": 18
+      },
+      "stress_delta": -7,
+      "satisfies_lt_needs": [
+        "exercise"
+      ],
+      "handler": "cycle_stationary",
+      "animations": {
+        "start": [
+          "sit_down_a"
+        ],
+        "loop": [
+          "cycle_a",
+          "cycle_b"
+        ],
+        "stop": [
+          "stand_up_a"
+        ]
+      }
+    },
+    "cycle_outdoors": {
+      "name": "Cycle Outdoors",
+      "description": "Ride a bicycle outdoors",
+      "category": "exercise",
+      "duration_ticks": 60,
+      "requires_prop_tags": [],
+      "off_grid": true,
+      "body_effects": {
+        "fatigue": 22
+      },
+      "stress_delta": -10,
+      "satisfies_lt_needs": [
+        "exercise",
+        "nature",
+        "adventure"
+      ],
+      "handler": "cycle_outdoors",
+      "animations": {
+        "start": [
+          "sit_down_a"
+        ],
+        "loop": [
+          "cycle_a",
+          "cycle_b"
+        ],
+        "stop": [
+          "stand_up_a"
+        ]
+      }
+    },
+    "practice_martial_arts": {
+      "name": "Practice Martial Arts",
+      "description": "Train martial arts moves",
+      "category": "exercise",
+      "duration_ticks": 45,
+      "requires_prop_tags": [
+        "punching_bag",
+        "mat"
+      ],
+      "body_effects": {
+        "fatigue": 25
+      },
+      "stress_delta": -10,
+      "satisfies_lt_needs": [
+        "exercise",
+        "mastery",
+        "self_discipline"
+      ],
+      "handler": "practice_martial_arts",
+      "animations": {
+        "start": [
+          "stand_idle_a"
+        ],
+        "loop": [
+          "punch_a",
+          "kick_a",
+          "block_a"
+        ],
+        "stop": [
+          "idle_a"
+        ]
+      }
+    },
+    "punch_bag": {
+      "name": "Hit Punching Bag",
+      "description": "Train on a punching bag",
+      "category": "exercise",
+      "duration_ticks": 20,
+      "requires_prop_tags": [
+        "punching_bag"
+      ],
+      "body_effects": {
+        "fatigue": 15
+      },
+      "stress_delta": -12,
+      "satisfies_lt_needs": [
+        "exercise",
+        "stress_relief"
+      ],
+      "handler": "punch_bag",
+      "animations": {
+        "start": [
+          "stand_idle_a"
+        ],
+        "loop": [
+          "punch_a",
+          "punch_b"
+        ],
+        "stop": [
+          "idle_a"
+        ]
+      }
+    },
+    "do_pull_ups": {
+      "name": "Do Pull-Ups",
+      "description": "Do pull-ups on a bar",
+      "category": "exercise",
+      "duration_ticks": 10,
+      "requires_prop_tags": [
+        "pull_up_bar"
+      ],
+      "body_effects": {
+        "fatigue": 10
+      },
+      "stress_delta": -5,
+      "satisfies_lt_needs": [
+        "exercise",
+        "mastery"
+      ],
+      "handler": "do_pull_ups",
+      "animations": {
+        "start": [
+          "stand_idle_a"
+        ],
+        "loop": [
+          "pull_up_a",
+          "pull_up_b"
+        ],
+        "stop": [
+          "idle_a"
+        ]
+      }
+    },
+    "row": {
+      "name": "Row",
+      "description": "Use a rowing machine",
+      "category": "exercise",
+      "duration_ticks": 30,
+      "requires_prop_tags": [
+        "rowing_machine"
+      ],
+      "body_effects": {
+        "fatigue": 20
+      },
+      "stress_delta": -8,
+      "satisfies_lt_needs": [
+        "exercise"
+      ],
+      "handler": "row",
+      "animations": {
+        "start": [
+          "sit_down_a"
+        ],
+        "loop": [
+          "row_a",
+          "row_b"
+        ],
+        "stop": [
+          "stand_up_a"
+        ]
+      }
+    },
+    "examine_collectible": {
+      "name": "Examine Collectible",
+      "description": "Carefully examine and appraise a collectible item",
+      "category": "collections",
+      "duration_ticks": 15,
+      "requires_prop_tags": [
+        "desk",
+        "table"
+      ],
+      "body_effects": {
+        "fatigue": 1
+      },
+      "stress_delta": -4,
+      "satisfies_lt_needs": [
+        "learning",
+        "mastery"
+      ],
+      "handler": "examine_collectible",
+      "animations": {
+        "start": [
+          "sit_down_a"
+        ],
+        "loop": [
+          "inspect_a",
+          "inspect_b"
+        ],
+        "stop": [
+          "stand_up_a"
+        ]
+      }
+    },
+    "catalog_collection": {
+      "name": "Catalog Collection",
+      "description": "Document and organise a collection",
+      "category": "collections",
+      "duration_ticks": 30,
+      "requires_prop_tags": [
+        "desk"
+      ],
+      "body_effects": {
+        "fatigue": 3
+      },
+      "stress_delta": -3,
+      "satisfies_lt_needs": [
+        "learning",
+        "mastery",
+        "order"
+      ],
+      "handler": "catalog_collection",
+      "animations": {
+        "start": [
+          "sit_down_a"
+        ],
+        "loop": [
+          "write_a",
+          "inspect_a"
+        ],
+        "stop": [
+          "stand_up_a"
+        ]
+      }
+    },
+    "play_vinyl": {
+      "name": "Play Vinyl Record",
+      "description": "Play a vinyl record on a turntable",
+      "category": "collections",
+      "duration_ticks": 45,
+      "requires_prop_tags": [
+        "turntable"
+      ],
+      "body_effects": {
+        "fatigue": -2
+      },
+      "stress_delta": -7,
+      "satisfies_lt_needs": [
+        "relaxation",
+        "entertainment"
+      ],
+      "handler": "play_vinyl",
+      "animations": {
+        "start": [
+          "stand_idle_a"
+        ],
+        "loop": [
+          "handle_disc_a",
+          "idle_listen_a"
+        ],
+        "stop": [
+          "idle_a"
+        ]
+      }
+    },
+    "shoot_arrow": {
+      "name": "Shoot Arrow",
+      "description": "Aim and shoot an arrow at a target",
+      "category": "sports",
+      "duration_ticks": 5,
+      "requires_prop_tags": [
+        "archery_target"
+      ],
+      "requires_item_category": "sports_equipment",
+      "body_effects": {
+        "fatigue": 3
+      },
+      "stress_delta": -5,
+      "satisfies_lt_needs": [
+        "mastery",
+        "focus"
+      ],
+      "handler": "shoot_arrow",
+      "animations": {
+        "start": [
+          "stand_idle_a"
+        ],
+        "loop": [
+          "aim_a",
+          "shoot_a"
+        ],
+        "stop": [
+          "idle_a"
+        ]
+      }
+    },
+    "play_sport_offgrid": {
+      "name": "Play Sport",
+      "description": "Play a team or solo sport at an off-grid venue",
+      "category": "sports",
+      "duration_ticks": 90,
+      "requires_prop_tags": [],
+      "off_grid": true,
+      "body_effects": {
+        "fatigue": 25
+      },
+      "stress_delta": -10,
+      "satisfies_lt_needs": [
+        "exercise",
+        "fun",
+        "social"
+      ],
+      "handler": "play_sport_offgrid",
+      "animations": {
+        "start": [
+          "stand_idle_a"
+        ],
+        "loop": [
+          "run_a",
+          "gesture_a"
+        ],
+        "stop": [
+          "idle_a"
+        ]
+      }
+    },
+    "browse_exhibit": {
+      "name": "Browse Exhibit",
+      "description": "Walk through a museum or gallery exhibit",
+      "category": "history",
+      "duration_ticks": 60,
+      "requires_prop_tags": [],
+      "off_grid": true,
+      "body_effects": {
+        "fatigue": 5
+      },
+      "stress_delta": -6,
+      "satisfies_lt_needs": [
+        "learning",
+        "culture",
+        "wonder"
+      ],
+      "handler": "browse_exhibit",
+      "animations": {
+        "start": [
+          "stand_idle_a"
+        ],
+        "loop": [
+          "walk_slow_a",
+          "look_around_a"
+        ],
+        "stop": [
+          "idle_a"
+        ]
+      }
+    },
+    "research_history": {
+      "name": "Research History",
+      "description": "Research historical topics at a desk or computer",
+      "category": "history",
+      "duration_ticks": 45,
+      "requires_prop_tags": [
+        "computer",
+        "desk"
+      ],
+      "body_effects": {
+        "fatigue": 4
+      },
+      "stress_delta": -3,
+      "satisfies_lt_needs": [
+        "learning",
+        "mastery"
+      ],
+      "handler": "research_history",
+      "animations": {
+        "start": [
+          "sit_down_a"
+        ],
+        "loop": [
+          "read_a",
+          "write_a"
+        ],
+        "stop": [
+          "stand_up_a"
+        ]
+      }
+    },
+    "play_card_game": {
+      "name": "Play Card Game",
+      "description": "Play poker, blackjack or another card game at a table",
+      "category": "gambling",
+      "duration_ticks": 90,
+      "requires_prop_tags": [
+        "card_table",
+        "table"
+      ],
+      "body_effects": {
+        "fatigue": 5
+      },
+      "stress_delta": 2,
+      "satisfies_lt_needs": [
+        "fun",
+        "social",
+        "thrill"
+      ],
+      "handler": "play_card_game",
+      "animations": {
+        "start": [
+          "sit_down_a"
+        ],
+        "loop": [
+          "card_deal_a",
+          "card_play_a"
+        ],
+        "stop": [
+          "stand_up_a"
+        ]
+      }
+    },
+    "place_bet": {
+      "name": "Place Bet",
+      "description": "Place a bet at a terminal or with a bookmaker",
+      "category": "gambling",
+      "duration_ticks": 10,
+      "requires_prop_tags": [],
+      "off_grid": true,
+      "body_effects": {},
+      "stress_delta": 3,
+      "satisfies_lt_needs": [
+        "thrill"
+      ],
+      "handler": "place_bet",
+      "animations": {
+        "start": [
+          "stand_idle_a"
+        ],
+        "loop": [
+          "phone_check_a",
+          "tap_a"
+        ],
+        "stop": [
+          "idle_a"
+        ]
+      }
+    },
+    "play_board_game": {
+      "name": "Play Board Game",
+      "description": "Play a board game at a table",
+      "category": "games",
+      "duration_ticks": 90,
+      "requires_prop_tags": [
+        "table"
+      ],
+      "requires_item_category": "games",
+      "body_effects": {
+        "fatigue": 3
+      },
+      "stress_delta": -7,
+      "satisfies_lt_needs": [
+        "fun",
+        "social",
+        "competition"
+      ],
+      "handler": "play_board_game",
+      "animations": {
+        "start": [
+          "sit_down_a"
+        ],
+        "loop": [
+          "inspect_a",
+          "gesture_a",
+          "talk_a"
+        ],
+        "stop": [
+          "stand_up_a"
+        ]
+      }
+    },
+    "play_chess": {
+      "name": "Play Chess",
+      "description": "Play chess at a table",
+      "category": "games",
+      "duration_ticks": 60,
+      "requires_prop_tags": [
+        "table"
+      ],
+      "requires_item_category": "games",
+      "body_effects": {
+        "fatigue": 2
+      },
+      "stress_delta": -4,
+      "satisfies_lt_needs": [
+        "learning",
+        "mastery",
+        "competition",
+        "focus"
+      ],
+      "handler": "play_chess",
+      "animations": {
+        "start": [
+          "sit_down_a"
+        ],
+        "loop": [
+          "inspect_a",
+          "move_piece_a"
+        ],
+        "stop": [
+          "stand_up_a"
+        ]
+      }
+    },
+    "play_video_game": {
+      "name": "Play Video Game",
+      "description": "Play a video game on a console or PC",
+      "category": "games",
+      "duration_ticks": 60,
+      "requires_prop_tags": [
+        "gaming_setup",
+        "tv",
+        "computer"
+      ],
+      "body_effects": {
+        "fatigue": 3
+      },
+      "stress_delta": -6,
+      "satisfies_lt_needs": [
+        "fun",
+        "entertainment",
+        "mastery"
+      ],
+      "handler": "play_video_game",
+      "animations": {
+        "start": [
+          "sit_down_a"
+        ],
+        "loop": [
+          "controller_a",
+          "controller_b"
+        ],
+        "stop": [
+          "stand_up_a"
+        ]
+      }
+    },
+    "play_tabletop_rpg": {
+      "name": "Play Tabletop RPG",
+      "description": "Play a tabletop role-playing game with a group",
+      "category": "games",
+      "duration_ticks": 180,
+      "requires_prop_tags": [
+        "table"
+      ],
+      "requires_item_category": "games",
+      "body_effects": {
+        "fatigue": 6
+      },
+      "stress_delta": -8,
+      "satisfies_lt_needs": [
+        "fun",
+        "social",
+        "creative",
+        "imagination"
+      ],
+      "handler": "play_tabletop_rpg",
+      "animations": {
+        "start": [
+          "sit_down_a"
+        ],
+        "loop": [
+          "talk_a",
+          "gesture_a",
+          "inspect_a"
+        ],
+        "stop": [
+          "stand_up_a"
+        ]
+      }
+    },
+    "chop_ingredients": {
+      "name": "Chop Ingredients",
+      "description": "Prep and chop ingredients on a counter",
+      "category": "culinary",
+      "duration_ticks": 15,
+      "requires_prop_tags": [
+        "counter"
+      ],
+      "body_effects": {
+        "fatigue": 3
+      },
+      "stress_delta": -3,
+      "satisfies_lt_needs": [
+        "creative"
+      ],
+      "handler": "chop_ingredients",
+      "animations": {
+        "start": [
+          "stand_idle_a"
+        ],
+        "loop": [
+          "chop_a",
+          "chop_b"
+        ],
+        "stop": [
+          "idle_a"
+        ]
+      }
+    },
+    "cook_on_stove": {
+      "name": "Cook on Stove",
+      "description": "Cook food on a stovetop",
+      "category": "culinary",
+      "duration_ticks": 30,
+      "requires_prop_tags": [
+        "stove"
+      ],
+      "body_effects": {
+        "fatigue": 5
+      },
+      "stress_delta": -4,
+      "satisfies_lt_needs": [
+        "creative",
+        "nurture"
+      ],
+      "handler": "cook_on_stove",
+      "animations": {
+        "start": [
+          "stand_idle_a"
+        ],
+        "loop": [
+          "stir_a",
+          "cook_a"
+        ],
+        "stop": [
+          "idle_a"
+        ]
+      }
+    },
+    "mix_batter": {
+      "name": "Mix Batter",
+      "description": "Mix batter or dough for baking",
+      "category": "culinary",
+      "duration_ticks": 15,
+      "requires_prop_tags": [
+        "counter"
+      ],
+      "body_effects": {
+        "fatigue": 5
+      },
+      "stress_delta": -4,
+      "satisfies_lt_needs": [
+        "creative",
+        "nurture"
+      ],
+      "handler": "mix_batter",
+      "animations": {
+        "start": [
+          "stand_idle_a"
+        ],
+        "loop": [
+          "mix_a",
+          "mix_b"
+        ],
+        "stop": [
+          "idle_a"
+        ]
+      }
+    },
+    "bake_in_oven": {
+      "name": "Bake in Oven",
+      "description": "Put items in the oven to bake",
+      "category": "culinary",
+      "duration_ticks": 45,
+      "requires_prop_tags": [
+        "oven"
+      ],
+      "body_effects": {
+        "fatigue": 3
+      },
+      "stress_delta": -3,
+      "satisfies_lt_needs": [
+        "creative",
+        "nurture"
+      ],
+      "handler": "bake_in_oven",
+      "animations": {
+        "start": [
+          "stand_idle_a"
+        ],
+        "loop": [
+          "oven_check_a"
+        ],
+        "stop": [
+          "idle_a"
+        ]
+      }
+    },
+    "brew_coffee": {
+      "name": "Brew Coffee",
+      "description": "Make coffee with a coffee machine",
+      "category": "culinary",
+      "duration_ticks": 5,
+      "requires_prop_tags": [
+        "coffee_machine"
+      ],
+      "body_effects": {
+        "fatigue": -2
+      },
+      "stress_delta": -2,
+      "satisfies_lt_needs": [
+        "relaxation"
+      ],
+      "handler": "brew_coffee",
+      "animations": {
+        "start": [
+          "stand_idle_a"
+        ],
+        "loop": [
+          "pour_a"
+        ],
+        "stop": [
+          "idle_a"
+        ]
+      }
+    },
+    "taste_wine": {
+      "name": "Taste Wine",
+      "description": "Taste and evaluate a glass of wine",
+      "category": "culinary",
+      "duration_ticks": 15,
+      "requires_prop_tags": [
+        "table"
+      ],
+      "body_effects": {
+        "fatigue": -1,
+        "hydration": 5
+      },
+      "stress_delta": -4,
+      "satisfies_lt_needs": [
+        "relaxation",
+        "learning",
+        "culture"
+      ],
+      "handler": "taste_wine",
+      "animations": {
+        "start": [
+          "stand_idle_a"
+        ],
+        "loop": [
+          "drink_a",
+          "inspect_a"
+        ],
+        "stop": [
+          "idle_a"
+        ]
+      }
+    },
+    "write": {
+      "name": "Write",
+      "description": "Write fiction, journals, articles or poetry",
+      "category": "literary",
+      "duration_ticks": 60,
+      "requires_prop_tags": [
+        "desk",
+        "computer"
+      ],
+      "body_effects": {
+        "fatigue": 4
+      },
+      "stress_delta": -6,
+      "satisfies_lt_needs": [
+        "creative",
+        "self_expression",
+        "mastery"
+      ],
+      "handler": "write",
+      "animations": {
+        "start": [
+          "sit_down_a"
+        ],
+        "loop": [
+          "write_a",
+          "write_b",
+          "think_a"
+        ],
+        "stop": [
+          "stand_up_a"
+        ]
+      }
+    },
+    "read": {
+      "name": "Read",
+      "description": "Read a book, magazine or other text",
+      "category": "literary",
+      "duration_ticks": 60,
+      "requires_prop_tags": [],
+      "requires_item_category": "books_media",
+      "body_effects": {
+        "fatigue": -3
+      },
+      "stress_delta": -7,
+      "satisfies_lt_needs": [
+        "learning",
+        "relaxation",
+        "imagination"
+      ],
+      "handler": "read",
+      "animations": {
+        "start": [
+          "sit_down_a"
+        ],
+        "loop": [
+          "read_a",
+          "read_b"
+        ],
+        "stop": [
+          "stand_up_a"
+        ]
+      }
+    },
+    "discuss_book": {
+      "name": "Discuss Book",
+      "description": "Discuss a book with other characters",
+      "category": "literary",
+      "duration_ticks": 45,
+      "requires_prop_tags": [
+        "table",
+        "sofa"
+      ],
+      "body_effects": {
+        "fatigue": 2
+      },
+      "stress_delta": -5,
+      "satisfies_lt_needs": [
+        "social",
+        "learning",
+        "creative"
+      ],
+      "handler": "discuss_book",
+      "animations": {
+        "start": [
+          "sit_down_a"
+        ],
+        "loop": [
+          "talk_a",
+          "gesture_a"
+        ],
+        "stop": [
+          "stand_up_a"
+        ]
+      }
     }
   },
   "activity_templates": {
@@ -10704,6 +12738,2474 @@
           "duration_minutes": 45,
           "requires": [
             "research"
+          ]
+        }
+      ]
+    },
+    "hobby_painting": {
+      "name": "Painting Session",
+      "category": "art",
+      "interruptible": true,
+      "hobby_id": "painting",
+      "satisfies_needs": [
+        "creative",
+        "mastery"
+      ],
+      "steps": [
+        {
+          "id": "setup",
+          "interaction": "sketch",
+          "target_tags": [
+            "easel",
+            "desk"
+          ],
+          "duration_minutes": 5,
+          "requires": []
+        },
+        {
+          "id": "paint",
+          "interaction": "paint",
+          "target_tags": [
+            "easel"
+          ],
+          "duration_minutes": 60,
+          "requires": [
+            "setup"
+          ]
+        }
+      ]
+    },
+    "hobby_photography": {
+      "name": "Photography Session",
+      "category": "art",
+      "interruptible": true,
+      "hobby_id": "photography",
+      "satisfies_needs": [
+        "creative",
+        "mastery"
+      ],
+      "steps": [
+        {
+          "id": "shoot",
+          "interaction": "take_photo",
+          "target_tags": [],
+          "duration_minutes": 45,
+          "requires": []
+        },
+        {
+          "id": "edit",
+          "interaction": "edit_photos",
+          "target_tags": [
+            "computer"
+          ],
+          "duration_minutes": 30,
+          "requires": [
+            "shoot"
+          ]
+        }
+      ]
+    },
+    "hobby_graffiti_street_art": {
+      "name": "Street Art Session",
+      "category": "art",
+      "interruptible": true,
+      "hobby_id": "graffiti_street_art",
+      "satisfies_needs": [
+        "creative",
+        "self_expression"
+      ],
+      "steps": [
+        {
+          "id": "create",
+          "interaction": "spray_paint",
+          "target_tags": [
+            "wall"
+          ],
+          "duration_minutes": 60,
+          "requires": []
+        }
+      ]
+    },
+    "hobby_wildlife_photography": {
+      "name": "Wildlife Photography",
+      "category": "art",
+      "interruptible": true,
+      "hobby_id": "wildlife_photography",
+      "satisfies_needs": [
+        "creative",
+        "nature",
+        "mastery"
+      ],
+      "steps": [
+        {
+          "id": "shoot",
+          "interaction": "take_photo",
+          "target_tags": [],
+          "duration_minutes": 90,
+          "requires": []
+        },
+        {
+          "id": "edit",
+          "interaction": "edit_photos",
+          "target_tags": [
+            "computer"
+          ],
+          "duration_minutes": 30,
+          "requires": [
+            "shoot"
+          ]
+        }
+      ]
+    },
+    "hobby_guitar": {
+      "name": "Guitar Practice",
+      "category": "music",
+      "interruptible": true,
+      "hobby_id": "guitar",
+      "satisfies_needs": [
+        "creative",
+        "mastery"
+      ],
+      "steps": [
+        {
+          "id": "tune",
+          "interaction": "tune_instrument",
+          "target_tags": [
+            "guitar"
+          ],
+          "duration_minutes": 5,
+          "requires": []
+        },
+        {
+          "id": "play",
+          "interaction": "play_guitar",
+          "target_tags": [
+            "guitar"
+          ],
+          "duration_minutes": 60,
+          "requires": [
+            "tune"
+          ]
+        }
+      ]
+    },
+    "hobby_piano": {
+      "name": "Piano Practice",
+      "category": "music",
+      "interruptible": true,
+      "hobby_id": "piano",
+      "satisfies_needs": [
+        "creative",
+        "mastery"
+      ],
+      "steps": [
+        {
+          "id": "tune",
+          "interaction": "tune_instrument",
+          "target_tags": [
+            "piano"
+          ],
+          "duration_minutes": 3,
+          "requires": []
+        },
+        {
+          "id": "play",
+          "interaction": "play_piano",
+          "target_tags": [
+            "piano"
+          ],
+          "duration_minutes": 60,
+          "requires": [
+            "tune"
+          ]
+        }
+      ]
+    },
+    "hobby_violin": {
+      "name": "Violin Practice",
+      "category": "music",
+      "interruptible": true,
+      "hobby_id": "violin",
+      "satisfies_needs": [
+        "creative",
+        "mastery"
+      ],
+      "steps": [
+        {
+          "id": "tune",
+          "interaction": "tune_instrument",
+          "target_tags": [
+            "violin"
+          ],
+          "duration_minutes": 5,
+          "requires": []
+        },
+        {
+          "id": "play",
+          "interaction": "play_violin",
+          "target_tags": [
+            "violin"
+          ],
+          "duration_minutes": 60,
+          "requires": [
+            "tune"
+          ]
+        }
+      ]
+    },
+    "hobby_drums": {
+      "name": "Drum Practice",
+      "category": "music",
+      "interruptible": true,
+      "hobby_id": "drums",
+      "satisfies_needs": [
+        "creative",
+        "mastery",
+        "exercise"
+      ],
+      "steps": [
+        {
+          "id": "play",
+          "interaction": "play_drums",
+          "target_tags": [
+            "drums"
+          ],
+          "duration_minutes": 45,
+          "requires": []
+        }
+      ]
+    },
+    "hobby_bass_guitar": {
+      "name": "Bass Guitar Practice",
+      "category": "music",
+      "interruptible": true,
+      "hobby_id": "bass_guitar",
+      "satisfies_needs": [
+        "creative",
+        "mastery"
+      ],
+      "steps": [
+        {
+          "id": "tune",
+          "interaction": "tune_instrument",
+          "target_tags": [
+            "bass_guitar"
+          ],
+          "duration_minutes": 5,
+          "requires": []
+        },
+        {
+          "id": "play",
+          "interaction": "play_bass",
+          "target_tags": [
+            "bass_guitar"
+          ],
+          "duration_minutes": 60,
+          "requires": [
+            "tune"
+          ]
+        }
+      ]
+    },
+    "hobby_trumpet": {
+      "name": "Trumpet Practice",
+      "category": "music",
+      "interruptible": true,
+      "hobby_id": "trumpet",
+      "satisfies_needs": [
+        "creative",
+        "mastery"
+      ],
+      "steps": [
+        {
+          "id": "tune",
+          "interaction": "tune_instrument",
+          "target_tags": [
+            "trumpet"
+          ],
+          "duration_minutes": 5,
+          "requires": []
+        },
+        {
+          "id": "play",
+          "interaction": "play_trumpet",
+          "target_tags": [
+            "trumpet"
+          ],
+          "duration_minutes": 45,
+          "requires": [
+            "tune"
+          ]
+        }
+      ]
+    },
+    "hobby_saxophone": {
+      "name": "Saxophone Practice",
+      "category": "music",
+      "interruptible": true,
+      "hobby_id": "saxophone",
+      "satisfies_needs": [
+        "creative",
+        "mastery"
+      ],
+      "steps": [
+        {
+          "id": "tune",
+          "interaction": "tune_instrument",
+          "target_tags": [
+            "saxophone"
+          ],
+          "duration_minutes": 5,
+          "requires": []
+        },
+        {
+          "id": "play",
+          "interaction": "play_saxophone",
+          "target_tags": [
+            "saxophone"
+          ],
+          "duration_minutes": 45,
+          "requires": [
+            "tune"
+          ]
+        }
+      ]
+    },
+    "hobby_flute": {
+      "name": "Flute Practice",
+      "category": "music",
+      "interruptible": true,
+      "hobby_id": "flute",
+      "satisfies_needs": [
+        "creative",
+        "mastery"
+      ],
+      "steps": [
+        {
+          "id": "play",
+          "interaction": "play_flute",
+          "target_tags": [
+            "flute"
+          ],
+          "duration_minutes": 45,
+          "requires": []
+        }
+      ]
+    },
+    "hobby_singing_karaoke": {
+      "name": "Singing / Karaoke Session",
+      "category": "music",
+      "interruptible": true,
+      "hobby_id": "singing_karaoke",
+      "satisfies_needs": [
+        "creative",
+        "social",
+        "fun"
+      ],
+      "steps": [
+        {
+          "id": "warmup",
+          "interaction": "sing",
+          "target_tags": [],
+          "duration_minutes": 10,
+          "requires": []
+        },
+        {
+          "id": "karaoke",
+          "interaction": "sing_karaoke",
+          "target_tags": [
+            "karaoke_machine"
+          ],
+          "duration_minutes": 45,
+          "requires": [
+            "warmup"
+          ]
+        }
+      ]
+    },
+    "hobby_vinyl_records": {
+      "name": "Vinyl Listening Session",
+      "category": "music",
+      "interruptible": true,
+      "hobby_id": "vinyl_records",
+      "satisfies_needs": [
+        "relaxation",
+        "entertainment"
+      ],
+      "steps": [
+        {
+          "id": "browse",
+          "interaction": "browse_shelf",
+          "target_tags": [
+            "vinyl_shelf"
+          ],
+          "duration_minutes": 5,
+          "requires": []
+        },
+        {
+          "id": "play",
+          "interaction": "play_vinyl",
+          "target_tags": [
+            "turntable"
+          ],
+          "duration_minutes": 45,
+          "requires": [
+            "browse"
+          ]
+        }
+      ]
+    },
+    "hobby_music_events": {
+      "name": "Attend Music Event",
+      "category": "music",
+      "interruptible": false,
+      "hobby_id": "music_events",
+      "satisfies_needs": [
+        "social",
+        "entertainment",
+        "culture"
+      ],
+      "steps": [
+        {
+          "id": "attend",
+          "interaction": "perform_on_stage",
+          "target_tags": [
+            "stage"
+          ],
+          "duration_minutes": 120,
+          "requires": []
+        }
+      ]
+    },
+    "hobby_theater": {
+      "name": "Theater Rehearsal",
+      "category": "performing_arts",
+      "interruptible": true,
+      "hobby_id": "theater",
+      "satisfies_needs": [
+        "creative",
+        "social",
+        "mastery"
+      ],
+      "steps": [
+        {
+          "id": "warmup",
+          "interaction": "sing",
+          "target_tags": [],
+          "duration_minutes": 10,
+          "requires": []
+        },
+        {
+          "id": "rehearse",
+          "interaction": "rehearse_lines",
+          "target_tags": [],
+          "duration_minutes": 30,
+          "requires": [
+            "warmup"
+          ]
+        },
+        {
+          "id": "perform",
+          "interaction": "perform_on_stage",
+          "target_tags": [
+            "stage"
+          ],
+          "duration_minutes": 60,
+          "requires": [
+            "rehearse"
+          ]
+        }
+      ]
+    },
+    "hobby_opera": {
+      "name": "Opera Practice",
+      "category": "performing_arts",
+      "interruptible": true,
+      "hobby_id": "opera",
+      "satisfies_needs": [
+        "creative",
+        "mastery",
+        "culture"
+      ],
+      "steps": [
+        {
+          "id": "warmup",
+          "interaction": "sing",
+          "target_tags": [],
+          "duration_minutes": 15,
+          "requires": []
+        },
+        {
+          "id": "rehearse",
+          "interaction": "rehearse_lines",
+          "target_tags": [],
+          "duration_minutes": 30,
+          "requires": [
+            "warmup"
+          ]
+        },
+        {
+          "id": "perform",
+          "interaction": "perform_on_stage",
+          "target_tags": [
+            "stage"
+          ],
+          "duration_minutes": 60,
+          "requires": [
+            "rehearse"
+          ]
+        }
+      ]
+    },
+    "hobby_dancing": {
+      "name": "Dance Fitness Session",
+      "category": "performing_arts",
+      "interruptible": true,
+      "hobby_id": "dance_fitness",
+      "satisfies_needs": [
+        "exercise",
+        "fun",
+        "creative"
+      ],
+      "steps": [
+        {
+          "id": "stretch",
+          "interaction": "do_yoga",
+          "target_tags": [],
+          "duration_minutes": 10,
+          "requires": []
+        },
+        {
+          "id": "dance",
+          "interaction": "dance",
+          "target_tags": [],
+          "duration_minutes": 45,
+          "requires": [
+            "stretch"
+          ]
+        }
+      ]
+    },
+    "hobby_movies": {
+      "name": "Watch a Movie",
+      "category": "entertainment",
+      "interruptible": true,
+      "hobby_id": "movies",
+      "satisfies_needs": [
+        "entertainment",
+        "relaxation"
+      ],
+      "steps": [
+        {
+          "id": "sit",
+          "interaction": "sit_down_seat",
+          "target_tags": [
+            "sofa",
+            "chair"
+          ],
+          "duration_minutes": 2,
+          "requires": []
+        },
+        {
+          "id": "watch",
+          "interaction": "watch_screen",
+          "target_tags": [
+            "tv",
+            "screen"
+          ],
+          "duration_minutes": 120,
+          "requires": [
+            "sit"
+          ]
+        }
+      ]
+    },
+    "hobby_movie_making": {
+      "name": "Movie Making Session",
+      "category": "media",
+      "interruptible": true,
+      "hobby_id": "movie_making",
+      "satisfies_needs": [
+        "creative",
+        "mastery"
+      ],
+      "steps": [
+        {
+          "id": "plan",
+          "interaction": "sketch",
+          "target_tags": [
+            "desk"
+          ],
+          "duration_minutes": 20,
+          "requires": []
+        },
+        {
+          "id": "film",
+          "interaction": "film_scene",
+          "target_tags": [],
+          "duration_minutes": 60,
+          "requires": [
+            "plan"
+          ]
+        },
+        {
+          "id": "edit",
+          "interaction": "edit_video",
+          "target_tags": [
+            "computer"
+          ],
+          "duration_minutes": 90,
+          "requires": [
+            "film"
+          ]
+        }
+      ]
+    },
+    "hobby_podcasts": {
+      "name": "Podcast Recording Session",
+      "category": "media",
+      "interruptible": true,
+      "hobby_id": "podcasts",
+      "satisfies_needs": [
+        "creative",
+        "self_expression",
+        "recognition"
+      ],
+      "steps": [
+        {
+          "id": "prep",
+          "interaction": "write",
+          "target_tags": [
+            "desk",
+            "computer"
+          ],
+          "duration_minutes": 15,
+          "requires": []
+        },
+        {
+          "id": "record",
+          "interaction": "record_podcast",
+          "target_tags": [
+            "microphone"
+          ],
+          "duration_minutes": 60,
+          "requires": [
+            "prep"
+          ]
+        },
+        {
+          "id": "edit",
+          "interaction": "edit_video",
+          "target_tags": [
+            "computer"
+          ],
+          "duration_minutes": 30,
+          "requires": [
+            "record"
+          ]
+        }
+      ]
+    },
+    "hobby_art_festivals": {
+      "name": "Attend Art Festival",
+      "category": "art",
+      "interruptible": false,
+      "hobby_id": "art_festivals",
+      "satisfies_needs": [
+        "culture",
+        "social",
+        "wonder"
+      ],
+      "steps": [
+        {
+          "id": "explore",
+          "interaction": "browse_exhibit",
+          "target_tags": [],
+          "duration_minutes": 120,
+          "requires": []
+        }
+      ]
+    },
+    "hobby_music_festivals": {
+      "name": "Attend Music Festival",
+      "category": "music",
+      "interruptible": false,
+      "hobby_id": "music_festivals",
+      "satisfies_needs": [
+        "social",
+        "entertainment",
+        "culture"
+      ],
+      "steps": [
+        {
+          "id": "attend",
+          "interaction": "browse_exhibit",
+          "target_tags": [],
+          "duration_minutes": 180,
+          "requires": []
+        }
+      ]
+    },
+    "hobby_hiking": {
+      "name": "Hiking Trip",
+      "category": "nature",
+      "interruptible": true,
+      "hobby_id": "hiking",
+      "satisfies_needs": [
+        "exercise",
+        "nature",
+        "adventure"
+      ],
+      "steps": [
+        {
+          "id": "hike",
+          "interaction": "hike",
+          "target_tags": [],
+          "duration_minutes": 120,
+          "requires": []
+        }
+      ]
+    },
+    "hobby_camping": {
+      "name": "Camping Trip",
+      "category": "nature",
+      "interruptible": false,
+      "hobby_id": "camping",
+      "satisfies_needs": [
+        "nature",
+        "adventure",
+        "social"
+      ],
+      "steps": [
+        {
+          "id": "hike",
+          "interaction": "hike",
+          "target_tags": [],
+          "duration_minutes": 60,
+          "requires": []
+        },
+        {
+          "id": "setup",
+          "interaction": "plant_seeds",
+          "target_tags": [
+            "garden_bed"
+          ],
+          "duration_minutes": 30,
+          "requires": [
+            "hike"
+          ]
+        },
+        {
+          "id": "campfire",
+          "interaction": "sit_down_seat",
+          "target_tags": [],
+          "duration_minutes": 60,
+          "requires": [
+            "setup"
+          ]
+        }
+      ]
+    },
+    "hobby_fishing": {
+      "name": "Fishing Trip",
+      "category": "nature",
+      "interruptible": true,
+      "hobby_id": "fishing",
+      "satisfies_needs": [
+        "nature",
+        "relaxation",
+        "patience"
+      ],
+      "steps": [
+        {
+          "id": "cast",
+          "interaction": "cast_fishing_rod",
+          "target_tags": [],
+          "duration_minutes": 60,
+          "requires": []
+        },
+        {
+          "id": "reel",
+          "interaction": "reel_in_fish",
+          "target_tags": [],
+          "duration_minutes": 5,
+          "requires": [
+            "cast"
+          ]
+        }
+      ]
+    },
+    "hobby_birdwatching": {
+      "name": "Birdwatching Session",
+      "category": "nature",
+      "interruptible": true,
+      "hobby_id": "wildlife_photography",
+      "satisfies_needs": [
+        "nature",
+        "learning",
+        "relaxation"
+      ],
+      "steps": [
+        {
+          "id": "observe",
+          "interaction": "observe_birds",
+          "target_tags": [],
+          "duration_minutes": 90,
+          "requires": []
+        }
+      ]
+    },
+    "hobby_gardening": {
+      "name": "Gardening Session",
+      "category": "nature",
+      "interruptible": true,
+      "hobby_id": "gardening",
+      "satisfies_needs": [
+        "nature",
+        "nurture",
+        "creative"
+      ],
+      "steps": [
+        {
+          "id": "plant",
+          "interaction": "plant_seeds",
+          "target_tags": [
+            "garden_bed",
+            "planter"
+          ],
+          "duration_minutes": 20,
+          "requires": []
+        },
+        {
+          "id": "water",
+          "interaction": "water_plants",
+          "target_tags": [
+            "garden_bed",
+            "planter"
+          ],
+          "duration_minutes": 15,
+          "requires": [
+            "plant"
+          ]
+        }
+      ]
+    },
+    "hobby_astronomy": {
+      "name": "Stargazing Session",
+      "category": "nature",
+      "interruptible": true,
+      "hobby_id": "astronomy",
+      "satisfies_needs": [
+        "learning",
+        "nature",
+        "wonder"
+      ],
+      "steps": [
+        {
+          "id": "observe",
+          "interaction": "use_telescope",
+          "target_tags": [
+            "telescope"
+          ],
+          "duration_minutes": 60,
+          "requires": []
+        }
+      ]
+    },
+    "hobby_mountain_climbing": {
+      "name": "Mountain Climbing",
+      "category": "nature",
+      "interruptible": false,
+      "hobby_id": "mountain_climbing",
+      "satisfies_needs": [
+        "exercise",
+        "adventure",
+        "mastery"
+      ],
+      "steps": [
+        {
+          "id": "climb",
+          "interaction": "rock_climb",
+          "target_tags": [
+            "climbing_wall"
+          ],
+          "duration_minutes": 120,
+          "requires": []
+        }
+      ]
+    },
+    "hobby_hunting": {
+      "name": "Hunting Trip",
+      "category": "nature",
+      "interruptible": false,
+      "hobby_id": "hunting",
+      "satisfies_needs": [
+        "nature",
+        "adventure",
+        "mastery"
+      ],
+      "steps": [
+        {
+          "id": "hunt",
+          "interaction": "hike",
+          "target_tags": [],
+          "duration_minutes": 180,
+          "requires": []
+        }
+      ]
+    },
+    "hobby_running": {
+      "name": "Running Session",
+      "category": "exercise",
+      "interruptible": true,
+      "hobby_id": "running",
+      "satisfies_needs": [
+        "exercise",
+        "nature"
+      ],
+      "steps": [
+        {
+          "id": "stretch",
+          "interaction": "do_yoga",
+          "target_tags": [],
+          "duration_minutes": 5,
+          "requires": []
+        },
+        {
+          "id": "run",
+          "interaction": "run_outdoors",
+          "target_tags": [],
+          "duration_minutes": 45,
+          "requires": [
+            "stretch"
+          ]
+        }
+      ]
+    },
+    "hobby_yoga": {
+      "name": "Yoga Session",
+      "category": "exercise",
+      "interruptible": true,
+      "hobby_id": "yoga",
+      "satisfies_needs": [
+        "exercise",
+        "relaxation",
+        "mindfulness"
+      ],
+      "steps": [
+        {
+          "id": "yoga",
+          "interaction": "do_yoga",
+          "target_tags": [
+            "yoga_mat"
+          ],
+          "duration_minutes": 45,
+          "requires": []
+        }
+      ]
+    },
+    "hobby_weightlifting": {
+      "name": "Weightlifting Session",
+      "category": "exercise",
+      "interruptible": true,
+      "hobby_id": "weightlifting",
+      "satisfies_needs": [
+        "exercise",
+        "mastery"
+      ],
+      "steps": [
+        {
+          "id": "warmup",
+          "interaction": "run_treadmill",
+          "target_tags": [
+            "treadmill"
+          ],
+          "duration_minutes": 10,
+          "requires": []
+        },
+        {
+          "id": "lift",
+          "interaction": "lift_weights",
+          "target_tags": [
+            "weight_rack",
+            "weight_bench"
+          ],
+          "duration_minutes": 45,
+          "requires": [
+            "warmup"
+          ]
+        },
+        {
+          "id": "pullups",
+          "interaction": "do_pull_ups",
+          "target_tags": [
+            "pull_up_bar"
+          ],
+          "duration_minutes": 10,
+          "requires": [
+            "lift"
+          ]
+        }
+      ]
+    },
+    "hobby_crossfit": {
+      "name": "CrossFit Session",
+      "category": "exercise",
+      "interruptible": false,
+      "hobby_id": "crossfit",
+      "satisfies_needs": [
+        "exercise",
+        "mastery",
+        "social"
+      ],
+      "steps": [
+        {
+          "id": "cardio",
+          "interaction": "row",
+          "target_tags": [
+            "rowing_machine"
+          ],
+          "duration_minutes": 15,
+          "requires": []
+        },
+        {
+          "id": "lift",
+          "interaction": "lift_weights",
+          "target_tags": [
+            "weight_rack",
+            "weight_bench"
+          ],
+          "duration_minutes": 20,
+          "requires": [
+            "cardio"
+          ]
+        },
+        {
+          "id": "bag",
+          "interaction": "punch_bag",
+          "target_tags": [
+            "punching_bag"
+          ],
+          "duration_minutes": 15,
+          "requires": [
+            "lift"
+          ]
+        },
+        {
+          "id": "pullups",
+          "interaction": "do_pull_ups",
+          "target_tags": [
+            "pull_up_bar"
+          ],
+          "duration_minutes": 10,
+          "requires": [
+            "bag"
+          ]
+        }
+      ]
+    },
+    "hobby_swimming": {
+      "name": "Swimming Session",
+      "category": "exercise",
+      "interruptible": true,
+      "hobby_id": "swimming",
+      "satisfies_needs": [
+        "exercise"
+      ],
+      "steps": [
+        {
+          "id": "swim",
+          "interaction": "swim",
+          "target_tags": [
+            "pool"
+          ],
+          "duration_minutes": 45,
+          "requires": []
+        }
+      ]
+    },
+    "hobby_cycling": {
+      "name": "Cycling Session",
+      "category": "exercise",
+      "interruptible": true,
+      "hobby_id": "cycling",
+      "satisfies_needs": [
+        "exercise",
+        "nature",
+        "adventure"
+      ],
+      "steps": [
+        {
+          "id": "cycle",
+          "interaction": "cycle_outdoors",
+          "target_tags": [],
+          "duration_minutes": 60,
+          "requires": []
+        }
+      ]
+    },
+    "hobby_martial_arts": {
+      "name": "Martial Arts Training",
+      "category": "exercise",
+      "interruptible": true,
+      "hobby_id": "martial_arts",
+      "satisfies_needs": [
+        "exercise",
+        "mastery",
+        "self_discipline"
+      ],
+      "steps": [
+        {
+          "id": "warmup",
+          "interaction": "do_yoga",
+          "target_tags": [],
+          "duration_minutes": 10,
+          "requires": []
+        },
+        {
+          "id": "bag",
+          "interaction": "punch_bag",
+          "target_tags": [
+            "punching_bag"
+          ],
+          "duration_minutes": 20,
+          "requires": [
+            "warmup"
+          ]
+        },
+        {
+          "id": "train",
+          "interaction": "practice_martial_arts",
+          "target_tags": [
+            "punching_bag",
+            "mat"
+          ],
+          "duration_minutes": 30,
+          "requires": [
+            "bag"
+          ]
+        }
+      ]
+    },
+    "hobby_dance_fitness": {
+      "name": "Dance Fitness Session",
+      "category": "exercise",
+      "interruptible": true,
+      "hobby_id": "dance_fitness",
+      "satisfies_needs": [
+        "exercise",
+        "fun",
+        "creative"
+      ],
+      "steps": [
+        {
+          "id": "stretch",
+          "interaction": "do_yoga",
+          "target_tags": [],
+          "duration_minutes": 10,
+          "requires": []
+        },
+        {
+          "id": "dance",
+          "interaction": "dance",
+          "target_tags": [],
+          "duration_minutes": 45,
+          "requires": [
+            "stretch"
+          ]
+        }
+      ]
+    },
+    "hobby_boxing": {
+      "name": "Boxing Training",
+      "category": "exercise",
+      "interruptible": true,
+      "hobby_id": "boxing",
+      "satisfies_needs": [
+        "exercise",
+        "mastery",
+        "stress_relief"
+      ],
+      "steps": [
+        {
+          "id": "warmup",
+          "interaction": "run_treadmill",
+          "target_tags": [
+            "treadmill"
+          ],
+          "duration_minutes": 10,
+          "requires": []
+        },
+        {
+          "id": "bag",
+          "interaction": "punch_bag",
+          "target_tags": [
+            "punching_bag"
+          ],
+          "duration_minutes": 30,
+          "requires": [
+            "warmup"
+          ]
+        }
+      ]
+    },
+    "hobby_fencing": {
+      "name": "Fencing Practice",
+      "category": "exercise",
+      "interruptible": true,
+      "hobby_id": "fencing",
+      "satisfies_needs": [
+        "exercise",
+        "mastery",
+        "social"
+      ],
+      "steps": [
+        {
+          "id": "practice",
+          "interaction": "play_sport_offgrid",
+          "target_tags": [],
+          "duration_minutes": 60,
+          "requires": []
+        }
+      ]
+    },
+    "hobby_tennis": {
+      "name": "Tennis Session",
+      "category": "sports",
+      "interruptible": true,
+      "hobby_id": "tennis",
+      "satisfies_needs": [
+        "exercise",
+        "fun",
+        "social"
+      ],
+      "steps": [
+        {
+          "id": "play",
+          "interaction": "play_sport_offgrid",
+          "target_tags": [],
+          "duration_minutes": 60,
+          "requires": []
+        }
+      ]
+    },
+    "hobby_basketball": {
+      "name": "Basketball Session",
+      "category": "sports",
+      "interruptible": true,
+      "hobby_id": "basketball",
+      "satisfies_needs": [
+        "exercise",
+        "fun",
+        "social"
+      ],
+      "steps": [
+        {
+          "id": "play",
+          "interaction": "play_sport_offgrid",
+          "target_tags": [],
+          "duration_minutes": 60,
+          "requires": []
+        }
+      ]
+    },
+    "hobby_football_soccer": {
+      "name": "Football / Soccer Match",
+      "category": "sports",
+      "interruptible": false,
+      "hobby_id": "football_soccer",
+      "satisfies_needs": [
+        "exercise",
+        "fun",
+        "social"
+      ],
+      "steps": [
+        {
+          "id": "play",
+          "interaction": "play_sport_offgrid",
+          "target_tags": [],
+          "duration_minutes": 90,
+          "requires": []
+        }
+      ]
+    },
+    "hobby_golf": {
+      "name": "Golf Round",
+      "category": "sports",
+      "interruptible": true,
+      "hobby_id": "golf",
+      "satisfies_needs": [
+        "exercise",
+        "relaxation",
+        "social"
+      ],
+      "steps": [
+        {
+          "id": "play",
+          "interaction": "play_sport_offgrid",
+          "target_tags": [],
+          "duration_minutes": 180,
+          "requires": []
+        }
+      ]
+    },
+    "hobby_bowling": {
+      "name": "Bowling Session",
+      "category": "sports",
+      "interruptible": true,
+      "hobby_id": "bowling",
+      "satisfies_needs": [
+        "fun",
+        "social"
+      ],
+      "steps": [
+        {
+          "id": "bowl",
+          "interaction": "play_sport_offgrid",
+          "target_tags": [],
+          "duration_minutes": 60,
+          "requires": []
+        }
+      ]
+    },
+    "hobby_archery": {
+      "name": "Archery Practice",
+      "category": "sports",
+      "interruptible": true,
+      "hobby_id": "archery",
+      "satisfies_needs": [
+        "mastery",
+        "focus"
+      ],
+      "steps": [
+        {
+          "id": "aim",
+          "interaction": "shoot_arrow",
+          "target_tags": [
+            "archery_target"
+          ],
+          "duration_minutes": 45,
+          "requires": []
+        }
+      ]
+    },
+    "hobby_horseback_riding": {
+      "name": "Horseback Riding",
+      "category": "sports",
+      "interruptible": false,
+      "hobby_id": "horseback_riding",
+      "satisfies_needs": [
+        "nature",
+        "adventure",
+        "mastery"
+      ],
+      "steps": [
+        {
+          "id": "ride",
+          "interaction": "play_sport_offgrid",
+          "target_tags": [],
+          "duration_minutes": 60,
+          "requires": []
+        }
+      ]
+    },
+    "hobby_surfing": {
+      "name": "Surfing Session",
+      "category": "sports",
+      "interruptible": true,
+      "hobby_id": "surfing",
+      "satisfies_needs": [
+        "exercise",
+        "adventure",
+        "nature"
+      ],
+      "steps": [
+        {
+          "id": "surf",
+          "interaction": "play_sport_offgrid",
+          "target_tags": [],
+          "duration_minutes": 90,
+          "requires": []
+        }
+      ]
+    },
+    "hobby_snowboarding": {
+      "name": "Snowboarding Session",
+      "category": "sports",
+      "interruptible": true,
+      "hobby_id": "snowboarding",
+      "satisfies_needs": [
+        "exercise",
+        "adventure",
+        "fun"
+      ],
+      "steps": [
+        {
+          "id": "ride",
+          "interaction": "play_sport_offgrid",
+          "target_tags": [],
+          "duration_minutes": 120,
+          "requires": []
+        }
+      ]
+    },
+    "hobby_american_football": {
+      "name": "American Football Practice",
+      "category": "sports",
+      "interruptible": true,
+      "hobby_id": "american_football",
+      "satisfies_needs": [
+        "exercise",
+        "fun",
+        "social"
+      ],
+      "steps": [
+        {
+          "id": "play",
+          "interaction": "play_sport_offgrid",
+          "target_tags": [],
+          "duration_minutes": 90,
+          "requires": []
+        }
+      ]
+    },
+    "hobby_baseball": {
+      "name": "Baseball Session",
+      "category": "sports",
+      "interruptible": true,
+      "hobby_id": "baseball",
+      "satisfies_needs": [
+        "exercise",
+        "fun",
+        "social"
+      ],
+      "steps": [
+        {
+          "id": "play",
+          "interaction": "play_sport_offgrid",
+          "target_tags": [],
+          "duration_minutes": 90,
+          "requires": []
+        }
+      ]
+    },
+    "hobby_ice_hockey": {
+      "name": "Ice Hockey Session",
+      "category": "sports",
+      "interruptible": false,
+      "hobby_id": "ice_hockey",
+      "satisfies_needs": [
+        "exercise",
+        "fun",
+        "social"
+      ],
+      "steps": [
+        {
+          "id": "play",
+          "interaction": "play_sport_offgrid",
+          "target_tags": [],
+          "duration_minutes": 60,
+          "requires": []
+        }
+      ]
+    },
+    "hobby_volleyball": {
+      "name": "Volleyball Session",
+      "category": "sports",
+      "interruptible": true,
+      "hobby_id": "volleyball",
+      "satisfies_needs": [
+        "exercise",
+        "fun",
+        "social"
+      ],
+      "steps": [
+        {
+          "id": "play",
+          "interaction": "play_sport_offgrid",
+          "target_tags": [],
+          "duration_minutes": 60,
+          "requires": []
+        }
+      ]
+    },
+    "hobby_shooting_sports": {
+      "name": "Shooting Range Session",
+      "category": "sports",
+      "interruptible": true,
+      "hobby_id": "shooting_sports",
+      "satisfies_needs": [
+        "mastery",
+        "focus"
+      ],
+      "steps": [
+        {
+          "id": "shoot",
+          "interaction": "shoot_arrow",
+          "target_tags": [
+            "archery_target"
+          ],
+          "duration_minutes": 60,
+          "requires": []
+        }
+      ]
+    },
+    "hobby_skateboarding": {
+      "name": "Skateboarding Session",
+      "category": "sports",
+      "interruptible": true,
+      "hobby_id": "skateboarding",
+      "satisfies_needs": [
+        "exercise",
+        "fun",
+        "adventure"
+      ],
+      "steps": [
+        {
+          "id": "skate",
+          "interaction": "play_sport_offgrid",
+          "target_tags": [],
+          "duration_minutes": 60,
+          "requires": []
+        }
+      ]
+    },
+    "hobby_coin_collecting": {
+      "name": "Coin Collecting Session",
+      "category": "collections",
+      "interruptible": true,
+      "hobby_id": "coin_collecting",
+      "satisfies_needs": [
+        "learning",
+        "mastery"
+      ],
+      "steps": [
+        {
+          "id": "examine",
+          "interaction": "examine_collectible",
+          "target_tags": [
+            "desk",
+            "table"
+          ],
+          "duration_minutes": 30,
+          "requires": []
+        },
+        {
+          "id": "catalog",
+          "interaction": "catalog_collection",
+          "target_tags": [
+            "desk"
+          ],
+          "duration_minutes": 20,
+          "requires": [
+            "examine"
+          ]
+        }
+      ]
+    },
+    "hobby_stamp_collecting": {
+      "name": "Stamp Collecting Session",
+      "category": "collections",
+      "interruptible": true,
+      "hobby_id": "stamp_collecting",
+      "satisfies_needs": [
+        "learning",
+        "mastery"
+      ],
+      "steps": [
+        {
+          "id": "examine",
+          "interaction": "examine_collectible",
+          "target_tags": [
+            "desk",
+            "table"
+          ],
+          "duration_minutes": 20,
+          "requires": []
+        },
+        {
+          "id": "catalog",
+          "interaction": "catalog_collection",
+          "target_tags": [
+            "desk"
+          ],
+          "duration_minutes": 20,
+          "requires": [
+            "examine"
+          ]
+        }
+      ]
+    },
+    "hobby_trading_cards": {
+      "name": "Trading Card Session",
+      "category": "collections",
+      "interruptible": true,
+      "hobby_id": "trading_cards",
+      "satisfies_needs": [
+        "fun",
+        "social",
+        "mastery"
+      ],
+      "steps": [
+        {
+          "id": "examine",
+          "interaction": "examine_collectible",
+          "target_tags": [
+            "desk",
+            "table"
+          ],
+          "duration_minutes": 20,
+          "requires": []
+        },
+        {
+          "id": "catalog",
+          "interaction": "catalog_collection",
+          "target_tags": [
+            "desk"
+          ],
+          "duration_minutes": 15,
+          "requires": [
+            "examine"
+          ]
+        }
+      ]
+    },
+    "hobby_action_figures": {
+      "name": "Action Figure Session",
+      "category": "collections",
+      "interruptible": true,
+      "hobby_id": "action_figures",
+      "satisfies_needs": [
+        "fun",
+        "mastery",
+        "creative"
+      ],
+      "steps": [
+        {
+          "id": "examine",
+          "interaction": "examine_collectible",
+          "target_tags": [
+            "desk",
+            "table"
+          ],
+          "duration_minutes": 20,
+          "requires": []
+        },
+        {
+          "id": "catalog",
+          "interaction": "catalog_collection",
+          "target_tags": [
+            "desk"
+          ],
+          "duration_minutes": 15,
+          "requires": [
+            "examine"
+          ]
+        }
+      ]
+    },
+    "hobby_comic_books": {
+      "name": "Read Comics",
+      "category": "collections",
+      "interruptible": true,
+      "hobby_id": "comic_books",
+      "satisfies_needs": [
+        "entertainment",
+        "learning",
+        "imagination"
+      ],
+      "steps": [
+        {
+          "id": "sit",
+          "interaction": "sit_down_seat",
+          "target_tags": [
+            "sofa",
+            "chair"
+          ],
+          "duration_minutes": 2,
+          "requires": []
+        },
+        {
+          "id": "read",
+          "interaction": "read",
+          "target_tags": [],
+          "duration_minutes": 45,
+          "requires": [
+            "sit"
+          ]
+        }
+      ]
+    },
+    "hobby_model_trains": {
+      "name": "Model Train Session",
+      "category": "collections",
+      "interruptible": true,
+      "hobby_id": "model_trains",
+      "satisfies_needs": [
+        "creative",
+        "mastery"
+      ],
+      "steps": [
+        {
+          "id": "build",
+          "interaction": "catalog_collection",
+          "target_tags": [
+            "desk",
+            "table"
+          ],
+          "duration_minutes": 60,
+          "requires": []
+        }
+      ]
+    },
+    "hobby_video_game_collecting": {
+      "name": "Video Game Collection Session",
+      "category": "collections",
+      "interruptible": true,
+      "hobby_id": "video_game_collecting",
+      "satisfies_needs": [
+        "fun",
+        "mastery"
+      ],
+      "steps": [
+        {
+          "id": "examine",
+          "interaction": "examine_collectible",
+          "target_tags": [
+            "desk",
+            "table"
+          ],
+          "duration_minutes": 20,
+          "requires": []
+        },
+        {
+          "id": "play",
+          "interaction": "play_video_game",
+          "target_tags": [
+            "gaming_setup",
+            "tv"
+          ],
+          "duration_minutes": 60,
+          "requires": [
+            "examine"
+          ]
+        }
+      ]
+    },
+    "hobby_art_museums": {
+      "name": "Visit Art Museum",
+      "category": "history",
+      "interruptible": true,
+      "hobby_id": "art_museums",
+      "satisfies_needs": [
+        "culture",
+        "learning",
+        "wonder"
+      ],
+      "steps": [
+        {
+          "id": "browse",
+          "interaction": "browse_exhibit",
+          "target_tags": [],
+          "duration_minutes": 90,
+          "requires": []
+        }
+      ]
+    },
+    "hobby_museum_visits": {
+      "name": "Visit Museum",
+      "category": "history",
+      "interruptible": true,
+      "hobby_id": "museum_visits",
+      "satisfies_needs": [
+        "culture",
+        "learning",
+        "wonder"
+      ],
+      "steps": [
+        {
+          "id": "browse",
+          "interaction": "browse_exhibit",
+          "target_tags": [],
+          "duration_minutes": 90,
+          "requires": []
+        }
+      ]
+    },
+    "hobby_historical_research": {
+      "name": "Historical Research Session",
+      "category": "history",
+      "interruptible": true,
+      "hobby_id": "historical_research",
+      "satisfies_needs": [
+        "learning",
+        "mastery"
+      ],
+      "steps": [
+        {
+          "id": "research",
+          "interaction": "research_history",
+          "target_tags": [
+            "computer",
+            "desk"
+          ],
+          "duration_minutes": 90,
+          "requires": []
+        }
+      ]
+    },
+    "hobby_historical_writing": {
+      "name": "Historical Writing Session",
+      "category": "history",
+      "interruptible": true,
+      "hobby_id": "historical_writing",
+      "satisfies_needs": [
+        "learning",
+        "creative",
+        "mastery"
+      ],
+      "steps": [
+        {
+          "id": "research",
+          "interaction": "research_history",
+          "target_tags": [
+            "computer",
+            "desk"
+          ],
+          "duration_minutes": 30,
+          "requires": []
+        },
+        {
+          "id": "write",
+          "interaction": "write",
+          "target_tags": [
+            "desk",
+            "computer"
+          ],
+          "duration_minutes": 60,
+          "requires": [
+            "research"
+          ]
+        }
+      ]
+    },
+    "hobby_historical_reenactment": {
+      "name": "Historical Reenactment",
+      "category": "history",
+      "interruptible": false,
+      "hobby_id": "historical_reenactment",
+      "satisfies_needs": [
+        "creative",
+        "social",
+        "culture"
+      ],
+      "steps": [
+        {
+          "id": "rehearse",
+          "interaction": "rehearse_lines",
+          "target_tags": [],
+          "duration_minutes": 30,
+          "requires": []
+        },
+        {
+          "id": "perform",
+          "interaction": "perform_on_stage",
+          "target_tags": [
+            "stage"
+          ],
+          "duration_minutes": 90,
+          "requires": [
+            "rehearse"
+          ]
+        }
+      ]
+    },
+    "hobby_archaeology": {
+      "name": "Archaeology Field Work",
+      "category": "history",
+      "interruptible": false,
+      "hobby_id": "archaeology",
+      "satisfies_needs": [
+        "learning",
+        "adventure",
+        "mastery"
+      ],
+      "steps": [
+        {
+          "id": "excavate",
+          "interaction": "hike",
+          "target_tags": [],
+          "duration_minutes": 180,
+          "requires": []
+        }
+      ]
+    },
+    "hobby_poker": {
+      "name": "Poker Session",
+      "category": "gambling",
+      "interruptible": true,
+      "hobby_id": "poker",
+      "satisfies_needs": [
+        "fun",
+        "social",
+        "thrill"
+      ],
+      "steps": [
+        {
+          "id": "play",
+          "interaction": "play_card_game",
+          "target_tags": [
+            "card_table",
+            "table"
+          ],
+          "duration_minutes": 120,
+          "requires": []
+        }
+      ]
+    },
+    "hobby_blackjack": {
+      "name": "Blackjack Session",
+      "category": "gambling",
+      "interruptible": true,
+      "hobby_id": "blackjack",
+      "satisfies_needs": [
+        "fun",
+        "thrill"
+      ],
+      "steps": [
+        {
+          "id": "play",
+          "interaction": "play_card_game",
+          "target_tags": [
+            "card_table",
+            "table"
+          ],
+          "duration_minutes": 60,
+          "requires": []
+        }
+      ]
+    },
+    "hobby_slot_machines": {
+      "name": "Slot Machine Session",
+      "category": "gambling",
+      "interruptible": true,
+      "hobby_id": "slot_machines",
+      "satisfies_needs": [
+        "thrill",
+        "fun"
+      ],
+      "steps": [
+        {
+          "id": "play",
+          "interaction": "place_bet",
+          "target_tags": [],
+          "duration_minutes": 60,
+          "requires": []
+        }
+      ]
+    },
+    "hobby_roulette": {
+      "name": "Roulette Session",
+      "category": "gambling",
+      "interruptible": true,
+      "hobby_id": "roulette",
+      "satisfies_needs": [
+        "thrill",
+        "fun",
+        "social"
+      ],
+      "steps": [
+        {
+          "id": "play",
+          "interaction": "place_bet",
+          "target_tags": [],
+          "duration_minutes": 60,
+          "requires": []
+        }
+      ]
+    },
+    "hobby_sports_betting": {
+      "name": "Sports Betting",
+      "category": "gambling",
+      "interruptible": true,
+      "hobby_id": "sports_betting",
+      "satisfies_needs": [
+        "thrill"
+      ],
+      "steps": [
+        {
+          "id": "bet",
+          "interaction": "place_bet",
+          "target_tags": [],
+          "duration_minutes": 15,
+          "requires": []
+        }
+      ]
+    },
+    "hobby_horse_racing_betting": {
+      "name": "Horse Racing & Betting",
+      "category": "gambling",
+      "interruptible": false,
+      "hobby_id": "horse_racing_betting",
+      "satisfies_needs": [
+        "thrill",
+        "social"
+      ],
+      "steps": [
+        {
+          "id": "bet",
+          "interaction": "place_bet",
+          "target_tags": [],
+          "duration_minutes": 10,
+          "requires": []
+        },
+        {
+          "id": "watch",
+          "interaction": "watch_screen",
+          "target_tags": [
+            "tv",
+            "screen"
+          ],
+          "duration_minutes": 30,
+          "requires": [
+            "bet"
+          ]
+        }
+      ]
+    },
+    "hobby_bingo": {
+      "name": "Bingo Session",
+      "category": "gambling",
+      "interruptible": true,
+      "hobby_id": "bingo",
+      "satisfies_needs": [
+        "fun",
+        "social"
+      ],
+      "steps": [
+        {
+          "id": "play",
+          "interaction": "play_card_game",
+          "target_tags": [
+            "table"
+          ],
+          "duration_minutes": 60,
+          "requires": []
+        }
+      ]
+    },
+    "hobby_lottery": {
+      "name": "Play Lottery",
+      "category": "gambling",
+      "interruptible": true,
+      "hobby_id": "lottery",
+      "satisfies_needs": [
+        "thrill"
+      ],
+      "steps": [
+        {
+          "id": "buy",
+          "interaction": "place_bet",
+          "target_tags": [],
+          "duration_minutes": 5,
+          "requires": []
+        }
+      ]
+    },
+    "hobby_boardgames": {
+      "name": "Board Game Session",
+      "category": "games",
+      "interruptible": true,
+      "hobby_id": "boardgames",
+      "satisfies_needs": [
+        "fun",
+        "social",
+        "competition"
+      ],
+      "steps": [
+        {
+          "id": "play",
+          "interaction": "play_board_game",
+          "target_tags": [
+            "table"
+          ],
+          "duration_minutes": 90,
+          "requires": []
+        }
+      ]
+    },
+    "hobby_pictionary": {
+      "name": "Pictionary Session",
+      "category": "games",
+      "interruptible": true,
+      "hobby_id": "pictionary",
+      "satisfies_needs": [
+        "fun",
+        "social",
+        "creative"
+      ],
+      "steps": [
+        {
+          "id": "play",
+          "interaction": "play_board_game",
+          "target_tags": [
+            "table"
+          ],
+          "duration_minutes": 60,
+          "requires": []
+        }
+      ]
+    },
+    "hobby_quiz_games": {
+      "name": "Quiz Night",
+      "category": "games",
+      "interruptible": true,
+      "hobby_id": "quiz_games",
+      "satisfies_needs": [
+        "fun",
+        "social",
+        "learning"
+      ],
+      "steps": [
+        {
+          "id": "play",
+          "interaction": "play_board_game",
+          "target_tags": [
+            "table"
+          ],
+          "duration_minutes": 60,
+          "requires": []
+        }
+      ]
+    },
+    "hobby_video_games": {
+      "name": "Video Game Session",
+      "category": "games",
+      "interruptible": true,
+      "hobby_id": "video_games",
+      "satisfies_needs": [
+        "fun",
+        "entertainment",
+        "mastery"
+      ],
+      "steps": [
+        {
+          "id": "sit",
+          "interaction": "sit_down_seat",
+          "target_tags": [
+            "sofa",
+            "chair",
+            "gaming_chair"
+          ],
+          "duration_minutes": 2,
+          "requires": []
+        },
+        {
+          "id": "play",
+          "interaction": "play_video_game",
+          "target_tags": [
+            "gaming_setup",
+            "tv",
+            "computer"
+          ],
+          "duration_minutes": 60,
+          "requires": [
+            "sit"
+          ]
+        }
+      ]
+    },
+    "hobby_esports": {
+      "name": "Esports Session",
+      "category": "games",
+      "interruptible": false,
+      "hobby_id": "esports",
+      "satisfies_needs": [
+        "fun",
+        "mastery",
+        "competition",
+        "social"
+      ],
+      "steps": [
+        {
+          "id": "sit",
+          "interaction": "sit_down_seat",
+          "target_tags": [
+            "chair"
+          ],
+          "duration_minutes": 2,
+          "requires": []
+        },
+        {
+          "id": "play",
+          "interaction": "play_video_game",
+          "target_tags": [
+            "computer",
+            "gaming_setup"
+          ],
+          "duration_minutes": 120,
+          "requires": [
+            "sit"
+          ]
+        }
+      ]
+    },
+    "hobby_cooking": {
+      "name": "Cooking Session",
+      "category": "culinary",
+      "interruptible": false,
+      "hobby_id": "cooking",
+      "satisfies_needs": [
+        "creative",
+        "nurture"
+      ],
+      "steps": [
+        {
+          "id": "prep",
+          "interaction": "chop_ingredients",
+          "target_tags": [
+            "counter"
+          ],
+          "duration_minutes": 15,
+          "requires": []
+        },
+        {
+          "id": "cook",
+          "interaction": "cook_on_stove",
+          "target_tags": [
+            "stove"
+          ],
+          "duration_minutes": 30,
+          "requires": [
+            "prep"
+          ]
+        },
+        {
+          "id": "plate",
+          "interaction": "chop_ingredients",
+          "target_tags": [
+            "counter"
+          ],
+          "duration_minutes": 5,
+          "requires": [
+            "cook"
+          ]
+        },
+        {
+          "id": "eat",
+          "interaction": "eat_meal",
+          "target_tags": [
+            "table",
+            "counter"
+          ],
+          "duration_minutes": 20,
+          "requires": [
+            "plate"
+          ]
+        }
+      ]
+    },
+    "hobby_baking": {
+      "name": "Baking Session",
+      "category": "culinary",
+      "interruptible": false,
+      "hobby_id": "baking",
+      "satisfies_needs": [
+        "creative",
+        "nurture"
+      ],
+      "steps": [
+        {
+          "id": "prep",
+          "interaction": "chop_ingredients",
+          "target_tags": [
+            "counter"
+          ],
+          "duration_minutes": 10,
+          "requires": []
+        },
+        {
+          "id": "mix",
+          "interaction": "mix_batter",
+          "target_tags": [
+            "counter"
+          ],
+          "duration_minutes": 15,
+          "requires": [
+            "prep"
+          ]
+        },
+        {
+          "id": "bake",
+          "interaction": "bake_in_oven",
+          "target_tags": [
+            "oven"
+          ],
+          "duration_minutes": 45,
+          "requires": [
+            "mix"
+          ]
+        }
+      ]
+    },
+    "hobby_wine_tasting": {
+      "name": "Wine Tasting",
+      "category": "culinary",
+      "interruptible": true,
+      "hobby_id": "roulette",
+      "satisfies_needs": [
+        "relaxation",
+        "learning",
+        "culture"
+      ],
+      "steps": [
+        {
+          "id": "taste",
+          "interaction": "taste_wine",
+          "target_tags": [
+            "table"
+          ],
+          "duration_minutes": 30,
+          "requires": []
+        }
+      ]
+    },
+    "hobby_reading": {
+      "name": "Reading Session",
+      "category": "literary",
+      "interruptible": true,
+      "hobby_id": "reading",
+      "satisfies_needs": [
+        "learning",
+        "relaxation",
+        "imagination"
+      ],
+      "steps": [
+        {
+          "id": "sit",
+          "interaction": "sit_down_seat",
+          "target_tags": [
+            "sofa",
+            "chair"
+          ],
+          "duration_minutes": 2,
+          "requires": []
+        },
+        {
+          "id": "read",
+          "interaction": "read",
+          "target_tags": [],
+          "duration_minutes": 60,
+          "requires": [
+            "sit"
+          ]
+        }
+      ]
+    },
+    "hobby_books": {
+      "name": "Reading Session",
+      "category": "literary",
+      "interruptible": true,
+      "hobby_id": "books",
+      "satisfies_needs": [
+        "learning",
+        "relaxation",
+        "imagination"
+      ],
+      "steps": [
+        {
+          "id": "sit",
+          "interaction": "sit_down_seat",
+          "target_tags": [
+            "sofa",
+            "chair"
+          ],
+          "duration_minutes": 2,
+          "requires": []
+        },
+        {
+          "id": "read",
+          "interaction": "read",
+          "target_tags": [],
+          "duration_minutes": 60,
+          "requires": [
+            "sit"
+          ]
+        }
+      ]
+    },
+    "hobby_reading_biographies": {
+      "name": "Read Biography",
+      "category": "literary",
+      "interruptible": true,
+      "hobby_id": "reading_biographies",
+      "satisfies_needs": [
+        "learning",
+        "imagination"
+      ],
+      "steps": [
+        {
+          "id": "sit",
+          "interaction": "sit_down_seat",
+          "target_tags": [
+            "sofa",
+            "chair"
+          ],
+          "duration_minutes": 2,
+          "requires": []
+        },
+        {
+          "id": "read",
+          "interaction": "read",
+          "target_tags": [],
+          "duration_minutes": 60,
+          "requires": [
+            "sit"
+          ]
+        }
+      ]
+    },
+    "hobby_book_club": {
+      "name": "Book Club Meeting",
+      "category": "literary",
+      "interruptible": false,
+      "hobby_id": "book_club",
+      "satisfies_needs": [
+        "social",
+        "learning",
+        "creative"
+      ],
+      "steps": [
+        {
+          "id": "read",
+          "interaction": "read",
+          "target_tags": [],
+          "duration_minutes": 30,
+          "requires": []
+        },
+        {
+          "id": "sit",
+          "interaction": "sit_down_seat",
+          "target_tags": [
+            "sofa",
+            "chair",
+            "table"
+          ],
+          "duration_minutes": 2,
+          "requires": [
+            "read"
+          ]
+        },
+        {
+          "id": "discuss",
+          "interaction": "discuss_book",
+          "target_tags": [
+            "sofa",
+            "table"
+          ],
+          "duration_minutes": 45,
+          "requires": [
+            "sit"
           ]
         }
       ]
