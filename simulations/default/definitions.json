@@ -261,7 +261,16 @@
           "dy": 0
         }
       ],
-      "anchors": [],
+      "anchors": [
+        {
+          "name": "anchor_paint",
+          "interaction": "paint"
+        },
+        {
+          "name": "anchor_sketch",
+          "interaction": "sketch"
+        }
+      ],
       "storage": null,
       "tags": [
         "art",
@@ -482,7 +491,16 @@
           "dy": 0
         }
       ],
-      "anchors": [],
+      "anchors": [
+        {
+          "name": "anchor_open_storage",
+          "interaction": "open_storage"
+        },
+        {
+          "name": "anchor_change_clothes",
+          "interaction": "change_clothes"
+        }
+      ],
       "storage": {
         "slots": 30,
         "accepted_categories": [
@@ -509,7 +527,16 @@
           "dy": 0
         }
       ],
-      "anchors": [],
+      "anchors": [
+        {
+          "name": "anchor_open_storage",
+          "interaction": "open_storage"
+        },
+        {
+          "name": "anchor_change_clothes",
+          "interaction": "change_clothes"
+        }
+      ],
       "storage": {
         "slots": 20,
         "accepted_categories": [
@@ -532,7 +559,16 @@
           "dy": 0
         }
       ],
-      "anchors": [],
+      "anchors": [
+        {
+          "name": "anchor_open_storage",
+          "interaction": "open_storage"
+        },
+        {
+          "name": "anchor_grab_item",
+          "interaction": "grab_item"
+        }
+      ],
       "storage": {
         "slots": 4,
         "accepted_categories": [
@@ -560,7 +596,16 @@
           "dy": 0
         }
       ],
-      "anchors": [],
+      "anchors": [
+        {
+          "name": "anchor_open_storage",
+          "interaction": "open_storage"
+        },
+        {
+          "name": "anchor_grab_item",
+          "interaction": "grab_item"
+        }
+      ],
       "storage": {
         "slots": 15,
         "accepted_categories": []
@@ -580,7 +625,16 @@
           "dy": 0
         }
       ],
-      "anchors": [],
+      "anchors": [
+        {
+          "name": "anchor_put_on_shoes",
+          "interaction": "put_on_shoes"
+        },
+        {
+          "name": "anchor_store_shoes",
+          "interaction": "store_shoes"
+        }
+      ],
       "storage": {
         "slots": 10,
         "accepted_categories": [
@@ -603,7 +657,16 @@
           "dy": 0
         }
       ],
-      "anchors": [],
+      "anchors": [
+        {
+          "name": "anchor_hang_coat",
+          "interaction": "hang_coat"
+        },
+        {
+          "name": "anchor_grab_coat",
+          "interaction": "grab_coat"
+        }
+      ],
       "storage": {
         "slots": 6,
         "accepted_categories": [
@@ -630,7 +693,16 @@
           "dy": 0
         }
       ],
-      "anchors": [],
+      "anchors": [
+        {
+          "name": "anchor_place_item",
+          "interaction": "place_item"
+        },
+        {
+          "name": "anchor_pick_up_item",
+          "interaction": "pick_up_item"
+        }
+      ],
       "storage": null,
       "tags": [
         "furniture",
@@ -648,7 +720,16 @@
           "dy": 0
         }
       ],
-      "anchors": [],
+      "anchors": [
+        {
+          "name": "anchor_place_item",
+          "interaction": "place_item"
+        },
+        {
+          "name": "anchor_pick_up_item",
+          "interaction": "pick_up_item"
+        }
+      ],
       "storage": null,
       "tags": [
         "furniture",
@@ -673,7 +754,12 @@
           "dy": 0
         }
       ],
-      "anchors": [],
+      "anchors": [
+        {
+          "name": "anchor_browse_shelf",
+          "interaction": "browse_shelf"
+        }
+      ],
       "storage": {
         "slots": 6,
         "accepted_categories": [
@@ -903,7 +989,16 @@
           "dy": 0
         }
       ],
-      "anchors": [],
+      "anchors": [
+        {
+          "name": "anchor_open_storage",
+          "interaction": "open_storage"
+        },
+        {
+          "name": "anchor_grab_item",
+          "interaction": "grab_item"
+        }
+      ],
       "storage": {
         "slots": 15,
         "accepted_categories": [
@@ -1169,7 +1264,16 @@
           "dy": 0
         }
       ],
-      "anchors": [],
+      "anchors": [
+        {
+          "name": "anchor_open_storage",
+          "interaction": "open_storage"
+        },
+        {
+          "name": "anchor_grab_item",
+          "interaction": "grab_item"
+        }
+      ],
       "storage": {
         "slots": 10,
         "accepted_categories": [
@@ -1220,7 +1324,16 @@
           "dy": 0
         }
       ],
-      "anchors": [],
+      "anchors": [
+        {
+          "name": "anchor_grab_towel",
+          "interaction": "grab_towel"
+        },
+        {
+          "name": "anchor_hang_towel",
+          "interaction": "hang_towel"
+        }
+      ],
       "storage": {
         "slots": 4,
         "accepted_categories": [
@@ -1248,7 +1361,8 @@
       "tags": [
         "decor",
         "bathroom"
-      ]
+      ],
+      "isDecorative": true
     },
     "washing_machine": {
       "name": "Washing Machine",
@@ -1316,7 +1430,16 @@
           "dy": 0
         }
       ],
-      "anchors": [],
+      "anchors": [
+        {
+          "name": "anchor_add_laundry",
+          "interaction": "add_laundry"
+        },
+        {
+          "name": "anchor_do_laundry",
+          "interaction": "do_laundry"
+        }
+      ],
       "storage": {
         "slots": 12,
         "accepted_categories": [
@@ -1456,7 +1579,12 @@
           "dy": 0
         }
       ],
-      "anchors": [],
+      "anchors": [
+        {
+          "name": "anchor_dispose_trash",
+          "interaction": "dispose_trash"
+        }
+      ],
       "storage": {
         "slots": 6,
         "accepted_categories": []
@@ -1477,7 +1605,12 @@
           "dy": 0
         }
       ],
-      "anchors": [],
+      "anchors": [
+        {
+          "name": "anchor_open_storage",
+          "interaction": "open_storage"
+        }
+      ],
       "storage": {
         "slots": 10,
         "accepted_categories": []
@@ -1528,7 +1661,16 @@
           "dy": 0
         }
       ],
-      "anchors": [],
+      "anchors": [
+        {
+          "name": "anchor_eat_meal",
+          "interaction": "eat_meal"
+        },
+        {
+          "name": "anchor_place_item",
+          "interaction": "place_item"
+        }
+      ],
       "storage": null,
       "tags": [
         "outdoor",
@@ -1581,7 +1723,12 @@
           "dy": 1
         }
       ],
-      "anchors": [],
+      "anchors": [
+        {
+          "name": "anchor_open_storage",
+          "interaction": "open_storage"
+        }
+      ],
       "storage": {
         "slots": 30,
         "accepted_categories": [
@@ -1832,7 +1979,16 @@
           "dy": 0
         }
       ],
-      "anchors": [],
+      "anchors": [
+        {
+          "name": "anchor_watch_content",
+          "interaction": "watch_content"
+        },
+        {
+          "name": "anchor_toggle_projector",
+          "interaction": "toggle_projector"
+        }
+      ],
       "storage": null,
       "tags": [
         "electronics",
@@ -2044,7 +2200,16 @@
           "dy": 1
         }
       ],
-      "anchors": [],
+      "anchors": [
+        {
+          "name": "anchor_practice_instrument",
+          "interaction": "practice_instrument"
+        },
+        {
+          "name": "anchor_listen_to_music",
+          "interaction": "listen_to_music"
+        }
+      ],
       "storage": {
         "slots": 10,
         "accepted_categories": [
@@ -2162,7 +2327,16 @@
           "dy": 0
         }
       ],
-      "anchors": [],
+      "anchors": [
+        {
+          "name": "anchor_open_storage",
+          "interaction": "open_storage"
+        },
+        {
+          "name": "anchor_grab_drink",
+          "interaction": "grab_drink"
+        }
+      ],
       "storage": {
         "slots": 12,
         "accepted_categories": [
@@ -2185,7 +2359,16 @@
           "dy": 0
         }
       ],
-      "anchors": [],
+      "anchors": [
+        {
+          "name": "anchor_grab_drink",
+          "interaction": "grab_drink"
+        },
+        {
+          "name": "anchor_store_drink",
+          "interaction": "store_drink"
+        }
+      ],
       "storage": {
         "slots": 12,
         "accepted_categories": [
@@ -2212,7 +2395,16 @@
           "dy": 0
         }
       ],
-      "anchors": [],
+      "anchors": [
+        {
+          "name": "anchor_place_item",
+          "interaction": "place_item"
+        },
+        {
+          "name": "anchor_pick_up_item",
+          "interaction": "pick_up_item"
+        }
+      ],
       "storage": {
         "slots": 4,
         "accepted_categories": []
@@ -2246,7 +2438,8 @@
       "tags": [
         "furniture",
         "divider"
-      ]
+      ],
+      "isDecorative": true
     },
     "fireplace": {
       "name": "Fireplace",
@@ -2293,7 +2486,16 @@
           "dy": 0
         }
       ],
-      "anchors": [],
+      "anchors": [
+        {
+          "name": "anchor_browse_shelf",
+          "interaction": "browse_shelf"
+        },
+        {
+          "name": "anchor_grab_item",
+          "interaction": "grab_item"
+        }
+      ],
       "storage": {
         "slots": 8,
         "accepted_categories": [
@@ -2326,7 +2528,16 @@
           "dy": 0
         }
       ],
-      "anchors": [],
+      "anchors": [
+        {
+          "name": "anchor_browse_shelf",
+          "interaction": "browse_shelf"
+        },
+        {
+          "name": "anchor_grab_item",
+          "interaction": "grab_item"
+        }
+      ],
       "storage": {
         "slots": 10,
         "accepted_categories": [
@@ -2350,7 +2561,12 @@
           "dy": 0
         }
       ],
-      "anchors": [],
+      "anchors": [
+        {
+          "name": "anchor_check_time",
+          "interaction": "check_time"
+        }
+      ],
       "storage": null,
       "tags": [
         "decor",
@@ -2367,7 +2583,12 @@
           "dy": 0
         }
       ],
-      "anchors": [],
+      "anchors": [
+        {
+          "name": "anchor_check_appearance",
+          "interaction": "check_appearance"
+        }
+      ],
       "storage": null,
       "tags": [
         "furniture",
@@ -2391,7 +2612,8 @@
         "decor",
         "plant",
         "outdoor"
-      ]
+      ],
+      "isDecorative": true
     },
     "corkboard": {
       "name": "Corkboard",
@@ -2403,7 +2625,16 @@
           "dy": 0
         }
       ],
-      "anchors": [],
+      "anchors": [
+        {
+          "name": "anchor_pin_note",
+          "interaction": "pin_note"
+        },
+        {
+          "name": "anchor_read_board",
+          "interaction": "read_board"
+        }
+      ],
       "storage": null,
       "tags": [
         "office",
@@ -2590,7 +2821,16 @@
           "dy": 0
         }
       ],
-      "anchors": [],
+      "anchors": [
+        {
+          "name": "anchor_hang_clothes",
+          "interaction": "hang_clothes"
+        },
+        {
+          "name": "anchor_change_clothes",
+          "interaction": "change_clothes"
+        }
+      ],
       "storage": {
         "slots": 16,
         "accepted_categories": [
@@ -2659,7 +2899,8 @@
         "fixture",
         "bathroom",
         "shower"
-      ]
+      ],
+      "isDecorative": true
     },
     "bath_storage": {
       "name": "Bath Storage Unit",
@@ -2671,7 +2912,16 @@
           "dy": 0
         }
       ],
-      "anchors": [],
+      "anchors": [
+        {
+          "name": "anchor_open_storage",
+          "interaction": "open_storage"
+        },
+        {
+          "name": "anchor_grab_item",
+          "interaction": "grab_item"
+        }
+      ],
       "storage": {
         "slots": 10,
         "accepted_categories": [
@@ -2695,7 +2945,12 @@
           "dy": 0
         }
       ],
-      "anchors": [],
+      "anchors": [
+        {
+          "name": "anchor_add_laundry",
+          "interaction": "add_laundry"
+        }
+      ],
       "storage": {
         "slots": 10,
         "accepted_categories": [
@@ -2723,7 +2978,16 @@
           "dy": 0
         }
       ],
-      "anchors": [],
+      "anchors": [
+        {
+          "name": "anchor_open_storage",
+          "interaction": "open_storage"
+        },
+        {
+          "name": "anchor_grab_food",
+          "interaction": "grab_food"
+        }
+      ],
       "storage": {
         "slots": 30,
         "accepted_categories": [
@@ -2787,7 +3051,16 @@
           "dy": 0
         }
       ],
-      "anchors": [],
+      "anchors": [
+        {
+          "name": "anchor_open_storage",
+          "interaction": "open_storage"
+        },
+        {
+          "name": "anchor_grab_drink",
+          "interaction": "grab_drink"
+        }
+      ],
       "storage": {
         "slots": 12,
         "accepted_categories": [
@@ -2815,7 +3088,12 @@
           "dy": 0
         }
       ],
-      "anchors": [],
+      "anchors": [
+        {
+          "name": "anchor_toggle_ventilation",
+          "interaction": "toggle_ventilation"
+        }
+      ],
       "storage": null,
       "tags": [
         "appliance",
@@ -2856,7 +3134,16 @@
           "dy": 0
         }
       ],
-      "anchors": [],
+      "anchors": [
+        {
+          "name": "anchor_open_storage",
+          "interaction": "open_storage"
+        },
+        {
+          "name": "anchor_file_document",
+          "interaction": "file_document"
+        }
+      ],
       "storage": {
         "slots": 20,
         "accepted_categories": [
@@ -2880,7 +3167,16 @@
           "dy": 0
         }
       ],
-      "anchors": [],
+      "anchors": [
+        {
+          "name": "anchor_print_document",
+          "interaction": "print_document"
+        },
+        {
+          "name": "anchor_pick_up_printout",
+          "interaction": "pick_up_printout"
+        }
+      ],
       "storage": {
         "slots": 4,
         "accepted_categories": [
@@ -3116,7 +3412,16 @@
           "dy": 0
         }
       ],
-      "anchors": [],
+      "anchors": [
+        {
+          "name": "anchor_watch_movie",
+          "interaction": "watch_movie"
+        },
+        {
+          "name": "anchor_toggle_screen",
+          "interaction": "toggle_screen"
+        }
+      ],
       "storage": null,
       "tags": [
         "electronics",
@@ -3134,7 +3439,16 @@
           "dy": 0
         }
       ],
-      "anchors": [],
+      "anchors": [
+        {
+          "name": "anchor_listen_to_music",
+          "interaction": "listen_to_music"
+        },
+        {
+          "name": "anchor_adjust_volume",
+          "interaction": "adjust_volume"
+        }
+      ],
       "storage": null,
       "tags": [
         "electronics",
@@ -3156,7 +3470,16 @@
           "dy": 0
         }
       ],
-      "anchors": [],
+      "anchors": [
+        {
+          "name": "anchor_browse_shelf",
+          "interaction": "browse_shelf"
+        },
+        {
+          "name": "anchor_grab_vinyl",
+          "interaction": "grab_vinyl"
+        }
+      ],
       "storage": {
         "slots": 50,
         "accepted_categories": [
@@ -3185,7 +3508,16 @@
           "dy": 0
         }
       ],
-      "anchors": [],
+      "anchors": [
+        {
+          "name": "anchor_browse_shelf",
+          "interaction": "browse_shelf"
+        },
+        {
+          "name": "anchor_grab_game",
+          "interaction": "grab_game"
+        }
+      ],
       "storage": {
         "slots": 30,
         "accepted_categories": [
@@ -3441,7 +3773,8 @@
       "tags": [
         "outdoor",
         "structure"
-      ]
+      ],
+      "isDecorative": true
     },
     "toy_box": {
       "name": "Toy Box",
@@ -3457,7 +3790,16 @@
           "dy": 0
         }
       ],
-      "anchors": [],
+      "anchors": [
+        {
+          "name": "anchor_open_storage",
+          "interaction": "open_storage"
+        },
+        {
+          "name": "anchor_play_with_toys",
+          "interaction": "play_with_toys"
+        }
+      ],
       "storage": {
         "slots": 20,
         "accepted_categories": []
@@ -3543,7 +3885,8 @@
       "tags": [
         "decor",
         "art"
-      ]
+      ],
+      "isDecorative": true
     },
     "indoor_plant_large": {
       "name": "Indoor Plant (Large)",
@@ -3561,7 +3904,8 @@
         "decor",
         "plant",
         "nature"
-      ]
+      ],
+      "isDecorative": true
     },
     "curtains": {
       "name": "Curtains",
@@ -3577,7 +3921,12 @@
           "dy": 0
         }
       ],
-      "anchors": [],
+      "anchors": [
+        {
+          "name": "anchor_toggle_curtains",
+          "interaction": "toggle_curtains"
+        }
+      ],
       "storage": null,
       "tags": [
         "decor",
@@ -3598,7 +3947,12 @@
           "dy": 0
         }
       ],
-      "anchors": [],
+      "anchors": [
+        {
+          "name": "anchor_toggle_blinds",
+          "interaction": "toggle_blinds"
+        }
+      ],
       "storage": null,
       "tags": [
         "decor",
@@ -3709,7 +4063,16 @@
           "dy": 0
         }
       ],
-      "anchors": [],
+      "anchors": [
+        {
+          "name": "anchor_open_storage",
+          "interaction": "open_storage"
+        },
+        {
+          "name": "anchor_change_clothes",
+          "interaction": "change_clothes"
+        }
+      ],
       "storage": {
         "slots": 20,
         "accepted_categories": [
@@ -3737,7 +4100,12 @@
           "dy": 0
         }
       ],
-      "anchors": [],
+      "anchors": [
+        {
+          "name": "anchor_open_storage",
+          "interaction": "open_storage"
+        }
+      ],
       "storage": {
         "slots": 10,
         "accepted_categories": []
@@ -3758,7 +4126,16 @@
           "dy": 0
         }
       ],
-      "anchors": [],
+      "anchors": [
+        {
+          "name": "anchor_hang_coat",
+          "interaction": "hang_coat"
+        },
+        {
+          "name": "anchor_grab_item",
+          "interaction": "grab_item"
+        }
+      ],
       "storage": {
         "slots": 6,
         "accepted_categories": [
