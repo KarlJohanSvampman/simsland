@@ -1516,13 +1516,10 @@ function updateTiles(state){
 
 function createFallbackProp(prop){
 
+  // Cylinder placeholder — blue-grey, easy to spot, clearly "not a real model"
   const mesh = new THREE.Mesh(
-
-    new THREE.BoxGeometry(1,1,1),
-
-    new THREE.MeshStandardMaterial({
-      color: 0xff00ff
-    })
+    new THREE.CylinderGeometry(0.38, 0.38, 1.0, 16),
+    new THREE.MeshStandardMaterial({ color: 0x6688aa, roughness: 0.7 })
   );
 
   mesh.position.set(

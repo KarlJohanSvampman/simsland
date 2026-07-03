@@ -371,6 +371,13 @@ function openTemplate(id) {
       loadPreviewModel(path);
     } else {
       clearPreviewModel();
+      showPlaceholderMesh(currentTab);
+      const modelRef = data?.model;
+      if (modelRef) {
+        setStatus(`No GLB for meshbank ID "${modelRef}" — add it via Mesh Bank`);
+      } else {
+        setStatus('No model assigned — use the asset browser to link one');
+      }
     }
   }
 
@@ -386,6 +393,36 @@ function clearPreviewMesh() {
     previewScene.remove(previewMesh);
     previewMesh = null;
   }
+}
+
+function showPlaceholderMesh(tab) {
+  clearPreviewMesh();
+
+  let geo, color, yPos;
+
+  if (tab === 'prop_templates') {
+    geo   = new THREE.CylinderGeometry(0.38, 0.38, 1.0, 24);
+    color = 0x6688aa;   // steel blue cylinder
+    yPos  = 0.5;
+  } else if (tab === 'item_templates') {
+    geo   = new THREE.BoxGeometry(0.35, 0.35, 0.35);
+    color = 0xcc9944;   // amber cube
+    yPos  = 0.175;
+  } else if (tab === 'character_templates') {
+    geo   = new THREE.CapsuleGeometry(0.35, 0.8, 8, 16);
+    color = 0x88bb88;   // soft green capsule
+    yPos  = 0.75;
+  } else {
+    return;
+  }
+
+  const mat = new THREE.MeshStandardMaterial({ color, roughness: 0.65, metalness: 0.1 });
+  previewMesh = new THREE.Mesh(geo, mat);
+  previewMesh.position.set(0, yPos, 0);
+  previewScene.add(previewMesh);
+
+  // Frame camera tightly on the placeholder
+  framePreviewCamera(previewMesh);
 }
 
 function applyTextureToMat(mat, texturePath) {
@@ -1668,10 +1705,3 @@ window._ixToggleHold = function(itemId, slot) {
     mesh.name = `held_${itemId}_${slot}`;
     mesh.position.set(0, 0, 0.1);
     bone.add(mesh);
-    _ixHeldMeshes[slot] = mesh;
-
-    if (btn) { btn.classList.add('held'); btn.dataset.ixSlot = slot; }
-    const itemName = (definitions.item_templates || {})[itemId]?.name || itemId;
-    setStatus(`Holding "${itemName}" in ${slot}`);
-  }
-};
