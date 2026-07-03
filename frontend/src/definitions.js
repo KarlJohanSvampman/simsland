@@ -120,7 +120,7 @@ let _ixTargetModel   = null;     // Three.Object3D in scene
 let _ixTargetMixer   = null;     // AnimationMixer
 let _ixTargetClips   = [];       // animation clips
 let _ixTargetPhases  = {};       // data.target_animations from template
-let _ixTargetRegionMarker = null; // sphere placed on target's bone
+let _ixTargetRegionMarkers = [];  // spheres placed on target bones (may be multiple)
 let _ixVarDefs       = {};       // data.variables definitions
 let _ixVarValues     = {};       // current variable values for this interaction
 
@@ -375,6 +375,8 @@ function openTemplate(id) {
   if (_ixItemMesh)    { previewScene.remove(_ixItemMesh); _ixItemMesh = null; }
   if (_ixTargetModel) { previewScene.remove(_ixTargetModel); _ixTargetModel = null; }
   if (_ixTargetMixer) { _ixTargetMixer.stopAllAction(); _ixTargetMixer = null; }
+  _ixTargetRegionMarkers.forEach(m => { if (m.parent) m.parent.remove(m); });
+  _ixTargetRegionMarkers = [];
   _ixTargetClips = [];
   if (currentTab === 'activity_templates') {
     loadActivityTimeline(data);
@@ -1407,36 +1409,65 @@ function loadActivityTimeline(data) {
 // BODY REGION MAP  (readable name → candidate bone names)
 // =====================================================
 
+// BODY_REGION_MAP: string[] = single-group (first match wins)
+//                  string[][] = bilateral group (one match per sub-array → multiple markers)
 const BODY_REGION_MAP = {
-  head:           ['Head','head','mixamorigHead'],
-  face:           ['Head','head','Face','face'],
-  neck:           ['Neck','neck','mixamorigNeck'],
-  chest:          ['Chest','chest','Spine2','mixamorigSpine2'],
-  torso:          ['Spine','Spine1','Spine2','chest','mixamorigSpine'],
-  upper_body:     ['Spine','Spine1','Spine2','Chest'],
-  lower_body:     ['Hips','hips','pelvis','Pelvis','mixamorigHips'],
-  right_arm:      ['RightArm','UpperArm_R','mixamorigRightArm'],
-  left_arm:       ['LeftArm','UpperArm_L','mixamorigLeftArm'],
-  right_hand:     ['RightHand','hand_r','Hand_R','mixamorigRightHand'],
-  left_hand:      ['LeftHand','hand_l','Hand_L','mixamorigLeftHand'],
-  right_leg:      ['RightUpLeg','Thigh_R','mixamorigRightUpLeg'],
-  left_leg:       ['LeftUpLeg','Thigh_L','mixamorigLeftUpLeg'],
-  right_foot:     ['RightFoot','foot_r','Foot_R','mixamorigRightFoot'],
-  left_foot:      ['LeftFoot','foot_l','Foot_L','mixamorigLeftFoot'],
-  right_shoulder: ['RightShoulder','Shoulder_R','mixamorigRightShoulder'],
-  left_shoulder:  ['LeftShoulder','Shoulder_L','mixamorigLeftShoulder'],
-  back:           ['Spine1','Spine2','mixamorigSpine1'],
-  groin:          ['Hips','pelvis','mixamorigHips'],
+  // ── broad areas ──────────────────────────────────────────────────────────
+  head:        ['Head','head','mixamorigHead'],
+  face:        ['Head','head','Face','face'],
+  neck:        ['Neck','neck','mixamorigNeck'],
+  chest:       ['Chest','chest','Spine2','mixamorigSpine2'],
+  torso:       ['Spine2','Spine1','Spine','chest','mixamorigSpine2'],
+  upper_body:  ['Spine2','Chest','Spine1','mixamorigSpine2'],
+  lower_body:  ['Hips','hips','pelvis','Pelvis','mixamorigHips'],
+  back:        ['Spine1','Spine2','mixamorigSpine1'],
+  groin:       ['Hips','pelvis','mixamorigHips'],
+  // ── bilateral (nested array → one marker per side) ────────────────────────
+  arms:        [['RightArm','UpperArm_R','mixamorigRightArm'],
+                ['LeftArm','UpperArm_L','mixamorigLeftArm']],
+  legs:        [['RightUpLeg','Thigh_R','mixamorigRightUpLeg'],
+                ['LeftUpLeg','Thigh_L','mixamorigLeftUpLeg']],
+  hands:       [['RightHand','hand_r','Hand_R','mixamorigRightHand'],
+                ['LeftHand','hand_l','Hand_L','mixamorigLeftHand']],
+  feet:        [['RightFoot','foot_r','Foot_R','mixamorigRightFoot'],
+                ['LeftFoot','foot_l','Foot_L','mixamorigLeftFoot']],
+  shoulders:   [['RightShoulder','Shoulder_R','mixamorigRightShoulder'],
+                ['LeftShoulder','Shoulder_L','mixamorigLeftShoulder']],
+  // ── single sides ─────────────────────────────────────────────────────────
+  right_arm:       ['RightArm','UpperArm_R','mixamorigRightArm'],
+  left_arm:        ['LeftArm','UpperArm_L','mixamorigLeftArm'],
+  right_hand:      ['RightHand','hand_r','Hand_R','mixamorigRightHand'],
+  left_hand:       ['LeftHand','hand_l','Hand_L','mixamorigLeftHand'],
+  right_leg:       ['RightUpLeg','Thigh_R','mixamorigRightUpLeg'],
+  left_leg:        ['LeftUpLeg','Thigh_L','mixamorigLeftUpLeg'],
+  right_foot:      ['RightFoot','foot_r','Foot_R','mixamorigRightFoot'],
+  left_foot:       ['LeftFoot','foot_l','Foot_L','mixamorigLeftFoot'],
+  right_shoulder:  ['RightShoulder','Shoulder_R','mixamorigRightShoulder'],
+  left_shoulder:   ['LeftShoulder','Shoulder_L','mixamorigLeftShoulder'],
 };
 
-// Return the first bone in boneList that matches a region name
-function resolveBodyRegion(regionName, boneList) {
-  const candidates = BODY_REGION_MAP[regionName] || [regionName];
-  for (const c of candidates) {
-    const hit = boneList.find(b => b === c || b.toLowerCase() === c.toLowerCase());
-    if (hit) return hit;
+// Returns array of matched bone names (1 for single-group, N for bilateral)
+function resolveBodyRegionBones(regionName, boneList) {
+  const entry = BODY_REGION_MAP[regionName];
+  if (!entry) {
+    // Fallback: direct bone name
+    const direct = boneList.find(b => b.toLowerCase() === regionName.toLowerCase());
+    return direct ? [direct] : [];
   }
-  return null;
+  if (Array.isArray(entry[0])) {
+    // Bilateral: entry is string[][] — resolve one bone per sub-array
+    return entry
+      .map(group => group.map(c => boneList.find(b => b === c || b.toLowerCase() === c.toLowerCase())).find(Boolean))
+      .filter(Boolean);
+  }
+  // Single group: string[] — first match
+  const hit = entry.map(c => boneList.find(b => b === c || b.toLowerCase() === c.toLowerCase())).find(Boolean);
+  return hit ? [hit] : [];
+}
+
+// Backward-compat alias (returns first bone name or null)
+function resolveBodyRegion(regionName, boneList) {
+  return resolveBodyRegionBones(regionName, boneList)[0] || null;
 }
 
 // =====================================================
@@ -2037,30 +2068,33 @@ window._ixToggleItem = function(itemId) {
 // =====================================================
 
 function _ixPlaceTargetRegionMarker(regionName) {
-  if (_ixTargetRegionMarker) {
-    if (_ixTargetRegionMarker.parent) _ixTargetRegionMarker.parent.remove(_ixTargetRegionMarker);
-    _ixTargetRegionMarker = null;
-  }
+  // Clear existing markers
+  _ixTargetRegionMarkers.forEach(m => { if (m.parent) m.parent.remove(m); });
+  _ixTargetRegionMarkers = [];
   if (!regionName || !_ixTargetModel) return;
 
   const boneNames = [];
   _ixTargetModel.traverse(o => { if (o.isBone) boneNames.push(o.name); });
 
-  const boneName = resolveBodyRegion(regionName, boneNames);
-  if (!boneName) {
-    _ixAddLog('Target region "' + regionName + '" - no matching bone (candidates: ' + boneNames.slice(0,5).join(', ') + ')');
+  const matched = resolveBodyRegionBones(regionName, boneNames);
+  if (!matched.length) {
+    _ixAddLog('Target region "' + regionName + '" - no bones matched (available: ' + boneNames.slice(0,6).join(', ') + '..)');
     return;
   }
 
-  let bone = null;
-  _ixTargetModel.traverse(o => { if (o.isBone && o.name === boneName) bone = o; });
-  if (!bone) return;
-
   const geo = new THREE.SphereGeometry(0.06, 8, 8);
   const mat = new THREE.MeshBasicMaterial({ color: 0xff3322, transparent: true, opacity: 0.85 });
-  _ixTargetRegionMarker = new THREE.Mesh(geo, mat);
-  bone.add(_ixTargetRegionMarker);
-  _ixAddLog('Target region "' + regionName + '" mapped to bone "' + boneName + '"');
+
+  matched.forEach(boneName => {
+    let bone = null;
+    _ixTargetModel.traverse(o => { if (o.isBone && o.name === boneName) bone = o; });
+    if (!bone) return;
+    const mesh = new THREE.Mesh(geo, mat);
+    bone.add(mesh);
+    _ixTargetRegionMarkers.push(mesh);
+  });
+
+  _ixAddLog('Target region "' + regionName + '" -> ' + matched.join(', ') + ' (' + matched.length + ' marker' + (matched.length > 1 ? 's' : '') + ')');
 }
 
 function _ixRenderVariables(vars) {
