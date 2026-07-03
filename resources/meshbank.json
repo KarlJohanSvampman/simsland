@@ -153,7 +153,8 @@
     },
     "targets": {},
     "interaction_points": {},
-    "mesh": "/resources/props/door_a_closed.glb"
+    "mesh": "/resources/props/door_a_closed.glb",
+    "category": "props"
   },
   "bed_a": {
     "anchors": {},
@@ -190,7 +191,8 @@
     },
     "targets": {},
     "interaction_points": {},
-    "mesh": "/resources/props/bed_a.glb"
+    "mesh": "/resources/props/bed_a.glb",
+    "category": "props"
   },
   "door_a": {
     "anchors": {
@@ -232,7 +234,8 @@
     },
     "targets": {},
     "interaction_points": {},
-    "mesh": "/resources/props/door_a.glb"
+    "mesh": "/resources/props/door_a.glb",
+    "category": "props"
   },
   "door_a_open": {
     "anchors": {},
@@ -267,7 +270,8 @@
     },
     "targets": {},
     "interaction_points": {},
-    "mesh": "/resources/props/door_a_open.glb"
+    "mesh": "/resources/props/door_a_open.glb",
+    "category": "props"
   },
   "sofa_a": {
     "anchors": {
@@ -311,7 +315,8 @@
     "hasSkeleton": false,
     "targets": {},
     "interaction_points": {},
-    "mesh": "/resources/props/sofa_a.glb"
+    "mesh": "/resources/props/sofa_a.glb",
+    "category": "props"
   },
   "television": {
     "anchors": {
@@ -325,7 +330,8 @@
       "height": 0.9085011589358437,
       "depth": 0.058471131140260625
     },
-    "mesh": "/resources/props/television.glb"
+    "mesh": "/resources/props/television.glb",
+    "category": "props"
   },
   "elder_male": {
     "anchors": {},
@@ -574,6 +580,31 @@
     },
     "targets": {},
     "interaction_points": {},
-    "mesh": "/resources/characters/elder_male.glb"
+    "mesh": "/resources/characters/elder_male.glb",
+    "category": "characters"
+  },
+  "make_up": {
+    "mesh": "/resources/items/make_up.glb",
+    "category": "items"
+  },
+  "salve_cream": {
+    "mesh": "/resources/items/salve_cream.glb",
+    "category": "items"
+  },
+  "soap": {
+    "mesh": "/resources/items/soap.glb",
+    "category": "items"
+  },
+  "toothpaste": {
+    "mesh": "/resources/items/toothpaste.glb",
+    "category": "items"
+  },
+  "disjhwasher_a": {
+    "mesh": "/resources/props/disjhwasher_a.glb",
+    "category": "props"
+  },
+  "toilet_a": {
+    "mesh": "/resources/props/toilet_a.glb",
+    "category": "props"
   }
 }
