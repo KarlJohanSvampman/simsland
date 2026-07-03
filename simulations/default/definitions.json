@@ -8166,7 +8166,7 @@
     },
     "computer_social_media": {
       "name": "Browse Social Media",
-      "description": "Scroll social feeds \u2014 mild fun boost, some stress relief",
+      "description": "Scroll social feeds — mild fun boost, some stress relief",
       "category": "computer",
       "duration_ticks": 20,
       "requires_prop_tags": [
@@ -8541,7 +8541,7 @@
     },
     "computer_order_item": {
       "name": "Order Item Online",
-      "description": "Purchase an item from the online store \u2014 delivered to home",
+      "description": "Purchase an item from the online store — delivered to home",
       "category": "computer",
       "duration_ticks": 8,
       "requires_prop_tags": [
@@ -10790,6 +10790,442 @@
         ],
         "stop": [
           "stand_up_a"
+        ]
+      }
+    },
+    "threaten": {
+      "name": "Threaten",
+      "description": "Intimidate another character. Effectiveness scales with held weapon, size difference, and whether the actor is masked.",
+      "category": "social_hostile",
+      "target": "character",
+      "target_region": "face",
+      "duration_ticks": 4,
+      "variables": {
+        "intensity": {
+          "type": "select",
+          "options": [
+            "intimidate",
+            "menace",
+            "deadly"
+          ],
+          "default": "intimidate",
+          "ai_choose": true,
+          "randomizable": true
+        },
+        "verbal": {
+          "type": "bool",
+          "default": true,
+          "ai_choose": true
+        }
+      },
+      "effectiveness_modifiers": [
+        {
+          "condition": "actor.held_item.category == 'firearm'",
+          "multiplier": 2.5
+        },
+        {
+          "condition": "actor.held_item.category == 'melee_weapon_sharp'",
+          "multiplier": 1.8
+        },
+        {
+          "condition": "actor.held_item.category == 'melee_weapon_blunt'",
+          "multiplier": 1.4
+        },
+        {
+          "condition": "actor.held_item == null",
+          "multiplier": 0.7
+        },
+        {
+          "condition": "actor.masked == true",
+          "multiplier": 1.3
+        },
+        {
+          "condition": "actor.height > target.height * 1.15",
+          "multiplier": 1.2
+        },
+        {
+          "condition": "target.trait == 'cowardly'",
+          "multiplier": 1.4
+        },
+        {
+          "condition": "target.trait == 'brave'",
+          "multiplier": 0.6
+        }
+      ],
+      "animations": {
+        "start": [
+          "threaten_start"
+        ],
+        "loop": [
+          "threaten_loop"
+        ],
+        "stop": [
+          "threaten_end"
+        ]
+      },
+      "target_animations": {
+        "start": [
+          "cower_start"
+        ],
+        "loop": [
+          "cower_loop"
+        ],
+        "stop": [
+          "cower_end"
+        ]
+      }
+    },
+    "hug": {
+      "name": "Hug",
+      "description": "Embrace another character.",
+      "category": "social_friendly",
+      "target": "character",
+      "target_region": "torso",
+      "duration_ticks": 3,
+      "variables": {
+        "duration_feel": {
+          "type": "select",
+          "options": [
+            "brief",
+            "warm",
+            "long"
+          ],
+          "default": "warm",
+          "ai_choose": true,
+          "randomizable": true
+        }
+      },
+      "animations": {
+        "start": [
+          "hug_start"
+        ],
+        "loop": [
+          "hug_loop"
+        ],
+        "stop": [
+          "hug_end"
+        ]
+      },
+      "target_animations": {
+        "start": [
+          "hug_receive_start"
+        ],
+        "loop": [
+          "hug_receive_loop"
+        ],
+        "stop": [
+          "hug_receive_end"
+        ]
+      }
+    },
+    "kiss": {
+      "name": "Kiss",
+      "description": "Kiss another character.",
+      "category": "social_romantic",
+      "target": "character",
+      "target_region": "face",
+      "duration_ticks": 2,
+      "variables": {
+        "type": {
+          "type": "select",
+          "options": [
+            "cheek",
+            "lips",
+            "forehead"
+          ],
+          "default": "cheek",
+          "ai_choose": true,
+          "randomizable": true
+        }
+      },
+      "animations": {
+        "start": [
+          "kiss_start"
+        ],
+        "loop": [],
+        "stop": [
+          "kiss_end"
+        ]
+      },
+      "target_animations": {
+        "start": [
+          "kiss_receive_start"
+        ],
+        "loop": [],
+        "stop": [
+          "kiss_receive_end"
+        ]
+      }
+    },
+    "punch": {
+      "name": "Punch",
+      "description": "Strike another character with a fist.",
+      "category": "combat",
+      "target": "character",
+      "target_region": "head",
+      "duration_ticks": 1,
+      "variables": {
+        "aim": {
+          "type": "select",
+          "options": [
+            "head",
+            "torso",
+            "groin"
+          ],
+          "default": "head",
+          "ai_choose": true,
+          "randomizable": true
+        },
+        "force": {
+          "type": "select",
+          "options": [
+            "light",
+            "medium",
+            "heavy"
+          ],
+          "default": "medium",
+          "ai_choose": true,
+          "randomizable": true
+        }
+      },
+      "effectiveness_modifiers": [
+        {
+          "condition": "actor.trait == 'strong'",
+          "multiplier": 1.4
+        },
+        {
+          "condition": "actor.height > target.height * 1.1",
+          "multiplier": 1.1
+        },
+        {
+          "condition": "target.trait == 'tough'",
+          "multiplier": 0.7
+        }
+      ],
+      "animations": {
+        "start": [
+          "punch_wind_up"
+        ],
+        "loop": [],
+        "stop": [
+          "punch_follow_through"
+        ]
+      },
+      "target_animations": {
+        "start": [
+          "hit_react_head"
+        ],
+        "loop": [],
+        "stop": [
+          "stagger_end"
+        ]
+      }
+    },
+    "kick": {
+      "name": "Kick",
+      "description": "Kick another character.",
+      "category": "combat",
+      "target": "character",
+      "target_region": "lower_body",
+      "duration_ticks": 1,
+      "variables": {
+        "aim": {
+          "type": "select",
+          "options": [
+            "knee",
+            "groin",
+            "chest",
+            "head"
+          ],
+          "default": "knee",
+          "ai_choose": true,
+          "randomizable": true
+        }
+      },
+      "effectiveness_modifiers": [
+        {
+          "condition": "actor.trait == 'strong'",
+          "multiplier": 1.3
+        },
+        {
+          "condition": "actor.height > target.height * 1.1",
+          "multiplier": 1.2
+        }
+      ],
+      "animations": {
+        "start": [
+          "kick_wind_up"
+        ],
+        "loop": [],
+        "stop": [
+          "kick_follow_through"
+        ]
+      },
+      "target_animations": {
+        "start": [
+          "hit_react_body"
+        ],
+        "loop": [],
+        "stop": [
+          "stagger_end"
+        ]
+      }
+    },
+    "shove": {
+      "name": "Shove",
+      "description": "Push another character away forcefully.",
+      "category": "combat",
+      "target": "character",
+      "target_region": "chest",
+      "duration_ticks": 1,
+      "variables": {
+        "force": {
+          "type": "select",
+          "options": [
+            "gentle",
+            "firm",
+            "aggressive"
+          ],
+          "default": "firm",
+          "ai_choose": true,
+          "randomizable": true
+        }
+      },
+      "effectiveness_modifiers": [
+        {
+          "condition": "actor.height > target.height * 1.1",
+          "multiplier": 1.3
+        },
+        {
+          "condition": "actor.trait == 'strong'",
+          "multiplier": 1.2
+        },
+        {
+          "condition": "target.trait == 'heavy_build'",
+          "multiplier": 0.6
+        }
+      ],
+      "animations": {
+        "start": [
+          "shove_start"
+        ],
+        "loop": [],
+        "stop": [
+          "shove_end"
+        ]
+      },
+      "target_animations": {
+        "start": [
+          "stumble_start"
+        ],
+        "loop": [],
+        "stop": [
+          "stumble_end"
+        ]
+      }
+    },
+    "smash": {
+      "name": "Smash",
+      "description": "Destroy or damage a prop or item. More effective with a blunt weapon; without one, the character pushes/knocks it instead.",
+      "category": "destructive",
+      "target_type": "prop_or_item",
+      "requires_prop_tags": [
+        "breakable",
+        "furniture",
+        "appliance",
+        "electronic"
+      ],
+      "duration_ticks": 2,
+      "variables": {
+        "method": {
+          "type": "select",
+          "options": [
+            "push_off",
+            "slam",
+            "bludgeon",
+            "stomp"
+          ],
+          "default": "push_off",
+          "ai_choose": true,
+          "randomizable": true
+        }
+      },
+      "effectiveness_modifiers": [
+        {
+          "condition": "actor.held_item.category == 'melee_weapon_blunt'",
+          "multiplier": 2.5,
+          "outcome": "destroy"
+        },
+        {
+          "condition": "actor.held_item.category == 'melee_weapon_sharp'",
+          "multiplier": 1.8,
+          "outcome": "damage"
+        },
+        {
+          "condition": "actor.held_item.category == 'heavy_object'",
+          "multiplier": 2.0,
+          "outcome": "destroy"
+        },
+        {
+          "condition": "actor.held_item == null",
+          "multiplier": 0.5,
+          "outcome": "displace"
+        },
+        {
+          "condition": "actor.trait == 'strong'",
+          "multiplier": 1.3
+        }
+      ],
+      "outcomes": {
+        "destroy": "prop/item is removed from the world",
+        "damage": "prop/item durability reduced; becomes broken state",
+        "displace": "prop/item knocked off surface or moved"
+      },
+      "animations": {
+        "start": [
+          "smash_wind_up"
+        ],
+        "loop": [],
+        "stop": [
+          "smash_follow_through"
+        ]
+      },
+      "clean_up_post_activity": {
+        "interaction": "pick_up_debris",
+        "required": false,
+        "lazy_skip_chance": 0.7,
+        "skip_trait": "lazy",
+        "social_annoyance": true,
+        "force_trait": "neat"
+      }
+    },
+    "destroy_item": {
+      "name": "Destroy Item",
+      "description": "Deliberately destroy a held item (throw, snap, crush).",
+      "category": "destructive",
+      "requires_item_category": "any",
+      "duration_ticks": 1,
+      "variables": {
+        "method": {
+          "type": "select",
+          "options": [
+            "throw",
+            "snap",
+            "crush",
+            "burn"
+          ],
+          "default": "throw",
+          "ai_choose": true,
+          "randomizable": true
+        }
+      },
+      "animations": {
+        "start": [
+          "destroy_item_start"
+        ],
+        "loop": [],
+        "stop": [
+          "destroy_item_end"
         ]
       }
     }
@@ -18100,7 +18536,7 @@
       ]
     },
     "cafe": {
-      "name": "Local Caf\u00e9",
+      "name": "Local Café",
       "sector": "cafe",
       "job_slots": [
         "barista"
@@ -18127,7 +18563,7 @@
   "need_templates": {
     "socialize": {
       "name": "Socialise",
-      "description": "Spend quality time with other people \u2014 friends, neighbours, or family.",
+      "description": "Spend quality time with other people — friends, neighbours, or family.",
       "category": "social",
       "weekly_target": 1,
       "satisfying_activities": [
@@ -18154,7 +18590,7 @@
     },
     "exercise": {
       "name": "Physical Exercise",
-      "description": "Engage in physical activity \u2014 gym, running, sports, or home workout.",
+      "description": "Engage in physical activity — gym, running, sports, or home workout.",
       "category": "health",
       "weekly_target": 2,
       "satisfying_activities": [
@@ -18168,7 +18604,7 @@
     },
     "creative": {
       "name": "Creative Outlet",
-      "description": "Engage in a creative activity \u2014 art, music, writing, cooking, or crafting.",
+      "description": "Engage in a creative activity — art, music, writing, cooking, or crafting.",
       "category": "self_expression",
       "weekly_target": 1,
       "satisfying_activities": [
@@ -18182,7 +18618,7 @@
     },
     "romance": {
       "name": "Romance",
-      "description": "Seek or maintain a romantic relationship \u2014 quality one-on-one time with a partner, dating, or pursuing new connections.",
+      "description": "Seek or maintain a romantic relationship — quality one-on-one time with a partner, dating, or pursuing new connections.",
       "category": "relationships",
       "weekly_target": 1,
       "satisfying_activities": [
@@ -18308,7 +18744,7 @@
     },
     "cheerful": {
       "name": "Cheerful",
-      "description": "Upbeat and positive \u2014 prone to jokes and warmth.",
+      "description": "Upbeat and positive — prone to jokes and warmth.",
       "emotional_temperature_range": [
         15,
         40

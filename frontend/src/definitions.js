@@ -119,6 +119,10 @@ let _ixTargetCharKey = null;
 let _ixTargetModel   = null;     // Three.Object3D in scene
 let _ixTargetMixer   = null;     // AnimationMixer
 let _ixTargetClips   = [];       // animation clips
+let _ixTargetPhases  = {};       // data.target_animations from template
+let _ixTargetRegionMarker = null; // sphere placed on target's bone
+let _ixVarDefs       = {};       // data.variables definitions
+let _ixVarValues     = {};       // current variable values for this interaction
 
 // =====================================================
 // MODEL RESOLUTION  (meshbank ID → actual mesh path)
@@ -1400,6 +1404,42 @@ function loadActivityTimeline(data) {
 }
 
 // =====================================================
+// BODY REGION MAP  (readable name → candidate bone names)
+// =====================================================
+
+const BODY_REGION_MAP = {
+  head:           ['Head','head','mixamorigHead'],
+  face:           ['Head','head','Face','face'],
+  neck:           ['Neck','neck','mixamorigNeck'],
+  chest:          ['Chest','chest','Spine2','mixamorigSpine2'],
+  torso:          ['Spine','Spine1','Spine2','chest','mixamorigSpine'],
+  upper_body:     ['Spine','Spine1','Spine2','Chest'],
+  lower_body:     ['Hips','hips','pelvis','Pelvis','mixamorigHips'],
+  right_arm:      ['RightArm','UpperArm_R','mixamorigRightArm'],
+  left_arm:       ['LeftArm','UpperArm_L','mixamorigLeftArm'],
+  right_hand:     ['RightHand','hand_r','Hand_R','mixamorigRightHand'],
+  left_hand:      ['LeftHand','hand_l','Hand_L','mixamorigLeftHand'],
+  right_leg:      ['RightUpLeg','Thigh_R','mixamorigRightUpLeg'],
+  left_leg:       ['LeftUpLeg','Thigh_L','mixamorigLeftUpLeg'],
+  right_foot:     ['RightFoot','foot_r','Foot_R','mixamorigRightFoot'],
+  left_foot:      ['LeftFoot','foot_l','Foot_L','mixamorigLeftFoot'],
+  right_shoulder: ['RightShoulder','Shoulder_R','mixamorigRightShoulder'],
+  left_shoulder:  ['LeftShoulder','Shoulder_L','mixamorigLeftShoulder'],
+  back:           ['Spine1','Spine2','mixamorigSpine1'],
+  groin:          ['Hips','pelvis','mixamorigHips'],
+};
+
+// Return the first bone in boneList that matches a region name
+function resolveBodyRegion(regionName, boneList) {
+  const candidates = BODY_REGION_MAP[regionName] || [regionName];
+  for (const c of candidates) {
+    const hit = boneList.find(b => b === c || b.toLowerCase() === c.toLowerCase());
+    if (hit) return hit;
+  }
+  return null;
+}
+
+// =====================================================
 // INTERACTION PREVIEW
 // =====================================================
 
@@ -1443,11 +1483,26 @@ const _IX_STYLE = `<style>
 .ixLogEntry{padding:1px 0;border-bottom:1px solid #1a2030;color:#8899bb;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:10px}
 .ixLogTs{color:#334455;font-family:monospace;margin-right:5px}
 .ixLogPhase{font-weight:bold}.ixLogPhase.start{color:#6fa}.ixLogPhase.loop{color:#ff9}.ixLogPhase.stop{color:#f96}.ixLogPhase.aborted{color:#f66}
+.ixVarRow{display:flex;align-items:center;gap:4px;padding:2px 0}
+.ixVarKey{font-size:11px;color:#99aacc;min-width:90px;flex-shrink:0}
+.ixVarSelect,.ixVarNum,.ixVarText{background:#222c38;color:#dde;border:1px solid #3a4a5a;padding:2px 4px;font-size:10px;flex:1;min-width:0;max-width:130px}
+.ixVarBtnRow{display:flex;gap:2px;margin-left:2px}
+.ixVarBtn{padding:1px 5px;font-size:11px;background:#223240;border:1px solid #334;color:#aaa;cursor:pointer;border-radius:2px}
+.ixVarBtn:hover{background:#334455}
+.ixTargetRegion{font-size:11px;color:#f99;background:#2a1a1a;border-left:2px solid #a44;padding:3px 8px;margin-top:4px;border-radius:2px}
+.ixModRow{display:flex;justify-content:space-between;padding:1px 0;font-size:10px}
+.ixModCond{color:#778;flex:1}
+.ixModVal{color:#9c9;font-weight:bold;margin-left:4px}
 </style>`;
 
 function loadInteractionPreview(data) {
   _ixActive = true;
-  _ixPhases  = data.animations || {};
+  _ixPhases       = data.animations         || {};
+  _ixTargetPhases = data.target_animations  || {};
+  _ixVarDefs      = data.variables          || {};
+  _ixVarValues    = Object.fromEntries(
+    Object.entries(_ixVarDefs).map(([k,v]) => [k, v.default ?? ''])
+  );
   _ixHeldMeshes = {};
   if (_ixPlayTimeout) { clearTimeout(_ixPlayTimeout); _ixPlayTimeout = null; }
 
@@ -1550,6 +1605,9 @@ function loadInteractionPreview(data) {
       </div>`).join('') : `<div class="ixEmptyNote">No items for category "${reqItemCat}"</div>`}
     </div>` : (!reqProps.length && !offGrid ? '<div class="ixEmptyNote">No prop or item requirements</div>' : '')}
     ${cleanupDef ? `<div class="ixCleanupNote">\u267b clean_up_post_activity: ${typeof cleanupDef === 'object' ? JSON.stringify(cleanupDef) : cleanupDef}</div>` : ''}
+    ${data.target_region ? `<div class="ixTargetRegion">\uD83C\uDFAF Target region: <b>${data.target_region}</b> \u2014 mapped to bone in preview</div>` : ''}
+    ${Object.keys(_ixVarDefs).length ? _ixRenderVariables(_ixVarDefs) : ''}
+    ${(data.effectiveness_modifiers||[]).length ? _ixRenderModifiers(data.effectiveness_modifiers) : ''}
   </div>
   <div id="ixLog"></div>
 </div>`;
@@ -1658,6 +1716,9 @@ function _ixLoadTargetChar() {
     if (idleClip) _ixTargetMixer.clipAction(idleClip).play();
 
     _ixAddLog('Target char loaded: ' + _ixTargetCharKey + ' (' + _ixTargetClips.length + ' clips)');
+    // Place region marker if interaction specifies a target_region
+    const curData = (definitions.interaction_templates || {})[currentTemplateId];
+    if (curData?.target_region) _ixPlaceTargetRegionMarker(curData.target_region);
   }, undefined, err => _ixAddLog('Target char load error: ' + (err.message || err)));
 }
 
@@ -1670,7 +1731,8 @@ function _ixTargetFindClip(name) {
 
 function _ixPlayTargetPhase(phase, targetPhases) {
   if (!_ixTargetMixer || !_ixActive) return;
-  const clipNames = (targetPhases[phase] || []);
+  const phases = targetPhases && Object.keys(targetPhases).length ? targetPhases : _ixTargetPhases;
+  const clipNames = (phases[phase] || []);
   const clip = clipNames.map(n => _ixTargetFindClip(n)).find(Boolean);
   if (!clip) return;
   _ixTargetMixer.stopAllAction();
@@ -1968,4 +2030,105 @@ window._ixToggleItem = function(itemId) {
   _ixCheckedItems.set(freeSlot, itemId);
   if (cb) cb.checked = true;
   _ixUpdateHandTags();
+};
+
+// =====================================================
+// INTERACTION PREVIEW HELPERS (body region / variables)
+// =====================================================
+
+function _ixPlaceTargetRegionMarker(regionName) {
+  if (_ixTargetRegionMarker) {
+    if (_ixTargetRegionMarker.parent) _ixTargetRegionMarker.parent.remove(_ixTargetRegionMarker);
+    _ixTargetRegionMarker = null;
+  }
+  if (!regionName || !_ixTargetModel) return;
+
+  const boneNames = [];
+  _ixTargetModel.traverse(o => { if (o.isBone) boneNames.push(o.name); });
+
+  const boneName = resolveBodyRegion(regionName, boneNames);
+  if (!boneName) {
+    _ixAddLog('Target region "' + regionName + '" - no matching bone (candidates: ' + boneNames.slice(0,5).join(', ') + ')');
+    return;
+  }
+
+  let bone = null;
+  _ixTargetModel.traverse(o => { if (o.isBone && o.name === boneName) bone = o; });
+  if (!bone) return;
+
+  const geo = new THREE.SphereGeometry(0.06, 8, 8);
+  const mat = new THREE.MeshBasicMaterial({ color: 0xff3322, transparent: true, opacity: 0.85 });
+  _ixTargetRegionMarker = new THREE.Mesh(geo, mat);
+  bone.add(_ixTargetRegionMarker);
+  _ixAddLog('Target region "' + regionName + '" mapped to bone "' + boneName + '"');
+}
+
+function _ixRenderVariables(vars) {
+  if (!vars || !Object.keys(vars).length) return '';
+  let html = '<div class="ixSection"><div class="ixSectionTitle">Variables</div>';
+  for (const [key, def] of Object.entries(vars)) {
+    html += '<div class="ixVarRow">';
+    html += '<span class="ixVarKey">' + key + '</span>';
+    if (def.type === 'select' && def.options) {
+      html += '<select class="ixVarSelect" data-var="' + key + '" onchange="window._ixSetVar(this)">';
+      for (const opt of def.options) {
+        const sel = opt === (def.default || def.options[0]) ? ' selected' : '';
+        html += '<option value="' + opt + '"' + sel + '>' + opt + '</option>';
+      }
+      html += '</select>';
+    } else if (def.type === 'bool') {
+      const chk = def.default ? ' checked' : '';
+      html += '<input type="checkbox" class="ixVarCheck" data-var="' + key + '" onchange="window._ixSetVar(this)"' + chk + '>';
+    } else if (def.type === 'number') {
+      const minAttr = (def.min != null) ? ' min="' + def.min + '"' : '';
+      const maxAttr = (def.max != null) ? ' max="' + def.max + '"' : '';
+      html += '<input type="number" class="ixVarNum" data-var="' + key + '" value="' + (def.default || 0) + '"' + minAttr + maxAttr + ' onchange="window._ixSetVar(this)">';
+    } else {
+      html += '<input type="text" class="ixVarText" data-var="' + key + '" value="' + (def.default || '') + '" oninput="window._ixSetVar(this)">';
+    }
+    html += '<span class="ixVarBtnRow">';
+    if (def.randomizable) html += '<button class="ixVarBtn" onclick="window._ixRandomizeVar(&quot;' + key + '&quot;)" title="Randomize">&#x1F3B2;</button>';
+    if (def.ai_choose)   html += '<button class="ixVarBtn" title="AI will choose at runtime">&#x1F916;</button>';
+    html += '</span></div>';
+  }
+  html += '</div>';
+  return html;
+}
+
+function _ixRenderModifiers(mods) {
+  if (!mods || !mods.length) return '';
+  let html = '<div class="ixSection"><div class="ixSectionTitle">Effectiveness Modifiers</div>';
+  for (const m of mods) {
+    html += '<div class="ixModRow"><span class="ixModCond">' + (m.condition || '') + '</span>';
+    if (m.multiplier != null) html += '<span class="ixModVal">x' + m.multiplier + '</span>';
+    if (m.outcome)            html += '<span class="ixModVal">' + m.outcome + '</span>';
+    html += '</div>';
+  }
+  html += '</div>';
+  return html;
+}
+
+window._ixSetVar = function(el) {
+  const key = el.dataset.var;
+  const val = el.type === 'checkbox' ? el.checked : (el.type === 'number' ? Number(el.value) : el.value);
+  _ixVarValues[key] = val;
+  _ixAddLog('Var "' + key + '" = ' + JSON.stringify(val));
+};
+
+window._ixRandomizeVar = function(key) {
+  const def = _ixVarDefs[key];
+  if (!def) return;
+  let val;
+  if (def.type === 'select' && def.options) {
+    val = def.options[Math.floor(Math.random() * def.options.length)];
+  } else if (def.type === 'number') {
+    const lo = def.min || 0, hi = def.max || 10;
+    val = Math.floor(Math.random() * (hi - lo + 1)) + lo;
+  } else if (def.type === 'bool') {
+    val = Math.random() > 0.5;
+  } else { return; }
+  _ixVarValues[key] = val;
+  const el = document.querySelector('[data-var="' + key + '"]');
+  if (el) { el.type === 'checkbox' ? (el.checked = val) : (el.value = val); }
+  _ixAddLog('Var "' + key + '" randomized = ' + JSON.stringify(val));
 };
