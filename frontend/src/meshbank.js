@@ -628,10 +628,14 @@ function populateAssetList(){
             "assetRow";
 
         div.textContent =
-            asset.split("/")
-            .pop();
+            asset.split("/").pop().replace(".glb","");
 
         div.onclick = ()=>{
+
+            // Clear active state on all rows
+            container.querySelectorAll(".assetRow")
+                .forEach(r => r.classList.remove("active"));
+            div.classList.add("active");
 
     currentAssetId =
         asset
@@ -1912,6 +1916,10 @@ animate();
 await loadMeshbank();
 
 await loadAssets();
+
+// Default to props (most common category)
+document.getElementById("category").value = "props";
+populateAssetList();
 pivot.onchange = ()=>{
 
     updatePlacementFromUI();
@@ -2010,6 +2018,26 @@ frameCamera(
 );
     }
 };
+
+
+function ensureBoneSlots(asset) {
+    asset.bone_slots ||= {};
+    return asset.bone_slots;
+}
+
+function populateSlots() {
+    const select = document.getElementById("slotSelect");
+    select.innerHTML = "";
+    if (!currentAssetId) return;
+    const slots = ensureBoneSlots(meshbank[currentAssetId]);
+    for (const name in slots) {
+        const option = document.createElement("option");
+        option.value = name;
+        option.textContent = name;
+        select.appendChild(option);
+    }
+    populateSlotBones();
+}
 
 addSlotBtn.onclick =
 ()=>{
