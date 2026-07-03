@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Social Debug Sandbox</title>
+<style>
+*,*::before,*::after { box-sizing:border-box; margin:0; padding:0; }
+html,body { width:100%; height:100%; overflow:hidden; background:#1a1e24; color:#ccc; font-family:Arial,sans-serif; font-size:13px; }
+
+/* ── Top bar ── */
+#topbar {
+  height:38px; background:#22272e; border-bottom:1px solid #3a3f48;
+  display:flex; align-items:center; gap:8px; padding:0 12px; flex-shrink:0;
+}
+#topbar h1 { font-size:14px; color:#adf; margin-right:8px; white-space:nowrap; }
+.topBtn { padding:4px 10px; background:#2d3440; border:1px solid #444; color:#ccc; border-radius:4px; cursor:pointer; font-size:12px; }
+.topBtn:hover { background:#3a4254; }
+.topBtn.active { background:#1a5276; border-color:#2e86c1; color:#fff; }
+.topBtn.danger { background:#5c1a1a; border-color:#a93226; color:#faa; }
+.topBtn.go { background:#1a4a1a; border-color:#27ae60; color:#aef; }
+#topbar select { background:#2d3440; border:1px solid #444; color:#ccc; padding:3px 6px; border-radius:4px; font-size:12px; }
+#speedLabel { font-size:11px; color:#888; }
+#speedSlider { width:80px; vertical-align:middle; }
+.sep { width:1px; height:22px; background:#3a3f48; margin:0 4px; }
+#thoughtToggle { display:flex; align-items:center; gap:4px; font-size:12px; color:#aaa; cursor:pointer; }
+#thoughtToggle input { cursor:pointer; }
+
+/* ── Main layout ── */
+#main { display:flex; width:100%; height:calc(100% - 38px); }
+
+/* ── Left column ── */
+#leftCol { display:flex; flex-direction:column; flex:1; min-width:0; border-right:1px solid #3a3f48; }
+#sandboxCanvas { flex:1; min-height:0; position:relative; background:#111; }
+#sandboxCanvas canvas { width:100%!important; height:100%!important; display:block; }
+
+/* ── Spawner drawer ── */
+#spawnerDrawer { background:#22272e; border-top:1px solid #3a3f48; transition:height 0.2s; overflow:hidden; }
+#spawnerToggle { display:flex; align-items:center; justify-content:space-between; padding:6px 12px; cursor:pointer; background:#1e242b; border-bottom:1px solid #2e3440; font-size:12px; color:#89b; user-select:none; }
+#spawnerToggle span { font-size:10px; color:#556; }
+#spawnerForm { padding:10px 12px; display:flex; flex-wrap:wrap; gap:8px; align-items:flex-start; }
+.spawnerField { display:flex; flex-direction:column; gap:3px; }
+.spawnerField label { font-size:11px; color:#778; text-transform:uppercase; letter-spacing:.05em; }
+.spawnerField input, .spawnerField select { background:#1a1e24; border:1px solid #3a3f48; color:#ccc; padding:4px 7px; border-radius:4px; font-size:12px; }
+.spawnerField input[type=number] { width:70px; }
+.chipArea { display:flex; flex-wrap:wrap; gap:4px; max-height:80px; overflow-y:auto; width:200px; padding:4px; background:#1a1e24; border:1px solid #3a3f48; border-radius:4px; }
+.chip { padding:2px 7px; border-radius:10px; font-size:11px; cursor:pointer; background:#2d3440; border:1px solid #3a3f48; color:#aaa; white-space:nowrap; user-select:none; }
+.chip.on { background:#1a3a5c; border-color:#2e86c1; color:#adf; }
+.chip.trait-pos { border-color:#2e7d32; }
+.chip.trait-pos.on { background:#1a3a1a; border-color:#4caf50; color:#aef; }
+.chip.trait-neg { border-color:#7d2e2e; }
+.chip.trait-neg.on { background:#3a1a1a; border-color:#ef5350; color:#faa; }
+#spawnBtn { align-self:flex-end; padding:6px 16px; background:#1a4a1a; border:1px solid #27ae60; color:#aef; border-radius:4px; cursor:pointer; font-size:13px; margin-bottom:2px; }
+#spawnBtn:hover { background:#1e5c1e; }
+
+/* ── Right column ── */
+#rightCol { width:380px; flex-shrink:0; display:flex; flex-direction:column; background:#1a1e24; }
+#charHeader { padding:8px 12px; background:#22272e; border-bottom:1px solid #3a3f48; font-size:13px; color:#adf; min-height:32px; display:flex; align-items:center; gap:8px; }
+#charHeader .charBadge { font-size:10px; padding:2px 6px; border-radius:8px; background:#2d3440; color:#aaa; }
+#pvCanvas { height:200px; flex-shrink:0; background:#111; position:relative; }
+#pvCanvas canvas { width:100%!important; height:100%!important; display:block; }
+#noCharMsg { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); color:#444; font-size:12px; text-align:center; pointer-events:none; }
+
+/* ── Inspector tabs ── */
+#tabBar { display:flex; background:#22272e; border-bottom:1px solid #3a3f48; flex-shrink:0; }
+.tab { padding:7px 12px; cursor:pointer; font-size:12px; color:#778; border-bottom:2px solid transparent; white-space:nowrap; }
+.tab:hover { color:#aaa; }
+.tab.active { color:#adf; border-bottom-color:#2e86c1; }
+#tabContent { flex:1; overflow:auto; padding:10px 12px; }
+
+/* ── Appearance tab ── */
+.fieldGrid { display:grid; grid-template-columns:90px 1fr; gap:6px 10px; align-items:center; }
+.fieldGrid label { color:#778; font-size:11px; }
+.fieldGrid input, .fieldGrid select { background:#1a1e24; border:1px solid #3a3f48; color:#ccc; padding:4px 7px; border-radius:4px; font-size:12px; width:100%; }
+.traitBadge { display:inline-block; padding:2px 8px; border-radius:10px; font-size:11px; margin:2px; background:#1a3a1a; border:1px solid #2e7d32; color:#aef; }
+.traitBadge.neg { background:#3a1a1a; border-color:#c62828; color:#faa; }
+.sectionHead { font-size:11px; color:#556; text-transform:uppercase; letter-spacing:.07em; margin:10px 0 5px; border-top:1px solid #2e3440; padding-top:8px; }
+
+/* ── State tab ── */
+.meterRow { display:flex; align-items:center; gap:8px; margin-bottom:6px; }
+.meterLabel { width:80px; font-size:11px; color:#889; text-align:right; flex-shrink:0; }
+.meterBar { flex:1; height:10px; background:#2d3440; border-radius:5px; overflow:hidden; }
+.meterFill { height:100%; border-radius:5px; transition:width 0.3s; }
+.meterVal { width:32px; font-size:11px; color:#aaa; text-align:right; }
+.moodPill { display:inline-block; padding:3px 12px; border-radius:12px; font-size:12px; margin-bottom:10px; }
+.editableVal { background:#1a1e24; border:1px solid #3a3f48; color:#ccc; padding:2px 6px; border-radius:3px; width:60px; font-size:12px; }
+
+/* ── JSON viewer ── */
+#runtimeJson, #templateJson { font-size:11px; font-family:monospace; white-space:pre-wrap; color:#9bc; line-height:1.5; }
+
+/* ── Log tab ── */
+#logFilter { display:flex; gap:8px; margin-bottom:8px; flex-wrap:wrap; }
+.logFilterBtn { padding:3px 10px; border-radius:10px; font-size:11px; cursor:pointer; border:1px solid #3a3f48; background:#2d3440; color:#aaa; }
+.logFilterBtn.on { background:#1a3050; border-color:#2e6da4; color:#adf; }
+#logEntries { display:flex; flex-direction:column; gap:6px; }
+.logEntry { padding:6px 8px; border-radius:5px; font-size:12px; border-left:3px solid #444; background:#1e242b; }
+.logEntry.speech { border-left-color:#27ae60; }
+.logEntry.thought { border-left-color:#8e44ad; }
+.logEntry.event  { border-left-color:#e67e22; }
+.logEntry.system { border-left-color:#2980b9; }
+.logMeta { font-size:10px; color:#556; margin-bottom:3px; }
+.logCharName { color:#89b; font-weight:bold; }
+.logType { padding:1px 5px; border-radius:6px; font-size:10px; }
+.logType.speech { background:#1a3a1a; color:#aef; }
+.logType.thought { background:#2a1a3a; color:#daf; }
+.logType.event   { background:#3a2a1a; color:#fda; }
+.logType.system  { background:#1a2a3a; color:#adf; }
+
+/* ── Sandbox overlay ── */
+#sandboxOverlay { position:absolute; top:8px; left:8px; display:flex; flex-direction:column; gap:6px; pointer-events:none; }
+.sbHint { background:rgba(0,0,0,.6); color:#aaa; font-size:11px; padding:4px 8px; border-radius:4px; border:1px solid #3a3f48; }
+#charCountBadge { background:rgba(20,40,60,.8); color:#adf; font-size:11px; padding:3px 8px; border-radius:4px; border:1px solid #2e6da4; }
+
+/* ── Perspective bar ── */
+#perspBar { display:flex; gap:3px; padding:4px 8px; background:#1e242b; border-bottom:1px solid #3a3f48; flex-shrink:0; align-items:center; }
+#perspBar .perspLabel { font-size:10px; color:#445; margin-right:3px; }
+.perspBtn { padding:2px 9px; background:#2d3440; border:1px solid #3a3f48; color:#889; border-radius:4px; cursor:pointer; font-size:11px; }
+.perspBtn:hover { background:#3a4254; color:#ccc; }
+.perspBtn.active { background:#1a3050; border-color:#2e6da4; color:#adf; }
+
+/* ── Item detail overlay ── */
+#itemDetailOverlay { display:none; position:absolute; bottom:8px; left:8px; background:rgba(12,18,28,.93); border:1px solid #2e5070; border-radius:6px; padding:8px 10px; min-width:155px; max-width:210px; font-size:11px; z-index:10; }
+#itemDetailOverlay h4 { margin:0 0 5px; font-size:12px; color:#adf; padding-right:16px; }
+#detailClose { position:absolute; top:4px; right:6px; cursor:pointer; color:#445; font-size:13px; background:none; border:none; padding:0; line-height:1; }
+#detailClose:hover { color:#aaa; }
+.detailRow { display:flex; justify-content:space-between; margin:2px 0; gap:8px; }
+.detailRow span:first-child { color:#7ab; }
+.detailRow span:last-child { color:#ccc; }
+#detailEquipBtn { margin-top:7px; width:100%; padding:4px; background:#1a3a1a; border:1px solid #27ae60; color:#aef; border-radius:3px; cursor:pointer; font-size:11px; }
+#detailEquipBtn:hover { background:#1e4a1e; }
+#detailUnequipBtn { margin-top:3px; width:100%; padding:4px; background:#3a1a1a; border:1px solid #a93226; color:#faa; border-radius:3px; cursor:pointer; font-size:11px; display:none; }
+#detailUnequipBtn:hover { background:#4a1a1a; }
+
+/* ── Outfit tab ── */
+.sHead2 { font-size:10px; color:#445; text-transform:uppercase; letter-spacing:.08em; margin:8px 0 4px; }
+#outfitSlots { display:flex; flex-wrap:wrap; gap:5px; margin-bottom:6px; }
+.slotChip { padding:3px 9px; border-radius:10px; font-size:11px; border:1px solid #2a3040; background:#1e242b; color:#445; cursor:default; }
+.slotChip.worn { border-color:#2e6da4; background:#182434; color:#adf; cursor:pointer; }
+.slotChip.worn:hover { background:#1e3040; }
+#outfitCatalogWrap { border-top:1px solid #252d38; padding-top:6px; }
+#clothingList { display:flex; flex-direction:column; gap:2px; }
+.clothingRow { display:flex; justify-content:space-between; align-items:center; padding:5px 8px; background:#1c2228; border:1px solid #232c38; border-radius:4px; cursor:pointer; }
+.clothingRow:hover { background:#232c3a; border-color:#3a4a5e; }
+.clothingRow.equipped { background:#182434; border-color:#2e6da4; }
+.cName { font-size:12px; color:#ccd; }
+.cMeta { font-size:10px; color:#4a5568; }
+.cEquipHint { font-size:10px; color:#2e6da4; }
+.cDblHint { font-size:9px; color:#2e3a4a; }
+.slotGroupLabel { font-size:10px; color:#3a4a5a; text-transform:uppercase; letter-spacing:.07em; margin:7px 0 3px; padding-left:2px; }
+</style>
+</head>
+<body>
+
+<!-- ── Top bar ── -->
+<div id="topbar">
+  <h1>💬 Social Sandbox</h1>
+  <button class="topBtn" onclick="window.location='/definitions.html'">← Editor</button>
+  <div class="sep"></div>
+  <label style="font-size:11px;color:#778">Scenario</label>
+  <select id="scenarioSelect">
+    <option value="conversation">Conversation</option>
+    <option value="group_conversation">Group Conversation</option>
+  </select>
+  <button class="topBtn go" id="btnStart" onclick="startScenario()">▶ Start</button>
+  <button class="topBtn" id="btnPause" onclick="pauseScenario()" disabled>⏸ Pause</button>
+  <button class="topBtn danger" id="btnStop" onclick="stopScenario()" disabled>■ Stop</button>
+  <div class="sep"></div>
+  <span id="speedLabel">Interval: <b id="speedVal">8</b>s</span>
+  <input id="speedSlider" type="range" min="2" max="60" value="8" oninput="document.getElementById('speedVal').textContent=this.value; speechInterval=+this.value">
+  <div class="sep"></div>
+  <button class="topBtn danger" id="btnEscalate" onclick="triggerEscalation()" disabled>⚡ Escalate</button>
+  <div class="sep"></div>
+  <label class="topBtn" id="thoughtToggle" title="Toggle thought bubbles">
+    <input type="checkbox" id="thoughtCheck" checked onchange="toggleThoughts(this.checked)"> 💭 Thoughts
+  </label>
+  <div class="sep"></div>
+  <span id="scenarioStatus" style="font-size:11px;color:#556">Idle — place characters to begin</span>
+</div>
+
+<!-- ── Main ── -->
+<div id="main">
+
+  <!-- LEFT COLUMN -->
+  <div id="leftCol">
+    <div id="sandboxCanvas">
+      <div id="sandboxOverlay">
+        <div class="sbHint">Click grid to place character · Click character to inspect</div>
+        <div id="charCountBadge">0 characters</div>
+      </div>
+    </div>
+
+    <!-- Spawner drawer -->
+    <div id="spawnerDrawer">
+      <div id="spawnerToggle" onclick="toggleSpawner()">
+        <b>＋ Character Spawner</b>
+        <span id="spawnerArrow">▲</span>
+      </div>
+      <div id="spawnerForm">
+        <div class="spawnerField">
+          <label>Name</label>
+          <input id="spName" placeholder="e.g. Alex" style="width:100px">
+        </div>
+        <div class="spawnerField">
+          <label>Sex</label>
+          <select id="spSex">
+            <option value="male">Male</option>
+            <option value="female">Female</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+        <div class="spawnerField">
+          <label>Age</label>
+          <input id="spAge" type="number" value="28" min="16" max="90">
+        </div>
+        <div class="spawnerField">
+          <label>Starting Mood</label>
+          <select id="spMood"></select>
+        </div>
+        <div class="spawnerField">
+          <label>Traits (pick up to 5)</label>
+          <div class="chipArea" id="traitChips"></div>
+        </div>
+        <div class="spawnerField">
+          <label>Hobbies (pick up to 3)</label>
+          <div class="chipArea" id="hobbyChips"></div>
+        </div>
+        <div class="spawnerField">
+          <label>Appearance notes</label>
+          <input id="spAppearance" placeholder="tall, dark hair..." style="width:140px">
+        </div>
+        <button id="spawnBtn" onclick="spawnCharacter()">＋ Spawn</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT COLUMN -->
+  <div id="rightCol">
+    <div id="charHeader">
+      <span id="charHeaderName" style="color:#556">No character selected</span>
+    </div>
+    <!-- Perspective quick buttons -->
+    <div id="perspBar">
+      <span class="perspLabel">VIEW</span>
+      <button class="perspBtn active" id="persp-front" onclick="setPerspective('front')">Front</button>
+      <button class="perspBtn" id="persp-back"  onclick="setPerspective('back')">Back</button>
+      <button class="perspBtn" id="persp-left"  onclick="setPerspective('left')">Left</button>
+      <button class="perspBtn" id="persp-right" onclick="setPerspective('right')">Right</button>
+      <button class="perspBtn" id="persp-top"   onclick="setPerspective('top')">Top</button>
+    </div>
+    <div id="pvCanvas" style="position:relative">
+      <div id="noCharMsg">Click a character<br>in the sandbox</div>
+      <!-- Item detail overlay (shown in Outfit tab) -->
+      <div id="itemDetailOverlay">
+        <h4 id="detailItemName">—</h4>
+        <button id="detailClose" onclick="closeItemDetail()">✕</button>
+        <div id="detailBody"></div>
+        <button id="detailEquipBtn"   onclick="equipFromDetail()">▲ Equip</button>
+        <button id="detailUnequipBtn" onclick="unequipFromDetail()">✕ Remove</button>
+      </div>
+    </div>
+    <div id="tabBar">
+      <div class="tab" data-tab="outfit"     onclick="switchTab(this)">Outfit</div>
+      <div class="tab active" data-tab="appearance" onclick="switchTab(this)">Appearance</div>
+      <div class="tab" data-tab="state"      onclick="switchTab(this)">State</div>
+      <div class="tab" data-tab="runtime"    onclick="switchTab(this)">Runtime</div>
+      <div class="tab" data-tab="template"   onclick="switchTab(this)">Template</div>
+      <div class="tab" data-tab="log"        onclick="switchTab(this)">Log</div>
+    </div>
+    <div id="tabContent">
+      <!-- Outfit tab -->
+      <div id="tab-outfit" style="display:none">
+        <div class="sHead2">Equipped</div>
+        <div id="outfitSlots"><span style="color:#3a4050;font-size:12px">Nothing worn</span></div>
+        <div id="outfitCatalogWrap">
+          <div class="sHead2">Clothing Catalog — double-click to equip</div>
+          <div id="clothingList"></div>
+        </div>
+      </div>
+      <div id="tab-appearance">
+        <p style="color:#445;font-size:12px">Select a character to inspect.</p>
+      </div>
+      <div id="tab-state"    style="display:none"></div>
+      <div id="tab-runtime"  style="display:none"><pre id="runtimeJson" style="color:#445">—</pre></div>
+      <div id="tab-template" style="display:none"><pre id="templateJson" style="color:#445">—</pre></div>
+      <div id="tab-log"      style="display:none">
+        <div id="logFilter">
+          <button class="logFilterBtn on" data-filter="speech"  onclick="toggleLogFilter(this)">💬 Speech</button>
+          <button class="logFilterBtn on" data-filter="thought" onclick="toggleLogFilter(this)">💭 Thought</button>
+          <button class="logFilterBtn on" data-filter="event"   onclick="toggleLogFilter(this)">⚡ Event</button>
+          <button class="logFilterBtn on" data-filter="system"  onclick="toggleLogFilter(this)">🔧 System</button>
+          <button class="logFilterBtn" style="margin-left:auto" onclick="clearLog()">Clear</button>
+        </div>
+        <div id="logEntries"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script type="module" src="/src/social_debug.js"></script>
+</body>
+</html>
