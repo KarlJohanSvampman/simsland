@@ -105,6 +105,9 @@ let previewMesh = null;   // for tile / material previews
 // ── Interaction preview state ─────────────────────────────────────────────────
 let _ixActive = false;
 let _ixCharKey = null;
+let _ixPropKey = null;        // currently previewed prop template key
+let _ixPropMesh = null;       // Three.Object3D for prop in scene
+let _ixItemMesh = null;       // Three.Object3D for item in scene
 let _ixClips = [];
 let _ixPhases = {};
 let _ixHeldMeshes = {};    // slot -> Three.Mesh
@@ -357,6 +360,8 @@ function openTemplate(id) {
 
   // Choose preview type based on tab
   _ixActive = false;  // deactivate interaction preview whenever we switch away
+  if (_ixPropMesh) { previewScene.remove(_ixPropMesh); _ixPropMesh = null; }
+  if (_ixItemMesh) { previewScene.remove(_ixItemMesh); _ixItemMesh = null; }
   if (currentTab === 'activity_templates') {
     loadActivityTimeline(data);
   } else if (currentTab === 'interaction_templates') {
@@ -1431,11 +1436,14 @@ function loadInteractionPreview(data) {
   const reqItemCat = data.requires_item_category || null;
   const offGrid    = !!data.off_grid;
 
-  const propChips = reqProps.map(tag => {
-    const hit = Object.entries(definitions.prop_templates || {})
-      .find(([, p]) => (p.tags || []).includes(tag));
-    return { tag, name: hit ? hit[1].name : tag, found: !!hit };
-  });
+  // All props that satisfy at least one required tag
+  const matchingProps = reqProps.length
+    ? Object.entries(definitions.prop_templates || {})
+        .filter(([, p]) => reqProps.some(tag => (p.tags || []).includes(tag)))
+    : [];
+  // Keep current prop selection if it still matches, else pick first
+  if (!_ixPropKey || !matchingProps.find(([k]) => k === _ixPropKey))
+    _ixPropKey = matchingProps[0]?.[0] || null;
 
   const matchItems = reqItemCat
     ? Object.entries(definitions.item_templates || {})
@@ -1447,6 +1455,10 @@ function loadInteractionPreview(data) {
     `<option value="${k}" ${k === _ixCharKey ? 'selected' : ''}>${k}</option>`
   ).join('') || '<option value="">— no character templates —</option>';
 
+  const propOptions = matchingProps.map(([k, p]) =>
+    `<option value="${k}" ${k === _ixPropKey ? 'selected' : ''}>${p.name || k}</option>`
+  ).join('');
+
   const phaseHasClips = phase => (_ixPhases[phase] || []).length > 0;
 
   document.getElementById('modelPreview').innerHTML = _IX_STYLE + `
@@ -1454,6 +1466,12 @@ function loadInteractionPreview(data) {
   <div id="ixCharBar">
     <label>Character</label>
     <select id="ixCharSelect">${charOptions}</select>
+    ${matchingProps.length ? `
+    <label>Prop</label>
+    <select id="ixPropSelect">
+      <option value="">\u2014 none \u2014</option>
+      ${propOptions}
+    </select>` : ''}
   </div>
   <div id="ixCanvas"></div>
   <div id="ixPhaseBar">
@@ -1468,12 +1486,10 @@ function loadInteractionPreview(data) {
   </div>
   <div id="ixInfoPanel">
     ${offGrid ? '<div class="ixOffGrid">\u2b1b Off-grid \u2014 no prop placement needed</div>' : ''}
-    ${propChips.length ? `
+    ${reqProps.length ? `
     <div class="ixSection">
-      <div class="ixSectionTitle">Required Props</div>
-      <div class="ixChips">
-        ${propChips.map(p => `<span class="ixChip${p.found ? '' : ' missing'}" title="${p.found ? 'found in prop_templates' : 'no prop with this tag'}">${p.name}</span>`).join('')}
-      </div>
+      <div class="ixSectionTitle">Required prop tags: ${reqProps.map(t => `<span class="ixChip">${t}</span>`).join(' ')}</div>
+      ${matchingProps.length === 0 ? '<div class="ixEmptyNote">No matching props found in prop_templates</div>' : ''}
     </div>` : ''}
     ${reqItemCat ? `
     <div class="ixSection">
@@ -1508,7 +1524,15 @@ function loadInteractionPreview(data) {
     _ixLoadChar();
   };
 
+  const propSel = document.getElementById('ixPropSelect');
+  if (propSel) propSel.onchange = e => {
+    _ixPropKey = e.target.value || null;
+    _ixLoadProp(_ixPropKey);
+  };
+
   _ixLoadChar();
+  _ixLoadProp(_ixPropKey);
+  if (reqItemCat) _ixLoadItem(reqItemCat);
 }
 
 function _ixLoadChar() {
@@ -1563,6 +1587,62 @@ function _ixClearHeld() {
   Object.values(_ixHeldMeshes).forEach(m => { if (m.parent) m.parent.remove(m); });
   _ixHeldMeshes = {};
   document.querySelectorAll('.ixHoldBtn').forEach(b => b.classList.remove('held'));
+}
+
+function _ixLoadProp(propKey) {
+  if (_ixPropMesh) { previewScene.remove(_ixPropMesh); _ixPropMesh = null; }
+  if (!propKey) return;
+  const tmpl = (definitions.prop_templates || {})[propKey];
+  if (!tmpl) return;
+  const path = resolveModelPath(tmpl);
+  if (path) {
+    previewLoader.load(path, gltf => {
+      if (!_ixActive) return;
+      _ixPropMesh = gltf.scene;
+      _ixPropMesh.position.set(0, 0, -1.2);
+      previewScene.add(_ixPropMesh);
+      setStatus(`Prop: ${tmpl.name || propKey}`);
+    }, undefined, () => _ixShowPropPlaceholder());
+  } else {
+    _ixShowPropPlaceholder();
+  }
+}
+
+function _ixShowPropPlaceholder() {
+  if (_ixPropMesh) { previewScene.remove(_ixPropMesh); _ixPropMesh = null; }
+  const geo = new THREE.CylinderGeometry(0.38, 0.38, 1.0, 24);
+  const mat = new THREE.MeshStandardMaterial({ color: 0x6688aa, roughness: 0.65, metalness: 0.1 });
+  _ixPropMesh = new THREE.Mesh(geo, mat);
+  _ixPropMesh.position.set(0, 0.5, -1.2);
+  previewScene.add(_ixPropMesh);
+}
+
+function _ixLoadItem(reqItemCat) {
+  if (_ixItemMesh) { previewScene.remove(_ixItemMesh); _ixItemMesh = null; }
+  if (!reqItemCat) return;
+  const entry = Object.entries(definitions.item_templates || {})
+    .find(([, v]) => v.category === reqItemCat);
+  if (!entry) { _ixShowItemPlaceholder(); return; }
+  const path = resolveModelPath(entry[1]);
+  if (path) {
+    previewLoader.load(path, gltf => {
+      if (!_ixActive) return;
+      _ixItemMesh = gltf.scene;
+      _ixItemMesh.position.set(0.9, 0.9, -0.4);
+      previewScene.add(_ixItemMesh);
+    }, undefined, () => _ixShowItemPlaceholder());
+  } else {
+    _ixShowItemPlaceholder();
+  }
+}
+
+function _ixShowItemPlaceholder() {
+  if (_ixItemMesh) { previewScene.remove(_ixItemMesh); _ixItemMesh = null; }
+  const geo = new THREE.BoxGeometry(0.35, 0.35, 0.35);
+  const mat = new THREE.MeshStandardMaterial({ color: 0xcc9944, roughness: 0.65, metalness: 0.1 });
+  _ixItemMesh = new THREE.Mesh(geo, mat);
+  _ixItemMesh.position.set(0.9, 0.875, -0.4);
+  previewScene.add(_ixItemMesh);
 }
 
 window._ixPlayPhase = function(phase) {
@@ -1628,80 +1708,75 @@ window._ixPlayAll = function() {
       document.querySelectorAll('.ixPhaseBtn').forEach(b => b.classList.remove('active'));
       document.getElementById('ixBtnLoop')?.classList.add('active');
       playClip(loopClips[0], true);
-      setStatus('\u21ba Playing loop phase\u2026');
-
+      setStatus('↺ Playing loop phase…');
       _ixPlayTimeout = setTimeout(() => {
         if (!_ixActive) return;
         document.querySelectorAll('.ixPhaseBtn').forEach(b => b.classList.remove('active'));
         if (stopClips.length) {
+          const dur2 = playClip(stopClips[0], false) * 1000;
           document.getElementById('ixBtnStop')?.classList.add('active');
-          const dur = playClip(stopClips[0], false) * 1000;
-          setStatus('\u25a0 Playing stop phase\u2026');
+          setStatus('■ Playing stop phase…');
           _ixPlayTimeout = setTimeout(() => {
             if (!_ixActive) return;
             window._ixPlayPhase('idle');
-            setStatus('Done \u2014 returned to idle');
-          }, dur);
+            setStatus('Done.');
+          }, dur2);
         } else {
           window._ixPlayPhase('idle');
-          setStatus('Done \u2014 returned to idle');
+          setStatus('Done.');
         }
       }, 3000);
     }, afterStart);
-
   } else if (stopClips.length) {
     _ixPlayTimeout = setTimeout(() => {
       if (!_ixActive) return;
       document.querySelectorAll('.ixPhaseBtn').forEach(b => b.classList.remove('active'));
+      const dur2 = playClip(stopClips[0], false) * 1000;
       document.getElementById('ixBtnStop')?.classList.add('active');
-      const dur = playClip(stopClips[0], false) * 1000;
-      setStatus('\u25a0 Playing stop phase\u2026');
+      setStatus('■ Playing stop phase…');
       _ixPlayTimeout = setTimeout(() => {
         if (!_ixActive) return;
         window._ixPlayPhase('idle');
-        setStatus('Done \u2014 returned to idle');
-      }, dur);
+        setStatus('Done.');
+      }, dur2);
     }, afterStart);
   } else if (!startClips.length) {
-    setStatus('No animation clips defined on this interaction');
+    setStatus('No animation clips found for any phase');
   }
 };
 
 window._ixToggleHold = function(itemId, slot) {
-  if (!previewModel) { setStatus('Load a character first'); return; }
-
-  const btnId  = slot === 'right_hand' ? `ixHR_${itemId}` : `ixHL_${itemId}`;
-  const btn    = document.getElementById(btnId);
-  const isHeld = btn?.classList.contains('held');
-
+  if (!previewModel || !_ixActive) return;
   if (_ixHeldMeshes[slot]) {
+    // already holding something in this slot — detach
     const old = _ixHeldMeshes[slot];
     if (old.parent) old.parent.remove(old);
     delete _ixHeldMeshes[slot];
-    document.querySelectorAll('.ixHoldBtn').forEach(b => {
-      if (b.dataset.ixSlot === slot) b.classList.remove('held');
-    });
+    const btnR = document.getElementById('ixHR_' + itemId);
+    const btnL = document.getElementById('ixHL_' + itemId);
+    if (slot === 'right_hand' && btnR) btnR.classList.remove('held');
+    if (slot === 'left_hand'  && btnL) btnL.classList.remove('held');
+    return;
   }
 
-  if (!isHeld) {
-    const rightNames = ['hand_r','Hand_R','RightHand','Bip01_R_Hand','mixamorig:RightHand','r_hand','Right_Hand'];
-    const leftNames  = ['hand_l','Hand_L','LeftHand','Bip01_L_Hand','mixamorig:LeftHand','l_hand','Left_Hand'];
-    const targets    = slot === 'right_hand' ? rightNames : leftNames;
+  // Find hand bone
+  const boneName = slot === 'right_hand' ? 'hand_r' : 'hand_l';
+  let bone = null;
+  previewModel.traverse(o => {
+    if (o.isBone && (o.name === boneName || o.name.toLowerCase() === boneName.toLowerCase())) bone = o;
+  });
+  if (!bone) { setStatus('Bone "' + boneName + '" not found on character'); return; }
 
-    let bone = null;
-    previewModel.traverse(o => {
-      if (!bone && targets.some(n => o.name.toLowerCase() === n.toLowerCase())) bone = o;
-    });
+  // Create placeholder cube for item
+  const geo = new THREE.BoxGeometry(0.12, 0.12, 0.12);
+  const mat = new THREE.MeshStandardMaterial({ color: 0xcc9944, roughness: 0.6 });
+  const mesh = new THREE.Mesh(geo, mat);
+  bone.add(mesh);
+  _ixHeldMeshes[slot] = mesh;
 
-    if (!bone) {
-      setStatus(`Bone not found for "${slot}". Expected: ${targets.slice(0,4).join(', ')}\u2026`);
-      return;
-    }
-
-    const mesh = new THREE.Mesh(
-      new THREE.BoxGeometry(0.05, 0.05, 0.18),
-      new THREE.MeshStandardMaterial({ color: slot === 'right_hand' ? 0x88aacc : 0xcc8855, roughness: 0.5 })
-    );
-    mesh.name = `held_${itemId}_${slot}`;
-    mesh.position.set(0, 0, 0.1);
-    bone.add(mesh);
+  const btnR = document.getElementById('ixHR_' + itemId);
+  const btnL = document.getElementById('ixHL_' + itemId);
+  if (slot === 'right_hand' && btnR) btnR.classList.add('held');
+  if (slot === 'left_hand'  && btnL) btnL.classList.add('held');
+  setStatus('Holding ' + itemId + ' in ' + slot);
+};
