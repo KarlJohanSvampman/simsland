@@ -123,6 +123,13 @@ let _ixTargetPhases  = {};       // data.target_animations from template
 let _ixTargetRegionMarkers = [];  // spheres placed on target bones (may be multiple)
 let _ixVarDefs       = {};       // data.variables definitions
 let _ixVarValues     = {};       // current variable values for this interaction
+// ── Prop drag + radius ring ───────────────────────────────────────────────────
+let _ixRadiusRing    = null;     // THREE.Line circle showing interaction reach
+let _ixDragging      = false;
+let _ixDragOffset    = new THREE.Vector3();
+let _ixInteractDist  = 1.2;     // metres — read from anchor.distance or default
+const _ixDragPlaneY  = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+const _ixDragRay     = new THREE.Raycaster();
 
 // =====================================================
 // MODEL RESOLUTION  (meshbank ID → actual mesh path)
@@ -373,6 +380,8 @@ function openTemplate(id) {
   _ixActive = false;  // deactivate interaction preview whenever we switch away
   if (_ixPropMesh)    { previewScene.remove(_ixPropMesh); _ixPropMesh = null; }
   if (_ixItemMesh)    { previewScene.remove(_ixItemMesh); _ixItemMesh = null; }
+  if (_ixRadiusRing)  { previewScene.remove(_ixRadiusRing); _ixRadiusRing = null; }
+  _ixDragging = false;
   if (_ixTargetModel) { previewScene.remove(_ixTargetModel); _ixTargetModel = null; }
   if (_ixTargetMixer) { _ixTargetMixer.stopAllAction(); _ixTargetMixer = null; }
   _ixTargetRegionMarkers.forEach(m => { if (m.parent) m.parent.remove(m); });
@@ -535,6 +544,34 @@ function clearPreviewModel() {
 }
 
 // =====================================================
+// PLACEHOLDER MESH (shown when a model file is missing)
+// =====================================================
+
+function showPreviewPlaceholder(label) {
+  clearPreviewModel();
+  // Orange semi-transparent humanoid box + wireframe overlay
+  const geo  = new THREE.BoxGeometry(0.7, 1.7, 0.45);
+  const mat  = new THREE.MeshStandardMaterial({ color:0xff6600, opacity:0.45, transparent:true });
+  const mesh = new THREE.Mesh(geo, mat);
+  const wire = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color:0xff9900, wireframe:true }));
+  mesh.add(wire);
+  mesh.position.set(0, 0.85, 0);
+  // Question-mark sphere on top
+  const headGeo = new THREE.SphereGeometry(0.22, 10, 8);
+  const headMat = new THREE.MeshStandardMaterial({ color:0xff6600, opacity:0.45, transparent:true });
+  const head = new THREE.Mesh(headGeo, headMat);
+  head.add(new THREE.Mesh(headGeo, new THREE.MeshBasicMaterial({ color:0xff9900, wireframe:true })));
+  head.position.set(0, 1.85, 0);
+  const grp = new THREE.Group();
+  grp.add(mesh);
+  grp.add(head);
+  previewModel = grp;
+  previewScene.add(previewModel);
+  framePreviewCamera(previewModel);
+  setStatus('⚠ ' + (label || 'Model file not found — placeholder shown'));
+}
+
+// =====================================================
 // LOAD PREVIEW MODEL
 // =====================================================
 
@@ -594,7 +631,7 @@ function loadPreviewModel(path) {
 
   }, undefined, (err) => {
     console.error(err);
-    setStatus('Model load failed');
+    showPreviewPlaceholder('Model not found: ' + path.split('/').pop());
   });
 }
 
@@ -1697,6 +1734,8 @@ function _ixLoadChar() {
   if (!_ixActive) return;
   const tmpl = (definitions.character_templates || {})[_ixCharKey];
   if (!tmpl?.model) { setStatus('Character template has no model path'); return; }
+  const charModelPath = resolveModelPath(tmpl);
+  if (!charModelPath) { setStatus('Cannot resolve model for ' + _ixCharKey + ' (check meshbank)'); return; }
 
   if (previewModel) { previewScene.remove(previewModel); previewModel = null; }
   if (previewMixer) { previewMixer.stopAllAction(); previewMixer = null; }
@@ -1704,7 +1743,7 @@ function _ixLoadChar() {
   _ixClearHeld();
 
   setStatus('Loading character\u2026');
-  previewLoader.load(tmpl.model, gltf => {
+  previewLoader.load(charModelPath, gltf => {
     if (!_ixActive) return;
     previewModel = gltf.scene;
     previewScene.add(previewModel);
@@ -1720,7 +1759,10 @@ function _ixLoadChar() {
 
     _ixRefreshPhaseBtns();
     setStatus(`${_ixCharKey} \u2014 ${_ixClips.length} animation clip(s) loaded`);
-  }, undefined, err => setStatus('Character load error: ' + (err.message || err)));
+  }, undefined, err => {
+    showPreviewPlaceholder('Character model missing: ' + _ixCharKey);
+    setStatus('Character load error: ' + (err.message || err));
+  });
 }
 
 function _ixLoadTargetChar() {
@@ -1731,8 +1773,10 @@ function _ixLoadTargetChar() {
 
   const tmpl = (definitions.character_templates || {})[_ixTargetCharKey];
   if (!tmpl?.model) { _ixAddLog('Target character has no model'); return; }
+  const targetModelPath = resolveModelPath(tmpl);
+  if (!targetModelPath) { _ixAddLog('Cannot resolve model for target char ' + _ixTargetCharKey); return; }
 
-  previewLoader.load(tmpl.model, gltf => {
+  previewLoader.load(targetModelPath, gltf => {
     if (!_ixActive) return;
     _ixTargetModel = gltf.scene;
     // Face the primary character — 1.2m away, rotated 180deg
@@ -1751,6 +1795,142 @@ function _ixLoadTargetChar() {
     const curData = (definitions.interaction_templates || {})[currentTemplateId];
     if (curData?.target_region) _ixPlaceTargetRegionMarker(curData.target_region);
   }, undefined, err => _ixAddLog('Target char load error: ' + (err.message || err)));
+}
+
+// ── Radius ring ───────────────────────────────────────────────────────────────
+function _ixUpdateRadiusRing() {
+  if (_ixRadiusRing) { previewScene.remove(_ixRadiusRing); _ixRadiusRing = null; }
+  if (!_ixPropMesh) return;
+  const cx = _ixPropMesh.position.x, cz = _ixPropMesh.position.z;
+  const r  = _ixInteractDist;
+  const segs = 64;
+  const pts = [];
+  for (let i = 0; i <= segs; i++) {
+    const a = (i / segs) * Math.PI * 2;
+    pts.push(new THREE.Vector3(cx + Math.cos(a) * r, 0.02, cz + Math.sin(a) * r));
+  }
+  const geo = new THREE.BufferGeometry().setFromPoints(pts);
+  const mat = new THREE.LineBasicMaterial({ color: 0x44aaff, transparent: true, opacity: 0.55 });
+  _ixRadiusRing = new THREE.Line(geo, mat);
+  previewScene.add(_ixRadiusRing);
+}
+
+// ── Prop drag ─────────────────────────────────────────────────────────────────
+function _ixSetupPropDrag(canvas) {
+  if (canvas._ixDragBound) return;
+  canvas._ixDragBound = true;
+
+  const ndc = e => {
+    const r = canvas.getBoundingClientRect();
+    return new THREE.Vector2(
+      ((e.clientX - r.left) / r.width)  *  2 - 1,
+      ((e.clientY - r.top)  / r.height) * -2 + 1
+    );
+  };
+
+  canvas.addEventListener('mousedown', e => {
+    if (!_ixPropMesh || !_ixActive) return;
+    _ixDragRay.setFromCamera(ndc(e), previewCamera);
+    if (!_ixDragRay.intersectObject(_ixPropMesh, true).length) return;
+    e.stopPropagation();
+    _ixDragging = true;
+    previewControls.enabled = false;
+    const hit = new THREE.Vector3();
+    _ixDragRay.ray.intersectPlane(_ixDragPlaneY, hit);
+    _ixDragOffset.set(_ixPropMesh.position.x - hit.x, 0, _ixPropMesh.position.z - hit.z);
+  });
+
+  canvas.addEventListener('mousemove', e => {
+    if (!_ixDragging || !_ixPropMesh) return;
+    _ixDragRay.setFromCamera(ndc(e), previewCamera);
+    const hit = new THREE.Vector3();
+    _ixDragRay.ray.intersectPlane(_ixDragPlaneY, hit);
+    _ixPropMesh.position.x = hit.x + _ixDragOffset.x;
+    _ixPropMesh.position.z = hit.z + _ixDragOffset.z;
+    _ixUpdateRadiusRing();
+  });
+
+  const end = () => {
+    if (!_ixDragging) return;
+    _ixDragging = false;
+    previewControls.enabled = true;
+    if (_ixPropMesh) _ixAddLog('Prop at (' + _ixPropMesh.position.x.toFixed(2) + ', ' + _ixPropMesh.position.z.toFixed(2) + ')');
+  };
+  canvas.addEventListener('mouseup',    end);
+  canvas.addEventListener('mouseleave', end);
+}
+
+// ── Load prop (GLB or cylinder placeholder) ───────────────────────────────────
+function _ixLoadProp(propKey) {
+  if (_ixPropMesh)   { previewScene.remove(_ixPropMesh); _ixPropMesh = null; }
+  if (_ixRadiusRing) { previewScene.remove(_ixRadiusRing); _ixRadiusRing = null; }
+  if (!propKey) return;
+
+  const tmpl = (definitions.prop_templates || {})[propKey];
+  if (!tmpl) return;
+
+  _ixInteractDist = (tmpl.anchors || [])[0]?.distance ?? 1.2;
+
+  const place = obj => {
+    _ixPropMesh = obj;
+    _ixPropMesh.position.set(0, 0, -1.5);
+    previewScene.add(_ixPropMesh);
+    _ixUpdateRadiusRing();
+    const canvas = document.querySelector('#ixCanvas canvas');
+    if (canvas) _ixSetupPropDrag(canvas);
+    _ixAddLog('Prop: ' + propKey + ' (reach ' + _ixInteractDist.toFixed(1) + 'm)');
+  };
+
+  const mkPlaceholder = () => {
+    const geo = new THREE.CylinderGeometry(0.38, 0.38, 1.0, 24);
+    const mat = new THREE.MeshStandardMaterial({ color: 0x6688aa, roughness: 0.65 });
+    const m = new THREE.Mesh(geo, mat);
+    m.position.y = 0.5;
+    return m;
+  };
+
+  const path = resolveModelPath(tmpl);
+  if (path) {
+    previewLoader.load(path, gltf => { if (_ixActive) place(gltf.scene); },
+      undefined, () => { if (_ixActive) place(mkPlaceholder()); });
+  } else {
+    place(mkPlaceholder());
+  }
+}
+
+// ── Load item (GLB or amber cube placeholder) ─────────────────────────────────
+function _ixLoadItem(itemCat) {
+  if (_ixItemMesh) { previewScene.remove(_ixItemMesh); _ixItemMesh = null; }
+  if (!itemCat) return;
+
+  const allItems = definitions.item_templates || {};
+  const entry = Object.entries(allItems).find(([, t]) =>
+    t.category === itemCat || (Array.isArray(t.categories) && t.categories.includes(itemCat))
+  );
+  const tmpl = entry?.[1] || null;
+
+  const place = obj => {
+    _ixItemMesh = obj;
+    _ixItemMesh.position.set(0.5, 1.0, -0.4);
+    previewScene.add(_ixItemMesh);
+    _ixAddLog('Item: ' + (entry?.[0] || itemCat));
+  };
+
+  const mkPlaceholder = () => {
+    const geo = new THREE.BoxGeometry(0.25, 0.25, 0.25);
+    const mat = new THREE.MeshStandardMaterial({ color: 0xcc9944, roughness: 0.65 });
+    return new THREE.Mesh(geo, mat);
+  };
+
+  if (tmpl) {
+    const path = resolveModelPath(tmpl);
+    if (path) {
+      previewLoader.load(path, gltf => { if (_ixActive) place(gltf.scene); },
+        undefined, () => { if (_ixActive) place(mkPlaceholder()); });
+      return;
+    }
+  }
+  place(mkPlaceholder());
 }
 
 function _ixTargetFindClip(name) {
@@ -2131,38 +2311,4 @@ function _ixRenderVariables(vars) {
 
 function _ixRenderModifiers(mods) {
   if (!mods || !mods.length) return '';
-  let html = '<div class="ixSection"><div class="ixSectionTitle">Effectiveness Modifiers</div>';
-  for (const m of mods) {
-    html += '<div class="ixModRow"><span class="ixModCond">' + (m.condition || '') + '</span>';
-    if (m.multiplier != null) html += '<span class="ixModVal">x' + m.multiplier + '</span>';
-    if (m.outcome)            html += '<span class="ixModVal">' + m.outcome + '</span>';
-    html += '</div>';
-  }
-  html += '</div>';
-  return html;
-}
-
-window._ixSetVar = function(el) {
-  const key = el.dataset.var;
-  const val = el.type === 'checkbox' ? el.checked : (el.type === 'number' ? Number(el.value) : el.value);
-  _ixVarValues[key] = val;
-  _ixAddLog('Var "' + key + '" = ' + JSON.stringify(val));
-};
-
-window._ixRandomizeVar = function(key) {
-  const def = _ixVarDefs[key];
-  if (!def) return;
-  let val;
-  if (def.type === 'select' && def.options) {
-    val = def.options[Math.floor(Math.random() * def.options.length)];
-  } else if (def.type === 'number') {
-    const lo = def.min || 0, hi = def.max || 10;
-    val = Math.floor(Math.random() * (hi - lo + 1)) + lo;
-  } else if (def.type === 'bool') {
-    val = Math.random() > 0.5;
-  } else { return; }
-  _ixVarValues[key] = val;
-  const el = document.querySelector('[data-var="' + key + '"]');
-  if (el) { el.type === 'checkbox' ? (el.checked = val) : (el.value = val); }
-  _ixAddLog('Var "' + key + '" randomized = ' + JSON.stringify(val));
-};
+  let html = '<div class="ixSection"><div 

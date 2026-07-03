@@ -802,6 +802,9 @@ function clearCurrentModel(){
 
     anchorHelpers = [];
 
+    _removeAnchorMarkers();
+    _removeTargetMarkers();
+
     mixer = null;
 }
 
@@ -1125,6 +1128,34 @@ function updateStats(model){
         Largest:
         ${maxDim.toFixed(2)}
     `;
+}
+
+// ── Placeholder mesh (shown when a GLB is missing/fails to load) ───────────────
+function showPlaceholderMesh(err) {
+    clearCurrentModel();
+    // Orange semi-transparent box body + wireframe overlay + question-mark head
+    const bodyGeo  = new THREE.BoxGeometry(0.8, 1.7, 0.5);
+    const bodyMat  = new THREE.MeshStandardMaterial({ color:0xff6600, opacity:0.4, transparent:true });
+    const body     = new THREE.Mesh(bodyGeo, bodyMat);
+    body.add(new THREE.Mesh(bodyGeo, new THREE.MeshBasicMaterial({ color:0xff9900, wireframe:true })));
+    body.position.y = 0.85;
+
+    const headGeo  = new THREE.SphereGeometry(0.25, 10, 8);
+    const headMat  = new THREE.MeshStandardMaterial({ color:0xff6600, opacity:0.4, transparent:true });
+    const head     = new THREE.Mesh(headGeo, headMat);
+    head.add(new THREE.Mesh(headGeo, new THREE.MeshBasicMaterial({ color:0xff9900, wireframe:true })));
+    head.position.y = 1.95;
+
+    const grp = new THREE.Group();
+    grp.add(body);
+    grp.add(head);
+    currentModel = grp;
+    scene.add(currentModel);
+    frameCamera(currentModel);
+
+    document.getElementById('stats').innerHTML =
+        '<span style="color:#ff8844">⚠ Model file not found</span><br>' +
+        '<span style="color:#664422;font-size:10px">' + (err?.message || err || 'GLB missing') + '</span>';
 }
 
 function updateBoxHelper(model){
@@ -1537,77 +1568,26 @@ const marker =
                     currentAnimations
                 );
             }
+        },
+
+        undefined,
+
+        err => {
+            console.warn('GLB load failed:', url, err);
+            showPlaceholderMesh(err);
         }
     );
 }
 function populateAnchors(){
-
-    const container =
-        document.getElementById(
-            "anchors"
-        );
-
-    container.innerHTML = "";
-
-    const anchors =
-        meshbank[
-            currentAssetId
-        ]?.anchors || {};
-
-    for(
-        const name
-        in anchors
-    ){
-
-        const row =
-            document.createElement(
-                "div"
-            );
-
-        row.className = "assetRow";
-
-        row.textContent = name;
-
-        container.appendChild(
-            row
-        );
-    }
+    selectedAnchorKey = null;
+    renderAnchorList();
+    _rebuildAnchorMarkers();
 }
 
 function populateTargets(){
-
-    const container =
-        document.getElementById(
-            "targets"
-        );
-
-    if(!container) return;
-
-    container.innerHTML = "";
-
-    const targets =
-        meshbank[
-            currentAssetId
-        ]?.targets || {};
-
-    for(
-        const name
-        in targets
-    ){
-
-        const row =
-            document.createElement(
-                "div"
-            );
-
-        row.className = "assetRow";
-
-        row.textContent = name;
-
-        container.appendChild(
-            row
-        );
-    }
+    selectedTargetKey = null;
+    renderTargetList();
+    _rebuildTargetMarkers();
 }
 
 function populateBones(){
@@ -2303,3 +2283,225 @@ document
         "Metadata generated"
     );
 };
+// =====================================================
+// ANCHOR / TARGET CRUD
+// =====================================================
+
+let selectedAnchorKey = null;
+let selectedTargetKey = null;
+let placingMode = null; // 'anchor' | 'target' | null
+const placeRaycaster = new THREE.Raycaster();
+
+// ── Shared helpers ────────────────────────────────────────────────────────────
+function ensureAnchors(asset) { asset.anchors ||= {}; return asset.anchors; }
+function ensureTargets(asset) { asset.targets ||= {}; return asset.targets; }
+
+function getCanvasNDC(e) {
+  const r = canvas.getBoundingClientRect();
+  return new THREE.Vector2(
+    ((e.clientX - r.left) / r.width)  *  2 - 1,
+    ((e.clientY - r.top)  / r.height) * -2 + 1
+  );
+}
+
+// ── 3D markers ────────────────────────────────────────────────────────────────
+let _anchorMarker3D = {};  // key -> {sphere, arrow}
+let _targetMarker3D = {};  // key -> sphere
+
+function _removeAnchorMarkers() {
+  Object.values(_anchorMarker3D).forEach(g => scene.remove(g));
+  _anchorMarker3D = {};
+}
+function _removeTargetMarkers() {
+  Object.values(_targetMarker3D).forEach(g => scene.remove(g));
+  _targetMarker3D = {};
+}
+
+function _rebuildAnchorMarkers() {
+  _removeAnchorMarkers();
+  if (!currentAssetId) return;
+  const anchors = ensureAnchors(meshbank[currentAssetId]);
+  const geoS = new THREE.SphereGeometry(0.08, 12, 12);
+  for (const [key, a] of Object.entries(anchors)) {
+    const pos = a.position || { x: 0, y: 0, z: 0 };
+    const isSelected = key === selectedAnchorKey;
+    const mat = new THREE.MeshBasicMaterial({ color: isSelected ? 0x00ff88 : 0x00cc44 });
+    const sphere = new THREE.Mesh(geoS, mat);
+    sphere.position.set(pos.x, pos.y, pos.z);
+    // Arrow showing facing direction
+    const ry = THREE.MathUtils.degToRad(a.rotation_y || 0);
+    const dir = new THREE.Vector3(Math.sin(ry), 0, Math.cos(ry)).normalize();
+    const arrow = new THREE.ArrowHelper(dir, sphere.position, a.distance || 1.0, isSelected ? 0x00ff88 : 0x00cc44, 0.15, 0.1);
+    const group = new THREE.Group();
+    group.add(sphere, arrow);
+    scene.add(group);
+    _anchorMarker3D[key] = group;
+  }
+}
+
+function _rebuildTargetMarkers() {
+  _removeTargetMarkers();
+  if (!currentAssetId) return;
+  const targets = ensureTargets(meshbank[currentAssetId]);
+  const geoS = new THREE.SphereGeometry(0.08, 12, 12);
+  for (const [key, t] of Object.entries(targets)) {
+    const pos = t.position || { x: 0, y: 0, z: 0 };
+    const isSelected = key === selectedTargetKey;
+    const mat = new THREE.MeshBasicMaterial({ color: isSelected ? 0x44aaff : 0x0066cc });
+    const sphere = new THREE.Mesh(geoS, mat);
+    sphere.position.set(pos.x, pos.y, pos.z);
+    scene.add(sphere);
+    _targetMarker3D[key] = sphere;
+  }
+}
+
+// ── Anchor list + editor ──────────────────────────────────────────────────────
+function renderAnchorList() {
+  const list = document.getElementById('anchorList');
+  if (!list) return;
+  const anchors = currentAssetId ? ensureAnchors(meshbank[currentAssetId]) : {};
+  list.innerHTML = '';
+  for (const key of Object.keys(anchors)) {
+    const row = document.createElement('div');
+    row.className = 'assetRow' + (key === selectedAnchorKey ? ' active' : '');
+    row.textContent = key;
+    row.onclick = () => { selectedAnchorKey = key; renderAnchorList(); loadAnchorEditor(); _rebuildAnchorMarkers(); };
+    list.appendChild(row);
+  }
+  const ed = document.getElementById('anchorEditor');
+  if (ed) ed.style.display = selectedAnchorKey ? '' : 'none';
+}
+
+function loadAnchorEditor() {
+  if (!currentAssetId || !selectedAnchorKey) return;
+  const a = ensureAnchors(meshbank[currentAssetId])[selectedAnchorKey] || {};
+  const pos = a.position || { x: 0, y: 0, z: 0 };
+  document.getElementById('anchorName').value      = a.name || selectedAnchorKey;
+  document.getElementById('anchorPosX').value      = pos.x ?? 0;
+  document.getElementById('anchorPosY').value      = pos.y ?? 0;
+  document.getElementById('anchorPosZ').value      = pos.z ?? 0;
+  document.getElementById('anchorRotY').value      = a.rotation_y ?? 0;
+  document.getElementById('anchorDist').value      = a.distance  ?? 1.2;
+  document.getElementById('anchorInteraction').value = a.interaction || '';
+}
+
+function saveAnchorEdits() {
+  if (!currentAssetId || !selectedAnchorKey) return;
+  const anchors = ensureAnchors(meshbank[currentAssetId]);
+  const newName = document.getElementById('anchorName').value.trim() || selectedAnchorKey;
+  const data = {
+    name:        newName,
+    position: {
+      x: parseFloat(document.getElementById('anchorPosX').value) || 0,
+      y: parseFloat(document.getElementById('anchorPosY').value) || 0,
+      z: parseFloat(document.getElementById('anchorPosZ').value) || 0,
+    },
+    rotation_y:  parseFloat(document.getElementById('anchorRotY').value) || 0,
+    distance:    parseFloat(document.getElementById('anchorDist').value)  || 1.2,
+    interaction: document.getElementById('anchorInteraction').value.trim(),
+  };
+  // Handle rename
+  if (newName !== selectedAnchorKey) {
+    delete anchors[selectedAnchorKey];
+    selectedAnchorKey = newName;
+  }
+  anchors[selectedAnchorKey] = data;
+  renderAnchorList();
+  _rebuildAnchorMarkers();
+}
+
+// ── Target list + editor ──────────────────────────────────────────────────────
+function renderTargetList() {
+  const list = document.getElementById('targetList');
+  if (!list) return;
+  const targets = currentAssetId ? ensureTargets(meshbank[currentAssetId]) : {};
+  list.innerHTML = '';
+  for (const key of Object.keys(targets)) {
+    const row = document.createElement('div');
+    row.className = 'assetRow' + (key === selectedTargetKey ? ' active' : '');
+    row.textContent = key;
+    row.onclick = () => { selectedTargetKey = key; renderTargetList(); loadTargetEditor(); _rebuildTargetMarkers(); };
+    list.appendChild(row);
+  }
+  const ed = document.getElementById('targetEditor');
+  if (ed) ed.style.display = selectedTargetKey ? '' : 'none';
+}
+
+function loadTargetEditor() {
+  if (!currentAssetId || !selectedTargetKey) return;
+  const t = ensureTargets(meshbank[currentAssetId])[selectedTargetKey] || {};
+  const pos = t.position || { x: 0, y: 0, z: 0 };
+  document.getElementById('targetName').value    = t.name || selectedTargetKey;
+  document.getElementById('targetPosX').value    = pos.x ?? 0;
+  document.getElementById('targetPosY').value    = pos.y ?? 0;
+  document.getElementById('targetPosZ').value    = pos.z ?? 0;
+  document.getElementById('targetType').value    = t.type || '';
+}
+
+function saveTargetEdits() {
+  if (!currentAssetId || !selectedTargetKey) return;
+  const targets = ensureTargets(meshbank[currentAssetId]);
+  const newName = document.getElementById('targetName').value.trim() || selectedTargetKey;
+  const data = {
+    name: newName,
+    position: {
+      x: parseFloat(document.getElementById('targetPosX').value) || 0,
+      y: parseFloat(document.getElementById('targetPosY').value) || 0,
+      z: parseFloat(document.getElementById('targetPosZ').value) || 0,
+    },
+    type: document.getElementById('targetType').value.trim(),
+  };
+  if (newName !== selectedTargetKey) {
+    delete targets[selectedTargetKey];
+    selectedTargetKey = newName;
+  }
+  targets[selectedTargetKey] = data;
+  renderTargetList();
+  _rebuildTargetMarkers();
+}
+
+// ── Place-at-click ────────────────────────────────────────────────────────────
+canvas.addEventListener('click', e => {
+  if (!placingMode || !currentModel) return;
+  placeRaycaster.setFromCamera(getCanvasNDC(e), camera);
+  const hits = placeRaycaster.intersectObject(currentModel, true);
+  if (!hits.length) return;
+  const p = hits[0].point;
+  if (placingMode === 'anchor') {
+    document.getElementById('anchorPosX').value = p.x.toFixed(3);
+    document.getElementById('anchorPosY').value = p.y.toFixed(3);
+    document.getElementById('anchorPosZ').value = p.z.toFixed(3);
+    saveAnchorEdits();
+  } else {
+    document.getElementById('targetPosX').value = p.x.toFixed(3);
+    document.getElementById('targetPosY').value = p.y.toFixed(3);
+    document.getElementById('targetPosZ').value = p.z.toFixed(3);
+    saveTargetEdits();
+  }
+  placingMode = null;
+  canvas.style.cursor = '';
+  document.getElementById('placeAnchorBtn') && (document.getElementById('placeAnchorBtn').textContent = 'Place at click');
+  document.getElementById('placeTargetBtn') && (document.getElementById('placeTargetBtn').textContent = 'Place at click');
+});
+
+// ── Wire up buttons ───────────────────────────────────────────────────────────
+document.getElementById('addAnchorBtn').onclick = () => {
+  if (!currentAssetId) return;
+  let n = 'anchor_' + Date.now().toString(36);
+  ensureAnchors(meshbank[currentAssetId])[n] = { name: n, position: { x:0,y:0,z:0 }, rotation_y:0, distance:1.2, interaction:'' };
+  selectedAnchorKey = n;
+  renderAnchorList();
+  loadAnchorEditor();
+  _rebuildAnchorMarkers();
+};
+document.getElementById('removeAnchorBtn').onclick = () => {
+  if (!currentAssetId || !selectedAnchorKey) return;
+  delete ensureAnchors(meshbank[currentAssetId])[selectedAnchorKey];
+  selectedAnchorKey = null;
+  renderAnchorList();
+  _rebuildAnchorMarkers();
+};
+document.getElementById('addTargetBtn').onclick = () => {
+  if (!currentAssetId) return;
+  let n = 'target_' + Date.now().toString(36);
+  ensureTargets(meshbank[currentAssetId])[n] = { 

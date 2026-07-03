@@ -4532,7 +4532,10 @@
       "stackable": true,
       "max_stack": 4,
       "style": 0.45,
-      "size": 1
+      "size": 1,
+      "price_new": 30,
+      "price_range": "budget",
+      "used_price": 12
     },
     "beanie": {
       "name": "Beanie",
@@ -4544,7 +4547,10 @@
       "stackable": true,
       "max_stack": 4,
       "style": 0.5,
-      "size": 1
+      "size": 1,
+      "price_new": 25,
+      "price_range": "budget",
+      "used_price": 10
     },
     "hair_short_brown": {
       "name": "Short Brown Hair",
@@ -4554,7 +4560,10 @@
       "dirty": false,
       "stackable": false,
       "style": 0.6,
-      "size": 1
+      "size": 1,
+      "price_new": 120,
+      "price_range": "mid",
+      "used_price": 40
     },
     "hair_long_black": {
       "name": "Long Black Hair",
@@ -4564,7 +4573,10 @@
       "dirty": false,
       "stackable": false,
       "style": 0.7,
-      "size": 1
+      "size": 1,
+      "price_new": 150,
+      "price_range": "premium",
+      "used_price": 50
     },
     "scarf_knit": {
       "name": "Knit Scarf",
@@ -4576,7 +4588,10 @@
       "stackable": true,
       "max_stack": 2,
       "style": 0.55,
-      "size": 1
+      "size": 1,
+      "price_new": 30,
+      "price_range": "budget",
+      "used_price": 12
     },
     "jacket_hoodie": {
       "name": "Hoodie",
@@ -4589,7 +4604,10 @@
       "max_stack": 3,
       "style": 0.55,
       "warmth": 0.6,
-      "size": 2
+      "size": 2,
+      "price_new": 75,
+      "price_range": "mid",
+      "used_price": 28
     },
     "jacket_denim": {
       "name": "Denim Jacket",
@@ -4602,7 +4620,10 @@
       "max_stack": 2,
       "style": 0.75,
       "warmth": 0.5,
-      "size": 2
+      "size": 2,
+      "price_new": 80,
+      "price_range": "mid",
+      "used_price": 30
     },
     "jacket_winter": {
       "name": "Winter Coat",
@@ -4614,7 +4635,10 @@
       "stackable": false,
       "style": 0.6,
       "warmth": 0.95,
-      "size": 2
+      "size": 2,
+      "price_new": 130,
+      "price_range": "premium",
+      "used_price": 48
     },
     "tshirt_white": {
       "name": "White T-Shirt",
@@ -4626,7 +4650,10 @@
       "stackable": true,
       "max_stack": 6,
       "style": 0.4,
-      "size": 1
+      "size": 1,
+      "price_new": 20,
+      "price_range": "budget",
+      "used_price": 6
     },
     "tshirt_black": {
       "name": "Black T-Shirt",
@@ -4638,7 +4665,10 @@
       "stackable": true,
       "max_stack": 6,
       "style": 0.5,
-      "size": 1
+      "size": 1,
+      "price_new": 20,
+      "price_range": "budget",
+      "used_price": 6
     },
     "shirt_flannel": {
       "name": "Flannel Shirt",
@@ -4650,7 +4680,10 @@
       "stackable": true,
       "max_stack": 4,
       "style": 0.55,
-      "size": 1
+      "size": 1,
+      "price_new": 50,
+      "price_range": "mid",
+      "used_price": 18
     },
     "shirt_dress": {
       "name": "Dress Shirt",
@@ -4662,7 +4695,10 @@
       "stackable": true,
       "max_stack": 4,
       "style": 0.85,
-      "size": 1
+      "size": 1,
+      "price_new": 70,
+      "price_range": "mid",
+      "used_price": 25
     },
     "top_crop": {
       "name": "Crop Top",
@@ -4674,7 +4710,10 @@
       "stackable": true,
       "max_stack": 4,
       "style": 0.7,
-      "size": 1
+      "size": 1,
+      "price_new": 28,
+      "price_range": "budget",
+      "used_price": 9
     },
     "tank_top": {
       "name": "Tank Top",
@@ -4686,7 +4725,10 @@
       "stackable": true,
       "max_stack": 6,
       "style": 0.35,
-      "size": 1
+      "size": 1,
+      "price_new": 18,
+      "price_range": "budget",
+      "used_price": 6
     },
     "jeans_blue": {
       "name": "Blue Jeans",
@@ -4698,7 +4740,10 @@
       "stackable": true,
       "max_stack": 3,
       "style": 0.65,
-      "size": 2
+      "size": 2,
+      "price_new": 65,
+      "price_range": "mid",
+      "used_price": 24
     },
     "jeans_black": {
       "name": "Black Jeans",
@@ -4710,7 +4755,10 @@
       "stackable": true,
       "max_stack": 3,
       "style": 0.7,
-      "size": 2
+      "size": 2,
+      "price_new": 65,
+      "price_range": "mid",
+      "used_price": 24
     },
     "sweatpants": {
       "name": "Sweatpants",
@@ -4722,7 +4770,10 @@
       "stackable": true,
       "max_stack": 3,
       "style": 0.3,
-      "size": 2
+      "size": 2,
+      "price_new": 40,
+      "price_range": "budget",
+      "used_price": 14
     },
     "shorts_casual": {
       "name": "Casual Shorts",
@@ -4734,7 +4785,10 @@
       "stackable": true,
       "max_stack": 4,
       "style": 0.4,
-      "size": 1
+      "size": 1,
+      "price_new": 28,
+      "price_range": "budget",
+      "used_price": 10
     },
     "dress_casual": {
       "name": "Casual Dress",
@@ -4745,7 +4799,10 @@
       "dirty": false,
       "stackable": false,
       "style": 0.8,
-      "size": 2
+      "size": 2,
+      "price_new": 60,
+      "price_range": "mid",
+      "used_price": 22
     },
     "suit_trousers": {
       "name": "Suit Trousers",
@@ -4757,7 +4814,10 @@
       "stackable": true,
       "max_stack": 2,
       "style": 0.9,
-      "size": 2
+      "size": 2,
+      "price_new": 95,
+      "price_range": "premium",
+      "used_price": 35
     },
     "pyjama_bottoms": {
       "name": "Pyjama Bottoms",
@@ -4769,7 +4829,10 @@
       "stackable": true,
       "max_stack": 3,
       "style": 0.2,
-      "size": 2
+      "size": 2,
+      "price_new": 32,
+      "price_range": "budget",
+      "used_price": 10
     },
     "underwear_basic": {
       "name": "Underwear",
@@ -4781,7 +4844,10 @@
       "stackable": true,
       "max_stack": 7,
       "style": 0.3,
-      "size": 1
+      "size": 1,
+      "price_new": 12,
+      "price_range": "budget",
+      "used_price": 0
     },
     "boxer_shorts": {
       "name": "Boxer Shorts",
@@ -4793,7 +4859,10 @@
       "stackable": true,
       "max_stack": 7,
       "style": 0.3,
-      "size": 1
+      "size": 1,
+      "price_new": 15,
+      "price_range": "budget",
+      "used_price": 0
     },
     "socks_white": {
       "name": "White Socks",
@@ -4806,7 +4875,10 @@
       "max_stack": 7,
       "style": 0.25,
       "bilateral": true,
-      "size": 1
+      "size": 1,
+      "price_new": 8,
+      "price_range": "budget",
+      "used_price": 2
     },
     "socks_ankle": {
       "name": "Ankle Socks",
@@ -4819,7 +4891,10 @@
       "max_stack": 7,
       "style": 0.3,
       "bilateral": true,
-      "size": 1
+      "size": 1,
+      "price_new": 10,
+      "price_range": "budget",
+      "used_price": 3
     },
     "sneakers_white": {
       "name": "White Sneakers",
@@ -4831,7 +4906,10 @@
       "stackable": false,
       "style": 0.7,
       "bilateral": true,
-      "size": 2
+      "size": 2,
+      "price_new": 70,
+      "price_range": "mid",
+      "used_price": 25
     },
     "shoes_casual": {
       "name": "Casual Shoes",
@@ -4843,7 +4921,10 @@
       "stackable": false,
       "style": 0.6,
       "bilateral": true,
-      "size": 2
+      "size": 2,
+      "price_new": 60,
+      "price_range": "mid",
+      "used_price": 22
     },
     "shoes_dress": {
       "name": "Dress Shoes",
@@ -4855,7 +4936,10 @@
       "stackable": false,
       "style": 0.9,
       "bilateral": true,
-      "size": 2
+      "size": 2,
+      "price_new": 100,
+      "price_range": "mid",
+      "used_price": 35
     },
     "slippers": {
       "name": "Slippers",
@@ -4867,7 +4951,10 @@
       "stackable": false,
       "style": 0.15,
       "bilateral": true,
-      "size": 1
+      "size": 1,
+      "price_new": 22,
+      "price_range": "budget",
+      "used_price": 8
     },
     "gloves_winter": {
       "name": "Winter Gloves",
@@ -4880,7 +4967,10 @@
       "style": 0.5,
       "bilateral": true,
       "warmth": 0.7,
-      "size": 1
+      "size": 1,
+      "price_new": 32,
+      "price_range": "budget",
+      "used_price": 12
     },
     "watch_casual": {
       "name": "Casual Watch",
@@ -4891,7 +4981,10 @@
       "dirty": false,
       "stackable": false,
       "style": 0.7,
-      "size": 1
+      "size": 1,
+      "price_new": 55,
+      "price_range": "mid",
+      "used_price": 22
     },
     "backpack": {
       "name": "Backpack",
@@ -4902,7 +4995,10 @@
       "dirty": false,
       "stackable": false,
       "style": 0.5,
-      "size": 2
+      "size": 2,
+      "price_new": 60,
+      "price_range": "mid",
+      "used_price": 22
     },
     "smartphone_budget": {
       "name": "Budget Smartphone",
@@ -5148,7 +5244,12 @@
       "size": 2,
       "base_price": 120,
       "stackable": false,
-      "consumable": false
+      "consumable": false,
+      "slot": "feet",
+      "bone": "LeftFoot",
+      "price_new": 95,
+      "price_range": "mid",
+      "used_price": 35
     },
     "water_bottle": {
       "name": "Water Bottle",
@@ -5325,7 +5426,12 @@
       "base_price": 20,
       "stackable": true,
       "max_stack": 4,
-      "consumable": false
+      "consumable": false,
+      "slot": "hands",
+      "bone": "LeftHand",
+      "price_new": 25,
+      "price_range": "budget",
+      "used_price": 9
     },
     "climbing_gear": {
       "name": "Climbing Gear",
@@ -5416,7 +5522,12 @@
       "size": 2,
       "base_price": 60,
       "stackable": false,
-      "consumable": false
+      "consumable": false,
+      "slot": "torso",
+      "bone": "Spine1",
+      "price_new": 70,
+      "price_range": "mid",
+      "used_price": 25
     },
     "belt": {
       "name": "Martial Arts Belt",
@@ -5424,7 +5535,12 @@
       "size": 1,
       "base_price": 15,
       "stackable": false,
-      "consumable": false
+      "consumable": false,
+      "slot": "accessory",
+      "bone": "Hips",
+      "price_new": 28,
+      "price_range": "budget",
+      "used_price": 10
     },
     "foil": {
       "name": "Fencing Foil",
@@ -5489,7 +5605,12 @@
       "size": 2,
       "base_price": 200,
       "stackable": false,
-      "consumable": false
+      "consumable": false,
+      "slot": "feet",
+      "bone": "LeftFoot",
+      "price_new": 90,
+      "price_range": "mid",
+      "used_price": 32
     },
     "goggles": {
       "name": "Goggles",
@@ -5505,7 +5626,12 @@
       "size": 2,
       "base_price": 200,
       "stackable": false,
-      "consumable": false
+      "consumable": false,
+      "slot": "outerwear",
+      "bone": "Spine2",
+      "price_new": 190,
+      "price_range": "premium",
+      "used_price": 70
     },
     "surfboard": {
       "name": "Surfboard",
@@ -5521,7 +5647,12 @@
       "size": 2,
       "base_price": 150,
       "stackable": false,
-      "consumable": false
+      "consumable": false,
+      "slot": "outerwear",
+      "bone": "Spine2",
+      "price_new": 230,
+      "price_range": "premium",
+      "used_price": 80
     },
     "surf_wax": {
       "name": "Surf Wax",
@@ -5579,7 +5710,12 @@
       "size": 2,
       "base_price": 30,
       "stackable": false,
-      "consumable": false
+      "consumable": false,
+      "slot": "feet",
+      "bone": "LeftFoot",
+      "price_new": 48,
+      "price_range": "mid",
+      "used_price": 15
     },
     "football": {
       "name": "Football",
@@ -5595,7 +5731,12 @@
       "size": 2,
       "base_price": 60,
       "stackable": false,
-      "consumable": false
+      "consumable": false,
+      "slot": "feet",
+      "bone": "LeftFoot",
+      "price_new": 65,
+      "price_range": "mid",
+      "used_price": 22
     },
     "shin_guards": {
       "name": "Shin Guards",
@@ -5612,7 +5753,12 @@
       "base_price": 10,
       "stackable": true,
       "max_stack": 8,
-      "consumable": false
+      "consumable": false,
+      "slot": "socks",
+      "bone": "LeftLeg",
+      "price_new": 10,
+      "price_range": "budget",
+      "used_price": 2
     },
     "pads": {
       "name": "Protective Pads",
@@ -5661,7 +5807,12 @@
       "size": 2,
       "base_price": 80,
       "stackable": false,
-      "consumable": false
+      "consumable": false,
+      "slot": "feet",
+      "bone": "LeftFoot",
+      "price_new": 85,
+      "price_range": "mid",
+      "used_price": 30
     },
     "volleyball": {
       "name": "Volleyball",
@@ -5703,7 +5854,12 @@
       "size": 2,
       "base_price": 80,
       "stackable": false,
-      "consumable": false
+      "consumable": false,
+      "slot": "feet",
+      "bone": "LeftFoot",
+      "price_new": 75,
+      "price_range": "mid",
+      "used_price": 26
     },
     "golf_clubs": {
       "name": "Golf Clubs",
@@ -5729,7 +5885,12 @@
       "size": 1,
       "base_price": 20,
       "stackable": false,
-      "consumable": false
+      "consumable": false,
+      "slot": "hands",
+      "bone": "LeftHand",
+      "price_new": 22,
+      "price_range": "budget",
+      "used_price": 8
     },
     "tees": {
       "name": "Golf Tees",
@@ -5780,7 +5941,12 @@
       "size": 2,
       "base_price": 40,
       "stackable": false,
-      "consumable": false
+      "consumable": false,
+      "slot": "legs",
+      "bone": "Hips",
+      "price_new": 45,
+      "price_range": "mid",
+      "used_price": 14
     },
     "swim_cap": {
       "name": "Swim Cap",
@@ -5789,7 +5955,12 @@
       "base_price": 10,
       "stackable": true,
       "max_stack": 4,
-      "consumable": false
+      "consumable": false,
+      "slot": "head",
+      "bone": "Head",
+      "price_new": 18,
+      "price_range": "budget",
+      "used_price": 6
     },
     "running_shoes": {
       "name": "Running Shoes",
@@ -5797,7 +5968,12 @@
       "size": 2,
       "base_price": 100,
       "stackable": false,
-      "consumable": false
+      "consumable": false,
+      "slot": "feet",
+      "bone": "LeftFoot",
+      "price_new": 95,
+      "price_range": "mid",
+      "used_price": 32
     },
     "gym_shoes": {
       "name": "Gym Shoes",
@@ -5805,7 +5981,12 @@
       "size": 2,
       "base_price": 70,
       "stackable": false,
-      "consumable": false
+      "consumable": false,
+      "slot": "feet",
+      "bone": "LeftFoot",
+      "price_new": 70,
+      "price_range": "mid",
+      "used_price": 24
     },
     "yoga_mat": {
       "name": "Yoga Mat",
@@ -6003,7 +6184,12 @@
       "size": 3,
       "base_price": 200,
       "stackable": false,
-      "consumable": false
+      "consumable": false,
+      "slot": "outerwear",
+      "bone": "Spine2",
+      "price_new": 80,
+      "price_range": "mid",
+      "used_price": 20
     },
     "period_weapon": {
       "name": "Period Weapon (Replica)",
@@ -6714,7 +6900,12 @@
       "size": 2,
       "base_price": 150,
       "stackable": false,
-      "consumable": false
+      "consumable": false,
+      "slot": "feet",
+      "bone": "LeftFoot",
+      "price_new": 140,
+      "price_range": "premium",
+      "used_price": 50
     },
     "riding_gear": {
       "name": "Riding Gear",
@@ -6722,7 +6913,12 @@
       "size": 2,
       "base_price": 200,
       "stackable": false,
-      "consumable": false
+      "consumable": false,
+      "slot": "outerwear",
+      "bone": "Spine2",
+      "price_new": 220,
+      "price_range": "premium",
+      "used_price": 75
     },
     "rolling_pin": {
       "name": "Rolling Pin",
@@ -7167,7 +7363,12 @@
       "size": 2,
       "base_price": 40,
       "stackable": false,
-      "consumable": false
+      "consumable": false,
+      "slot": "outerwear",
+      "bone": "Spine2",
+      "price_new": 50,
+      "price_range": "mid",
+      "used_price": 16
     },
     "air_freshener": {
       "name": "Air Freshener",
@@ -7257,7 +7458,12 @@
       "stackable": true,
       "max_stack": 4,
       "consumable": true,
-      "uses": 20
+      "uses": 20,
+      "slot": "accessory",
+      "bone": "Hips",
+      "price_new": 8,
+      "price_range": "budget",
+      "used_price": 3
     },
     "lint_roller": {
       "name": "Lint Roller",
@@ -7267,7 +7473,12 @@
       "stackable": true,
       "max_stack": 4,
       "consumable": true,
-      "uses": 50
+      "uses": 50,
+      "slot": "accessory",
+      "bone": "Hips",
+      "price_new": 6,
+      "price_range": "budget",
+      "used_price": 2
     },
     "handheld_mirror": {
       "name": "Handheld Mirror",
@@ -7283,7 +7494,12 @@
       "size": 1,
       "base_price": 30,
       "stackable": false,
-      "consumable": false
+      "consumable": false,
+      "slot": "accessory",
+      "bone": "Head",
+      "price_new": 32,
+      "price_range": "budget",
+      "used_price": 12
     },
     "calculator": {
       "name": "Calculator",
@@ -7744,11 +7960,539 @@
       "base_price": 15,
       "stackable": false,
       "consumable": false
+    },
+    "fedora": {
+      "name": "Fedora",
+      "category": "clothing",
+      "slot": "head",
+      "bone": "Head",
+      "base_price": 38,
+      "price_new": 55,
+      "price_range": "mid",
+      "used_price": 18,
+      "dirty": false,
+      "stackable": true,
+      "max_stack": 4,
+      "style": 0.68,
+      "size": 1
+    },
+    "bucket_hat": {
+      "name": "Bucket Hat",
+      "category": "clothing",
+      "slot": "head",
+      "bone": "Head",
+      "base_price": 18,
+      "price_new": 25,
+      "price_range": "budget",
+      "used_price": 7,
+      "dirty": false,
+      "stackable": true,
+      "max_stack": 4,
+      "style": 0.42,
+      "size": 1
+    },
+    "wide_brim_hat": {
+      "name": "Wide Brim Hat",
+      "category": "clothing",
+      "slot": "head",
+      "bone": "Head",
+      "base_price": 30,
+      "price_new": 44,
+      "price_range": "mid",
+      "used_price": 14,
+      "dirty": false,
+      "stackable": true,
+      "max_stack": 4,
+      "style": 0.55,
+      "size": 1
+    },
+    "hair_curly_auburn": {
+      "name": "Curly Auburn Hair",
+      "category": "clothing",
+      "slot": "hair",
+      "bone": "Head",
+      "base_price": 85,
+      "price_new": 130,
+      "price_range": "premium",
+      "used_price": 0,
+      "dirty": false,
+      "stackable": true,
+      "max_stack": 4,
+      "style": 0.72,
+      "size": 1
+    },
+    "hair_bun": {
+      "name": "Hair Bun",
+      "category": "clothing",
+      "slot": "hair",
+      "bone": "Head",
+      "base_price": 65,
+      "price_new": 100,
+      "price_range": "mid",
+      "used_price": 0,
+      "dirty": false,
+      "stackable": true,
+      "max_stack": 4,
+      "style": 0.6,
+      "size": 1
+    },
+    "hair_short_blonde": {
+      "name": "Short Blonde Hair",
+      "category": "clothing",
+      "slot": "hair",
+      "bone": "Head",
+      "base_price": 75,
+      "price_new": 115,
+      "price_range": "mid",
+      "used_price": 0,
+      "dirty": false,
+      "stackable": true,
+      "max_stack": 4,
+      "style": 0.58,
+      "size": 1
+    },
+    "hair_long_red": {
+      "name": "Long Red Hair",
+      "category": "clothing",
+      "slot": "hair",
+      "bone": "Head",
+      "base_price": 95,
+      "price_new": 150,
+      "price_range": "premium",
+      "used_price": 0,
+      "dirty": false,
+      "stackable": true,
+      "max_stack": 4,
+      "style": 0.74,
+      "size": 1
+    },
+    "undershirt_white": {
+      "name": "White Undershirt",
+      "category": "clothing",
+      "slot": "undershirt",
+      "bone": "Spine1",
+      "base_price": 8,
+      "price_new": 12,
+      "price_range": "budget",
+      "used_price": 0,
+      "dirty": true,
+      "stackable": true,
+      "max_stack": 6,
+      "style": 0.2,
+      "size": 1
+    },
+    "sports_bra": {
+      "name": "Sports Bra",
+      "category": "clothing",
+      "slot": "undershirt",
+      "bone": "Spine1",
+      "base_price": 22,
+      "price_new": 36,
+      "price_range": "mid",
+      "used_price": 8,
+      "dirty": true,
+      "stackable": true,
+      "max_stack": 5,
+      "style": 0.48,
+      "size": 1
+    },
+    "cami_top": {
+      "name": "Cami Top",
+      "category": "clothing",
+      "slot": "undershirt",
+      "bone": "Spine1",
+      "base_price": 12,
+      "price_new": 18,
+      "price_range": "budget",
+      "used_price": 4,
+      "dirty": true,
+      "stackable": true,
+      "max_stack": 5,
+      "style": 0.38,
+      "size": 1
+    },
+    "thermal_undershirt": {
+      "name": "Thermal Undershirt",
+      "category": "clothing",
+      "slot": "undershirt",
+      "bone": "Spine1",
+      "base_price": 18,
+      "price_new": 28,
+      "price_range": "budget",
+      "used_price": 6,
+      "dirty": true,
+      "stackable": true,
+      "max_stack": 4,
+      "style": 0.22,
+      "size": 1,
+      "warmth": 0.45
+    },
+    "compression_shirt": {
+      "name": "Compression Shirt",
+      "category": "clothing",
+      "slot": "undershirt",
+      "bone": "Spine1",
+      "base_price": 28,
+      "price_new": 42,
+      "price_range": "mid",
+      "used_price": 10,
+      "dirty": true,
+      "stackable": true,
+      "max_stack": 4,
+      "style": 0.32,
+      "size": 1
+    },
+    "socks_knee_high": {
+      "name": "Knee-High Socks",
+      "category": "clothing",
+      "slot": "socks",
+      "bone": "LeftLeg",
+      "base_price": 9,
+      "price_new": 14,
+      "price_range": "budget",
+      "used_price": 3,
+      "dirty": true,
+      "stackable": true,
+      "max_stack": 8,
+      "style": 0.4,
+      "size": 1
+    },
+    "socks_no_show": {
+      "name": "No-Show Socks",
+      "category": "clothing",
+      "slot": "socks",
+      "bone": "LeftLeg",
+      "base_price": 6,
+      "price_new": 9,
+      "price_range": "budget",
+      "used_price": 2,
+      "dirty": true,
+      "stackable": true,
+      "max_stack": 10,
+      "style": 0.2,
+      "size": 1
+    },
+    "socks_dress": {
+      "name": "Dress Socks",
+      "category": "clothing",
+      "slot": "socks",
+      "bone": "LeftLeg",
+      "base_price": 8,
+      "price_new": 12,
+      "price_range": "budget",
+      "used_price": 3,
+      "dirty": true,
+      "stackable": true,
+      "max_stack": 8,
+      "style": 0.3,
+      "size": 1
+    },
+    "mittens": {
+      "name": "Wool Mittens",
+      "category": "clothing",
+      "slot": "hands",
+      "bone": "LeftHand",
+      "base_price": 15,
+      "price_new": 22,
+      "price_range": "budget",
+      "used_price": 6,
+      "dirty": false,
+      "stackable": true,
+      "max_stack": 4,
+      "style": 0.35,
+      "size": 1,
+      "warmth": 0.65
+    },
+    "fingerless_gloves": {
+      "name": "Fingerless Gloves",
+      "category": "clothing",
+      "slot": "hands",
+      "bone": "LeftHand",
+      "base_price": 13,
+      "price_new": 20,
+      "price_range": "budget",
+      "used_price": 5,
+      "dirty": false,
+      "stackable": true,
+      "max_stack": 4,
+      "style": 0.52,
+      "size": 1
+    },
+    "work_gloves": {
+      "name": "Work Gloves",
+      "category": "clothing",
+      "slot": "hands",
+      "bone": "LeftHand",
+      "base_price": 10,
+      "price_new": 16,
+      "price_range": "budget",
+      "used_price": 4,
+      "dirty": false,
+      "stackable": true,
+      "max_stack": 4,
+      "style": 0.22,
+      "size": 1
+    },
+    "necktie": {
+      "name": "Silk Necktie",
+      "category": "clothing",
+      "slot": "neck",
+      "bone": "Neck",
+      "base_price": 35,
+      "price_new": 55,
+      "price_range": "mid",
+      "used_price": 14,
+      "dirty": false,
+      "stackable": true,
+      "max_stack": 4,
+      "style": 0.78,
+      "size": 1
+    },
+    "bow_tie": {
+      "name": "Bow Tie",
+      "category": "clothing",
+      "slot": "neck",
+      "bone": "Neck",
+      "base_price": 25,
+      "price_new": 40,
+      "price_range": "mid",
+      "used_price": 10,
+      "dirty": false,
+      "stackable": true,
+      "max_stack": 4,
+      "style": 0.72,
+      "size": 1
+    },
+    "necklace_chain": {
+      "name": "Chain Necklace",
+      "category": "clothing",
+      "slot": "neck",
+      "bone": "Neck",
+      "base_price": 18,
+      "price_new": 28,
+      "price_range": "budget",
+      "used_price": 9,
+      "dirty": false,
+      "stackable": true,
+      "max_stack": 4,
+      "style": 0.56,
+      "size": 1
+    },
+    "choker": {
+      "name": "Velvet Choker",
+      "category": "clothing",
+      "slot": "neck",
+      "bone": "Neck",
+      "base_price": 10,
+      "price_new": 16,
+      "price_range": "budget",
+      "used_price": 5,
+      "dirty": false,
+      "stackable": true,
+      "max_stack": 4,
+      "style": 0.52,
+      "size": 1
+    },
+    "bandana": {
+      "name": "Bandana",
+      "category": "clothing",
+      "slot": "neck",
+      "bone": "Neck",
+      "base_price": 6,
+      "price_new": 9,
+      "price_range": "budget",
+      "used_price": 2,
+      "dirty": true,
+      "stackable": true,
+      "max_stack": 5,
+      "style": 0.36,
+      "size": 1
+    },
+    "bracelet_leather": {
+      "name": "Leather Bracelet",
+      "category": "clothing",
+      "slot": "wrist_l",
+      "bone": "LeftHand",
+      "base_price": 14,
+      "price_new": 22,
+      "price_range": "budget",
+      "used_price": 7,
+      "dirty": false,
+      "stackable": false,
+      "max_stack": 1,
+      "style": 0.46,
+      "size": 1
+    },
+    "sports_watch": {
+      "name": "Sports Watch",
+      "category": "clothing",
+      "slot": "wrist_l",
+      "bone": "LeftHand",
+      "base_price": 42,
+      "price_new": 65,
+      "price_range": "mid",
+      "used_price": 18,
+      "dirty": false,
+      "stackable": false,
+      "max_stack": 1,
+      "style": 0.52,
+      "size": 1
+    },
+    "smartwatch": {
+      "name": "Smartwatch",
+      "category": "clothing",
+      "slot": "wrist_l",
+      "bone": "LeftHand",
+      "base_price": 145,
+      "price_new": 220,
+      "price_range": "premium",
+      "used_price": 55,
+      "dirty": false,
+      "stackable": false,
+      "max_stack": 1,
+      "style": 0.68,
+      "size": 1
+    },
+    "bangle": {
+      "name": "Metal Bangle",
+      "category": "clothing",
+      "slot": "wrist_l",
+      "bone": "LeftHand",
+      "base_price": 12,
+      "price_new": 18,
+      "price_range": "budget",
+      "used_price": 5,
+      "dirty": false,
+      "stackable": true,
+      "max_stack": 3,
+      "style": 0.42,
+      "size": 1
+    },
+    "friendship_bracelet": {
+      "name": "Friendship Bracelet",
+      "category": "clothing",
+      "slot": "wrist_l",
+      "bone": "LeftHand",
+      "base_price": 5,
+      "price_new": 8,
+      "price_range": "budget",
+      "used_price": 2,
+      "dirty": false,
+      "stackable": true,
+      "max_stack": 3,
+      "style": 0.3,
+      "size": 1
+    },
+    "purse": {
+      "name": "Leather Purse",
+      "category": "clothing",
+      "slot": "accessory",
+      "bone": "LeftHand",
+      "base_price": 48,
+      "price_new": 75,
+      "price_range": "mid",
+      "used_price": 18,
+      "dirty": false,
+      "stackable": false,
+      "max_stack": 1,
+      "style": 0.68,
+      "size": 2
+    },
+    "thong": {
+      "name": "Thong",
+      "category": "clothing",
+      "slot": "underwear",
+      "bone": "Hips",
+      "base_price": 9,
+      "price_new": 14,
+      "price_range": "budget",
+      "used_price": 0,
+      "dirty": true,
+      "stackable": true,
+      "max_stack": 8,
+      "style": 0.46,
+      "size": 1
+    },
+    "boyshorts": {
+      "name": "Boyshorts",
+      "category": "clothing",
+      "slot": "underwear",
+      "bone": "Hips",
+      "base_price": 10,
+      "price_new": 16,
+      "price_range": "budget",
+      "used_price": 0,
+      "dirty": true,
+      "stackable": true,
+      "max_stack": 8,
+      "style": 0.36,
+      "size": 1
+    },
+    "bralette": {
+      "name": "Soft Bralette",
+      "category": "clothing",
+      "slot": "underwear",
+      "bone": "Spine1",
+      "base_price": 15,
+      "price_new": 24,
+      "price_range": "budget",
+      "used_price": 0,
+      "dirty": true,
+      "stackable": true,
+      "max_stack": 6,
+      "style": 0.52,
+      "size": 1
+    },
+    "briefs": {
+      "name": "Classic Briefs",
+      "category": "clothing",
+      "slot": "underwear",
+      "bone": "Hips",
+      "base_price": 8,
+      "price_new": 12,
+      "price_range": "budget",
+      "used_price": 0,
+      "dirty": true,
+      "stackable": true,
+      "max_stack": 8,
+      "style": 0.22,
+      "size": 1
     }
   },
   "character_templates": {
     "adult_male_a": {
       "model": "adult_male",
+      "bone_slots": {
+        "head": "mixamorigHead",
+        "neck": "mixamorigNeck",
+        "right_hand": "mixamorigRightHand",
+        "left_hand": "mixamorigLeftHand",
+        "spine": "mixamorigSpine2",
+        "pelvis": "mixamorigHips",
+        "right_foot": "mixamorigRightFoot",
+        "left_foot": "mixamorigLeftFoot"
+      },
+      "body_region_bones": {
+        "head": "mixamorigHead",
+        "face": "mixamorigHead",
+        "neck": "mixamorigNeck",
+        "chest": "mixamorigSpine2",
+        "torso": "mixamorigSpine2",
+        "upper_body": "mixamorigSpine2",
+        "lower_body": "mixamorigHips",
+        "back": "mixamorigSpine1",
+        "groin": "mixamorigHips",
+        "right_arm": "mixamorigRightArm",
+        "left_arm": "mixamorigLeftArm",
+        "right_hand": "mixamorigRightHand",
+        "left_hand": "mixamorigLeftHand",
+        "right_leg": "mixamorigRightUpLeg",
+        "left_leg": "mixamorigLeftUpLeg",
+        "right_foot": "mixamorigRightFoot",
+        "left_foot": "mixamorigLeftFoot",
+        "right_shoulder": "mixamorigRightShoulder",
+        "left_shoulder": "mixamorigLeftShoulder"
+      },
       "base_animations": {
         "idle": "idle",
         "walk": "walk",
@@ -7766,24 +8510,6 @@
     }
   },
   "interaction_templates": {
-    "sit_chair": {
-      "requires_free_hands": false,
-      "animations": {
-        "start": [
-          "sit_down_a",
-          "sit_down_b"
-        ],
-        "loop": [
-          "sit_idle_a",
-          "sit_idle_b"
-        ],
-        "stop": [
-          "stand_up_a"
-        ]
-      },
-      "ik": {},
-      "prop_animations": {}
-    },
     "open_fridge": {
       "requires_free_hands": 1,
       "animations": {
@@ -7819,15 +8545,13 @@
       "handler": "sit_down_seat",
       "animations": {
         "start": [
-          "sit_down_a",
-          "sit_down_b"
+          "sit_down"
         ],
         "loop": [
-          "sit_idle_a",
-          "sit_idle_b"
+          "sit_idle"
         ],
         "stop": [
-          "stand_up_a"
+          "stand_up"
         ]
       }
     },
@@ -11163,7 +11887,7 @@
         },
         {
           "condition": "actor.held_item.category == 'heavy_object'",
-          "multiplier": 2.0,
+          "multiplier": 2,
           "outcome": "destroy"
         },
         {
