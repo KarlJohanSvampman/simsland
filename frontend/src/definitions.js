@@ -105,13 +105,20 @@ let previewMesh = null;   // for tile / material previews
 // ── Interaction preview state ─────────────────────────────────────────────────
 let _ixActive = false;
 let _ixCharKey = null;
-let _ixPropKey = null;        // currently previewed prop template key
-let _ixPropMesh = null;       // Three.Object3D for prop in scene
-let _ixItemMesh = null;       // Three.Object3D for item in scene
+let _ixPropKey = null;           // currently previewed prop template key
+let _ixPropMesh = null;          // Three.Object3D for prop in scene
+let _ixItemMesh = null;          // Three.Object3D for item in scene
 let _ixClips = [];
 let _ixPhases = {};
-let _ixHeldMeshes = {};    // slot -> Three.Mesh
+let _ixHeldMeshes = {};          // slot -> Three.Mesh
+let _ixCheckedItems = new Map();  // slot ('right_hand'/'left_hand') -> itemId
+let _ixPhase = null;             // current active phase name
 let _ixPlayTimeout = null;
+// ── Second character (char-on-char interactions) ──────────────────────────────
+let _ixTargetCharKey = null;
+let _ixTargetModel   = null;     // Three.Object3D in scene
+let _ixTargetMixer   = null;     // AnimationMixer
+let _ixTargetClips   = [];       // animation clips
 
 // =====================================================
 // MODEL RESOLUTION  (meshbank ID → actual mesh path)
@@ -360,8 +367,11 @@ function openTemplate(id) {
 
   // Choose preview type based on tab
   _ixActive = false;  // deactivate interaction preview whenever we switch away
-  if (_ixPropMesh) { previewScene.remove(_ixPropMesh); _ixPropMesh = null; }
-  if (_ixItemMesh) { previewScene.remove(_ixItemMesh); _ixItemMesh = null; }
+  if (_ixPropMesh)    { previewScene.remove(_ixPropMesh); _ixPropMesh = null; }
+  if (_ixItemMesh)    { previewScene.remove(_ixItemMesh); _ixItemMesh = null; }
+  if (_ixTargetModel) { previewScene.remove(_ixTargetModel); _ixTargetModel = null; }
+  if (_ixTargetMixer) { _ixTargetMixer.stopAllAction(); _ixTargetMixer = null; }
+  _ixTargetClips = [];
   if (currentTab === 'activity_templates') {
     loadActivityTimeline(data);
   } else if (currentTab === 'interaction_templates') {
@@ -1022,7 +1032,8 @@ function animate() {
   requestAnimationFrame(animate);
   const delta = previewClock.getDelta();
   previewControls.update();
-  if (previewMixer) previewMixer.update(delta);
+  if (previewMixer)       previewMixer.update(delta);
+  if (_ixTargetMixer)     _ixTargetMixer.update(delta);
   previewRenderer.render(previewScene, previewCamera);
 }
 
@@ -1394,32 +1405,44 @@ function loadActivityTimeline(data) {
 
 const _IX_STYLE = `<style>
 #ixWrap{display:flex;flex-direction:column;height:100%;background:#1a1e24;overflow:hidden}
-#ixCharBar{display:flex;align-items:center;gap:6px;padding:6px 8px;background:#1d2229;border-bottom:1px solid #333;flex-shrink:0}
+#ixCharBar{display:flex;align-items:center;gap:6px;padding:6px 8px;background:#1d2229;border-bottom:1px solid #333;flex-shrink:0;flex-wrap:wrap}
 #ixCharBar label{font-size:11px;color:#888;white-space:nowrap}
-#ixCharSelect{background:#2a2f38;color:#fff;border:1px solid #555;padding:3px 6px;font-size:11px;flex:1;min-width:0}
-#ixCanvas{flex:1;min-height:0;overflow:hidden;background:#111}
+#ixCharSelect,#ixPropSelect{background:#2a2f38;color:#fff;border:1px solid #555;padding:3px 6px;font-size:11px;flex:1;min-width:0}
+#ixCanvas{flex:1;min-height:0;overflow:hidden;background:#111;position:relative}
+#ixPhaseTag{position:absolute;top:8px;right:10px;background:#1a253099;color:#7bf;font-size:11px;font-weight:bold;padding:3px 10px;border-radius:10px;letter-spacing:.08em;pointer-events:none;z-index:10;text-transform:uppercase;transition:color .2s}
+#ixPhaseTag.start{color:#6fa}
+#ixPhaseTag.loop{color:#ff9}
+#ixPhaseTag.stop{color:#f96}
+#ixPhaseTag.aborted{color:#f66;background:#2a000099}
+#ixPhaseTag.idle{color:#557}
 #ixPhaseBar{display:flex;gap:4px;padding:6px 8px;background:#1d2229;border-top:1px solid #333;flex-shrink:0;flex-wrap:wrap;align-items:center}
 .ixPhaseBtn{padding:4px 10px;font-size:11px;background:#2a3340;color:#cde;border:none;cursor:pointer;border-radius:2px;transition:background .12s}
 .ixPhaseBtn:hover:not(:disabled){background:#3a4f60}
 .ixPhaseBtn.active{background:#4a7fa0;color:#fff}
 .ixPhaseBtn:disabled{opacity:.35;cursor:default}
-.ixPlayAll{background:#2a4a2a !important}
-.ixPlayAll:hover:not(:disabled){background:#3a6a3a !important}
+.ixPlayAll{background:#2a4a2a !important}.ixPlayAll:hover:not(:disabled){background:#3a6a3a !important}
+.ixAbortBtn{background:#4a2020 !important;color:#f88 !important}.ixAbortBtn:hover:not(:disabled){background:#6a2a2a !important}
+.ixResetBtn{background:#383020 !important;color:#cc8 !important}.ixResetBtn:hover:not(:disabled){background:#4a4030 !important}
+.ixReturnBtn{background:#1e3a1e !important;color:#8d8 !important}.ixReturnBtn:hover:not(:disabled){background:#2a5a2a !important}
 #ixIdleBtn{margin-left:auto}
-#ixInfoPanel{flex-shrink:0;padding:6px 10px;border-top:1px solid #333;background:#1b1f25;max-height:190px;overflow-y:auto}
+#ixInfoPanel{flex-shrink:0;padding:6px 10px;border-top:1px solid #333;background:#1b1f25;max-height:130px;overflow-y:auto}
 .ixSection{margin-bottom:8px}
 .ixSectionTitle{font-size:10px;color:#6699cc;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px;border-bottom:1px solid #2a3340;padding-bottom:2px}
 .ixChips{display:flex;flex-wrap:wrap;gap:4px}
 .ixChip{padding:2px 8px;background:#2a3a4a;color:#adc;font-size:11px;border-radius:10px}
 .ixChip.missing{background:#4a2a2a;color:#f99}
-.ixItemRow{display:flex;align-items:center;gap:6px;padding:3px 0;border-bottom:1px solid #222}
+.ixItemRow{display:flex;align-items:center;gap:5px;padding:3px 0;border-bottom:1px solid #222}
 .ixItemRow:last-child{border-bottom:none}
+.ixItemCb{width:14px;height:14px;cursor:pointer;accent-color:#4a9a4a;flex-shrink:0}
 .ixItemLabel{font-size:11px;color:#ccc;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.ixHoldBtn{padding:2px 8px;font-size:10px;background:#333a44;border:none;color:#aaa;cursor:pointer;border-radius:2px;transition:background .1s}
-.ixHoldBtn:hover{background:#404a58}
-.ixHoldBtn.held{background:#2a5a2a;color:#9f9}
+.ixHandTag{min-width:18px;font-size:10px;font-weight:bold;color:#9cf;background:#1a3a5a;border-radius:3px;padding:1px 4px;text-align:center;flex-shrink:0}
+.ixCleanupNote{font-size:11px;color:#c9a;background:#2a2530;border-left:2px solid #a88;padding:3px 8px;margin-top:4px;border-radius:2px}
 .ixOffGrid{font-size:11px;color:#f0a060;padding:2px 0;margin-bottom:4px}
 .ixEmptyNote{font-size:11px;color:#555;padding:4px 0}
+#ixLog{flex-shrink:0;max-height:90px;overflow-y:auto;padding:4px 8px;background:#111620;border-top:1px solid #222}
+.ixLogEntry{padding:1px 0;border-bottom:1px solid #1a2030;color:#8899bb;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:10px}
+.ixLogTs{color:#334455;font-family:monospace;margin-right:5px}
+.ixLogPhase{font-weight:bold}.ixLogPhase.start{color:#6fa}.ixLogPhase.loop{color:#ff9}.ixLogPhase.stop{color:#f96}.ixLogPhase.aborted{color:#f66}
 </style>`;
 
 function loadInteractionPreview(data) {
@@ -1432,9 +1455,21 @@ function loadInteractionPreview(data) {
   const charKeys = Object.keys(charTemplates);
   if (!_ixCharKey || !charTemplates[_ixCharKey]) _ixCharKey = charKeys[0] || null;
 
-  const reqProps   = data.requires_prop_tags   || [];
-  const reqItemCat = data.requires_item_category || null;
-  const offGrid    = !!data.off_grid;
+  const reqProps     = data.requires_prop_tags    || [];
+  const reqItemCat   = data.requires_item_category || null;
+  const offGrid      = !!data.off_grid;
+  const isCharTarget = data.target === 'character'; // char-on-char interaction
+
+  // Target character — default to same type as primary
+  if (isCharTarget) {
+    if (!_ixTargetCharKey || !charTemplates[_ixTargetCharKey])
+      _ixTargetCharKey = _ixCharKey;
+  } else {
+    // Clean up any previously loaded target
+    if (_ixTargetModel) { previewScene.remove(_ixTargetModel); _ixTargetModel = null; }
+    if (_ixTargetMixer) { _ixTargetMixer.stopAllAction(); _ixTargetMixer = null; }
+    _ixTargetClips = [];
+  }
 
   // All props that satisfy at least one required tag
   const matchingProps = reqProps.length
@@ -1455,27 +1490,37 @@ function loadInteractionPreview(data) {
     `<option value="${k}" ${k === _ixCharKey ? 'selected' : ''}>${k}</option>`
   ).join('') || '<option value="">— no character templates —</option>';
 
+  const targetOptions = charKeys.map(k =>
+    `<option value="${k}" ${k === _ixTargetCharKey ? 'selected' : ''}>${k}</option>`
+  ).join('') || '<option value="">— no character templates —</option>';
+
   const propOptions = matchingProps.map(([k, p]) =>
     `<option value="${k}" ${k === _ixPropKey ? 'selected' : ''}>${p.name || k}</option>`
   ).join('');
 
   const phaseHasClips = phase => (_ixPhases[phase] || []).length > 0;
 
+  const cleanupDef = data.clean_up_post_activity;
+
   document.getElementById('modelPreview').innerHTML = _IX_STYLE + `
 <div id="ixWrap">
   <div id="ixCharBar">
-    <label>Character</label>
+    <label>${isCharTarget ? 'Char A' : 'Character'}</label>
     <select id="ixCharSelect">${charOptions}</select>
+    ${isCharTarget ? `
+    <label style="color:#fc9">Char B</label>
+    <select id="ixTargetCharSelect" style="border-color:#664422">${targetOptions}</select>` : ''}
     ${matchingProps.length ? `
     <label>Prop</label>
     <select id="ixPropSelect">
       <option value="">\u2014 none \u2014</option>
       ${propOptions}
     </select>` : ''}
+    ${isCharTarget ? '<span style="font-size:10px;color:#fc9;margin-left:4px">&#x1F465; char&#8209;on&#8209;char</span>' : ''}
   </div>
   <div id="ixCanvas"></div>
   <div id="ixPhaseBar">
-    <button class="ixPhaseBtn ixPlayAll" onclick="window._ixPlayAll()" title="Run start then loop (3s) then stop then idle">\u25b6 Play All</button>
+    <button class="ixPhaseBtn ixPlayAll" onclick="window._ixPlayAll()" title="Run full sequence">\u25b6 Play All</button>
     <button class="ixPhaseBtn" id="ixBtnStart" onclick="window._ixPlayPhase('start')"
       ${phaseHasClips('start') ? '' : 'disabled'} title="${(_ixPhases.start||[]).join(', ')||'(none)'}">\u25b6 Start</button>
     <button class="ixPhaseBtn" id="ixBtnLoop" onclick="window._ixPlayPhase('loop')"
@@ -1483,30 +1528,47 @@ function loadInteractionPreview(data) {
     <button class="ixPhaseBtn" id="ixBtnStop" onclick="window._ixPlayPhase('stop')"
       ${phaseHasClips('stop') ? '' : 'disabled'} title="${(_ixPhases.stop||[]).join(', ')||'(none)'}">\u25a0 Stop</button>
     <button class="ixPhaseBtn" id="ixIdleBtn" onclick="window._ixPlayPhase('idle')">\u2b1c Idle</button>
+    <button class="ixPhaseBtn ixAbortBtn" onclick="window._ixAbort()" title="Stop here \u2014 state left as-is">\u26d4 Abort</button>
+    <button class="ixPhaseBtn ixResetBtn" onclick="window._ixReset()" title="Stop and return to idle">\u21ba Reset</button>
+    <button class="ixPhaseBtn ixReturnBtn" onclick="window._ixReturn()" title="Re-run interaction from start">\u21a9 Return</button>
   </div>
   <div id="ixInfoPanel">
-    ${offGrid ? '<div class="ixOffGrid">\u2b1b Off-grid \u2014 no prop placement needed</div>' : ''}
+    ${offGrid ? '<div class="ixOffGrid">\u2b1b Off-grid \u2014 no prop needed</div>' : ''}
     ${reqProps.length ? `
     <div class="ixSection">
       <div class="ixSectionTitle">Required prop tags: ${reqProps.map(t => `<span class="ixChip">${t}</span>`).join(' ')}</div>
-      ${matchingProps.length === 0 ? '<div class="ixEmptyNote">No matching props found in prop_templates</div>' : ''}
+      ${matchingProps.length === 0 ? '<div class="ixEmptyNote">No matching props found</div>' : ''}
     </div>` : ''}
     ${reqItemCat ? `
     <div class="ixSection">
-      <div class="ixSectionTitle">Required Item \u2014 ${reqItemCat}</div>
+      <div class="ixSectionTitle">Items \u2014 ${reqItemCat} <span style="color:#556;font-weight:normal;text-transform:none">(check to equip, max 2)</span></div>
       ${matchItems.length ? matchItems.map(([id, item]) => `
       <div class="ixItemRow">
+        <input type="checkbox" class="ixItemCb" id="ixCb_${id}" onchange="window._ixToggleItem('${id}')">
         <span class="ixItemLabel" title="${id}">${item.name}</span>
-        <button class="ixHoldBtn" id="ixHR_${id}" onclick="window._ixToggleHold('${id}','right_hand')">Hold R</button>
-        <button class="ixHoldBtn" id="ixHL_${id}" onclick="window._ixToggleHold('${id}','left_hand')">Hold L</button>
-      </div>`).join('') : `<div class="ixEmptyNote">No items found for category "${reqItemCat}"</div>`}
+        <span class="ixHandTag" id="ixHand_${id}"></span>
+      </div>`).join('') : `<div class="ixEmptyNote">No items for category "${reqItemCat}"</div>`}
     </div>` : (!reqProps.length && !offGrid ? '<div class="ixEmptyNote">No prop or item requirements</div>' : '')}
+    ${cleanupDef ? `<div class="ixCleanupNote">\u267b clean_up_post_activity: ${typeof cleanupDef === 'object' ? JSON.stringify(cleanupDef) : cleanupDef}</div>` : ''}
   </div>
+  <div id="ixLog"></div>
 </div>`;
+
+  _ixCheckedItems = new Map();
+  _ixPhase = null;
 
   const slot = document.getElementById('ixCanvas');
   previewRenderer.setSize(slot.clientWidth || 400, slot.clientHeight || 240);
   slot.appendChild(previewRenderer.domElement);
+
+  // Phase overlay tag
+  const phaseTag = document.createElement('div');
+  phaseTag.id = 'ixPhaseTag';
+  phaseTag.className = 'idle';
+  phaseTag.textContent = 'IDLE';
+  slot.appendChild(phaseTag);
+
+  _ixAddLog(`Interaction loaded: ${data.name || '(unnamed)'} — ${(_ixPhases.start||[]).length}×start, ${(_ixPhases.loop||[]).length}×loop, ${(_ixPhases.stop||[]).length}×stop`);
 
   const ro = new ResizeObserver(entries => {
     const e = entries[0];
@@ -1530,7 +1592,14 @@ function loadInteractionPreview(data) {
     _ixLoadProp(_ixPropKey);
   };
 
+  const targetSel = document.getElementById('ixTargetCharSelect');
+  if (targetSel) targetSel.onchange = e => {
+    _ixTargetCharKey = e.target.value;
+    _ixLoadTargetChar();
+  };
+
   _ixLoadChar();
+  if (isCharTarget) _ixLoadTargetChar();
   _ixLoadProp(_ixPropKey);
   if (reqItemCat) _ixLoadItem(reqItemCat);
 }
@@ -1565,6 +1634,52 @@ function _ixLoadChar() {
   }, undefined, err => setStatus('Character load error: ' + (err.message || err)));
 }
 
+function _ixLoadTargetChar() {
+  if (!_ixActive) return;
+  if (_ixTargetModel) { previewScene.remove(_ixTargetModel); _ixTargetModel = null; }
+  if (_ixTargetMixer) { _ixTargetMixer.stopAllAction(); _ixTargetMixer = null; }
+  _ixTargetClips = [];
+
+  const tmpl = (definitions.character_templates || {})[_ixTargetCharKey];
+  if (!tmpl?.model) { _ixAddLog('Target character has no model'); return; }
+
+  previewLoader.load(tmpl.model, gltf => {
+    if (!_ixActive) return;
+    _ixTargetModel = gltf.scene;
+    // Face the primary character — 1.2m away, rotated 180deg
+    _ixTargetModel.position.set(0, 0, -1.2);
+    _ixTargetModel.rotation.y = Math.PI;
+    previewScene.add(_ixTargetModel);
+
+    _ixTargetClips = gltf.animations || [];
+    _ixTargetMixer = new THREE.AnimationMixer(_ixTargetModel);
+
+    const idleClip = _ixTargetFindClip(tmpl.base_animations?.idle || 'idle');
+    if (idleClip) _ixTargetMixer.clipAction(idleClip).play();
+
+    _ixAddLog('Target char loaded: ' + _ixTargetCharKey + ' (' + _ixTargetClips.length + ' clips)');
+  }, undefined, err => _ixAddLog('Target char load error: ' + (err.message || err)));
+}
+
+function _ixTargetFindClip(name) {
+  if (!name || !_ixTargetClips.length) return null;
+  return _ixTargetClips.find(c => c.name === name)
+    || _ixTargetClips.find(c => c.name.toLowerCase() === name.toLowerCase())
+    || null;
+}
+
+function _ixPlayTargetPhase(phase, targetPhases) {
+  if (!_ixTargetMixer || !_ixActive) return;
+  const clipNames = (targetPhases[phase] || []);
+  const clip = clipNames.map(n => _ixTargetFindClip(n)).find(Boolean);
+  if (!clip) return;
+  _ixTargetMixer.stopAllAction();
+  const a = _ixTargetMixer.clipAction(clip);
+  a.setLoop(phase === 'loop' ? THREE.LoopRepeat : THREE.LoopOnce, Infinity);
+  a.clampWhenFinished = (phase !== 'loop');
+  a.reset().play();
+}
+
 function _ixFindClip(name) {
   if (!name || !_ixClips.length) return null;
   return _ixClips.find(c => c.name === name)
@@ -1586,65 +1701,83 @@ function _ixRefreshPhaseBtns() {
 function _ixClearHeld() {
   Object.values(_ixHeldMeshes).forEach(m => { if (m.parent) m.parent.remove(m); });
   _ixHeldMeshes = {};
-  document.querySelectorAll('.ixHoldBtn').forEach(b => b.classList.remove('held'));
+  _ixCheckedItems = new Map();
+  document.querySelectorAll('.ixItemCb').forEach(cb => cb.checked = false);
+  document.querySelectorAll('.ixHandTag').forEach(t => { t.textContent = ''; });
 }
 
-function _ixLoadProp(propKey) {
-  if (_ixPropMesh) { previewScene.remove(_ixPropMesh); _ixPropMesh = null; }
-  if (!propKey) return;
-  const tmpl = (definitions.prop_templates || {})[propKey];
-  if (!tmpl) return;
-  const path = resolveModelPath(tmpl);
-  if (path) {
-    previewLoader.load(path, gltf => {
-      if (!_ixActive) return;
-      _ixPropMesh = gltf.scene;
-      _ixPropMesh.position.set(0, 0, -1.2);
-      previewScene.add(_ixPropMesh);
-      setStatus(`Prop: ${tmpl.name || propKey}`);
-    }, undefined, () => _ixShowPropPlaceholder());
-  } else {
-    _ixShowPropPlaceholder();
+// ── Phase tag + log ───────────────────────────────────────────────────────────
+function _ixSetPhase(name) {
+  _ixPhase = name;
+  const tag = document.getElementById('ixPhaseTag');
+  if (tag) {
+    tag.textContent = name ? name.toUpperCase() : 'IDLE';
+    tag.className = name || 'idle';
   }
 }
 
-function _ixShowPropPlaceholder() {
-  if (_ixPropMesh) { previewScene.remove(_ixPropMesh); _ixPropMesh = null; }
-  const geo = new THREE.CylinderGeometry(0.38, 0.38, 1.0, 24);
-  const mat = new THREE.MeshStandardMaterial({ color: 0x6688aa, roughness: 0.65, metalness: 0.1 });
-  _ixPropMesh = new THREE.Mesh(geo, mat);
-  _ixPropMesh.position.set(0, 0.5, -1.2);
-  previewScene.add(_ixPropMesh);
+function _ixAddLog(msg, phaseClass) {
+  const log = document.getElementById('ixLog');
+  if (!log) return;
+  const now = new Date();
+  const ts = `${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}:${now.getSeconds().toString().padStart(2,'0')}`;
+  const entry = document.createElement('div');
+  entry.className = 'ixLogEntry';
+  const cls = phaseClass ? ` ixLogPhase ${phaseClass}` : '';
+  entry.innerHTML = `<span class="ixLogTs">${ts}</span><span class="${cls.trim()}">${msg}</span>`;
+  log.insertBefore(entry, log.firstChild);
+  while (log.children.length > 40) log.removeChild(log.lastChild);
 }
 
-function _ixLoadItem(reqItemCat) {
-  if (_ixItemMesh) { previewScene.remove(_ixItemMesh); _ixItemMesh = null; }
-  if (!reqItemCat) return;
-  const entry = Object.entries(definitions.item_templates || {})
-    .find(([, v]) => v.category === reqItemCat);
-  if (!entry) { _ixShowItemPlaceholder(); return; }
-  const path = resolveModelPath(entry[1]);
-  if (path) {
-    previewLoader.load(path, gltf => {
-      if (!_ixActive) return;
-      _ixItemMesh = gltf.scene;
-      _ixItemMesh.position.set(0.9, 0.9, -0.4);
-      previewScene.add(_ixItemMesh);
-    }, undefined, () => _ixShowItemPlaceholder());
-  } else {
-    _ixShowItemPlaceholder();
+function _ixUpdateHandTags() {
+  document.querySelectorAll('.ixHandTag').forEach(t => { t.textContent = ''; });
+  for (const [slot, itemId] of _ixCheckedItems) {
+    const tag = document.getElementById('ixHand_' + itemId);
+    if (tag) tag.textContent = slot === 'right_hand' ? 'R' : 'L';
   }
 }
 
-function _ixShowItemPlaceholder() {
-  if (_ixItemMesh) { previewScene.remove(_ixItemMesh); _ixItemMesh = null; }
-  const geo = new THREE.BoxGeometry(0.35, 0.35, 0.35);
-  const mat = new THREE.MeshStandardMaterial({ color: 0xcc9944, roughness: 0.65, metalness: 0.1 });
-  _ixItemMesh = new THREE.Mesh(geo, mat);
-  _ixItemMesh.position.set(0.9, 0.875, -0.4);
-  previewScene.add(_ixItemMesh);
-}
 
+// ── Abort / Reset / Return ────────────────────────────────────────────────────
+window._ixAbort = function() {
+  if (!_ixActive) return;
+  if (_ixPlayTimeout) { clearTimeout(_ixPlayTimeout); _ixPlayTimeout = null; }
+  if (previewMixer) previewMixer.stopAllAction();
+  if (_ixTargetMixer) _ixTargetMixer.stopAllAction();
+  document.querySelectorAll('.ixPhaseBtn').forEach(b => b.classList.remove('active'));
+  _ixSetPhase('aborted');
+  _ixAddLog('Interaction aborted — state left as-is', 'aborted');
+};
+
+window._ixReset = function() {
+  if (!_ixActive) return;
+  if (_ixPlayTimeout) { clearTimeout(_ixPlayTimeout); _ixPlayTimeout = null; }
+  if (previewMixer) previewMixer.stopAllAction();
+  if (_ixTargetMixer) _ixTargetMixer.stopAllAction();
+  document.querySelectorAll('.ixPhaseBtn').forEach(b => b.classList.remove('active'));
+  _ixSetPhase('idle');
+  _ixClearHeld();
+  const tmpl = (definitions.character_templates || {})[_ixCharKey];
+  const clip = _ixFindClip(tmpl?.base_animations?.idle || 'idle');
+  if (clip && previewMixer) {
+    previewMixer.clipAction(clip).play();
+    document.getElementById('ixIdleBtn')?.classList.add('active');
+  }
+  if (_ixTargetMixer) {
+    const tTmpl = (definitions.character_templates || {})[_ixTargetCharKey];
+    const tClip = _ixTargetFindClip(tTmpl?.base_animations?.idle || 'idle');
+    if (tClip) _ixTargetMixer.clipAction(tClip).play();
+  }
+  _ixAddLog('Reset — returned to idle');
+};
+
+window._ixReturn = function() {
+  if (!_ixActive) return;
+  _ixAddLog('Returning to start of interaction...');
+  window._ixPlayAll();
+};
+
+// ── Phase playback ─────────────────────────────────────────────────────────────
 window._ixPlayPhase = function(phase) {
   if (!previewMixer || !_ixActive) return;
   previewMixer.stopAllAction();
@@ -1654,32 +1787,53 @@ window._ixPlayPhase = function(phase) {
     const tmpl = (definitions.character_templates || {})[_ixCharKey];
     const clip = _ixFindClip(tmpl?.base_animations?.idle || 'idle');
     if (clip) previewMixer.clipAction(clip).play();
+    if (_ixTargetMixer) {
+      _ixTargetMixer.stopAllAction();
+      const tTmpl = (definitions.character_templates || {})[_ixTargetCharKey];
+      const tClip = _ixTargetFindClip(tTmpl?.base_animations?.idle || 'idle');
+      if (tClip) _ixTargetMixer.clipAction(tClip).play();
+    }
     document.getElementById('ixIdleBtn')?.classList.add('active');
+    _ixSetPhase('idle');
+    _ixAddLog('Idle animation playing');
     return;
   }
 
   const clips = (_ixPhases[phase] || []).map(_ixFindClip).filter(Boolean);
-  if (!clips.length) { setStatus(`No clips found for "${phase}" phase`); return; }
+  if (!clips.length) {
+    _ixAddLog('Phase "' + phase + '" — no matching clips found');
+    setStatus('No clips found for "' + phase + '" phase');
+    return;
+  }
 
   const action = previewMixer.clipAction(clips[0]);
   action.setLoop(phase === 'loop' ? THREE.LoopRepeat : THREE.LoopOnce, Infinity);
   action.clampWhenFinished = (phase !== 'loop');
   action.reset().play();
 
+  // Also fire target_animations on the second character
+  if (_ixTargetMixer) _ixPlayTargetPhase(phase, _ixPhases._target || {});
+
   const btnId = 'ixBtn' + phase.charAt(0).toUpperCase() + phase.slice(1);
   document.getElementById(btnId)?.classList.add('active');
-  setStatus(`\u25b6 ${phase}: "${clips[0].name}"`);
+  _ixSetPhase(phase);
+  _ixAddLog('Phase: ' + phase + ' — clip "' + clips[0].name + '" (' + clips[0].duration.toFixed(2) + 's)', phase);
+  setStatus(phase + ': "' + clips[0].name + '"');
 };
 
 window._ixPlayAll = function() {
   if (!previewMixer || !_ixActive) return;
   if (_ixPlayTimeout) { clearTimeout(_ixPlayTimeout); _ixPlayTimeout = null; }
   previewMixer.stopAllAction();
+  if (_ixTargetMixer) _ixTargetMixer.stopAllAction();
   document.querySelectorAll('.ixPhaseBtn').forEach(b => b.classList.remove('active'));
 
   const startClips = (_ixPhases.start || []).map(_ixFindClip).filter(Boolean);
   const loopClips  = (_ixPhases.loop  || []).map(_ixFindClip).filter(Boolean);
   const stopClips  = (_ixPhases.stop  || []).map(_ixFindClip).filter(Boolean);
+  const targetPhases = _ixPhases._target || {};
+
+  _ixAddLog('Play All — start:' + startClips.length + ' loop:' + loopClips.length + ' stop:' + stopClips.length);
 
   function playClip(clip, loop) {
     if (!previewMixer) return clip.duration;
@@ -1695,9 +1849,11 @@ window._ixPlayAll = function() {
 
   if (startClips.length) {
     const dur = playClip(startClips[0], false) * 1000;
+    if (_ixTargetMixer) _ixPlayTargetPhase('start', targetPhases);
     document.getElementById('ixBtnStart')?.classList.add('active');
+    _ixSetPhase('start');
+    _ixAddLog('Phase: start — "' + startClips[0].name + '" (' + startClips[0].duration.toFixed(2) + 's)', 'start');
     delay += dur;
-    setStatus('\u25b6 Playing start phase\u2026');
   }
 
   const afterStart = delay;
@@ -1708,22 +1864,26 @@ window._ixPlayAll = function() {
       document.querySelectorAll('.ixPhaseBtn').forEach(b => b.classList.remove('active'));
       document.getElementById('ixBtnLoop')?.classList.add('active');
       playClip(loopClips[0], true);
-      setStatus('↺ Playing loop phase…');
+      if (_ixTargetMixer) _ixPlayTargetPhase('loop', targetPhases);
+      _ixSetPhase('loop');
+      _ixAddLog('Phase: loop — "' + loopClips[0].name + '" (3s preview)', 'loop');
       _ixPlayTimeout = setTimeout(() => {
         if (!_ixActive) return;
         document.querySelectorAll('.ixPhaseBtn').forEach(b => b.classList.remove('active'));
         if (stopClips.length) {
           const dur2 = playClip(stopClips[0], false) * 1000;
+          if (_ixTargetMixer) _ixPlayTargetPhase('stop', targetPhases);
           document.getElementById('ixBtnStop')?.classList.add('active');
-          setStatus('■ Playing stop phase…');
+          _ixSetPhase('stop');
+          _ixAddLog('Phase: stop — "' + stopClips[0].name + '" (' + stopClips[0].duration.toFixed(2) + 's)', 'stop');
           _ixPlayTimeout = setTimeout(() => {
             if (!_ixActive) return;
             window._ixPlayPhase('idle');
-            setStatus('Done.');
+            _ixAddLog('Sequence complete');
           }, dur2);
         } else {
           window._ixPlayPhase('idle');
-          setStatus('Done.');
+          _ixAddLog('Sequence complete (no stop phase)');
         }
       }, 3000);
     }, afterStart);
@@ -1732,51 +1892,80 @@ window._ixPlayAll = function() {
       if (!_ixActive) return;
       document.querySelectorAll('.ixPhaseBtn').forEach(b => b.classList.remove('active'));
       const dur2 = playClip(stopClips[0], false) * 1000;
+      if (_ixTargetMixer) _ixPlayTargetPhase('stop', targetPhases);
       document.getElementById('ixBtnStop')?.classList.add('active');
-      setStatus('■ Playing stop phase…');
+      _ixSetPhase('stop');
+      _ixAddLog('Phase: stop — "' + stopClips[0].name + '" (' + stopClips[0].duration.toFixed(2) + 's)', 'stop');
       _ixPlayTimeout = setTimeout(() => {
         if (!_ixActive) return;
         window._ixPlayPhase('idle');
-        setStatus('Done.');
+        _ixAddLog('Sequence complete');
       }, dur2);
     }, afterStart);
   } else if (!startClips.length) {
+    _ixAddLog('No animation clips defined for any phase');
     setStatus('No animation clips found for any phase');
   }
 };
 
-window._ixToggleHold = function(itemId, slot) {
-  if (!previewModel || !_ixActive) return;
-  if (_ixHeldMeshes[slot]) {
-    // already holding something in this slot — detach
-    const old = _ixHeldMeshes[slot];
-    if (old.parent) old.parent.remove(old);
-    delete _ixHeldMeshes[slot];
-    const btnR = document.getElementById('ixHR_' + itemId);
-    const btnL = document.getElementById('ixHL_' + itemId);
-    if (slot === 'right_hand' && btnR) btnR.classList.remove('held');
-    if (slot === 'left_hand'  && btnL) btnL.classList.remove('held');
+// ── Item checkbox equip ────────────────────────────────────────────────────────
+window._ixToggleItem = function(itemId) {
+  if (!_ixActive) return;
+
+  let currentSlot = null;
+  for (const [slot, id] of _ixCheckedItems) {
+    if (id === itemId) { currentSlot = slot; break; }
+  }
+
+  const cb = document.getElementById('ixCb_' + itemId);
+
+  if (currentSlot) {
+    const mesh = _ixHeldMeshes[currentSlot];
+    if (mesh && mesh.parent) mesh.parent.remove(mesh);
+    delete _ixHeldMeshes[currentSlot];
+    _ixCheckedItems.delete(currentSlot);
+    if (cb) cb.checked = false;
+    _ixUpdateHandTags();
+    _ixAddLog('Unequipped "' + itemId + '" from ' + currentSlot);
     return;
   }
 
-  // Find hand bone
-  const boneName = slot === 'right_hand' ? 'hand_r' : 'hand_l';
+  const freeSlot = !_ixCheckedItems.has('right_hand') ? 'right_hand'
+                 : !_ixCheckedItems.has('left_hand')  ? 'left_hand'
+                 : null;
+  if (!freeSlot) {
+    if (cb) cb.checked = false;
+    setStatus('Both hands are full — uncheck an item first');
+    _ixAddLog('Both hands full — uncheck an item first');
+    return;
+  }
+  if (!previewModel) {
+    if (cb) cb.checked = false;
+    _ixAddLog('No character loaded — load a character first');
+    return;
+  }
+
+  const boneName = freeSlot === 'right_hand' ? 'hand_r' : 'hand_l';
   let bone = null;
   previewModel.traverse(o => {
-    if (o.isBone && (o.name === boneName || o.name.toLowerCase() === boneName.toLowerCase())) bone = o;
+    if (o.isBone && o.name.toLowerCase() === boneName.toLowerCase()) bone = o;
   });
-  if (!bone) { setStatus('Bone "' + boneName + '" not found on character'); return; }
 
-  // Create placeholder cube for item
   const geo = new THREE.BoxGeometry(0.12, 0.12, 0.12);
   const mat = new THREE.MeshStandardMaterial({ color: 0xcc9944, roughness: 0.6 });
   const mesh = new THREE.Mesh(geo, mat);
-  bone.add(mesh);
-  _ixHeldMeshes[slot] = mesh;
 
-  const btnR = document.getElementById('ixHR_' + itemId);
-  const btnL = document.getElementById('ixHL_' + itemId);
-  if (slot === 'right_hand' && btnR) btnR.classList.add('held');
-  if (slot === 'left_hand'  && btnL) btnL.classList.add('held');
-  setStatus('Holding ' + itemId + ' in ' + slot);
+  if (bone) {
+    bone.add(mesh);
+    _ixAddLog('Equipped "' + itemId + '" in ' + freeSlot + ' (bone: ' + bone.name + ')');
+  } else {
+    mesh.position.set(freeSlot === 'right_hand' ? 0.55 : -0.55, 1.05, 0.3);
+    previewScene.add(mesh);
+    _ixAddLog('Equipped "' + itemId + '" in ' + freeSlot + ' (bone "' + boneName + '" not found - floating)');
+  }
+
+  _ixHeldMeshes[freeSlot] = mesh;
+  _ixCheckedItems.set(freeSlot, itemId);
+  if (cb) cb.checked = true;
+  _ixUpdateHandTags();
 };
