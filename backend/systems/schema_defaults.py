@@ -419,6 +419,18 @@ def ensure_character_defaults(c):
     c.setdefault("arousal_level",      0.0)    # global arousal (separate from per-rel)
     c.setdefault("attractiveness",     None)   # None = auto-computed on first use
 
+    # Fitness tracking — exercise sessions, fitness level, injury state
+    c.setdefault("fitness_stats", {
+        "fitness_level":        0.30,   # 0-1; decays without exercise; drives attractiveness bump
+        "cardio_sessions":      0,      # cumulative sessions by type
+        "strength_sessions":    0,
+        "flexibility_sessions": 0,
+        "sessions_this_week":   0,
+        "streak_weeks":         0,      # consecutive weeks with ≥1 session
+        "injury_cooldown":      0,      # ticks until can exercise again (0 = healthy)
+        "last_session_tick":    0,
+    })
+
     # Physical body features — used for fertility appeal scoring
     # Female chars: breast_size, hip_ratio, thigh_build assigned at gen
     # Male chars: build, height_cm assigned at gen

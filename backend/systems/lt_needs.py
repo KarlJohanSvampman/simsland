@@ -169,9 +169,11 @@ def _apply_lt_frustration(c, total_frustration):
 
 # ── SATISFY A NEED ────────────────────────────────────────────────────────────
 
-def satisfy_lt_need(c, need_id, world):
+def satisfy_lt_need(c, need_id, world, hobby_id=None, has_companion=False):
     """
     Call when a character completes an activity that satisfies a long-term need.
+    hobby_id: optional — used to route exercise sessions into the exercise system.
+    has_companion: True if the character exercised with someone (affects social-only archetype).
     """
     lt = c.get("lt_needs", {})
     if need_id not in lt:
@@ -184,6 +186,20 @@ def satisfy_lt_need(c, need_id, world):
 
     # Reduce stress slightly
     c["stress"] = max(0, c.get("stress", 0) - 5)
+
+    # Exercise need: route into full exercise system
+    if need_id == "exercise":
+        try:
+            from systems.exercise import complete_exercise_session
+            ex_hobby = hobby_id or "running"   # default to cardio if no specific hobby
+            result   = complete_exercise_session(c, ex_hobby, world,
+                                                 has_companion=has_companion)
+            # If session was skipped (social-only alone) undo the need satisfaction
+            if result.get("status") == "skipped_solo":
+                nd["week_count"] = max(0, nd["week_count"] - 1)
+                nd["frustration"] = min(1.0, nd["frustration"] + FRUSTRATION_DECAY_ON_SATISFY * 0.5)
+        except Exception:
+            pass
 
 
 def reset_weekly_counts(c):

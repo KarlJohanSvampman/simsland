@@ -82,6 +82,7 @@ from systems.faction_ai import apply_faction_influence, process_rival_tensions
 from systems.intimacy   import tick_intimacy
 from systems.envy       import tick_envy
 from systems.trauma     import tick_trauma
+from systems.exercise   import tick_exercise
 
 # -- Weekly ───────────────────────────────────────────────────────
 from systems.scheduling import generate_week_schedule, adjust_for_household
@@ -195,6 +196,7 @@ def tick(world):
             adjust_for_household(c, world)
             reset_weekly_counts(c)
             distribute_lt_needs(c, world=world)  # no-op if already distributed
+        tick_exercise(world)   # weekly fitness decay + streak tracking
 
     # -- Fast: perception + attention (÷5) ──────────────────
     if every(world, CADENCE["perception"]):

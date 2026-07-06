@@ -455,9 +455,13 @@ def _appearance_score(c, other):
     total  = base_w + age_w + fertility_weight
     base_w /= total; age_w /= total; fertility_weight /= total
 
+    # Fitness bonus — baked in by exercise system, pre-computed
+    fitness_bonus = other.get("fitness_attractiveness_bonus", 0.0)
+
     score = (base_attractiveness * base_w
              + age_factor        * age_w
              + fertility         * fertility_weight
+             + fitness_bonus
              - hygiene_penalty)
     return max(0.0, min(1.0, score))
 

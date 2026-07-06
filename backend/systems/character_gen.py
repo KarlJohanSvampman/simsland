@@ -463,6 +463,9 @@ def generate_character(defs, overrides=None):
     # Physical body features — fertility signals and build
     character["body_features"] = _gen_body_features(character)
 
+    # Exercise personality — mutually exclusive, or none (35% chance of no tag)
+    _assign_exercise_personality(character)
+
     # Attraction profile — libido, quirks, initiation style, etc.
     try:
         from systems.attraction import generate_attraction_profile as _gen_ap
@@ -481,6 +484,25 @@ def generate_character(defs, overrides=None):
 
 
 
+
+
+def _assign_exercise_personality(c):
+    """Assign at most one exercise personality trait."""
+    existing = set(c.get("traits", []) + c.get("personality_traits", []))
+    EXERCISE_TRAITS = ("exercise_overdoer", "exercise_consistent", "exercise_social_only")
+    if any(t in existing for t in EXERCISE_TRAITS):
+        return  # already has one
+
+    # 65% chance of having a distinct exercise style
+    if random.random() > 0.65:
+        return
+
+    # Weights: consistent is most common, social & overdoer less so
+    trait = random.choices(
+        EXERCISE_TRAITS,
+        weights=[0.20, 0.50, 0.30]
+    )[0]
+    c.setdefault("traits", []).append(trait)
 
 def _gen_body_features(c):
     """

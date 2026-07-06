@@ -20857,6 +20857,36 @@
         "romance_weight": 0.4,
         "casual_sex_reluctance": 0.4
       }
+    },
+    "exercise_overdoer": {
+      "label": "Overdoer",
+      "description": "Goes all-out every session \u2014 rapid gains but high injury risk and long recovery gaps.",
+      "category": "lifestyle",
+      "effects": {
+        "fitness_gain_mult": 1.4,
+        "injury_chance_mult": 3.0,
+        "recovery_gap_mult": 2.0
+      }
+    },
+    "exercise_consistent": {
+      "label": "Consistent Trainer",
+      "description": "Builds sustainable routines, rarely skips, rarely gets hurt. Slow and steady wins.",
+      "category": "lifestyle",
+      "effects": {
+        "fitness_gain_mult": 1.1,
+        "injury_chance_mult": 0.3,
+        "streak_bonus": 0.05
+      }
+    },
+    "exercise_social_only": {
+      "label": "Social Exerciser",
+      "description": "Goes reluctantly alone; needs a workout buddy. Full benefit only with a companion.",
+      "category": "lifestyle",
+      "effects": {
+        "solo_gain_mult": 0.35,
+        "social_gain_mult": 1.2,
+        "skips_solo": true
+      }
     }
   },
   "recipe_templates": {
@@ -48118,6 +48148,53 @@
       "mutual": false,
       "pleasure_bonus": 0.0,
       "aftercare_modifier": 0.3
+    }
+  },
+  "exercise_type_registry": {
+    "running": {
+      "type": "cardio",
+      "intensity": 2,
+      "social": false
+    },
+    "cycling": {
+      "type": "cardio",
+      "intensity": 2,
+      "social": false
+    },
+    "swimming": {
+      "type": "cardio",
+      "intensity": 2,
+      "social": false
+    },
+    "dance_fitness": {
+      "type": "cardio",
+      "intensity": 2,
+      "social": true
+    },
+    "weightlifting": {
+      "type": "strength",
+      "intensity": 3,
+      "social": false
+    },
+    "crossfit": {
+      "type": "strength",
+      "intensity": 3,
+      "social": true
+    },
+    "martial_arts": {
+      "type": "strength",
+      "intensity": 2,
+      "social": true
+    },
+    "yoga": {
+      "type": "flexibility",
+      "intensity": 1,
+      "social": false
+    },
+    "hiking": {
+      "type": "cardio",
+      "intensity": 1,
+      "social": true
     }
   }
 }
