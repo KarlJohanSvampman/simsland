@@ -20778,6 +20778,85 @@
         "arrogant",
         "selfish"
       ]
+    },
+    "high_libido": {
+      "label": "High Libido",
+      "description": "Naturally high sexual drive; lower arousal thresholds and initiates more frequently.",
+      "category": "sexuality",
+      "effects": {
+        "libido_modifier": 0.35,
+        "arousal_threshold_modifier": -0.2,
+        "initiation_bias": 0.3
+      }
+    },
+    "low_libido": {
+      "label": "Low Libido",
+      "description": "Low sexual drive; higher arousal thresholds and rarely initiates.",
+      "category": "sexuality",
+      "effects": {
+        "libido_modifier": -0.35,
+        "arousal_threshold_modifier": 0.25,
+        "initiation_bias": -0.3
+      }
+    },
+    "promiscuous": {
+      "label": "Promiscuous",
+      "description": "Comfortable with casual intimacy; fewer emotional prerequisites, open to multiple partners.",
+      "category": "sexuality",
+      "effects": {
+        "emotional_bond_requirement": -0.4,
+        "intimacy_stage_gate_modifier": -1,
+        "libido_modifier": 0.2
+      }
+    },
+    "flirtatious": {
+      "label": "Flirtatious",
+      "description": "Enjoys flirting and light sexual tension; doesn't always intend follow-through.",
+      "category": "sexuality",
+      "effects": {
+        "flirt_frequency": 0.4,
+        "flirt_weight_in_intimacy": -0.2
+      }
+    },
+    "sexually_confident": {
+      "label": "Sexually Confident",
+      "description": "Comfortable with their sexuality; expresses desires clearly, no performance anxiety.",
+      "category": "sexuality",
+      "effects": {
+        "sexual_anxiety_modifier": -0.5,
+        "initiation_bias": 0.2,
+        "rejection_resilience": 0.3
+      }
+    },
+    "sexually_insecure": {
+      "label": "Sexually Insecure",
+      "description": "Anxious about intimacy; may deflect advances even when interested, fears rejection.",
+      "category": "sexuality",
+      "effects": {
+        "sexual_anxiety_modifier": 0.5,
+        "initiation_bias": -0.3,
+        "rejection_resilience": -0.4
+      }
+    },
+    "demisexual": {
+      "label": "Demisexual",
+      "description": "Sexual attraction only activates after forming a strong emotional bond.",
+      "category": "sexuality",
+      "effects": {
+        "requires_trust_for_attraction": 0.7,
+        "libido_modifier": 0.0,
+        "emotional_bond_requirement": 0.5
+      }
+    },
+    "romantic": {
+      "label": "Romantic",
+      "description": "Values emotional intimacy and romantic connection deeply; prefers meaningful encounters.",
+      "category": "sexuality",
+      "effects": {
+        "emotional_bond_requirement": 0.3,
+        "romance_weight": 0.4,
+        "casual_sex_reluctance": 0.4
+      }
     }
   },
   "recipe_templates": {
@@ -46807,5 +46886,831 @@
         "activist": 30
       }
     }
-  }
+  },
+  "sexual_acts": {
+    "hug_brief": {
+      "name": "Brief Hug",
+      "intimacy_tier": 3,
+      "description": "A short friendly or affectionate embrace.",
+      "compatibility": "any",
+      "requires_private": false,
+      "reversible": true,
+      "duration_ticks": 1,
+      "spatial": {
+        "formation": "face_to_face",
+        "distance": "contact",
+        "valid_positions": [
+          "standing"
+        ]
+      },
+      "animations": {
+        "initiator": "anim_hug_give",
+        "recipient": "anim_hug_receive"
+      },
+      "effects": {
+        "intimacy_progress_boost": 0.05,
+        "mood_boost_recipient": 0.05,
+        "trust_boost": 0.02
+      }
+    },
+    "hug_prolonged": {
+      "name": "Prolonged Hug",
+      "intimacy_tier": 3,
+      "description": "A long, close embrace \u2014 more than friendly.",
+      "compatibility": "any",
+      "requires_private": false,
+      "reversible": true,
+      "duration_ticks": 2,
+      "spatial": {
+        "formation": "face_to_face",
+        "distance": "contact",
+        "valid_positions": [
+          "standing"
+        ]
+      },
+      "animations": {
+        "initiator": "anim_hug_prolonged_give",
+        "recipient": "anim_hug_prolonged_receive"
+      },
+      "effects": {
+        "intimacy_progress_boost": 0.08,
+        "arousal_boost_initiator": 0.03,
+        "arousal_boost_recipient": 0.03
+      }
+    },
+    "kiss_cheek": {
+      "name": "Kiss on the Cheek",
+      "intimacy_tier": 3,
+      "description": "A soft kiss on the cheek \u2014 affectionate or romantic.",
+      "compatibility": "any",
+      "requires_private": false,
+      "reversible": true,
+      "duration_ticks": 1,
+      "spatial": {
+        "formation": "face_to_face",
+        "distance": "close",
+        "valid_positions": [
+          "standing",
+          "sitting"
+        ]
+      },
+      "animations": {
+        "initiator": "anim_kiss_cheek_give",
+        "recipient": "anim_kiss_cheek_receive"
+      },
+      "effects": {
+        "intimacy_progress_boost": 0.06,
+        "mood_boost_recipient": 0.06
+      }
+    },
+    "kiss_forehead": {
+      "name": "Kiss on the Forehead",
+      "intimacy_tier": 3,
+      "description": "A tender forehead kiss \u2014 protective and intimate.",
+      "compatibility": "any",
+      "requires_private": false,
+      "reversible": false,
+      "duration_ticks": 1,
+      "spatial": {
+        "formation": "face_to_face",
+        "distance": "close",
+        "valid_positions": [
+          "standing",
+          "sitting"
+        ]
+      },
+      "animations": {
+        "initiator": "anim_kiss_forehead_give",
+        "recipient": "anim_kiss_forehead_receive"
+      },
+      "effects": {
+        "intimacy_progress_boost": 0.07,
+        "comfort_boost": 0.05
+      }
+    },
+    "hold_hands": {
+      "name": "Hold Hands",
+      "intimacy_tier": 3,
+      "description": "Walking or sitting while holding hands.",
+      "compatibility": "any",
+      "requires_private": false,
+      "reversible": true,
+      "duration_ticks": 10,
+      "spatial": {
+        "formation": "side_by_side",
+        "distance": "touching",
+        "valid_positions": [
+          "standing",
+          "walking"
+        ]
+      },
+      "animations": {
+        "initiator": "anim_hold_hands",
+        "recipient": "anim_hold_hands"
+      },
+      "effects": {
+        "intimacy_progress_boost": 0.04,
+        "mood_boost_recipient": 0.04,
+        "trust_boost": 0.01
+      }
+    },
+    "kiss_lips": {
+      "name": "Kiss on the Lips",
+      "intimacy_tier": 4,
+      "description": "A brief but romantic kiss on the lips.",
+      "compatibility": "any",
+      "requires_private": false,
+      "reversible": true,
+      "duration_ticks": 1,
+      "spatial": {
+        "formation": "face_to_face",
+        "distance": "contact",
+        "valid_positions": [
+          "standing",
+          "sitting"
+        ]
+      },
+      "animations": {
+        "initiator": "anim_kiss_lips_give",
+        "recipient": "anim_kiss_lips_receive"
+      },
+      "effects": {
+        "intimacy_progress_boost": 0.12,
+        "arousal_boost_initiator": 0.05,
+        "arousal_boost_recipient": 0.05
+      }
+    },
+    "kiss_passionate": {
+      "name": "Passionate Kiss",
+      "intimacy_tier": 4,
+      "description": "A deep, lingering kiss.",
+      "compatibility": "any",
+      "requires_private": false,
+      "reversible": true,
+      "duration_ticks": 2,
+      "spatial": {
+        "formation": "face_to_face",
+        "distance": "contact",
+        "valid_positions": [
+          "standing",
+          "sitting"
+        ]
+      },
+      "animations": {
+        "initiator": "anim_kiss_passionate_give",
+        "recipient": "anim_kiss_passionate_receive"
+      },
+      "effects": {
+        "intimacy_progress_boost": 0.18,
+        "arousal_boost_initiator": 0.1,
+        "arousal_boost_recipient": 0.1
+      }
+    },
+    "embrace_close": {
+      "name": "Close Embrace",
+      "intimacy_tier": 4,
+      "description": "Pressing close together, arms wrapped around each other.",
+      "compatibility": "any",
+      "requires_private": false,
+      "reversible": true,
+      "duration_ticks": 3,
+      "spatial": {
+        "formation": "face_to_face",
+        "distance": "contact",
+        "valid_positions": [
+          "standing"
+        ]
+      },
+      "animations": {
+        "initiator": "anim_embrace_give",
+        "recipient": "anim_embrace_receive"
+      },
+      "effects": {
+        "intimacy_progress_boost": 0.1,
+        "arousal_boost_initiator": 0.06,
+        "arousal_boost_recipient": 0.06
+      }
+    },
+    "kiss_neck": {
+      "name": "Kiss on the Neck",
+      "intimacy_tier": 5,
+      "description": "Soft kisses along the neck \u2014 clearly intimate.",
+      "compatibility": "any",
+      "requires_private": true,
+      "reversible": false,
+      "duration_ticks": 2,
+      "spatial": {
+        "formation": "from_behind",
+        "distance": "contact",
+        "valid_positions": [
+          "standing",
+          "sitting"
+        ]
+      },
+      "animations": {
+        "initiator": "anim_kiss_neck_give",
+        "recipient": "anim_kiss_neck_receive"
+      },
+      "effects": {
+        "intimacy_progress_boost": 0.2,
+        "arousal_boost_initiator": 0.12,
+        "arousal_boost_recipient": 0.18
+      }
+    },
+    "caress": {
+      "name": "Caress",
+      "intimacy_tier": 5,
+      "description": "Gentle stroking of the face, hair, or arms.",
+      "compatibility": "any",
+      "requires_private": false,
+      "reversible": true,
+      "duration_ticks": 2,
+      "spatial": {
+        "formation": "face_to_face",
+        "distance": "close",
+        "valid_positions": [
+          "standing",
+          "sitting",
+          "lying"
+        ]
+      },
+      "animations": {
+        "initiator": "anim_caress_give",
+        "recipient": "anim_caress_receive"
+      },
+      "effects": {
+        "intimacy_progress_boost": 0.15,
+        "arousal_boost_initiator": 0.08,
+        "arousal_boost_recipient": 0.1,
+        "comfort_boost": 0.05
+      }
+    },
+    "undress_partner": {
+      "name": "Undress Partner",
+      "intimacy_tier": 5,
+      "description": "Removing the partner's clothing.",
+      "compatibility": "any",
+      "requires_private": true,
+      "reversible": true,
+      "duration_ticks": 2,
+      "spatial": {
+        "formation": "face_to_face",
+        "distance": "contact",
+        "valid_positions": [
+          "standing"
+        ]
+      },
+      "animations": {
+        "initiator": "anim_undress_give",
+        "recipient": "anim_undress_receive"
+      },
+      "effects": {
+        "intimacy_progress_boost": 0.25,
+        "arousal_boost_initiator": 0.15,
+        "arousal_boost_recipient": 0.15
+      }
+    },
+    "manual_stimulation": {
+      "name": "Manual Stimulation",
+      "intimacy_tier": 6,
+      "description": "Stimulation of partner using hands.",
+      "compatibility": "any",
+      "requires_private": true,
+      "reversible": true,
+      "duration_ticks": 4,
+      "spatial": {
+        "formation": "face_to_face",
+        "distance": "contact",
+        "valid_positions": [
+          "lying",
+          "sitting",
+          "standing"
+        ]
+      },
+      "animations": {
+        "initiator": "anim_manual_give",
+        "recipient": "anim_manual_receive"
+      },
+      "effects": {
+        "arousal_boost_initiator": 0.1,
+        "arousal_boost_recipient": 0.25,
+        "intimacy_progress_boost": 0.15
+      }
+    },
+    "oral_giving": {
+      "name": "Oral Sex (giving)",
+      "intimacy_tier": 6,
+      "description": "Performing oral stimulation on the partner.",
+      "compatibility": "any",
+      "requires_private": true,
+      "reversible": true,
+      "duration_ticks": 6,
+      "spatial": {
+        "formation": "one_kneeling",
+        "distance": "contact",
+        "valid_positions": [
+          "standing",
+          "sitting_edge",
+          "lying"
+        ]
+      },
+      "animations": {
+        "initiator": "anim_oral_give",
+        "recipient": "anim_oral_receive"
+      },
+      "effects": {
+        "arousal_boost_initiator": 0.08,
+        "arousal_boost_recipient": 0.35,
+        "intimacy_progress_boost": 0.2
+      }
+    },
+    "kissing_all_over": {
+      "name": "Kissing All Over",
+      "intimacy_tier": 6,
+      "description": "Kissing the partner's body from head to toe.",
+      "compatibility": "any",
+      "requires_private": true,
+      "reversible": true,
+      "duration_ticks": 5,
+      "spatial": {
+        "formation": "one_above",
+        "distance": "contact",
+        "valid_positions": [
+          "lying"
+        ]
+      },
+      "animations": {
+        "initiator": "anim_kiss_body_give",
+        "recipient": "anim_kiss_body_receive"
+      },
+      "effects": {
+        "arousal_boost_initiator": 0.12,
+        "arousal_boost_recipient": 0.28,
+        "intimacy_progress_boost": 0.18
+      }
+    },
+    "intercourse_missionary": {
+      "name": "Intercourse (Missionary)",
+      "intimacy_tier": 6,
+      "description": "Face-to-face penetrative intercourse.",
+      "compatibility": "heterosexual_only",
+      "requires_private": true,
+      "reversible": false,
+      "duration_ticks": 8,
+      "spatial": {
+        "formation": "face_to_face_lying",
+        "distance": "contact",
+        "valid_positions": [
+          "lying"
+        ]
+      },
+      "animations": {
+        "initiator": "anim_intercourse_missionary_top",
+        "recipient": "anim_intercourse_missionary_bottom"
+      },
+      "effects": {
+        "arousal_boost_initiator": 0.3,
+        "arousal_boost_recipient": 0.3,
+        "intimacy_progress_boost": 0.3,
+        "mood_boost_recipient": 0.15
+      }
+    },
+    "intercourse_from_behind": {
+      "name": "Intercourse (From Behind)",
+      "intimacy_tier": 6,
+      "description": "Penetrative intercourse from behind.",
+      "compatibility": "heterosexual_only",
+      "requires_private": true,
+      "reversible": false,
+      "duration_ticks": 8,
+      "spatial": {
+        "formation": "from_behind_lying",
+        "distance": "contact",
+        "valid_positions": [
+          "lying",
+          "standing",
+          "kneeling"
+        ]
+      },
+      "animations": {
+        "initiator": "anim_intercourse_behind_give",
+        "recipient": "anim_intercourse_behind_receive"
+      },
+      "effects": {
+        "arousal_boost_initiator": 0.28,
+        "arousal_boost_recipient": 0.28,
+        "intimacy_progress_boost": 0.28
+      }
+    },
+    "intercourse_on_top": {
+      "name": "Intercourse (On Top)",
+      "intimacy_tier": 6,
+      "description": "Penetrative intercourse with recipient on top.",
+      "compatibility": "heterosexual_only",
+      "requires_private": true,
+      "reversible": false,
+      "duration_ticks": 8,
+      "spatial": {
+        "formation": "recipient_above",
+        "distance": "contact",
+        "valid_positions": [
+          "lying"
+        ]
+      },
+      "animations": {
+        "initiator": "anim_intercourse_bottom",
+        "recipient": "anim_intercourse_ontop"
+      },
+      "effects": {
+        "arousal_boost_initiator": 0.28,
+        "arousal_boost_recipient": 0.32,
+        "intimacy_progress_boost": 0.3
+      }
+    },
+    "anal_intercourse": {
+      "name": "Anal Intercourse",
+      "intimacy_tier": 6,
+      "description": "Anal penetrative intercourse.",
+      "compatibility": "any",
+      "requires_private": true,
+      "reversible": true,
+      "duration_ticks": 8,
+      "spatial": {
+        "formation": "from_behind",
+        "distance": "contact",
+        "valid_positions": [
+          "lying",
+          "kneeling",
+          "standing"
+        ]
+      },
+      "animations": {
+        "initiator": "anim_anal_give",
+        "recipient": "anim_anal_receive"
+      },
+      "effects": {
+        "arousal_boost_initiator": 0.28,
+        "arousal_boost_recipient": 0.22,
+        "intimacy_progress_boost": 0.28
+      }
+    },
+    "mutual_oral": {
+      "name": "Mutual Oral (69)",
+      "intimacy_tier": 6,
+      "description": "Simultaneous mutual oral stimulation.",
+      "compatibility": "any",
+      "requires_private": true,
+      "reversible": false,
+      "duration_ticks": 8,
+      "spatial": {
+        "formation": "head_to_toe",
+        "distance": "contact",
+        "valid_positions": [
+          "lying"
+        ]
+      },
+      "animations": {
+        "initiator": "anim_mutual_oral_top",
+        "recipient": "anim_mutual_oral_bottom"
+      },
+      "effects": {
+        "arousal_boost_initiator": 0.3,
+        "arousal_boost_recipient": 0.3,
+        "intimacy_progress_boost": 0.25
+      }
+    },
+    "masturbation_mutual": {
+      "name": "Mutual Masturbation",
+      "intimacy_tier": 6,
+      "description": "Each partner stimulates themselves while watching the other.",
+      "compatibility": "any",
+      "requires_private": true,
+      "reversible": false,
+      "duration_ticks": 5,
+      "spatial": {
+        "formation": "face_to_face",
+        "distance": "close",
+        "valid_positions": [
+          "lying",
+          "sitting",
+          "standing"
+        ]
+      },
+      "animations": {
+        "initiator": "anim_mutual_masturbation",
+        "recipient": "anim_mutual_masturbation"
+      },
+      "effects": {
+        "arousal_boost_initiator": 0.2,
+        "arousal_boost_recipient": 0.2,
+        "intimacy_progress_boost": 0.12
+      }
+    },
+    "tribadism": {
+      "name": "Tribadism",
+      "intimacy_tier": 6,
+      "description": "Genital-to-genital stimulation between two women.",
+      "compatibility": "same_sex_female_only",
+      "requires_private": true,
+      "reversible": false,
+      "duration_ticks": 8,
+      "spatial": {
+        "formation": "scissor",
+        "distance": "contact",
+        "valid_positions": [
+          "lying"
+        ]
+      },
+      "animations": {
+        "initiator": "anim_tribadism_a",
+        "recipient": "anim_tribadism_b"
+      },
+      "effects": {
+        "arousal_boost_initiator": 0.28,
+        "arousal_boost_recipient": 0.28,
+        "intimacy_progress_boost": 0.28
+      }
+    },
+    "frottage": {
+      "name": "Frottage",
+      "intimacy_tier": 6,
+      "description": "Mutual genital stimulation through grinding \u2014 male partners.",
+      "compatibility": "same_sex_male_only",
+      "requires_private": true,
+      "reversible": false,
+      "duration_ticks": 6,
+      "spatial": {
+        "formation": "face_to_face",
+        "distance": "contact",
+        "valid_positions": [
+          "standing",
+          "lying"
+        ]
+      },
+      "animations": {
+        "initiator": "anim_frottage_a",
+        "recipient": "anim_frottage_b"
+      },
+      "effects": {
+        "arousal_boost_initiator": 0.25,
+        "arousal_boost_recipient": 0.25,
+        "intimacy_progress_boost": 0.22
+      }
+    },
+    "cuddling": {
+      "name": "Cuddling",
+      "intimacy_tier": 5,
+      "description": "Lying together closely, bodies intertwined \u2014 intimate but not sexual.",
+      "compatibility": "any",
+      "requires_private": false,
+      "reversible": false,
+      "duration_ticks": 10,
+      "spatial": {
+        "formation": "spooning",
+        "distance": "contact",
+        "valid_positions": [
+          "lying"
+        ]
+      },
+      "animations": {
+        "initiator": "anim_cuddle_big_spoon",
+        "recipient": "anim_cuddle_little_spoon"
+      },
+      "effects": {
+        "intimacy_progress_boost": 0.12,
+        "comfort_boost": 0.1,
+        "mood_boost_recipient": 0.08,
+        "arousal_boost_initiator": 0.04,
+        "arousal_boost_recipient": 0.04
+      }
+    },
+    "lap_sitting": {
+      "name": "Sit on Lap",
+      "intimacy_tier": 4,
+      "description": "One person sits on the other's lap.",
+      "compatibility": "any",
+      "requires_private": false,
+      "reversible": false,
+      "duration_ticks": 5,
+      "spatial": {
+        "formation": "recipient_above_sitting",
+        "distance": "contact",
+        "valid_positions": [
+          "sitting"
+        ]
+      },
+      "animations": {
+        "initiator": "anim_lap_sit_base",
+        "recipient": "anim_lap_sit_top"
+      },
+      "effects": {
+        "intimacy_progress_boost": 0.1,
+        "arousal_boost_initiator": 0.05,
+        "arousal_boost_recipient": 0.05
+      }
+    },
+    "dance_close": {
+      "name": "Close Dancing",
+      "intimacy_tier": 4,
+      "description": "Slow dancing pressed close together.",
+      "compatibility": "any",
+      "requires_private": false,
+      "reversible": false,
+      "duration_ticks": 8,
+      "spatial": {
+        "formation": "face_to_face",
+        "distance": "contact",
+        "valid_positions": [
+          "standing"
+        ]
+      },
+      "animations": {
+        "initiator": "anim_dance_close_lead",
+        "recipient": "anim_dance_close_follow"
+      },
+      "effects": {
+        "intimacy_progress_boost": 0.12,
+        "arousal_boost_initiator": 0.06,
+        "arousal_boost_recipient": 0.06,
+        "mood_boost_recipient": 0.08
+      }
+    },
+    "whisper_intimate": {
+      "name": "Intimate Whisper",
+      "intimacy_tier": 5,
+      "description": "Whispering something intimate directly into the partner's ear.",
+      "compatibility": "any",
+      "requires_private": false,
+      "reversible": false,
+      "duration_ticks": 1,
+      "spatial": {
+        "formation": "side_by_side",
+        "distance": "close",
+        "valid_positions": [
+          "standing",
+          "sitting"
+        ]
+      },
+      "animations": {
+        "initiator": "anim_whisper_give",
+        "recipient": "anim_whisper_receive"
+      },
+      "effects": {
+        "intimacy_progress_boost": 0.1,
+        "arousal_boost_recipient": 0.08
+      }
+    }
+  },
+  "attraction_quirks_registry": [
+    {
+      "id": "attracted_to_uniforms",
+      "label": "Attracted to uniforms",
+      "condition": "job_wears_uniform",
+      "boost": 0.25
+    },
+    {
+      "id": "attracted_to_authority",
+      "label": "Attracted to authority figures",
+      "condition": "high_seniority_job",
+      "boost": 0.2
+    },
+    {
+      "id": "attracted_to_creative_types",
+      "label": "Drawn to creative people",
+      "condition": "creative_hobby_or_job",
+      "boost": 0.2
+    },
+    {
+      "id": "attracted_to_wealth",
+      "label": "Attracted to wealth",
+      "condition": "high_income_class",
+      "boost": 0.25
+    },
+    {
+      "id": "attracted_to_danger",
+      "label": "Attracted to dangerous people",
+      "condition": "illegal_job_or_criminal",
+      "boost": 0.3
+    },
+    {
+      "id": "attracted_to_older",
+      "label": "Prefers older partners",
+      "condition": "age_10_plus_older",
+      "boost": 0.2
+    },
+    {
+      "id": "attracted_to_younger",
+      "label": "Prefers younger partners",
+      "condition": "age_10_plus_younger",
+      "boost": 0.2
+    },
+    {
+      "id": "attracted_to_tattoos",
+      "label": "Finds tattoos attractive",
+      "condition": "has_tattoos",
+      "boost": 0.2
+    },
+    {
+      "id": "attracted_to_intelligence",
+      "label": "Drawn to intelligence",
+      "condition": "high_education",
+      "boost": 0.2
+    },
+    {
+      "id": "attracted_to_musicians",
+      "label": "Musician magnetism",
+      "condition": "music_hobby_or_job",
+      "boost": 0.25
+    },
+    {
+      "id": "attracted_to_athletic",
+      "label": "Drawn to athletic build",
+      "condition": "athletic_build",
+      "boost": 0.2
+    },
+    {
+      "id": "attracted_to_shyness",
+      "label": "Finds shyness endearing",
+      "condition": "has_trait_shy",
+      "boost": 0.2
+    },
+    {
+      "id": "repelled_by_aggression",
+      "label": "Turned off by aggression",
+      "condition": "has_trait_aggressive",
+      "boost": -0.3
+    },
+    {
+      "id": "repelled_by_dishonesty",
+      "label": "Can't stand dishonesty",
+      "condition": "has_trait_dishonest",
+      "boost": -0.35
+    },
+    {
+      "id": "repelled_by_clingy",
+      "label": "Turned off by neediness",
+      "condition": "has_trait_clingy",
+      "boost": -0.25
+    },
+    {
+      "id": "repelled_by_smoking",
+      "label": "Turned off by smokers",
+      "condition": "has_smoking_problem",
+      "boost": -0.3
+    },
+    {
+      "id": "repelled_by_heavy_perfume",
+      "label": "Sensitive to strong perfume",
+      "condition": "high_odor",
+      "boost": -0.2
+    },
+    {
+      "id": "repelled_by_criminals",
+      "label": "Uncomfortable with criminals",
+      "condition": "illegal_job_or_criminal",
+      "boost": -0.3
+    },
+    {
+      "id": "repelled_by_much_older",
+      "label": "Uncomfortable with large age gap (older)",
+      "condition": "age_15_plus_older",
+      "boost": -0.25
+    },
+    {
+      "id": "repelled_by_much_younger",
+      "label": "Uncomfortable with large age gap (younger)",
+      "condition": "age_15_plus_younger",
+      "boost": -0.25
+    },
+    {
+      "id": "sapiosexual",
+      "label": "Sapiosexual \u2014 brains over looks",
+      "condition": "bachelor_plus_education",
+      "boost": 0.3
+    },
+    {
+      "id": "attracted_to_humor",
+      "label": "Laugh is the key",
+      "condition": "has_trait_funny",
+      "boost": 0.25
+    },
+    {
+      "id": "attracted_to_confidence",
+      "label": "Confidence is magnetic",
+      "condition": "has_trait_confident",
+      "boost": 0.25
+    },
+    {
+      "id": "attracted_to_kindness",
+      "label": "Kindness above all",
+      "condition": "has_trait_kind",
+      "boost": 0.2
+    },
+    {
+      "id": "repelled_by_arrogance",
+      "label": "Arrogance is a dealbreaker",
+      "condition": "has_trait_arrogant",
+      "boost": -0.3
+    }
+  ]
 }

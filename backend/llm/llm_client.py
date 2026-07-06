@@ -4,6 +4,34 @@ import redis
 import os
 import asyncio
 import httpx
+import time
+from collections import deque
+
+# ---------------------------------------------------------------------------
+# Per-character prompt log (in-memory ring buffer, max 50 entries per char)
+# ---------------------------------------------------------------------------
+_PROMPT_LOG: dict[str, deque] = {}
+_PROMPT_LOG_MAX = 50
+
+def log_prompt_entry(char_id: str, messages: list, response: str, elapsed: float, cached: bool):
+    """Store a prompt/response pair for a character. Thread-safe for asyncio."""
+    if char_id not in _PROMPT_LOG:
+        _PROMPT_LOG[char_id] = deque(maxlen=_PROMPT_LOG_MAX)
+    _PROMPT_LOG[char_id].appendleft({
+        "ts": time.time(),
+        "messages": messages,
+        "response": response,
+        "elapsed_s": round(elapsed, 3),
+        "cached": cached,
+    })
+
+def get_prompt_log(char_id: str) -> list:
+    """Return prompt history for a character, newest first."""
+    return list(_PROMPT_LOG.get(char_id, []))
+
+def clear_prompt_log(char_id: str):
+    if char_id in _PROMPT_LOG:
+        _PROMPT_LOG[char_id].clear()
 
 
 # =========================================================
@@ -161,7 +189,9 @@ async def call_llm(
 
     use_cache=True,
 
-    session=None
+    session=None,
+
+    char_id=None
 ):
 
     # =====================================================
@@ -270,6 +300,16 @@ async def call_llm(
             json.dumps(result),
 
             ex=300
+        )
+
+    # Log prompt/response for debugging (keyed by char_id if provided)
+    if char_id:
+        log_prompt_entry(
+            char_id,
+            full_messages,
+            result if isinstance(result, str) else json.dumps(result),
+            elapsed=0.0,   # caller may patch if needed
+            cached=False,
         )
 
     return result

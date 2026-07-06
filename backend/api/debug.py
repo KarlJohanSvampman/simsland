@@ -129,6 +129,13 @@ class LLMTestReq(BaseModel):
     use_cache: bool = False
 
 
+class LLMSendReq(BaseModel):
+    char_id: str
+    system_prompt: str
+    user_prompt: str
+    use_cache: bool = False
+
+
 class ScheduleReq(BaseModel):
     character: Dict[str, Any] = {}
     household: Optional[Dict[str, Any]] = None
@@ -356,4 +363,75 @@ def plan_activity_ep(req: ActivityPlanReq):
         "prop_phases":      prop_phases,
         "all_interactions": all_interactions,
         "errors":           errors,
+    }
+
+
+# ─── LLM Prompt Log endpoints ─────────────────────────────────────────────────
+
+@router.get("/prompt-log/{char_id}")
+def get_prompt_log_ep(char_id: str):
+    """Return stored LLM prompt/response history for a character (newest first)."""
+    from llm.llm_client import get_prompt_log
+    return {"char_id": char_id, "entries": get_prompt_log(char_id)}
+
+
+@router.delete("/prompt-log/{char_id}")
+def clear_prompt_log_ep(char_id: str):
+    from llm.llm_client import clear_prompt_log
+    clear_prompt_log(char_id)
+    return {"ok": True}
+
+
+@router.post("/prompt-send")
+async def prompt_send_ep(req: LLMSendReq):
+    """
+    Send a custom system+user prompt to the LLM on behalf of a character.
+    Stores the result in that character's prompt log and returns the raw response.
+    """
+    from llm.llm_client import call_llm, log_prompt_entry
+    from brain.llm_brain import validate_response
+
+    messages = [
+        {"role": "system", "content": req.system_prompt},
+        {"role": "user",   "content": req.user_prompt},
+    ]
+
+    t0 = time.time()
+    raw_response: Any = None
+    parse_error: Optional[str] = None
+    parsed: Optional[Dict] = None
+    valid = False
+
+    try:
+        raw_response = await asyncio.wait_for(
+            call_llm(messages, use_cache=req.use_cache, char_id=req.char_id),
+            timeout=90,
+        )
+        if isinstance(raw_response, str):
+            try:
+                parsed = json.loads(raw_response)
+            except Exception as pe:
+                parse_error = str(pe)
+        elif isinstance(raw_response, dict):
+            parsed = raw_response
+        if parsed:
+            valid = validate_response(parsed)
+    except Exception as e:
+        parse_error = f"{type(e).__name__}: {e}"
+
+    elapsed = round(time.time() - t0, 3)
+
+    # Patch elapsed into the log entry that call_llm stored
+    from llm.llm_client import _PROMPT_LOG
+    log = _PROMPT_LOG.get(req.char_id)
+    if log:
+        log[0]["elapsed_s"] = elapsed
+
+    return {
+        "char_id":       req.char_id,
+        "raw_response":  raw_response,
+        "parsed_action": parsed,
+        "parse_error":   parse_error,
+        "valid":         valid,
+        "elapsed_s":     elapsed,
     }

@@ -453,4 +453,18 @@ def generate_character(defs, overrides=None):
                      "x","y","household_id","home_id","template"):
             character[k] = v
 
+    # Attractiveness score (age bell-curve + noise, baked in at generation)
+    import math as _math
+    age_factor = _math.exp(-((age - 27) ** 2) / (2 * 18 ** 2))
+    character["attractiveness"] = round(
+        max(0.10, min(0.99, random.gauss(0.50, 0.18) * 0.6 + age_factor * 0.4)), 3
+    )
+
+    # Attraction profile — libido, quirks, initiation style, etc.
+    try:
+        from systems.attraction import generate_attraction_profile as _gen_ap
+        _gen_ap(character, defs)
+    except Exception as _e:
+        character.setdefault("attraction_profile", None)
+
     return character

@@ -566,6 +566,9 @@ def build_context(
         "family":            _build_family_context(c, world),
         "secrets_held":      _build_secrets_keeper_context(c),
         "secrets_targeted":  _build_secrets_target_context(c, world),
+        "attraction":        _build_attraction_context(c, world),
+        "intimacy":          _build_intimacy_context(c, world),
+        "envy_conflicts":    _build_envy_context(c, world),
     }
 
     return context
@@ -1253,3 +1256,27 @@ def _build_secrets_target_context(c, world):
                 # Deliberately omit actual content — the target doesn't know the truth
             })
     return result
+
+
+def _build_attraction_context(c, world):
+    try:
+        from systems.attraction import get_attraction_context
+        return get_attraction_context(c, world).get("attraction", [])
+    except Exception:
+        return []
+
+
+def _build_intimacy_context(c, world):
+    try:
+        from systems.intimacy import get_intimacy_context
+        return get_intimacy_context(c, world).get("intimacy", [])
+    except Exception:
+        return []
+
+
+def _build_envy_context(c, world):
+    try:
+        from systems.envy import get_envy_context
+        return get_envy_context(c, world).get("envy_conflicts", [])
+    except Exception:
+        return []

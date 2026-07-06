@@ -214,6 +214,12 @@ def index():
     return FileResponse(path) if path.exists() else {"ok": True, "message": "frontend not found"}
 
 
+@app.get("/social_debug.html")
+def social_debug_page():
+    path = Path(__file__).parent / "frontend" / "social_debug.html"
+    return FileResponse(path)
+
+
 @app.get("/api/state")
 def state():
     return load_world(SIM_ID)

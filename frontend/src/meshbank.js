@@ -603,6 +603,14 @@ function extractAnchors(root){
 
     return anchors;
 }
+// Derive a stable asset ID from the full URL path.
+// For backward compat: root-level files keep their bare name ("long_wavy"),
+// subfoldered files use a path relative to category root ("hair/long_wavy").
+function assetIdFromPath(assetPath, category) {
+    const prefix = `/resources/${category}/`;
+    return assetPath.replace(prefix, '').replace(/\.glb$/i, '');
+}
+
 function populateAssetList(){
 
     const category =
@@ -617,65 +625,82 @@ function populateAssetList(){
 
     container.innerHTML = "";
 
-    for(const asset of assets[category] || []){
+    // Group by subfolder (first path component after category root)
+    const groups = {};   // folderName → [{asset, assetId, filename}]
+    const prefix = `/resources/${category}/`;
 
-        const div =
-            document.createElement(
-                "div"
-            );
+    for (const asset of assets[category] || []) {
+        const rel = asset.replace(prefix, '').replace(/\.glb$/i, '');
+        const parts = rel.split('/');
+        const folder = parts.length > 1 ? parts.slice(0, -1).join('/') : '';
+        const filename = parts[parts.length - 1];
+        (groups[folder] ||= []).push({ asset, assetId: rel, filename });
+    }
 
-        div.className =
-            "assetRow";
+    // Sort: root first, then alphabetical folders
+    const folderKeys = Object.keys(groups).sort((a, b) => {
+        if (a === '') return -1;
+        if (b === '') return 1;
+        return a.localeCompare(b);
+    });
 
-        div.textContent =
-            asset.split("/").pop().replace(".glb","");
+    function makeAssetRow(item, indented) {
+        const div = document.createElement('div');
+        div.className = 'assetRow' + (indented ? ' indented' : '');
+        div.textContent = item.filename;
+        div.dataset.assetId = item.assetId;
+        div.onclick = () => {
+            container.querySelectorAll('.assetRow').forEach(r => r.classList.remove('active'));
+            div.classList.add('active');
 
-        div.onclick = ()=>{
+            currentAssetId = item.assetId;
+            loadModel(item.asset);
 
-            // Clear active state on all rows
-            container.querySelectorAll(".assetRow")
-                .forEach(r => r.classList.remove("active"));
-            div.classList.add("active");
+            meshbank[currentAssetId] ||= { display_name: item.filename, anchors: {} };
+            meshbank[currentAssetId].mesh = item.asset;
 
-    currentAssetId =
-        asset
-            .split("/")
-            .pop()
-            .replace(".glb","");
-
-            loadModel(asset);
-
-            // Ensure mesh path is always stored
-            meshbank[currentAssetId] ||= { display_name: currentAssetId, anchors: {} };
-            meshbank[currentAssetId].mesh = asset;
-
-            const meta =
-                meshbank[currentAssetId];
-
-            document
-            .getElementById(
-                "displayName"
-            )
-            .value =
-                meta?.display_name || "";
-
-            document
-            .getElementById(
-                "tags"
-            )
-            .value =
-                (
-                    meta?.tags || []
-                ).join(",");
-                        loadPlacementUI();
-        loadTransformUI();
+            const meta = meshbank[currentAssetId];
+            document.getElementById('displayName').value = meta?.display_name || '';
+            document.getElementById('tags').value = (meta?.tags || []).join(',');
+            loadPlacementUI();
+            loadTransformUI();
+            loadHairAttachUI();
         };
+        return div;
+    }
 
+    for (const folder of folderKeys) {
+        const items = groups[folder];
+        if (folder === '') {
+            // Root items — no header
+            for (const item of items) {
+                container.appendChild(makeAssetRow(item, false));
+            }
+        } else {
+            // Folder group with collapsible header
+            const group = document.createElement('div');
+            group.className = 'folderGroup';
 
+            const header = document.createElement('div');
+            header.className = 'folderHeader';
+            header.textContent = '▾ 📁 ' + folder;
+            header.onclick = () => {
+                group.classList.toggle('collapsed');
+                header.textContent = group.classList.contains('collapsed')
+                    ? '▸ 📁 ' + folder
+                    : '▾ 📁 ' + folder;
+            };
 
-        container.appendChild(
-            div
-        );
+            const itemsDiv = document.createElement('div');
+            itemsDiv.className = 'folderItems';
+            for (const item of items) {
+                itemsDiv.appendChild(makeAssetRow(item, true));
+            }
+
+            group.appendChild(header);
+            group.appendChild(itemsDiv);
+            container.appendChild(group);
+        }
     }
 }
 
@@ -846,74 +871,47 @@ document
 .onclick = async ()=>{
 
     const file =
-
-        document
-        .getElementById(
-            "uploadFile"
-        )
-        .files[0];
+        document.getElementById("uploadFile").files[0];
 
     if(!file)
         return;
 
     const category =
-        document
-        .getElementById(
-            "category"
-        )
-        .value;
+        document.getElementById("category").value;
 
-    const form =
-        new FormData();
+    const subfolder =
+        document.getElementById("uploadSubfolder").value.trim().replace(/^\/|\/$/g, '');
 
-    form.append(
-        "file",
-        file
+    // Full category path including optional subfolder
+    const categoryPath = subfolder ? `${category}/${subfolder}` : category;
+
+    const form = new FormData();
+    form.append("file", file);
+
+    const res = await fetch(
+        `/api/assets/upload?category=${encodeURIComponent(categoryPath)}`,
+        { method:"POST", body:form }
     );
 
-    const res =
-        await fetch(
-
-            `/api/assets/upload?category=${category}`,
-
-            {
-                method:"POST",
-                body:form
-            }
-        );
-
-    const result =
-        await res.json();
-
-    alert(
-        "Uploaded"
-    );
+    const result = await res.json();
 
     await loadAssets();
 
-    const assetId = file.name.replace(".glb","");
-    const meta = meshbank[assetId];
-    const tags = [];
+    // ID is relative path within category: "subfolder/filename" or just "filename"
+    const bareId = file.name.replace(/\.glb$/i, '');
+    const assetId = subfolder ? `${subfolder}/${bareId}` : bareId;
 
     meshbank[assetId] = {
-
-        display_name:
-            assetId,
-
+        display_name: bareId,
         category,
-
-        mesh:
-            result.path,
-
-        tags,
-
+        subfolder: subfolder || null,
+        mesh: result.path,
+        tags: [],
         anchors: {}
     };
-meshbank[
-    assetId
-].anchors ||= {};
-    await saveMeshbank();
 
+    await saveMeshbank();
+    alert("Uploaded: " + assetId);
 };
 
 
@@ -2488,20 +2486,4 @@ canvas.addEventListener('click', e => {
 document.getElementById('addAnchorBtn').onclick = () => {
   if (!currentAssetId) return;
   let n = 'anchor_' + Date.now().toString(36);
-  ensureAnchors(meshbank[currentAssetId])[n] = { name: n, position: { x:0,y:0,z:0 }, rotation_y:0, distance:1.2, interaction:'' };
-  selectedAnchorKey = n;
-  renderAnchorList();
-  loadAnchorEditor();
-  _rebuildAnchorMarkers();
-};
-document.getElementById('removeAnchorBtn').onclick = () => {
-  if (!currentAssetId || !selectedAnchorKey) return;
-  delete ensureAnchors(meshbank[currentAssetId])[selectedAnchorKey];
-  selectedAnchorKey = null;
-  renderAnchorList();
-  _rebuildAnchorMarkers();
-};
-document.getElementById('addTargetBtn').onclick = () => {
-  if (!currentAssetId) return;
-  let n = 'target_' + Date.now().toString(36);
-  ensureTargets(meshbank[currentAssetId])[n] = { 
+  ensureAnchors(meshbank[currentAssetId])[n] = { name: n, position: {

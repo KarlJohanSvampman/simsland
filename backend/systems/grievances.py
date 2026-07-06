@@ -40,6 +40,13 @@ SEVERITY = {
     "disrespected":       5.0,
     "resource_conflict":  5.0,
     "ignored_me":         3.0,
+    "romantic_envy":     10.0,
+    "partner_jealousy":   9.0,
+    "status_envy":        5.0,
+    "career_envy":        6.0,
+    "social_envy":        4.0,
+    "opportunity_envy":   5.5,
+    "rejected_advance":   4.0,
 }
 
 

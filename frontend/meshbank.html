@@ -98,22 +98,59 @@ button{
     font-size:12px;
 }
 
-#anchors{
-
-    max-height:150px;
+#anchorList,#targetList,#bones{
+    max-height:140px;
     overflow:auto;
     font-size:12px;
+    margin-bottom:6px;
 }
-
-#targets,
-#bones{
-
-    max-height:150px;
-
-    overflow:auto;
-
+.anchorEditorGrid{
+    display:grid;
+    grid-template-columns:80px 1fr;
+    gap:4px 8px;
+    align-items:center;
+    font-size:12px;
+    margin-top:6px;
+}
+.anchorEditorGrid label{
+    display:block;
+    margin:0;
+    color:#aaa;
+}
+.anchorEditorGrid input{
+    padding:3px 5px;
     font-size:12px;
 }
+.anchorBtnRow{
+    display:flex;
+    gap:6px;
+    margin-top:6px;
+    flex-wrap:wrap;
+}
+.anchorBtnRow button{
+    flex:1;
+    margin:0;
+    padding:4px 6px;
+    font-size:11px;
+}
+button.danger{ background:#7a2020; color:#fff; }
+button.place-active{ background:#226688; color:#fff; }
+
+.folderHeader{
+    padding:4px 8px;
+    background:#1a2030;
+    color:#88aacc;
+    font-size:11px;
+    font-weight:bold;
+    letter-spacing:0.5px;
+    border-top:1px solid #3a4a5a;
+    cursor:pointer;
+    user-select:none;
+}
+.folderHeader:hover{ background:#223040; }
+.folderGroup.collapsed > .folderItems{ display:none; }
+.assetRow.indented{ padding-left:18px; }
+
 
 </style>
 
@@ -161,6 +198,11 @@ button{
                 <input
                     type="file"
                     id="uploadFile">
+
+                <label>Subfolder (optional)</label>
+                <input
+                    id="uploadSubfolder"
+                    placeholder="e.g. hair / bodies / furniture">
 
                 <button
                     id="uploadBtn">
@@ -346,6 +388,30 @@ Delete Slot
 <select id="slotBone">
 </select>
         <div class="section">
+            <h3>Hair Attach Point</h3>
+            <p style="font-size:11px;color:#888;margin:0 0 6px">
+                Bone where hairstyle GLBs are parented on this character.
+            </p>
+            <div class="anchorEditorGrid">
+                <label>Bone</label>
+                <select id="hairAttachBone"></select>
+                <label>Offset X</label>
+                <input id="hairAttachOffX" type="number" step="0.001" value="0">
+                <label>Offset Y</label>
+                <input id="hairAttachOffY" type="number" step="0.001" value="0">
+                <label>Offset Z</label>
+                <input id="hairAttachOffZ" type="number" step="0.001" value="0">
+                <label>Rot X°</label>
+                <input id="hairAttachRotX" type="number" step="1" value="0">
+                <label>Rot Y°</label>
+                <input id="hairAttachRotY" type="number" step="1" value="0">
+                <label>Rot Z°</label>
+                <input id="hairAttachRotZ" type="number" step="1" value="0">
+            </div>
+            <button id="saveHairAttachBtn" style="margin-top:8px">Save Hair Attach</button>
+        </div>
+
+        <div class="section">
 
             <h3>Animations</h3>
 
@@ -358,61 +424,32 @@ Delete Slot
 
 
         <div class="section">
-
             <h3>Anchors</h3>
-
-            <div id="anchors"></div>
-
-        </div>
-        <div class="section">
-<div class="section">
-
-    <h3>Targets</h3>
-
-    <div id="targets"></div>
-
-</div>
-
-<div class="section">
-
-    <h3>Bones</h3>
-
-    <div id="bones"></div>
-
-</div>
-    <h3>Statistics</h3>
-
-    <div id="stats">
-
-        No model loaded
-
-    </div>
-
-</div>
-
-        <div class="section">
-
-            <h3>Hierarchy</h3>
-
-            <div id="hierarchy"></div>
-
-        </div>
-
-    </div>
-
-    <div id="preview">
-
-        <canvas id="canvas"></canvas>
-
-    </div>
-
-</div>
-
-<script
-type="module"
-src="/src/meshbank.js">
-</script>
-
-</body>
-
-</html>
+            <div id="anchorList"></div>
+            <div class="anchorBtnRow">
+                <button id="addAnchorBtn">+ Add</button>
+                <button id="removeAnchorBtn" class="danger">Remove</button>
+            </div>
+            <div id="anchorEditor" style="display:none">
+                <hr style="border-color:#444;margin:8px 0">
+                <div class="anchorEditorGrid">
+                    <label>Name</label>
+                    <input id="anchorName" placeholder="anchor_sit">
+                    <label>Pos X</label>
+                    <input id="anchorPosX" type="number" step="0.01" value="0">
+                    <label>Pos Y</label>
+                    <input id="anchorPosY" type="number" step="0.01" value="0">
+                    <label>Pos Z</label>
+                    <input id="anchorPosZ" type="number" step="0.01" value="0">
+                    <label>Facing Y°</label>
+                    <input id="anchorRotY" type="number" step="1" value="0">
+                    <label>Distance</label>
+                    <input id="anchorDist" type="number" step="0.1" value="1.2">
+                    <label>Interaction</label>
+                    <input id="anchorInteraction" placeholder="sit_chair">
+                </div>
+                <div class="anchorBtnRow">
+                    <button id="placeAnchorBtn">📍 Place at click</button>
+                </div>
+            </div>
+  

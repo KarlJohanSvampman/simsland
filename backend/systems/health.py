@@ -1,25 +1,641 @@
+"""
+health.py -- Comprehensive health simulation system for HoloSims
+"""
+
 import random
-from brain.memory import store_memory
-DISEASES={"flu":{"curable":True,"symptoms":["fatigue","fever","cough"],"base_duration":70,"treatment_cost":80,"med_weekly":15},"chronic_pain":{"curable":False,"symptoms":["fatigue","pain"],"base_duration":999999,"treatment_cost":120,"med_weekly":25}}
-def apply_health_cost(c, world, cost):
-    ins=c.get("insurance",{})
-    if ins.get("health"): cost *= (1-ins.get("coverage",.5))
-    h=world["households"].get(c["household_id"])
-    if h: h["wealth"]-=cost
-    return cost
+
+TICKS_PER_HOUR = 1
+TICKS_PER_DAY  = 24
+TICKS_PER_WEEK = TICKS_PER_DAY * 7
+
+MIN_HEART_ATTACK_SURVIVAL_MINUTES = 15
+CARDIAC_ARREST_BRAIN_DAMAGE_PER_MIN = 0.08
+STROKE_DISSOLVE_CHANCE_PER_CHECK    = 0.20
+COMA_RECOVERY_CHANCE_BASE           = 0.25
+COMA_DEATH_RISK_PER_WEEK            = 0.05
+
+BLUNT_BONE_BREAK_THRESHOLD        = 0.55
+BLUNT_LUNG_DAMAGE_THRESHOLD       = 0.70
+BLUNT_UNCONSCIOUS_THRESHOLD       = 0.65
+BLUNT_HEAD_MENTAL_TRAIT_THRESHOLD = 0.60
+
+TRAUMA_MENTAL_TRAITS = [
+    "depression", "paranoid_personality", "antisocial_personality",
+    "ptsd", "dementia", "bipolar_disorder"
+]
+
+
+# ---------------------------------------------------------------------------
+# Memory helper (graceful fallback if brain module absent)
+# ---------------------------------------------------------------------------
+
+def _remember(char, msg, weight, tags, category, tick):
+    try:
+        from brain.memory import store_memory
+        store_memory(char, msg, weight, tags, category, tick)
+    except Exception:
+        pass
+
+
+# ---------------------------------------------------------------------------
+# Immune score
+# ---------------------------------------------------------------------------
+
+def _age_immune_penalty(age):
+    """Daily immune decay bonus/penalty from age alone.
+    Children (<12) and elderly (>65) have naturally weaker immune systems."""
+    if age is None:
+        return 0.0
+    if age < 5:
+        return -1.5   # infants — very vulnerable
+    if age < 12:
+        return -0.5   # children — still developing
+    if age < 30:
+        return 0.0    # peak immunity
+    if age < 50:
+        return -0.2   # gradual decline
+    if age < 65:
+        return -0.6
+    if age < 75:
+        return -1.2
+    return -2.0       # elderly 75+ — substantially weakened
+
+
+def immune_modifier(char):
+    """
+    Returns a 0.0-1.0 multiplier for random health-check probabilities.
+    At 100 immune_score the modifier is 1.0 (no amplification).
+    At 0 it is 2.5 (two and a half times more likely to get/worsen conditions).
+    """
+    score = char.get("immune_score", 100.0)
+    # Linear interpolation: score 100 → 1.0, score 0 → 2.5
+    return 1.0 + (1.0 - score / 100.0) * 1.5
+
+
+def compute_daily_immune_delta(char, world):
+    log = char.get("daily_log", {})
+    delta = 0.0
+
+    sleep_h = log.get("sleep_hours", 7)
+    if sleep_h < 4:
+        delta -= 6.0
+    elif sleep_h < 6:
+        delta -= 3.0
+    elif sleep_h > 10:
+        delta -= 1.0
+
+    if log.get("sleep_time_variance_hours", 0) > 2:
+        delta -= 1.5
+    if log.get("meal_timing_variance_hours", 0) > 3:
+        delta -= 1.0
+
+    for q in log.get("meal_quality", []):
+        if q == "healthy":
+            delta += 0.5
+        elif q == "junk":
+            delta -= 1.0
+        elif q == "none":
+            delta -= 2.0
+
+    delta -= log.get("alcohol_units", 0) * 0.8
+    if log.get("drug_use", False):
+        delta -= 3.0
+    if log.get("caffeine_cups", 0) > 4:
+        delta -= 0.5
+    if log.get("sugar_intake_high", False):
+        delta -= 0.8
+
+    # Poor hygiene contact (set by contagion system)
+    if log.get("contacted_unhygienic_person", False):
+        delta -= 0.5
+
+    if sleep_h >= 7 and not log.get("drug_use", False) and log.get("alcohol_units", 0) < 2:
+        delta += 1.5
+
+    for cond_key in char.get("physical_health", []):
+        if cond_key == "std_hiv":
+            delta -= 2.0
+        elif cond_key == "cancer_high":
+            delta -= 1.5
+        elif cond_key == "cancer_medium":
+            delta -= 0.8
+
+    # Age penalty
+    delta += _age_immune_penalty(char.get("age"))
+
+    return delta
+
+
+def tick_immune_score(char, world):
+    if "immune_score" not in char:
+        char["immune_score"] = 100.0
+    delta = compute_daily_immune_delta(char, world)
+    char["immune_score"] = max(0.0, min(100.0, char["immune_score"] + delta))
+    # Low immune score → opportunistic infection; age amplifies risk
+    opp_threshold = 0.15 * immune_modifier(char)
+    if char["immune_score"] < 40 and random.random() < opp_threshold:
+        _trigger_opportunistic_infection(char, world)
+
+
+def _trigger_opportunistic_infection(char, world):
+    candidates = ["common_cold", "influenza", "aggressive_gut_bacteria"]
+    condition = random.choice(candidates)
+    if condition not in char.get("physical_health", []):
+        char.setdefault("physical_health", []).append(condition)
+        _remember(char, "Became ill from a weakened immune system.", 0.80,
+                  ["health", condition], "health", world.get("tick", 0))
+
+
+# ---------------------------------------------------------------------------
+# Physical condition progression
+# ---------------------------------------------------------------------------
+
+def tick_physical_conditions(char, world):
+    defs = world.get("definitions", {})
+    ph_templates = defs.get("physical_health_templates", {})
+    tick = world.get("tick", 0)
+
+    for cond_key in list(char.get("physical_health", [])):
+        tmpl = ph_templates.get(cond_key)
+        if not tmpl:
+            continue
+
+        state = char.setdefault("condition_state", {}).setdefault(cond_key, {
+            "severity_index": 0.0, "days_elapsed": 0
+        })
+        state["days_elapsed"] += 1
+
+        if tmpl.get("progressive"):
+            state["severity_index"] = min(
+                1.0,
+                state["severity_index"] + tmpl.get("worsening_rate_per_day", 0.002)
+            )
+
+        if cond_key == "heart_disease_high":
+            _check_heart_disease_high(char, world, tick)
+
+        if cond_key == "cancer_high" and state["days_elapsed"] % 7 == 0:
+            risk = tmpl.get("mortality_risk_per_week", 0.03) * immune_modifier(char)
+            if random.random() < risk:
+                _trigger_death(char, world, "cancer_high_terminal")
+
+        if cond_key == "epilepsy":
+            meds = char.get("health_state", {}).get("medications_taken", {})
+            has_med = "antiepileptic" in meds
+            base = (tmpl.get("seizure_chance_without_meds_per_day", 0.35)
+                    if not has_med else tmpl.get("seizure_trigger_chance_per_day", 0.08))
+            chance = min(0.95, base * immune_modifier(char))
+            if random.random() < chance:
+                trigger_seizure(char, world, tick)
+
+        if cond_key == "concussion":
+            # Multiple concussions: cumulative CTE risk
+            count = sum(1 for c in char.get("condition_state", {})
+                        if c == "concussion")
+            if count >= 3 and random.random() < 0.05 * count:
+                _apply_trauma_mental_trait(char, world, tick, "repeated_concussions")
+
+        if cond_key == "borrelia":
+            days = state.get("days_elapsed", 0)
+            meds = char.get("health_state", {}).get("medications_taken", {})
+            if days >= tmpl.get("becomes_chronic_after_days", 60) and "antibiotic_broad" not in meds:
+                if "nerve_damage" not in char.get("physical_health", []):
+                    char["physical_health"].append("nerve_damage")
+                char["physical_health"].remove("borrelia")
+                _remember(char, "Borrelia became chronic, causing nerve damage.", 0.9,
+                          ["health", "borrelia"], "health", tick)
+
+        for symptom_key in tmpl.get("active_symptoms", []):
+            _apply_symptom_penalties(char, world, symptom_key, defs)
+
+        sp = tmpl.get("stamina_penalty", 0)
+        if sp:
+            char["stamina"] = max(0.0, char.get("stamina", 1.0) - sp * 0.01)
+
+    _check_recoveries(char, world, ph_templates, tick)
+
+
+def _check_heart_disease_high(char, world, tick):
+    tmpl = (world.get("definitions", {})
+            .get("physical_health_templates", {})
+            .get("heart_disease_high", {}))
+    emergencies = char.setdefault("health_state", {}).setdefault("active_emergencies", {})
+
+    mod = immune_modifier(char)
+    if "heart_attack" not in emergencies:
+        if random.random() < tmpl.get("heart_attack_risk_per_day", 0.08) * mod:
+            trigger_heart_attack(char, world, tick)
+
+    if "unconscious" not in emergencies:
+        if random.random() < tmpl.get("collapse_risk_per_day", 0.05) * mod:
+            emergencies["unconscious"] = {"severity": 7, "onset_tick": tick,
+                                           "cause": "heart_disease_high_collapse"}
+            _remember(char, "Collapsed from severe heart disease.", 0.95,
+                      ["health", "heart_disease"], "health", tick)
+
+
+def _apply_symptom_penalties(char, world, symptom_key, defs):
+    tmpl = defs.get("symptom_templates", {}).get(symptom_key, {})
+    for need, amount in tmpl.get("need_penalties", {}).items():
+        if need in char:
+            char[need] = max(0.0, min(1.0, char.get(need, 1.0) + amount * 0.05))
+
+
+def _check_recoveries(char, world, ph_templates, tick):
+    for cond_key in list(char.get("physical_health", [])):
+        tmpl = ph_templates.get(cond_key, {})
+        if not (tmpl.get("curable") and not tmpl.get("progressive")):
+            continue
+        state = char.setdefault("condition_state", {}).get(cond_key, {})
+        days = state.get("days_elapsed", 0)
+        duration = tmpl.get("typical_duration_days", 7)
+        meds = char.get("health_state", {}).get("medications_taken", {})
+        treated = any(m in meds for m in tmpl.get("medicine", []))
+        if days >= duration * (0.6 if treated else 1.0):
+            char["physical_health"].remove(cond_key)
+            _remember(char, f"Recovered from {tmpl.get('name', cond_key)}.", 0.7,
+                      ["health", "recovery"], "health", tick)
+
+
+# ---------------------------------------------------------------------------
+# Heart attack
+# ---------------------------------------------------------------------------
+
+def trigger_heart_attack(char, world, tick):
+    em = char.setdefault("health_state", {}).setdefault("active_emergencies", {})
+    em["heart_attack"] = {
+        "severity": 9, "onset_tick": tick,
+        "heart_stopped": False, "minutes_elapsed": 0
+    }
+    _remember(char, "Is having a heart attack!", 1.0, ["health", "emergency"], "health", tick)
+
+
+def tick_heart_attack(char, world):
+    tick = world.get("tick", 0)
+    state = char.get("health_state", {}).get("active_emergencies", {}).get("heart_attack")
+    if not state:
+        return
+    state["minutes_elapsed"] = (tick - state["onset_tick"]) * (60 / TICKS_PER_HOUR)
+    if state["minutes_elapsed"] >= MIN_HEART_ATTACK_SURVIVAL_MINUTES and not state["heart_stopped"]:
+        state["heart_stopped"] = True
+        char["health_state"]["active_emergencies"]["cardiac_arrest"] = {
+            "severity": 10, "onset_tick": tick, "minutes_elapsed": 0
+        }
+    if state["heart_stopped"]:
+        _tick_cardiac_arrest(char, world)
+
+
+def _tick_cardiac_arrest(char, world):
+    tick = world.get("tick", 0)
+    state = char.get("health_state", {}).get("active_emergencies", {}).get("cardiac_arrest")
+    if not state:
+        return
+    state["minutes_elapsed"] = (tick - state["onset_tick"]) * (60 / TICKS_PER_HOUR)
+    if state["minutes_elapsed"] >= 4:
+        _trigger_death(char, world, "cardiac_arrest")
+
+
+def resolve_heart_attack(char, world):
+    tick = world.get("tick", 0)
+    em = char.get("health_state", {}).get("active_emergencies", {})
+    ha = em.get("heart_attack", {})
+    ca = em.get("cardiac_arrest", {})
+
+    coma_risk = 0.0
+    if ca:
+        coma_risk = min(0.95, ca.get("minutes_elapsed", 0) * CARDIAC_ARREST_BRAIN_DAMAGE_PER_MIN)
+        em.pop("cardiac_arrest", None)
+    ha_min = ha.get("minutes_elapsed", 0)
+    if ha_min > 8:
+        coma_risk = max(coma_risk, (ha_min - 8) * 0.03)
+    em.pop("heart_attack", None)
+
+    if random.random() < coma_risk:
+        trigger_coma(char, world, "heart_attack_revival", tick)
+    else:
+        _remember(char, "Survived a heart attack and is recovering.", 0.95,
+                  ["health", "heart_attack"], "health", tick)
+
+
+# ---------------------------------------------------------------------------
+# Stroke
+# ---------------------------------------------------------------------------
+
+def trigger_stroke(char, world, tick):
+    em = char.setdefault("health_state", {}).setdefault("active_emergencies", {})
+    em["stroke"] = {"severity": 8, "onset_tick": tick, "checks_failed": 0}
+    _remember(char, "Is having a stroke!", 1.0, ["health", "emergency"], "health", tick)
+
+
+def tick_stroke(char, world):
+    tick = world.get("tick", 0)
+    state = char.get("health_state", {}).get("active_emergencies", {}).get("stroke")
+    if not state:
+        return
+    if random.random() < STROKE_DISSOLVE_CHANCE_PER_CHECK:
+        char["health_state"]["active_emergencies"].pop("stroke", None)
+        _remember(char, "Stroke has dissolved. Monitoring for after-effects.", 0.85,
+                  ["health", "stroke"], "health", tick)
+    else:
+        state["checks_failed"] += 1
+        existing = char.get("mental_health", [])
+        candidates = [t for t in TRAUMA_MENTAL_TRAITS if t not in existing]
+        if candidates:
+            trait = random.choice(candidates)
+            char.setdefault("mental_health", []).append(trait)
+            _remember(char, f"Stroke caused {trait.replace('_', ' ')}.", 0.9,
+                      ["health", "stroke", "mental_health"], "health", tick)
+
+
+# ---------------------------------------------------------------------------
+# Coma
+# ---------------------------------------------------------------------------
+
+def trigger_coma(char, world, cause, tick):
+    em = char.setdefault("health_state", {}).setdefault("active_emergencies", {})
+    em["coma"] = {"severity": 10, "onset_tick": tick, "weeks_in_coma": 0, "cause": cause}
+    char["location"] = "hospital"
+    _remember(char, f"Has fallen into a coma ({cause.replace('_', ' ')}).", 1.0,
+              ["health", "coma"], "health", tick)
+
+
+def tick_coma(char, world):
+    tick = world.get("tick", 0)
+    state = char.get("health_state", {}).get("active_emergencies", {}).get("coma")
+    if not state:
+        return
+    state["weeks_in_coma"] += 1
+    weeks = state["weeks_in_coma"]
+    if random.random() < COMA_DEATH_RISK_PER_WEEK:
+        _trigger_death(char, world, f"coma_week_{weeks}")
+        return
+    recovery_chance = max(0.05, COMA_RECOVERY_CHANCE_BASE - weeks * 0.02)
+    if random.random() < recovery_chance:
+        char["health_state"]["active_emergencies"].pop("coma", None)
+        if weeks > 2 and random.random() < 0.40:
+            existing = char.get("mental_health", [])
+            candidates = [t for t in TRAUMA_MENTAL_TRAITS if t not in existing]
+            if candidates:
+                trait = random.choice(candidates)
+                char.setdefault("mental_health", []).append(trait)
+                _remember(char, f"Emerged from coma but developed {trait.replace('_', ' ')}.", 0.95,
+                          ["health", "coma", "mental_health"], "health", tick)
+        else:
+            _remember(char, "Emerged from coma and is recovering.", 0.95,
+                      ["health", "coma"], "health", tick)
+
+
+# ---------------------------------------------------------------------------
+# Seizure
+# ---------------------------------------------------------------------------
+
+def trigger_seizure(char, world, tick):
+    em = char.setdefault("health_state", {}).setdefault("active_emergencies", {})
+    em["convulsions"] = {"severity": 6, "onset_tick": tick}
+    if random.random() < 0.20:
+        _apply_head_impact(char, world, 0.45, tick)
+    _remember(char, "Had a seizure.", 0.85, ["health", "epilepsy"], "health", tick)
+
+
+# ---------------------------------------------------------------------------
+# Physical injury: blunt trauma
+# ---------------------------------------------------------------------------
+
+def apply_blunt_trauma(char, world, body_part, force_normalized, tick):
+    injuries = char.setdefault("health_state", {}).setdefault("injuries", [])
+    effects = {}
+
+    if force_normalized >= BLUNT_BONE_BREAK_THRESHOLD:
+        effects["broken_bone"] = True
+        effects["bone_location"] = body_part
+        _remember(char, f"Broke {body_part.replace('_', ' ')}.", 0.9,
+                  ["health", "injury"], "health", tick)
+
+    if force_normalized >= BLUNT_LUNG_DAMAGE_THRESHOLD and body_part in ("torso", "chest", "back"):
+        effects["lung_damage"] = True
+        char.setdefault("health_state", {}).setdefault("active_emergencies", {})["agonizing_pain"] = {
+            "severity": 8, "source": "lung_damage"
+        }
+
+    if force_normalized >= BLUNT_UNCONSCIOUS_THRESHOLD:
+        effects["unconscious"] = True
+        char["health_state"]["active_emergencies"]["unconscious"] = {
+            "severity": 7, "onset_tick": tick, "cause": "blunt_trauma"
+        }
+
+    if body_part in ("head", "skull", "face"):
+        effects["head_impact"] = True
+        if force_normalized >= BLUNT_HEAD_MENTAL_TRAIT_THRESHOLD:
+            risk = min(0.90, (force_normalized - BLUNT_HEAD_MENTAL_TRAIT_THRESHOLD) * 2.5)
+            effects["mental_trait_risk"] = risk
+            if random.random() < risk:
+                _apply_trauma_mental_trait(char, world, tick, "head_trauma")
+
+    injury = {"type": "blunt", "body_part": body_part,
+              "force": force_normalized, "tick": tick, "effects": effects}
+    injuries.append(injury)
+    return injury
+
+
+# ---------------------------------------------------------------------------
+# Physical injury: blade
+# ---------------------------------------------------------------------------
+
+def apply_blade_injury(char, world, body_part, sharpness, size, irregular_shape, tick):
+    bleeding_base = sharpness * 0.5 + size * 0.5
+    complexity_mult = 1.5 if irregular_shape else 1.0
+    bleeding_severity = min(1.0, bleeding_base * complexity_mult)
+    hard_to_close = irregular_shape and sharpness < 0.5
+
+    injuries = char.setdefault("health_state", {}).setdefault("injuries", [])
+    injury = {
+        "type": "blade", "body_part": body_part, "tick": tick,
+        "blade_sharpness": sharpness, "blade_size": size,
+        "irregular_shape": irregular_shape,
+        "bleeding_severity": round(bleeding_severity, 3),
+        "hard_to_close": hard_to_close
+    }
+    injuries.append(injury)
+
+    if bleeding_severity > 0.1:
+        em = char.setdefault("health_state", {}).setdefault("active_emergencies", {})
+        existing = em.get("bleeding", {})
+        total_rate = existing.get("blood_loss_rate", 0.0) + bleeding_severity * 0.05
+        em["bleeding"] = {
+            "severity": int(bleeding_severity * 10),
+            "location": body_part,
+            "blood_loss_rate": round(min(1.0, total_rate), 4),
+            "hard_to_close": hard_to_close
+        }
+
+    _remember(char, f"Sustained blade injury to {body_part.replace('_', ' ')}.", 0.85,
+              ["health", "injury", "blade"], "health", tick)
+    return injury
+
+
+def tick_bleeding(char, world):
+    tick = world.get("tick", 0)
+    state = char.get("health_state", {}).get("active_emergencies", {}).get("bleeding")
+    if not state:
+        return
+    total = char.get("health_state", {}).setdefault("total_blood_lost", 0.0)
+    total += state.get("blood_loss_rate", 0.0)
+    char["health_state"]["total_blood_lost"] = total
+    if total >= 1.0:
+        _trigger_death(char, world, "haemorrhagic_shock")
+    elif total > 0.5:
+        em = char["health_state"]["active_emergencies"]
+        if "unconscious" not in em:
+            em["unconscious"] = {"severity": 8, "onset_tick": tick, "cause": "blood_loss"}
+
+
+def treat_bleeding(char, world, success_rate=0.85):
+    if random.random() < success_rate:
+        char.get("health_state", {}).get("active_emergencies", {}).pop("bleeding", None)
+        _remember(char, "Bleeding controlled.", 0.80,
+                  ["health", "injury"], "health", world.get("tick", 0))
+        return True
+    return False
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def _apply_trauma_mental_trait(char, world, tick, cause="head_trauma"):
+    existing = char.get("mental_health", [])
+    candidates = [t for t in TRAUMA_MENTAL_TRAITS if t not in existing]
+    if not candidates:
+        return None
+    trait = random.choice(candidates)
+    char.setdefault("mental_health", []).append(trait)
+    _remember(char, f"{cause.replace('_', ' ').title()} caused {trait.replace('_', ' ')}.", 0.9,
+              ["health", "mental_health", cause], "health", tick)
+    return trait
+
+
+def _apply_head_impact(char, world, force, tick):
+    if force >= BLUNT_HEAD_MENTAL_TRAIT_THRESHOLD:
+        risk = min(0.90, (force - BLUNT_HEAD_MENTAL_TRAIT_THRESHOLD) * 2.5)
+        if random.random() < risk:
+            _apply_trauma_mental_trait(char, world, tick, "head_impact")
+
+
+def _trigger_death(char, world, cause):
+    char["alive"] = False
+    char["death_cause"] = cause
+    char["death_tick"] = world.get("tick", 0)
+    _remember(char, f"Died: {cause.replace('_', ' ')}.", 1.0,
+              ["death", cause], "health", world.get("tick", 0))
+
+
+# ---------------------------------------------------------------------------
+# Character initialisation
+# ---------------------------------------------------------------------------
+
+def init_health_state(char):
+    char.setdefault("immune_score", 100.0)
+    char.setdefault("physical_health", [])
+    char.setdefault("mental_health", [])
+    char.setdefault("abnormal_traits", [])
+    char.setdefault("phobias", [])
+    char.setdefault("fetishes", [])
+    char.setdefault("allergies", [])
+    char.setdefault("condition_state", {})
+    char.setdefault("health_state", {
+        "active_emergencies": {},
+        "injuries": [],
+        "active_symptoms": {},
+        "medications_taken": {},
+        "total_blood_lost": 0.0
+    })
+    char.setdefault("alive", True)
+    char.setdefault("stamina", 1.0)
+
+
+def assign_random_traits(char, defs,
+                         abnormal_count=(0, 2), phobia_count=(0, 1),
+                         fetish_count=(0, 2), allergy_count=(0, 1)):
+    """
+    Assign random keyword-tag traits from registries at character creation.
+
+    Probability rules:
+      problems       — 75% → 0, 25% → 1 or 2 (weighted toward 1)
+      natural_talents — 75% → 0, 25% → exactly 1
+      abnormal_traits — 0-2 per count_range arg
+      phobias, fetishes, allergies — per count_range args
+    """
+    def pick(registry_key, count_range):
+        registry = defs.get(registry_key, [])
+        n = random.randint(*count_range)
+        return random.sample(registry, min(n, len(registry))) if registry else []
+
+    # problems: 75% none, 20% one, 5% two
+    prob_roll = random.random()
+    if prob_roll < 0.75:
+        n_problems = 0
+    elif prob_roll < 0.95:
+        n_problems = 1
+    else:
+        n_problems = 2
+    reg_problems = defs.get("problems_registry", [])
+    char["problems"] = (random.sample(reg_problems, min(n_problems, len(reg_problems)))
+                        if reg_problems else [])
+
+    # natural_talents: 75% none, 25% exactly one
+    reg_talents = defs.get("natural_talents_registry", [])
+    if random.random() < 0.25 and reg_talents:
+        char["natural_talents"] = [random.choice(reg_talents)]
+    else:
+        char["natural_talents"] = []
+
+    char["abnormal_traits"] = pick("abnormal_traits_registry", abnormal_count)
+    char["phobias"]         = pick("phobias_registry",         phobia_count)
+    char["fetishes"]        = pick("fetishes_registry",        fetish_count)
+    char["allergies"]       = pick("allergies_registry",       allergy_count)
+
+
+# ---------------------------------------------------------------------------
+# Main tick entry point
+# ---------------------------------------------------------------------------
+
+def process_health(char, world):
+    if not char.get("alive", True):
+                return
+    tick = world.get("tick", 0)
+
+    if tick % TICKS_PER_DAY == 0:
+        tick_immune_score(char, world)
+        tick_physical_conditions(char, world)
+
+    if tick % TICKS_PER_WEEK == 0:
+        tick_coma(char, world)
+
+    em = char.get("health_state", {}).get("active_emergencies", {})
+
+    if "heart_attack" in em:
+        tick_heart_attack(char, world)
+
+    if "stroke" in em and tick % TICKS_PER_HOUR == 0:
+        tick_stroke(char, world)
+
+    if "bleeding" in em:
+        tick_bleeding(char, world)
+
+
+# ---------------------------------------------------------------------------
+# Legacy shim
+# ---------------------------------------------------------------------------
+
 def trigger_health_event(c, world):
-    if c.get("health",{}).get("conditions"): return
-    if random.random()<.0008*(1.5-world["environment"].get("health_quality",.7)):
-        disease="flu" if random.random()<.85 else "chronic_pain"; d=DISEASES[disease]
-        c["health"]["conditions"].append({"id":disease,"symptoms":d["symptoms"],"curable":d["curable"],"treated":False,"start_tick":world["tick"],"recovery_tick":world["tick"]+d["base_duration"]})
-        store_memory(c,f"Started feeling symptoms of {disease}.",.75,["health",disease],"health",world["tick"])
-def process_health(c, world):
-    for cond in list(c.get("health",{}).get("conditions",[])):
-        c["fatigue"]=min(100,c.get("fatigue",0)+.02*len(cond.get("symptoms",[])))
-        if not cond.get("treated") and random.random()<.005:
-            cost=apply_health_cost(c,world,DISEASES.get(cond["id"],{}).get("treatment_cost",100)*world["environment"].get("health_cost_index",1))
-            cond["treated"]=True; c["health"]["treatment"]="doctor_visit_and_medication"
-            store_memory(c,f"Went to the doctor for {cond['id']} and paid ${cost:.0f}.",.8,["health","money"],"health",world["tick"])
-        if cond.get("curable") and world["tick"]>=cond.get("recovery_tick",999999):
-            c["health"]["conditions"].remove(cond); c["health"]["treatment"]=None
-            store_memory(c,f"Recovered from {cond['id']}.",.7,["health","recovery"],"health",world["tick"])
+    process_health(c, world)
+
+
+def apply_health_cost(c, world, cost):
+    ins = c.get("insurance", {})
+    if ins.get("health"):
+        cost *= (1 - ins.get("coverage", 0.5))
+    h = world.get("households", {}).get(c.get("household_id"))
+    if h:
+        h["wealth"] -= cost
+    return cost
