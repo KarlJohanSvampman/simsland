@@ -572,6 +572,7 @@ def build_context(
         "envy_conflicts":    _build_envy_context(c, world),
         "impulse":           _build_impulse_context(c, world),
         "domestic_situation": _build_domestic_context(c, world),
+        "emotional_control_situation": _build_emotional_control_context(c, world),
         "trauma":            _build_trauma_context(c, world),
         "sexual_history":    _build_pleasure_context(c, world),
     }
@@ -1323,5 +1324,13 @@ def _build_domestic_context(c, world):
     try:
         from systems.domestic_control import get_domestic_control_context
         return get_domestic_control_context(c, world).get("domestic_situation", [])
+    except Exception:
+        return []
+
+
+def _build_emotional_control_context(c, world):
+    try:
+        from systems.domestic_control import get_emotional_control_victim_context
+        return get_emotional_control_victim_context(c, world)
     except Exception:
         return []

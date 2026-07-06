@@ -20997,6 +20997,33 @@
         "career_drive": 0.4,
         "gatekeeper_vulnerability": 0.25
       }
+    },
+    "emotionally_controlling": {
+      "label": "Emotionally Controlling",
+      "description": "Uses psychological tactics \u2014 emasculation, ridicule, abandonment threats, affair humiliation \u2014 to dominate and diminish a partner.",
+      "category": "personality",
+      "effects": {
+        "emotional_control_tendency": 0.75,
+        "dominant_intimate": true
+      }
+    },
+    "financial_dominator": {
+      "label": "Financial Dominator",
+      "description": "Ensures they always out-earn the partner; uses financial superiority as leverage.",
+      "category": "personality",
+      "effects": {
+        "career_drive": 0.3,
+        "financial_control_tendency": 0.65
+      }
+    },
+    "emasculator": {
+      "label": "Emasculator",
+      "description": "Systematically attacks a male partner's sense of masculinity, competence, and attractiveness.",
+      "category": "personality",
+      "effects": {
+        "emasculation_severity": 0.8,
+        "emotional_control_tendency": 0.55
+      }
     }
   },
   "recipe_templates": {

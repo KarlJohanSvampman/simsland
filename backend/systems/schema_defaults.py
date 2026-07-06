@@ -422,6 +422,15 @@ def ensure_character_defaults(c):
     # Self-confidence — degraded by negging/manipulation; affects assertiveness
     c.setdefault("self_confidence", 0.60)   # 0-1; 0.60 default healthy baseline
 
+    # Masculinity confidence — separate axis targeted by emasculation tactics
+    c.setdefault("masculinity_confidence", 0.65)  # males only; attacks via ridicule/emasculation
+
+    # Sexual dependency — character has been conditioned to need dominant partner style
+    c.setdefault("sexual_dependency", {
+        "dominant_partner_id": None,   # id of the partner they're conditioned to
+        "dependency_score":    0.0,    # 0-1; high = can't climax without that dynamic
+    })
+
     # Impulse control — anger pressure vs self-control
     c.setdefault("impulse_state", {
         "anger_pressure":   0.0,   # 0-1; accumulates from grievances/frustration

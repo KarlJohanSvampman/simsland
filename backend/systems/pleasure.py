@@ -150,6 +150,15 @@ def compute_climax(c, other, pleasure_score, world, session_climax_count=0):
             base_prob = BASE_CLIMAX_MALE
         else:
             base_prob = BASE_CLIMAX_MALE * (MALE_REFRACTORY_PENALTY ** session_climax_count)
+
+        # Sexual dependency: conditioned to dominant partner style
+        dep = c.get("sexual_dependency", {})
+        dep_score = dep.get("dependency_score", 0.0)
+        if dep_score > 0.20:
+            if dep.get("dominant_partner_id") == other.get("id"):
+                base_prob = min(0.98, base_prob * (1.0 + dep_score * 0.30))   # easier with them
+            else:
+                base_prob = base_prob * (1.0 - dep_score * 0.40)              # harder without them
     else:
         # Female: starts lower, improves with experience with THIS partner
         skill_bonus = min(FEMALE_CLIMAX_CAP - BASE_CLIMAX_FEMALE,

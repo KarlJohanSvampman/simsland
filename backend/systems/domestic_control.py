@@ -870,3 +870,382 @@ def _apply_qp_pressure(gatekeeper, target, world):
         })
     except Exception:
         pass
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# EMOTIONAL / PSYCHOLOGICAL CONTROL (female-pattern abuse)
+#
+# Distinct from physical domestic abuse: the mechanism is psychological
+# erosion — attacks on masculinity, appearance, competence; financial
+# superiority used as leverage; children weaponised; affairs staged as
+# deliberate humiliation; sexual dominance conditioning.
+#
+# The victim stays because:
+#   - self_confidence / masculinity_confidence have been ground down
+#   - believes "no one else would want me"
+#   - fears losing custody of children
+#   - financially dependent (lower earner)
+#   - has developed sexual dependency on the dominant dynamic
+# ═══════════════════════════════════════════════════════════════════════════
+
+EMASCULATION_HIT          = 0.05   # masculinity_confidence drop per event
+MASC_CONFIDENCE_MIN       = 0.05
+ABANDONMENT_FEAR_GAIN     = 10     # relationship["fear"] per threat
+AFFAIR_HUMILIATION_TRAUMA = 0.09   # trauma severity per witnessed affair
+FINANCIAL_GAP_TARGET      = 0.30   # controller aims to earn 30%+ more than victim
+SEXUAL_DEPENDENCY_GAIN    = 0.04   # per intimate encounter where controller dominates
+
+
+def tick_emotional_control(world):
+    """
+    Medium cadence.  For characters with emotionally_controlling / emasculator
+    traits, apply psychological control tactics to their intimate partner.
+    """
+    chars = world.get("characters", {})
+    if isinstance(chars, list):
+        chars = {c["id"]: c for c in chars}
+
+    for cid, c in chars.items():
+        if c.get("is_offscreen"):
+            continue
+        traits = set(c.get("traits", []) + c.get("personality_traits", []))
+        if not ({"emotionally_controlling", "emasculator", "financial_dominator"} & traits):
+            continue
+
+        control_score = max(
+            0.75 if "emotionally_controlling" in traits else 0.0,
+            0.80 if "emasculator"             in traits else 0.0,
+        )
+
+        partners = _find_intimate_partners(c, chars)
+        for pid in partners:
+            partner = chars.get(pid)
+            if not partner or partner.get("sex") not in ("male", "intersex"):
+                continue   # this pattern primarily targets male partners
+            _apply_emotional_control_tactics(c, partner, control_score, world)
+
+        # Financial dominance — boost controller's career drive
+        if "financial_dominator" in traits or "emotionally_controlling" in traits:
+            _maintain_financial_dominance(c, chars, world)
+
+
+def _apply_emotional_control_tactics(controller, partner, control_score, world):
+    """Route to individual tactics each tick."""
+    cid = controller["id"]
+    pid = partner["id"]
+
+    rel_c_to_p = controller.setdefault("relationships", {}).setdefault(pid, {})
+    rel_p_to_c = partner.setdefault("relationships", {}).setdefault(cid, {})
+
+    c_traits = set(controller.get("traits", []) + controller.get("personality_traits", []))
+
+    # ── Emasculation / ridicule ───────────────────────────────────────────
+    if random.random() < 0.06 * control_score:
+        _apply_emasculation(controller, partner, rel_p_to_c, world)
+
+    # ── Wardrobe control ─────────────────────────────────────────────────
+    if random.random() < 0.03 * control_score:
+        _apply_wardrobe_control(controller, partner, world)
+
+    # ── Abandonment threat ───────────────────────────────────────────────
+    if random.random() < 0.04 * control_score:
+        _apply_abandonment_threat(controller, partner, rel_p_to_c, world)
+
+    # ── Custody threat (if children in household) ─────────────────────────
+    if random.random() < 0.03 * control_score:
+        _apply_custody_threat(controller, partner, rel_p_to_c, world)
+
+    # ── Affair humiliation (low probability, high impact) ────────────────
+    if random.random() < 0.008 * control_score:
+        _apply_affair_humiliation(controller, partner, world)
+
+    # ── Sexual dominance conditioning ────────────────────────────────────
+    intimacy_stage = rel_c_to_p.get("intimacy_stage", 0)
+    if intimacy_stage >= 5:
+        _reinforce_sexual_dependency(controller, partner, world)
+
+    # ── Dependency increase (partner becomes more attached despite misery) ─
+    dep = rel_p_to_c.get("dependency", 0)
+    rel_p_to_c["dependency"] = min(100, dep + 3 * control_score)
+
+
+def _apply_emasculation(controller, partner, rel_p_to_c, world):
+    """
+    Ridicule, put-downs about competence / looks / masculinity.
+    Targets masculinity_confidence specifically.
+    """
+    p_traits = set(partner.get("traits", []) + partner.get("personality_traits", []))
+
+    vuln = 1.0
+    if "low_self_esteem" in p_traits:
+        vuln = 1.45
+    if "insecure" in p_traits:
+        vuln = max(vuln, 1.30)
+    if "confident" in p_traits or "assertive" in p_traits:
+        vuln = 0.55
+
+    # Hit masculinity_confidence
+    hit = EMASCULATION_HIT * vuln
+    partner["masculinity_confidence"] = round(
+        max(MASC_CONFIDENCE_MIN, partner.get("masculinity_confidence", 0.65) - hit), 4
+    )
+    # Also erodes general self_confidence (slower)
+    partner["self_confidence"] = round(
+        max(SELF_CONFIDENCE_MIN, partner.get("self_confidence", 0.60) - hit * 0.4), 4
+    )
+
+    rel_p_to_c["fear"]       = min(100, rel_p_to_c.get("fear", 0) + 2)
+    rel_p_to_c["resentment"] = min(100, rel_p_to_c.get("resentment", 0) + 4)
+
+    # Trauma (slow, repeated)
+    try:
+        from systems.trauma import add_trauma_event
+        add_trauma_event(partner, "public_humiliation", controller["id"], world,
+                         severity_override=0.04,
+                         details={"tactic": "emasculation"})
+    except Exception:
+        pass
+
+    try:
+        from core.event_bus import emit
+        emit("domestic_control_tactic", {
+            "abuser_id": controller["id"],
+            "victim_id": partner["id"],
+            "tactic":    "emasculation",
+            "tick":      world.get("tick", 0),
+        })
+    except Exception:
+        pass
+
+
+def _apply_wardrobe_control(controller, partner, world):
+    """
+    Controller decides what partner wears — undermines his autonomy and
+    self-expression.  Flagged as a control event; erodes autonomy sense.
+    """
+    # Small self-confidence hit (autonomy erosion)
+    partner["self_confidence"] = round(
+        max(SELF_CONFIDENCE_MIN, partner.get("self_confidence", 0.60) - 0.02), 4
+    )
+    partner["masculinity_confidence"] = round(
+        max(MASC_CONFIDENCE_MIN, partner.get("masculinity_confidence", 0.65) - 0.015), 4
+    )
+    # Flag: controller has clothing override intent (picked up by clothing system)
+    partner["_wardrobe_controlled_by"] = controller["id"]
+
+    try:
+        from core.event_bus import emit
+        emit("domestic_control_tactic", {
+            "abuser_id": controller["id"],
+            "victim_id": partner["id"],
+            "tactic":    "wardrobe_control",
+            "tick":      world.get("tick", 0),
+        })
+    except Exception:
+        pass
+
+
+def _apply_abandonment_threat(controller, partner, rel_p_to_c, world):
+    """
+    'You're pathetic — no woman would ever want you.'
+    Raises fear of being alone, reinforces dependency.
+    """
+    p_traits = set(partner.get("traits", []) + partner.get("personality_traits", []))
+
+    fear_hit = ABANDONMENT_FEAR_GAIN
+    if "insecure" in p_traits or "low_self_esteem" in p_traits:
+        fear_hit = int(fear_hit * 1.5)
+
+    rel_p_to_c["fear"] = min(100, rel_p_to_c.get("fear", 0) + fear_hit)
+    rel_p_to_c["dependency"] = min(100, rel_p_to_c.get("dependency", 0) + 5)
+
+    # Suppress partner's intention to leave
+    partner["_fears_abandonment"] = True
+
+    try:
+        from systems.trauma import add_trauma_event
+        add_trauma_event(partner, "betrayal_intimate", controller["id"], world,
+                         severity_override=0.05,
+                         details={"tactic": "abandonment_threat"})
+    except Exception:
+        pass
+
+
+def _apply_custody_threat(controller, partner, rel_p_to_c, world):
+    """
+    Uses children as leverage — 'I'll take them and you'll never see them again.'
+    Only fires if they share children (family system).
+    """
+    # Check shared children via family system
+    c_family  = controller.get("family_id")
+    p_family  = partner.get("family_id")
+    if not c_family or c_family != p_family:
+        return
+
+    # Confirm there are children in the household
+    world_chars = world.get("characters", {})
+    if isinstance(world_chars, list):
+        world_chars = {c["id"]: c for c in world_chars}
+
+    has_children = any(
+        ch.get("family_id") == c_family and ch.get("age", 30) < 18
+        for ch in world_chars.values()
+    )
+    if not has_children:
+        return
+
+    # Significant fear/dependency spike
+    rel_p_to_c["fear"]       = min(100, rel_p_to_c.get("fear", 0) + 15)
+    rel_p_to_c["dependency"] = min(100, rel_p_to_c.get("dependency", 0) + 8)
+    partner["_custody_threatened"] = True
+
+    try:
+        from systems.trauma import add_trauma_event
+        add_trauma_event(partner, "betrayal_intimate", controller["id"], world,
+                         severity_override=0.08,
+                         details={"tactic": "custody_threat"})
+    except Exception:
+        pass
+
+    try:
+        from core.event_bus import emit
+        emit("domestic_control_tactic", {
+            "abuser_id": controller["id"],
+            "victim_id": partner["id"],
+            "tactic":    "custody_threat",
+            "tick":      world.get("tick", 0),
+        })
+    except Exception:
+        pass
+
+
+def _apply_affair_humiliation(controller, partner, world):
+    """
+    Controller has (or flaunts) an affair — deliberate humiliation.
+    Partner is made aware; this is the cruelest tactic, causing severe trauma
+    while simultaneously deepening dependency (partner feels worthless,
+    believes controller is all they deserve).
+    """
+    cid = controller["id"]
+    pid = partner["id"]
+
+    # Trauma hit — significant
+    try:
+        from systems.trauma import add_trauma_event
+        add_trauma_event(partner, "betrayal_intimate", cid, world,
+                         severity_override=AFFAIR_HUMILIATION_TRAUMA,
+                         details={"tactic": "affair_humiliation", "made_aware": True})
+    except Exception:
+        pass
+
+    # Masculinity and self-confidence hit
+    partner["masculinity_confidence"] = round(
+        max(MASC_CONFIDENCE_MIN, partner.get("masculinity_confidence", 0.65) - 0.12), 4
+    )
+    partner["self_confidence"] = round(
+        max(SELF_CONFIDENCE_MIN, partner.get("self_confidence", 0.60) - 0.08), 4
+    )
+
+    # Grievance — but suppressed by fear/dependency
+    rel_p_to_c = partner.setdefault("relationships", {}).setdefault(cid, {})
+    rel_p_to_c["resentment"] = min(100, rel_p_to_c.get("resentment", 0) + 25)
+    rel_p_to_c["fear"]       = min(100, rel_p_to_c.get("fear", 0) + 10)
+    # Paradoxically, dependency increases (trauma bonding)
+    rel_p_to_c["dependency"] = min(100, rel_p_to_c.get("dependency", 0) + 10)
+
+    # Anger pressure on partner — may boil over eventually
+    try:
+        from systems.impulse import add_anger_pressure
+        add_anger_pressure(partner, 0.25, "affair_humiliation", world)
+    except Exception:
+        pass
+
+    try:
+        from core.event_bus import emit
+        emit("domestic_control_tactic", {
+            "abuser_id": cid,
+            "victim_id": pid,
+            "tactic":    "affair_humiliation",
+            "tick":      world.get("tick", 0),
+        })
+    except Exception:
+        pass
+
+
+def _reinforce_sexual_dependency(controller, partner, world):
+    """
+    Controller always takes dominant role — over time partner becomes
+    conditioned to this dynamic.  High dependency score means he struggles
+    to achieve climax without the dominant partner, but the relationship
+    is otherwise miserable.
+    """
+    cid = controller["id"]
+    dep = partner.setdefault("sexual_dependency", {
+        "dominant_partner_id": None, "dependency_score": 0.0
+    })
+    dep["dominant_partner_id"] = cid
+    dep["dependency_score"] = round(
+        min(1.0, dep.get("dependency_score", 0.0) + SEXUAL_DEPENDENCY_GAIN), 4
+    )
+
+
+def _maintain_financial_dominance(controller, chars, world):
+    """
+    Ensure controller always earns more than the partner.
+    Boost controller career ambition; subtly sabotage partner's job prospects
+    (missed promotion events, reluctance to support their career moves).
+    """
+    partners = _find_intimate_partners(controller, chars)
+    for pid in partners:
+        partner = chars.get(pid)
+        if not partner:
+            continue
+        c_wealth = controller.get("wealth", 0) or 0
+        p_wealth = partner.get("wealth",     0) or 0
+        if c_wealth <= p_wealth * (1 + FINANCIAL_GAP_TARGET):
+            # Controller is not earning enough more — ramp up career drive
+            controller.setdefault("_career_ambition_boost", 0)
+            controller["_career_ambition_boost"] = min(
+                1.0, controller.get("_career_ambition_boost", 0) + 0.05
+            )
+        # Flag partner's promotions as "blocked" if controller is sabotaging
+        if random.random() < 0.05:
+            partner["_promotion_suppressed"] = True
+
+
+# ── Context for victim (male partner in emotional control relationship) ────
+
+def get_emotional_control_victim_context(c, world):
+    """LLM context: masculinity damage, sexual dependency, custody fear."""
+    lines = []
+
+    mc = c.get("masculinity_confidence", 0.65)
+    if mc < 0.25:
+        lines.append(f"masculinity_confidence critically eroded ({mc:.2f}) — feels pathetic, worthless as a man")
+    elif mc < 0.45:
+        lines.append(f"masculinity_confidence low ({mc:.2f}) — self-doubt, shame about appearance/competence")
+
+    dep = c.get("sexual_dependency", {})
+    if dep.get("dependency_score", 0) > 0.50:
+        lines.append(f"sexually conditioned — needs dominant partner dynamic to feel pleasure (dependency={dep['dependency_score']:.2f})")
+
+    if c.get("_fears_abandonment"):
+        lines.append("terrified of being left — believes no one else would want him")
+
+    if c.get("_custody_threatened"):
+        lines.append("paralysed by custody threat — will not leave for fear of losing children")
+
+    if c.get("_wardrobe_controlled_by"):
+        lines.append("partner controls his clothing choices — stripped of autonomy in appearance")
+
+    chars = world.get("characters", {})
+    if isinstance(chars, list):
+        chars = {ch["id"]: ch for ch in chars}
+    for oid, rel in c.get("relationships", {}).items():
+        fear = rel.get("fear", 0)
+        dep_score = rel.get("dependency", 0)
+        if fear >= 35 and dep_score >= 50:
+            name = chars.get(oid, {}).get("name", oid)
+            lines.append(f"trapped with {name}: fear={fear}, dependency={dep_score} — miserable but cannot leave")
+
+    return {"emotional_control_situation": lines} if lines else {}
