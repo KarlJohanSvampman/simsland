@@ -29,6 +29,12 @@ import uuid
 from systems.grievances import add_grievance
 from systems.reputation import apply_reputation_event
 
+# ── Feature flag ─────────────────────────────────────────────────────────
+# Set COERCION_ENABLED = True to activate non-consent escalation mechanics.
+# While False, maybe_ignore_rejection() always returns "backed_off" and
+# the trauma system is never triggered from intimacy events.
+COERCION_ENABLED = False
+
 # ── Boundary respect thresholds ───────────────────────────────────────────
 # Characters with boundary_violator trait may ignore rejection
 COERCION_TRAIT_RISK    = {"boundary_violator", "aggressive", "controlling",
@@ -553,6 +559,9 @@ def maybe_ignore_rejection(proposer, recipient, world):
       "backed_off" — character respected the rejection
       "escalated"  — character ignored rejection → triggers resolve_sexual_assault()
     """
+    if not COERCION_ENABLED:
+        return "backed_off"
+
     pid = proposer["id"]
     rid = recipient["id"]
 
