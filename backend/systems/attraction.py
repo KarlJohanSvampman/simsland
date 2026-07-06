@@ -386,22 +386,79 @@ def compute_attraction(c, other, world):
     return round(max(0.0, min(1.0, base)), 4)
 
 
-def _appearance_score(c, other):
-    """Rough appearance compatibility."""
-    # Attractiveness proxy: fitness level, hygiene, age (bell-curve peak ~25-35)
-    age = other.get("age", 30)
-    # bell-curve: peak attractiveness ~27, gentle falloff
-    age_factor = math.exp(-((age - 27) ** 2) / (2 * 15 ** 2))  # sigma=15 years
+# ── Fertility appeal — common-knowledge signal ───────────────────────────
+# Men (and most characters) read fertility cues the same way: larger breasts,
+# wider hips, fuller thighs signal reproductive health.  This is treated as
+# publicly legible — every character "understands" the signal even if they don't
+# act on it (orientation gating happens later in compute_attraction).
 
-    # Hygiene penalty
+BREAST_SCORES  = {"small": 0.35, "medium": 0.55, "large": 0.80, "very_large": 0.95}
+HIP_SCORES     = {"narrow": 0.30, "average": 0.50, "wide": 0.75, "hourglass": 0.95}
+THIGH_SCORES   = {"slim": 0.40, "toned": 0.65, "thick": 0.80, "full": 0.90}
+
+
+def compute_fertility_appeal(other):
+    """
+    Returns 0-1 fertility-signal score based on other's body_features.
+    Only meaningful for female or intersex characters; returns 0.50 (neutral)
+    for male characters without female features.
+    """
+    sex = other.get("sex", "male")
+    if sex not in ("female", "intersex"):
+        return 0.50   # neutral — no female fertility signals
+
+    bf = other.get("body_features", {})
+    breast = BREAST_SCORES.get(bf.get("breast_size", "medium"),  0.55)
+    hips   = HIP_SCORES.get(   bf.get("hip_ratio",   "average"), 0.50)
+    thighs = THIGH_SCORES.get( bf.get("thigh_build",  "toned"),  0.65)
+
+    # Simple weighted average — all three signals matter equally
+    return round((breast + hips + thighs) / 3.0, 4)
+
+
+def _appearance_score(c, other):
+    """
+    Appearance score that c assigns to other.
+    Incorporates:
+      - base attractiveness (baked in at character gen)
+      - age bell-curve
+      - hygiene penalty
+      - fertility appeal (breast/hip/thigh) — weighted heavily for
+        heterosexual male attractors and lesbian female attractors
+    """
+    age = other.get("age", 30)
+    age_factor = math.exp(-((age - 27) ** 2) / (2 * 15 ** 2))
+
     odor = other.get("body", {}).get("odor_level", 0.0)
     hygiene_penalty = odor * 0.4
 
-    # Base appearance: randomness baked into a character "attractiveness" field if present
     base_attractiveness = other.get("attractiveness", random.gauss(0.5, 0.15))
     base_attractiveness = max(0.0, min(1.0, base_attractiveness))
 
-    score = base_attractiveness * 0.6 + age_factor * 0.4 - hygiene_penalty
+    # Fertility signal weight — high for hetero male / lesbian female attractors
+    c_sex  = c.get("sex", "male")
+    c_ori  = c.get("sexual_orientation", "heterosexual")
+    other_sex = other.get("sex", "female")
+
+    fertility_weight = 0.0
+    if other_sex in ("female", "intersex"):
+        if (c_sex == "male"   and c_ori in ("heterosexual", "bisexual")) or            (c_sex == "female" and c_ori in ("homosexual",  "bisexual")):
+            fertility_weight = 0.30   # fertility signals carry significant weight
+
+    fertility = compute_fertility_appeal(other) if fertility_weight > 0 else 0.0
+
+    # Allocate weights: base + age + fertility must sum to 1 before penalty
+    base_w = 0.55 - fertility_weight * 0.30   # shrinks to give room to fertility
+    age_w  = 0.45 - fertility_weight * 0.70   # age matters less when fertility matters
+    base_w = max(0.20, base_w)
+    age_w  = max(0.15, age_w)
+    total  = base_w + age_w + fertility_weight
+    base_w /= total; age_w /= total; fertility_weight /= total
+
+    score = (base_attractiveness * base_w
+             + age_factor        * age_w
+             + fertility         * fertility_weight
+             - hygiene_penalty)
     return max(0.0, min(1.0, score))
 
 

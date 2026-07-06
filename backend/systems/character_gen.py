@@ -460,6 +460,9 @@ def generate_character(defs, overrides=None):
         max(0.10, min(0.99, random.gauss(0.50, 0.18) * 0.6 + age_factor * 0.4)), 3
     )
 
+    # Physical body features — fertility signals and build
+    character["body_features"] = _gen_body_features(character)
+
     # Attraction profile — libido, quirks, initiation style, etc.
     try:
         from systems.attraction import generate_attraction_profile as _gen_ap
@@ -476,6 +479,52 @@ def generate_character(defs, overrides=None):
 
     return character
 
+
+
+
+def _gen_body_features(c):
+    """
+    Assign randomised body features at character generation.
+    Female chars get breast_size / hip_ratio / thigh_build (fertility signals).
+    All chars get height_cm and build.
+    """
+    sex = c.get("sex", "male")
+    age = c.get("age", 25)
+
+    # Height (cm) — sex-differentiated normal distribution
+    if sex == "female":
+        height_cm = round(random.gauss(164, 7))
+    else:
+        height_cm = round(random.gauss(177, 8))
+    height_cm = max(140, min(210, height_cm))
+
+    # Build — weighted by age (younger chars slightly more likely to be slim/athletic)
+    if age < 30:
+        build_weights = {"slim": 0.25, "average": 0.30, "athletic": 0.30, "stocky": 0.10, "heavy": 0.05}
+    elif age < 50:
+        build_weights = {"slim": 0.15, "average": 0.35, "athletic": 0.20, "stocky": 0.20, "heavy": 0.10}
+    else:
+        build_weights = {"slim": 0.10, "average": 0.30, "athletic": 0.15, "stocky": 0.25, "heavy": 0.20}
+    builds = list(build_weights.keys())
+    build  = random.choices(builds, weights=[build_weights[b] for b in builds])[0]
+
+    features = {"height_cm": height_cm, "build": build}
+
+    if sex in ("female", "intersex"):
+        features["breast_size"] = random.choices(
+            ["small", "medium", "large", "very_large"],
+            weights=[0.20, 0.45, 0.25, 0.10]
+        )[0]
+        features["hip_ratio"] = random.choices(
+            ["narrow", "average", "wide", "hourglass"],
+            weights=[0.15, 0.40, 0.30, 0.15]
+        )[0]
+        features["thigh_build"] = random.choices(
+            ["slim", "toned", "thick", "full"],
+            weights=[0.20, 0.35, 0.30, 0.15]
+        )[0]
+
+    return features
 
 def _gen_sexual_preferences(c, defs):
     """Assign random sexual preferences from definitions registries."""
