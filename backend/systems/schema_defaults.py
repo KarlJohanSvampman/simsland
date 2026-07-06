@@ -431,6 +431,18 @@ def ensure_character_defaults(c):
         "dependency_score":    0.0,    # 0-1; high = can't climax without that dynamic
     })
 
+    # Religious repression — shame/identity conflict from strict upbringing
+    c.setdefault("repression_state", {
+        "repression_score":       0.0,   # 0-1 accumulated shame/suppression
+        "identity_conflict":      False, # LGBT+ identity vs family values
+        "shame_events":           0,
+        "addiction_pressure":     0.0,
+        "self_destructive_urge":  0.0,
+        "intimacy_avoidance":     0.0,
+        "porn_shame_flag":        False,
+        "last_conflict_tick":     0,
+    })
+
     # Impulse control — anger pressure vs self-control
     c.setdefault("impulse_state", {
         "anger_pressure":   0.0,   # 0-1; accumulates from grievances/frustration

@@ -21024,6 +21024,73 @@
         "emasculation_severity": 0.8,
         "emotional_control_tendency": 0.55
       }
+    },
+    "deeply_religious": {
+      "name": "Deeply Religious",
+      "polarity": "neutral",
+      "description": "Strong religious faith shapes worldview, morality, and relationships.",
+      "behavior_flags": [
+        "deeply_religious"
+      ]
+    },
+    "sex_negative": {
+      "name": "Sex-Negative",
+      "polarity": "negative",
+      "description": "Believes sex is shameful or only acceptable for reproduction within marriage.",
+      "behavior_flags": [
+        "sex_negative"
+      ]
+    },
+    "homophobic": {
+      "name": "Homophobic",
+      "polarity": "negative",
+      "description": "Holds strongly negative views toward homosexuality and LGBT+ identities.",
+      "behavior_flags": [
+        "homophobic"
+      ]
+    },
+    "sexually_repressed": {
+      "name": "Sexually Repressed",
+      "polarity": "negative",
+      "description": "Sexual desires suppressed by shame or religious upbringing; affects intimacy.",
+      "behavior_flags": [
+        "sexually_repressed"
+      ],
+      "need_modifiers": {
+        "intimacy": -0.15
+      }
+    },
+    "sexual_shame": {
+      "name": "Sexual Shame",
+      "polarity": "negative",
+      "description": "Experiences intense guilt or shame around sexuality and intimate desires.",
+      "behavior_flags": [
+        "sexual_shame"
+      ]
+    },
+    "self_destructive": {
+      "name": "Self-Destructive",
+      "polarity": "negative",
+      "description": "Prone to behaviour that causes harm to oneself, often as a coping mechanism.",
+      "behavior_flags": [
+        "self_destructive"
+      ]
+    },
+    "addiction_prone": {
+      "name": "Addiction-Prone",
+      "polarity": "negative",
+      "description": "Susceptible to dependency on substances or compulsive behaviours under stress.",
+      "behavior_flags": [
+        "addiction_prone"
+      ]
+    },
+    "identity_crisis_prone": {
+      "name": "Identity Crisis-Prone",
+      "polarity": "negative",
+      "description": "Struggles with a coherent sense of self; vulnerable to existential destabilisation.",
+      "behavior_flags": [
+        "identity_crisis_prone"
+      ]
     }
   },
   "recipe_templates": {
@@ -44333,6 +44400,32 @@
       },
       "mood_volatility": 3.0,
       "notes": "Extreme mood swings in response to perceived slights. Relationships intensely unstable. Dialectical Behaviour Therapy (DBT) is primary treatment."
+    },
+    "sexual_repression_disorder": {
+      "label": "Sexual Repression Disorder",
+      "description": "Chronic inability to accept or express sexuality; rooted in shame or conditioning.",
+      "severity_range": [
+        0.2,
+        1.0
+      ],
+      "effects": [
+        "intimacy_avoidance",
+        "depression_risk",
+        "self_destructive_risk"
+      ]
+    },
+    "identity_crisis": {
+      "label": "Identity Crisis",
+      "description": "Profound conflict between inner identity (often LGBT+) and external expectations.",
+      "severity_range": [
+        0.3,
+        1.0
+      ],
+      "effects": [
+        "depression_risk",
+        "social_withdrawal",
+        "self_destructive_risk"
+      ]
     }
   },
   "abnormal_traits_registry": [

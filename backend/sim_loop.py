@@ -85,6 +85,7 @@ from systems.trauma     import tick_trauma
 from systems.exercise        import tick_exercise
 from systems.impulse         import tick_impulse, sync_anger_from_grievances, add_anger_pressure
 from systems.domestic_control import tick_domestic_control, tick_quid_pro_quo, check_victim_revenge, tick_emotional_control
+from systems.religious_repression import tick_religious_repression
 
 # -- Weekly ───────────────────────────────────────────────────────
 from systems.scheduling import generate_week_schedule, adjust_for_household
@@ -342,6 +343,7 @@ def tick(world):
         tick_domestic_control(world)
         tick_quid_pro_quo(world)
         tick_emotional_control(world)
+        tick_religious_repression(world)
         for _c in characters:
             sync_anger_from_grievances(_c, world)
             check_victim_revenge(_c, world)

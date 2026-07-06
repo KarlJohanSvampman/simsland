@@ -347,6 +347,10 @@ def recipient_decision(recipient, proposer, world):
     # Trauma avoidance penalty
     willingness -= trauma_avoidance * 0.4
 
+    # Religious repression avoidance penalty
+    repression_avoidance = recipient.get("intimacy_avoidance", 0.0)
+    willingness -= repression_avoidance * 0.50
+
     # Trust floor check (trauma raises minimum trust required)
     trust_floor = recipient.get("trauma", {}).get("trust_floor", 0.0)
     if trust_floor > 0 and trust < trust_floor:

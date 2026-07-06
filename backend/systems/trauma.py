@@ -47,12 +47,18 @@ from systems.reputation   import apply_reputation_event
 
 # ── Severity presets ──────────────────────────────────────────────────────
 TRAUMA_SEVERITY = {
-    "betrayal_intimate":    0.20,
-    "physical_assault":     0.20,
-    "witnessed_violence":   0.10,
-    "public_humiliation":   0.08,
-    "stalking":             0.15,
-    "harassment":           0.10,
+    "betrayal_intimate":          0.20,
+    "physical_assault":           0.20,
+    "witnessed_violence":         0.10,
+    "public_humiliation":         0.08,
+    "stalking":                   0.15,
+    "harassment":                 0.10,
+    # Religious repression types
+    "identity_shame":             0.12,
+    "porn_shame":                 0.06,
+    "sexual_curiosity_shame":     0.05,
+    "residual_identity_shame":    0.08,
+    "identity_crisis_onset":      0.15,
 }
 
 # Psychological thresholds

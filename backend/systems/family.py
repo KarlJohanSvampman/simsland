@@ -23,6 +23,7 @@ And on the per-contact relationship object:
 """
 
 import random
+from systems.religious_repression import generate_family_values, init_repression_state
 import uuid
 
 # ---------------------------------------------------------------------------
@@ -74,6 +75,7 @@ def _new_family(surname):
         "surname":   surname,
         "members":   [],
         "relations": {},
+        "values":    generate_family_values(),
     }
 
 def _random_char_for_role(world, defs, age_lo, age_hi, sex=None, exclude_ids=None):
