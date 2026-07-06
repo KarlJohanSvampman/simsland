@@ -83,6 +83,7 @@ from systems.intimacy   import tick_intimacy
 from systems.envy       import tick_envy
 from systems.trauma     import tick_trauma
 from systems.exercise   import tick_exercise
+from systems.impulse    import tick_impulse, sync_anger_from_grievances, add_anger_pressure
 
 # -- Weekly ───────────────────────────────────────────────────────
 from systems.scheduling import generate_week_schedule, adjust_for_household
@@ -337,9 +338,14 @@ def tick(world):
         tick_secrets(world)
         tick_envy(world)
         tick_trauma(world)
+        for _c in characters:
+            sync_anger_from_grievances(_c, world)
 
     # -- Intimacy arousal decay (every tick) ───────────────
     tick_intimacy(world)
+
+    # -- Impulse control pressure + boilover (every tick) ───
+    tick_impulse(world)
 
     # -- Very slow (÷300) ───────────────────────────────────
     if every(world, CADENCE["crisis"], offset=20):

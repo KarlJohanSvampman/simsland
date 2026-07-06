@@ -419,6 +419,14 @@ def ensure_character_defaults(c):
     c.setdefault("arousal_level",      0.0)    # global arousal (separate from per-rel)
     c.setdefault("attractiveness",     None)   # None = auto-computed on first use
 
+    # Impulse control — anger pressure vs self-control
+    c.setdefault("impulse_state", {
+        "anger_pressure":   0.0,   # 0-1; accumulates from grievances/frustration
+        "self_control":     0.5,   # 0-1; trait-derived, slow to change
+        "sexism_level":     0.0,   # 0-1; male chars: raises aggression threshold toward female targets
+        "last_outburst_tick": 0,   # cooldown prevents immediate repeat
+    })
+
     # Fitness tracking — exercise sessions, fitness level, injury state
     c.setdefault("fitness_stats", {
         "fitness_level":        0.30,   # 0-1; decays without exercise; drives attractiveness bump

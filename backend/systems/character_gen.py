@@ -463,6 +463,13 @@ def generate_character(defs, overrides=None):
     # Physical body features — fertility signals and build
     character["body_features"] = _gen_body_features(character)
 
+    # Impulse state — derive self_control + sexism_level from traits
+    try:
+        from systems.impulse import init_impulse_state
+        init_impulse_state(character)
+    except Exception:
+        pass
+
     # Exercise personality — mutually exclusive, or none (35% chance of no tag)
     _assign_exercise_personality(character)
 

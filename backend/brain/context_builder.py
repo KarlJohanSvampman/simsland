@@ -570,6 +570,7 @@ def build_context(
         "intimacy":          _build_intimacy_context(c, world),
         "rivalries":         _build_rival_context(c, world),
         "envy_conflicts":    _build_envy_context(c, world),
+        "impulse":           _build_impulse_context(c, world),
         "trauma":            _build_trauma_context(c, world),
         "sexual_history":    _build_pleasure_context(c, world),
     }
@@ -1305,5 +1306,13 @@ def _build_rival_context(c, world):
     try:
         from systems.rival_cascade import get_rival_context
         return get_rival_context(c, world).get("rivalries", [])
+    except Exception:
+        return []
+
+
+def _build_impulse_context(c, world):
+    try:
+        from systems.impulse import get_impulse_context
+        return get_impulse_context(c, world).get("impulse", [])
     except Exception:
         return []

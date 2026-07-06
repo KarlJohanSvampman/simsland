@@ -20887,6 +20887,51 @@
         "social_gain_mult": 1.2,
         "skips_solo": true
       }
+    },
+    "high_self_control": {
+      "label": "High Self-Control",
+      "description": "Rarely acts on impulse; can endure significant frustration before lashing out.",
+      "category": "personality",
+      "effects": {
+        "self_control": 0.4,
+        "impulse_threshold_mult": 1.6
+      }
+    },
+    "low_self_control": {
+      "label": "Low Self-Control",
+      "description": "Struggles to suppress impulses; minor provocations can spiral quickly.",
+      "category": "personality",
+      "effects": {
+        "self_control": -0.35,
+        "impulse_threshold_mult": 0.55
+      }
+    },
+    "hot_tempered": {
+      "label": "Hot-Tempered",
+      "description": "Short fuse \u2014 anger spikes fast but may also cool quickly.",
+      "category": "personality",
+      "effects": {
+        "self_control": -0.25,
+        "anger_gain_mult": 1.5,
+        "anger_decay_fast": true
+      }
+    },
+    "sexist": {
+      "label": "Sexist",
+      "description": "Holds derogatory attitudes toward women; more likely to direct aggression at female targets.",
+      "category": "personality",
+      "effects": {
+        "sexism_level": 0.4,
+        "female_target_aggression_mult": 1.5
+      }
+    },
+    "egalitarian": {
+      "label": "Egalitarian",
+      "description": "Treats all genders equitably; sexism_level near zero.",
+      "category": "personality",
+      "effects": {
+        "sexism_level": -0.3
+      }
     }
   },
   "recipe_templates": {
