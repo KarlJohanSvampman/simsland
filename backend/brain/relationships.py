@@ -56,6 +56,9 @@ def ensure_relationship(
 
             "attraction": 0,
 
+            # True once the character makes a public approach revealing their interest
+            "attraction_visible": False,
+
             "romantic_interest": 0,
 
             "sexual_interest": 0,

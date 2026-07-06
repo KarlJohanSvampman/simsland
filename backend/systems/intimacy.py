@@ -206,6 +206,19 @@ def propose_act(proposer, recipient, act_id, world):
     }
     p_rel["negotiation"] = dict(neg)
     r_rel["negotiation"] = dict(neg)
+
+    # Reveal mechanic — female initiating toward male makes her attraction public
+    p_sex = proposer.get("sex", "")
+    r_sex = recipient.get("sex", "")
+    if p_sex in ("female", "intersex") and r_sex in ("male", "intersex"):
+        try:
+            from systems.rival_cascade import reveal_attraction, check_rival_cascade
+            is_new = reveal_attraction(proposer, recipient, world)
+            if is_new:
+                check_rival_cascade(proposer, recipient, world)
+        except Exception:
+            pass
+
     return {"ok": True, "act_id": act_id}
 
 
