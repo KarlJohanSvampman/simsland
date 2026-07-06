@@ -73,4 +73,9 @@ CADENCE = {
 }
 
 # Phone battery drain — every tick but gated by cadence to spread load
-CADENCE["phone_battery"] = 1    # every tick
+CADENCE["phone_battery"]    = 1    # every tick
+
+# Social / calendar events (fire frequently; internally guard to once per real day/hour)
+CADENCE["social_events"]    = 60
+CADENCE["maybe_deadlines"]  = 30
+CADENCE["calendar_events"]  = 60

@@ -1,3 +1,4 @@
+import random
 from systems.stock_market import init_stocks
 from systems.market import init_market_catalog
 from systems.personal_items import make_smartphone, make_house_key, make_wallet
@@ -576,6 +577,27 @@ def generate_initial_world():
             assign_birthday(c, world)
         if not c.get("hobbies"):
             assign_hobbies(c, world)
+
+    # Seed faction instances from criminal company templates
+    from systems.faction_ai import seed_factions_from_companies
+    try:
+        seed_factions_from_companies(world, _defs_for_families)
+    except Exception as e:
+        print("[generate_world] faction seed error:", e)
+
+    # Seed family trees for adult characters (probabilistic — ~60% get one)
+    from systems.family import generate_family_for_character
+    from core.definitions import load_definitions as _ld
+    try:
+        _defs_for_families = _ld(world.get("sim_id", "default"))
+    except Exception:
+        _defs_for_families = {}
+    for c in list(world["characters"].values()):
+        if c.get("age", 0) >= 18 and not c.get("family_id") and random.random() < 0.60:
+            try:
+                generate_family_for_character(c, world, _defs_for_families, depth=1)
+            except Exception:
+                pass
 
     # Social events — seed initial world events
     from systems.social_events import generate_world_events

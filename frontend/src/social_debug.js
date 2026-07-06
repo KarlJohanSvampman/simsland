@@ -659,7 +659,146 @@ function refreshTab(tab) {
   if (tab==='runtime')    document.getElementById('runtimeJson').textContent = JSON.stringify(selectedChar.instance, null,2);
   if (tab==='template')   document.getElementById('templateJson').textContent = JSON.stringify(selectedChar.template, null,2);
   if (tab==='log')        renderLogTab();
+  if (tab==='prompts')    renderPromptsTab();
+  if (tab==='family')     window._refreshFamilyTab && window._refreshFamilyTab();
 }
+
+// =====================================================================
+// PROMPTS TAB
+// =====================================================================
+
+let _promptLog = [];
+
+async function renderPromptsTab() {
+  if (!selectedChar) return;
+  await refreshPromptLog(false);
+}
+
+window.refreshPromptLog = async function(scroll=true) {
+  if (!selectedChar) return;
+  const charId = selectedChar.id;
+  const statusEl = document.getElementById('promptLogStatus');
+  statusEl.textContent = 'Loading…';
+  try {
+    const res = await fetch(`/debug/prompt-log/${encodeURIComponent(charId)}`);
+    const data = await res.json();
+    _promptLog = data.entries || [];
+    renderPromptEntries();
+    statusEl.textContent = `${_promptLog.length} entries for ${charId}`;
+  } catch(e) {
+    statusEl.textContent = 'Error: ' + e.message;
+  }
+};
+
+window.clearPromptLog = async function() {
+  if (!selectedChar) return;
+  await fetch(`/debug/prompt-log/${encodeURIComponent(selectedChar.id)}`, {method:'DELETE'});
+  _promptLog = [];
+  renderPromptEntries();
+  document.getElementById('promptLogStatus').textContent = 'Cleared';
+};
+
+function renderPromptEntries() {
+  const container = document.getElementById('promptLogEntries');
+  if (!_promptLog.length) {
+    container.innerHTML = '<div style="color:#445;font-size:12px;padding:10px 0">No LLM calls logged yet for this character.</div>';
+    return;
+  }
+  container.innerHTML = _promptLog.map((e, idx) => {
+    const ts = new Date(e.ts * 1000).toLocaleTimeString();
+    const msgs = e.messages || [];
+    const sysPart = msgs.find(m => m.role === 'system');
+    const userPart = msgs.find(m => m.role === 'user');
+    const sysPreview = sysPart ? sysPart.content.slice(0, 80) + (sysPart.content.length > 80 ? '…' : '') : '—';
+    return `<div class="promptEntry">
+      <div class="promptEntryHead" onclick="togglePromptEntry(${idx})">
+        <span style="color:#aaa">#${_promptLog.length - idx}</span>
+        <span style="color:#7af;font-size:10px">${e.elapsed_s}s</span>
+        <span class="peBadge ${e.cached ? 'cached' : 'live'}">${e.cached ? 'cached' : 'live'}</span>
+        <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#667">${escHtml(sysPreview)}</span>
+        <button class="promptLoadBtn" onclick="event.stopPropagation();loadPromptIntoCompose(${idx})">Edit &amp; Send</button>
+        <span class="peTime">${ts}</span>
+      </div>
+      <div id="promptEntry-${idx}" style="display:none">
+        <div class="promptSection">
+          <div class="psLabel">System Prompt</div>
+          <pre>${escHtml(sysPart ? sysPart.content : '—')}</pre>
+        </div>
+        <div class="promptSection">
+          <div class="psLabel">User Prompt</div>
+          <pre>${escHtml(userPart ? userPart.content : '—')}</pre>
+        </div>
+        <div class="promptSection response">
+          <div class="psLabel">Response</div>
+          <pre>${escHtml(typeof e.response === 'string' ? e.response : JSON.stringify(e.response, null, 2))}</pre>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+window.togglePromptEntry = function(idx) {
+  const el = document.getElementById('promptEntry-' + idx);
+  if (el) el.style.display = el.style.display === 'none' ? '' : 'none';
+};
+
+window.loadPromptIntoCompose = function(idx) {
+  const e = _promptLog[idx];
+  if (!e) return;
+  const msgs = e.messages || [];
+  const sys  = msgs.find(m => m.role === 'system');
+  const user = msgs.find(m => m.role === 'user');
+  document.getElementById('promptSysInput').value  = sys  ? sys.content  : '';
+  document.getElementById('promptUserInput').value = user ? user.content : '';
+  document.getElementById('promptResponseBox').textContent = '—';
+  document.getElementById('promptSendStatus').textContent = '';
+};
+
+window.loadLastPromptIntoCompose = function() {
+  if (_promptLog.length) loadPromptIntoCompose(0);
+};
+
+window.sendCustomPrompt = async function() {
+  if (!selectedChar) return;
+  const sys  = document.getElementById('promptSysInput').value.trim();
+  const user = document.getElementById('promptUserInput').value.trim();
+  const statusEl = document.getElementById('promptSendStatus');
+  const respBox  = document.getElementById('promptResponseBox');
+  if (!sys && !user) { statusEl.textContent = 'Nothing to send'; return; }
+  statusEl.textContent = 'Sending…';
+  respBox.textContent = '…';
+  try {
+    const res = await fetch('/debug/prompt-send', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        char_id: selectedChar.id,
+        system_prompt: sys,
+        user_prompt: user,
+        use_cache: false
+      })
+    });
+    const data = await res.json();
+    const raw = data.raw_response;
+    respBox.textContent = typeof raw === 'string' ? raw : JSON.stringify(raw, null, 2);
+    statusEl.textContent = `${data.elapsed_s}s • valid=${data.valid}${data.parse_error ? ' ⚠ '+data.parse_error : ''}`;
+    // Add to local log immediately
+    _promptLog.unshift({
+      ts: Date.now() / 1000,
+      messages: [
+        {role:'system', content: sys},
+        {role:'user',   content: user}
+      ],
+      response: raw,
+      elapsed_s: data.elapsed_s,
+      cached: false
+    });
+    renderPromptEntries();
+  } catch(e) {
+    statusEl.textContent = 'Error: ' + e.message;
+    respBox.textContent = '—';
+  }
+};
 
 // ── Appearance tab ──
 function renderAppearanceTab() {
@@ -900,3 +1039,102 @@ window.toggleThoughts = function(val) { showThoughts = val; };
 // INIT
 // =====================================================================
 await loadDefinitions();
+
+// =====================================================================
+// FAMILY TAB
+// =====================================================================
+
+window.generateFamilyTree = async function(replace=false) {
+  if (!selectedChar) { alert('Select a character first.'); return; }
+  const charId  = selectedChar.id;
+  const depth   = document.getElementById('familyDepth2')?.checked ? 2 : 1;
+  const statusEl = document.getElementById('familyStatus');
+  const treeEl   = document.getElementById('familyTree');
+
+  statusEl.textContent = 'Generating…';
+  treeEl.innerHTML = '';
+
+  try {
+    const res = await fetch(`/api/editor/characters/${charId}/generate_family`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ sim_id: 'default', depth, replace }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || res.statusText);
+
+    const fam = data.family;
+    statusEl.textContent = data.already_existed
+      ? `Existing family loaded — ${fam.size} members`
+      : `Generated — ${fam.size} members (depth ${depth})`;
+
+    // Render the tree
+    treeEl.innerHTML = _renderFamilyHTML(fam, charId);
+
+    // Refresh instance data (family_id is now set)
+    const worldRes = await fetch('/api/editor/world?sim_id=default');
+    const world    = await worldRes.json();
+    const updated  = world?.characters?.[charId];
+    if (updated) selectedChar.instance = updated;
+
+  } catch(e) {
+    statusEl.textContent = '⚠ ' + e.message;
+    console.error('[family]', e);
+  }
+};
+
+function _renderFamilyHTML(fam, focusId) {
+  // Group members by role order
+  const roleOrder = ['grandparent','parent','spouse','head','sibling','in_law','child','aunt_uncle','cousin','ex_spouse','other'];
+  const members = [...fam.members].sort((a,b) => {
+    return (roleOrder.indexOf(a.role ?? 'other') - roleOrder.indexOf(b.role ?? 'other'));
+  });
+
+  const roleColors = {
+    grandparent: '#8a7',  parent: '#7ab',  spouse: '#da8',
+    sibling:     '#a9c',  child:  '#7c9',  in_law: '#98a',
+    aunt_uncle:  '#b97',  cousin: '#8ba',  ex_spouse: '#a77',
+    head:        '#adf',  other:  '#778',
+  };
+
+  let html = `<div style="font-size:10px;color:#445;margin-bottom:6px;text-transform:uppercase;letter-spacing:.07em">
+    ${fam.surname} Family — ${fam.size} members
+  </div>`;
+
+  for (const m of members) {
+    const isFocus  = m.id === focusId;
+    const col      = roleColors[m.role] || '#778';
+    const roleTag  = m.role ? `<span style="color:${col};font-size:10px">[${m.role}]</span>` : '';
+    const offTag   = m.offscreen ? ' <span style="color:#333;font-size:9px">(off-screen)</span>' : '';
+    const focusMark= isFocus ? ' ★' : '';
+    const rels     = Object.entries(m.relations_to_others || {});
+
+    html += `<div style="border-left:2px solid ${isFocus ? '#2e86c1' : '#2a3040'};
+      padding:5px 8px;margin-bottom:4px;background:${isFocus ? '#111d2a' : '#13171d'}">
+      <div style="color:${isFocus ? '#adf' : '#ccd'};font-size:12px">${m.name}${focusMark} ${offTag}</div>
+      <div style="font-size:10px;color:#445">age ${m.age} · ${m.sex} ${roleTag}</div>`;
+
+    if (rels.length) {
+      const relStr = rels.map(([name, rel]) =>
+        `<span style="color:#445">${name}</span> <span style="color:#667">(${rel})</span>`
+      ).join(' · ');
+      html += `<div style="font-size:10px;margin-top:2px">${relStr}</div>`;
+    }
+    html += '</div>';
+  }
+  return html;
+}
+
+// Hook into refreshTab
+const _origRefreshTab = refreshTab;
+// Patch refreshTab by re-declaring (module scope safe via closure)
+window._refreshFamilyTab = function() {
+  if (!selectedChar) return;
+  const fam_id = selectedChar.instance?.family_id;
+  const statusEl = document.getElementById('familyStatus');
+  const treeEl   = document.getElementById('familyTree');
+  if (!fam_id) {
+    if (statusEl) statusEl.textContent = 'No family tree yet — click Generate.';
+    if (treeEl)   treeEl.innerHTML = '';
+  }
+};

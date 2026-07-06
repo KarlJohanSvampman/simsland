@@ -561,6 +561,11 @@ def build_context(
         "social_events":     _build_events_context(c, world),
         "upcoming_calendar_events": _build_calendar_context(c, world),
         "hobbies":           _build_hobbies_context(c, world),
+        "reputation":        _build_reputation_context(c),
+        "factions":          _build_faction_context(c, world),
+        "family":            _build_family_context(c, world),
+        "secrets_held":      _build_secrets_keeper_context(c),
+        "secrets_targeted":  _build_secrets_target_context(c, world),
     }
 
     return context
@@ -1145,3 +1150,106 @@ def _build_calendar_context(c, world):
             line += " — prep: " + ", ".join(ev["prep_requirements"])
         items.append(line)
     return items
+
+# =========================================================
+# REPUTATION CONTEXT
+# =========================================================
+
+def _build_reputation_context(c):
+    from systems.reputation import get_reputation_summary
+    return get_reputation_summary(c)
+
+
+# =========================================================
+# FAMILY CONTEXT
+# =========================================================
+
+def _build_family_context(c, world):
+    fam_id = c.get("family_id")
+    if not fam_id:
+        return None
+    fam = world.get("families", {}).get(fam_id)
+    if not fam:
+        return None
+    chars = world.get("characters", {})
+    members = []
+    for mid in fam.get("members", []):
+        if mid == c["id"]:
+            continue
+        other = chars.get(mid, {})
+        kinship = fam["relations"].get(f"{c['id']}:{mid}")
+        members.append({
+            "id":      mid,
+            "name":    other.get("name", mid),
+            "kinship": kinship,
+            "age":     other.get("age"),
+            "alive":   not other.get("deceased", False),
+            "offscreen": other.get("is_offscreen", False),
+        })
+    return {
+        "family_id":   fam_id,
+        "surname":     fam.get("surname"),
+        "role":        c.get("family_role"),
+        "members":     members,
+    }
+
+
+# =========================================================
+# SECRETS CONTEXT — keeper perspective
+# =========================================================
+
+def _build_secrets_keeper_context(c):
+    secrets = c.get("secrets", [])
+    if not secrets:
+        return []
+    out = []
+    for s in secrets:
+        targets_summary = {}
+        for tid, dt in s.get("deception_targets", {}).items():
+            targets_summary[tid] = {
+                "deceived_level":  dt.get("deceived_level", 1.0),
+                "suspicion_level": dt.get("suspicion_level", 0.0),
+                "false_belief":    dt.get("false_belief"),
+            }
+        out.append({
+            "id":       s["id"],
+            "content":  s["content"],
+            "severity": s.get("severity", 0.5),
+            "stakes":   s.get("stakes"),
+            "category": s.get("category"),
+            "known_by": s.get("known_by", []),
+            "targets":  targets_summary,
+        })
+    return out
+
+
+# =========================================================
+# SECRETS CONTEXT — target/deceived perspective
+# =========================================================
+
+def _build_secrets_target_context(c, world):
+    """
+    For each secret kept from this character, return what they perceive —
+    their suspicion level, who they blame, and what false belief they hold.
+    """
+    my_id  = c["id"]
+    chars  = world.get("characters", {})
+    result = []
+    for other in chars.values():
+        if other["id"] == my_id:
+            continue
+        for s in other.get("secrets", []):
+            dt = s.get("deception_targets", {}).get(my_id)
+            if not dt:
+                continue
+            result.append({
+                "secret_id":       s["id"],
+                "kept_by":         other.get("name", other["id"]),
+                "kept_by_id":      other["id"],
+                "suspicion_level": dt.get("suspicion_level", 0.0),
+                "suspicion_of":    dt.get("suspicion_of"),      # id blamed instead
+                "false_belief":    dt.get("false_belief"),
+                "category":        s.get("category"),
+                # Deliberately omit actual content — the target doesn't know the truth
+            })
+    return result

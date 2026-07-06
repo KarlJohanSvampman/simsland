@@ -2,7 +2,27 @@
 # WORLD DEFAULTS
 # =========================================================
 
-def ensure_world_defaults(world):
+def ensure_world_defaults(world, defs=None):
+    # Init community stats from definitions if provided
+    if defs is not None:
+        try:
+            from systems.socioeconomics import init_community_stats
+            init_community_stats(world, defs)
+        except Exception:
+            pass
+
+    # Init public figures registry
+    if defs is not None:
+        pf = defs.get("public_figures", {})
+        if pf and not world.get("public_figures"):
+            world["public_figures"] = list(pf.values())
+
+    # Init government from definitions
+    if defs is not None:
+        gov = defs.get("government")
+        if gov:
+            world.setdefault("government", gov.copy())
+
 
     # =====================================================
     # CORE
@@ -227,6 +247,9 @@ def ensure_world_defaults(world):
         []
     )
 
+    world.setdefault("families", {})
+    world.setdefault("factions", {})
+
     # =====================================================
     # MAP
     # =====================================================
@@ -363,6 +386,33 @@ def ensure_character_defaults(c):
         "job_searching",
         False
     )
+
+    # Work history
+    c.setdefault("work_history",            [])
+    c.setdefault("current_job_start_tick",  None)
+    c.setdefault("company_id",              None)
+    c.setdefault("job_template_id",         None)
+    c.setdefault("industry_experience",     {})
+
+    # Family tree
+    c.setdefault("family_id",   None)
+    c.setdefault("family_role", None)
+
+    # Secrets
+    c.setdefault("secrets", [])
+
+    # Faction memberships
+    c.setdefault("faction_memberships", [])
+
+    # Reputation
+    c.setdefault("reputation", {
+        "global":       0.5,
+        "community":    0.5,
+        "by_faction":   {},
+        "notoriety":    0.0,
+        "last_event":   None,
+        "last_updated": 0,
+    })
 
     c.setdefault(
         "ses",
@@ -667,13 +717,4 @@ def ensure_household_defaults(h):
         0.0
     )
 
-    h.setdefault("mailbox", {
-        "has_mail": False,
-        "items": [],
-        "unopened_count": 0
-    })
-
-    h.setdefault("unopened_mail", [])
-    h.setdefault("unpaid_bills", [])
-    h.setdefault("pending_responses", [])
-    h.setdefault("completed_documents", [])
+    h.set

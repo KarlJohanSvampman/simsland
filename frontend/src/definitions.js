@@ -43,6 +43,7 @@ const tabs = [
   "tile_templates",
   "material_templates",
   "hobby_templates",
+  "socioeconomics",
 ];
 
 let meshbank = {};
@@ -309,14 +310,19 @@ function renderTabs() {
     if (tab === currentTab) el.classList.add('active');
 
     // Show just the prefix (e.g. "prop" from "prop_templates")
-    el.textContent = tab.replace('_templates', '');
+    const label = tab === 'socioeconomics' ? 'Socioeconomics' : tab.replace('_templates', '');
+    el.textContent = label;
 
     el.onclick = () => {
       currentTab = tab;
       currentTemplateId = null;
       renderTabs();
-      renderTemplateList();
-      document.getElementById('boneSlotEditor').innerHTML = '';
+      if (tab === 'socioeconomics') {
+        renderSocioeconomicsPanel();
+      } else {
+        renderTemplateList();
+        document.getElementById('boneSlotEditor').innerHTML = '';
+      }
     };
 
     tabsEl.appendChild(el);
@@ -328,6 +334,11 @@ function renderTabs() {
 // =====================================================
 
 function renderTemplateList() {
+  // Restore JSON editor if switching away from Socioeconomics
+  const _jsonEd = document.getElementById('jsonEditor');
+  const _socioP = document.getElementById('socioPanel');
+  if (_jsonEd)  _jsonEd.style.display  = '';
+  if (_socioP) _socioP.style.display = 'none';
 
   templateListEl.innerHTML = '';
 
@@ -2311,4 +2322,429 @@ function _ixRenderVariables(vars) {
 
 function _ixRenderModifiers(mods) {
   if (!mods || !mods.length) return '';
-  let html = '<div class="ixSection"><div 
+  let html = '<div class="ixSection"><div class="ixSectionTitle">Effectiveness Modifiers</div>';
+  for (const m of mods) {
+    html += '<div class="ixModRow"><span class="ixModCond">' + (m.condition || '') + '</span>';
+    if (m.multiplier != null) html += '<span class="ixModVal">x' + m.multiplier + '</span>';
+    if (m.outcome)            html += '<span class="ixModVal">' + m.outcome + '</span>';
+    html += '</div>';
+  }
+  html += '</div>';
+  return html;
+}
+
+window._ixSetVar = function(el) {
+  const key = el.dataset.var;
+  const val = el.type === 'checkbox' ? el.checked : (el.type === 'number' ? Number(el.value) : el.value);
+  _ixVarValues[key] = val;
+  _ixAddLog('Var "' + key + '" = ' + JSON.stringify(val));
+};
+
+window._ixRandomizeVar = function(key) {
+  const def = _ixVarDefs[key];
+  if (!def) return;
+  let val;
+  if (def.type === 'select' && def.options) {
+    val = def.options[Math.floor(Math.random() * def.options.length)];
+  } else if (def.type === 'number') {
+    const lo = def.min || 0, hi = def.max || 10;
+    val = Math.floor(Math.random() * (hi - lo + 1)) + lo;
+  } else if (def.type === 'bool') {
+    val = Math.random() > 0.5;
+  } else { return; }
+  _ixVarValues[key] = val;
+  const el = document.querySelector('[data-var="' + key + '"]');
+  if (el) { el.type === 'checkbox' ? (el.checked = val) : (el.value = val); }
+  _ixAddLog('Var "' + key + '" randomized = ' + JSON.stringify(val));
+};
+
+
+// =====================================================
+// SOCIOECONOMICS TAB
+// =====================================================
+
+const FAME_LABELS = ['','Local (neighborhood)','City-wide','Regional','National','International'];
+const CATEGORY_LABELS = {
+  politician: '🏛 Politician',
+  government_official: '🏢 Gov. Official',
+  law_enforcement: '🚔 Law Enforcement',
+  business_leader: '💼 Business Leader',
+  celebrity: '🎬 Celebrity',
+  journalist: '📰 Journalist',
+  civic_leader: '🤝 Civic Leader',
+};
+
+let _socioActiveSub = 'stats'; // 'stats' | 'government' | 'figures'
+let _socioActiveFigure = null;
+
+function renderSocioeconomicsPanel() {
+  // Hide generic editor, show custom socio panel
+  const editorEl = document.getElementById('jsonEditor');
+  const titleEl  = document.getElementById('editorTitle');
+  let panel = document.getElementById('socioPanel');
+
+  if (!panel) {
+    panel = document.createElement('div');
+    panel.id = 'socioPanel';
+    panel.style.cssText = 'flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:8px;';
+    editorEl.parentNode.insertBefore(panel, editorEl);
+  }
+  editorEl.style.display = 'none';
+  panel.style.display    = 'flex';
+  titleEl.textContent    = 'Socioeconomics';
+
+  // Sub-nav
+  panel.innerHTML = `
+    <div style="display:flex;gap:6px;margin-bottom:4px;">
+      ${['stats','government','figures'].map(s => `
+        <button onclick="window._socioSub('${s}')"
+          style="flex:1;padding:6px;font-size:12px;background:${_socioActiveSub===s?'#3a6ea8':'#2e3640'};color:#fff;border:1px solid #555;cursor:pointer;border-radius:3px">
+          ${s==='stats'?'📊 Statistics':s==='government'?'🏛 Government':'👤 Public Figures'}
+        </button>`).join('')}
+    </div>
+    <div id="socioContent"></div>`;
+
+  _renderSocioContent();
+}
+
+window._socioSub = function(sub) {
+  _socioActiveSub = sub;
+  _renderSocioContent();
+};
+
+function _renderSocioContent() {
+  const el = document.getElementById('socioContent');
+  if (!el) return;
+  if (_socioActiveSub === 'stats')       _renderSocioStats(el);
+  else if (_socioActiveSub === 'government') _renderSocioGov(el);
+  else _renderSocioFigures(el);
+}
+
+// ── Statistics panel ──────────────────────────────────────────────────────
+function _renderSocioStats(el) {
+  const cfg = definitions.community_stats_config || {};
+  let html = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+      <span style="font-size:12px;color:#aaa;">Configure baseline values and daily ±drift for each statistic.</span>
+      <button onclick="window._socioSaveStats()" style="padding:5px 12px;background:#2a6a2a;color:#fff;border:none;cursor:pointer;border-radius:3px">💾 Save Stats</button>
+    </div>
+    <table style="width:100%;border-collapse:collapse;font-size:12px;">
+      <thead>
+        <tr style="color:#aaa;border-bottom:1px solid #444;">
+          <th style="text-align:left;padding:4px 6px;width:36%">Statistic</th>
+          <th style="text-align:right;padding:4px 6px;width:14%">Value</th>
+          <th style="text-align:right;padding:4px 6px;width:10%">Min</th>
+          <th style="text-align:right;padding:4px 6px;width:10%">Max</th>
+          <th style="text-align:right;padding:4px 6px;width:14%">±Drift/day</th>
+          <th style="text-align:left;padding:4px 6px;width:16%">Unit</th>
+        </tr>
+      </thead>
+      <tbody>`;
+
+  Object.entries(cfg).forEach(([key, stat]) => {
+    html += `
+      <tr style="border-bottom:1px solid #2a2f36;" data-stat-key="${key}">
+        <td style="padding:4px 6px;color:#ccc;">${stat.label || key}</td>
+        <td style="padding:2px 4px;"><input type="number" data-stat="${key}" data-field="value" value="${stat.value}" step="any"
+          style="width:80px;background:#1b1f24;color:#fff;border:1px solid #444;padding:2px 4px;text-align:right;font-size:11px;"></td>
+        <td style="padding:2px 4px;"><input type="number" data-stat="${key}" data-field="min" value="${stat.min}" step="any"
+          style="width:60px;background:#1b1f24;color:#fff;border:1px solid #444;padding:2px 4px;text-align:right;font-size:11px;"></td>
+        <td style="padding:2px 4px;"><input type="number" data-stat="${key}" data-field="max" value="${stat.max}" step="any"
+          style="width:60px;background:#1b1f24;color:#fff;border:1px solid #444;padding:2px 4px;text-align:right;font-size:11px;"></td>
+        <td style="padding:2px 4px;"><input type="number" data-stat="${key}" data-field="drift_range" value="${stat.drift_range}" step="any" min="0"
+          style="width:70px;background:#1b1f24;color:#fff;border:1px solid #444;padding:2px 4px;text-align:right;font-size:11px;"></td>
+        <td style="padding:4px 6px;color:#888;font-size:11px;">${stat.unit || ''}</td>
+      </tr>`;
+  });
+
+  html += '</tbody></table>';
+  el.innerHTML = html;
+}
+
+window._socioSaveStats = function() {
+  const inputs = document.querySelectorAll('#socioContent input[data-stat]');
+  inputs.forEach(inp => {
+    const key   = inp.dataset.stat;
+    const field = inp.dataset.field;
+    if (!definitions.community_stats_config) definitions.community_stats_config = {};
+    if (!definitions.community_stats_config[key]) definitions.community_stats_config[key] = {};
+    definitions.community_stats_config[key][field] = parseFloat(inp.value) || 0;
+  });
+  saveDefinitions();
+  document.getElementById('statusBar').textContent = 'Statistics saved.';
+};
+
+// ── Government panel ──────────────────────────────────────────────────────
+function _renderSocioGov(el) {
+  const gov = definitions.government || {};
+  const pf  = definitions.public_figures || {};
+
+  const pfOptions = (role) => Object.entries(pf)
+    .filter(([,v]) => !role || v.role === role || v.category === role)
+    .map(([k,v]) => `<option value="${k}" ${gov[role+'_id']===k||gov.mayor_id===k&&role==='mayor'||gov.police_chief_id===k&&role==='police_chief'?'selected':''}>${v.name} (${v.title})</option>`)
+    .join('');
+
+  const allPfOptions = (selected) => Object.entries(pf)
+    .map(([k,v]) => `<option value="${k}" ${selected===k?'selected':''}>${v.name}</option>`)
+    .join('');
+
+  el.innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+      <div>
+        <label style="color:#aaa;font-size:11px;display:block;margin-bottom:4px;">City Name</label>
+        <input id="gov_city_name" value="${gov.city_name||''}" style="width:100%;background:#1b1f24;color:#fff;border:1px solid #444;padding:5px;">
+        <label style="color:#aaa;font-size:11px;display:block;margin:8px 0 4px;">State / Region</label>
+        <input id="gov_state" value="${gov.state||''}" style="width:100%;background:#1b1f24;color:#fff;border:1px solid #444;padding:5px;">
+        <label style="color:#aaa;font-size:11px;display:block;margin:8px 0 4px;">Government Type</label>
+        <select id="gov_type" style="width:100%;background:#1b1f24;color:#fff;border:1px solid #444;padding:5px;">
+          ${['mayor-council','council-manager','commission','strong-mayor'].map(t=>`<option value="${t}" ${gov.government_type===t?'selected':''}>${t}</option>`).join('')}
+        </select>
+      </div>
+      <div>
+        <label style="color:#aaa;font-size:11px;display:block;margin-bottom:4px;">Party Majority</label>
+        <select id="gov_party" style="width:100%;background:#1b1f24;color:#fff;border:1px solid #444;padding:5px;">
+          ${['republican','democrat','independent','coalition'].map(p=>`<option value="${p}" ${gov.party_majority===p?'selected':''}>${p.charAt(0).toUpperCase()+p.slice(1)}</option>`).join('')}
+        </select>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:8px;">
+          <div>
+            <label style="color:#aaa;font-size:11px;display:block;margin-bottom:4px;">Rep. Seats</label>
+            <input id="gov_rep" type="number" value="${gov.republican_seats||0}" style="width:100%;background:#1b1f24;color:#fff;border:1px solid #444;padding:5px;">
+          </div>
+          <div>
+            <label style="color:#aaa;font-size:11px;display:block;margin-bottom:4px;">Dem. Seats</label>
+            <input id="gov_dem" type="number" value="${gov.democrat_seats||0}" style="width:100%;background:#1b1f24;color:#fff;border:1px solid #444;padding:5px;">
+          </div>
+          <div>
+            <label style="color:#aaa;font-size:11px;display:block;margin-bottom:4px;">Ind. Seats</label>
+            <input id="gov_ind" type="number" value="${gov.independent_seats||0}" style="width:100%;background:#1b1f24;color:#fff;border:1px solid #444;padding:5px;">
+          </div>
+        </div>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px;">
+      <div>
+        <label style="color:#aaa;font-size:11px;display:block;margin-bottom:4px;">Last Election Date</label>
+        <input id="gov_last_elec" type="date" value="${gov.last_election_date||''}" style="width:100%;background:#1b1f24;color:#fff;border:1px solid #444;padding:5px;">
+      </div>
+      <div>
+        <label style="color:#aaa;font-size:11px;display:block;margin-bottom:4px;">Next Election Date</label>
+        <input id="gov_next_elec" type="date" value="${gov.next_election_date||''}" style="width:100%;background:#1b1f24;color:#fff;border:1px solid #444;padding:5px;">
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px;">
+      <div>
+        <label style="color:#aaa;font-size:11px;display:block;margin-bottom:4px;">Mayor</label>
+        <select id="gov_mayor" style="width:100%;background:#1b1f24;color:#fff;border:1px solid #444;padding:5px;">
+          <option value="">— None —</option>
+          ${Object.entries(pf).map(([k,v])=>`<option value="${k}" ${gov.mayor_id===k?'selected':''}>${v.name} (${v.title})</option>`).join('')}
+        </select>
+      </div>
+      <div>
+        <label style="color:#aaa;font-size:11px;display:block;margin-bottom:4px;">Police Chief</label>
+        <select id="gov_chief" style="width:100%;background:#1b1f24;color:#fff;border:1px solid #444;padding:5px;">
+          <option value="">— None —</option>
+          ${Object.entries(pf).map(([k,v])=>`<option value="${k}" ${gov.police_chief_id===k?'selected':''}>${v.name} (${v.title})</option>`).join('')}
+        </select>
+      </div>
+    </div>
+    <div style="margin-top:12px;">
+      <label style="color:#aaa;font-size:11px;display:block;margin-bottom:4px;">City Budget ($)</label>
+      <input id="gov_budget" type="number" value="${gov.city_budget||0}" style="width:220px;background:#1b1f24;color:#fff;border:1px solid #444;padding:5px;">
+      <label style="color:#aaa;font-size:11px;display:block;margin:8px 0 4px;">Surplus / Deficit ($)</label>
+      <input id="gov_surplus" type="number" value="${gov.budget_surplus_deficit||0}" style="width:220px;background:#1b1f24;color:#fff;border:1px solid #444;padding:5px;">
+    </div>
+    <button onclick="window._socioSaveGov()" style="margin-top:12px;padding:6px 16px;background:#2a6a2a;color:#fff;border:none;cursor:pointer;border-radius:3px">💾 Save Government</button>
+  `;
+}
+
+window._socioSaveGov = function() {
+  if (!definitions.government) definitions.government = {};
+  const g = definitions.government;
+  g.city_name              = document.getElementById('gov_city_name').value;
+  g.state                  = document.getElementById('gov_state').value;
+  g.government_type        = document.getElementById('gov_type').value;
+  g.party_majority         = document.getElementById('gov_party').value;
+  g.republican_seats       = parseInt(document.getElementById('gov_rep').value)||0;
+  g.democrat_seats         = parseInt(document.getElementById('gov_dem').value)||0;
+  g.independent_seats      = parseInt(document.getElementById('gov_ind').value)||0;
+  g.last_election_date     = document.getElementById('gov_last_elec').value;
+  g.next_election_date     = document.getElementById('gov_next_elec').value;
+  g.mayor_id               = document.getElementById('gov_mayor').value;
+  g.police_chief_id        = document.getElementById('gov_chief').value;
+  g.city_budget            = parseInt(document.getElementById('gov_budget').value)||0;
+  g.budget_surplus_deficit = parseInt(document.getElementById('gov_surplus').value)||0;
+  saveDefinitions();
+  document.getElementById('statusBar').textContent = 'Government saved.';
+};
+
+// ── Public Figures panel ──────────────────────────────────────────────────
+function _renderSocioFigures(el) {
+  const pf = definitions.public_figures || {};
+
+  let listHtml = `
+    <div style="display:flex;gap:6px;margin-bottom:8px;">
+      <button onclick="window._socioNewFigure()" style="padding:5px 10px;background:#2a5a8a;color:#fff;border:none;cursor:pointer;border-radius:3px;font-size:12px;">+ New Figure</button>
+      <span style="font-size:11px;color:#888;align-self:center;">${Object.keys(pf).length} public figure(s)</span>
+    </div>
+    <div style="display:flex;gap:8px;">
+      <div style="width:200px;flex-shrink:0;border-right:1px solid #333;padding-right:8px;">`;
+
+  const cats = {};
+  Object.entries(pf).forEach(([k,v]) => {
+    const cat = v.category || 'other';
+    (cats[cat] = cats[cat]||[]).push([k,v]);
+  });
+
+  Object.entries(cats).forEach(([cat, items]) => {
+    listHtml += `<div style="color:#88aacc;font-size:10px;font-weight:bold;text-transform:uppercase;letter-spacing:0.5px;margin:6px 0 2px;padding-left:2px;">${CATEGORY_LABELS[cat]||cat}</div>`;
+    items.forEach(([k,v]) => {
+      const active = _socioActiveFigure === k;
+      listHtml += `
+        <div onclick="window._socioSelectFigure('${k}')"
+          style="padding:5px 7px;cursor:pointer;font-size:12px;border-radius:3px;margin-bottom:2px;
+                 background:${active?'#3a5a7a':'#2a2f36'};color:${active?'#fff':'#ccc'};
+                 display:flex;justify-content:space-between;align-items:center;">
+          <span>${v.name}</span>
+          <span style="font-size:10px;color:#888;">★${v.fame_level||1}</span>
+        </div>`;
+    });
+  });
+
+  listHtml += `</div><div style="flex:1;" id="socioFigureDetail">`;
+
+  if (_socioActiveFigure && pf[_socioActiveFigure]) {
+    listHtml += _buildFigureForm(_socioActiveFigure, pf[_socioActiveFigure]);
+  } else {
+    listHtml += `<div style="color:#666;font-size:12px;padding:20px;">Select a figure to edit</div>`;
+  }
+
+  listHtml += '</div></div>';
+  el.innerHTML = listHtml;
+}
+
+function _buildFigureForm(id, fig) {
+  const controversies = (fig.controversial_subjects || []).join('\n');
+  const tags = (fig.tags || []).join(', ');
+  return `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+      <b style="font-size:14px;">${fig.name}</b>
+      <button onclick="window._socioDeleteFigure('${id}')" style="padding:3px 8px;background:#6a2a2a;color:#fff;border:none;cursor:pointer;border-radius:3px;font-size:11px;">Delete</button>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px;">
+      <div>
+        <label style="color:#aaa;font-size:11px;display:block;margin-bottom:3px;">Full Name</label>
+        <input id="fig_name" value="${fig.name||''}" style="width:100%;background:#1b1f24;color:#fff;border:1px solid #444;padding:4px;">
+      </div>
+      <div>
+        <label style="color:#aaa;font-size:11px;display:block;margin-bottom:3px;">Title / Role Label</label>
+        <input id="fig_title" value="${fig.title||''}" style="width:100%;background:#1b1f24;color:#fff;border:1px solid #444;padding:4px;">
+      </div>
+      <div>
+        <label style="color:#aaa;font-size:11px;display:block;margin-bottom:3px;">Age</label>
+        <input id="fig_age" type="number" value="${fig.age||''}" style="width:100%;background:#1b1f24;color:#fff;border:1px solid #444;padding:4px;">
+      </div>
+      <div>
+        <label style="color:#aaa;font-size:11px;display:block;margin-bottom:3px;">Category</label>
+        <select id="fig_cat" style="width:100%;background:#1b1f24;color:#fff;border:1px solid #444;padding:4px;">
+          ${Object.keys(CATEGORY_LABELS).map(c=>`<option value="${c}" ${fig.category===c?'selected':''}>${CATEGORY_LABELS[c]}</option>`).join('')}
+        </select>
+      </div>
+      <div>
+        <label style="color:#aaa;font-size:11px;display:block;margin-bottom:3px;">Role ID</label>
+        <input id="fig_role" value="${fig.role||''}" style="width:100%;background:#1b1f24;color:#fff;border:1px solid #444;padding:4px;">
+      </div>
+      <div>
+        <label style="color:#aaa;font-size:11px;display:block;margin-bottom:3px;">Party</label>
+        <select id="fig_party" style="width:100%;background:#1b1f24;color:#fff;border:1px solid #444;padding:4px;">
+          <option value="">None / Independent</option>
+          ${['republican','democrat','independent','green','libertarian'].map(p=>`<option value="${p}" ${fig.party===p?'selected':''}>${p.charAt(0).toUpperCase()+p.slice(1)}</option>`).join('')}
+        </select>
+      </div>
+      <div>
+        <label style="color:#aaa;font-size:11px;display:block;margin-bottom:3px;">Approval Rating (0–1)</label>
+        <input id="fig_approval" type="number" step="0.01" min="0" max="1" value="${fig.approval_rating||0.5}"
+          style="width:100%;background:#1b1f24;color:#fff;border:1px solid #444;padding:4px;">
+      </div>
+      <div>
+        <label style="color:#aaa;font-size:11px;display:block;margin-bottom:3px;">Fame Level (1–5)</label>
+        <select id="fig_fame" style="width:100%;background:#1b1f24;color:#fff;border:1px solid #444;padding:4px;">
+          ${[1,2,3,4,5].map(n=>`<option value="${n}" ${fig.fame_level===n?'selected':''}>★${n} — ${FAME_LABELS[n]}</option>`).join('')}
+        </select>
+      </div>
+      <div>
+        <label style="color:#aaa;font-size:11px;display:block;margin-bottom:3px;">Influence Power (0–1)</label>
+        <input id="fig_influence" type="number" step="0.01" min="0" max="1" value="${fig.influence_power||0.5}"
+          style="width:100%;background:#1b1f24;color:#fff;border:1px solid #444;padding:4px;">
+      </div>
+      <div>
+        <label style="color:#aaa;font-size:11px;display:block;margin-bottom:3px;">Credibility (0–1)</label>
+        <input id="fig_cred" type="number" step="0.01" min="0" max="1" value="${fig.credibility||0.5}"
+          style="width:100%;background:#1b1f24;color:#fff;border:1px solid #444;padding:4px;">
+      </div>
+    </div>
+    <label style="color:#aaa;font-size:11px;display:block;margin:8px 0 3px;">Bio</label>
+    <textarea id="fig_bio" rows="4" style="width:100%;background:#1b1f24;color:#fff;border:1px solid #444;padding:4px;font-size:12px;resize:vertical;">${fig.bio||''}</textarea>
+    <label style="color:#aaa;font-size:11px;display:block;margin:8px 0 3px;">Controversial Subjects <span style="color:#666;">(one per line)</span></label>
+    <textarea id="fig_controversies" rows="3" style="width:100%;background:#1b1f24;color:#fff;border:1px solid #444;padding:4px;font-size:12px;resize:vertical;">${controversies}</textarea>
+    <label style="color:#aaa;font-size:11px;display:block;margin:8px 0 3px;">Tags <span style="color:#666;">(comma-separated)</span></label>
+    <input id="fig_tags" value="${tags}" style="width:100%;background:#1b1f24;color:#fff;border:1px solid #444;padding:4px;font-size:12px;">
+    <div style="margin-top:10px;display:flex;gap:8px;">
+      <button onclick="window._socioSaveFigure('${id}')"
+        style="padding:6px 16px;background:#2a6a2a;color:#fff;border:none;cursor:pointer;border-radius:3px;">💾 Save</button>
+    </div>`;
+}
+
+window._socioSelectFigure = function(id) {
+  _socioActiveFigure = id;
+  _renderSocioContent();
+};
+
+window._socioSaveFigure = function(id) {
+  if (!definitions.public_figures) definitions.public_figures = {};
+  const existing = definitions.public_figures[id] || {};
+  definitions.public_figures[id] = {
+    ...existing,
+    id,
+    name:                  document.getElementById('fig_name').value,
+    title:                 document.getElementById('fig_title').value,
+    age:                   parseInt(document.getElementById('fig_age').value)||0,
+    category:              document.getElementById('fig_cat').value,
+    role:                  document.getElementById('fig_role').value,
+    party:                 document.getElementById('fig_party').value || null,
+    approval_rating:       parseFloat(document.getElementById('fig_approval').value)||0.5,
+    fame_level:            parseInt(document.getElementById('fig_fame').value)||1,
+    influence_power:       parseFloat(document.getElementById('fig_influence').value)||0.5,
+    credibility:           parseFloat(document.getElementById('fig_cred').value)||0.5,
+    bio:                   document.getElementById('fig_bio').value,
+    controversial_subjects: document.getElementById('fig_controversies').value
+      .split('\n').map(s=>s.trim()).filter(Boolean),
+    tags:                  document.getElementById('fig_tags').value
+      .split(',').map(s=>s.trim()).filter(Boolean),
+  };
+  saveDefinitions();
+  _renderSocioContent();
+  document.getElementById('statusBar').textContent = `Figure "${definitions.public_figures[id].name}" saved.`;
+};
+
+window._socioNewFigure = function() {
+  const id = 'pf_' + Date.now().toString(36);
+  if (!definitions.public_figures) definitions.public_figures = {};
+  definitions.public_figures[id] = {
+    id, name:'New Figure', title:'', role:'', category:'politician',
+    age:40, party:null, bio:'', approval_rating:0.5, fame_level:1,
+    influence_power:0.5, credibility:0.5, controversial_subjects:[], tags:[],
+    scope:'domestic', importance:0.5,
+  };
+  _socioActiveFigure = id;
+  _renderSocioContent();
+};
+
+window._socioDeleteFigure = function(id) {
+  if (!confirm('Delete this figure?')) return;
+  delete definitions.public_figures[id];
+  if (_socioActiveFigure === id) _socioActiveFigure = null;
+  saveDefinitions();
+  _renderSocioContent();
+};
+
+// (renderTemplateList visibility patched inline below)

@@ -156,3 +156,44 @@ def _on_fight_physical(data, world):
             break  # one incident per fight is enough
 
 subscribe("fight_physical", _on_fight_physical)
+
+
+# ── Reputation hooks ───────────────────────────────────────────────────────
+
+def _on_character_arrested(data, world):
+    from systems.reputation import apply_reputation_event
+    c = world.get("characters", {}).get(data.get("character_id"))
+    if c:
+        apply_reputation_event(c, "arrested", world)
+
+subscribe("character_arrested", _on_character_arrested)
+
+
+def _on_character_convicted(data, world):
+    from systems.reputation import apply_reputation_event
+    c = world.get("characters", {}).get(data.get("character_id"))
+    if c:
+        apply_reputation_event(c, "convicted", world)
+        apply_reputation_event(c, "notoriety_crime", world)
+
+subscribe("character_jailed", _on_character_convicted)
+
+
+def _on_character_fired_rep(data, world):
+    from systems.reputation import apply_reputation_event
+    c = world.get("characters", {}).get(data.get("character_id"))
+    if c:
+        apply_reputation_event(c, "fired", world)
+
+subscribe("character_fired", _on_character_fired_rep)
+
+
+def _on_fight_rep(data, world):
+    from systems.reputation import apply_reputation_event
+    for pid in data.get("parties", []):
+        c = world.get("characters", {}).get(pid)
+        if c:
+            apply_reputation_event(c, "assault", world)
+            apply_reputation_event(c, "notoriety_violence", world)
+
+subscribe("fight_physical", _on_fight_rep)

@@ -98,6 +98,8 @@ def ensure_relationship(
 
             "labels": [],
 
+            "kinship": None,
+
             "known_secrets": [],
 
             "shared_groups": [],

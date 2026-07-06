@@ -56,7 +56,7 @@ from systems.traffic    import update_ambient_traffic
 from systems.media      import generate_news
 from systems.emergency  import trigger_incident, resolve   # resolve polls arrival ticks
 from systems.law        import process_jail, process_trials, maybe_arrest_from_incidents
-from systems.jobs       import generate_job_listings, maybe_fire, process_interview
+from systems.jobs       import generate_job_listings, tick_job_market, maybe_fire, process_interview, init_company_slots
 from systems.postal_service     import update_postal_service
 from systems.service_vehicles   import update_service_vehicles
 from systems.appliance_degradation import update_appliance_degradation
@@ -71,11 +71,14 @@ from systems.conflict_pipeline import process_conflicts
 from systems.social_contracts  import check_contract_violations
 
 # -- Very slow (÷300) ─────────────────────────────────────────────
-from systems.crisis     import check_crises, process_crises
-from systems.politics   import process_pending_effects, check_election
-from systems.influence  import apply_public_figure_influence, apply_social_influence
+from systems.crisis         import check_crises, process_crises
+from systems.politics       import process_pending_effects, check_election
+from systems.influence      import apply_public_figure_influence, apply_social_influence
+from systems.socioeconomics import tick_socioeconomics
+from systems.reputation     import tick_reputation
+from systems.secrets        import tick_secrets
 from systems.hierarchy  import update_hierarchy
-from systems.faction_ai import apply_faction_influence
+from systems.faction_ai import apply_faction_influence, process_rival_tensions
 
 # -- Weekly ───────────────────────────────────────────────────────
 from systems.scheduling import generate_week_schedule, adjust_for_household
@@ -253,9 +256,13 @@ def tick(world):
 
     # -- Slow: still-periodic systems (÷30-60) ──────────────
 
-    # Job listings refresh; maybe_fire emits character_fired → handler calls apply_for_job
-    if every(world, CADENCE["job_market"], offset=10):
+    # Job market — init slots once, refresh daily, process interviews each cycle
+    if not world.get("company_slots"):
+        init_company_slots(world)
+    if not world.get("job_listings"):
         generate_job_listings(world)
+    if every(world, CADENCE["job_market"], offset=10):
+        tick_job_market(world)          # daily turnover + new listings
         for c in characters:
             maybe_fire(c, world)        # emits character_fired → apply_for_job
             process_interview(c, world) # polls interview.tick; emits character_hired
@@ -313,6 +320,17 @@ def tick(world):
     if every(world, CADENCE["contract_checks"], offset=26):
         check_contract_violations(world)  # emits contract_violated
 
+    # -- Daily stats drift ──────────────────────────────────
+    if every(world, CADENCE["socioeconomics"], offset=19):
+        try:
+            from core.definitions import load_definitions
+            _defs = load_definitions(world.get("sim_id", "default"))
+            tick_socioeconomics(world, _defs)
+        except Exception:
+            pass
+        tick_reputation(world)
+        tick_secrets(world)
+
     # -- Very slow (÷300) ───────────────────────────────────
     if every(world, CADENCE["crisis"], offset=20):
         check_crises(world)
@@ -326,6 +344,7 @@ def tick(world):
         apply_faction_influence(world)
         apply_public_figure_influence(world)
         apply_social_influence(world)
+        process_rival_tensions(world)
 
     if every(world, CADENCE["hierarchy"], offset=23):
         update_hierarchy(world)
