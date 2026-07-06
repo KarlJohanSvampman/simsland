@@ -574,6 +574,7 @@ def build_context(
         "domestic_situation": _build_domestic_context(c, world),
         "emotional_control_situation": _build_emotional_control_context(c, world),
         "religious_repression": _build_repression_context(c, world),
+        "pregnancy":         _build_pregnancy_context(c, world),
         "trauma":            _build_trauma_context(c, world),
         "sexual_history":    _build_pleasure_context(c, world),
     }
@@ -1341,5 +1342,13 @@ def _build_repression_context(c, world):
     try:
         from systems.religious_repression import get_repression_context
         return get_repression_context(c, world)
+    except Exception:
+        return []
+
+
+def _build_pregnancy_context(c, world):
+    try:
+        from systems.pregnancy import get_pregnancy_context
+        return get_pregnancy_context(c, world)
     except Exception:
         return []

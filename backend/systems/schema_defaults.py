@@ -431,6 +431,18 @@ def ensure_character_defaults(c):
         "dependency_score":    0.0,    # 0-1; high = can't climax without that dynamic
     })
 
+    # Pregnancy state
+    c.setdefault("pregnancy", {
+        "status":          "none",    # none | pregnant | postpartum | aborted | adopted_out
+        "father_id":       None,
+        "conception_tick": 0,
+        "discovered_tick": None,
+        "decision":        "undecided",
+        "decision_tick":   None,
+        "weeks":           0,
+        "drama_fired":     [],
+    })
+
     # Religious repression — shame/identity conflict from strict upbringing
     c.setdefault("repression_state", {
         "repression_score":       0.0,   # 0-1 accumulated shame/suppression

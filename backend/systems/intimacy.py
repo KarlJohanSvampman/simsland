@@ -499,6 +499,16 @@ def execute_act(initiator, recipient, act_id, world):
         except Exception:
             pass
 
+    # ── Conception check ──────────────────────────────────────────────────
+    if act_stage >= 5:
+        try:
+            from systems.pregnancy import maybe_conceive
+            female = initiator if initiator.get("sex") in ("female","intersex") else recipient
+            male   = recipient if female is initiator else initiator
+            maybe_conceive(female, male, world)
+        except Exception:
+            pass
+
     return {
         "ok":         True,
         "act_id":     act_id,

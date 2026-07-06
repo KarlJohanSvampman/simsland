@@ -51,6 +51,15 @@ SEVERITY = {
     "witnessed_transgression":   6.0,   # heard via gossip that someone did this
     "romantic_rivalry":         10.0,   # rival revealed attraction to same person
     "fight_loss_humiliation":   12.0,   # lost a physical fight (public humiliation)
+    # Pregnancy drama
+    "family_pregnancy_shock":         14.0,
+    "family_abortion_conflict":       18.0,
+    "family_adoption_grief":          12.0,
+    "family_pregnancy_obligation":    10.0,
+    "family_social_shame":            10.0,
+    "family_birth_event":              6.0,
+    "father_family_blamed":           15.0,
+    "mother_family_blamed":           15.0,
 }
 
 

@@ -86,6 +86,7 @@ from systems.exercise        import tick_exercise
 from systems.impulse         import tick_impulse, sync_anger_from_grievances, add_anger_pressure
 from systems.domestic_control import tick_domestic_control, tick_quid_pro_quo, check_victim_revenge, tick_emotional_control
 from systems.religious_repression import tick_religious_repression
+from systems.pregnancy import tick_pregnancy
 
 # -- Weekly ───────────────────────────────────────────────────────
 from systems.scheduling import generate_week_schedule, adjust_for_household
@@ -199,7 +200,8 @@ def tick(world):
             adjust_for_household(c, world)
             reset_weekly_counts(c)
             distribute_lt_needs(c, world=world)  # no-op if already distributed
-        tick_exercise(world)   # weekly fitness decay + streak tracking
+        tick_exercise(world)
+        tick_pregnancy(world)   # weekly fitness decay + streak tracking
 
     # -- Fast: perception + attention (÷5) ──────────────────
     if every(world, CADENCE["perception"]):

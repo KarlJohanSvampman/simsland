@@ -59,6 +59,19 @@ TRAUMA_SEVERITY = {
     "sexual_curiosity_shame":     0.05,
     "residual_identity_shame":    0.08,
     "identity_crisis_onset":      0.15,
+    # Pregnancy drama
+    "unplanned_pregnancy_discovery": 0.14,
+    "abortion_grief":             0.10,
+    "adoption_grief":             0.12,
+    "family_pregnancy_discovery": 0.08,
+    "family_pregnancy_showing":   0.05,
+    "family_pregnancy_birth":     0.04,
+    "family_pregnancy_abortion_decision": 0.10,
+    "family_pregnancy_adoption_decision": 0.07,
+    "family_pregnancy_keep_decision":     0.05,
+    "pregnancy_discovery":        0.06,
+    "pregnancy_abortion_decision":0.08,
+    "pregnancy_keep_decision":    0.04,
 }
 
 # Psychological thresholds
