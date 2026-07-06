@@ -20857,6 +20857,24 @@
         "romance_weight": 0.4,
         "casual_sex_reluctance": 0.4
       }
+    },
+    "boundary_violator": {
+      "label": "Boundary Violator",
+      "description": "Disregards others' consent; may ignore rejection and escalate sexually or physically.",
+      "category": "sexuality",
+      "effects": {
+        "boundary_respect": -1.0,
+        "coercion_risk": 1.0
+      }
+    },
+    "boundary_respectful": {
+      "label": "Boundary Respectful",
+      "description": "Deeply respectful of consent; immediately backs off at any sign of discomfort.",
+      "category": "sexuality",
+      "effects": {
+        "boundary_respect": 1.0,
+        "coercion_risk": -1.0
+      }
     }
   },
   "recipe_templates": {
@@ -47712,5 +47730,412 @@
       "condition": "has_trait_arrogant",
       "boost": -0.3
     }
-  ]
+  ],
+  "positions_registry": {
+    "missionary": {
+      "label": "Missionary",
+      "description": "Classic face-to-face position with initiator on top.",
+      "compatible_with": [
+        "heterosexual",
+        "same_sex_male",
+        "same_sex_female"
+      ],
+      "formation": "lying_face_to_face",
+      "initiator_role": "on_top",
+      "acts_enhanced": [
+        "intercourse_missionary",
+        "frottage"
+      ],
+      "minimum_stage": 6,
+      "intensity": 2,
+      "eye_contact": true,
+      "emotional_intimacy": 0.3,
+      "pleasure_modifier": {
+        "initiator": 0.0,
+        "recipient": 0.05
+      }
+    },
+    "doggy_style": {
+      "label": "Doggy Style",
+      "description": "Rear-entry position, initiator behind recipient.",
+      "compatible_with": [
+        "heterosexual",
+        "same_sex_male",
+        "same_sex_female"
+      ],
+      "formation": "rear_entry_kneeling",
+      "initiator_role": "behind",
+      "acts_enhanced": [
+        "intercourse_missionary",
+        "anal_intercourse"
+      ],
+      "minimum_stage": 6,
+      "intensity": 3,
+      "eye_contact": false,
+      "emotional_intimacy": -0.1,
+      "pleasure_modifier": {
+        "initiator": 0.15,
+        "recipient": 0.05
+      }
+    },
+    "cowgirl": {
+      "label": "Cowgirl",
+      "description": "Recipient on top, facing initiator.",
+      "compatible_with": [
+        "heterosexual",
+        "same_sex_male",
+        "same_sex_female"
+      ],
+      "formation": "sitting_straddle_facing",
+      "initiator_role": "on_bottom",
+      "acts_enhanced": [
+        "intercourse_missionary"
+      ],
+      "minimum_stage": 6,
+      "intensity": 2,
+      "eye_contact": true,
+      "emotional_intimacy": 0.15,
+      "pleasure_modifier": {
+        "initiator": 0.0,
+        "recipient": 0.15
+      }
+    },
+    "reverse_cowgirl": {
+      "label": "Reverse Cowgirl",
+      "description": "Recipient on top, facing away.",
+      "compatible_with": [
+        "heterosexual",
+        "same_sex_male"
+      ],
+      "formation": "sitting_straddle_reverse",
+      "initiator_role": "on_bottom",
+      "acts_enhanced": [
+        "intercourse_missionary"
+      ],
+      "minimum_stage": 6,
+      "intensity": 3,
+      "eye_contact": false,
+      "emotional_intimacy": -0.05,
+      "pleasure_modifier": {
+        "initiator": 0.1,
+        "recipient": 0.1
+      }
+    },
+    "spooning": {
+      "label": "Spooning",
+      "description": "Side-by-side, initiator behind recipient.",
+      "compatible_with": [
+        "heterosexual",
+        "same_sex_male",
+        "same_sex_female"
+      ],
+      "formation": "lying_side_rear",
+      "initiator_role": "behind",
+      "acts_enhanced": [
+        "intercourse_missionary",
+        "frottage"
+      ],
+      "minimum_stage": 6,
+      "intensity": 1,
+      "eye_contact": false,
+      "emotional_intimacy": 0.25,
+      "pleasure_modifier": {
+        "initiator": -0.05,
+        "recipient": 0.0
+      }
+    },
+    "standing": {
+      "label": "Standing",
+      "description": "Both upright, initiator behind or facing.",
+      "compatible_with": [
+        "heterosexual",
+        "same_sex_male",
+        "same_sex_female"
+      ],
+      "formation": "standing_upright",
+      "initiator_role": "behind_or_front",
+      "acts_enhanced": [
+        "intercourse_missionary"
+      ],
+      "minimum_stage": 6,
+      "intensity": 3,
+      "eye_contact": false,
+      "emotional_intimacy": -0.15,
+      "pleasure_modifier": {
+        "initiator": 0.05,
+        "recipient": -0.1
+      }
+    },
+    "sixty_nine": {
+      "label": "Sixty-Nine",
+      "description": "Mutual oral stimulation simultaneously.",
+      "compatible_with": [
+        "heterosexual",
+        "same_sex_male",
+        "same_sex_female"
+      ],
+      "formation": "inverted_face_to_groin",
+      "initiator_role": "any",
+      "acts_enhanced": [
+        "oral_sex",
+        "tribadism"
+      ],
+      "minimum_stage": 5,
+      "intensity": 3,
+      "eye_contact": false,
+      "emotional_intimacy": 0.1,
+      "pleasure_modifier": {
+        "initiator": 0.2,
+        "recipient": 0.2
+      }
+    },
+    "face_sitting": {
+      "label": "Face-Sitting",
+      "description": "One partner sits on the other's face for oral stimulation.",
+      "compatible_with": [
+        "heterosexual",
+        "same_sex_male",
+        "same_sex_female"
+      ],
+      "formation": "sitting_on_face",
+      "initiator_role": "on_bottom",
+      "acts_enhanced": [
+        "oral_sex"
+      ],
+      "minimum_stage": 5,
+      "intensity": 3,
+      "eye_contact": false,
+      "emotional_intimacy": 0.05,
+      "pleasure_modifier": {
+        "initiator": -0.1,
+        "recipient": 0.3
+      }
+    },
+    "scissors": {
+      "label": "Scissors / Tribadism",
+      "description": "Mutual grinding between two female partners.",
+      "compatible_with": [
+        "same_sex_female"
+      ],
+      "formation": "interlocked_lying",
+      "initiator_role": "any",
+      "acts_enhanced": [
+        "tribadism"
+      ],
+      "minimum_stage": 6,
+      "intensity": 2,
+      "eye_contact": false,
+      "emotional_intimacy": 0.2,
+      "pleasure_modifier": {
+        "initiator": 0.15,
+        "recipient": 0.15
+      }
+    },
+    "cuddling_intimate": {
+      "label": "Intimate Cuddling",
+      "description": "Close holding with gentle touching \u2014 sensual rather than explicitly sexual.",
+      "compatible_with": [
+        "heterosexual",
+        "same_sex_male",
+        "same_sex_female"
+      ],
+      "formation": "lying_embraced",
+      "initiator_role": "any",
+      "acts_enhanced": [
+        "cuddling",
+        "mutual_touch"
+      ],
+      "minimum_stage": 3,
+      "intensity": 1,
+      "eye_contact": true,
+      "emotional_intimacy": 0.4,
+      "pleasure_modifier": {
+        "initiator": 0.0,
+        "recipient": 0.0
+      }
+    }
+  },
+  "kinks_registry": {
+    "roleplay": {
+      "label": "Roleplay",
+      "category": "psychological",
+      "intensity": 1,
+      "description": "Enjoys acting out scenarios or characters during intimacy.",
+      "requires_consent": true,
+      "mutual": false,
+      "pleasure_bonus": 0.1
+    },
+    "dirty_talk": {
+      "label": "Dirty Talk",
+      "category": "verbal",
+      "intensity": 1,
+      "description": "Aroused by explicit verbal expression during intimacy.",
+      "requires_consent": false,
+      "mutual": false,
+      "pleasure_bonus": 0.08
+    },
+    "light_bdsm": {
+      "label": "Light BDSM",
+      "category": "power_exchange",
+      "intensity": 2,
+      "description": "Enjoys mild restraint, light spanking, or power dynamics.",
+      "requires_consent": true,
+      "mutual": false,
+      "pleasure_bonus": 0.15
+    },
+    "dominance": {
+      "label": "Dominance",
+      "category": "power_exchange",
+      "intensity": 2,
+      "description": "Prefers taking control; aroused by leading the encounter.",
+      "requires_consent": true,
+      "mutual": false,
+      "pleasure_bonus": 0.12
+    },
+    "submission": {
+      "label": "Submission",
+      "category": "power_exchange",
+      "intensity": 2,
+      "description": "Prefers being led; aroused by relinquishing control.",
+      "requires_consent": true,
+      "mutual": false,
+      "pleasure_bonus": 0.12
+    },
+    "voyeurism": {
+      "label": "Voyeurism",
+      "category": "visual",
+      "intensity": 2,
+      "description": "Aroused by watching others; may watch or be watched.",
+      "requires_consent": true,
+      "mutual": false,
+      "pleasure_bonus": 0.1
+    },
+    "exhibitionism": {
+      "label": "Exhibitionism",
+      "category": "visual",
+      "intensity": 2,
+      "description": "Aroused by being seen or performing for an audience.",
+      "requires_consent": true,
+      "mutual": false,
+      "pleasure_bonus": 0.1
+    },
+    "sensory_play": {
+      "label": "Sensory Play",
+      "category": "physical",
+      "intensity": 2,
+      "description": "Enjoys blindfolds, temperature play, feathers, or texture.",
+      "requires_consent": true,
+      "mutual": false,
+      "pleasure_bonus": 0.1
+    },
+    "foot_fetish": {
+      "label": "Foot Fetish",
+      "category": "body_focus",
+      "intensity": 1,
+      "description": "Specifically aroused by feet.",
+      "requires_consent": false,
+      "mutual": false,
+      "pleasure_bonus": 0.1
+    },
+    "size_preference_larger": {
+      "label": "Size Preference \u2014 Larger",
+      "category": "body_focus",
+      "intensity": 1,
+      "description": "Attracted to larger partners.",
+      "requires_consent": false,
+      "mutual": false,
+      "pleasure_bonus": 0.05
+    },
+    "size_preference_smaller": {
+      "label": "Size Preference \u2014 Smaller",
+      "category": "body_focus",
+      "intensity": 1,
+      "description": "Attracted to petite partners.",
+      "requires_consent": false,
+      "mutual": false,
+      "pleasure_bonus": 0.05
+    },
+    "rough_sex": {
+      "label": "Rough Sex",
+      "category": "physical",
+      "intensity": 3,
+      "description": "Prefers intense, aggressive physical encounters.",
+      "requires_consent": true,
+      "mutual": true,
+      "pleasure_bonus": 0.2
+    },
+    "gentle_sex": {
+      "label": "Gentle / Slow Sex",
+      "category": "physical",
+      "intensity": 1,
+      "description": "Prefers slow, tender, emotionally connected encounters.",
+      "requires_consent": false,
+      "mutual": false,
+      "pleasure_bonus": 0.08
+    },
+    "outdoor_sex": {
+      "label": "Outdoor / Public Risk",
+      "category": "situational",
+      "intensity": 2,
+      "description": "Aroused by the risk of being caught outdoors or in semi-public places.",
+      "requires_consent": true,
+      "mutual": false,
+      "pleasure_bonus": 0.15
+    },
+    "bondage": {
+      "label": "Bondage",
+      "category": "power_exchange",
+      "intensity": 3,
+      "description": "Aroused by physical restraint using rope, cuffs, or similar.",
+      "requires_consent": true,
+      "mutual": false,
+      "pleasure_bonus": 0.18
+    },
+    "masochism": {
+      "label": "Masochism",
+      "category": "power_exchange",
+      "intensity": 3,
+      "description": "Derives pleasure from receiving pain in a consensual context.",
+      "requires_consent": true,
+      "mutual": false,
+      "pleasure_bonus": 0.2
+    },
+    "sadism": {
+      "label": "Sadism",
+      "category": "power_exchange",
+      "intensity": 3,
+      "description": "Derives pleasure from inflicting consensual pain.",
+      "requires_consent": true,
+      "mutual": false,
+      "pleasure_bonus": 0.2
+    },
+    "group_sex": {
+      "label": "Group Sex",
+      "category": "situational",
+      "intensity": 3,
+      "description": "Interested in encounters with more than one partner simultaneously.",
+      "requires_consent": true,
+      "mutual": false,
+      "pleasure_bonus": 0.15
+    },
+    "tantric": {
+      "label": "Tantric / Meditative",
+      "category": "spiritual",
+      "intensity": 1,
+      "description": "Values slow, intentional, spiritually connected intimacy.",
+      "requires_consent": false,
+      "mutual": true,
+      "pleasure_bonus": 0.12
+    },
+    "aftercare_important": {
+      "label": "Aftercare \u2014 High Need",
+      "category": "emotional",
+      "intensity": 1,
+      "description": "Needs significant emotional care and reassurance after intimate encounters.",
+      "requires_consent": false,
+      "mutual": false,
+      "pleasure_bonus": 0.0,
+      "aftercare_modifier": 0.3
+    }
+  }
 }

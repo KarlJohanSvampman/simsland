@@ -464,7 +464,45 @@ def generate_character(defs, overrides=None):
     try:
         from systems.attraction import generate_attraction_profile as _gen_ap
         _gen_ap(character, defs)
-    except Exception as _e:
+    except Exception:
         character.setdefault("attraction_profile", None)
 
+    # Sexual preferences — positions, kinks (adults only)
+    if age_group not in ("child", "teen"):
+        try:
+            _gen_sexual_preferences(character, defs)
+        except Exception:
+            pass
+
     return character
+
+
+def _gen_sexual_preferences(c, defs):
+    """Assign random sexual preferences from definitions registries."""
+    positions = list(defs.get("positions_registry", {}).keys())
+    kinks     = list(defs.get("kinks_registry",     {}).keys())
+
+    # Pick 1-3 liked positions, 0-1 disliked
+    liked    = random.sample(positions, min(random.randint(1, 3), len(positions))) if positions else []
+    disliked = random.sample([p for p in positions if p not in liked],
+                             min(random.randint(0, 1), max(0, len(positions) - len(liked)))) if positions else []
+
+    # Kinks: probability of having any = 0.65; pick 0-3
+    all_kinks     = []
+    hard_no_kinks = []
+    kinks_reg     = defs.get("kinks_registry", {})
+    if kinks and random.random() < 0.65:
+        num = random.randint(1, min(3, len(kinks)))
+        all_kinks = random.sample(kinks, num)
+    # Hard-no: a few kinks the character explicitly rejects
+    remaining = [k for k in kinks if k not in all_kinks]
+    if remaining and random.random() < 0.40:
+        hard_no_kinks = random.sample(remaining, min(random.randint(1, 2), len(remaining)))
+
+    c.setdefault("sexual_preferences", {
+        "positions_liked":    liked,
+        "positions_disliked": disliked,
+        "kinks":              all_kinks,
+        "kinks_hard_no":      hard_no_kinks,
+        "partner_experience": {},
+    })

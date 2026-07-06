@@ -29,6 +29,15 @@ import uuid
 from systems.grievances import add_grievance
 from systems.reputation import apply_reputation_event
 
+# ── Boundary respect thresholds ───────────────────────────────────────────
+# Characters with boundary_violator trait may ignore rejection
+COERCION_TRAIT_RISK    = {"boundary_violator", "aggressive", "controlling",
+                           "possessive", "manipulative", "ruthless"}
+BOUNDARY_SAFE_TRAITS   = {"boundary_respectful", "compassionate", "honest",
+                           "empathetic", "loyal"}
+IGNORE_REJECTION_BASE  = 0.05   # 5% base chance any rejected proposal escalates
+COERCION_RISK_MULT     = 8.0    # multiplier for high-risk traits
+
 # ── Stage configuration ───────────────────────────────────────────────────
 
 STAGE_LABELS = {
@@ -294,6 +303,20 @@ def recipient_decision(recipient, proposer, world):
     act_tier  = act.get("tier", 3)
     act_stage = TIER_TO_STAGE.get(act_tier, act_tier)
 
+    # ── Preference-aware scoring ──────────────────────────────────────────
+    prefs = recipient.get("sexual_preferences", {})
+    # Hard-no kinks requested in the proposed act
+    act_kinks = set(act.get("kinks", []))
+    hard_no   = set(prefs.get("kinks_hard_no", []))
+    if act_kinks & hard_no:
+        # Proposing a hard-no kink → immediate reject
+        return "reject"
+    # Liked kinks boost willingness
+    liked_kinks = set(prefs.get("kinks", []))
+    kink_match  = len(act_kinks & liked_kinks)
+    # Trauma: intimacy_avoidance reduces willingness
+    trauma_avoidance = recipient.get("trauma", {}).get("intimacy_avoidance", 0.0)
+
     # Gather recipient relationship state
     attraction  = r_rel.get("attraction",  0) / 100.0
     trust       = r_rel.get("trust",       0) / 100.0
@@ -311,6 +334,17 @@ def recipient_decision(recipient, proposer, world):
 
     # Base willingness — combination of attraction, trust, arousal
     willingness = (attraction * 0.5 + trust * 0.25 + comfort * 0.15 + arousal * 0.10)
+
+    # Kink match bonus
+    willingness += kink_match * 0.08
+
+    # Trauma avoidance penalty
+    willingness -= trauma_avoidance * 0.4
+
+    # Trust floor check (trauma raises minimum trust required)
+    trust_floor = recipient.get("trauma", {}).get("trust_floor", 0.0)
+    if trust_floor > 0 and trust < trust_floor:
+        willingness -= (trust_floor - trust) * 0.8
 
     # Anxiety penalty
     willingness -= anxiety * 0.25
@@ -442,6 +476,19 @@ def execute_act(initiator, recipient, act_id, world):
             apply_reputation_event(initiator, "public_indecency", world)
             apply_reputation_event(recipient, "public_indecency", world)
 
+    # ── Pleasure + climax resolution ─────────────────────────────────────
+    pleasure_outcome = None
+    if act_stage >= 5:   # only for explicit stages
+        try:
+            from systems.pleasure import resolve_encounter_outcome
+            pleasure_outcome = resolve_encounter_outcome(
+                initiator, recipient, act_id,
+                position_id=None,    # position set separately by action_router
+                world=world
+            )
+        except Exception:
+            pass
+
     return {
         "ok":         True,
         "act_id":     act_id,
@@ -450,6 +497,7 @@ def execute_act(initiator, recipient, act_id, world):
         "formation":  act.get("spatial", {}).get("formation", ""),
         "initiator_animation": act.get("animations", {}).get("initiator", ""),
         "recipient_animation": act.get("animations", {}).get("recipient", ""),
+        "pleasure_outcome":    pleasure_outcome,
     }
 
 
@@ -492,6 +540,64 @@ def _handle_rejection_fallout(proposer, recipient, world):
     rel = proposer.get("relationships", {}).get(recipient["id"], {})
     if rel:
         rel["resentment"] = min(100, rel.get("resentment", 0) + severity)
+
+
+# ── Non-consent escalation ────────────────────────────────────────────────
+
+def maybe_ignore_rejection(proposer, recipient, world):
+    """
+    After a rejection, check whether the proposer ignores it and forces the act.
+    Only called when rejection state is set.
+
+    Returns:
+      "backed_off" — character respected the rejection
+      "escalated"  — character ignored rejection → triggers resolve_sexual_assault()
+    """
+    pid = proposer["id"]
+    rid = recipient["id"]
+
+    p_traits = set(proposer.get("traits", []) + proposer.get("personality_traits", []))
+
+    # Safe traits make coercion nearly impossible
+    if p_traits & BOUNDARY_SAFE_TRAITS:
+        return "backed_off"
+
+    # Compute coercion risk
+    risk = IGNORE_REJECTION_BASE
+    risk_traits = p_traits & COERCION_TRAIT_RISK
+    if risk_traits:
+        risk *= COERCION_RISK_MULT * (1 + 0.3 * (len(risk_traits) - 1))
+
+    # Arousal amplifies risk
+    p_rel = proposer.get("relationships", {}).get(rid, {})
+    arousal = p_rel.get("arousal_level", 0.0)
+    risk += arousal * 0.15
+
+    # High attraction and prior relationship reduces (more invested in consent)
+    attraction = p_rel.get("attraction", 0) / 100.0
+    trust      = p_rel.get("trust",      0) / 100.0
+    if attraction > 0.7 and trust > 0.6:
+        risk *= 0.5   # cares about the relationship
+
+    risk = min(0.90, risk)
+
+    if random.random() > risk:
+        return "backed_off"
+
+    # Escalation — call trauma system
+    try:
+        from systems.trauma import resolve_sexual_assault
+        outcome = resolve_sexual_assault(proposer, recipient, world)
+        # Reset negotiation to idle — the act is over (with terrible consequences)
+        tick = world.get("tick", 0)
+        idle_neg = {"state": NEG_IDLE, "proposed_act": None, "proposed_by": None,
+                    "counter_act": None, "condition": None, "last_tick": tick}
+        p_rel["negotiation"] = dict(idle_neg)
+        r_rel = recipient.get("relationships", {}).setdefault(pid, {})
+        r_rel["negotiation"] = dict(idle_neg)
+        return "escalated"
+    except Exception:
+        return "backed_off"
 
 
 # ── Context helper ────────────────────────────────────────────────────────

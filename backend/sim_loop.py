@@ -79,6 +79,9 @@ from systems.reputation     import tick_reputation
 from systems.secrets        import tick_secrets
 from systems.hierarchy  import update_hierarchy
 from systems.faction_ai import apply_faction_influence, process_rival_tensions
+from systems.intimacy   import tick_intimacy
+from systems.envy       import tick_envy
+from systems.trauma     import tick_trauma
 
 # -- Weekly ───────────────────────────────────────────────────────
 from systems.scheduling import generate_week_schedule, adjust_for_household
@@ -330,6 +333,11 @@ def tick(world):
             pass
         tick_reputation(world)
         tick_secrets(world)
+        tick_envy(world)
+        tick_trauma(world)
+
+    # -- Intimacy arousal decay (every tick) ───────────────
+    tick_intimacy(world)
 
     # -- Very slow (÷300) ───────────────────────────────────
     if every(world, CADENCE["crisis"], offset=20):
@@ -374,11 +382,4 @@ def tick(world):
 
     # -- Maybe-RSVP deadline nudges ──────────────────────────────
     if every(world, CADENCE["maybe_deadlines"], offset=31):
-        check_maybe_deadlines(world)
-
-    if every(world, CADENCE["calendar_events"], offset=32):
-        check_calendar_reminders(world)
-
-    # Story arcs are lightweight — keep per-tick
-    for c in characters:
-        update_story_arc(c)
+        check_m

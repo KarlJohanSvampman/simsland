@@ -419,6 +419,24 @@ def ensure_character_defaults(c):
     c.setdefault("arousal_level",      0.0)    # global arousal (separate from per-rel)
     c.setdefault("attractiveness",     None)   # None = auto-computed on first use
 
+    # Sexual preferences: positions liked/disliked, kinks, partner experience counter
+    c.setdefault("sexual_preferences", {
+        "positions_liked":    [],   # list of position keys from positions_registry
+        "positions_disliked": [],
+        "kinks":              [],   # list of kink keys from kinks_registry
+        "kinks_hard_no":      [],   # will never do these
+        "partner_experience": {},   # {other_id: int} — sessions with that partner
+    })
+
+    # Trauma tracking
+    c.setdefault("trauma", {
+        "score":       0.0,    # 0-1 cumulative
+        "events":      [],     # list of trauma event records
+        "ptsd_active": False,
+        "intimacy_avoidance": 0.0,    # 0-1 reluctance modifier
+        "trust_floor": 0.0,           # minimum trust required before any intimacy
+    })
+
     c.setdefault(
         "ses",
         0.5

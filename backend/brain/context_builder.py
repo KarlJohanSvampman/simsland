@@ -569,6 +569,8 @@ def build_context(
         "attraction":        _build_attraction_context(c, world),
         "intimacy":          _build_intimacy_context(c, world),
         "envy_conflicts":    _build_envy_context(c, world),
+        "trauma":            _build_trauma_context(c, world),
+        "sexual_history":    _build_pleasure_context(c, world),
     }
 
     return context
@@ -1278,5 +1280,21 @@ def _build_envy_context(c, world):
     try:
         from systems.envy import get_envy_context
         return get_envy_context(c, world).get("envy_conflicts", [])
+    except Exception:
+        return []
+
+
+def _build_trauma_context(c, world):
+    try:
+        from systems.trauma import get_trauma_context
+        return get_trauma_context(c, world).get("trauma", [])
+    except Exception:
+        return []
+
+
+def _build_pleasure_context(c, world):
+    try:
+        from systems.pleasure import get_pleasure_context
+        return get_pleasure_context(c, world).get("sexual_history", [])
     except Exception:
         return []
