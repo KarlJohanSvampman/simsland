@@ -20932,6 +20932,71 @@
       "effects": {
         "sexism_level": -0.3
       }
+    },
+    "controlling_partner": {
+      "label": "Controlling Partner",
+      "description": "Uses psychological pressure, jealousy, and isolation to dominate intimate partners.",
+      "category": "personality",
+      "effects": {
+        "domestic_control_tendency": 0.6,
+        "jealousy_monitor": true
+      }
+    },
+    "domestic_abuser": {
+      "label": "Domestic Abuser",
+      "description": "Directs violence preferentially at intimate partners; uses shame, threats, and physical force to maintain control.",
+      "category": "personality",
+      "effects": {
+        "domestic_control_tendency": 0.9,
+        "intimate_target_bias": 0.8,
+        "sexism_level": 0.3
+      }
+    },
+    "low_self_esteem": {
+      "label": "Low Self-Esteem",
+      "description": "Prone to self-doubt; more vulnerable to negging and psychological manipulation.",
+      "category": "personality",
+      "effects": {
+        "self_confidence_base": -0.3,
+        "manipulation_vulnerability": 0.25
+      }
+    },
+    "codependent": {
+      "label": "Codependent",
+      "description": "Ties self-worth to the relationship; tolerates mistreatment to avoid abandonment.",
+      "category": "personality",
+      "effects": {
+        "leave_relationship_threshold_mult": 1.8,
+        "dependency_gain_mult": 1.4
+      }
+    },
+    "authority_abuser": {
+      "label": "Authority Abuser",
+      "description": "Exploits institutional position (police, boss, doctor) to control and conceal abuse. Reports are less believed; victim faces retaliatory consequences.",
+      "category": "personality",
+      "effects": {
+        "concealment_bonus": 0.5,
+        "report_belief_penalty": 0.4,
+        "retaliation_access": true
+      }
+    },
+    "power_gatekeeper": {
+      "label": "Power Gatekeeper",
+      "description": "Controls career opportunities, contacts, or resources others depend on. Uses this leverage for coercive quid-pro-quo arrangements.",
+      "category": "personality",
+      "effects": {
+        "opportunity_leverage": 0.7,
+        "quid_pro_quo_tendency": 0.65
+      }
+    },
+    "career_ambitious": {
+      "label": "Career Ambitious",
+      "description": "Strongly motivated by professional advancement; vulnerable to quid-pro-quo pressure from gatekeepers.",
+      "category": "personality",
+      "effects": {
+        "career_drive": 0.4,
+        "gatekeeper_vulnerability": 0.25
+      }
     }
   },
   "recipe_templates": {

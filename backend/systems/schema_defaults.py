@@ -419,6 +419,9 @@ def ensure_character_defaults(c):
     c.setdefault("arousal_level",      0.0)    # global arousal (separate from per-rel)
     c.setdefault("attractiveness",     None)   # None = auto-computed on first use
 
+    # Self-confidence — degraded by negging/manipulation; affects assertiveness
+    c.setdefault("self_confidence", 0.60)   # 0-1; 0.60 default healthy baseline
+
     # Impulse control — anger pressure vs self-control
     c.setdefault("impulse_state", {
         "anger_pressure":   0.0,   # 0-1; accumulates from grievances/frustration

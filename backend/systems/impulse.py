@@ -161,6 +161,25 @@ def _trigger_outburst(c, imp, threshold, world):
     if isinstance(chars, list):
         chars = {ch["id"]: ch for ch in chars}
 
+    # Domestic abuser: preferentially target intimate partner
+    try:
+        from systems.domestic_control import get_domestic_target
+        override = get_domestic_target(c, chars)
+        if override and override in chars:
+            target = chars[override]
+            _apply_outburst_consequences(c, target, "assault", world)
+            imp["anger_pressure"] = round(imp["anger_pressure"] * 0.45, 4)
+            imp["last_outburst_tick"] = tick
+            try:
+                from core.event_bus import emit
+                emit("impulsive_outburst", {"actor_id": cid, "target_id": override,
+                     "act_type": "domestic_assault", "pressure": imp["anger_pressure"], "tick": tick})
+            except Exception:
+                pass
+            return
+    except Exception:
+        pass
+
     from systems.grievances import get_grievance_score
     best_target_id = None
     best_score     = 0.0

@@ -82,8 +82,9 @@ from systems.faction_ai import apply_faction_influence, process_rival_tensions
 from systems.intimacy   import tick_intimacy
 from systems.envy       import tick_envy
 from systems.trauma     import tick_trauma
-from systems.exercise   import tick_exercise
-from systems.impulse    import tick_impulse, sync_anger_from_grievances, add_anger_pressure
+from systems.exercise        import tick_exercise
+from systems.impulse         import tick_impulse, sync_anger_from_grievances, add_anger_pressure
+from systems.domestic_control import tick_domestic_control, tick_quid_pro_quo, check_victim_revenge
 
 # -- Weekly ───────────────────────────────────────────────────────
 from systems.scheduling import generate_week_schedule, adjust_for_household
@@ -338,8 +339,11 @@ def tick(world):
         tick_secrets(world)
         tick_envy(world)
         tick_trauma(world)
+        tick_domestic_control(world)
+        tick_quid_pro_quo(world)
         for _c in characters:
             sync_anger_from_grievances(_c, world)
+            check_victim_revenge(_c, world)
 
     # -- Intimacy arousal decay (every tick) ───────────────
     tick_intimacy(world)
