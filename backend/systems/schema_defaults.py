@@ -419,6 +419,11 @@ def ensure_character_defaults(c):
     c.setdefault("arousal_level",      0.0)    # global arousal (separate from per-rel)
     c.setdefault("attractiveness",     None)   # None = auto-computed on first use
 
+    # Physical body features — used for fertility appeal scoring
+    # Female chars: breast_size, hip_ratio, thigh_build assigned at gen
+    # Male chars: build, height_cm assigned at gen
+    c.setdefault("body_features", {})
+
     # Sexual preferences: positions liked/disliked, kinks, partner experience counter
     c.setdefault("sexual_preferences", {
         "positions_liked":    [],   # list of position keys from positions_registry

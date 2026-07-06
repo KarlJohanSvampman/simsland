@@ -29,20 +29,7 @@ import uuid
 from systems.grievances import add_grievance
 from systems.reputation import apply_reputation_event
 
-# ── Feature flag ─────────────────────────────────────────────────────────
-# Set COERCION_ENABLED = True to activate non-consent escalation mechanics.
-# While False, maybe_ignore_rejection() always returns "backed_off" and
-# the trauma system is never triggered from intimacy events.
-COERCION_ENABLED = False
-
-# ── Boundary respect thresholds ───────────────────────────────────────────
-# Characters with boundary_violator trait may ignore rejection
-COERCION_TRAIT_RISK    = {"boundary_violator", "aggressive", "controlling",
-                           "possessive", "manipulative", "ruthless"}
-BOUNDARY_SAFE_TRAITS   = {"boundary_respectful", "compassionate", "honest",
-                           "empathetic", "loyal"}
-IGNORE_REJECTION_BASE  = 0.05   # 5% base chance any rejected proposal escalates
-COERCION_RISK_MULT     = 8.0    # multiplier for high-risk traits
+# ── No non-consent mechanics — rejection always results in social consequences only
 
 # ── Stage configuration ───────────────────────────────────────────────────
 
@@ -548,65 +535,82 @@ def _handle_rejection_fallout(proposer, recipient, world):
         rel["resentment"] = min(100, rel.get("resentment", 0) + severity)
 
 
-# ── Non-consent escalation ────────────────────────────────────────────────
+# ── Social consequences of ignoring rejection ─────────────────────────────
 
-def maybe_ignore_rejection(proposer, recipient, world):
+def handle_ignored_rejection(proposer, recipient, world):
     """
-    After a rejection, check whether the proposer ignores it and forces the act.
-    Only called when rejection state is set.
+    Called when a character ignores a rejection and persists with an unwanted
+    advance.  No criminal mechanics — consequences are entirely social:
+      1. Deep disrespect grievance on the recipient
+      2. Significant trust/resentment damage
+      3. If in recipient's home → expulsion queued
+      4. High chance (0.70 base) the recipient gossips → reputation damage
+         and nearby characters hear of the transgression
 
-    Returns:
-      "backed_off" — character respected the rejection
-      "escalated"  — character ignored rejection → triggers resolve_sexual_assault()
+    Returns "disrespected".
     """
-    if not COERCION_ENABLED:
-        return "backed_off"
-
     pid = proposer["id"]
     rid = recipient["id"]
 
-    p_traits = set(proposer.get("traits", []) + proposer.get("personality_traits", []))
+    # 1. Grievance — this is a serious disrespect
+    add_grievance(recipient, pid, "ignored_rejection", world,
+                  details={"context": "ignored_intimate_rejection"})
 
-    # Safe traits make coercion nearly impossible
-    if p_traits & BOUNDARY_SAFE_TRAITS:
-        return "backed_off"
+    # 2. Relationship damage
+    r_to_p = recipient.get("relationships", {}).setdefault(pid, {})
+    r_to_p["trust"]      = max(0, r_to_p.get("trust",      50) - 35)
+    r_to_p["resentment"] = min(100, r_to_p.get("resentment", 0) + 45)
+    r_to_p["warmth"]     = max(0, r_to_p.get("warmth",     50) - 20)
 
-    # Compute coercion risk
-    risk = IGNORE_REJECTION_BASE
-    risk_traits = p_traits & COERCION_TRAIT_RISK
-    if risk_traits:
-        risk *= COERCION_RISK_MULT * (1 + 0.3 * (len(risk_traits) - 1))
+    # 3. Expulsion — if recipient is in their own home, they throw the proposer out
+    r_home = recipient.get("home_id") or recipient.get("household_id")
+    p_home = proposer.get("home_id")  or proposer.get("household_id")
+    if r_home and r_home != p_home:
+        recipient.setdefault("reaction_queue", []).append({
+            "type":      "expel_visitor",
+            "target_id": pid,
+            "reason":    "ignored_rejection",
+            "tick":      world.get("tick", 0),
+        })
 
-    # Arousal amplifies risk
-    p_rel = proposer.get("relationships", {}).get(rid, {})
-    arousal = p_rel.get("arousal_level", 0.0)
-    risk += arousal * 0.15
+    # 4. Gossip — recipient tells others what happened
+    gossip_chance = 0.70
+    r_traits = set(recipient.get("traits", []) + recipient.get("personality_traits", []))
+    if "discreet" in r_traits or "shy" in r_traits:
+        gossip_chance -= 0.20
+    if "dramatic" in r_traits or "gossip" in r_traits or "outspoken" in r_traits:
+        gossip_chance += 0.15
+    gossip_chance = min(0.90, max(0.10, gossip_chance))
 
-    # High attraction and prior relationship reduces (more invested in consent)
-    attraction = p_rel.get("attraction", 0) / 100.0
-    trust      = p_rel.get("trust",      0) / 100.0
-    if attraction > 0.7 and trust > 0.6:
-        risk *= 0.5   # cares about the relationship
+    if random.random() < gossip_chance:
+        # Direct reputation hit for proposer
+        apply_reputation_event(proposer, "disrespected_rejection", world,
+                               severity=0.12, observer_id=rid)
+        # Broadcast so any subscribed handler can spread word to the social network
+        try:
+            from core.event_bus import emit
+            emit("social_transgression_gossip", {
+                "gossiper_id":   rid,
+                "accused_id":    pid,
+                "transgression": "ignored_intimate_rejection",
+                "tick":          world.get("tick", 0),
+                "severity":      0.60,
+            })
+        except Exception:
+            pass
 
-    risk = min(0.90, risk)
+    # Reset negotiation to idle
+    tick = world.get("tick", 0)
+    idle_neg = {
+        "state": NEG_IDLE, "proposed_act": None, "proposed_by": None,
+        "counter_act": None, "condition": None, "last_tick": tick,
+    }
+    if rid in proposer.get("relationships", {}):
+        proposer["relationships"][rid]["negotiation"] = dict(idle_neg)
+    if pid in recipient.get("relationships", {}):
+        recipient["relationships"][pid]["negotiation"] = dict(idle_neg)
 
-    if random.random() > risk:
-        return "backed_off"
-
-    # Escalation — call trauma system
-    try:
-        from systems.trauma import resolve_sexual_assault
-        outcome = resolve_sexual_assault(proposer, recipient, world)
-        # Reset negotiation to idle — the act is over (with terrible consequences)
-        tick = world.get("tick", 0)
-        idle_neg = {"state": NEG_IDLE, "proposed_act": None, "proposed_by": None,
-                    "counter_act": None, "condition": None, "last_tick": tick}
-        p_rel["negotiation"] = dict(idle_neg)
-        r_rel = recipient.get("relationships", {}).setdefault(pid, {})
-        r_rel["negotiation"] = dict(idle_neg)
-        return "escalated"
-    except Exception:
-        return "backed_off"
+    return "disrespected"
 
 
 # ── Context helper ────────────────────────────────────────────────────────

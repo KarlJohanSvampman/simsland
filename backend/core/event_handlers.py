@@ -197,3 +197,42 @@ def _on_fight_rep(data, world):
             apply_reputation_event(c, "notoriety_violence", world)
 
 subscribe("fight_physical", _on_fight_rep)
+
+
+# ── Gossip / social transgression ─────────────────────────────────────────
+
+def _on_social_transgression_gossip(data, world):
+    """
+    When a character is outed for ignoring a rejection, word spreads through
+    their social network.  Close contacts of the gossiper hear about it and
+    form grievances / see a reputation hit.
+    """
+    from systems.grievances import add_grievance
+    from systems.reputation import apply_reputation_event
+
+    accused_id  = data.get("accused_id")
+    gossiper_id = data.get("gossiper_id")
+    severity    = data.get("severity", 0.50)
+
+    accused  = world.get("characters", {}).get(accused_id)
+    gossiper = world.get("characters", {}).get(gossiper_id)
+    if not accused or not gossiper:
+        return
+
+    # Spread to gossiper's social connections (friends + acquaintances)
+    for oid, rel in gossiper.get("relationships", {}).items():
+        if rel.get("trust", 0) < 30:
+            continue
+        listener = world.get("characters", {}).get(oid)
+        if not listener or listener["id"] == accused_id:
+            continue
+        # Listener adds a grievance against the accused proportional to how
+        # close they are to the gossiper and the severity of the act
+        bond_factor = rel.get("trust", 30) / 100.0
+        add_grievance(
+            listener, accused_id, "witnessed_transgression", world,
+            severity=severity * bond_factor * 10,
+            details={"heard_from": gossiper_id, "transgression": data.get("transgression")},
+        )
+
+subscribe("social_transgression_gossip", _on_social_transgression_gossip)

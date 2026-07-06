@@ -20857,24 +20857,6 @@
         "romance_weight": 0.4,
         "casual_sex_reluctance": 0.4
       }
-    },
-    "boundary_violator": {
-      "label": "Boundary Violator",
-      "description": "Disregards others' consent; may ignore rejection and escalate sexually or physically.",
-      "category": "sexuality",
-      "effects": {
-        "boundary_respect": -1.0,
-        "coercion_risk": 1.0
-      }
-    },
-    "boundary_respectful": {
-      "label": "Boundary Respectful",
-      "description": "Deeply respectful of consent; immediately backs off at any sign of discomfort.",
-      "category": "sexuality",
-      "effects": {
-        "boundary_respect": 1.0,
-        "coercion_risk": -1.0
-      }
     }
   },
   "recipe_templates": {

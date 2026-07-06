@@ -47,6 +47,8 @@ SEVERITY = {
     "social_envy":        4.0,
     "opportunity_envy":   5.5,
     "rejected_advance":   4.0,
+    "ignored_rejection":  14.0,   # pushed advance after clear rejection
+    "witnessed_transgression": 6.0,  # heard via gossip that someone did this
 }
 
 
