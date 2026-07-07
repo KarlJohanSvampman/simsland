@@ -521,17 +521,360 @@ def execute_act(initiator, recipient, act_id, world):
     }
 
 
+
+
+# ── Touch Proposal System (stages 1-3: hug, kiss, cuddle) ────────────────
+# Parallel to the sexual-act negotiation channel but for non-explicit
+# physical acts that still require both characters to animate together.
+
+# Touch negotiation states (same semantics as NEG_* above)
+TNEG_IDLE        = "idle"
+TNEG_PROPOSED    = "proposed"
+TNEG_ACCEPTED    = "accepted"
+TNEG_REJECTED    = "rejected"
+
+# Templates that go through the touch-proposal flow
+TOUCH_PROPOSAL_TEMPLATES = {
+    "hug",
+    "kiss",
+    "kiss_peck",
+    "kiss_deep",
+    "cuddle",
+}
+
+# Stage requirement per template (minimum intimacy_stage needed)
+TOUCH_STAGE_REQUIREMENT = {
+    "hug":       1,
+    "kiss":      2,
+    "kiss_peck": 2,
+    "kiss_deep": 3,
+    "cuddle":    2,
+}
+
+# Dual animations: initiator / recipient
+TOUCH_ANIMATIONS = {
+    "hug":       ("anim_hug_give",        "anim_hug_receive"),
+    "kiss":      ("anim_kiss_give",        "anim_kiss_receive"),
+    "kiss_peck": ("anim_kiss_peck_give",   "anim_kiss_peck_receive"),
+    "kiss_deep": ("anim_kiss_deep_give",   "anim_kiss_deep_receive"),
+    "cuddle":    ("anim_cuddle_big_spoon", "anim_cuddle_little_spoon"),
+}
+
+# How many ticks before an unanswered touch proposal auto-expires
+TOUCH_PROPOSAL_TIMEOUT = 5
+
+
+def ensure_touch_negotiation(rel):
+    """Ensure touch_negotiation sub-dict exists on a relationship object."""
+    rel.setdefault("touch_negotiation", {
+        "state":        TNEG_IDLE,
+        "template_id":  None,
+        "proposed_by":  None,
+        "last_tick":    0,
+    })
+    return rel
+
+
+def propose_touch(proposer, recipient, template_id, world):
+    """
+    Proposer initiates a hug / kiss / cuddle toward recipient.
+    Stores touch_negotiation state on both relationship objects.
+    Returns {"ok": True} or {"ok": False, "reason": ...}
+    """
+    if template_id not in TOUCH_PROPOSAL_TEMPLATES:
+        return {"ok": False, "reason": "not_a_touch_template"}
+
+    pid = proposer["id"]
+    rid = recipient["id"]
+
+    p_rel = ensure_touch_negotiation(
+        ensure_intimacy_state(
+            proposer.setdefault("relationships", {}).setdefault(rid, {})))
+    r_rel = ensure_touch_negotiation(
+        ensure_intimacy_state(
+            recipient.setdefault("relationships", {}).setdefault(pid, {})))
+
+    # Already in a pending touch negotiation?
+    if p_rel["touch_negotiation"]["state"] == TNEG_PROPOSED:
+        return {"ok": False, "reason": "already_pending_touch"}
+
+    # Stage gate — check intimacy_stage vs requirement
+    req_stage = TOUCH_STAGE_REQUIREMENT.get(template_id, 1)
+    cur_stage = p_rel.get("intimacy_stage", 0)
+    # For hugs between close friends/family we relax the gate slightly
+    labels = p_rel.get("labels", [])
+    is_close = any(lbl in labels for lbl in ("partner", "spouse", "family", "friend_close"))
+    if cur_stage < req_stage and not is_close:
+        return {"ok": False, "reason": "stage_too_low"}
+
+    tick = world.get("tick", 0)
+    neg = {
+        "state":       TNEG_PROPOSED,
+        "template_id": template_id,
+        "proposed_by": pid,
+        "last_tick":   tick,
+    }
+    p_rel["touch_negotiation"] = dict(neg)
+    r_rel["touch_negotiation"] = dict(neg)
+
+    # Set proposer to waiting animation
+    proposer["animation_state"] = "waiting_touch"
+
+    return {"ok": True, "template_id": template_id}
+
+
+def respond_to_touch_proposal(recipient, proposer, response, world):
+    """
+    Recipient responds to a pending touch proposal.
+    response: "accept" | "reject"
+    Returns {"ok": True, "result": ...} or {"ok": False, "reason": ...}
+    """
+    pid = proposer["id"]
+    rid = recipient["id"]
+
+    r_rel = ensure_touch_negotiation(
+        recipient.setdefault("relationships", {}).setdefault(pid, {}))
+    p_rel = ensure_touch_negotiation(
+        proposer.setdefault("relationships", {}).setdefault(rid, {}))
+
+    if r_rel["touch_negotiation"]["state"] != TNEG_PROPOSED:
+        return {"ok": False, "reason": "no_active_touch_proposal"}
+
+    tick = world.get("tick", 0)
+    template_id = r_rel["touch_negotiation"]["template_id"]
+
+    if response == "accept":
+        new_state = TNEG_ACCEPTED
+        _execute_touch(proposer, recipient, template_id, world)
+    elif response == "reject":
+        new_state = TNEG_REJECTED
+        _handle_touch_rejection(proposer, recipient, template_id, world)
+    else:
+        return {"ok": False, "reason": "unknown_response"}
+
+    idle = {
+        "state":       TNEG_IDLE,
+        "template_id": None,
+        "proposed_by": None,
+        "last_tick":   tick,
+    }
+    r_rel["touch_negotiation"] = dict(idle)
+    p_rel["touch_negotiation"] = dict(idle)
+
+    return {"ok": True, "result": new_state}
+
+
+def recipient_touch_decision(recipient, proposer, world):
+    """
+    AI decision for an incoming touch proposal.
+    Returns "accept" or "reject".
+
+    Factors:
+      - Relationship warmth / trust toward proposer
+      - Template stage requirement vs current intimacy
+      - Recipient personality (shy, romantic, cold)
+      - Whether they are currently busy
+    """
+    pid = proposer["id"]
+    rel = ensure_touch_negotiation(
+        recipient.setdefault("relationships", {}).setdefault(pid, {}))
+    inti = ensure_intimacy_state(rel)
+
+    template_id = rel["touch_negotiation"].get("template_id", "hug")
+    warmth      = rel.get("warmth",  50) / 100.0
+    trust       = rel.get("trust",   50) / 100.0
+    attraction  = rel.get("attraction", 0) / 100.0
+    labels      = rel.get("labels", [])
+
+    traits = set(recipient.get("traits", []) + recipient.get("personality_traits", []))
+
+    # Base acceptance probability from warmth + attraction
+    accept_prob = 0.40 + warmth * 0.35 + attraction * 0.20
+
+    # Partner / spouse → almost always accepts touch
+    if "partner" in labels or "spouse" in labels:
+        accept_prob += 0.30
+    elif "family" in labels:
+        accept_prob += 0.15
+    elif "friend_close" in labels:
+        accept_prob += 0.10
+
+    # Personality modifiers
+    if "romantic" in traits or "affectionate" in traits:
+        accept_prob += 0.15
+    if "shy" in traits or "reserved" in traits:
+        accept_prob -= 0.15
+    if "cold" in traits or "distant" in traits:
+        accept_prob -= 0.20
+    if "easily_embarrassed" in traits:
+        accept_prob -= 0.10
+
+    # Stage-specific modifiers
+    req_stage = TOUCH_STAGE_REQUIREMENT.get(template_id, 1)
+    cur_stage = inti.get("intimacy_stage", 0)
+    if cur_stage < req_stage:
+        accept_prob -= 0.25  # asking for more than earned
+
+    # Recipient busy?
+    activity = recipient.get("activity", {})
+    if activity and activity.get("type") not in (None, "idle", "wait", "socialize"):
+        accept_prob -= 0.40  # don't interrupt important activities
+
+    accept_prob = max(0.02, min(0.98, accept_prob))
+
+    import random
+    return "accept" if random.random() < accept_prob else "reject"
+
+
+def _execute_touch(proposer, recipient, template_id, world):
+    """
+    Both characters begin the touch interaction simultaneously.
+    Sets activity + animation_state on both.
+    """
+    init_anim, recv_anim = TOUCH_ANIMATIONS.get(
+        template_id, ("anim_hug_give", "anim_hug_receive"))
+
+    defs = world.get("defs", {})
+    tpl  = defs.get("interaction_templates", {}).get(template_id, {})
+    duration = tpl.get("duration_ticks", 4)
+
+    tick = world.get("tick", 0)
+
+    def _set_touch_activity(char, anim, partner_id):
+        char["activity"] = {
+            "type":               "touch_interaction",
+            "interaction":        template_id,
+            "phase":              "using",
+            "phase_started_tick": tick,
+            "duration":           duration,
+            "target_id":          partner_id,
+            "state":              {},
+        }
+        char["animation_state"] = anim
+
+    _set_touch_activity(proposer, init_anim, recipient["id"])
+    _set_touch_activity(recipient, recv_anim, proposer["id"])
+
+    # Intimacy gains — comfort + progress toward next stage
+    pid = proposer["id"]
+    rid = recipient["id"]
+    stage = TOUCH_STAGE_REQUIREMENT.get(template_id, 1)
+    comfort_gain = COMFORT_GAIN.get(stage, 2)
+    arousal_gain = AROUSAL_GAIN.get(stage, 0.02)
+
+    for (c_a, c_b) in ((proposer, recipient), (recipient, proposer)):
+        rel = c_a.setdefault("relationships", {}).setdefault(c_b["id"], {})
+        ensure_intimacy_state(rel)
+        rel["comfort"]      = min(100, rel.get("comfort", 0) + comfort_gain)
+        rel["arousal_level"] = min(1.0, rel.get("arousal_level", 0.0) + arousal_gain)
+        # Small warmth boost
+        rel["warmth"] = min(100, rel.get("warmth", 50) + 1)
+
+
+def _handle_touch_rejection(proposer, recipient, template_id, world):
+    """
+    Mild social consequence for rejected touch — much softer than intimate rejection.
+    Only stings if asked for a kiss/cuddle from near-stranger.
+    """
+    req_stage = TOUCH_STAGE_REQUIREMENT.get(template_id, 1)
+    cur_stage = proposer.get("relationships", {}).get(
+        recipient["id"], {}).get("intimacy_stage", 0)
+
+    severity = max(0.5, (req_stage - cur_stage) * 1.5)
+    try:
+        add_grievance(
+            proposer, recipient["id"],
+            "rejected_touch",
+            world,
+            severity=round(severity, 2),
+            details={"template": template_id},
+        )
+    except Exception:
+        pass
+
+
+def tick_touch_proposals(world):
+    """
+    Per-tick: resolve pending touch proposals via AI decision.
+    Called from tick_intimacy.
+
+    For every relationship where touch_negotiation.state == PROPOSED
+    and this character is NOT the proposer, call recipient_touch_decision
+    and respond accordingly.  Expire stale proposals.
+    """
+    tick     = world.get("tick", 0)
+    chars    = world.get("characters", {})
+
+    seen_pairs = set()  # avoid processing the same proposal twice
+
+    for cid, c in chars.items():
+        for oid, rel in c.get("relationships", {}).items():
+            tneg = rel.get("touch_negotiation", {})
+            if tneg.get("state") != TNEG_PROPOSED:
+                continue
+
+            proposer_id = tneg.get("proposed_by")
+            if proposer_id is None:
+                continue
+
+            # This character is the RECIPIENT (not the proposer)
+            if cid == proposer_id:
+                continue
+
+            pair_key = tuple(sorted([cid, oid]))
+            if pair_key in seen_pairs:
+                continue
+            seen_pairs.add(pair_key)
+
+            proposer  = chars.get(proposer_id)
+            recipient = c
+            if not proposer:
+                # Proposer gone — clear
+                _clear_touch_neg(recipient, proposer_id, tick)
+                continue
+
+            # Expire stale proposals
+            if tick - tneg.get("last_tick", 0) > TOUCH_PROPOSAL_TIMEOUT:
+                _clear_touch_neg(proposer, recipient["id"], tick)
+                _clear_touch_neg(recipient, proposer_id, tick)
+                continue
+
+            # Both must be at the same location
+            if proposer.get("current_location") != recipient.get("current_location"):
+                continue
+
+            # AI decision
+            decision = recipient_touch_decision(recipient, proposer, world)
+            respond_to_touch_proposal(recipient, proposer, decision, world)
+
+
+def _clear_touch_neg(c, other_id, tick):
+    """Reset touch_negotiation to idle on c's relationship toward other_id."""
+    rel = c.get("relationships", {}).get(other_id)
+    if rel is not None:
+        rel["touch_negotiation"] = {
+            "state":       TNEG_IDLE,
+            "template_id": None,
+            "proposed_by": None,
+            "last_tick":   tick,
+        }
+    if c.get("animation_state") == "waiting_touch":
+        c["animation_state"] = "idle"
+
+
 # ── Tick ──────────────────────────────────────────────────────────────────
 
 def tick_intimacy(world):
     """
-    Per-tick: decay arousal slowly on all relationships.
+    Per-tick: decay arousal slowly on all relationships + resolve touch proposals.
     Called from sim_loop.
     """
     for c in world.get("characters", {}).values():
         for oid, rel in c.get("relationships", {}).items():
             if "arousal_level" in rel:
                 rel["arousal_level"] = max(0.0, rel["arousal_level"] - AROUSAL_DECAY)
+    # Resolve pending hug/kiss/cuddle proposals
+    tick_touch_proposals(world)
 
 
 # ── Rejection fallout ─────────────────────────────────────────────────────

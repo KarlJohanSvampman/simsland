@@ -607,6 +607,11 @@ def route_action(c, world, action, speech, definitions=None):
     elif action_type == "plan_hobby_session":
         _route_plan_hobby_session(c, world, action)
 
+    elif action_type in ("hug", "kiss", "kiss_peck", "kiss_deep", "cuddle"):
+        _route_propose_touch(c, world, action, action_type)
+    elif action_type == "respond_touch":
+        _route_respond_touch(c, world, action)
+
     elif action_type == "breastfeed":
         _route_breastfeed(c, world, action)
     elif action_type == "bottle_feed":
@@ -615,6 +620,54 @@ def route_action(c, world, action, speech, definitions=None):
         _route_hold_baby(c, world, action)
     elif action_type == "put_baby_in_carriage":
         _route_put_baby_in_carriage(c, world, action)
+
+# =========================================================
+# TOUCH PROPOSAL HANDLERS
+# =========================================================
+
+def _route_propose_touch(c, world, action, template_id):
+    """
+    Character proposes a hug / kiss / cuddle to a target.
+    Stores touch_negotiation state; recipient resolves on next tick.
+    """
+    target_id = action.get("target_id") or action.get("target")
+    if not target_id:
+        return
+    chars     = world.get("characters", {})
+    recipient = chars.get(target_id)
+    if not recipient:
+        return
+    # Must be at same location
+    if c.get("current_location") != recipient.get("current_location"):
+        return
+
+    try:
+        from systems.intimacy import propose_touch
+        propose_touch(c, recipient, template_id, world)
+    except Exception:
+        pass
+
+
+def _route_respond_touch(c, world, action):
+    """
+    Character manually responds to a pending touch proposal.
+    Used when the player overrides the AI decision.
+    action: {"type": "respond_touch", "target_id": proposer_id, "response": "accept"|"reject"}
+    """
+    proposer_id = action.get("target_id") or action.get("target")
+    response    = action.get("response", "accept")
+    if not proposer_id:
+        return
+    proposer = world.get("characters", {}).get(proposer_id)
+    if not proposer:
+        return
+
+    try:
+        from systems.intimacy import respond_to_touch_proposal
+        respond_to_touch_proposal(c, proposer, response, world)
+    except Exception:
+        pass
+
 
 # =========================================================
 # CHILDCARE HANDLERS

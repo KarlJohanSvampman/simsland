@@ -568,6 +568,7 @@ def build_context(
         "secrets_targeted":  _build_secrets_target_context(c, world),
         "attraction":        _build_attraction_context(c, world),
         "intimacy":          _build_intimacy_context(c, world),
+        "pending_touch_proposal": _build_touch_proposal_context(c, world),
         "rivalries":         _build_rival_context(c, world),
         "envy_conflicts":    _build_envy_context(c, world),
         "impulse":           _build_impulse_context(c, world),
@@ -1352,6 +1353,39 @@ def _build_intimacy_context(c, world):
         return get_intimacy_context(c, world).get("intimacy", [])
     except Exception:
         return []
+
+
+def _build_touch_proposal_context(c, world):
+    """
+    If someone has proposed a hug/kiss/cuddle TO this character (and it's pending),
+    surface that so the LLM knows it should respond.
+    Also surface outgoing proposals so the LLM knows to wait.
+    """
+    result = {}
+    chars = world.get("characters", {})
+    for oid, rel in c.get("relationships", {}).items():
+        tneg = rel.get("touch_negotiation", {})
+        if tneg.get("state") != "proposed":
+            continue
+        other = chars.get(oid)
+        other_name = other.get("name", oid) if other else oid
+        template_id = tneg.get("template_id", "hug")
+        proposer_id = tneg.get("proposed_by")
+        if proposer_id == c["id"]:
+            # We proposed — waiting for response
+            result["outgoing"] = {
+                "to": other_name,
+                "action": template_id,
+                "note": f"You proposed a {template_id} to {other_name} — waiting for their response.",
+            }
+        else:
+            # We received — need to respond
+            result["incoming"] = {
+                "from": other_name,
+                "action": template_id,
+                "note": f"{other_name} wants to {template_id} with you. You can accept or decline.",
+            }
+    return result or None
 
 
 def _build_envy_context(c, world):

@@ -13240,7 +13240,11 @@
         "relationship": 0.05
       },
       "sets_posture": "embrace",
-      "animation": "hug"
+      "animation": "hug",
+      "initiator_animation": "anim_hug_give",
+      "recipient_animation": "anim_hug_receive",
+      "stage_requirement": 1,
+      "duration_ticks": 4
     },
     "kiss": {
       "name": "Kiss",
@@ -13280,7 +13284,10 @@
           "kiss_receive_end"
         ]
       },
-      "initiation_type": "suggestion_proposal"
+      "initiation_type": "suggestion_proposal",
+      "initiator_animation": "anim_kiss_give",
+      "recipient_animation": "anim_kiss_receive",
+      "stage_requirement": 2
     },
     "punch": {
       "name": "Punch",
@@ -13941,7 +13948,11 @@
         "relationship": 0.04
       },
       "sets_posture": "standing_close",
-      "animation": "kiss_peck"
+      "animation": "kiss_peck",
+      "initiator_animation": "anim_kiss_peck_give",
+      "recipient_animation": "anim_kiss_peck_receive",
+      "stage_requirement": 2,
+      "duration_ticks": 2
     },
     "kiss_deep": {
       "name": "Kiss (Deep)",
@@ -13983,7 +13994,11 @@
         "relationship": 0.08
       },
       "sets_posture": "standing_close",
-      "animation": "kiss_deep"
+      "animation": "kiss_deep",
+      "initiator_animation": "anim_kiss_deep_give",
+      "recipient_animation": "anim_kiss_deep_receive",
+      "stage_requirement": 3,
+      "duration_ticks": 6
     },
     "hold_hands": {
       "name": "Hold Hands",
@@ -14062,7 +14077,11 @@
         "relationship": 0.08
       },
       "sets_posture": "depends_on_prop",
-      "animation": "cuddle"
+      "animation": "cuddle",
+      "initiator_animation": "anim_cuddle_big_spoon",
+      "recipient_animation": "anim_cuddle_little_spoon",
+      "stage_requirement": 2,
+      "duration_ticks": 30
     },
     "caress": {
       "name": "Caress",
