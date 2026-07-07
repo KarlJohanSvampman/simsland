@@ -25,4 +25,11 @@ export default defineConfig({
           resolve(__dirname, "meshbank.html"),
 
         animbank:
-  
+          resolve(__dirname, "animbank.html"),
+
+        social_debug:
+          resolve(__dirname, "social_debug.html")
+      }
+    }
+  }
+});
