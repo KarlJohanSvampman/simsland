@@ -591,6 +591,7 @@ def build_events_context(c, world, limit=8):
     """
     Returns a compact list of events the character knows about,
     with their RSVP status, for inclusion in the LLM context.
+    Also includes a social_disposition hint to guide the agent's RSVP decisions.
     """
     cid    = c["id"]
     events = get_events_for_character(c, world)
@@ -613,7 +614,36 @@ def build_events_context(c, world, limit=8):
             "pending_approval": evt.get("draft_approvals", {}).get(cid) == "pending",
             "has_pending_changes": bool(evt.get("pending_changes")),
         })
-    return out
+
+    # Social disposition hint — tells the LLM how likely this character is to want to go out
+    profile = c.get("attraction_profile", {})
+    pd      = profile.get("party_disposition", 0.3)
+    cr      = profile.get("casual_reluctance", 0.5)
+    repr_sc = c.get("repression_state", {}).get("repression_score", 0.0)
+
+    if pd >= 0.60:
+        disposition_hint = (
+            f"Social butterfly (party_disposition={pd:.2f}): strongly inclined to attend "
+            f"parties, go out, and meet new people. Open to casual encounters "
+            f"(casual_reluctance={cr:.2f})."
+        )
+    elif pd >= 0.40:
+        disposition_hint = (
+            f"Socially active (party_disposition={pd:.2f}): enjoys going out when the "
+            f"opportunity fits."
+        )
+    elif repr_sc >= 0.40:
+        disposition_hint = (
+            f"Socially reserved due to sexual repression (party_disposition={pd:.2f}, "
+            f"repression={repr_sc:.2f}): tends to avoid parties and casual intimacy."
+        )
+    else:
+        disposition_hint = (
+            f"Homebody/reserved (party_disposition={pd:.2f}): prefers staying in or "
+            f"small gatherings; unlikely to seek out parties or casual encounters."
+        )
+
+    return {"events": out, "social_disposition": disposition_hint}
 
 
 # =========================================================

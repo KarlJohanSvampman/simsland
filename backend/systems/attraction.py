@@ -151,6 +151,27 @@ def generate_attraction_profile(c, defs):
     total = sum(weights.values()) or 1.0
     weights = {k: round(v / total, 3) for k, v in weights.items()}
 
+    # ── Party & ONS disposition ──────────────────────────────────────────
+    # High self-confidence, no sexual hangups, high libido, low emotional_gate
+    # → more likely to seek out parties and engage in casual encounters.
+    self_conf   = c.get("self_confidence", 0.60)
+    repr_score  = c.get("repression_state", {}).get("repression_score", 0.0)
+    sx_shame    = 1 if ("sexually_repressed" in traits or "sexual_shame" in traits) else 0
+    # party_disposition: 0=homebody/reserved, 1=social butterfly/hedonist
+    party_disposition = (
+        self_conf           * 0.35
+        + libido            * 0.30
+        + initiation_bias   * 0.15   # already 0-1 range needed — map from -1..1
+        + (1.0 - emotional_gate) * 0.20
+        - repr_score        * 0.40
+        - sx_shame          * 0.25
+        - sexual_anxiety    * 0.20
+    )
+    party_disposition = max(0.0, min(1.0, party_disposition))
+
+    # High party_disposition → reduce casual_reluctance (they're comfortable with strangers)
+    casual_reluctance = max(0.0, casual_reluctance - party_disposition * 0.45)
+
     c["attraction_profile"] = {
         "libido":               round(libido, 3),
         "arousal_threshold":    round(arousal_threshold, 3),
@@ -164,6 +185,7 @@ def generate_attraction_profile(c, defs):
         "stage_gate_mod":       stage_gate_mod,
         "partner_monitoring":   round(min(1.0, partner_monitoring), 3),
         "casual_reluctance":    round(min(1.0, casual_reluctance), 3),
+        "party_disposition":    round(party_disposition, 3),
         "quirks":               quirks,
         "weights":              weights,
     }
@@ -783,12 +805,24 @@ def get_attraction_context(c, world):
 
     lines = []
     if profile:
-        lib = profile.get("libido", 0.5)
+        lib  = profile.get("libido", 0.5)
         style = profile.get("initiation_style", "neutral")
         anxiety = profile.get("sexual_anxiety", 0.25)
+        pd  = profile.get("party_disposition", 0.3)
+        cr  = profile.get("casual_reluctance", 0.0)
         lines.append(f"libido={'high' if lib > 0.65 else 'low' if lib < 0.35 else 'moderate'}, "
                      f"initiation_style={style}, "
                      f"sexual_anxiety={'high' if anxiety > 0.55 else 'low' if anxiety < 0.20 else 'moderate'}")
+        if pd >= 0.55:
+            lines.append(
+                f"party_disposition={pd:.2f}: enjoys going out, socialising, and is open to "
+                f"casual encounters with new people (casual_reluctance={cr:.2f})."
+            )
+        elif pd <= 0.25:
+            lines.append(
+                f"party_disposition={pd:.2f}: prefers staying in; uncomfortable with or "
+                f"uninterested in casual sexual encounters."
+            )
 
     for oid, score, flags in top_attractions[:3]:
         name = chars[oid].get("name", oid)
