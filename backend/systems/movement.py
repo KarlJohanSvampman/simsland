@@ -121,6 +121,26 @@ def update_character_movement(
         0.05
     )
 
+    # Pushable prop — apply walk_speed_modifier and drag prop along
+    pushed_prop_id = c.get("pushed_prop_id")
+    if pushed_prop_id:
+        prop = world.get("placed_props", {}).get(pushed_prop_id)
+        if prop:
+            prop_tpl = world.get("definitions", {}).get("prop_templates", {}).get(
+                prop.get("template_id", ""), {}
+            )
+            speed_mod = prop_tpl.get("walk_speed_modifier", 1.0)
+            speed = speed * speed_mod
+            # Override locomotion style to push animation while moving
+            push_anim = prop_tpl.get("push_animation")
+            if push_anim:
+                c["_active_locomotion_override"] = push_anim
+        else:
+            # Prop gone — detach
+            c.pop("pushed_prop_id", None)
+    else:
+        c.pop("_active_locomotion_override", None)
+
     # =====================================
     # ARRIVED TILE
     # =====================================
@@ -147,5 +167,13 @@ def update_character_movement(
         c["y"] += (
             dy / dist
         ) * speed
+
+        # Keep pushed prop in front of character
+        pushed_prop_id = c.get("pushed_prop_id")
+        if pushed_prop_id:
+            prop = world.get("placed_props", {}).get(pushed_prop_id)
+            if prop:
+                prop["x"] = c["x"] + (dx / dist) * 0.6
+                prop["y"] = c["y"] + (dy / dist) * 0.6
 
     return True

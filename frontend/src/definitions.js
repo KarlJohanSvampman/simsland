@@ -38,6 +38,7 @@ const tabs = [
   "service_templates",
   "job_templates",
   "company_templates",
+  "school_templates",
   "vehicle_templates",
   "floorplan_templates",
   "tile_templates",

@@ -584,3 +584,23 @@ def _gen_sexual_preferences(c, defs):
         "kinks_hard_no":      hard_no_kinks,
         "partner_experience": {},
     })
+    # ── Celebrity idol (teens and young adults) ────────────────────────────
+    age = c.get("age", 30)
+    if 10 <= age <= 25:
+        try:
+            from systems.crushes import add_celebrity_idol
+            import random as _r
+            celeb_reg = defs.get("celebrity_registry", {})
+            if celeb_reg:
+                age_approp = [
+                    cid for cid, cd in celeb_reg.items()
+                    if cd.get("appeal_age_range", [0, 99])[0] <= age
+                    <= cd.get("appeal_age_range", [0, 99])[1]
+                ]
+                if age_approp:
+                    chosen_id = _r.choice(age_approp)
+                    add_celebrity_idol(c, chosen_id, {"definitions": defs})
+        except Exception:
+            pass
+
+

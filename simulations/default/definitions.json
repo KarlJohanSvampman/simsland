@@ -4100,6 +4100,201 @@
         "examine_reflection"
       ],
       "base_price": 250
+    },
+    "baby_carriage_a": {
+      "name": "Baby Carriage",
+      "category": "equipment",
+      "pushable": true,
+      "push_animation": "push_carriage",
+      "walk_speed_modifier": 0.85,
+      "footprint": [
+        {
+          "dx": 0,
+          "dy": 0
+        }
+      ],
+      "storage": {
+        "accepted_categories": [
+          "baby_item"
+        ],
+        "slots": 4
+      },
+      "tags": [
+        "pushable",
+        "baby",
+        "carriage"
+      ],
+      "base_price": 280,
+      "description": "A four-wheeled pram for transporting an infant. Character uses push animation while attached."
+    },
+    "lawnmower_a": {
+      "name": "Lawn Mower",
+      "category": "equipment",
+      "pushable": true,
+      "push_animation": "push_mower",
+      "walk_speed_modifier": 0.7,
+      "footprint": [
+        {
+          "dx": 0,
+          "dy": 0
+        }
+      ],
+      "storage": null,
+      "tags": [
+        "pushable",
+        "garden",
+        "mower"
+      ],
+      "base_price": 320,
+      "requires_fuel": true,
+      "description": "Push mower for cutting grass. Character walks behind it using mowing gait."
+    },
+    "poster_celeb_pop_star_ava": {
+      "name": "Ava Soleil Poster",
+      "category": "wall_decor",
+      "footprint": [
+        {
+          "dx": 0,
+          "dy": 0
+        }
+      ],
+      "wall_mounted": true,
+      "storage": null,
+      "tags": [
+        "poster",
+        "wall_art",
+        "celebrity",
+        "pop_music"
+      ],
+      "base_price": 19,
+      "celebrity_id": "celeb_pop_star_ava",
+      "description": "A poster of Ava Soleil. Popular bedroom wall decoration."
+    },
+    "poster_celeb_rapper_kade": {
+      "name": "Kade Knox Poster",
+      "category": "wall_decor",
+      "footprint": [
+        {
+          "dx": 0,
+          "dy": 0
+        }
+      ],
+      "wall_mounted": true,
+      "storage": null,
+      "tags": [
+        "poster",
+        "wall_art",
+        "celebrity",
+        "rap_music"
+      ],
+      "base_price": 15,
+      "celebrity_id": "celeb_rapper_kade",
+      "description": "A poster of Kade Knox. Popular bedroom wall decoration."
+    },
+    "poster_celeb_action_hero_rex": {
+      "name": "Rex Holloway Poster",
+      "category": "wall_decor",
+      "footprint": [
+        {
+          "dx": 0,
+          "dy": 0
+        }
+      ],
+      "wall_mounted": true,
+      "storage": null,
+      "tags": [
+        "poster",
+        "wall_art",
+        "celebrity",
+        "film"
+      ],
+      "base_price": 19,
+      "celebrity_id": "celeb_action_hero_rex",
+      "description": "A poster of Rex Holloway. Popular bedroom wall decoration."
+    },
+    "poster_celeb_actress_luna": {
+      "name": "Luna Voss Poster",
+      "category": "wall_decor",
+      "footprint": [
+        {
+          "dx": 0,
+          "dy": 0
+        }
+      ],
+      "wall_mounted": true,
+      "storage": null,
+      "tags": [
+        "poster",
+        "wall_art",
+        "celebrity",
+        "film"
+      ],
+      "base_price": 11,
+      "celebrity_id": "celeb_actress_luna",
+      "description": "A poster of Luna Voss. Popular bedroom wall decoration."
+    },
+    "poster_celeb_influencer_jay": {
+      "name": "Jay Mercer Poster",
+      "category": "wall_decor",
+      "footprint": [
+        {
+          "dx": 0,
+          "dy": 0
+        }
+      ],
+      "wall_mounted": true,
+      "storage": null,
+      "tags": [
+        "poster",
+        "wall_art",
+        "celebrity",
+        "social_media"
+      ],
+      "base_price": 13,
+      "celebrity_id": "celeb_influencer_jay",
+      "description": "A poster of Jay Mercer. Popular bedroom wall decoration."
+    },
+    "poster_celeb_rockstar_vera": {
+      "name": "Vera Night Poster",
+      "category": "wall_decor",
+      "footprint": [
+        {
+          "dx": 0,
+          "dy": 0
+        }
+      ],
+      "wall_mounted": true,
+      "storage": null,
+      "tags": [
+        "poster",
+        "wall_art",
+        "celebrity",
+        "rock_music"
+      ],
+      "base_price": 11,
+      "celebrity_id": "celeb_rockstar_vera",
+      "description": "A poster of Vera Night. Popular bedroom wall decoration."
+    },
+    "poster_celeb_athlete_marco": {
+      "name": "Marco Diaz Poster",
+      "category": "wall_decor",
+      "footprint": [
+        {
+          "dx": 0,
+          "dy": 0
+        }
+      ],
+      "wall_mounted": true,
+      "storage": null,
+      "tags": [
+        "poster",
+        "wall_art",
+        "celebrity",
+        "sports"
+      ],
+      "base_price": 8,
+      "celebrity_id": "celeb_athlete_marco",
+      "description": "A poster of Marco Diaz. Popular bedroom wall decoration."
     }
   },
   "item_templates": {
@@ -10085,7 +10280,11 @@
         "stop": [
           "toilet_stand_a"
         ]
-      }
+      },
+      "privacy_level": 3,
+      "shame_level": 3,
+      "intrusion_reaction_female": "embarrassed_scream",
+      "intrusion_reaction_male": "embarrassed"
     },
     "flush_toilet": {
       "name": "Flush Toilet",
@@ -13425,7 +13624,11 @@
         "computer_desk": "seated_device",
         "null": "standing"
       },
-      "animation": "masturbate"
+      "animation": "masturbate",
+      "privacy_level": 4,
+      "shame_level": 4,
+      "intrusion_reaction_female": "horrified_scream",
+      "intrusion_reaction_male": "shocked"
     },
     "wash_hands": {
       "name": "Wash Hands",
@@ -13994,7 +14197,11 @@
         "intimacy": 0.15
       },
       "sets_posture": "intimate",
-      "animation": "foreplay"
+      "animation": "foreplay",
+      "privacy_level": 3,
+      "shame_level": 3,
+      "intrusion_reaction_female": "embarrassed_scream",
+      "intrusion_reaction_male": "embarrassed"
     },
     "have_sex": {
       "name": "Have Sex",
@@ -14090,7 +14297,11 @@
         "pregnancy_if_applicable": true
       },
       "sets_posture": "depends_on_position",
-      "animation": "sex"
+      "animation": "sex",
+      "privacy_level": 3,
+      "shame_level": 2,
+      "intrusion_reaction_female": "cover_up_gasp",
+      "intrusion_reaction_male": "embarrassed"
     },
     "oral_sex": {
       "name": "Oral Sex",
@@ -14152,7 +14363,11 @@
         "std_transmission_if_no_protection": true
       },
       "sets_posture": "intimate_floor",
-      "animation": "oral_sex"
+      "animation": "oral_sex",
+      "privacy_level": 4,
+      "shame_level": 4,
+      "intrusion_reaction_female": "horrified_scream",
+      "intrusion_reaction_male": "shocked"
     },
     "perform_cpr": {
       "name": "Perform CPR",
@@ -15048,6 +15263,84 @@
           "stand_up"
         ]
       }
+    },
+    "breastfeed": {
+      "label": "Breastfeed baby",
+      "description": "Mother nurses the infant. Requires baby to be present at same location.",
+      "category": "childcare",
+      "requires_target": true,
+      "target_filter": {
+        "age_max": 1,
+        "development_stage": [
+          "newborn",
+          "infant"
+        ]
+      },
+      "duration_ticks": 30,
+      "animation": "breastfeed",
+      "private": true,
+      "tags": [
+        "childcare",
+        "breastfeeding",
+        "intimate"
+      ],
+      "privacy_level": 2,
+      "shame_level": 1,
+      "intrusion_reaction_female": "cover_up",
+      "intrusion_reaction_male": "embarrassed"
+    },
+    "bottle_feed": {
+      "label": "Bottle feed baby",
+      "description": "Feed the infant with a bottle of formula or expressed milk.",
+      "category": "childcare",
+      "requires_target": true,
+      "target_filter": {
+        "age_max": 2,
+        "development_stage": [
+          "newborn",
+          "infant",
+          "toddler"
+        ]
+      },
+      "duration_ticks": 25,
+      "animation": "bottle_feed",
+      "tags": [
+        "childcare",
+        "feeding"
+      ]
+    },
+    "hold_baby": {
+      "label": "Hold and comfort baby",
+      "description": "Pick up and soothe a crying infant.",
+      "category": "childcare",
+      "requires_target": true,
+      "target_filter": {
+        "age_max": 2,
+        "development_stage": [
+          "newborn",
+          "infant",
+          "crawler"
+        ]
+      },
+      "duration_ticks": 20,
+      "animation": "hold_baby",
+      "tags": [
+        "childcare",
+        "comfort"
+      ]
+    },
+    "put_baby_in_carriage": {
+      "label": "Put baby in carriage",
+      "description": "Place the infant in the baby carriage and attach it for pushing.",
+      "category": "childcare",
+      "requires_target": true,
+      "requires_prop": "baby_carriage_a",
+      "duration_ticks": 5,
+      "animation": "put_in_carriage",
+      "tags": [
+        "childcare",
+        "carriage"
+      ]
     }
   },
   "activity_templates": {
@@ -21091,6 +21384,56 @@
       "behavior_flags": [
         "identity_crisis_prone"
       ]
+    },
+    "sexually_shy": {
+      "description": "Becomes flustered and avoidant when sexuality or romance is raised; blushes easily and struggles to reciprocate flirting.",
+      "category": "sexuality",
+      "effects": {
+        "casual_reluctance": 0.3,
+        "blush_threshold": -0.25,
+        "initiation_bias": -0.2
+      }
+    },
+    "easily_embarrassed": {
+      "description": "Flushes and becomes visibly flustered at mildly awkward or suggestive topics, even non-sexual ones.",
+      "category": "temperament",
+      "effects": {
+        "blush_threshold": -0.35,
+        "social_anxiety": 0.15
+      }
+    },
+    "asexual_tendency": {
+      "description": "Little or no spontaneous sexual attraction; may engage for emotional closeness but rarely initiates. Distinct from low_libido \u2014 the motivation is absent, not just the drive.",
+      "category": "sexuality",
+      "effects": {
+        "libido": -0.4,
+        "initiation_bias": -0.5,
+        "casual_reluctance": 0.5
+      }
+    },
+    "sexually_brazen": {
+      "description": "Openly discusses and pursues sex without embarrassment; rarely blushes, comfortable making explicit suggestions.",
+      "category": "sexuality",
+      "effects": {
+        "blush_threshold": 0.4,
+        "initiation_bias": 0.25,
+        "casual_reluctance": -0.2
+      }
+    },
+    "daydreamer": {
+      "description": "Frequently lost in fantasy and imagination; prone to vivid romantic or sexual daydreams about specific people.",
+      "category": "temperament",
+      "effects": {
+        "daydream_frequency": 0.4
+      }
+    },
+    "infatuation_prone": {
+      "description": "Develops intense crushes quickly; fixates on a person and fantasizes about them at length, often out of proportion to actual closeness.",
+      "category": "sexuality",
+      "effects": {
+        "crush_intensity_multiplier": 0.5,
+        "daydream_frequency": 0.2
+      }
     }
   },
   "recipe_templates": {
@@ -40767,6 +41110,78 @@
       ],
       "max_staff": 20,
       "turnover_rate": 0.08
+    },
+    "obstetrics_clinic": {
+      "name": "Obstetrics & Prenatal Clinic",
+      "industry": "healthcare",
+      "off_grid": true,
+      "service_category": "prenatal",
+      "opening_hours": {
+        "open": 8,
+        "close": 17
+      },
+      "staff_roles": [
+        "obstetrician",
+        "midwife",
+        "nurse"
+      ],
+      "avg_visit_duration_ticks": 60,
+      "visit_cost": 180,
+      "description": "Specialist prenatal care: routine check-ups, ultrasounds, and delivery planning.",
+      "tags": [
+        "prenatal",
+        "maternity",
+        "healthcare"
+      ]
+    },
+    "maternity_ward": {
+      "name": "Maternity Ward",
+      "industry": "healthcare",
+      "off_grid": true,
+      "service_category": "childbirth",
+      "opening_hours": {
+        "open": 0,
+        "close": 24
+      },
+      "staff_roles": [
+        "obstetrician",
+        "midwife",
+        "nurse"
+      ],
+      "avg_visit_duration_ticks": 1440,
+      "visit_cost": 4500,
+      "description": "In-patient childbirth and post-natal recovery unit.",
+      "tags": [
+        "birth",
+        "maternity",
+        "healthcare"
+      ]
+    },
+    "kindergarten": {
+      "name": "Kindergarten",
+      "industry": "education",
+      "off_grid": true,
+      "service_category": "childcare",
+      "opening_hours": {
+        "open": 7,
+        "close": 18
+      },
+      "staff_roles": [
+        "kindergarten_teacher",
+        "childcare_worker"
+      ],
+      "avg_visit_duration_ticks": 480,
+      "monthly_fee": 600,
+      "age_range": [
+        1,
+        3
+      ],
+      "description": "Daycare and early education for children age 1\u20133 before preschool.",
+      "tags": [
+        "childcare",
+        "early_education",
+        "education"
+      ]
     }
   },
   "need_templates": {
@@ -45620,13 +46035,15 @@
       "child": "male_child_base",
       "teen": "male_teen_base",
       "adult": "male_adult_base",
-      "elderly": "male_elderly_base"
+      "elderly": "male_elderly_base",
+      "portrait_url": null
     },
     "female": {
       "child": "female_child_base",
       "teen": "female_teen_base",
       "adult": "female_adult_base",
-      "elderly": "female_elderly_base"
+      "elderly": "female_elderly_base",
+      "portrait_url": null
     }
   },
   "skills_registry": {
@@ -48425,6 +48842,118 @@
       "type": "cardio",
       "intensity": 1,
       "social": true
+    }
+  },
+  "celebrity_registry": {
+    "celeb_pop_star_ava": {
+      "name": "Ava Soleil",
+      "category": "pop_music",
+      "style_tags": [
+        "glam",
+        "colorful",
+        "trendy",
+        "feminine"
+      ],
+      "appeal_age_range": [
+        10,
+        22
+      ],
+      "portrait_url": "portraits/celebrities/ava_soleil.jpg",
+      "description": "Chart-topping pop star known for her bold fashion and upbeat anthems."
+    },
+    "celeb_rapper_kade": {
+      "name": "Kade Knox",
+      "category": "rap_music",
+      "style_tags": [
+        "streetwear",
+        "gold_chains",
+        "sneakers",
+        "oversized"
+      ],
+      "appeal_age_range": [
+        12,
+        28
+      ],
+      "portrait_url": "portraits/celebrities/kade_knox.jpg",
+      "description": "Controversial rapper with a massive teen following and signature drip."
+    },
+    "celeb_action_hero_rex": {
+      "name": "Rex Holloway",
+      "category": "film",
+      "style_tags": [
+        "rugged",
+        "masculine",
+        "military_aesthetic"
+      ],
+      "appeal_age_range": [
+        10,
+        30
+      ],
+      "portrait_url": "portraits/celebrities/rex_holloway.jpg",
+      "description": "Blockbuster action star, poster boy for a generation of young boys."
+    },
+    "celeb_actress_luna": {
+      "name": "Luna Voss",
+      "category": "film",
+      "style_tags": [
+        "elegant",
+        "minimalist",
+        "glamorous"
+      ],
+      "appeal_age_range": [
+        10,
+        25
+      ],
+      "portrait_url": "portraits/celebrities/luna_voss.jpg",
+      "description": "Critically acclaimed actress turned style icon."
+    },
+    "celeb_influencer_jay": {
+      "name": "Jay Mercer",
+      "category": "social_media",
+      "style_tags": [
+        "casual",
+        "athletic",
+        "streetwear",
+        "sunglasses"
+      ],
+      "appeal_age_range": [
+        13,
+        24
+      ],
+      "portrait_url": "portraits/celebrities/jay_mercer.jpg",
+      "description": "Fitness influencer and lifestyle vlogger with record-breaking follower counts."
+    },
+    "celeb_rockstar_vera": {
+      "name": "Vera Night",
+      "category": "rock_music",
+      "style_tags": [
+        "edgy",
+        "dark",
+        "leather",
+        "punk",
+        "band_tees"
+      ],
+      "appeal_age_range": [
+        13,
+        30
+      ],
+      "portrait_url": "portraits/celebrities/vera_night.jpg",
+      "description": "Lead singer of a cult rock band; fashion icon for the alternative crowd."
+    },
+    "celeb_athlete_marco": {
+      "name": "Marco Diaz",
+      "category": "sports",
+      "style_tags": [
+        "athletic",
+        "sportswear",
+        "jerseys"
+      ],
+      "appeal_age_range": [
+        8,
+        25
+      ],
+      "portrait_url": "portraits/celebrities/marco_diaz.jpg",
+      "description": "Star footballer and brand ambassador; kids paste his face on their school bags."
     }
   }
 }

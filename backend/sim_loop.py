@@ -88,6 +88,9 @@ from systems.domestic_control import tick_domestic_control, tick_quid_pro_quo, c
 from systems.religious_repression import tick_religious_repression
 from systems.pregnancy import tick_pregnancy
 from systems.harassment import tick_harassment, tick_harassment_daily
+from systems.baby     import tick_baby_hourly, tick_baby_daily, tick_baby_weekly
+from systems.nudity_perception import tick_nudity_perception
+from systems.crushes import tick_crushes
 
 # -- Weekly ───────────────────────────────────────────────────────
 from systems.scheduling import generate_week_schedule, adjust_for_household
@@ -203,6 +206,7 @@ def tick(world):
             distribute_lt_needs(c, world=world)  # no-op if already distributed
         tick_exercise(world)
         tick_pregnancy(world)   # weekly fitness decay + streak tracking
+        tick_baby_weekly(world)
 
     # -- Fast: perception + attention (÷5) ──────────────────
     if every(world, CADENCE["perception"]):
@@ -348,6 +352,7 @@ def tick(world):
         tick_emotional_control(world)
         tick_religious_repression(world)
         tick_harassment_daily(world)
+        tick_baby_daily(world)
         for _c in characters:
             sync_anger_from_grievances(_c, world)
             check_victim_revenge(_c, world)
@@ -358,6 +363,9 @@ def tick(world):
     # -- Impulse control pressure + boilover (every tick) ───
     tick_impulse(world)
     tick_harassment(world)
+    tick_baby_hourly(world)
+    tick_nudity_perception(world)
+    tick_crushes(world)
 
     # -- Very slow (÷300) ───────────────────────────────────
     if every(world, CADENCE["crisis"], offset=20):

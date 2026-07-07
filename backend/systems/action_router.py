@@ -607,6 +607,117 @@ def route_action(c, world, action, speech, definitions=None):
     elif action_type == "plan_hobby_session":
         _route_plan_hobby_session(c, world, action)
 
+    elif action_type == "breastfeed":
+        _route_breastfeed(c, world, action)
+    elif action_type == "bottle_feed":
+        _route_bottle_feed(c, world, action)
+    elif action_type == "hold_baby":
+        _route_hold_baby(c, world, action)
+    elif action_type == "put_baby_in_carriage":
+        _route_put_baby_in_carriage(c, world, action)
+
+# =========================================================
+# CHILDCARE HANDLERS
+# =========================================================
+
+def _route_breastfeed(c, world, action):
+    """Mother nurses the baby. Baby must be at the same location."""
+    target_id = action.get("target_id") or action.get("target")
+    if not target_id:
+        return
+    characters = world.get("characters", {})
+    baby = characters.get(target_id)
+    if not baby:
+        return
+    # Validate: baby must be at same location
+    if baby.get("current_location") != c.get("current_location"):
+        return
+    # Validate: mother must not be weaned
+    bf = baby.get("breastfeeding_state", {})
+    if bf.get("weaned"):
+        return
+
+    c["activity"] = _scaffold(c, world, "breastfeed",
+                               target_id=target_id,
+                               interaction="breastfeed",
+                               duration=30)
+
+    # Immediately apply feed (interaction resolves at completion in activities.py,
+    # but we also apply on initiation so needs don't stay critical)
+    try:
+        from systems.baby import do_breastfeed
+        do_breastfeed(baby, c, world)
+    except Exception:
+        pass
+
+
+def _route_bottle_feed(c, world, action):
+    target_id = action.get("target_id") or action.get("target")
+    if not target_id:
+        return
+    baby = world.get("characters", {}).get(target_id)
+    if not baby or baby.get("current_location") != c.get("current_location"):
+        return
+
+    c["activity"] = _scaffold(c, world, "bottle_feed",
+                               target_id=target_id,
+                               interaction="bottle_feed",
+                               duration=25)
+    # Apply feed
+    needs = baby.setdefault("baby_needs", {})
+    needs["hunger"]  = min(1.0, needs.get("hunger",  0) + 0.65)
+    needs["comfort"] = min(1.0, needs.get("comfort", 0) + 0.15)
+    # Clear cry if needs are met
+    if min(needs.values()) >= 0.30:
+        baby["is_crying"] = False
+
+
+def _route_hold_baby(c, world, action):
+    target_id = action.get("target_id") or action.get("target")
+    if not target_id:
+        return
+    baby = world.get("characters", {}).get(target_id)
+    if not baby or baby.get("current_location") != c.get("current_location"):
+        return
+
+    c["activity"] = _scaffold(c, world, "hold_baby",
+                               target_id=target_id,
+                               interaction="hold_baby",
+                               duration=20)
+    needs = baby.setdefault("baby_needs", {})
+    needs["comfort"] = min(1.0, needs.get("comfort", 0) + 0.55)
+    if needs.get("comfort", 0) >= 0.30:
+        baby["is_crying"] = False
+
+
+def _route_put_baby_in_carriage(c, world, action):
+    """Place baby in carriage and set pushed_prop_id on the parent."""
+    target_id  = action.get("target_id") or action.get("target")
+    prop_id    = action.get("prop_id")
+    if not target_id or not prop_id:
+        return
+    baby = world.get("characters", {}).get(target_id)
+    prop = world.get("placed_props", {}).get(prop_id)
+    if not baby or not prop:
+        return
+
+    tpl_id = prop.get("template_id", "")
+    defs   = world.get("definitions", {})
+    tpl    = defs.get("prop_templates", {}).get(tpl_id, {})
+    if not tpl.get("pushable"):
+        return
+
+    # Seat baby in carriage
+    baby["in_carriage"]        = prop_id
+    baby["current_location"]   = c.get("current_location")  # follows parent
+    # Parent starts pushing
+    c["pushed_prop_id"] = prop_id
+    c["activity"] = _scaffold(c, world, "put_baby_in_carriage",
+                               target_id=target_id,
+                               interaction="put_baby_in_carriage",
+                               duration=5)
+
+
 # =========================================================
 # PHONE HANDLERS
 # =========================================================

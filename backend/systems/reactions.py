@@ -33,7 +33,26 @@ REACTION_ANIMATIONS = {
     "shrug":        ["react_shrug"],
 
     # ── Environmental ──
-    "look_around":  ["react_look_around"],
+    "look_around":        ["react_look_around"],
+
+    # ── Nudity / sexual ──
+    "saw_nudity":          ["react_shocked",      "react_gasp",       "react_look_away"],
+    "walked_in_on_sex":    ["react_shocked",      "react_gasp",       "react_back_away"],
+    "heard_sex_sounds":    ["react_startled",     "react_look_around"],
+    "look_away":           ["react_look_away"],
+    "embarrassed":         ["react_embarrassed"],
+    "aroused_react":       ["react_interested",   "react_stare"],
+
+    # ── Embarrassment / blushing ──
+    "blush":               ["react_blush"],
+    "blush_heavy":         ["react_blush_heavy"],
+    "flustered":           ["react_flustered", "react_blush"],
+
+    # ── Person being walked in on ──
+    "horrified_scream":    ["react_horrified_scream"],        # female walked in on by stranger
+    "embarrassed_scream":  ["react_embarrassed_scream"],      # female moderate shame
+    "cover_up_gasp":       ["react_cover_up",  "react_gasp"], # topless / bath
+    "cover_up":            ["react_cover_up"],                 # mild cover-up
 }
 
 
@@ -60,6 +79,22 @@ REACTION_PRIORITIES = {
     "interested":  1,
     "shrug":       1,
     "look_around": 1,
+
+    "saw_nudity":       3,
+    "walked_in_on_sex": 3,
+    "heard_sex_sounds": 2,
+    "look_away":        2,
+    "embarrassed":      2,
+    "aroused_react":    1,
+
+    "blush":           1,
+    "blush_heavy":     2,
+    "flustered":       2,
+
+    "horrified_scream":   3,
+    "embarrassed_scream": 3,
+    "cover_up_gasp":      2,
+    "cover_up":           2,
 }
 
 

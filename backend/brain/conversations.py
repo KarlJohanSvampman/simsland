@@ -263,6 +263,16 @@ def add_message(
         speech_act
     )
 
+    # Blush check — fire on all participants except the speaker
+    participants = conv.get("participants", [])
+    characters   = world.get("characters", {}) if world else {}
+    for pid in participants:
+        if pid == speaker_id:
+            continue
+        recipient = characters.get(pid)
+        if recipient:
+            maybe_blush_from_conversation(recipient, speech_act, topic, world)
+
     entry = {
 
         "speaker":
@@ -411,6 +421,52 @@ def update_conversation_tone(conv, speech_act):
             conv["tone"] = "tense"
     elif speech_act in vulnerable:
         conv["tone"] = "emotional"
+
+
+# =========================================================
+# BLUSHING HOOK — called when a message is received
+# =========================================================
+
+# Map speech acts / topics to TOPIC_BLUSH keys in crushes.py
+_SPEECH_ACT_TO_BLUSH_TOPIC = {
+    "flirt":          "flirting",
+    "sexual_advance": "sexual_advance",
+    "confess_love":   "romance",
+    "compliment":     "romance",
+    "sexual_remark":  "sex",
+    "discuss_sex":    "sex",
+    "tease":          "general_awkward",
+    "awkward_silence": "general_awkward",
+}
+
+_TOPIC_TO_BLUSH_TOPIC = {
+    "romance":    "romance",
+    "sex":        "sex",
+    "intimacy":   "sex",
+    "dating":     "romance",
+    "crush":      "crush",
+    "pregnancy":  "pregnancy",
+    "nudity":     "nudity",
+    "flirting":   "flirting",
+}
+
+
+def maybe_blush_from_conversation(c, speech_act, conv_topic, world):
+    """
+    Check whether character c should blush based on what was just said.
+    Call this on the *recipient* of each message.
+    """
+    blush_topic = (
+        _SPEECH_ACT_TO_BLUSH_TOPIC.get(speech_act) or
+        _TOPIC_TO_BLUSH_TOPIC.get(conv_topic)
+    )
+    if not blush_topic:
+        return
+    try:
+        from systems.crushes import apply_topic_blush
+        apply_topic_blush(c, blush_topic, world)
+    except Exception:
+        pass
 
 
 # =========================================================

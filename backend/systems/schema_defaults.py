@@ -465,6 +465,60 @@ def ensure_character_defaults(c):
         "last_conflict_tick":     0,
     })
 
+    # Portrait / profile image
+    c.setdefault("portrait_url", None)      # path or URL to headshot image
+
+    # Crushes / infatuations — people this character has feelings for
+    # Each entry: {
+    #   "character_id": str | None,       # null if they don't know who they are yet
+    #   "name": str,                       # display name
+    #   "relation_label": str,             # "neighbour", "teacher", "cousin", "coworker" etc.
+    #   "attraction_type": "sexual"|"romantic"|"both",
+    #   "intensity": float,                # 0–1
+    #   "is_secret": bool,
+    #   "fantasy_count": int,              # times fantasised about this person
+    #   "last_fantasy_tick": int,
+    # }
+    c.setdefault("crushes", [])
+
+    # Thought bubble — what the character is currently visibly thinking about
+    # Consumed by frontend to render a thought bubble with portrait + caption
+    # {
+    #   "active": bool,
+    #   "subject_id": str | None,
+    #   "subject_name": str,
+    #   "portrait_url": str | None,
+    #   "type": "crush" | "intention" | "daydream" | "worry",
+    #   "caption": str,                    # short text shown in bubble
+    #   "tick_expires": int,
+    # }
+    c.setdefault("thought_bubble", {"active": False})
+
+    # Blushing state
+    c.setdefault("blush_score",  0.0)   # 0–1, decays over time
+    c.setdefault("is_blushing",  False)
+
+    # Nudity state — recomputed by clothing.py on every dress/undress
+    c.setdefault("is_nude",        False)   # lower body exposed
+    c.setdefault("exposed_chest",  False)   # female upper body exposed
+    c.setdefault("nudity_witnessed", {})    # {observer_id: tick} — who saw this char nude
+
+    # Infant/child fields (only meaningful for age < 6, but stamped on all)
+    c.setdefault("age_months",         None)           # float months; set on newborns
+    c.setdefault("development_stage",  None)           # newborn/infant/crawler/toddler/child/preschool
+    c.setdefault("dev_milestones",     {})             # {milestone_id: tick_achieved}
+    c.setdefault("baby_needs",         None)           # {hunger,sleep,comfort,stimulation} — set on infants
+    c.setdefault("is_crying",          False)
+    c.setdefault("breastfeeding_state", None)          # set on newborns
+    c.setdefault("maternity_leave_until", 0)           # tick until which mother is on leave
+    c.setdefault("on_maternity_leave",    False)
+    c.setdefault("prenatal_prep",      None)           # set during pregnancy
+    c.setdefault("school_enrollment",  None)           # school_template id when enrolled
+
+    # Pushable prop
+    c.setdefault("pushed_prop_id",         None)       # prop instance id when pushing carriage/mower etc.
+    c.setdefault("_active_locomotion_override", None)  # animation override while pushing
+
     # Impulse control — anger pressure vs self-control
     c.setdefault("impulse_state", {
         "anger_pressure":   0.0,   # 0-1; accumulates from grievances/frustration

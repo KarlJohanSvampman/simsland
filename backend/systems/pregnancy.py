@@ -63,6 +63,33 @@ RELIGIOUS_DRAMA_MULTIPLIER  = 2.0    # multiplies drama for strictly religious f
 
 TICKS_PER_WEEK              = 7 * 24 * 60   # assuming 1 tick = 1 game minute
 
+# Visual / physical progression
+PREGNANCY_FULL_TERM_WEEKS   = 40
+# Move speed defaults (base for adult female)
+BASE_MOVE_SPEED             = 0.05
+# By trimester: max speed reduction at full term
+SPEED_REDUCTION_MAX         = 0.40    # 40% slower at 40 weeks
+
+# Morph value ramp: belly grows non-linearly (slow start, faster in 3rd trimester)
+def _belly_morph_value(weeks):
+    """
+    Maps 0–40 weeks → 0.0–1.0 morph influence.
+    Uses a gentle ease-in curve so the first trimester barely shows.
+    weeks 0-12  → 0.00–0.10  (barely visible)
+    weeks 12-28 → 0.10–0.55  (clear bump)
+    weeks 28-40 → 0.55–1.00  (large, near full term)
+    """
+    if weeks <= 0:
+        return 0.0
+    if weeks >= PREGNANCY_FULL_TERM_WEEKS:
+        return 1.0
+    if weeks <= 12:
+        return round((weeks / 12) * 0.10, 3)
+    elif weeks <= 28:
+        return round(0.10 + ((weeks - 12) / 16) * 0.45, 3)
+    else:
+        return round(0.55 + ((weeks - 28) / 12) * 0.45, 3)
+
 # ── public API ────────────────────────────────────────────────────────────────
 
 def init_pregnancy_state(c):
@@ -152,6 +179,16 @@ def tick_pregnancy(world):
         preg["weeks"] = preg.get("weeks", 0) + 1
         weeks = preg["weeks"]
 
+        # Update visual morph + mobility every week
+        _update_visual_state(c, preg)
+
+        # Prenatal prep (doctor visits, gear, kindergarten)
+        try:
+            from systems.baby import tick_prenatal_prep
+            tick_prenatal_prep(c, preg, world)
+        except Exception:
+            pass
+
         # Discovery window
         if preg.get("discovered_tick") is None:
             delay_weeks = random.randint(DISCOVERY_DELAY_MIN_WEEKS, DISCOVERY_DELAY_MAX_WEEKS)
@@ -228,6 +265,31 @@ def get_pregnancy_context(c, world):
 
 # ── Internal helpers ──────────────────────────────────────────────────────────
 
+def _update_visual_state(c, preg):
+    """
+    Compute pregnancy_morph_value (0–1) and apply move_speed penalty.
+    Called weekly while pregnant. Frontend reads pregnancy_morph_value
+    and passes it to mesh.morphTargetInfluences["belly_pregnant"].
+    """
+    weeks = preg.get("weeks", 0)
+    morph = _belly_morph_value(weeks)
+    c["pregnancy_morph_value"] = morph
+
+    # Mobility reduction: scales with belly size
+    # At full term: 40% slower than base speed
+    speed_penalty = morph * SPEED_REDUCTION_MAX
+    base = c.get("_base_move_speed", c.get("move_speed", BASE_MOVE_SPEED))
+    c.setdefault("_base_move_speed", base)   # save original once
+    c["move_speed"] = round(max(0.01, base * (1.0 - speed_penalty)), 4)
+
+
+def _reset_visual_state(c):
+    """Clear morph and restore move_speed after pregnancy ends."""
+    c["pregnancy_morph_value"] = 0.0
+    if "_base_move_speed" in c:
+        c["move_speed"] = c.pop("_base_move_speed")
+
+
 def _has_contraception(female, male):
     """Check inventory or relationship flags for contraception use."""
     # Future: check item inventory for contraceptive items
@@ -282,11 +344,13 @@ def _resolve_decision(female, preg, decision, world):
         _add_trauma(female, "abortion_grief", None, 0.10, world)
         female["self_confidence"] = max(0.05, female.get("self_confidence", 0.60) - 0.05)
         _fire_family_drama(female, preg, "abortion_decision", world)
+        _reset_visual_state(female)
 
     elif decision == "adopt":
         preg["status"] = "adopted_out"
         _add_trauma(female, "adoption_grief", None, 0.12, world)
         _fire_family_drama(female, preg, "adoption_decision", world)
+        _reset_visual_state(female)
 
     elif decision == "keep":
         # remains "pregnant" until postpartum; handled by milestone
@@ -375,6 +439,19 @@ def _check_drama_milestones(female, preg, world):
         preg["drama_fired"] = fired
         preg["status"] = "postpartum"
         _fire_family_drama(female, preg, "birth", world)
+        _reset_visual_state(female)
+        # Spawn the child
+        try:
+            from systems.baby import spawn_child
+            father_id = preg.get("father_id")
+            child = spawn_child(female, father_id, world)
+            preg["child_id"] = child["id"]
+        except Exception:
+            pass
+        # Maternity leave — 6 months from now
+        import math
+        TICKS_PER_MONTH = 60 * 24 * 30
+        female["maternity_leave_until"] = world.get("tick", 0) + TICKS_PER_MONTH * 6
 
 
 def _fire_family_drama(female, preg, event_type, world):

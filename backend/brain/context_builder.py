@@ -575,12 +575,83 @@ def build_context(
         "emotional_control_situation": _build_emotional_control_context(c, world),
         "religious_repression": _build_repression_context(c, world),
         "pregnancy":         _build_pregnancy_context(c, world),
+        "prenatal_prep":     _build_prenatal_prep_context(c, world),
+        "baby":              _build_baby_context(c, world),
         "intoxication":      _build_intoxication_context(c, world),
+        "crushes":           _build_crushes_context(c, world),
         "trauma":            _build_trauma_context(c, world),
         "sexual_history":    _build_pleasure_context(c, world),
     }
 
     return context
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Baby / child context
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _build_baby_context(c, world):
+    """Context for a baby/infant/toddler character."""
+    try:
+        from systems.baby import get_baby_context
+        lines = get_baby_context(c, world)
+        return lines if lines else None
+    except Exception:
+        return None
+
+
+def _build_crushes_context(c, world):
+    try:
+        from systems.crushes import get_crush_context
+        lines = get_crush_context(c, world)
+        # Add shared-idol note if talking with someone
+        conv_partner_id = _get_current_conversation_partner(c, world)
+        if conv_partner_id:
+            partner = world.get("characters", {}).get(conv_partner_id, {})
+            shared = _shared_idols(c, partner)
+            for name in shared[:2]:
+                lines.append(f"Both are fans of {name} — natural conversation topic.")
+        return lines if lines else None
+    except Exception:
+        return None
+
+
+def _get_current_conversation_partner(c, world):
+    """Return the ID of whoever c is currently conversing with, if any."""
+    try:
+        for conv in world.get("conversations", {}).values():
+            parts = conv.get("participants", [])
+            if c.get("id") in parts and len(parts) == 2:
+                other = [p for p in parts if p != c.get("id")]
+                return other[0] if other else None
+    except Exception:
+        pass
+    return None
+
+
+def _shared_idols(c, partner):
+    """Return list of celebrity names both characters are fans of."""
+    c_celebs = {x["celebrity_id"] for x in c.get("crushes", [])
+                if x.get("is_celebrity") and x.get("celebrity_id")}
+    p_celebs = {x["celebrity_id"] for x in partner.get("crushes", [])
+                if x.get("is_celebrity") and x.get("celebrity_id")}
+    shared_ids = c_celebs & p_celebs
+    names = []
+    for cid in shared_ids:
+        name = next((x["name"] for x in c.get("crushes", [])
+                     if x.get("celebrity_id") == cid), cid)
+        names.append(name)
+    return names
+
+
+def _build_prenatal_prep_context(c, world):
+    """Context for a pregnant character's preparation tasks."""
+    try:
+        from systems.baby import get_prenatal_context
+        lines = get_prenatal_context(c, world)
+        return lines if lines else None
+    except Exception:
+        return None
 
 
 # =========================================================

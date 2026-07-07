@@ -58,6 +58,28 @@ def ensure_worn(c):
     worn = c.setdefault("worn", {})
     for slot in ALL_SLOTS:
         worn.setdefault(slot, None)
+    recompute_nudity_state(c)
+
+
+def recompute_nudity_state(c):
+    """
+    Recompute c["is_nude"] and c["exposed_chest"] from current worn slots.
+    Called after any put_on / take_off / undress_all.
+
+      is_nude       — True when both 'legs' and 'underwear' are empty
+      exposed_chest — True for female characters when 'torso', 'undershirt',
+                      and 'outerwear' are all empty (topless)
+    """
+    worn = c.get("worn", {})
+    lower_covered = worn.get("legs") or worn.get("underwear")
+    c["is_nude"] = not bool(lower_covered)
+
+    sex = c.get("sex", "male")
+    if sex in ("female", "intersex"):
+        upper_covered = worn.get("torso") or worn.get("undershirt") or worn.get("outerwear")
+        c["exposed_chest"] = not bool(upper_covered)
+    else:
+        c["exposed_chest"] = False
     return worn
 
 
@@ -180,6 +202,7 @@ def put_on_clothing(c, world, item_id):
 
     # Wear the new item
     worn[slot] = item
+    recompute_nudity_state(c)
 
     # Return displaced item to inventory
     if displaced:
@@ -210,6 +233,7 @@ def take_off_clothing(c, world, slot):
         return None
 
     worn[slot] = None
+    recompute_nudity_state(c)
     _add_to_inventory(c, item)
     return item
 
