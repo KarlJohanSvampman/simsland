@@ -594,6 +594,8 @@ def ensure_character_defaults(c):
     if "worn" not in c:
         from systems.clothing import ensure_worn
         ensure_worn(c)
+    c.setdefault("posture",                  "standing")  # standing | sitting | lying | leaning
+    c.setdefault("leaning_wall_id",          None)        # wall being leaned on (cleared on move)
     c.setdefault("social_contract_ids",      [])
     c.setdefault("conditioning_profile",      [])   # conditioned behaviors
     c.setdefault("active_lies",               [])   # currently maintained lies
@@ -854,20 +856,4 @@ def ensure_household_defaults(h):
         }
     )
 
-    h.setdefault(
-        "owned_objects",
-        []
-    )
-
-    h.setdefault(
-        "cleanliness",
-        1.0
-    )
-
-    h.setdefault(
-        "trash_level",
-        0.0
-    )
-
-    h.setdefault(
-        "ho
+    h.setdefau

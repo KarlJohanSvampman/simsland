@@ -94,6 +94,11 @@ def clear_expired_speech(c, world):
 # =========================================================
 
 def _route_move(c, world, action):
+    # Moving always clears a leaning posture
+    if c.get("posture") == "leaning":
+        c["posture"]        = "standing"
+        c["leaning_wall_id"] = None
+
     target_id = action.get("target")
     if not target_id:
         return
@@ -634,6 +639,18 @@ def route_action(c, world, action, speech, definitions=None):
     elif action_type == "put_baby_in_carriage":
         _route_put_baby_in_carriage(c, world, action)
 
+    # ── Posture ──────────────────────────────────────────────────────────
+    elif action_type == "sit_down":
+        _route_sit_down(c, world, action)
+    elif action_type == "stand_up":
+        _route_stand_up(c, world, action)
+    elif action_type == "lie_down":
+        _route_lie_down(c, world, action)
+    elif action_type == "lean_against_wall":
+        _route_lean_against_wall(c, world, action)
+    elif action_type == "push_off_wall":
+        _route_push_off_wall(c, world, action)
+
 # =========================================================
 # SOCIAL CONTRACT HANDLERS
 # =========================================================
@@ -1023,6 +1040,30 @@ def _route_lie_down(c, world, action):
                                target_id=action.get("target"),
                                interaction="lie_down")
     c["posture"] = "lying"
+
+
+def _route_lean_against_wall(c, world, action):
+    """
+    Lean against a nearby wall.
+
+    Does NOT touch c["activity"] — ongoing conversations, negotiations,
+    and touch proposals continue uninterrupted.
+    """
+    from systems.walls import find_leanable_wall
+    wall_id = action.get("target") or action.get("wall_id")
+    if not wall_id:
+        result = find_leanable_wall(c, world)
+        if not result:
+            return
+        wall_id = result["wall_id"]
+    c["posture"]         = "leaning"
+    c["leaning_wall_id"] = wall_id
+
+
+def _route_push_off_wall(c, world, action):
+    """Stand back up from leaning — does not touch activity."""
+    c["posture"]         = "standing"
+    c["leaning_wall_id"] = None
 
 
 # =========================================================

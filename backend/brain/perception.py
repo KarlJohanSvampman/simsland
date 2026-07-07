@@ -193,6 +193,10 @@ def perceived_activity(other):
     Checks the interaction field first (new system), then the activity
     type (legacy), so both paths produce meaningful descriptions."""
 
+    # Posture overlay — leaning has no activity dict
+    if other.get("posture") == "leaning":
+        return "leaning against the wall"
+
     activity = other.get("activity") or {}
     if not activity:
         return None
@@ -212,8 +216,10 @@ def perceived_activity(other):
     mapping = {
         # --- interactions (new system) ---
         "watch_tv":     "watching television",
-        "sit":          "sitting down",
-        "lie_down":     "lying down",
+        "sit":             "sitting down",
+        "sit_down_seat":   "sitting down",
+        "lie_down":        "lying down",
+        "lean_against_wall": "leaning against the wall",
         "sleep":        "sleeping",
         "cook":         "cooking",
         "eat":          "eating",

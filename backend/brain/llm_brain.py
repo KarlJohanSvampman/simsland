@@ -43,6 +43,12 @@ Rules:
 - "clean": target a prop or tile id. Animation is chosen automatically from the object type (mop for floors, scrub for toilet/sink, wipe for tables, etc.).
 - "trash" or "destroy": target a prop id. The prop will be removed from the world on completion.
 - Only use trash/destroy when the character intentionally wants to discard or break something.
+- "lean_against_wall": lean casually against a nearby wall. Does NOT interrupt conversations,
+  negotiations, or any other ongoing activity — it is purely a posture change. No target needed;
+  the nearest wall is found automatically. Only valid when posture.can_lean is true.
+- "push_off_wall": stand back up from leaning. Only valid when posture.current == "leaning".
+- "sit_down": sit on a nearby seat prop (target the prop id). Sets posture to sitting.
+- "stand_up": stand up from sitting or lying.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 SPEECH
@@ -67,7 +73,7 @@ OUTPUT FORMAT  (strict JSON, no other text)
   "intention":  { "type": "...", "reason": "...", "priority": 0 },
   "goal":       "short-term goal this tick",
   "action": {
-    "type":        "interact | speak | move | eat | sleep | wait | work | socialize | call | text | examine | search | carry | clean | trash | destroy",
+    "type":        "interact | speak | move | eat | sleep | wait | work | socialize | call | text | examine | search | carry | clean | trash | destroy | lean_against_wall | push_off_wall | sit_down | stand_up | lie_down",
     "target":      "prop_id or character_id — MUST be a real id from available_actions",
     "interaction": "interaction name from interactable_props (for interact actions only)",
     "destination": {"x": 0, "y": 0},

@@ -26,6 +26,7 @@ paint_bucket or wallpaper_roll in their inventory containing the right material_
 """
 
 import uuid
+import math
 
 
 # =========================================================
@@ -146,6 +147,41 @@ def walls_near(world, x, y, radius=1):
 def is_load_bearing(world, wall_id):
     wall = world.get("walls", {}).get(wall_id)
     return bool(wall and wall.get("load_bearing"))
+
+
+def find_leanable_wall(c, world):
+    """
+    Find a wall the character can lean against.
+
+    Returns {"wall_id": str, "x": int, "y": int, "virtual": bool}, or None
+    if the character is outdoors with no boundary in reach.
+
+    Priority:
+      1. Real wall entity within manhattan radius 1 in the same building.
+      2. Virtual wall — a synthetic id derived from the character's position,
+         used when room boundaries haven't been placed as explicit entities.
+         Virtual walls work fine for posture bookkeeping; they just have no
+         paint/material data.
+    """
+    cx, cy = int(c.get("x", 0)), int(c.get("y", 0))
+    bid    = c.get("building_id")
+
+    # 1. Real wall entities
+    nearby = walls_near(world, cx, cy, radius=1)
+    if bid:
+        nearby = [w for w in nearby if w.get("building_id") == bid]
+    if nearby:
+        w = nearby[0]
+        return {"wall_id": w["id"], "x": w["x"], "y": w["y"], "virtual": False}
+
+    # 2. Virtual fallback — only inside a building
+    if not bid:
+        return None
+
+    # Snap to nearest grid boundary on the X axis as a simple heuristic
+    wx = math.floor(cx) if (cx % 2 < 1) else math.ceil(cx)
+    virtual_id = f"vwall_{bid}_{wx}_{cy}"
+    return {"wall_id": virtual_id, "x": wx, "y": cy, "virtual": True}
 
 
 # =========================================================

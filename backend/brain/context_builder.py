@@ -573,6 +573,7 @@ def build_context(
         "conditioning":           _build_conditioning_context(c),
         "active_lies":            _build_active_lies_context(c, world),
         "private_offgrid":        _build_private_offgrid_context(c, world),
+        "posture":                _build_posture_context(c, world),
         "notes_in_location":      _build_notes_context(c, world),
         "rivalries":         _build_rival_context(c, world),
         "envy_conflicts":    _build_envy_context(c, world),
@@ -1446,6 +1447,7 @@ def _build_active_lies_context(c, world):
     ]
 
 
+
 def _build_private_offgrid_context(c, world):
     """
     Surface recent private off-grid events — things that happened while the
@@ -1474,7 +1476,6 @@ def _build_private_offgrid_context(c, world):
                 "hidden": evs,
             })
     return result or None
-
 
 def _build_notes_context(c, world):
     """Notes left in character's current location that they haven't read."""
@@ -1531,4 +1532,65 @@ def _build_rival_context(c, world):
 def _build_impulse_context(c, world):
     try:
         from systems.impulse import get_impulse_context
-        return get_impulse_context(c, world).get("impulse", 
+        return get_impulse_context(c, world).get("impulse", [])
+    except Exception:
+        return []
+
+
+def _build_domestic_context(c, world):
+    try:
+        from systems.domestic_control import get_domestic_control_context
+        return get_domestic_control_context(c, world).get("domestic_situation", [])
+    except Exception:
+        return []
+
+
+def _build_emotional_control_context(c, world):
+    try:
+        from systems.domestic_control import get_emotional_control_victim_context
+        return get_emotional_control_victim_context(c, world)
+    except Exception:
+        return []
+
+
+def _build_repression_context(c, world):
+    try:
+        from systems.religious_repression import get_repression_context
+        return get_repression_context(c, world)
+    except Exception:
+        return []
+
+
+def _build_pregnancy_context(c, world):
+    try:
+        from systems.pregnancy import get_pregnancy_context
+        return get_pregnancy_context(c, world)
+    except Exception:
+        return []
+
+
+def _build_intoxication_context(c, world):
+    try:
+        from systems.harassment import get_harassment_context
+        return get_harassment_context(c, world)
+    except Exception:
+        return []
+
+
+def _build_posture_context(c, world):
+    """Surface the character's current physical posture to the LLM."""
+    posture = c.get("posture", "standing")
+    result  = {"current": posture}
+    if posture == "leaning":
+        result["leaning_on"]   = c.get("leaning_wall_id")
+        result["can_push_off"] = True
+    elif posture == "standing":
+        try:
+            from systems.walls import find_leanable_wall
+            wall = find_leanable_wall(c, world)
+            result["can_lean"]    = wall is not None
+            if wall:
+                result["nearest_wall"] = wall["wall_id"]
+        except Exception:
+            result["can_lean"] = False
+    return result
