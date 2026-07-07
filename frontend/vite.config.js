@@ -22,8 +22,7 @@ export default defineConfig({
           resolve(__dirname, "floorplan.html"),
 
         meshbank:
-          resolve(__dirname, "meshbank.html")
-      }
-    }
-  }
-});
+          resolve(__dirname, "meshbank.html"),
+
+        animbank:
+  
