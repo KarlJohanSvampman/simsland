@@ -191,6 +191,21 @@ select { padding: 4px 6px; background: #1a1e28; border: 1px solid #3a4050; color
 .notifyFire { animation: notifyFlash 0.3s ease; }
 @keyframes notifyFlash { 0%{background:#ffaa44} 100%{background:transparent} }
 
+/* blend panel */
+#blendPanel {
+    flex-shrink: 0;
+    background: #192030; border-top: 1px solid #263040;
+    padding: 6px 12px; display: flex; align-items: center; gap: 8px;
+    font-size: 12px; flex-wrap: wrap;
+}
+#blendPanel.hidden { display: none; }
+#blendPanel > .blendLabel { color: #7a8aaa; white-space: nowrap; }
+#blendPanel select {
+    flex: 1; min-width: 120px; max-width: 220px;
+    padding: 3px 6px; background: #141820; border: 1px solid #3a4050;
+    color: #ccc; border-radius: 3px; font-size: 11px;
+}
+
 </style>
 </head>
 <body>
@@ -237,6 +252,19 @@ select { padding: 4px 6px; background: #1a1e28; border: 1px solid #3a4050; color
 
     <!-- 3D Canvas (fills all remaining space) -->
     <canvas id="canvas"></canvas>
+
+    <!-- Blend panel (shown once a character is loaded) -->
+    <div id="blendPanel" class="hidden">
+      <span class="blendLabel">⚗ Blend</span>
+      <span class="blendLabel">Upper body:</span>
+      <select id="blendUpperSel"></select>
+      <span class="blendLabel">Lower body:</span>
+      <select id="blendLowerSel"></select>
+      <button id="blendPlayBtn" class="primary"
+              style="font-size:12px;padding:4px 10px;flex-shrink:0">▶ Play Blend</button>
+      <span id="blendBoneInfo"
+            style="color:#445;font-size:10px;margin-left:auto;white-space:nowrap"></span>
+    </div>
 
     <!-- Clip header -->
     <div id="clipHeader">

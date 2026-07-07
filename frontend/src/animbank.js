@@ -44,6 +44,37 @@ function classifyClip(name) {
 }
 
 // =========================================================
+// BONE CLASSIFICATION FOR BLEND MODE
+// =========================================================
+
+function getBoneNameFromTrack(trackName) {
+    // Handles "[BoneName].prop" and "BoneName.prop" formats
+    const m = trackName.match(/\[(.+?)\]/);
+    return m ? m[1] : trackName.split('.')[0];
+}
+
+function classifyBones(character) {
+    const upper = new Set();
+    const lower = new Set();
+    character.traverse(node => {
+        if (!node.isBone) return;
+        const stripped = node.name.replace(/mixamorig/i, "");
+        // Lower body: hips/pelvis, legs, knees, ankles, feet, toes
+        if (/leg|upleg|foot|toe|ankle|knee|hip|pelvis/i.test(stripped)) {
+            lower.add(node.name);
+        } else {
+            upper.add(node.name);
+        }
+    });
+    return { upper, lower };
+}
+
+function filterClip(clip, boneNames, nameSuffix) {
+    const tracks = clip.tracks.filter(t => boneNames.has(getBoneNameFromTrack(t.name)));
+    return new THREE.AnimationClip(clip.name + nameSuffix, clip.duration, tracks);
+}
+
+// =========================================================
 // STATE
 // =========================================================
 
@@ -67,6 +98,12 @@ let isPlaying      = false;
 let loopMode       = THREE.LoopRepeat;  // current loop mode
 let playSpeed      = 1.0;
 let clipFPS        = 30;
+
+// Blend mode state
+let blendEnabled      = false;
+let boneSets          = { upper: new Set(), lower: new Set() };
+let activeActionUpper = null;
+let activeActionLower = null;
 
 // Notify tracking (fires once per crossing)
 let lastMixerTime  = 0;
@@ -122,8 +159,10 @@ function resize() {
     const editor = document.getElementById("editor");
     const transport = document.getElementById("transport");
     const header = document.getElementById("clipHeader");
+    const blendPanel = document.getElementById("blendPanel");
+    const blendH = blendPanel && !blendPanel.classList.contains("hidden") ? blendPanel.offsetHeight : 0;
     const edH = editor.classList.contains("hidden") ? 0 : editor.offsetHeight;
-    const h = main.offsetHeight - transport.offsetHeight - header.offsetHeight - edH;
+    const h = main.offsetHeight - transport.offsetHeight - header.offsetHeight - edH - blendH;
     const w = main.offsetWidth;
     rendererInst.setSize(w, h);
     camera.aspect = w / h;
@@ -154,6 +193,7 @@ function render() {
         if (t >= endT) {
             if (loopMode === THREE.LoopOnce) {
                 activeAction.paused = true;
+                if (activeActionLower) activeActionLower.paused = true;
                 isPlaying = false;
                 document.getElementById("playBtn").textContent = "▶";
             } else {
@@ -241,6 +281,13 @@ function setupCharacter(gltf, offsetX) {
     if (offsetX === 0) {
         characterA = model;
         mixerA     = new THREE.AnimationMixer(model);
+        boneSets   = classifyBones(model);
+        const info = document.getElementById("blendBoneInfo");
+        if (info) info.textContent =
+            `upper: ${boneSets.upper.size} bones · lower: ${boneSets.lower.size} bones`;
+        const bp = document.getElementById("blendPanel");
+        if (bp) bp.classList.remove("hidden");
+        renderBlendDropdowns();
     } else {
         characterB = model;
         mixerB     = new THREE.AnimationMixer(model);
@@ -251,9 +298,13 @@ function clearScene() {
     if (characterA) { scene.remove(characterA); characterA = null; mixerA = null; }
     if (characterB) { scene.remove(characterB); characterB = null; mixerB = null; }
     activeAction = null; activeActionB = null;
+    activeActionUpper = null; activeActionLower = null;
+    blendEnabled = false;
     rawClipsA = [];
     isPlaying = false;
     document.getElementById("playBtn").textContent = "▶";
+    const bp = document.getElementById("blendPanel");
+    if (bp) bp.classList.add("hidden");
 }
 
 function frameAll() {
@@ -271,6 +322,11 @@ function frameAll() {
 // =========================================================
 
 async function playClip(clipMeta) {
+    // Exit blend mode; single-clip takes over
+    blendEnabled      = false;
+    activeActionUpper = null;
+    activeActionLower = null;
+
     currentClipMeta = clipMeta;
     lastMixerTime   = 0;
     notifyFired.clear();
@@ -338,6 +394,64 @@ function findPairClip(pairGroup, role) {
     const src = bank[currentSourceKey];
     if (!src) return null;
     return (src.clips || []).find(c => c.pair_group === pairGroup && c.pair_role === role) || null;
+}
+
+// =========================================================
+// BLEND PLAYBACK
+// =========================================================
+
+function renderBlendDropdowns() {
+    const src = bank[currentSourceKey];
+    const clips = src?.clips || [];
+    ["blendUpperSel", "blendLowerSel"].forEach(id => {
+        const sel = document.getElementById(id);
+        if (!sel) return;
+        const prev = sel.value;
+        sel.innerHTML = '<option value="">— select clip —</option>';
+        for (const c of clips) {
+            const opt = document.createElement("option");
+            opt.value = c.original_name || c.name;
+            opt.textContent = `[${c.category}] ${c.name}`;
+            if (opt.value === prev) opt.selected = true;
+            sel.appendChild(opt);
+        }
+    });
+}
+
+function playBlended() {
+    if (!mixerA) { showStatus("Load a character first."); return; }
+
+    const upperName = document.getElementById("blendUpperSel").value;
+    const lowerName = document.getElementById("blendLowerSel").value;
+    if (!upperName || !lowerName) { showStatus("Select both clips."); return; }
+
+    const upperRaw = rawClipsA.find(c => c.name === upperName);
+    const lowerRaw = rawClipsA.find(c => c.name === lowerName);
+    if (!upperRaw || !lowerRaw) { showStatus("Clip(s) not in loaded GLB."); return; }
+
+    const upperFiltered = filterClip(upperRaw, boneSets.upper, "__upper");
+    const lowerFiltered = filterClip(lowerRaw, boneSets.lower, "__lower");
+
+    if (!upperFiltered.tracks.length) { showStatus("No upper-body tracks found in that clip."); return; }
+    if (!lowerFiltered.tracks.length) { showStatus("No lower-body tracks found in that clip."); return; }
+
+    mixerA.stopAllAction();
+
+    activeActionUpper = mixerA.clipAction(upperFiltered);
+    activeActionUpper.reset().setEffectiveWeight(1).setEffectiveTimeScale(1).play();
+    activeActionUpper.loop = loopMode;
+
+    activeActionLower = mixerA.clipAction(lowerFiltered);
+    activeActionLower.reset().setEffectiveWeight(1).setEffectiveTimeScale(1).play();
+    activeActionLower.loop = THREE.LoopRepeat;  // lower body always loops
+
+    mixerA.update(0);  // force first frame immediately
+
+    activeAction = activeActionUpper;  // timeline + transport track the upper clip
+    blendEnabled  = true;
+    isPlaying     = true;
+    document.getElementById("playBtn").textContent = "⏸";
+    showStatus(`Blending: ${upperRaw.name} ↑  +  ${lowerRaw.name} ↓`);
 }
 
 // =========================================================
@@ -574,6 +688,8 @@ function renderClipList() {
         group.appendChild(items);
         el.appendChild(group);
     }
+    // Keep blend dropdowns in sync with current clip list
+    renderBlendDropdowns();
 }
 
 // =========================================================
@@ -729,8 +845,9 @@ function wireEvents() {
     document.getElementById("playBtn").addEventListener("click", () => {
         if (!activeAction) return;
         isPlaying = !isPlaying;
-        activeAction.paused = !isPlaying;
-        if (activeActionB) activeActionB.paused = !isPlaying;
+        activeAction.paused   = !isPlaying;
+        if (activeActionB)     activeActionB.paused     = !isPlaying;
+        if (activeActionLower) activeActionLower.paused  = !isPlaying;
         document.getElementById("playBtn").textContent = isPlaying ? "⏸" : "▶";
         if (isPlaying) notifyFired.clear();
     });
@@ -851,6 +968,9 @@ function wireEvents() {
         });
         renderNotifyList(currentClipMeta);
     });
+
+    // Blend panel
+    document.getElementById("blendPlayBtn").addEventListener("click", playBlended);
 
     // Paired load (when paired checkbox toggled)
     document.getElementById("ePaired").addEventListener("change", async (e) => {
