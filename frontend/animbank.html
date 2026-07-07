@@ -191,6 +191,51 @@ select { padding: 4px 6px; background: #1a1e28; border: 1px solid #3a4050; color
 .notifyFire { animation: notifyFlash 0.3s ease; }
 @keyframes notifyFlash { 0%{background:#ffaa44} 100%{background:transparent} }
 
+/* sidebar tabs */
+#sidebarTabs { display: flex; border-bottom: 1px solid #2e3440; }
+.sideTab {
+    flex: 1; padding: 7px 4px; background: #1e2430; border: none;
+    border-bottom: 2px solid transparent; color: #778; font-size: 12px;
+    cursor: pointer; border-radius: 0;
+}
+.sideTab:hover { background: #252d3a; color: #aaa; }
+.sideTab.active { color: #ddeeff; border-bottom-color: #4a90d9; background: #1a2030; }
+
+/* template list */
+#templateList { padding: 6px 8px; }
+#newTemplateBtn { margin: 6px 12px; display: block; width: calc(100% - 24px); }
+
+/* chain rows */
+.chainRow {
+    display: flex; align-items: center; gap: 4px;
+    padding: 4px 8px; border-bottom: 1px solid #252a32;
+}
+.chainRow:last-child { border-bottom: none; }
+#chainList { border: 1px solid #2e3440; border-radius: 3px; margin: 0 12px 6px; min-height: 30px; }
+#chainLabel { padding: 4px 12px; font-size: 11px; color: #88aacc; text-transform: uppercase; display: flex; align-items: center; gap: 8px; }
+#addChainClipBtn { margin: 0 12px 6px; font-size: 11px; }
+
+/* template editor */
+#templateEditor {
+    flex-shrink: 0; background: #1e2430; border-top: 1px solid #2e3840;
+    overflow-y: auto; max-height: 280px;
+}
+#templateEditor.hidden { display: none; }
+#templateNotifySection { padding: 6px 12px 0; border-top: 1px solid #2a3040; }
+#templateNotifySection h4 { margin: 0 0 4px; font-size: 11px; color: #88aacc; text-transform: uppercase; }
+
+/* IK panel */
+#ikPanel {
+    flex-shrink: 0;
+    background: #1a2028; border-top: 1px solid #253035;
+    padding: 6px 12px; display: flex; align-items: flex-start; gap: 8px;
+    font-size: 12px; flex-wrap: wrap;
+}
+#ikPanel.hidden { display: none; }
+.ikLabel { color: #7a9aaa; white-space: nowrap; padding-top: 2px; }
+.ikBtn { font-size: 11px; padding: 3px 8px; }
+#ikTargetList { flex: 1; min-width: 200px; }
+
 /* blend panel */
 #blendPanel {
     flex-shrink: 0;
@@ -214,6 +259,12 @@ select { padding: 4px 6px; background: #1a1e28; border: 1px solid #3a4050; color
 
   <!-- ═══════════════════════════════════════════════════ SIDEBAR -->
   <div id="sidebar">
+    <div id="sidebarTabs">
+      <button class="sideTab active" data-tab="sources">Sources</button>
+      <button class="sideTab" data-tab="templates">Templates</button>
+    </div>
+
+    <div id="tab-sources">
     <div id="sidebarTop">
 
       <!-- Sources -->
@@ -237,6 +288,12 @@ select { padding: 4px 6px; background: #1a1e28; border: 1px solid #3a4050; color
     <!-- Clip list (scrollable) -->
     <div id="clipScroll">
       <div id="clipList"></div>
+    </div>
+    </div><!-- /tab-sources -->
+
+    <div id="tab-templates" class="hidden">
+      <button id="newTemplateBtn">+ New Template</button>
+      <div id="templateList"></div>
     </div>
 
   </div><!-- /sidebar -->
@@ -354,6 +411,38 @@ select { padding: 4px 6px; background: #1a1e28; border: 1px solid #3a4050; color
       </div>
     </div>
 
+    <!-- Template editor (shown when a template is open) -->
+    <div id="templateEditor" class="hidden">
+      <div class="editorGrid">
+        <label>Name</label>
+        <input id="teName" placeholder="sit_idle_talk">
+        <label>Source GLB</label>
+        <select id="teSource"></select>
+      </div>
+
+      <div id="chainLabel">
+        Clip Chain
+        <button id="addChainClipBtn" style="font-size:10px;padding:2px 6px">+ Add Clip</button>
+      </div>
+      <div id="chainList"></div>
+
+      <div class="editorGrid">
+        <label>Alternatives</label>
+        <input id="teAlternatives" placeholder="template_name, another_one">
+      </div>
+
+      <div id="templateNotifySection">
+        <h4>Notifies  <button id="addTemplateNotifyBtn" style="font-size:10px;padding:2px 6px;margin-left:8px">+ Add</button></h4>
+        <div id="templateNotifyList"></div>
+      </div>
+
+      <div class="editorBtns">
+        <button id="playTemplateBtn" class="primary">▶ Play Chain</button>
+        <button id="saveTemplateBtn" class="primary">💾 Save Template</button>
+        <button id="deleteTemplateBtn" class="danger">Delete</button>
+      </div>
+    </div>
+
   </div><!-- /main -->
 
 </div><!-- /root -->
@@ -373,6 +462,8 @@ select { padding: 4px 6px; background: #1a1e28; border: 1px solid #3a4050; color
   <option value="camera_shake">
   <option value="spawn_particle">
   <option value="end_clip">
+  <option value="ik_add">
+  <option value="ik_remove">
 </datalist>
 
 <script type="module" src="/src/animbank.js"></script>

@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
-import { GLTFLoader }    from "three/examples/jsm/loaders/GLTFLoader.js";
+import { GLTFLoader }         from "three/examples/jsm/loaders/GLTFLoader.js";
+import { TransformControls }   from "three/examples/jsm/controls/TransformControls.js";
 
 // =========================================================
 // CATEGORY REGISTRY
@@ -75,6 +76,214 @@ function filterClip(clip, boneNames, nameSuffix) {
 }
 
 // =========================================================
+// IK — BONE DETECTION + TARGET MANAGEMENT
+// =========================================================
+
+function getBoneByPattern(character, patterns) {
+    let found = null;
+    character.traverse(n => {
+        if (!n.isBone || found) return;
+        const stripped = n.name.replace(/mixamorig/i, "").toLowerCase();
+        if (patterns.some(p => stripped.includes(p))) found = n;
+    });
+    return found;
+}
+
+function initIKBones(character) {
+    ikBones = {
+        right_hand: {
+            upper: getBoneByPattern(character, ["rightarm", "r_arm", "r_upperarm"]),
+            lower: getBoneByPattern(character, ["rightforearm", "r_forearm", "r_lowerarm"]),
+            hand:  getBoneByPattern(character, ["righthand", "r_hand"]),
+        },
+        left_hand: {
+            upper: getBoneByPattern(character, ["leftarm", "l_arm", "l_upperarm"]),
+            lower: getBoneByPattern(character, ["leftforearm", "l_forearm", "l_lowerarm"]),
+            hand:  getBoneByPattern(character, ["lefthand", "l_hand"]),
+        },
+        head: {
+            neck: getBoneByPattern(character, ["neck"]),
+            head: getBoneByPattern(character, ["head"]),
+        },
+    };
+}
+
+function addIKTarget(type) {
+    if (ikTargets[type]) return;          // already added
+    if (!characterA) return;
+
+    // Determine initial world position from the relevant bone
+    const boneRef = {
+        right_hand: ikBones.right_hand?.hand,
+        left_hand:  ikBones.left_hand?.hand,
+        look_at:    ikBones.head?.head,
+    }[type] || (type === "both_hands" ? ikBones.right_hand?.hand : null);
+
+    const initPos = new THREE.Vector3();
+    if (boneRef) boneRef.getWorldPosition(initPos);
+    else initPos.set(0, 1.5, 0.4);
+
+    const color = { right_hand: 0xff4444, left_hand: 0x4444ff,
+                    both_hands: 0xff44ff, look_at: 0x44ff88 }[type] || 0xffffff;
+
+    const mesh = new THREE.Mesh(
+        new THREE.SphereGeometry(0.04, 10, 10),
+        new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.85 })
+    );
+    mesh.position.copy(initPos);
+    scene.add(mesh);
+
+    const tc = new TransformControls(camera, rendererInst.domElement);
+    tc.setMode("translate");
+    tc.setSize(0.6);
+    tc.attach(mesh);
+    tc.addEventListener("dragging-changed", e => { controls.enabled = !e.value; });
+    scene.add(tc);
+
+    ikTargets[type] = { mesh, tc, trackBone: null };
+    updateIKTargetListUI();
+    showStatus(`IK target added: ${type}`);
+}
+
+function removeIKTarget(type) {
+    const t = ikTargets[type];
+    if (!t) return;
+    t.tc.detach();
+    scene.remove(t.tc);
+    scene.remove(t.mesh);
+    t.tc.dispose();
+    t.mesh.geometry.dispose();
+    delete ikTargets[type];
+    updateIKTargetListUI();
+}
+
+function setIKTrackBone(type, bone) {
+    if (ikTargets[type]) ikTargets[type].trackBone = bone || null;
+}
+
+// 2-bone IK: point upper→lower chain at targetWorldPos
+function applyReachIK(upper, lower, targetWorldPos) {
+    if (!upper || !lower) return;
+
+    // Upper arm: align bone's natural axis toward target
+    const uFwd = upper.position.clone().normalize();
+    const uWorldPos = new THREE.Vector3();
+    upper.getWorldPosition(uWorldPos);
+    const uDir = targetWorldPos.clone().sub(uWorldPos).normalize();
+    const uPQ = new THREE.Quaternion();
+    if (upper.parent) upper.parent.getWorldQuaternion(uPQ);
+    const uLocalDir = uDir.clone().applyQuaternion(uPQ.clone().invert());
+    upper.quaternion.copy(new THREE.Quaternion().setFromUnitVectors(uFwd, uLocalDir));
+    upper.updateWorldMatrix(true, true);
+
+    // Forearm: align toward target from current elbow position
+    const lFwd = lower.position.clone().normalize();
+    const lWorldPos = new THREE.Vector3();
+    lower.getWorldPosition(lWorldPos);
+    const lDir = targetWorldPos.clone().sub(lWorldPos).normalize();
+    const lPQ = new THREE.Quaternion();
+    if (lower.parent) lower.parent.getWorldQuaternion(lPQ);
+    const lLocalDir = lDir.clone().applyQuaternion(lPQ.clone().invert());
+    lower.quaternion.copy(new THREE.Quaternion().setFromUnitVectors(lFwd, lLocalDir));
+    lower.updateWorldMatrix(true, true);
+}
+
+function applyLookAtIK(neck, head, targetWorldPos) {
+    for (const bone of [neck, head].filter(Boolean)) {
+        const fwd = bone.position.clone().normalize();
+        if (fwd.lengthSq() < 0.001) continue;
+        const wPos = new THREE.Vector3();
+        bone.getWorldPosition(wPos);
+        const dir = targetWorldPos.clone().sub(wPos).normalize();
+        const pq = new THREE.Quaternion();
+        if (bone.parent) bone.parent.getWorldQuaternion(pq);
+        const localDir = dir.clone().applyQuaternion(pq.clone().invert());
+        bone.quaternion.copy(new THREE.Quaternion().setFromUnitVectors(fwd, localDir));
+        bone.updateWorldMatrix(true, true);
+    }
+}
+
+function updateIK() {
+    if (!characterA || !Object.keys(ikTargets).length) return;
+
+    for (const [type, t] of Object.entries(ikTargets)) {
+        // If tracking a CharB bone, copy its world pos to sphere
+        if (t.trackBone) {
+            const wp = new THREE.Vector3();
+            t.trackBone.getWorldPosition(wp);
+            t.mesh.position.copy(wp);
+            t.tc.update();
+        }
+
+        const target = t.mesh.position.clone();
+
+        if (type === "right_hand") {
+            applyReachIK(ikBones.right_hand?.upper, ikBones.right_hand?.lower, target);
+        } else if (type === "left_hand") {
+            applyReachIK(ikBones.left_hand?.upper, ikBones.left_hand?.lower, target);
+        } else if (type === "both_hands") {
+            // Both hands share the same target sphere — mirror offset for L
+            applyReachIK(ikBones.right_hand?.upper, ikBones.right_hand?.lower, target);
+            applyReachIK(ikBones.left_hand?.upper,  ikBones.left_hand?.lower,  target);
+        } else if (type === "look_at") {
+            applyLookAtIK(ikBones.head?.neck, ikBones.head?.head, target);
+        }
+    }
+}
+
+function updateIKTargetListUI() {
+    const el = document.getElementById("ikTargetList");
+    if (!el) return;
+    el.innerHTML = "";
+
+    const typeLabels = {
+        right_hand: "R.Hand", left_hand: "L.Hand",
+        both_hands: "Both Hands", look_at: "Look At",
+    };
+
+    for (const [type, t] of Object.entries(ikTargets)) {
+        const row = document.createElement("div");
+        row.style.cssText = "display:flex;align-items:center;gap:6px;margin-bottom:3px;font-size:11px";
+
+        const lbl = document.createElement("span");
+        lbl.textContent = typeLabels[type] || type;
+        lbl.style.color = "#aaa";
+
+        // Optional: track CharB bone
+        if (characterB) {
+            const sel = document.createElement("select");
+            sel.style.cssText = "flex:1;padding:2px 4px;background:#141820;border:1px solid #333;color:#ccc;border-radius:3px;font-size:10px";
+            const blank = document.createElement("option");
+            blank.value = ""; blank.textContent = "— free —";
+            sel.appendChild(blank);
+            characterB.traverse(n => {
+                if (!n.isBone) return;
+                const opt = document.createElement("option");
+                opt.value = n.name; opt.textContent = n.name;
+                sel.appendChild(opt);
+            });
+            sel.value = t.trackBone?.name || "";
+            sel.addEventListener("change", () => {
+                let bone = null;
+                if (sel.value) characterB.traverse(n => { if (n.name === sel.value) bone = n; });
+                setIKTrackBone(type, bone);
+            });
+            row.appendChild(lbl);
+            row.appendChild(sel);
+        } else {
+            row.appendChild(lbl);
+        }
+
+        const del = document.createElement("button");
+        del.textContent = "✕"; del.className = "danger";
+        del.style.cssText = "padding:1px 5px;font-size:10px";
+        del.addEventListener("click", () => removeIKTarget(type));
+        row.appendChild(del);
+        el.appendChild(row);
+    }
+}
+
+// =========================================================
 // STATE
 // =========================================================
 
@@ -104,6 +313,15 @@ let blendEnabled      = false;
 let boneSets          = { upper: new Set(), lower: new Set() };
 let activeActionUpper = null;
 let activeActionLower = null;
+
+// Template state
+let currentTemplate = null;   // template object being edited / playing
+let chainIndex      = 0;      // which step in the chain is active
+let chainListener   = null;   // mixer 'finished' listener for chain advancement
+
+// IK state
+let ikBones   = {};   // { right_hand:{upper,lower,hand}, left_hand:{...}, head:{neck,head} }
+let ikTargets = {};   // { right_hand:{mesh,tc,trackBone:null}, ... }
 
 // Notify tracking (fires once per crossing)
 let lastMixerTime  = 0;
@@ -161,8 +379,12 @@ function resize() {
     const header = document.getElementById("clipHeader");
     const blendPanel = document.getElementById("blendPanel");
     const blendH = blendPanel && !blendPanel.classList.contains("hidden") ? blendPanel.offsetHeight : 0;
+    const ikPanel = document.getElementById("ikPanel");
+    const ikH = ikPanel && !ikPanel.classList.contains("hidden") ? ikPanel.offsetHeight : 0;
+    const teH = document.getElementById("templateEditor")?.classList.contains("hidden") ? 0
+              : (document.getElementById("templateEditor")?.offsetHeight || 0);
     const edH = editor.classList.contains("hidden") ? 0 : editor.offsetHeight;
-    const h = main.offsetHeight - transport.offsetHeight - header.offsetHeight - edH - blendH;
+    const h = main.offsetHeight - transport.offsetHeight - header.offsetHeight - edH - blendH - ikH - teH;
     const w = main.offsetWidth;
     rendererInst.setSize(w, h);
     camera.aspect = w / h;
@@ -184,6 +406,8 @@ function render() {
     if (mixerB && isPlaying) {
         mixerB.update(delta * playSpeed);
     }
+    // IK runs every frame regardless of pause state (so you can drag while paused)
+    if (characterA) updateIK();
 
     // Enforce start/end frame range
     if (activeAction && isPlaying) {
@@ -228,6 +452,10 @@ function checkNotifies(currentTime) {
             notifyFired.add(n.id);
             flashNotifyRow(n.id);
             console.log("[AnimNotify]", n.event, "at frame", n.frame, "payload:", n.payload || {});
+
+            // IK target add/remove via notifies
+            if (n.event === "ik_add" && n.payload?.target)    addIKTarget(n.payload.target);
+            if (n.event === "ik_remove" && n.payload?.target) removeIKTarget(n.payload.target);
 
             // Built-in reaction handler for altercation clips
             if (n.event === "start_reaction" && n.payload?.clip && mixerB) {
@@ -282,11 +510,14 @@ function setupCharacter(gltf, offsetX) {
         characterA = model;
         mixerA     = new THREE.AnimationMixer(model);
         boneSets   = classifyBones(model);
+        initIKBones(model);
         const info = document.getElementById("blendBoneInfo");
         if (info) info.textContent =
             `upper: ${boneSets.upper.size} bones · lower: ${boneSets.lower.size} bones`;
         const bp = document.getElementById("blendPanel");
         if (bp) bp.classList.remove("hidden");
+        const ikp = document.getElementById("ikPanel");
+        if (ikp) ikp.classList.remove("hidden");
         renderBlendDropdowns();
     } else {
         characterB = model;
@@ -300,11 +531,17 @@ function clearScene() {
     activeAction = null; activeActionB = null;
     activeActionUpper = null; activeActionLower = null;
     blendEnabled = false;
+    chainTemplate = null; chainIndex = 0;
+    // Remove all IK targets
+    for (const type of Object.keys(ikTargets)) removeIKTarget(type);
+    ikBones = {};
     rawClipsA = [];
     isPlaying = false;
     document.getElementById("playBtn").textContent = "▶";
     const bp = document.getElementById("blendPanel");
     if (bp) bp.classList.add("hidden");
+    const ikp = document.getElementById("ikPanel");
+    if (ikp) ikp.classList.add("hidden");
 }
 
 function frameAll() {
@@ -454,6 +691,291 @@ function playBlended() {
     showStatus(`Blending: ${upperRaw.name} ↑  +  ${lowerRaw.name} ↓`);
 }
 
+
+// =========================================================
+// ANIMATION TEMPLATES
+// =========================================================
+
+function getTemplates() {
+    return bank["_templates"] || (bank["_templates"] = {});
+}
+
+function createTemplate() {
+    const id = crypto.randomUUID();
+    const tmpl = {
+        id,
+        name: "new_template",
+        source_key: currentSourceKey || "",
+        chain: [],
+        alternatives: [],
+        notifies: [],
+        ik_targets: [],
+    };
+    getTemplates()[id] = tmpl;
+    renderTemplateTab();
+    openTemplateEditor(tmpl);
+}
+
+function openTemplateEditor(tmpl) {
+    currentTemplate = tmpl;
+
+    // Show template editor, hide clip editor
+    document.getElementById("editor").classList.add("hidden");
+    const te = document.getElementById("templateEditor");
+    te.classList.remove("hidden");
+
+    document.getElementById("teName").value        = tmpl.name || "";
+    document.getElementById("teAlternatives").value = (tmpl.alternatives || []).join(", ");
+
+    // Source dropdown
+    const srcSel = document.getElementById("teSource");
+    srcSel.innerHTML = "";
+    for (const key of Object.keys(bank)) {
+        if (key.startsWith("_")) continue;
+        const opt = document.createElement("option");
+        opt.value = key;
+        opt.textContent = bank[key].display_name || key;
+        if (key === tmpl.source_key) opt.selected = true;
+        srcSel.appendChild(opt);
+    }
+    srcSel.addEventListener("change", () => {
+        tmpl.source_key = srcSel.value;
+        renderChainList(tmpl);
+    });
+
+    renderChainList(tmpl);
+    renderTemplateNotifyList(tmpl);
+    resize();
+}
+
+function renderChainList(tmpl) {
+    const el = document.getElementById("chainList");
+    el.innerHTML = "";
+
+    const src = bank[tmpl.source_key];
+    const clipOpts = (src?.clips || []).map(c => ({
+        label: `[${c.category}] ${c.name}`,
+        value: c.original_name || c.name,
+    }));
+
+    (tmpl.chain || []).forEach((entry, idx) => {
+        const row = document.createElement("div");
+        row.className = "chainRow";
+
+        // Clip selector
+        const sel = document.createElement("select");
+        sel.style.cssText = "flex:2;padding:3px 5px;background:#141820;border:1px solid #3a4050;color:#ccc;border-radius:3px;font-size:11px";
+        const blank = document.createElement("option");
+        blank.value = ""; blank.textContent = "— clip —";
+        sel.appendChild(blank);
+        for (const o of clipOpts) {
+            const opt = document.createElement("option");
+            opt.value = o.value; opt.textContent = o.label;
+            if (o.value === entry.clip) opt.selected = true;
+            sel.appendChild(opt);
+        }
+        sel.addEventListener("change", () => { entry.clip = sel.value; });
+
+        // Start frame
+        const startF = document.createElement("input");
+        startF.type = "number"; startF.min = 0; startF.value = entry.start_frame ?? 0;
+        startF.title = "Start frame";
+        startF.style.cssText = "width:44px;padding:3px;background:#141820;border:1px solid #333;color:#ccc;border-radius:3px;font-size:11px";
+        startF.addEventListener("change", () => { entry.start_frame = parseInt(startF.value) || 0; });
+
+        // End frame
+        const endF = document.createElement("input");
+        endF.type = "number"; endF.min = 0; endF.value = entry.end_frame ?? "";
+        endF.placeholder = "end"; endF.title = "End frame (blank = full clip)";
+        endF.style.cssText = "width:44px;padding:3px;background:#141820;border:1px solid #333;color:#ccc;border-radius:3px;font-size:11px";
+        endF.addEventListener("change", () => {
+            entry.end_frame = endF.value === "" ? null : parseInt(endF.value);
+        });
+
+        // Speed
+        const spd = document.createElement("input");
+        spd.type = "number"; spd.step = 0.05; spd.min = 0.05; spd.max = 4;
+        spd.value = entry.speed ?? 1.0; spd.title = "Speed";
+        spd.style.cssText = "width:44px;padding:3px;background:#141820;border:1px solid #333;color:#ccc;border-radius:3px;font-size:11px";
+        spd.addEventListener("change", () => { entry.speed = parseFloat(spd.value) || 1.0; });
+
+        // Loop mode
+        const loopSel = document.createElement("select");
+        loopSel.style.cssText = "padding:3px 5px;background:#141820;border:1px solid #3a4050;color:#ccc;border-radius:3px;font-size:11px";
+        for (const [v, lbl] of [["repeat","↺ Loop"],["pingpong","⇄ Ping"],["once","→| Once"]]) {
+            const o = document.createElement("option");
+            o.value = v; o.textContent = lbl;
+            if (v === (entry.loop || "repeat")) o.selected = true;
+            loopSel.appendChild(o);
+        }
+        loopSel.addEventListener("change", () => { entry.loop = loopSel.value; });
+
+        // Loop count
+        const cnt = document.createElement("input");
+        cnt.type = "number"; cnt.min = -1; cnt.value = entry.loop_count ?? -1;
+        cnt.title = "Loop count (-1 = infinite)";
+        cnt.style.cssText = "width:40px;padding:3px;background:#141820;border:1px solid #333;color:#ccc;border-radius:3px;font-size:11px";
+        cnt.addEventListener("change", () => { entry.loop_count = parseInt(cnt.value); });
+
+        // Delete
+        const del = document.createElement("button");
+        del.textContent = "✕"; del.className = "danger";
+        del.style.cssText = "padding:2px 5px;font-size:10px;flex-shrink:0";
+        del.addEventListener("click", () => {
+            tmpl.chain.splice(idx, 1);
+            renderChainList(tmpl);
+        });
+
+        row.appendChild(sel);
+        row.appendChild(startF);
+        row.appendChild(endF);
+        row.appendChild(spd);
+        row.appendChild(loopSel);
+        row.appendChild(cnt);
+        row.appendChild(del);
+        el.appendChild(row);
+    });
+}
+
+function renderTemplateNotifyList(tmpl) {
+    const el = document.getElementById("templateNotifyList");
+    if (!el) return;
+    el.innerHTML = "";
+    for (const n of (tmpl.notifies || [])) {
+        const row = document.createElement("div");
+        row.className = "notifyRow"; row.dataset.id = n.id;
+
+        const frameInput = document.createElement("input");
+        frameInput.className = "nFrame"; frameInput.type = "number"; frameInput.value = n.frame;
+        frameInput.addEventListener("change", () => { n.frame = parseInt(frameInput.value) || 0; });
+
+        const eventInput = document.createElement("input");
+        eventInput.className = "nEvent";
+        eventInput.setAttribute("list", "notifyEventOptions");
+        eventInput.value = n.event || ""; eventInput.placeholder = "event_name";
+        eventInput.addEventListener("change", () => { n.event = eventInput.value; });
+
+        const delBtn = document.createElement("button");
+        delBtn.className = "nDel danger"; delBtn.textContent = "✕";
+        delBtn.addEventListener("click", () => {
+            tmpl.notifies = (tmpl.notifies || []).filter(x => x.id !== n.id);
+            renderTemplateNotifyList(tmpl);
+        });
+
+        row.appendChild(frameInput); row.appendChild(eventInput); row.appendChild(delBtn);
+        el.appendChild(row);
+    }
+}
+
+function saveCurrentTemplate() {
+    if (!currentTemplate) return;
+    currentTemplate.name        = document.getElementById("teName").value.trim() || currentTemplate.name;
+    currentTemplate.alternatives = document.getElementById("teAlternatives").value
+        .split(",").map(s => s.trim()).filter(Boolean);
+    getTemplates()[currentTemplate.id] = currentTemplate;
+    renderTemplateTab();
+    showStatus("Template saved.");
+}
+
+function deleteCurrentTemplate() {
+    if (!currentTemplate) return;
+    delete getTemplates()[currentTemplate.id];
+    currentTemplate = null;
+    document.getElementById("templateEditor").classList.add("hidden");
+    renderTemplateTab();
+    showStatus("Template deleted.");
+}
+
+// Play entire chain sequence
+function playTemplate(tmpl) {
+    if (!rawClipsA.length) {
+        // Auto-load the source GLB if not already loaded
+        if (tmpl.source_key && bank[tmpl.source_key]) {
+            loadSourceGLB(tmpl.source_key).then(() => playTemplate(tmpl));
+        }
+        return;
+    }
+    chainTemplate = tmpl;
+    chainIndex = 0;
+    playChainStep(0);
+}
+
+function playChainStep(idx) {
+    if (!chainTemplate) return;
+    const entry = (chainTemplate.chain || [])[idx];
+    if (!entry) return;
+
+    const raw = rawClipsA.find(c => c.name === entry.clip);
+    if (!raw) {
+        console.warn("Chain: clip not found in GLB:", entry.clip);
+        // Advance anyway
+        if (idx + 1 < chainTemplate.chain.length) playChainStep(idx + 1);
+        return;
+    }
+
+    blendEnabled = false; activeActionUpper = null; activeActionLower = null;
+    mixerA.stopAllAction();
+
+    // Remove previous chain listener
+    if (chainListener) { mixerA.removeEventListener("finished", chainListener); chainListener = null; }
+
+    const loopMap = { repeat: THREE.LoopRepeat, pingpong: THREE.LoopPingPong, once: THREE.LoopOnce };
+    const loop = loopMap[entry.loop || "repeat"] || THREE.LoopRepeat;
+
+    const action = mixerA.clipAction(raw);
+    action.reset().setEffectiveWeight(1).setEffectiveTimeScale(entry.speed || 1.0).play();
+    action.loop = loop;
+    action.clampWhenFinished = loop === THREE.LoopOnce;
+    if (entry.loop_count > 0) action.repetitions = entry.loop_count;
+
+    const startT = (entry.start_frame || 0) / clipFPS;
+    action.time = startT;
+    mixerA.update(0);
+
+    activeAction = action;
+    chainIndex   = idx;
+    isPlaying    = true;
+    document.getElementById("playBtn").textContent = "⏸";
+
+    // Advance to next step when this one finishes (only for once / finite loops)
+    if (idx + 1 < chainTemplate.chain.length && loop !== THREE.LoopRepeat) {
+        chainListener = (e) => {
+            if (e.action === action) {
+                mixerA.removeEventListener("finished", chainListener);
+                chainListener = null;
+                playChainStep(idx + 1);
+            }
+        };
+        mixerA.addEventListener("finished", chainListener);
+    }
+}
+
+function renderTemplateTab() {
+    const el = document.getElementById("templateList");
+    if (!el) return;
+    el.innerHTML = "";
+    const templates = getTemplates();
+    for (const tmpl of Object.values(templates)) {
+        const row = document.createElement("div");
+        row.className = "sourceRow" + (currentTemplate?.id === tmpl.id ? " active" : "");
+        row.style.cursor = "pointer";
+
+        const name = document.createElement("div");
+        name.className = "srcName"; name.textContent = tmpl.name;
+
+        const count = document.createElement("div");
+        count.className = "srcCount";
+        count.textContent = (tmpl.chain || []).length + " clips";
+
+        row.appendChild(name); row.appendChild(count);
+        row.addEventListener("click", () => {
+            renderTemplateTab();
+            openTemplateEditor(tmpl);
+        });
+        el.appendChild(row);
+    }
+}
+
 // =========================================================
 // EXTRACT CLIPS FROM LOADED GLB
 // =========================================================
@@ -537,6 +1059,7 @@ async function loadBank() {
     renderSidebar();
     renderCategoryFilter();
     renderClipList();
+    renderTemplateTab();
 }
 
 async function saveBank() {
@@ -967,6 +1490,47 @@ function wireEvents() {
             payload: {},
         });
         renderNotifyList(currentClipMeta);
+    });
+
+    // IK panel buttons
+    document.getElementById("ikAddRH").addEventListener("click",    () => addIKTarget("right_hand"));
+    document.getElementById("ikAddLH").addEventListener("click",    () => addIKTarget("left_hand"));
+    document.getElementById("ikAddBoth").addEventListener("click",  () => addIKTarget("both_hands"));
+    document.getElementById("ikAddLookAt").addEventListener("click",() => addIKTarget("look_at"));
+
+    // Template buttons (inside templateEditor)
+    document.getElementById("saveTemplateBtn").addEventListener("click", saveCurrentTemplate);
+    document.getElementById("deleteTemplateBtn").addEventListener("click", deleteCurrentTemplate);
+    document.getElementById("newTemplateBtn").addEventListener("click", createTemplate);
+    document.getElementById("addChainClipBtn").addEventListener("click", () => {
+        if (!currentTemplate) return;
+        currentTemplate.chain = currentTemplate.chain || [];
+        currentTemplate.chain.push({
+            id: crypto.randomUUID(), clip: "", start_frame: 0,
+            end_frame: null, speed: 1.0, loop: "repeat", loop_count: -1,
+        });
+        renderChainList(currentTemplate);
+    });
+    document.getElementById("playTemplateBtn").addEventListener("click", () => {
+        if (currentTemplate) playTemplate(currentTemplate);
+    });
+    document.getElementById("addTemplateNotifyBtn").addEventListener("click", () => {
+        if (!currentTemplate) return;
+        currentTemplate.notifies = currentTemplate.notifies || [];
+        currentTemplate.notifies.push({ id: crypto.randomUUID(), frame: 0, fps: clipFPS, event: "", payload: {} });
+        renderTemplateNotifyList(currentTemplate);
+    });
+
+    // Sidebar tabs
+    document.querySelectorAll(".sideTab").forEach(btn => {
+        btn.addEventListener("click", () => {
+            const tab = btn.dataset.tab;
+            document.querySelectorAll(".sideTab").forEach(b => b.classList.remove("active"));
+            btn.classList.add("active");
+            document.getElementById("tab-sources").classList.toggle("hidden", tab !== "sources");
+            document.getElementById("tab-templates").classList.toggle("hidden", tab !== "templates");
+            if (tab === "templates") renderTemplateTab();
+        });
     });
 
     // Blend panel
