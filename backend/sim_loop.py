@@ -417,4 +417,11 @@ def tick(world):
 
     # -- Maybe-RSVP deadline nudges ──────────────────────────────
     if every(world, CADENCE["maybe_deadlines"], offset=31):
-        check_m
+        check_maybe_deadlines(world)
+
+    if every(world, CADENCE["calendar_events"], offset=32):
+        check_calendar_reminders(world)
+
+    # Story arcs are lightweight — keep per-tick
+    for c in characters:
+        update_story_arc(c)
