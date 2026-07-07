@@ -607,6 +607,15 @@ def route_action(c, world, action, speech, definitions=None):
     elif action_type == "plan_hobby_session":
         _route_plan_hobby_session(c, world, action)
 
+    elif action_type == "announce_departure":
+        _route_announce_departure(c, world, action)
+    elif action_type == "apply_discipline":
+        _route_apply_discipline(c, world, action)
+    elif action_type == "apply_reward":
+        _route_apply_discipline(c, world, action)   # same pipeline
+    elif action_type == "negotiate_contract":
+        _route_negotiate_contract(c, world, action)
+
     elif action_type in ("hug", "kiss", "kiss_peck", "kiss_deep", "cuddle", "hold_hands", "handshake", "high_five"):
         _route_propose_touch(c, world, action, action_type)
     elif action_type == "respond_touch":
@@ -620,6 +629,97 @@ def route_action(c, world, action, speech, definitions=None):
         _route_hold_baby(c, world, action)
     elif action_type == "put_baby_in_carriage":
         _route_put_baby_in_carriage(c, world, action)
+
+# =========================================================
+# SOCIAL CONTRACT HANDLERS
+# =========================================================
+
+def _route_announce_departure(c, world, action):
+    """
+    Character announces they are leaving.
+    Sets _announced_departure flag and fires an incidental speech bubble.
+    target_id: authority or authorized person to tell (optional — will find one)
+    """
+    target_id = action.get("target_id") or action.get("target")
+    chars     = world.get("characters", {})
+
+    # If no explicit target, find an authority in same location
+    if not target_id:
+        cur_loc = c.get("current_location") or c.get("building_id")
+        for oid, other in chars.items():
+            if oid == c["id"]:
+                continue
+            other_loc = other.get("current_location") or other.get("building_id")
+            if other_loc != cur_loc:
+                continue
+            rel = c.get("relationships", {}).get(oid, {})
+            if any(lbl in rel.get("labels", []) for lbl in ("parent","guardian","spouse","partner")):
+                target_id = oid
+                break
+
+    try:
+        from systems.incidental_speech import fire_incidental
+        import random
+        phrases = [
+            "I'm heading out.",
+            "Just letting you know I'm leaving.",
+            "Going out — be back later.",
+        ]
+        fire_incidental(c, "announce", random.choice(phrases), world, target_id=target_id)
+    except Exception:
+        pass
+
+    c["_announced_departure"] = True
+
+
+def _route_apply_discipline(c, world, action):
+    """
+    Authority applies a disciplinary or reward method to a subject.
+    action: {type: "apply_discipline", target_id: subject_id, method_id: "grounding"}
+    """
+    target_id = action.get("target_id") or action.get("target")
+    method_id = action.get("method_id") or action.get("method")
+    if not target_id or not method_id:
+        return
+    subject = world.get("characters", {}).get(target_id)
+    if not subject:
+        return
+
+    try:
+        from systems.conditioning import apply_discipline
+        apply_discipline(subject, c, method_id, world)
+    except Exception:
+        pass
+
+
+def _route_negotiate_contract(c, world, action):
+    """
+    Subject proposes modification to an existing social contract.
+    action: {type: "negotiate_contract", contract_id: "...",
+             proposed_terms: {...}, exchange_offer: "..."}
+    """
+    contract_id    = action.get("contract_id")
+    proposed_terms = action.get("proposed_terms", {})
+    exchange_offer = action.get("exchange_offer", "")
+
+    contract = world.get("social_contracts", {}).get(contract_id)
+    if not contract:
+        # Try to find active contract where c is subject
+        for cid_loop in c.get("social_contract_ids", []):
+            ct = world.get("social_contracts", {}).get(cid_loop, {})
+            if ct.get("status") == "active" and ct.get("subject_id") == c["id"]:
+                contract = ct
+                break
+    if not contract:
+        return
+
+    try:
+        from systems.social_contracts import propose_contract_modification
+        propose_contract_modification(contract, c["id"], proposed_terms,
+                                      exchange_offer, world)
+    except Exception:
+        pass
+
 
 # =========================================================
 # TOUCH PROPOSAL HANDLERS

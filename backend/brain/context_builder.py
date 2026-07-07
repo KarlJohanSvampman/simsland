@@ -569,6 +569,8 @@ def build_context(
         "attraction":        _build_attraction_context(c, world),
         "intimacy":          _build_intimacy_context(c, world),
         "pending_touch_proposal": _build_touch_proposal_context(c, world),
+        "authority_contracts":    _build_authority_contracts_context(c, world),
+        "conditioning":           _build_conditioning_context(c),
         "rivalries":         _build_rival_context(c, world),
         "envy_conflicts":    _build_envy_context(c, world),
         "impulse":           _build_impulse_context(c, world),
@@ -1386,6 +1388,42 @@ def _build_touch_proposal_context(c, world):
                 "note": f"{other_name} wants to {template_id} with you. You can accept or decline.",
             }
     return result or None
+
+
+def _build_authority_contracts_context(c, world):
+    """Active authority contracts + compliance scores for LLM context."""
+    try:
+        from systems.social_contracts import get_contracts_for_character
+        contracts = get_contracts_for_character(c["id"], world)
+        result = []
+        for ct in contracts:
+            score = ct.get("compliance_score", 0.5)
+            ctype = ct.get("contract_type", "agreement")
+            auth_id = ct.get("authority_id")
+            chars = world.get("characters", {})
+            auth_name = chars.get(auth_id, {}).get("name", auth_id) if auth_id else None
+            terms_summary = [t.get("commitment", "") for t in ct.get("terms", [])]
+            neg = ct.get("negotiation", {})
+            entry = {
+                "type": ctype,
+                "authority": auth_name,
+                "terms": terms_summary,
+                "compliance_score": round(score, 2),
+            }
+            if neg.get("state") == "proposed":
+                entry["pending_negotiation"] = f"Proposed: {neg.get('proposed_terms')} — offering: {neg.get('exchange_offer')}"
+            result.append(entry)
+        return result or None
+    except Exception:
+        return None
+
+
+def _build_conditioning_context(c):
+    try:
+        from systems.conditioning import get_conditioning_context
+        return get_conditioning_context(c) or None
+    except Exception:
+        return None
 
 
 def _build_envy_context(c, world):

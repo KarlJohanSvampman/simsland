@@ -91,6 +91,8 @@ from systems.harassment import tick_harassment, tick_harassment_daily
 from systems.baby     import tick_baby_hourly, tick_baby_daily, tick_baby_weekly
 from systems.nudity_perception import tick_nudity_perception
 from systems.crushes import tick_crushes
+from systems.incidental_speech import tick_incidental_speech, clear_departure_flags
+from systems.conditioning import tick_conditioning_weekly
 
 # -- Weekly ───────────────────────────────────────────────────────
 from systems.scheduling import generate_week_schedule, adjust_for_household
@@ -207,6 +209,7 @@ def tick(world):
         tick_exercise(world)
         tick_pregnancy(world)   # weekly fitness decay + streak tracking
         tick_baby_weekly(world)
+        tick_conditioning_weekly(world)
 
     # -- Fast: perception + attention (÷5) ──────────────────
     if every(world, CADENCE["perception"]):
@@ -357,6 +360,9 @@ def tick(world):
             sync_anger_from_grievances(_c, world)
             check_victim_revenge(_c, world)
 
+    # -- Clear one-tick departure flags (must be first) ────
+    clear_departure_flags(world)
+
     # -- Intimacy arousal decay (every tick) ───────────────
     tick_intimacy(world)
 
@@ -366,6 +372,7 @@ def tick(world):
     tick_baby_hourly(world)
     tick_nudity_perception(world)
     tick_crushes(world)
+    tick_incidental_speech(world)
 
     # -- Very slow (÷300) ───────────────────────────────────
     if every(world, CADENCE["crisis"], offset=20):

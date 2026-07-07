@@ -90,15 +90,20 @@ def update_character_movement(
 
                 # Lock home doors when character steps outside
                 _auto_lock_on_exit(c, world)
+                prev_building = c.get("building_id")
                 c["building_id"] = None
+                # Fire departure observation (incidental speech system)
+                if prev_building:
+                    try:
+                        from systems.incidental_speech import mark_departure
+                        mark_departure(c, prev_building)
+                    except Exception:
+                        pass
 
             elif next_segment["type"] == "indoor":
 
-                c["building_id"] = (
-                    next_segment.get(
-                        "building_id"
-                    )
-                )
+                new_building = next_segment.get("building_id")
+                c["building_id"] = new_building
 
         return True
 

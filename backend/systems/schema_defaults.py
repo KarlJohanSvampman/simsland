@@ -53,7 +53,9 @@ def ensure_world_defaults(world, defs=None):
         []
     )
     world.setdefault("conflicts",          {})
-    world.setdefault("social_contracts",   {})
+    world.setdefault("social_contracts",        {})
+    world.setdefault("pending_contract_proposals", [])
+    world.setdefault("micro_request_queue",        [])
     world.setdefault("stocks",             {})
     world.setdefault("stock_sector_trends", {})
     world.setdefault("service_contracts",  [])
@@ -593,6 +595,11 @@ def ensure_character_defaults(c):
         from systems.clothing import ensure_worn
         ensure_worn(c)
     c.setdefault("social_contract_ids",      [])
+    c.setdefault("conditioning_profile",      [])   # conditioned behaviors
+    c.setdefault("conditioned_traits",        [])   # promoted conditioning entries
+    c.setdefault("discipline_log",            [])   # discipline events received
+    c.setdefault("pending_authority_contact", [])   # violation escalation queue
+    c.setdefault("intention_queue",           [])   # pending AI intentions
     c.setdefault("cold_shoulder_towards",    [])
     c.setdefault("_confrontation_emitted",   [])
     c.setdefault("recent_behavior_tags",     [])

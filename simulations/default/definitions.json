@@ -48984,5 +48984,218 @@
       "portrait_url": "portraits/celebrities/marco_diaz.jpg",
       "description": "Star footballer and brand ambassador; kids paste his face on their school bags."
     }
+  },
+  "disciplinary_methods_registry": {
+    "verbal_warning": {
+      "name": "Verbal Warning",
+      "category": "verbal",
+      "severity": 1,
+      "authority_types": [
+        "parent",
+        "guardian",
+        "employer",
+        "teacher",
+        "spouse"
+      ],
+      "effect": "add_grievance_mild",
+      "conditioning_stimulus": "mild_reprimand",
+      "conditioning_response": "caution",
+      "shame_delta": 0.05,
+      "resentment_delta": 2,
+      "description": "A calm but firm verbal correction."
+    },
+    "lecture": {
+      "name": "Lecture",
+      "category": "verbal",
+      "severity": 2,
+      "authority_types": [
+        "parent",
+        "guardian",
+        "teacher"
+      ],
+      "effect": "add_grievance_mild",
+      "conditioning_stimulus": "lecture",
+      "conditioning_response": "avoidance",
+      "shame_delta": 0.12,
+      "resentment_delta": 5,
+      "description": "Extended verbal correction with moral instruction."
+    },
+    "public_reprimand": {
+      "name": "Public Reprimand",
+      "category": "verbal",
+      "severity": 3,
+      "authority_types": [
+        "parent",
+        "employer",
+        "teacher"
+      ],
+      "effect": "reputation_damage_minor",
+      "conditioning_stimulus": "public_shame",
+      "conditioning_response": "shame_anxiety",
+      "shame_delta": 0.3,
+      "resentment_delta": 15,
+      "description": "Scolded in front of others \u2014 humiliating."
+    },
+    "early_curfew": {
+      "name": "Earlier Curfew",
+      "category": "privilege_removal",
+      "severity": 2,
+      "authority_types": [
+        "parent",
+        "guardian"
+      ],
+      "creates_contract": "curfew",
+      "contract_params": {
+        "deadline_delta": -2
+      },
+      "conditioning_stimulus": "restricted_freedom",
+      "conditioning_response": "frustration",
+      "resentment_delta": 8,
+      "description": "Curfew moved earlier as a consequence."
+    },
+    "phone_confiscated": {
+      "name": "Phone Confiscated",
+      "category": "privilege_removal",
+      "severity": 3,
+      "authority_types": [
+        "parent",
+        "guardian"
+      ],
+      "effect": "remove_item_phone",
+      "conditioning_stimulus": "loss_of_connection",
+      "conditioning_response": "frustration",
+      "resentment_delta": 12,
+      "description": "Phone taken away for a period."
+    },
+    "grounding": {
+      "name": "Grounding",
+      "category": "privilege_removal",
+      "severity": 4,
+      "authority_types": [
+        "parent",
+        "guardian"
+      ],
+      "creates_contract": "grounding",
+      "contract_params": {
+        "duration_ticks": 1440
+      },
+      "conditioning_stimulus": "confinement",
+      "conditioning_response": "resentment_authority",
+      "resentment_delta": 20,
+      "shame_delta": 0.1,
+      "description": "Restricted to home for a set period."
+    },
+    "allowance_cut": {
+      "name": "Allowance Cut",
+      "category": "privilege_removal",
+      "severity": 3,
+      "authority_types": [
+        "parent",
+        "guardian"
+      ],
+      "effect": "reduce_allowance",
+      "conditioning_stimulus": "financial_penalty",
+      "conditioning_response": "frustration",
+      "resentment_delta": 10,
+      "description": "Weekly allowance reduced or withheld."
+    },
+    "extra_chores": {
+      "name": "Extra Chores",
+      "category": "added_obligation",
+      "severity": 2,
+      "authority_types": [
+        "parent",
+        "guardian",
+        "spouse"
+      ],
+      "creates_contract": "chore",
+      "conditioning_stimulus": "extra_burden",
+      "conditioning_response": "avoidance",
+      "resentment_delta": 6,
+      "description": "Additional household tasks assigned as consequence."
+    },
+    "written_apology": {
+      "name": "Written Apology",
+      "category": "added_obligation",
+      "severity": 2,
+      "authority_types": [
+        "parent",
+        "guardian",
+        "teacher",
+        "employer"
+      ],
+      "effect": "creates_apology_obligation",
+      "conditioning_stimulus": "forced_contrition",
+      "conditioning_response": "shame",
+      "shame_delta": 0.15,
+      "resentment_delta": 5,
+      "description": "Must write and deliver a formal apology."
+    },
+    "verbal_praise": {
+      "name": "Verbal Praise",
+      "category": "reward",
+      "severity": 0,
+      "authority_types": [
+        "parent",
+        "guardian",
+        "teacher",
+        "employer",
+        "spouse"
+      ],
+      "effect": "mood_boost",
+      "conditioning_stimulus": "praise",
+      "conditioning_response": "compliance_habit",
+      "mood_delta": 0.12,
+      "trust_delta": 3,
+      "description": "Sincere acknowledgment of good behavior."
+    },
+    "extended_privilege": {
+      "name": "Extended Privilege",
+      "category": "reward",
+      "severity": 0,
+      "authority_types": [
+        "parent",
+        "guardian"
+      ],
+      "creates_contract": "curfew",
+      "contract_params": {
+        "deadline_delta": 1
+      },
+      "conditioning_stimulus": "earned_freedom",
+      "conditioning_response": "compliance_habit",
+      "mood_delta": 0.15,
+      "trust_delta": 5,
+      "description": "Curfew or freedoms extended as reward for compliance."
+    },
+    "allowance_increase": {
+      "name": "Allowance Increase",
+      "category": "reward",
+      "severity": 0,
+      "authority_types": [
+        "parent",
+        "guardian"
+      ],
+      "effect": "increase_allowance",
+      "conditioning_stimulus": "financial_reward",
+      "conditioning_response": "compliance_habit",
+      "mood_delta": 0.1,
+      "description": "Increased allowance for sustained good behavior."
+    },
+    "quality_time": {
+      "name": "Quality Time",
+      "category": "reward",
+      "severity": 0,
+      "authority_types": [
+        "parent",
+        "guardian",
+        "spouse"
+      ],
+      "effect": "schedule_bonding_activity",
+      "conditioning_stimulus": "bonding_reward",
+      "conditioning_response": "attachment_warmth",
+      "mood_delta": 0.18,
+      "warmth_delta": 4,
+      "description": "Special time together as recognition of good behavior."
+    }
   }
 }
