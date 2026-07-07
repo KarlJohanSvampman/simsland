@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Holosims Anim Bank</title>
+<style>
+html, body {
+    margin: 0; width: 100%; height: 100%; overflow: hidden;
+    background: #1a1e24; color: #ccc;
+    font-family: Arial, sans-serif; font-size: 13px;
+}
+#root { display: flex; width: 100%; height: 100%; }
+
+/* ── SIDEBAR ─────────────────────────────────────────── */
+#sidebar {
+    width: 320px; min-width: 320px;
+    background: #222830;
+    border-right: 1px solid #3a4050;
+    display: flex; flex-direction: column;
+    overflow: hidden;
+}
+#sidebarTop { flex-shrink: 0; }
+#clipScroll  { flex: 1; overflow-y: auto; }
+
+.section { padding: 10px 12px; border-bottom: 1px solid #2e3440; }
+.section h3 { margin: 0 0 8px; font-size: 12px; color: #88aacc;
+              letter-spacing: 0.5px; text-transform: uppercase; }
+
+/* source list */
+.sourceRow {
+    padding: 5px 8px; cursor: pointer; border-radius: 4px;
+    border: 1px solid transparent; margin-bottom: 3px;
+    display: flex; align-items: center; gap: 6px;
+}
+.sourceRow:hover  { background: #2e3844; }
+.sourceRow.active { background: #2a3f55; border-color: #4a7aaa; }
+.sourceRow .srcDot { width: 8px; height: 8px; border-radius: 50%; flex-shrink:0; }
+.sourceRow .srcName { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sourceRow .srcCount { color: #666; font-size: 11px; }
+
+/* category filter */
+#catFilter {
+    display: flex; flex-wrap: wrap; gap: 4px;
+    padding: 8px 12px; border-bottom: 1px solid #2e3440;
+}
+.catBtn {
+    padding: 3px 7px; border-radius: 3px; border: 1px solid #444;
+    cursor: pointer; font-size: 11px; background: #2a2f38; color: #aaa;
+    white-space: nowrap;
+}
+.catBtn:hover    { background: #3a4050; }
+.catBtn.active   { color: #fff; border-color: transparent; }
+
+/* clip list */
+.catGroup { }
+.catHeader {
+    padding: 5px 12px; font-size: 11px; font-weight: bold;
+    letter-spacing: 0.4px; color: #fff; cursor: pointer;
+    display: flex; justify-content: space-between; align-items: center;
+    position: sticky; top: 0; z-index: 1;
+}
+.catHeader .catCount { color: rgba(255,255,255,0.45); font-weight: normal; }
+.catHeader .arrow { font-size: 10px; transition: transform 0.15s; }
+.catGroup.collapsed .catHeader .arrow { transform: rotate(-90deg); }
+.catGroup.collapsed .catItems { display: none; }
+
+.clipRow {
+    padding: 6px 12px 6px 20px; cursor: pointer;
+    border-bottom: 1px solid #252a32;
+    display: flex; align-items: center; gap: 6px;
+}
+.clipRow:hover  { background: #272d38; }
+.clipRow.active { background: #1e3050; }
+.clipRow .clipName  { flex: 1; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.clipRow .clipDur   { color: #666; font-size: 11px; flex-shrink: 0; }
+.clipRow .pairedBadge {
+    font-size: 10px; padding: 1px 4px; border-radius: 3px;
+    background: #4a3060; color: #cc88ff; flex-shrink: 0;
+}
+
+/* add source */
+.addRow { display: flex; gap: 6px; margin-top: 6px; }
+.addRow input { flex: 1; padding: 4px 6px; background: #1a1e24; border: 1px solid #444; color: #ccc; border-radius: 3px; }
+button {
+    padding: 5px 10px; background: #2a3f55; border: 1px solid #3a6090;
+    color: #aaccee; border-radius: 3px; cursor: pointer; font-size: 12px;
+}
+button:hover { background: #3a5070; }
+button.danger { background: #552020; border-color: #883030; color: #ffaaaa; }
+button.primary { background: #1a5080; border-color: #3a80c0; color: #ddeeff; }
+
+/* ── MAIN PANEL ──────────────────────────────────────── */
+#main {
+    flex: 1; display: flex; flex-direction: column;
+    position: relative; overflow: hidden;
+}
+#canvas { display: block; }
+
+/* transport bar */
+#transport {
+    flex-shrink: 0;
+    background: #1e2430; border-top: 1px solid #2e3840;
+    padding: 8px 12px; display: flex; align-items: center; gap: 10px;
+}
+#transport button { padding: 4px 10px; font-size: 16px; min-width: 36px; }
+#timeline {
+    flex: 1; height: 6px; cursor: pointer;
+    accent-color: #4a90d9;
+}
+#timeDisplay { color: #888; font-size: 11px; white-space: nowrap; min-width: 80px; }
+
+/* clip header above transport */
+#clipHeader {
+    flex-shrink: 0;
+    background: #1a1e28; border-top: 1px solid #2a3040;
+    padding: 6px 12px; display: flex; align-items: center; gap: 10px;
+}
+#clipTitle { font-weight: bold; font-size: 13px; }
+.catPill {
+    padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: bold;
+}
+
+/* editor panel */
+#editor {
+    flex-shrink: 0;
+    background: #1e2430; border-top: 1px solid #2e3840;
+    overflow-y: auto; max-height: 280px;
+}
+#editor.hidden { display: none; }
+.editorGrid {
+    display: grid; grid-template-columns: 110px 1fr; gap: 6px 10px;
+    padding: 10px 12px; align-items: center;
+}
+.editorGrid label { color: #888; font-size: 12px; }
+.editorGrid input, .editorGrid select {
+    padding: 4px 6px; background: #141820; border: 1px solid #3a4050;
+    color: #ccc; border-radius: 3px; font-size: 12px; width: 100%;
+}
+.editorGrid input[type=checkbox] { width: auto; }
+.editorBtns { display: flex; gap: 8px; padding: 0 12px 10px; }
+
+/* notify list */
+#notifySection { padding: 8px 12px 0; border-top: 1px solid #2a3040; }
+#notifySection h4 { margin: 0 0 6px; font-size: 11px; color: #88aacc; text-transform: uppercase; }
+.notifyRow {
+    display: flex; align-items: center; gap: 6px; margin-bottom: 4px;
+    font-size: 12px;
+}
+.notifyRow input { padding: 3px 5px; background: #141820; border: 1px solid #333; color: #ccc; border-radius: 3px; }
+.notifyRow .nFrame { width: 55px; }
+.notifyRow .nEvent { flex: 1; }
+.notifyRow .nDel { padding: 2px 6px; font-size: 11px; }
+.notifyMarker {
+    position: absolute; top: 0; width: 2px; background: #ffaa44;
+    pointer-events: none; transform: translateX(-50%);
+}
+
+/* frame range overlay on timeline */
+#rangeOverlay {
+    position: relative; flex: 1; display: flex; align-items: center;
+}
+#rangeBar {
+    position: absolute; height: 6px; background: rgba(74,144,217,0.3);
+    border-left: 2px solid #4a90d9; border-right: 2px solid #4a90d9;
+    pointer-events: none; border-radius: 2px;
+}
+#timelineWrap { position: relative; flex: 1; }
+.notifyTick {
+    position: absolute; top: -14px; width: 2px; height: 14px;
+    background: #ffaa44; transform: translateX(-50%); pointer-events: none;
+}
+
+/* toolbar */
+#toolbar {
+    position: absolute; top: 10px; right: 10px;
+    display: flex; gap: 8px; z-index: 10;
+}
+#toolbar button { font-size: 12px; }
+
+/* speed / loop row in transport */
+#speedWrap { display: flex; align-items: center; gap: 4px; }
+#speedWrap input[type=range] { width: 70px; accent-color: #4a90d9; }
+#speedLabel { color: #888; font-size: 11px; min-width: 32px; }
+
+.loopBtn { font-size: 11px; min-width: 28px; padding: 3px 6px; }
+.loopBtn.active { background: #1a5080; border-color: #3a80c0; }
+
+select { padding: 4px 6px; background: #1a1e28; border: 1px solid #3a4050; color: #ccc; border-radius: 3px; }
+
+/* notify fire flash */
+.notifyFire { animation: notifyFlash 0.3s ease; }
+@keyframes notifyFlash { 0%{background:#ffaa44} 100%{background:transparent} }
+
+</style>
+</head>
+<body>
+
+<div id="root">
+
+  <!-- ═══════════════════════════════════════════════════ SIDEBAR -->
+  <div id="sidebar">
+    <div id="sidebarTop">
+
+      <!-- Sources -->
+      <div class="section">
+        <h3>Sources</h3>
+        <div id="sourceList"></div>
+        <div class="addRow" style="margin-top:8px">
+          <input id="addSourcePath" placeholder="/resources/characters/adult_male.glb">
+          <button id="addSourceBtn">+ Add</button>
+        </div>
+        <div class="addRow" style="margin-top:4px">
+          <input type="file" id="uploadGlb" accept=".glb" style="flex:1;font-size:11px">
+        </div>
+      </div>
+
+    </div><!-- /sidebarTop -->
+
+    <!-- Category filter -->
+    <div id="catFilter"></div>
+
+    <!-- Clip list (scrollable) -->
+    <div id="clipScroll">
+      <div id="clipList"></div>
+    </div>
+
+  </div><!-- /sidebar -->
+
+  <!-- ═══════════════════════════════════════════════════ MAIN -->
+  <div id="main">
+
+    <!-- Toolbar -->
+    <div id="toolbar">
+      <button id="extractBtn">⚡ Extract Clips</button>
+      <button id="saveBankBtn" class="primary">💾 Save Bank</button>
+    </div>
+
+    <!-- 3D Canvas (fills all remaining space) -->
+    <canvas id="canvas"></canvas>
+
+    <!-- Clip header -->
+    <div id="clipHeader">
+      <span id="clipTitle" style="color:#666">No clip selected</span>
+      <span id="clipCatPill" class="catPill"></span>
+      <span id="pairedBadge" style="display:none;padding:2px 8px;border-radius:10px;font-size:11px;background:#4a3060;color:#cc88ff">PAIRED</span>
+      <span id="clipDurLabel" style="color:#666;font-size:11px;margin-left:auto"></span>
+    </div>
+
+    <!-- Transport -->
+    <div id="transport">
+      <button id="playBtn">▶</button>
+
+      <!-- Frame range + timeline -->
+      <div style="display:flex;align-items:center;gap:4px;font-size:11px;color:#888">
+        <span>In</span>
+        <input id="startFrame" type="number" min="0" value="0"
+               style="width:48px;padding:3px 5px;background:#141820;border:1px solid #333;color:#ccc;border-radius:3px;font-size:11px">
+      </div>
+
+      <div id="timelineWrap">
+        <input type="range" id="timeline" min="0" max="1" step="0.001" value="0">
+      </div>
+
+      <div style="display:flex;align-items:center;gap:4px;font-size:11px;color:#888">
+        <span>Out</span>
+        <input id="endFrame" type="number" min="0" value="999"
+               style="width:48px;padding:3px 5px;background:#141820;border:1px solid #333;color:#ccc;border-radius:3px;font-size:11px">
+      </div>
+
+      <span id="timeDisplay" style="color:#888;font-size:11px;min-width:90px;text-align:right">0.00 / 0.00</span>
+
+      <!-- Loop buttons -->
+      <button class="loopBtn" id="loopRepeat" title="Loop">↺</button>
+      <button class="loopBtn" id="loopPingPong" title="Ping-Pong">⇄</button>
+      <button class="loopBtn" id="loopOnce" title="Once">→|</button>
+
+      <!-- Speed -->
+      <div id="speedWrap">
+        <span style="font-size:11px;color:#888">Speed</span>
+        <input type="range" id="speedSlider" min="0.1" max="3" step="0.05" value="1">
+        <span id="speedLabel">1.00×</span>
+      </div>
+
+      <!-- FPS display -->
+      <span id="fpsHint" style="color:#555;font-size:10px;white-space:nowrap">30 fps</span>
+    </div>
+
+    <!-- Clip editor -->
+    <div id="editor" class="hidden">
+      <div class="editorGrid">
+        <label>Display Name</label>
+        <input id="eName" placeholder="idle_standing">
+
+        <label>Category</label>
+        <select id="eCat"></select>
+
+        <label>Loop</label>
+        <input id="eLoop" type="checkbox">
+
+        <label>Paired</label>
+        <input id="ePaired" type="checkbox">
+
+        <label>Pair Group</label>
+        <input id="ePairGroup" placeholder="hug_standing">
+
+        <label>Pair Role</label>
+        <select id="ePairRole">
+          <option value="">—</option>
+          <option value="a">A (initiator)</option>
+          <option value="b">B (receiver)</option>
+        </select>
+
+        <label>Tags</label>
+        <input id="eTags" placeholder="contact, affection">
+      </div>
+
+      <!-- Notify section -->
+      <div id="notifySection">
+        <h4>Anim Notifies  <button style="font-size:10px;padding:2px 6px;margin-left:8px" id="addNotifyBtn">+ Add</button></h4>
+        <div id="notifyList"></div>
+      </div>
+
+      <div class="editorBtns">
+        <button id="saveClipBtn" class="primary">Save Clip</button>
+        <button id="deleteClipBtn" class="danger">Remove from Bank</button>
+      </div>
+    </div>
+
+  </div><!-- /main -->
+
+</div><!-- /root -->
+
+<!-- Common notify events for autocomplete -->
+<datalist id="notifyEventOptions">
+  <option value="footstep_left">
+  <option value="footstep_right">
+  <option value="impact">
+  <option value="impact_land">
+  <option value="grab">
+  <option value="release">
+  <option value="start_reaction">
+  <option value="sfx_punch">
+  <option value="sfx_kick">
+  <option value="sfx_shove">
+  <option value="camera_shake">
+  <option value="spawn_particle">
+  <option value="end_clip">
+</datalist>
+
+<script type="module" src="/src/animbank.js"></script>
+</body>
+</html>
