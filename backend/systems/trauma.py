@@ -151,7 +151,7 @@ def tick_trauma(world):
     Daily pass: very slow natural decay of trauma score.
     Support network accelerates healing.
     """
-    chars = {c["id"]: c for c in world.get("characters", [])
+    chars = {c["id"]: c for c in world.get("characters", {}).values()
              if not c.get("is_offscreen")}
 
     for cid, c in chars.items():

@@ -224,7 +224,7 @@ def tick_envy(world):
     Daily tick — runs all envy and conflict-of-interest checks.
     Called from sim_loop at DAILY cadence.
     """
-    chars = {c["id"]: c for c in world.get("characters", [])
+    chars = {c["id"]: c for c in world.get("characters", {}).values()
              if not c.get("is_offscreen")}
 
     # Romantic envy + partner jealousy + status envy (from attraction.py)
@@ -251,7 +251,7 @@ def get_envy_context(c, world):
     Summarise active envy grievances for LLM context.
     Returns dict with "envy" key listing who c envies and why.
     """
-    chars  = {x["id"]: x for x in world.get("characters", [])}
+    chars  = {x["id"]: x for x in world.get("characters", {}).values()}
     lines  = []
     ENVY_TYPES = {"romantic_envy", "partner_jealousy", "status_envy",
                   "career_envy", "social_envy", "opportunity_envy"}

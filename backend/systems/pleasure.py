@@ -304,7 +304,7 @@ def _needs_aftercare(c, world):
 def get_pleasure_context(c, world):
     """Summarise recent encounter history for LLM context."""
     lines = []
-    chars = {x["id"]: x for x in world.get("characters", [])}
+    chars = {x["id"]: x for x in world.get("characters", {}).values()}
 
     for oid, rel in c.get("relationships", {}).items():
         history = rel.get("encounter_history", [])

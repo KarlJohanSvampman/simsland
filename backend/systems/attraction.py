@@ -565,7 +565,7 @@ def check_envy_events(world):
       2. Partner jealousy — A is partnered with B, B shows interest in C → A envies C
       3. Status envy — A's wealth/reputation significantly below neighbor B's
     """
-    chars = {c["id"]: c for c in world.get("characters", []) if not c.get("is_offscreen")}
+    chars = {c["id"]: c for c in world.get("characters", {}).values() if not c.get("is_offscreen")}
 
     # Build intimacy map: who is "taken" and by whom
     # We look at relationship labels for "partner", "spouse", intimate stages
@@ -704,7 +704,7 @@ def check_conflict_of_interest(world):
       - Romantic rivalry: two people attracted to the same person
       - Loyalty conflict: attracted to a friend's partner
     """
-    chars = {c["id"]: c for c in world.get("characters", []) if not c.get("is_offscreen")}
+    chars = {c["id"]: c for c in world.get("characters", {}).values() if not c.get("is_offscreen")}
     company_jobs = {}  # company_id → list of (char_id, job_prestige)
     for cid, c in chars.items():
         job = c.get("job") or {}
@@ -793,7 +793,7 @@ def get_attraction_context(c, world):
     Does NOT include explicit act details — just drive, style, feelings.
     """
     profile = c.get("attraction_profile", {})
-    chars   = {x["id"]: x for x in world.get("characters", [])}
+    chars   = {x["id"]: x for x in world.get("characters", {}).values()}
 
     # Find who c is most attracted to
     top_attractions = []

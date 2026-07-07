@@ -528,7 +528,7 @@ def tick_intimacy(world):
     Per-tick: decay arousal slowly on all relationships.
     Called from sim_loop.
     """
-    for c in world.get("characters", []):
+    for c in world.get("characters", {}).values():
         for oid, rel in c.get("relationships", {}).items():
             if "arousal_level" in rel:
                 rel["arousal_level"] = max(0.0, rel["arousal_level"] - AROUSAL_DECAY)
@@ -648,7 +648,7 @@ def get_intimacy_context(c, world):
     Returns privacy-safe summary — no explicit act names, only stage + mood.
     """
     lines = []
-    chars = {x["id"]: x for x in world.get("characters", [])}
+    chars = {x["id"]: x for x in world.get("characters", {}).values()}
 
     for oid, rel in c.get("relationships", {}).items():
         stage   = rel.get("intimacy_stage", 0)
