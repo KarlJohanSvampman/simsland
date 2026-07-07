@@ -431,6 +431,16 @@ def ensure_character_defaults(c):
         "dependency_score":    0.0,    # 0-1; high = can't climax without that dynamic
     })
 
+    # Intoxication & substance state
+    c.setdefault("intoxication_state", {
+        "alcohol_level":   0.0,
+        "drug_level":      0.0,
+        "porn_habit":      0.0,
+        "libido_boost":    0.0,
+        "sessions_today":  0,
+        "last_harass_tick": {},
+    })
+
     # Pregnancy state
     c.setdefault("pregnancy", {
         "status":          "none",    # none | pregnant | postpartum | aborted | adopted_out

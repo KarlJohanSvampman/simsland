@@ -60,6 +60,10 @@ SEVERITY = {
     "family_birth_event":              6.0,
     "father_family_blamed":           15.0,
     "mother_family_blamed":           15.0,
+    # Harassment
+    "sexual_harassment":              14.0,
+    "partner_harassed":               12.0,
+    "verbal_harassment":               9.0,
 }
 
 

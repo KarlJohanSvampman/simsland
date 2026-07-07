@@ -102,9 +102,22 @@ def maybe_conceive(female, male, world):
     if f_age < 20:
         chance *= TEEN_CONCEPTION_MULTIPLIER
 
-    # Contraception: stored as a relationship flag or character item
+    # Contraception reduces chance significantly
     if _has_contraception(female, male):
         chance *= (1.0 - CONTRACEPTION_REDUCTION)
+    else:
+        # No contraception: male intoxication & low impulse control → more likely to
+        # lose themselves in the moment and not pull out in time
+        m_intox  = male.get("intoxication_state", {})
+        al       = m_intox.get("alcohol_level", 0.0)
+        dl       = m_intox.get("drug_level",    0.0)
+        m_imp    = male.get("impulse_state", {})
+        sc       = m_imp.get("self_control", 0.5)
+        m_libido = male.get("attraction_profile", {}).get("libido", 0.5)
+        # pull-out failure probability: higher when drunk/high + low self-control + high libido
+        pullout_fail = (al * 0.50 + dl * 0.35 + (1.0 - sc) * 0.30 + m_libido * 0.15) / 1.30
+        pullout_fail = min(1.0, pullout_fail)
+        chance *= (1.0 + pullout_fail * 1.50)   # up to 2.5× base chance at max fail
 
     if random.random() >= chance:
         return False

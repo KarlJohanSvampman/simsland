@@ -59,6 +59,11 @@ TRAUMA_SEVERITY = {
     "sexual_curiosity_shame":     0.05,
     "residual_identity_shame":    0.08,
     "identity_crisis_onset":      0.15,
+    # Harassment
+    "harassment_lewd_stare":           0.02,
+    "harassment_crude_remark":         0.04,
+    "harassment_unwanted_touch":       0.07,
+    "harassment_explicit_proposition": 0.06,
     # Pregnancy drama
     "unplanned_pregnancy_discovery": 0.14,
     "abortion_grief":             0.10,

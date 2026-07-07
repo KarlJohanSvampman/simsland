@@ -1502,6 +1502,32 @@ def complete_activity(
             sort_household_mail(household)
 
     # =====================================
+    # ADULT CONTENT — porn habit + sexism drift
+    # =====================================
+    if activity_type in ("watch_porn", "masturbate"):
+        try:
+            from systems.harassment import on_porn_session
+            on_porn_session(c, world)
+        except Exception:
+            pass
+
+    # =====================================
+    # ALCOHOL / DRUG CONSUMPTION
+    # =====================================
+    elif activity_type in ("drink", "drink_alcohol", "have_drink"):
+        # Check if consumed item has alcohol_units
+        try:
+            from systems.harassment import consume_alcohol
+            target_id = c.get("activity", {}).get("target_id")
+            items     = world.get("items", {})
+            item      = items.get(target_id, {}) if target_id else {}
+            units     = item.get("alcohol_units", 0)
+            if units > 0:
+                consume_alcohol(c, units, world)
+        except Exception:
+            pass
+
+    # =====================================
     # RECORD HABIT
     # Every completed activity reinforces a time-of-day habit so future
     # intention sorting will slightly prefer it at the same hour.
