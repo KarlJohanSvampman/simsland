@@ -207,7 +207,7 @@ def _evaluate_quirks(c, other, defs):
     Returns a float modifier (-1 to +1) from c's quirks applied to other.
     Uses condition-string matching against other's fields.
     """
-    profile  = c.get("attraction_profile", {})
+    profile  = c.get("attraction_profile") or {}
     quirks   = profile.get("quirks", [])
     registry = _quirks_as_dict(defs)
     modifier = 0.0
@@ -359,7 +359,7 @@ def compute_attraction(c, other, world):
     if compat < 0.05:
         return 0.0
 
-    profile = c.get("attraction_profile", {})
+    profile = c.get("attraction_profile") or {}
     defs    = world.get("defs", {})
     weights = profile.get("weights", {"appearance": 0.35, "personality": 0.40,
                                       "status": 0.15, "familiarity": 0.10})
@@ -582,7 +582,7 @@ def check_envy_events(world):
 
     # 1. Romantic envy
     for cid, c in chars.items():
-        profile = c.get("attraction_profile", {})
+        profile = c.get("attraction_profile") or {}
         envy_sens = profile.get("envy_sensitivity", 0.3)
 
         for oid, rel in c.get("relationships", {}).items():
@@ -614,7 +614,7 @@ def check_envy_events(world):
 
     # 2. Partner jealousy — possessive/jealous traits watch their partner
     for cid, c in chars.items():
-        profile = c.get("attraction_profile", {})
+        profile = c.get("attraction_profile") or {}
         if profile.get("partner_monitoring", 0) < 0.2:
             continue  # not the jealous type
         partner_id = partner_map.get(cid)
@@ -792,7 +792,7 @@ def get_attraction_context(c, world):
     Return a dict summarising c's attraction state for LLM context.
     Does NOT include explicit act details — just drive, style, feelings.
     """
-    profile = c.get("attraction_profile", {})
+    profile = c.get("attraction_profile") or {}
     chars   = {x["id"]: x for x in world.get("characters", {}).values()}
 
     # Find who c is most attracted to
