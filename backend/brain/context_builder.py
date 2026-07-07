@@ -571,6 +571,8 @@ def build_context(
         "pending_touch_proposal": _build_touch_proposal_context(c, world),
         "authority_contracts":    _build_authority_contracts_context(c, world),
         "conditioning":           _build_conditioning_context(c),
+        "active_lies":            _build_active_lies_context(c, world),
+        "notes_in_location":      _build_notes_context(c, world),
         "rivalries":         _build_rival_context(c, world),
         "envy_conflicts":    _build_envy_context(c, world),
         "impulse":           _build_impulse_context(c, world),
@@ -1424,6 +1426,43 @@ def _build_conditioning_context(c):
         return get_conditioning_context(c) or None
     except Exception:
         return None
+
+
+def _build_active_lies_context(c, world):
+    """Surface active undetected lies so LLM knows to maintain consistency."""
+    lies = [l for l in c.get("active_lies", []) if not l.get("detected")]
+    if not lies:
+        return None
+    chars = world.get("characters", {})
+    return [
+        {
+            "told_to": [chars.get(tid, {}).get("name", tid) for tid in l.get("told_to", [])],
+            "claim":   l["lie_text"],
+            "truth":   l["actual_truth"],
+            "topic":   l["question_type"],
+        }
+        for l in lies[-5:]
+    ]
+
+
+def _build_notes_context(c, world):
+    """Notes left in character's current location that they haven't read."""
+    cur_loc = c.get("current_location") or c.get("building_id")
+    cid     = c["id"]
+    notes   = [
+        n for n in world.get("notes", [])
+        if n.get("location_id") == cur_loc and cid not in n.get("read_by", [])
+    ]
+    if not notes:
+        return None
+    chars = world.get("characters", {})
+    return [
+        {
+            "from":  chars.get(n.get("author_id"), {}).get("name", "someone"),
+            "text":  n["text"],
+        }
+        for n in notes[-3:]
+    ]
 
 
 def _build_envy_context(c, world):

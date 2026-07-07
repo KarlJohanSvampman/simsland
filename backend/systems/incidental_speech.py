@@ -167,34 +167,18 @@ def tick_incidental_speech(world):
         has_authority_contract = _has_announce_contract(c, world)
         already_announced      = c.get("_announced_departure", False)
 
-        # A: If they have a contract obligation to announce → do so
+        # A: Contract obligation to announce
         if has_authority_contract and not already_announced:
-            text = _get_announcement_text(c, world)
-            # Find the authority to address
-            auth = _find_authority(c, former_cohabitants, world)
-            target_id = auth["id"] if auth else None
-            fire_incidental(c, "announce", text, world, target_id=target_id)
-            c["_announced_departure"] = True
+            _perform_departure_announcement(c, former_cohabitants, world)
 
-            # Check for curfew contract → authority fires reminder
-            if auth and not _on_cooldown(auth, cid, world):
-                curfew_c = _get_curfew_contract(c, auth, world)
-                if curfew_c:
-                    remind = _get_curfew_reminder_text(auth, c, curfew_c, world)
-                    fire_incidental(auth, "reminder", remind, world, target_id=cid)
-                    _mark_cooldown(auth, cid, world)
-
-        # B: Spontaneous announcement (responsible adult)
+        # B: Spontaneous announcement (responsible adult — no contract needed)
         elif not already_announced and former_cohabitants:
             announce_prob = _spontaneous_announce_probability(c, former_cohabitants)
             if random.random() < announce_prob:
-                text = _get_announcement_text(c, world)
-                target = former_cohabitants[0]
-                fire_incidental(c, "announce", text, world, target_id=target["id"])
-                c["_announced_departure"] = True
+                _perform_departure_announcement(c, former_cohabitants, world)
 
-        # C: No announcement → authorities who are present may inquire
-        elif not already_announced:
+        # C: No announcement made → authorities may inquire
+        if not c.get("_announced_departure"):
             for obs in former_cohabitants:
                 rel = c.get("relationships", {}).get(obs["id"], {})
                 labels = rel.get("labels", [])
@@ -208,6 +192,94 @@ def tick_incidental_speech(world):
 
     # 2. Process pending micro-request queue
     _tick_micro_requests(chars, world)
+
+
+def _perform_departure_announcement(c, former_cohabitants, world):
+    """
+    Choose the best available announcement method and execute it.
+    Priority: verbal to authority → verbal to sibling/authorized →
+              leave note → text → call
+    """
+    try:
+        from systems.excuses import choose_announcement_method, generate_announcement, leave_note
+        method = choose_announcement_method(c, world)
+    except Exception:
+        method = "verbal"
+
+    chars = world.get("characters", {})
+
+    if method in ("verbal", "sibling"):
+        # Find the best recipient present
+        try:
+            from systems.excuses import get_authorized_recipients
+            authorized = set(get_authorized_recipients(c, world))
+        except Exception:
+            authorized = set()
+
+        target = None
+        # Prefer primary authority (parent/guardian/spouse) if verbal
+        if method == "verbal":
+            for obs in former_cohabitants:
+                rel = c.get("relationships", {}).get(obs["id"], {})
+                if any(lbl in rel.get("labels", [])
+                       for lbl in ("parent", "guardian", "spouse")):
+                    target = obs
+                    break
+        # Fall back to any authorized recipient present
+        if not target:
+            for obs in former_cohabitants:
+                if obs["id"] in authorized:
+                    target = obs
+                    break
+        if not target and former_cohabitants:
+            target = former_cohabitants[0]
+
+        try:
+            from systems.excuses import generate_announcement
+            result = generate_announcement(c, world, method=method,
+                                          audience_id=target["id"] if target else None)
+            text = result["text"]
+        except Exception:
+            text = _get_announcement_text(c, world)
+
+        target_id = target["id"] if target else None
+        fire_incidental(c, "announce", text, world, target_id=target_id)
+        c["_announced_departure"] = True
+
+        # Curfew reminder back from authority
+        if target and not _on_cooldown(target, c["id"], world):
+            curfew_c = _get_curfew_contract(c, target, world)
+            if curfew_c:
+                remind = _get_curfew_reminder_text(target, c, curfew_c, world)
+                fire_incidental(target, "reminder", remind, world, target_id=c["id"])
+                _mark_cooldown(target, c["id"], world)
+
+    elif method == "note":
+        try:
+            from systems.excuses import leave_note, generate_announcement
+            result = generate_announcement(c, world, method="note")
+            leave_note(c, world, text=result["text"])
+        except Exception:
+            c["_announced_departure"] = True
+
+    elif method in ("text", "call"):
+        # Queue phone action in intention_queue — executed by action_router next tick
+        try:
+            from systems.excuses import get_authorized_recipients, generate_announcement
+            recipients = get_authorized_recipients(c, world)
+            if recipients:
+                result = generate_announcement(c, world, method=method)
+                c.setdefault("intention_queue", []).append({
+                    "type":      "phone_send_text" if method == "text" else "phone_call",
+                    "target_id": recipients[0],
+                    "message":   result["text"],
+                    "reason":    "departure_announcement",
+                    "priority":  7,
+                    "tick":      world.get("tick", 0),
+                })
+                c["_announced_departure"] = True
+        except Exception:
+            pass
 
 
 def _has_announce_contract(c, world):

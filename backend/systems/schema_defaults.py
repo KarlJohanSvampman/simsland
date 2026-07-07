@@ -596,6 +596,12 @@ def ensure_character_defaults(c):
         ensure_worn(c)
     c.setdefault("social_contract_ids",      [])
     c.setdefault("conditioning_profile",      [])   # conditioned behaviors
+    c.setdefault("active_lies",               [])   # currently maintained lies
+    c.setdefault("suspicion_of",              {})   # {char_id: 0-1} authority's suspicion
+    c.setdefault("forbidden_locations",       [])   # locations this character has banned for subordinates
+    c.setdefault("disliked_location_types",   [])   # location types authority dislikes
+    c.setdefault("behavior_tags",             [])   # observable behavior habits (e.g. heavy_drinker)
+    c.setdefault("objected_activities",       [])   # activities this authority explicitly objects to
     c.setdefault("conditioned_traits",        [])   # promoted conditioning entries
     c.setdefault("discipline_log",            [])   # discipline events received
     c.setdefault("pending_authority_contact", [])   # violation escalation queue

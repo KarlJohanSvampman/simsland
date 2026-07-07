@@ -404,12 +404,19 @@ def _check_curfew(term, party_char, world):
 
 def _check_announce_departure(term, party_char, world):
     """
-    True if character changed location this tick without setting
-    'announced_departure' flag on their current_speech.
+    True if character departed without satisfying any allowed announcement method.
+    Allowed methods: verbal (told an authorized recipient), note, text, call.
+    Any authorized_recipient receiving the message satisfies the contract.
     """
     if not party_char.get("_departed_this_tick"):
         return False
-    return not party_char.get("_announced_departure")
+    # If _announced_departure is set by any method, contract is satisfied
+    if party_char.get("_announced_departure"):
+        return False
+    # Also check if a note was left this tick
+    if party_char.get("_left_note_this_tick"):
+        return False
+    return True
 
 
 def _check_presence_required(term, party_char, world):
@@ -447,8 +454,10 @@ def create_authority_contract(authority_id, subject_id, contract_type,
             "check_type":  "curfew",
         },
         "announce_departure": {
-            "commitment":  "Tell a household authority before leaving",
+            "commitment":  "Tell an authorized person before leaving",
             "check_type":  "announce_departure",
+            # params may include: authorized_recipients (list of char IDs),
+            #   allowed_methods (list: verbal|note|text|call)
         },
         "chore": {
             "commitment":  params.get("commitment", "Complete assigned chore"),

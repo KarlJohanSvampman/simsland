@@ -607,6 +607,10 @@ def route_action(c, world, action, speech, definitions=None):
     elif action_type == "plan_hobby_session":
         _route_plan_hobby_session(c, world, action)
 
+    elif action_type == "leave_note":
+        _route_leave_note(c, world, action)
+    elif action_type == "give_excuse":
+        _route_give_excuse(c, world, action)
     elif action_type == "announce_departure":
         _route_announce_departure(c, world, action)
     elif action_type == "apply_discipline":
@@ -688,6 +692,46 @@ def _route_apply_discipline(c, world, action):
     try:
         from systems.conditioning import apply_discipline
         apply_discipline(subject, c, method_id, world)
+    except Exception:
+        pass
+
+
+def _route_leave_note(c, world, action):
+    """
+    Character writes and leaves a note on a message_surface prop.
+    action: {type: "leave_note", text: "...", target_id: prop_id (optional)}
+    """
+    text = action.get("text") or action.get("message")
+    try:
+        from systems.excuses import leave_note
+        leave_note(c, world, text=text)
+    except Exception:
+        c["_announced_departure"] = True
+        c["_left_note_this_tick"] = True
+
+
+def _route_give_excuse(c, world, action):
+    """
+    Character gives an explanation or excuse when confronted.
+    action: {type: "give_excuse", target_id: authority_id, question_type: "who"|"where"|"what"|"when"}
+    The system decides: vague truth → omission → lie, based on relationship + privacy.
+    """
+    target_id     = action.get("target_id") or action.get("target")
+    question_type = action.get("question_type", "where")
+    if not target_id:
+        return
+    authority = world.get("characters", {}).get(target_id)
+    if not authority:
+        return
+
+    try:
+        from systems.excuses import generate_excuse
+        from systems.incidental_speech import fire_incidental
+        result = generate_excuse(c, authority, question_type, world)
+        fire_incidental(c, "inform", result["text"], world, target_id=target_id)
+        # Log if it was a lie
+        if result.get("is_lie"):
+            c.setdefault("_recent_lie_to", {})[target_id] = result["lie_detail"]
     except Exception:
         pass
 

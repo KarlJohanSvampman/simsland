@@ -48,7 +48,8 @@
       "tags": [
         "appliance",
         "fridge",
-        "food_storage"
+        "food_storage",
+        "message_surface"
       ]
     },
     "wall_socket": {
@@ -240,7 +241,8 @@
       ],
       "tags": [
         "table",
-        "dining"
+        "dining",
+        "message_surface"
       ],
       "storage": null
     },
@@ -674,7 +676,8 @@
       "tags": [
         "furniture",
         "table",
-        "living_room"
+        "living_room",
+        "message_surface"
       ],
       "isSurface": true
     },
@@ -2950,7 +2953,8 @@
         "appliance",
         "kitchen",
         "storage",
-        "drink"
+        "drink",
+        "message_surface"
       ]
     },
     "range_hood": {
@@ -4057,7 +4061,8 @@
         "furniture",
         "table",
         "kitchen",
-        "dining"
+        "dining",
+        "message_surface"
       ]
     },
     "barber_chair": {
