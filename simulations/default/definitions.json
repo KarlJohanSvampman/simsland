@@ -14029,7 +14029,11 @@
         "relationship": 0.04
       },
       "sets_posture": "walking_linked",
-      "animation": "hold_hands"
+      "animation": "hold_hands",
+      "initiator_animation": "anim_hold_hands_a",
+      "recipient_animation": "anim_hold_hands_b",
+      "stage_requirement": 2,
+      "duration_ticks": 60
     },
     "cuddle": {
       "name": "Cuddle",
@@ -15177,7 +15181,10 @@
         ],
         "loop": [],
         "stop": []
-      }
+      },
+      "initiator_animation": "anim_high_five_give",
+      "recipient_animation": "anim_high_five_receive",
+      "stage_requirement": 0
     },
     "handshake": {
       "name": "Handshake",
@@ -15203,7 +15210,10 @@
         ],
         "loop": [],
         "stop": []
-      }
+      },
+      "initiator_animation": "anim_handshake_give",
+      "recipient_animation": "anim_handshake_receive",
+      "stage_requirement": 0
     },
     "give_haircut": {
       "name": "Give Haircut",

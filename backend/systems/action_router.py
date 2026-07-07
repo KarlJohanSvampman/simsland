@@ -607,7 +607,7 @@ def route_action(c, world, action, speech, definitions=None):
     elif action_type == "plan_hobby_session":
         _route_plan_hobby_session(c, world, action)
 
-    elif action_type in ("hug", "kiss", "kiss_peck", "kiss_deep", "cuddle"):
+    elif action_type in ("hug", "kiss", "kiss_peck", "kiss_deep", "cuddle", "hold_hands", "handshake", "high_five"):
         _route_propose_touch(c, world, action, action_type)
     elif action_type == "respond_touch":
         _route_respond_touch(c, world, action)

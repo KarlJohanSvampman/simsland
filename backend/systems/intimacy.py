@@ -540,24 +540,37 @@ TOUCH_PROPOSAL_TEMPLATES = {
     "kiss_peck",
     "kiss_deep",
     "cuddle",
+    "hold_hands",
+    # if_reciprocated — near-instant auto-accept
+    "handshake",
+    "high_five",
 }
+
+# Templates where the recipient almost always accepts (if_reciprocated)
+TOUCH_AUTO_ACCEPT = {"handshake", "high_five"}
 
 # Stage requirement per template (minimum intimacy_stage needed)
 TOUCH_STAGE_REQUIREMENT = {
-    "hug":       1,
-    "kiss":      2,
-    "kiss_peck": 2,
-    "kiss_deep": 3,
-    "cuddle":    2,
+    "hug":        1,
+    "kiss":       2,
+    "kiss_peck":  2,
+    "kiss_deep":  3,
+    "cuddle":     2,
+    "hold_hands": 2,
+    "handshake":  0,   # anyone
+    "high_five":  0,   # anyone
 }
 
 # Dual animations: initiator / recipient
 TOUCH_ANIMATIONS = {
-    "hug":       ("anim_hug_give",        "anim_hug_receive"),
-    "kiss":      ("anim_kiss_give",        "anim_kiss_receive"),
-    "kiss_peck": ("anim_kiss_peck_give",   "anim_kiss_peck_receive"),
-    "kiss_deep": ("anim_kiss_deep_give",   "anim_kiss_deep_receive"),
-    "cuddle":    ("anim_cuddle_big_spoon", "anim_cuddle_little_spoon"),
+    "hug":        ("anim_hug_give",         "anim_hug_receive"),
+    "kiss":       ("anim_kiss_give",         "anim_kiss_receive"),
+    "kiss_peck":  ("anim_kiss_peck_give",    "anim_kiss_peck_receive"),
+    "kiss_deep":  ("anim_kiss_deep_give",    "anim_kiss_deep_receive"),
+    "cuddle":     ("anim_cuddle_big_spoon",  "anim_cuddle_little_spoon"),
+    "hold_hands": ("anim_hold_hands_a",      "anim_hold_hands_b"),
+    "handshake":  ("anim_handshake_give",    "anim_handshake_receive"),
+    "high_five":  ("anim_high_five_give",    "anim_high_five_receive"),
 }
 
 # How many ticks before an unanswered touch proposal auto-expires
@@ -714,6 +727,10 @@ def recipient_touch_decision(recipient, proposer, world):
     cur_stage = inti.get("intimacy_stage", 0)
     if cur_stage < req_stage:
         accept_prob -= 0.25  # asking for more than earned
+
+    # Auto-accept if_reciprocated gestures (handshake, high_five)
+    if template_id in TOUCH_AUTO_ACCEPT:
+        return "accept"
 
     # Recipient busy?
     activity = recipient.get("activity", {})
