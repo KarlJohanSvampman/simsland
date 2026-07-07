@@ -295,23 +295,22 @@ async function playClip(clipMeta) {
         return;
     }
 
-    // Apply start/end frame subclip
-    const startF = parseInt(document.getElementById("startFrame").value) || 0;
-    const endF   = parseInt(document.getElementById("endFrame").value);
-    const totalFrames = Math.round(clip.duration * clipFPS);
-    const clampEnd = Math.min(endF, totalFrames);
-
-    let playClipObj = clip;
-    if (startF > 0 || clampEnd < totalFrames) {
-        playClipObj = THREE.AnimationUtils.subclip(clip, clip.name + "_sub", startF, clampEnd, clipFPS);
-    }
-
+    // Stop all cached actions so no stale "T-pose ghost" action blends
+    // on top of the new one. We skip AnimationUtils.subclip because it
+    // creates a separate clip object that can leave the original clip's
+    // cached action half-active. Instead we play the full clip and let
+    // the render loop enforce startFrame / endFrame boundaries.
     mixerA.stopAllAction();
-    activeAction = mixerA.clipAction(playClipObj);
-    activeAction.loop      = loopMode;
-    activeAction.clampWhenFinished = true;
-    activeAction.timeScale = 1;  // speed applied in render loop via delta scaling
-    activeAction.play();
+    activeAction = mixerA.clipAction(clip);
+    activeAction
+        .reset()
+        .setEffectiveWeight(1)
+        .setEffectiveTimeScale(1)
+        .play();
+
+    // Jump to the requested start frame; render loop clamps the end.
+    activeAction.time = startFrameToTime();
+    mixerA.update(0);   // force first frame immediately (kills T-pose flicker)
 
     // Paired side
     if (clipMeta.paired && clipMeta.pair_group && characterB) {
