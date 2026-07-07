@@ -572,6 +572,7 @@ def build_context(
         "authority_contracts":    _build_authority_contracts_context(c, world),
         "conditioning":           _build_conditioning_context(c),
         "active_lies":            _build_active_lies_context(c, world),
+        "private_offgrid":        _build_private_offgrid_context(c, world),
         "notes_in_location":      _build_notes_context(c, world),
         "rivalries":         _build_rival_context(c, world),
         "envy_conflicts":    _build_envy_context(c, world),
@@ -1445,6 +1446,36 @@ def _build_active_lies_context(c, world):
     ]
 
 
+def _build_private_offgrid_context(c, world):
+    """
+    Surface recent private off-grid events — things that happened while the
+    character was away that they would not want household members to learn about.
+    Only included in the character's OWN context; never surfaced to observers.
+    """
+    history = c.get("private_off_grid_history", [])
+    if not history:
+        return None
+    chars = world.get("characters", {})
+    result = []
+    for entry in history[-3:]:   # last 3 outings with private events
+        evs = []
+        for ev in entry.get("events", []):
+            item = {
+                "what":     ev.get("description", ""),
+                "category": ev.get("fear_tag", ""),
+            }
+            if ev.get("target_id"):
+                item["with"] = chars.get(ev["target_id"], {}).get("name", "someone")
+            evs.append(item)
+        if evs:
+            result.append({
+                "tick":   entry["tick"],
+                "reason": entry["reason"],
+                "hidden": evs,
+            })
+    return result or None
+
+
 def _build_notes_context(c, world):
     """Notes left in character's current location that they haven't read."""
     cur_loc = c.get("current_location") or c.get("building_id")
@@ -1500,46 +1531,4 @@ def _build_rival_context(c, world):
 def _build_impulse_context(c, world):
     try:
         from systems.impulse import get_impulse_context
-        return get_impulse_context(c, world).get("impulse", [])
-    except Exception:
-        return []
-
-
-def _build_domestic_context(c, world):
-    try:
-        from systems.domestic_control import get_domestic_control_context
-        return get_domestic_control_context(c, world).get("domestic_situation", [])
-    except Exception:
-        return []
-
-
-def _build_emotional_control_context(c, world):
-    try:
-        from systems.domestic_control import get_emotional_control_victim_context
-        return get_emotional_control_victim_context(c, world)
-    except Exception:
-        return []
-
-
-def _build_repression_context(c, world):
-    try:
-        from systems.religious_repression import get_repression_context
-        return get_repression_context(c, world)
-    except Exception:
-        return []
-
-
-def _build_pregnancy_context(c, world):
-    try:
-        from systems.pregnancy import get_pregnancy_context
-        return get_pregnancy_context(c, world)
-    except Exception:
-        return []
-
-
-def _build_intoxication_context(c, world):
-    try:
-        from systems.harassment import get_harassment_context
-        return get_harassment_context(c, world)
-    except Exception:
-        return []
+        return get_impulse_context(c, world).get("impulse", 

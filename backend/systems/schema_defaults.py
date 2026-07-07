@@ -597,6 +597,7 @@ def ensure_character_defaults(c):
     c.setdefault("social_contract_ids",      [])
     c.setdefault("conditioning_profile",      [])   # conditioned behaviors
     c.setdefault("active_lies",               [])   # currently maintained lies
+    c.setdefault("private_off_grid_history",  [])  # secret events from off-grid trips (not shared)
     c.setdefault("suspicion_of",              {})   # {char_id: 0-1} authority's suspicion
     c.setdefault("forbidden_locations",       [])   # locations this character has banned for subordinates
     c.setdefault("disliked_location_types",   [])   # location types authority dislikes
@@ -869,13 +870,4 @@ def ensure_household_defaults(h):
     )
 
     h.setdefault(
-        "home_id",
-        None
-    )
-
-    h.setdefault(
-        "housing_stress",
-        0.0
-    )
-
-    h.set
+        "ho
