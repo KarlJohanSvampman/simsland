@@ -1,4 +1,4 @@
-from fastapi import APIRouter, UploadFile, File
+from fastapi import APIRouter, UploadFile, File, Form
 from pathlib import Path
 import json
 import shutil
@@ -79,8 +79,7 @@ def update_meshbank(
 @router.post("/assets/upload")
 async def upload_asset(
 
-    category: str,
-
+    category: str = Form(...),
     file: UploadFile = File(...)
 ):
 
@@ -114,5 +113,4 @@ async def upload_asset(
         "ok": True,
 
         "path":
-            f"/resources/{category}/{file.filename}"
-    }
+            f"/resources/{category}/{file
