@@ -518,15 +518,22 @@ function setupCharacter(gltf, offsetX) {
     model.position.x = offsetX;
     model.traverse(o => {
         if (!o.isMesh) return;
-        o.castShadow = true;
+        o.castShadow    = true;
         o.receiveShadow = true;
-        // DoubleSide prevents holes/see-through on skinned meshes during extreme poses
+        // Disable frustum culling: prevents Three.js skipping bone-matrix uploads
+        // when the bounding sphere misses the frustum, causing T-pose ghost overlay.
+        o.frustumCulled = false;
+        // DoubleSide prevents holes/see-through during extreme poses.
         const mats = Array.isArray(o.material) ? o.material : [o.material];
         mats.forEach(m => {
             if (!m) return;
             m.side       = THREE.DoubleSide;
             m.depthWrite = true;
         });
+    });
+    // Flush skeleton to animated pose immediately so bind-pose ghost never renders.
+    model.traverse(o => {
+        if (o.isSkinnedMesh && o.skeleton) o.skeleton.pose();
     });
     scene.add(model);
 
@@ -1589,6 +1596,7 @@ function setLoopMode(mode, btnId) {
             activeAction.reset().play();
         }
     }
+
     if (activeActionB) {
         activeActionB.loop = mode;
         if (mode === THREE.LoopOnce) activeActionB.reset().play();
