@@ -1570,4 +1570,27 @@ function wireEvents() {
 function setLoopMode(mode, btnId) {
     loopMode = mode;
     document.querySelectorAll(".loopBtn").forEach(b => b.classList.remove("active"));
- 
+     document.getElementById(btnId).classList.add("active");
+    if (activeAction) {
+        activeAction.loop = mode;
+        if (mode === THREE.LoopOnce) {
+            activeAction.clampWhenFinished = true;
+            activeAction.reset().play();
+        }
+    }
+    if (activeActionB) {
+        activeActionB.loop = mode;
+        if (mode === THREE.LoopOnce) activeActionB.reset().play();
+    }
+}
+
+// =========================================================
+// BOOT
+// =========================================================
+
+initThree();
+wireEvents();
+loadBank();
+
+// Set default loop button active
+document.getElementById("loopRepeat").classList.add("active");
