@@ -516,7 +516,18 @@ async function loadSourceGLB(sourceKey) {
 function setupCharacter(gltf, offsetX) {
     const model = gltf.scene;
     model.position.x = offsetX;
-    model.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+    model.traverse(o => {
+        if (!o.isMesh) return;
+        o.castShadow = true;
+        o.receiveShadow = true;
+        // DoubleSide prevents holes/see-through on skinned meshes during extreme poses
+        const mats = Array.isArray(o.material) ? o.material : [o.material];
+        mats.forEach(m => {
+            if (!m) return;
+            m.side       = THREE.DoubleSide;
+            m.depthWrite = true;
+        });
+    });
     scene.add(model);
 
     if (offsetX === 0) {
