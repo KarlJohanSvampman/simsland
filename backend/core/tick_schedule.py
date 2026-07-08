@@ -79,3 +79,6 @@ CADENCE["phone_battery"]    = 1    # every tick
 CADENCE["social_events"]    = 60
 CADENCE["maybe_deadlines"]  = 30
 CADENCE["calendar_events"]  = 60
+
+# Socioeconomics — once per simulated day (~24 ticks)
+CADENCE["socioeconomics"]   = 24

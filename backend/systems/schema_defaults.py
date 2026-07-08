@@ -856,4 +856,28 @@ def ensure_household_defaults(h):
         }
     )
 
-    h.setdefau
+    h.setdefault(
+        "owned_objects",
+        []
+    )
+
+    h.setdefault(
+        "cleanliness",
+        1.0
+    )
+
+    h.setdefault(
+        "trash_level",
+        0.0
+    )
+
+    h.setdefault(
+        "home_id",
+        None
+    )
+
+    h.setdefault(
+        "housing_stress",
+        0.0
+    )
+

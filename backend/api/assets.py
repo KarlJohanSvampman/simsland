@@ -23,17 +23,13 @@ def scan_glbs(path):
 @router.get("/assets")
 def get_assets():
 
+    categories = [
+        "props", "characters", "items",
+        "vehicles", "buildings", "animations",
+        "hair", "clothing",
+    ]
+
     return {
-
-        "props": scan_glbs(
-            RESOURCE_DIR / "props"
-        ),
-
-        "characters": scan_glbs(
-            RESOURCE_DIR / "characters"
-        ),
-
-        "items": scan_glbs(
-            RESOURCE_DIR / "items"
-        )
+        cat: scan_glbs(RESOURCE_DIR / cat)
+        for cat in categories
     }
