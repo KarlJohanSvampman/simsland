@@ -491,14 +491,26 @@ function flashNotifyRow(id) {
 
 async function loadSourceGLB(sourceKey) {
     const src = bank[sourceKey];
-    if (!src) return;
+    if (!src) { console.warn("loadSourceGLB: no bank entry for", sourceKey); return; }
     currentSourceKey = sourceKey;
+    showStatus("Loading " + (src.path || sourceKey) + "…");
     clearScene();
-    const gltf = await loader.loadAsync(src.path);
-    setupCharacter(gltf, 0);
-    rawClipsA = gltf.animations || [];
-    frameAll();
-    renderClipList();
+    try {
+        const gltf = await loader.loadAsync(src.path);
+        setupCharacter(gltf, 0);
+        rawClipsA = gltf.animations || [];
+        console.log("[animbank] GLB loaded:", src.path, "| animations:", rawClipsA.length);
+        if (!rawClipsA.length) {
+            showStatus("⚠ GLB loaded but contains NO animations — check the file");
+        } else {
+            showStatus("Loaded " + rawClipsA.length + " animations from " + (src.display_name || sourceKey));
+        }
+        frameAll();
+        renderClipList();
+    } catch (err) {
+        console.error("[animbank] loadSourceGLB failed:", err);
+        showStatus("❌ Failed to load GLB: " + (err.message || err));
+    }
 }
 
 function setupCharacter(gltf, offsetX) {
@@ -1558,27 +1570,4 @@ function wireEvents() {
 function setLoopMode(mode, btnId) {
     loopMode = mode;
     document.querySelectorAll(".loopBtn").forEach(b => b.classList.remove("active"));
-    document.getElementById(btnId).classList.add("active");
-    if (activeAction) {
-        activeAction.loop = mode;
-        if (mode === THREE.LoopOnce) {
-            activeAction.clampWhenFinished = true;
-            activeAction.reset().play();
-        }
-    }
-    if (activeActionB) {
-        activeActionB.loop = mode;
-        if (mode === THREE.LoopOnce) activeActionB.reset().play();
-    }
-}
-
-// =========================================================
-// BOOT
-// =========================================================
-
-initThree();
-wireEvents();
-loadBank();
-
-// Set default loop button active
-document.getElementById("loopRepeat").classList.add("active");
+ 
