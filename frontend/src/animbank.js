@@ -316,6 +316,7 @@ let activeActionLower = null;
 
 // Template state
 let currentTemplate = null;   // template object being edited / playing
+let chainTemplate   = null;   // template currently playing (chain)
 let chainIndex      = 0;      // which step in the chain is active
 let chainListener   = null;   // mixer 'finished' listener for chain advancement
 
@@ -1433,6 +1434,10 @@ function wireEvents() {
         fd.append("file", file);
         fd.append("category", "characters");
         const r = await fetch("/api/assets/upload", { method: "POST", body: fd });
+        if (!r.ok) {
+            alert(`Upload failed: ${r.status} ${r.statusText}${r.status === 413 ? " — file too large (nginx limit)" : ""}`);
+            return;
+        }
         const data = await r.json();
         if (!data.ok) { alert("Upload failed"); return; }
         const key = file.name.replace(".glb", "").replace(/\W+/g, "_");

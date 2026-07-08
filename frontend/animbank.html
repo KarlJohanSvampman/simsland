@@ -310,6 +310,16 @@ select { padding: 4px 6px; background: #1a1e28; border: 1px solid #3a4050; color
     <!-- 3D Canvas (fills all remaining space) -->
     <canvas id="canvas"></canvas>
 
+    <!-- IK panel (hidden until a character is loaded) -->
+    <div id="ikPanel" class="hidden">
+      <span class="ikLabel">🎯 IK</span>
+      <button class="ikBtn" id="ikAddRH">R.Hand</button>
+      <button class="ikBtn" id="ikAddLH">L.Hand</button>
+      <button class="ikBtn" id="ikAddBoth">Both</button>
+      <button class="ikBtn" id="ikAddLookAt">LookAt</button>
+      <div id="ikTargetList"></div>
+    </div>
+
     <!-- Blend panel (shown once a character is loaded) -->
     <div id="blendPanel" class="hidden">
       <span class="blendLabel">⚗ Blend</span>
