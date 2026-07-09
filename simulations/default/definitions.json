@@ -19639,6 +19639,11 @@
       "name": "Wall with Door",
       "kind": "door",
       "material": "paint_beige_matt"
+    },
+    "wall_corner": {
+      "name": "Wall Corner",
+      "kind": "corner",
+      "material": "paint_white_matt"
     }
   },
   "tile_templates": {
@@ -19669,6 +19674,14 @@
       "interior": false,
       "floor": false,
       "material": "asphalt_sidewalk_01"
+    },
+    "sidewalk_corner": {
+      "walk_speed": 1,
+      "buildable": false,
+      "interior": false,
+      "floor": false,
+      "material": "asphalt_sidewalk_01",
+      "kind": "corner"
     },
     "wall": {
       "walk_speed": 0,

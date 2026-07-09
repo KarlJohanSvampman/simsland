@@ -867,12 +867,13 @@ const DEFAULT_TEMPLATES = {
     vehicle_access: false,
     movement_cost: 1,
     blocks_los: false,
-    buildable: true
+    buildable: true,
+    kind: "straight"   // "straight" | "corner" — corner tiles get a rotatable corner marker in the world editor
   },
 
   wall_segment_templates: {
     name: "New Wall Segment",
-    kind: "straight",   // "straight" | "window" | "door"
+    kind: "straight",   // "straight" | "window" | "door" | "corner"
     material: ""
   },
 

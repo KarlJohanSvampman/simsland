@@ -71,9 +71,10 @@ const worldState = {
   wall_segments: []
 };
 
-let currentTool          = null;   // "paint_tile" | "place_floorplan" | "place_prop"
-let currentWorldTileType = "grass";
-let lastClickedTile      = null;   // { x, y } — used for character spawn
+let currentTool             = null;   // "paint_tile" | "place_floorplan" | "place_prop"
+let currentWorldTileType    = "grass";
+let currentWorldTileRotation = 0;
+let lastClickedTile         = null;   // { x, y } — used for character spawn
 
 const placementState = {
   active:     false,
@@ -89,8 +90,9 @@ const placementState = {
 // ===================================
 //
 
-const tileData    = new Map();
-const tileIndexMap = new Map();
+const tileData      = new Map();
+const tileRotations = new Map();
+const tileIndexMap  = new Map();
 
 function key(x, y) { return `${x},${y}`; }
 
@@ -161,6 +163,7 @@ const tileVisualAssignment = new Map(); // "x,y" -> visualKey
 
 function hideInstance(mesh, index) {
   dummy.position.set(0, 0, 0);
+  dummy.rotation.set(0, 0, 0);
   dummy.scale.set(0, 0, 0);
   dummy.updateMatrix();
   mesh.setMatrixAt(index, dummy.matrix);
@@ -214,6 +217,14 @@ scene.add(selection);
 const placedGroup = new THREE.Group();
 scene.add(placedGroup);
 
+// Schematic markers drawn over "corner"-kind tiles (e.g. sidewalk_corner) so
+// their rotation is visible in the editor even though the underlying tile
+// texture is the same flat material as the straight variant — see
+// updateTileCornerMarker() near paintTile().
+const tileCornerMarkerGroup = new THREE.Group();
+scene.add(tileCornerMarkerGroup);
+const tileCornerMarkers = new Map(); // "x,y" -> THREE.Group
+
 function addPropMarker(entry) {
   const world = gridToWorld(entry.x, entry.y);
   const mesh = new THREE.Mesh(
@@ -255,9 +266,12 @@ function addFloorplanMarker(entry) {
 // with a small decal so they're distinguishable here.
 //
 
-const WALL_SEGMENT_WIDTH     = 0.5;
-const WALL_SEGMENT_HEIGHT    = 1.6;
-const WALL_SEGMENT_THICKNESS = 0.12;
+// Sized to match main.js's real in-game walls (WALL_HEIGHT / WALL_THICKNESS):
+// width spans the full tile edge (1 unit) so adjacent segments butt together
+// with no gap, instead of floating as isolated half-width posts.
+const WALL_SEGMENT_WIDTH     = 1;
+const WALL_SEGMENT_HEIGHT    = 1.2;
+const WALL_SEGMENT_THICKNESS = 0.1;
 
 // Rotation snaps to one of the tile's 4 outer edges rather than free rotation —
 // each 90° step picks the next side, and the wall is offset to sit right on
@@ -269,6 +283,29 @@ function wallSideFromRotation(rotation) {
   return WALL_SIDES[steps];
 }
 
+// Corner pieces cover two adjacent sides at once (e.g. north+east), forming
+// an L that meets exactly at the tile's corner since each arm already spans
+// the full edge. Rotation cycles which corner of the tile it occupies.
+const CORNER_SIDE_PAIRS = [
+  ["north", "east"],
+  ["east", "south"],
+  ["south", "west"],
+  ["west", "north"]
+];
+
+function cornerSidesFromRotation(rotation) {
+  const steps = Math.round((((rotation % 360) + 360) % 360) / 90) % 4;
+  return CORNER_SIDE_PAIRS[steps];
+}
+
+// Label used in status text — a single side for straight/window/door kinds,
+// or the joined pair (e.g. "north-east") for corner kind.
+function wallSideLabel(templateId, rotation) {
+  const tmpl = (definitions.wall_segment_templates || {})[templateId] || {};
+  if (tmpl.kind === "corner") return cornerSidesFromRotation(rotation).join("-");
+  return wallSideFromRotation(rotation);
+}
+
 // Resolve a material id (from any template, not just tiles) to a texture
 // or flat color — shared by wall segments here and reusable elsewhere.
 function resolveMaterialVisual(materialId) {
@@ -278,15 +315,9 @@ function resolveMaterialVisual(materialId) {
   return { textureUrl: null, color: 0xdddddd };
 }
 
-function addWallSegmentMarker(entry) {
-  const tmpl   = (definitions.wall_segment_templates || {})[entry.template] || {};
-  const visual = resolveMaterialVisual(tmpl.material);
-
-  const material = visual.textureUrl
-    ? new THREE.MeshBasicMaterial({ map: getTexture(visual.textureUrl) })
-    : new THREE.MeshBasicMaterial({ color: visual.color ?? 0xdddddd });
-
-  const side       = wallSideFromRotation(entry.rotation || 0);
+// Builds one full-edge wall box for a given side, positioned relative to the
+// tile center (parent group is what gets moved to the tile's world position).
+function buildWallSideMesh(side, material) {
   const horizontal = side === "north" || side === "south";
 
   const mesh = new THREE.Mesh(
@@ -298,46 +329,75 @@ function addWallSegmentMarker(entry) {
     material
   );
 
-  const world = gridToWorld(entry.x, entry.y);
-  let px = world.x;
-  let pz = world.z;
+  let px = 0;
+  let pz = 0;
   if (side === "north") pz -= 0.5;
   if (side === "south") pz += 0.5;
   if (side === "west")  px -= 0.5;
   if (side === "east")  px += 0.5;
+  mesh.position.set(px, 0, pz);
 
-  mesh.position.set(px, WALL_SEGMENT_HEIGHT / 2, pz);
-  mesh.userData = { type: "wall_segment", id: entry.id, template: entry.template, side };
+  return mesh;
+}
 
-  // Simple accent decal so window/door kinds are visually distinguishable
-  // in this schematic editor view — same base box either way, just faced
-  // toward whichever axis this segment's outward side points along.
-  if (tmpl.kind === "window" || tmpl.kind === "door") {
-    const isWindow = tmpl.kind === "window";
-    const decal = new THREE.Mesh(
-      new THREE.PlaneGeometry(
-        WALL_SEGMENT_WIDTH * (isWindow ? 0.7 : 0.6),
-        WALL_SEGMENT_HEIGHT * (isWindow ? 0.4 : 0.75)
-      ),
-      new THREE.MeshBasicMaterial({
-        color:       isWindow ? 0x88ccff : 0x6b4226,
-        transparent: isWindow,
-        opacity:     isWindow ? 0.6 : 1,
-        side:        THREE.DoubleSide
-      })
-    );
-    if (!isWindow) decal.position.y = -WALL_SEGMENT_HEIGHT * 0.1;
-    if (horizontal) {
-      decal.position.z = WALL_SEGMENT_THICKNESS / 2 + 0.005;
-    } else {
-      decal.rotation.y = Math.PI / 2;
-      decal.position.x = WALL_SEGMENT_THICKNESS / 2 + 0.005;
+// Simple accent decal so window/door kinds are visually distinguishable in
+// this schematic editor view — same base box either way, just faced toward
+// whichever axis this segment's outward side points along.
+function addWallSideDecal(mesh, side, kind) {
+  const horizontal = side === "north" || side === "south";
+  const isWindow    = kind === "window";
+  const decal = new THREE.Mesh(
+    new THREE.PlaneGeometry(
+      WALL_SEGMENT_WIDTH * (isWindow ? 0.7 : 0.6),
+      WALL_SEGMENT_HEIGHT * (isWindow ? 0.4 : 0.75)
+    ),
+    new THREE.MeshBasicMaterial({
+      color:       isWindow ? 0x88ccff : 0x6b4226,
+      transparent: isWindow,
+      opacity:     isWindow ? 0.6 : 1,
+      side:        THREE.DoubleSide
+    })
+  );
+  if (!isWindow) decal.position.y = -WALL_SEGMENT_HEIGHT * 0.1;
+  if (horizontal) {
+    decal.position.z = WALL_SEGMENT_THICKNESS / 2 + 0.005;
+  } else {
+    decal.rotation.y = Math.PI / 2;
+    decal.position.x = WALL_SEGMENT_THICKNESS / 2 + 0.005;
+  }
+  mesh.add(decal);
+}
+
+function addWallSegmentMarker(entry) {
+  const tmpl   = (definitions.wall_segment_templates || {})[entry.template] || {};
+  const visual = resolveMaterialVisual(tmpl.material);
+
+  const material = visual.textureUrl
+    ? new THREE.MeshBasicMaterial({ map: getTexture(visual.textureUrl) })
+    : new THREE.MeshBasicMaterial({ color: visual.color ?? 0xdddddd });
+
+  const world = gridToWorld(entry.x, entry.y);
+  const group = new THREE.Group();
+  group.position.set(world.x, WALL_SEGMENT_HEIGHT / 2, world.z);
+
+  let side;
+  if (tmpl.kind === "corner") {
+    const sides = cornerSidesFromRotation(entry.rotation || 0);
+    for (const s of sides) group.add(buildWallSideMesh(s, material));
+    side = sides.join("-");
+  } else {
+    side = wallSideFromRotation(entry.rotation || 0);
+    const mesh = buildWallSideMesh(side, material);
+    group.add(mesh);
+    if (tmpl.kind === "window" || tmpl.kind === "door") {
+      addWallSideDecal(mesh, side, tmpl.kind);
     }
-    mesh.add(decal);
   }
 
-  placedGroup.add(mesh);
-  return mesh;
+  group.userData = { type: "wall_segment", id: entry.id, template: entry.template, side };
+
+  placedGroup.add(group);
+  return group;
 }
 
 //
@@ -399,8 +459,9 @@ function resolveTileVisual(type) {
   return { key: `flat:${t}`, textureUrl: null, color: TILE_COLORS[t] || 0x557799 };
 }
 
-function paintTile(x, y, type) {
+function paintTile(x, y, type, rotation = 0) {
   const t = (type || "").toLowerCase();
+  const r = ((rotation % 360) + 360) % 360;
   const gridKey = key(x, y);
   const index   = tileIndexMap.get(gridKey);
   if (index == null) return;
@@ -420,20 +481,71 @@ function paintTile(x, y, type) {
 
   const world = gridToWorld(x, y);
   dummy.position.set(world.x, 0.02, world.z);
+  dummy.rotation.set(0, THREE.MathUtils.degToRad(r), 0);
   dummy.scale.set(1, 1, 1);
   dummy.updateMatrix();
   mesh.setMatrixAt(index, dummy.matrix);
   mesh.instanceMatrix.needsUpdate = true;
+  dummy.rotation.set(0, 0, 0); // dummy is shared — leave it neutral for other callers
 
   tileVisualAssignment.set(gridKey, visual.key);
   tileData.set(gridKey, t);
+  tileRotations.set(gridKey, r);
 
   const existing = worldState.world_tiles.find(wt => wt.x === x && wt.y === y);
   if (existing) {
-    existing.type = t;
+    existing.type     = t;
+    existing.rotation = r;
   } else {
-    worldState.world_tiles.push({ x, y, type: t });
+    worldState.world_tiles.push({ x, y, type: t, rotation: r });
   }
+
+  updateTileCornerMarker(x, y, t, r);
+}
+
+// Draws (or clears) the schematic corner marker for a tile. Only tile
+// templates with kind "corner" (e.g. sidewalk_corner) get one — it's the
+// only visual sign of orientation, since the tile texture itself doesn't
+// change per rotation. Reuses cornerSidesFromRotation()/WALL_SIDES logic
+// defined below in the WALL SEGMENTS section (hoisted, safe to call here).
+function updateTileCornerMarker(x, y, type, rotation) {
+  const gridKey  = key(x, y);
+  const existing = tileCornerMarkers.get(gridKey);
+  if (existing) {
+    tileCornerMarkerGroup.remove(existing);
+    tileCornerMarkers.delete(gridKey);
+  }
+
+  const tmpl = (definitions.tile_templates || {})[type] || {};
+  if (tmpl.kind !== "corner") return;
+
+  const world = gridToWorld(x, y);
+  const group = new THREE.Group();
+  group.position.set(world.x, 0.03, world.z);
+
+  const material = new THREE.MeshBasicMaterial({ color: 0xffe066 });
+  for (const side of cornerSidesFromRotation(rotation)) {
+    const horizontal = side === "north" || side === "south";
+    const mesh = new THREE.Mesh(
+      new THREE.BoxGeometry(
+        horizontal ? 0.9  : 0.06,
+        0.02,
+        horizontal ? 0.06 : 0.9
+      ),
+      material
+    );
+    let px = 0;
+    let pz = 0;
+    if (side === "north") pz = -0.47;
+    if (side === "south") pz =  0.47;
+    if (side === "west")  px = -0.47;
+    if (side === "east")  px =  0.47;
+    mesh.position.set(px, 0, pz);
+    group.add(mesh);
+  }
+
+  tileCornerMarkerGroup.add(group);
+  tileCornerMarkers.set(gridKey, group);
 }
 
 //
@@ -470,11 +582,13 @@ renderer.domElement.addEventListener("pointerdown", (event) => {
   selection.position.set(world.x, 0.03, world.z);
 
   const tileType = tileData.get(key(tile.x, tile.y)) || "(unpainted)";
+  const tileRot  = tileRotations.get(key(tile.x, tile.y)) || 0;
 
   document.getElementById("editorSelection").innerHTML = `
     <b>Tile</b><hr>
     Grid: ${tile.x}, ${tile.y}<br>
-    Type: ${tileType}
+    Type: ${tileType}<br>
+    Rotation: ${tileRot}°
   `;
 });
 
@@ -533,7 +647,7 @@ function commitPlacement(tile) {
     };
     worldState.wall_segments.push(entry);
     addWallSegmentMarker(entry);
-    const side = wallSideFromRotation(entry.rotation);
+    const side = wallSideLabel(entry.template, entry.rotation);
     document.getElementById("editorSelection").innerHTML = `
       <b>Placed wall segment</b><br>
       ${entry.template}<br>
@@ -550,8 +664,8 @@ renderer.domElement.addEventListener("dblclick", (event) => {
   if (!tile) return;
 
   if (currentTool === "paint_tile") {
-    paintTile(tile.x, tile.y, currentWorldTileType);
-    setStatus(`Painted ${currentWorldTileType} @ ${tile.x}, ${tile.y}`);
+    paintTile(tile.x, tile.y, currentWorldTileType, currentWorldTileRotation);
+    setStatus(`Painted ${currentWorldTileType} @ ${tile.x}, ${tile.y} (${currentWorldTileRotation}°)`);
     return;
   }
 
@@ -606,8 +720,8 @@ document.getElementById("btn-place_tile").onclick = () => {
     setStatus("Click a tile first, then press Place Tile");
     return;
   }
-  paintTile(lastClickedTile.x, lastClickedTile.y, currentWorldTileType);
-  setStatus(`Painted ${currentWorldTileType} @ ${lastClickedTile.x}, ${lastClickedTile.y}`);
+  paintTile(lastClickedTile.x, lastClickedTile.y, currentWorldTileType, currentWorldTileRotation);
+  setStatus(`Painted ${currentWorldTileType} @ ${lastClickedTile.x}, ${lastClickedTile.y} (${currentWorldTileRotation}°)`);
 };
 
 //
@@ -632,14 +746,19 @@ function updatePlaceButton() {
 function updateRotateButton() {
   const btn = document.getElementById("btn-rotate");
   if (!btn) return;
-  btn.style.display = placementState.active ? "block" : "none";
+  btn.style.display = (placementState.active || currentTool === "paint_tile") ? "block" : "none";
 }
 
 function rotatePlacement() {
+  if (currentTool === "paint_tile") {
+    currentWorldTileRotation = (currentWorldTileRotation + 90) % 360;
+    setStatus(`Tile rotation: ${currentWorldTileRotation}°`);
+    return;
+  }
   if (!placementState.active) return;
   placementState.rotation = (placementState.rotation + 90) % 360;
   if (placementState.mode === "wall_segment") {
-    setStatus(`Wall side: ${wallSideFromRotation(placementState.rotation)}`);
+    setStatus(`Wall side: ${wallSideLabel(placementState.templateId, placementState.rotation)}`);
   } else {
     setStatus(`Rotation: ${placementState.rotation}°`);
   }
@@ -648,7 +767,7 @@ function rotatePlacement() {
 document.getElementById("btn-rotate").onclick = rotatePlacement;
 
 window.addEventListener("keydown", (e) => {
-  if ((e.key === "r" || e.key === "R") && placementState.active) {
+  if ((e.key === "r" || e.key === "R") && (placementState.active || currentTool === "paint_tile")) {
     rotatePlacement();
   }
 });
@@ -716,10 +835,11 @@ document.getElementById("btn-paint_tile").onclick = () => {
       // { "Grass": { "grass": { name, material, ... } } }
       // The outer key is the display name; we need the inner key for paintTile.
       const innerKey = (Object.keys(tmpl).find(k => typeof tmpl[k] === "object") || id).toLowerCase();
-      currentWorldTileType = innerKey;
+      currentWorldTileType     = innerKey;
+      currentWorldTileRotation = 0;
       setActiveTool("paint_tile");
       closeModal("modal-paint_tile");
-      setStatus(`Paint tile: ${innerKey} — double-click a tile, or click a tile then press Place Tile`);
+      setStatus(`Paint tile: ${innerKey} — double-click a tile, or click a tile then press Place Tile. Press R to rotate.`);
     }
   );
   openModal("modal-paint_tile");
@@ -859,7 +979,7 @@ async function loadWorld() {
   Object.assign(worldState, world);
 
   for (const tile of worldState.world_tiles || []) {
-    paintTile(tile.x, tile.y, tile.type);
+    paintTile(tile.x, tile.y, tile.type, tile.rotation || 0);
   }
 
   for (const prop of worldState.placed_props || []) {
