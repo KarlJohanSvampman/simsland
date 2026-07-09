@@ -452,4 +452,75 @@ Delete Slot
                     <button id="placeAnchorBtn">📍 Place at click</button>
                 </div>
             </div>
-  
+        </div>
+
+        <div class="section">
+            <h3>Targets</h3>
+            <div id="targetList"></div>
+            <div class="anchorBtnRow">
+                <button id="addTargetBtn">+ Add</button>
+                <button id="removeTargetBtn" class="danger">Remove</button>
+            </div>
+            <div id="targetEditor" style="display:none">
+                <hr style="border-color:#444;margin:8px 0">
+                <div class="anchorEditorGrid">
+                    <label>Name</label>
+                    <input id="targetName" placeholder="target_front">
+                    <label>Pos X</label>
+                    <input id="targetPosX" type="number" step="0.01" value="0">
+                    <label>Pos Y</label>
+                    <input id="targetPosY" type="number" step="0.01" value="1">
+                    <label>Pos Z</label>
+                    <input id="targetPosZ" type="number" step="0.01" value="0">
+                    <label>Type</label>
+                    <input id="targetType" placeholder="body / head / hand_r">
+                </div>
+                <div class="anchorBtnRow">
+                    <button id="placeTargetBtn">📍 Place at click</button>
+                </div>
+            </div>
+        </div>
+
+<div class="section">
+
+    <h3>Bones</h3>
+
+    <div id="bones"></div>
+
+</div>
+    <h3>Statistics</h3>
+
+    <div id="stats">
+
+        No model loaded
+
+    </div>
+
+</div>
+
+        <div class="section">
+
+            <h3>Hierarchy</h3>
+
+            <div id="hierarchy"></div>
+
+        </div>
+
+    </div>
+
+    <div id="preview">
+
+        <canvas id="canvas"></canvas>
+
+    </div>
+
+</div>
+
+<script
+type="module"
+src="/src/meshbank.js">
+</script>
+
+</body>
+
+</html>

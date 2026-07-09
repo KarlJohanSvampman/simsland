@@ -51,6 +51,7 @@ def load_definitions(sim_id: str):
             "vehicle_templates":      {},
             "floorplan_templates":    {},
             "tile_templates":         {},
+            "wall_segment_templates": {},
             "material_templates":     {},
         }
     with open(path, "r") as f:

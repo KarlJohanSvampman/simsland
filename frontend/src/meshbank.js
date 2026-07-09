@@ -2486,4 +2486,116 @@ canvas.addEventListener('click', e => {
 document.getElementById('addAnchorBtn').onclick = () => {
   if (!currentAssetId) return;
   let n = 'anchor_' + Date.now().toString(36);
-  ensureAnchors(meshbank[currentAssetId])[n] = { name: n, position: {
+  ensureAnchors(meshbank[currentAssetId])[n] = { name: n, position: { x:0,y:0,z:0 }, rotation_y:0, distance:1.2, interaction:'' };
+  selectedAnchorKey = n;
+  renderAnchorList();
+  loadAnchorEditor();
+  _rebuildAnchorMarkers();
+};
+document.getElementById('removeAnchorBtn').onclick = () => {
+  if (!currentAssetId || !selectedAnchorKey) return;
+  delete ensureAnchors(meshbank[currentAssetId])[selectedAnchorKey];
+  selectedAnchorKey = null;
+  renderAnchorList();
+  _rebuildAnchorMarkers();
+};
+document.getElementById('addTargetBtn').onclick = () => {
+  if (!currentAssetId) return;
+  let n = 'target_' + Date.now().toString(36);
+  ensureTargets(meshbank[currentAssetId])[n] = { name: n, position: { x:0,y:1,z:0 }, type:'' };
+  selectedTargetKey = n;
+  renderTargetList();
+  loadTargetEditor();
+  _rebuildTargetMarkers();
+};
+document.getElementById('removeTargetBtn').onclick = () => {
+  if (!currentAssetId || !selectedTargetKey) return;
+  delete ensureTargets(meshbank[currentAssetId])[selectedTargetKey];
+  selectedTargetKey = null;
+  renderTargetList();
+  _rebuildTargetMarkers();
+};
+document.getElementById('placeAnchorBtn').onclick = () => {
+  if (!selectedAnchorKey) return;
+  placingMode = placingMode === 'anchor' ? null : 'anchor';
+  canvas.style.cursor = placingMode ? 'crosshair' : '';
+  document.getElementById('placeAnchorBtn').textContent = placingMode ? 'Click model to place...' : 'Place at click';
+};
+document.getElementById('placeTargetBtn').onclick = () => {
+  if (!selectedTargetKey) return;
+  placingMode = placingMode === 'target' ? null : 'target';
+  canvas.style.cursor = placingMode ? 'crosshair' : '';
+  document.getElementById('placeTargetBtn').textContent = placingMode ? 'Click model to place...' : 'Place at click';
+};
+
+// Live-update on input
+['anchorName','anchorPosX','anchorPosY','anchorPosZ','anchorRotY','anchorDist','anchorInteraction']
+  .forEach(id => { const el = document.getElementById(id); if (el) el.addEventListener('input', saveAnchorEdits); });
+['targetName','targetPosX','targetPosY','targetPosZ','targetType']
+  .forEach(id => { const el = document.getElementById(id); if (el) el.addEventListener('input', saveTargetEdits); });
+
+// ══════════════════════════════════════════════════════════════════════════════
+// HAIR ATTACH POINT
+// ══════════════════════════════════════════════════════════════════════════════
+
+function ensureHairAttach(asset) {
+    asset.hair_attach ||= {
+        bone: '',
+        offset: { x: 0, y: 0, z: 0 },
+        rotation: { x: 0, y: 0, z: 0 },
+    };
+    return asset.hair_attach;
+}
+
+function loadHairAttachUI() {
+    if (!currentAssetId) return;
+    const asset = meshbank[currentAssetId];
+    if (!asset) return;
+    const ha = asset.hair_attach || {};
+
+    // Populate bone selector with bones extracted from the loaded model
+    const boneSelect = document.getElementById('hairAttachBone');
+    boneSelect.innerHTML = '<option value="">-- none --</option>';
+    const bones = asset.bones || {};
+    for (const boneName in bones) {
+        const opt = document.createElement('option');
+        opt.value = boneName;
+        opt.textContent = boneName;
+        if (boneName === ha.bone) opt.selected = true;
+        boneSelect.appendChild(opt);
+    }
+    if (ha.bone) boneSelect.value = ha.bone;
+
+    const off = ha.offset || {};
+    const rot = ha.rotation || {};
+    document.getElementById('hairAttachOffX').value = off.x ?? 0;
+    document.getElementById('hairAttachOffY').value = off.y ?? 0;
+    document.getElementById('hairAttachOffZ').value = off.z ?? 0;
+    document.getElementById('hairAttachRotX').value = rot.x ?? 0;
+    document.getElementById('hairAttachRotY').value = rot.y ?? 0;
+    document.getElementById('hairAttachRotZ').value = rot.z ?? 0;
+}
+
+function saveHairAttach() {
+    if (!currentAssetId) return;
+    const asset = meshbank[currentAssetId] ||= {};
+    const ha = ensureHairAttach(asset);
+    ha.bone     = document.getElementById('hairAttachBone').value;
+    ha.offset   = {
+        x: parseFloat(document.getElementById('hairAttachOffX').value) || 0,
+        y: parseFloat(document.getElementById('hairAttachOffY').value) || 0,
+        z: parseFloat(document.getElementById('hairAttachOffZ').value) || 0,
+    };
+    ha.rotation = {
+        x: parseFloat(document.getElementById('hairAttachRotX').value) || 0,
+        y: parseFloat(document.getElementById('hairAttachRotY').value) || 0,
+        z: parseFloat(document.getElementById('hairAttachRotZ').value) || 0,
+    };
+}
+
+document.getElementById('saveHairAttachBtn').onclick = async () => {
+    saveHairAttach();
+    await saveMeshbank();
+    document.getElementById('saveHairAttachBtn').textContent = 'Saved ✓';
+    setTimeout(() => { document.getElementById('saveHairAttachBtn').textContent = 'Save Hair Attach'; }, 1500);
+};

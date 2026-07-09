@@ -10083,7 +10083,7 @@
         "pockets": 4
       },
       "instance": {
-        "immune_score": 100.0,
+        "immune_score": 100,
         "health_state": {
           "active_emergencies": {},
           "injuries": [],
@@ -10100,8 +10100,8 @@
         "locomotion": {
           "style": "normal",
           "current_mode": "walk",
-          "walk_speed": 1.0,
-          "run_speed": 3.0,
+          "walk_speed": 1,
+          "run_speed": 3,
           "sneak_speed": 0.4,
           "crawl_speed": 0.25,
           "limp_walk_speed": 0.6,
@@ -15012,11 +15012,11 @@
       "adult_only": true,
       "legal_consequence_risk": true,
       "social_impact": {
-        "relationship": -1.0,
+        "relationship": -1,
         "reputation": -0.9
       },
       "mood_effects": {
-        "violated": 1.0,
+        "violated": 1,
         "traumatized": 0.8
       },
       "mental_health_risk": "PTSD",
@@ -19624,24 +19624,51 @@
       ]
     }
   },
+  "wall_segment_templates": {
+    "wall_straight": {
+      "name": "Wall Segment",
+      "kind": "straight",
+      "material": "paint_white_matt"
+    },
+    "wall_window": {
+      "name": "Wall with Window",
+      "kind": "window",
+      "material": "paint_white_matt"
+    },
+    "wall_door": {
+      "name": "Wall with Door",
+      "kind": "door",
+      "material": "paint_beige_matt"
+    }
+  },
   "tile_templates": {
     "wood_floor": {
       "walk_speed": 1,
       "buildable": true,
       "interior": true,
-      "floor": true
+      "floor": true,
+      "material": "wood_floor_01"
     },
     "grass": {
       "walk_speed": 0.8,
       "buildable": false,
       "interior": false,
-      "floor": false
+      "floor": false,
+      "material": "grass_01"
     },
     "road": {
       "walk_speed": 1,
       "buildable": false,
       "interior": false,
-      "floor": false
+      "floor": false,
+      "material": "asphalt_road_01"
+    },
+    "sidewalk": {
+      "walk_speed": 1,
+      "buildable": false,
+      "interior": false,
+      "floor": false,
+      "material": "asphalt_sidewalk_01"
     },
     "wall": {
       "walk_speed": 0,
@@ -19651,9 +19678,23 @@
     }
   },
   "material_templates": {
+    "asphalt_road_01": {
+      "name": "Asphalt Road",
+      "texture": "/resources/tiles/asphalt_road.jpg",
+      "category": "terrain",
+      "interior": false,
+      "floor": false
+    },
+    "asphalt_sidewalk_01": {
+      "name": "Sidewalk",
+      "texture": "/resources/tiles/asphalt_sidewalk.jpg",
+      "category": "terrain",
+      "interior": false,
+      "floor": false
+    },
     "wood_floor_01": {
       "name": "Wood Floor",
-      "texture": "/resources/textures/wood_floor.jpg",
+      "texture": "/resources/tiles/wood_floor.jpg",
       "category": "floor",
       "interior": true,
       "floor": true,
@@ -19693,14 +19734,14 @@
     },
     "wallpaper_blue_01": {
       "name": "Blue Wallpaper",
-      "texture": "/resources/textures/wallpaper_blue.jpg",
+      "color": "#6f9bc9",
       "category": "wall",
       "interior": true,
       "floor": false
     },
     "grass_01": {
       "name": "Grass",
-      "texture": "/resources/textures/grass.jpg",
+      "texture": "/resources/tiles/grass.jpg",
       "category": "terrain",
       "interior": false,
       "floor": false
@@ -19789,7 +19830,7 @@
     "wallpaper_floral_01": {
       "name": "Floral Wallpaper",
       "category": "wallpaper",
-      "texture": "/resources/textures/wallpaper_floral.jpg",
+      "color": "#c98fb0",
       "pattern": "floral",
       "repeat": "tile",
       "interior": true,
@@ -19799,7 +19840,7 @@
     "wallpaper_stripe_01": {
       "name": "Stripe Wallpaper",
       "category": "wallpaper",
-      "texture": "/resources/textures/wallpaper_stripe.jpg",
+      "color": "#cfd8dc",
       "pattern": "stripe",
       "repeat": "tile",
       "interior": true,
@@ -19809,7 +19850,7 @@
     "wallpaper_plain_cream": {
       "name": "Cream Wallpaper",
       "category": "wallpaper",
-      "texture": "/resources/textures/wallpaper_cream.jpg",
+      "color": "#f0e6d2",
       "pattern": "plain",
       "repeat": "tile",
       "interior": true,
@@ -19819,7 +19860,7 @@
     "wallpaper_geometric_01": {
       "name": "Geometric Wallpaper",
       "category": "wallpaper",
-      "texture": "/resources/textures/wallpaper_geometric.jpg",
+      "color": "#8d99ae",
       "pattern": "geometric",
       "repeat": "tile",
       "interior": true,
@@ -19829,7 +19870,7 @@
     "wallpaper_brick_01": {
       "name": "Exposed Brick Wallpaper",
       "category": "wallpaper",
-      "texture": "/resources/textures/wallpaper_brick.jpg",
+      "texture": "/resources/tiles/patterned_brick_floor.jpg",
       "pattern": "brick",
       "repeat": "tile",
       "interior": true,
@@ -21171,7 +21212,7 @@
       "category": "sexuality",
       "effects": {
         "requires_trust_for_attraction": 0.7,
-        "libido_modifier": 0.0,
+        "libido_modifier": 0,
         "emotional_bond_requirement": 0.5
       }
     },
@@ -21191,8 +21232,8 @@
       "category": "lifestyle",
       "effects": {
         "fitness_gain_mult": 1.4,
-        "injury_chance_mult": 3.0,
-        "recovery_gap_mult": 2.0
+        "injury_chance_mult": 3,
+        "recovery_gap_mult": 2
       }
     },
     "exercise_consistent": {
@@ -24860,7 +24901,7 @@
       "sector": "government",
       "income_class": "Upper Middle",
       "average_salary": 52000,
-      "hourly_wage": 25.0,
+      "hourly_wage": 25,
       "salary": 4333,
       "work_mode": "On-site",
       "work_hours": [
@@ -25124,7 +25165,7 @@
       "sector": "construction",
       "income_class": "Lower Middle",
       "average_salary": 52000,
-      "hourly_wage": 25.0,
+      "hourly_wage": 25,
       "salary": 4333,
       "work_mode": "On-site",
       "work_hours": [
@@ -25553,7 +25594,7 @@
       "sector": "manufacturing",
       "income_class": "Low",
       "average_salary": 364000,
-      "hourly_wage": 175.0,
+      "hourly_wage": 175,
       "salary": 30333,
       "work_mode": "On-site",
       "work_hours": [
@@ -25586,7 +25627,7 @@
       "sector": "construction",
       "income_class": "Upper Middle",
       "average_salary": 156000,
-      "hourly_wage": 75.0,
+      "hourly_wage": 75,
       "salary": 13000,
       "work_mode": "Hybrid",
       "work_hours": [
@@ -27302,7 +27343,7 @@
       "sector": "education",
       "income_class": "Lower Middle",
       "average_salary": 156000,
-      "hourly_wage": 75.0,
+      "hourly_wage": 75,
       "salary": 13000,
       "work_mode": "Hybrid",
       "work_hours": [
@@ -27962,7 +28003,7 @@
       "sector": "education",
       "income_class": "Upper Middle",
       "average_salary": 52000,
-      "hourly_wage": 25.0,
+      "hourly_wage": 25,
       "salary": 4333,
       "work_mode": "Remote",
       "work_hours": [
@@ -30041,7 +30082,7 @@
       "sector": "finance",
       "income_class": "Middle",
       "average_salary": 104000,
-      "hourly_wage": 50.0,
+      "hourly_wage": 50,
       "salary": 8667,
       "work_mode": "On-site",
       "work_hours": [
@@ -30701,7 +30742,7 @@
       "sector": "finance",
       "income_class": "High",
       "average_salary": 52000,
-      "hourly_wage": 25.0,
+      "hourly_wage": 25,
       "salary": 4333,
       "work_mode": "Hybrid",
       "work_hours": [
@@ -31823,7 +31864,7 @@
       "sector": "hospitality",
       "income_class": "Low",
       "average_salary": 156000,
-      "hourly_wage": 75.0,
+      "hourly_wage": 75,
       "salary": 13000,
       "work_mode": "Remote",
       "work_hours": [
@@ -33473,7 +33514,7 @@
       "sector": "transport",
       "income_class": "High",
       "average_salary": 52000,
-      "hourly_wage": 25.0,
+      "hourly_wage": 25,
       "salary": 4333,
       "work_mode": "On-site",
       "work_hours": [
@@ -35552,7 +35593,7 @@
       "sector": "government",
       "income_class": "Low",
       "average_salary": 52000,
-      "hourly_wage": 25.0,
+      "hourly_wage": 25,
       "salary": 4333,
       "work_mode": "On-site",
       "work_hours": [
@@ -37136,7 +37177,7 @@
       "sector": "manufacturing",
       "income_class": "Upper Middle",
       "average_salary": 52000,
-      "hourly_wage": 25.0,
+      "hourly_wage": 25,
       "salary": 4333,
       "work_mode": "Hybrid",
       "work_hours": [
@@ -39774,7 +39815,7 @@
       "sector": "security",
       "income_class": "Middle",
       "average_salary": 52000,
-      "hourly_wage": 25.0,
+      "hourly_wage": 25,
       "salary": 4333,
       "work_mode": "On-site",
       "work_hours": [
@@ -44192,7 +44233,7 @@
       "surgery_hospital_days": 14,
       "survival_rate": 70,
       "worsening_rate_per_day": 0.003,
-      "alcohol_multiplier": 5.0,
+      "alcohol_multiplier": 5,
       "notes": "Alcohol massively accelerates deterioration. Medication doses must be adjusted. Risk of hepatic coma in severe cases."
     },
     "borrelia": {
@@ -44847,7 +44888,7 @@
         "social": -0.25,
         "fun": -0.15
       },
-      "mood_volatility": 3.0,
+      "mood_volatility": 3,
       "notes": "Extreme mood swings in response to perceived slights. Relationships intensely unstable. Dialectical Behaviour Therapy (DBT) is primary treatment."
     },
     "sexual_repression_disorder": {
@@ -44855,7 +44896,7 @@
       "description": "Chronic inability to accept or express sexuality; rooted in shame or conditioning.",
       "severity_range": [
         0.2,
-        1.0
+        1
       ],
       "effects": [
         "intimacy_avoidance",
@@ -44868,7 +44909,7 @@
       "description": "Profound conflict between inner identity (often LGBT+) and external expectations.",
       "severity_range": [
         0.3,
-        1.0
+        1
       ],
       "effects": [
         "depression_risk",
@@ -45052,7 +45093,7 @@
       "label": "SEVERE MEDICAL EMERGENCY",
       "description": "Blood accumulating in body cavity from ruptured vessel or organ damage.",
       "blood_loss_per_tick": 0.05,
-      "death_threshold": 1.0,
+      "death_threshold": 1,
       "surgical_required": true,
       "visual_symptoms": [
         "abdominal_pain",
@@ -45094,7 +45135,7 @@
     "bleeding": {
       "severity": 0,
       "location": null,
-      "blood_loss_rate": 0.0
+      "blood_loss_rate": 0
     },
     "heart_attack": {
       "severity": 0,
@@ -45153,60 +45194,60 @@
     },
     "internal_bleeding": {
       "severity": 0,
-      "total_blood_lost": 0.0
+      "total_blood_lost": 0
     }
   },
   "physical_injury_schema": {
     "_note": "These are instance fields for injuries. One entry per injury site.",
     "blunt": {
       "body_part": null,
-      "force": 0.0,
+      "force": 0,
       "effects": {
         "broken_bone": false,
         "bone_location": null,
         "lung_damage": false,
         "unconscious": false,
         "head_impact": false,
-        "mental_trait_risk": 0.0
+        "mental_trait_risk": 0
       }
     },
     "blade": {
       "body_part": null,
-      "blade_sharpness": 1.0,
-      "blade_size": 1.0,
+      "blade_sharpness": 1,
+      "blade_size": 1,
       "irregular_shape": false,
-      "bleeding_severity": 0.0,
-      "wound_complexity": 0.0,
+      "bleeding_severity": 0,
+      "wound_complexity": 0,
       "hard_to_close": false
     }
   },
   "immune_score_factors": {
     "_note": "Daily penalty to immune_score per factor. Score clamped to 0-100.",
     "sleep_deprivation": {
-      "hours_below_6": -3.0,
-      "hours_below_4": -6.0,
-      "hours_above_10": -1.0
+      "hours_below_6": -3,
+      "hours_below_4": -6,
+      "hours_above_10": -1
     },
     "irregular_sleep": {
       "sleep_time_variance_hours_gt_2": -1.5
     },
     "irregular_meals": {
-      "meal_timing_variance_hours_gt_3": -1.0
+      "meal_timing_variance_hours_gt_3": -1
     },
     "diet": {
       "healthy_meal_bonus": 0.5,
-      "junk_food_penalty": -1.0,
-      "no_meal_penalty": -2.0
+      "junk_food_penalty": -1,
+      "no_meal_penalty": -2
     },
     "substances": {
       "alcohol_unit_penalty": -0.8,
-      "drug_use_penalty": -3.0,
+      "drug_use_penalty": -3,
       "caffeine_cups_gt_4_penalty": -0.5,
       "sugar_high_intake_penalty": -0.8
     },
     "natural_recovery": {
       "per_day_rested": 1.5,
-      "max_daily_recovery": 2.0
+      "max_daily_recovery": 2
     },
     "disease_penalty": {
       "std_hiv": -30,
@@ -45267,8 +45308,8 @@
       "animation_sneak": "sneak_normal",
       "animation_crawl": "crawl_normal",
       "animation_limp": "limp_normal",
-      "walk_speed": 1.0,
-      "run_speed": 3.0,
+      "walk_speed": 1,
+      "run_speed": 3,
       "sneak_speed": 0.4,
       "crawl_speed": 0.25
     },
@@ -45307,7 +45348,7 @@
       "animation_crawl": "crawl_normal",
       "animation_limp": "limp_normal",
       "walk_speed": 1.15,
-      "run_speed": 4.0,
+      "run_speed": 4,
       "sneak_speed": 0.55,
       "crawl_speed": 0.35
     },
@@ -46350,7 +46391,7 @@
       "prestige": "low",
       "annual_cost": 0,
       "requires_interview": "none",
-      "approval_rate": 1.0,
+      "approval_rate": 1,
       "special_education": true,
       "boarding": false,
       "description": "Government-funded preschool open to all children in the district.",
@@ -46371,7 +46412,7 @@
       "prestige": "medium",
       "annual_cost": 0,
       "requires_interview": "none",
-      "approval_rate": 1.0,
+      "approval_rate": 1,
       "special_education": true,
       "boarding": false,
       "description": "Standard public primary school serving the local catchment area.",
@@ -46416,7 +46457,7 @@
       "prestige": "medium",
       "annual_cost": 0,
       "requires_interview": "none",
-      "approval_rate": 1.0,
+      "approval_rate": 1,
       "special_education": true,
       "boarding": false,
       "description": "Public middle school with strong arts and sports programmes.",
@@ -46440,7 +46481,7 @@
       "prestige": "medium",
       "annual_cost": 0,
       "requires_interview": "none",
-      "approval_rate": 1.0,
+      "approval_rate": 1,
       "special_education": true,
       "boarding": false,
       "avg_grade_score": 68,
@@ -46777,7 +46818,7 @@
       "min": 0,
       "max": 2000000,
       "unit": "people",
-      "daily_drift": 0.0,
+      "daily_drift": 0,
       "drift_range": 0.001
     },
     "birth_rate": {
@@ -46786,7 +46827,7 @@
       "min": 0,
       "max": 5,
       "unit": "%/year",
-      "daily_drift": 0.0,
+      "daily_drift": 0,
       "drift_range": 0.002
     },
     "death_rate": {
@@ -46795,7 +46836,7 @@
       "min": 0,
       "max": 5,
       "unit": "%/year",
-      "daily_drift": 0.0,
+      "daily_drift": 0,
       "drift_range": 0.002
     },
     "unemployment_rate": {
@@ -46804,7 +46845,7 @@
       "min": 0,
       "max": 60,
       "unit": "%",
-      "daily_drift": 0.0,
+      "daily_drift": 0,
       "drift_range": 0.05
     },
     "violent_crime_rate": {
@@ -46813,7 +46854,7 @@
       "min": 0,
       "max": 20,
       "unit": "% of pop",
-      "daily_drift": 0.0,
+      "daily_drift": 0,
       "drift_range": 0.015
     },
     "nonviolent_crime_rate": {
@@ -46822,7 +46863,7 @@
       "min": 0,
       "max": 40,
       "unit": "% of pop",
-      "daily_drift": 0.0,
+      "daily_drift": 0,
       "drift_range": 0.025
     },
     "incarceration_per_100k": {
@@ -46831,7 +46872,7 @@
       "min": 0,
       "max": 2000,
       "unit": "per 100k",
-      "daily_drift": 0.0,
+      "daily_drift": 0,
       "drift_range": 0.5
     },
     "republican_pct": {
@@ -46840,7 +46881,7 @@
       "min": 0,
       "max": 100,
       "unit": "%",
-      "daily_drift": 0.0,
+      "daily_drift": 0,
       "drift_range": 0.02
     },
     "democrat_pct": {
@@ -46849,7 +46890,7 @@
       "min": 0,
       "max": 100,
       "unit": "%",
-      "daily_drift": 0.0,
+      "daily_drift": 0,
       "drift_range": 0.02
     },
     "independent_pct": {
@@ -46858,7 +46899,7 @@
       "min": 0,
       "max": 100,
       "unit": "%",
-      "daily_drift": 0.0,
+      "daily_drift": 0,
       "drift_range": 0.01
     },
     "income_tax_rate": {
@@ -46867,8 +46908,8 @@
       "min": 0,
       "max": 50,
       "unit": "%",
-      "daily_drift": 0.0,
-      "drift_range": 0.0
+      "daily_drift": 0,
+      "drift_range": 0
     },
     "food_stamp_pct": {
       "label": "Food Stamp Recipients",
@@ -46876,7 +46917,7 @@
       "min": 0,
       "max": 60,
       "unit": "% of pop",
-      "daily_drift": 0.0,
+      "daily_drift": 0,
       "drift_range": 0.03
     },
     "homeless_pct": {
@@ -46885,7 +46926,7 @@
       "min": 0,
       "max": 10,
       "unit": "% of pop",
-      "daily_drift": 0.0,
+      "daily_drift": 0,
       "drift_range": 0.01
     },
     "health_system_capacity": {
@@ -46894,8 +46935,8 @@
       "min": 10,
       "max": 5000,
       "unit": "patients/day",
-      "daily_drift": 0.0,
-      "drift_range": 0.0
+      "daily_drift": 0,
+      "drift_range": 0
     },
     "health_system_load": {
       "label": "Health System Load",
@@ -46903,8 +46944,8 @@
       "min": 0,
       "max": 5000,
       "unit": "patients/day",
-      "daily_drift": 0.0,
-      "drift_range": 2.0
+      "daily_drift": 0,
+      "drift_range": 2
     },
     "traffic_congestion_pct": {
       "label": "Traffic Congestion",
@@ -46912,7 +46953,7 @@
       "min": 0,
       "max": 100,
       "unit": "%",
-      "daily_drift": 0.0,
+      "daily_drift": 0,
       "drift_range": 0.5
     },
     "traffic_accident_rate": {
@@ -46921,7 +46962,7 @@
       "min": 0,
       "max": 20,
       "unit": "per 1000 vehicles/day",
-      "daily_drift": 0.0,
+      "daily_drift": 0,
       "drift_range": 0.05
     },
     "addiction_help_pct": {
@@ -46930,7 +46971,7 @@
       "min": 0,
       "max": 30,
       "unit": "% of pop",
-      "daily_drift": 0.0,
+      "daily_drift": 0,
       "drift_range": 0.02
     },
     "alcoholism_pct": {
@@ -46939,7 +46980,7 @@
       "min": 0,
       "max": 40,
       "unit": "% of pop",
-      "daily_drift": 0.0,
+      "daily_drift": 0,
       "drift_range": 0.02
     },
     "inflation_rate": {
@@ -46948,16 +46989,16 @@
       "min": -5,
       "max": 30,
       "unit": "%/year",
-      "daily_drift": 0.0,
+      "daily_drift": 0,
       "drift_range": 0.005
     },
     "cost_of_living_index": {
       "label": "Cost of Living Index",
-      "value": 1.0,
+      "value": 1,
       "min": 0.3,
-      "max": 3.0,
+      "max": 3,
       "unit": "index",
-      "daily_drift": 0.0,
+      "daily_drift": 0,
       "drift_range": 0.001
     },
     "housing_vacancy_rate": {
@@ -46966,7 +47007,7 @@
       "min": 0,
       "max": 40,
       "unit": "%",
-      "daily_drift": 0.0,
+      "daily_drift": 0,
       "drift_range": 0.03
     },
     "median_household_income": {
@@ -46975,8 +47016,8 @@
       "min": 10000,
       "max": 500000,
       "unit": "$/year",
-      "daily_drift": 0.0,
-      "drift_range": 5.0
+      "daily_drift": 0,
+      "drift_range": 5
     },
     "poverty_rate": {
       "label": "Poverty Rate",
@@ -46984,25 +47025,25 @@
       "min": 0,
       "max": 60,
       "unit": "% of pop",
-      "daily_drift": 0.0,
+      "daily_drift": 0,
       "drift_range": 0.02
     },
     "high_school_graduation": {
       "label": "High School Graduation Rate",
-      "value": 87.0,
+      "value": 87,
       "min": 0,
       "max": 100,
       "unit": "%",
-      "daily_drift": 0.0,
+      "daily_drift": 0,
       "drift_range": 0.01
     },
     "college_attendance": {
       "label": "College Attendance Rate",
-      "value": 38.0,
+      "value": 38,
       "min": 0,
       "max": 100,
       "unit": "%",
-      "daily_drift": 0.0,
+      "daily_drift": 0,
       "drift_range": 0.01
     }
   },
@@ -47404,7 +47445,7 @@
         "public": 0.5,
         "among_rivals": 0.4,
         "among_allies": 0.7,
-        "notoriety": 0.0
+        "notoriety": 0
       },
       "typical_roles": {
         "party_chair": 1,
@@ -47440,7 +47481,7 @@
         "public": 0.7,
         "among_rivals": 0.5,
         "among_allies": 0.8,
-        "notoriety": 0.0
+        "notoriety": 0
       },
       "typical_roles": {
         "president": 1,
@@ -47480,7 +47521,7 @@
         "public": 0.55,
         "among_rivals": 0.3,
         "among_allies": 0.75,
-        "notoriety": 0.0
+        "notoriety": 0
       },
       "typical_roles": {
         "president": 1,
@@ -47514,7 +47555,7 @@
         "public": 0.65,
         "among_rivals": 0.5,
         "among_allies": 0.85,
-        "notoriety": 0.0
+        "notoriety": 0
       },
       "typical_roles": {
         "leader": 1,
@@ -48444,7 +48485,7 @@
       "eye_contact": true,
       "emotional_intimacy": 0.3,
       "pleasure_modifier": {
-        "initiator": 0.0,
+        "initiator": 0,
         "recipient": 0.05
       }
     },
@@ -48489,7 +48530,7 @@
       "eye_contact": true,
       "emotional_intimacy": 0.15,
       "pleasure_modifier": {
-        "initiator": 0.0,
+        "initiator": 0,
         "recipient": 0.15
       }
     },
@@ -48534,7 +48575,7 @@
       "emotional_intimacy": 0.25,
       "pleasure_modifier": {
         "initiator": -0.05,
-        "recipient": 0.0
+        "recipient": 0
       }
     },
     "standing": {
@@ -48643,8 +48684,8 @@
       "eye_contact": true,
       "emotional_intimacy": 0.4,
       "pleasure_modifier": {
-        "initiator": 0.0,
-        "recipient": 0.0
+        "initiator": 0,
+        "recipient": 0
       }
     }
   },
@@ -48827,7 +48868,7 @@
       "description": "Needs significant emotional care and reassurance after intimate encounters.",
       "requires_consent": false,
       "mutual": false,
-      "pleasure_bonus": 0.0,
+      "pleasure_bonus": 0,
       "aftercare_modifier": 0.3
     }
   },

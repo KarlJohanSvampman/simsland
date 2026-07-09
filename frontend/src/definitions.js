@@ -13,6 +13,7 @@ let definitions = {
   interaction_templates: {},
   activity_templates: {},
   tile_templates: {},
+  wall_segment_templates: {},
   floorplan_templates: {},
   material_templates: {},
   recipe_templates: {},
@@ -42,6 +43,7 @@ const tabs = [
   "vehicle_templates",
   "floorplan_templates",
   "tile_templates",
+  "wall_segment_templates",
   "material_templates",
   "hobby_templates",
   "socioeconomics",
@@ -866,6 +868,12 @@ const DEFAULT_TEMPLATES = {
     movement_cost: 1,
     blocks_los: false,
     buildable: true
+  },
+
+  wall_segment_templates: {
+    name: "New Wall Segment",
+    kind: "straight",   // "straight" | "window" | "door"
+    material: ""
   },
 
   material_templates: {

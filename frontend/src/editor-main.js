@@ -39,6 +39,24 @@ scene.add(new THREE.GridHelper(WORLD_SIZE, WORLD_SIZE));
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
 
+//
+// ===================================
+// TEXTURE LOADING
+// ===================================
+//
+
+const textureLoader = new THREE.TextureLoader();
+const textureCache   = new Map();
+
+function getTexture(url) {
+  if (textureCache.has(url)) return textureCache.get(url);
+  const tex = textureLoader.load(url);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  if ("colorSpace" in tex) tex.colorSpace = THREE.SRGBColorSpace;
+  textureCache.set(url, tex);
+  return tex;
+}
+
 let definitions = {
   tile_templates:      {},
   floorplan_templates: {},
@@ -47,9 +65,10 @@ let definitions = {
 };
 
 const worldState = {
-  floorplans:   [],
-  world_tiles:  [],
-  placed_props: []
+  floorplans:    [],
+  world_tiles:   [],
+  placed_props:  [],
+  wall_segments: []
 };
 
 let currentTool          = null;   // "paint_tile" | "place_floorplan" | "place_prop"
@@ -92,19 +111,22 @@ scene.add(ground);
 // ===================================
 // INSTANCED TILE MESH
 // ===================================
+// Base layer: a flat grey "unpainted ground" plane under every cell.
+// Painted tiles get their own per-material textured InstancedMesh layered
+// just above this, so each material can show its real texture instead of
+// a flat color swatch.
 //
 
 const tileGeometry = new THREE.PlaneGeometry(1, 1);
 tileGeometry.rotateX(-Math.PI / 2);
 
-const tileMaterial = new THREE.MeshBasicMaterial({ vertexColors: true });
-
 const TILE_COUNT = WORLD_SIZE * WORLD_SIZE;
-const tileMesh   = new THREE.InstancedMesh(tileGeometry, tileMaterial, TILE_COUNT);
-scene.add(tileMesh);
+
+const baseMaterial = new THREE.MeshBasicMaterial({ color: 0x557799 });
+const baseMesh     = new THREE.InstancedMesh(tileGeometry, baseMaterial, TILE_COUNT);
+scene.add(baseMesh);
 
 const dummy = new THREE.Object3D();
-const color = new THREE.Color();
 
 let instance = 0;
 
@@ -115,17 +137,57 @@ for (let x = 0; x < WORLD_SIZE; x++) {
       0,
       y + 0.5 - WORLD_SIZE / 2
     );
+    dummy.scale.set(1, 1, 1);
     dummy.updateMatrix();
-    tileMesh.setMatrixAt(instance, dummy.matrix);
-    color.setHex(0x557799);
-    tileMesh.setColorAt(instance, color);
+    baseMesh.setMatrixAt(instance, dummy.matrix);
     tileIndexMap.set(key(x, y), instance);
     instance++;
   }
 }
 
-tileMesh.instanceMatrix.needsUpdate = true;
-tileMesh.instanceColor.needsUpdate  = true;
+baseMesh.instanceMatrix.needsUpdate = true;
+
+//
+// ===================================
+// PER-MATERIAL TILE TYPE MESHES
+// ===================================
+// One InstancedMesh per resolved material/color, all sharing the same
+// TILE_COUNT-sized instance index scheme as tileIndexMap. Unused instances
+// are scaled to 0 so they're invisible.
+//
+
+const tileTypeMeshes       = new Map(); // visualKey -> { mesh }
+const tileVisualAssignment = new Map(); // "x,y" -> visualKey
+
+function hideInstance(mesh, index) {
+  dummy.position.set(0, 0, 0);
+  dummy.scale.set(0, 0, 0);
+  dummy.updateMatrix();
+  mesh.setMatrixAt(index, dummy.matrix);
+  dummy.scale.set(1, 1, 1);
+}
+
+function getOrCreateTileTypeMesh(visual) {
+  let entry = tileTypeMeshes.get(visual.key);
+  if (entry) return entry;
+
+  const material = visual.textureUrl
+    ? new THREE.MeshBasicMaterial({ map: getTexture(visual.textureUrl) })
+    : new THREE.MeshBasicMaterial({ color: visual.color ?? 0x557799 });
+
+  const mesh = new THREE.InstancedMesh(tileGeometry, material, TILE_COUNT);
+  mesh.frustumCulled = false;
+
+  for (let i = 0; i < TILE_COUNT; i++) {
+    hideInstance(mesh, i);
+  }
+  mesh.instanceMatrix.needsUpdate = true;
+
+  scene.add(mesh);
+  entry = { mesh };
+  tileTypeMeshes.set(visual.key, entry);
+  return entry;
+}
 
 //
 // ===================================
@@ -143,6 +205,143 @@ scene.add(selection);
 
 //
 // ===================================
+// PLACED PROP / FLOORPLAN MARKERS
+// ===================================
+// The editor doesn't load actual GLB models — these are simple placeholder
+// markers so placed props/floorplans are actually visible in the scene.
+//
+
+const placedGroup = new THREE.Group();
+scene.add(placedGroup);
+
+function addPropMarker(entry) {
+  const world = gridToWorld(entry.x, entry.y);
+  const mesh = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.3, 0.35, 0.9, 12),
+    new THREE.MeshBasicMaterial({ color: 0xe0a030 })
+  );
+  mesh.position.set(world.x, 0.45, world.z);
+  mesh.userData = { type: "prop", id: entry.id, template: entry.template };
+  placedGroup.add(mesh);
+  return mesh;
+}
+
+function addFloorplanMarker(entry) {
+  const world = gridToWorld(entry.x, entry.y);
+  const mesh = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.96, 0.96),
+    new THREE.MeshBasicMaterial({
+      color:       0x4090e0,
+      transparent: true,
+      opacity:     0.55,
+      side:        THREE.DoubleSide
+    })
+  );
+  mesh.rotation.x = -Math.PI / 2;
+  mesh.position.set(world.x, 0.04, world.z);
+  mesh.userData = { type: "floorplan", id: entry.id, template: entry.template };
+  placedGroup.add(mesh);
+  return mesh;
+}
+
+//
+// ===================================
+// WALL SEGMENTS
+// ===================================
+// A wall segment is more like a prop than a ground tile: a rectangular
+// model (half a tile wide) snapped to the outer edge of the tile it's
+// built on (north/east/south/west, cycled via rotation), textured from a
+// wallpaper/paint material. "window" and "door" kinds reuse the same box
+// with a small decal so they're distinguishable here.
+//
+
+const WALL_SEGMENT_WIDTH     = 0.5;
+const WALL_SEGMENT_HEIGHT    = 1.6;
+const WALL_SEGMENT_THICKNESS = 0.12;
+
+// Rotation snaps to one of the tile's 4 outer edges rather than free rotation —
+// each 90° step picks the next side, and the wall is offset to sit right on
+// that edge (like main.js's real floorplan walls), not floating in the middle.
+const WALL_SIDES = ["north", "east", "south", "west"];
+
+function wallSideFromRotation(rotation) {
+  const steps = Math.round((((rotation % 360) + 360) % 360) / 90) % 4;
+  return WALL_SIDES[steps];
+}
+
+// Resolve a material id (from any template, not just tiles) to a texture
+// or flat color — shared by wall segments here and reusable elsewhere.
+function resolveMaterialVisual(materialId) {
+  const material = materialId ? (definitions.material_templates || {})[materialId] : null;
+  if (material && material.texture) return { textureUrl: material.texture, color: null };
+  if (material && material.color)   return { textureUrl: null, color: parseInt(material.color.replace("#", ""), 16) };
+  return { textureUrl: null, color: 0xdddddd };
+}
+
+function addWallSegmentMarker(entry) {
+  const tmpl   = (definitions.wall_segment_templates || {})[entry.template] || {};
+  const visual = resolveMaterialVisual(tmpl.material);
+
+  const material = visual.textureUrl
+    ? new THREE.MeshBasicMaterial({ map: getTexture(visual.textureUrl) })
+    : new THREE.MeshBasicMaterial({ color: visual.color ?? 0xdddddd });
+
+  const side       = wallSideFromRotation(entry.rotation || 0);
+  const horizontal = side === "north" || side === "south";
+
+  const mesh = new THREE.Mesh(
+    new THREE.BoxGeometry(
+      horizontal ? WALL_SEGMENT_WIDTH     : WALL_SEGMENT_THICKNESS,
+      WALL_SEGMENT_HEIGHT,
+      horizontal ? WALL_SEGMENT_THICKNESS : WALL_SEGMENT_WIDTH
+    ),
+    material
+  );
+
+  const world = gridToWorld(entry.x, entry.y);
+  let px = world.x;
+  let pz = world.z;
+  if (side === "north") pz -= 0.5;
+  if (side === "south") pz += 0.5;
+  if (side === "west")  px -= 0.5;
+  if (side === "east")  px += 0.5;
+
+  mesh.position.set(px, WALL_SEGMENT_HEIGHT / 2, pz);
+  mesh.userData = { type: "wall_segment", id: entry.id, template: entry.template, side };
+
+  // Simple accent decal so window/door kinds are visually distinguishable
+  // in this schematic editor view — same base box either way, just faced
+  // toward whichever axis this segment's outward side points along.
+  if (tmpl.kind === "window" || tmpl.kind === "door") {
+    const isWindow = tmpl.kind === "window";
+    const decal = new THREE.Mesh(
+      new THREE.PlaneGeometry(
+        WALL_SEGMENT_WIDTH * (isWindow ? 0.7 : 0.6),
+        WALL_SEGMENT_HEIGHT * (isWindow ? 0.4 : 0.75)
+      ),
+      new THREE.MeshBasicMaterial({
+        color:       isWindow ? 0x88ccff : 0x6b4226,
+        transparent: isWindow,
+        opacity:     isWindow ? 0.6 : 1,
+        side:        THREE.DoubleSide
+      })
+    );
+    if (!isWindow) decal.position.y = -WALL_SEGMENT_HEIGHT * 0.1;
+    if (horizontal) {
+      decal.position.z = WALL_SEGMENT_THICKNESS / 2 + 0.005;
+    } else {
+      decal.rotation.y = Math.PI / 2;
+      decal.position.x = WALL_SEGMENT_THICKNESS / 2 + 0.005;
+    }
+    mesh.add(decal);
+  }
+
+  placedGroup.add(mesh);
+  return mesh;
+}
+
+//
+// ===================================
 // TILE COLORS
 // ===================================
 //
@@ -152,7 +351,8 @@ const TILE_COLORS = {
   road:     0x333333,
   sidewalk: 0xaaaaaa,
   park:     0x55aa55,
-  water:    0x3377cc
+  water:    0x3377cc,
+  wall:     0x552222
 };
 
 //
@@ -181,30 +381,54 @@ function gridToWorld(x, y) {
 // ===================================
 //
 
-function tileColor(type) {
+// Resolve a tile type to its visual: a real texture (via tile_templates[type].material
+// -> material_templates[materialId].texture) when available, otherwise a flat color.
+function resolveTileVisual(type) {
   const t = (type || "").toLowerCase();
-  // 1. Check material_templates for an editor_color (dynamic, from definitions)
-  const matBucket = definitions.material_templates || {};
-  for (const bucket of Object.values(matBucket)) {
-    const inner = bucket[t];
-    if (inner && inner.editor_color) {
-      return parseInt(inner.editor_color.replace("#", ""), 16);
-    }
+
+  const tileTpl    = (definitions.tile_templates || {})[t];
+  const materialId = tileTpl && tileTpl.material;
+  const material    = materialId ? (definitions.material_templates || {})[materialId] : null;
+
+  if (material && material.texture) {
+    return { key: materialId, textureUrl: material.texture, color: null };
   }
-  // 2. Fall back to hardcoded map
-  return TILE_COLORS[t] || 0x557799;
+  if (material && material.color) {
+    return { key: materialId, textureUrl: null, color: parseInt(material.color.replace("#", ""), 16) };
+  }
+  return { key: `flat:${t}`, textureUrl: null, color: TILE_COLORS[t] || 0x557799 };
 }
 
 function paintTile(x, y, type) {
   const t = (type || "").toLowerCase();
-  const index = tileIndexMap.get(key(x, y));
+  const gridKey = key(x, y);
+  const index   = tileIndexMap.get(gridKey);
   if (index == null) return;
 
-  color.setHex(tileColor(t));
-  tileMesh.setColorAt(index, color);
-  tileMesh.instanceColor.needsUpdate = true;
+  const visual = resolveTileVisual(t);
+  const { mesh } = getOrCreateTileTypeMesh(visual);
 
-  const existing = worldState.world_tiles.find(t => t.x === x && t.y === y);
+  // If this cell previously showed a different material/color, hide it there.
+  const prevKey = tileVisualAssignment.get(gridKey);
+  if (prevKey && prevKey !== visual.key) {
+    const prevEntry = tileTypeMeshes.get(prevKey);
+    if (prevEntry) {
+      hideInstance(prevEntry.mesh, index);
+      prevEntry.mesh.instanceMatrix.needsUpdate = true;
+    }
+  }
+
+  const world = gridToWorld(x, y);
+  dummy.position.set(world.x, 0.02, world.z);
+  dummy.scale.set(1, 1, 1);
+  dummy.updateMatrix();
+  mesh.setMatrixAt(index, dummy.matrix);
+  mesh.instanceMatrix.needsUpdate = true;
+
+  tileVisualAssignment.set(gridKey, visual.key);
+  tileData.set(gridKey, t);
+
+  const existing = worldState.world_tiles.find(wt => wt.x === x && wt.y === y);
   if (existing) {
     existing.type = t;
   } else {
@@ -245,11 +469,80 @@ renderer.domElement.addEventListener("pointerdown", (event) => {
   selection.visible = true;
   selection.position.set(world.x, 0.03, world.z);
 
+  const tileType = tileData.get(key(tile.x, tile.y)) || "(unpainted)";
+
   document.getElementById("editorSelection").innerHTML = `
     <b>Tile</b><hr>
-    Grid: ${tile.x}, ${tile.y}
+    Grid: ${tile.x}, ${tile.y}<br>
+    Type: ${tileType}
   `;
 });
+
+//
+// Commit a prop/floorplan placement at a given tile — shared by the
+// double-click handler and the explicit "Place Here" button.
+//
+function commitPlacement(tile) {
+  if (!placementState.active || !tile) return;
+
+  if (placementState.mode === "prop") {
+    const entry = {
+      id:       crypto.randomUUID(),
+      template: placementState.templateId,
+      x:        tile.x,
+      y:        tile.y,
+      rotation: placementState.rotation
+    };
+    worldState.placed_props.push(entry);
+    addPropMarker(entry);
+    document.getElementById("editorSelection").innerHTML = `
+      <b>Placed prop</b><br>
+      ${entry.template}<br>
+      @ ${entry.x}, ${entry.y}
+    `;
+    setStatus(`Placed prop: ${entry.template} @ ${entry.x}, ${entry.y}`);
+    return;
+  }
+
+  if (placementState.mode === "floorplan") {
+    const entry = {
+      id:       crypto.randomUUID(),
+      template: placementState.templateId,
+      x:        tile.x,
+      y:        tile.y,
+      rotation: placementState.rotation
+    };
+    worldState.floorplans.push(entry);
+    addFloorplanMarker(entry);
+    document.getElementById("editorSelection").innerHTML = `
+      <b>Placed floorplan</b><br>
+      ${entry.template}<br>
+      @ ${entry.x}, ${entry.y}
+    `;
+    setStatus(`Placed floorplan: ${entry.template} @ ${entry.x}, ${entry.y}`);
+    return;
+  }
+
+  if (placementState.mode === "wall_segment") {
+    const entry = {
+      id:       crypto.randomUUID(),
+      template: placementState.templateId,
+      x:        tile.x,
+      y:        tile.y,
+      rotation: placementState.rotation
+    };
+    worldState.wall_segments.push(entry);
+    addWallSegmentMarker(entry);
+    const side = wallSideFromRotation(entry.rotation);
+    document.getElementById("editorSelection").innerHTML = `
+      <b>Placed wall segment</b><br>
+      ${entry.template}<br>
+      @ ${entry.x}, ${entry.y} (${side} side)
+    `;
+    setStatus(`Placed wall segment: ${entry.template} @ ${entry.x}, ${entry.y} (${side} side)`);
+    return;
+  }
+}
 
 // Double click — place / paint
 renderer.domElement.addEventListener("dblclick", (event) => {
@@ -263,37 +556,7 @@ renderer.domElement.addEventListener("dblclick", (event) => {
   }
 
   if (placementState.active) {
-    if (placementState.mode === "prop") {
-      worldState.placed_props.push({
-        id:       crypto.randomUUID(),
-        template: placementState.templateId,
-        x:        tile.x,
-        y:        tile.y,
-        rotation: placementState.rotation
-      });
-      document.getElementById("editorSelection").innerHTML = `
-        <b>Placed prop</b><br>
-        ${placementState.templateId}<br>
-        @ ${tile.x}, ${tile.y}
-      `;
-      setStatus(`Placed prop: ${placementState.templateId} @ ${tile.x}, ${tile.y}`);
-      return;
-    }
-
-    worldState.floorplans.push({
-      id:       crypto.randomUUID(),
-      template: placementState.templateId,
-      x:        tile.x,
-      y:        tile.y,
-      rotation: placementState.rotation
-    });
-    document.getElementById("editorSelection").innerHTML = `
-      <b>Placed floorplan</b><br>
-      ${placementState.templateId}<br>
-      @ ${tile.x}, ${tile.y}
-    `;
-    setStatus(`Placed floorplan: ${placementState.templateId} @ ${tile.x}, ${tile.y}`);
-    return;
+    commitPlacement(tile);
   }
 });
 
@@ -322,7 +585,82 @@ function setActiveTool(tool) {
   document.querySelectorAll(".toolButton[data-tool]").forEach(btn => {
     btn.classList.toggle("active", btn.dataset.tool === tool);
   });
+
+  updatePlaceButton();
+  updatePlaceTileButton();
 }
+
+//
+// "Place Tile" button — shows while the paint_tile tool is active, lets you
+// paint the last-selected tile immediately without needing a double-click.
+//
+function updatePlaceTileButton() {
+  const btn = document.getElementById("btn-place_tile");
+  if (!btn) return;
+  btn.style.display = currentTool === "paint_tile" ? "block" : "none";
+}
+
+document.getElementById("btn-place_tile").onclick = () => {
+  if (currentTool !== "paint_tile") return;
+  if (!lastClickedTile) {
+    setStatus("Click a tile first, then press Place Tile");
+    return;
+  }
+  paintTile(lastClickedTile.x, lastClickedTile.y, currentWorldTileType);
+  setStatus(`Painted ${currentWorldTileType} @ ${lastClickedTile.x}, ${lastClickedTile.y}`);
+};
+
+//
+// "Place Here" button — shows whenever a floorplan/prop placement is armed,
+// lets you commit the placement on the last-selected tile without needing
+// a double-click.
+//
+function updatePlaceButton() {
+  const btn = document.getElementById("btn-place_here");
+  if (!btn) return;
+  btn.style.display = placementState.active ? "block" : "none";
+  updateRotateButton();
+}
+
+//
+// Rotate control — rotates the currently-armed placement (floorplan, prop,
+// or wall segment) in 90° steps before it's committed. Visually meaningful
+// for wall segments right now, since props/floorplans are placeholder
+// markers with no directional shape yet.
+//
+
+function updateRotateButton() {
+  const btn = document.getElementById("btn-rotate");
+  if (!btn) return;
+  btn.style.display = placementState.active ? "block" : "none";
+}
+
+function rotatePlacement() {
+  if (!placementState.active) return;
+  placementState.rotation = (placementState.rotation + 90) % 360;
+  if (placementState.mode === "wall_segment") {
+    setStatus(`Wall side: ${wallSideFromRotation(placementState.rotation)}`);
+  } else {
+    setStatus(`Rotation: ${placementState.rotation}°`);
+  }
+}
+
+document.getElementById("btn-rotate").onclick = rotatePlacement;
+
+window.addEventListener("keydown", (e) => {
+  if ((e.key === "r" || e.key === "R") && placementState.active) {
+    rotatePlacement();
+  }
+});
+
+document.getElementById("btn-place_here").onclick = () => {
+  if (!placementState.active) return;
+  if (!lastClickedTile) {
+    setStatus("Click a tile first, then press Place Here");
+    return;
+  }
+  commitPlacement(lastClickedTile);
+};
 
 //
 // ===================================
@@ -381,7 +719,7 @@ document.getElementById("btn-paint_tile").onclick = () => {
       currentWorldTileType = innerKey;
       setActiveTool("paint_tile");
       closeModal("modal-paint_tile");
-      setStatus(`Paint tile: ${innerKey}`);
+      setStatus(`Paint tile: ${innerKey} — double-click a tile, or click a tile then press Place Tile`);
     }
   );
   openModal("modal-paint_tile");
@@ -396,12 +734,14 @@ document.getElementById("btn-place_floorplan").onclick = () => {
     document.getElementById("list-place_floorplan"),
     definitions.floorplan_templates,
     (id) => {
+      setActiveTool("place_floorplan");
       placementState.templateId = id;
       placementState.mode       = "floorplan";
       placementState.active     = true;
-      setActiveTool("place_floorplan");
+      placementState.rotation   = 0;
+      updatePlaceButton();
       closeModal("modal-place_floorplan");
-      setStatus(`Place floorplan: ${id} — click a tile`);
+      setStatus(`Place floorplan: ${id} — double-click a tile, or click a tile then press Place Here`);
     }
   );
   openModal("modal-place_floorplan");
@@ -416,15 +756,39 @@ document.getElementById("btn-place_prop").onclick = () => {
     document.getElementById("list-place_prop"),
     definitions.prop_templates,
     (id) => {
+      setActiveTool("place_prop");
       placementState.templateId = id;
       placementState.mode       = "prop";
       placementState.active     = true;
-      setActiveTool("place_prop");
+      placementState.rotation   = 0;
+      updatePlaceButton();
       closeModal("modal-place_prop");
-      setStatus(`Place prop: ${id} — click a tile`);
+      setStatus(`Place prop: ${id} — double-click a tile, or click a tile then press Place Here`);
     }
   );
   openModal("modal-place_prop");
+};
+
+//
+// Place Wall button
+//
+
+document.getElementById("btn-place_wall").onclick = () => {
+  buildModalList(
+    document.getElementById("list-place_wall"),
+    definitions.wall_segment_templates,
+    (id) => {
+      setActiveTool("place_wall");
+      placementState.templateId = id;
+      placementState.mode       = "wall_segment";
+      placementState.active     = true;
+      placementState.rotation   = 0;
+      updatePlaceButton();
+      closeModal("modal-place_wall");
+      setStatus(`Place wall: ${id} — snaps to the tile's north edge by default, press R to cycle sides, then double-click or Place Here`);
+    }
+  );
+  openModal("modal-place_wall");
 };
 
 //
@@ -496,6 +860,18 @@ async function loadWorld() {
 
   for (const tile of worldState.world_tiles || []) {
     paintTile(tile.x, tile.y, tile.type);
+  }
+
+  for (const prop of worldState.placed_props || []) {
+    addPropMarker(prop);
+  }
+
+  for (const fp of worldState.floorplans || []) {
+    addFloorplanMarker(fp);
+  }
+
+  for (const wallSeg of worldState.wall_segments || []) {
+    addWallSegmentMarker(wallSeg);
   }
 }
 

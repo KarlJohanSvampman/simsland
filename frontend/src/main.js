@@ -172,7 +172,26 @@ function createWallMaterial(wallData){
   if(texture){
 
     return new THREE.MeshStandardMaterial({
-      map: texture
+      map:         texture,
+      transparent: true,
+      opacity:     1
+    });
+  }
+
+  // No texture asset — fall back to the material's flat color (e.g. paint
+  // swatches) before resorting to the generic wall/door/window defaults.
+  const materialTemplate =
+    getMaterialTemplate(
+      definitions,
+      wallData.material
+    );
+
+  if(materialTemplate?.color){
+
+    return new THREE.MeshStandardMaterial({
+      color:       parseInt(materialTemplate.color.replace("#", ""), 16),
+      transparent: true,
+      opacity:     1
     });
   }
 
@@ -187,7 +206,9 @@ function createWallMaterial(wallData){
   }
 
   return new THREE.MeshStandardMaterial({
-    color
+    color,
+    transparent: true,
+    opacity:     1
   });
 }
 function createWallMesh(
@@ -404,16 +425,23 @@ function createWindowSegment(
         1
       );
 
+  // Fill the gap between lower and upper exactly, so the "hollow" center
+  // is seamless (no accidental unrendered slivers above/below the glass).
+  const lowerHeight = 0.9;
+  const upperHeight = 0.7;
+  const glassHeight = WALL_HEIGHT - lowerHeight - upperHeight;
+  const glassCenterY = (lowerHeight - upperHeight) / 2; // midpoint between the two solid pieces
+
   const glassGeo =
     horizontal
     ? new THREE.BoxGeometry(
         0.85,
-        0.9,
+        glassHeight,
         WALL_THICKNESS / 2
       )
     : new THREE.BoxGeometry(
         WALL_THICKNESS / 2,
-        0.9,
+        glassHeight,
         0.85
       );
 
@@ -423,6 +451,7 @@ function createWindowSegment(
 
   lower.position.y = -0.95;
   upper.position.y = 1.05;
+  glass.position.y = glassCenterY;
 
   group.add(lower);
   group.add(upper);
@@ -613,7 +642,10 @@ function updateFloorplanWalls(state){
 
           mesh = createWallMesh(
             x,
-            y,)
+            y,
+            side,
+            wallData
+          );
         }
 
         else if(wallData.type === "door"){
@@ -1449,7 +1481,8 @@ function createTile(tile){
   type: "tile",
 
   x: tile.x,
-  y: tile.y
+  y: tile.y,
+  tileType: tile.type
 };
 
 selectable.push(mesh);
@@ -2459,6 +2492,7 @@ renderer.domElement.addEventListener(
         "viewerSelection"
       ).innerHTML = `
         <b>${d.type}</b><br>
+        ${d.tileType ? `Type: ${d.tileType}<br>` : ""}
         ${d.id || ""}<br>
         ${d.name || ""}
       `;
@@ -2575,6 +2609,78 @@ connectWS();
 // RENDER LOOP
 // =========================================================
 
+// =========================================================
+// WALL CAMERA OCCLUSION
+// =========================================================
+// Fade any wall/door/window segment that sits between the camera and a
+// character, so the camera can always see characters inside rooms instead
+// of staring at the outside of a wall.
+
+const _occlusionRaycaster = new THREE.Raycaster();
+const _occludedWalls      = new Set(); // wallKey currently faded
+const WALL_FADE_FACTOR    = 0.15;      // fraction of normal opacity while faded
+
+function _tagBaseOpacity(mesh) {
+  if (mesh.material && mesh.material.userData.baseOpacity === undefined) {
+    mesh.material.userData.baseOpacity = mesh.material.opacity ?? 1;
+  }
+}
+
+function _setWallFaded(entry, faded) {
+  entry.traverse((obj) => {
+    if (obj.isMesh && obj.material && "opacity" in obj.material) {
+      _tagBaseOpacity(obj);
+      const base = obj.material.userData.baseOpacity;
+      obj.material.opacity = faded ? base * WALL_FADE_FACTOR : base;
+    }
+  });
+}
+
+function updateWallOcclusion() {
+  const hitKeysThisFrame = new Set();
+  const camPos = camera.position;
+  const _target = new THREE.Vector3();
+  const _dir    = new THREE.Vector3();
+
+  for (const id in sims) {
+    sims[id].getWorldPosition(_target);
+    _target.y += 1.0; // aim roughly torso/head height, not the feet
+
+    _dir.copy(_target).sub(camPos);
+    const distance = _dir.length();
+    if (distance < 0.001) continue;
+    _dir.normalize();
+
+    _occlusionRaycaster.set(camPos, _dir);
+    _occlusionRaycaster.far = Math.max(distance - 0.15, 0);
+
+    for (const wallKey in wallRegistry) {
+      if (hitKeysThisFrame.has(wallKey)) continue;
+      const entry = wallRegistry[wallKey];
+      if (_occlusionRaycaster.intersectObject(entry, true).length) {
+        hitKeysThisFrame.add(wallKey);
+      }
+    }
+  }
+
+  for (const wallKey of hitKeysThisFrame) {
+    if (!_occludedWalls.has(wallKey)) {
+      const entry = wallRegistry[wallKey];
+      if (entry) _setWallFaded(entry, true);
+    }
+  }
+
+  for (const wallKey of _occludedWalls) {
+    if (!hitKeysThisFrame.has(wallKey)) {
+      const entry = wallRegistry[wallKey];
+      if (entry) _setWallFaded(entry, false);
+    }
+  }
+
+  _occludedWalls.clear();
+  for (const k of hitKeysThisFrame) _occludedWalls.add(k);
+}
+
 function animate() {
   requestAnimationFrame(animate);
   controls.update();
@@ -2591,6 +2697,8 @@ function animate() {
   for (const id in propAnimations) {
     propAnimations[id].mixer.update(delta);
   }
+
+  updateWallOcclusion();
 
   renderer.render(scene, camera);
   cssRenderer.render(scene, camera);
