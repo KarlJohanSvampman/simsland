@@ -40,6 +40,16 @@ def connect_with_retry():
     raise Exception("Could not connect to DB")
 
 conn = connect_with_retry()
+# Reads elsewhere in this module only close their cursor, not the
+# transaction (e.g. load_world/load_character do `with conn.cursor()`,
+# which never commits) — under the default autocommit=False, every read
+# left the shared connection sitting "idle in transaction" indefinitely.
+# That's harmless until something needs a stronger lock (e.g. an ALTER
+# TABLE in init_db() on the next restart), which then hangs behind it.
+# Autocommit removes the open-transaction state entirely; the `with conn:`
+# blocks used for writes still work fine (their commit/rollback becomes a
+# no-op since each statement is already committed as it executes).
+conn.autocommit = True
 
 def init_db():
     with conn:

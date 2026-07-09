@@ -315,10 +315,115 @@ function resolveMaterialVisual(materialId) {
   return { textureUrl: null, color: 0xdddddd };
 }
 
-// Builds one full-edge wall box for a given side, positioned relative to the
-// tile center (parent group is what gets moved to the tile's world position).
-function buildWallSideMesh(side, material) {
+// Shared positioning: offsets an object (mesh or group) from the tile
+// center out to the given edge, matching gridToWorld's tile-center origin.
+function positionOnWallSide(obj, side) {
+  let px = 0;
+  let pz = 0;
+  if (side === "north") pz -= 0.5;
+  if (side === "south") pz += 0.5;
+  if (side === "west")  px -= 0.5;
+  if (side === "east")  px += 0.5;
+  obj.position.set(px, 0, pz);
+}
+
+// Proportions (fractions of the wall segment's own width/height) for the
+// hollowed-out door and window openings — mirrors main.js's createDoorSegment
+// / createWindowSegment, which use the same fractions in absolute units at
+// the real in-game wall scale.
+const DOOR_WIDTH_FRACTION         = 0.55;
+const DOOR_TOP_HEIGHT_FRACTION    = 0.16;
+const WINDOW_LOWER_FRACTION       = 0.32;
+const WINDOW_UPPER_FRACTION       = 0.25;
+const WINDOW_GLASS_WIDTH_FRACTION = 0.85;
+
+// Door: an actual gap in the wall — left/right jambs plus a header above the
+// opening, with nothing spanning the doorway itself.
+function buildDoorSideMesh(side, horizontal, material) {
+  const group = new THREE.Group();
+
+  const doorWidth  = WALL_SEGMENT_WIDTH * DOOR_WIDTH_FRACTION;
+  const jambWidth  = (WALL_SEGMENT_WIDTH - doorWidth) / 2;
+  const topHeight  = WALL_SEGMENT_HEIGHT * DOOR_TOP_HEIGHT_FRACTION;
+
+  const jambGeo = horizontal
+    ? new THREE.BoxGeometry(jambWidth, WALL_SEGMENT_HEIGHT, WALL_SEGMENT_THICKNESS)
+    : new THREE.BoxGeometry(WALL_SEGMENT_THICKNESS, WALL_SEGMENT_HEIGHT, jambWidth);
+
+  const topGeo = horizontal
+    ? new THREE.BoxGeometry(doorWidth, topHeight, WALL_SEGMENT_THICKNESS)
+    : new THREE.BoxGeometry(WALL_SEGMENT_THICKNESS, topHeight, doorWidth);
+
+  const left  = new THREE.Mesh(jambGeo, material);
+  const right = new THREE.Mesh(jambGeo, material);
+  const top   = new THREE.Mesh(topGeo, material);
+
+  const jambOffset = WALL_SEGMENT_WIDTH / 2 - jambWidth / 2;
+  if (horizontal) {
+    left.position.x  = -jambOffset;
+    right.position.x =  jambOffset;
+  } else {
+    left.position.z  = -jambOffset;
+    right.position.z =  jambOffset;
+  }
+  top.position.y = WALL_SEGMENT_HEIGHT / 2 - topHeight / 2;
+
+  group.add(left, right, top);
+  positionOnWallSide(group, side);
+  return group;
+}
+
+// Window: solid sill and header around a hollow band filled only with a
+// translucent "glass" pane, instead of an opaque box with a decal on top.
+function buildWindowSideMesh(side, horizontal, material) {
+  const group = new THREE.Group();
+
+  const lowerHeight = WALL_SEGMENT_HEIGHT * WINDOW_LOWER_FRACTION;
+  const upperHeight = WALL_SEGMENT_HEIGHT * WINDOW_UPPER_FRACTION;
+  const glassHeight = WALL_SEGMENT_HEIGHT - lowerHeight - upperHeight;
+  const glassWidth  = WALL_SEGMENT_WIDTH * WINDOW_GLASS_WIDTH_FRACTION;
+
+  const lowerGeo = horizontal
+    ? new THREE.BoxGeometry(WALL_SEGMENT_WIDTH, lowerHeight, WALL_SEGMENT_THICKNESS)
+    : new THREE.BoxGeometry(WALL_SEGMENT_THICKNESS, lowerHeight, WALL_SEGMENT_WIDTH);
+
+  const upperGeo = horizontal
+    ? new THREE.BoxGeometry(WALL_SEGMENT_WIDTH, upperHeight, WALL_SEGMENT_THICKNESS)
+    : new THREE.BoxGeometry(WALL_SEGMENT_THICKNESS, upperHeight, WALL_SEGMENT_WIDTH);
+
+  const glassGeo = horizontal
+    ? new THREE.BoxGeometry(glassWidth, glassHeight, WALL_SEGMENT_THICKNESS / 2)
+    : new THREE.BoxGeometry(WALL_SEGMENT_THICKNESS / 2, glassHeight, glassWidth);
+
+  const glassMaterial = new THREE.MeshBasicMaterial({
+    color:       0x88ccff,
+    transparent: true,
+    opacity:     0.35,
+    side:        THREE.DoubleSide
+  });
+
+  const lower = new THREE.Mesh(lowerGeo, material);
+  const upper = new THREE.Mesh(upperGeo, material);
+  const glass = new THREE.Mesh(glassGeo, glassMaterial);
+
+  lower.position.y = -WALL_SEGMENT_HEIGHT / 2 + lowerHeight / 2;
+  upper.position.y =  WALL_SEGMENT_HEIGHT / 2 - upperHeight / 2;
+  glass.position.y = (lowerHeight - upperHeight) / 2;
+
+  group.add(lower, upper, glass);
+  positionOnWallSide(group, side);
+  return group;
+}
+
+// Builds one full-edge wall piece for a given side, positioned relative to
+// the tile center (parent group is what gets moved to the tile's world
+// position). Straight/corner kinds get a plain solid box; door/window kinds
+// get an actual hollowed-out opening instead of a decal on a solid box.
+function buildWallSideMesh(side, material, kind) {
   const horizontal = side === "north" || side === "south";
+
+  if (kind === "door")   return buildDoorSideMesh(side, horizontal, material);
+  if (kind === "window") return buildWindowSideMesh(side, horizontal, material);
 
   const mesh = new THREE.Mesh(
     new THREE.BoxGeometry(
@@ -328,44 +433,9 @@ function buildWallSideMesh(side, material) {
     ),
     material
   );
-
-  let px = 0;
-  let pz = 0;
-  if (side === "north") pz -= 0.5;
-  if (side === "south") pz += 0.5;
-  if (side === "west")  px -= 0.5;
-  if (side === "east")  px += 0.5;
-  mesh.position.set(px, 0, pz);
+  positionOnWallSide(mesh, side);
 
   return mesh;
-}
-
-// Simple accent decal so window/door kinds are visually distinguishable in
-// this schematic editor view — same base box either way, just faced toward
-// whichever axis this segment's outward side points along.
-function addWallSideDecal(mesh, side, kind) {
-  const horizontal = side === "north" || side === "south";
-  const isWindow    = kind === "window";
-  const decal = new THREE.Mesh(
-    new THREE.PlaneGeometry(
-      WALL_SEGMENT_WIDTH * (isWindow ? 0.7 : 0.6),
-      WALL_SEGMENT_HEIGHT * (isWindow ? 0.4 : 0.75)
-    ),
-    new THREE.MeshBasicMaterial({
-      color:       isWindow ? 0x88ccff : 0x6b4226,
-      transparent: isWindow,
-      opacity:     isWindow ? 0.6 : 1,
-      side:        THREE.DoubleSide
-    })
-  );
-  if (!isWindow) decal.position.y = -WALL_SEGMENT_HEIGHT * 0.1;
-  if (horizontal) {
-    decal.position.z = WALL_SEGMENT_THICKNESS / 2 + 0.005;
-  } else {
-    decal.rotation.y = Math.PI / 2;
-    decal.position.x = WALL_SEGMENT_THICKNESS / 2 + 0.005;
-  }
-  mesh.add(decal);
 }
 
 function addWallSegmentMarker(entry) {
@@ -383,15 +453,11 @@ function addWallSegmentMarker(entry) {
   let side;
   if (tmpl.kind === "corner") {
     const sides = cornerSidesFromRotation(entry.rotation || 0);
-    for (const s of sides) group.add(buildWallSideMesh(s, material));
+    for (const s of sides) group.add(buildWallSideMesh(s, material, "corner"));
     side = sides.join("-");
   } else {
     side = wallSideFromRotation(entry.rotation || 0);
-    const mesh = buildWallSideMesh(side, material);
-    group.add(mesh);
-    if (tmpl.kind === "window" || tmpl.kind === "door") {
-      addWallSideDecal(mesh, side, tmpl.kind);
-    }
+    group.add(buildWallSideMesh(side, material, tmpl.kind));
   }
 
   group.userData = { type: "wall_segment", id: entry.id, template: entry.template, side };
