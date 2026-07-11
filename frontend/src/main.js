@@ -2458,12 +2458,19 @@ function _sendViewport(ws) {
 // Recompute viewport center from camera and notify server.
 // Call whenever the camera moves significantly.
 function _updateViewport(ws) {
-  // Camera looks at isometric origin offset (10, 7); each tile is 1 unit.
-  const cx = Math.round(camera.position.x);
-  const cy = Math.round(camera.position.z);
-  // Map zoom level: close = zoom 3, medium = 2, far = 1
-  const dist = camera.position.distanceTo(controls.target ?? new THREE.Vector3());
-  const zoom = dist < 15 ? 3 : dist < 30 ? 2 : 1;
+  // Center on controls.target (the ground point the camera orbits/looks
+  // at), not camera.position — the isometric camera sits at a constant
+  // offset from its target (e.g. (20,20,20) looking at (0,0,0)), so using
+  // position instead left every query centered ~28 units away from what
+  // was actually on screen.
+  const target = controls.target ?? new THREE.Vector3();
+  const cx = Math.round(target.x);
+  const cy = Math.round(target.z);
+  // Map zoom level from the OrthographicCamera's own .zoom (magnification)
+  // — OrbitControls' mouse-wheel zoom scales this directly and leaves
+  // camera.position untouched for orthographic cameras, so distance-to-
+  // target (the old metric here) never changed when the user scrolled.
+  const zoom = camera.zoom > 1.8 ? 3 : camera.zoom > 0.9 ? 2 : 1;
   if (cx !== _viewport.cx || cy !== _viewport.cy || zoom !== _viewport.zoom) {
     _viewport = { cx, cy, zoom };
     _sendViewport(ws);

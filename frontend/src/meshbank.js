@@ -201,11 +201,7 @@ function updatePivotMarker(){
         );
     }
 
-    const box =
-        new THREE.Box3()
-            .setFromObject(
-                currentModel
-            );
+    const box = computeModelBounds(currentModel);
 
     const center =
         box.getCenter(
@@ -545,10 +541,20 @@ function loadTransformUI(){
             currentAssetId
         ];
 
+    // Read-only display — must NOT create a persistent transform as a
+    // side effect (unlike updateTransformFromUI's own ensureTransform()
+    // call, which is meant to mutate). This runs synchronously right
+    // after loadModel() kicks off its async GLB fetch; if it wrote a
+    // default {position:{x:0,y:0,z:0},...} onto the asset here, loadModel's
+    // later `if(transform) applyTransform(...)` check would see that
+    // default as "the user set a custom transform" and silently overwrite
+    // normalizeModel()'s correct ground-snap position with (0,0,0).
     const t =
-        ensureTransform(
-            asset
-        );
+        asset.transform || {
+            position: { x:0, y:0, z:0 },
+            rotation: { x:0, y:0, z:0 },
+            scale:    { x:1, y:1, z:1 }
+        };
 
     posX.value =
         t.position.x;
@@ -1019,11 +1025,50 @@ function populateAnimations(
         );
     }
 }
+// Box3.setFromObject() reads a SkinnedMesh's static bind-pose geometry
+// transformed by the mesh's own matrixWorld — it has no idea about GPU
+// skinning, so for a posed/corrected skeleton (see the rotation/scale
+// fixes above) it reports completely wrong bounds. Approximate real
+// bounds instead from the skeleton's own bone world positions, which are
+// always accurate since bone matrices drive the actual render.
+function computeModelBounds(model){
+
+    const bonePositions = [];
+
+    model.traverse(node=>{
+
+        if(node.isSkinnedMesh && node.skeleton){
+
+            for(const bone of node.skeleton.bones){
+
+                bonePositions.push(
+                    bone.getWorldPosition(new THREE.Vector3())
+                );
+            }
+        }
+    });
+
+    if(!bonePositions.length){
+
+        return new THREE.Box3().setFromObject(model);
+    }
+
+    const box = new THREE.Box3();
+
+    for(const p of bonePositions){
+        box.expandByPoint(p);
+    }
+
+    // Bones sit at joint centers, not the skin surface — pad the box a
+    // bit so framing/ground-snap isn't flush against the skeleton line.
+    box.expandByScalar(0.12);
+
+    return box;
+}
+
 function normalizeModel(model){
 
-    const box =
-        new THREE.Box3()
-            .setFromObject(model);
+    const box = computeModelBounds(model);
 
     const center =
         box.getCenter(
@@ -1045,12 +1090,11 @@ function normalizeModel(model){
     model.updateMatrixWorld(
         true
     );
+
 }
 function frameCamera(model){
 
-    const box =
-        new THREE.Box3()
-            .setFromObject(model);
+    const box = computeModelBounds(model);
 
     const size =
         box.getSize(
@@ -1089,9 +1133,7 @@ function frameCamera(model){
 }
 function updateStats(model){
 
-    const box =
-        new THREE.Box3()
-            .setFromObject(model);
+    const box = computeModelBounds(model);
 
     const size =
         box.getSize(
@@ -1168,8 +1210,7 @@ function updateBoxHelper(model){
     currentBoxHelper =
         new THREE.Box3Helper(
 
-            new THREE.Box3()
-                .setFromObject(model),
+            computeModelBounds(model),
 
             0xffff00
         );
@@ -1272,11 +1313,7 @@ function extractBounds(
         true
     );
 
-    const box =
-        new THREE.Box3()
-            .setFromObject(
-                root
-            );
+    const box = computeModelBounds(root);
 
     const size =
         box.getSize(
@@ -1360,15 +1397,23 @@ function loadModel(url){
             currentModel =
                 gltf.scene;
 
+            // GLTFLoader doesn't eagerly compute matrixWorld for the parsed
+            // scene graph — it's normally left to the renderer's automatic
+            // per-frame update. Everything below (bind-pose flush, the
+            // scale/rotation mismatch detection, normalizeModel's bone-
+            // position bounds) runs synchronously here, before any render
+            // frame happens, so without this it all reads/writes based on
+            // stale (identity) parent matrices — e.g. normalizeModel would
+            // see every bone still at its stale pre-fix position and
+            // compute a near-zero bounding box, silently no-op-ing the
+            // ground-snap it's supposed to do.
+            gltf.scene.updateMatrixWorld(true);
+
                 if(currentAssetId){
 
                     meshbank[
                         currentAssetId
                     ] ||= {};
-
-console.log(
-    gltf.scene
-);
 
 gltf.scene.traverse(node=>{
 
@@ -1376,8 +1421,94 @@ gltf.scene.traverse(node=>{
 
         node.visible = true;
 
+        // Disable frustum culling: prevents Three.js skipping bone-matrix
+        // uploads when the bounding sphere misses the frustum (computed
+        // from the unposed bind skeleton before the pose() flush below),
+        // which otherwise leaves skinned character previews invisible.
         node.frustumCulled = false;
 
+        const mats = Array.isArray(node.material) ? node.material : [node.material];
+        mats.forEach(m => {
+            if (!m) return;
+            m.side = THREE.DoubleSide;
+            // GLTFLoader sets depthWrite=false on any material whose glTF
+            // alphaMode is BLEND, which for opaque-looking character/prop
+            // materials leaves them rendering behind (or invisible against)
+            // whatever else is in the scene depending on draw order. Same
+            // fix already used for character previews in animbank.js.
+            m.depthWrite = true;
+        });
+    }
+});
+
+// Flush skinned meshes to their bind pose immediately — without this,
+// Box3.setFromObject() (used by frameCamera/normalizeModel below) can
+// read stale/zeroed bone matrices and compute a degenerate bounding box,
+// framing the camera on empty space instead of the model.
+gltf.scene.traverse(node=>{
+
+    if(node.isSkinnedMesh && node.skeleton){
+
+        node.skeleton.pose();
+    }
+});
+
+// Some exported rigs (seen on Mixamo-derived character GLBs) bake a
+// cm-to-meters scale correction onto BOTH the top-level object node and
+// the skeleton's own root bone, instead of just once. The two 0.01
+// factors compound to 0.0001 on the skeleton while the mesh geometry
+// only inherits the single 0.01, so skinning renders the character at
+// ~1% of its intended size — collapsed to an invisible speck. Detect the
+// mismatch per skinned mesh and correct the skeleton root's own scale so
+// it matches the mesh's world scale again.
+gltf.scene.traverse(node=>{
+
+    if(node.isSkinnedMesh && node.skeleton && node.skeleton.bones.length){
+
+        const rootBone = node.skeleton.bones.find(b => !b.parent?.isBone);
+        if(!rootBone) return;
+
+        const meshScale = new THREE.Vector3();
+        node.getWorldScale(meshScale);
+
+        const boneScale = new THREE.Vector3();
+        rootBone.getWorldScale(boneScale);
+
+        if(boneScale.x === 0) return;
+
+        const correction = meshScale.x / boneScale.x;
+
+        if(Math.abs(correction - 1) > 0.01){
+            rootBone.scale.multiplyScalar(correction);
+            rootBone.updateMatrixWorld(true);
+        }
+    }
+});
+
+// Some exported rigs also bake an erroneous rotation (seen: 90° about X)
+// onto the shared parent of the mesh and skeleton root, tipping skinned
+// characters onto their back instead of standing. Unlike the scale bug,
+// the mesh's own geometry has no compensating rotation to cancel this
+// back out — the fix is to zero out the skeleton root's WORLD rotation
+// entirely (not match it to the mesh's, which carries the same tilt).
+gltf.scene.traverse(node=>{
+
+    if(node.isSkinnedMesh && node.skeleton && node.skeleton.bones.length){
+
+        const rootBone = node.skeleton.bones.find(b => !b.parent?.isBone);
+        if(!rootBone || !rootBone.parent) return;
+
+        const worldQuat = new THREE.Quaternion();
+        rootBone.getWorldQuaternion(worldQuat);
+
+        const angleDeg = 2 * Math.acos(Math.min(1, Math.abs(worldQuat.w))) * 180 / Math.PI;
+
+        if(angleDeg > 5){
+            const parentWorldQuat = new THREE.Quaternion();
+            rootBone.parent.getWorldQuaternion(parentWorldQuat);
+            rootBone.quaternion.copy(parentWorldQuat.clone().invert());
+            rootBone.updateMatrixWorld(true);
+        }
     }
 });
 
@@ -1424,6 +1555,11 @@ populateInteractions();
 scene.add(
     currentModel
 );
+
+// Re-sync after the scale/rotation corrections above and the reparent
+// into `scene` — normalizeModel's bounds computation needs fully current
+// bone world matrices, not whatever was last computed mid-fix.
+currentModel.updateMatrixWorld(true);
 
 normalizeModel(
     currentModel

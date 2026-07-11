@@ -236,15 +236,69 @@ function addPropMarker(entry) {
     new THREE.MeshBasicMaterial({ color: 0xe0a030 })
   );
   mesh.position.set(world.x, 0.45, world.z);
-  mesh.userData = { type: "prop", id: entry.id, template: entry.template };
+  mesh.userData = {
+    type:     "prop",
+    id:       entry.id,
+    template: entry.template,
+    x:        entry.x,
+    y:        entry.y,
+    rotation: entry.rotation || 0
+  };
   placedGroup.add(mesh);
   return mesh;
 }
 
+// Mirrors backend/systems/transforms.py::rotate_local_tile — same 4-way
+// rotation convention, needed here to compute the footprint's rotated
+// world-space bounds for the marker outline.
+function rotateLocalTile(x, y, rotation) {
+  const r = ((Math.round(rotation) % 360) + 360) % 360;
+  if (r === 90)  return [-y, x];
+  if (r === 180) return [-x, -y];
+  if (r === 270) return [y, -x];
+  return [x, y];
+}
+
+// Sizes/positions the marker to the floorplan template's actual tile
+// footprint (e.g. 3x3 for small_house) instead of a single fixed tile,
+// accounting for the building's rotation the same way the backend does
+// when it instantiates the real floorplan.
 function addFloorplanMarker(entry) {
-  const world = gridToWorld(entry.x, entry.y);
+  const tmpl  = (definitions.floorplan_templates || {})[entry.template];
+  const tiles = tmpl && tmpl.tiles ? Object.keys(tmpl.tiles) : [];
+
+  let minX = 0, maxX = 0, minY = 0, maxY = 0;
+
+  if (tiles.length) {
+    const rotation = entry.rotation || 0;
+    let first = true;
+
+    for (const key of tiles) {
+      const [tx, ty] = key.split(",").map(Number);
+      const [rx, ry] = rotateLocalTile(tx, ty, rotation);
+
+      if (first) {
+        minX = maxX = rx;
+        minY = maxY = ry;
+        first = false;
+      } else {
+        minX = Math.min(minX, rx); maxX = Math.max(maxX, rx);
+        minY = Math.min(minY, ry); maxY = Math.max(maxY, ry);
+      }
+    }
+  }
+
+  const width = maxX - minX + 1;
+  const depth = maxY - minY + 1;
+
+  // Center of the footprint in world-tile space (gridToWorld already
+  // adds the +0.5 tile-center offset, so pass the footprint's own center).
+  const centerLocalX = entry.x + minX + (width  - 1) / 2;
+  const centerLocalY = entry.y + minY + (depth - 1) / 2;
+  const world = gridToWorld(centerLocalX, centerLocalY);
+
   const mesh = new THREE.Mesh(
-    new THREE.PlaneGeometry(0.96, 0.96),
+    new THREE.PlaneGeometry(width - 0.04, depth - 0.04),
     new THREE.MeshBasicMaterial({
       color:       0x4090e0,
       transparent: true,
@@ -254,7 +308,14 @@ function addFloorplanMarker(entry) {
   );
   mesh.rotation.x = -Math.PI / 2;
   mesh.position.set(world.x, 0.04, world.z);
-  mesh.userData = { type: "floorplan", id: entry.id, template: entry.template };
+  mesh.userData = {
+    type:     "floorplan",
+    id:       entry.id,
+    template: entry.template,
+    x:        entry.x,
+    y:        entry.y,
+    rotation: entry.rotation || 0
+  };
   placedGroup.add(mesh);
   return mesh;
 }
@@ -452,10 +513,53 @@ function pickTile(event) {
 // ===================================
 //
 
-// Single click — select tile only
+// Populates the Inspector panel (#inspectorContent) — separate from the
+// toolbar's Selection panel (#editorSelection), which stays focused on
+// active-placement feedback. Shared by the placed-object and tile
+// branches below so both give the Inspector something useful.
+function showInspector(html) {
+  const el = document.getElementById("inspectorContent");
+  if (el) el.innerHTML = html;
+}
+
+// Single click — select a placed prop/floorplan if one was hit directly,
+// otherwise fall back to selecting the tile underneath the cursor.
 renderer.domElement.addEventListener("pointerdown", (event) => {
+  mouse.x =  (event.clientX / window.innerWidth)  * 2 - 1;
+  mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+  raycaster.setFromCamera(mouse, camera);
+
+  const objectHits = raycaster.intersectObjects(placedGroup.children, true);
+
+  if (objectHits.length) {
+    let obj = objectHits[0].object;
+    while (obj && !obj.userData?.type) obj = obj.parent;
+
+    if (obj) {
+      const d = obj.userData;
+
+      document.getElementById("editorSelection").innerHTML = `
+        <b>${d.type}</b><hr>
+        ${d.template ? `Template: ${d.template}<br>` : ""}
+        Grid: ${d.x}, ${d.y}
+      `;
+
+      showInspector(`
+        <b>Type:</b> ${d.type}<br>
+        <b>ID:</b> ${d.id || "(none)"}<br>
+        ${d.template ? `<b>Template:</b> ${d.template}<br>` : ""}
+        <b>Grid:</b> ${d.x}, ${d.y}<br>
+        <b>Rotation:</b> ${d.rotation || 0}°
+      `);
+      return;
+    }
+  }
+
   const tile = pickTile(event);
-  if (!tile) return;
+  if (!tile) {
+    showInspector("Nothing selected");
+    return;
+  }
 
   const world = gridToWorld(tile.x, tile.y);
   lastClickedTile = tile;
@@ -471,6 +575,13 @@ renderer.domElement.addEventListener("pointerdown", (event) => {
     Type: ${tileType}<br>
     Rotation: ${tileRot}°
   `;
+
+  showInspector(`
+    <b>Type:</b> tile<br>
+    <b>Grid:</b> ${tile.x}, ${tile.y}<br>
+    <b>Terrain:</b> ${tileType}<br>
+    <b>Rotation:</b> ${tileRot}°
+  `);
 });
 
 //

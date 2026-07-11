@@ -258,6 +258,21 @@ def store_intention(
     if not intention:
         return
 
+    # intention comes straight from parsed LLM JSON (see llm_brain.py's
+    # decision schema) — clamp priority into the same 0-100 scale every
+    # hardcoded intention (body_intentions.py etc.) uses. Without this, a
+    # hallucinated numeric token (seen in practice: values in the
+    # 10^31 range) makes final_priority() = category_score*1000 + priority
+    # dwarf every other intention's score, permanently locking the
+    # character onto whatever this intention is and starving all others
+    # (sleep, eat, going outside, ...) forever.
+    try:
+        priority = float(intention.get("priority", 0))
+    except (TypeError, ValueError):
+        priority = 0
+
+    intention["priority"] = max(0, min(100, priority))
+
     c.setdefault(
         "active_intentions",
         []

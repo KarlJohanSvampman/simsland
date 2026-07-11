@@ -3,6 +3,14 @@ import { resolve } from "path";
 
 export default defineConfig({
 
+  server: {
+    proxy: {
+      "/api": "http://localhost:8000",
+      "/resources": "http://localhost:8000",
+      "/debug": "http://localhost:8000"
+    }
+  },
+
   build: {
 
     rollupOptions: {
