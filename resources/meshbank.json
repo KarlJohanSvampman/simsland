@@ -608,10 +608,96 @@
     "category": "props"
   },
   "adult_female": {
-    "display_name": "adult_female",
+    "display_name": "Adult Female",
     "category": "characters",
     "subfolder": null,
     "tags": [],
-    "anchors": {}
+    "anchors": {},
+    "mesh": "/resources/characters/adult_female.glb",
+    "placement": {
+      "pivot": "bottom_center",
+      "snap_to_ground": true,
+      "snap_to_grid": true
+    },
+    "bones": {
+      "mixamorigHips": {
+        "name": "mixamorigHips"
+      },
+      "mixamorigSpine": {
+        "name": "mixamorigSpine"
+      },
+      "mixamorigSpine1": {
+        "name": "mixamorigSpine1"
+      },
+      "mixamorigSpine2": {
+        "name": "mixamorigSpine2"
+      },
+      "mixamorigNeck": {
+        "name": "mixamorigNeck"
+      },
+      "mixamorigHead": {
+        "name": "mixamorigHead"
+      },
+      "mixamorigHeadTop_End": {
+        "name": "mixamorigHeadTop_End"
+      },
+      "mixamorigLeftShoulder": {
+        "name": "mixamorigLeftShoulder"
+      },
+      "mixamorigLeftArm": {
+        "name": "mixamorigLeftArm"
+      },
+      "mixamorigLeftForeArm": {
+        "name": "mixamorigLeftForeArm"
+      },
+      "mixamorigLeftHand": {
+        "name": "mixamorigLeftHand"
+      },
+      "mixamorigRightShoulder": {
+        "name": "mixamorigRightShoulder"
+      },
+      "mixamorigRightArm": {
+        "name": "mixamorigRightArm"
+      },
+      "mixamorigRightForeArm": {
+        "name": "mixamorigRightForeArm"
+      },
+      "mixamorigRightHand": {
+        "name": "mixamorigRightHand"
+      },
+      "mixamorigLeftUpLeg": {
+        "name": "mixamorigLeftUpLeg"
+      },
+      "mixamorigLeftLeg": {
+        "name": "mixamorigLeftLeg"
+      },
+      "mixamorigLeftFoot": {
+        "name": "mixamorigLeftFoot"
+      },
+      "mixamorigLeftToeBase": {
+        "name": "mixamorigLeftToeBase"
+      },
+      "mixamorigLeftToe_End": {
+        "name": "mixamorigLeftToe_End"
+      },
+      "mixamorigRightUpLeg": {
+        "name": "mixamorigRightUpLeg"
+      },
+      "mixamorigRightLeg": {
+        "name": "mixamorigRightLeg"
+      },
+      "mixamorigRightFoot": {
+        "name": "mixamorigRightFoot"
+      },
+      "mixamorigRightToeBase": {
+        "name": "mixamorigRightToeBase"
+      },
+      "mixamorigRightToe_End": {
+        "name": "mixamorigRightToe_End"
+      }
+    },
+    "hasSkeleton": true,
+    "targets": {},
+    "interaction_points": {}
   }
 }

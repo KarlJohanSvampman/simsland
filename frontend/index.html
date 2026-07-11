@@ -17,6 +17,7 @@
     right: 10px;
 
     width: 260px;
+    max-height: 85vh;
 
     background: rgba(0,0,0,0.85);
 
@@ -29,6 +30,24 @@
     font-family: monospace;
 
     border: 1px solid #444;
+
+    overflow-y: auto;
+    box-sizing: border-box;
+  }
+
+  #viewerInspector.expanded {
+    width: 480px;
+  }
+
+  #viewerInspector pre {
+    white-space: pre-wrap;
+    word-break: break-word;
+    background: rgba(255,255,255,0.06);
+    padding: 6px;
+    border-radius: 4px;
+    max-height: 240px;
+    overflow-y: auto;
+    font-size: 11px;
   }
 
   </style>

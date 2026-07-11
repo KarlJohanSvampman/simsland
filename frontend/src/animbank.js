@@ -982,6 +982,8 @@ function playChainStep(idx) {
 }
 
 function renderTemplateTab() {
+    renderLocomotionPanel();
+
     const el = document.getElementById("templateList");
     if (!el) return;
     el.innerHTML = "";
@@ -1168,7 +1170,75 @@ function makeCatBtn(label, value) {
 // RENDER CLIP LIST
 // =========================================================
 
+// =========================================================
+// LOCOMOTION MAPPING (per source/character)
+// =========================================================
+// Which TEMPLATE fills each movement state for this character — read by
+// the live game (main.js) instead of its hardcoded walk/run clip-name
+// convention. Mapped to templates (not raw clips) so locomotion reuses
+// the same reusable-chain/variant-pool abstraction as every other
+// animation in the bank, rather than being a one-off special case.
+//
+// The live game only plays continuous loops for these 5 states, so it
+// resolves a mapped template down to its first chain step's clip (the
+// loopable clip) at character-load time — chain steps beyond the first,
+// and notifies, aren't consumed by locomotion playback. `alternatives`
+// isn't consumed by the live game yet either (main.js's variant-pool
+// system is keyed globally by clip stem, not per-character).
+
+const LOCOMOTION_STATES = [
+    { key: "idle",         selectId: "locoIdle" },
+    { key: "walk",         selectId: "locoWalk" },
+    { key: "run",          selectId: "locoRun" },
+    { key: "crouch_idle",  selectId: "locoCrouchIdle" },
+    { key: "crouch_walk",  selectId: "locoCrouchWalk" },
+];
+
+function renderLocomotionPanel() {
+    const panel = document.getElementById("locomotionPanel");
+    const src = bank[currentSourceKey];
+
+    if (!src) {
+        panel.classList.add("hidden");
+        return;
+    }
+    panel.classList.remove("hidden");
+
+    src.locomotion = src.locomotion || {};
+
+    const templates = Object.values(getTemplates())
+        .filter(t => t.source_key === currentSourceKey);
+
+    for (const { key, selectId } of LOCOMOTION_STATES) {
+        const select = document.getElementById(selectId);
+        const current = src.locomotion[key] || "";
+
+        select.innerHTML = `<option value="">— none —</option>` +
+            templates.map(t => `<option value="${t.id}">${t.name}</option>`).join("");
+        select.value = templates.some(t => t.id === current) ? current : "";
+
+        if (templates.length === 0) {
+            select.title = "No templates for this character yet — create one in the Templates tab first.";
+        } else {
+            select.title = "";
+        }
+
+        select.onchange = () => {
+            const src2 = bank[currentSourceKey];
+            if (!src2) return;
+            src2.locomotion = src2.locomotion || {};
+            if (select.value) {
+                src2.locomotion[key] = select.value;
+            } else {
+                delete src2.locomotion[key];
+            }
+        };
+    }
+}
+
 function renderClipList() {
+    renderLocomotionPanel();
+
     const el = document.getElementById("clipList");
     el.innerHTML = "";
     const src = bank[currentSourceKey];

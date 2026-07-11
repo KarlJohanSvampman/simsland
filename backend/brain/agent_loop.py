@@ -663,7 +663,8 @@ def update_agent(
     # =====================================
 
     decision = think(
-        context
+        context,
+        char_id=c["id"]
     )
 
     if not decision:

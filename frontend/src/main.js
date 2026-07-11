@@ -44,6 +44,46 @@ async function loadMeshbank() {
   }
 }
 
+// =========================================================
+// ANIMBANK  (per-character locomotion template mapping)
+// =========================================================
+// animBank[modelKey].locomotion = { idle, walk, run, crouch_idle, crouch_walk }
+// — maps each movement state to an animbank TEMPLATE id (animbank.html's
+// Templates tab), not a raw clip, so locomotion reuses the same reusable
+// chain/variant abstraction as every other animation in the bank. Keyed
+// the same way as meshbank (by the character's `model` field), since
+// animbank derives its source key from the same GLB filename convention.
+
+let animBank = {};
+
+async function loadAnimBank() {
+  try {
+    const res = await fetch('/api/animbank');
+    animBank = await res.json();
+  } catch (e) {
+    console.warn('Animbank unavailable', e);
+  }
+}
+
+// Resolves a character's locomotion state->template mapping down to
+// state->clip, using each template's first chain step (the loopable
+// clip) — the live game only plays one continuous clip per locomotion
+// state, not a full template chain/notify sequence.
+function resolveLocomotionMap(modelKey) {
+  const locomotion = animBank[modelKey]?.locomotion;
+  if (!locomotion) return null;
+
+  const templates = animBank._templates || {};
+  const resolved = {};
+
+  for (const [state, templateId] of Object.entries(locomotion)) {
+    const clip = templates[templateId]?.chain?.[0]?.clip;
+    if (clip) resolved[state] = clip;
+  }
+
+  return Object.keys(resolved).length ? resolved : null;
+}
+
 function resolveModel(modelRef) {
   if (!modelRef) return null;
   // If it's a meshbank key, return the mesh path
@@ -719,9 +759,14 @@ function makeLayerClip(clip, layer) {
 
 const ANIM_LAYERS = {
   // ── Locomotion (lower drives legs, upper comes from same clip) ──
+  // These 5 states can be overridden per-character via animData.locomotionMap
+  // (set in animbank.html) — see playLayeredAnim(), which checks that map
+  // before falling back to these literal clip-name defaults.
   idle:          { lower: "idle",        upper: "idle"        },
   walk:          { lower: "walk",        upper: "walk"        },
   run:           { lower: "run",         upper: "run"         },
+  crouch_idle:   { lower: "crouch_idle", upper: "crouch_idle" },
+  crouch_walk:   { lower: "crouch_walk", upper: "crouch_walk" },
 
   // ── Standing interactions (idle legs + active upper) ──
   talk:          { lower: "idle",        upper: "talk"        },
@@ -857,9 +902,26 @@ function _setLayer(animData, layer, newStem) {
 // PLAY LAYERED ANIMATION
 // =========================================================
 
+// The 5 states a character's animbank locomotion mapping can override —
+// see animbank.html's Locomotion panel. Each maps to a single clip used
+// for both lower and upper layers (no separate upper-body variant for
+// these, unlike interaction states).
+const LOCOMOTION_OVERRIDE_STATES = new Set([
+  "idle", "walk", "run", "crouch_idle", "crouch_walk"
+]);
+
 function playLayeredAnim(animData, animState) {
   const key = (animState || "idle").toLowerCase();
-  const layers = ANIM_LAYERS[key];
+
+  let layers = ANIM_LAYERS[key];
+
+  if (LOCOMOTION_OVERRIDE_STATES.has(key)) {
+    const override = animData.locomotionMap?.[key];
+    if (override) {
+      const stem = override.toLowerCase();
+      layers = { lower: stem, upper: stem };
+    }
+  }
 
   if (!layers) {
     // Unknown state — fall back to full-body single action
@@ -2012,6 +2074,10 @@ await equipAllClothing(
   const animData = {
     mixer,
     actions,
+    // Per-character override for locomotion states (idle/walk/run/
+    // crouch_idle/crouch_walk), authored as animbank templates and
+    // resolved to concrete clip names here — see resolveLocomotionMap().
+    locomotionMap: resolveLocomotionMap(character?.model),
     // Two-layer tracking — current clip names (with _lower / _upper suffix)
     lowerCurrent:     null,
     upperCurrent:     null,
@@ -2423,6 +2489,9 @@ renderer.domElement.addEventListener(
 
     const d = obj.userData;
 
+    const inspector = document.getElementById("viewerInspector");
+    inspector.classList.toggle("expanded", d.type === "character");
+
     document
       .getElementById(
         "viewerSelection"
@@ -2432,8 +2501,77 @@ renderer.domElement.addEventListener(
         ${d.id || ""}<br>
         ${d.name || ""}
       `;
+
+    if(d.type === "character" && d.id){
+      showCharacterLLMLog(d.id);
+    }
   }
 );
+
+// Selection token guards against a slower, earlier fetch overwriting the
+// panel after the user has already clicked a different character/tile.
+let _llmLogSelectionToken = 0;
+
+async function showCharacterLLMLog(charId){
+  const token = ++_llmLogSelectionToken;
+  const container = document.getElementById("viewerSelection");
+
+  container.innerHTML += `<hr><i>Loading last LLM request/response…</i>`;
+
+  let entries;
+  try {
+    const res = await fetch(`/debug/prompt-log/${encodeURIComponent(charId)}`);
+    ({ entries } = await res.json());
+  } catch (e) {
+    if(token !== _llmLogSelectionToken) return;
+    container.innerHTML += `<br><span style="color:#f88">Failed to load: ${e.message}</span>`;
+    return;
+  }
+
+  if(token !== _llmLogSelectionToken) return;
+
+  if(!entries || !entries.length){
+    container.innerHTML += `<br><i>No LLM calls logged yet for this character.</i>`;
+    return;
+  }
+
+  const latest = entries[0];
+  const prompt = latest.messages?.find(m => m.role === "user")?.content ?? "";
+  const system = latest.messages?.find(m => m.role === "system")?.content ?? "";
+
+  // Prompts are compact single-line JSON (no whitespace, to save tokens) —
+  // pretty-print for readability here since this is a debug view, not the
+  // actual LLM-facing payload.
+  const prettyPrompt = _tryPrettyJSON(prompt);
+  const prettyResponse = _tryPrettyJSON(latest.response);
+
+  const ts = latest.ts ? new Date(latest.ts * 1000).toLocaleTimeString() : "?";
+
+  container.innerHTML += `
+    <hr>
+    <b>Last LLM call</b><br>
+    ${ts} · ${latest.elapsed_s ?? "?"}s ${latest.cached ? "(cached)" : ""}<br>
+    ${system ? `<details><summary>System prompt</summary><pre>${_escapeHTML(system)}</pre></details>` : ""}
+    <details open><summary>Request</summary><pre>${_escapeHTML(prettyPrompt)}</pre></details>
+    <details open><summary>Response</summary><pre>${_escapeHTML(prettyResponse)}</pre></details>
+  `;
+}
+
+function _tryPrettyJSON(text){
+  if(typeof text !== "string") return JSON.stringify(text, null, 2);
+  try {
+    return JSON.stringify(JSON.parse(text), null, 2);
+  } catch {
+    return text;
+  }
+}
+
+function _escapeHTML(str){
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
 
 // =========================================================
 // WEBSOCKET + STATE APPLICATION
@@ -2441,6 +2579,9 @@ renderer.domElement.addEventListener(
 
 // Load meshbank once at startup so model references resolve
 loadMeshbank();
+
+// Load animbank once at startup so per-character locomotion mapping resolves
+loadAnimBank();
 
 // Cached last-known full world state so delta patches have something to merge into
 let _worldState = {};

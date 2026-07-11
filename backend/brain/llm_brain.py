@@ -181,7 +181,9 @@ def fallback_response():
 
 def think(
 
-    context
+    context,
+
+    char_id=None
 ):
 
     prompt = build_prompt(
@@ -197,8 +199,13 @@ def think(
     # ThreadPoolExecutor worker thread (via _run_agent), a plain OS thread
     # with no pre-existing event loop, so asyncio.run() here is safe and
     # gets its own fresh loop per call.
+    # char_id lets call_llm log this prompt/response into the per-character
+    # ring buffer (llm_client.py::_PROMPT_LOG), which the World Editor's
+    # Inspector reads via GET /debug/prompt-log/{char_id} when a character
+    # is selected — without it, that log only ever gets populated by the
+    # manual /debug/prompt-send tool, never by real gameplay decisions.
     raw = asyncio.run(
-        call_llm_safe(messages)
+        call_llm_safe(messages, char_id=char_id)
     )
 
     try:

@@ -152,7 +152,9 @@ async def call_llm_safe(
 
     messages,
 
-    session=None
+    session=None,
+
+    char_id=None
 ):
 
     try:
@@ -163,7 +165,9 @@ async def call_llm_safe(
 
                 messages,
 
-                session=session
+                session=session,
+
+                char_id=char_id
             ),
 
             # Ollama cold-starts a model on its first call after being idle
