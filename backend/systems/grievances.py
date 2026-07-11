@@ -141,25 +141,27 @@ def check_grievance_thresholds(c, world):
     for g in c.get("grievances", []):
         scores[g["caused_by"]] = scores.get(g["caused_by"], 0) + g["weight"]
 
-    fired = c.setdefault("_confrontation_emitted", set())
+    fired = c.setdefault("_confrontation_emitted", [])
 
     for target_id, score in scores.items():
         if score >= CONFRONT_THRESHOLD and target_id not in fired:
-            fired.add(target_id)
+            fired.append(target_id)
             emit("confrontation_desired", {
                 "initiator_id": c["id"],
                 "target_id":    target_id,
                 "score":        score,
             })
-        elif score < COLD_SHOULDER_THRESHOLD * 0.5:
+        elif score < COLD_SHOULDER_THRESHOLD * 0.5 and target_id in fired:
             # Recovered enough — allow re-firing later
-            fired.discard(target_id)
+            fired.remove(target_id)
 
         # Cold shoulder (avoid without confronting) — just flag, no event needed
+        cold_shoulder = c.setdefault("cold_shoulder_towards", [])
         if COLD_SHOULDER_THRESHOLD <= score < CONFRONT_THRESHOLD:
-            c.setdefault("cold_shoulder_towards", set()).add(target_id)
-        else:
-            c.get("cold_shoulder_towards", set()).discard(target_id)
+            if target_id not in cold_shoulder:
+                cold_shoulder.append(target_id)
+        elif target_id in cold_shoulder:
+            cold_shoulder.remove(target_id)
 
 
 def update_grievances(world):

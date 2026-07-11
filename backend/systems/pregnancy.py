@@ -140,7 +140,7 @@ def maybe_conceive(female, male, world):
         dl       = m_intox.get("drug_level",    0.0)
         m_imp    = male.get("impulse_state", {})
         sc       = m_imp.get("self_control", 0.5)
-        m_libido = male.get("attraction_profile", {}).get("libido", 0.5)
+        m_libido = (male.get("attraction_profile") or {}).get("libido", 0.5)
         # pull-out failure probability: higher when drunk/high + low self-control + high libido
         pullout_fail = (al * 0.50 + dl * 0.35 + (1.0 - sc) * 0.30 + m_libido * 0.15) / 1.30
         pullout_fail = min(1.0, pullout_fail)

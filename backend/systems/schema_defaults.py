@@ -68,6 +68,19 @@ def ensure_world_defaults(world, defs=None):
     )
 
     # =====================================================
+    # BUILDINGS
+    # =====================================================
+    # Backfills pre-floorplan-system buildings (missing "template"/"x"/"y")
+    # so build_world_geometry() can resolve them instead of silently
+    # skipping them every load. Runs before build_world_geometry, so it
+    # patches already-persisted world data, not just freshly generated worlds.
+    for building in world.get("buildings", []):
+        building.setdefault("template", "small_house")
+        building.setdefault("x", 0)
+        building.setdefault("y", 0)
+        building.setdefault("rotation", 0)
+
+    # =====================================================
     # ENVIRONMENT
     # =====================================================
 

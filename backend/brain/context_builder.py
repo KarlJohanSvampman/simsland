@@ -196,6 +196,16 @@ def build_social_context(
 # =========================================================
 # ACTIVE INTENTIONS
 # =========================================================
+# Calendar-driven intentions (prepare_for_event/budget_for_event/get_outfit
+# — see systems/calendar_events.py::_inject_intention) accumulate without a
+# cap as events approach, so a character with several upcoming events queued
+# could carry 20+ of these at once. Only the character's current top
+# priorities are actually decision-relevant each tick, so this only surfaces
+# the top few — c["active_intentions"] is already priority-sorted by the
+# time build_context() runs (agent_loop.py calls sort_intentions(c) first).
+
+MAX_INTENTIONS_IN_CONTEXT = 6
+
 
 def build_intentions(c):
 
@@ -204,7 +214,7 @@ def build_intentions(c):
     for i in c.get(
         "active_intentions",
         []
-    ):
+    )[:MAX_INTENTIONS_IN_CONTEXT]:
 
         intentions.append({
 
@@ -225,6 +235,89 @@ def build_intentions(c):
         })
 
     return intentions
+
+
+# =========================================================
+# ATTENTION
+# Surfaces the character's current focus and top salient things
+# (brain/attention.py's c["attention"] = {"focus", "salience"}) as
+# human-readable labels for the LLM context.
+# =========================================================
+
+def build_attention_summary(c, world):
+
+    attention = c.get("attention", {})
+    focus = attention.get("focus")
+
+    def _label(key):
+        if key.startswith("person:"):
+            pid = key.split(":", 1)[1]
+            person = world.get("characters", {}).get(pid, {})
+            return person.get("name", pid)
+        if key.startswith("scene:"):
+            return key.split(":", 1)[1]
+        return key
+
+    salience = attention.get("salience", {})
+    top = sorted(salience.items(), key=lambda kv: kv[1], reverse=True)[:3]
+
+    return {
+        "focus": {
+            "on":       _label(focus["key"]),
+            "strength": round(focus["strength"], 2),
+        } if focus else None,
+
+        "salient": [
+            {"on": _label(key), "strength": round(value, 2)}
+            for key, value in top
+        ],
+    }
+
+
+# =========================================================
+# ACTIVE CONVERSATIONS
+# Conversations this character is currently a participant in
+# (brain/conversations.py's world["conversations"] registry).
+# =========================================================
+
+def build_active_conversations(c, world):
+
+    conversations = world.get("conversations", {})
+    result = []
+
+    for conv in conversations.values():
+
+        if not conv.get("active"):
+            continue
+
+        if c["id"] not in conv.get("participants", []):
+            continue
+
+        other_id = next(
+            (pid for pid in conv["participants"] if pid != c["id"]),
+            None
+        )
+        other = world.get("characters", {}).get(other_id, {})
+
+        result.append({
+            "conversation_id": conv["id"],
+            "with":            other.get("name", other_id),
+            "topic":           conv.get("topic"),
+            "tone":            conv.get("tone"),
+            "your_turn":       conv.get("turn_owner") == c["id"],
+            "recent_messages": [
+                {
+                    "speaker": (
+                        "you" if m.get("speaker") == c["id"]
+                        else other.get("name", m.get("speaker"))
+                    ),
+                    "utterance": m.get("utterance"),
+                }
+                for m in conv.get("history", [])[-5:]
+            ],
+        })
+
+    return result
 
 
 # =========================================================
@@ -384,8 +477,72 @@ def build_available_actions(c, world):
 
 
 # =========================================================
+# SCENE DESCRIPTION
+# =========================================================
+# Natural-language description of the character's immediate surroundings —
+# who's nearby (reusing perception's existing per-person semantic
+# descriptions from systems/perception/descriptions.py) and any active
+# conversation — instead of dumping the full structured perception/social
+# data as JSON. This is the "what the AI sees and who's there" half of the
+# minimal context; build_context() below is the other half (traits/state).
+
+def build_scene_description(c, world):
+
+    perception = c.get("perception", {})
+    lines = []
+
+    building = c.get("building_id")
+    room = c.get("room_id")
+    if building:
+        where = f"indoors, in {room}" if room else "indoors"
+    else:
+        where = "outdoors"
+    lines.append(f"You are {where}.")
+
+    people = perception.get("visible_people", [])
+    if people:
+        for p in people[:5]:
+            bits = [p.get("description") or p.get("name") or "someone"]
+            if p.get("activity"):
+                bits.append(f"currently {p['activity']}")
+            if p.get("appears"):
+                bits.append(f"appears {p['appears']}")
+            if p.get("speaking"):
+                bits.append("speaking")
+            lines.append(" — ".join(bits))
+    else:
+        lines.append("No one else is nearby.")
+
+    for conv in build_active_conversations(c, world):
+        turn_note = " — it's your turn to respond." if conv.get("your_turn") else "."
+        lines.append(
+            f"You are in conversation with {conv['with']} about "
+            f"{conv.get('topic', 'something')}{turn_note}"
+        )
+        for m in conv.get("recent_messages", [])[-2:]:
+            lines.append(f'{m["speaker"]}: "{m["utterance"]}"')
+
+    props = perception.get("visible_props", [])
+    prop_names = [p.get("template") for p in props[:5] if p.get("template")]
+    if prop_names:
+        lines.append("Nearby objects: " + ", ".join(prop_names))
+
+    return "\n".join(lines)
+
+
+# =========================================================
 # MAIN CONTEXT BUILDER
 # =========================================================
+# Deliberately minimal: character traits/state, a semantic scene
+# description (see above), active intentions, and available actions —
+# not a dump of every subsystem's raw state. A full character-context
+# prompt with all ~55 subsystem sections included measured ~4200 tokens
+# combined with the system prompt and was too slow for realtime decisions
+# on constrained hardware; this version is close to identity + perception
+# + what-can-I-do, which is what a decision actually needs most ticks.
+# The dropped subsystems (memories, social state, investments, grievances,
+# conditioning, factions, etc.) are still fully tracked in the simulation
+# — they're just not surfaced to the LLM per-decision right now.
 
 def build_context(
 
@@ -394,203 +551,30 @@ def build_context(
     world
 ):
 
-    context = {
-
-        # =====================================
-        # IDENTITY
-        # =====================================
+    return {
 
         "identity": {
-
-            "name":
-                c.get("name"),
-
-            "age":
-                c.get("age"),
-
-            "traits":
-                c.get(
-                    "traits",
-                    []
-                ),
-
-            "occupation":
-                c.get(
-                    "occupation"
-                )
+            "name":       c.get("name"),
+            "age":        c.get("age"),
+            "traits":     c.get("traits", []),
+            "occupation": c.get("occupation"),
         },
-
-        # =====================================
-        # INTERNAL STATE
-        # =====================================
 
         "internal_state": {
-
-            "emotion":
-                c.get("emotion", "neutral"),
-
-            "mood":
-                c.get("mood"),
-
-            "stress":
-                c.get("stress", 0),
-
-            "social_need":
-                c.get("needs", {}).get("social", 0.7),
-
-            "fun_need":
-                c.get("needs", {}).get("fun", 0.6),
-
-            "sleep_debt":
-                c.get("body", {}).get("sleep_debt", 0),
+            "emotion":     c.get("emotion", "neutral"),
+            "mood":        c.get("mood"),
+            "stress":      c.get("stress", 0),
+            "social_need": c.get("needs", {}).get("social", 0.7),
+            "fun_need":    c.get("needs", {}).get("fun", 0.6),
+            "sleep_debt":  c.get("body", {}).get("sleep_debt", 0),
         },
 
-        # =====================================
-        # ACTIVE INTENTIONS
-        # =====================================
+        "scene": build_scene_description(c, world),
 
-        "active_intentions":
-            build_intentions(c),
+        "active_intentions": build_intentions(c),
 
-        # =====================================
-        # PERCEPTION (SCENE)
-        # =====================================
-        "perception":
-            c.get(
-                "perception",
-                {}
-            ),
-        # =====================================
-        # ATTENTION
-        # =====================================
-        "attention_summary":
-            build_attention_summary(
-                c,
-                world
-            ),
-        # =====================================
-        # CURRENT LOCATION
-        # =====================================
-
-        "location": {
-
-            "building":
-                c.get(
-                    "building_id"
-                ),
-
-            "room":
-                c.get(
-                    "room_id"
-                )
-        },
-
-        # =====================================
-        # PHONE
-        # =====================================
-
-        "phone_notifications":
-            c.get(
-                "phone_notifications",
-                []
-            ),
-
-        # =====================================
-        # NEWS
-        # =====================================
-
-        "news":
-            world.get(
-                "news_feed",
-                []
-            )[:5],
-
-        # =====================================
-        # ACTIONS
-        # =====================================
-
-        "available_actions":
-            build_available_actions(
-                c,
-                world
-            ),
-
-        "conversations":
-            build_conversation_context(
-                c,
-                world
-            ),
-        "persistent_desires":
-        [
-            d
-
-            for d in c.get(
-                "persistent_desires",
-                []
-            )
-
-            if not d.get(
-                "resolved"
-            )
-        ][:5],
-        "current_turn":
-            get_current_turn(
-                c,
-                world
-            ),
-        "beliefs": build_belief_context(c),
-        "political_alignment": compute_alignment(c),
-        "life_narratives": build_narratives(c),
-        "self_model": build_self_model(c),
-        "schedule": build_schedule_context(c),
-        "body_state": build_body_context(c),
-        "lt_needs": _build_lt_need_context(c),
-        "household_resources":build_household_resource_context( c,world),
-        "cognitive_pressure": build_cognitive_pressure(c),
-        "social": build_social_context(c,world),
-        "memories": build_memory_context(c),
-        "active_conversations":build_active_conversations(c, world),
-        "social_models":build_social_model_context(c),
-        "active_conflict": build_conflict_context(c, world),
-        "grievances": build_grievance_context(c, world),
-        "investments":       build_investment_context(c, world),
-        "inventory":         _build_inventory_context(c),
-        "worn":              _build_worn_context(c),
-        "services":          _build_services_context(c, world),
-        "phone":             _build_phone_context(c),
-        "social_events":     _build_events_context(c, world),
-        "upcoming_calendar_events": _build_calendar_context(c, world),
-        "hobbies":           _build_hobbies_context(c, world),
-        "reputation":        _build_reputation_context(c),
-        "factions":          _build_faction_context(c, world),
-        "family":            _build_family_context(c, world),
-        "secrets_held":      _build_secrets_keeper_context(c),
-        "secrets_targeted":  _build_secrets_target_context(c, world),
-        "attraction":        _build_attraction_context(c, world),
-        "intimacy":          _build_intimacy_context(c, world),
-        "pending_touch_proposal": _build_touch_proposal_context(c, world),
-        "authority_contracts":    _build_authority_contracts_context(c, world),
-        "conditioning":           _build_conditioning_context(c),
-        "active_lies":            _build_active_lies_context(c, world),
-        "private_offgrid":        _build_private_offgrid_context(c, world),
-        "posture":                _build_posture_context(c, world),
-        "notes_in_location":      _build_notes_context(c, world),
-        "rivalries":         _build_rival_context(c, world),
-        "envy_conflicts":    _build_envy_context(c, world),
-        "impulse":           _build_impulse_context(c, world),
-        "domestic_situation": _build_domestic_context(c, world),
-        "emotional_control_situation": _build_emotional_control_context(c, world),
-        "religious_repression": _build_repression_context(c, world),
-        "pregnancy":         _build_pregnancy_context(c, world),
-        "prenatal_prep":     _build_prenatal_prep_context(c, world),
-        "baby":              _build_baby_context(c, world),
-        "intoxication":      _build_intoxication_context(c, world),
-        "crushes":           _build_crushes_context(c, world),
-        "trauma":            _build_trauma_context(c, world),
-        "sexual_history":    _build_pleasure_context(c, world),
+        "available_actions": build_available_actions(c, world),
     }
-
-    return context
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1201,6 +1185,41 @@ def build_investment_context(c, world):
 def _build_lt_need_context(c):
     from systems.lt_needs import build_lt_need_context
     return build_lt_need_context(c)
+
+
+# =========================================================
+# INVENTORY / WORN CONTEXT
+# =========================================================
+
+def _build_inventory_context(c):
+    from systems.personal_items import inventory_summary
+    return inventory_summary(c)
+
+
+def _build_worn_context(c):
+    from systems.clothing import worn_summary
+    return worn_summary(c)
+
+
+# =========================================================
+# SERVICES CONTEXT
+# =========================================================
+
+def _build_services_context(c, world):
+    from systems.services import active_contracts_for_household
+    household_id = c.get("household_id")
+    if not household_id:
+        return []
+    return active_contracts_for_household(world, household_id)
+
+
+# =========================================================
+# FACTION CONTEXT
+# =========================================================
+
+def _build_faction_context(c, world):
+    from systems.faction_ai import get_faction_context
+    return get_faction_context(c, world) or None
 
 
 # =========================================================

@@ -7,6 +7,7 @@
 import time
 
 from systems.activities import get_phase_animation, get_clean_animation
+from systems.navigation import plan_character_route
 
 
 # =========================================================
@@ -113,6 +114,9 @@ def _route_move(c, world, action):
             "target_id": target_id,
             "target_type": "character",
         }
+        if plan_character_route(world, c, t.get("x", 0), t.get("y", 0)):
+            c["animation_state"] = "walk"
+            c["is_moving"]       = True
         return
 
     props = world.get("props", {})
@@ -124,6 +128,9 @@ def _route_move(c, world, action):
             "target_id": target_id,
             "target_type": "prop",
         }
+        if plan_character_route(world, c, p.get("x", 0), p.get("y", 0)):
+            c["animation_state"] = "walk"
+            c["is_moving"]       = True
         return
 
 
@@ -346,7 +353,10 @@ def _route_carry(c, world, action):
         "target_id": target_id,
         "target_type": "prop",
     }
-    c["is_moving"] = True
+    # Only mark as walking if a route was actually found — otherwise the
+    # "walking" phase (activities.py) would wait on is_moving forever with
+    # no route ever progressing to clear it.
+    c["is_moving"] = plan_character_route(world, c, prop.get("x", 0), prop.get("y", 0))
     c["activity"] = act
     c["animation_state"] = "walk"
 

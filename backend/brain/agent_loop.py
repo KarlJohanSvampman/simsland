@@ -425,10 +425,6 @@ def post_update(
 
 
 # =========================================================
-# MAIN AGEN  T TICK
-# =========================================================
-
-# =========================================================
 # MAIN AGENT TICK
 # =========================================================
 
@@ -593,4 +589,87 @@ def update_agent(
             return
 
     # =====================================
+    # MOVEMENT
+    # =====================================
+    # If still walking a previously-planned route, let it continue and
+    # skip evaluating new intentions / calling the LLM this tick.
+
+    moving = update_character_movement(
+        c,
+        world
+    )
+
+    if moving:
+        return
+
+    # =====================================
+    # EXECUTE SOCIAL / BODY INTENTIONS
+    # =====================================
+
+    for intention in c.get(
+        "active_intentions",
+        []
+    ):
+
+        activity_type = resolve_strategy(
+            c,
+            world,
+            intention
+        )
+
+        if not activity_type:
+            continue
+
+        started = start_activity(
+            c,
+            world,
+            activity_type
+        )
+
+        if started:
+
+            c["current_intention"] = (
+                intention
+            )
+
+            return
+
+    # =====================================
+    # BUILD CONTEXT
+    # =====================================
+
+    context = build_context(
+        c,
+        world
+    )
+
+    # =====================================
+    # THINK
+    # =====================================
+
+    decision = think(
+        context
+    )
+
+    if not decision:
+        return
+
+    # =====================================
+    # PROCESS DECISION
+    # =====================================
+
+    process_decision(
+        c,
+        world,
+        decision
+    )
+
+    # =====================================
+    # POST
+    # =====================================
+
+    post_update(
+        c,
+        world
+    )
     #

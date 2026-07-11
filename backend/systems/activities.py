@@ -17,6 +17,9 @@ from systems.mail import (
 from systems.waste import (
     generate_activity_waste
 )
+from systems.interactions import (
+    request_route_to_anchor
+)
 from systems.props import (
     find_nearest_anchor,
     get_prop_by_id,
@@ -182,6 +185,17 @@ def get_phase_animation(interaction, phase):
         return val
     defaults = {"walking": "walk", "using": "interact", "finishing": "idle"}
     return defaults.get(phase, "idle")
+
+
+def set_activity_phase(act, phase, world):
+    """Transition an activity to a new phase and reset its phase clock.
+
+    Every phase-elapsed check in this file (e.g. the "USING" tick-elapsed
+    branch) reads act["phase_started_tick"] relative to world["tick"], so
+    the two must always change together.
+    """
+    act["phase"] = phase
+    act["phase_started_tick"] = world.get("tick", 0)
 
 
 # =========================================================
@@ -1534,3 +1548,20 @@ def complete_activity(
     # =====================================
     from systems.habits import record_habit
     record_habit(c, activity_type, world)
+
+
+# =========================================================
+# FINISH ACTIVITY
+# =========================================================
+
+def finish_activity(c, world):
+    """Clear a completed activity so the character is free to decide again.
+
+    complete_activity() already ran the completion side-effects (habit
+    recording, body-need resolution, queue advancement) one phase earlier
+    (from the "using" -> "finishing" transition); this just releases the
+    activity slot once the finishing animation's single tick has played.
+    """
+    c["activity"] = None
+    c["current_intention"] = None
+    c["animation_state"] = "idle"

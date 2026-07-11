@@ -256,13 +256,13 @@ def clamp_body(c):
 def _check_health_thresholds(c):
     from core.event_bus import emit
     b     = c.get("body", {})
-    fired = c.setdefault("_health_events_fired", set())
+    fired = c.setdefault("_health_events_fired", [])
     for need, threshold in _HEALTH_THRESHOLDS.items():
         key = f"{need}_critical"
         val = b.get(need, 0)
         if val >= threshold and key not in fired:
-            fired.add(key)
+            fired.append(key)
             emit("health_threshold_crossed",
                  {"character_id": c["id"], "need": need, "value": val})
-        elif val < threshold * 0.7:
-            fired.discard(key)
+        elif val < threshold * 0.7 and key in fired:
+            fired.remove(key)

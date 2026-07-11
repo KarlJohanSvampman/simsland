@@ -166,7 +166,13 @@ async def call_llm_safe(
                 session=session
             ),
 
-            timeout=15
+            # Ollama cold-starts a model on its first call after being idle
+            # (measured ~20-40s just for load_duration on this setup), and a
+            # full character-context prompt (~3000 tokens) takes longer still
+            # to evaluate — 15s was cutting that off every time, forcing the
+            # fallback response. Must stay above call_llm's own httpx timeout
+            # (120s) so that one fires first with a clean TimeoutException.
+            timeout=150
         )
 
     except Exception as e:
@@ -185,7 +191,7 @@ async def call_llm(
 
     messages,
 
-    timeout=60.0,
+    timeout=120.0,
 
     use_cache=True,
 

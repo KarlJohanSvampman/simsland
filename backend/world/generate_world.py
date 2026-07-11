@@ -512,6 +512,13 @@ def generate_initial_world():
             {
                 "id": "house_1",
 
+                "template": "small_house",
+
+                "x": 0,
+                "y": 0,
+
+                "rotation": 0,
+
                 "rooms": [
 
                     {

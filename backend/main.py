@@ -12,14 +12,16 @@ Key changes vs. original:
 """
 
 import asyncio, os, json
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 
 from core.redis_queue import enqueue
+from core.cache import set_world_cache
 from db import load_world, save_world, init_db, update_world_tick
 from sim_loop import tick, collect_dirty
 from api.view import get_view, in_view
@@ -107,6 +109,13 @@ def _build_delta(dirty: dict, cx: int, cy: int, zoom: int) -> dict | None:
 # MAIN LOOP
 # =========================================================
 
+# Dedicated executor for tick() — kept separate from asyncio's shared
+# default executor (which anyio/Starlette may also draw from for sync
+# route handlers) so a long-running tick can never starve HTTP requests
+# of a worker thread.
+_tick_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="tick")
+
+
 async def loop():
     tick_rate = float(os.getenv("TICK_RATE_SECONDS", "1.0"))
     definitions = load_definitions(SIM_ID)
@@ -116,7 +125,13 @@ async def loop():
         ensure_world_defaults(world)
         world["definitions"] = definitions
 
-        tick(world)
+        # tick() blocks synchronously on concurrent.futures.as_completed
+        # while character agent threads run (including real LLM calls, up
+        # to ~150s each) — running it inline here would freeze the entire
+        # event loop (all HTTP/WebSocket handling) for that whole duration.
+        # Runs on its own dedicated executor (not asyncio's shared default
+        # one) so it can never starve other request handling of a thread.
+        await asyncio.get_event_loop().run_in_executor(_tick_executor, tick, world)
 
         update_world_tick(SIM_ID, world["tick"])
 
@@ -128,8 +143,46 @@ async def loop():
                 "character_id":  c["id"],
             })
 
-        # Collect what changed this tick
+        # Collect what changed this tick — must happen before persisting
+        # below, since it pops world["_dirty"] (which holds raw Python
+        # sets, not JSON-serializable) out of the tree entirely.
         dirty = collect_dirty(world)
+
+        # Persist this tick's mutations. Without this, load_world() on the
+        # next iteration serves a stale cached snapshot (or, once the 5s
+        # Redis TTL expires, rebuilds from Postgres) and every character
+        # decision / movement update / need decay this tick made is
+        # silently discarded. Re-caching every tick also means the TTL
+        # never actually expires during normal operation, so the expensive
+        # cache-miss rebuild (build_world_geometry, generate_world_tiles,
+        # build_outdoor_navigation, ...) only runs once at startup.
+        #
+        # world_tiles/world_tile_lookup/outdoor_navigation/etc. are excluded
+        # here — together ~46MB of static, purely-derived grid data — and
+        # re-serializing/re-deserializing that on every load_world() call
+        # (every tick, AND every incoming request that reads world state)
+        # was causing severe multi-second latency under any concurrent
+        # load. db.py's _ensure_static_world_data cheaply restores them
+        # from a process-local cache whenever they're missing.
+        persisted_snapshot = {
+            k: v for k, v in world.items()
+            if k not in (
+                "world_tiles", "world_tile_lookup", "outdoor_navigation",
+                "road_entry_points", "road_exit_points", "road_graph", "traffic",
+            )
+        }
+
+        await asyncio.get_event_loop().run_in_executor(
+            _tick_executor, set_world_cache, SIM_ID, persisted_snapshot
+        )
+
+        # Durability: periodically persist to Postgres too, so simulation
+        # progress survives a backend restart instead of only reflecting
+        # whatever was last explicitly saved via the World Editor.
+        if world["tick"] % 30 == 0:
+            await asyncio.get_event_loop().run_in_executor(
+                _tick_executor, save_world, SIM_ID, persisted_snapshot
+            )
 
         # Broadcast to each client
         dead = []
@@ -236,7 +289,15 @@ def animbank_page():
 
 @app.get("/api/state")
 def state():
-    return load_world(SIM_ID)
+    # FastAPI's default jsonable_encoder() (used for any raw dict/list
+    # return value) recursively type-checks every value in pure Python —
+    # measured ~7.5s on this payload vs. ~1s for a plain json.dumps() of
+    # the same data. World state is already JSON-safe (it round-trips
+    # through Redis via json.dumps every tick), so encode it directly.
+    return Response(
+        content=json.dumps(load_world(SIM_ID)),
+        media_type="application/json",
+    )
 
 
 @app.get("/api/household/{household_id}")

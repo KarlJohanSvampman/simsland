@@ -587,11 +587,16 @@ def suggest_event_in_person(speaker_c, listener_c, world, event_id):
 # CONTEXT FOR LLM
 # =========================================================
 
-def build_events_context(c, world, limit=8):
+def build_events_context(c, world, limit=4):
     """
     Returns a compact list of events the character knows about,
     with their RSVP status, for inclusion in the LLM context.
     Also includes a social_disposition hint to guide the agent's RSVP decisions.
+
+    Trimmed to the fields actually used for RSVP/attendance decisions and
+    action routing (id is required — _route_social_event_rsvp needs it to
+    target a specific event) — headcount/tags were costing real tokens on
+    every decision for marginal decision value.
     """
     cid    = c["id"]
     events = get_events_for_character(c, world)
@@ -600,6 +605,13 @@ def build_events_context(c, world, limit=8):
     for evt in events[:limit]:
         if evt.get("start_ts", 0) < now - 86400:  # skip events > 1 day in the past
             continue
+        start_ts = evt.get("start_ts")
+        days_until = int((start_ts - now) / 86400) if start_ts else None
+        when = (
+            "today" if days_until == 0 else
+            "tomorrow" if days_until == 1 else
+            f"in {days_until} days" if days_until is not None else "unscheduled"
+        )
         out.append({
             "id":            evt["id"],
             "title":         evt["title"],
@@ -608,15 +620,13 @@ def build_events_context(c, world, limit=8):
             "my_rsvp":       evt.get("attendees", {}).get(cid, "no_response"),
             "i_organise":    cid in evt.get("organizers", []),
             "location":      evt.get("location", ""),
-            "start_ts":      evt.get("start_ts"),
-            "attending_yes": sum(1 for v in evt.get("attendees", {}).values() if v == "yes"),
-            "tags":          evt.get("tags", []),
+            "when":          when,
             "pending_approval": evt.get("draft_approvals", {}).get(cid) == "pending",
             "has_pending_changes": bool(evt.get("pending_changes")),
         })
 
     # Social disposition hint — tells the LLM how likely this character is to want to go out
-    profile = c.get("attraction_profile", {})
+    profile = c.get("attraction_profile") or {}
     pd      = profile.get("party_disposition", 0.3)
     cr      = profile.get("casual_reluctance", 0.5)
     repr_sc = c.get("repression_state", {}).get("repression_score", 0.0)

@@ -132,14 +132,15 @@ def _run_agent(c, world, t):
 def advance_calendar(world):
     now = datetime.now()
     world["calendar"] = {
-        "year":      now.year,
-        "month":     now.month,
-        "day":       now.day,
-        "hour":      now.hour,
-        "minute":    now.minute,
-        "second":    now.second,
-        "weekday":   now.strftime("%A"),
-        "timestamp": time.time(),
+        "year":         now.year,
+        "month":        now.month,
+        "day":          now.day,
+        "hour":         now.hour,
+        "minute":       now.minute,
+        "second":       now.second,
+        "minute_of_day": now.hour * 60 + now.minute,
+        "weekday":      now.strftime("%A"),
+        "timestamp":    time.time(),
     }
 
 

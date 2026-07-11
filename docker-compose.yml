@@ -9,8 +9,10 @@ services:
     environment:
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/sim
       - REDIS_HOST=redis
-      - OLLAMA_BASE_URL=http://192.168.0.7:11434  # 👈 your remote Ollama
+      - OLLAMA_BASE_URL=http://192.168.10.203:11434  # 👈 your remote Ollama
+      - OLLAMA_MODEL=llama3.1:latest
       - PYTHONPATH=/app
+      - PYTHONUNBUFFERED=1
     depends_on:
       - db
       - redis
@@ -31,8 +33,10 @@ services:
     environment:
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/sim
       - REDIS_HOST=redis
-      - OLLAMA_BASE_URL=http://192.168.0.7:11434  # 👈 your remote 
+      - OLLAMA_BASE_URL=http://192.168.10.203:11434  # 👈 your remote
+      - OLLAMA_MODEL=llama3.1:latest
       - PYTHONPATH=/app
+      - PYTHONUNBUFFERED=1
     command: python -m workers.worker
   frontend:
     build: ./frontend

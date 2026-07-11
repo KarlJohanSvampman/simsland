@@ -21,6 +21,56 @@ from systems.building_manager import (
     build_world_geometry
 )
 import time
+
+# =========================================================
+# PROCESS-LOCAL STATIC WORLD DATA CACHE
+# =========================================================
+# world_tiles (the outdoor 300x300 grid) is ~16MB, and world_tile_lookup/
+# outdoor_navigation/road_graph/etc. (purely derived from it, no data of
+# their own) add another ~30MB — re-serializing/deserializing ~46MB of
+# static grid data on every single load_world() call (which happens on
+# every tick AND every incoming request that reads world state) was
+# causing multi-second latency under any concurrent load. All of it is
+# excluded from the Redis-cached/Postgres-persisted world blob (see
+# main.py::loop()) and instead computed once per backend process here.
+#
+# Known limitation: since this lives outside the world dict's normal
+# persistence, editing the map (tiles) via the World Editor while this
+# process is running won't be reflected here until the backend container
+# restarts.
+_STATIC_WORLD_KEYS = (
+    "world_tiles",
+    "world_tile_lookup", "outdoor_navigation",
+    "road_entry_points", "road_exit_points", "road_graph", "traffic",
+)
+_static_world_cache = {}
+
+
+def _ensure_static_world_data(world, sim_id):
+    cached_static = _static_world_cache.get(sim_id)
+
+    if cached_static is not None:
+        world.update(cached_static)
+        return
+
+    from world.world_tiles import (
+        generate_world_tiles,
+        build_world_tile_lookup,
+        build_traffic_network
+    )
+
+    if not world.get("world_tiles"):
+        generate_world_tiles(world)
+
+    build_world_tile_lookup(world)
+    build_traffic_network(world)
+    build_outdoor_navigation(world)
+
+    _static_world_cache[sim_id] = {
+        k: world[k] for k in _STATIC_WORLD_KEYS if k in world
+    }
+
+
 #conn = psycopg2.connect(
 #    dbname=os.getenv("POSTGRES_DB","sim"),
 #    user=os.getenv("POSTGRES_USER","postgres"),
@@ -131,6 +181,14 @@ def load_world(sim_id):
             cached
         )
 
+        # world_tiles/world_tile_lookup/outdoor_navigation/etc. are
+        # deliberately excluded from the cached blob (see main.py::loop())
+        # — restore them from the process-local static-world cache (or
+        # build it once) instead of recomputing/re-deserializing ~46MB on
+        # every single load_world() call.
+        if not cached.get("world_tiles") or not cached.get("outdoor_navigation"):
+            _ensure_static_world_data(cached, sim_id)
+
         return cached
 
     # =====================================
@@ -193,35 +251,7 @@ def load_world(sim_id):
         world
     )
 
-    from world.world_tiles import (
-
-        generate_world_tiles,
-
-        build_world_tile_lookup,
-
-        generate_road_gateways,
-        build_traffic_network
-    )
-
-    if not world.get(
-        "world_tiles"
-    ):
-
-        generate_world_tiles(
-            world
-        )
-
-    build_world_tile_lookup(
-        world
-    )
-
-    build_traffic_network(
-        world
-    )
-
-    build_outdoor_navigation(
-        world
-    )
+    _ensure_static_world_data(world, sim_id)
 
     # =====================================
     # FIND FLOORPLAN

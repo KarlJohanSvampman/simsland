@@ -498,14 +498,15 @@ def _resolve(conflict, outcome, world):
     for pid in conflict["parties"]:
         c = chars.get(pid)
         if c:
-            c.get("_confrontation_emitted", set()).discard(
-                _other_party(conflict, pid)
-            )
+            other = _other_party(conflict, pid)
+            emitted = c.get("_confrontation_emitted", [])
+            if other in emitted:
+                emitted.remove(other)
             # Cold shoulder after unresolved conflict
             if outcome in ("cold_shoulder", "storm_off", "suppressed"):
-                c.setdefault("cold_shoulder_towards", set()).add(
-                    _other_party(conflict, pid)
-                )
+                cold_shoulder = c.setdefault("cold_shoulder_towards", [])
+                if other not in cold_shoulder:
+                    cold_shoulder.append(other)
 
     emit("conflict_resolved", {
         "conflict_id": conflict["id"],

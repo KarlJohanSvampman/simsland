@@ -254,7 +254,7 @@ def _compute_harassment_drive(c):
     """
     harassment_drive = effective_libido × sexism_level × (1 - self_control)
     """
-    profile  = c.get("attraction_profile", {})
+    profile  = c.get("attraction_profile") or {}
     base_lib = profile.get("libido", 0.50)
     boost    = c.get("intoxication_state", {}).get("libido_boost", 0.0)
     eff_lib  = min(1.0, base_lib + boost)

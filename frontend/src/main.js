@@ -59,7 +59,6 @@ const loadingProps = {};
 const loadingCharacters = {};
 const floorRegistry = {};
 const wallRegistry = {};
-const buildingRegistry = {};
 const WALL_HEIGHT = 2.8;
 const WALL_THICKNESS = 0.08;
 const textureLoader =
@@ -546,139 +545,85 @@ function removeSelectable(obj){
   }
 }
 
-function getBuildingGroup(fp){
-
-  if(buildingRegistry[fp.id]){
-
-    return buildingRegistry[
-      fp.id
-    ];
-  }
-
-  const group =
-    new THREE.Group();
-
-  group.position.set(
-
-    fp.x - 10,
-
-    0,
-
-    fp.y - 7
-  );
-
-  group.rotation.y =
-    THREE.MathUtils.degToRad(
-      fp.rotation || 0
-    );
-
-  group.userData = {
-
-    type: "building",
-
-    id: fp.id
-  };
-
-  selectable.push(group);
-
-  scene.add(group);
-
-  buildingRegistry[
-    fp.id
-  ] = group;
-
-  return group;
-}
-
+// Walls/doors/windows come from the backend already fully resolved to world
+// coordinates (building_manager.py's instantiate_floorplan projects each
+// floorplan-local tile through local_to_world before it's sent), so each
+// tile is positioned the same way every other entity in this file is —
+// world coords minus the (10, 7) scene origin offset — no per-building
+// local-space group/transform needed.
 function updateFloorplanWalls(state){
 
   const active = new Set();
-  const activeBuildings = new Set();
 
-  const floorplans =
-    state.floorplans || [];
+  const runtimeTiles =
+    Array.isArray(state.tiles)
+    ? state.tiles
+    : Object.values(state.tiles || {});
 
-  for(const fp of floorplans){
-    activeBuildings.add(fp.id);
-    const building =
-      resolveFloorplan(
-        definitions,
-        fp.building
-      );
+  for(const tile of runtimeTiles){
 
-    const buildingGroup = getBuildingGroup(fp.id);
+    const walls =
+      tile.walls || {};
 
-    if(!building) continue;
+    const x = tile.x - 10;
+    const y = tile.y - 7;
 
-    for(const key in building.tiles){
+    for(const side in walls){
 
-      const tile = building.tiles[key];
+      const wallData = walls[side];
 
-      const walls =
-        tile.walls || {};
+      if(!wallData) continue;
 
-      const [x,y] = key
-        .split(",")
-        .map(Number);
+      const wallKey =
+        `${tile.x}_${tile.y}_${side}`;
 
-      for(const side in walls){
+      active.add(wallKey);
 
-        const wallData = walls[side];
+      if(wallRegistry[wallKey]){
+        continue;
+      }
 
-        if(!wallData) continue;
+      let mesh = null;
 
-        const wallKey =
-          `${building.id}_${x}_${y}_${side}`;
+      if(wallData.type === "wall"){
 
-        active.add(wallKey);
+        mesh = createWallMesh(
+          x,
+          y,
+          side,
+          wallData
+        );
+      }
 
-        if(wallRegistry[wallKey]){
-          continue;
-        }
+      else if(wallData.type === "door"){
 
-        let mesh = null;
+        mesh = createDoorSegment(
+          x,
+          y,
+          side,
+          wallData
+        );
+      }
 
-        if(wallData.type === "wall"){
+      else if(wallData.type === "window"){
 
-          mesh = createWallMesh(
-            x,
-            y,
-            side,
-            wallData
-          );
-        }
+        mesh = createWindowSegment(
+          x,
+          y,
+          side,
+          wallData
+        );
+      }
 
-        else if(wallData.type === "door"){
+      if(mesh){
 
-          mesh = createDoorSegment(
-            x,
-            y,
-            side,
-            wallData
-          );
-        }
+        scene.add(mesh);
 
-        else if(wallData.type === "window"){
-
-          mesh = createWindowSegment(
-            x,
-            y,
-            side,
-            wallData
-          );
-        }
-
-        if(mesh){
-
-          buildingGroup.add(mesh);
-
-          wallRegistry[
-            wallKey
-          ] = mesh;
-        }
+        wallRegistry[
+          wallKey
+        ] = mesh;
       }
     }
-    cleanupBuildings(activeBuildings);
   }
 
   // cleanup
@@ -1388,51 +1333,33 @@ function createFloorMesh(x, y, tileFloor){
 function updateFloorplanFloors(state){
 
   const active = new Set();
-  const activeBuildings = new Set();
-  const floorplans =
-    state.floorplans || [];
 
-for(const fp of floorplans){
-  activeBuildings.add(fp.id);
-  const building =
-    resolveFloorplan(
-      definitions,
-      fp.building
-    );
-    
+  const runtimeTiles =
+    Array.isArray(state.tiles)
+    ? state.tiles
+    : Object.values(state.tiles || {});
 
-  const buildingGroup = getBuildingGroup(fp.id);
+  for(const tile of runtimeTiles){
 
-  if(!building) continue;
+    if(!tile.floor) continue;
 
-  for(const key in building.tiles){
+    const worldKey =
+      `${tile.x}_${tile.y}`;
 
-      const tile = building.tiles[key];
+    active.add(worldKey);
 
-      if(!tile.floor) continue;
+    if(!floorRegistry[worldKey]){
 
-      const [x,y] = key
-        .split(",")
-        .map(Number);
+      const mesh =
+        createFloorMesh(
+          tile.x - 10,
+          tile.y - 7,
+          tile.floor
+        );
 
-      const worldKey =
-        `${fp.id}_${x}_${y}`;
+      scene.add(mesh);
 
-      active.add(worldKey);
-
-      if(!floorRegistry[worldKey]){
-
-        const mesh =
-          createFloorMesh(
-            x,
-            y,
-            tile.floor
-          );
-
-        buildingGroup.add(mesh);
-
-        floorRegistry[worldKey] = mesh;
-      }
+      floorRegistry[worldKey] = mesh;
     }
   }
 
@@ -1447,8 +1374,6 @@ for(const fp of floorplans){
 
     delete floorRegistry[key];
   }
-
-  cleanupBuildings(activeBuildings);
 }
 
 
@@ -1742,25 +1667,6 @@ delete loadingProps[prop.id];
     delete props[id];
     delete propNodes[id];
     delete propAnimations[id];
-  }
-}
-
-function cleanupBuildings(activeIds){
-
-  for(const id in buildingRegistry){
-
-    if(activeIds.has(id)){
-      continue;
-    }
-
-    const group =
-      buildingRegistry[id];
-
-    scene.remove(group);
-
-    removeSelectable(group);
-
-    delete buildingRegistry[id];
   }
 }
 

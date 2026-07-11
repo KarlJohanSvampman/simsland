@@ -192,12 +192,13 @@ def clean_intentions(c):
 # =========================================================
 
 def sort_intentions(c):
-    """Return active intentions sorted by final_priority, descending."""
-    return sorted(
+    """Sort active intentions by final_priority, descending, in place."""
+    c["active_intentions"] = sorted(
         c.get("active_intentions", []),
         key=final_priority,
         reverse=True
     )
+    return c["active_intentions"]
 
 
 # ===================================================

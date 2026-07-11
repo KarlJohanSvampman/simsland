@@ -13,6 +13,9 @@ from core.spatial import (
     parse_spatial_key
 )
 
+from systems.templates import resolve_floorplan
+from systems.outdoor_navigation import find_outdoor_path
+
 
 # =========================================================
 # ROOM ROUTE KEY
@@ -772,3 +775,198 @@ def runtime_room_id(
 ):
 
     return f"{building_id}:{room_id}"
+
+
+# =========================================================
+# ROUTE ORCHESTRATOR
+# =========================================================
+# Builds the segmented {"type": "indoor"|"outdoor", "tiles": [...],
+# "building_id": ...} route shape systems/movement.py's
+# update_character_movement() consumes. Works directly off tile.walls
+# (the shape the Floorplan Designer/World Editor actually produce) rather
+# than the legacy top-level floorplan.doors/rooms/roomGraph schema the
+# build_multi_room_path/build_portals machinery above expects — that
+# machinery is left as-is for future multi-room buildings once that data
+# is authored; this only needs single-room-or-open-plan buildings to work
+# indoor <-> outdoor through a door.
+
+_DOOR_SIDE_OFFSETS = {
+    "north": (0, -1),
+    "south": (0, 1),
+    "east":  (1, 0),
+    "west":  (-1, 0),
+}
+
+
+def find_building_entrances(building, floorplan):
+
+    entrances = []
+
+    for key, tile in floorplan.get("tiles", {}).items():
+
+        walls = tile.get("walls") or {}
+
+        tx, ty = (int(v) for v in key.split(","))
+
+        for side, wall in walls.items():
+
+            if not wall or wall.get("type") != "door":
+                continue
+
+            dx, dy = _DOOR_SIDE_OFFSETS.get(side, (0, 0))
+
+            entrances.append({
+                "inside":  local_to_world(building, tx, ty),
+                "outside": local_to_world(building, tx + dx, ty + dy),
+                "side":    side,
+            })
+
+    return entrances
+
+
+def find_building_at(world, x, y):
+
+    for building in world.get("buildings", []):
+
+        floorplan = resolve_floorplan(world, building)
+
+        if not floorplan:
+            continue
+
+        lx, ly = world_to_local(building, x, y)
+
+        if f"{lx},{ly}" in floorplan.get("tiles", {}):
+            return building, floorplan
+
+    return None, None
+
+
+def _nearest_entrance(entrances, key, x, y):
+
+    return min(
+        entrances,
+        key=lambda e: abs(e[key][0] - x) + abs(e[key][1] - y)
+    )
+
+
+def plan_character_route(world, c, target_x, target_y):
+
+    sx = int(round(c.get("x", 0)))
+    sy = int(round(c.get("y", 0)))
+    tx = int(round(target_x))
+    ty = int(round(target_y))
+
+    start_building = None
+    start_floorplan = None
+
+    start_building_id = c.get("building_id")
+
+    if start_building_id:
+
+        start_building = next(
+            (b for b in world.get("buildings", []) if b["id"] == start_building_id),
+            None
+        )
+
+        if start_building:
+            start_floorplan = resolve_floorplan(world, start_building)
+
+    # Fall back to position-based lookup — building_id is only ever set by
+    # update_character_movement() completing an indoor route segment, so a
+    # character that spawned or was placed directly inside a building's
+    # footprint won't have it tagged yet.
+    if not start_building:
+        start_building, start_floorplan = find_building_at(world, sx, sy)
+
+    target_building, target_floorplan = find_building_at(world, tx, ty)
+
+    segments = []
+
+    same_building = (
+        start_building
+        and target_building
+        and start_building["id"] == target_building["id"]
+    )
+
+    if same_building:
+
+        tiles = build_building_path(
+            start_building, start_floorplan, (sx, sy), (tx, ty)
+        )
+
+        if not tiles:
+            return False
+
+        segments.append({
+            "type": "indoor", "tiles": tiles, "building_id": start_building["id"]
+        })
+
+    else:
+
+        exit_point = (sx, sy)
+
+        if start_building:
+
+            entrances = find_building_entrances(start_building, start_floorplan)
+
+            if not entrances:
+                return False
+
+            entrance = _nearest_entrance(entrances, "inside", sx, sy)
+
+            indoor_tiles = build_building_path(
+                start_building, start_floorplan, (sx, sy), entrance["inside"]
+            )
+
+            if indoor_tiles:
+                segments.append({
+                    "type": "indoor",
+                    "tiles": indoor_tiles,
+                    "building_id": start_building["id"],
+                })
+
+            exit_point = entrance["outside"]
+
+        entry_point = (tx, ty)
+
+        if target_building:
+
+            target_entrances = find_building_entrances(target_building, target_floorplan)
+
+            if not target_entrances:
+                return False
+
+            target_entrance = _nearest_entrance(target_entrances, "outside", *exit_point)
+
+            entry_point = target_entrance["outside"]
+
+        if exit_point != entry_point:
+
+            outdoor_tiles = find_outdoor_path(world, exit_point, entry_point)
+
+            if not outdoor_tiles:
+                return False
+
+            segments.append({"type": "outdoor", "tiles": outdoor_tiles})
+
+        if target_building:
+
+            indoor_tiles = build_building_path(
+                target_building, target_floorplan, target_entrance["inside"], (tx, ty)
+            )
+
+            if indoor_tiles:
+                segments.append({
+                    "type": "indoor",
+                    "tiles": indoor_tiles,
+                    "building_id": target_building["id"],
+                })
+
+    if not segments:
+        return False
+
+    c["route"] = segments
+    c["route_segment_index"] = 0
+    c["path_index"] = 0
+
+    return True

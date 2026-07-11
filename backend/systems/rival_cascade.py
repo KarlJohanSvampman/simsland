@@ -131,7 +131,7 @@ def _on_rival_learns(rival, revealer, man, rival_attraction, world):
     mid  = man["id"]
 
     # 1. Grievance against revealer — she made her move first
-    envy_mult = rival.get("attraction_profile", {}).get("envy_sensitivity", 0.5)
+    envy_mult = (rival.get("attraction_profile") or {}).get("envy_sensitivity", 0.5)
     grievance_sev = 10.0 + (rival_attraction / 100.0) * 12.0 * envy_mult
     add_grievance(
         rival, wid,
@@ -142,7 +142,9 @@ def _on_rival_learns(rival, revealer, man, rival_attraction, world):
     )
 
     # 2. Rival raises her own seduction drive
-    r_profile = rival.setdefault("attraction_profile", {})
+    if rival.get("attraction_profile") is None:
+        rival["attraction_profile"] = {}
+    r_profile = rival["attraction_profile"]
     r_profile["initiation_bias"] = min(
         1.0,
         r_profile.get("initiation_bias", 0.0) + SEDUCTION_BIAS_BOOST
@@ -188,7 +190,7 @@ def _escalate_rivalry(rival, revealer, man, world):
         fight_chance += 0.20
     if "competitive" in r_traits:
         fight_chance += 0.10
-    envy_sens = rival.get("attraction_profile", {}).get("envy_sensitivity", 0.5)
+    envy_sens = (rival.get("attraction_profile") or {}).get("envy_sensitivity", 0.5)
     fight_chance += envy_sens * 0.15
     fight_chance = min(0.75, fight_chance)
 
@@ -208,7 +210,9 @@ def _escalate_rivalry(rival, revealer, man, world):
     _apply_fight_loss(loser, winner, world)
 
     # Winner: seduction confidence bump toward the man
-    w_profile = winner.setdefault("attraction_profile", {})
+    if winner.get("attraction_profile") is None:
+        winner["attraction_profile"] = {}
+    w_profile = winner["attraction_profile"]
     w_profile["initiation_bias"] = min(1.0, w_profile.get("initiation_bias", 0.0) + 0.15)
     w_profile["rejection_resilience"] = min(1.0,
         w_profile.get("rejection_resilience", 0.5) + 0.10)

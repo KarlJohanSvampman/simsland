@@ -1,3 +1,4 @@
+import asyncio
 import json
 
 from llm.llm_client import (
@@ -97,11 +98,16 @@ OUTPUT FORMAT  (strict JSON, no other text)
 
 def build_prompt(context):
 
+    # Compact encoding — pretty-printing (indent=2) buys nothing for the
+    # model (JSON structure is unambiguous either way) but cost ~1000
+    # tokens of pure whitespace on a real character context, which was a
+    # meaningful chunk of why decisions were timing out on constrained
+    # hardware.
     return json.dumps(
 
         context,
 
-        indent=2
+        separators=(",", ":")
     )
 
 
@@ -182,11 +188,17 @@ def think(
         context
     )
 
-    raw = call_llm_safe(
+    messages = [
+        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "user",   "content": prompt},
+    ]
 
-        SYSTEM_PROMPT,
-
-        prompt
+    # call_llm_safe is async; think() runs synchronously inside a
+    # ThreadPoolExecutor worker thread (via _run_agent), a plain OS thread
+    # with no pre-existing event loop, so asyncio.run() here is safe and
+    # gets its own fresh loop per call.
+    raw = asyncio.run(
+        call_llm_safe(messages)
     )
 
     try:

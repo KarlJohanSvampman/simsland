@@ -19,11 +19,25 @@ def build_outdoor_navigation(world):
         {}
     )
 
+    # Building interiors overlap the outdoor tile grid (generate_world_tiles
+    # blankets the whole world as walkable with no awareness of buildings),
+    # so exclude any tile a floorplan actually occupies — otherwise outdoor
+    # pathfinding would cut straight through walls instead of routing to a
+    # door. runtime_tiles is already computed earlier in load_world()'s
+    # sequence (build_world_geometry runs before this).
+    building_footprint = {
+        (t["x"], t["y"])
+        for t in world.get("runtime_tiles", [])
+    }
+
     for key, tile in lookup.items():
 
         x, y = parse_spatial_key(
             key
         )
+
+        if (x, y) in building_footprint:
+            continue
 
         if not tile.get(
             "walkable",
@@ -43,6 +57,9 @@ def build_outdoor_navigation(world):
 
             nx = x + dx
             ny = y + dy
+
+            if (nx, ny) in building_footprint:
+                continue
 
             neighbor = lookup.get(
 

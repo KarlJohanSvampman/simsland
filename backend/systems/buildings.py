@@ -39,8 +39,9 @@ def instantiate_floorplan(
         {}
     ).items():
 
-        tx = tile["x"]
-        ty = tile["y"]
+        tx, ty = (
+            int(v) for v in key.split(",")
+        )
 
         wx, wy = local_to_world(
             building,

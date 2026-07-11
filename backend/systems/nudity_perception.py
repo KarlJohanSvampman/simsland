@@ -394,7 +394,7 @@ def _would_be_aroused(observer, target):
     o_sex       = observer.get("sex", "male")
     t_sex       = target.get("sex", "male")
     avoidance   = observer.get("intimacy_avoidance", 0.0)
-    libido      = observer.get("attraction_profile", {}).get("libido", 0.5)
+    libido      = (observer.get("attraction_profile") or {}).get("libido", 0.5)
 
     # Orientation match
     attracted = False

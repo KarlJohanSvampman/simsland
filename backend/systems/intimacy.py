@@ -109,8 +109,8 @@ def can_advance_stage(c, other, world):
     familiarity = min(c_rel.get("familiarity", 0), o_rel.get("familiarity", 0))
 
     # Stage gate modifier from attraction profiles
-    c_mod = c.get("attraction_profile", {}).get("stage_gate_mod", 0)
-    o_mod = other.get("attraction_profile", {}).get("stage_gate_mod", 0)
+    c_mod = (c.get("attraction_profile") or {}).get("stage_gate_mod", 0)
+    o_mod = (other.get("attraction_profile") or {}).get("stage_gate_mod", 0)
     gate_mod = c_mod + o_mod  # combined: promiscuous pair can unlock faster
 
     max_stage = current
@@ -330,7 +330,7 @@ def recipient_decision(recipient, proposer, world):
     arousal     = r_rel.get("arousal_level", 0.0)
     current_stage = r_rel.get("intimacy_stage", 0)
 
-    profile     = recipient.get("attraction_profile", {})
+    profile     = recipient.get("attraction_profile") or {}
     anxiety     = profile.get("sexual_anxiety",   0.25)
     gate        = profile.get("emotional_gate",   0.25)
     casual_rel  = profile.get("casual_reluctance", 0.0)
@@ -901,7 +901,7 @@ def _handle_rejection_fallout(proposer, recipient, world):
     If proposer has low rejection resilience, add mild grievance toward recipient.
     Repeated rejections build resentment.
     """
-    profile    = proposer.get("attraction_profile", {})
+    profile    = proposer.get("attraction_profile") or {}
     resilience = profile.get("rejection_resilience", 0.5)
     if resilience > 0.6:
         return  # bounces back easily, no grievance

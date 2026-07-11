@@ -19897,12 +19897,75 @@
         "0,0": {
           "type": "floor",
           "interior": true,
-          "floor": true
+          "floor": true,
+          "walls": {
+            "north": { "type": "wall", "material": "paint_white_matt" },
+            "west":  { "type": "wall", "material": "paint_white_matt" }
+          }
         },
         "1,0": {
           "type": "floor",
           "interior": true,
+          "floor": true,
+          "walls": {
+            "north": { "type": "wall", "material": "paint_white_matt" }
+          }
+        },
+        "2,0": {
+          "type": "floor",
+          "interior": true,
+          "floor": true,
+          "walls": {
+            "north": { "type": "wall", "material": "paint_white_matt" },
+            "east":  { "type": "wall", "material": "paint_white_matt" }
+          }
+        },
+        "0,1": {
+          "type": "floor",
+          "interior": true,
+          "floor": true,
+          "walls": {
+            "west": { "type": "wall", "material": "paint_white_matt" }
+          }
+        },
+        "1,1": {
+          "type": "floor",
+          "interior": true,
           "floor": true
+        },
+        "2,1": {
+          "type": "floor",
+          "interior": true,
+          "floor": true,
+          "walls": {
+            "east": { "type": "window", "material": "paint_white_matt" }
+          }
+        },
+        "0,2": {
+          "type": "floor",
+          "interior": true,
+          "floor": true,
+          "walls": {
+            "south": { "type": "wall", "material": "paint_white_matt" },
+            "west":  { "type": "wall", "material": "paint_white_matt" }
+          }
+        },
+        "1,2": {
+          "type": "floor",
+          "interior": true,
+          "floor": true,
+          "walls": {
+            "south": { "type": "door", "material": "paint_beige_matt" }
+          }
+        },
+        "2,2": {
+          "type": "floor",
+          "interior": true,
+          "floor": true,
+          "walls": {
+            "south": { "type": "wall", "material": "paint_white_matt" },
+            "east":  { "type": "wall", "material": "paint_white_matt" }
+          }
         }
       },
       "id": "small_house"

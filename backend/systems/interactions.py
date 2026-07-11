@@ -11,6 +11,8 @@ from systems.anchors import (
     get_world_anchor_position
 )
 
+from systems.navigation import plan_character_route
+
 
 # =========================================================
 # REQUEST ROUTE TO ANCHOR
@@ -45,8 +47,12 @@ def request_route_to_anchor(c, world, prop, anchor):
         "anchor_name": anchor.get("name"),
     }
 
-    c["animation_state"] = "walk"
-    c["is_moving"]       = True
+    # Only mark as walking if a route was actually found — otherwise the
+    # "walking" phase (activities.py) would wait on is_moving forever with
+    # no route ever progressing to clear it.
+    if plan_character_route(world, c, ax, ay):
+        c["animation_state"] = "walk"
+        c["is_moving"]       = True
 
 
 # =========================================================
