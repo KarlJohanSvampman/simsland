@@ -64,11 +64,15 @@ let definitions = {
   character_templates: {}
 };
 
+// props/buildings/world_tiles are the SAME arrays the live game reads
+// (world["props"]/world["buildings"]/world["world_tiles"]) — declared
+// here as defaults only for a fresh/empty world; loadWorld()'s
+// Object.assign(worldState, world) overwrites these with the real,
+// already-populated arrays once the world loads.
 const worldState = {
-  floorplans:    [],
-  world_tiles:   [],
-  placed_props:  [],
-  wall_segments: []
+  buildings:   [],
+  world_tiles: [],
+  props:       []
 };
 
 let currentTool             = null;   // "paint_tile" | "place_floorplan" | "place_prop"
@@ -257,35 +261,14 @@ function addFloorplanMarker(entry) {
 
 //
 // ===================================
-// WALL SEGMENTS
+// TILE CORNER ORIENTATION
 // ===================================
-// A wall segment is more like a prop than a ground tile: a rectangular
-// model (half a tile wide) snapped to the outer edge of the tile it's
-// built on (north/east/south/west, cycled via rotation), textured from a
-// wallpaper/paint material. "window" and "door" kinds reuse the same box
-// with a small decal so they're distinguishable here.
+// Corner tiles (e.g. sidewalk_corner) cover two adjacent sides of a tile
+// edge at once (e.g. north+east). Rotation cycles which corner of the tile
+// it occupies. Used by updateTileCornerMarker() below to draw the schematic
+// orientation marker.
 //
 
-// Sized to match main.js's real in-game walls (WALL_HEIGHT / WALL_THICKNESS):
-// width spans the full tile edge (1 unit) so adjacent segments butt together
-// with no gap, instead of floating as isolated half-width posts.
-const WALL_SEGMENT_WIDTH     = 1;
-const WALL_SEGMENT_HEIGHT    = 1.2;
-const WALL_SEGMENT_THICKNESS = 0.1;
-
-// Rotation snaps to one of the tile's 4 outer edges rather than free rotation —
-// each 90° step picks the next side, and the wall is offset to sit right on
-// that edge (like main.js's real floorplan walls), not floating in the middle.
-const WALL_SIDES = ["north", "east", "south", "west"];
-
-function wallSideFromRotation(rotation) {
-  const steps = Math.round((((rotation % 360) + 360) % 360) / 90) % 4;
-  return WALL_SIDES[steps];
-}
-
-// Corner pieces cover two adjacent sides at once (e.g. north+east), forming
-// an L that meets exactly at the tile's corner since each arm already spans
-// the full edge. Rotation cycles which corner of the tile it occupies.
 const CORNER_SIDE_PAIRS = [
   ["north", "east"],
   ["east", "south"],
@@ -296,174 +279,6 @@ const CORNER_SIDE_PAIRS = [
 function cornerSidesFromRotation(rotation) {
   const steps = Math.round((((rotation % 360) + 360) % 360) / 90) % 4;
   return CORNER_SIDE_PAIRS[steps];
-}
-
-// Label used in status text — a single side for straight/window/door kinds,
-// or the joined pair (e.g. "north-east") for corner kind.
-function wallSideLabel(templateId, rotation) {
-  const tmpl = (definitions.wall_segment_templates || {})[templateId] || {};
-  if (tmpl.kind === "corner") return cornerSidesFromRotation(rotation).join("-");
-  return wallSideFromRotation(rotation);
-}
-
-// Resolve a material id (from any template, not just tiles) to a texture
-// or flat color — shared by wall segments here and reusable elsewhere.
-function resolveMaterialVisual(materialId) {
-  const material = materialId ? (definitions.material_templates || {})[materialId] : null;
-  if (material && material.texture) return { textureUrl: material.texture, color: null };
-  if (material && material.color)   return { textureUrl: null, color: parseInt(material.color.replace("#", ""), 16) };
-  return { textureUrl: null, color: 0xdddddd };
-}
-
-// Shared positioning: offsets an object (mesh or group) from the tile
-// center out to the given edge, matching gridToWorld's tile-center origin.
-function positionOnWallSide(obj, side) {
-  let px = 0;
-  let pz = 0;
-  if (side === "north") pz -= 0.5;
-  if (side === "south") pz += 0.5;
-  if (side === "west")  px -= 0.5;
-  if (side === "east")  px += 0.5;
-  obj.position.set(px, 0, pz);
-}
-
-// Proportions (fractions of the wall segment's own width/height) for the
-// hollowed-out door and window openings — mirrors main.js's createDoorSegment
-// / createWindowSegment, which use the same fractions in absolute units at
-// the real in-game wall scale.
-const DOOR_WIDTH_FRACTION         = 0.55;
-const DOOR_TOP_HEIGHT_FRACTION    = 0.16;
-const WINDOW_LOWER_FRACTION       = 0.32;
-const WINDOW_UPPER_FRACTION       = 0.25;
-const WINDOW_GLASS_WIDTH_FRACTION = 0.85;
-
-// Door: an actual gap in the wall — left/right jambs plus a header above the
-// opening, with nothing spanning the doorway itself.
-function buildDoorSideMesh(side, horizontal, material) {
-  const group = new THREE.Group();
-
-  const doorWidth  = WALL_SEGMENT_WIDTH * DOOR_WIDTH_FRACTION;
-  const jambWidth  = (WALL_SEGMENT_WIDTH - doorWidth) / 2;
-  const topHeight  = WALL_SEGMENT_HEIGHT * DOOR_TOP_HEIGHT_FRACTION;
-
-  const jambGeo = horizontal
-    ? new THREE.BoxGeometry(jambWidth, WALL_SEGMENT_HEIGHT, WALL_SEGMENT_THICKNESS)
-    : new THREE.BoxGeometry(WALL_SEGMENT_THICKNESS, WALL_SEGMENT_HEIGHT, jambWidth);
-
-  const topGeo = horizontal
-    ? new THREE.BoxGeometry(doorWidth, topHeight, WALL_SEGMENT_THICKNESS)
-    : new THREE.BoxGeometry(WALL_SEGMENT_THICKNESS, topHeight, doorWidth);
-
-  const left  = new THREE.Mesh(jambGeo, material);
-  const right = new THREE.Mesh(jambGeo, material);
-  const top   = new THREE.Mesh(topGeo, material);
-
-  const jambOffset = WALL_SEGMENT_WIDTH / 2 - jambWidth / 2;
-  if (horizontal) {
-    left.position.x  = -jambOffset;
-    right.position.x =  jambOffset;
-  } else {
-    left.position.z  = -jambOffset;
-    right.position.z =  jambOffset;
-  }
-  top.position.y = WALL_SEGMENT_HEIGHT / 2 - topHeight / 2;
-
-  group.add(left, right, top);
-  positionOnWallSide(group, side);
-  return group;
-}
-
-// Window: solid sill and header around a hollow band filled only with a
-// translucent "glass" pane, instead of an opaque box with a decal on top.
-function buildWindowSideMesh(side, horizontal, material) {
-  const group = new THREE.Group();
-
-  const lowerHeight = WALL_SEGMENT_HEIGHT * WINDOW_LOWER_FRACTION;
-  const upperHeight = WALL_SEGMENT_HEIGHT * WINDOW_UPPER_FRACTION;
-  const glassHeight = WALL_SEGMENT_HEIGHT - lowerHeight - upperHeight;
-  const glassWidth  = WALL_SEGMENT_WIDTH * WINDOW_GLASS_WIDTH_FRACTION;
-
-  const lowerGeo = horizontal
-    ? new THREE.BoxGeometry(WALL_SEGMENT_WIDTH, lowerHeight, WALL_SEGMENT_THICKNESS)
-    : new THREE.BoxGeometry(WALL_SEGMENT_THICKNESS, lowerHeight, WALL_SEGMENT_WIDTH);
-
-  const upperGeo = horizontal
-    ? new THREE.BoxGeometry(WALL_SEGMENT_WIDTH, upperHeight, WALL_SEGMENT_THICKNESS)
-    : new THREE.BoxGeometry(WALL_SEGMENT_THICKNESS, upperHeight, WALL_SEGMENT_WIDTH);
-
-  const glassGeo = horizontal
-    ? new THREE.BoxGeometry(glassWidth, glassHeight, WALL_SEGMENT_THICKNESS / 2)
-    : new THREE.BoxGeometry(WALL_SEGMENT_THICKNESS / 2, glassHeight, glassWidth);
-
-  const glassMaterial = new THREE.MeshBasicMaterial({
-    color:       0x88ccff,
-    transparent: true,
-    opacity:     0.35,
-    side:        THREE.DoubleSide
-  });
-
-  const lower = new THREE.Mesh(lowerGeo, material);
-  const upper = new THREE.Mesh(upperGeo, material);
-  const glass = new THREE.Mesh(glassGeo, glassMaterial);
-
-  lower.position.y = -WALL_SEGMENT_HEIGHT / 2 + lowerHeight / 2;
-  upper.position.y =  WALL_SEGMENT_HEIGHT / 2 - upperHeight / 2;
-  glass.position.y = (lowerHeight - upperHeight) / 2;
-
-  group.add(lower, upper, glass);
-  positionOnWallSide(group, side);
-  return group;
-}
-
-// Builds one full-edge wall piece for a given side, positioned relative to
-// the tile center (parent group is what gets moved to the tile's world
-// position). Straight/corner kinds get a plain solid box; door/window kinds
-// get an actual hollowed-out opening instead of a decal on a solid box.
-function buildWallSideMesh(side, material, kind) {
-  const horizontal = side === "north" || side === "south";
-
-  if (kind === "door")   return buildDoorSideMesh(side, horizontal, material);
-  if (kind === "window") return buildWindowSideMesh(side, horizontal, material);
-
-  const mesh = new THREE.Mesh(
-    new THREE.BoxGeometry(
-      horizontal ? WALL_SEGMENT_WIDTH     : WALL_SEGMENT_THICKNESS,
-      WALL_SEGMENT_HEIGHT,
-      horizontal ? WALL_SEGMENT_THICKNESS : WALL_SEGMENT_WIDTH
-    ),
-    material
-  );
-  positionOnWallSide(mesh, side);
-
-  return mesh;
-}
-
-function addWallSegmentMarker(entry) {
-  const tmpl   = (definitions.wall_segment_templates || {})[entry.template] || {};
-  const visual = resolveMaterialVisual(tmpl.material);
-
-  const material = visual.textureUrl
-    ? new THREE.MeshBasicMaterial({ map: getTexture(visual.textureUrl) })
-    : new THREE.MeshBasicMaterial({ color: visual.color ?? 0xdddddd });
-
-  const world = gridToWorld(entry.x, entry.y);
-  const group = new THREE.Group();
-  group.position.set(world.x, WALL_SEGMENT_HEIGHT / 2, world.z);
-
-  let side;
-  if (tmpl.kind === "corner") {
-    const sides = cornerSidesFromRotation(entry.rotation || 0);
-    for (const s of sides) group.add(buildWallSideMesh(s, material, "corner"));
-    side = sides.join("-");
-  } else {
-    side = wallSideFromRotation(entry.rotation || 0);
-    group.add(buildWallSideMesh(side, material, tmpl.kind));
-  }
-
-  group.userData = { type: "wall_segment", id: entry.id, template: entry.template, side };
-
-  placedGroup.add(group);
-  return group;
 }
 
 //
@@ -572,8 +387,8 @@ function paintTile(x, y, type, rotation = 0) {
 // Draws (or clears) the schematic corner marker for a tile. Only tile
 // templates with kind "corner" (e.g. sidewalk_corner) get one — it's the
 // only visual sign of orientation, since the tile texture itself doesn't
-// change per rotation. Reuses cornerSidesFromRotation()/WALL_SIDES logic
-// defined below in the WALL SEGMENTS section (hoisted, safe to call here).
+// change per rotation. Reuses cornerSidesFromRotation() defined above in
+// the TILE CORNER ORIENTATION section (hoisted, safe to call here).
 function updateTileCornerMarker(x, y, type, rotation) {
   const gridKey  = key(x, y);
   const existing = tileCornerMarkers.get(gridKey);
@@ -673,7 +488,7 @@ function commitPlacement(tile) {
       y:        tile.y,
       rotation: placementState.rotation
     };
-    worldState.placed_props.push(entry);
+    worldState.props.push(entry);
     addPropMarker(entry);
     document.getElementById("editorSelection").innerHTML = `
       <b>Placed prop</b><br>
@@ -692,7 +507,7 @@ function commitPlacement(tile) {
       y:        tile.y,
       rotation: placementState.rotation
     };
-    worldState.floorplans.push(entry);
+    worldState.buildings.push(entry);
     addFloorplanMarker(entry);
     document.getElementById("editorSelection").innerHTML = `
       <b>Placed floorplan</b><br>
@@ -700,26 +515,6 @@ function commitPlacement(tile) {
       @ ${entry.x}, ${entry.y}
     `;
     setStatus(`Placed floorplan: ${entry.template} @ ${entry.x}, ${entry.y}`);
-    return;
-  }
-
-  if (placementState.mode === "wall_segment") {
-    const entry = {
-      id:       crypto.randomUUID(),
-      template: placementState.templateId,
-      x:        tile.x,
-      y:        tile.y,
-      rotation: placementState.rotation
-    };
-    worldState.wall_segments.push(entry);
-    addWallSegmentMarker(entry);
-    const side = wallSideLabel(entry.template, entry.rotation);
-    document.getElementById("editorSelection").innerHTML = `
-      <b>Placed wall segment</b><br>
-      ${entry.template}<br>
-      @ ${entry.x}, ${entry.y} (${side} side)
-    `;
-    setStatus(`Placed wall segment: ${entry.template} @ ${entry.x}, ${entry.y} (${side} side)`);
     return;
   }
 }
@@ -803,10 +598,8 @@ function updatePlaceButton() {
 }
 
 //
-// Rotate control — rotates the currently-armed placement (floorplan, prop,
-// or wall segment) in 90° steps before it's committed. Visually meaningful
-// for wall segments right now, since props/floorplans are placeholder
-// markers with no directional shape yet.
+// Rotate control — rotates the currently-armed placement (floorplan or prop)
+// in 90° steps before it's committed.
 //
 
 function updateRotateButton() {
@@ -823,11 +616,7 @@ function rotatePlacement() {
   }
   if (!placementState.active) return;
   placementState.rotation = (placementState.rotation + 90) % 360;
-  if (placementState.mode === "wall_segment") {
-    setStatus(`Wall side: ${wallSideLabel(placementState.templateId, placementState.rotation)}`);
-  } else {
-    setStatus(`Rotation: ${placementState.rotation}°`);
-  }
+  setStatus(`Rotation: ${placementState.rotation}°`);
 }
 
 document.getElementById("btn-rotate").onclick = rotatePlacement;
@@ -956,28 +745,6 @@ document.getElementById("btn-place_prop").onclick = () => {
 };
 
 //
-// Place Wall button
-//
-
-document.getElementById("btn-place_wall").onclick = () => {
-  buildModalList(
-    document.getElementById("list-place_wall"),
-    definitions.wall_segment_templates,
-    (id) => {
-      setActiveTool("place_wall");
-      placementState.templateId = id;
-      placementState.mode       = "wall_segment";
-      placementState.active     = true;
-      placementState.rotation   = 0;
-      updatePlaceButton();
-      closeModal("modal-place_wall");
-      setStatus(`Place wall: ${id} — snaps to the tile's north edge by default, press R to cycle sides, then double-click or Place Here`);
-    }
-  );
-  openModal("modal-place_wall");
-};
-
-//
 // Spawn Character button
 //
 
@@ -1048,16 +815,12 @@ async function loadWorld() {
     paintTile(tile.x, tile.y, tile.type, tile.rotation || 0);
   }
 
-  for (const prop of worldState.placed_props || []) {
+  for (const prop of worldState.props || []) {
     addPropMarker(prop);
   }
 
-  for (const fp of worldState.floorplans || []) {
-    addFloorplanMarker(fp);
-  }
-
-  for (const wallSeg of worldState.wall_segments || []) {
-    addWallSegmentMarker(wallSeg);
+  for (const building of worldState.buildings || []) {
+    addFloorplanMarker(building);
   }
 }
 

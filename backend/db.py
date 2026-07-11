@@ -34,10 +34,10 @@ import time
 # excluded from the Redis-cached/Postgres-persisted world blob (see
 # main.py::loop()) and instead computed once per backend process here.
 #
-# Known limitation: since this lives outside the world dict's normal
-# persistence, editing the map (tiles) via the World Editor while this
-# process is running won't be reflected here until the backend container
-# restarts.
+# Since this lives outside the world dict's normal persistence, edits to
+# world_tiles made anywhere other than the World Editor's save endpoint
+# (which calls invalidate_static_world_cache() below) won't be reflected
+# here until the backend container restarts.
 _STATIC_WORLD_KEYS = (
     "world_tiles",
     "world_tile_lookup", "outdoor_navigation",
@@ -62,6 +62,46 @@ def _ensure_static_world_data(world, sim_id):
     if not world.get("world_tiles"):
         generate_world_tiles(world)
 
+    build_world_tile_lookup(world)
+    build_traffic_network(world)
+    build_outdoor_navigation(world)
+
+    _static_world_cache[sim_id] = {
+        k: world[k] for k in _STATIC_WORLD_KEYS if k in world
+    }
+
+
+def invalidate_static_world_cache(sim_id):
+    """Drop the cached static grid data so the next load_world() rebuilds it
+    from scratch (procedural regeneration). Only correct when there is no
+    edited world_tiles to restore from — otherwise use
+    refresh_static_world_cache(), which preserves edits. NOT called from the
+    generic save_world() path, since the tick loop's durability saves go
+    through that too and unconditionally invalidating there would
+    reintroduce the rebuild cost this cache exists to avoid."""
+    _static_world_cache.pop(sim_id, None)
+
+
+def refresh_static_world_cache(sim_id, world_tiles):
+    """Rebuild the process-local static-world cache from an edited
+    world_tiles array (e.g. from the World Editor's save) instead of
+    discarding it. Popping the cache alone isn't enough here: world_tiles is
+    deliberately excluded from the Redis/Postgres-persisted world blob (see
+    main.py::loop()), so the next cache-miss rebuild would fall back to pure
+    procedural regeneration and silently lose the edit. Rebuilding the
+    derived structures (lookup/traffic/nav) directly from the posted tiles
+    and re-caching them makes editor terrain edits stick for the life of
+    this process, same as the original procedurally-generated grid did."""
+    if not world_tiles:
+        invalidate_static_world_cache(sim_id)
+        return
+
+    from world.world_tiles import (
+        build_world_tile_lookup,
+        build_traffic_network
+    )
+
+    world = {"world_tiles": world_tiles}
     build_world_tile_lookup(world)
     build_traffic_network(world)
     build_outdoor_navigation(world)

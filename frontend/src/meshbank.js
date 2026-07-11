@@ -1347,7 +1347,7 @@ function loadModel(url){
     clearMarkers();
     document
     .getElementById(
-        "anchors"
+        "anchorList"
     )
     .innerHTML = "";
 

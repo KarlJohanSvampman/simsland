@@ -1377,6 +1377,16 @@ function updateFloorplanFloors(state){
 }
 
 
+// Matches the World Editor's TILE_COLORS palette (editor-main.js) so
+// outdoor tiles look consistent between the editor and the live game.
+const _TILE_TYPE_COLORS = {
+  grass:    0x3f7a3f,
+  road:     0x333333,
+  sidewalk: 0xaaaaaa,
+  park:     0x55aa55,
+  water:    0x3377cc,
+};
+
 function createTile(tile){
 
   const mesh = new THREE.Mesh(
@@ -1386,9 +1396,8 @@ function createTile(tile){
     new THREE.MeshStandardMaterial({
 
       color:
-        tile.walkable
-        ? 0x557799
-        : 0xaa3333,
+        _TILE_TYPE_COLORS[tile.type]
+        ?? (tile.walkable ? 0x557799 : 0xaa3333),
 
       side: THREE.DoubleSide
     })
@@ -1437,6 +1446,16 @@ function updateTiles(state){
   // =========================
 
   for(const tile of arr){
+
+    // Floorplan-interior tiles (runtime_tiles, injected into this same
+    // array alongside outdoor ground) are rendered separately by
+    // updateFloorplanFloors()/createFloorMesh — this generic ground
+    // renderer is for outdoor tiles only. Interior tiles have no
+    // `walkable` field, so createTile's fallback treated them as
+    // "blocked" and rendered a solid red box on top of the real floor.
+    if(tile.interior){
+      continue;
+    }
 
     const key =
       `${tile.x},${tile.y}`;
@@ -2040,6 +2059,17 @@ delete loadingCharacters[id];
     if(active.has(id)) continue;
 
     const mesh = sims[id];
+
+    // Speech bubbles are CSS2DObject children of the character mesh —
+    // scene.remove(mesh) drops them from the Three.js scene graph but
+    // doesn't tell speechBubbles/CSS2DRenderer to clean up, leaving an
+    // orphaned DOM element behind (visible as a stray empty bubble) if
+    // this character ever comes back (e.g. after going off-grid), since
+    // getOrCreateBubble would otherwise still find the stale entry.
+    if(speechBubbles[id]){
+      mesh.remove(speechBubbles[id].cssObject);
+      delete speechBubbles[id];
+    }
 
     scene.remove(mesh);
 

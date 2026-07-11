@@ -10116,6 +10116,53 @@
           "mesh": null
         }
       }
+    },
+    "adult_female": {
+      "name": "New Character",
+      "age_range": [
+        25,
+        40
+      ],
+      "traits": [],
+      "model": "adult_female",
+      "bone_slots": {
+        "head": "mixamorigHead",
+        "neck": "mixamorigNeck",
+        "right_hand": "mixamorigRightHand",
+        "left_hand": "mixamorigLeftHand",
+        "spine": "mixamorigSpine2",
+        "pelvis": "mixamorigHips",
+        "right_foot": "mixamorigRightFoot",
+        "left_foot": "mixamorigLeftFoot"
+      },
+      "needs": {
+        "hunger": 100,
+        "energy": 100,
+        "hygiene": 100,
+        "social": 100,
+        "fun": 100
+      },
+      "skills": {
+        "cooking": 0,
+        "cleaning": 0,
+        "repair": 0,
+        "social": 0
+      },
+      "employment": {
+        "job": "",
+        "salary": 0
+      },
+      "daily_schedule": {
+        "sleep": [
+          22,
+          6
+        ],
+        "work": [
+          8,
+          17
+        ]
+      },
+      "starting_inventory": []
     }
   },
   "interaction_templates": {
@@ -19899,8 +19946,14 @@
           "interior": true,
           "floor": true,
           "walls": {
-            "north": { "type": "wall", "material": "paint_white_matt" },
-            "west":  { "type": "wall", "material": "paint_white_matt" }
+            "north": {
+              "type": "wall",
+              "material": "paint_white_matt"
+            },
+            "west": {
+              "type": "wall",
+              "material": "paint_white_matt"
+            }
           }
         },
         "1,0": {
@@ -19908,7 +19961,10 @@
           "interior": true,
           "floor": true,
           "walls": {
-            "north": { "type": "wall", "material": "paint_white_matt" }
+            "north": {
+              "type": "wall",
+              "material": "paint_white_matt"
+            }
           }
         },
         "2,0": {
@@ -19916,8 +19972,14 @@
           "interior": true,
           "floor": true,
           "walls": {
-            "north": { "type": "wall", "material": "paint_white_matt" },
-            "east":  { "type": "wall", "material": "paint_white_matt" }
+            "north": {
+              "type": "wall",
+              "material": "paint_white_matt"
+            },
+            "east": {
+              "type": "wall",
+              "material": "paint_white_matt"
+            }
           }
         },
         "0,1": {
@@ -19925,7 +19987,10 @@
           "interior": true,
           "floor": true,
           "walls": {
-            "west": { "type": "wall", "material": "paint_white_matt" }
+            "west": {
+              "type": "wall",
+              "material": "paint_white_matt"
+            }
           }
         },
         "1,1": {
@@ -19938,7 +20003,10 @@
           "interior": true,
           "floor": true,
           "walls": {
-            "east": { "type": "window", "material": "paint_white_matt" }
+            "east": {
+              "type": "window",
+              "material": "paint_white_matt"
+            }
           }
         },
         "0,2": {
@@ -19946,8 +20014,14 @@
           "interior": true,
           "floor": true,
           "walls": {
-            "south": { "type": "wall", "material": "paint_white_matt" },
-            "west":  { "type": "wall", "material": "paint_white_matt" }
+            "south": {
+              "type": "wall",
+              "material": "paint_white_matt"
+            },
+            "west": {
+              "type": "wall",
+              "material": "paint_white_matt"
+            }
           }
         },
         "1,2": {
@@ -19955,7 +20029,10 @@
           "interior": true,
           "floor": true,
           "walls": {
-            "south": { "type": "door", "material": "paint_beige_matt" }
+            "south": {
+              "type": "door",
+              "material": "paint_beige_matt"
+            }
           }
         },
         "2,2": {
@@ -19963,8 +20040,14 @@
           "interior": true,
           "floor": true,
           "walls": {
-            "south": { "type": "wall", "material": "paint_white_matt" },
-            "east":  { "type": "wall", "material": "paint_white_matt" }
+            "south": {
+              "type": "wall",
+              "material": "paint_white_matt"
+            },
+            "east": {
+              "type": "wall",
+              "material": "paint_white_matt"
+            }
           }
         }
       },

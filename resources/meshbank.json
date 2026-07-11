@@ -606,5 +606,12 @@
   "toilet_a": {
     "mesh": "/resources/props/toilet_a.glb",
     "category": "props"
+  },
+  "adult_female": {
+    "display_name": "adult_female",
+    "category": "characters",
+    "subfolder": null,
+    "tags": [],
+    "anchors": {}
   }
 }

@@ -3,7 +3,7 @@ from pathlib import Path
 import json
 import uuid
 
-from db import load_world, save_world
+from db import load_world, save_world, refresh_static_world_cache, _STATIC_WORLD_KEYS
 from core.definitions import load_definitions as _load_defs_core
 
 from systems.navigation import cache_floorplan
@@ -17,7 +17,20 @@ def get_world(sim_id: str):
 
 @router.post("/world")
 def save(sim_id: str, data: dict):
-    save_world(sim_id, data)
+    # world_tiles and its derived nav structures (world_tile_lookup,
+    # outdoor_navigation, road_graph, etc.) are deliberately excluded from
+    # the persisted world blob everywhere else (see main.py::loop()) so that
+    # load_world() always rebuilds them from the process-local static cache
+    # instead of serving a snapshot straight from Redis/Postgres. The editor
+    # posts the full merged world dict back (it round-trips whatever
+    # loadWorld() gave it), which would otherwise smuggle stale derived nav
+    # data into persistence and get served ahead of the freshly-rebuilt
+    # cache below. Strip them before persisting; keep the human-edited
+    # world_tiles only to refresh the process-local cache.
+    world_tiles = data.get("world_tiles")
+    persisted = {k: v for k, v in data.items() if k not in _STATIC_WORLD_KEYS}
+    save_world(sim_id, persisted)
+    refresh_static_world_cache(sim_id, world_tiles)
     return {"status": "ok"}
 
 

@@ -130,7 +130,7 @@ def get_view(
     ]
 
     # =====================================
-    # RUNTIME TILES
+    # RUNTIME TILES (floorplan interiors)
     # =====================================
 
     tiles = [
@@ -153,6 +153,30 @@ def get_view(
             radius
         )
     ]
+
+    # =====================================
+    # OUTDOOR WORLD TILES (grass/road/sidewalk)
+    # =====================================
+    # These were never sent to the live game client at all — only
+    # floorplan-interior tiles were, via runtime_tiles above — so outdoor
+    # ground never rendered. Walk just the viewport range through
+    # world_tile_lookup (O(radius^2), not the full 300x300 grid) rather
+    # than scanning world["world_tiles"] (90k entries) on every request.
+    # Skip anything a building's floorplan already covers, so outdoor
+    # grass/road doesn't render on top of interior floors.
+    building_footprint = {
+        (t["x"], t["y"])
+        for t in world.get("runtime_tiles", [])
+    }
+
+    tile_lookup = world.get("world_tile_lookup", {})
+    for wx in range(cx - radius, cx + radius + 1):
+        for wy in range(cy - radius, cy + radius + 1):
+            if (wx, wy) in building_footprint:
+                continue
+            t = tile_lookup.get(f"{wx},{wy}")
+            if t:
+                tiles.append(t)
 
     # =====================================
     # RUNTIME ROOMS
