@@ -54,6 +54,10 @@ def fire_incidental(character, speech_type, text, world, target_id=None):
     Uses the same current_speech field as apply_speech() but is called
     directly here so we don't import action_router (circular).
     """
+    text = (text or "").strip()
+    if not text:
+        return
+
     tick = world.get("tick", 0)
     character["current_speech"] = {
         "utterance":       text,

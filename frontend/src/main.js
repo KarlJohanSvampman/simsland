@@ -181,10 +181,6 @@ light.position.set(10,20,10);
 
 scene.add(light);
 
-scene.add(
-  new THREE.GridHelper(100,100)
-);
-
 const loader = new GLTFLoader();
 
 const characterAnimations = {};
@@ -1805,9 +1801,13 @@ function updateSpeechBubbles(state){
     }
 
     const speech = c.current_speech;
+    // .trim() guards against a whitespace-only utterance slipping through
+    // some server-side code path — truthy but visually blank, which would
+    // otherwise show as an empty bubble box.
+    const utterance = speech?.utterance?.trim();
 
-    if(speech && speech.utterance){
-      div.textContent = speech.utterance;
+    if(utterance){
+      div.textContent = utterance;
       div.style.display = "block";
     } else {
       div.style.display = "none";
@@ -1981,6 +1981,78 @@ const loaded =
   model.animations =
   loaded.animations;
 
+  // Without this, Three.js frustum-culls a SkinnedMesh using its
+  // bind-pose (T-pose) bounding sphere, so a moving character can skip
+  // GPU bone-matrix uploads for a frame and render a stale pose
+  // overlapping the current one — visible as the model appearing to
+  // render "twice". Same fix already used in meshbank.js/animbank.js.
+  model.traverse(o => {
+    if (!o.isMesh) return;
+    o.frustumCulled = false;
+    const mats = Array.isArray(o.material) ? o.material : [o.material];
+    mats.forEach(m => {
+      if (!m) return;
+      m.side       = THREE.DoubleSide;
+      m.depthWrite = true;
+    });
+  });
+  model.traverse(o => {
+    if (o.isSkinnedMesh && o.skeleton) o.skeleton.pose();
+  });
+
+  // Some exported rigs (seen on Mixamo-derived character GLBs) bake a
+  // cm-to-meters scale correction onto BOTH the top-level object node and
+  // the skeleton's own root bone, instead of just once — the two 0.01
+  // factors compound to 0.0001 on the skeleton while the mesh geometry
+  // only inherits the single 0.01, so skinning renders the character at
+  // ~1% of its intended size. Same fix as meshbank.js/animbank.js: detect
+  // the mismatch and correct the skeleton root's own scale to match the
+  // mesh's world scale again.
+  model.traverse(o => {
+    if (!o.isSkinnedMesh || !o.skeleton || !o.skeleton.bones.length) return;
+
+    const rootBone = o.skeleton.bones.find(b => !b.parent?.isBone);
+    if (!rootBone) return;
+
+    const meshScale = new THREE.Vector3();
+    o.getWorldScale(meshScale);
+
+    const boneScale = new THREE.Vector3();
+    rootBone.getWorldScale(boneScale);
+
+    if (boneScale.x === 0) return;
+
+    const correction = meshScale.x / boneScale.x;
+    if (Math.abs(correction - 1) > 0.01) {
+      rootBone.scale.multiplyScalar(correction);
+      rootBone.updateMatrixWorld(true);
+    }
+  });
+
+  // Some exported rigs also bake an erroneous rotation (seen: 90° about X)
+  // onto the shared parent of the mesh and skeleton root, tipping/
+  // contorting skinned characters instead of standing them upright. The
+  // mesh's own geometry has no compensating rotation to cancel this back
+  // out, so the fix is to zero out the skeleton root's WORLD rotation
+  // entirely (not match it to the mesh's, which carries the same tilt).
+  model.traverse(o => {
+    if (!o.isSkinnedMesh || !o.skeleton || !o.skeleton.bones.length) return;
+
+    const rootBone = o.skeleton.bones.find(b => !b.parent?.isBone);
+    if (!rootBone || !rootBone.parent) return;
+
+    const worldQuat = new THREE.Quaternion();
+    rootBone.getWorldQuaternion(worldQuat);
+
+    const angleDeg = 2 * Math.acos(Math.min(1, Math.abs(worldQuat.w))) * 180 / Math.PI;
+    if (angleDeg > 5) {
+      const parentWorldQuat = new THREE.Quaternion();
+      rootBone.parent.getWorldQuaternion(parentWorldQuat);
+      rootBone.quaternion.copy(parentWorldQuat.clone().invert());
+      rootBone.updateMatrixWorld(true);
+    }
+  });
+
     // =========================
     // ANIMATION SETUP
     // =========================
@@ -2040,6 +2112,22 @@ const loaded =
       o.receiveShadow = true;
     }
   });
+
+  // Clicking the thin/gappy skinned-mesh geometry directly (limbs, gaps
+  // between them, etc.) is an unreliable click target, especially at the
+  // isometric zoom levels this game plays at — add a simple invisible
+  // cylinder covering the character's full silhouette so any click within
+  // roughly their outline selects them, not just a click that happens to
+  // land exactly on a rendered triangle.
+  const selectionHitbox = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.4, 0.4, 1.8, 8),
+    new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false })
+  );
+  selectionHitbox.name = "_selectionHitbox";
+  selectionHitbox.position.y = 0.9;
+  selectionHitbox.castShadow = false;
+  selectionHitbox.receiveShadow = false;
+  model.add(selectionHitbox);
 
   selectable.push(model);
 
@@ -2722,21 +2810,30 @@ function _setWallFaded(entry, faded) {
 
 function updateWallOcclusion() {
   const hitKeysThisFrame = new Set();
-  const camPos = camera.position;
   const _target = new THREE.Vector3();
   const _dir    = new THREE.Vector3();
+  const _origin = new THREE.Vector3();
+
+  // For an OrthographicCamera, view rays are all parallel to the camera's
+  // forward direction — they do NOT converge at camera.position the way
+  // perspective rays do. Using (target - camera.position) as the ray only
+  // matches reality for a target sitting exactly on the camera's optical
+  // axis; for anyone off-center it tests a ray that isn't actually what's
+  // occluding them on screen, which is why walls were fading in and out
+  // seemingly at random. The correct ray for orthographic occlusion is
+  // parallel to the camera's constant view direction, offset back from
+  // each target individually.
+  camera.getWorldDirection(_dir);
+  const RAY_BACK_DISTANCE = 50;
 
   for (const id in sims) {
     sims[id].getWorldPosition(_target);
     _target.y += 1.0; // aim roughly torso/head height, not the feet
 
-    _dir.copy(_target).sub(camPos);
-    const distance = _dir.length();
-    if (distance < 0.001) continue;
-    _dir.normalize();
+    _origin.copy(_dir).multiplyScalar(-RAY_BACK_DISTANCE).add(_target);
 
-    _occlusionRaycaster.set(camPos, _dir);
-    _occlusionRaycaster.far = Math.max(distance - 0.15, 0);
+    _occlusionRaycaster.set(_origin, _dir);
+    _occlusionRaycaster.far = Math.max(RAY_BACK_DISTANCE - 0.15, 0);
 
     for (const wallKey in wallRegistry) {
       if (hitKeysThisFrame.has(wallKey)) continue;

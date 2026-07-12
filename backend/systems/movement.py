@@ -126,6 +126,34 @@ def update_character_movement(
         0.05
     )
 
+    # =====================================
+    # STUCK DETECTION
+    # =====================================
+    # The interpolation below always closes `dist` by exactly `speed` per
+    # tick, so it can't stall on its own — but nothing upstream guarantees
+    # `path`/`route` stay valid (e.g. a stale route computed against a
+    # since-changed building, or c["x"]/c["y"] getting perturbed by
+    # another system). Previously a character wedged into that state had
+    # no way out until the next LLM decision cycle, which can be minutes
+    # away — track lack of progress here and abandon the route so a fresh
+    # decision gets made promptly instead of leaving them frozen.
+    last_dist = c.get("_stuck_last_dist")
+    if last_dist is not None and dist >= last_dist - (speed * 0.5):
+        c["_stuck_ticks"] = c.get("_stuck_ticks", 0) + 1
+    else:
+        c["_stuck_ticks"] = 0
+    c["_stuck_last_dist"] = dist
+
+    if c["_stuck_ticks"] > 60:
+        c["route"] = []
+        c["route_segment_index"] = 0
+        c["path_index"] = 0
+        c["is_moving"] = False
+        c["animation_state"] = "idle"
+        c["_stuck_ticks"] = 0
+        c["_stuck_last_dist"] = None
+        return False
+
     # Pushable prop — apply walk_speed_modifier and drag prop along
     pushed_prop_id = c.get("pushed_prop_id")
     if pushed_prop_id:
