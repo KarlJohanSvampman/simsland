@@ -11,7 +11,7 @@ Key changes vs. original:
   - Agent ticks are offloaded to the Redis queue (unchanged from before).
 """
 
-import asyncio, os, json
+import asyncio, os, json, traceback
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -121,92 +121,103 @@ async def loop():
     definitions = load_definitions(SIM_ID)
 
     while True:
-        world = load_world(SIM_ID)
-        ensure_world_defaults(world)
-        world["definitions"] = definitions
+        try:
+            world = load_world(SIM_ID)
+            ensure_world_defaults(world)
+            world["definitions"] = definitions
 
-        # tick() blocks synchronously on concurrent.futures.as_completed
-        # while character agent threads run (including real LLM calls, up
-        # to ~150s each) — running it inline here would freeze the entire
-        # event loop (all HTTP/WebSocket handling) for that whole duration.
-        # Runs on its own dedicated executor (not asyncio's shared default
-        # one) so it can never starve other request handling of a thread.
-        await asyncio.get_event_loop().run_in_executor(_tick_executor, tick, world)
+            # tick() blocks synchronously on concurrent.futures.as_completed
+            # while character agent threads run (including real LLM calls, up
+            # to ~150s each) — running it inline here would freeze the entire
+            # event loop (all HTTP/WebSocket handling) for that whole duration.
+            # Runs on its own dedicated executor (not asyncio's shared default
+            # one) so it can never starve other request handling of a thread.
+            await asyncio.get_event_loop().run_in_executor(_tick_executor, tick, world)
 
-        update_world_tick(SIM_ID, world["tick"])
+            update_world_tick(SIM_ID, world["tick"])
 
-        # Offload LLM-heavy agent work to Redis queue
-        for c in list(world.get("characters", {}).values()):
-            enqueue({
-                "type":          "agent_tick",
-                "simulation_id": SIM_ID,
-                "character_id":  c["id"],
-            })
+            # Offload LLM-heavy agent work to Redis queue
+            for c in list(world.get("characters", {}).values()):
+                enqueue({
+                    "type":          "agent_tick",
+                    "simulation_id": SIM_ID,
+                    "character_id":  c["id"],
+                })
 
-        # Collect what changed this tick — must happen before persisting
-        # below, since it pops world["_dirty"] (which holds raw Python
-        # sets, not JSON-serializable) out of the tree entirely.
-        dirty = collect_dirty(world)
+            # Collect what changed this tick — must happen before persisting
+            # below, since it pops world["_dirty"] (which holds raw Python
+            # sets, not JSON-serializable) out of the tree entirely.
+            dirty = collect_dirty(world)
 
-        # Persist this tick's mutations. Without this, load_world() on the
-        # next iteration serves a stale cached snapshot (or, once the 5s
-        # Redis TTL expires, rebuilds from Postgres) and every character
-        # decision / movement update / need decay this tick made is
-        # silently discarded. Re-caching every tick also means the TTL
-        # never actually expires during normal operation, so the expensive
-        # cache-miss rebuild (build_world_geometry, generate_world_tiles,
-        # build_outdoor_navigation, ...) only runs once at startup.
-        #
-        # world_tiles/world_tile_lookup/outdoor_navigation/etc. are excluded
-        # here — together ~46MB of static, purely-derived grid data — and
-        # re-serializing/re-deserializing that on every load_world() call
-        # (every tick, AND every incoming request that reads world state)
-        # was causing severe multi-second latency under any concurrent
-        # load. db.py's _ensure_static_world_data cheaply restores them
-        # from a process-local cache whenever they're missing.
-        persisted_snapshot = {
-            k: v for k, v in world.items()
-            if k not in (
-                "world_tiles", "world_tile_lookup", "outdoor_navigation",
-                "road_entry_points", "road_exit_points", "road_graph", "traffic",
-            )
-        }
+            # Persist this tick's mutations. Without this, load_world() on the
+            # next iteration serves a stale cached snapshot (or, once the 5s
+            # Redis TTL expires, rebuilds from Postgres) and every character
+            # decision / movement update / need decay this tick made is
+            # silently discarded. Re-caching every tick also means the TTL
+            # never actually expires during normal operation, so the expensive
+            # cache-miss rebuild (build_world_geometry, generate_world_tiles,
+            # build_outdoor_navigation, ...) only runs once at startup.
+            #
+            # world_tiles/world_tile_lookup/outdoor_navigation/etc. are excluded
+            # here — together ~46MB of static, purely-derived grid data — and
+            # re-serializing/re-deserializing that on every load_world() call
+            # (every tick, AND every incoming request that reads world state)
+            # was causing severe multi-second latency under any concurrent
+            # load. db.py's _ensure_static_world_data cheaply restores them
+            # from a process-local cache whenever they're missing.
+            persisted_snapshot = {
+                k: v for k, v in world.items()
+                if k not in (
+                    "world_tiles", "world_tile_lookup", "outdoor_navigation",
+                    "road_entry_points", "road_exit_points", "road_graph", "traffic",
+                )
+            }
 
-        await asyncio.get_event_loop().run_in_executor(
-            _tick_executor, set_world_cache, SIM_ID, persisted_snapshot
-        )
-
-        # Durability: periodically persist to Postgres too, so simulation
-        # progress survives a backend restart instead of only reflecting
-        # whatever was last explicitly saved via the World Editor.
-        if world["tick"] % 30 == 0:
             await asyncio.get_event_loop().run_in_executor(
-                _tick_executor, save_world, SIM_ID, persisted_snapshot
+                _tick_executor, set_world_cache, SIM_ID, persisted_snapshot
             )
 
-        # Broadcast to each client
-        dead = []
-        for client in _clients:
-            ws   = client["ws"]
-            cx   = client.get("cx", 0)
-            cy   = client.get("cy", 0)
-            zoom = client.get("zoom", 2)
-            try:
-                if client.get("needs_full"):
-                    snapshot = _build_full_snapshot(world, definitions, cx, cy, zoom)
-                    snapshot["type"] = "snapshot"
-                    await ws.send_json(snapshot)
-                    client["needs_full"] = False
-                else:
-                    delta = _build_delta(dirty, cx, cy, zoom)
-                    if delta:
-                        await ws.send_json(delta)
-            except Exception:
-                dead.append(client)
+            # Durability: periodically persist to Postgres too, so simulation
+            # progress survives a backend restart instead of only reflecting
+            # whatever was last explicitly saved via the World Editor.
+            if world["tick"] % 30 == 0:
+                await asyncio.get_event_loop().run_in_executor(
+                    _tick_executor, save_world, SIM_ID, persisted_snapshot
+                )
 
-        for client in dead:
-            if client in _clients:
-                _clients.remove(client)
+            # Broadcast to each client
+            dead = []
+            for client in _clients:
+                ws   = client["ws"]
+                cx   = client.get("cx", 0)
+                cy   = client.get("cy", 0)
+                zoom = client.get("zoom", 2)
+                try:
+                    if client.get("needs_full"):
+                        snapshot = _build_full_snapshot(world, definitions, cx, cy, zoom)
+                        snapshot["type"] = "snapshot"
+                        await ws.send_json(snapshot)
+                        client["needs_full"] = False
+                    else:
+                        delta = _build_delta(dirty, cx, cy, zoom)
+                        if delta:
+                            await ws.send_json(delta)
+                except Exception:
+                    dead.append(client)
+
+            for client in dead:
+                if client in _clients:
+                    _clients.remove(client)
+        except Exception:
+            # This loop is a single long-lived background task that nothing
+            # supervises or restarts — an unhandled exception here (e.g. the
+            # psycopg2 "connection cannot be re-entered recursively" crash
+            # this guards against, now also fixed at the source by db.py's
+            # _conn_lock) used to kill the task outright, silently freezing
+            # the whole simulation *and* every client's WebSocket feed
+            # (broadcast happens from inside this same loop) until the
+            # backend was restarted. Log and keep ticking instead.
+            traceback.print_exc()
 
         await asyncio.sleep(tick_rate)
 

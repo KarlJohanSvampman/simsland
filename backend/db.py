@@ -1,4 +1,4 @@
-import psycopg2, json, os
+import psycopg2, json, os, threading
 from core.cache import get_world_cache, set_world_cache
 from core.cache import get_char_cache, set_char_cache
 from systems.schema_defaults import (
@@ -141,8 +141,23 @@ conn = connect_with_retry()
 # no-op since each statement is already committed as it executes).
 conn.autocommit = True
 
+# psycopg2 connections aren't safe for concurrent use from multiple
+# threads. This one module-level `conn` is touched both from main.py's
+# dedicated tick executor thread (every tick, via update_world_tick/
+# save_world) and from FastAPI's own request threadpool (any plain `def`
+# route — e.g. the World Editor's POST /world — runs there, off the main
+# event loop). When those two threads' `with conn:`/`with conn.cursor()`
+# blocks overlapped, psycopg2 raised "the connection cannot be re-entered
+# recursively", which crashed main.py's loop() task outright — since
+# nothing supervises/restarts that task, the whole simulation (and every
+# client's WebSocket feed, which is broadcast from inside the same loop)
+# silently froze until the backend was restarted. Serializing all access
+# to `conn` through this lock closes that race. RLock (not Lock) because
+# init_db() calls save_world() while already holding the lock itself.
+_conn_lock = threading.RLock()
+
 def init_db():
-    with conn:
+    with _conn_lock, conn:
         with conn.cursor() as cur:
             cur.execute("""
             CREATE TABLE IF NOT EXISTS characters (
@@ -235,7 +250,7 @@ def load_world(sim_id):
     # LOAD DB
     # =====================================
 
-    with conn.cursor() as cur:
+    with _conn_lock, conn.cursor() as cur:
 
         cur.execute(
 
@@ -355,7 +370,7 @@ def load_world(sim_id):
     return world
 
 def save_world(sim_id, world):
-    with conn:
+    with _conn_lock, conn:
         with conn.cursor() as cur:
             cur.execute("""
                 INSERT INTO world (simulation_id, data)
@@ -370,7 +385,7 @@ def save_world(sim_id, world):
 
 def save_character_safe(c, sim_id="default"):
 
-    with conn:
+    with _conn_lock, conn:
         with conn.cursor() as cur:
             cur.execute("""
                 UPDATE characters
@@ -522,7 +537,7 @@ def load_character(
     sim_id="default"
 ):
 
-    with conn.cursor() as cur:
+    with _conn_lock, conn.cursor() as cur:
 
         cur.execute(
 
@@ -553,7 +568,7 @@ def load_character(
         return c
 
 def update_world_tick(sim_id, tick):
-    with conn:
+    with _conn_lock, conn:
         with conn.cursor() as cur:
             cur.execute("""
                 UPDATE world
