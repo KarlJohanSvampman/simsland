@@ -162,6 +162,21 @@ button.primary { background: #1a5080; border-color: #3a80c0; color: #ddeeff; }
     padding: 4px 6px; background: #141820; border: 1px solid #3a4050;
     color: #ccc; border-radius: 3px; font-size: 12px; width: 100%;
 }
+.stanceGroup { margin-bottom: 10px; }
+.stanceGroupLabel {
+    font-size: 11px; color: #88aacc; text-transform: uppercase;
+    margin-bottom: 4px;
+}
+
+/* transitions */
+.transRow {
+    display: flex; align-items: center; gap: 4px;
+    padding: 4px 8px; border-bottom: 1px solid #252a32;
+}
+.transRow:last-child { border-bottom: none; }
+.transRow select { flex: 1; min-width: 0; }
+.transRow .transDel { padding: 2px 6px; font-size: 11px; flex: none; }
+#transitionList { border: 1px solid #2e3440; border-radius: 3px; margin: 0 12px 6px; min-height: 30px; }
 
 /* notify list */
 #notifySection { padding: 8px 12px 0; border-top: 1px solid #2a3040; }
@@ -304,32 +319,22 @@ select { padding: 4px 6px; background: #1a1e28; border: 1px solid #3a4050; color
         </div>
       </div>
 
-      <!-- Locomotion mapping — per-character (per-source) assignment of
-           which clip fills each movement state, consumed by the live
-           game's animation lookup instead of its hardcoded clip-name
-           convention. -->
-      <div class="section hidden" id="locomotionPanel">
-        <h3>Locomotion</h3>
-        <div class="locoRow">
-          <label>Idle</label>
-          <select id="locoIdle"></select>
-        </div>
-        <div class="locoRow">
-          <label>Walk</label>
-          <select id="locoWalk"></select>
-        </div>
-        <div class="locoRow">
-          <label>Jog / Run</label>
-          <select id="locoRun"></select>
-        </div>
-        <div class="locoRow">
-          <label>Crouch Idle</label>
-          <select id="locoCrouchIdle"></select>
-        </div>
-        <div class="locoRow">
-          <label>Crouch Walk</label>
-          <select id="locoCrouchWalk"></select>
-        </div>
+      <!-- Stance mapping — per-character (per-source) assignment of which
+           clip fills each body-stance's idle/movement animation, consumed
+           by the live game's animation lookup instead of its hardcoded
+           clip-name convention. Rows are generated from the STANCES config
+           in animbank.js, not hardcoded here. -->
+      <div class="section hidden" id="stancesPanel">
+        <h3>Stances</h3>
+        <div id="stanceList"></div>
+      </div>
+
+      <!-- Transitions — sparse from/to stance-pair graph, each pair
+           optionally assigned a one-shot transition template (e.g. "slip
+           and fall" for standing->fallen). Rows generated dynamically. -->
+      <div class="section hidden" id="transitionsPanel">
+        <h3>Transitions <button id="addTransitionBtn" style="font-size:10px;padding:2px 6px;margin-left:8px">+ Add Transition</button></h3>
+        <div id="transitionList"></div>
       </div>
 
     </div><!-- /sidebarTop -->

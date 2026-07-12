@@ -41,6 +41,7 @@ Tile assembly box schema:
 }
 """
 
+import copy
 import uuid
 
 
@@ -117,6 +118,16 @@ def assemble_prop(c, world, item_id):
         "x":           int(c.get("x", 0)),
         "y":           int(c.get("y", 0)),
         "rotation":    0,
+        # Deep-copied from the template so anchor-based systems
+        # (occupancy's find_free_anchor/reserve_anchor, props.get_anchor/
+        # find_nearest_anchor) — which all read anchors off the placed
+        # instance, not the template — actually have something to find.
+        # Must be a copy, not the same list/dicts as the template: reserve_
+        # anchor() mutates an anchor's occupied_by/queue in place, and
+        # every prop assembled from this template shares one `template`
+        # object read from world["definitions"] — a shallow reference here
+        # would let one sofa's occupancy leak into every other sofa.
+        "anchors":     copy.deepcopy(template.get("anchors", [])),
         "state": {
             "reserved_by":  [],
             "dirty":        False,

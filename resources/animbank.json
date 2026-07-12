@@ -835,6 +835,24 @@
       "run": "8f1d2ec5-c601-4de8-92ff-b97104a5fe0f",
       "crouch_idle": "205122e5-62ae-4300-8e80-be8073f3bdd2",
       "crouch_walk": "b22ff053-d891-44cb-b12e-69f4fad82f02"
-    }
+    },
+    "stances": {
+      "standing": {
+        "idle": "9a7effad-738c-40c6-853c-9dd5d61c45d9",
+        "walk": "33b25eb8-5e1e-4c0c-a8aa-a3ccb9985d37",
+        "run": "8f1d2ec5-c601-4de8-92ff-b97104a5fe0f"
+      },
+      "sitting_seat": {},
+      "sitting_floor": {},
+      "lying": {},
+      "crouching": {
+        "idle": "205122e5-62ae-4300-8e80-be8073f3bdd2",
+        "move": "b22ff053-d891-44cb-b12e-69f4fad82f02"
+      },
+      "crawling": {},
+      "fallen": {},
+      "leaning_wall": {}
+    },
+    "transitions": []
   }
 }

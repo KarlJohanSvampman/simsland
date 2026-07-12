@@ -47,8 +47,8 @@ Rules:
 - "lean_against_wall": lean casually against a nearby wall. Does NOT interrupt conversations,
   negotiations, or any other ongoing activity — it is purely a posture change. No target needed;
   the nearest wall is found automatically. Only valid when posture.can_lean is true.
-- "push_off_wall": stand back up from leaning. Only valid when posture.current == "leaning".
-- "sit_down": sit on a nearby seat prop (target the prop id). Sets posture to sitting.
+- "push_off_wall": stand back up from leaning. Only valid when posture.current == "leaning_wall".
+- "sit_down": sit on a nearby seat prop (target the prop id). Sets posture to sitting_seat.
 - "stand_up": stand up from sitting or lying.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━

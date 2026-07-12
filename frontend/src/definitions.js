@@ -266,6 +266,118 @@ function renderBoneSlotEditor() {
 }
 
 // =====================================================
+// TRAIT RANDOMIZER
+// =====================================================
+// Fills a character_templates entry's `traits` (personal, from
+// trait_templates) and `abnormal_traits` (physical, from
+// physical_trait_templates) with a random pick, optionally weighted by
+// polarity. This only edits the template JSON in place, same as
+// renderBoneSlotEditor() above — saving goes through the existing Save
+// button / saveDefinitions().
+
+// Sample `count` distinct entries from `pool` (array of {id, polarity}).
+// Clamped to pool size — asking for more than exists just returns
+// everything available, no error.
+function _sampleTraits(pool, count) {
+  const shuffled = pool.slice().sort(() => Math.random() - 0.5);
+  return shuffled.slice(0, Math.max(0, count)).map(t => t.id);
+}
+
+// positive/negative both true -> split the count evenly between the two
+// polarity subsets. Only one true -> sample only that polarity. Neither
+// true -> unweighted sample from the whole pool (including neutral).
+function _randomPickTraits(pool, count, positive, negative) {
+  if (positive && negative) {
+    const posCount = Math.ceil(count / 2);
+    const negCount = count - posCount;
+    return [
+      ..._sampleTraits(pool.filter(t => t.polarity === "positive"), posCount),
+      ..._sampleTraits(pool.filter(t => t.polarity === "negative"), negCount),
+    ];
+  }
+  if (positive) return _sampleTraits(pool.filter(t => t.polarity === "positive"), count);
+  if (negative) return _sampleTraits(pool.filter(t => t.polarity === "negative"), count);
+  return _sampleTraits(pool, count);
+}
+
+function _traitPool(templatesDict) {
+  return Object.entries(templatesDict || {}).map(([id, t]) => ({ id, polarity: t.polarity }));
+}
+
+function renderTraitRandomizerEditor() {
+
+  const container = document.getElementById('traitRandomizerEditor');
+  container.innerHTML = '';
+
+  if (currentTab !== 'character_templates') return;
+  if (!currentTemplateId) return;
+
+  const personalCountInput = document.createElement('input');
+  personalCountInput.type = 'number'; personalCountInput.min = 0; personalCountInput.value = 3;
+
+  const physicalCountInput = document.createElement('input');
+  physicalCountInput.type = 'number'; physicalCountInput.min = 0; physicalCountInput.value = 1;
+
+  const makeRow = (labelText, input) => {
+    const row = document.createElement('div');
+    row.className = 'traitRandRow';
+    const label = document.createElement('label');
+    label.textContent = labelText;
+    row.appendChild(label);
+    row.appendChild(input);
+    return row;
+  };
+  container.appendChild(makeRow('Personal traits', personalCountInput));
+  container.appendChild(makeRow('Physical traits', physicalCountInput));
+
+  const checkboxRow = document.createElement('div');
+  checkboxRow.className = 'traitRandCheckboxes';
+
+  const posCheckbox = document.createElement('input');
+  posCheckbox.type = 'checkbox';
+  const posLabel = document.createElement('label');
+  posLabel.appendChild(posCheckbox);
+  posLabel.appendChild(document.createTextNode('Positive'));
+
+  const negCheckbox = document.createElement('input');
+  negCheckbox.type = 'checkbox';
+  const negLabel = document.createElement('label');
+  negLabel.appendChild(negCheckbox);
+  negLabel.appendChild(document.createTextNode('Negative'));
+
+  checkboxRow.appendChild(posLabel);
+  checkboxRow.appendChild(negLabel);
+  container.appendChild(checkboxRow);
+
+  const generateBtn = document.createElement('button');
+  generateBtn.id = 'traitRandomizeBtn';
+  generateBtn.textContent = 'Generate';
+  generateBtn.onclick = () => {
+    let template;
+    try {
+      template = JSON.parse(jsonEditor.value);
+    } catch {
+      return;
+    }
+
+    const personalPool = _traitPool(definitions.trait_templates);
+    const physicalPool = _traitPool(definitions.physical_trait_templates);
+
+    template.traits = _randomPickTraits(
+      personalPool, parseInt(personalCountInput.value) || 0,
+      posCheckbox.checked, negCheckbox.checked
+    );
+    template.abnormal_traits = _randomPickTraits(
+      physicalPool, parseInt(physicalCountInput.value) || 0,
+      posCheckbox.checked, negCheckbox.checked
+    );
+
+    jsonEditor.value = JSON.stringify(template, null, 2);
+  };
+  container.appendChild(generateBtn);
+}
+
+// =====================================================
 // LOAD MESHBANK
 // =====================================================
 
@@ -325,6 +437,7 @@ function renderTabs() {
       } else {
         renderTemplateList();
         document.getElementById('boneSlotEditor').innerHTML = '';
+        document.getElementById('traitRandomizerEditor').innerHTML = '';
       }
     };
 
@@ -389,6 +502,7 @@ function openTemplate(id) {
   }
 
   renderBoneSlotEditor();
+  renderTraitRandomizerEditor();
 
   // Choose preview type based on tab
   _ixActive = false;  // deactivate interaction preview whenever we switch away
@@ -640,6 +754,7 @@ function loadPreviewModel(path) {
     });
 
     renderBoneSlotEditor();
+    renderTraitRandomizerEditor();
 
     setStatus(`Loaded: ${path}`);
 

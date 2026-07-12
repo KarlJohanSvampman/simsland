@@ -96,8 +96,9 @@ def clear_expired_speech(c, world):
 
 def _route_move(c, world, action):
     # Moving always clears a leaning posture
-    if c.get("posture") == "leaning":
-        c["posture"]        = "standing"
+    if c.get("posture") == "leaning_wall":
+        from systems.posture import set_posture
+        set_posture(c, world, "standing")
         c["leaning_wall_id"] = None
 
     target_id = action.get("target")
@@ -242,12 +243,14 @@ def _route_eat(c, world, action):
 # =========================================================
 
 def _route_sleep(c, world, action):
+    from systems.posture import set_posture
     target_id = action.get("target")
     c["activity"] = _scaffold(
         c, world, "sleep",
         target_id=target_id,
         interaction="sleep",
     )
+    set_posture(c, world, "lying")
 
 
 # =========================================================
@@ -1032,24 +1035,45 @@ def _route_charge_device(c, world, action):
 # =========================================================
 
 def _route_sit_down(c, world, action):
+    from systems.posture import set_posture
+    from systems.props import get_prop_by_id
+    from systems.occupancy import find_free_anchor, reserve_anchor
+
+    target_id = action.get("target")
     c["activity"] = _scaffold(c, world, "sit_down_seat",
-                               target_id=action.get("target"),
+                               target_id=target_id,
                                interaction="sit_down_seat")
-    c["posture"] = "sitting"
+    set_posture(c, world, "sitting_seat")
+
+    # Anchor onto the seat prop (if any) so the frontend snaps the
+    # character's position/facing to the chair's anchor_sit node, the same
+    # anchor-reservation dance _execute_use_seat() does for the queue-based
+    # seating flow — see updateIK() in main.js, which reads c.seat_prop_id.
+    prop = get_prop_by_id(world, target_id) if target_id else None
+    if prop:
+        anchor = find_free_anchor(prop, "sit")
+        if anchor:
+            reserve_anchor(c, prop, anchor)
+        c["seat_prop_id"] = target_id
 
 
 def _route_stand_up(c, world, action):
-    c["posture"] = "standing"
+    from systems.posture import set_posture
+    from systems.occupancy import release_anchor
+    set_posture(c, world, "standing")
+    release_anchor(c, world)
+    c.pop("seat_prop_id", None)
     act = c.get("activity", {})
     if act.get("interaction") in ("sit_down_seat", "lie_down", "sleep"):
         c["activity"] = None
 
 
 def _route_lie_down(c, world, action):
+    from systems.posture import set_posture
     c["activity"] = _scaffold(c, world, "lie_down",
                                target_id=action.get("target"),
                                interaction="lie_down")
-    c["posture"] = "lying"
+    set_posture(c, world, "lying")
 
 
 def _route_lean_against_wall(c, world, action):
@@ -1059,6 +1083,7 @@ def _route_lean_against_wall(c, world, action):
     Does NOT touch c["activity"] — ongoing conversations, negotiations,
     and touch proposals continue uninterrupted.
     """
+    from systems.posture import set_posture
     from systems.walls import find_leanable_wall
     wall_id = action.get("target") or action.get("wall_id")
     if not wall_id:
@@ -1066,13 +1091,14 @@ def _route_lean_against_wall(c, world, action):
         if not result:
             return
         wall_id = result["wall_id"]
-    c["posture"]         = "leaning"
+    set_posture(c, world, "leaning_wall")
     c["leaning_wall_id"] = wall_id
 
 
 def _route_push_off_wall(c, world, action):
     """Stand back up from leaning — does not touch activity."""
-    c["posture"]         = "standing"
+    from systems.posture import set_posture
+    set_posture(c, world, "standing")
     c["leaning_wall_id"] = None
 
 

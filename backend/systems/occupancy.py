@@ -28,6 +28,8 @@ def release_anchor(c, world):
     if not occ:
         return
 
+    c["occupying"] = None
+
     prop_id = occ["prop_id"]
     anchor_name = occ["anchor_name"]
 

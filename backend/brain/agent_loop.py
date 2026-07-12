@@ -110,6 +110,10 @@ from systems.action_router import (
     clear_expired_speech
 )
 
+from systems.posture import (
+    promote_pending_posture
+)
+
 from systems.activity_queue import (
     process_activity_queue,
     suspend_activity_queue,
@@ -168,6 +172,8 @@ def update_internal_state(
     distribute_lt_needs(c, world=world)
 
     clear_expired_speech(c, world)
+
+    promote_pending_posture(c, world)
 
     decay_memories(c)
 

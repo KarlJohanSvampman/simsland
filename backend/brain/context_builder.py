@@ -1600,7 +1600,7 @@ def _build_posture_context(c, world):
     """Surface the character's current physical posture to the LLM."""
     posture = c.get("posture", "standing")
     result  = {"current": posture}
-    if posture == "leaning":
+    if posture == "leaning_wall":
         result["leaning_on"]   = c.get("leaning_wall_id")
         result["can_push_off"] = True
     elif posture == "standing":

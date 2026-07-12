@@ -45,14 +45,18 @@ async function loadMeshbank() {
 }
 
 // =========================================================
-// ANIMBANK  (per-character locomotion template mapping)
+// ANIMBANK  (per-character stance/transition template mapping)
 // =========================================================
-// animBank[modelKey].locomotion = { idle, walk, run, crouch_idle, crouch_walk }
-// — maps each movement state to an animbank TEMPLATE id (animbank.html's
-// Templates tab), not a raw clip, so locomotion reuses the same reusable
-// chain/variant abstraction as every other animation in the bank. Keyed
-// the same way as meshbank (by the character's `model` field), since
-// animbank derives its source key from the same GLB filename convention.
+// animBank[modelKey].stances = { standing: {idle,walk,run}, sitting_seat:
+// {idle}, ... } and .transitions = [{from,to,template}, ...] — map each
+// stance's idle/movement slot, and each authored stance-pair transition,
+// to an animbank TEMPLATE id (animbank.html's Templates tab), not a raw
+// clip, so this reuses the same reusable chain/variant abstraction as
+// every other animation in the bank. Keyed the same way as meshbank (by
+// the character's `model` field), since animbank derives its source key
+// from the same GLB filename convention. See resolveLocomotionMap() below
+// for the flattening into a single state->clip lookup, and animbank.js's
+// STANCES config / backend/systems/posture.py for the matching key names.
 
 let animBank = {};
 
@@ -65,19 +69,52 @@ async function loadAnimBank() {
   }
 }
 
-// Resolves a character's locomotion state->template mapping down to
-// state->clip, using each template's first chain step (the loopable
-// clip) — the live game only plays one continuous clip per locomotion
+// Canonical stance -> animation_state key, mirrored from animbank.js's
+// STANCES config and backend/systems/posture.py's _IDLE_KEY — keep all
+// three in sync if this vocabulary changes.
+const _STANCE_IDLE_KEY = {
+  standing: "idle", sitting_seat: "sit_idle", sitting_floor: "sit_idle_floor",
+  lying: "lie_idle", crouching: "crouch_idle", crawling: "crawl_idle",
+  fallen: "fallen_idle", leaning_wall: "leaning_idle", carry: "carry_idle",
+};
+const _STANCE_MOVE_KEY = {
+  standing_walk: "walk", standing_run: "run",
+  crouching_move: "crouch_walk", crawling_move: "crawl",
+  carry_move: "carry_walk",
+};
+
+// Resolves a character's stance/transition state->template mapping down to
+// state->clip, using each template's first chain step (the loopable clip)
+// — the live game only plays one continuous clip per stance/transition
 // state, not a full template chain/notify sequence.
 function resolveLocomotionMap(modelKey) {
-  const locomotion = animBank[modelKey]?.locomotion;
-  if (!locomotion) return null;
+  const src = animBank[modelKey];
+  if (!src) return null;
 
   const templates = animBank._templates || {};
+  const clipOf = (templateId) => templates[templateId]?.chain?.[0]?.clip;
   const resolved = {};
 
-  for (const [state, templateId] of Object.entries(locomotion)) {
-    const clip = templates[templateId]?.chain?.[0]?.clip;
+  for (const [stance, slots] of Object.entries(src.stances || {})) {
+    for (const [slot, templateId] of Object.entries(slots || {})) {
+      const clip = clipOf(templateId);
+      if (!clip) continue;
+      const key = slot === "idle" ? _STANCE_IDLE_KEY[stance] : _STANCE_MOVE_KEY[`${stance}_${slot}`];
+      if (key) resolved[key] = clip;
+    }
+  }
+
+  for (const t of (src.transitions || [])) {
+    const clip = clipOf(t.template);
+    if (clip) resolved[`${t.from}_to_${t.to}`] = clip;
+  }
+
+  // Legacy fallback — sources not yet migrated by animbank.js (e.g. an
+  // animbank.json saved before this change and never reopened in the
+  // authoring tool) still work via the old flat locomotion map.
+  for (const [state, templateId] of Object.entries(src.locomotion || {})) {
+    if (resolved[state]) continue;
+    const clip = clipOf(templateId);
     if (clip) resolved[state] = clip;
   }
 
@@ -898,26 +935,19 @@ function _setLayer(animData, layer, newStem) {
 // PLAY LAYERED ANIMATION
 // =========================================================
 
-// The 5 states a character's animbank locomotion mapping can override —
-// see animbank.html's Locomotion panel. Each maps to a single clip used
-// for both lower and upper layers (no separate upper-body variant for
-// these, unlike interaction states).
-const LOCOMOTION_OVERRIDE_STATES = new Set([
-  "idle", "walk", "run", "crouch_idle", "crouch_walk"
-]);
-
 function playLayeredAnim(animData, animState) {
   const key = (animState || "idle").toLowerCase();
 
-  let layers = ANIM_LAYERS[key];
-
-  if (LOCOMOTION_OVERRIDE_STATES.has(key)) {
-    const override = animData.locomotionMap?.[key];
-    if (override) {
-      const stem = override.toLowerCase();
-      layers = { lower: stem, upper: stem };
-    }
-  }
+  // A character's animbank stance/transition mapping (see animbank.html's
+  // Stances/Transitions panels) can override any state key, not just a
+  // fixed allowlist — any stance idle/move slot or any authored
+  // {from}_to_{to} transition pair resolves through here the same way.
+  // Each maps to a single clip used for both lower and upper layers (no
+  // separate upper-body variant for these, unlike interaction states).
+  const override = animData.locomotionMap?.[key];
+  const layers = override
+    ? { lower: override.toLowerCase(), upper: override.toLowerCase() }
+    : ANIM_LAYERS[key];
 
   if (!layers) {
     // Unknown state — fall back to full-body single action

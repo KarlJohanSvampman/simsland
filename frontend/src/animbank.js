@@ -1004,7 +1004,8 @@ function playChainStep(idx) {
 }
 
 function renderTemplateTab() {
-    renderLocomotionPanel();
+    renderStancesPanel();
+    renderTransitionsPanel();
 
     const el = document.getElementById("templateList");
     if (!el) return;
@@ -1109,12 +1110,51 @@ function updateTransportUI() {
 }
 
 // =========================================================
+// STANCE / TRANSITION MIGRATION
+// =========================================================
+// Replaces the old flat 5-state `locomotion` map with the richer `stances`
+// (per-stance idle/move template slots) + `transitions` (from->to template
+// graph) shape. `locomotion` is left in place on disk, untouched — nothing
+// reads it after this, but there's no reason to destroy it.
+
+function migrateLocomotionToStances(src) {
+    if (!src || src.stances) return;   // already migrated (or nothing to migrate)
+
+    const loco = src.locomotion || {};
+    src.stances = {
+        standing:      { idle: loco.idle, walk: loco.walk, run: loco.run },
+        sitting_seat:  {},
+        sitting_floor: {},
+        lying:         {},
+        crouching:     { idle: loco.crouch_idle, move: loco.crouch_walk },
+        crawling:      {},
+        fallen:        {},
+        leaning_wall:  {},
+    };
+    // Drop undefined slots rather than storing them — matches the existing
+    // "absent key means unset" convention used by the old locomotion map.
+    for (const slots of Object.values(src.stances)) {
+        for (const [slot, val] of Object.entries(slots)) {
+            if (val === undefined) delete slots[slot];
+        }
+    }
+    src.transitions = src.transitions || [];
+}
+
+// =========================================================
 // BANK API
 // =========================================================
 
 async function loadBank() {
     const r = await fetch("/api/animbank");
     bank = await r.json();
+    for (const [key, src] of Object.entries(bank)) {
+        // "_templates" holds the template dict itself, not a character
+        // source — skip it, migrateLocomotionToStances() is only meaningful
+        // for per-character source entries.
+        if (key === "_templates") continue;
+        if (src && typeof src === "object") migrateLocomotionToStances(src);
+    }
     renderSidebar();
     renderCategoryFilter();
     renderClipList();
@@ -1197,31 +1237,49 @@ function makeCatBtn(label, value) {
 // =========================================================
 
 // =========================================================
-// LOCOMOTION MAPPING (per source/character)
+// STANCES + TRANSITIONS (per source/character)
 // =========================================================
-// Which TEMPLATE fills each movement state for this character — read by
-// the live game (main.js) instead of its hardcoded walk/run clip-name
-// convention. Mapped to templates (not raw clips) so locomotion reuses
+// Which TEMPLATE fills each stance's idle/movement animation, and which
+// TEMPLATE (if any) plays as a one-shot transition when moving between two
+// stances — read by the live game (main.js) instead of its hardcoded
+// clip-name convention. Mapped to templates (not raw clips) so this reuses
 // the same reusable-chain/variant-pool abstraction as every other
 // animation in the bank, rather than being a one-off special case.
 //
-// The live game only plays continuous loops for these 5 states, so it
-// resolves a mapped template down to its first chain step's clip (the
-// loopable clip) at character-load time — chain steps beyond the first,
-// and notifies, aren't consumed by locomotion playback. `alternatives`
-// isn't consumed by the live game yet either (main.js's variant-pool
-// system is keyed globally by clip stem, not per-character).
+// Idle/move slots resolve a mapped template down to its first chain step's
+// clip (the loopable clip) at character-load time; transitions do too, but
+// since a transition is a one-shot rather than a loop, authoring a
+// multi-step chain (e.g. "slip" then "fall") on the template lets the
+// live game play the full sequence — see resolveLocomotionMap() in main.js.
 
-const LOCOMOTION_STATES = [
-    { key: "idle",         selectId: "locoIdle" },
-    { key: "walk",         selectId: "locoWalk" },
-    { key: "run",          selectId: "locoRun" },
-    { key: "crouch_idle",  selectId: "locoCrouchIdle" },
-    { key: "crouch_walk",  selectId: "locoCrouchWalk" },
+const STANCES = [
+    { key: "standing",      label: "Standing",
+      moves: [{ slot: "idle", label: "Idle" }, { slot: "walk", label: "Walk" }, { slot: "run", label: "Run" }] },
+    { key: "sitting_seat",  label: "Sitting (Seat)",  moves: [{ slot: "idle", label: "Idle" }] },
+    { key: "sitting_floor", label: "Sitting (Floor)", moves: [{ slot: "idle", label: "Idle" }] },
+    { key: "lying",         label: "Lying",           moves: [{ slot: "idle", label: "Idle" }] },
+    { key: "crouching",     label: "Crouching",
+      moves: [{ slot: "idle", label: "Idle" }, { slot: "move", label: "Move" }] },
+    { key: "crawling",      label: "Crawling",
+      moves: [{ slot: "idle", label: "Idle" }, { slot: "move", label: "Move" }] },
+    { key: "fallen",        label: "Fallen",          moves: [{ slot: "idle", label: "Idle" }] },
+    { key: "leaning_wall",  label: "Leaning (Wall)",  moves: [{ slot: "idle", label: "Idle" }] },
+    // Carry is an upper-body overlay (legs keep walking/idling normally
+    // while carrying), not an exclusive full-body pose like the others —
+    // main.js already has working carry_idle/carry_walk ANIM_LAYERS
+    // entries for this, so leaving these unset here keeps that fallback;
+    // authoring a template here overrides both layers with the same clip.
+    { key: "carry",         label: "Carry",
+      moves: [{ slot: "idle", label: "Idle" }, { slot: "move", label: "Move" }] },
 ];
 
-function renderLocomotionPanel() {
-    const panel = document.getElementById("locomotionPanel");
+function _templateOptionsHTML(templates, current) {
+    return `<option value="">— none —</option>` +
+        templates.map(t => `<option value="${t.id}"${t.id === current ? " selected" : ""}>${t.name}</option>`).join("");
+}
+
+function renderStancesPanel() {
+    const panel = document.getElementById("stancesPanel");
     const src = bank[currentSourceKey];
 
     if (!src) {
@@ -1230,40 +1288,115 @@ function renderLocomotionPanel() {
     }
     panel.classList.remove("hidden");
 
-    src.locomotion = src.locomotion || {};
+    migrateLocomotionToStances(src);   // defensive — matches old src.locomotion=src.locomotion||{} guard
+
+    const templates = Object.values(getTemplates())
+        .filter(t => t.source_key === currentSourceKey);
+    const title = templates.length === 0
+        ? "No templates for this character yet — create one in the Templates tab first." : "";
+
+    const listEl = document.getElementById("stanceList");
+    listEl.innerHTML = "";
+
+    for (const stance of STANCES) {
+        src.stances[stance.key] = src.stances[stance.key] || {};
+        const slots = src.stances[stance.key];
+
+        const group = document.createElement("div");
+        group.className = "stanceGroup";
+        const groupLabel = document.createElement("div");
+        groupLabel.className = "stanceGroupLabel";
+        groupLabel.textContent = stance.label;
+        group.appendChild(groupLabel);
+
+        for (const { slot, label } of stance.moves) {
+            const row = document.createElement("div");
+            row.className = "locoRow";
+            const lbl = document.createElement("label");
+            lbl.textContent = label;
+            const select = document.createElement("select");
+            select.title = title;
+            select.innerHTML = _templateOptionsHTML(templates, slots[slot] || "");
+            select.onchange = () => {
+                if (select.value) slots[slot] = select.value;
+                else delete slots[slot];
+            };
+            row.appendChild(lbl);
+            row.appendChild(select);
+            group.appendChild(row);
+        }
+        listEl.appendChild(group);
+    }
+}
+
+function renderTransitionsPanel() {
+    const panel = document.getElementById("transitionsPanel");
+    const src = bank[currentSourceKey];
+
+    if (!src) {
+        panel.classList.add("hidden");
+        return;
+    }
+    panel.classList.remove("hidden");
+
+    migrateLocomotionToStances(src);
+    src.transitions = src.transitions || [];
 
     const templates = Object.values(getTemplates())
         .filter(t => t.source_key === currentSourceKey);
 
-    for (const { key, selectId } of LOCOMOTION_STATES) {
-        const select = document.getElementById(selectId);
-        const current = src.locomotion[key] || "";
+    const listEl = document.getElementById("transitionList");
+    listEl.innerHTML = "";
 
-        select.innerHTML = `<option value="">— none —</option>` +
-            templates.map(t => `<option value="${t.id}">${t.name}</option>`).join("");
-        select.value = templates.some(t => t.id === current) ? current : "";
+    for (const t of src.transitions) {
+        const row = document.createElement("div");
+        row.className = "transRow";
 
-        if (templates.length === 0) {
-            select.title = "No templates for this character yet — create one in the Templates tab first.";
-        } else {
-            select.title = "";
+        const fromSel = document.createElement("select");
+        for (const s of STANCES) {
+            const o = document.createElement("option");
+            o.value = s.key; o.textContent = s.label;
+            if (s.key === t.from) o.selected = true;
+            fromSel.appendChild(o);
         }
+        fromSel.addEventListener("change", () => { t.from = fromSel.value; });
 
-        select.onchange = () => {
-            const src2 = bank[currentSourceKey];
-            if (!src2) return;
-            src2.locomotion = src2.locomotion || {};
-            if (select.value) {
-                src2.locomotion[key] = select.value;
-            } else {
-                delete src2.locomotion[key];
-            }
-        };
+        const arrow = document.createElement("span");
+        arrow.textContent = "→";
+        arrow.style.cssText = "color:#666;flex:none";
+
+        const toSel = document.createElement("select");
+        for (const s of STANCES) {
+            const o = document.createElement("option");
+            o.value = s.key; o.textContent = s.label;
+            if (s.key === t.to) o.selected = true;
+            toSel.appendChild(o);
+        }
+        toSel.addEventListener("change", () => { t.to = toSel.value; });
+
+        const tmplSel = document.createElement("select");
+        tmplSel.innerHTML = _templateOptionsHTML(templates, t.template || "");
+        tmplSel.addEventListener("change", () => { t.template = tmplSel.value || null; });
+
+        const del = document.createElement("button");
+        del.textContent = "✕"; del.className = "danger transDel";
+        del.addEventListener("click", () => {
+            src.transitions = src.transitions.filter(x => x.id !== t.id);
+            renderTransitionsPanel();
+        });
+
+        row.appendChild(fromSel);
+        row.appendChild(arrow);
+        row.appendChild(toSel);
+        row.appendChild(tmplSel);
+        row.appendChild(del);
+        listEl.appendChild(row);
     }
 }
 
 function renderClipList() {
-    renderLocomotionPanel();
+    renderStancesPanel();
+    renderTransitionsPanel();
 
     const el = document.getElementById("clipList");
     el.innerHTML = "";
@@ -1631,6 +1764,16 @@ function wireEvents() {
     document.getElementById("ikAddLH").addEventListener("click",    () => addIKTarget("left_hand"));
     document.getElementById("ikAddBoth").addEventListener("click",  () => addIKTarget("both_hands"));
     document.getElementById("ikAddLookAt").addEventListener("click",() => addIKTarget("look_at"));
+
+    // Transitions
+    document.getElementById("addTransitionBtn").addEventListener("click", () => {
+        const src = bank[currentSourceKey];
+        if (!src) return;
+        migrateLocomotionToStances(src);
+        src.transitions = src.transitions || [];
+        src.transitions.push({ id: crypto.randomUUID(), from: "standing", to: "standing", template: "" });
+        renderTransitionsPanel();
+    });
 
     // Template buttons (inside templateEditor)
     document.getElementById("saveTemplateBtn").addEventListener("click", saveCurrentTemplate);

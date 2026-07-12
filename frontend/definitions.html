@@ -206,6 +206,57 @@ body {
   font-size: 11px;
 }
 
+#traitRandomizerPanel {
+  padding: 8px 10px;
+  border-bottom: 1px solid #444;
+}
+
+#traitRandomizerPanel h3 {
+  margin: 0 0 6px 0;
+  font-size: 13px;
+}
+
+.traitRandRow {
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.traitRandRow label {
+  font-size: 11px;
+  width: 100px;
+  flex-shrink: 0;
+  color: #aaa;
+}
+
+.traitRandRow input[type=number] {
+  flex: 1;
+  background: #2a2f38;
+  color: white;
+  border: 1px solid #555;
+  padding: 2px 4px;
+  font-size: 11px;
+}
+
+.traitRandCheckboxes {
+  display: flex;
+  gap: 14px;
+  margin-bottom: 8px;
+  font-size: 11px;
+  color: #aaa;
+}
+
+.traitRandCheckboxes label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+#traitRandomizeBtn {
+  width: 100%;
+}
+
 #assetBrowserSection {
   flex: 1;
   display: flex;
@@ -363,6 +414,11 @@ button:hover {
   <div id="boneSlotPanel">
     <h3>Bone Slots</h3>
     <div id="boneSlotEditor"></div>
+  </div>
+
+  <div id="traitRandomizerPanel">
+    <h3>Randomize Traits</h3>
+    <div id="traitRandomizerEditor"></div>
   </div>
 
   <div id="assetBrowserSection">

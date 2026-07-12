@@ -11,7 +11,7 @@
       "anchors": [
         {
           "name": "anchor_sit",
-          "interaction": "sit_chair"
+          "interaction": "sit"
         }
       ],
       "storage": null,
@@ -10115,7 +10115,18 @@
           "color": "brown",
           "mesh": null
         }
-      }
+      },
+      "traits": [
+        "wise",
+        "charismatic",
+        "honest",
+        "greedy",
+        "egotistical"
+      ],
+      "abnormal_traits": [
+        "double_jointed",
+        "sensitive_stomach"
+      ]
     },
     "adult_female": {
       "name": "Mary Jane",
@@ -45075,6 +45086,183 @@
         "social_withdrawal",
         "self_destructive_risk"
       ]
+    }
+  },
+  "physical_trait_templates": {
+    "extra_toe": {
+      "name": "Extra Toe",
+      "polarity": "neutral",
+      "description": "Has an extra toe on one foot."
+    },
+    "giant_penis": {
+      "name": "Giant Penis",
+      "polarity": "neutral",
+      "description": "Unusually large genitalia."
+    },
+    "micro_penis": {
+      "name": "Micro Penis",
+      "polarity": "neutral",
+      "description": "Unusually small genitalia."
+    },
+    "obese": {
+      "name": "Obese",
+      "polarity": "negative",
+      "description": "Carries significant excess body weight."
+    },
+    "underweight": {
+      "name": "Underweight",
+      "polarity": "negative",
+      "description": "Notably below a healthy body weight."
+    },
+    "hyperactive_libido": {
+      "name": "Hyperactive Libido",
+      "polarity": "neutral",
+      "description": "Unusually strong sex drive."
+    },
+    "asexual": {
+      "name": "Asexual",
+      "polarity": "neutral",
+      "description": "Experiences little to no sexual attraction."
+    },
+    "sensitive_stomach": {
+      "name": "Sensitive Stomach",
+      "polarity": "negative",
+      "description": "Prone to digestive upset from rich or unfamiliar food."
+    },
+    "low_stamina": {
+      "name": "Low Stamina",
+      "polarity": "negative",
+      "description": "Tires quickly during physical activity."
+    },
+    "high_stamina": {
+      "name": "High Stamina",
+      "polarity": "positive",
+      "description": "Can sustain physical activity for long periods."
+    },
+    "insomnia": {
+      "name": "Insomnia",
+      "polarity": "negative",
+      "description": "Struggles to fall or stay asleep."
+    },
+    "large_feet": {
+      "name": "Large Feet",
+      "polarity": "neutral",
+      "description": "Notably large feet."
+    },
+    "small_feet": {
+      "name": "Small Feet",
+      "polarity": "neutral",
+      "description": "Notably small feet."
+    },
+    "extra_teeth": {
+      "name": "Extra Teeth",
+      "polarity": "neutral",
+      "description": "Has one or more supernumerary teeth."
+    },
+    "large_mole": {
+      "name": "Large Mole",
+      "polarity": "neutral",
+      "description": "A prominent, noticeable mole."
+    },
+    "body_odor": {
+      "name": "Body Odor",
+      "polarity": "negative",
+      "description": "Persistent, noticeable body odor."
+    },
+    "dwarf": {
+      "name": "Dwarf",
+      "polarity": "neutral",
+      "description": "Significantly shorter than average stature."
+    },
+    "incontinent": {
+      "name": "Incontinent",
+      "polarity": "negative",
+      "description": "Has difficulty controlling bladder or bowels."
+    },
+    "double_jointed": {
+      "name": "Double-Jointed",
+      "polarity": "positive",
+      "description": "Exceptional joint flexibility."
+    },
+    "ambidextrous": {
+      "name": "Ambidextrous",
+      "polarity": "positive",
+      "description": "Equally skilled with both hands."
+    },
+    "colorblind": {
+      "name": "Colorblind",
+      "polarity": "negative",
+      "description": "Reduced ability to distinguish certain colors."
+    },
+    "photographic_memory": {
+      "name": "Photographic Memory",
+      "polarity": "positive",
+      "description": "Recalls visual detail with exceptional accuracy."
+    },
+    "night_owl": {
+      "name": "Night Owl",
+      "polarity": "neutral",
+      "description": "Naturally more alert and active at night."
+    },
+    "fast_metabolism": {
+      "name": "Fast Metabolism",
+      "polarity": "positive",
+      "description": "Burns energy quickly; rarely gains weight."
+    },
+    "slow_metabolism": {
+      "name": "Slow Metabolism",
+      "polarity": "negative",
+      "description": "Burns energy slowly; gains weight easily."
+    },
+    "natural_athlete": {
+      "name": "Natural Athlete",
+      "polarity": "positive",
+      "description": "Picks up physical skills and sports with ease."
+    },
+    "flat_feet": {
+      "name": "Flat Feet",
+      "polarity": "negative",
+      "description": "Lacks a normal foot arch; prone to discomfort when active."
+    },
+    "very_hairy": {
+      "name": "Very Hairy",
+      "polarity": "neutral",
+      "description": "Unusually dense body hair."
+    },
+    "hairless": {
+      "name": "Hairless",
+      "polarity": "neutral",
+      "description": "Little to no body hair."
+    },
+    "hypersensitive_skin": {
+      "name": "Hypersensitive Skin",
+      "polarity": "negative",
+      "description": "Skin reacts easily to irritants and fabrics."
+    },
+    "extremely_pale": {
+      "name": "Extremely Pale",
+      "polarity": "neutral",
+      "description": "Very light, pale complexion."
+    },
+    "very_dark_complexion": {
+      "name": "Very Dark Complexion",
+      "polarity": "neutral",
+      "description": "Very deep, dark complexion."
+    },
+    "albinism": {
+      "name": "Albinism",
+      "polarity": "neutral",
+      "description": "Little to no pigmentation in skin, hair, and eyes."
+    },
+    "sixth_finger": {
+      "name": "Sixth Finger",
+      "polarity": "neutral",
+      "description": "Has an extra finger on one hand."
+    },
+    "webbed_toes": {
+      "name": "Webbed Toes",
+      "polarity": "neutral",
+      "description": "Partial webbing between toes."
     }
   },
   "abnormal_traits_registry": [

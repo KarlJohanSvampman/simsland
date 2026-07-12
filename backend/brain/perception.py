@@ -194,7 +194,7 @@ def perceived_activity(other):
     type (legacy), so both paths produce meaningful descriptions."""
 
     # Posture overlay — leaning has no activity dict
-    if other.get("posture") == "leaning":
+    if other.get("posture") == "leaning_wall":
         return "leaning against the wall"
 
     activity = other.get("activity") or {}

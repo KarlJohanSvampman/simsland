@@ -52,7 +52,10 @@ INTERACTION_ANIMATIONS = {
     "lie_down":     {"walking": "walk", "using": "lie_idle",   "finishing": "stand_up"},
 
     # --- sleep ---
-    "sleep":        {"walking": "walk", "using": "sleep_idle", "finishing": "wake_up"},
+    # "using" reuses "lie_idle" (not a separate "sleep_idle") — sleep is
+    # modeled as the "lying" stance's idle animation, same as just lying
+    # down awake; there's no distinct sleep stance.
+    "sleep":        {"walking": "walk", "using": "lie_idle",   "finishing": "wake_up"},
 
     # --- screens / entertainment ---
     "watch_tv":     {"walking": "walk", "using": "sit_idle",   "finishing": "stand_up"},
@@ -1135,6 +1138,52 @@ def start_activity(
     return True
 
 # =========================================================
+# USE SEAT / FINISH SEATED
+# =========================================================
+# Sitting is open-ended: reaching the "using" phase marks the queue task
+# done and clears the activity so a dependent task (e.g. a hobby session)
+# can dispatch next while the character stays seated. Standing back up is
+# driven externally — by complete_activity()'s hobby-session branch, or an
+# explicit stand_up route — via _finish_seated(), not by this function
+# staying active.
+
+def _execute_use_seat(c, world, act):
+    from systems.posture import set_posture
+
+    phase = act.get("phase", "walking")
+
+    if phase == "walking":
+        if c.get("is_moving"):
+            return True
+
+        # Arrived — anchor onto the seat and sit down. seat_prop_id is set
+        # on the character (not just the activity dict) because that's
+        # what complete_activity()'s hobby-session branch and
+        # _finish_seated() both read to know a character is seated.
+        c["seat_prop_id"] = act.get("seat_prop_id")
+        set_posture(c, world, "sitting_seat")
+        set_activity_phase(act, "using", world)
+        return True
+
+    if phase == "using":
+        from systems.activity_queue import mark_queue_task_done
+        mark_queue_task_done(c, "use_seat", success=True)
+        c["activity"] = None
+        c["current_intention"] = None
+        return False
+
+    return True
+
+
+def _finish_seated(c, world):
+    from systems.posture import set_posture
+
+    c.pop("seat_prop_id", None)
+    release_anchor(c, world)
+    set_posture(c, world, "standing")
+
+
+# =========================================================
 # EXECUTE ACTIVITY
 # =========================================================
 
@@ -1409,6 +1458,17 @@ def complete_activity(
     if activity_type == "sleep":
         duration = c.get("activity", {}).get("duration", 28800) / 60
         on_sleep_complete(c, duration)
+        # Posture bookkeeping — set_posture() also writes a transient
+        # "lying_to_standing" animation_state, but the very next line in
+        # the caller (the "using" phase's completion branch) immediately
+        # overwrites it with the "finishing" phase's wake_up clip, so the
+        # transition key itself is never actually rendered here. That's
+        # fine: promote_pending_posture() no-ops safely once it sees
+        # animation_state no longer matches what it armed (see its guard),
+        # and wake_up -> idle already carries the character to a sane
+        # resting animation via finish_activity() a tick later.
+        from systems.posture import set_posture
+        set_posture(c, world, "standing")
 
     # =====================================
     # TOILET

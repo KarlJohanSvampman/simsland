@@ -607,7 +607,15 @@ def ensure_character_defaults(c):
     if "worn" not in c:
         from systems.clothing import ensure_worn
         ensure_worn(c)
-    c.setdefault("posture",                  "standing")  # standing | sitting | lying | leaning
+    # Legacy remap — the enum used to be standing|sitting|lying|leaning;
+    # widened to the 8-stance vocabulary (see systems/posture.py) so
+    # sitting/leaning distinguish seat-vs-floor and wall-vs-none.
+    if c.get("posture") == "sitting":
+        c["posture"] = "sitting_seat"
+    elif c.get("posture") == "leaning":
+        c["posture"] = "leaning_wall"
+    c.setdefault("posture",                  "standing")
+    # standing | sitting_seat | sitting_floor | lying | crouching | crawling | fallen | leaning_wall
     c.setdefault("leaning_wall_id",          None)        # wall being leaned on (cleared on move)
     c.setdefault("social_contract_ids",      [])
     c.setdefault("conditioning_profile",      [])   # conditioned behaviors
