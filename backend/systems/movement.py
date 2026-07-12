@@ -1,10 +1,16 @@
 from systems.personal_items import lock_home
+from systems.props import get_prop_by_id
+from systems.templates import get_prop_template
+from systems.prop_movement import get_move_capacity, get_drag_animation, get_push_animation
 import math
 
 
 # =========================================================
 # UPDATE ROUTE MOVEMENT
 # =========================================================
+
+OFFSET_DRAG = 0.6   # matches the pre-existing baby-carriage "in front" offset
+OFFSET_PUSH = 1.1   # pusher trails further back than the dragged prop itself
 
 
 def _auto_lock_on_exit(c, world):
@@ -26,6 +32,30 @@ def update_character_movement(
 
     world
 ):
+
+    # A pusher has no route/move_target of their own — they're attached to
+    # the prop, not independently walking. Position is driven entirely by
+    # the dragger's movement, so this short-circuits before the normal
+    # route logic below (which a route-less pusher would otherwise just
+    # bail out of via the `if not route` check with no effect at all).
+    pushing_prop_id = c.get("pushing_prop_id")
+    if pushing_prop_id:
+        prop = get_prop_by_id(world, pushing_prop_id)
+        if prop and prop.get("being_dragged_by"):
+            dragger = world.get("characters", {}).get(prop["being_dragged_by"])
+            if dragger:
+                ddx = dragger["x"] - prop["x"]
+                ddy = dragger["y"] - prop["y"]
+                ddist = math.hypot(ddx, ddy) or 1
+                c["x"] = prop["x"] - (ddx / ddist) * OFFSET_PUSH
+                c["y"] = prop["y"] - (ddy / ddist) * OFFSET_PUSH
+            push_anim = get_push_animation(world, prop)
+            if push_anim:
+                c["animation_state"] = push_anim
+        else:
+            # Dragger let go or prop gone — detach.
+            c["pushing_prop_id"] = None
+        return True
 
     route = c.get(
         "route",
@@ -154,25 +184,40 @@ def update_character_movement(
         c["_stuck_last_dist"] = None
         return False
 
-    # Pushable prop — apply walk_speed_modifier and drag prop along
+    # Pushable prop (baby carriage / lawnmower) — apply walk_speed_modifier
+    # and set the push animation directly. Previously looked up a
+    # "placed_props" world key nothing ever wrote to, and a "template_id"
+    # instance field that's actually called "template" — both always
+    # resolved to nothing, so this silently no-op'd every tick. The
+    # animation override also used to be written to
+    # c["_active_locomotion_override"], which nothing anywhere ever read
+    # back — fixed to set c["animation_state"] directly instead, matching
+    # the already-working pattern activities.py uses for carry_walk.
     pushed_prop_id = c.get("pushed_prop_id")
     if pushed_prop_id:
-        prop = world.get("placed_props", {}).get(pushed_prop_id)
-        if prop:
-            prop_tpl = world.get("definitions", {}).get("prop_templates", {}).get(
-                prop.get("template_id", ""), {}
-            )
+        pushed_prop = get_prop_by_id(world, pushed_prop_id)
+        if pushed_prop:
+            prop_tpl = get_prop_template(world, pushed_prop) or {}
             speed_mod = prop_tpl.get("walk_speed_modifier", 1.0)
             speed = speed * speed_mod
-            # Override locomotion style to push animation while moving
             push_anim = prop_tpl.get("push_animation")
             if push_anim:
-                c["_active_locomotion_override"] = push_anim
+                c["animation_state"] = push_anim
         else:
             # Prop gone — detach
             c.pop("pushed_prop_id", None)
-    else:
-        c.pop("_active_locomotion_override", None)
+
+    # Dragged prop (chairs/sofas/etc. — see systems/prop_movement.py)
+    dragged_prop = None
+    dragged_prop_id = c.get("dragged_prop_id")
+    if dragged_prop_id:
+        dragged_prop = get_prop_by_id(world, dragged_prop_id)
+        if dragged_prop:
+            drag_anim = get_drag_animation(world, dragged_prop)
+            if drag_anim:
+                c["animation_state"] = drag_anim
+        else:
+            c["dragged_prop_id"] = None
 
     # =====================================
     # ARRIVED TILE
@@ -204,9 +249,21 @@ def update_character_movement(
         # Keep pushed prop in front of character
         pushed_prop_id = c.get("pushed_prop_id")
         if pushed_prop_id:
-            prop = world.get("placed_props", {}).get(pushed_prop_id)
-            if prop:
-                prop["x"] = c["x"] + (dx / dist) * 0.6
-                prop["y"] = c["y"] + (dy / dist) * 0.6
+            pushed_prop = get_prop_by_id(world, pushed_prop_id)
+            if pushed_prop:
+                pushed_prop["x"] = c["x"] + (dx / dist) * OFFSET_DRAG
+                pushed_prop["y"] = c["y"] + (dy / dist) * OFFSET_DRAG
+
+        # Dragged prop trails BEHIND the character (negated offset, vs.
+        # the pushed-prop "in front" case above). A move_capacity=2 prop
+        # only actually follows once a second character has joined as
+        # pusher — otherwise it deliberately stays put; the dragger can
+        # still walk off without it.
+        if dragged_prop_id and dragged_prop:
+            capacity = get_move_capacity(dragged_prop)
+            crewed = capacity == 1 or (capacity == 2 and dragged_prop.get("being_pushed_by"))
+            if crewed:
+                dragged_prop["x"] = c["x"] - (dx / dist) * OFFSET_DRAG
+                dragged_prop["y"] = c["y"] - (dy / dist) * OFFSET_DRAG
 
     return True

@@ -33,7 +33,14 @@ VALID_ACTIONS = {
 
     "take_from_stack",
 
-    "pocket_item"
+    "pocket_item",
+
+    # Movable prop actions (see systems/prop_movement.py)
+    "drag_prop",
+
+    "push_prop",
+
+    "let_go_prop"
 }
 
 

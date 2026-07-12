@@ -136,7 +136,10 @@
         "sofa",
         "sleepable"
       ],
-      "storage": null
+      "storage": null,
+      "move_capacity": 2,
+      "drag_animation": "drag_move",
+      "push_animation": "pushing"
     },
     "toilet_a": {
       "category": "bathroom",

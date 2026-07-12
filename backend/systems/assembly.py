@@ -128,6 +128,11 @@ def assemble_prop(c, world, item_id):
         # object read from world["definitions"] — a shallow reference here
         # would let one sofa's occupancy leak into every other sofa.
         "anchors":     copy.deepcopy(template.get("anchors", [])),
+        # None = not movable at all. Unlike anchors, drag/push animation
+        # names stay template-only (read via get_prop_template() at drag
+        # time) — only move_capacity needs to be cheaply, unambiguously
+        # readable straight off the instance for route validation.
+        "move_capacity": template.get("move_capacity"),
         "state": {
             "reserved_by":  [],
             "dirty":        False,

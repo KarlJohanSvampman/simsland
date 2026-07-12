@@ -365,6 +365,92 @@ def _route_carry(c, world, action):
 
 
 # =========================================================
+# MOVABLE PROPS — drag / push / let go
+# (see systems/prop_movement.py; a prop tagged move_capacity=1 can be
+# dragged solo, move_capacity=2 needs a second character to push before
+# it actually moves)
+# =========================================================
+
+def _route_drag_prop(c, world, action):
+    from systems.props import get_prop_by_id
+    from systems.prop_movement import get_move_capacity, play_prop_action_once
+
+    target_id = action.get("target")
+    if not target_id:
+        return
+    prop = get_prop_by_id(world, target_id)
+    if not prop:
+        return
+    if get_move_capacity(prop) not in (1, 2):
+        return
+    dragger = prop.get("being_dragged_by")
+    if dragger and dragger != c["id"]:
+        return
+
+    c["dragged_prop_id"] = target_id
+    prop["being_dragged_by"] = c["id"]
+    play_prop_action_once(c, world, "start_dragging", target_idle="drag_idle")
+
+
+def _route_push_prop(c, world, action):
+    from systems.props import get_prop_by_id
+    from systems.prop_movement import get_move_capacity, play_prop_action_once
+
+    target_id = action.get("target")
+    if not target_id:
+        return
+    prop = get_prop_by_id(world, target_id)
+    if not prop:
+        return
+    if get_move_capacity(prop) != 2:
+        return
+    dragger = prop.get("being_dragged_by")
+    if not dragger or dragger == c["id"]:
+        return
+
+    c["pushing_prop_id"] = target_id
+    prop["being_pushed_by"] = c["id"]
+    # Reuses the dragger's "getting into position" clip for the pusher too
+    # — no separate pusher-specific start animation was called for.
+    play_prop_action_once(c, world, "start_dragging", target_idle="pushing")
+
+
+def _route_let_go_prop(c, world, action):
+    from systems.props import get_prop_by_id
+    from systems.prop_movement import play_prop_action_once
+
+    target_id = action.get("target")
+
+    if target_id and c.get("dragged_prop_id") != target_id and c.get("pushing_prop_id") != target_id:
+        return
+
+    dragged_id = c.get("dragged_prop_id")
+    if dragged_id:
+        prop = get_prop_by_id(world, dragged_id)
+        c["dragged_prop_id"] = None
+        if prop:
+            prop["being_dragged_by"] = None
+            # A pusher left attached to a now-driverless prop is invalid
+            # state — cascade-clear them too.
+            pusher_id = prop.pop("being_pushed_by", None)
+            if pusher_id:
+                pusher = world.get("characters", {}).get(pusher_id)
+                if pusher:
+                    pusher["pushing_prop_id"] = None
+                    play_prop_action_once(pusher, world, "let_go")
+        play_prop_action_once(c, world, "let_go")
+        return
+
+    pushing_id = c.get("pushing_prop_id")
+    if pushing_id:
+        prop = get_prop_by_id(world, pushing_id)
+        c["pushing_prop_id"] = None
+        if prop:
+            prop["being_pushed_by"] = None
+        play_prop_action_once(c, world, "let_go")
+
+
+# =========================================================
 # ROUTE CLEAN
 # Picks the correct animation based on the target prop's tags.
 # =========================================================
@@ -554,6 +640,15 @@ def route_action(c, world, action, speech, definitions=None):
 
     elif action_type == "assemble_tile":
         _route_assemble_tile(c, world, action)
+
+    elif action_type == "drag_prop":
+        _route_drag_prop(c, world, action)
+
+    elif action_type == "push_prop":
+        _route_push_prop(c, world, action)
+
+    elif action_type == "let_go_prop":
+        _route_let_go_prop(c, world, action)
 
     elif action_type == "hire_service":
         _route_hire_service(c, world, action)
@@ -933,14 +1028,15 @@ def _route_put_baby_in_carriage(c, world, action):
     prop_id    = action.get("prop_id")
     if not target_id or not prop_id:
         return
+    from systems.props import get_prop_by_id
+    from systems.templates import get_prop_template
+
     baby = world.get("characters", {}).get(target_id)
-    prop = world.get("placed_props", {}).get(prop_id)
+    prop = get_prop_by_id(world, prop_id)
     if not baby or not prop:
         return
 
-    tpl_id = prop.get("template_id", "")
-    defs   = world.get("definitions", {})
-    tpl    = defs.get("prop_templates", {}).get(tpl_id, {})
+    tpl = get_prop_template(world, prop) or {}
     if not tpl.get("pushable"):
         return
 

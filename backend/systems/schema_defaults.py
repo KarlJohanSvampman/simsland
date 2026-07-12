@@ -530,9 +530,13 @@ def ensure_character_defaults(c):
     c.setdefault("prenatal_prep",      None)           # set during pregnancy
     c.setdefault("school_enrollment",  None)           # school_template id when enrolled
 
-    # Pushable prop
+    # Pushable prop (baby carriage / lawnmower — separate mechanic from drag/push below)
     c.setdefault("pushed_prop_id",         None)       # prop instance id when pushing carriage/mower etc.
     c.setdefault("_active_locomotion_override", None)  # animation override while pushing
+
+    # Movable props (chairs/sofas/etc. — see systems/prop_movement.py)
+    c.setdefault("dragged_prop_id",        None)  # prop this character is the primary dragger of
+    c.setdefault("pushing_prop_id",        None)  # prop this character is the second-person pusher of
 
     # Impulse control — anger pressure vs self-control
     c.setdefault("impulse_state", {

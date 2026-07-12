@@ -830,6 +830,15 @@ const ANIM_LAYERS = {
   carry_idle:    { lower: "idle",        upper: "carry_idle"  },
   carry_walk:    { lower: "walk",        upper: "carry_idle"  },
 
+  // ── Movable props (drag/push) — full-body, unlike the upper-body-only
+  // item-action states above, since dragging/pushing engages the whole
+  // body, not just the arms. ──
+  drag_idle:      { lower: "drag_idle",      upper: "drag_idle"      },
+  drag_move:      { lower: "drag_move",      upper: "drag_move"      },
+  start_dragging: { lower: "start_dragging", upper: "start_dragging" },
+  let_go:         { lower: "let_go",         upper: "let_go"         },
+  pushing:        { lower: "pushing",        upper: "pushing"        },
+
   // ── Seated (sit_idle lower folds legs; upper does activity) ──
   sit_idle:      { lower: "sit_idle",    upper: "sit_idle"    },
   sit_watch:     { lower: "sit_idle",    upper: "sit_watch"   },
