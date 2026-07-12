@@ -603,6 +603,10 @@ def ensure_character_defaults(c):
     c.setdefault("watched_stocks",           [])
     c.setdefault("last_stock_check",         0)
     c.setdefault("inventory",                [])
+    # Ordered bottom->top list of item dicts held as a stack in one hand —
+    # separate from inventory (items leave inventory while stacked, same as
+    # they already leave it when placed on the ground). See systems/item_stack.py.
+    c.setdefault("held_stack",               [])
     # Clothing worn on body — populated by clothing.ensure_worn on first use
     if "worn" not in c:
         from systems.clothing import ensure_worn

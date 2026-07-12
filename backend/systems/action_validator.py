@@ -22,7 +22,18 @@ VALID_ACTIONS = {
 
     "work",
 
-    "socialize"
+    "socialize",
+
+    # Item stack actions (see systems/item_stack.py)
+    "add_to_stack",
+
+    "put_down_stack",
+
+    "search_stack",
+
+    "take_from_stack",
+
+    "pocket_item"
 }
 
 
@@ -67,7 +78,9 @@ def validate_target(
 
     world,
 
-    action
+    action,
+
+    c=None
 ):
 
     target = action.get(
@@ -111,6 +124,21 @@ def validate_target(
 
         if b["id"] == target:
             return True
+
+    # =====================================
+    # ITEM TARGET (inventory, held stack, placed)
+    # =====================================
+
+    if c is not None:
+
+        if any(i.get("id") == target for i in c.get("inventory", [])):
+            return True
+
+        if any(i.get("id") == target for i in c.get("held_stack", [])):
+            return True
+
+    if target in world.get("placed_items", {}):
+        return True
 
     return False
 
@@ -184,7 +212,9 @@ def validate_action(
 
         world,
 
-        action
+        action,
+
+        c
     ):
 
         return False

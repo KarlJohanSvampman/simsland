@@ -663,6 +663,16 @@ def route_action(c, world, action, speech, definitions=None):
         _route_lean_against_wall(c, world, action)
     elif action_type == "push_off_wall":
         _route_push_off_wall(c, world, action)
+    elif action_type == "add_to_stack":
+        _route_add_to_stack(c, world, action)
+    elif action_type == "put_down_stack":
+        _route_put_down_stack(c, world, action)
+    elif action_type == "search_stack":
+        _route_search_stack(c, world, action)
+    elif action_type == "take_from_stack":
+        _route_take_from_stack(c, world, action)
+    elif action_type == "pocket_item":
+        _route_pocket_item(c, world, action)
 
 # =========================================================
 # SOCIAL CONTRACT HANDLERS
@@ -1358,6 +1368,86 @@ def _route_break_item(c, world, action):
 
 
 # =========================================================
+# ITEM STACK ACTIONS  (see systems/item_stack.py)
+# =========================================================
+
+def _route_add_to_stack(c, world, action):
+    """Add a placed item to the character's held stack — rejected outright
+    if the item's stack_position is 'not_stackable'."""
+    from systems.item_stack import add_to_held_stack, play_item_action_once
+    item_id = action.get("item_id") or action.get("target")
+    if not item_id:
+        return
+    placed = world.setdefault("placed_items", {})
+    item = placed.get(item_id)
+    if not item or item.get("stack_position", "not_stackable") == "not_stackable":
+        return
+    del placed[item_id]
+    item.pop("x", None)
+    item.pop("y", None)
+    item.pop("placed_by", None)
+    item.pop("placed_at_tick", None)
+    add_to_held_stack(c, item)
+    play_item_action_once(c, world, "add_to_stack")
+
+
+def _route_put_down_stack(c, world, action):
+    """Break the stack apart — each item becomes an ordinary placed item
+    at the character's current position."""
+    from systems.item_stack import play_item_action_once
+    stack = c.get("held_stack", [])
+    if not stack:
+        return
+    x, y, tick = c.get("x", 0), c.get("y", 0), world.get("tick", 0)
+    placed = world.setdefault("placed_items", {})
+    for item in stack:
+        item["location"]        = "placed"
+        item["x"]               = x
+        item["y"]               = y
+        item["placed_by"]       = c.get("id")
+        item["placed_at_tick"]  = tick
+        placed[item["id"]] = item
+    c["held_stack"] = []
+    play_item_action_once(c, world, "put_down_stack")
+
+
+def _route_search_stack(c, world, action):
+    """Cosmetic only — no data mutation. Stack contents are already
+    surfaced to the LLM via build_available_actions()'s held_stack_names
+    (see context_builder.py); this is just the rummaging animation beat."""
+    from systems.item_stack import play_item_action_once
+    play_item_action_once(c, world, "search_stack")
+
+
+def _route_take_from_stack(c, world, action):
+    """Extract a specific item from the stack into the character's free
+    hand — held there (location='held') until put down/given/pocketed."""
+    from systems.item_stack import remove_from_held_stack, play_item_action_once
+    from systems.personal_items import add_item
+    item_id = action.get("item_id") or action.get("target")
+    if not item_id:
+        return
+    item = remove_from_held_stack(c, item_id)
+    if not item:
+        return
+    item["location"] = "held"
+    add_item(c, item)
+    play_item_action_once(c, world, "take_from_stack")
+
+
+def _route_pocket_item(c, world, action):
+    """Stow a location='held' item into the pocket — the 4th disposal path
+    for an item taken from the stack (the other 3 — put down / give /
+    place — already work unmodified via the existing item routes above,
+    since they operate on any inventory item regardless of location)."""
+    from systems.personal_items import get_item_by_id
+    item_id = action.get("item_id") or action.get("target")
+    if not item_id:
+        return
+    item = get_item_by_id(c, item_id)
+    if item and item.get("location") == "held":
+        item["location"] = "pocket"
+
 
 # =========================================================
 # SOCIAL EVENTS

@@ -820,6 +820,12 @@ const ANIM_LAYERS = {
   throw:         { lower: "idle",        upper: "throw"       },
   smash:         { lower: "idle",        upper: "smash"       },
 
+  // ── Item stack (hand actions, orthogonal to body posture) ──
+  add_to_stack:    { lower: "idle", upper: "add_to_stack"    },
+  put_down_stack:  { lower: "idle", upper: "put_down_stack"  },
+  search_stack:    { lower: "idle", upper: "search_stack"    },
+  take_from_stack: { lower: "idle", upper: "take_from_stack" },
+
   // ── Carry (different upper depending on whether moving) ──
   carry_idle:    { lower: "idle",        upper: "carry_idle"  },
   carry_walk:    { lower: "walk",        upper: "carry_idle"  },
@@ -1362,6 +1368,45 @@ async function equipAllClothing(id, characterModel, characterRoot, equipped, def
         const meshes = await attachClothing(characterModel, slot, tpl, characterRoot);
         characterAttachments[id].clothing[slot] = meshes;
     }
+}
+
+// =========================================================
+// HELD ITEM / STACK ATTACHMENT
+// Simplified visual: only the topmost held_stack item (left hand) and any
+// location==="held" inventory item (right hand, the "free hand") ever get
+// a mesh — no literal multi-item 3D stacking. Diffed by item id, not
+// deep-equal, since item dicts are heavier than the small `equipped` dict
+// the clothing diff above compares.
+// =========================================================
+
+async function updateStackAttachment(id, characterModel, heldStack, itemTemplates) {
+    const prev = (characterAttachments[id] || {}).stackItem || null;
+    const top = heldStack && heldStack.length ? heldStack[heldStack.length - 1] : null;
+    if ((prev?.itemId || null) === (top?.id || null)) return;
+
+    if (prev?.mesh) prev.mesh.parent?.remove(prev.mesh);
+    if (!characterAttachments[id]) characterAttachments[id] = {};
+
+    if (!top) { characterAttachments[id].stackItem = null; return; }
+    const tpl = itemTemplates?.[top.template_id];
+    if (!tpl?.model) { characterAttachments[id].stackItem = null; return; }
+    const mesh = await attachItemToBone(characterModel, "mixamorigLeftHand", tpl);
+    characterAttachments[id].stackItem = { itemId: top.id, mesh };
+}
+
+async function updateHeldItemAttachment(id, characterModel, inventory, itemTemplates) {
+    const prev = (characterAttachments[id] || {}).heldItem || null;
+    const held = (inventory || []).find(i => i.location === "held") || null;
+    if ((prev?.itemId || null) === (held?.id || null)) return;
+
+    if (prev?.mesh) prev.mesh.parent?.remove(prev.mesh);
+    if (!characterAttachments[id]) characterAttachments[id] = {};
+
+    if (!held) { characterAttachments[id].heldItem = null; return; }
+    const tpl = itemTemplates?.[held.template_id];
+    if (!tpl?.model) { characterAttachments[id].heldItem = null; return; }
+    const mesh = await attachItemToBone(characterModel, "mixamorigRightHand", tpl);
+    characterAttachments[id].heldItem = { itemId: held.id, mesh };
 }
 
 function createFloorMaterial(tileFloor){
@@ -1927,6 +1972,9 @@ async function updateCharacters(state){
         if (prevEquipped !== nextEquipped) {
           equipAllClothing(id, sims[id], sims[id], c.equipped || {}, definitions);
         }
+
+        updateStackAttachment(id, sims[id], c.held_stack, definitions?.item_templates || {});
+        updateHeldItemAttachment(id, sims[id], c.inventory, definitions?.item_templates || {});
       }
 
       // Sync position from server unless the IK system has already taken
@@ -2194,6 +2242,9 @@ await equipAllClothing(
     c.equipped || {},
     definitions
 );
+
+await updateStackAttachment(id, model, c.held_stack, definitions?.item_templates || {});
+await updateHeldItemAttachment(id, model, c.inventory, definitions?.item_templates || {});
 
   const animData = {
     mixer,

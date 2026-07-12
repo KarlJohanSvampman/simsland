@@ -449,6 +449,22 @@ def build_available_actions(c, world):
     if paint_buckets:
         action_types.append("paint_wall")
 
+    # Held stack — what's currently piled in the character's stacking hand,
+    # and any item taken out of the stack into the free hand. This is the
+    # actual functional payoff of "search_stack": the AI can already see
+    # stack contents here without needing a separate data-revealing effect.
+    held_stack_names = [
+        {"item_id": i["id"], "name": i.get("name"), "stack_position": i.get("stack_position")}
+        for i in c.get("held_stack", [])
+    ]
+    held_item = next((i for i in c.get("inventory", []) if i.get("location") == "held"), None)
+
+    action_types.append("add_to_stack")
+    if held_stack_names:
+        action_types.extend(["put_down_stack", "search_stack", "take_from_stack"])
+    if held_item:
+        action_types.append("pocket_item")
+
     # Nearby walls for context
     from systems.walls import walls_near
     nearby_walls = [
@@ -473,6 +489,11 @@ def build_available_actions(c, world):
         "tile_boxes":            t_boxes,
         "paint_buckets":         paint_buckets,
         "nearby_walls":          nearby_walls,
+        "held_stack_names":      held_stack_names,
+        "held_item":             (
+            {"item_id": held_item["id"], "name": held_item.get("name")}
+            if held_item else None
+        ),
     }
 
 
