@@ -732,6 +732,24 @@ function getTemplates() {
 }
 
 function createTemplate() {
+    // Reuse an already-open, never-renamed-or-populated scaffold for this
+    // source rather than creating another one — otherwise clicking
+    // "+ New Template" again (e.g. after Save, unsure whether it "took")
+    // silently piles up empty "new_template" entries that never get cleaned
+    // up, since createTemplate() inserts into the bank immediately, before
+    // the user has typed a name or saved anything.
+    const templates = getTemplates();
+    const existingScaffold = Object.values(templates).find(t =>
+        t.source_key === (currentSourceKey || "") &&
+        t.name === "new_template" &&
+        (t.chain || []).length === 0
+    );
+    if (existingScaffold) {
+        openTemplateEditor(existingScaffold);
+        renderTemplateTab();
+        return;
+    }
+
     const id = crypto.randomUUID();
     const tmpl = {
         id,
@@ -742,9 +760,13 @@ function createTemplate() {
         notifies: [],
         ik_targets: [],
     };
-    getTemplates()[id] = tmpl;
-    renderTemplateTab();
+    templates[id] = tmpl;
+    // Set currentTemplate before rendering the list so the new row's
+    // "active" highlight (currentTemplate?.id === tmpl.id, in
+    // renderTemplateTab) is correct on the very first render instead of
+    // lagging one click behind.
     openTemplateEditor(tmpl);
+    renderTemplateTab();
 }
 
 function openTemplateEditor(tmpl) {
@@ -1002,8 +1024,12 @@ function renderTemplateTab() {
 
         row.appendChild(name); row.appendChild(count);
         row.addEventListener("click", () => {
-            renderTemplateTab();
+            // openTemplateEditor() must run first — it sets currentTemplate,
+            // which renderTemplateTab()'s active-row highlight reads. Doing
+            // it in the other order re-renders the list against the
+            // previous selection, so the highlight lags one click behind.
             openTemplateEditor(tmpl);
+            renderTemplateTab();
         });
         el.appendChild(row);
     }
@@ -1347,6 +1373,9 @@ function updateClipHeader(clipMeta, rawClip) {
 function updateEditorPanel(clipMeta) {
     const editor = document.getElementById("editor");
     editor.classList.remove("hidden");
+    // Mirror openTemplateEditor()'s hide of #editor — selecting a clip must
+    // also close out any open template editor, or the two panels stack.
+    document.getElementById("templateEditor").classList.add("hidden");
 
     document.getElementById("eName").value      = clipMeta.name || "";
     document.getElementById("eLoop").checked    = !!clipMeta.loop;
