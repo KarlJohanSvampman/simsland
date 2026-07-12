@@ -1010,8 +1010,16 @@ function renderTemplateTab() {
     const el = document.getElementById("templateList");
     if (!el) return;
     el.innerHTML = "";
-    const templates = getTemplates();
-    for (const tmpl of Object.values(templates)) {
+    // Filtered to the currently selected character/source — without this,
+    // every template from every character shows in one flat list, and it's
+    // easy to accidentally open/edit e.g. adult_male's walk cycle while
+    // adult_female is selected. Falls back to unfiltered if no source is
+    // selected yet, matching the tool's state before a source is picked.
+    const allTemplates = Object.values(getTemplates());
+    const templates = currentSourceKey
+        ? allTemplates.filter(t => t.source_key === currentSourceKey)
+        : allTemplates;
+    for (const tmpl of templates) {
         const row = document.createElement("div");
         row.className = "sourceRow" + (currentTemplate?.id === tmpl.id ? " active" : "");
         row.style.cursor = "pointer";
@@ -1128,7 +1136,8 @@ function migrateLocomotionToStances(src) {
         lying:         {},
         crouching:     { idle: loco.crouch_idle, move: loco.crouch_walk },
         crawling:      {},
-        fallen:        {},
+        fallen_front:  {},
+        fallen_back:   {},
         leaning_wall:  {},
     };
     // Drop undefined slots rather than storing them — matches the existing
@@ -1178,6 +1187,9 @@ function renderSidebar() {
     const el = document.getElementById("sourceList");
     el.innerHTML = "";
     for (const [key, src] of Object.entries(bank)) {
+        // "_templates" holds the template dict itself, not a character
+        // source — same exclusion as loadBank()'s migration loop above.
+        if (key === "_templates") continue;
         const row = document.createElement("div");
         row.className = "sourceRow" + (key === currentSourceKey ? " active" : "");
         const dot = document.createElement("div");
@@ -1196,6 +1208,7 @@ function renderSidebar() {
             currentSourceKey = key;
             renderSidebar();
             renderClipList();
+            renderTemplateTab();
             loadSourceGLB(key);
         });
         el.appendChild(row);
@@ -1262,8 +1275,17 @@ const STANCES = [
       moves: [{ slot: "idle", label: "Idle" }, { slot: "move", label: "Move" }] },
     { key: "crawling",      label: "Crawling",
       moves: [{ slot: "idle", label: "Idle" }, { slot: "move", label: "Move" }] },
-    { key: "fallen",        label: "Fallen",          moves: [{ slot: "idle", label: "Idle" }] },
+    // Split by fall direction (not one generic "Fallen") so fall_forward/
+    // get_up_front and fall_backward/get_up_back are just ordinary
+    // standing<->stance transitions with no new from/to concept needed —
+    // each pair is already unique in the Transitions panel below.
+    { key: "fallen_front",  label: "Fallen (Front)",  moves: [{ slot: "idle", label: "Idle" }] },
+    { key: "fallen_back",   label: "Fallen (Back)",   moves: [{ slot: "idle", label: "Idle" }] },
     { key: "leaning_wall",  label: "Leaning (Wall)",  moves: [{ slot: "idle", label: "Idle" }] },
+    { key: "unconscious",   label: "Unconscious",     moves: [{ slot: "idle", label: "Idle" }] },
+    { key: "dead",          label: "Dead",            moves: [{ slot: "idle", label: "Idle" }] },
+    { key: "intoxicated",   label: "Intoxicated",
+      moves: [{ slot: "idle", label: "Idle" }, { slot: "walk", label: "Walk" }, { slot: "run", label: "Run" }] },
     // Carry is an upper-body overlay (legs keep walking/idling normally
     // while carrying), not an exclusive full-body pose like the others —
     // main.js already has working carry_idle/carry_walk ANIM_LAYERS
@@ -1271,6 +1293,12 @@ const STANCES = [
     // authoring a template here overrides both layers with the same clip.
     { key: "carry",         label: "Carry",
       moves: [{ slot: "idle", label: "Idle" }, { slot: "move", label: "Move" }] },
+    // Dragging/pushing: same "optional override of an existing ANIM_LAYERS
+    // fallback" pattern as carry, not real c["posture"] values — see the
+    // comment on _STANCE_IDLE_KEY in main.js.
+    { key: "dragging",      label: "Dragging",
+      moves: [{ slot: "idle", label: "Idle" }, { slot: "move", label: "Move" }] },
+    { key: "pushing",       label: "Pushing",         moves: [{ slot: "idle", label: "Idle" }] },
 ];
 
 function _templateOptionsHTML(templates, current) {

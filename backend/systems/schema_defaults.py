@@ -623,7 +623,8 @@ def ensure_character_defaults(c):
     elif c.get("posture") == "leaning":
         c["posture"] = "leaning_wall"
     c.setdefault("posture",                  "standing")
-    # standing | sitting_seat | sitting_floor | lying | crouching | crawling | fallen | leaning_wall
+    # standing | sitting_seat | sitting_floor | lying | crouching | crawling |
+    # fallen_front | fallen_back | leaning_wall | unconscious | dead | intoxicated
     c.setdefault("leaning_wall_id",          None)        # wall being leaned on (cleared on move)
     c.setdefault("social_contract_ids",      [])
     c.setdefault("conditioning_profile",      [])   # conditioned behaviors

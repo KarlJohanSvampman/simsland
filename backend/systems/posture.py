@@ -2,7 +2,11 @@
 systems/posture.py
 
 Body-stance transitions: standing, sitting_seat, sitting_floor, lying,
-crouching, crawling, fallen, leaning_wall.
+crouching, crawling, fallen_front, fallen_back, leaning_wall, unconscious,
+dead, intoxicated. (Dragging/pushing are NOT posture values — they're a
+separate, prop-attachment-driven mechanic, see systems/prop_movement.py
+and movement.py; their animation resolution is authored in animbank the
+same way, but through main.js's _STANCE_IDLE_KEY, not through this file.)
 
 set_posture() is the single entry point every route/activity should use to
 change a character's posture — it updates c["posture"] immediately, and
@@ -33,8 +37,12 @@ _IDLE_KEY = {
     "lying":         "lie_idle",
     "crouching":     "crouch_idle",
     "crawling":      "crawl_idle",
-    "fallen":        "fallen_idle",
+    "fallen_front":  "fallen_front_idle",
+    "fallen_back":   "fallen_back_idle",
     "leaning_wall":  "leaning_idle",
+    "unconscious":   "unconscious_idle",
+    "dead":          "dead_idle",
+    "intoxicated":   "intoxicated_idle",
 }
 
 

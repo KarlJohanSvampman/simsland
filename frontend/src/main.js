@@ -75,12 +75,23 @@ async function loadAnimBank() {
 const _STANCE_IDLE_KEY = {
   standing: "idle", sitting_seat: "sit_idle", sitting_floor: "sit_idle_floor",
   lying: "lie_idle", crouching: "crouch_idle", crawling: "crawl_idle",
-  fallen: "fallen_idle", leaning_wall: "leaning_idle", carry: "carry_idle",
+  fallen_front: "fallen_front_idle", fallen_back: "fallen_back_idle",
+  leaning_wall: "leaning_idle", carry: "carry_idle",
+  unconscious: "unconscious_idle", dead: "dead_idle", intoxicated: "intoxicated_idle",
+  // dragging/pushing are NOT real c["posture"] values on the backend (see
+  // posture.py's _IDLE_KEY, which deliberately excludes them, same as
+  // carry) — movement.py drives their animation_state directly from the
+  // dragged/pushed prop's own template fields. These entries exist purely
+  // so an animbank-authored template can override the hardcoded
+  // ANIM_LAYERS["drag_idle"/"pushing"] fallback, same mechanism as carry.
+  dragging: "drag_idle", pushing: "pushing",
 };
 const _STANCE_MOVE_KEY = {
   standing_walk: "walk", standing_run: "run",
   crouching_move: "crouch_walk", crawling_move: "crawl",
   carry_move: "carry_walk",
+  intoxicated_walk: "drunk_walk", intoxicated_run: "drunk_run",
+  dragging_move: "drag_move",
 };
 
 // Resolves a character's stance/transition state->template mapping down to
