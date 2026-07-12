@@ -75,14 +75,20 @@ def get_view(
     # CHARACTERS
     # =====================================
 
-    characters = [
+    # Keyed by character id (not a list) to match the shape of the
+    # WebSocket delta payload (_build_delta in main.py) — the frontend
+    # merges snapshot and delta characters into the same dict, and if this
+    # were a list, Object.entries() would key characters by array index
+    # ("0", "1", ...) instead of their real id, creating a second,
+    # never-cleaned-up model for the same character once a delta arrived.
+    characters = {
 
-        c
+        cid: c
 
-        for c in world.get(
+        for cid, c in world.get(
             "characters",
             {}
-        ).values()
+        ).items()
 
         if in_view(
 
@@ -94,7 +100,7 @@ def get_view(
 
             radius
         )
-    ]
+    }
 
     # =====================================
     # PROPS

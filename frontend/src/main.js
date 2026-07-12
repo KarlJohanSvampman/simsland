@@ -1806,11 +1806,17 @@ function updateSpeechBubbles(state){
     // otherwise show as an empty bubble box.
     const utterance = speech?.utterance?.trim();
 
+    // Toggle visibility via cssObject.visible, not div.style.display —
+    // CSS2DRenderer.render() unconditionally overwrites element.style.display
+    // ('' or 'none') every frame based on frustum visibility alone, so a
+    // manually-set "none" here gets clobbered on the very next frame and the
+    // bubble reappears as an empty white box. .visible is the one flag the
+    // renderer actually checks before doing that.
     if(utterance){
       div.textContent = utterance;
-      div.style.display = "block";
+      cssObject.visible = true;
     } else {
-      div.style.display = "none";
+      cssObject.visible = false;
     }
   }
 
@@ -2580,6 +2586,18 @@ renderer.domElement.addEventListener(
     const inspector = document.getElementById("viewerInspector");
     inspector.classList.toggle("expanded", d.type === "character");
 
+    // Activity/animation state come from the last server tick's character
+    // payload (cached on characterAnimations[id].state), not userData —
+    // userData is set once at load time and never carries live sim state.
+    const liveState = d.type === "character"
+      ? characterAnimations[d.id]?.state
+      : null;
+    const activityLabel = liveState
+      ? (liveState.activity?.type
+          ? `Doing: ${liveState.activity.type}`
+          : `State: ${liveState.animation_state || "idle"}`)
+      : "";
+
     document
       .getElementById(
         "viewerSelection"
@@ -2587,7 +2605,8 @@ renderer.domElement.addEventListener(
         <b>${d.type}</b><br>
         ${d.tileType ? `Type: ${d.tileType}<br>` : ""}
         ${d.id || ""}<br>
-        ${d.name || ""}
+        ${d.name || ""}<br>
+        ${activityLabel}
       `;
 
     if(d.type === "character" && d.id){
