@@ -595,18 +595,115 @@ def build_scene_description(c, world):
 
 
 # =========================================================
+# NARRATIVE — the DM-style prose block
+# =========================================================
+# Composes existing sentence-generating helpers (build_scene_description,
+# build_body_context, build_relationship_context, ...) into paragraphs
+# instead of parallel JSON keys — denser than the old flat dict (no
+# repeated keys/braces/quotes) and restores a few of the ~55 dormant
+# subsystem sections (relationships, memories, family) that build_context()
+# used to leave out entirely for token-budget reasons (see the old comment
+# this replaced: a full dump of all ~55 sections measured ~4200 tokens and
+# was too slow on constrained hardware). Those functions were fully built
+# but never called from build_context() — the same "defined but never
+# wired in" gap already found and fixed twice this session for
+# touch-proposal and household-process context.
+#
+# Deliberately curated, not a dump of every subsystem: only the sections
+# most likely to shape an actual decision this round. The rest of the
+# dormant sections (secrets, conditioning, factions, pregnancy,
+# intoxication, ...) stay out for now — see the LLM pipeline plan for
+# follow-up scope.
+
+def build_narrative(c, world):
+
+    paragraphs = [build_scene_description(c, world)]
+
+    # ---- identity + emotional state ----
+    name = c.get("name", "You")
+    bits = [f"You are {name}"]
+    if c.get("age") is not None:
+        bits[0] += f", {c['age']} years old"
+    if c.get("occupation"):
+        bits[0] += f", working as a {c['occupation']}"
+    bits[0] += "."
+    traits = c.get("traits", [])
+    if traits:
+        bits.append(f"Your personality: {', '.join(traits)}.")
+    bits.append(f"Right now you feel {c.get('emotion', 'neutral')}.")
+    if c.get("stress", 0) > 60:
+        bits.append("You're under real stress.")
+    paragraphs.append(" ".join(bits))
+
+    # ---- body / needs — reuse the already-prose build_body_context ----
+    body_issues = build_body_context(c)
+    if body_issues:
+        paragraphs.append(" ".join(body_issues))
+
+    # ---- active intentions/goals ----
+    intentions = build_intentions(c)
+    if intentions:
+        top = intentions[0]
+        line = f"Right now you're mainly focused on {top.get('type')}"
+        if top.get("reason"):
+            line += f" ({top['reason']})"
+        line += "."
+        rest = [i.get("type") for i in intentions[1:4] if i.get("type")]
+        if rest:
+            line += f" You're also thinking about: {', '.join(rest)}."
+        paragraphs.append(line)
+
+    # ---- relationships — restores build_relationship_context, which was
+    # already fully built but never called from build_context() ----
+    relationships = build_relationship_context(c, world, limit=5)
+    if relationships:
+        paragraphs.append(" ".join(r["summary"] for r in relationships))
+
+    # ---- memories — restores build_memory_context, previously unused ----
+    memories = build_memory_context(c)
+    if memories:
+        top_memories = sorted(
+            memories, key=lambda m: m.get("importance", 0), reverse=True
+        )[:3]
+        mem_text = "; ".join(m["text"] for m in top_memories if m.get("text"))
+        if mem_text:
+            paragraphs.append(f"You recall: {mem_text}.")
+
+    # ---- family — restores _build_family_context, previously unused ----
+    family = _build_family_context(c, world)
+    if family and family.get("members"):
+        fam_bits = [
+            f"{m['name']} ({m['kinship']})"
+            for m in family["members"] if m.get("kinship")
+        ]
+        if fam_bits:
+            paragraphs.append(f"Your family: {', '.join(fam_bits)}.")
+
+    # ---- household processes + proposals — already carry descriptive
+    # fields; inlined as sentences instead of nested JSON ----
+    for p in _build_household_process_context(c, world) or []:
+        paragraphs.append(
+            f"There's a {p.get('type')} in progress, currently at the "
+            f"{p.get('stage')} stage, waiting on {p.get('waiting')}."
+        )
+
+    proposals = _build_proposal_context(c, world) or {}
+    for entry in proposals.get("incoming", []):
+        paragraphs.append(entry["note"])
+    for entry in proposals.get("mediating", []):
+        paragraphs.append(entry["note"])
+
+    return "\n\n".join(p for p in paragraphs if p)
+
+
+# =========================================================
 # MAIN CONTEXT BUILDER
 # =========================================================
-# Deliberately minimal: character traits/state, a semantic scene
-# description (see above), active intentions, and available actions —
-# not a dump of every subsystem's raw state. A full character-context
-# prompt with all ~55 subsystem sections included measured ~4200 tokens
-# combined with the system prompt and was too slow for realtime decisions
-# on constrained hardware; this version is close to identity + perception
-# + what-can-I-do, which is what a decision actually needs most ticks.
-# The dropped subsystems (memories, social state, investments, grievances,
-# conditioning, factions, etc.) are still fully tracked in the simulation
-# — they're just not surfaced to the LLM per-decision right now.
+# narrative: the DM-style prose block above — everything the character
+# perceives/remembers/feels, in free text. available_actions: the only
+# place literal prop/character ids appear, kept as strict JSON because the
+# model must echo those back exactly (see llm_brain.py::build_prompt,
+# which assembles the two into one prompt).
 
 def build_context(
 
@@ -617,31 +714,9 @@ def build_context(
 
     return {
 
-        "identity": {
-            "name":       c.get("name"),
-            "age":        c.get("age"),
-            "traits":     c.get("traits", []),
-            "occupation": c.get("occupation"),
-        },
-
-        "internal_state": {
-            "emotion":     c.get("emotion", "neutral"),
-            "mood":        c.get("mood"),
-            "stress":      c.get("stress", 0),
-            "social_need": c.get("needs", {}).get("social", 0.7),
-            "fun_need":    c.get("needs", {}).get("fun", 0.6),
-            "sleep_debt":  c.get("body", {}).get("sleep_debt", 0),
-        },
-
-        "scene": build_scene_description(c, world),
-
-        "active_intentions": build_intentions(c),
+        "narrative": build_narrative(c, world),
 
         "available_actions": build_available_actions(c, world),
-
-        "household_processes": _build_household_process_context(c, world),
-
-        "proposals": _build_proposal_context(c, world),
     }
 
 

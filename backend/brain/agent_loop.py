@@ -670,7 +670,8 @@ def update_agent(
 
     decision = think(
         context,
-        char_id=c["id"]
+        char_id=c["id"],
+        session=c.get("_llm_session")
     )
 
     if not decision:

@@ -11,6 +11,9 @@ services:
       - REDIS_HOST=redis
       - OLLAMA_BASE_URL=http://192.168.10.203:11434  # 👈 your remote Ollama
       - OLLAMA_MODEL=llama3.1:latest
+      - OLLAMA_NUM_CTX=8192          # 👈 explicit context window (was implicit 4096)
+      - OLLAMA_KEEP_ALIVE=10m        # 👈 reduce cold-start reloads between ticks
+      - OLLAMA_MAX_CONCURRENCY=2     # 👈 tune to what the Ollama host can actually parallelize
       - PYTHONPATH=/app
       - PYTHONUNBUFFERED=1
     depends_on:

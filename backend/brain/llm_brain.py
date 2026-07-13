@@ -1,8 +1,11 @@
-import asyncio
 import json
 
 from llm.llm_client import (
     call_llm_safe
+)
+
+from llm.llm_gate import (
+    run_llm_call
 )
 
 
@@ -23,14 +26,20 @@ CORE RULES
 - Respond ONLY with a single valid JSON object. No markdown, no explanations, no narration outside the schema.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+WHAT YOU'RE GIVEN
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+The user message has two parts:
+1. Free-text narration — what you perceive, remember, and feel right now, written like a
+   game master describing a scene. Treat it as ground truth about your situation, but it is
+   prose, not data — never copy an id or number out of it.
+2. A LEGAL_MOVES JSON block — the ONLY source of real ids you may reference:
+     interactable_props  — props you can see right now, each with an "id", "tags", "interactions".
+     nearby_characters   — people nearby, each with an "id" and "name".
+     action_types        — legal action type strings.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 CHOOSING ACTIONS
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-The context contains:
-  available_actions.interactable_props  — list of props you can see right now,
-                                          each with an "id", "tags", and "interactions".
-  available_actions.nearby_characters   — list of people nearby, each with an "id" and "name".
-  available_actions.action_types        — legal action type strings.
-
 Rules:
 - When you choose action type "interact", set "target" to a prop "id" from interactable_props.
   Pick based on tags: e.g. to sit → a prop tagged "seatable", to sleep → "sleepable".
@@ -75,7 +84,7 @@ OUTPUT FORMAT  (strict JSON, no other text)
   "goal":       "short-term goal this tick",
   "action": {
     "type":        "interact | speak | move | eat | sleep | wait | work | socialize | call | text | examine | search | carry | clean | trash | destroy | lean_against_wall | push_off_wall | sit_down | stand_up | lie_down",
-    "target":      "prop_id or character_id — MUST be a real id from available_actions",
+    "target":      "prop_id or character_id — MUST be a real id from LEGAL_MOVES",
     "interaction": "interaction name from interactable_props (for interact actions only)",
     "destination": {"x": 0, "y": 0},
     "reason":      "why you chose this"
@@ -98,16 +107,30 @@ OUTPUT FORMAT  (strict JSON, no other text)
 
 def build_prompt(context):
 
-    # Compact encoding — pretty-printing (indent=2) buys nothing for the
-    # model (JSON structure is unambiguous either way) but cost ~1000
-    # tokens of pure whitespace on a real character context, which was a
-    # meaningful chunk of why decisions were timing out on constrained
-    # hardware.
-    return json.dumps(
+    # context = {"narrative": "<prose>", "available_actions": {...}}
+    # (brain/context_builder.py::build_context). The narrative is sent as
+    # plain text — prose is denser per-token than the equivalent JSON (no
+    # repeated keys/braces/quotes), which is what actually motivated the
+    # older compact-JSON-only encoding this replaced. available_actions is
+    # still compact JSON (no pretty-print whitespace, same reasoning as
+    # before) — it's the one place literal ids appear, and those must stay
+    # exact.
+    narrative = context.get("narrative", "")
 
-        context,
+    legal_moves = json.dumps(
+
+        context.get("available_actions", {}),
 
         separators=(",", ":")
+    )
+
+    return (
+
+        f"{narrative}\n\n"
+
+        f"LEGAL_MOVES (the only source of real ids — reference these "
+
+        f"exactly, never invent an id):\n{legal_moves}"
     )
 
 
@@ -179,11 +202,31 @@ def fallback_response():
 # MAIN THINK FUNCTION
 # =========================================================
 
+def _condense_turn(data):
+    """Reduce a parsed decision down to one short line for session history —
+    see think()'s session handling below for why this can't just be the
+    raw messages/response."""
+    action = data.get("action") or {}
+    speech = data.get("speech") or {}
+
+    bits = []
+    if data.get("thought"):
+        bits.append(f'thought: "{data["thought"]}"')
+    if action.get("type"):
+        bits.append(f'did: {action["type"]}')
+    if speech.get("utterance"):
+        bits.append(f'said: "{speech["utterance"]}"')
+
+    return " — ".join(bits) if bits else None
+
+
 def think(
 
     context,
 
-    char_id=None
+    char_id=None,
+
+    session=None
 ):
 
     prompt = build_prompt(
@@ -195,16 +238,35 @@ def think(
         {"role": "user",   "content": prompt},
     ]
 
+    # Persistent per-character session (c["_llm_session"], see
+    # schema_defaults.py). Deliberately NOT passed as call_llm_safe's own
+    # `session=` kwarg — that mechanism re-embeds the entire messages list
+    # (system prompt + full per-tick context) into rolling history on every
+    # call, which would compound the exact token-cost problem the compact
+    # JSON encoding above was already fighting. Instead, a short condensed
+    # digest of the last few turns (thought/action/speech only, via
+    # _condense_turn) is folded in as one extra message — real continuity
+    # of "what did I just do" without repeating the full context each tick.
+    history = (session or {}).get("history", [])
+    if history:
+        messages.insert(1, {
+            "role": "system",
+            "content": "Your recent turns:\n" + "\n".join(history[-6:]),
+        })
+
     # call_llm_safe is async; think() runs synchronously inside a
     # ThreadPoolExecutor worker thread (via _run_agent), a plain OS thread
-    # with no pre-existing event loop, so asyncio.run() here is safe and
-    # gets its own fresh loop per call.
+    # with no pre-existing event loop. run_llm_call() hands the coroutine
+    # off to llm_gate.py's single shared event-loop thread and blocks here
+    # until it completes — this is what actually bounds how many characters'
+    # LLM calls are in flight to Ollama at once (OLLAMA_MAX_CONCURRENCY),
+    # instead of every agent worker thread hitting Ollama independently.
     # char_id lets call_llm log this prompt/response into the per-character
     # ring buffer (llm_client.py::_PROMPT_LOG), which the World Editor's
     # Inspector reads via GET /debug/prompt-log/{char_id} when a character
     # is selected — without it, that log only ever gets populated by the
     # manual /debug/prompt-send tool, never by real gameplay decisions.
-    raw = asyncio.run(
+    raw = run_llm_call(
         call_llm_safe(messages, char_id=char_id)
     )
 
@@ -219,5 +281,15 @@ def think(
     if not validate_response(data):
 
         return fallback_response()
+
+    if session is not None:
+
+        digest = _condense_turn(data)
+
+        if digest:
+
+            session.setdefault("history", []).append(digest)
+
+            session["history"] = session["history"][-20:]
 
     return data

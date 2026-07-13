@@ -1,9 +1,3 @@
-import asyncio
-
-from llm.llm_queue import (
-    enqueue
-)
-
 from llm.social_interpretation import (
     generate_social_interpretation
 )
@@ -16,6 +10,11 @@ from systems.social_models import (
 # =========================================================
 # QUEUE SOCIAL REFLECTION
 # =========================================================
+# Concurrency is bounded by the caller — see systems/reflection.py's
+# handle_reflection(), which submits this whole coroutine through
+# llm/llm_gate.py's shared semaphore. This used to go through its own
+# single-consumer queue (llm/llm_queue.py); that's retired in favor of one
+# shared concurrency budget across every Ollama caller in the codebase.
 
 async def queue_social_reflection(
 
@@ -26,21 +25,13 @@ async def queue_social_reflection(
     context
 ):
 
-    async def job():
+    data = await generate_social_interpretation(
 
-        return await generate_social_interpretation(
+        observer,
 
-            observer,
+        target,
 
-            target,
-
-            context
-        )
-
-    result = await enqueue(job)
-
-    data = result.get(
-        "text"
+        context
     )
 
     if not data:

@@ -1,8 +1,11 @@
 import random
-import asyncio
 
 from llm.cognition_jobs import (
     queue_social_reflection
+)
+
+from llm.llm_gate import (
+    run_llm_call
 )
 
 from systems.social_models import (
@@ -180,7 +183,18 @@ def handle_reflection(
     # QUEUE LLM REFLECTION
     # =====================================================
 
-    asyncio.create_task(
+    # process_reflections() runs synchronously inside a ThreadPoolExecutor
+    # worker thread (sim_loop.py's _agent_pool via _run_agent) with no
+    # running event loop, so asyncio.create_task() here would raise
+    # RuntimeError every time a reflection is actually due, silently
+    # killing that character's whole tick (caught and logged one level up
+    # in sim_loop.py's tick(), but the character's decision for that tick
+    # never happens). run_llm_call() submits the coroutine to
+    # llm_gate.py's dedicated event-loop thread and blocks here until it
+    # resolves, which also keeps the resulting social-model mutation
+    # on the same thread/timing as the rest of this character's tick,
+    # avoiding a race with other characters' worker threads.
+    run_llm_call(
 
         queue_social_reflection(
 

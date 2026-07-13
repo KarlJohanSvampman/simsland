@@ -107,6 +107,16 @@ async def _call_llm(
         "llama3"
     )
 
+    # Ollama defaults num_ctx to whatever the model's Modelfile specifies
+    # (measured 4096 for the llama3.1 instance this backend actually talks
+    # to — uncomfortably close to a real character context, risking silent
+    # truncation) and keep_alive to 5m, which can cold-reload the model
+    # (~20-40s) between ticks on a quiet character. Both are made explicit
+    # and tunable rather than left to whatever the server happens to default
+    # to.
+    num_ctx = int(os.getenv("OLLAMA_NUM_CTX", "8192"))
+    keep_alive = os.getenv("OLLAMA_KEEP_ALIVE", "10m")
+
     async with httpx.AsyncClient(
 
         timeout=timeout
@@ -123,7 +133,14 @@ async def _call_llm(
 
                 "messages": messages,
 
-                "stream": False
+                "stream": False,
+
+                "keep_alive": keep_alive,
+
+                "options": {
+
+                    "num_ctx": num_ctx
+                }
             }
         )
 
@@ -262,12 +279,16 @@ async def call_llm(
     # REAL CALL
     # =====================================================
 
+    _t0 = time.time()
+
     result = await _call_llm(
 
         full_messages,
 
         timeout
     )
+
+    _elapsed = time.time() - _t0
 
     # =====================================================
     # UPDATE SESSION
@@ -318,7 +339,7 @@ async def call_llm(
             char_id,
             full_messages,
             result if isinstance(result, str) else json.dumps(result),
-            elapsed=0.0,   # caller may patch if needed
+            elapsed=_elapsed,
             cached=False,
         )
 

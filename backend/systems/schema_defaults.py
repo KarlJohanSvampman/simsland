@@ -566,6 +566,13 @@ def ensure_character_defaults(c):
     # from c["activity"] — see sim_loop.py's comment on why.
     c.setdefault("character_wait",         None)
 
+    # Persistent per-character LLM session (see brain/llm_brain.py::think())
+    # — a rolling list of short condensed turn digests (thought/action/
+    # speech), NOT raw prompts/responses. Kept deliberately small/condensed
+    # so continuity of "what did I just do" doesn't re-embed the full
+    # per-tick context every turn.
+    c.setdefault("_llm_session", {"history": []})
+
     # Impulse control — anger pressure vs self-control
     c.setdefault("impulse_state", {
         "anger_pressure":   0.0,   # 0-1; accumulates from grievances/frustration
