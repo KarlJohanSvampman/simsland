@@ -2,9 +2,10 @@ from fastapi import APIRouter, HTTPException, Request
 from pathlib import Path
 import json
 import uuid
+import asyncio
 
-from db import load_world, save_world, refresh_static_world_cache, _STATIC_WORLD_KEYS
-from core.definitions import load_definitions as _load_defs_core
+from db import load_world, save_world, refresh_static_world_cache, _STATIC_WORLD_KEYS, world_lock
+from core.definitions import load_definitions as _load_defs_core, invalidate_definitions_cache
 
 from systems.navigation import cache_floorplan
 from systems.character_gen import generate_character
@@ -29,7 +30,8 @@ def save(sim_id: str, data: dict):
     # world_tiles only to refresh the process-local cache.
     world_tiles = data.get("world_tiles")
     persisted = {k: v for k, v in data.items() if k not in _STATIC_WORLD_KEYS}
-    save_world(sim_id, persisted)
+    with world_lock():
+        save_world(sim_id, persisted)
     refresh_static_world_cache(sim_id, world_tiles)
     return {"status": "ok"}
 
@@ -96,12 +98,47 @@ async def save_definitions(sim_id: str, request: Request):
         if "id" not in fp:
             fp["id"] = fp_id
         cache_floorplan(fp_id, fp)
+    invalidate_definitions_cache(sim_id)
     return {"ok": True}
 
 
 # =====================================
 # SPAWN CHARACTER
 # =====================================
+
+def _spawn_character_locked(sim_id, template_id, x, y, body):
+    """Runs on a background thread (see spawn_character below) — holds
+    world_lock() for its whole load_world->mutate->save_world span, same
+    as every other world-mutating route."""
+    defs = load_definitions(sim_id)
+    with world_lock():
+        world = load_world(sim_id)
+
+        if template_id:
+            tmpl = defs.get("character_templates", {}).get(template_id)
+            if not tmpl:
+                raise HTTPException(status_code=404,
+                                    detail=f"Character template '{template_id}' not found")
+            cid  = f"char_{uuid.uuid4().hex[:8]}"
+            name = tmpl.get("name") or template_id.replace("_", " ").title()
+            overrides = {
+                "id": cid, "x": x, "y": y, "template": template_id, "name": name,
+            }
+            if tmpl.get("model"):    overrides["model"]  = tmpl["model"]
+            if tmpl.get("traits"):   overrides["traits"] = tmpl["traits"]
+            if tmpl.get("instance"): overrides.update(tmpl["instance"])
+            character = generate_character(defs, overrides)
+        else:
+            overrides = {k: v for k, v in body.items()
+                         if k not in ("sim_id", "x", "y")}
+            overrides["x"] = x
+            overrides["y"] = y
+            character = generate_character(defs, overrides)
+
+        world.setdefault("characters", {})[character["id"]] = character
+        save_world(sim_id, world)
+    return {"ok": True, "id": character["id"], "name": character.get("name")}
+
 
 @router.post("/spawn_character")
 async def spawn_character(request: Request):
@@ -121,38 +158,66 @@ async def spawn_character(request: Request):
     x           = body.get("x", 0)
     y           = body.get("y", 0)
 
-    defs  = load_definitions(sim_id)
-    world = load_world(sim_id)
-
-    if template_id:
-        tmpl = defs.get("character_templates", {}).get(template_id)
-        if not tmpl:
-            raise HTTPException(status_code=404,
-                                detail=f"Character template '{template_id}' not found")
-        cid  = f"char_{uuid.uuid4().hex[:8]}"
-        name = tmpl.get("name") or template_id.replace("_", " ").title()
-        overrides = {
-            "id": cid, "x": x, "y": y, "template": template_id, "name": name,
-        }
-        if tmpl.get("model"):    overrides["model"]  = tmpl["model"]
-        if tmpl.get("traits"):   overrides["traits"] = tmpl["traits"]
-        if tmpl.get("instance"): overrides.update(tmpl["instance"])
-        character = generate_character(defs, overrides)
-    else:
-        overrides = {k: v for k, v in body.items()
-                     if k not in ("sim_id", "x", "y")}
-        overrides["x"] = x
-        overrides["y"] = y
-        character = generate_character(defs, overrides)
-
-    world.setdefault("characters", {})[character["id"]] = character
-    save_world(sim_id, world)
-    return {"ok": True, "id": character["id"], "name": character.get("name")}
+    # world_lock() blocks (a real blocking call, not asyncio-aware) — run
+    # the whole critical section on a background thread so a contended
+    # lock doesn't freeze the event loop (this route used to call
+    # load_world/save_world directly inline here, already blocking the
+    # event loop for its DB round-trip; this fixes that too).
+    return await asyncio.get_event_loop().run_in_executor(
+        None, _spawn_character_locked, sim_id, template_id, x, y, body
+    )
 
 
 # =====================================
 # GENERATE FAMILY TREE
 # =====================================
+
+def _generate_family_locked(sim_id, char_id, depth, replace):
+    """Runs on a background thread (see generate_family below). Both
+    possible outcomes (already-has-a-family early return, and the
+    freshly-generated-family path) each call save_world() exactly once,
+    but both must sit inside the *same* lock acquisition spanning from
+    this function's own load_world() — holding world_lock() around the
+    whole function body does that correctly regardless of which branch
+    runs."""
+    defs = load_definitions(sim_id)
+    with world_lock():
+        world = load_world(sim_id)
+
+        char = world.get("characters", {}).get(char_id)
+        if not char:
+            raise HTTPException(status_code=404, detail=f"Character '{char_id}' not found")
+
+        # Optionally remove existing family membership
+        if replace and char.get("family_id"):
+            old_fam_id = char["family_id"]
+            old_fam = world.get("families", {}).get(old_fam_id, {})
+            # Remove char from old family (orphan them, don't destroy others)
+            old_fam.get("members", []).remove(char_id) if char_id in old_fam.get("members", []) else None
+            # Remove directed edges from/to char
+            world["families"][old_fam_id]["relations"] = {
+                k: v for k, v in old_fam.get("relations", {}).items()
+                if not k.startswith(f"{char_id}:") and not k.endswith(f":{char_id}")
+            }
+            char["family_id"]   = None
+            char["family_role"] = None
+
+        if char.get("family_id") and not replace:
+            # Already has a family — just return the summary
+            from systems.family import get_family_summary
+            fam = world["families"][char["family_id"]]
+            save_world(sim_id, world)
+            return {"ok": True, "already_existed": True, "family": get_family_summary(fam, world)}
+
+        from systems.family import generate_family_for_character, get_family_summary
+        family = generate_family_for_character(char, world, defs, depth=depth)
+        save_world(sim_id, world)
+
+    return {
+        "ok":     True,
+        "family": get_family_summary(family, world),
+    }
+
 
 @router.post("/characters/{char_id}/generate_family")
 async def generate_family(char_id: str, request: Request):
@@ -170,39 +235,6 @@ async def generate_family(char_id: str, request: Request):
     depth  = int(body.get("depth", 1))
     replace= bool(body.get("replace", False))
 
-    defs  = load_definitions(sim_id)
-    world = load_world(sim_id)
-
-    char = world.get("characters", {}).get(char_id)
-    if not char:
-        raise HTTPException(status_code=404, detail=f"Character '{char_id}' not found")
-
-    # Optionally remove existing family membership
-    if replace and char.get("family_id"):
-        old_fam_id = char["family_id"]
-        old_fam = world.get("families", {}).get(old_fam_id, {})
-        # Remove char from old family (orphan them, don't destroy others)
-        old_fam.get("members", []).remove(char_id) if char_id in old_fam.get("members", []) else None
-        # Remove directed edges from/to char
-        world["families"][old_fam_id]["relations"] = {
-            k: v for k, v in old_fam.get("relations", {}).items()
-            if not k.startswith(f"{char_id}:") and not k.endswith(f":{char_id}")
-        }
-        char["family_id"]   = None
-        char["family_role"] = None
-
-    if char.get("family_id") and not replace:
-        # Already has a family — just return the summary
-        from systems.family import get_family_summary
-        fam = world["families"][char["family_id"]]
-        save_world(sim_id, world)
-        return {"ok": True, "already_existed": True, "family": get_family_summary(fam, world)}
-
-    from systems.family import generate_family_for_character, get_family_summary
-    family = generate_family_for_character(char, world, defs, depth=depth)
-    save_world(sim_id, world)
-
-    return {
-        "ok":     True,
-        "family": get_family_summary(family, world),
-    }
+    return await asyncio.get_event_loop().run_in_executor(
+        None, _generate_family_locked, sim_id, char_id, depth, replace
+    )

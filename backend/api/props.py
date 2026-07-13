@@ -3,7 +3,8 @@ from uuid import uuid4
 
 from db import (
     load_world,
-    save_world
+    save_world,
+    world_lock
 )
 
 from core.definitions import (
@@ -47,8 +48,6 @@ def create_prop(
     payload: dict
 ):
 
-    world = load_world(sim_id)
-
     definitions = load_definitions(sim_id)
 
     floorplan = get_default_floorplan(
@@ -71,29 +70,32 @@ def create_prop(
         )
     }
 
-    world.setdefault(
-        "props",
-        []
-    ).append(prop)
+    with world_lock():
+        world = load_world(sim_id)
 
-    # =====================================
-    # SEMANTIC EVENT
-    # =====================================
+        world.setdefault(
+            "props",
+            []
+        ).append(prop)
 
-    if floorplan:
+        # =====================================
+        # SEMANTIC EVENT
+        # =====================================
 
-        on_prop_created(
+        if floorplan:
 
-            sim_id,
+            on_prop_created(
 
-            floorplan,
+                sim_id,
 
-            definitions,
+                floorplan,
 
-            prop
-        )
+                definitions,
 
-    save_world(sim_id, world)
+                prop
+            )
+
+        save_world(sim_id, world)
 
     return {
         "ok": True,
@@ -111,8 +113,6 @@ def move_prop(
     payload: dict
 ):
 
-    world = load_world(sim_id)
-
     definitions = load_definitions(sim_id)
 
     floorplan = get_default_floorplan(
@@ -121,46 +121,49 @@ def move_prop(
 
     prop_id = payload["id"]
 
-    for prop in world.get(
-        "props",
-        []
-    ):
+    with world_lock():
+        world = load_world(sim_id)
 
-        if prop["id"] != prop_id:
-            continue
+        for prop in world.get(
+            "props",
+            []
+        ):
 
-        prop["x"] = payload["x"]
-        prop["y"] = payload["y"]
+            if prop["id"] != prop_id:
+                continue
 
-        if "rotation" in payload:
+            prop["x"] = payload["x"]
+            prop["y"] = payload["y"]
 
-            prop["rotation"] = payload[
-                "rotation"
-            ]
+            if "rotation" in payload:
 
-        # =====================================
-        # SEMANTIC EVENT
-        # =====================================
+                prop["rotation"] = payload[
+                    "rotation"
+                ]
 
-        if floorplan:
+            # =====================================
+            # SEMANTIC EVENT
+            # =====================================
 
-            on_prop_moved(
+            if floorplan:
 
-                sim_id,
+                on_prop_moved(
 
-                floorplan,
+                    sim_id,
 
-                definitions,
+                    floorplan,
 
-                prop
-            )
+                    definitions,
 
-        save_world(sim_id, world)
+                    prop
+                )
 
-        return {
-            "ok": True,
-            "prop": prop
-        }
+            save_world(sim_id, world)
+
+            return {
+                "ok": True,
+                "prop": prop
+            }
 
     return {
         "ok": False,
@@ -178,47 +181,48 @@ def delete_prop(
     payload: dict
 ):
 
-    world = load_world(sim_id)
-
     prop_id = payload["id"]
 
-    new_props = []
+    with world_lock():
+        world = load_world(sim_id)
 
-    found = False
+        new_props = []
 
-    for prop in world.get(
-        "props",
-        []
-    ):
+        found = False
 
-        if prop["id"] == prop_id:
+        for prop in world.get(
+            "props",
+            []
+        ):
 
-            found = True
-            continue
+            if prop["id"] == prop_id:
 
-        new_props.append(prop)
+                found = True
+                continue
 
-    if not found:
+            new_props.append(prop)
 
-        return {
-            "ok": False,
-            "error": "prop not found"
-        }
+        if not found:
 
-    world["props"] = new_props
+            return {
+                "ok": False,
+                "error": "prop not found"
+            }
 
-    # =====================================
-    # SEMANTIC EVENT
-    # =====================================
+        world["props"] = new_props
 
-    on_prop_deleted(
+        # =====================================
+        # SEMANTIC EVENT
+        # =====================================
 
-        sim_id,
+        on_prop_deleted(
 
-        prop_id
-    )
+            sim_id,
 
-    save_world(sim_id, world)
+            prop_id
+        )
+
+        save_world(sim_id, world)
 
     return {
         "ok": True

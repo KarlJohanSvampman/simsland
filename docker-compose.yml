@@ -23,21 +23,6 @@ services:
     command: >
       uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 
-  worker:
-    build: ./backend
-    container_name: sim-worker
-    depends_on:
-      - backend
-      - redis
-      - db
-    environment:
-      - DATABASE_URL=postgresql://postgres:postgres@db:5432/sim
-      - REDIS_HOST=redis
-      - OLLAMA_BASE_URL=http://192.168.10.203:11434  # 👈 your remote
-      - OLLAMA_MODEL=llama3.1:latest
-      - PYTHONPATH=/app
-      - PYTHONUNBUFFERED=1
-    command: python -m workers.worker
   frontend:
     build: ./frontend
     container_name: sim-frontend

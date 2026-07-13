@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from db import load_world, save_world
+from db import load_world, save_world, world_lock
 from systems.props import get_prop_by_id
 from systems.building_entrances import get_building_by_id
 from systems.household_manager import (
@@ -20,17 +20,18 @@ router = APIRouter()
 
 @router.post("/household/create")
 def create(sim_id: str, payload: dict):
-    world = load_world(sim_id)
+    with world_lock():
+        world = load_world(sim_id)
 
-    mailbox = get_prop_by_id(world, payload["mailbox_prop_id"])
-    if not mailbox:
-        return {"ok": False, "error": "mailbox prop not found"}
+        mailbox = get_prop_by_id(world, payload["mailbox_prop_id"])
+        if not mailbox:
+            return {"ok": False, "error": "mailbox prop not found"}
 
-    household = create_household(world, payload.get("name"))
-    mailbox["household_id"] = household["id"]
+        household = create_household(world, payload.get("name"))
+        mailbox["household_id"] = household["id"]
 
-    save_world(sim_id, world)
-    return {"ok": True, "household": household}
+        save_world(sim_id, world)
+        return {"ok": True, "household": household}
 
 
 # =========================================================
@@ -39,15 +40,16 @@ def create(sim_id: str, payload: dict):
 
 @router.post("/household/set_name")
 def set_name(sim_id: str, payload: dict):
-    world = load_world(sim_id)
+    with world_lock():
+        world = load_world(sim_id)
 
-    household = world.get("households", {}).get(payload["household_id"])
-    if not household:
-        return {"ok": False, "error": "household not found"}
+        household = world.get("households", {}).get(payload["household_id"])
+        if not household:
+            return {"ok": False, "error": "household not found"}
 
-    household["name"] = payload.get("name")
-    save_world(sim_id, world)
-    return {"ok": True, "household": household}
+        household["name"] = payload.get("name")
+        save_world(sim_id, world)
+        return {"ok": True, "household": household}
 
 
 # =========================================================
@@ -56,33 +58,35 @@ def set_name(sim_id: str, payload: dict):
 
 @router.post("/household/assign_building")
 def assign_building(sim_id: str, payload: dict):
-    world = load_world(sim_id)
+    with world_lock():
+        world = load_world(sim_id)
 
-    household = world.get("households", {}).get(payload["household_id"])
-    if not household:
-        return {"ok": False, "error": "household not found"}
+        household = world.get("households", {}).get(payload["household_id"])
+        if not household:
+            return {"ok": False, "error": "household not found"}
 
-    building = get_building_by_id(world, payload["building_id"])
-    if not building:
-        return {"ok": False, "error": "building not found"}
+        building = get_building_by_id(world, payload["building_id"])
+        if not building:
+            return {"ok": False, "error": "building not found"}
 
-    assign_building_to_household(world, building, household)
-    save_world(sim_id, world)
-    return {"ok": True, "household": household, "building": building}
+        assign_building_to_household(world, building, household)
+        save_world(sim_id, world)
+        return {"ok": True, "household": household, "building": building}
 
 
 @router.post("/household/unassign_building")
 def unassign_building_route(sim_id: str, payload: dict):
-    world = load_world(sim_id)
+    with world_lock():
+        world = load_world(sim_id)
 
-    building = get_building_by_id(world, payload["building_id"])
-    if not building:
-        return {"ok": False, "error": "building not found"}
+        building = get_building_by_id(world, payload["building_id"])
+        if not building:
+            return {"ok": False, "error": "building not found"}
 
-    household = world.get("households", {}).get(building.get("owner_household_id"))
-    unassign_building(building, household)
-    save_world(sim_id, world)
-    return {"ok": True, "building": building}
+        household = world.get("households", {}).get(building.get("owner_household_id"))
+        unassign_building(building, household)
+        save_world(sim_id, world)
+        return {"ok": True, "building": building}
 
 
 # =========================================================
@@ -91,36 +95,38 @@ def unassign_building_route(sim_id: str, payload: dict):
 
 @router.post("/household/add_member")
 def add_member(sim_id: str, payload: dict):
-    world = load_world(sim_id)
+    with world_lock():
+        world = load_world(sim_id)
 
-    household = world.get("households", {}).get(payload["household_id"])
-    if not household:
-        return {"ok": False, "error": "household not found"}
+        household = world.get("households", {}).get(payload["household_id"])
+        if not household:
+            return {"ok": False, "error": "household not found"}
 
-    character = world.get("characters", {}).get(payload["character_id"])
-    if not character:
-        return {"ok": False, "error": "character not found"}
+        character = world.get("characters", {}).get(payload["character_id"])
+        if not character:
+            return {"ok": False, "error": "character not found"}
 
-    add_member_to_household(world, character, household)
-    save_world(sim_id, world)
-    return {"ok": True, "household": household}
+        add_member_to_household(world, character, household)
+        save_world(sim_id, world)
+        return {"ok": True, "household": household}
 
 
 @router.post("/household/remove_member")
 def remove_member(sim_id: str, payload: dict):
-    world = load_world(sim_id)
+    with world_lock():
+        world = load_world(sim_id)
 
-    character = world.get("characters", {}).get(payload["character_id"])
-    if not character:
-        return {"ok": False, "error": "character not found"}
+        character = world.get("characters", {}).get(payload["character_id"])
+        if not character:
+            return {"ok": False, "error": "character not found"}
 
-    household = world.get("households", {}).get(character.get("household_id"))
-    if not household:
-        return {"ok": False, "error": "character has no household"}
+        household = world.get("households", {}).get(character.get("household_id"))
+        if not household:
+            return {"ok": False, "error": "character has no household"}
 
-    remove_member_from_household(character, household)
-    save_world(sim_id, world)
-    return {"ok": True, "household": household}
+        remove_member_from_household(character, household)
+        save_world(sim_id, world)
+        return {"ok": True, "household": household}
 
 
 # =========================================================

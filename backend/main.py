@@ -8,7 +8,11 @@ Key changes vs. original:
     clients receive a full snapshot on first connect, then patches.
   - World is loaded once at startup and kept in the Redis cache; load_world()
     in the tick loop hits the cache almost exclusively.
-  - Agent ticks are offloaded to the Redis queue (unchanged from before).
+  - Every character's LLM decision runs in-process, inside tick()'s own
+    agent pool (sim_loop.py) — there used to also be a separate `sim-worker`
+    container re-running the same decisions a second time via a Redis
+    queue, unsynchronized with this process's world-mutation lock; it was
+    removed (redundant LLM cost, and a second silent data-loss path).
 """
 
 import asyncio, os, json, traceback
@@ -20,9 +24,8 @@ from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 
-from core.redis_queue import enqueue
 from core.cache import set_world_cache
-from db import load_world, save_world, init_db, update_world_tick
+from db import load_world, save_world, init_db, update_world_tick, world_lock, _world_lock, _STATIC_WORLD_KEYS
 from sim_loop import tick, collect_dirty
 from api.view import get_view, in_view
 from api.editor import load_definitions, save_definitions
@@ -118,74 +121,75 @@ def _build_delta(dirty: dict, cx: int, cy: int, zoom: int) -> dict | None:
 _tick_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="tick")
 
 
+def _run_tick_and_persist(sim_id: str, definitions: dict) -> tuple[dict, dict]:
+    """Runs the whole load->tick->persist span for one tick, held under
+    _world_lock end to end. Bundled into one function (rather than the
+    load/tick/cache/save calls each individually hopping to the executor,
+    as before) so the lock — which must cover the entire span, since
+    tick() reads/mutates world throughout its run, not just once — is
+    acquired and released on this executor's background thread, never on
+    the main event-loop thread (threading.Lock.acquire() is a blocking
+    call; calling it directly inside async def loop() would freeze all
+    HTTP/WebSocket handling while waiting on a lock some API route holds).
+
+    Bonus: today only tick() itself ran via run_in_executor — load_world()
+    and update_world_tick() ran inline on the event loop. Bundling
+    everything here moves all of it off that thread too.
+    """
+    with _world_lock:
+        world = load_world(sim_id)
+        ensure_world_defaults(world)
+        world["definitions"] = definitions
+
+        tick(world)
+
+        update_world_tick(sim_id, world["tick"])
+
+        # Collect what changed this tick — must happen before persisting
+        # below, since it pops world["_dirty"] (which holds raw Python
+        # sets, not JSON-serializable) out of the tree entirely.
+        dirty = collect_dirty(world)
+
+        # Persist this tick's mutations. Without this, load_world() on the
+        # next iteration serves a stale cached snapshot (or, once the 5s
+        # Redis TTL expires, rebuilds from Postgres) and every character
+        # decision / movement update / need decay this tick made is
+        # silently discarded. Re-caching every tick also means the TTL
+        # never actually expires during normal operation, so the expensive
+        # cache-miss rebuild (build_world_geometry, generate_world_tiles,
+        # build_outdoor_navigation, ...) only runs once at startup.
+        #
+        # world_tiles/world_tile_lookup/outdoor_navigation/etc. (~46MB of
+        # static, purely-derived grid data) and "definitions" (loaded once,
+        # never mutated through this path, ~71% of the blob's bytes) are
+        # excluded here — see db.py's _STATIC_WORLD_KEYS, which load_world()
+        # backfills on every call so no caller notices either is missing
+        # from what's actually persisted.
+        persisted_snapshot = {
+            k: v for k, v in world.items()
+            if k not in _STATIC_WORLD_KEYS
+        }
+
+        set_world_cache(sim_id, persisted_snapshot)
+
+        # Durability: periodically persist to Postgres too, so simulation
+        # progress survives a backend restart instead of only reflecting
+        # whatever was last explicitly saved via the World Editor.
+        if world["tick"] % 30 == 0:
+            save_world(sim_id, persisted_snapshot)
+
+    return world, dirty
+
+
 async def loop():
     tick_rate = float(os.getenv("TICK_RATE_SECONDS", "1.0"))
     definitions = load_definitions(SIM_ID)
 
     while True:
         try:
-            world = load_world(SIM_ID)
-            ensure_world_defaults(world)
-            world["definitions"] = definitions
-
-            # tick() blocks synchronously on concurrent.futures.as_completed
-            # while character agent threads run (including real LLM calls, up
-            # to ~150s each) — running it inline here would freeze the entire
-            # event loop (all HTTP/WebSocket handling) for that whole duration.
-            # Runs on its own dedicated executor (not asyncio's shared default
-            # one) so it can never starve other request handling of a thread.
-            await asyncio.get_event_loop().run_in_executor(_tick_executor, tick, world)
-
-            update_world_tick(SIM_ID, world["tick"])
-
-            # Offload LLM-heavy agent work to Redis queue
-            for c in list(world.get("characters", {}).values()):
-                enqueue({
-                    "type":          "agent_tick",
-                    "simulation_id": SIM_ID,
-                    "character_id":  c["id"],
-                })
-
-            # Collect what changed this tick — must happen before persisting
-            # below, since it pops world["_dirty"] (which holds raw Python
-            # sets, not JSON-serializable) out of the tree entirely.
-            dirty = collect_dirty(world)
-
-            # Persist this tick's mutations. Without this, load_world() on the
-            # next iteration serves a stale cached snapshot (or, once the 5s
-            # Redis TTL expires, rebuilds from Postgres) and every character
-            # decision / movement update / need decay this tick made is
-            # silently discarded. Re-caching every tick also means the TTL
-            # never actually expires during normal operation, so the expensive
-            # cache-miss rebuild (build_world_geometry, generate_world_tiles,
-            # build_outdoor_navigation, ...) only runs once at startup.
-            #
-            # world_tiles/world_tile_lookup/outdoor_navigation/etc. are excluded
-            # here — together ~46MB of static, purely-derived grid data — and
-            # re-serializing/re-deserializing that on every load_world() call
-            # (every tick, AND every incoming request that reads world state)
-            # was causing severe multi-second latency under any concurrent
-            # load. db.py's _ensure_static_world_data cheaply restores them
-            # from a process-local cache whenever they're missing.
-            persisted_snapshot = {
-                k: v for k, v in world.items()
-                if k not in (
-                    "world_tiles", "world_tile_lookup", "outdoor_navigation",
-                    "road_entry_points", "road_exit_points", "road_graph", "traffic",
-                )
-            }
-
-            await asyncio.get_event_loop().run_in_executor(
-                _tick_executor, set_world_cache, SIM_ID, persisted_snapshot
+            world, dirty = await asyncio.get_event_loop().run_in_executor(
+                _tick_executor, _run_tick_and_persist, SIM_ID, definitions
             )
-
-            # Durability: periodically persist to Postgres too, so simulation
-            # progress survives a backend restart instead of only reflecting
-            # whatever was last explicitly saved via the World Editor.
-            if world["tick"] % 30 == 0:
-                await asyncio.get_event_loop().run_in_executor(
-                    _tick_executor, save_world, SIM_ID, persisted_snapshot
-                )
 
             # Broadcast to each client
             dead = []
@@ -321,10 +325,11 @@ def household(household_id: str):
 
 @app.post("/api/config/environment")
 def update_environment(payload: dict):
-    world = load_world(SIM_ID)
-    world.setdefault("environment", {}).update(payload)
-    save_world(SIM_ID, world)
-    return world["environment"]
+    with world_lock():
+        world = load_world(SIM_ID)
+        world.setdefault("environment", {}).update(payload)
+        save_world(SIM_ID, world)
+        return world["environment"]
 
 
 @app.get("/api/llm/logs")
@@ -335,7 +340,8 @@ def llm_logs():
 
 @app.delete("/api/llm/logs")
 def clear_llm_logs():
-    world = load_world(SIM_ID)
-    world["llm_logs"] = []
-    save_world(SIM_ID, world)
-    return {"ok": True}
+    with world_lock():
+        world = load_world(SIM_ID)
+        world["llm_logs"] = []
+        save_world(SIM_ID, world)
+        return {"ok": True}

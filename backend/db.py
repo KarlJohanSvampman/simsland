@@ -1,4 +1,6 @@
 import psycopg2, json, os, threading
+from contextlib import contextmanager
+from fastapi import HTTPException
 from core.cache import get_world_cache, set_world_cache
 from core.cache import get_char_cache, set_char_cache
 from systems.schema_defaults import (
@@ -42,6 +44,13 @@ _STATIC_WORLD_KEYS = (
     "world_tiles",
     "world_tile_lookup", "outdoor_navigation",
     "road_entry_points", "road_exit_points", "road_graph", "traffic",
+    # "definitions" is loaded once and never mutated through any
+    # save_world/set_world_cache path (the one real mutator,
+    # api/editor.py's save_definitions(), writes straight to the JSON
+    # file on disk) — it was ~71% of the persisted blob's bytes, and
+    # excluding it just needs load_world() to keep backfilling it (see
+    # below) so no caller notices it's no longer actually persisted.
+    "definitions",
 )
 _static_world_cache = {}
 
@@ -156,6 +165,43 @@ conn.autocommit = True
 # init_db() calls save_world() while already holding the lock itself.
 _conn_lock = threading.RLock()
 
+# A second, broader lock: `_conn_lock` only protects the psycopg2 connection
+# object itself from concurrent use, not the read-modify-write span around
+# it. Two callers can each safely `load_world()` (no conn contention) then
+# both `save_world()` moments apart, and whichever writes last silently
+# discards the other's changes — this is exactly how main.py's tick loop
+# was found to be clobbering out-of-band API writes (a prop move via the
+# World Editor, reverted within ~1-2s with zero errors). No existing
+# versioning/dirty-tracking is granular enough for a partial-merge fix
+# (collect_dirty() only tracks characters that got an LLM tick this cycle,
+# never props/buildings/households — see sim_loop.py), and props/buildings/
+# households/characters are all mutated by *both* the tick loop and API
+# routes, so no safe key-level partition exists either. Full mutual
+# exclusion over the whole read-modify-write span, on both sides, is the
+# correct fix.
+_world_lock = threading.Lock()   # not RLock — no call path re-enters it
+
+
+@contextmanager
+def world_lock(timeout=30):
+    """API routes should wrap their load_world()->mutate->save_world() body
+    in `with world_lock():`, not the raw _world_lock directly — this gives
+    a bounded wait with a clear 503 instead of an open-ended hang. The tick
+    loop's own critical section can genuinely take up to ~150s in the
+    worst case (an LLM call's timeout — see llm_client.py) since tick()
+    reads/mutates world throughout its run, not just once, so it uses the
+    raw _world_lock (unbounded wait is fine for a background task). A 503
+    here means "simulation busy, retry" — expected under load, not a bug.
+    """
+    acquired = _world_lock.acquire(timeout=timeout)
+    if not acquired:
+        raise HTTPException(status_code=503, detail="simulation busy, try again")
+    try:
+        yield
+    finally:
+        _world_lock.release()
+
+
 def init_db():
     with _conn_lock, conn:
         with conn.cursor() as cur:
@@ -244,6 +290,12 @@ def load_world(sim_id):
         if not cached.get("world_tiles") or not cached.get("outdoor_navigation"):
             _ensure_static_world_data(cached, sim_id)
 
+        # "definitions" is excluded from the cached blob too (see
+        # _STATIC_WORLD_KEYS above) — every caller of load_world() still
+        # expects it populated, so backfill it the same way.
+        if "definitions" not in cached:
+            cached["definitions"] = load_definitions(sim_id)
+
         return cached
 
     # =====================================
@@ -301,6 +353,10 @@ def load_world(sim_id):
     definitions = load_definitions(
         sim_id
     )
+    # See the cache-hit branch above — every caller of load_world()
+    # expects world["definitions"] populated even though it's excluded
+    # from what actually gets persisted.
+    world["definitions"] = definitions
     build_world_geometry(
         sim_id,
         world
