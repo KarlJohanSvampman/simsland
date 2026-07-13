@@ -619,6 +619,31 @@ def build_narrative(c, world):
 
     paragraphs = [build_scene_description(c, world)]
 
+    # ---- hearing — restores perceive_audio()'s audible_events, computed
+    # every perception cadence tick but never surfaced anywhere before this
+    # (not in the old flat context, not consumed by attention.py either) ----
+    audible = c.get("perception", {}).get("audible_events", [])
+    if audible:
+        lines = []
+        for event in audible[:4]:
+            if event.get("type") == "speech":
+                lines.append(
+                    f"You hear {event.get('speaker') or 'someone'} "
+                    "talking somewhere nearby."
+                )
+            elif event.get("type") == "ambient" and event.get("sound"):
+                lines.append(
+                    f"You hear a {event['sound'].replace('_', ' ')}."
+                )
+        if lines:
+            paragraphs.append(" ".join(lines))
+
+    # ---- attention/focus — restores build_attention_summary, previously
+    # unused (dead code, same gap as relationships/memories above) ----
+    focus = build_attention_summary(c, world).get("focus")
+    if focus and focus.get("strength", 0) > 0.4 and focus.get("on"):
+        paragraphs.append(f"Your attention keeps drifting to {focus['on']}.")
+
     # ---- identity + emotional state ----
     name = c.get("name", "You")
     bits = [f"You are {name}"]

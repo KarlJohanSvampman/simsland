@@ -573,6 +573,12 @@ def ensure_character_defaults(c):
     # per-tick context every turn.
     c.setdefault("_llm_session", {"history": []})
 
+    # Sense-related physical traits (poor_eyesight, keen_hearing, ...) —
+    # see brain/perception.py's SENSE_TRAIT_MODIFIERS. Kept separate from
+    # c["traits"] (personality) since build_narrative() describes them
+    # completely differently in the prompt.
+    c.setdefault("physical_traits", [])
+
     # Impulse control — anger pressure vs self-control
     c.setdefault("impulse_state", {
         "anger_pressure":   0.0,   # 0-1; accumulates from grievances/frustration

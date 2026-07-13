@@ -16,15 +16,71 @@ def manhattan(a, b):
 
 
 # =========================================================
+# SENSE TRAITS
+# =========================================================
+# Plain dict constant, mirroring this file's own _ANCHOR_TAGS and
+# reactions.py's REACTION_PRIORITIES — not a new JSON registry.
+# definitions.json's trait_templates key exists but is currently empty and
+# is for personality traits (c["traits"]), a different purpose from
+# sense-related physical traits (c["physical_traits"]).
+
+SENSE_TRAIT_MODIFIERS = {
+    "poor_eyesight":  {"vision": 0.6},
+    "keen_eyesight":  {"vision": 1.3},
+    "poor_hearing":   {"hearing": 0.6},
+    "keen_hearing":   {"hearing": 1.3},
+}
+
+
+def _sense_modifier(c, sense):
+    """Multiply together every physical_traits modifier for the given
+    sense ("vision" or "hearing"). Characters with no matching trait get
+    the neutral 1.0 multiplier."""
+
+    modifier = 1.0
+
+    for trait in c.get("physical_traits", []):
+
+        modifier *= SENSE_TRAIT_MODIFIERS.get(trait, {}).get(sense, 1.0)
+
+    return modifier
+
+
+# =========================================================
+# NIGHT
+# =========================================================
+# Same day/night bucketing _build_room_summary() already uses for its
+# time-of-day label, so "night" means the same thing everywhere in the
+# narrative.
+
+def _is_night(world):
+
+    hour = world.get("calendar", {}).get("hour", 12)
+
+    return hour < 6 or hour >= 21
+
+
+# =========================================================
 # VISUAL RANGE
 # =========================================================
 
 def visual_range(c, world):
 
-    if c.get("inside"):
-        return 8
+    # c.get("inside") is never written anywhere in this codebase — always
+    # falsy, so this branch never fired and every character got the
+    # outdoor range regardless of actually being indoors. building_id is
+    # the one live-maintained spatial field (movement.py, room_assignment.py).
+    indoors = bool(c.get("building_id"))
 
-    return 14
+    base = 8 if indoors else 14
+
+    if _is_night(world):
+        # No lighting/lamp-state system exists to model per-room darkness,
+        # so this is a flat reduction rather than lit/unlit per room — a
+        # deliberate simplification, not a hidden gap.
+        base *= 0.55 if indoors else 0.35
+
+    return base * _sense_modifier(c, "vision")
 
 
 # =========================================================
@@ -33,7 +89,7 @@ def visual_range(c, world):
 
 def hearing_range(c):
 
-    return 10
+    return 10 * _sense_modifier(c, "hearing")
 
 
 # =========================================================

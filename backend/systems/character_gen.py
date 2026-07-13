@@ -130,6 +130,21 @@ def _pick_from_registry(registry, max_picks, skip_chance):
         return []
     return random.sample(registry, min(max_picks, len(registry)))
 
+# Sense-related physical traits (see brain/perception.py's
+# SENSE_TRAIT_MODIFIERS). Kept as a small in-code pool rather than a
+# definitions.json registry for this first slice — mirrors how
+# stance_templates/trait_templates started before being promoted to
+# editable JSON. Vision and hearing are rolled independently (a character
+# can have both a vision quirk and a hearing quirk, or neither).
+_VISION_TRAIT_POOL  = ["poor_eyesight", "keen_eyesight"]
+_HEARING_TRAIT_POOL = ["poor_hearing", "keen_hearing"]
+
+def _random_physical_traits():
+    return (
+        _pick_from_registry(_VISION_TRAIT_POOL, 1, 0.75)
+        + _pick_from_registry(_HEARING_TRAIT_POOL, 1, 0.75)
+    )
+
 # ── Job assignment ────────────────────────────────────────────────────────────
 
 def _assign_job(defs, age_group, education):
@@ -262,7 +277,8 @@ def generate_character(defs, overrides=None):
         or f"{sex}_{age_group}_base"
     )
 
-    traits       = overrides.get("traits")             or _random_traits(defs)
+    traits          = overrides.get("traits")             or _random_traits(defs)
+    physical_traits = overrides.get("physical_traits")    or _random_physical_traits()
     hobbies      = overrides.get("hobbies")            or _random_hobbies(defs)
     orientation  = overrides.get("sexual_orientation") or _random_orientation()
     problems     = overrides.get("problems")           or _random_problems(defs)
@@ -336,6 +352,7 @@ def generate_character(defs, overrides=None):
         "facing":   "south",
         # Personality & social
         "traits":             traits,
+        "physical_traits":    physical_traits,
         "hobbies":            hobbies,
         "sexual_orientation": orientation,
         "gender_identity":    "cisgender",
