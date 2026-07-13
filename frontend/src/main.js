@@ -2716,6 +2716,292 @@ renderer.domElement.addEventListener(
   }
 );
 
+// =========================================================
+// HOUSEHOLD ADMIN MODAL (mailbox double-click)
+// =========================================================
+// The viewer's inspector above is otherwise strictly read-only — this is
+// the one deliberate exception, for administering a mailbox's household
+// (family name, owned floorplans, member characters). Modal CSS/markup
+// ported from editor.html/editor-main.js, the only place this pattern
+// existed before (the live viewer had no modal infrastructure at all).
+
+window.closeModal = function(id) {
+  document.getElementById(id).classList.remove("open");
+};
+
+function openModal(id) {
+  document.getElementById(id).classList.add("open");
+}
+
+document.querySelectorAll(".modal-overlay").forEach(overlay => {
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay) overlay.classList.remove("open");
+  });
+});
+
+renderer.domElement.addEventListener("dblclick", (event) => {
+  mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+  mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+  raycaster.setFromCamera(mouse, camera);
+
+  const hits = raycaster
+    .intersectObjects(selectable, true)
+    .filter(h => !h.object.userData?.ignoreRaycast);
+  if (!hits.length) return;
+
+  let obj = hits[0].object;
+  while (obj && !obj.userData?.type) obj = obj.parent;
+  if (!obj) return;
+
+  const d = obj.userData;
+  if (d.type === "prop" && d.template === "mailbox") {
+    openHouseholdModal(d.id);
+  }
+});
+
+function _findProp(propId) {
+  return _worldState._propsMap?.[propId]
+    ?? (_worldState.props || []).find(p => p.id === propId);
+}
+
+// Guards a modal refresh against a slower, earlier fetch overwriting the
+// panel after the user has since closed it or double-clicked a different
+// mailbox — same idiom as _llmLogSelectionToken below.
+let _householdModalToken = 0;
+
+async function openHouseholdModal(propId) {
+  const token = ++_householdModalToken;
+  openModal("modal-household");
+
+  const householdId = _findProp(propId)?.household_id ?? null;
+  if (!householdId) {
+    _renderCreateHouseholdForm(propId);
+    return;
+  }
+
+  document.getElementById("householdModalTitle").textContent = "Household";
+  document.getElementById("householdModalBody").innerHTML = "<i>Loading…</i>";
+
+  let detail = null;
+  try {
+    const res = await fetch(`/api/household/${encodeURIComponent(householdId)}/admin?sim_id=default`);
+    const data = await res.json();
+    detail = data.ok ? data.household : null;
+  } catch { /* detail stays null, handled below */ }
+
+  if (token !== _householdModalToken) return;
+  if (!detail) {
+    document.getElementById("householdModalBody").innerHTML =
+      `<div class="modal-empty">Household not found.</div>`;
+    return;
+  }
+  _renderHouseholdAdminPanel(detail, propId);
+}
+
+function _renderCreateHouseholdForm(propId) {
+  document.getElementById("householdModalTitle").textContent = "New Household";
+  const body = document.getElementById("householdModalBody");
+  body.innerHTML = "";
+
+  const p = document.createElement("p");
+  p.textContent = "This mailbox isn't linked to a household yet.";
+  body.appendChild(p);
+
+  const nameInput = document.createElement("input");
+  nameInput.placeholder = "Family name";
+  nameInput.style.width = "100%";
+  nameInput.style.marginBottom = "8px";
+  body.appendChild(nameInput);
+
+  const createBtn = document.createElement("button");
+  createBtn.textContent = "Create Household";
+  createBtn.addEventListener("click", async () => {
+    const res = await fetch("/api/household/create?sim_id=default", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: nameInput.value || null, mailbox_prop_id: propId }),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      // Reflect the new link locally so re-opening this mailbox before
+      // the next WS snapshot/delta arrives still sees it.
+      const prop = _findProp(propId);
+      if (prop) prop.household_id = data.household.id;
+      openHouseholdModal(propId);
+    }
+  });
+  body.appendChild(createBtn);
+}
+
+function _renderHouseholdAdminPanel(h, mailboxPropId) {
+  document.getElementById("householdModalTitle").textContent = h.name || "Household";
+  const body = document.getElementById("householdModalBody");
+  body.innerHTML = "";
+
+  const refresh = () => openHouseholdModal(mailboxPropId);
+
+  // --- Family name ---
+  const nameRow = document.createElement("div");
+  nameRow.className = "modal-row";
+  const nameInput = document.createElement("input");
+  nameInput.value = h.name || "";
+  nameInput.placeholder = "Family name";
+  const nameSaveBtn = document.createElement("button");
+  nameSaveBtn.textContent = "Save";
+  nameSaveBtn.addEventListener("click", async () => {
+    await fetch("/api/household/set_name?sim_id=default", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ household_id: h.id, name: nameInput.value }),
+    });
+    refresh();
+  });
+  nameRow.appendChild(nameInput);
+  nameRow.appendChild(nameSaveBtn);
+  body.appendChild(nameRow);
+
+  // --- Members ---
+  const memH = document.createElement("h4");
+  memH.textContent = "Members";
+  body.appendChild(memH);
+
+  if (!h.members.length) {
+    const empty = document.createElement("div");
+    empty.className = "modal-empty";
+    empty.textContent = "No characters assigned.";
+    body.appendChild(empty);
+  }
+  for (const m of h.members) {
+    const row = document.createElement("div");
+    row.className = "modal-row";
+    const label = document.createElement("span");
+    label.textContent = m.name || m.id;
+    const removeBtn = document.createElement("button");
+    removeBtn.textContent = "Remove";
+    removeBtn.addEventListener("click", async () => {
+      await fetch("/api/household/remove_member?sim_id=default", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ character_id: m.id }),
+      });
+      refresh();
+    });
+    row.appendChild(label);
+    row.appendChild(removeBtn);
+    body.appendChild(row);
+  }
+
+  const addMemberRow = document.createElement("div");
+  addMemberRow.className = "modal-row";
+  const memberSelect = document.createElement("select");
+  const addMemberBtn = document.createElement("button");
+  addMemberBtn.textContent = "Add";
+  addMemberRow.appendChild(memberSelect);
+  addMemberRow.appendChild(addMemberBtn);
+  body.appendChild(addMemberRow);
+
+  fetch("/api/household/characters?sim_id=default")
+    .then(r => r.json())
+    .then(data => {
+      if (!data.ok) return;
+      memberSelect.innerHTML = "";
+      for (const c of data.characters) {
+        const opt = document.createElement("option");
+        opt.value = c.id;
+        // Current membership shown inline rather than filtered out —
+        // assigning someone already in another household silently moves
+        // them (household_id is a single scalar read by many systems),
+        // so make that visible instead of hiding it.
+        const current = c.household_id === h.id
+          ? " (this household)"
+          : c.household_id ? " (in another household)" : "";
+        opt.textContent = `${c.name || c.id}${current}`;
+        memberSelect.appendChild(opt);
+      }
+    });
+
+  addMemberBtn.addEventListener("click", async () => {
+    if (!memberSelect.value) return;
+    await fetch("/api/household/add_member?sim_id=default", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ household_id: h.id, character_id: memberSelect.value }),
+    });
+    refresh();
+  });
+
+  // --- Floorplans ---
+  const bldH = document.createElement("h4");
+  bldH.textContent = "Floorplans";
+  body.appendChild(bldH);
+
+  if (!h.buildings.length) {
+    const empty = document.createElement("div");
+    empty.className = "modal-empty";
+    empty.textContent = "No floorplans assigned.";
+    body.appendChild(empty);
+  }
+  for (const b of h.buildings) {
+    const row = document.createElement("div");
+    row.className = "modal-row";
+    const label = document.createElement("span");
+    label.textContent = `${b.template} (${b.x}, ${b.y})`;
+    const removeBtn = document.createElement("button");
+    removeBtn.textContent = "Unassign";
+    removeBtn.addEventListener("click", async () => {
+      await fetch("/api/household/unassign_building?sim_id=default", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ building_id: b.id }),
+      });
+      refresh();
+    });
+    row.appendChild(label);
+    row.appendChild(removeBtn);
+    body.appendChild(row);
+  }
+
+  const addBuildingRow = document.createElement("div");
+  addBuildingRow.className = "modal-row";
+  const buildingSelect = document.createElement("select");
+  const addBuildingBtn = document.createElement("button");
+  addBuildingBtn.textContent = "Assign";
+  addBuildingRow.appendChild(buildingSelect);
+  addBuildingRow.appendChild(addBuildingBtn);
+  body.appendChild(addBuildingRow);
+
+  fetch("/api/household/available_buildings?sim_id=default")
+    .then(r => r.json())
+    .then(data => {
+      if (!data.ok) return;
+      buildingSelect.innerHTML = "";
+      if (!data.buildings.length) {
+        const opt = document.createElement("option");
+        opt.textContent = "No available floorplans";
+        opt.disabled = true;
+        buildingSelect.appendChild(opt);
+        addBuildingBtn.disabled = true;
+        return;
+      }
+      for (const b of data.buildings) {
+        const opt = document.createElement("option");
+        opt.value = b.id;
+        opt.textContent = `${b.template} (${b.x}, ${b.y})`;
+        buildingSelect.appendChild(opt);
+      }
+    });
+
+  addBuildingBtn.addEventListener("click", async () => {
+    if (!buildingSelect.value) return;
+    await fetch("/api/household/assign_building?sim_id=default", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ household_id: h.id, building_id: buildingSelect.value }),
+    });
+    refresh();
+  });
+}
+
 // Selection token guards against a slower, earlier fetch overwriting the
 // panel after the user has already clicked a different character/tile.
 let _llmLogSelectionToken = 0;

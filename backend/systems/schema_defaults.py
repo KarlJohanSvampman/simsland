@@ -2,6 +2,9 @@
 # WORLD DEFAULTS
 # =========================================================
 
+from uuid import uuid4
+
+
 def ensure_world_defaults(world, defs=None):
     # Init community stats from definitions if provided
     if defs is not None:
@@ -79,6 +82,23 @@ def ensure_world_defaults(world, defs=None):
         building.setdefault("x", 0)
         building.setdefault("y", 0)
         building.setdefault("rotation", 0)
+        # owner_household_id is read by building_manager.py but nothing
+        # wrote it until the household admin feature — safe stub default.
+        building.setdefault("owner_household_id", None)
+        # Not backend-enforced at creation time (every current source of
+        # buildings happens to supply one), but household admin's
+        # lookups key on it — backfill defensively so a legacy/hand-edited
+        # entry without one doesn't KeyError there.
+        building.setdefault("id", str(uuid4()))
+
+    # A mailbox prop is the in-game control point for one household (see
+    # systems/household_manager.py) — distinct from a building's
+    # owner_household_id, which is the household that owns *that
+    # floorplan*. Backfilled here rather than via a generic per-prop
+    # metadata field, since none exists in this codebase.
+    from systems.props import get_props_by_template
+    for mailbox in get_props_by_template(world, "mailbox"):
+        mailbox.setdefault("household_id", None)
 
     # =====================================================
     # ENVIRONMENT
@@ -858,6 +878,16 @@ def ensure_character_defaults(c):
 # =========================================================
 
 def ensure_household_defaults(h):
+
+    h.setdefault(
+        "name",
+        None
+    )
+
+    h.setdefault(
+        "building_ids",
+        []
+    )
 
     h.setdefault(
         "members",
