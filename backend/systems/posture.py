@@ -22,6 +22,14 @@ fed by animbank.js's Stances/Transitions panels) — if nothing was authored
 for a given pair, the transition key simply falls back to whatever
 ANIM_LAYERS/_playSingleAction already do with an unrecognized key, so an
 un-authored transition doesn't error, it just cuts less gracefully.
+
+The stance vocabulary itself (which postures exist, each one's idle key)
+lives in definitions.json's "stance_templates" category, not hardcoded
+here — see _idle_key() below. This is the same vocabulary animbank.js's
+Stances panel and main.js's _STANCE_IDLE_KEY/_STANCE_MOVE_KEY read, so
+adding a new posture (or a new animation-override slot like carry) is a
+data edit in the Definitions editor, not a change in three separate
+files.
 """
 
 # Fixed placeholder — the backend has no visibility into how long an
@@ -30,20 +38,19 @@ un-authored transition doesn't error, it just cuts less gracefully.
 # real clip duration.
 _POSTURE_SETTLE_TICKS = 15
 
-_IDLE_KEY = {
-    "standing":      "idle",
-    "sitting_seat":  "sit_idle",
-    "sitting_floor": "sit_idle_floor",
-    "lying":         "lie_idle",
-    "crouching":     "crouch_idle",
-    "crawling":      "crawl_idle",
-    "fallen_front":  "fallen_front_idle",
-    "fallen_back":   "fallen_back_idle",
-    "leaning_wall":  "leaning_idle",
-    "unconscious":   "unconscious_idle",
-    "dead":          "dead_idle",
-    "intoxicated":   "intoxicated_idle",
-}
+
+def _idle_key(world, posture):
+    """Look up a posture's idle animation_state from stance_templates.
+    Only entries with is_posture=true are real c["posture"] values (carry/
+    dragging/pushing are animation-override slots driven by other
+    character fields, not posture — see the module docstring). Cheap
+    enough (~15 entries) not to need its own cache; world["definitions"]
+    is already refreshed every tick (main.py::_run_tick_and_persist)."""
+    stances = (world.get("definitions") or {}).get("stance_templates") or {}
+    entry = stances.get(posture)
+    if entry and entry.get("is_posture"):
+        return entry.get("idle_key", "idle")
+    return "idle"
 
 
 def set_posture(c, world, new_posture):
@@ -65,7 +72,7 @@ def set_posture(c, world, new_posture):
     c["animation_state"] = transition_key
     c["_posture_settle"] = {
         "expected_state": transition_key,
-        "target_idle":    _IDLE_KEY[new_posture],
+        "target_idle":    _idle_key(world, new_posture),
         "ready_at_tick":  world.get("tick", 0) + _POSTURE_SETTLE_TICKS,
     }
 

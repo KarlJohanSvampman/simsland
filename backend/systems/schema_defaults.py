@@ -62,6 +62,7 @@ def ensure_world_defaults(world, defs=None):
     world.setdefault("stocks",             {})
     world.setdefault("stock_sector_trends", {})
     world.setdefault("service_contracts",  [])
+    world.setdefault("household_processes", [])
     world.setdefault("walls",              {})
 
 

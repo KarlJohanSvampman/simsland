@@ -44,6 +44,7 @@ from brain.memory       import decay_memories
 from brain.beliefs      import polarization_drift, compute_alignment
 from brain.relationships import first_impression, update_relationship_state
 from systems.cooking_process import update_cooking_process
+from systems.task_process import update_household_processes
 from systems.market     import update_market, produce, consume_households
 from systems.stock_market  import update_stocks, init_stocks
 from systems.investments   import update_investment_behavior
@@ -255,6 +256,12 @@ def tick(world):
             hh = world.get("households", {}).get(c.get("household_id"))
             if hh:
                 update_cooking_process(c, hh, world)
+
+    # Household-scoped multi-stage processes (laundry, etc.) — ticks
+    # forward for every household regardless of who's nearby, same
+    # cadence tier as cooking. See systems/task_process.py.
+    if every(world, CADENCE["cooking"], offset=33):
+        update_household_processes(world)
 
     if every(world, CADENCE["deliveries"], offset=6):
         deliver_messages(world)

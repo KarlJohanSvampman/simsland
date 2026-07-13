@@ -23,7 +23,10 @@ let definitions = {
   mood_templates: {},
   trait_templates: {},
   job_templates: {},
-  company_templates: {}
+  company_templates: {},
+  stance_templates: {},
+  stage_primitives: {},
+  chore_templates: {}
 };
 
 const tabs = [
@@ -46,6 +49,9 @@ const tabs = [
   "wall_segment_templates",
   "material_templates",
   "hobby_templates",
+  "stance_templates",
+  "stage_primitives",
+  "chore_templates",
   "socioeconomics",
 ];
 
@@ -1018,6 +1024,40 @@ const DEFAULT_TEMPLATES = {
     skill_required: "cooking",
     skill_level: 0,
     duration_minutes: 30
+  },
+
+  // Stance/locomotion vocabulary — the single source of truth posture.py,
+  // animbank.js's Stances panel, and main.js's animation-state resolution
+  // all read from. is_posture=true means it's a real c["posture"] value;
+  // false means it's an animation-override slot (carry/dragging/pushing)
+  // driven by other character fields.
+  stance_templates: {
+    key: "new_stance",
+    label: "New Stance",
+    is_posture: true,
+    idle_key: "new_stance_idle",
+    moves: []
+  },
+
+  // Reusable animation/duration primitive a chore/recipe stage can
+  // reference by key (e.g. "chop", "fry", "fold_item") instead of every
+  // recipe hand-authoring its own one-off stage animation.
+  stage_primitives: {
+    key: "new_primitive",
+    label: "New Primitive",
+    default_duration: 5,
+    default_active: true,
+    animation_state: "idle"
+  },
+
+  // Same shape as recipe_templates but for non-food multi-stage chores
+  // (laundry, etc.) — stages reference stage_primitives by key, with
+  // duration/active as optional per-stage overrides.
+  chore_templates: {
+    category: "housekeeping",
+    time_minutes: 30,
+    stages: [],
+    output: { resource_type: "", servings: 1 }
   },
 
   // Service catalog entry — what hired service workers offer

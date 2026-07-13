@@ -14,6 +14,8 @@ RECIPES = {
 
                 "name": "boil_water",
 
+                "primitive": "boil",
+
                 "duration": 5,
 
                 "active": False
@@ -22,6 +24,8 @@ RECIPES = {
             {
 
                 "name": "cook_carbs",
+
+                "primitive": "boil",
 
                 "inputs": {
 
@@ -36,6 +40,8 @@ RECIPES = {
             {
 
                 "name": "prepare_sauce",
+
+                "primitive": "mix",
 
                 "inputs": {
 
@@ -72,6 +78,8 @@ RECIPES = {
 
                 "name": "roast_protein",
 
+                "primitive": "roast",
+
                 "inputs": {
 
                     "FOOD_PROTEIN": 1
@@ -86,6 +94,8 @@ RECIPES = {
 
                 "name": "cook_vegetables",
 
+                "primitive": "fry",
+
                 "inputs": {
 
                     "FOOD_VEGETABLE": 1
@@ -99,6 +109,8 @@ RECIPES = {
             {
 
                 "name": "prepare_carbs",
+
+                "primitive": "boil",
 
                 "inputs": {
 

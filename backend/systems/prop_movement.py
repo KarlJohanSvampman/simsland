@@ -19,7 +19,7 @@ its own single-character-only thing.
 """
 
 from systems.templates import get_prop_template
-from systems.posture import _IDLE_KEY, _POSTURE_SETTLE_TICKS
+from systems.posture import _idle_key, _POSTURE_SETTLE_TICKS
 
 
 def get_move_capacity(prop):
@@ -43,7 +43,7 @@ def play_prop_action_once(c, world, action_key, target_idle=None, ticks=_POSTURE
     """
     One-shot animation that settles back to an idle state — same shape as
     item_stack.py's play_item_action_once, with one addition: an optional
-    target_idle override. _IDLE_KEY is keyed by body posture (standing,
+    target_idle override. _idle_key() resolves by body posture (standing,
     sitting_seat, ...), which drag/push are orthogonal to — after
     "start_dragging" finishes, a character should settle to "drag_idle",
     not their ordinary posture idle, hence the override.
@@ -51,6 +51,6 @@ def play_prop_action_once(c, world, action_key, target_idle=None, ticks=_POSTURE
     c["animation_state"] = action_key
     c["_posture_settle"] = {
         "expected_state": action_key,
-        "target_idle":    target_idle or _IDLE_KEY.get(c.get("posture", "standing"), "idle"),
+        "target_idle":    target_idle or _idle_key(world, c.get("posture", "standing")),
         "ready_at_tick":  world.get("tick", 0) + ticks,
     }

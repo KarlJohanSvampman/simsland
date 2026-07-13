@@ -20080,6 +20080,4899 @@
         }
       },
       "id": "small_house"
+    },
+    "starter_house": {
+      "id": "starter_house",
+      "category": "residential",
+      "tags": [
+        "small",
+        "starter"
+      ],
+      "width": 20,
+      "height": 20,
+      "tiles": {
+        "6,3": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "south": null,
+            "east": null,
+            "west": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            }
+          }
+        },
+        "7,3": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "10,3": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "6,2": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "east": null,
+            "west": null
+          }
+        },
+        "7,2": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "east": null,
+            "west": null
+          }
+        },
+        "6,1": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "5,3": {
+          "floor": null,
+          "walls": {
+            "north": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "south": null,
+            "east": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "west": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            }
+          }
+        },
+        "8,2": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "east": null,
+            "west": null
+          }
+        },
+        "9,2": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "east": null,
+            "west": null
+          }
+        },
+        "10,2": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "east": null,
+            "west": null
+          }
+        },
+        "9,3": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "8,3": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "11,3": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "11,4": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "11,5": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": {
+              "type": "door",
+              "material": "wallpaper_geometric_01"
+            },
+            "east": null,
+            "west": null
+          }
+        },
+        "10,5": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": {
+              "type": "door",
+              "material": "wallpaper_geometric_01"
+            },
+            "east": null,
+            "west": null
+          }
+        },
+        "10,6": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": {
+              "type": "door",
+              "material": "wallpaper_geometric_01"
+            },
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "10,7": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "11,7": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "11,6": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": {
+              "type": "door",
+              "material": "wallpaper_geometric_01"
+            },
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "9,6": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "south": null,
+            "east": null,
+            "west": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            }
+          }
+        },
+        "9,5": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "east": null,
+            "west": null
+          }
+        },
+        "9,4": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "10,4": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "8,4": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "7,4": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "6,4": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            }
+          }
+        },
+        "6,5": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "east": null,
+            "west": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            }
+          }
+        },
+        "7,5": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "east": null,
+            "west": null
+          }
+        },
+        "8,5": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "east": null,
+            "west": null
+          }
+        },
+        "9,7": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            }
+          }
+        },
+        "9,8": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "8,8": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "7,8": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "6,8": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "5,8": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "5,9": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "5,10": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "east": null,
+            "west": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            }
+          }
+        },
+        "6,10": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": {
+              "type": "door",
+              "material": "wallpaper_geometric_01"
+            },
+            "east": null,
+            "west": null
+          }
+        },
+        "7,10": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "east": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "west": null
+          }
+        },
+        "7,9": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "6,9": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "8,9": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "east": null,
+            "west": null
+          }
+        },
+        "10,9": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "11,9": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "12,9": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "west": null
+          }
+        },
+        "13,9": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            }
+          }
+        },
+        "13,8": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "south": null,
+            "east": null,
+            "west": {
+              "type": "door",
+              "material": "wallpaper_geometric_01"
+            }
+          }
+        },
+        "13,7": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "east": null,
+            "west": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            }
+          }
+        },
+        "13,6": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "south": null,
+            "east": null,
+            "west": {
+              "type": "door",
+              "material": "wallpaper_geometric_01"
+            }
+          }
+        },
+        "12,6": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "south": null,
+            "east": {
+              "type": "door",
+              "material": "wallpaper_geometric_01"
+            },
+            "west": null
+          }
+        },
+        "12,8": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": {
+              "type": "door",
+              "material": "wallpaper_geometric_01"
+            },
+            "west": null
+          }
+        },
+        "12,7": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "west": null
+          }
+        },
+        "11,8": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "10,8": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "13,10": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            }
+          }
+        },
+        "14,10": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "14,9": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "14,8": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "14,7": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "east": null,
+            "west": null
+          }
+        },
+        "14,6": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "12,3": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "south": null,
+            "east": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "west": null
+          }
+        },
+        "12,4": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "west": null
+          }
+        },
+        "12,5": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "east": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "west": null
+          }
+        },
+        "4,8": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "4,9": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "4,10": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "west": null
+          }
+        },
+        "3,9": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "2,9": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "east": null,
+            "west": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            }
+          }
+        },
+        "3,8": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "2,8": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            }
+          }
+        },
+        "2,7": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            }
+          }
+        },
+        "3,7": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "west": null
+          }
+        },
+        "15,6": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "15,7": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "east": null,
+            "west": null
+          }
+        },
+        "15,8": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "15,9": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "16,6": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "south": null,
+            "east": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "west": null
+          }
+        },
+        "16,7": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "east": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "west": null
+          }
+        },
+        "16,8": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "south": null,
+            "east": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "west": null
+          }
+        },
+        "16,9": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "west": null
+          }
+        },
+        "16,10": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "west": null
+          }
+        },
+        "11,2": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "east": null,
+            "west": null
+          }
+        },
+        "12,2": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "east": null,
+            "west": null
+          }
+        },
+        "13,3": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            }
+          }
+        },
+        "13,4": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            }
+          }
+        },
+        "13,5": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "east": null,
+            "west": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            }
+          }
+        },
+        "5,4": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "west": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            }
+          }
+        },
+        "5,5": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "west": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            }
+          }
+        },
+        "6,6": {
+          "floor": null,
+          "walls": {
+            "north": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "7,6": {
+          "floor": null,
+          "walls": {
+            "north": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "8,6": {
+          "floor": null,
+          "walls": {
+            "north": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "south": null,
+            "east": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "west": null
+          }
+        },
+        "8,7": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "east": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "west": null
+          }
+        },
+        "14,5": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "east": null,
+            "west": null
+          }
+        },
+        "15,5": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "east": null,
+            "west": null
+          }
+        },
+        "16,5": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "east": null,
+            "west": null
+          }
+        },
+        "17,7": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            }
+          }
+        },
+        "17,6": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            }
+          }
+        },
+        "4,7": {
+          "floor": null,
+          "walls": {
+            "north": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "south": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "east": null,
+            "west": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            }
+          }
+        },
+        "5,7": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "east": null,
+            "west": null
+          }
+        },
+        "6,7": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "east": null,
+            "west": null
+          }
+        },
+        "7,7": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "east": null,
+            "west": null
+          }
+        },
+        "5,6": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            }
+          }
+        },
+        "1,7": {
+          "floor": null,
+          "walls": {
+            "north": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "south": null,
+            "east": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "west": null
+          }
+        },
+        "1,8": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "west": null
+          }
+        },
+        "1,9": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "west": null
+          }
+        },
+        "1,10": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "2,10": {
+          "floor": null,
+          "walls": {
+            "north": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "south": null,
+            "east": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "west": null
+          }
+        },
+        "0,7": {
+          "floor": null,
+          "walls": {
+            "north": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "0,8": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "0,9": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "0,10": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "2,11": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "west": null
+          }
+        },
+        "2,12": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "west": null
+          }
+        },
+        "5,12": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            }
+          }
+        },
+        "5,11": {
+          "floor": null,
+          "walls": {
+            "north": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "south": null,
+            "east": null,
+            "west": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            }
+          }
+        },
+        "3,13": {
+          "floor": null,
+          "walls": {
+            "north": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "4,13": {
+          "floor": null,
+          "walls": {
+            "north": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "3,10": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "3,11": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "4,11": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "3,12": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "4,12": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "6,11": {
+          "floor": null,
+          "walls": {
+            "north": {
+              "type": "door",
+              "material": "wallpaper_geometric_01"
+            },
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "7,11": {
+          "floor": null,
+          "walls": {
+            "north": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "8,10": {
+          "floor": null,
+          "walls": {
+            "north": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "south": null,
+            "east": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "west": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            }
+          }
+        },
+        "8,11": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "west": null
+          }
+        },
+        "9,11": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "east": null,
+            "west": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            }
+          }
+        },
+        "8,12": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "9,12": {
+          "floor": null,
+          "walls": {
+            "north": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "9,13": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "10,12": {
+          "floor": null,
+          "walls": {
+            "north": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "10,13": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "11,12": {
+          "floor": null,
+          "walls": {
+            "north": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "11,13": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "12,12": {
+          "floor": null,
+          "walls": {
+            "north": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "12,13": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "13,12": {
+          "floor": null,
+          "walls": {
+            "north": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "10,11": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "east": null,
+            "west": null
+          }
+        },
+        "11,11": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "east": null,
+            "west": null
+          }
+        },
+        "12,11": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "east": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "west": null
+          }
+        },
+        "17,8": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            }
+          }
+        },
+        "17,9": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            }
+          }
+        },
+        "17,10": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            }
+          }
+        },
+        "17,11": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            }
+          }
+        },
+        "15,12": {
+          "floor": null,
+          "walls": {
+            "north": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "14,12": {
+          "floor": null,
+          "walls": {
+            "north": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "16,12": {
+          "floor": null,
+          "walls": {
+            "north": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "17,12": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "13,13": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "14,13": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "15,13": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "16,13": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "17,13": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "16,11": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "east": null,
+            "west": null
+          }
+        },
+        "15,11": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "east": null,
+            "west": null
+          }
+        },
+        "18,9": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "18,10": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "18,11": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "18,12": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "13,11": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "east": null,
+            "west": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            }
+          }
+        },
+        "14,11": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "east": null,
+            "west": null
+          }
+        },
+        "12,14": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "13,14": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "15,10": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "9,9": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "9,10": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "10,10": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "11,10": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "12,10": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "west": null
+          }
+        },
+        "1,2": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "2,2": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "1,4": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "1,3": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "2,3": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "3,3": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "5,0": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "5,1": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "5,2": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "east": null,
+            "west": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            }
+          }
+        },
+        "0,6": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            }
+          }
+        },
+        "0,5": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            }
+          }
+        },
+        "0,4": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            }
+          }
+        },
+        "0,2": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": {
+              "type": "door",
+              "material": "wallpaper_geometric_01"
+            },
+            "south": null,
+            "east": null,
+            "west": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            }
+          }
+        },
+        "0,1": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": {
+              "type": "door",
+              "material": "wallpaper_geometric_01"
+            },
+            "east": null,
+            "west": null
+          }
+        },
+        "0,3": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            }
+          }
+        },
+        "1,1": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "0,0": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "4,0": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "3,1": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "east": null,
+            "west": null
+          }
+        },
+        "3,2": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "4,1": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "east": null,
+            "west": null
+          }
+        },
+        "4,2": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": {
+              "type": "wall",
+              "material": "wallpaper_geometric_01"
+            },
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "2,5": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "1,5": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "1,6": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "2,6": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "3,6": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "4,6": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "4,5": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "3,5": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "3,4": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "4,4": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "4,3": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "2,4": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        }
+      },
+      "rooms": [
+        {
+          "id": "kitchen_0",
+          "type": "kitchen",
+          "tags": [
+            "ground_floor",
+            "kitchen"
+          ],
+          "tiles": [
+            {
+              "x": 6,
+              "y": 3
+            },
+            {
+              "x": 7,
+              "y": 3
+            },
+            {
+              "x": 8,
+              "y": 3
+            },
+            {
+              "x": 9,
+              "y": 3
+            },
+            {
+              "x": 10,
+              "y": 3
+            },
+            {
+              "x": 12,
+              "y": 3
+            },
+            {
+              "x": 11,
+              "y": 3
+            },
+            {
+              "x": 6,
+              "y": 4
+            },
+            {
+              "x": 7,
+              "y": 4
+            },
+            {
+              "x": 8,
+              "y": 4
+            },
+            {
+              "x": 9,
+              "y": 4
+            },
+            {
+              "x": 10,
+              "y": 4
+            },
+            {
+              "x": 11,
+              "y": 4
+            },
+            {
+              "x": 12,
+              "y": 4
+            },
+            {
+              "x": 10,
+              "y": 5
+            },
+            {
+              "x": 11,
+              "y": 5
+            },
+            {
+              "x": 12,
+              "y": 5
+            },
+            {
+              "x": 8,
+              "y": 5
+            },
+            {
+              "x": 9,
+              "y": 5
+            },
+            {
+              "x": 7,
+              "y": 5
+            },
+            {
+              "x": 6,
+              "y": 5
+            }
+          ]
+        },
+        {
+          "id": "dining_room_1",
+          "type": "dining_room",
+          "tags": [
+            "ground_floor",
+            "dining_room"
+          ],
+          "tiles": [
+            {
+              "x": 10,
+              "y": 6
+            },
+            {
+              "x": 11,
+              "y": 6
+            },
+            {
+              "x": 9,
+              "y": 6
+            },
+            {
+              "x": 12,
+              "y": 6
+            },
+            {
+              "x": 12,
+              "y": 11
+            },
+            {
+              "x": 12,
+              "y": 8
+            },
+            {
+              "x": 12,
+              "y": 7
+            },
+            {
+              "x": 12,
+              "y": 9
+            },
+            {
+              "x": 12,
+              "y": 10
+            },
+            {
+              "x": 10,
+              "y": 11
+            },
+            {
+              "x": 9,
+              "y": 10
+            },
+            {
+              "x": 10,
+              "y": 10
+            },
+            {
+              "x": 11,
+              "y": 11
+            },
+            {
+              "x": 9,
+              "y": 11
+            },
+            {
+              "x": 11,
+              "y": 10
+            },
+            {
+              "x": 11,
+              "y": 9
+            },
+            {
+              "x": 10,
+              "y": 9
+            },
+            {
+              "x": 9,
+              "y": 9
+            },
+            {
+              "x": 9,
+              "y": 7
+            },
+            {
+              "x": 9,
+              "y": 8
+            },
+            {
+              "x": 10,
+              "y": 8
+            },
+            {
+              "x": 11,
+              "y": 8
+            },
+            {
+              "x": 11,
+              "y": 7
+            },
+            {
+              "x": 10,
+              "y": 7
+            }
+          ]
+        },
+        {
+          "id": "restroom_2",
+          "type": "restroom",
+          "tags": [
+            "ground_floor",
+            "restroom",
+            "toilet",
+            "shower"
+          ],
+          "tiles": [
+            {
+              "x": 13,
+              "y": 6
+            },
+            {
+              "x": 14,
+              "y": 6
+            },
+            {
+              "x": 15,
+              "y": 6
+            },
+            {
+              "x": 16,
+              "y": 6
+            },
+            {
+              "x": 16,
+              "y": 7
+            },
+            {
+              "x": 14,
+              "y": 7
+            },
+            {
+              "x": 13,
+              "y": 7
+            },
+            {
+              "x": 15,
+              "y": 7
+            }
+          ]
+        },
+        {
+          "id": "corridor_3",
+          "type": "corridor",
+          "tags": [
+            "ground_floor",
+            "hallway"
+          ],
+          "tiles": [
+            {
+              "x": 3,
+              "y": 10
+            },
+            {
+              "x": 3,
+              "y": 11
+            },
+            {
+              "x": 4,
+              "y": 12
+            },
+            {
+              "x": 4,
+              "y": 11
+            },
+            {
+              "x": 4,
+              "y": 10
+            },
+            {
+              "x": 3,
+              "y": 12
+            },
+            {
+              "x": 5,
+              "y": 10
+            },
+            {
+              "x": 7,
+              "y": 10
+            },
+            {
+              "x": 6,
+              "y": 10
+            },
+            {
+              "x": 6,
+              "y": 9
+            },
+            {
+              "x": 5,
+              "y": 9
+            },
+            {
+              "x": 7,
+              "y": 9
+            },
+            {
+              "x": 8,
+              "y": 8
+            },
+            {
+              "x": 7,
+              "y": 8
+            },
+            {
+              "x": 5,
+              "y": 8
+            },
+            {
+              "x": 6,
+              "y": 8
+            },
+            {
+              "x": 8,
+              "y": 9
+            },
+            {
+              "x": 4,
+              "y": 8
+            },
+            {
+              "x": 4,
+              "y": 9
+            },
+            {
+              "x": 2,
+              "y": 9
+            },
+            {
+              "x": 3,
+              "y": 8
+            },
+            {
+              "x": 3,
+              "y": 9
+            },
+            {
+              "x": 3,
+              "y": 7
+            },
+            {
+              "x": 3,
+              "y": 6
+            },
+            {
+              "x": 2,
+              "y": 6
+            },
+            {
+              "x": 2,
+              "y": 7
+            },
+            {
+              "x": 2,
+              "y": 8
+            }
+          ]
+        },
+        {
+          "id": "living_room_4",
+          "type": "living_room",
+          "tags": [
+            "ground_floor",
+            "living_room",
+            "TV; sofas",
+            "music",
+            "atmospheric_lighting"
+          ],
+          "tiles": [
+            {
+              "x": 0,
+              "y": 2
+            },
+            {
+              "x": 4,
+              "y": 2
+            },
+            {
+              "x": 3,
+              "y": 2
+            },
+            {
+              "x": 2,
+              "y": 2
+            },
+            {
+              "x": 1,
+              "y": 2
+            },
+            {
+              "x": 0,
+              "y": 3
+            },
+            {
+              "x": 0,
+              "y": 4
+            },
+            {
+              "x": 0,
+              "y": 5
+            },
+            {
+              "x": 0,
+              "y": 6
+            },
+            {
+              "x": 1,
+              "y": 6
+            },
+            {
+              "x": 2,
+              "y": 6
+            },
+            {
+              "x": 3,
+              "y": 6
+            },
+            {
+              "x": 4,
+              "y": 6
+            },
+            {
+              "x": 4,
+              "y": 4
+            },
+            {
+              "x": 4,
+              "y": 5
+            },
+            {
+              "x": 3,
+              "y": 5
+            },
+            {
+              "x": 2,
+              "y": 5
+            },
+            {
+              "x": 1,
+              "y": 5
+            },
+            {
+              "x": 1,
+              "y": 4
+            },
+            {
+              "x": 2,
+              "y": 4
+            },
+            {
+              "x": 3,
+              "y": 3
+            },
+            {
+              "x": 3,
+              "y": 4
+            },
+            {
+              "x": 4,
+              "y": 3
+            },
+            {
+              "x": 2,
+              "y": 3
+            },
+            {
+              "x": 1,
+              "y": 3
+            }
+          ]
+        },
+        {
+          "id": "bedroom_5",
+          "type": "bedroom",
+          "tags": [
+            "ground_floor",
+            "master_bedroom",
+            "double_bed",
+            "closets"
+          ],
+          "tiles": [
+            {
+              "x": 13,
+              "y": 8
+            },
+            {
+              "x": 14,
+              "y": 8
+            },
+            {
+              "x": 15,
+              "y": 8
+            },
+            {
+              "x": 16,
+              "y": 8
+            },
+            {
+              "x": 16,
+              "y": 9
+            },
+            {
+              "x": 15,
+              "y": 9
+            },
+            {
+              "x": 14,
+              "y": 9
+            },
+            {
+              "x": 13,
+              "y": 9
+            },
+            {
+              "x": 13,
+              "y": 11
+            },
+            {
+              "x": 13,
+              "y": 10
+            },
+            {
+              "x": 15,
+              "y": 10
+            },
+            {
+              "x": 16,
+              "y": 10
+            },
+            {
+              "x": 16,
+              "y": 11
+            },
+            {
+              "x": 14,
+              "y": 11
+            },
+            {
+              "x": 14,
+              "y": 10
+            },
+            {
+              "x": 15,
+              "y": 11
+            }
+          ]
+        }
+      ],
+      "roomGraph": {
+        "kitchen_0": {
+          "neighbors": [
+            "dining_room_1"
+          ]
+        },
+        "dining_room_1": {
+          "neighbors": [
+            "kitchen_0",
+            "bedroom_5",
+            "restroom_2"
+          ]
+        },
+        "restroom_2": {
+          "neighbors": [
+            "dining_room_1"
+          ]
+        },
+        "corridor_3": {
+          "neighbors": []
+        },
+        "living_room_4": {
+          "neighbors": []
+        },
+        "bedroom_5": {
+          "neighbors": [
+            "dining_room_1"
+          ]
+        }
+      },
+      "navigation": {
+        "walkable": [
+          {
+            "x": 0,
+            "y": 2
+          },
+          {
+            "x": 0,
+            "y": 3
+          },
+          {
+            "x": 0,
+            "y": 4
+          },
+          {
+            "x": 0,
+            "y": 5
+          },
+          {
+            "x": 0,
+            "y": 6
+          },
+          {
+            "x": 1,
+            "y": 2
+          },
+          {
+            "x": 1,
+            "y": 3
+          },
+          {
+            "x": 1,
+            "y": 4
+          },
+          {
+            "x": 1,
+            "y": 5
+          },
+          {
+            "x": 1,
+            "y": 6
+          },
+          {
+            "x": 2,
+            "y": 2
+          },
+          {
+            "x": 2,
+            "y": 3
+          },
+          {
+            "x": 2,
+            "y": 4
+          },
+          {
+            "x": 2,
+            "y": 5
+          },
+          {
+            "x": 2,
+            "y": 6
+          },
+          {
+            "x": 2,
+            "y": 7
+          },
+          {
+            "x": 2,
+            "y": 8
+          },
+          {
+            "x": 2,
+            "y": 9
+          },
+          {
+            "x": 3,
+            "y": 2
+          },
+          {
+            "x": 3,
+            "y": 3
+          },
+          {
+            "x": 3,
+            "y": 4
+          },
+          {
+            "x": 3,
+            "y": 5
+          },
+          {
+            "x": 3,
+            "y": 6
+          },
+          {
+            "x": 3,
+            "y": 7
+          },
+          {
+            "x": 3,
+            "y": 8
+          },
+          {
+            "x": 3,
+            "y": 9
+          },
+          {
+            "x": 3,
+            "y": 10
+          },
+          {
+            "x": 3,
+            "y": 11
+          },
+          {
+            "x": 3,
+            "y": 12
+          },
+          {
+            "x": 4,
+            "y": 2
+          },
+          {
+            "x": 4,
+            "y": 3
+          },
+          {
+            "x": 4,
+            "y": 4
+          },
+          {
+            "x": 4,
+            "y": 5
+          },
+          {
+            "x": 4,
+            "y": 6
+          },
+          {
+            "x": 4,
+            "y": 8
+          },
+          {
+            "x": 4,
+            "y": 9
+          },
+          {
+            "x": 4,
+            "y": 10
+          },
+          {
+            "x": 4,
+            "y": 11
+          },
+          {
+            "x": 4,
+            "y": 12
+          },
+          {
+            "x": 5,
+            "y": 8
+          },
+          {
+            "x": 5,
+            "y": 9
+          },
+          {
+            "x": 5,
+            "y": 10
+          },
+          {
+            "x": 6,
+            "y": 3
+          },
+          {
+            "x": 6,
+            "y": 4
+          },
+          {
+            "x": 6,
+            "y": 5
+          },
+          {
+            "x": 6,
+            "y": 8
+          },
+          {
+            "x": 6,
+            "y": 9
+          },
+          {
+            "x": 6,
+            "y": 10
+          },
+          {
+            "x": 7,
+            "y": 3
+          },
+          {
+            "x": 7,
+            "y": 4
+          },
+          {
+            "x": 7,
+            "y": 5
+          },
+          {
+            "x": 7,
+            "y": 8
+          },
+          {
+            "x": 7,
+            "y": 9
+          },
+          {
+            "x": 7,
+            "y": 10
+          },
+          {
+            "x": 8,
+            "y": 3
+          },
+          {
+            "x": 8,
+            "y": 4
+          },
+          {
+            "x": 8,
+            "y": 5
+          },
+          {
+            "x": 8,
+            "y": 8
+          },
+          {
+            "x": 8,
+            "y": 9
+          },
+          {
+            "x": 9,
+            "y": 3
+          },
+          {
+            "x": 9,
+            "y": 4
+          },
+          {
+            "x": 9,
+            "y": 5
+          },
+          {
+            "x": 9,
+            "y": 6
+          },
+          {
+            "x": 9,
+            "y": 7
+          },
+          {
+            "x": 9,
+            "y": 8
+          },
+          {
+            "x": 9,
+            "y": 9
+          },
+          {
+            "x": 9,
+            "y": 10
+          },
+          {
+            "x": 9,
+            "y": 11
+          },
+          {
+            "x": 10,
+            "y": 3
+          },
+          {
+            "x": 10,
+            "y": 4
+          },
+          {
+            "x": 10,
+            "y": 5
+          },
+          {
+            "x": 10,
+            "y": 6
+          },
+          {
+            "x": 10,
+            "y": 7
+          },
+          {
+            "x": 10,
+            "y": 8
+          },
+          {
+            "x": 10,
+            "y": 9
+          },
+          {
+            "x": 10,
+            "y": 10
+          },
+          {
+            "x": 10,
+            "y": 11
+          },
+          {
+            "x": 11,
+            "y": 3
+          },
+          {
+            "x": 11,
+            "y": 4
+          },
+          {
+            "x": 11,
+            "y": 5
+          },
+          {
+            "x": 11,
+            "y": 6
+          },
+          {
+            "x": 11,
+            "y": 7
+          },
+          {
+            "x": 11,
+            "y": 8
+          },
+          {
+            "x": 11,
+            "y": 9
+          },
+          {
+            "x": 11,
+            "y": 10
+          },
+          {
+            "x": 11,
+            "y": 11
+          },
+          {
+            "x": 12,
+            "y": 3
+          },
+          {
+            "x": 12,
+            "y": 4
+          },
+          {
+            "x": 12,
+            "y": 5
+          },
+          {
+            "x": 12,
+            "y": 6
+          },
+          {
+            "x": 12,
+            "y": 7
+          },
+          {
+            "x": 12,
+            "y": 8
+          },
+          {
+            "x": 12,
+            "y": 9
+          },
+          {
+            "x": 12,
+            "y": 10
+          },
+          {
+            "x": 12,
+            "y": 11
+          },
+          {
+            "x": 13,
+            "y": 6
+          },
+          {
+            "x": 13,
+            "y": 7
+          },
+          {
+            "x": 13,
+            "y": 8
+          },
+          {
+            "x": 13,
+            "y": 9
+          },
+          {
+            "x": 13,
+            "y": 10
+          },
+          {
+            "x": 13,
+            "y": 11
+          },
+          {
+            "x": 14,
+            "y": 6
+          },
+          {
+            "x": 14,
+            "y": 7
+          },
+          {
+            "x": 14,
+            "y": 8
+          },
+          {
+            "x": 14,
+            "y": 9
+          },
+          {
+            "x": 14,
+            "y": 10
+          },
+          {
+            "x": 14,
+            "y": 11
+          },
+          {
+            "x": 15,
+            "y": 6
+          },
+          {
+            "x": 15,
+            "y": 7
+          },
+          {
+            "x": 15,
+            "y": 8
+          },
+          {
+            "x": 15,
+            "y": 9
+          },
+          {
+            "x": 15,
+            "y": 10
+          },
+          {
+            "x": 15,
+            "y": 11
+          },
+          {
+            "x": 16,
+            "y": 6
+          },
+          {
+            "x": 16,
+            "y": 7
+          },
+          {
+            "x": 16,
+            "y": 8
+          },
+          {
+            "x": 16,
+            "y": 9
+          },
+          {
+            "x": 16,
+            "y": 10
+          },
+          {
+            "x": 16,
+            "y": 11
+          }
+        ],
+        "blocked": [
+          "0,0",
+          "0,1",
+          "0,7",
+          "0,8",
+          "0,9",
+          "0,10",
+          "0,11",
+          "0,12",
+          "0,13",
+          "0,14",
+          "0,15",
+          "0,16",
+          "0,17",
+          "0,18",
+          "0,19",
+          "1,0",
+          "1,1",
+          "1,7",
+          "1,8",
+          "1,9",
+          "1,10",
+          "1,11",
+          "1,12",
+          "1,13",
+          "1,14",
+          "1,15",
+          "1,16",
+          "1,17",
+          "1,18",
+          "1,19",
+          "2,0",
+          "2,1",
+          "2,10",
+          "2,11",
+          "2,12",
+          "2,13",
+          "2,14",
+          "2,15",
+          "2,16",
+          "2,17",
+          "2,18",
+          "2,19",
+          "3,0",
+          "3,1",
+          "3,13",
+          "3,14",
+          "3,15",
+          "3,16",
+          "3,17",
+          "3,18",
+          "3,19",
+          "4,0",
+          "4,1",
+          "4,7",
+          "4,13",
+          "4,14",
+          "4,15",
+          "4,16",
+          "4,17",
+          "4,18",
+          "4,19",
+          "5,0",
+          "5,1",
+          "5,2",
+          "5,3",
+          "5,4",
+          "5,5",
+          "5,6",
+          "5,7",
+          "5,11",
+          "5,12",
+          "5,13",
+          "5,14",
+          "5,15",
+          "5,16",
+          "5,17",
+          "5,18",
+          "5,19",
+          "6,0",
+          "6,1",
+          "6,2",
+          "6,6",
+          "6,7",
+          "6,11",
+          "6,12",
+          "6,13",
+          "6,14",
+          "6,15",
+          "6,16",
+          "6,17",
+          "6,18",
+          "6,19",
+          "7,0",
+          "7,1",
+          "7,2",
+          "7,6",
+          "7,7",
+          "7,11",
+          "7,12",
+          "7,13",
+          "7,14",
+          "7,15",
+          "7,16",
+          "7,17",
+          "7,18",
+          "7,19",
+          "8,0",
+          "8,1",
+          "8,2",
+          "8,6",
+          "8,7",
+          "8,10",
+          "8,11",
+          "8,12",
+          "8,13",
+          "8,14",
+          "8,15",
+          "8,16",
+          "8,17",
+          "8,18",
+          "8,19",
+          "9,0",
+          "9,1",
+          "9,2",
+          "9,12",
+          "9,13",
+          "9,14",
+          "9,15",
+          "9,16",
+          "9,17",
+          "9,18",
+          "9,19",
+          "10,0",
+          "10,1",
+          "10,2",
+          "10,12",
+          "10,13",
+          "10,14",
+          "10,15",
+          "10,16",
+          "10,17",
+          "10,18",
+          "10,19",
+          "11,0",
+          "11,1",
+          "11,2",
+          "11,12",
+          "11,13",
+          "11,14",
+          "11,15",
+          "11,16",
+          "11,17",
+          "11,18",
+          "11,19",
+          "12,0",
+          "12,1",
+          "12,2",
+          "12,12",
+          "12,13",
+          "12,14",
+          "12,15",
+          "12,16",
+          "12,17",
+          "12,18",
+          "12,19",
+          "13,0",
+          "13,1",
+          "13,2",
+          "13,3",
+          "13,4",
+          "13,5",
+          "13,12",
+          "13,13",
+          "13,14",
+          "13,15",
+          "13,16",
+          "13,17",
+          "13,18",
+          "13,19",
+          "14,0",
+          "14,1",
+          "14,2",
+          "14,3",
+          "14,4",
+          "14,5",
+          "14,12",
+          "14,13",
+          "14,14",
+          "14,15",
+          "14,16",
+          "14,17",
+          "14,18",
+          "14,19",
+          "15,0",
+          "15,1",
+          "15,2",
+          "15,3",
+          "15,4",
+          "15,5",
+          "15,12",
+          "15,13",
+          "15,14",
+          "15,15",
+          "15,16",
+          "15,17",
+          "15,18",
+          "15,19",
+          "16,0",
+          "16,1",
+          "16,2",
+          "16,3",
+          "16,4",
+          "16,5",
+          "16,12",
+          "16,13",
+          "16,14",
+          "16,15",
+          "16,16",
+          "16,17",
+          "16,18",
+          "16,19",
+          "17,0",
+          "17,1",
+          "17,2",
+          "17,3",
+          "17,4",
+          "17,5",
+          "17,6",
+          "17,7",
+          "17,8",
+          "17,9",
+          "17,10",
+          "17,11",
+          "17,12",
+          "17,13",
+          "17,14",
+          "17,15",
+          "17,16",
+          "17,17",
+          "17,18",
+          "17,19",
+          "18,0",
+          "18,1",
+          "18,2",
+          "18,3",
+          "18,4",
+          "18,5",
+          "18,6",
+          "18,7",
+          "18,8",
+          "18,9",
+          "18,10",
+          "18,11",
+          "18,12",
+          "18,13",
+          "18,14",
+          "18,15",
+          "18,16",
+          "18,17",
+          "18,18",
+          "18,19",
+          "19,0",
+          "19,1",
+          "19,2",
+          "19,3",
+          "19,4",
+          "19,5",
+          "19,6",
+          "19,7",
+          "19,8",
+          "19,9",
+          "19,10",
+          "19,11",
+          "19,12",
+          "19,13",
+          "19,14",
+          "19,15",
+          "19,16",
+          "19,17",
+          "19,18",
+          "19,19"
+        ],
+        "wallEdges": [
+          {
+            "x": 6,
+            "y": 3,
+            "side": "north",
+            "type": "wall"
+          },
+          {
+            "x": 6,
+            "y": 3,
+            "side": "west",
+            "type": "wall"
+          },
+          {
+            "x": 7,
+            "y": 3,
+            "side": "north",
+            "type": "wall"
+          },
+          {
+            "x": 10,
+            "y": 3,
+            "side": "north",
+            "type": "wall"
+          },
+          {
+            "x": 6,
+            "y": 2,
+            "side": "south",
+            "type": "wall"
+          },
+          {
+            "x": 7,
+            "y": 2,
+            "side": "south",
+            "type": "wall"
+          },
+          {
+            "x": 5,
+            "y": 3,
+            "side": "north",
+            "type": "wall"
+          },
+          {
+            "x": 5,
+            "y": 3,
+            "side": "east",
+            "type": "wall"
+          },
+          {
+            "x": 5,
+            "y": 3,
+            "side": "west",
+            "type": "wall"
+          },
+          {
+            "x": 8,
+            "y": 2,
+            "side": "south",
+            "type": "wall"
+          },
+          {
+            "x": 9,
+            "y": 2,
+            "side": "south",
+            "type": "wall"
+          },
+          {
+            "x": 10,
+            "y": 2,
+            "side": "south",
+            "type": "wall"
+          },
+          {
+            "x": 11,
+            "y": 3,
+            "side": "north",
+            "type": "wall"
+          },
+          {
+            "x": 11,
+            "y": 5,
+            "side": "south",
+            "type": "door"
+          },
+          {
+            "x": 10,
+            "y": 5,
+            "side": "south",
+            "type": "door"
+          },
+          {
+            "x": 10,
+            "y": 6,
+            "side": "north",
+            "type": "door"
+          },
+          {
+            "x": 11,
+            "y": 6,
+            "side": "north",
+            "type": "door"
+          },
+          {
+            "x": 9,
+            "y": 6,
+            "side": "north",
+            "type": "wall"
+          },
+          {
+            "x": 9,
+            "y": 6,
+            "side": "west",
+            "type": "wall"
+          },
+          {
+            "x": 9,
+            "y": 5,
+            "side": "south",
+            "type": "wall"
+          },
+          {
+            "x": 6,
+            "y": 4,
+            "side": "west",
+            "type": "wall"
+          },
+          {
+            "x": 6,
+            "y": 5,
+            "side": "south",
+            "type": "wall"
+          },
+          {
+            "x": 6,
+            "y": 5,
+            "side": "west",
+            "type": "wall"
+          },
+          {
+            "x": 7,
+            "y": 5,
+            "side": "south",
+            "type": "wall"
+          },
+          {
+            "x": 8,
+            "y": 5,
+            "side": "south",
+            "type": "wall"
+          },
+          {
+            "x": 9,
+            "y": 7,
+            "side": "west",
+            "type": "wall"
+          },
+          {
+            "x": 8,
+            "y": 8,
+            "side": "north",
+            "type": "wall"
+          },
+          {
+            "x": 7,
+            "y": 8,
+            "side": "north",
+            "type": "wall"
+          },
+          {
+            "x": 6,
+            "y": 8,
+            "side": "north",
+            "type": "wall"
+          },
+          {
+            "x": 5,
+            "y": 8,
+            "side": "north",
+            "type": "wall"
+          },
+          {
+            "x": 5,
+            "y": 10,
+            "side": "south",
+            "type": "wall"
+          },
+          {
+            "x": 5,
+            "y": 10,
+            "side": "west",
+            "type": "wall"
+          },
+          {
+            "x": 6,
+            "y": 10,
+            "side": "south",
+            "type": "door"
+          },
+          {
+            "x": 7,
+            "y": 10,
+            "side": "south",
+            "type": "wall"
+          },
+          {
+            "x": 7,
+            "y": 10,
+            "side": "east",
+            "type": "wall"
+          },
+          {
+            "x": 8,
+            "y": 9,
+            "side": "south",
+            "type": "wall"
+          },
+          {
+            "x": 12,
+            "y": 9,
+            "side": "east",
+            "type": "wall"
+          },
+          {
+            "x": 13,
+            "y": 9,
+            "side": "west",
+            "type": "wall"
+          },
+          {
+            "x": 13,
+            "y": 8,
+            "side": "north",
+            "type": "wall"
+          },
+          {
+            "x": 13,
+            "y": 8,
+            "side": "west",
+            "type": "door"
+          },
+          {
+            "x": 13,
+            "y": 7,
+            "side": "south",
+            "type": "wall"
+          },
+          {
+            "x": 13,
+            "y": 7,
+            "side": "west",
+            "type": "wall"
+          },
+          {
+            "x": 13,
+            "y": 6,
+            "side": "north",
+            "type": "wall"
+          },
+          {
+            "x": 13,
+            "y": 6,
+            "side": "west",
+            "type": "door"
+          },
+          {
+            "x": 12,
+            "y": 6,
+            "side": "north",
+            "type": "wall"
+          },
+          {
+            "x": 12,
+            "y": 6,
+            "side": "east",
+            "type": "door"
+          },
+          {
+            "x": 12,
+            "y": 8,
+            "side": "east",
+            "type": "door"
+          },
+          {
+            "x": 12,
+            "y": 7,
+            "side": "east",
+            "type": "wall"
+          },
+          {
+            "x": 13,
+            "y": 10,
+            "side": "west",
+            "type": "wall"
+          },
+          {
+            "x": 14,
+            "y": 8,
+            "side": "north",
+            "type": "wall"
+          },
+          {
+            "x": 14,
+            "y": 7,
+            "side": "south",
+            "type": "wall"
+          },
+          {
+            "x": 14,
+            "y": 6,
+            "side": "north",
+            "type": "wall"
+          },
+          {
+            "x": 12,
+            "y": 3,
+            "side": "north",
+            "type": "wall"
+          },
+          {
+            "x": 12,
+            "y": 3,
+            "side": "east",
+            "type": "wall"
+          },
+          {
+            "x": 12,
+            "y": 4,
+            "side": "east",
+            "type": "wall"
+          },
+          {
+            "x": 12,
+            "y": 5,
+            "side": "south",
+            "type": "wall"
+          },
+          {
+            "x": 12,
+            "y": 5,
+            "side": "east",
+            "type": "wall"
+          },
+          {
+            "x": 4,
+            "y": 8,
+            "side": "north",
+            "type": "wall"
+          },
+          {
+            "x": 4,
+            "y": 10,
+            "side": "east",
+            "type": "wall"
+          },
+          {
+            "x": 2,
+            "y": 9,
+            "side": "south",
+            "type": "wall"
+          },
+          {
+            "x": 2,
+            "y": 9,
+            "side": "west",
+            "type": "wall"
+          },
+          {
+            "x": 2,
+            "y": 8,
+            "side": "west",
+            "type": "wall"
+          },
+          {
+            "x": 2,
+            "y": 7,
+            "side": "west",
+            "type": "wall"
+          },
+          {
+            "x": 3,
+            "y": 7,
+            "side": "east",
+            "type": "wall"
+          },
+          {
+            "x": 15,
+            "y": 6,
+            "side": "north",
+            "type": "wall"
+          },
+          {
+            "x": 15,
+            "y": 7,
+            "side": "south",
+            "type": "wall"
+          },
+          {
+            "x": 15,
+            "y": 8,
+            "side": "north",
+            "type": "wall"
+          },
+          {
+            "x": 16,
+            "y": 6,
+            "side": "north",
+            "type": "wall"
+          },
+          {
+            "x": 16,
+            "y": 6,
+            "side": "east",
+            "type": "wall"
+          },
+          {
+            "x": 16,
+            "y": 7,
+            "side": "south",
+            "type": "wall"
+          },
+          {
+            "x": 16,
+            "y": 7,
+            "side": "east",
+            "type": "wall"
+          },
+          {
+            "x": 16,
+            "y": 8,
+            "side": "north",
+            "type": "wall"
+          },
+          {
+            "x": 16,
+            "y": 8,
+            "side": "east",
+            "type": "wall"
+          },
+          {
+            "x": 16,
+            "y": 9,
+            "side": "east",
+            "type": "wall"
+          },
+          {
+            "x": 16,
+            "y": 10,
+            "side": "east",
+            "type": "wall"
+          },
+          {
+            "x": 11,
+            "y": 2,
+            "side": "south",
+            "type": "wall"
+          },
+          {
+            "x": 12,
+            "y": 2,
+            "side": "south",
+            "type": "wall"
+          },
+          {
+            "x": 13,
+            "y": 3,
+            "side": "west",
+            "type": "wall"
+          },
+          {
+            "x": 13,
+            "y": 4,
+            "side": "west",
+            "type": "wall"
+          },
+          {
+            "x": 13,
+            "y": 5,
+            "side": "south",
+            "type": "wall"
+          },
+          {
+            "x": 13,
+            "y": 5,
+            "side": "west",
+            "type": "wall"
+          },
+          {
+            "x": 5,
+            "y": 4,
+            "side": "east",
+            "type": "wall"
+          },
+          {
+            "x": 5,
+            "y": 4,
+            "side": "west",
+            "type": "wall"
+          },
+          {
+            "x": 5,
+            "y": 5,
+            "side": "east",
+            "type": "wall"
+          },
+          {
+            "x": 5,
+            "y": 5,
+            "side": "west",
+            "type": "wall"
+          },
+          {
+            "x": 6,
+            "y": 6,
+            "side": "north",
+            "type": "wall"
+          },
+          {
+            "x": 7,
+            "y": 6,
+            "side": "north",
+            "type": "wall"
+          },
+          {
+            "x": 8,
+            "y": 6,
+            "side": "north",
+            "type": "wall"
+          },
+          {
+            "x": 8,
+            "y": 6,
+            "side": "east",
+            "type": "wall"
+          },
+          {
+            "x": 8,
+            "y": 7,
+            "side": "south",
+            "type": "wall"
+          },
+          {
+            "x": 8,
+            "y": 7,
+            "side": "east",
+            "type": "wall"
+          },
+          {
+            "x": 14,
+            "y": 5,
+            "side": "south",
+            "type": "wall"
+          },
+          {
+            "x": 15,
+            "y": 5,
+            "side": "south",
+            "type": "wall"
+          },
+          {
+            "x": 16,
+            "y": 5,
+            "side": "south",
+            "type": "wall"
+          },
+          {
+            "x": 17,
+            "y": 7,
+            "side": "west",
+            "type": "wall"
+          },
+          {
+            "x": 17,
+            "y": 6,
+            "side": "west",
+            "type": "wall"
+          },
+          {
+            "x": 4,
+            "y": 7,
+            "side": "north",
+            "type": "wall"
+          },
+          {
+            "x": 4,
+            "y": 7,
+            "side": "south",
+            "type": "wall"
+          },
+          {
+            "x": 4,
+            "y": 7,
+            "side": "west",
+            "type": "wall"
+          },
+          {
+            "x": 5,
+            "y": 7,
+            "side": "south",
+            "type": "wall"
+          },
+          {
+            "x": 6,
+            "y": 7,
+            "side": "south",
+            "type": "wall"
+          },
+          {
+            "x": 7,
+            "y": 7,
+            "side": "south",
+            "type": "wall"
+          },
+          {
+            "x": 5,
+            "y": 6,
+            "side": "west",
+            "type": "wall"
+          },
+          {
+            "x": 1,
+            "y": 7,
+            "side": "north",
+            "type": "wall"
+          },
+          {
+            "x": 1,
+            "y": 7,
+            "side": "east",
+            "type": "wall"
+          },
+          {
+            "x": 1,
+            "y": 8,
+            "side": "east",
+            "type": "wall"
+          },
+          {
+            "x": 1,
+            "y": 9,
+            "side": "east",
+            "type": "wall"
+          },
+          {
+            "x": 2,
+            "y": 10,
+            "side": "north",
+            "type": "wall"
+          },
+          {
+            "x": 2,
+            "y": 10,
+            "side": "east",
+            "type": "wall"
+          },
+          {
+            "x": 0,
+            "y": 7,
+            "side": "north",
+            "type": "wall"
+          },
+          {
+            "x": 2,
+            "y": 11,
+            "side": "east",
+            "type": "wall"
+          },
+          {
+            "x": 2,
+            "y": 12,
+            "side": "east",
+            "type": "wall"
+          },
+          {
+            "x": 5,
+            "y": 12,
+            "side": "west",
+            "type": "wall"
+          },
+          {
+            "x": 5,
+            "y": 11,
+            "side": "north",
+            "type": "wall"
+          },
+          {
+            "x": 5,
+            "y": 11,
+            "side": "west",
+            "type": "wall"
+          },
+          {
+            "x": 3,
+            "y": 13,
+            "side": "north",
+            "type": "wall"
+          },
+          {
+            "x": 4,
+            "y": 13,
+            "side": "north",
+            "type": "wall"
+          },
+          {
+            "x": 6,
+            "y": 11,
+            "side": "north",
+            "type": "door"
+          },
+          {
+            "x": 7,
+            "y": 11,
+            "side": "north",
+            "type": "wall"
+          },
+          {
+            "x": 8,
+            "y": 10,
+            "side": "north",
+            "type": "wall"
+          },
+          {
+            "x": 8,
+            "y": 10,
+            "side": "east",
+            "type": "wall"
+          },
+          {
+            "x": 8,
+            "y": 10,
+            "side": "west",
+            "type": "wall"
+          },
+          {
+            "x": 8,
+            "y": 11,
+            "side": "east",
+            "type": "wall"
+          },
+          {
+            "x": 9,
+            "y": 11,
+            "side": "south",
+            "type": "wall"
+          },
+          {
+            "x": 9,
+            "y": 11,
+            "side": "west",
+            "type": "wall"
+          },
+          {
+            "x": 9,
+            "y": 12,
+            "side": "north",
+            "type": "wall"
+          },
+          {
+            "x": 10,
+            "y": 12,
+            "side": "north",
+            "type": "wall"
+          },
+          {
+            "x": 11,
+            "y": 12,
+            "side": "north",
+            "type": "wall"
+          },
+          {
+            "x": 12,
+            "y": 12,
+            "side": "north",
+            "type": "wall"
+          },
+          {
+            "x": 13,
+            "y": 12,
+            "side": "north",
+            "type": "wall"
+          },
+          {
+            "x": 10,
+            "y": 11,
+            "side": "south",
+            "type": "wall"
+          },
+          {
+            "x": 11,
+            "y": 11,
+            "side": "south",
+            "type": "wall"
+          },
+          {
+            "x": 12,
+            "y": 11,
+            "side": "south",
+            "type": "wall"
+          },
+          {
+            "x": 12,
+            "y": 11,
+            "side": "east",
+            "type": "wall"
+          },
+          {
+            "x": 17,
+            "y": 8,
+            "side": "west",
+            "type": "wall"
+          },
+          {
+            "x": 17,
+            "y": 9,
+            "side": "west",
+            "type": "wall"
+          },
+          {
+            "x": 17,
+            "y": 10,
+            "side": "west",
+            "type": "wall"
+          },
+          {
+            "x": 17,
+            "y": 11,
+            "side": "west",
+            "type": "wall"
+          },
+          {
+            "x": 15,
+            "y": 12,
+            "side": "north",
+            "type": "wall"
+          },
+          {
+            "x": 14,
+            "y": 12,
+            "side": "north",
+            "type": "wall"
+          },
+          {
+            "x": 16,
+            "y": 12,
+            "side": "north",
+            "type": "wall"
+          },
+          {
+            "x": 16,
+            "y": 11,
+            "side": "south",
+            "type": "wall"
+          },
+          {
+            "x": 15,
+            "y": 11,
+            "side": "south",
+            "type": "wall"
+          },
+          {
+            "x": 13,
+            "y": 11,
+            "side": "south",
+            "type": "wall"
+          },
+          {
+            "x": 13,
+            "y": 11,
+            "side": "west",
+            "type": "wall"
+          },
+          {
+            "x": 14,
+            "y": 11,
+            "side": "south",
+            "type": "wall"
+          },
+          {
+            "x": 12,
+            "y": 10,
+            "side": "east",
+            "type": "wall"
+          },
+          {
+            "x": 1,
+            "y": 2,
+            "side": "north",
+            "type": "wall"
+          },
+          {
+            "x": 2,
+            "y": 2,
+            "side": "north",
+            "type": "wall"
+          },
+          {
+            "x": 5,
+            "y": 2,
+            "side": "south",
+            "type": "wall"
+          },
+          {
+            "x": 5,
+            "y": 2,
+            "side": "west",
+            "type": "wall"
+          },
+          {
+            "x": 0,
+            "y": 6,
+            "side": "west",
+            "type": "wall"
+          },
+          {
+            "x": 0,
+            "y": 5,
+            "side": "west",
+            "type": "wall"
+          },
+          {
+            "x": 0,
+            "y": 4,
+            "side": "west",
+            "type": "wall"
+          },
+          {
+            "x": 0,
+            "y": 2,
+            "side": "north",
+            "type": "door"
+          },
+          {
+            "x": 0,
+            "y": 2,
+            "side": "west",
+            "type": "wall"
+          },
+          {
+            "x": 0,
+            "y": 1,
+            "side": "south",
+            "type": "door"
+          },
+          {
+            "x": 0,
+            "y": 3,
+            "side": "west",
+            "type": "wall"
+          },
+          {
+            "x": 3,
+            "y": 1,
+            "side": "south",
+            "type": "wall"
+          },
+          {
+            "x": 3,
+            "y": 2,
+            "side": "north",
+            "type": "wall"
+          },
+          {
+            "x": 4,
+            "y": 1,
+            "side": "south",
+            "type": "wall"
+          },
+          {
+            "x": 4,
+            "y": 2,
+            "side": "north",
+            "type": "wall"
+          }
+        ]
+      },
+      "prop_spawns": []
     }
   },
   "trait_templates": {
@@ -21706,11 +26599,13 @@
       "stages": [
         {
           "name": "boil_water",
+          "primitive": "boil",
           "duration": 5,
           "active": false
         },
         {
           "name": "cook_carbs",
+          "primitive": "boil",
           "inputs": {
             "FOOD_CARB": 1
           },
@@ -21719,6 +26614,7 @@
         },
         {
           "name": "prepare_sauce",
+          "primitive": "mix",
           "inputs": {
             "FOOD_VEGETABLE": 1,
             "FOOD_SPICE": 1
@@ -21739,6 +26635,7 @@
       "stages": [
         {
           "name": "roast_protein",
+          "primitive": "roast",
           "inputs": {
             "FOOD_PROTEIN": 1
           },
@@ -21747,6 +26644,7 @@
         },
         {
           "name": "cook_vegetables",
+          "primitive": "fry",
           "inputs": {
             "FOOD_VEGETABLE": 1
           },
@@ -21755,6 +26653,7 @@
         },
         {
           "name": "prepare_carbs",
+          "primitive": "boil",
           "inputs": {
             "FOOD_CARB": 1
           },
@@ -49606,6 +54505,316 @@
       "mood_delta": 0.18,
       "warmth_delta": 4,
       "description": "Special time together as recognition of good behavior."
+    }
+  },
+  "stance_templates": {
+    "standing": {
+      "key": "standing",
+      "label": "Standing",
+      "is_posture": true,
+      "idle_key": "idle",
+      "moves": [
+        {
+          "slot": "walk",
+          "key": "walk"
+        },
+        {
+          "slot": "run",
+          "key": "run"
+        }
+      ]
+    },
+    "sitting_seat": {
+      "key": "sitting_seat",
+      "label": "Sitting (Seat)",
+      "is_posture": true,
+      "idle_key": "sit_idle",
+      "moves": []
+    },
+    "sitting_floor": {
+      "key": "sitting_floor",
+      "label": "Sitting (Floor)",
+      "is_posture": true,
+      "idle_key": "sit_idle_floor",
+      "moves": []
+    },
+    "lying": {
+      "key": "lying",
+      "label": "Lying",
+      "is_posture": true,
+      "idle_key": "lie_idle",
+      "moves": []
+    },
+    "crouching": {
+      "key": "crouching",
+      "label": "Crouching",
+      "is_posture": true,
+      "idle_key": "crouch_idle",
+      "moves": [
+        {
+          "slot": "move",
+          "key": "crouch_walk"
+        }
+      ]
+    },
+    "crawling": {
+      "key": "crawling",
+      "label": "Crawling",
+      "is_posture": true,
+      "idle_key": "crawl_idle",
+      "moves": [
+        {
+          "slot": "move",
+          "key": "crawl"
+        }
+      ]
+    },
+    "fallen_front": {
+      "key": "fallen_front",
+      "label": "Fallen (Front)",
+      "is_posture": true,
+      "idle_key": "fallen_front_idle",
+      "moves": []
+    },
+    "fallen_back": {
+      "key": "fallen_back",
+      "label": "Fallen (Back)",
+      "is_posture": true,
+      "idle_key": "fallen_back_idle",
+      "moves": []
+    },
+    "leaning_wall": {
+      "key": "leaning_wall",
+      "label": "Leaning (Wall)",
+      "is_posture": true,
+      "idle_key": "leaning_idle",
+      "moves": []
+    },
+    "unconscious": {
+      "key": "unconscious",
+      "label": "Unconscious",
+      "is_posture": true,
+      "idle_key": "unconscious_idle",
+      "moves": []
+    },
+    "dead": {
+      "key": "dead",
+      "label": "Dead",
+      "is_posture": true,
+      "idle_key": "dead_idle",
+      "moves": []
+    },
+    "intoxicated": {
+      "key": "intoxicated",
+      "label": "Intoxicated",
+      "is_posture": true,
+      "idle_key": "intoxicated_idle",
+      "moves": [
+        {
+          "slot": "walk",
+          "key": "drunk_walk"
+        },
+        {
+          "slot": "run",
+          "key": "drunk_run"
+        }
+      ]
+    },
+    "carry": {
+      "key": "carry",
+      "label": "Carry",
+      "is_posture": false,
+      "idle_key": "carry_idle",
+      "moves": [
+        {
+          "slot": "move",
+          "key": "carry_walk"
+        }
+      ]
+    },
+    "dragging": {
+      "key": "dragging",
+      "label": "Dragging",
+      "is_posture": false,
+      "idle_key": "drag_idle",
+      "moves": [
+        {
+          "slot": "move",
+          "key": "drag_move"
+        }
+      ]
+    },
+    "pushing": {
+      "key": "pushing",
+      "label": "Pushing",
+      "is_posture": false,
+      "idle_key": "pushing",
+      "moves": []
+    }
+  },
+  "stage_primitives": {
+    "chop": {
+      "key": "chop",
+      "label": "Chop",
+      "default_duration": 3,
+      "default_active": true,
+      "animation_state": "chop"
+    },
+    "fry": {
+      "key": "fry",
+      "label": "Fry",
+      "default_duration": 8,
+      "default_active": true,
+      "animation_state": "fry"
+    },
+    "stir": {
+      "key": "stir",
+      "label": "Stir",
+      "default_duration": 4,
+      "default_active": true,
+      "animation_state": "stir"
+    },
+    "mix": {
+      "key": "mix",
+      "label": "Mix",
+      "default_duration": 5,
+      "default_active": true,
+      "animation_state": "mix"
+    },
+    "boil": {
+      "key": "boil",
+      "label": "Boil",
+      "default_duration": 6,
+      "default_active": false,
+      "animation_state": "idle"
+    },
+    "bake": {
+      "key": "bake",
+      "label": "Bake",
+      "default_duration": 30,
+      "default_active": false,
+      "animation_state": "idle"
+    },
+    "roast": {
+      "key": "roast",
+      "label": "Roast",
+      "default_duration": 30,
+      "default_active": false,
+      "animation_state": "idle"
+    },
+    "put_on_stove": {
+      "key": "put_on_stove",
+      "label": "Put on Stove",
+      "default_duration": 2,
+      "default_active": true,
+      "animation_state": "put_on_stove"
+    },
+    "take_off_stove": {
+      "key": "take_off_stove",
+      "label": "Take off Stove",
+      "default_duration": 2,
+      "default_active": true,
+      "animation_state": "take_off_stove"
+    },
+    "put_in_oven": {
+      "key": "put_in_oven",
+      "label": "Put in Oven",
+      "default_duration": 2,
+      "default_active": true,
+      "animation_state": "put_in_oven"
+    },
+    "take_out_of_oven": {
+      "key": "take_out_of_oven",
+      "label": "Take out of Oven",
+      "default_duration": 2,
+      "default_active": true,
+      "animation_state": "take_out_of_oven"
+    },
+    "fill_container": {
+      "key": "fill_container",
+      "label": "Fill Container",
+      "default_duration": 3,
+      "default_active": true,
+      "animation_state": "fill_container"
+    },
+    "empty_container": {
+      "key": "empty_container",
+      "label": "Empty Container",
+      "default_duration": 3,
+      "default_active": true,
+      "animation_state": "empty_container"
+    },
+    "hang_item": {
+      "key": "hang_item",
+      "label": "Hang Item",
+      "default_duration": 4,
+      "default_active": true,
+      "animation_state": "hang_item"
+    },
+    "fold_item": {
+      "key": "fold_item",
+      "label": "Fold Item",
+      "default_duration": 3,
+      "default_active": true,
+      "animation_state": "fold_item"
+    },
+    "put_away_item": {
+      "key": "put_away_item",
+      "label": "Put Away Item",
+      "default_duration": 3,
+      "default_active": true,
+      "animation_state": "put_away_item"
+    },
+    "wash_cycle": {
+      "key": "wash_cycle",
+      "label": "Wash Cycle",
+      "default_duration": 90,
+      "default_active": false,
+      "animation_state": "idle"
+    }
+  },
+  "chore_templates": {
+    "laundry_load": {
+      "category": "housekeeping",
+      "time_minutes": 90,
+      "stages": [
+        {
+          "primitive": "fill_container",
+          "name": "fill_washer",
+          "active": true
+        },
+        {
+          "primitive": "wash_cycle",
+          "name": "wash_cycle",
+          "active": false
+        },
+        {
+          "primitive": "empty_container",
+          "name": "empty_washer",
+          "active": true
+        },
+        {
+          "primitive": "hang_item",
+          "name": "hang_dry",
+          "duration": 240,
+          "active": false
+        },
+        {
+          "primitive": "fold_item",
+          "name": "fold_laundry",
+          "duration": 10,
+          "active": true
+        },
+        {
+          "primitive": "put_away_item",
+          "name": "put_away",
+          "active": true
+        }
+      ],
+      "output": {
+        "resource_type": "CLEAN_LAUNDRY",
+        "servings": 1
+      }
     }
   }
 }

@@ -69,10 +69,14 @@ async function loadAnimBank() {
   }
 }
 
-// Canonical stance -> animation_state key, mirrored from animbank.js's
-// STANCES config and backend/systems/posture.py's _IDLE_KEY — keep all
-// three in sync if this vocabulary changes.
-const _STANCE_IDLE_KEY = {
+// Canonical stance -> animation_state key. Hardcoded fallback only — once
+// world["definitions"]["stance_templates"] arrives (every full WS
+// snapshot, see _applyState()), _rebuildStanceMaps() below overwrites
+// these from that shared vocabulary (the same data posture.py's
+// _idle_key() and animbank.js's Stances panel read), so adding a new
+// stance/locomotion slot is a data edit in the Definitions editor, not a
+// change in three separate files.
+let _STANCE_IDLE_KEY = {
   standing: "idle", sitting_seat: "sit_idle", sitting_floor: "sit_idle_floor",
   lying: "lie_idle", crouching: "crouch_idle", crawling: "crawl_idle",
   fallen_front: "fallen_front_idle", fallen_back: "fallen_back_idle",
@@ -86,13 +90,41 @@ const _STANCE_IDLE_KEY = {
   // ANIM_LAYERS["drag_idle"/"pushing"] fallback, same mechanism as carry.
   dragging: "drag_idle", pushing: "pushing",
 };
-const _STANCE_MOVE_KEY = {
+let _STANCE_MOVE_KEY = {
   standing_walk: "walk", standing_run: "run",
   crouching_move: "crouch_walk", crawling_move: "crawl",
   carry_move: "carry_walk",
   intoxicated_walk: "drunk_walk", intoxicated_run: "drunk_run",
   dragging_move: "drag_move",
 };
+
+// Rebuilds _STANCE_IDLE_KEY/_STANCE_MOVE_KEY from stance_templates, and
+// adds an ANIM_LAYERS fallback for any stance-derived key that doesn't
+// already have one hand-tuned — e.g. carry_walk deliberately mixes "walk"
+// legs with a "carry_idle" upper body, never overwrite an existing entry.
+function _rebuildStanceMaps(defs) {
+  const stances = defs && defs.stance_templates;
+  if (!stances || !Object.keys(stances).length) return;   // keep hardcoded fallback
+
+  const idleKey = {};
+  const moveKey = {};
+  for (const entry of Object.values(stances)) {
+    if (!entry.idle_key) continue;
+    idleKey[entry.key] = entry.idle_key;
+    if (!(entry.idle_key in ANIM_LAYERS)) {
+      ANIM_LAYERS[entry.idle_key] = { lower: entry.idle_key, upper: entry.idle_key };
+    }
+    for (const m of (entry.moves || [])) {
+      if (!m.key) continue;
+      moveKey[`${entry.key}_${m.slot}`] = m.key;
+      if (!(m.key in ANIM_LAYERS)) {
+        ANIM_LAYERS[m.key] = { lower: m.key, upper: m.key };
+      }
+    }
+  }
+  _STANCE_IDLE_KEY = idleKey;
+  _STANCE_MOVE_KEY = moveKey;
+}
 
 // Resolves a character's stance/transition state->template mapping down to
 // state->clip, using each template's first chain step (the loopable clip)
@@ -3114,6 +3146,7 @@ function _updateViewport(ws) {
 
 async function _applyState(state) {
   definitions = state.definitions || definitions;
+  _rebuildStanceMaps(state.definitions);
   updateTiles(state);
   await updateProps(state);
   updateFloorplanFloors(state);

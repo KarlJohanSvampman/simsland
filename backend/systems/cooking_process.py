@@ -127,12 +127,32 @@ def begin_stage(
         "stage_name"
     ] = stage["name"]
 
-    process[
-        "waiting"
-    ] = not stage.get(
+    is_active = stage.get(
         "active",
         True
     )
+
+    process[
+        "waiting"
+    ] = not is_active
+
+    # =====================================================
+    # STAGE ANIMATION
+    # =====================================================
+    # Previously this function never touched c["animation_state"] at
+    # all — every stage transition (boil_water -> cook_carbs ->
+    # prepare_sauce) was invisible, the character just idled through
+    # the whole multi-stage process. Only set it for active stages
+    # (the character needs to be doing something); an unattended stage
+    # (active: false — boiling, roasting) leaves animation_state alone,
+    # matching the already-intentional "character is free to walk away"
+    # behavior once this activities.py hand-off has happened.
+    if is_active:
+        primitives = (world.get("definitions") or {}).get("stage_primitives") or {}
+        prim = primitives.get(stage.get("primitive"), {})
+        anim = prim.get("animation_state")
+        if anim:
+            c["animation_state"] = anim
 
     # =====================================================
     # CONSUME INPUTS

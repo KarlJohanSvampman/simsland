@@ -108,6 +108,11 @@ INTERACTION_ANIMATIONS = {
     "wash_dishes":  {"walking": "walk", "using": "wash_dishes",   "finishing": "idle"},
     "window_clean": {"walking": "walk", "using": "window_wipe",   "finishing": "idle"},
 
+    # --- laundry (fill hand-off into systems/task_process.py; the rest of
+    # the wash/dry/fold/put-away chain progresses in the background, not
+    # through activities.py — see chore_templates["laundry_load"]) ---
+    "do_laundry":   {"walking": "walk", "using": "fill_container", "finishing": "idle"},
+
     # --- generic fallback ---
     "interact":     {"walking": "walk", "using": "interact",   "finishing": "idle"},
 }
@@ -591,6 +596,24 @@ ACTIVITIES = {
         "interaction": "laundry",
 
         "base_duration_minutes": 90,
+
+        "interruptible": True,
+
+        "category": "maintenance"
+    },
+
+    # Loads the washing machine, then hands off to systems/task_process.py
+    # (start_process(), "laundry_load" chore) — the wash cycle, emptying,
+    # hanging, folding, and putting away all progress in the background
+    # from there (systems/sim_loop.py's update_household_processes()), not
+    # through further activities.py entries. See complete_activity()'s
+    # do_laundry_fill branch below, mirroring cook_recipe's hand-off to
+    # systems/cooking_process.py.
+    "do_laundry_fill": {
+
+        "interaction": "do_laundry",
+
+        "base_duration_minutes": 3,
 
         "interruptible": True,
 
@@ -1545,6 +1568,22 @@ def complete_activity(
             recipe_id = choose_recipe(c, household)
             if recipe_id:
                 start_cooking_process(c, household, recipe_id, world)
+
+    # =====================================
+    # LAUNDRY — hand off to the household-scoped process engine
+    # =====================================
+    elif activity_type == "do_laundry_fill":
+
+        from systems.task_process import start_process, resolve_stages
+
+        household = world["households"].get(c.get("household_id"))
+
+        if household:
+            chore = (world.get("definitions") or {}).get("chore_templates", {}).get("laundry_load")
+            if chore:
+                stages = resolve_stages(world, chore["stages"])
+                start_process(household, world, "laundry", "laundry_load", stages,
+                               prop_id=act.get("target_id"))
 
     # =====================================
     # SNACK

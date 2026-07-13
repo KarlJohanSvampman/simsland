@@ -91,8 +91,17 @@ async def save_definitions(sim_id: str, request: Request):
     data = await request.json()
     path = defs_path(sim_id)
     path.parent.mkdir(parents=True, exist_ok=True)
-    with open(path, "w") as f:
+    # Write to a temp file then atomically replace — writing the real
+    # path in place left a window where a concurrent reader (main.py's
+    # tick loop now reloads definitions every tick, not just once at
+    # startup) could open the file mid-write and hit a torn/truncated
+    # JSONDecodeError. os.replace() is atomic on both POSIX and Windows,
+    # so a reader always sees either the fully-old or fully-new file.
+    import os
+    tmp_path = path.with_suffix(".json.tmp")
+    with open(tmp_path, "w") as f:
         json.dump(data, f, indent=2)
+    os.replace(tmp_path, path)
     floorplans = data.get("floorplan_templates", {})
     for fp_id, fp in floorplans.items():
         if "id" not in fp:

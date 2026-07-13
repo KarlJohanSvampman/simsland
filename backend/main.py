@@ -28,7 +28,12 @@ from core.cache import set_world_cache
 from db import load_world, save_world, init_db, update_world_tick, world_lock, _world_lock, _STATIC_WORLD_KEYS
 from sim_loop import tick, collect_dirty
 from api.view import get_view, in_view
-from api.editor import load_definitions, save_definitions
+# core.definitions (not api.editor's own separate, uncached duplicate of
+# the same name) — this is the one with the process-local cache that
+# api/editor.py's save_definitions() actually invalidates on edit, so the
+# tick loop and every API route agree on the same fresh-vs-stale state.
+from core.definitions import load_definitions
+from api.editor import save_definitions
 from systems.economy import household_economy
 from systems.schema_defaults import ensure_world_defaults
 from api.assets  import router as assets_router
@@ -121,7 +126,7 @@ def _build_delta(dirty: dict, cx: int, cy: int, zoom: int) -> dict | None:
 _tick_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="tick")
 
 
-def _run_tick_and_persist(sim_id: str, definitions: dict) -> tuple[dict, dict]:
+def _run_tick_and_persist(sim_id: str) -> tuple[dict, dict]:
     """Runs the whole load->tick->persist span for one tick, held under
     _world_lock end to end. Bundled into one function (rather than the
     load/tick/cache/save calls each individually hopping to the executor,
@@ -139,7 +144,12 @@ def _run_tick_and_persist(sim_id: str, definitions: dict) -> tuple[dict, dict]:
     with _world_lock:
         world = load_world(sim_id)
         ensure_world_defaults(world)
-        world["definitions"] = definitions
+        # Loaded fresh every tick (cheap on a cache hit) rather than once
+        # at loop() startup — definitions.json edits via the Definitions
+        # editor otherwise never reach a running simulation until restart,
+        # even though save_definitions() already invalidates the read
+        # cache correctly on its end.
+        world["definitions"] = load_definitions(sim_id)
 
         tick(world)
 
@@ -183,12 +193,11 @@ def _run_tick_and_persist(sim_id: str, definitions: dict) -> tuple[dict, dict]:
 
 async def loop():
     tick_rate = float(os.getenv("TICK_RATE_SECONDS", "1.0"))
-    definitions = load_definitions(SIM_ID)
 
     while True:
         try:
             world, dirty = await asyncio.get_event_loop().run_in_executor(
-                _tick_executor, _run_tick_and_persist, SIM_ID, definitions
+                _tick_executor, _run_tick_and_persist, SIM_ID
             )
 
             # Broadcast to each client
@@ -200,7 +209,7 @@ async def loop():
                 zoom = client.get("zoom", 2)
                 try:
                     if client.get("needs_full"):
-                        snapshot = _build_full_snapshot(world, definitions, cx, cy, zoom)
+                        snapshot = _build_full_snapshot(world, world["definitions"], cx, cy, zoom)
                         snapshot["type"] = "snapshot"
                         await ws.send_json(snapshot)
                         client["needs_full"] = False

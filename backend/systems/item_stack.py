@@ -13,7 +13,7 @@ from the pre-existing boolean `stackable` on items, which means something
 unrelated (identical instances merging into a quantity counter).
 """
 
-from systems.posture import _IDLE_KEY, _POSTURE_SETTLE_TICKS
+from systems.posture import _idle_key, _POSTURE_SETTLE_TICKS
 
 
 def add_to_held_stack(c, item):
@@ -63,6 +63,6 @@ def play_item_action_once(c, world, action_key, ticks=_POSTURE_SETTLE_TICKS):
     c["animation_state"] = action_key
     c["_posture_settle"] = {
         "expected_state": action_key,
-        "target_idle":    _IDLE_KEY.get(c.get("posture", "standing"), "idle"),
+        "target_idle":    _idle_key(world, c.get("posture", "standing")),
         "ready_at_tick":  world.get("tick", 0) + ticks,
     }

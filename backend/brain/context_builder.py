@@ -595,7 +595,34 @@ def build_context(
         "active_intentions": build_intentions(c),
 
         "available_actions": build_available_actions(c, world),
+
+        "household_processes": _build_household_process_context(c, world),
     }
+
+
+def _build_household_process_context(c, world):
+    """Ambient visibility into any in-progress household chore/recipe
+    process (systems/task_process.py) — e.g. a wash cycle sitting in its
+    "empty_washer" stage, waiting for someone to act on it. There is no
+    push/notify mechanism anywhere in this codebase (deliberately, see
+    task_process.py's module docstring) — a character only ever learns
+    about a pending process by seeing it here, the same way hired-service
+    contracts were meant to surface (systems/services.py's
+    active_contracts_for_household(), though that particular wiring turned
+    out to be dead code — not repeating that mistake here)."""
+    household_id = c.get("household_id")
+    if not household_id:
+        return []
+    return [
+        {
+            "type":        p.get("type"),
+            "stage":       p.get("stage_name"),
+            "waiting":     p.get("waiting"),
+            "prop_id":     p.get("prop_id"),
+        }
+        for p in world.get("household_processes", [])
+        if p.get("household_id") == household_id and not p.get("completed")
+    ]
 
 
 # ─────────────────────────────────────────────────────────────────────────────

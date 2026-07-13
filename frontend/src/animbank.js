@@ -1154,6 +1154,36 @@ function migrateLocomotionToStances(src) {
 // BANK API
 // =========================================================
 
+// Overwrites the hardcoded STANCES fallback with the shared stance
+// vocabulary from definitions.json's stance_templates category — the same
+// data posture.py's _idle_key() and main.js's _STANCE_IDLE_KEY/
+// _STANCE_MOVE_KEY read. Must run before any renderStancesPanel() call.
+async function loadStanceTemplates() {
+    try {
+        const r = await fetch("/api/editor/definitions?sim_id=default");
+        const defs = await r.json();
+        const raw = defs.stance_templates;
+        if (!raw || !Object.keys(raw).length) return;   // keep hardcoded fallback
+
+        const slotLabel = s => s.charAt(0).toUpperCase() + s.slice(1);
+        STANCES = Object.values(raw)
+            .sort((a, b) => (a.label || a.key).localeCompare(b.label || b.key))
+            .map(entry => ({
+                key: entry.key,
+                label: entry.label || entry.key,
+                // definitions.json's "moves" never repeats idle (idle_key
+                // is a separate field) — prepend it so every stance still
+                // gets an Idle mapping row, matching the hardcoded shape.
+                moves: [
+                    { slot: "idle", label: "Idle" },
+                    ...(entry.moves || []).map(m => ({ slot: m.slot, label: slotLabel(m.slot) })),
+                ],
+            }));
+    } catch (err) {
+        console.warn("[animbank] failed to load stance_templates, using built-in defaults:", err);
+    }
+}
+
 async function loadBank() {
     const r = await fetch("/api/animbank");
     bank = await r.json();
@@ -1265,7 +1295,13 @@ function makeCatBtn(label, value) {
 // multi-step chain (e.g. "slip" then "fall") on the template lets the
 // live game play the full sequence — see resolveLocomotionMap() in main.js.
 
-const STANCES = [
+// Hardcoded fallback, used only if /api/editor/definitions has no
+// stance_templates yet (e.g. a fresh sim with an old definitions.json) —
+// loadStanceTemplates() below overwrites this from the shared
+// definitions.json vocabulary that posture.py and main.js also read, so
+// adding a new stance/locomotion slot is a data edit in the Definitions
+// editor, not a change in three separate files.
+let STANCES = [
     { key: "standing",      label: "Standing",
       moves: [{ slot: "idle", label: "Idle" }, { slot: "walk", label: "Walk" }, { slot: "run", label: "Run" }] },
     { key: "sitting_seat",  label: "Sitting (Seat)",  moves: [{ slot: "idle", label: "Idle" }] },
@@ -1879,7 +1915,7 @@ function setLoopMode(mode, btnId) {
 
 initThree();
 wireEvents();
-loadBank();
+loadStanceTemplates().then(loadBank);
 
 // Set default loop button active
 document.getElementById("loopRepeat").classList.add("active");
