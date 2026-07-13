@@ -418,10 +418,19 @@ def tick(world):
             else:
                 update_phone_battery(c)
 
-    # -- Social events: completions + new event generation ──────────
-    if every(world, CADENCE["social_events"], offset=30):
-        check_event_completions(world)
-        generate_world_events(world)
+    # -- Individual wait activities (microwave, phone hold, ...) ────
+    # c["character_wait"] is deliberately its own field, not folded into
+    # c["activity"] — agent_loop.py returns early every tick whenever
+    # c["activity"] is truthy (skips straight to execute_activity(), never
+    # reaches the LLM decision call), so a character with something
+    # sitting in c["activity"] can never be "free to do other things
+    # meanwhile." The wait state has to live somewhere the LLM loop
+    # doesn't treat as blocking.
+    if every(world, CADENCE["character_wait"], offset=34):
+        for c in characters:
+            wait = c.get("character_wait")
+            if wait and not wait.get("ready") and world["tick"] >= wait.get("ready_at_tick", 0):
+                wait["ready"] = True
 
     # -- Maybe-RSVP deadline nudges ──────────────────────────────
     if every(world, CADENCE["maybe_deadlines"], offset=31):

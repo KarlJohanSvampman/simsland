@@ -39,17 +39,29 @@ def register_process_type(process_type, on_begin=None, on_complete=None):
 # START PROCESS
 # =========================================================
 
-def start_process(household, world, process_type, template_id, stages, prop_id=None):
+def start_process(household, world, process_type, template_id, stages, prop_id=None, participants=None):
     """stages is a resolved list snapshotted at start time (already
     primitive-expanded — see resolve_stages() below), so a mid-process
     edit to the chore/recipe template in definitions.json doesn't shift
-    an in-flight process."""
+    an in-flight process.
+
+    participants defaults to just the character who triggered the initial
+    hand-off. Recorded once, here, at start time — not tracked
+    incrementally as stages advance, since only the very first "active"
+    stage of a chore is currently wired to a real activities.py hand-off
+    (see the module docstring below); nothing observes who's actually
+    present for later stages, so incremental tracking would silently
+    always equal this same initial list anyway. A caller resolving a
+    multi-recipient chore proposal (systems/proposals.py) should pass the
+    proposal's final accepted character-id list here.
+    """
     process = {
         "id": str(uuid4()),
         "type": process_type,
         "template_id": template_id,
         "household_id": household["id"],
         "prop_id": prop_id,
+        "participants": list(participants) if participants else [],
         "started_tick": world.get("tick", 0),
         "current_stage": 0,
         "stage_started_tick": world.get("tick", 0),
@@ -111,6 +123,19 @@ def advance_process(household, process, world):
 
 def finish_process(household, process, world):
     process["completed"] = True
+
+    # If 2+ people participated, remember it so the household can be
+    # offered a "make this recurring" proposal (see systems/proposals.py's
+    # offer_recurring(), triggered by action_router.py's
+    # _route_propose_recurring) — single slot, most-recent-wins, same
+    # rationale as _pending_chore's hand-off cache: this is a rare,
+    # deliberate follow-up prompt, not a queue of every past chore.
+    if len(process.get("participants", [])) >= 2:
+        household["_last_completed_chore"] = {
+            "chore_id":     process["template_id"],
+            "participants": list(process["participants"]),
+        }
+
     on_complete = _PROCESS_HOOKS.get(process["type"], {}).get("on_complete")
     if on_complete:
         on_complete(household, process, world)
@@ -164,14 +189,20 @@ def update_household_processes(world):
 # =========================================================
 # LAUNDRY — the one process type built this round
 # =========================================================
-# Each active stage sets c["animation_state"] on whichever character's
-# activities.py interaction just triggered advance_process() — see
-# systems/activities.py's do_laundry_* completion hand-offs, which call
-# start_process()/advance_process() the same way cook_recipe already hands
-# off to systems/cooking_process.py. Unattended stages (wash_cycle,
-# hang_dry) leave animation_state alone — the character is free to walk
-# away, matching the same deliberate behavior cooking's unattended stages
-# already have.
+# Only the FIRST active stage (fill_washer) currently has a real
+# activities.py hand-off (do_laundry_fill -> start_process(), mirroring
+# cook_recipe's hand-off to systems/cooking_process.py) — every stage
+# after that (empty_washer, fold_laundry, put_away) is timer-only today;
+# their "active" flag doesn't yet gate on any character actually being
+# present, since advance_process() is only ever called from the cadence
+# sweep (update_household_processes()), not re-entered by a per-stage
+# activities.py interaction. This is a known, deliberate simplification
+# (see task_process.py's own module docstring) — treat "active" as "should
+# animate someone if this hook has a character in scope," not "blocks
+# progress until someone shows up." Unattended stages (wash_cycle,
+# hang_dry) leave animation_state alone regardless — the character is free
+# to walk away, matching the same deliberate behavior cooking's unattended
+# stages already have.
 
 def _laundry_on_begin(household, process, stage, world):
     if not stage.get("active", True):

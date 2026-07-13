@@ -63,6 +63,7 @@ def ensure_world_defaults(world, defs=None):
     world.setdefault("stock_sector_trends", {})
     world.setdefault("service_contracts",  [])
     world.setdefault("household_processes", [])
+    world.setdefault("proposals", {})
     world.setdefault("walls",              {})
 
 
@@ -558,6 +559,12 @@ def ensure_character_defaults(c):
     # Movable props (chairs/sofas/etc. — see systems/prop_movement.py)
     c.setdefault("dragged_prop_id",        None)  # prop this character is the primary dragger of
     c.setdefault("pushing_prop_id",        None)  # prop this character is the second-person pusher of
+
+    # Individual wait activities (microwave, phone hold, ... — see
+    # systems/activities.py's start_microwave/take_out_of_microwave and
+    # sim_loop.py's character_wait cadence block). Deliberately separate
+    # from c["activity"] — see sim_loop.py's comment on why.
+    c.setdefault("character_wait",         None)
 
     # Impulse control — anger pressure vs self-control
     c.setdefault("impulse_state", {

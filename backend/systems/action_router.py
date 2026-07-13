@@ -254,6 +254,53 @@ def _route_sleep(c, world, action):
 
 
 # =========================================================
+# ROUTE INDIVIDUAL WAIT ACTIVITIES — microwave
+# =========================================================
+# Mirrors _route_eat/_route_sleep, not the generic _route_interact: that
+# generic path always sets c["activity"]["type"] literally to "interact"
+# (see _scaffold's call site above), so a named activity like this one
+# needs its own dedicated route + VALID_ACTIONS entry to ever actually
+# become that activity's own type string — "interact" alone would never
+# match complete_activity()'s "start_microwave"/"take_out_of_microwave"
+# branches.
+
+def _route_start_microwave(c, world, action):
+    target_id = action.get("target")
+    c["activity"] = _scaffold(
+        c, world, "start_microwave",
+        target_id=target_id,
+        interaction="microwave",
+    )
+
+
+def _route_take_out_of_microwave(c, world, action):
+    target_id = action.get("target")
+    c["activity"] = _scaffold(
+        c, world, "take_out_of_microwave",
+        target_id=target_id,
+        interaction="microwave",
+    )
+
+
+# =========================================================
+# ROUTE LAUNDRY — same reachability fix as the microwave routes above.
+# do_laundry_fill existed since last round but had no dedicated route,
+# so it was only ever startable via a direct start_activity() call, never
+# by an LLM-driven character choosing it through the normal available-
+# actions path — which meant an accepted chore proposal (systems/
+# proposals.py) would have had no way to actually get the chore started.
+# =========================================================
+
+def _route_do_laundry_fill(c, world, action):
+    target_id = action.get("target")
+    c["activity"] = _scaffold(
+        c, world, "do_laundry_fill",
+        target_id=target_id,
+        interaction="do_laundry",
+    )
+
+
+# =========================================================
 # ROUTE WAIT
 # =========================================================
 
@@ -608,6 +655,15 @@ def route_action(c, world, action, speech, definitions=None):
     elif action_type == "sleep":
         _route_sleep(c, world, action)
 
+    elif action_type == "start_microwave":
+        _route_start_microwave(c, world, action)
+
+    elif action_type == "take_out_of_microwave":
+        _route_take_out_of_microwave(c, world, action)
+
+    elif action_type == "do_laundry_fill":
+        _route_do_laundry_fill(c, world, action)
+
     elif action_type == "wait":
         _route_wait(c, world, action)
 
@@ -737,6 +793,15 @@ def route_action(c, world, action, speech, definitions=None):
         _route_propose_touch(c, world, action, action_type)
     elif action_type == "respond_touch":
         _route_respond_touch(c, world, action)
+
+    elif action_type == "propose_chore":
+        _route_propose_chore(c, world, action)
+    elif action_type == "respond_chore":
+        _route_respond_chore(c, world, action)
+    elif action_type == "advance_chore_round":
+        _route_advance_chore_round(c, world, action)
+    elif action_type == "propose_recurring":
+        _route_propose_recurring(c, world, action)
 
     elif action_type == "breastfeed":
         _route_breastfeed(c, world, action)
@@ -944,6 +1009,92 @@ def _route_respond_touch(c, world, action):
     try:
         from systems.intimacy import respond_to_touch_proposal
         respond_to_touch_proposal(c, proposer, response, world)
+    except Exception:
+        pass
+
+
+# =========================================================
+# CHORE PROPOSAL HANDLERS — see systems/proposals.py
+# =========================================================
+
+def _route_propose_chore(c, world, action):
+    """
+    Character proposes doing a household chore together.
+    action: {"type": "propose_chore", "chore_id": "laundry_load", "params": {...}}
+    """
+    chore_id = action.get("chore_id")
+    if not chore_id:
+        return
+    params = action.get("params", {})
+    try:
+        from systems.proposals import propose_chore_to_household
+        propose_chore_to_household(c, world, chore_id, params)
+    except Exception:
+        pass
+
+
+def _route_respond_chore(c, world, action):
+    """
+    Character responds to a pending chore proposal — accept, decline, or
+    counter with different params (the AI decides which details, if any,
+    it has an opinion on).
+    action: {"type": "respond_chore", "proposal_id": ..., "response": "accept"|"decline"|"counter", "counter_params": {...}}
+    """
+    proposal_id = action.get("proposal_id")
+    response    = action.get("response", "accept")
+    if not proposal_id:
+        return
+    counter_params = action.get("counter_params")
+    try:
+        from systems.proposals import respond
+        respond(c, world, proposal_id, response, counter_params)
+    except Exception:
+        pass
+
+
+def _route_advance_chore_round(c, world, action):
+    """
+    The proposer mediates a round of counter-proposals: optionally
+    revises the chore's params, then re-opens still-countering recipients
+    for another round (up to the round cap).
+    action: {"type": "advance_chore_round", "proposal_id": ..., "new_params": {...}}
+    """
+    proposal_id = action.get("proposal_id")
+    if not proposal_id:
+        return
+    new_params = action.get("new_params")
+    try:
+        from systems.proposals import proposer_advance_round
+        proposer_advance_round(c, world, proposal_id, new_params)
+    except Exception:
+        pass
+
+
+def _route_propose_recurring(c, world, action):
+    """
+    Offer to turn a just-completed joint chore into a recurring social
+    contract. Only valid if this household has a completed joint chore
+    (2+ participants) waiting — see task_process.py::finish_process().
+    action: {"type": "propose_recurring", "days": [...], "start_hour": ..., "end_hour": ...}
+    """
+    household = world.get("households", {}).get(c.get("household_id"))
+    if not household:
+        return
+    last = household.get("_last_completed_chore")
+    if not last or len(last.get("participants", [])) < 2:
+        return
+
+    chars = world.get("characters", {})
+    participants = [chars[pid] for pid in last["participants"] if pid in chars]
+    schedule_params = {
+        "days":       action.get("days", ["monday"]),
+        "start_hour": action.get("start_hour", 18),
+        "end_hour":   action.get("end_hour", 19),
+    }
+    try:
+        from systems.proposals import offer_recurring
+        offer_recurring(c, participants, world, last["chore_id"], schedule_params)
+        household["_last_completed_chore"] = None   # consumed
     except Exception:
         pass
 

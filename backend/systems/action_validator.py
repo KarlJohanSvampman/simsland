@@ -40,7 +40,31 @@ VALID_ACTIONS = {
 
     "push_prop",
 
-    "let_go_prop"
+    "let_go_prop",
+
+    # Chore proposal/negotiation actions (see systems/proposals.py) —
+    # registered here deliberately, unlike the pre-existing touch-proposal
+    # actions (hug/kiss/respond_touch/...), which were found this session
+    # to be missing from VALID_ACTIONS and therefore silently unreachable
+    # from the live agent loop despite having correct router code.
+    "propose_chore",
+
+    "respond_chore",
+
+    "advance_chore_round",
+
+    "propose_recurring",
+
+    # Individual wait activity (see systems/activities.py,
+    # sim_loop.py's character_wait cadence block)
+    "start_microwave",
+
+    "take_out_of_microwave",
+
+    # Laundry chore hand-off (see systems/task_process.py) — pre-existed
+    # since last round but was unreachable from the live agent loop until
+    # now, same class of gap as the touch-proposal system.
+    "do_laundry_fill"
 }
 
 

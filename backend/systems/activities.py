@@ -313,6 +313,33 @@ ACTIVITIES = {
         "category": "food"
     },
 
+    # Individual wait activity, first example — start the microwave, then
+    # the character is free (c["activity"] clears normally via
+    # finish_activity(), same as any other activity) while
+    # c["character_wait"] ticks in the background. See complete_activity()
+    # below and sim_loop.py's character_wait cadence block.
+    "start_microwave": {
+
+        "interaction": "microwave",
+
+        "base_duration_minutes": 1,
+
+        "interruptible": True,
+
+        "category": "food"
+    },
+
+    "take_out_of_microwave": {
+
+        "interaction": "microwave",
+
+        "base_duration_minutes": 1,
+
+        "interruptible": True,
+
+        "category": "food"
+    },
+
     "store_leftovers": {
 
         "interaction": "fridge",
@@ -1582,8 +1609,48 @@ def complete_activity(
             chore = (world.get("definitions") or {}).get("chore_templates", {}).get("laundry_load")
             if chore:
                 stages = resolve_stages(world, chore["stages"])
+                # If this fill was the result of an accepted chore
+                # proposal (systems/proposals.py), the resolved
+                # participant list is waiting in this single-slot
+                # hand-off cache — consume it here. Falls back to solo
+                # (just this character) for the ordinary un-proposed path,
+                # unchanged from before.
+                pending = household.pop("_pending_chore", None)
+                if pending and pending.get("chore_id") == "laundry_load":
+                    participants = pending.get("participants") or [c["id"]]
+                else:
+                    participants = [c["id"]]
                 start_process(household, world, "laundry", "laundry_load", stages,
-                               prop_id=act.get("target_id"))
+                               prop_id=act.get("target_id"), participants=participants)
+
+    # =====================================
+    # INDIVIDUAL WAIT — microwave
+    # =====================================
+    elif activity_type == "start_microwave":
+
+        wait_minutes = act.get("state", {}).get("wait_minutes", 3)
+        c["character_wait"] = {
+            "type":               "microwave",
+            "prop_id":            act.get("target_id"),
+            "ready_at_tick":      world.get("tick", 0) + wait_minutes * 60,
+            "resume_interaction": "take_out_of_microwave",
+            "ready":              False,
+        }
+        # c["activity"] clears normally via finish_activity() right after
+        # this branch returns — the character is genuinely free from here,
+        # unlike household chores/recipes where a background process
+        # object keeps ticking; here it's just this one timer.
+
+    elif activity_type == "take_out_of_microwave":
+
+        wait = c.get("character_wait")
+        if wait and wait.get("type") == "microwave":
+            from systems.household_storage import create_household_resource
+            household = world["households"].get(c.get("household_id"))
+            if household:
+                create_household_resource(household, "MEAL", quantity=1, servings=1,
+                                           nutrition=0.5, quality=0.5, container="held")
+        c["character_wait"] = None
 
     # =====================================
     # SNACK

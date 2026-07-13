@@ -431,6 +431,49 @@ def build_available_actions(c, world):
     # Hired services — always available (character decides if they can afford it)
     action_types.append("hire_service")
 
+    # Individual wait activity (see systems/activities.py
+    # start_microwave/take_out_of_microwave, sim_loop.py's character_wait
+    # cadence block). start_microwave listed unconditionally like
+    # hire_service (the route handler validates the target); the resume
+    # action only appears once the timer's actually elapsed — before that
+    # the character is free to do anything else, same as if nothing were
+    # waiting at all — and is skipped entirely while a wait is already
+    # running but not yet ready, so the LLM doesn't try to start a second
+    # one on top of it.
+    wait = c.get("character_wait")
+    if not wait:
+        action_types.append("start_microwave")
+    elif wait.get("ready") and wait.get("resume_interaction"):
+        action_types.append(wait["resume_interaction"])
+
+    # Chore proposals (see systems/proposals.py) — propose_chore listed
+    # unconditionally, same as hire_service (the route handler itself
+    # validates the character is actually home before creating anything).
+    # propose_recurring only appears once a joint chore this household
+    # just finished is waiting to be offered (task_process.py's
+    # finish_process() sets this; consumed the moment it's proposed).
+    action_types.append("propose_chore")
+    action_types.append("do_laundry_fill")
+    household_id = c.get("household_id")
+    household = world.get("households", {}).get(household_id) if household_id else None
+    if household and household.get("_last_completed_chore"):
+        action_types.append("propose_recurring")
+
+    # respond_chore/advance_chore_round only make sense (and only appear)
+    # when this character actually has something pending — see
+    # _build_proposal_context() below, the same "proposals" context key
+    # this mirrors, so the two never disagree about what's live.
+    cid = c["id"]
+    for p in world.get("proposals", {}).values():
+        if p.get("status") != "open":
+            continue
+        if p.get("responses", {}).get(cid) == "pending" and "respond_chore" not in action_types:
+            action_types.append("respond_chore")
+        elif (p.get("proposer_id") == cid
+              and "advance_chore_round" not in action_types
+              and any(state == "counter" for state in p.get("responses", {}).values())):
+            action_types.append("advance_chore_round")
+
     # Wall actions — always contextually available
     action_types.extend(["build_wall", "remove_wall"])
 
@@ -597,6 +640,8 @@ def build_context(
         "available_actions": build_available_actions(c, world),
 
         "household_processes": _build_household_process_context(c, world),
+
+        "proposals": _build_proposal_context(c, world),
     }
 
 
@@ -623,6 +668,72 @@ def _build_household_process_context(c, world):
         for p in world.get("household_processes", [])
         if p.get("household_id") == household_id and not p.get("completed")
     ]
+
+
+def _build_proposal_context(c, world):
+    """Ambient visibility into pending systems/proposals.py negotiations —
+    chore invites and recurring-schedule offers. This is the wiring the
+    pre-existing touch-proposal system (systems/intimacy.py) was missing:
+    its own context-surfacing function was defined but never actually
+    added to build_context()'s returned dict, so incoming proposals were
+    genuinely invisible to a recipient's LLM and got resolved by a
+    tick-based probability heuristic instead of real AI choice. This
+    function IS wired in (see build_context() above) — don't repeat that
+    mistake if this gets refactored later.
+
+    Surfaces two kinds of entries for a character:
+      - incoming: a proposal awaiting THIS character's response (accept/
+        decline/counter).
+      - mediating: a proposal THIS character made, where one or more
+        recipients have countered and are waiting on a decision (see
+        systems/proposals.py's "proposer-mediated reconciliation" rule —
+        counters are proposals to the proposer, not to each other).
+    """
+    cid = c["id"]
+    incoming, mediating = [], []
+
+    for p in world.get("proposals", {}).values():
+        if p.get("status") != "open":
+            continue
+
+        if p.get("responses", {}).get(cid) == "pending":
+            incoming.append({
+                "proposal_id": p["id"],
+                "kind":        p.get("kind"),
+                "chore_id":    p.get("chore_id"),
+                "params":      p.get("params"),
+                "proposed_by": p.get("proposer_id"),
+                "round":       p.get("round"),
+                "note":        f"Someone proposed {p.get('chore_id')} — you can accept, decline, "
+                               f"or counter with different details." if p.get("kind") == "chore"
+                               else f"Someone offered to make {p.get('chore_id')} a recurring thing.",
+            })
+
+        elif p.get("proposer_id") == cid:
+            counters = {
+                rid: p["counter_params"].get(rid)
+                for rid, state in p.get("responses", {}).items()
+                if state == "counter"
+            }
+            if counters:
+                mediating.append({
+                    "proposal_id": p["id"],
+                    "kind":        p.get("kind"),
+                    "chore_id":    p.get("chore_id"),
+                    "your_params": p.get("params"),
+                    "counters":    counters,
+                    "round":       p.get("round"),
+                    "note":        "One or more people countered your proposal with different "
+                                   "details — decide new terms (advance_chore_round) or let it "
+                                   "lapse.",
+                })
+
+    result = {}
+    if incoming:
+        result["incoming"] = incoming
+    if mediating:
+        result["mediating"] = mediating
+    return result or None
 
 
 # ─────────────────────────────────────────────────────────────────────────────
