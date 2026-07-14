@@ -241,6 +241,46 @@ def perceived_emotion(observer, other):
 
 
 # =========================================================
+# PERCEIVED TOPIC (MISHEARING)
+# =========================================================
+# Same shape as perceived_emotion() above, applied to hearing instead of
+# sight: below a clarity threshold there's a real, deterministic (not
+# random-every-tick) chance of a genuine misunderstanding — a different,
+# plausible-but-wrong topic guess, reported with the same confidence as
+# hearing correctly. That confidence is the point: an unintended
+# mishearing doesn't come with a hedge attached, or it wouldn't be a
+# mishearing. Below a second, lower threshold, hearing_range() itself
+# already gates the event out entirely — see perceive_audio()'s very-low-
+# clarity branch for the "can't make out anything" case instead.
+
+_MISHEARD_TOPIC_POOL = [
+    "the weather", "money", "work", "someone's family",
+    "weekend plans", "a rumor", "dinner plans",
+]
+
+
+def _perceived_topic(observer_id, speaker_id, real_topic, clarity):
+
+    if not real_topic or clarity >= 0.6:
+        return real_topic
+
+    key = f"{observer_id}:{speaker_id}:{real_topic}"
+
+    # Chance of mishearing rises the further clarity drops below 0.6 —
+    # up to ~70% right at the edge of the mishearing band.
+    mishear_chance = (0.6 - clarity) / 0.6 * 70
+
+    if hash(key) % 100 >= mishear_chance:
+        return real_topic
+
+    pool = [t for t in _MISHEARD_TOPIC_POOL if t != real_topic]
+
+    idx = hash(key + ":mishear") % len(pool)
+
+    return pool[idx]
+
+
+# =========================================================
 # PERCEIVED ACTIVITY
 # =========================================================
 
@@ -553,20 +593,31 @@ def perceive_audio(
         if effective > hrange:
             continue
 
+        # 1.0 = right next to the source, 0.0 = at the very edge of
+        # hearing_range() (which already bakes in sense-trait/night
+        # multipliers from perception.py's visual/hearing range work).
+        clarity = max(0.0, 1 - (effective / hrange)) if hrange else 0.0
+
+        real_topic = speech.get("topic")
+
+        heard_topic = _perceived_topic(
+            c["id"], other["id"], real_topic, clarity
+        )
+
+        # Below the mishearing band entirely, the character can't even
+        # tell who's talking — distinct from mishearing *what* was said.
+        heard_speaker = other.get("name") if clarity >= 0.3 else None
+
         heard.append({
 
             "type":
                 "speech",
 
             "speaker":
-                other.get(
-                    "name"
-                ),
+                heard_speaker,
 
             "topic":
-                speech.get(
-                    "topic"
-                ),
+                heard_topic,
 
             "tone":
                 speech.get(
@@ -577,7 +628,10 @@ def perceive_audio(
                 round(
                     effective,
                     2
-                )
+                ),
+
+            "clarity":
+                round(clarity, 2)
         })
 
     # =====================================

@@ -38,6 +38,7 @@ from systems.item_knowledge import update_item_knowledge
 # -- Fast (÷5) ---------------------------------------------------
 from brain.perception   import perceive
 from brain.attention    import update_attention
+from systems.excuses    import check_visible_lies_for_observer
 
 # -- Medium (÷10-20) ---------------------------------------------
 from brain.memory       import decay_memories
@@ -217,6 +218,9 @@ def tick(world):
     if every(world, CADENCE["perception"]):
         for c in characters:
             perceive(c, world)
+            # "Authority hears a conflicting account via observation" —
+            # see systems/excuses.py::check_visible_lies_for_observer.
+            check_visible_lies_for_observer(c, world)
 
     if every(world, CADENCE["attention"], offset=1):
         for c in characters:

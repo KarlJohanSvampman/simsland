@@ -64,7 +64,16 @@ VALID_ACTIONS = {
     # Laundry chore hand-off (see systems/task_process.py) — pre-existed
     # since last round but was unreachable from the live agent loop until
     # now, same class of gap as the touch-proposal system.
-    "do_laundry_fill"
+    "do_laundry_fill",
+
+    # Lie/excuse engine (see systems/excuses.py) — the decision tree and
+    # router code (_route_give_excuse/_route_leave_note in
+    # action_router.py) were fully built but these were never registered,
+    # same class of gap as the touch-proposal system: silently unreachable
+    # from the live agent loop despite correct router code.
+    "give_excuse",
+
+    "leave_note"
 }
 
 

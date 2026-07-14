@@ -474,6 +474,14 @@ def build_available_actions(c, world):
               and any(state == "counter" for state in p.get("responses", {}).values())):
             action_types.append("advance_chore_round")
 
+    # Lie/excuse engine (see systems/excuses.py) — give_excuse listed
+    # whenever someone's actually present to give it to (the route handler
+    # further validates the target exists); leave_note always available —
+    # same "route handler validates" pattern as hire_service/propose_chore.
+    if nearby_people:
+        action_types.append("give_excuse")
+    action_types.append("leave_note")
+
     # Wall actions — always contextually available
     action_types.extend(["build_wall", "remove_wall"])
 
@@ -621,16 +629,30 @@ def build_narrative(c, world):
 
     # ---- hearing — restores perceive_audio()'s audible_events, computed
     # every perception cadence tick but never surfaced anywhere before this
-    # (not in the old flat context, not consumed by attention.py either) ----
+    # (not in the old flat context, not consumed by attention.py either).
+    # event["speaker"]/["topic"] already carry perceive_audio()'s mishearing
+    # (perception.py::_perceived_topic) — a corrupted topic is reported
+    # with full confidence here, same as a correct one, because that's
+    # what an unintended misunderstanding actually is; only the very-low-
+    # clarity case (speaker is None) gets an explicit hedge. ----
     audible = c.get("perception", {}).get("audible_events", [])
     if audible:
         lines = []
         for event in audible[:4]:
             if event.get("type") == "speech":
-                lines.append(
-                    f"You hear {event.get('speaker') or 'someone'} "
-                    "talking somewhere nearby."
-                )
+                speaker = event.get("speaker")
+                topic = event.get("topic")
+                if not speaker:
+                    lines.append(
+                        "You hear muffled talking nearby, but can't "
+                        "make out who or what."
+                    )
+                elif topic:
+                    lines.append(
+                        f"You hear {speaker} mention something about {topic}."
+                    )
+                else:
+                    lines.append(f"You hear {speaker} talking somewhere nearby.")
             elif event.get("type") == "ambient" and event.get("sound"):
                 lines.append(
                     f"You hear a {event['sound'].replace('_', ' ')}."

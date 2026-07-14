@@ -440,6 +440,32 @@ def _guess_destination_label(c, dest, world):
 
 # ── Lie detection ─────────────────────────────────────────────────────────
 
+def check_visible_lies_for_observer(observer, world):
+    """
+    The "authority hears a conflicting account (gossip, observation)" hook
+    check_lie_consistency()'s own docstring describes, but which nothing
+    ever called — lies were recorded in active_lies but never actually
+    checked against reality. Built directly on brain/perception.py's
+    visible_people: if the observer can literally see someone who told
+    them a lie, that's a real, in-perception "observation" moment worth
+    checking. Call once per perception cadence tick (sim_loop.py), same
+    cadence perceive() already runs on.
+    """
+    chars = world.get("characters", {})
+
+    for p in observer.get("perception", {}).get("visible_people", []):
+
+        liar = chars.get(p["id"])
+
+        if not liar or not liar.get("active_lies"):
+            continue
+
+        if any(observer["id"] in lie.get("told_to", [])
+               for lie in liar["active_lies"] if not lie.get("detected")):
+
+            check_lie_consistency(liar, observer, world)
+
+
 def check_lie_consistency(c, authority, world):
     """
     Called when authority hears a conflicting account (gossip, observation).
