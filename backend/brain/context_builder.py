@@ -542,7 +542,7 @@ def build_available_actions(c, world):
             "grab_offensive", "hold", "punch", "kick", "shove", "threaten",
         ])
     if _has_recent_aggressor(c, world):
-        action_types.extend(["dodge", "block", "turn_and_run"])
+        action_types.extend(["dodge", "block", "turn_and_run", "back_away"])
 
     # Weapon-gated strikes (see systems/hostile_actions.py) — stab/knock
     # only offered when the actor is actually holding a matching
@@ -595,8 +595,17 @@ def build_available_actions(c, world):
         # character needs to be able to keep struggling every round.
         if "dodge" not in action_types:
             action_types.append("dodge")
-    if c.get("grappled_by") or c.get("grappling"):
-        action_types = [a for a in action_types if a not in ("move", "turn_and_run")]
+    if c.get("held_by"):
+        # dodge/struggle option for a pin-mode hold, same reasoning as the
+        # wrestle-mode grappled_by case above.
+        if "dodge" not in action_types:
+            action_types.append("dodge")
+    if c.get("holding"):
+        action_types.append("release_hold")
+
+    from systems.action_router import _movement_blocked
+    if _movement_blocked(c):
+        action_types = [a for a in action_types if a not in ("move", "turn_and_run", "back_away")]
 
     # Wall actions — always contextually available
     action_types.extend(["build_wall", "remove_wall"])
@@ -886,6 +895,13 @@ def build_narrative(c, world):
     body_issues = build_body_context(c)
     if body_issues:
         paragraphs.append(" ".join(body_issues))
+
+    # ---- injury/illness severity — see systems/health.py::
+    # compute_severity(). Previously the LLM had zero visibility into
+    # physical_health/mental_health/health_state/injuries at all. ----
+    health_line = _build_health_context(c, world)
+    if health_line:
+        paragraphs.append(health_line)
 
     # ---- active intentions/goals ----
     intentions = build_intentions(c)
@@ -1825,7 +1841,7 @@ def _build_family_context(c, world):
             "name":    other.get("name", mid),
             "kinship": kinship,
             "age":     other.get("age"),
-            "alive":   not other.get("deceased", False),
+            "alive":   other.get("alive", True),
             "offscreen": other.get("is_offscreen", False),
         })
     return {
@@ -1999,6 +2015,59 @@ def _build_witnessed_offense_line(c, world):
         return (f"You just saw {offender_name} attack {victim_name} — "
                 f"you could intervene or call 911.")
     return f"You just saw {offender_name} act violently — you could intervene or call 911."
+
+
+def _build_health_context(c, world):
+    """
+    Self-awareness of injury/illness severity — see systems/health.py::
+    compute_severity(), the first unified "how badly hurt is this
+    character" aggregate in the codebase. Healthy/mild tiers get no
+    paragraph (keeps token cost down, matches every other narrative
+    section this session); moderate-or-worse names the tier and the
+    worst active emergency/injury so the LLM understands why dodge/
+    call_911/its own reduced options are showing up.
+    """
+    try:
+        from systems.health import compute_severity
+    except Exception:
+        return None
+
+    score, tier = compute_severity(c)
+    hs = c.get("health_state", {})
+    lines = []
+
+    if tier not in ("healthy", "mild"):
+        em = hs.get("active_emergencies", {})
+        worst_label = None
+        if em:
+            worst_key = max(em, key=lambda k: em[k].get("severity", 0))
+            worst_label = worst_key.replace("_", " ")
+        else:
+            injuries = hs.get("injuries", [])
+            if injuries:
+                last = injuries[-1]
+                part = last.get("body_part", "body").replace("_", " ")
+                worst_label = f"{last.get('type')} injury to your {part}"
+
+        tier_phrase = {
+            "moderate": "You're in noticeable pain and not at full strength.",
+            "severe":   "You're badly hurt — every movement is a struggle.",
+            "critical": "You're in critical condition, barely able to move.",
+            "dead":     "You have died.",
+        }.get(tier, "")
+        if worst_label:
+            tier_phrase += f" ({worst_label})"
+        if tier_phrase:
+            lines.append(tier_phrase)
+
+    # Pain-specific line — independent of overall severity tier (pain is
+    # only one of several signals compute_severity() weighs, so real pain
+    # — bad domestic-abuse bruising, a nasty fever — doesn't always push
+    # the aggregate tier past "moderate").
+    if hs.get("pain", 0) >= 50:
+        lines.append("You're in a lot of pain.")
+
+    return " ".join(lines) or None
 
 
 def _build_incident_context(c, world):

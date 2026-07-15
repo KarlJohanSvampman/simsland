@@ -269,15 +269,16 @@ def _apply_outburst_consequences(actor, target, act_type, world):
 
     # Physical acts: target may be injured
     if act_type in ("shove", "assault"):
+        from systems.health import add_pain
         health = target.setdefault("health", {})
         if act_type == "assault":
-            health["pain"] = min(1.0, health.get("pain", 0.0) + 0.30)
+            add_pain(target, 30)
             health.setdefault("conditions", [])
             if "bruised" not in health["conditions"]:
                 health["conditions"].append("bruised")
         # Shove: minor chance of pain
         elif random.random() < 0.30:
-            health["pain"] = min(1.0, health.get("pain", 0.0) + 0.10)
+            add_pain(target, 10)
 
     # Assault: legal record
     if act_type == "assault":

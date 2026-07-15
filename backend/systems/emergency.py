@@ -55,6 +55,30 @@ def report_assault_incident(world, offender, victim=None):
     return inc
 
 
+def report_medical_emergency_incident(world, c):
+    """
+    Create a real incident when a character's severity (systems/health.py::
+    compute_severity) first crosses into "severe"/"critical" — the 911
+    bridge for the health-severity spine, same always-fires shape as
+    report_assault_incident() above, just with no offender: this isn't
+    caused by another character, so offender_id is None (participants is
+    just the affected character, still reachable via call_911's existing
+    proximity/awareness gate and _build_incident_context's proximity scan).
+    """
+    inc = {
+        "id":           f"inc_{uuid.uuid4().hex[:6]}",
+        "type":         "medical_emergency",
+        "offender_id":  None,
+        "participants": [c["id"]],
+        "location":     {"x": c["x"], "y": c["y"]},
+        "reported":     False,
+        "tick":         world["tick"],
+    }
+    world.setdefault("incidents", []).append(inc)
+    emit("incident_created", {"incident_id": inc["id"], "type": inc["type"]})
+    return inc
+
+
 def trigger_incident(world, c):
     """Create incidents from character state or random world events."""
     if c is not None:

@@ -33,6 +33,17 @@ def update_character_movement(
     world
 ):
 
+    # Defense-in-depth: a route already in flight when a character dies or
+    # collapses (see systems/health.py::apply_severity_consequences)
+    # shouldn't keep interpolating just because it was queued before that
+    # happened — action_router.py's _movement_blocked() already stops a
+    # *new* move/turn_and_run from being issued, this covers one already
+    # underway.
+    if not c.get("alive", True) or c.get("posture") in ("unconscious", "dead"):
+        c["route"] = []
+        c["is_moving"] = False
+        return False
+
     # A pusher has no route/move_target of their own — they're attached to
     # the prop, not independently walking. Position is driven entirely by
     # the dragger's movement, so this short-circuits before the normal

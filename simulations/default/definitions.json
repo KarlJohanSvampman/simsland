@@ -54634,6 +54634,10 @@
         {
           "slot": "run",
           "key": "run"
+        },
+        {
+          "slot": "walk_backward",
+          "key": "walk_backward"
         }
       ]
     },
@@ -54762,6 +54766,46 @@
       "label": "Pushing",
       "is_posture": false,
       "idle_key": "pushing",
+      "moves": []
+    },
+    "limping": {
+      "key": "limping",
+      "label": "Limping",
+      "is_posture": true,
+      "idle_key": "limp_idle",
+      "moves": [
+        {
+          "slot": "walk",
+          "key": "limp_walk"
+        }
+      ]
+    },
+    "held": {
+      "key": "held",
+      "label": "Held (Standing)",
+      "is_posture": true,
+      "idle_key": "struggle_standing_idle",
+      "moves": []
+    },
+    "holding": {
+      "key": "holding",
+      "label": "Holding (Standing)",
+      "is_posture": true,
+      "idle_key": "hold_standing_idle",
+      "moves": []
+    },
+    "held_down": {
+      "key": "held_down",
+      "label": "Held Down (Ground)",
+      "is_posture": true,
+      "idle_key": "struggle_pinned_idle",
+      "moves": []
+    },
+    "holding_down": {
+      "key": "holding_down",
+      "label": "Holding Down (Ground)",
+      "is_posture": true,
+      "idle_key": "hold_pinned_idle",
       "moves": []
     }
   },

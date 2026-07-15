@@ -88,8 +88,7 @@ from systems.jobs import (
 )
 
 from systems.health import (
-    process_health,
-    trigger_health_event
+    process_health
 )
 
 from systems.mail import (
@@ -180,11 +179,6 @@ def update_internal_state(
     decay_habits(c)
 
     process_health(
-        c,
-        world
-    )
-
-    trigger_health_event(
         c,
         world
     )

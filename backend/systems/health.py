@@ -207,6 +207,7 @@ def tick_physical_conditions(char, world):
 
         for symptom_key in tmpl.get("active_symptoms", []):
             _apply_symptom_penalties(char, world, symptom_key, defs)
+            tick_symptom_reactions(char, world, defs, symptom_key, state["severity_index"])
 
         sp = tmpl.get("stamina_penalty", 0)
         if sp:
@@ -239,6 +240,51 @@ def _apply_symptom_penalties(char, world, symptom_key, defs):
     for need, amount in tmpl.get("need_penalties", {}).items():
         if need in char:
             char[need] = max(0.0, min(1.0, char.get(need, 1.0) + amount * 0.05))
+
+
+# Symptom -> reaction type, for the symptoms with a clean, distinct
+# physical cue worth an observable reaction (see reactions.py's
+# push_reaction/REACTION_ANIMATIONS -- the same mechanism hostile actions
+# already use). Deliberately not every visual symptom in symptom_templates:
+# convulsions already gets dramatic treatment via trigger_seizure()'s own
+# active_emergencies path, and the rest (mood_swings/runny_nose/rash/
+# speech_difficulty) don't have a clean single-clip cue -- skipped rather
+# than forcing a weak mapping.
+_SYMPTOM_REACTION_MAP = {
+    "coughing":             "cough",
+    "sweating":             "sweating",
+    "fever":                "sweating",
+    "shortness_of_breath":  "breathless",
+    "dizziness":            "dizzy",
+}
+
+
+def tick_symptom_reactions(char, world, defs, symptom_key, severity_index):
+    """
+    One active symptom's contribution to the unified pain field (see
+    add_pain() above) and, for the symptoms with a clean visual cue, a
+    real observable reaction. Called from tick_physical_conditions()'s
+    existing per-condition loop -- same daily cadence, no new cadence
+    machinery. severity_index (0-1, already tracked per-condition) scales
+    the pain contribution: a mild new cold barely hurts, a progressed one
+    does.
+    """
+    tmpl = defs.get("symptom_templates", {}).get(symptom_key)
+    if not tmpl:
+        return
+
+    add_pain(char, 2 + severity_index * 6)
+
+    if not tmpl.get("visual"):
+        return
+    reaction_type = _SYMPTOM_REACTION_MAP.get(symptom_key)
+    if not reaction_type:
+        return
+    try:
+        from systems.reactions import push_reaction
+        push_reaction(char, reaction_type, world.get("tick", 0))
+    except Exception:
+        pass
 
 
 def _check_recoveries(char, world, ph_templates, tick):
@@ -434,6 +480,7 @@ def apply_blunt_trauma(char, world, body_part, force_normalized, tick):
     injury = {"type": "blunt", "body_part": body_part,
               "force": force_normalized, "tick": tick, "effects": effects}
     injuries.append(injury)
+    add_pain(char, force_normalized * 40)
     return injury
 
 
@@ -470,6 +517,7 @@ def apply_blade_injury(char, world, body_part, sharpness, size, irregular_shape,
 
     _remember(char, f"Sustained blade injury to {body_part.replace('_', ' ')}.", 0.85,
               ["health", "injury", "blade"], "health", tick)
+    add_pain(char, bleeding_severity * 40)
     return injury
 
 
@@ -496,6 +544,34 @@ def treat_bleeding(char, world, success_rate=0.85):
                   ["health", "injury"], "health", world.get("tick", 0))
         return True
     return False
+
+
+# ---------------------------------------------------------------------------
+# Unified pain -- health_state["pain"], 0-100. Consolidates what were three
+# disconnected trackers (c["body"]["pain"], never written by anything;
+# c["health"]["pain"], written additively by domestic_control.py/
+# impulse.py/rival_cascade.py, never decayed, never read anywhere; nothing
+# in health_state at all). This is now the one real pain field -- fed by
+# violence (below), redirected domestic-abuse/rivalry pain (see those
+# files), and symptoms (tick_symptom_reactions below). Accidents are a
+# documented future fourth source -- no accident-injury mechanic exists
+# yet anywhere in this codebase; whatever adds one just calls add_pain()
+# the same way.
+# ---------------------------------------------------------------------------
+
+PAIN_DECAY_PER_TICK = 0.15
+
+
+def add_pain(char, amount):
+    hs = char.setdefault("health_state", {})
+    hs["pain"] = max(0.0, min(100.0, hs.get("pain", 0.0) + amount))
+
+
+def _decay_pain(char):
+    hs = char.get("health_state")
+    if not hs or not hs.get("pain"):
+        return
+    hs["pain"] = max(0.0, hs["pain"] - PAIN_DECAY_PER_TICK)
 
 
 # ---------------------------------------------------------------------------
@@ -596,12 +672,122 @@ def assign_random_traits(char, defs,
 
 
 # ---------------------------------------------------------------------------
+# Unified severity
+# ---------------------------------------------------------------------------
+# c["health_state"] (this function's only input) is, per this round's
+# research, the one health-adjacent structure that's actually internally
+# consistent -- c["health"]/c["physical_health"]/c["body"] each track their
+# own independent, non-communicating state. Every existing severity number
+# in this codebase (0-10 active_emergencies, 0-1 bleeding_severity/force,
+# 0-100 fire incidents, open-ended grievance floats) lives on its own scale;
+# this is the first place they get reduced to one comparable number.
+
+_SEVERITY_TIERS = [
+    ("healthy",  0,  20),
+    ("mild",    20,  40),
+    ("moderate",40,  60),
+    ("severe",  60,  80),
+    ("critical",80, 101),
+]
+
+
+def compute_severity(char):
+    """
+    Returns (score, tier). score is 0-100, weighted toward the worst single
+    signal rather than purely additive -- one severe emergency should
+    dominate five mild ones, not average them away.
+    """
+    if not char.get("alive", True):
+        return 100.0, "dead"
+
+    hs = char.get("health_state", {})
+    signals = []
+
+    for em in hs.get("active_emergencies", {}).values():
+        signals.append(min(100.0, em.get("severity", 0) * 10))
+
+    for inj in hs.get("injuries", []):
+        if inj.get("type") == "blade":
+            signals.append(min(100.0, inj.get("bleeding_severity", 0) * 100))
+        elif inj.get("type") == "blunt":
+            signals.append(min(100.0, inj.get("force", 0) * 100))
+
+    blood_lost = hs.get("total_blood_lost", 0.0)
+    if blood_lost:
+        signals.append(min(100.0, blood_lost * 100))
+
+    pain = hs.get("pain", 0.0)
+    if pain:
+        signals.append(min(100.0, pain))
+
+    if not signals:
+        return 0.0, "healthy"
+
+    worst = max(signals)
+    avg = sum(signals) / len(signals)
+    score = min(100.0, worst * 0.7 + avg * 0.3)
+
+    for tier, lo, hi in _SEVERITY_TIERS:
+        if lo <= score < hi:
+            return score, tier
+    return score, "critical"
+
+
+# ---------------------------------------------------------------------------
+# Real consequences -- posture, movement (via posture), and the 911 bridge.
+# This is the actual payoff of the whole severity system: health.py already
+# had a fully-working emergency/injury/death engine with zero downstream
+# effect (posture.py's unconscious/dead stances had zero call sites; a dead
+# character kept thinking and walking normally). This function is where
+# that finally changes.
+# ---------------------------------------------------------------------------
+
+_MEDICAL_INCIDENT_TIERS = ("severe", "critical")
+
+
+def apply_severity_consequences(char, world):
+    from systems.posture import set_posture
+
+    if not char.get("alive", True):
+        set_posture(char, world, "dead")
+        return
+
+    score, tier = compute_severity(char)
+    em = char.get("health_state", {}).get("active_emergencies", {})
+
+    if "unconscious" in em or "coma" in em:
+        set_posture(char, world, "unconscious")
+    elif tier == "critical":
+        set_posture(char, world, "crawling")
+    elif tier == "severe":
+        set_posture(char, world, "limping")
+    elif char.get("posture") in ("limping", "crawling"):
+        # Severity has receded -- this posture was severity-driven, not a
+        # deliberate choice (sitting/lying for other reasons is untouched,
+        # since posture won't be "limping"/"crawling" in that case).
+        set_posture(char, world, "standing")
+
+    if tier in _MEDICAL_INCIDENT_TIERS:
+        if not char.get("_medical_incident_reported"):
+            char["_medical_incident_reported"] = True
+            try:
+                from systems.emergency import report_medical_emergency_incident
+                report_medical_emergency_incident(world, char)
+            except Exception:
+                pass
+    else:
+        char["_medical_incident_reported"] = False
+
+
+# ---------------------------------------------------------------------------
 # Main tick entry point
 # ---------------------------------------------------------------------------
 
 def process_health(char, world):
+    apply_severity_consequences(char, world)
     if not char.get("alive", True):
                 return
+    _decay_pain(char)
     tick = world.get("tick", 0)
 
     if tick % TICKS_PER_DAY == 0:

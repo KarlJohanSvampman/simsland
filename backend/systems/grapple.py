@@ -35,36 +35,60 @@ def _has(c, *traits):
     return any(t in c.get("traits", []) for t in traits)
 
 
-def start_grapple(holder, held, world):
+# Posture pair per mode -- "wrestle" (standing contest, see
+# hostile_actions.py's catch_and_hold) vs "pin" (static hold, see
+# hostile_actions.py's hold_down "hit" outcome). Each stance's idle_key
+# *is* the struggle animation -- no separate cosmetic layer needed,
+# matching every other posture in stance_templates.
+_MODE_POSTURES = {
+    "wrestle": {"held": "held",      "holder": "holding"},
+    "pin":     {"held": "held_down", "holder": "holding_down"},
+}
+_MODE_FIELDS = {
+    "wrestle": {"held": "grappled_by", "holder": "grappling"},
+    "pin":     {"held": "held_by",     "holder": "holding"},
+}
+
+
+def start_grapple(holder, held, world, mode="wrestle"):
     """Create the persistent grapple entry once the initial grab (see
-    action_router.py::_route_wrestle, which resolves the grab itself via
-    hostile_actions.resolve_hostile_action(..., "catch_and_hold", ...))
-    lands."""
+    action_router.py::_route_wrestle for mode="wrestle", or
+    hostile_actions.py::resolve_hostile_action's hold_down hit branch for
+    mode="pin") lands."""
     grapple = {
         "id":              f"grapple_{uuid.uuid4().hex[:8]}",
         "holder_id":       holder["id"],
         "held_id":         held["id"],
+        "mode":            mode,
         "round":           1,
         "tick_started":    world.get("tick", 0),
         "tick_last_round": world.get("tick", 0),
         "outcome":         None,
     }
     world.setdefault("grapples", {})[grapple["id"]] = grapple
-    held["grappled_by"] = holder["id"]
-    holder["grappling"] = held["id"]
+
+    fields = _MODE_FIELDS[mode]
+    held[fields["held"]] = holder["id"]
+    holder[fields["holder"]] = held["id"]
+
+    from systems.posture import set_posture
+    postures = _MODE_POSTURES[mode]
+    set_posture(held, world, postures["held"])
+    set_posture(holder, world, postures["holder"])
+
     emit("grapple_started", {
-        "grapple_id": grapple["id"],
-        "holder_id":  holder["id"],
-        "held_id":    held["id"],
+        "grapple_id": grapple["id"], "mode": mode,
+        "holder_id":  holder["id"],  "held_id": held["id"],
     })
     return grapple
 
 
-def _escape_chance(held, holder, world):
+def _escape_chance(held, holder, world, mode="wrestle"):
     """Same trait/emotion/dice shape as conflict_pipeline.py's
     _escalation_chance/_de_escalation_chance -- base + trait deltas +
-    a stamina term + a small random term."""
-    base = 0.25
+    a stamina term + a small random term. A static pin (mode="pin") is
+    harder to break than shrugging off a wrestling hold."""
+    base = 0.25 if mode == "wrestle" else 0.15
     if _has(held, "agile", "athletic", "strong"):
         base += 0.15
     if _has(held, "clumsy", "heavy_build", "weak"):
@@ -92,10 +116,17 @@ def _clear_grapple_flags(grapple, world):
     chars = world.get("characters", {})
     held = chars.get(grapple["held_id"])
     holder = chars.get(grapple["holder_id"])
+    fields = _MODE_FIELDS[grapple.get("mode", "wrestle")]
     if held:
-        held.pop("grappled_by", None)
+        held.pop(fields["held"], None)
     if holder:
-        holder.pop("grappling", None)
+        holder.pop(fields["holder"], None)
+
+    from systems.posture import set_posture
+    if held and held.get("posture") in ("held", "held_down"):
+        set_posture(held, world, "standing")
+    if holder and holder.get("posture") in ("holding", "holding_down"):
+        set_posture(holder, world, "standing")
 
 
 def _resolve(grapple, outcome, world):
@@ -169,7 +200,7 @@ def process_grapples(world):
             held.pop("defense_stance", None)
             continue
 
-        escaped = random.random() < _escape_chance(held, holder, world)
+        escaped = random.random() < _escape_chance(held, holder, world, grapple.get("mode", "wrestle"))
         # Struggling on purpose is a one-round-at-a-time choice -- consume
         # the stance so the bonus doesn't silently persist across rounds
         # without the LLM choosing to keep fighting.

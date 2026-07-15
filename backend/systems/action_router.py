@@ -148,9 +148,32 @@ def clear_expired_speech(c, world):
 # ROUTE MOVE
 # =========================================================
 
-def _route_move(c, world, action):
+def _movement_blocked(c):
+    """
+    True if this character is physically unable to move right now.
+    Centralizes every reason movement should no-op — see
+    systems/grapple.py (wrestle/hold restraint), systems/health.py's
+    severity-driven postures (apply_severity_consequences), and
+    death/unconsciousness — so _route_move/_route_turn_and_run and
+    context_builder.py::build_available_actions() never disagree about
+    what's live.
+    """
+    if not c.get("alive", True):
+        return True
+    if c.get("posture") in ("unconscious", "dead"):
+        return True
     if c.get("grappled_by") or c.get("grappling"):
-        return  # physically restrained — see systems/grapple.py
+        return True
+    if c.get("held_by") or c.get("holding"):
+        return True
+    if c.get("activity"):
+        return True
+    return False
+
+
+def _route_move(c, world, action):
+    if _movement_blocked(c):
+        return
 
     # Moving always clears a leaning posture
     if c.get("posture") == "leaning_wall":
@@ -863,6 +886,8 @@ def route_action(c, world, action, speech, definitions=None):
         _route_block(c, world, action)
     elif action_type == "turn_and_run":
         _route_turn_and_run(c, world, action)
+    elif action_type == "back_away":
+        _route_back_away(c, world, action)
     elif action_type == "wrestle":
         _route_wrestle(c, world, action)
     elif action_type == "release_hold":
@@ -1148,6 +1173,7 @@ _INCIDENT_CALL_TYPE = {
     "crime":                ("police",  "A crime is in progress."),
     "injury":               ("medical", "Someone is injured and needs help."),
     "fire":                 ("fire",    "There's a fire!"),
+    "medical_emergency":    ("medical", "Someone needs urgent medical help."),
 }
 
 
@@ -1244,8 +1270,8 @@ def _route_turn_and_run(c, world, action):
     movement today): just relocate, flag the panic state for narrative
     flavor, nothing scripted beyond that.
     """
-    if c.get("grappled_by") or c.get("grappling"):
-        return  # physically restrained — see systems/grapple.py
+    if _movement_blocked(c):
+        return
 
     aggressor_id = action.get("target_id") or action.get("target")
     aggressor = world.get("characters", {}).get(aggressor_id) if aggressor_id else None
@@ -1264,6 +1290,36 @@ def _route_turn_and_run(c, world, action):
     c["_panic_fleeing"] = {"from_id": aggressor_id, "tick": world.get("tick", 0)}
     if plan_character_route(world, c, flee_x, flee_y):
         c["animation_state"] = "run"
+        c["is_moving"] = True
+
+
+def _route_back_away(c, world, action):
+    """
+    action: {"type": "back_away", "target_id": other_id}
+    A controlled retreat, not panic flight — same short straight-line
+    relocation as turn_and_run (systems/navigation.py::plan_character_route,
+    no pathfinding sophistication), but keeps facing the target and uses
+    the new "walk_backward" locomotion instead of "run" — no panic flag.
+    """
+    if _movement_blocked(c):
+        return
+
+    target_id = action.get("target_id") or action.get("target")
+    target = world.get("characters", {}).get(target_id) if target_id else None
+
+    cx, cy = c.get("x", 0), c.get("y", 0)
+    if target:
+        dx, dy = cx - target.get("x", cx), cy - target.get("y", cy)
+        dist = (dx ** 2 + dy ** 2) ** 0.5 or 1
+        back_x = cx + (dx / dist) * 5
+        back_y = cy + (dy / dist) * 5
+    else:
+        import random
+        back_x = cx + random.uniform(-5, 5)
+        back_y = cy + random.uniform(-5, 5)
+
+    if plan_character_route(world, c, back_x, back_y):
+        c["animation_state"] = "walk_backward"
         c["is_moving"] = True
 
 

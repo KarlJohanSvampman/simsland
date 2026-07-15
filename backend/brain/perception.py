@@ -289,9 +289,24 @@ def perceived_activity(other):
     Checks the interaction field first (new system), then the activity
     type (legacy), so both paths produce meaningful descriptions."""
 
-    # Posture overlay — leaning has no activity dict
-    if other.get("posture") == "leaning_wall":
-        return "leaning against the wall"
+    # Posture overlay — these postures are inherently visible and take
+    # priority over whatever's in the activity dict (see
+    # systems/health.py::apply_severity_consequences and
+    # systems/grapple.py for how characters end up in them).
+    posture_labels = {
+        "leaning_wall":  "leaning against the wall",
+        "limping":       "limping, visibly hurt",
+        "crawling":      "crawling on the ground, badly hurt",
+        "unconscious":   "lying unconscious",
+        "dead":          "lying motionless — not breathing",
+        "held":          "being physically restrained",
+        "holding":       "physically restraining someone",
+        "held_down":     "pinned to the ground",
+        "holding_down":  "pinning someone to the ground",
+    }
+    posture_label = posture_labels.get(other.get("posture"))
+    if posture_label:
+        return posture_label
 
     activity = other.get("activity") or {}
     if not activity:

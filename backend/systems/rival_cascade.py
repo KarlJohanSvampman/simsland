@@ -256,8 +256,9 @@ def _apply_fight_loss(loser, winner, world):
 
     # Minor injury (random chance)
     if random.random() < 0.45:
+        from systems.health import add_pain
         health = loser.setdefault("health", {})
-        health["pain"] = min(1.0, health.get("pain", 0.0) + 0.25)
+        add_pain(loser, 25)
         conditions = health.setdefault("conditions", [])
         if "bruised" not in conditions:
             conditions.append("bruised")

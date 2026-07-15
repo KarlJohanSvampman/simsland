@@ -39,6 +39,12 @@ REACTION_ANIMATIONS = {
     "dodge":        ["react_dodge"],
     "block":        ["react_block"],
 
+    # ── Symptoms (systems/health.py::tick_symptom_reactions) ──
+    "cough":        ["react_cough"],
+    "sweating":     ["react_sweating", "react_wipe_brow"],
+    "breathless":   ["react_breathless"],
+    "dizzy":        ["react_dizzy", "react_stumble"],
+
     # ── Nudity / sexual ──
     "saw_nudity":          ["react_shocked",      "react_gasp",       "react_look_away"],
     "walked_in_on_sex":    ["react_shocked",      "react_gasp",       "react_back_away"],
@@ -86,6 +92,11 @@ REACTION_PRIORITIES = {
 
     "dodge":       3,
     "block":       3,
+
+    "cough":       1,
+    "sweating":    1,
+    "breathless":  2,
+    "dizzy":       2,
 
     "saw_nudity":       3,
     "walked_in_on_sex": 3,

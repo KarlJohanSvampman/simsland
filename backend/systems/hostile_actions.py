@@ -301,6 +301,20 @@ def resolve_hostile_action(actor, target, action_id, world):
             except Exception:
                 pass
 
+        # hold_down landing a hit used to be purely cosmetic (twin
+        # animation write, then nothing persisted -- its authored
+        # "applies_state": "pinned" field was read by zero code). Now it
+        # starts a real, persistent restraint via the same engine
+        # wrestle uses (systems/grapple.py), just mode="pin" -- a static
+        # hold rather than a stamina-contest wrestle, with its own
+        # held_down/holding_down postures and a lower base escape chance.
+        if template_id == "hold_down" and not target.get("held_by") and not actor.get("holding"):
+            try:
+                from systems.grapple import start_grapple
+                start_grapple(actor, target, world, mode="pin")
+            except Exception:
+                pass
+
         try:
             from systems.reactions import push_reaction
             push_reaction(target, "startled", tick, priority=2)
