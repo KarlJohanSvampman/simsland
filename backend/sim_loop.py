@@ -56,6 +56,7 @@ from systems.household_monitoring   import update_household_monitoring
 # -- Slow (÷30-60) — still periodic ─────────────────────────────
 from systems.traffic    import update_ambient_traffic
 from systems.media      import generate_news
+from brain.conversations import cleanup_conversations
 from systems.emergency  import trigger_incident, resolve   # resolve polls arrival ticks
 from systems.law        import process_jail, process_trials, maybe_arrest_from_incidents
 from systems.jobs       import generate_job_listings, tick_job_market, maybe_fire, process_interview, init_company_slots
@@ -327,6 +328,12 @@ def tick(world):
     if every(world, CADENCE["news"], offset=17):
         generate_news(world)
         maybe_generate_shared_event(world)
+
+    # Conversations threaded via action_router.py's apply_speech() aren't
+    # tied to a scripted activity with its own end condition anymore, so
+    # this is what retires them after a period of silence.
+    if every(world, CADENCE["conversation_cleanup"], offset=19):
+        cleanup_conversations(world)
 
     if every(world, CADENCE["job_market"], offset=20):
         for c in characters:

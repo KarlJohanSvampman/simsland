@@ -276,6 +276,17 @@ def resolve_social_strategy(
     # =====================================================
     # SAME BUILDING
     # =====================================================
+    # "conversation" used to be an option here, but the activity it starts
+    # (activities.py's generic start_activity()) never sets
+    # activity["conversation_id"], so update_conversation_activity() always
+    # dead-ended while still blocking the character from think() for the
+    # activity's full duration — a frozen character, not a conversation.
+    # None falls through cleanly to the character's normal per-tick
+    # decision (agent_loop.py: "if not activity_type: continue"), which now
+    # threads real speech into conversations via apply_speech() instead.
+    # "hangout" is unrelated to that broken path (execute_activity() only
+    # special-cases the literal string "conversation") and stays as a
+    # genuine, working leisure activity.
 
     if (
 
@@ -286,9 +297,9 @@ def resolve_social_strategy(
 
         return random.choice([
 
-            "conversation",
+            "hangout",
 
-            "hangout"
+            None
         ])
 
     # =====================================================

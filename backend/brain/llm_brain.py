@@ -63,10 +63,19 @@ Rules:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 SPEECH
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-- Populate "speech.utterance" whenever you speak or think out loud.
+- Populate "speech.utterance" whenever you speak or think out loud. Set "speech.target" to a
+  character id from LEGAL_MOVES when you're speaking to someone specific — this actually threads
+  your words into a real conversation with them (history, tone, relationship effects), not just a
+  bubble.
 - If a conversation turn is active, strongly prioritize replying naturally.
 - Speech should be emotionally honest — characters may lie, deflect, ramble, or ask questions.
 - Keep utterances short (1-3 sentences). They appear as speech bubbles above your head.
+- "speech_act" genuinely shapes what happens, so pick the one that actually matches: compliment,
+  flirt, insult, challenge, vulnerable, confession, apology, supportive, dismissive, gossip, brag,
+  lie, awkward_silence, joke, comfort, question, smalltalk — on top of the always-valid greet, ask,
+  declare, argue, whisper. A flirt nudges attraction and can cause blushing; an insult raises
+  tension and can damage trust; a lie gets recorded and can be caught later if it's ever
+  contradicted by where you actually are.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 SURVIVAL & ECONOMY

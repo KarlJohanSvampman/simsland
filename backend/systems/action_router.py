@@ -5,6 +5,7 @@
 # =========================================================
 
 import time
+import random
 
 from systems.activities import get_phase_animation, get_clean_animation
 from systems.navigation import plan_character_route
@@ -59,12 +60,15 @@ def apply_speech(c, world, speech):
         return
 
     tick = world.get("tick", 0)
+    speech_act = speech.get("speech_act", "speak")
+    topic = speech.get("topic", "")
+    target_id = speech.get("target")
 
     c["current_speech"] = {
         "utterance":      utterance,
-        "speech_act":     speech.get("speech_act", "speak"),
-        "topic":          speech.get("topic", ""),
-        "target":         speech.get("target"),
+        "speech_act":     speech_act,
+        "topic":          topic,
+        "target":         target_id,
         "expires_at_tick": tick + SPEECH_BUBBLE_TICKS,
     }
 
@@ -73,9 +77,51 @@ def apply_speech(c, world, speech):
     c["speech_log"].append({
         "tick":      tick,
         "utterance": utterance,
-        "target":    speech.get("target"),
+        "target":    target_id,
     })
     c["speech_log"] = c["speech_log"][-20:]   # keep last 20
+
+    # =====================================================
+    # THREAD INTO A REAL CONVERSATION
+    # apply_speech() used to be a dead end — no conversations entry ever
+    # got created here, so build_active_conversations()'s "it's your turn
+    # to respond" context and conversations.py's whole tone/dynamics/
+    # memory/observation machinery (add_message()) never fired for
+    # LLM-driven speech, only for the (separately broken) templated
+    # activity path. See the LLM-conversations plan for the full trace.
+    # =====================================================
+    listener = world.get("characters", {}).get(target_id) if target_id else None
+
+    if listener:
+
+        from brain.conversations import get_or_create_conversation, add_message
+        from systems.reactions import push_conversation_reaction
+        from brain.relationships import apply_interaction
+        from systems.conversation_analysis import analyze_message, should_schedule_reflection
+
+        conv = get_or_create_conversation(
+            world, c["id"], target_id, topic=topic or "general"
+        )
+
+        add_message(
+            world, conv, c["id"], utterance, speech_act,
+            topic or conv.get("topic", "general"), tick
+        )
+
+        push_conversation_reaction(listener, speech_act, tick)
+
+        apply_interaction(c, listener, speech_act)
+
+        result = analyze_message(world, conv, c, listener, utterance, speech_act)
+
+        if should_schedule_reflection(result):
+            listener.setdefault("pending_reflections", []).append({
+                "type":           "conversation",
+                "target_id":      c["id"],
+                "reason":         speech_act,
+                "scheduled_tick": tick + random.randint(50, 300),
+                "observations":   result.get("observations", []),
+            })
 
 
 # =========================================================
