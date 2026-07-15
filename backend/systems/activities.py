@@ -30,10 +30,6 @@ from systems.interactions import (
     begin_interaction
 )
 
-from systems.conversation_runtime import (
-    update_conversation_activity
-)
-
 # =========================================================
 # INTERACTION ANIMATIONS
 # Maps interaction name → animations per activity phase.
@@ -763,17 +759,6 @@ ACTIVITIES = {
     # SOCIAL
     # =====================================================
 
-    "conversation": {
-
-        "interaction": "socialize",
-
-        "base_duration_minutes": 20,
-
-        "interruptible": True,
-
-        "category": "social"
-    },
-
     "hangout": {
 
         "interaction": "socialize",
@@ -1249,21 +1234,6 @@ def execute_activity(
     activity_type = act.get(
         "type"
     )
-
-    # =====================================================
-    # CONVERSATION
-    # =====================================================
-
-    if activity_type == "conversation":
-
-        return update_conversation_activity(
-
-            c,
-
-            world,
-
-            act
-        )
 
     # Resolve the interaction name for animation lookups
     # (LLM-dispatched activities store it as act["interaction"];

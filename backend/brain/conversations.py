@@ -392,8 +392,8 @@ def add_message(
         speech_act
     )
 
-    # NOTE: reflection scheduling is handled by conversation_runtime.py
-    # after each turn so it is not duplicated here.
+    # NOTE: reflection scheduling is handled by action_router.py's
+    # apply_speech() after each turn so it is not duplicated here.
 
 
 # =========================================================

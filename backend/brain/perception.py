@@ -1025,118 +1025,6 @@ def perceive_social_scenes(
     return scenes
 
 
-# =========================================================
-# SOCIAL RELATIONSHIP PERCEPTION
-# =========================================================
-
-def perceive_social_relationships(
-
-    c,
-
-    world,
-
-    visible_people
-):
-
-    results = []
-
-    social = c.get(
-        "social",
-        {}
-    )
-
-    for p in visible_people:
-
-        pid = p["id"]
-
-        rel = social.get(
-            pid,
-            {}
-        )
-
-        tension = rel.get(
-            "tension",
-            0
-        )
-
-        closeness = rel.get(
-            "closeness",
-            0
-        )
-
-        trust = rel.get(
-            "trust",
-            0.5
-        )
-
-        attraction = rel.get(
-            "attraction",
-            0
-        )
-
-        interpretation = []
-
-        # =====================================
-        # TENSION
-        # =====================================
-
-        if tension > 0.7:
-
-            interpretation.append(
-                "relationship feels strained"
-            )
-
-        elif tension > 0.4:
-
-            interpretation.append(
-                "some tension exists"
-            )
-
-        # =====================================
-        # CLOSENESS
-        # =====================================
-
-        if closeness > 0.7:
-
-            interpretation.append(
-                "you feel emotionally close"
-            )
-
-        # =====================================
-        # TRUST
-        # =====================================
-
-        if trust < 0.3:
-
-            interpretation.append(
-                "you feel wary around them"
-            )
-
-        # =====================================
-        # ATTRACTION
-        # =====================================
-
-        if attraction > 0.7:
-
-            interpretation.append(
-                "you feel drawn to them"
-            )
-
-        if interpretation:
-
-            results.append({
-
-                "target":
-                    p["name"],
-
-                "interpretation":
-                    interpretation
-            })
-
-    return results
-
-
-
 def select_focus(
     perception
 ):
@@ -1260,16 +1148,6 @@ def perceive(
 
         "visible_people":
             visible_people,
-
-        "social_relations":
-            perceive_social_relationships(
-
-                c,
-
-                world,
-
-                perception_people
-            ),
 
         "social_scenes":
             perceive_social_scenes(

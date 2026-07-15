@@ -460,10 +460,6 @@ def update_agent(
         process_reflections
     )
 
-    from systems.social_execution import (
-        execute_social_intention
-    )
-
     # =====================================
     # OFFGRID
     # =====================================
