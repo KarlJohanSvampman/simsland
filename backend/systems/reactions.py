@@ -35,6 +35,10 @@ REACTION_ANIMATIONS = {
     # ── Environmental ──
     "look_around":        ["react_look_around"],
 
+    # ── Hostile actions (systems/hostile_actions.py) ──
+    "dodge":        ["react_dodge"],
+    "block":        ["react_block"],
+
     # ── Nudity / sexual ──
     "saw_nudity":          ["react_shocked",      "react_gasp",       "react_look_away"],
     "walked_in_on_sex":    ["react_shocked",      "react_gasp",       "react_back_away"],
@@ -79,6 +83,9 @@ REACTION_PRIORITIES = {
     "interested":  1,
     "shrug":       1,
     "look_around": 1,
+
+    "dodge":       3,
+    "block":       3,
 
     "saw_nudity":       3,
     "walked_in_on_sex": 3,
@@ -184,8 +191,11 @@ def process_reaction_queue(c, tick):
     if not queue:
         return
 
-    # Sort descending by priority, take the best
-    queue.sort(key=lambda r: r["priority"], reverse=True)
+    # Sort descending by priority, take the best. .get() with a default --
+    # intimacy.py::handle_ignored_rejection pushes an "expel_visitor" entry
+    # onto this same queue with no "priority" key, which would otherwise
+    # raise KeyError the moment it's present when this runs.
+    queue.sort(key=lambda r: r.get("priority", 1), reverse=True)
     reaction = queue.pop(0)
     c["reaction_queue"] = queue
 

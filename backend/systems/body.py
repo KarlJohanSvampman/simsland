@@ -72,6 +72,15 @@ def body_hygiene_norm(c):
     return c.get("body", {}).get("hygiene", 100) / 100
 
 
+def drain_stamina(c, amount):
+    """c["stamina"] (health.py, 0.0-1.0) previously only ever decreased,
+    and only via injury-template stamina_penalty -- nothing drained it
+    from exertion. This is the generic exertion-cost entry point (hostile
+    actions this round; a future wrestle/overtake round reuses this same
+    call for its repeated-hold drain)."""
+    c["stamina"] = max(0.0, c.get("stamina", 1.0) - amount)
+
+
 # ── main tick ─────────────────────────────────────────────────────────────────
 
 def update_body_needs(c, dt=1.0):
@@ -145,6 +154,10 @@ def update_body_needs(c, dt=1.0):
         b["stomach_discomfort"] = min(100, b["stomach_discomfort"] + 0.5 * dt)
     else:
         b["stomach_discomfort"] = max(0, b["stomach_discomfort"] - 0.1 * dt)
+
+    # ── STAMINA REGEN  (passive recovery -- the only other stamina path,
+    # health.py's injury stamina_penalty, is one-directional drain) ──────────
+    c["stamina"] = min(1.0, c.get("stamina", 1.0) + 0.01 * dt)
 
     # ── APPLY SLEEP DEBT EFFECTS ─────────────────────────────────────────────
     _apply_sleep_debt_effects(c)

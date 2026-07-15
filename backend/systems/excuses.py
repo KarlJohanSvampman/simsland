@@ -466,6 +466,46 @@ def check_visible_lies_for_observer(observer, world):
             check_lie_consistency(liar, observer, world)
 
 
+# ── Witnessed hostility ──────────────────────────────────────────────────
+
+_WITNESSED_OFFENSE_WINDOW_TICKS = 15
+
+
+def check_witnessed_hostility_for_observer(observer, world):
+    """
+    Same shape as check_visible_lies_for_observer() directly above —
+    scans the observer's own perception.visible_people (real, in-perception
+    evidence, not omniscient world state) for anyone who just committed a
+    hostile action (systems/hostile_actions.py tags
+    actor["recent_hostile_acts"] on every punch/kick/shove/grab/hold/
+    threaten). Tags the observer's own witnessed_offenses (mirrors
+    nudity_perception.py's nudity_witnessed cooldown-dict pattern) so the
+    same act doesn't re-tag every tick. Does not create an incident itself
+    — resolve_hostile_action() already creates one on every hit/fumble,
+    reachable by proximity via context_builder.py::_build_incident_context;
+    this function's job is purely the observer's own awareness/narrative
+    (fuels build_narrative()'s witnessed-offense line and lets the
+    observer's "confront" double as intervening).
+    """
+    chars = world.get("characters", {})
+    tick = world.get("tick", 0)
+    witnessed = observer.setdefault("witnessed_offenses", {})
+
+    for p in observer.get("perception", {}).get("visible_people", []):
+        offender = chars.get(p["id"])
+        if not offender or offender["id"] == observer["id"]:
+            continue
+
+        for act in offender.get("recent_hostile_acts", []):
+            if tick - act.get("tick", -9999) > _WITNESSED_OFFENSE_WINDOW_TICKS:
+                continue
+            last_tagged = witnessed.get(offender["id"], -9999)
+            if tick - last_tagged <= _WITNESSED_OFFENSE_WINDOW_TICKS:
+                continue  # already tagged this same window, don't re-fire
+            witnessed[offender["id"]] = tick
+            break
+
+
 def check_lie_consistency(c, authority, world):
     """
     Called when authority hears a conflicting account (gossip, observation).

@@ -24,7 +24,7 @@ def maybe_arrest_from_incidents(world):
         if inc.get("arrest_checked"):
             continue
         inc["arrest_checked"] = True
-        if inc["type"] in ("domestic_disturbance", "crime"):
+        if inc["type"] in ("domestic_disturbance", "crime", "assault"):
             if random.random() < world["environment"].get("crime_solve_rate", .5):
                 for cid in inc.get("participants", [])[:1]:
                     c = world["characters"].get(cid)

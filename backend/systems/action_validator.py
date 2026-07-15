@@ -104,7 +104,49 @@ VALID_ACTIONS = {
 
     "high_five",
 
-    "respond_touch"
+    "respond_touch",
+
+    # Hostile intentions / emergency pipeline (see systems/conflict_pipeline.py
+    # and systems/emergency.py) — confront wires directly into the existing
+    # trait/dice-driven conflict state machine, previously only reachable via
+    # the automatic confrontation_desired event; call_911 wires into the
+    # existing (already event-wired) 911/dispatch/resolve chain, previously
+    # only reachable via rare automatic dice rolls.
+    "confront",
+
+    "call_911",
+
+    # Hostile actions (see systems/hostile_actions.py) — reads the
+    # already-authored (previously never-consumed) interaction_templates
+    # entries: punch/kick/shove resolve directly, grab_offensive/hold map
+    # onto catch_and_hold/hold_down. dodge/block/turn_and_run are the
+    # target's own defensive/flight response actions.
+    "grab_offensive",
+
+    "hold",
+
+    "punch",
+
+    "kick",
+
+    "shove",
+
+    "threaten",
+
+    "dodge",
+
+    "block",
+
+    "turn_and_run",
+
+    # Recovery from a hostile-action knockdown (see systems/posture.py) —
+    # _route_stand_up already existed and was fully wired but, like the
+    # rest of the posture-action family, was never in VALID_ACTIONS —
+    # unreachable until now, same class of gap found repeatedly this
+    # session. Only registering the one needed for knockdown recovery;
+    # sit_down/lie_down/lean_against_wall have the identical gap but are
+    # out of scope here.
+    "stand_up"
 }
 
 
@@ -210,6 +252,14 @@ def validate_target(
 
     if target in world.get("placed_items", {}):
         return True
+
+    # =====================================
+    # INCIDENT TARGET (call_911)
+    # =====================================
+
+    for inc in world.get("incidents", []):
+        if inc["id"] == target:
+            return True
 
     return False
 

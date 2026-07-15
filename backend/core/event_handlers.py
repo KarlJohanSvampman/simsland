@@ -147,12 +147,14 @@ subscribe("contract_violated", _on_contract_violated)
 
 
 def _on_fight_physical(data, world):
-    """Physical altercation — trigger the emergency/law pipeline."""
-    from systems.emergency import trigger_incident
+    """Physical altercation — reliably create a real incident (not the
+    dice-roll trigger_incident(), which almost never fires for the exact
+    fight that just happened)."""
+    from systems.emergency import report_assault_incident
     for pid in data.get("parties", []):
         c = world.get("characters", {}).get(pid)
         if c:
-            trigger_incident(world, c)
+            report_assault_incident(world, c)
             break  # one incident per fight is enough
 
 subscribe("fight_physical", _on_fight_physical)

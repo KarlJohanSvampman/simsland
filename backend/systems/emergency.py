@@ -3,20 +3,56 @@ from brain.memory import store_memory
 from core.event_bus import emit
 
 
-def create_911_call(world, caller, emergency_type, report):
+def create_911_call(world, caller, emergency_type, report, incident_id=None):
     call = {
-        "id":       f"call_{uuid.uuid4().hex[:6]}",
-        "type":     emergency_type,
-        "caller":   caller["id"],
-        "location": {"x": caller["x"], "y": caller["y"]},
-        "report":   report,
-        "status":   "pending",
-        "tick":     world["tick"],
+        "id":          f"call_{uuid.uuid4().hex[:6]}",
+        "type":        emergency_type,
+        "caller":      caller["id"],
+        "location":    {"x": caller["x"], "y": caller["y"]},
+        "report":      report,
+        "status":      "pending",
+        "tick":        world["tick"],
+        "incident_id": incident_id,
     }
     world.setdefault("calls", []).append(call)
     store_memory(caller, f"Called 911: {report}", .8, ["911", emergency_type], "emergency", world["tick"])
     emit("emergency_call_created", {"call_id": call["id"], "type": emergency_type})
     return call
+
+
+def report_assault_incident(world, offender, victim=None):
+    """
+    Create a real, deterministic incident for a physical altercation
+    (see core/event_handlers.py::_on_fight_physical, and
+    systems/hostile_actions.py::resolve_hostile_action for the individual
+    punch/kick/shove/... case). Unlike trigger_incident()'s dice-roll
+    incidents (domestic_disturbance/injury, gated on unrelated conditions
+    like emotional_temperature), this always fires — a physical fight is
+    not a "maybe."
+
+    victim is optional (the conflict_pipeline call site only has one
+    character handy) — when known, both offender and victim are recorded
+    as participants so either one (or a bystander, via the existing
+    Manhattan-4 proximity check in context_builder.py::
+    _build_incident_context) can reach this incident with call_911.
+    offender_id is recorded explicitly (distinct from participants) so
+    later code can tell who to blame without guessing from list order.
+    """
+    participants = [offender["id"]]
+    if victim and victim["id"] not in participants:
+        participants.append(victim["id"])
+    inc = {
+        "id":           f"inc_{uuid.uuid4().hex[:6]}",
+        "type":         "assault",
+        "offender_id":  offender["id"],
+        "participants": participants,
+        "location":     {"x": offender["x"], "y": offender["y"]},
+        "reported":     False,
+        "tick":         world["tick"],
+    }
+    world.setdefault("incidents", []).append(inc)
+    emit("incident_created", {"incident_id": inc["id"], "type": inc["type"]})
+    return inc
 
 
 def trigger_incident(world, c):
@@ -60,6 +96,43 @@ def trigger_incident(world, c):
                 "tick":         world["tick"],
             })
 
+        # Fire — only rolled against buildings that currently have someone
+        # in them, so it's actually perceivable when it starts. Severity
+        # then climbs via tick_fire_incidents() until a "fire" responder
+        # extinguishes it (see resolve() below).
+        if random.random() < .0004:
+            chars = world.get("characters", {})
+            occupied = {}
+            for ch in chars.values():
+                bid = ch.get("building_id")
+                if bid:
+                    occupied.setdefault(bid, []).append(ch)
+            if occupied:
+                building_id = random.choice(list(occupied.keys()))
+                present = occupied[building_id]
+                building = next(
+                    (b for b in world.get("buildings", []) if b["id"] == building_id),
+                    None,
+                )
+                anchor = present[0]
+                inc = {
+                    "id":           f"inc_{uuid.uuid4().hex[:6]}",
+                    "type":         "fire",
+                    "participants": [p["id"] for p in present],
+                    "building_id":  building_id,
+                    "room_id":      anchor.get("room_id"),
+                    "location":     {
+                        "x": building["x"] if building else anchor["x"],
+                        "y": building["y"] if building else anchor["y"],
+                    },
+                    "severity":     15,
+                    "extinguished": False,
+                    "reported":     False,
+                    "tick":         world["tick"],
+                }
+                world.setdefault("incidents", []).append(inc)
+                emit("incident_created", {"incident_id": inc["id"], "type": inc["type"]})
+
 
 def auto_report_incidents(world):
     for inc in world.get("incidents", []):
@@ -86,6 +159,7 @@ def dispatch(world):
                 "id":           f"resp_{uuid.uuid4().hex[:6]}",
                 "type":         call["type"],
                 "call_id":      call["id"],
+                "incident_id":  call.get("incident_id"),
                 "location":     call["location"],
                 "status":       "en_route",
                 "arrival_tick": world["tick"] + 8,
@@ -108,4 +182,53 @@ def resolve(world):
                 for c in world["characters"].values():
                     if abs(c["x"] - loc["x"]) + abs(c["y"] - loc["y"]) < 4:
                         c["health"]["treatment"] = "first_response"
+            elif r["type"] == "fire":
+                inc = next(
+                    (i for i in world.get("incidents", [])
+                     if i["id"] == r.get("incident_id")),
+                    None,
+                )
+                if inc:
+                    inc["severity"] = 0
+                    inc["extinguished"] = True
+                    building_id = inc.get("building_id")
+                    for c in world["characters"].values():
+                        if building_id and c.get("building_id") != building_id:
+                            continue
+                        conditions = c.get("health", {}).get("conditions", [])
+                        c["health"]["conditions"] = [
+                            cond for cond in conditions
+                            if cond.get("id") not in ("smoke_inhalation", "burn")
+                        ]
             emit("incident_resolved", {"responder_id": r["id"], "type": r["type"]})
+
+
+def tick_fire_incidents(world):
+    """Advance active fire incidents: severity climbs each tick until a
+    'fire' responder extinguishes it (see resolve() above); harm applies to
+    anyone still in the building at higher severity thresholds."""
+    chars = world.get("characters", {})
+    for inc in world.get("incidents", []):
+        if inc.get("type") != "fire" or inc.get("extinguished"):
+            continue
+        inc["severity"] = min(100, inc.get("severity", 0) + 3)
+        building_id = inc.get("building_id")
+        if not building_id:
+            continue
+        present = [c for c in chars.values() if c.get("building_id") == building_id]
+        for c in present:
+            conditions = c["health"].setdefault("conditions", [])
+            if inc["severity"] >= 40 and not any(
+                cond.get("id") == "smoke_inhalation" for cond in conditions
+            ):
+                conditions.append({
+                    "id": "smoke_inhalation", "symptoms": ["coughing", "dizziness"],
+                    "curable": True, "treated": False,
+                })
+            if inc["severity"] >= 70 and not any(
+                cond.get("id") == "burn" for cond in conditions
+            ):
+                conditions.append({
+                    "id": "burn", "symptoms": ["pain", "fatigue"],
+                    "curable": True, "treated": False,
+                })

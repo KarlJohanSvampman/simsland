@@ -62,6 +62,7 @@ CADENCE = {
     "evictions":           120,
     "arrests":              30,
     "trials":               60,
+    "fires":                10,
 
     # Conflict / social drama
     "grievances":           15,

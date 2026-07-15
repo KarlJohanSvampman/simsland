@@ -513,6 +513,45 @@ def build_available_actions(c, world):
     ):
         action_types.append("respond_touch")
 
+    # Hostile intentions / emergency (see systems/conflict_pipeline.py,
+    # systems/emergency.py) — confront listed whenever someone's nearby and
+    # this character isn't already a party to an active conflict (avoids
+    # offering an action that start_conflict()'s own double-conflict guard
+    # would just silently no-op). call_911 only appears once there's a
+    # real, unreported incident this character is aware of — see
+    # _build_incident_context(), the same detection this mirrors in
+    # build_narrative() so the two never disagree about what's live.
+    if nearby_people and not build_conflict_context(c, world):
+        action_types.append("confront")
+
+    active_incidents = [
+        inc for inc in _build_incident_context(c, world) if not inc["reported"]
+    ]
+    if active_incidents:
+        action_types.append("call_911")
+
+    # Hostile actions (see systems/hostile_actions.py) — the six offensive
+    # types listed whenever someone's nearby, same "route handler
+    # validates the rest" pattern as propose_touch/confront. dodge/block/
+    # turn_and_run only appear once this character is an active target —
+    # someone visible has a recent_hostile_acts entry aimed at them —
+    # mirroring the exact detection this mirrors in build_narrative() so
+    # the two never disagree about what's live.
+    if nearby_people:
+        action_types.extend([
+            "grab_offensive", "hold", "punch", "kick", "shove", "threaten",
+        ])
+    if _has_recent_aggressor(c, world):
+        action_types.extend(["dodge", "block", "turn_and_run"])
+
+    # Knockdown recovery — _route_stand_up (action_router.py) already
+    # existed but, like the rest of the posture-action family, was never
+    # reachable (missing from VALID_ACTIONS until this round). Only
+    # surfaced here for the fallen_front case this round's knockdown
+    # outcome produces.
+    if c.get("posture") == "fallen_front":
+        action_types.append("stand_up")
+
     # Wall actions — always contextually available
     action_types.extend(["build_wall", "remove_wall"])
 
@@ -571,6 +610,7 @@ def build_available_actions(c, world):
         "tile_boxes":            t_boxes,
         "paint_buckets":         paint_buckets,
         "nearby_walls":          nearby_walls,
+        "active_incidents":      active_incidents,
         "held_stack_names":      held_stack_names,
         "held_item":             (
             {"item_id": held_item["id"], "name": held_item.get("name")}
@@ -710,6 +750,55 @@ def build_narrative(c, world):
         if lines:
             paragraphs.append(" ".join(lines))
 
+    # ---- active incidents (fire, assault, ...) — see
+    # _build_incident_context() below. Only incidents this character is a
+    # participant in or physically close enough to have witnessed. ----
+    incidents = _build_incident_context(c, world)
+    if incidents:
+        lines = []
+        for inc in incidents:
+            if inc["type"] == "fire":
+                lines.append(
+                    f"There's a fire{' spreading' if inc['severity'] >= 40 else ''} here"
+                    f"{' — you could call 911.' if not inc['reported'] else ' — it has already been reported.'}"
+                )
+            else:
+                label = inc["type"].replace("_", " ")
+                lines.append(
+                    f"There's a {label} happening nearby"
+                    f"{' — you could call 911.' if not inc['reported'] else ' — it has already been reported.'}"
+                )
+            # Self-incrimination nudge — narrative only, the LLM stays
+            # free to call anyway (per the fluid-reactions design
+            # constraint). Only relevant while nobody's called it in yet.
+            if inc.get("offender_id") == c["id"] and not inc["reported"]:
+                lines.append("Calling attention to this could implicate you.")
+            # Flee-on-arrival nudge — same "nudge, not a forced behavior"
+            # rule; turn_and_run is a real action they can choose in
+            # response.
+            if inc.get("offender_id") == c["id"] and inc.get("responder_status") == "arrived":
+                lines.append("The police have arrived — you might want to get out of here.")
+        paragraphs.append(" ".join(lines))
+
+    # ---- active aggressor — see _has_recent_aggressor(). Explains why
+    # dodge/block/turn_and_run suddenly appeared, same "gate the action +
+    # explain it in prose" pattern as every other gated action this
+    # session (touch proposals, chore proposals, ...). ----
+    if _has_recent_aggressor(c, world):
+        paragraphs.append(
+            "Someone nearby just came at you — you could dodge, block, "
+            "or turn and run."
+        )
+
+    # ---- witnessed offenses — see
+    # systems/excuses.py::check_witnessed_hostility_for_observer(). Purely
+    # a "who did I just see do something hostile" cue; confront/call_911
+    # were already reachable via nearby_people/proximity (§ above), this
+    # just gives the LLM a name and a reason. ----
+    witnessed_line = _build_witnessed_offense_line(c, world)
+    if witnessed_line:
+        paragraphs.append(witnessed_line)
+
     # ---- attention/focus — restores build_attention_summary, previously
     # unused (dead code, same gap as relationships/memories above) ----
     focus = build_attention_summary(c, world).get("focus")
@@ -755,6 +844,36 @@ def build_narrative(c, world):
     relationships = build_relationship_context(c, world, limit=5)
     if relationships:
         paragraphs.append(" ".join(r["summary"] for r in relationships))
+
+    # ---- grievances — restores build_grievance_context, previously
+    # unused (same "defined but never wired in" gap as everything else in
+    # this function). Surfaced so the LLM has visible motive before ever
+    # reaching for the "confront" action. ----
+    grievances = build_grievance_context(c, world)
+    if grievances:
+        top = grievances[0]
+        line = f"You're still bothered by {top['with']} over {', '.join(top['top_issues'])}."
+        paragraphs.append(line)
+
+    # ---- active conflict — restores build_conflict_context, previously
+    # unused. Purely reflects the trait/dice-driven conflict_pipeline.py
+    # state machine; the LLM cannot alter this resolution, only decide
+    # whether to have entered it (via "confront") and how to react. ----
+    conflict = build_conflict_context(c, world)
+    if conflict:
+        other = conflict["with"]
+        phase = conflict["phase"]
+        if phase == "deliberation":
+            paragraphs.append(
+                f"You're privately weighing whether to work things out with {other} "
+                f"or let it turn into a fight."
+            )
+        elif phase == "negotiation":
+            issues = ", ".join(conflict.get("issues", [])) or "what's been bothering you"
+            paragraphs.append(f"You're negotiating with {other} about {issues}.")
+        elif phase == "fight":
+            stage = (conflict.get("fight_stage") or "verbal_dispute").replace("_", " ")
+            paragraphs.append(f"You're in a {stage} with {other}.")
 
     # ---- memories — restores build_memory_context, previously unused ----
     memories = build_memory_context(c)
@@ -1764,6 +1883,117 @@ def _build_touch_proposal_context(c, world):
                 "note": f"{other_name} wants to {template_id} with you. You can accept or decline.",
             }
     return result or None
+
+
+_RECENT_AGGRESSOR_WINDOW_TICKS = 15
+
+
+def _has_recent_aggressor(c, world):
+    """True if a visible nearby character has a recent_hostile_acts entry
+    (systems/hostile_actions.py) aimed at this character within the last
+    few ticks — i.e. this character is an active target and dodge/block/
+    turn_and_run are real, timely choices, not standing offers."""
+    cid = c["id"]
+    tick = world.get("tick", 0)
+    chars = world.get("characters", {})
+    for p in c.get("perception", {}).get("visible_people", []):
+        other = chars.get(p["id"])
+        if not other:
+            continue
+        for act in other.get("recent_hostile_acts", []):
+            if (act.get("target_id") == cid
+                    and tick - act.get("tick", -9999) <= _RECENT_AGGRESSOR_WINDOW_TICKS):
+                return True
+    return False
+
+
+def _build_witnessed_offense_line(c, world):
+    """Render a sentence for the most recent still-fresh entry in this
+    character's witnessed_offenses (systems/excuses.py::
+    check_witnessed_hostility_for_observer). Names the offender and, if
+    known, their target."""
+    tick = world.get("tick", 0)
+    witnessed = c.get("witnessed_offenses", {})
+    if not witnessed:
+        return None
+    chars = world.get("characters", {})
+
+    offender_id, tagged_tick = max(witnessed.items(), key=lambda kv: kv[1])
+    if tick - tagged_tick > _RECENT_AGGRESSOR_WINDOW_TICKS:
+        return None
+    offender = chars.get(offender_id)
+    if not offender:
+        return None
+    offender_name = offender.get("name", "someone")
+
+    victim_name = None
+    for act in offender.get("recent_hostile_acts", []):
+        if tick - act.get("tick", -9999) <= _RECENT_AGGRESSOR_WINDOW_TICKS:
+            victim = chars.get(act.get("target_id"))
+            if victim:
+                victim_name = victim.get("name")
+            break
+
+    if victim_name:
+        return (f"You just saw {offender_name} attack {victim_name} — "
+                f"you could intervene or call 911.")
+    return f"You just saw {offender_name} act violently — you could intervene or call 911."
+
+
+def _build_incident_context(c, world):
+    """
+    Active incidents (systems/emergency.py) this character is aware of —
+    either a direct participant, or physically close enough to have
+    witnessed it (same Manhattan-4 radius emergency.py::resolve() already
+    uses for responder effect). Only unresolved incidents are surfaced;
+    once extinguished/resolved they naturally drop out.
+    """
+    cid = c["id"]
+    cx, cy = c.get("x", 0), c.get("y", 0)
+    result = []
+    for inc in world.get("incidents", []):
+        if inc.get("extinguished"):
+            continue
+        if inc.get("type") == "fire" and inc.get("severity", 0) <= 0:
+            continue
+        loc = inc.get("location", {})
+        is_participant = cid in inc.get("participants", [])
+        is_nearby = (
+            "x" in loc and "y" in loc
+            and abs(cx - loc["x"]) + abs(cy - loc["y"]) < 4
+        )
+        if not (is_participant or is_nearby):
+            continue
+        result.append({
+            "id":               inc["id"],
+            "type":             inc.get("type"),
+            "severity":         inc.get("severity", 0),
+            "reported":         inc.get("reported", False),
+            "offender_id":      inc.get("offender_id"),
+            "responder_status": _responder_status_for_incident(inc, world),
+        })
+    return result
+
+
+def _responder_status_for_incident(incident, world):
+    """"en_route" / "arrived" for whichever responder was dispatched off a
+    call linked to this incident (emergency.py::create_911_call's
+    incident_id -> dispatch()'s responder.incident_id), or None if nobody's
+    been dispatched yet. Computed from arrival_tick directly rather than
+    trusting the responder's own "status" field, since resolve() only
+    flips that on its own (÷30) cadence — this stays accurate to the tick
+    even before that cadence catches up."""
+    tick = world.get("tick", 0)
+    call_ids = {
+        call["id"] for call in world.get("calls", [])
+        if call.get("incident_id") == incident["id"]
+    }
+    if not call_ids:
+        return None
+    for r in world.get("responders", []):
+        if r.get("call_id") in call_ids:
+            return "arrived" if tick >= r.get("arrival_tick", float("inf")) else "en_route"
+    return None
 
 
 def _build_authority_contracts_context(c, world):

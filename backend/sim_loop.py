@@ -38,7 +38,7 @@ from systems.item_knowledge import update_item_knowledge
 # -- Fast (÷5) ---------------------------------------------------
 from brain.perception   import perceive
 from brain.attention    import update_attention
-from systems.excuses    import check_visible_lies_for_observer
+from systems.excuses    import check_visible_lies_for_observer, check_witnessed_hostility_for_observer
 
 # -- Medium (÷10-20) ---------------------------------------------
 from brain.memory       import decay_memories
@@ -57,7 +57,7 @@ from systems.household_monitoring   import update_household_monitoring
 from systems.traffic    import update_ambient_traffic
 from systems.media      import generate_news
 from brain.conversations import cleanup_conversations
-from systems.emergency  import trigger_incident, resolve   # resolve polls arrival ticks
+from systems.emergency  import trigger_incident, resolve, tick_fire_incidents   # resolve polls arrival ticks
 from systems.law        import process_jail, process_trials, maybe_arrest_from_incidents
 from systems.jobs       import generate_job_listings, tick_job_market, maybe_fire, process_interview, init_company_slots
 from systems.postal_service     import update_postal_service
@@ -222,6 +222,9 @@ def tick(world):
             # "Authority hears a conflicting account via observation" —
             # see systems/excuses.py::check_visible_lies_for_observer.
             check_visible_lies_for_observer(c, world)
+            # Same shape, for witnessing a punch/kick/shove/... — see
+            # systems/excuses.py::check_witnessed_hostility_for_observer.
+            check_witnessed_hostility_for_observer(c, world)
 
     if every(world, CADENCE["attention"], offset=1):
         for c in characters:
@@ -318,6 +321,9 @@ def tick(world):
         trigger_incident(world, None)  # world-level random only
         resolve(world)                 # poll responder arrival ticks
         maybe_arrest_from_incidents(world)
+
+    if every(world, CADENCE["fires"], offset=16):
+        tick_fire_incidents(world)
 
     # Jail release still needs tick poll
     if every(world, CADENCE["trials"], offset=16):

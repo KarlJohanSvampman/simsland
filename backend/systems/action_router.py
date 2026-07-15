@@ -848,6 +848,19 @@ def route_action(c, world, action, speech, definitions=None):
     elif action_type == "respond_touch":
         _route_respond_touch(c, world, action)
 
+    elif action_type == "confront":
+        _route_confront(c, world, action)
+    elif action_type == "call_911":
+        _route_call_911(c, world, action)
+    elif action_type in ("grab_offensive", "hold", "punch", "kick", "shove", "threaten"):
+        _route_hostile_action(c, world, action)
+    elif action_type == "dodge":
+        _route_dodge(c, world, action)
+    elif action_type == "block":
+        _route_block(c, world, action)
+    elif action_type == "turn_and_run":
+        _route_turn_and_run(c, world, action)
+
     elif action_type == "propose_chore":
         _route_propose_chore(c, world, action)
     elif action_type == "respond_chore":
@@ -1079,6 +1092,167 @@ def _route_respond_touch(c, world, action):
         respond_to_touch_proposal(c, proposer, response, world)
     except Exception:
         pass
+
+
+# =========================================================
+# HOSTILE INTENTIONS / EMERGENCY HANDLERS — see
+# systems/conflict_pipeline.py and systems/emergency.py
+# =========================================================
+
+def _route_confront(c, world, action):
+    """
+    Character deliberately confronts another over accumulated grievances.
+    action: {"type": "confront", "target_id": other_id}
+    Hands off to the existing trait/dice-driven conflict state machine
+    (systems/conflict_pipeline.py) — same formulaic resolution it already
+    uses when triggered automatically via confrontation_desired. Only the
+    decision to confront is the LLM's; everything after is the same
+    non-fluid pipeline used everywhere else, per the user's explicit
+    fluid-vs-scripted boundary.
+    """
+    target_id = action.get("target_id") or action.get("target")
+    if not target_id:
+        return
+    target = world.get("characters", {}).get(target_id)
+    if not target:
+        return
+    # Locality — building_id is the one live-maintained spatial field,
+    # same fix applied to every other locality gate this session.
+    if c.get("building_id") != target.get("building_id"):
+        return
+
+    try:
+        from systems.conflict_pipeline import start_conflict
+        start_conflict(c["id"], target_id, world)
+    except Exception:
+        pass
+
+
+# Incident type → (emergency call type, default report text). Mirrors the
+# mapping auto_report_incidents() (systems/emergency.py) already uses for
+# domestic_disturbance/injury; extended here with assault/fire so a
+# character-initiated call knows what to say for the new incident types
+# this round adds.
+_INCIDENT_CALL_TYPE = {
+    "domestic_disturbance": ("police",  "There is a serious disturbance."),
+    "assault":              ("police",  "Someone was just physically attacked."),
+    "crime":                ("police",  "A crime is in progress."),
+    "injury":               ("medical", "Someone is injured and needs help."),
+    "fire":                 ("fire",    "There's a fire!"),
+}
+
+
+def _route_call_911(c, world, action):
+    """
+    Character calls 911 about a specific incident they're aware of.
+    action: {"type": "call_911", "target_id": incident_id}
+    Lock-in: the first successful call reports the incident; later calls on
+    the same incident are a harmless no-op (see emergency.py::resolve() /
+    auto_report_incidents() for the rest of the already-wired dispatch
+    chain — create_911_call() itself emits emergency_call_created, which
+    core/event_handlers.py already subscribes to dispatch() on).
+    """
+    incident_id = action.get("target_id") or action.get("target")
+    if not incident_id:
+        return
+    incident = next(
+        (i for i in world.get("incidents", []) if i["id"] == incident_id),
+        None,
+    )
+    if not incident or incident.get("reported"):
+        return
+
+    # Awareness gate: either a direct participant, or physically close
+    # enough to have witnessed it — same Manhattan-4 radius
+    # emergency.py::resolve() already uses for responder effect.
+    loc = incident.get("location", {})
+    is_participant = c["id"] in incident.get("participants", [])
+    is_nearby = (
+        "x" in loc and "y" in loc
+        and abs(c.get("x", 0) - loc["x"]) + abs(c.get("y", 0) - loc["y"]) < 4
+    )
+    if not (is_participant or is_nearby):
+        return
+
+    emergency_type, report = _INCIDENT_CALL_TYPE.get(
+        incident.get("type"), ("police", "There's an emergency.")
+    )
+
+    try:
+        from systems.emergency import create_911_call
+        create_911_call(world, c, emergency_type, report, incident_id=incident["id"])
+        incident["reported"] = True
+    except Exception:
+        pass
+
+
+# =========================================================
+# HOSTILE ACTIONS — see systems/hostile_actions.py. Individual
+# resolvable acts (punch/kick/shove/grab/hold/threaten), each pre-
+# resolved hit/evaded/fumble in advance, plus the target's own
+# dodge/block defensive stances and turn_and_run flight response.
+# =========================================================
+
+def _route_hostile_action(c, world, action):
+    """
+    action: {"type": "punch"|"kick"|"shove"|"grab_offensive"|"hold"|
+             "threaten", "target_id": other_id}
+    """
+    target_id = action.get("target_id") or action.get("target")
+    if not target_id:
+        return
+    target = world.get("characters", {}).get(target_id)
+    if not target:
+        return
+    if c.get("building_id") != target.get("building_id"):
+        return
+
+    try:
+        from systems.hostile_actions import resolve_hostile_action
+        resolve_hostile_action(c, target, action["type"], world)
+    except Exception:
+        pass
+
+
+def _route_dodge(c, world, action):
+    """Brace to evade an incoming attack — see hostile_actions.py's
+    _evasion_chance(), which only grants a bonus while this stance is
+    fresh (DEFENSE_STANCE_WINDOW_TICKS)."""
+    c["defense_stance"] = {"type": "dodge", "tick": world.get("tick", 0)}
+
+
+def _route_block(c, world, action):
+    """Brace to block an incoming attack — smaller evasion bonus than
+    dodge but still consumed the same way."""
+    c["defense_stance"] = {"type": "block", "tick": world.get("tick", 0)}
+
+
+def _route_turn_and_run(c, world, action):
+    """
+    action: {"type": "turn_and_run", "target_id": aggressor_id}
+    Panic flight — move to a point away from the aggressor. Kept
+    intentionally minimal (no code exists anywhere for panic/flee
+    movement today): just relocate, flag the panic state for narrative
+    flavor, nothing scripted beyond that.
+    """
+    aggressor_id = action.get("target_id") or action.get("target")
+    aggressor = world.get("characters", {}).get(aggressor_id) if aggressor_id else None
+
+    cx, cy = c.get("x", 0), c.get("y", 0)
+    if aggressor:
+        dx, dy = cx - aggressor.get("x", cx), cy - aggressor.get("y", cy)
+        dist = (dx ** 2 + dy ** 2) ** 0.5 or 1
+        flee_x = cx + (dx / dist) * 10
+        flee_y = cy + (dy / dist) * 10
+    else:
+        import random
+        flee_x = cx + random.uniform(-10, 10)
+        flee_y = cy + random.uniform(-10, 10)
+
+    c["_panic_fleeing"] = {"from_id": aggressor_id, "tick": world.get("tick", 0)}
+    if plan_character_route(world, c, flee_x, flee_y):
+        c["animation_state"] = "run"
+        c["is_moving"] = True
 
 
 # =========================================================
