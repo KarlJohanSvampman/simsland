@@ -300,10 +300,11 @@ def build_active_conversations(c, world):
         other = world.get("characters", {}).get(other_id, {})
 
         result.append({
-            "conversation_id": conv["id"],
-            "with":            other.get("name", other_id),
-            "topic":           conv.get("topic"),
-            "tone":            conv.get("tone"),
+            "conversation_id":    conv["id"],
+            "with":               other.get("name", other_id),
+            "topic":              conv.get("topic"),
+            "tone":               conv.get("tone"),
+            "conversation_type":  conv.get("conversation_type"),
             "your_turn":       conv.get("turn_owner") == c["id"],
             "recent_messages": [
                 {
@@ -462,17 +463,24 @@ def build_available_actions(c, world):
     # respond_chore/advance_chore_round only make sense (and only appear)
     # when this character actually has something pending — see
     # _build_proposal_context() below, the same "proposals" context key
-    # this mirrors, so the two never disagree about what's live.
+    # this mirrors, so the two never disagree about what's live. Branches
+    # on kind so "social_ask" proposals (systems/proposals.py) surface
+    # respond_social/advance_social_round instead — respond()/
+    # proposer_advance_round() are already kind-agnostic, only the action
+    # name the LLM sees needs to match the kind.
     cid = c["id"]
     for p in world.get("proposals", {}).values():
         if p.get("status") != "open":
             continue
-        if p.get("responses", {}).get(cid) == "pending" and "respond_chore" not in action_types:
-            action_types.append("respond_chore")
+        is_social = p.get("kind") == "social_ask"
+        respond_action = "respond_social" if is_social else "respond_chore"
+        advance_action = "advance_social_round" if is_social else "advance_chore_round"
+        if p.get("responses", {}).get(cid) == "pending" and respond_action not in action_types:
+            action_types.append(respond_action)
         elif (p.get("proposer_id") == cid
-              and "advance_chore_round" not in action_types
+              and advance_action not in action_types
               and any(state == "counter" for state in p.get("responses", {}).values())):
-            action_types.append("advance_chore_round")
+            action_types.append(advance_action)
 
     # Lie/excuse engine (see systems/excuses.py) — give_excuse listed
     # whenever someone's actually present to give it to (the route handler
@@ -481,6 +489,12 @@ def build_available_actions(c, world):
     if nearby_people:
         action_types.append("give_excuse")
     action_types.append("leave_note")
+
+    # Social negotiation (see systems/proposals.py's "social_ask" kind) —
+    # propose_social listed whenever there's someone nearby to propose to,
+    # same "route handler validates" pattern as give_excuse.
+    if nearby_people:
+        action_types.append("propose_social")
 
     # Wall actions — always contextually available
     action_types.extend(["build_wall", "remove_wall"])
@@ -558,6 +572,28 @@ def build_available_actions(c, world):
 # data as JSON. This is the "what the AI sees and who's there" half of the
 # minimal context; build_context() below is the other half (traits/state).
 
+# Optional LLM-set conversation_type (see action_router.py::apply_speech())
+# rendered as its own framing sentence instead of the flat default — falls
+# back to the exact original phrasing when unset, so untyped conversations
+# are unchanged.
+_CONVERSATION_TYPE_PHRASING = {
+    "argument":    "You're in the middle of an argument with {who} about {topic}",
+    "negotiation": "You're negotiating with {who} about {topic}",
+    "persuasion":  "You're trying to convince {who} about {topic}",
+    "competition": "You and {who} are in a friendly competition about {topic}",
+    "gossip":      "You're gossiping with {who} about {topic}",
+}
+
+
+def _conversation_frame_line(conv):
+    who = conv["with"]
+    topic = conv.get("topic") or "something"
+    template = _CONVERSATION_TYPE_PHRASING.get(conv.get("conversation_type"))
+    if template:
+        return template.format(who=who, topic=topic)
+    return f"You are in conversation with {who} about {topic}"
+
+
 def build_scene_description(c, world):
 
     perception = c.get("perception", {})
@@ -587,10 +623,7 @@ def build_scene_description(c, world):
 
     for conv in build_active_conversations(c, world):
         turn_note = " — it's your turn to respond." if conv.get("your_turn") else "."
-        lines.append(
-            f"You are in conversation with {conv['with']} about "
-            f"{conv.get('topic', 'something')}{turn_note}"
-        )
+        lines.append(_conversation_frame_line(conv) + turn_note)
         for m in conv.get("recent_messages", [])[-2:]:
             lines.append(f'{m["speaker"]}: "{m["utterance"]}"')
 
@@ -818,17 +851,25 @@ def _build_proposal_context(c, world):
         if p.get("status") != "open":
             continue
 
+        kind = p.get("kind")
+
         if p.get("responses", {}).get(cid) == "pending":
+            if kind == "chore":
+                note = (f"Someone proposed {p.get('chore_id')} — you can accept, decline, "
+                        f"or counter with different details.")
+            elif kind == "social_ask":
+                note = (f"Someone is asking you: {p.get('chore_id')} — you can accept, "
+                        f"decline, or counter.")
+            else:
+                note = f"Someone offered to make {p.get('chore_id')} a recurring thing."
             incoming.append({
                 "proposal_id": p["id"],
-                "kind":        p.get("kind"),
+                "kind":        kind,
                 "chore_id":    p.get("chore_id"),
                 "params":      p.get("params"),
                 "proposed_by": p.get("proposer_id"),
                 "round":       p.get("round"),
-                "note":        f"Someone proposed {p.get('chore_id')} — you can accept, decline, "
-                               f"or counter with different details." if p.get("kind") == "chore"
-                               else f"Someone offered to make {p.get('chore_id')} a recurring thing.",
+                "note":        note,
             })
 
         elif p.get("proposer_id") == cid:
@@ -838,15 +879,16 @@ def _build_proposal_context(c, world):
                 if state == "counter"
             }
             if counters:
+                advance_action = "advance_social_round" if kind == "social_ask" else "advance_chore_round"
                 mediating.append({
                     "proposal_id": p["id"],
-                    "kind":        p.get("kind"),
+                    "kind":        kind,
                     "chore_id":    p.get("chore_id"),
                     "your_params": p.get("params"),
                     "counters":    counters,
                     "round":       p.get("round"),
                     "note":        "One or more people countered your proposal with different "
-                                   "details — decide new terms (advance_chore_round) or let it "
+                                   f"details — decide new terms ({advance_action}) or let it "
                                    "lapse.",
                 })
 

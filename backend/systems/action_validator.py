@@ -73,7 +73,16 @@ VALID_ACTIONS = {
     # from the live agent loop despite correct router code.
     "give_excuse",
 
-    "leave_note"
+    "leave_note",
+
+    # Social negotiation (see systems/proposals.py's "social_ask" kind) —
+    # the conversation-level counterpart to propose_chore, no
+    # household/building gate.
+    "propose_social",
+
+    "respond_social",
+
+    "advance_social_round"
 }
 
 

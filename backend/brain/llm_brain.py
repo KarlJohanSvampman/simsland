@@ -76,6 +76,12 @@ SPEECH
   declare, argue, whisper. A flirt nudges attraction and can cause blushing; an insult raises
   tension and can damage trust; a lie gets recorded and can be caught later if it's ever
   contradicted by where you actually are.
+- "conversation_type" is optional — set it when you're starting a conversation or deliberately
+  steering its shape: smalltalk, argument, negotiation, persuasion, competition, gossip. Leave it
+  out to just continue naturally. It's yours to set or change any time, not locked in once picked.
+  For a negotiation or persuasion attempt with a concrete ask (not just talk), use the
+  propose_social/respond_social/advance_social_round actions when available in LEGAL_MOVES — that
+  gets you a real accept/decline/counter negotiation instead of just conversation.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 SURVIVAL & ECONOMY
@@ -99,10 +105,11 @@ OUTPUT FORMAT  (strict JSON, no other text)
     "reason":      "why you chose this"
   },
   "speech": {
-    "target":     "character_id or null",
-    "speech_act": "greet | ask | declare | joke | comfort | argue | whisper | ...",
-    "topic":      "topic keyword",
-    "utterance":  "exact words you say aloud — shown as speech bubble"
+    "target":            "character_id or null",
+    "speech_act":        "greet | ask | declare | joke | comfort | argue | whisper | ...",
+    "topic":             "topic keyword",
+    "utterance":         "exact words you say aloud — shown as speech bubble",
+    "conversation_type": "smalltalk | argument | negotiation | persuasion | competition | gossip | null"
   },
   "reflection": "brief reflection on recent events",
   "confidence": 0.0

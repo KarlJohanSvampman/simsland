@@ -3,8 +3,8 @@ systems/proposals.py
 
 Unified propose/respond negotiation engine for anything shaped like "one
 character proposes something to N others, who can accept, decline, or (for
-chore proposals) counter with different details." Two kinds share this one
-engine rather than being two near-duplicate modules:
+chore and social-ask proposals) counter with different details." Three
+kinds share this one engine rather than being near-duplicate modules:
 
   "chore"           — propose doing a household chore together (e.g. "let's
                        cook dinner"); recipients may accept, decline, or
@@ -14,6 +14,15 @@ engine rather than being two near-duplicate modules:
   "recurring_offer" — after an enjoyed joint chore, offer to turn it into a
                        recurring social contract. Accept/decline only, no
                        counter-proposing a schedule makes sense here.
+  "social_ask"      — a general negotiation between two characters over
+                       anything (a favor, money, forgiveness, plans) — the
+                       conversation-level counterpart to "chore", with no
+                       household/building gate at all (see
+                       propose_social_ask()). Recipients may accept,
+                       decline, or counter, same as chores. Resolution has
+                       no special hand-off (unlike chore/recurring_offer) —
+                       it's visible via _build_proposal_context() and the
+                       accepted/declined outcome is enough on its own.
 
 Built after finding the one existing negotiation precedent in this
 codebase — systems/intimacy.py's touch-proposal system (hug/kiss/etc.) —
@@ -136,7 +145,7 @@ def respond(recipient, world, proposal_id, response, counter_params=None):
         return {"ok": False, "reason": "already_resolved"}
 
     if response == "counter":
-        if proposal["kind"] != "chore":
+        if proposal["kind"] not in ("chore", "social_ask"):
             return {"ok": False, "reason": "counter_not_supported_for_this_kind"}
         proposal["responses"][rid] = "counter"
         proposal["counter_params"][rid] = dict(counter_params or {})
@@ -206,6 +215,21 @@ def _maybe_resolve(proposal, world):
             }
     elif proposal["kind"] == "recurring_offer":
         _finalize_recurring_offer(proposal, world)
+
+
+# =========================================================
+# SOCIAL ASK — general negotiation between two characters, no
+# household/building gate. Counter-proposing is supported (see respond()).
+# =========================================================
+
+def propose_social_ask(proposer, recipient, world, ask, params=None):
+    """recipient: a single character dict — whoever the proposer is asking.
+    No locality/household gate at all, unlike propose_chore_to_household():
+    a social ask can be made of anyone the proposer is actually talking to
+    (the caller — action_router.py's _route_propose_social — is what
+    ensures there's a real target)."""
+    proposal = propose(proposer, [recipient], "social_ask", ask, params, world)
+    return {"ok": True, "proposal": proposal}
 
 
 # =========================================================

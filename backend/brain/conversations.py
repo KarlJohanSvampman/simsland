@@ -113,6 +113,12 @@ def create_conversation(
 
         "tone": tone,
 
+        # Optional LLM-set framing ("argument", "negotiation", "persuasion",
+        # "competition", "gossip", ...) — see action_router.py::apply_speech()
+        # and context_builder.py's narrative phrasing. Not set here; can
+        # change over the conversation's life, so it starts unset.
+        "conversation_type": None,
+
         "history": [],
 
         "turn_owner": a_id,

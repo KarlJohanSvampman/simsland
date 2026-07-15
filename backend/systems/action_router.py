@@ -103,6 +103,14 @@ def apply_speech(c, world, speech):
             world, c["id"], target_id, topic=topic or "general"
         )
 
+        # Optional LLM-set framing (argument, negotiation, persuasion, ...).
+        # Simple overwrite, not a state machine — a conversation drifting
+        # from small talk into an argument is realistic, and either
+        # participant can steer it.
+        conversation_type = speech.get("conversation_type")
+        if conversation_type:
+            conv["conversation_type"] = conversation_type
+
         add_message(
             world, conv, c["id"], utterance, speech_act,
             topic or conv.get("topic", "general"), tick
@@ -849,6 +857,17 @@ def route_action(c, world, action, speech, definitions=None):
     elif action_type == "propose_recurring":
         _route_propose_recurring(c, world, action)
 
+    elif action_type == "propose_social":
+        _route_propose_social(c, world, action)
+    elif action_type == "respond_social":
+        # respond()/proposer_advance_round() (systems/proposals.py) are
+        # already kind-agnostic — they look up by proposal_id, not kind —
+        # so the same chore-proposal routers handle social_ask proposals
+        # too rather than duplicating identical logic under a new name.
+        _route_respond_chore(c, world, action)
+    elif action_type == "advance_social_round":
+        _route_advance_chore_round(c, world, action)
+
     elif action_type == "breastfeed":
         _route_breastfeed(c, world, action)
     elif action_type == "bottle_feed":
@@ -1112,6 +1131,29 @@ def _route_advance_chore_round(c, world, action):
     try:
         from systems.proposals import proposer_advance_round
         proposer_advance_round(c, world, proposal_id, new_params)
+    except Exception:
+        pass
+
+
+def _route_propose_social(c, world, action):
+    """
+    Character proposes something directly to another character — a favor,
+    money, forgiveness, plans — the conversation-level counterpart to
+    propose_chore, with no household/building gate (see
+    systems/proposals.py::propose_social_ask()).
+    action: {"type": "propose_social", "target": character_id, "ask": "...", "params": {...}}
+    """
+    target_id = action.get("target")
+    ask = action.get("ask")
+    if not target_id or not ask:
+        return
+    recipient = world.get("characters", {}).get(target_id)
+    if not recipient:
+        return
+    params = action.get("params", {})
+    try:
+        from systems.proposals import propose_social_ask
+        propose_social_ask(c, recipient, world, ask, params)
     except Exception:
         pass
 
