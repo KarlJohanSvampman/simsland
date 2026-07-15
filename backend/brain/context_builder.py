@@ -544,6 +544,30 @@ def build_available_actions(c, world):
     if _has_recent_aggressor(c, world):
         action_types.extend(["dodge", "block", "turn_and_run"])
 
+    # Weapon-gated strikes (see systems/hostile_actions.py) — stab/knock
+    # only offered when the actor is actually holding a matching
+    # weapon_category item (unarmed, effectiveness_modifiers already
+    # apply a heavy penalty — but offering the action bare-handed would
+    # be misleading, so it's gated out entirely instead). wield_item
+    # offered whenever there's an eligible weapon-tagged item in
+    # inventory not already held.
+    from systems.templates import resolve_item
+
+    held_weapon_category = None
+    _held = next((i for i in c.get("inventory", []) if i.get("location") == "held"), None)
+    if _held:
+        held_weapon_category = resolve_item(world, _held).get("weapon_category")
+    if nearby_people and held_weapon_category == "melee_weapon_sharp":
+        action_types.append("stab")
+    if nearby_people and held_weapon_category == "melee_weapon_blunt":
+        action_types.append("knock")
+
+    if any(
+        i.get("location") != "held" and resolve_item(world, i).get("weapon_category")
+        for i in c.get("inventory", [])
+    ):
+        action_types.append("wield_item")
+
     # Knockdown recovery — _route_stand_up (action_router.py) already
     # existed but, like the rest of the posture-action family, was never
     # reachable (missing from VALID_ACTIONS until this round). Only
@@ -551,6 +575,28 @@ def build_available_actions(c, world):
     # outcome produces.
     if c.get("posture") == "fallen_front":
         action_types.append("stand_up")
+
+    # Multi-round grapple (see systems/grapple.py) — wrestle listed
+    # whenever someone's nearby, same "route handler validates the rest"
+    # pattern as the other hostile actions. While actively grappled
+    # (either side), move/turn_and_run are physically impossible (see the
+    # matching gate in action_router.py::_route_move/_route_turn_and_run)
+    # so they're removed here too; release_hold is the holder's own free
+    # exit, dodge stays available as the held character's struggle option
+    # (already offered above via _has_recent_aggressor once someone's
+    # come at them).
+    if nearby_people and not c.get("grappled_by") and not c.get("grappling"):
+        action_types.append("wrestle")
+    if c.get("grappling"):
+        action_types.append("release_hold")
+    if c.get("grappled_by"):
+        # dodge must stay available for the whole grapple, not just the
+        # initial 15-tick _has_recent_aggressor window above — a held
+        # character needs to be able to keep struggling every round.
+        if "dodge" not in action_types:
+            action_types.append("dodge")
+    if c.get("grappled_by") or c.get("grappling"):
+        action_types = [a for a in action_types if a not in ("move", "turn_and_run")]
 
     # Wall actions — always contextually available
     action_types.extend(["build_wall", "remove_wall"])
@@ -779,6 +825,21 @@ def build_narrative(c, world):
             if inc.get("offender_id") == c["id"] and inc.get("responder_status") == "arrived":
                 lines.append("The police have arrived — you might want to get out of here.")
         paragraphs.append(" ".join(lines))
+
+    # ---- active grapple — see systems/grapple.py. Explains why
+    # move/turn_and_run disappeared and release_hold/dodge showed up. ----
+    if c.get("grappled_by"):
+        holder = world.get("characters", {}).get(c["grappled_by"])
+        holder_name = holder.get("name", "someone") if holder else "someone"
+        paragraphs.append(
+            f"{holder_name} is holding you in place — you're struggling to break free."
+        )
+    elif c.get("grappling"):
+        held = world.get("characters", {}).get(c["grappling"])
+        held_name = held.get("name", "them") if held else "them"
+        paragraphs.append(
+            f"You're holding {held_name} in place — they're struggling to get free."
+        )
 
     # ---- active aggressor — see _has_recent_aggressor(). Explains why
     # dodge/block/turn_and_run suddenly appeared, same "gate the action +

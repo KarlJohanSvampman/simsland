@@ -50,6 +50,16 @@ _KNOCKDOWN_BASE = {
 _STAMINA_COST = {
     "punch": 0.03, "kick": 0.04, "shove": 0.02,
     "catch_and_hold": 0.05, "hold_down": 0.06, "threaten": 0.0,
+    "stab": 0.04, "knock": 0.05,
+}
+
+# Weapon category each weapon-gated template requires for its injury
+# branch to actually fire -- an unarmed "stab"/"knock" is just a weak
+# unarmed strike (effectiveness_modifiers already apply a heavy penalty
+# for it), not a real wound.
+_REQUIRED_WEAPON_CATEGORY = {
+    "stab": "melee_weapon_sharp",
+    "knock": "melee_weapon_blunt",
 }
 
 
@@ -63,7 +73,13 @@ def _resolve_field(side, field, world):
         held = next((i for i in side.get("inventory", []) if i.get("location") == "held"), None)
         if not held:
             return None
-        return resolve_item(world, held).get("category")
+        # weapon_category, not category -- category is the item's
+        # shelving/UI grouping (e.g. "kitchenware"); weapon_category is
+        # the new, narrower combat tag added this round (see
+        # simulations/default/definitions.json's item_templates: knife/
+        # utility_knife -> melee_weapon_sharp, bat/pan/hammer ->
+        # melee_weapon_blunt).
+        return resolve_item(world, held).get("weapon_category")
     return side.get(field)
 
 
@@ -108,6 +124,14 @@ def _eval_condition(condition, actor, target, world):
         if op != "==" or not isinstance(rhs, str):
             return False
         return rhs in side.get("traits", [])
+
+    # "actor.held_item == null" (the unarmed check threaten/stab/knock
+    # all rely on) needs its own branch -- the generic "lhs is None ->
+    # not satisfied" short-circuit below would otherwise make this
+    # condition impossible to ever satisfy, since an unarmed character
+    # is exactly the case where held_item resolves to None.
+    if field == "held_item" and op == "==" and rhs_raw.strip().lower() in ("null", "none"):
+        return _resolve_field(side, field, world) is None
 
     lhs = _resolve_field(side, field, world)
     if lhs is None or isinstance(lhs, (list, dict)):
@@ -253,6 +277,29 @@ def resolve_hostile_action(actor, target, action_id, world):
         if knockdown_chance > 0 and random.random() < knockdown_chance:
             drain_stamina(target, 0.05)
             set_posture(target, world, "fallen_front")
+
+        # Real injury for weapon-gated strikes -- health.py's
+        # apply_blade_injury()/apply_blunt_trauma() were fully built
+        # against definitions.json's physical_injury_schema but had zero
+        # call sites before this round. Only fires when the actor is
+        # actually holding the right weapon category -- an unarmed
+        # "stab"/"knock" (already heavily penalized by
+        # effectiveness_modifiers) is a weak strike, not a real wound.
+        required_weapon = _REQUIRED_WEAPON_CATEGORY.get(template_id)
+        if required_weapon and _resolve_field(actor, "held_item.category", world) == required_weapon:
+            body_part = tpl.get("target_region", "torso")
+            try:
+                if template_id == "stab":
+                    from systems.health import apply_blade_injury
+                    apply_blade_injury(target, world, body_part,
+                                        sharpness=0.7, size=0.5,
+                                        irregular_shape=False, tick=tick)
+                elif template_id == "knock":
+                    from systems.health import apply_blunt_trauma
+                    force_normalized = max(0.0, min(1.0, effectiveness / 3.0))
+                    apply_blunt_trauma(target, world, body_part, force_normalized, tick)
+            except Exception:
+                pass
 
         try:
             from systems.reactions import push_reaction

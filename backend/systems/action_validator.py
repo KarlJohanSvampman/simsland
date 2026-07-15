@@ -139,6 +139,24 @@ VALID_ACTIONS = {
 
     "turn_and_run",
 
+    # Multi-round grapple (see systems/grapple.py) — wrestle attempts the
+    # initial grab (via hostile_actions.resolve_hostile_action against
+    # catch_and_hold) then, on success, starts a repeatable hold;
+    # release_hold is the holder's own free exit at any point.
+    "wrestle",
+
+    "release_hold",
+
+    # Weapon-gated strikes (see systems/hostile_actions.py's stab/knock
+    # branch + systems/health.py's apply_blade_injury/apply_blunt_trauma,
+    # both fully built but previously never called) — wield_item is the
+    # new generic equip action neither of these had a path to before.
+    "stab",
+
+    "knock",
+
+    "wield_item",
+
     # Recovery from a hostile-action knockdown (see systems/posture.py) —
     # _route_stand_up already existed and was fully wired but, like the
     # rest of the posture-action family, was never in VALID_ACTIONS —

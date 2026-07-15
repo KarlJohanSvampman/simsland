@@ -6065,6 +6065,7 @@
     "bat": {
       "name": "Baseball Bat",
       "category": "sports_equipment",
+      "weapon_category": "melee_weapon_blunt",
       "size": 3,
       "base_price": 50,
       "stackable": false,
@@ -6549,6 +6550,7 @@
     "pan": {
       "name": "Frying Pan",
       "category": "kitchenware",
+      "weapon_category": "melee_weapon_blunt",
       "size": 2,
       "base_price": 25,
       "stackable": true,
@@ -6567,6 +6569,7 @@
     "knife": {
       "name": "Kitchen Knife",
       "category": "kitchenware",
+      "weapon_category": "melee_weapon_sharp",
       "size": 1,
       "base_price": 30,
       "stackable": false,
@@ -7136,6 +7139,7 @@
     "hammer": {
       "name": "Hammer",
       "category": "tools",
+      "weapon_category": "melee_weapon_blunt",
       "size": 2,
       "base_price": 20,
       "stackable": false,
@@ -7974,6 +7978,7 @@
     "utility_knife": {
       "name": "Utility Knife",
       "category": "tools",
+      "weapon_category": "melee_weapon_sharp",
       "size": 1,
       "base_price": 8,
       "stackable": false,
@@ -13535,6 +13540,114 @@
         "loop": [],
         "stop": [
           "stumble_end"
+        ]
+      },
+      "initiation_type": "forced"
+    },
+    "stab": {
+      "name": "Stab",
+      "description": "Attack another character with a sharp weapon. Requires a melee_weapon_sharp item held.",
+      "category": "combat",
+      "target": "character",
+      "target_region": "torso",
+      "duration_ticks": 1,
+      "variables": {
+        "aim": {
+          "type": "select",
+          "options": [
+            "torso",
+            "arm",
+            "leg"
+          ],
+          "default": "torso",
+          "ai_choose": true,
+          "randomizable": true
+        }
+      },
+      "effectiveness_modifiers": [
+        {
+          "condition": "actor.held_item.category == 'melee_weapon_sharp'",
+          "multiplier": 2.2
+        },
+        {
+          "condition": "actor.held_item == null",
+          "multiplier": 0.15
+        },
+        {
+          "condition": "actor.trait == 'strong'",
+          "multiplier": 1.2
+        }
+      ],
+      "animations": {
+        "start": [
+          "stab_wind_up"
+        ],
+        "loop": [],
+        "stop": [
+          "stab_follow_through"
+        ]
+      },
+      "target_animations": {
+        "start": [
+          "hit_react_stab"
+        ],
+        "loop": [],
+        "stop": [
+          "collapse_wounded"
+        ]
+      },
+      "initiation_type": "forced"
+    },
+    "knock": {
+      "name": "Knock",
+      "description": "Strike another character with a blunt weapon. Requires a melee_weapon_blunt item held.",
+      "category": "combat",
+      "target": "character",
+      "target_region": "head",
+      "duration_ticks": 1,
+      "variables": {
+        "aim": {
+          "type": "select",
+          "options": [
+            "head",
+            "torso",
+            "limb"
+          ],
+          "default": "head",
+          "ai_choose": true,
+          "randomizable": true
+        }
+      },
+      "effectiveness_modifiers": [
+        {
+          "condition": "actor.held_item.category == 'melee_weapon_blunt'",
+          "multiplier": 2.0
+        },
+        {
+          "condition": "actor.held_item == null",
+          "multiplier": 0.15
+        },
+        {
+          "condition": "actor.trait == 'strong'",
+          "multiplier": 1.2
+        }
+      ],
+      "animations": {
+        "start": [
+          "knock_wind_up"
+        ],
+        "loop": [],
+        "stop": [
+          "knock_follow_through"
+        ]
+      },
+      "target_animations": {
+        "start": [
+          "hit_react_head"
+        ],
+        "loop": [],
+        "stop": [
+          "stagger_end"
         ]
       },
       "initiation_type": "forced"

@@ -59,7 +59,12 @@ SPEECH_ACTS = [
 
     "supportive",
 
-    "awkward_silence"
+    "awkward_silence",
+
+    # Secondhand witness alert (systems/excuses.py's witnessed_offenses,
+    # systems/conversation_analysis.py's apply_speech_act_analysis) — a
+    # witness relaying a hostile act they saw to someone who wasn't there.
+    "urgent_report"
 ]
 
 

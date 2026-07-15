@@ -149,6 +149,9 @@ def clear_expired_speech(c, world):
 # =========================================================
 
 def _route_move(c, world, action):
+    if c.get("grappled_by") or c.get("grappling"):
+        return  # physically restrained — see systems/grapple.py
+
     # Moving always clears a leaning posture
     if c.get("posture") == "leaning_wall":
         from systems.posture import set_posture
@@ -852,7 +855,7 @@ def route_action(c, world, action, speech, definitions=None):
         _route_confront(c, world, action)
     elif action_type == "call_911":
         _route_call_911(c, world, action)
-    elif action_type in ("grab_offensive", "hold", "punch", "kick", "shove", "threaten"):
+    elif action_type in ("grab_offensive", "hold", "punch", "kick", "shove", "threaten", "stab", "knock"):
         _route_hostile_action(c, world, action)
     elif action_type == "dodge":
         _route_dodge(c, world, action)
@@ -860,6 +863,12 @@ def route_action(c, world, action, speech, definitions=None):
         _route_block(c, world, action)
     elif action_type == "turn_and_run":
         _route_turn_and_run(c, world, action)
+    elif action_type == "wrestle":
+        _route_wrestle(c, world, action)
+    elif action_type == "release_hold":
+        _route_release_hold(c, world, action)
+    elif action_type == "wield_item":
+        _route_wield_item(c, world, action)
 
     elif action_type == "propose_chore":
         _route_propose_chore(c, world, action)
@@ -1235,6 +1244,9 @@ def _route_turn_and_run(c, world, action):
     movement today): just relocate, flag the panic state for narrative
     flavor, nothing scripted beyond that.
     """
+    if c.get("grappled_by") or c.get("grappling"):
+        return  # physically restrained — see systems/grapple.py
+
     aggressor_id = action.get("target_id") or action.get("target")
     aggressor = world.get("characters", {}).get(aggressor_id) if aggressor_id else None
 
@@ -1253,6 +1265,72 @@ def _route_turn_and_run(c, world, action):
     if plan_character_route(world, c, flee_x, flee_y):
         c["animation_state"] = "run"
         c["is_moving"] = True
+
+
+# =========================================================
+# GRAPPLE — see systems/grapple.py. wrestle/overtake: a repeatable
+# hold, not a single resolved exchange like the other hostile actions.
+# =========================================================
+
+def _route_wrestle(c, world, action):
+    """
+    action: {"type": "wrestle", "target_id": other_id}
+    The initial grab is resolved exactly like grab_offensive (one
+    hit/evaded/fumble roll against catch_and_hold) — only a landed grab
+    starts the persistent multi-round hold.
+    """
+    if c.get("grappled_by") or c.get("grappling"):
+        return  # already mid-grapple
+
+    target_id = action.get("target_id") or action.get("target")
+    if not target_id:
+        return
+    target = world.get("characters", {}).get(target_id)
+    if not target:
+        return
+    if c.get("building_id") != target.get("building_id"):
+        return
+
+    try:
+        from systems.hostile_actions import resolve_hostile_action
+        from systems.grapple import start_grapple
+        outcome = resolve_hostile_action(c, target, "catch_and_hold", world)
+        if outcome == "hit":
+            start_grapple(c, target, world)
+    except Exception:
+        pass
+
+
+def _route_release_hold(c, world, action):
+    """The holder's own choice to let go — see systems/grapple.py::release_hold."""
+    try:
+        from systems.grapple import release_hold
+        release_hold(c, world)
+    except Exception:
+        pass
+
+
+# =========================================================
+# WEAPONS — see systems/hostile_actions.py's stab/knock branch and
+# systems/health.py's apply_blade_injury/apply_blunt_trauma.
+# =========================================================
+
+def _route_wield_item(c, world, action):
+    """
+    action: {"type": "wield_item", "target_id": item_id}
+    Move an item already in inventory (pocket, etc.) directly to
+    location="held" — the only existing path to "held" was the awkward
+    drop -> add_to_stack -> take_from_stack chain (see
+    _route_take_from_stack); this is the generic equip action that chain
+    never provided.
+    """
+    from systems.personal_items import get_item_by_id
+    item_id = action.get("target_id") or action.get("target") or action.get("item_id")
+    if not item_id:
+        return
+    item = get_item_by_id(c, item_id)
+    if item:
+        item["location"] = "held"
 
 
 # =========================================================

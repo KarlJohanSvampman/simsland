@@ -67,6 +67,7 @@ CADENCE = {
     # Conflict / social drama
     "grievances":           15,
     "conflicts":             5,
+    "grapples":              5,
     "contract_checks":      60,
 
     # Body / needs

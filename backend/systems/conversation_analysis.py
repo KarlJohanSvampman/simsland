@@ -71,7 +71,9 @@ def analyze_message(
 
         utterance,
 
-        speech_act
+        speech_act,
+
+        world
     )
 
     # =====================================================
@@ -165,7 +167,9 @@ def apply_speech_act_analysis(
 
     utterance,
 
-    speech_act
+    speech_act,
+
+    world=None
 ):
 
     name = speaker["name"]
@@ -458,6 +462,43 @@ def apply_speech_act_analysis(
 
             "awkwardness": 0.3
         }
+
+    # =====================================================
+    # URGENT REPORT — secondhand witness alert. Relays the speaker's own
+    # witnessed_offenses (systems/excuses.py::
+    # check_witnessed_hostility_for_observer, systems/hostile_actions.py's
+    # recent_hostile_acts tagging) onto the listener, who was never
+    # actually near the scene. Because witnessed_offenses already drives
+    # confront/call_911 availability and the narrative witnessed-offense
+    # line (context_builder.py), this is the entire secondhand mechanism
+    # — no separate belief/pursuit system needed. Only relays a real
+    # witnessed tag; there's no fabrication path.
+    # =====================================================
+
+    elif speech_act == "urgent_report":
+
+        speaker_witnessed = speaker.get("witnessed_offenses", {})
+        if speaker_witnessed and world is not None:
+            offender_id, _tick = max(speaker_witnessed.items(), key=lambda kv: kv[1])
+            listener.setdefault("witnessed_offenses", {})[offender_id] = world.get("tick", 0)
+
+            result[
+                "observations"
+            ].append({
+
+                "text":
+                    f"{name} warned about something dangerous.",
+
+                "weight":
+                    0.7
+            })
+
+            result[
+                "emotional_effects"
+            ] = {
+
+                "fear": 0.2
+            }
 
 
 # =========================================================

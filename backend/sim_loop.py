@@ -71,6 +71,7 @@ from systems.services   import update_services
 # -- Conflict / social drama ──────────────────────────────────────────────
 from systems.grievances        import update_grievances
 from systems.conflict_pipeline import process_conflicts
+from systems.grapple         import process_grapples
 from systems.social_contracts  import check_contract_violations
 
 # -- Very slow (÷300) ─────────────────────────────────────────────
@@ -356,6 +357,9 @@ def tick(world):
     # -- Conflict / social drama ────────────────────────────────────────
     if every(world, CADENCE["conflicts"], offset=24):
         process_conflicts(world)
+
+    if every(world, CADENCE["grapples"], offset=35):
+        process_grapples(world)
 
     if every(world, CADENCE["grievances"], offset=25):
         update_grievances(world)    # decay + emit confrontation_desired

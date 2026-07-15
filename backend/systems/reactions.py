@@ -126,6 +126,7 @@ SPEECH_ACT_REACTIONS = {
     "gossip":        "interested",
     "brag":          "shrug",
     "awkward_silence": "look_around",
+    "urgent_report": "fear",
     "defensive":     "confused",
 }
 
