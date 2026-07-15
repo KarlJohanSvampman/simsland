@@ -496,6 +496,23 @@ def build_available_actions(c, world):
     if nearby_people:
         action_types.append("propose_social")
 
+    # Touch proposals (see systems/intimacy.py) — the six propose-touch
+    # types listed whenever someone's nearby, same "route handler
+    # validates the rest" pattern (propose_touch() already does its own
+    # stage/relationship checks). respond_touch only appears when this
+    # character actually has an incoming pending proposal.
+    if nearby_people:
+        action_types.extend([
+            "hug", "kiss", "kiss_peck", "kiss_deep",
+            "cuddle", "hold_hands", "handshake", "high_five",
+        ])
+    if any(
+        rel.get("touch_negotiation", {}).get("state") == "proposed"
+        and rel.get("touch_negotiation", {}).get("proposed_by") != cid
+        for rel in c.get("relationships", {}).values()
+    ):
+        action_types.append("respond_touch")
+
     # Wall actions — always contextually available
     action_types.extend(["build_wall", "remove_wall"])
 
@@ -772,6 +789,19 @@ def build_narrative(c, world):
         paragraphs.append(entry["note"])
     for entry in proposals.get("mediating", []):
         paragraphs.append(entry["note"])
+
+    # ---- touch proposals + intimacy state — restores
+    # _build_touch_proposal_context/_build_intimacy_context, previously
+    # unused (dead code, same gap as relationships/memories above) ----
+    touch = _build_touch_proposal_context(c, world) or {}
+    if touch.get("incoming"):
+        paragraphs.append(touch["incoming"]["note"])
+    if touch.get("outgoing"):
+        paragraphs.append(touch["outgoing"]["note"])
+
+    intimacy_lines = _build_intimacy_context(c, world)
+    if intimacy_lines:
+        paragraphs.append("; ".join(intimacy_lines) + ".")
 
     return "\n\n".join(p for p in paragraphs if p)
 

@@ -1046,8 +1046,11 @@ def _route_propose_touch(c, world, action, template_id):
     recipient = chars.get(target_id)
     if not recipient:
         return
-    # Must be at same location
-    if c.get("current_location") != recipient.get("current_location"):
+    # Must be at same location. building_id is the one live-maintained
+    # spatial field (movement.py, room_assignment.py) — current_location
+    # is never written anywhere, so comparing it always passed regardless
+    # of real proximity.
+    if c.get("building_id") != recipient.get("building_id"):
         return
 
     try:

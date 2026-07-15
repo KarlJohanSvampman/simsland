@@ -573,8 +573,15 @@ TOUCH_ANIMATIONS = {
     "high_five":  ("anim_high_five_give",    "anim_high_five_receive"),
 }
 
-# How many ticks before an unanswered touch proposal auto-expires
-TOUCH_PROPOSAL_TIMEOUT = 5
+# How many ticks a touch proposal waits for the recipient's own LLM to
+# respond via respond_touch before tick_touch_proposals() falls back to
+# recipient_touch_decision()'s heuristic. Was 5 — nowhere near how long a
+# real LLM decision takes (measured 40-80s/call this session), which meant
+# the heuristic resolved almost every proposal before the recipient's own
+# think() cycle ever saw it as a pending choice. 300 gives a real window,
+# matching this codebase's other "wait a while before falling back"
+# thresholds (brain/conversations.py::cleanup_conversations's timeout=600).
+TOUCH_PROPOSAL_TIMEOUT = 300
 
 
 def ensure_touch_negotiation(rel):
@@ -812,12 +819,19 @@ def _handle_touch_rejection(proposer, recipient, template_id, world):
 
 def tick_touch_proposals(world):
     """
-    Per-tick: resolve pending touch proposals via AI decision.
+    Per-tick: give pending touch proposals a chance to resolve.
     Called from tick_intimacy.
 
-    For every relationship where touch_negotiation.state == PROPOSED
-    and this character is NOT the proposer, call recipient_touch_decision
-    and respond accordingly.  Expire stale proposals.
+    For every relationship where touch_negotiation.state == PROPOSED and
+    this character is NOT the proposer, wait for the recipient's own LLM
+    to respond via the respond_touch action (action_router.py) — once
+    that fires, respond_to_touch_proposal() resets the state to idle and
+    this loop naturally stops seeing it. Only once TOUCH_PROPOSAL_TIMEOUT
+    ticks pass with no manual response does recipient_touch_decision()'s
+    heuristic kick in, as a genuine fallback rather than the primary
+    resolution path (previously this ran every tick regardless of age,
+    which meant the heuristic resolved almost every proposal before the
+    recipient's own think() cycle ever had a chance to see it).
     """
     tick     = world.get("tick", 0)
     chars    = world.get("characters", {})
@@ -850,17 +864,20 @@ def tick_touch_proposals(world):
                 _clear_touch_neg(recipient, proposer_id, tick)
                 continue
 
-            # Expire stale proposals
-            if tick - tneg.get("last_tick", 0) > TOUCH_PROPOSAL_TIMEOUT:
+            # Still within the response window — give the recipient's own
+            # LLM a real chance to call respond_touch first.
+            if tick - tneg.get("last_tick", 0) < TOUCH_PROPOSAL_TIMEOUT:
+                continue
+
+            # Timed out. building_id is the one live-maintained spatial
+            # field — if they've drifted apart in the meantime, the
+            # proposal just lapses; otherwise fall back to a heuristic
+            # decision so it doesn't hang forever unanswered.
+            if proposer.get("building_id") != recipient.get("building_id"):
                 _clear_touch_neg(proposer, recipient["id"], tick)
                 _clear_touch_neg(recipient, proposer_id, tick)
                 continue
 
-            # Both must be at the same location
-            if proposer.get("current_location") != recipient.get("current_location"):
-                continue
-
-            # AI decision
             decision = recipient_touch_decision(recipient, proposer, world)
             respond_to_touch_proposal(recipient, proposer, decision, world)
 

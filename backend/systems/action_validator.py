@@ -82,7 +82,29 @@ VALID_ACTIONS = {
 
     "respond_social",
 
-    "advance_social_round"
+    "advance_social_round",
+
+    # Touch proposals (see systems/intimacy.py) — the router code
+    # (_route_propose_touch/_route_respond_touch in action_router.py) was
+    # fully built but these were never registered, the exact gap
+    # systems/proposals.py's docstring was written against.
+    "hug",
+
+    "kiss",
+
+    "kiss_peck",
+
+    "kiss_deep",
+
+    "cuddle",
+
+    "hold_hands",
+
+    "handshake",
+
+    "high_five",
+
+    "respond_touch"
 }
 
 
