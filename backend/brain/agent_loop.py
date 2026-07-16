@@ -410,16 +410,22 @@ def process_decision(
                 definitions=world.get("definitions", {})
             )
 
-            # still call execute_activity for non-router
-            # action types (eat, sleep, work handled there)
+            # route_action() above scaffolds c["activity"] for activity-style
+            # action types (eat, sleep, work, ...) via _scaffold()/start_activity().
+            # Process that scaffolded activity's first tick immediately rather
+            # than waiting a full tick — but read it back off c, not the raw
+            # LLM `action` dict, which never has the "phase"/"duration"/etc.
+            # fields execute_activity() requires and isn't itself an activity.
+            # Some action types (hug, confront, propose_chore, ...) don't set
+            # c["activity"] at all, hence the truthiness guard.
             if action.get("type") not in (
                 "speak", "socialize", "move",
                 "interact", "wait", "call", "text",
-            ):
+            ) and c.get("activity"):
                 execute_activity(
                     c,
                     world,
-                    action
+                    c["activity"]
                 )
 
         else:
