@@ -203,6 +203,24 @@ def maybe_go_offgrid(c, world):
         send_offgrid(c, world, random.choice(["leisure", "gym", "cafe"]), 28)
 
 
+def maybe_schedule_doctor_visit(c, world):
+    """Send a character off-grid for a doctor/hospital visit, frequency
+    scaled by systems/health.py::_compute_doctor_visits_needed's severity-
+    weighted target (see process_return's "doctor"/"hospital" branch below
+    for the treatment applied on return)."""
+    if c.get("off_grid") or c.get("conversation"):
+        return
+    if not c.get("alive", True) or c.get("posture") in ("incapacitated", "crawling"):
+        return
+    needed = c.get("health_state", {}).get("doctor_visits_needed", 0)
+    if needed <= 0:
+        return
+    if random.random() < 0.002 * needed:
+        reason = "hospital" if needed >= 4 else "doctor"
+        duration = 60 if reason == "hospital" else 20
+        send_offgrid(c, world, reason, duration)
+
+
 def _story(c, world, reason):
     env    = world["environment"]
     parts  = []
@@ -281,6 +299,30 @@ def process_return(c, world):
         if h:
             h["wealth"] += earned
         story["summary"] += f" Earned ${earned:.0f}."
+    elif reason in ("doctor", "hospital"):
+        from core.definitions import load_definitions
+        defs = load_definitions(world.get("sim_id", "default"))
+        ph_templates = defs.get("physical_health_templates", {})
+        meds = c.setdefault("health_state", {}).setdefault("medications_taken", {})
+        treated_any = []
+        for cond_key in c.get("physical_health", []):
+            tmpl = ph_templates.get(cond_key, {})
+            for med in tmpl.get("medicine", []):
+                if med not in meds:
+                    meds[med] = {"tick": world["tick"], "treats": cond_key}
+                    treated_any.append(med)
+                    break
+        company = defs.get("company_templates", {}).get(
+            "hospital" if reason == "hospital" else "gp_clinic", {})
+        lo, hi = company.get("cost_range", [50, 300])
+        cost = random.uniform(lo, hi)
+        h = world.get("households", {}).get(c.get("household_id"))
+        if h:
+            h["wealth"] = max(0, h.get("wealth", 0) - cost)
+        if treated_any:
+            story["summary"] += f" Was prescribed {', '.join(treated_any)}. Cost ${cost:.0f}."
+        else:
+            story["summary"] += f" Routine checkup. Cost ${cost:.0f}."
 
     handle_return_transport(c, world)
 

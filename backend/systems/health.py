@@ -256,6 +256,25 @@ def tick_physical_conditions(char, world):
             char["stamina"] = max(0.0, char.get("stamina", 1.0) - sp * 0.01)
 
     _check_recoveries(char, world, ph_templates, tick)
+    char.setdefault("health_state", {})["doctor_visits_needed"] = \
+        _compute_doctor_visits_needed(char, ph_templates)
+
+
+def _compute_doctor_visits_needed(char, ph_templates):
+    """How many doctor/hospital visits would fully treat this character's
+    current undertreated conditions right now -- severity-scaled (see
+    systems/offgrid.py::maybe_schedule_doctor_visit, the consumer). A
+    condition already covered by medications_taken doesn't keep demanding
+    visits, so this falls back to 0 once treatment catches up."""
+    total = 0
+    meds = char.get("health_state", {}).get("medications_taken", {})
+    for cond_key in char.get("physical_health", []):
+        tmpl = ph_templates.get(cond_key, {})
+        medicine = tmpl.get("medicine", [])
+        if medicine and any(m in meds for m in medicine):
+            continue
+        total += max(1, round(tmpl.get("severity", 3) / 3))
+    return min(total, 5)
 
 
 def _check_heart_disease_high(char, world, tick):

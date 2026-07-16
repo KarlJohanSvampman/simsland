@@ -74,6 +74,7 @@ from systems.scheduling import (
 
 from systems.offgrid import (
     maybe_go_offgrid,
+    maybe_schedule_doctor_visit,
     process_return
 )
 
@@ -239,6 +240,11 @@ def update_offgrid(
     )
 
     maybe_go_offgrid(
+        c,
+        world
+    )
+
+    maybe_schedule_doctor_visit(
         c,
         world
     )
