@@ -6,6 +6,9 @@ from uuid import uuid4
 
 
 def ensure_world_defaults(world, defs=None):
+    # Server-side time-scale control (see api/admin.py) -- 1x is realtime.
+    world.setdefault("time_scale", 1)
+
     # Init community stats from definitions if provided
     if defs is not None:
         try:

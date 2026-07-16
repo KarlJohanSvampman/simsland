@@ -44,6 +44,7 @@ from api.animbank  import router as animbank_router
 from api.view      import router as view_router
 from api.debug     import router as debug_router
 from api.household import router as household_router
+from api.admin     import router as admin_router
 
 app = FastAPI(title="Simsland")
 app.add_middleware(
@@ -63,6 +64,7 @@ app.include_router(animbank_router,  prefix="/api")
 app.include_router(editor_router,   prefix="/api/editor")
 app.include_router(debug_router)
 app.include_router(household_router, prefix="/api")
+app.include_router(admin_router)
 
 frontend_dir = Path(__file__).parent / "frontend"
 if frontend_dir.exists():
@@ -192,7 +194,11 @@ def _run_tick_and_persist(sim_id: str) -> tuple[dict, dict]:
 
 
 async def loop():
-    tick_rate = float(os.getenv("TICK_RATE_SECONDS", "1.0"))
+    from core.tick_schedule import TICK_RATE_SECONDS
+
+    world = {}  # only used for time_scale below; overwritten each iteration
+                # on success, stays {} (-> default 1x) if the very first
+                # tick throws before ever assigning it.
 
     while True:
         try:
@@ -234,7 +240,13 @@ async def loop():
             # backend was restarted. Log and keep ticking instead.
             traceback.print_exc()
 
-        await asyncio.sleep(tick_rate)
+        # Server-side time-scale control (see api/admin.py) -- ticks fire
+        # more often in real time as time_scale increases, which is what
+        # actually speeds up everything counted in ticks (activity
+        # durations, need decay, calendar). movement.py counter-scales its
+        # own per-tick distance so walking speed on screen stays constant.
+        time_scale = max(1, min(10, world.get("time_scale", 1)))
+        await asyncio.sleep(TICK_RATE_SECONDS / time_scale)
 
 
 # =========================================================
@@ -310,6 +322,12 @@ def meshbank_page():
 @app.get("/animbank.html")
 def animbank_page():
     path = Path(__file__).parent / "frontend" / "animbank.html"
+    return FileResponse(path)
+
+
+@app.get("/admin.html")
+def admin_page():
+    path = Path(__file__).parent / "frontend" / "admin.html"
     return FileResponse(path)
 
 

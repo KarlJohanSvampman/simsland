@@ -162,10 +162,16 @@ def update_character_movement(
         + dy * dy
     )
 
+    # Counter-scale against server-side time-scale control (see
+    # api/admin.py): ticks fire more often in real time as time_scale
+    # increases, so dividing the per-tick step keeps *real-time* walking
+    # speed constant even though more ticks are being processed per second
+    # -- the one place this file needs to know about time_scale at all.
+    time_scale = max(1, min(10, world.get("time_scale", 1)))
     speed = c.get(
         "move_speed",
         0.05
-    )
+    ) / time_scale
 
     # =====================================
     # STUCK DETECTION

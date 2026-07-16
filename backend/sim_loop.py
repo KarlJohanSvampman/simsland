@@ -27,7 +27,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import core.event_handlers  # noqa: F401 — registers all subscriptions on import
 
-from core.tick_schedule import every, CADENCE
+from core.tick_schedule import every, CADENCE, TICK_RATE_SECONDS
 from core.event_bus     import flush as flush_events
 
 # -- Per-tick (always) -------------------------------------------
@@ -137,7 +137,18 @@ def _run_agent(c, world, t):
 # =========================================================
 
 def advance_calendar(world):
-    now = datetime.now()
+    # Server-side time-scale control (see api/admin.py). This used to just
+    # mirror datetime.now() every tick -- there was no simulated-time
+    # concept to speed up. Now sim_time is its own accumulator, seeded from
+    # real time so 1x behaves identically to before. The speedup itself
+    # comes from main.py's loop() firing ticks more often in real time as
+    # time_scale increases, not from multiplying the increment here --
+    # each tick still only adds one nominal TICK_RATE_SECONDS.
+    if "sim_time" not in world:
+        world["sim_time"] = time.time()
+    else:
+        world["sim_time"] += TICK_RATE_SECONDS
+    now = datetime.fromtimestamp(world["sim_time"])
     world["calendar"] = {
         "year":         now.year,
         "month":        now.month,
@@ -147,7 +158,7 @@ def advance_calendar(world):
         "second":       now.second,
         "minute_of_day": now.hour * 60 + now.minute,
         "weekday":      now.strftime("%A"),
-        "timestamp":    time.time(),
+        "timestamp":    world["sim_time"],
     }
 
 

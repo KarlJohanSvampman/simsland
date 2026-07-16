@@ -16,6 +16,17 @@
 # sim_loop.
 # =========================================================
 
+import os
+
+# Real seconds between world ticks at 1x time_scale -- single source of
+# truth shared by main.py's loop() (which divides this by the live
+# time_scale to decide how long to sleep) and sim_loop.py's
+# advance_calendar() (which adds this flat amount of simulated time per
+# tick; the speedup itself comes from ticks firing more often, not from
+# multiplying this value -- see systems/schema_defaults.py's time_scale
+# default and api/admin.py).
+TICK_RATE_SECONDS = float(os.getenv("TICK_RATE_SECONDS", "1.0"))
+
 
 def every(world: dict, n: int, offset: int = 0) -> bool:
     """True once every `n` ticks, offset by `offset` to spread load."""

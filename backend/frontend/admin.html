@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HoloSims Admin</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --bg2: #161b22;
+    --bg3: #21262d;
+    --border: #30363d;
+    --text: #c9d1d9;
+    --text-dim: #8b949e;
+    --accent: #58a6ff;
+    --accent2: #3fb950;
+    --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --mono: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg); color: var(--text); font-family: var(--sans);
+    min-height: 100vh; display: flex; flex-direction: column; align-items: center;
+    padding: 40px 20px;
+  }
+  h1 { font-size: 18px; font-weight: 600; margin-bottom: 4px; }
+  h1 span { color: var(--accent); }
+  .subtitle { color: var(--text-dim); font-size: 12px; margin-bottom: 28px; }
+
+  .card {
+    background: var(--bg2); border: 1px solid var(--border); border-radius: 10px;
+    padding: 24px 28px; width: 100%; max-width: 520px;
+  }
+
+  .clock-label { font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px; }
+  .clock { font-family: var(--mono); font-size: 28px; color: var(--text); margin-bottom: 4px; }
+  .clock-date { font-family: var(--mono); font-size: 13px; color: var(--text-dim); margin-bottom: 24px; }
+
+  .speed-label { font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 10px; }
+  .speed-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+  .speed-btn {
+    background: var(--bg3); border: 1px solid var(--border); border-radius: 6px;
+    color: var(--text); padding: 12px 0; font-size: 14px; font-family: var(--mono);
+    cursor: pointer; transition: all .12s;
+  }
+  .speed-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .speed-btn.active {
+    background: rgba(63,185,80,.15); border-color: var(--accent2); color: var(--accent2);
+    font-weight: 600;
+  }
+
+  .status { margin-top: 16px; font-size: 11px; color: var(--text-dim); min-height: 14px; }
+</style>
+</head>
+<body>
+  <h1>HoloSims <span>Admin</span></h1>
+  <div class="subtitle">Server-side simulation controls</div>
+
+  <div class="card">
+    <div class="clock-label">Simulated Date &amp; Time</div>
+    <div class="clock" id="clock">--:--:--</div>
+    <div class="clock-date" id="clockDate">-</div>
+
+    <div class="speed-label">Time Scale</div>
+    <div class="speed-grid" id="speedGrid"></div>
+
+    <div class="status" id="status"></div>
+  </div>
+
+<script>
+const grid = document.getElementById('speedGrid');
+const clockEl = document.getElementById('clock');
+const dateEl = document.getElementById('clockDate');
+const statusEl = document.getElementById('status');
+
+for (let i = 1; i <= 10; i++) {
+  const btn = document.createElement('button');
+  btn.className = 'speed-btn';
+  btn.textContent = i + 'x';
+  btn.dataset.value = i;
+  btn.addEventListener('click', () => setTimeScale(i));
+  grid.appendChild(btn);
+}
+
+function highlight(value) {
+  for (const btn of grid.children) {
+    btn.classList.toggle('active', Number(btn.dataset.value) === value);
+  }
+}
+
+function renderCalendar(cal) {
+  if (!cal || cal.hour === undefined) return;
+  const pad = n => String(n).padStart(2, '0');
+  clockEl.textContent = `${pad(cal.hour)}:${pad(cal.minute)}:${pad(cal.second)}`;
+  dateEl.textContent = `${cal.weekday}, ${cal.year}-${pad(cal.month)}-${pad(cal.day)}`;
+}
+
+async function refreshState() {
+  try {
+    const res = await fetch('/admin/state');
+    const data = await res.json();
+    highlight(data.time_scale);
+    renderCalendar(data.calendar);
+  } catch (e) {
+    statusEl.textContent = 'Failed to reach server.';
+  }
+}
+
+async function setTimeScale(value) {
+  highlight(value);
+  statusEl.textContent = 'Setting...';
+  try {
+    const res = await fetch('/admin/time_scale', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({value}),
+    });
+    const data = await res.json();
+    highlight(data.time_scale);
+    statusEl.textContent = `Speed set to ${data.time_scale}x`;
+  } catch (e) {
+    statusEl.textContent = 'Failed to set speed.';
+  }
+}
+
+refreshState();
+setInterval(refreshState, 2000);
+</script>
+</body>
+</html>
