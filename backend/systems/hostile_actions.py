@@ -235,6 +235,22 @@ def _apply_relationship_impact(actor, target, outcome):
 
 # ── Main entry point ────────────────────────────────────────────────────────
 
+def _tag_minor_offender_incident(inc, actor, target, world):
+    """When the offender is a child, tag the incident with the signal
+    action_router.py's _route_call_parent needs to decide whether a parent
+    call (not 911) is the appropriate response -- captured once here so
+    nothing downstream has to recompute severity. "Hurt" = compute_severity
+    lands at moderate or worse; a plain punch/kick/shove never calls
+    apply_blunt_trauma at all today (only weapon-gated stab/knock do), so
+    most child scuffles will naturally land at healthy/mild."""
+    if not inc or actor.get("age_group") != "child":
+        return
+    from systems.health import compute_severity
+    _, tier = compute_severity(target)
+    inc["offender_is_minor"] = True
+    inc["victim_injured"] = tier not in ("healthy", "mild")
+
+
 def resolve_hostile_action(actor, target, action_id, world):
     """
     Resolve a hostile action (punch/kick/shove/catch_and_hold/hold_down/
@@ -323,7 +339,8 @@ def resolve_hostile_action(actor, target, action_id, world):
 
         try:
             from systems.emergency import report_assault_incident
-            report_assault_incident(world, actor, victim=target)
+            inc = report_assault_incident(world, actor, victim=target)
+            _tag_minor_offender_incident(inc, actor, target, world)
         except Exception:
             pass
 
@@ -343,7 +360,8 @@ def resolve_hostile_action(actor, target, action_id, world):
             pass
         try:
             from systems.emergency import report_assault_incident
-            report_assault_incident(world, actor, victim=target)
+            inc = report_assault_incident(world, actor, victim=target)
+            _tag_minor_offender_incident(inc, actor, target, world)
         except Exception:
             pass
 

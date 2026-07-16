@@ -1377,7 +1377,7 @@ def execute_activity(
     # USING  — tick elapsed time
     # =====================================================
 
-    if act["phase"] == "using":
+    if act.get("phase", "using") == "using":
 
         elapsed = world["tick"] - act["phase_started_tick"]
 
@@ -1393,6 +1393,18 @@ def execute_activity(
                         props.pop(pid, None)
                     else:
                         world["props"] = [p for p in props if p.get("id") != pid]
+                    # "destroy" is a real offense (vandalism), not the
+                    # legitimate garbage disposal "trash" is -- see
+                    # systems/emergency.py::report_property_damage_incident,
+                    # picked up by action_router.py::_route_call_parent /
+                    # context_builder.py's call_parent-offering logic with
+                    # zero changes to either.
+                    if interaction == "destroy":
+                        try:
+                            from systems.emergency import report_property_damage_incident
+                            report_property_damage_incident(world, c, prop)
+                        except Exception:
+                            pass
 
             # Reset prop animation (door closes, button returns to idle, etc.)
             prop = get_prop_by_id(world, act.get("target_id"))
@@ -1408,7 +1420,7 @@ def execute_activity(
     # FINISHING  — one tick to play finishing animation
     # =====================================================
 
-    if act["phase"] == "finishing":
+    if act.get("phase", "using") == "finishing":
 
         finish_activity(c, world)
         return False

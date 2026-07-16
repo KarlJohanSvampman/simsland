@@ -111,7 +111,7 @@ def apply_discipline(character, authority, method_id, world):
 
     Returns the method definition or None if not found.
     """
-    defs    = world.get("defs", {})
+    defs    = world.get("definitions", {})
     methods = defs.get("disciplinary_methods_registry", {})
     method  = methods.get(method_id)
     if not method:

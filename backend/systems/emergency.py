@@ -55,6 +55,35 @@ def report_assault_incident(world, offender, victim=None):
     return inc
 
 
+def report_property_damage_incident(world, offender, prop):
+    """
+    Create a real incident for a deliberate "destroy" action (see
+    activities.py's trash/destroy completion handler) -- mirrors
+    report_assault_incident's shape, just no victim. offender_is_minor is
+    set directly here (rather than by the caller, like hostile_actions.py
+    does for assault) since there's only one call site for this one.
+    Reused as-is by action_router.py::_route_call_parent and
+    context_builder.py::build_available_actions -- both key off the
+    generic offender_is_minor/victim_injured fields, not anything
+    assault-specific, so a property-damage incident needs no changes to
+    either.
+    """
+    inc = {
+        "id":           f"inc_{uuid.uuid4().hex[:6]}",
+        "type":         "property_damage",
+        "offender_id":  offender["id"],
+        "participants": [offender["id"]],
+        "location":     {"x": offender["x"], "y": offender["y"]},
+        "reported":     False,
+        "tick":         world["tick"],
+    }
+    if offender.get("age_group") == "child":
+        inc["offender_is_minor"] = True
+    world.setdefault("incidents", []).append(inc)
+    emit("incident_created", {"incident_id": inc["id"], "type": inc["type"]})
+    return inc
+
+
 def report_medical_emergency_incident(world, c):
     """
     Create a real incident when a character's severity (systems/health.py::

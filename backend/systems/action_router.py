@@ -878,6 +878,8 @@ def route_action(c, world, action, speech, definitions=None):
         _route_confront(c, world, action)
     elif action_type == "call_911":
         _route_call_911(c, world, action)
+    elif action_type == "call_parent":
+        _route_call_parent(c, world, action)
     elif action_type in ("grab_offensive", "hold", "punch", "kick", "shove", "threaten", "stab", "knock"):
         _route_hostile_action(c, world, action)
     elif action_type == "dodge":
@@ -1006,6 +1008,10 @@ def _route_apply_discipline(c, world, action):
     try:
         from systems.conditioning import apply_discipline
         apply_discipline(subject, c, method_id, world)
+        # Clear the intention that prompted this (see systems/child_care.py's
+        # discipline_child_* intention, injected by _route_call_parent below)
+        # -- same close-the-loop pattern feed_child/remind_child already use.
+        _clear_parent_intention(c, f"discipline_child_{target_id}")
     except Exception:
         pass
 
@@ -1176,6 +1182,7 @@ _INCIDENT_CALL_TYPE = {
     "injury":               ("medical", "Someone is injured and needs help."),
     "fire":                 ("fire",    "There's a fire!"),
     "medical_emergency":    ("medical", "Someone needs urgent medical help."),
+    "property_damage":      ("police",  "Someone is destroying property."),
 }
 
 
@@ -1218,6 +1225,65 @@ def _route_call_911(c, world, action):
     try:
         from systems.emergency import create_911_call
         create_911_call(world, c, emergency_type, report, incident_id=incident["id"])
+        incident["reported"] = True
+    except Exception:
+        pass
+
+
+def _route_call_parent(c, world, action):
+    """
+    Adult witness to a child's hostile act calls the child's parent(s)
+    instead of 911 (see systems/hostile_actions.py's offender_is_minor/
+    victim_injured incident tagging). Mirrors _route_call_911's incident
+    lookup + awareness gate exactly; the extra gates below are specific to
+    this action -- wrong incident shape, or a child trying to call on
+    themselves, is a silent no-op, same style call_911 already uses.
+    action: {"type": "call_parent", "target_id": incident_id}
+    """
+    if c.get("age_group") not in ("adult", "elderly"):
+        return
+
+    incident_id = action.get("target_id") or action.get("target")
+    if not incident_id:
+        return
+    incident = next(
+        (i for i in world.get("incidents", []) if i["id"] == incident_id),
+        None,
+    )
+    if not incident or incident.get("reported"):
+        return
+    if not incident.get("offender_is_minor") or incident.get("victim_injured"):
+        return
+
+    loc = incident.get("location", {})
+    is_participant = c["id"] in incident.get("participants", [])
+    is_nearby = (
+        "x" in loc and "y" in loc
+        and abs(c.get("x", 0) - loc["x"]) + abs(c.get("y", 0) - loc["y"]) < 4
+    )
+    if not (is_participant or is_nearby):
+        return
+
+    offender = world.get("characters", {}).get(incident.get("offender_id"))
+    if not offender:
+        return
+
+    try:
+        from systems.child_care import _find_parents_for_child
+        from brain.intentions import add_intention
+
+        parents = _find_parents_for_child(offender, world)
+        if not parents:
+            return
+
+        for parent in parents:
+            add_intention(parent, {
+                "type":     f"discipline_child_{offender['id']}",
+                "category": "health",
+                "priority": 85,
+                "reason":   f"{offender.get('name', 'your child')} got into a fight and needs to be dealt with",
+                "child_id": offender["id"],
+            })
         incident["reported"] = True
     except Exception:
         pass

@@ -173,6 +173,33 @@ VALID_ACTIONS = {
     "feed_child",
 
     "remind_child",
+
+    # Discipline system (see systems/conditioning.py) — apply_discipline/
+    # apply_reward/negotiate_contract are fully built and already dispatched
+    # in action_router.py's elif chain, but were never registered here —
+    # same class of gap as stand_up above. Also blocked until now by
+    # conditioning.py reading world["defs"] (always empty; the live world
+    # only ever populates world["definitions"]).
+    "apply_discipline",
+
+    "apply_reward",
+
+    "negotiate_contract",
+
+    # Adult witness to a child's hostile act calling the child's parent(s)
+    # instead of 911 (see systems/hostile_actions.py's offender_is_minor/
+    # victim_injured incident tagging, action_router.py's _route_call_parent).
+    "call_parent",
+
+    # Prop destruction/disposal (see activities.py's trash/destroy
+    # completion handler, which already genuinely removes the prop --
+    # fully built but, like everything else in this class of gap, never
+    # registered here. "destroy" additionally reports a real
+    # property_damage incident (systems/emergency.py); "trash" is
+    # legitimate garbage disposal and reports nothing.
+    "trash",
+
+    "destroy",
 }
 
 

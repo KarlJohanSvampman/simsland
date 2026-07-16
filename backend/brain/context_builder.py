@@ -398,6 +398,14 @@ def build_available_actions(c, world):
         "text",
     ]
 
+    # Prop disposal/destruction (see activities.py's trash/destroy
+    # completion handler) — offered generically whenever a prop is visible,
+    # same "route handler validates the specific target" convention as
+    # interact/the hostile-action types; "destroy" additionally reports a
+    # real property_damage incident (systems/emergency.py).
+    if interactable:
+        action_types.extend(["trash", "destroy"])
+
     # Clothing in inventory — can put on
     wearable_in_inventory = [
         {"item_id": i["id"], "template_id": i.get("template_id"), "name": i.get("name"), "slot": i.get("slot")}
@@ -548,6 +556,17 @@ def build_available_actions(c, world):
     ]
     if active_incidents:
         action_types.append("call_911")
+
+    # call_parent (see systems/hostile_actions.py's offender_is_minor/
+    # victim_injured incident tagging, action_router.py's _route_call_parent)
+    # -- offered instead of/alongside call_911 for a co-located adult when
+    # the offender is a child and nobody was actually hurt. call_911 above
+    # stays available regardless; this just adds the more fitting option.
+    if c.get("age_group") in ("adult", "elderly") and any(
+        inc["offender_is_minor"] and not inc["victim_injured"]
+        for inc in active_incidents
+    ):
+        action_types.append("call_parent")
 
     # Hostile actions (see systems/hostile_actions.py) — the six offensive
     # types listed whenever someone's nearby, same "route handler
@@ -2129,12 +2148,14 @@ def _build_incident_context(c, world):
         if not (is_participant or is_nearby):
             continue
         result.append({
-            "id":               inc["id"],
-            "type":             inc.get("type"),
-            "severity":         inc.get("severity", 0),
-            "reported":         inc.get("reported", False),
-            "offender_id":      inc.get("offender_id"),
-            "responder_status": _responder_status_for_incident(inc, world),
+            "id":                 inc["id"],
+            "type":               inc.get("type"),
+            "severity":           inc.get("severity", 0),
+            "reported":           inc.get("reported", False),
+            "offender_id":        inc.get("offender_id"),
+            "offender_is_minor":  inc.get("offender_is_minor", False),
+            "victim_injured":     inc.get("victim_injured", False),
+            "responder_status":   _responder_status_for_incident(inc, world),
         })
     return result
 
