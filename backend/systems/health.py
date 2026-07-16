@@ -587,6 +587,26 @@ def apply_blade_injury(char, world, body_part, sharpness, size, irregular_shape,
     return injury
 
 
+# ---------------------------------------------------------------------------
+# Physical injury: burn
+# ---------------------------------------------------------------------------
+
+def apply_burn_injury(char, world, body_part, severity, tick):
+    injuries = char.setdefault("health_state", {}).setdefault("injuries", [])
+    injury = {"type": "burn", "body_part": body_part, "severity": round(severity, 3), "tick": tick}
+    injuries.append(injury)
+
+    if severity >= 0.6:
+        char["health_state"].setdefault("active_emergencies", {})["agonizing_pain"] = {
+            "severity": 6, "source": "burn"
+        }
+
+    _remember(char, f"Suffered a burn to {body_part.replace('_', ' ')}.", 0.85,
+              ["health", "injury", "burn"], "health", tick)
+    add_pain(char, severity * 35)
+    return injury
+
+
 def tick_bleeding(char, world):
     tick = world.get("tick", 0)
     state = char.get("health_state", {}).get("active_emergencies", {}).get("bleeding")
@@ -794,6 +814,8 @@ def compute_severity(char):
             signals.append(min(100.0, inj.get("bleeding_severity", 0) * 100))
         elif inj.get("type") == "blunt":
             signals.append(min(100.0, inj.get("force", 0) * 100))
+        elif inj.get("type") == "burn":
+            signals.append(min(100.0, inj.get("severity", 0) * 100))
 
     blood_lost = hs.get("total_blood_lost", 0.0)
     if blood_lost:

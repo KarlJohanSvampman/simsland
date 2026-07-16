@@ -93,21 +93,6 @@ def trigger_incident(world, c):
             }
             world.setdefault("incidents", []).append(inc)
             emit("incident_created", {"incident_id": inc["id"], "type": inc["type"]})
-
-        if random.random() < .0008:
-            inc = {
-                "id":           f"inc_{uuid.uuid4().hex[:6]}",
-                "type":         "injury",
-                "participants": [c["id"]],
-                "location":     {"x": c["x"], "y": c["y"]},
-                "reported":     False,
-                "tick":         world["tick"],
-            }
-            world.setdefault("incidents", []).append(inc)
-            c["health"].setdefault("conditions", []).append(
-                {"id": "injury", "symptoms": ["pain", "fatigue"], "curable": True, "treated": False}
-            )
-            emit("incident_created", {"incident_id": inc["id"], "type": inc["type"]})
     else:
         # World-level random incidents (no character context)
         if random.random() < .0002:
@@ -219,10 +204,10 @@ def resolve(world):
                     for c in world["characters"].values():
                         if building_id and c.get("building_id") != building_id:
                             continue
-                        conditions = c.get("health", {}).get("conditions", [])
-                        c["health"]["conditions"] = [
-                            cond for cond in conditions
-                            if cond.get("id") not in ("smoke_inhalation", "burn")
+                        hs = c.setdefault("health_state", {})
+                        hs["injuries"] = [
+                            inj for inj in hs.get("injuries", [])
+                            if not (inj.get("type") == "burn" and inj.get("incident_id") == inc["id"])
                         ]
             emit("incident_resolved", {"responder_id": r["id"], "type": r["type"]})
 
@@ -230,7 +215,12 @@ def resolve(world):
 def tick_fire_incidents(world):
     """Advance active fire incidents: severity climbs each tick until a
     'fire' responder extinguishes it (see resolve() above); harm applies to
-    anyone still in the building at higher severity thresholds."""
+    anyone still in the building at higher severity thresholds. Feeds the
+    real health_state pipeline (apply_burn_injury/add_pain) instead of the
+    disconnected legacy c["health"]["conditions"] list, so a fire actually
+    registers in compute_severity() and can trip the 911 medical-emergency
+    bridge like any other injury."""
+    from systems.health import apply_burn_injury, add_pain
     chars = world.get("characters", {})
     for inc in world.get("incidents", []):
         if inc.get("type") != "fire" or inc.get("extinguished"):
@@ -241,18 +231,11 @@ def tick_fire_incidents(world):
             continue
         present = [c for c in chars.values() if c.get("building_id") == building_id]
         for c in present:
-            conditions = c["health"].setdefault("conditions", [])
-            if inc["severity"] >= 40 and not any(
-                cond.get("id") == "smoke_inhalation" for cond in conditions
-            ):
-                conditions.append({
-                    "id": "smoke_inhalation", "symptoms": ["coughing", "dizziness"],
-                    "curable": True, "treated": False,
-                })
-            if inc["severity"] >= 70 and not any(
-                cond.get("id") == "burn" for cond in conditions
-            ):
-                conditions.append({
-                    "id": "burn", "symptoms": ["pain", "fatigue"],
-                    "curable": True, "treated": False,
-                })
+            if inc["severity"] >= 40:
+                add_pain(c, 2)
+            if inc["severity"] >= 70:
+                injuries = c.setdefault("health_state", {}).setdefault("injuries", [])
+                if not any(inj.get("type") == "burn" and inj.get("incident_id") == inc["id"]
+                           for inj in injuries):
+                    burn = apply_burn_injury(c, world, "torso", severity=0.5, tick=world["tick"])
+                    burn["incident_id"] = inc["id"]

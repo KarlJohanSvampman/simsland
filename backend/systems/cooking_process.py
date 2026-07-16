@@ -248,6 +248,10 @@ def update_cooking_process(
         stage["duration"] * 60
     )
 
+    if stage.get("active", True):
+        from systems.accidents import maybe_trigger_cooking_accident
+        maybe_trigger_cooking_accident(c, world, stage.get("primitive"))
+
     # =====================================================
     # STAGE COMPLETE
     # =====================================================
