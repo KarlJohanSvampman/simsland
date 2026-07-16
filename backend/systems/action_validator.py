@@ -164,7 +164,15 @@ VALID_ACTIONS = {
     # session. Only registering the one needed for knockdown recovery;
     # sit_down/lie_down/lean_against_wall have the identical gap but are
     # out of scope here.
-    "stand_up"
+    "stand_up",
+
+    # Child care (see systems/child_care.py's tick_child_needs) — parent-
+    # initiated response to a child's hunger (can't cook for themselves) or
+    # a reminder nudge for a need the child can handle once prompted
+    # (toilet/sleep).
+    "feed_child",
+
+    "remind_child",
 }
 
 

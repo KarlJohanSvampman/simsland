@@ -335,12 +335,19 @@ def build_available_actions(c, world):
     # INTERACTABLE PROPS  (from visible_props)
     # -----------------------------------------------
     interactable = []
+    is_child = c.get("age_group") == "child"
 
     for prop in perception.get("visible_props", []):
         tags = prop.get("tags", [])
         interactions = prop.get("interactions", [])
 
         if not tags and not interactions:
+            continue
+
+        # Children can't cook for themselves (see systems/child_care.py) —
+        # strip stove/oven/microwave-type props from what they're even
+        # told is available, rather than relying on the LLM to decline.
+        if is_child and "cooking" in tags:
             continue
 
         interactable.append({
@@ -459,6 +466,18 @@ def build_available_actions(c, world):
     household = world.get("households", {}).get(household_id) if household_id else None
     if household and household.get("_last_completed_chore"):
         action_types.append("propose_recurring")
+
+    # Child care (see systems/child_care.py) — feed_child/remind_child only
+    # offered when a co-located child actually has a flagged need, mirroring
+    # propose_recurring's "only appears once there's something to act on"
+    # shape above.
+    for other in world.get("characters", {}).values():
+        if other.get("building_id") != c.get("building_id"):
+            continue
+        if other.get("_awaiting_caregiver") and "feed_child" not in action_types:
+            action_types.append("feed_child")
+        if other.get("_awaiting_reminder") and "remind_child" not in action_types:
+            action_types.append("remind_child")
 
     # respond_chore/advance_chore_round only make sense (and only appear)
     # when this character actually has something pending — see
@@ -904,6 +923,19 @@ def build_narrative(c, world):
     health_line = _build_health_context(c, world)
     if health_line:
         paragraphs.append(health_line)
+
+    # ---- bedroom ownership — see systems/bedroom_assignment.py ----
+    bedroom_id = c.get("bedroom_id")
+    if bedroom_id:
+        roommates = [
+            other.get("name", "someone")
+            for other in world.get("characters", {}).values()
+            if other["id"] != c["id"] and other.get("bedroom_id") == bedroom_id
+        ]
+        if roommates:
+            paragraphs.append(f"You share your room with {', '.join(roommates)}.")
+        else:
+            paragraphs.append("You have your own room.")
 
     # ---- active intentions/goals ----
     intentions = build_intentions(c)

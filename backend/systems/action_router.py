@@ -921,6 +921,10 @@ def route_action(c, world, action, speech, definitions=None):
         _route_hold_baby(c, world, action)
     elif action_type == "put_baby_in_carriage":
         _route_put_baby_in_carriage(c, world, action)
+    elif action_type == "feed_child":
+        _route_feed_child(c, world, action)
+    elif action_type == "remind_child":
+        _route_remind_child(c, world, action)
 
     # ── Posture ──────────────────────────────────────────────────────────
     elif action_type == "sit_down":
@@ -1567,6 +1571,65 @@ def _route_put_baby_in_carriage(c, world, action):
                                target_id=target_id,
                                interaction="put_baby_in_carriage",
                                duration=5)
+
+
+# =========================================================
+# CHILD CARE — see systems/child_care.py. Parent-initiated response to a
+# child's need notification (tick_child_needs). Locality uses building_id,
+# the one live-maintained spatial field this session's other locality gates
+# all use (not current_location, which baby.py's routes above use but
+# nothing else in the live schema populates).
+# =========================================================
+
+def _clear_parent_intention(parent, intent_type):
+    parent["active_intentions"] = [
+        i for i in parent.get("active_intentions", [])
+        if i.get("type") != intent_type
+    ]
+
+
+def _route_feed_child(c, world, action):
+    """Parent feeds a hungry child who can't cook for themselves."""
+    target_id = action.get("target_id") or action.get("target")
+    if not target_id:
+        return
+    child = world.get("characters", {}).get(target_id)
+    if not child or child.get("building_id") != c.get("building_id"):
+        return
+    if not child.get("_awaiting_caregiver"):
+        return
+
+    body = child.setdefault("body", {})
+    body["hunger"] = max(0.0, body.get("hunger", 0) - 60)
+    child.pop("_awaiting_caregiver", None)
+    _clear_parent_intention(c, f"feed_child_{child['id']}")
+
+
+def _route_remind_child(c, world, action):
+    """Parent reminds a child to handle a need the child can manage
+    themselves (toilet/sleep) once prompted."""
+    from brain.intentions import add_intention
+
+    target_id = action.get("target_id") or action.get("target")
+    if not target_id:
+        return
+    child = world.get("characters", {}).get(target_id)
+    if not child or child.get("building_id") != c.get("building_id"):
+        return
+    awaiting = child.get("_awaiting_reminder")
+    if not awaiting:
+        return
+
+    need = awaiting.get("need")
+    prompt_type = "go_to_sleep" if need == "fatigue" else "go_to_toilet"
+    add_intention(child, {
+        "type":     prompt_type,
+        "category": "survival",
+        "priority": 90,
+        "reason":   f"your parent just reminded you about {need}",
+    })
+    child.pop("_awaiting_reminder", None)
+    _clear_parent_intention(c, f"remind_child_{child['id']}")
 
 
 # =========================================================

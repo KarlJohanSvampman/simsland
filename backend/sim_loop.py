@@ -74,6 +74,8 @@ from systems.conflict_pipeline import process_conflicts
 from systems.grapple         import process_grapples
 from systems.social_contracts  import check_contract_violations
 from systems.contagion       import tick_contagion_location
+from systems.child_care      import tick_child_needs
+from systems.bedroom_assignment import tick_bedroom_assignments
 
 # -- Very slow (÷300) ─────────────────────────────────────────────
 from systems.crisis         import check_crises, process_crises
@@ -445,6 +447,14 @@ def tick(world):
         for group in groups.values():
             if len(group) > 1:
                 tick_contagion_location(group, world)
+
+    # -- Child needs oversight + baseline accountability contract ──
+    if every(world, CADENCE["child_care"], offset=37):
+        tick_child_needs(world)
+
+    # -- Age-based bedroom ownership ────────────────────────────────
+    if every(world, CADENCE["bedroom_assignment"], offset=38):
+        tick_bedroom_assignments(world)
 
     # -- Phone battery drain + charging (÷5) ───────────────
     if every(world, CADENCE["phone_battery"], offset=29):
