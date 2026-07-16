@@ -749,22 +749,27 @@ def apply_severity_consequences(char, world):
     from systems.posture import set_posture
 
     if not char.get("alive", True):
-        set_posture(char, world, "dead")
+        set_posture(char, world, "incapacitated")
         return
 
     score, tier = compute_severity(char)
     em = char.get("health_state", {}).get("active_emergencies", {})
 
     if "unconscious" in em or "coma" in em:
-        set_posture(char, world, "unconscious")
+        set_posture(char, world, "incapacitated")
     elif tier == "critical":
         set_posture(char, world, "crawling")
-    elif tier == "severe":
-        set_posture(char, world, "limping")
-    elif char.get("posture") in ("limping", "crawling"):
-        # Severity has receded -- this posture was severity-driven, not a
-        # deliberate choice (sitting/lying for other reasons is untouched,
-        # since posture won't be "limping"/"crawling" in that case).
+    elif char.get("posture") == "crawling":
+        # Severity has receded below critical -- this posture was
+        # severity-driven, not a deliberate choice (sitting/lying for
+        # other reasons is untouched, since posture won't be "crawling"
+        # in that case).
+        set_posture(char, world, "standing")
+    elif char.get("posture") == "incapacitated":
+        # Recovered from unconscious/coma (still alive, since the alive
+        # check above already returned for the dead case) -- there was
+        # no revert path for this before "unconscious" and "dead" shared
+        # no common posture to revert from.
         set_posture(char, world, "standing")
 
     if tier in _MEDICAL_INCIDENT_TIERS:

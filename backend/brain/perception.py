@@ -293,14 +293,16 @@ def perceived_activity(other):
     # priority over whatever's in the activity dict (see
     # systems/health.py::apply_severity_consequences and
     # systems/grapple.py for how characters end up in them).
+    # "incapacitated" covers both unconscious and dead (systems/health.py
+    # merged them — the only real distinction is c["alive"], which an
+    # observer can read directly, same as the character's own narrative
+    # does), so it's handled separately from the flat lookup below.
+    if other.get("posture") == "incapacitated":
+        return "lying unconscious" if other.get("alive", True) else "lying motionless — not breathing"
+
     posture_labels = {
         "leaning_wall":  "leaning against the wall",
-        "limping":       "limping, visibly hurt",
         "crawling":      "crawling on the ground, badly hurt",
-        "unconscious":   "lying unconscious",
-        "dead":          "lying motionless — not breathing",
-        "held":          "being physically restrained",
-        "holding":       "physically restraining someone",
         "held_down":     "pinned to the ground",
         "holding_down":  "pinning someone to the ground",
     }

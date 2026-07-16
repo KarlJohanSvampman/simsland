@@ -542,7 +542,7 @@ def build_available_actions(c, world):
             "grab_offensive", "hold", "punch", "kick", "shove", "threaten",
         ])
     if _has_recent_aggressor(c, world):
-        action_types.extend(["dodge", "block", "turn_and_run", "back_away"])
+        action_types.extend(["dodge", "block", "turn_and_run"])
 
     # Weapon-gated strikes (see systems/hostile_actions.py) — stab/knock
     # only offered when the actor is actually holding a matching
@@ -568,12 +568,14 @@ def build_available_actions(c, world):
     ):
         action_types.append("wield_item")
 
-    # Knockdown recovery — _route_stand_up (action_router.py) already
-    # existed but, like the rest of the posture-action family, was never
-    # reachable (missing from VALID_ACTIONS until this round). Only
-    # surfaced here for the fallen_front case this round's knockdown
-    # outcome produces.
-    if c.get("posture") == "fallen_front":
+    # Knockdown/critical-severity recovery — _route_stand_up
+    # (action_router.py) already existed but, like the rest of the
+    # posture-action family, was never reachable until it was registered.
+    # "crawling" is now the one on-the-ground-but-conscious state, reached
+    # either via a knockdown/fumble (hostile_actions.py) or automatically
+    # via critical severity (health.py::apply_severity_consequences) — a
+    # character can always try to stand back up from it.
+    if c.get("posture") == "crawling":
         action_types.append("stand_up")
 
     # Multi-round grapple (see systems/grapple.py) — wrestle listed
@@ -605,7 +607,7 @@ def build_available_actions(c, world):
 
     from systems.action_router import _movement_blocked
     if _movement_blocked(c):
-        action_types = [a for a in action_types if a not in ("move", "turn_and_run", "back_away")]
+        action_types = [a for a in action_types if a not in ("move", "turn_and_run")]
 
     # Wall actions — always contextually available
     action_types.extend(["build_wall", "remove_wall"])

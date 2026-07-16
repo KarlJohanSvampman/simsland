@@ -235,7 +235,12 @@ def tick(world):
     # Service worker NPCs are driven by update_services, not LLM — skip them.
     # Each character's LLM call is I/O-bound; workers release the GIL while
     # waiting for the network, so this gives real throughput scaling.
-    agent_chars = [c for c in characters if not c.get("is_service_worker") and c.get("alive", True)]
+    agent_chars = [
+        c for c in characters
+        if not c.get("is_service_worker")
+        and c.get("alive", True)
+        and c.get("posture") != "incapacitated"
+    ]
     futs = {_agent_pool.submit(_run_agent, c, world, t): c for c in agent_chars}
     dirty_char_ids = set()
     for fut in as_completed(futs):

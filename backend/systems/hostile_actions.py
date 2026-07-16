@@ -276,7 +276,7 @@ def resolve_hostile_action(actor, target, action_id, world):
         knockdown_chance = _KNOCKDOWN_BASE.get(template_id, 0.0) * effectiveness
         if knockdown_chance > 0 and random.random() < knockdown_chance:
             drain_stamina(target, 0.05)
-            set_posture(target, world, "fallen_front")
+            set_posture(target, world, "crawling")
 
         # Real injury for weapon-gated strikes -- health.py's
         # apply_blade_injury()/apply_blunt_trauma() were fully built
@@ -335,7 +335,7 @@ def resolve_hostile_action(actor, target, action_id, world):
             pass
 
     elif outcome == "fumble":
-        set_posture(actor, world, "fallen_front")
+        set_posture(actor, world, "crawling")
         try:
             from systems.reactions import push_reaction
             push_reaction(target, "dodge", tick)

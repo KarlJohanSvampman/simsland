@@ -160,7 +160,7 @@ def _movement_blocked(c):
     """
     if not c.get("alive", True):
         return True
-    if c.get("posture") in ("unconscious", "dead"):
+    if c.get("posture") == "incapacitated":
         return True
     if c.get("grappled_by") or c.get("grappling"):
         return True
@@ -886,8 +886,6 @@ def route_action(c, world, action, speech, definitions=None):
         _route_block(c, world, action)
     elif action_type == "turn_and_run":
         _route_turn_and_run(c, world, action)
-    elif action_type == "back_away":
-        _route_back_away(c, world, action)
     elif action_type == "wrestle":
         _route_wrestle(c, world, action)
     elif action_type == "release_hold":
@@ -1290,36 +1288,6 @@ def _route_turn_and_run(c, world, action):
     c["_panic_fleeing"] = {"from_id": aggressor_id, "tick": world.get("tick", 0)}
     if plan_character_route(world, c, flee_x, flee_y):
         c["animation_state"] = "run"
-        c["is_moving"] = True
-
-
-def _route_back_away(c, world, action):
-    """
-    action: {"type": "back_away", "target_id": other_id}
-    A controlled retreat, not panic flight — same short straight-line
-    relocation as turn_and_run (systems/navigation.py::plan_character_route,
-    no pathfinding sophistication), but keeps facing the target and uses
-    the new "walk_backward" locomotion instead of "run" — no panic flag.
-    """
-    if _movement_blocked(c):
-        return
-
-    target_id = action.get("target_id") or action.get("target")
-    target = world.get("characters", {}).get(target_id) if target_id else None
-
-    cx, cy = c.get("x", 0), c.get("y", 0)
-    if target:
-        dx, dy = cx - target.get("x", cx), cy - target.get("y", cy)
-        dist = (dx ** 2 + dy ** 2) ** 0.5 or 1
-        back_x = cx + (dx / dist) * 5
-        back_y = cy + (dy / dist) * 5
-    else:
-        import random
-        back_x = cx + random.uniform(-5, 5)
-        back_y = cy + random.uniform(-5, 5)
-
-    if plan_character_route(world, c, back_x, back_y):
-        c["animation_state"] = "walk_backward"
         c["is_moving"] = True
 
 

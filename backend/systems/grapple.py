@@ -35,15 +35,18 @@ def _has(c, *traits):
     return any(t in c.get("traits", []) for t in traits)
 
 
-# Posture pair per mode -- "wrestle" (standing contest, see
-# hostile_actions.py's catch_and_hold) vs "pin" (static hold, see
-# hostile_actions.py's hold_down "hit" outcome). Each stance's idle_key
-# *is* the struggle animation -- no separate cosmetic layer needed,
-# matching every other posture in stance_templates.
-_MODE_POSTURES = {
-    "wrestle": {"held": "held",      "holder": "holding"},
-    "pin":     {"held": "held_down", "holder": "holding_down"},
-}
+# Both "wrestle" (standing contest, see hostile_actions.py's
+# catch_and_hold) and "pin" (static hold, see hostile_actions.py's
+# hold_down "hit" outcome) share the one held_down/holding_down posture
+# pair -- a standing-vs-ground distinction turned out not to earn its
+# keep, see the stance-simplification round. Each stance's idle_key *is*
+# the struggle animation -- no separate cosmetic layer needed.
+_HELD_POSTURE   = "held_down"
+_HOLDING_POSTURE = "holding_down"
+
+# The bookkeeping *flag* names stay mode-distinct -- they still drive
+# different escape-chance formulas (see _escape_chance below) even
+# though the visual posture no longer differs.
 _MODE_FIELDS = {
     "wrestle": {"held": "grappled_by", "holder": "grappling"},
     "pin":     {"held": "held_by",     "holder": "holding"},
@@ -72,9 +75,8 @@ def start_grapple(holder, held, world, mode="wrestle"):
     holder[fields["holder"]] = held["id"]
 
     from systems.posture import set_posture
-    postures = _MODE_POSTURES[mode]
-    set_posture(held, world, postures["held"])
-    set_posture(holder, world, postures["holder"])
+    set_posture(held, world, _HELD_POSTURE)
+    set_posture(holder, world, _HOLDING_POSTURE)
 
     emit("grapple_started", {
         "grapple_id": grapple["id"], "mode": mode,
@@ -123,9 +125,9 @@ def _clear_grapple_flags(grapple, world):
         holder.pop(fields["holder"], None)
 
     from systems.posture import set_posture
-    if held and held.get("posture") in ("held", "held_down"):
+    if held and held.get("posture") == _HELD_POSTURE:
         set_posture(held, world, "standing")
-    if holder and holder.get("posture") in ("holding", "holding_down"):
+    if holder and holder.get("posture") == _HOLDING_POSTURE:
         set_posture(holder, world, "standing")
 
 

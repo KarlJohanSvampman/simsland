@@ -139,12 +139,6 @@ VALID_ACTIONS = {
 
     "turn_and_run",
 
-    # Back away while facing a target — see systems/action_router.py's
-    # _route_back_away (new stance_templates "walk_backward" move slot on
-    # "standing"). Distinct from turn_and_run: a controlled retreat that
-    # keeps eyes on the target, not panic flight.
-    "back_away",
-
     # Multi-round grapple (see systems/grapple.py) — wrestle attempts the
     # initial grab (via hostile_actions.resolve_hostile_action against
     # catch_and_hold) then, on success, starts a repeatable hold;

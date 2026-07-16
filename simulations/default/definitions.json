@@ -54636,8 +54636,8 @@
           "key": "run"
         },
         {
-          "slot": "walk_backward",
-          "key": "walk_backward"
+          "slot": "sneak",
+          "key": "sneak_move"
         }
       ]
     },
@@ -54662,18 +54662,6 @@
       "idle_key": "lie_idle",
       "moves": []
     },
-    "crouching": {
-      "key": "crouching",
-      "label": "Crouching",
-      "is_posture": true,
-      "idle_key": "crouch_idle",
-      "moves": [
-        {
-          "slot": "move",
-          "key": "crouch_walk"
-        }
-      ]
-    },
     "crawling": {
       "key": "crawling",
       "label": "Crawling",
@@ -54686,20 +54674,6 @@
         }
       ]
     },
-    "fallen_front": {
-      "key": "fallen_front",
-      "label": "Fallen (Front)",
-      "is_posture": true,
-      "idle_key": "fallen_front_idle",
-      "moves": []
-    },
-    "fallen_back": {
-      "key": "fallen_back",
-      "label": "Fallen (Back)",
-      "is_posture": true,
-      "idle_key": "fallen_back_idle",
-      "moves": []
-    },
     "leaning_wall": {
       "key": "leaning_wall",
       "label": "Leaning (Wall)",
@@ -54707,18 +54681,11 @@
       "idle_key": "leaning_idle",
       "moves": []
     },
-    "unconscious": {
-      "key": "unconscious",
-      "label": "Unconscious",
+    "incapacitated": {
+      "key": "incapacitated",
+      "label": "Incapacitated",
       "is_posture": true,
-      "idle_key": "unconscious_idle",
-      "moves": []
-    },
-    "dead": {
-      "key": "dead",
-      "label": "Dead",
-      "is_posture": true,
-      "idle_key": "dead_idle",
+      "idle_key": "incapacitated_idle",
       "moves": []
     },
     "intoxicated": {
@@ -54730,10 +54697,6 @@
         {
           "slot": "walk",
           "key": "drunk_walk"
-        },
-        {
-          "slot": "run",
-          "key": "drunk_run"
         }
       ]
     },
@@ -54749,15 +54712,15 @@
         }
       ]
     },
-    "dragging": {
-      "key": "dragging",
-      "label": "Dragging",
+    "pulling": {
+      "key": "pulling",
+      "label": "Pulling",
       "is_posture": false,
-      "idle_key": "drag_idle",
+      "idle_key": "pull_idle",
       "moves": [
         {
           "slot": "move",
-          "key": "drag_move"
+          "key": "pull_move"
         }
       ]
     },
@@ -54766,32 +54729,6 @@
       "label": "Pushing",
       "is_posture": false,
       "idle_key": "pushing",
-      "moves": []
-    },
-    "limping": {
-      "key": "limping",
-      "label": "Limping",
-      "is_posture": true,
-      "idle_key": "limp_idle",
-      "moves": [
-        {
-          "slot": "walk",
-          "key": "limp_walk"
-        }
-      ]
-    },
-    "held": {
-      "key": "held",
-      "label": "Held (Standing)",
-      "is_posture": true,
-      "idle_key": "struggle_standing_idle",
-      "moves": []
-    },
-    "holding": {
-      "key": "holding",
-      "label": "Holding (Standing)",
-      "is_posture": true,
-      "idle_key": "hold_standing_idle",
       "moves": []
     },
     "held_down": {
