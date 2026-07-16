@@ -73,6 +73,7 @@ from systems.grievances        import update_grievances
 from systems.conflict_pipeline import process_conflicts
 from systems.grapple         import process_grapples
 from systems.social_contracts  import check_contract_violations
+from systems.contagion       import tick_contagion_location
 
 # -- Very slow (÷300) ─────────────────────────────────────────────
 from systems.crisis         import check_crises, process_crises
@@ -434,6 +435,16 @@ def tick(world):
     if every(world, CADENCE["social_odor"], offset=28):
         for c in characters:
             apply_odor_social_pressure(c, world)
+
+    # -- Disease/contagion proximity sweep, grouped by building ────
+    if every(world, CADENCE["contagion"], offset=36):
+        groups = {}
+        for c in characters:
+            c["location_tile"] = f"{int(c.get('x', 0))},{int(c.get('y', 0))}"
+            groups.setdefault(c.get("building_id"), []).append(c)
+        for group in groups.values():
+            if len(group) > 1:
+                tick_contagion_location(group, world)
 
     # -- Phone battery drain + charging (÷5) ───────────────
     if every(world, CADENCE["phone_battery"], offset=29):

@@ -139,10 +139,12 @@ def _pick_from_registry(registry, max_picks, skip_chance):
 _VISION_TRAIT_POOL  = ["poor_eyesight", "keen_eyesight"]
 _HEARING_TRAIT_POOL = ["poor_hearing", "keen_hearing"]
 
-def _random_physical_traits():
+def _random_physical_traits(defs):
+    constitutional = list(defs.get("physical_trait_templates", {}).keys())
     return (
         _pick_from_registry(_VISION_TRAIT_POOL, 1, 0.75)
         + _pick_from_registry(_HEARING_TRAIT_POOL, 1, 0.75)
+        + _pick_from_registry(constitutional, 2, 0.70)
     )
 
 # ── Job assignment ────────────────────────────────────────────────────────────
@@ -278,7 +280,7 @@ def generate_character(defs, overrides=None):
     )
 
     traits          = overrides.get("traits")             or _random_traits(defs)
-    physical_traits = overrides.get("physical_traits")    or _random_physical_traits()
+    physical_traits = overrides.get("physical_traits")    or _random_physical_traits(defs)
     hobbies      = overrides.get("hobbies")            or _random_hobbies(defs)
     orientation  = overrides.get("sexual_orientation") or _random_orientation()
     problems     = overrides.get("problems")           or _random_problems(defs)

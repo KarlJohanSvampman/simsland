@@ -61,6 +61,27 @@ def _age_immune_penalty(age):
     return -2.0       # elderly 75+ — substantially weakened
 
 
+# physical_trait_templates entries with a plausible constitutional effect on
+# disease susceptibility -- read from char["physical_traits"] (not
+# char["traits"], which holds personality traits). The other 27 entries in
+# the registry (extra_toe, giant_penis, colorblind, ...) are cosmetic/sensory
+# and have no health-relevant effect.
+_TRAIT_IMMUNE_DELTAS = {
+    "obese":             -1.0,
+    "underweight":       -0.8,
+    "low_stamina":       -0.6,
+    "high_stamina":       0.5,
+    "slow_metabolism":   -0.3,
+    "fast_metabolism":    0.3,
+    "insomnia":          -0.5,
+    "sensitive_stomach": -0.3,
+}
+
+
+def _trait_immune_penalty(char):
+    return sum(_TRAIT_IMMUNE_DELTAS.get(t, 0.0) for t in char.get("physical_traits", []))
+
+
 def immune_modifier(char):
     """
     Returns a 0.0-1.0 multiplier for random health-check probabilities.
@@ -120,8 +141,24 @@ def compute_daily_immune_delta(char, world):
         elif cond_key == "cancer_medium":
             delta -= 0.8
 
+    # Neglected physical needs (c["body"], live state -- distinct from the
+    # daily_log snapshot above, e.g. sleep_debt is accumulated across days
+    # while sleep_hours only reflects last night).
+    b = char.get("body", {})
+    if b.get("hygiene", 100) < 30:
+        delta -= 0.8
+    if b.get("hunger", 0) > 85:
+        delta -= 1.2
+    if b.get("hydration", 100) < 25:
+        delta -= 1.5
+    if b.get("sleep_debt", 0) > 75:
+        delta -= 1.0
+
     # Age penalty
     delta += _age_immune_penalty(char.get("age"))
+
+    # Physical trait penalty/bonus
+    delta += _trait_immune_penalty(char)
 
     return delta
 
@@ -142,6 +179,11 @@ def _trigger_opportunistic_infection(char, world):
     condition = random.choice(candidates)
     if condition not in char.get("physical_health", []):
         char.setdefault("physical_health", []).append(condition)
+        try:
+            from systems.contagion import update_contagious_state
+            update_contagious_state(char, world.get("tick", 0))
+        except ImportError:
+            pass
         _remember(char, "Became ill from a weakened immune system.", 0.80,
                   ["health", condition], "health", world.get("tick", 0))
 
@@ -236,10 +278,26 @@ def _check_heart_disease_high(char, world, tick):
 
 
 def _apply_symptom_penalties(char, world, symptom_key, defs):
+    """need_penalties keys (authored on symptom_templates, 0-1 scale) don't
+    correspond to any top-level character field -- route each to its real
+    home: hunger/hygiene live in c["body"] (0-100 scale), energy has no
+    dedicated field so it feeds the inverse (fatigue), and fun/social are
+    long-term-need satisfaction, tracked as frustration in c["lt_needs"]."""
     tmpl = defs.get("symptom_templates", {}).get(symptom_key, {})
+    b  = char.setdefault("body", {})
+    lt = char.get("lt_needs", {})
     for need, amount in tmpl.get("need_penalties", {}).items():
-        if need in char:
-            char[need] = max(0.0, min(1.0, char.get(need, 1.0) + amount * 0.05))
+        mag = abs(amount) * 5  # authored 0-1 scale -> body.py's 0-100 scale
+        if need == "hunger":
+            b["hunger"] = min(100, b.get("hunger", 0) + mag)
+        elif need == "hygiene":
+            b["hygiene"] = max(0, b.get("hygiene", 100) - mag)
+        elif need == "energy":
+            b["fatigue"] = min(100, b.get("fatigue", 0) + mag)
+        elif need in ("fun", "social"):
+            nd = lt.get("play" if need == "fun" else "socialize")
+            if nd:
+                nd["frustration"] = min(1.0, nd.get("frustration", 0.0) + abs(amount) * 0.3)
 
 
 # Symptom -> reaction type, for the symptoms with a clean, distinct
@@ -297,8 +355,16 @@ def _check_recoveries(char, world, ph_templates, tick):
         duration = tmpl.get("typical_duration_days", 7)
         meds = char.get("health_state", {}).get("medications_taken", {})
         treated = any(m in meds for m in tmpl.get("medicine", []))
-        if days >= duration * (0.6 if treated else 1.0):
+        # A weaker/older character (higher immune_modifier) takes longer to
+        # shake off a condition even when treated.
+        required = duration * (0.6 if treated else 1.0) * immune_modifier(char)
+        if days >= required:
             char["physical_health"].remove(cond_key)
+            try:
+                from systems.contagion import update_contagious_state
+                update_contagious_state(char, tick)
+            except ImportError:
+                pass
             _remember(char, f"Recovered from {tmpl.get('name', cond_key)}.", 0.7,
                       ["health", "recovery"], "health", tick)
 
@@ -574,6 +640,23 @@ def _decay_pain(char):
     hs["pain"] = max(0.0, hs["pain"] - PAIN_DECAY_PER_TICK)
 
 
+def apply_body_neglect_pain(char, world):
+    """Continuous pain contribution from severely neglected physical needs
+    (starvation cramps, dehydration headache, exhaustion). Proportional to
+    how far past threshold the need is; naturally self-corrects once the
+    need is met, same as the symptom-reaction pain contribution."""
+    b = char.get("body", {})
+    hunger = b.get("hunger", 0)
+    if hunger > 85:
+        add_pain(char, (hunger - 85) / 15 * 3)
+    hydration = b.get("hydration", 100)
+    if hydration < 20:
+        add_pain(char, (20 - hydration) / 20 * 4)
+    sleep_debt = b.get("sleep_debt", 0)
+    if sleep_debt > 75:
+        add_pain(char, (sleep_debt - 75) / 25 * 2)
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -793,6 +876,7 @@ def process_health(char, world):
     if not char.get("alive", True):
                 return
     _decay_pain(char)
+    apply_body_neglect_pain(char, world)
     tick = world.get("tick", 0)
 
     if tick % TICKS_PER_DAY == 0:

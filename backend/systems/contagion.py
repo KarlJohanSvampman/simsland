@@ -424,6 +424,9 @@ def evaluate_food_safety(food_item, char, world):
     # Aged food, poor prep, or high bacterial load all increase risk
     risk = (1.0 - freshness) * 0.4 + (1.0 - prep_quality) * 0.3 + bacterial * 0.3
 
+    if "sensitive_stomach" in char.get("physical_traits", []):
+        risk *= 1.5
+
     if risk <= 0.05:
         return None   # safe
 

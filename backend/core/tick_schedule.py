@@ -73,6 +73,7 @@ CADENCE = {
     # Body / needs
     "lt_needs":             30,   # long-term need frustration update (~30 game-min)
     "social_odor":          20,   # smell pressure scan
+    "contagion":            15,   # proximity disease-spread sweep, per building group
 
     # Individual wait activities (microwave, phone hold, etc.) — see
     # systems/activities.py's start_microwave/take_out_of_microwave and
