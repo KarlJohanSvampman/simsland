@@ -406,34 +406,64 @@ def build_available_actions(c, world):
     if interactable:
         action_types.extend(["trash", "destroy"])
 
-    # Plants/gardening (see systems/plants.py) — water/pull_weed/harvest
-    # offered when a visible prop is an actual planted instance (has a
-    # live plant_state, checked against the real world prop rather than
-    # the perception-scanned tags, since plant_template/plant_state aren't
-    # part of the perceived-prop shape); harvest's own route handler
-    # no-ops unless the plant is actually mature, same "handler validates
-    # specifics" convention as trash/destroy above. plant_seed offered
-    # when a visible prop is an empty pot (category "pot", no
-    # plant_template yet) — soil-tile planting works via the same route
-    # (an x/y target) but isn't offered here yet since there's no
-    # nearby-tile scan in this function; garden/growhouse floorplan
-    # content is deferred, same as the bedroom-assignment round.
-    if interactable:
-        world_props_by_id = {p["id"]: p for p in world.get("props", [])}
-        has_plant = False
-        has_empty_pot = False
-        for entry in interactable:
-            live_prop = world_props_by_id.get(entry["id"])
-            if not live_prop:
-                continue
-            if live_prop.get("plant_state"):
-                has_plant = True
-            elif "pot" in entry.get("tags", []) and not live_prop.get("plant_template"):
-                has_empty_pot = True
-        if has_plant:
-            action_types.extend(["water", "pull_weed", "harvest"])
-        if has_empty_pot:
-            action_types.append("plant_seed")
+    # Plants/gardening (see systems/plants.py) — water/pull_weed offered
+    # when a visible prop is an actual planted instance (has a live
+    # plant_state, checked against the real world prop rather than the
+    # perception-scanned tags, since plant_template/plant_state aren't
+    # part of the perceived-prop shape); harvest additionally requires
+    # the plant's own fruit container (systems/containers.py) to be
+    # non-empty, since fruit now only appears there once the plant turns
+    # "mature" (systems/plants.py::tick_plants) rather than being granted
+    # on demand. plant_seed offered when a visible prop is an empty pot
+    # (category "pot", no plant_template yet) — soil-tile planting works
+    # via the same route (an x/y target) but isn't offered here yet since
+    # there's no nearby-tile scan in this function; garden/growhouse
+    # floorplan content is deferred, same as the bedroom-assignment round.
+    #
+    # Collect (see systems/containers.py) — the general version of
+    # harvest, offered whenever ANY reachable container (a visible prop
+    # with storage/fruit, or an item-container the character is
+    # carrying/wearing) actually has something in it. Reuses
+    # containers_in_inventory() (already imported below for paint
+    # buckets) for the carried/worn case.
+    world_props_by_id = {p["id"]: p for p in world.get("props", [])}
+    has_plant = False
+    has_harvestable_plant = False
+    has_empty_pot = False
+    has_container_with_contents = False
+    for entry in interactable:
+        live_prop = world_props_by_id.get(entry["id"])
+        if not live_prop:
+            continue
+        if live_prop.get("plant_state"):
+            has_plant = True
+            if live_prop.get("items"):
+                has_harvestable_plant = True
+                has_container_with_contents = True
+        elif "pot" in entry.get("tags", []) and not live_prop.get("plant_template"):
+            has_empty_pot = True
+        elif live_prop.get("items"):
+            has_container_with_contents = True
+
+    from systems.containers import containers_in_inventory
+    for ct in containers_in_inventory(c):
+        if ct.get("items"):
+            has_container_with_contents = True
+            break
+    if not has_container_with_contents:
+        for item in list(c.get("worn", {}).values()) + c.get("inventory", []):
+            if item and item.get("items"):
+                has_container_with_contents = True
+                break
+
+    if has_plant:
+        action_types.extend(["water", "pull_weed"])
+    if has_harvestable_plant:
+        action_types.append("harvest")
+    if has_empty_pot:
+        action_types.append("plant_seed")
+    if has_container_with_contents:
+        action_types.append("collect")
 
     # Clothing in inventory — can put on
     wearable_in_inventory = [

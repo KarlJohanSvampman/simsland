@@ -888,6 +888,8 @@ def route_action(c, world, action, speech, definitions=None):
         _route_pull_weed(c, world, action)
     elif action_type == "harvest":
         _route_harvest(c, world, action)
+    elif action_type == "collect":
+        _route_collect(c, world, action)
     elif action_type in ("grab_offensive", "hold", "punch", "kick", "shove", "threaten", "stab", "knock"):
         _route_hostile_action(c, world, action)
     elif action_type == "dodge":
@@ -1369,16 +1371,40 @@ def _route_pull_weed(c, world, action):
 
 
 def _route_harvest(c, world, action):
-    """action: {"type": "harvest", "target_id": plant_prop_id}"""
+    """action: {"type": "harvest", "target_id": plant_prop_id,
+    "dest_id": optional carried/worn container to deposit into --
+    defaults to held_stack, same as collect below}.
+    Plant-specific sugar over the generic collect mechanic
+    (systems/containers.py::collect_item) -- harvest is scoped to a
+    plant's own fruit container; maturity gating is implicit, since
+    nothing to collect exists until systems/plants.py's tick_plants
+    populates that container at the growing->mature transition."""
     target_id = action.get("target_id") or action.get("target")
     if not target_id:
         return
     from systems.props import get_prop_by_id
     prop = get_prop_by_id(world, target_id)
-    if not prop:
+    if not prop or not prop.get("plant_state"):
         return
-    from systems.plants import harvest_plant
-    harvest_plant(c, prop, world)
+    from systems.containers import collect_item
+    collect_item(c, world, prop, dest_id=action.get("dest_id"))
+
+
+def _route_collect(c, world, action):
+    """action: {"type": "collect", "source_id": container_id,
+    "item_id": optional specific item, "dest_id": optional carried/worn
+    container to deposit into -- defaults to held_stack ("stacked in
+    hand")}. Generic version of harvest above: source can be any
+    container -- storage furniture, a bag/basket, a worn backpack, or a
+    plant's fruit container (see systems/containers.py)."""
+    source_id = action.get("source_id") or action.get("target_id") or action.get("target")
+    if not source_id:
+        return
+    from systems.containers import resolve_container, collect_item
+    source = resolve_container(c, world, source_id)
+    if not source:
+        return
+    collect_item(c, world, source, item_id=action.get("item_id"), dest_id=action.get("dest_id"))
 
 
 # =========================================================

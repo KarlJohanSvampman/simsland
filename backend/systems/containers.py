@@ -138,10 +138,25 @@ def slots_available(container):
 def can_fit(container, item, quantity=1):
     """
     Return True if `quantity` units of item fit in container.
-    Does not allow containers inside containers.
+    Does not allow containers inside containers. accepted_categories,
+    when present on the container (storage furniture / bag items --
+    see ensure_prop_storage/ensure_item_container below), restricts what
+    category of item may enter; accepted_templates is the narrower,
+    single-(or few-)item-type version of the same idea -- a plant's fruit
+    container only ever accepts its own yield_item (see systems/
+    plants.py), regardless of category. Both are absent on the
+    pre-existing container types (cardboard_box, backpack, toolbox,
+    chest, bucket), so this is a no-op for all of those and behavior
+    there is unchanged.
     """
     if item.get("type") == "container":
         return False  # no nesting
+    accepted_categories = container.get("accepted_categories")
+    if accepted_categories is not None and item.get("category") not in accepted_categories:
+        return False
+    accepted_templates = container.get("accepted_templates")
+    if accepted_templates is not None and item.get("template_id") not in accepted_templates:
+        return False
     needed = item.get("size", 1) * quantity
     return slots_available(container) >= needed
 
@@ -242,6 +257,124 @@ def find_bucket_for_material(c, material_id):
 def containers_in_inventory(c):
     """Return all container items in character's top-level inventory."""
     return [i for i in c.get("inventory", []) if i.get("type") == "container"]
+
+
+# =========================================================
+# STORAGE FURNITURE / BAG ITEMS / WORN CONTAINERS
+# Extends the container model above (same "items"/"capacity" contract,
+# so add_to_container/remove_from_container/can_fit/slots_used all work
+# unmodified) to objects that aren't themselves container-type items:
+# storage props (drawers, wardrobes, closets -- prop_templates' existing
+# "storage" field) and container-capable regular items (a worn backpack,
+# a carried basket -- item_templates' new "container" field). Lazily
+# stamps "items"/"capacity"/"accepted_categories" onto the instance the
+# first time it's touched, same pattern systems/plants.py uses for
+# plant_state.
+# =========================================================
+
+def ensure_prop_storage(prop, world):
+    """Prop instance (world["props"]) whose template has a `storage`
+    field. Returns the prop (now container-shaped) or None if its
+    template isn't storage-capable."""
+    if "items" in prop and "capacity" in prop:
+        return prop
+    storage = (
+        world.get("definitions", {})
+        .get("prop_templates", {})
+        .get(prop.get("template"), {})
+        .get("storage")
+    )
+    if not storage:
+        return None
+    prop["items"] = prop.get("items", [])
+    prop["capacity"] = storage.get("slots", 0)
+    prop["accepted_categories"] = storage.get("accepted_categories")
+    return prop
+
+
+def ensure_item_container(item, world):
+    """Item instance (inventory/held_stack/worn/placed) whose template
+    has a `container` field -- e.g. a worn backpack. Returns the item
+    (now container-shaped) or None if its template isn't container-
+    capable."""
+    if "items" in item and "capacity" in item:
+        return item
+    meta = (
+        world.get("definitions", {})
+        .get("item_templates", {})
+        .get(item.get("template_id"), {})
+        .get("container")
+    )
+    if not meta:
+        return None
+    item["items"] = item.get("items", [])
+    item["capacity"] = meta.get("slots", 0)
+    item["accepted_categories"] = meta.get("accepted_categories")
+    return item
+
+
+def resolve_container(c, world, container_id):
+    """Finds a container by id across world props/placed_items and the
+    given character's inventory/held_stack/worn -- covers pre-existing
+    container-type items (cardboard_box/backpack/toolbox/chest/bucket,
+    already container-shaped) as well as storage props and container-
+    capable regular items (lazily equipped via ensure_prop_storage /
+    ensure_item_container above). Returns None if container_id doesn't
+    resolve to anything, or resolves to something that isn't actually a
+    container."""
+    if not container_id:
+        return None
+
+    for prop in world.get("props", []):
+        if prop.get("id") == container_id:
+            return ensure_prop_storage(prop, world)
+
+    placed = world.get("placed_items", {})
+    if container_id in placed:
+        item = placed[container_id]
+        return item if "items" in item else ensure_item_container(item, world)
+
+    if c is not None:
+        pools = [c.get("inventory", []), c.get("held_stack", [])]
+        for item in [i for pool in pools for i in pool] + list(c.get("worn", {}).values()):
+            if item and item.get("id") == container_id:
+                return item if "items" in item else ensure_item_container(item, world)
+
+    return None
+
+
+def collect_item(c, world, source, item_id=None, dest_id=None):
+    """Orchestrates the "collect"/"harvest" actions (action_router.py):
+    pop one item out of `source`'s contents, then either deposit it into
+    a resolved dest container (`dest_id`) or -- absent a dest -- into the
+    character's held_stack (systems/item_stack.py's existing "stack in
+    hand" mechanic). If the dest rejects the item (full / wrong
+    category), it's put back in source rather than lost. Returns True on
+    success."""
+    if item_id is None:
+        items = source.get("items", [])
+        if not items:
+            return False
+        item_id = items[0]["id"]
+
+    removed = remove_from_container(source, item_id)
+    if not removed.get("success"):
+        return False
+    item = removed["item"]
+
+    if dest_id:
+        dest = resolve_container(c, world, dest_id)
+        if dest:
+            result = add_to_container(dest, item)
+            if result.get("success"):
+                return True
+        # Dest missing or rejected the item -- put it back in source.
+        source.setdefault("items", []).append(item)
+        return False
+
+    from systems.item_stack import add_to_held_stack
+    add_to_held_stack(c, item)
+    return True
 
 
 def container_summary(container):

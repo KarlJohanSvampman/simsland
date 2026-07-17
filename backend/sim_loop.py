@@ -73,7 +73,7 @@ from systems.grievances        import update_grievances
 from systems.conflict_pipeline import process_conflicts
 from systems.grapple         import process_grapples
 from systems.social_contracts  import check_contract_violations
-from systems.contagion       import tick_contagion_location
+from systems.contagion       import tick_contagion_location, age_food_items
 from systems.child_care      import tick_child_needs
 from systems.bedroom_assignment import tick_bedroom_assignments
 from systems.plants           import tick_plants
@@ -471,6 +471,10 @@ def tick(world):
     # -- Plant growth/moisture/weeds ─────────────────────────────────
     if every(world, CADENCE["plants"], offset=39):
         tick_plants(world)
+
+    # -- Food freshness decay ─────────────────────────────────────────
+    if every(world, CADENCE["food_aging"], offset=40):
+        age_food_items(world)
 
     # -- Phone battery drain + charging (÷5) ───────────────
     if every(world, CADENCE["phone_battery"], offset=29):

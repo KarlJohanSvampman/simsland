@@ -210,6 +210,10 @@ VALID_ACTIONS = {
     "pull_weed",
 
     "harvest",
+
+    # Generic container retrieval (see systems/containers.py) --
+    # supersedes harvest's old direct-to-inventory grant.
+    "collect",
 }
 
 

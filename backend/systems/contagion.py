@@ -444,22 +444,56 @@ def evaluate_food_safety(food_item, char, world):
     return None
 
 
+SPOILED_FRESHNESS_THRESHOLD = 0.15
+
+
+def _age_one_food_item(item):
+    """Decay a single item's freshness by one day, if it's food. Flags
+    `spoiled` once freshness crosses the threshold -- no auto-deletion,
+    same "no death mechanic, keep it simple" call as the plants round."""
+    if item.get("category") != "food" and not item.get("is_food"):
+        return
+    freshness = item.get("freshness", 1.0)
+    # Decay rate: ~5% per day at room temperature; refrigerated slows 5x
+    decay = 0.05 if not item.get("refrigerated") else 0.01
+    freshness = max(0.0, freshness - decay)
+    item["freshness"] = freshness
+    if freshness < 0.2:
+        item["bacterial_load"] = min(1.0, item.get("bacterial_load", 0.0) + 0.10)
+    if freshness <= SPOILED_FRESHNESS_THRESHOLD:
+        item["spoiled"] = True
+
+
 def age_food_items(world, ticks_per_day=24):
     """
-    Decay freshness of all placed food items/props each day.
-    Call once per in-game day.
+    Decay freshness of every food item in the simulation, once per
+    in-game day (see CADENCE["food_aging"], sim_loop.py). Sweeps every
+    location a food item can actually live in: each character's
+    inventory/held_stack/worn, world["placed_items"], and one level of
+    container contents (storage props, plant fruit containers, and any
+    bag/backpack/box found in the locations above -- systems/
+    containers.py's generic "items" list). Previously only swept
+    placed_items gated on an `is_food` flag nothing ever set; now driven
+    off item_templates' real `category == "food"` field.
     """
-    tick = world.get("tick", 0)
-    for item in world.get("placed_items", {}).values():
-        if not item.get("is_food"):
-            continue
-        freshness = item.get("freshness", 1.0)
-        # Decay rate: ~5% per day at room temperature; refrigerated slows 5x
-        decay = 0.05 if not item.get("refrigerated") else 0.01
-        item["freshness"] = max(0.0, freshness - decay)
-        # High bacterial load once very old
-        if item["freshness"] < 0.2:
-            item["bacterial_load"] = min(1.0, item.get("bacterial_load", 0.0) + 0.10)
+    def _sweep(items):
+        for item in items:
+            if not item:
+                continue
+            _age_one_food_item(item)
+            if item.get("items"):
+                _sweep(item["items"])
+
+    for c in world.get("characters", {}).values():
+        _sweep(c.get("inventory", []))
+        _sweep(c.get("held_stack", []))
+        _sweep(c.get("worn", {}).values())
+
+    _sweep(world.get("placed_items", {}).values())
+
+    for prop in world.get("props", []):
+        if prop.get("items"):
+            _sweep(prop["items"])
 
 
 # ---------------------------------------------------------------------------

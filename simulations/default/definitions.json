@@ -5283,7 +5283,11 @@
       "size": 2,
       "price_new": 60,
       "price_range": "mid",
-      "used_price": 22
+      "used_price": 22,
+      "container": {
+        "slots": 10,
+        "accepted_categories": null
+      }
     },
     "smartphone_budget": {
       "name": "Budget Smartphone",
