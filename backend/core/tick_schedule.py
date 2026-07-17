@@ -89,6 +89,7 @@ CADENCE = {
     "bedroom_assignment":   60,   # age-based bedroom ownership -- changes rarely
     "plants":               30,   # growth/moisture/weed tick (see systems/plants.py)
     "food_aging":           24,   # freshness decay, ~once/sim-day (see systems/contagion.py)
+    "body_composition":     24,   # weight/trait sync, ~once/sim-day (see systems/body_composition.py)
 
     # Individual wait activities (microwave, phone hold, etc.) — see
     # systems/activities.py's start_microwave/take_out_of_microwave and

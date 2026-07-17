@@ -68,7 +68,11 @@ def complete_exercise_session(c, hobby_id, world, has_companion=False):
 
     ex_reg   = defs.get("exercise_type_registry", {})
     ex_entry = ex_reg.get(hobby_id, {"type": "cardio", "intensity": 2, "social": False})
-    ex_type  = ex_entry["type"]          # "cardio" | "strength" | "flexibility"
+    ex_type  = ex_entry["type"]          # "cardio" | "strength" | "flexibility" |
+                                          # ("cardio", "strength") -- a balanced
+                                          # calisthenics exercise (sit_ups/chin_ups)
+                                          # credits both at half rate, see below.
+    ex_types  = list(ex_type) if isinstance(ex_type, (list, tuple)) else [ex_type]
     intensity = ex_entry.get("intensity", 2)
     is_social = ex_entry.get("social", False)
 
@@ -108,16 +112,27 @@ def complete_exercise_session(c, hobby_id, world, has_companion=False):
     # Apply gain
     old_level = fs.get("fitness_level", 0.30)
     fs["fitness_level"] = round(min(FITNESS_CAP, old_level + gain), 4)
-    fs[f"{ex_type}_sessions"] = fs.get(f"{ex_type}_sessions", 0) + 1
+    # Balanced (sit_ups/chin_ups) sessions credit both cardio and strength
+    # counters at half rate each rather than one counter at full rate --
+    # "more balanced between strength and stamina" per the exercise round.
+    credit = 1.0 / len(ex_types)
+    for t in ex_types:
+        fs[f"{t}_sessions"] = round(fs.get(f"{t}_sessions", 0) + credit, 4)
     fs["sessions_this_week"]  = fs.get("sessions_this_week", 0) + 1
     fs["last_session_tick"]   = world.get("tick", 0)
     delta = round(fs["fitness_level"] - old_level, 4)
 
     # Apply body feature drift
-    _apply_body_adaptation(c, ex_type, fs)
+    _apply_body_adaptation(c, ex_types[0], fs)
 
     # Apply attractiveness update
     _update_attractiveness(c)
+
+    # Calories burned -- feeds systems/body_composition.py's daily
+    # weight-balance model. Scaled by intensity, not by type -- a hard
+    # session burns more regardless of what it's building.
+    from systems.body_composition import record_calories_burned, EXERCISE_BURN_PER_INTENSITY
+    record_calories_burned(c, intensity * EXERCISE_BURN_PER_INTENSITY)
 
     # Injury check
     inj_chance = INJURY_CHANCE.get(intensity, 0.05)
@@ -138,7 +153,7 @@ def complete_exercise_session(c, hobby_id, world, has_companion=False):
         # this is always a sprain/strain, never a broken bone or a knockout.
         try:
             from systems.health import apply_blunt_trauma
-            body_part = {"cardio": "leg", "strength": "back", "flexibility": "back"}.get(ex_type, "leg")
+            body_part = {"cardio": "leg", "strength": "back", "flexibility": "back"}.get(ex_types[0], "leg")
             apply_blunt_trauma(c, world, body_part,
                                 force_normalized=random.uniform(0.15, 0.35),
                                 tick=world.get("tick", 0))

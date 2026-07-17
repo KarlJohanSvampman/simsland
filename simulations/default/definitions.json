@@ -54311,6 +54311,16 @@
       "type": "cardio",
       "intensity": 1,
       "social": true
+    },
+    "sit_ups": {
+      "type": ["cardio", "strength"],
+      "intensity": 1,
+      "social": false
+    },
+    "chin_ups": {
+      "type": ["cardio", "strength"],
+      "intensity": 2,
+      "social": false
     }
   },
   "celebrity_registry": {

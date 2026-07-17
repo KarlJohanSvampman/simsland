@@ -500,7 +500,7 @@ def _route_carry(c, world, action):
 
 def _route_drag_prop(c, world, action):
     from systems.props import get_prop_by_id
-    from systems.prop_movement import get_move_capacity, play_prop_action_once
+    from systems.prop_movement import get_move_capacity, play_prop_action_once, can_drag
 
     target_id = action.get("target")
     if not target_id:
@@ -509,6 +509,8 @@ def _route_drag_prop(c, world, action):
     if not prop:
         return
     if get_move_capacity(prop) not in (1, 2):
+        return
+    if not can_drag(c):
         return
     dragger = prop.get("being_dragged_by")
     if dragger and dragger != c["id"]:
@@ -890,6 +892,14 @@ def route_action(c, world, action, speech, definitions=None):
         _route_harvest(c, world, action)
     elif action_type == "collect":
         _route_collect(c, world, action)
+    elif action_type == "jog":
+        _route_jog(c, world, action)
+    elif action_type == "sit_ups":
+        _route_sit_ups(c, world, action)
+    elif action_type == "chin_ups":
+        _route_chin_ups(c, world, action)
+    elif action_type == "lift_weights":
+        _route_lift_weights(c, world, action)
     elif action_type in ("grab_offensive", "hold", "punch", "kick", "shove", "threaten", "stab", "knock"):
         _route_hostile_action(c, world, action)
     elif action_type == "dodge":
@@ -1405,6 +1415,61 @@ def _route_collect(c, world, action):
     if not source:
         return
     collect_item(c, world, source, item_id=action.get("item_id"), dest_id=action.get("dest_id"))
+
+
+# =========================================================
+# EXERCISE — see systems/exercise.py (fitness_level, injury risk,
+# attractiveness bonus, all pre-existing but never wired to a real
+# trigger until now) and systems/body_composition.py (calorie burn).
+# Duration `_scaffold` activities, not instant -- exercise takes time,
+# same as eat/sleep. jog/sit_ups need no target; chin_ups/lift_weights
+# require a nearby prop whose template declares the matching anchor
+# interaction (do_pull_ups / lift_weights) -- pull_up_bar and
+# weight_bench already exist with exactly these anchors.
+# =========================================================
+
+_EXERCISE_REQUIRED_INTERACTION = {
+    "chin_ups":     "do_pull_ups",
+    "lift_weights": "lift_weights",
+}
+_EXERCISE_DURATION_TICKS = 1800
+
+def _route_exercise_activity(c, world, action, activity_type):
+    target_id = action.get("target")
+    required_interaction = _EXERCISE_REQUIRED_INTERACTION.get(activity_type)
+    if required_interaction:
+        if not target_id:
+            return
+        from systems.props import get_prop_by_id
+        prop = get_prop_by_id(world, target_id)
+        if not prop:
+            return
+        tpl = world.get("definitions", {}).get("prop_templates", {}).get(prop.get("template"), {})
+        if not any(a.get("interaction") == required_interaction for a in tpl.get("anchors", [])):
+            return
+
+    c["activity"] = _scaffold(
+        c, world, activity_type,
+        target_id=target_id,
+        interaction=activity_type,
+        duration=_EXERCISE_DURATION_TICKS,
+    )
+
+
+def _route_jog(c, world, action):
+    _route_exercise_activity(c, world, action, "jog")
+
+
+def _route_sit_ups(c, world, action):
+    _route_exercise_activity(c, world, action, "sit_ups")
+
+
+def _route_chin_ups(c, world, action):
+    _route_exercise_activity(c, world, action, "chin_ups")
+
+
+def _route_lift_weights(c, world, action):
+    _route_exercise_activity(c, world, action, "lift_weights")
 
 
 # =========================================================

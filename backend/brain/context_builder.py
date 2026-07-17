@@ -406,6 +406,18 @@ def build_available_actions(c, world):
     if interactable:
         action_types.extend(["trash", "destroy"])
 
+    # Exercise (see systems/exercise.py, action_router.py) — jog/sit_ups
+    # need no target, offered unconditionally like hire_service/
+    # propose_chore (the route handler needs no target validation).
+    # chin_ups/lift_weights only when a prop with the matching anchor
+    # interaction (do_pull_ups / lift_weights) is actually visible.
+    action_types.extend(["jog", "sit_ups"])
+    for entry in interactable:
+        if "do_pull_ups" in entry.get("interactions", []) and "chin_ups" not in action_types:
+            action_types.append("chin_ups")
+        if "lift_weights" in entry.get("interactions", []) and "lift_weights" not in action_types:
+            action_types.append("lift_weights")
+
     # Plants/gardening (see systems/plants.py) — water/pull_weed offered
     # when a visible prop is an actual planted instance (has a live
     # plant_state, checked against the real world prop rather than the
@@ -948,6 +960,19 @@ def build_narrative(c, world):
         paragraphs.append(
             f"You're holding {held_name} in place — they're struggling to get free."
         )
+
+    # ---- body composition + fitness — systems/body_composition.py and
+    # systems/exercise.py, both fully built in earlier rounds but never
+    # actually surfaced to the LLM until now. Self-conscious framing at
+    # the extremes is the "impacts motivation" ask -- not a hard mechanical
+    # block on any action, just narrative pressure, same as every other
+    # nudge-not-force pattern in this file. ----
+    from systems.body_composition import get_body_composition_context
+    from systems.exercise import get_exercise_context
+    body_lines = get_body_composition_context(c).get("body_composition", [])
+    fitness_lines = get_exercise_context(c).get("fitness", [])
+    if body_lines or fitness_lines:
+        paragraphs.append(" ".join(body_lines + fitness_lines))
 
     # ---- active aggressor — see _has_recent_aggressor(). Explains why
     # dodge/block/turn_and_run suddenly appeared, same "gate the action +

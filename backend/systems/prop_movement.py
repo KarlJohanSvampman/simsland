@@ -29,6 +29,18 @@ def get_move_capacity(prop):
     return prop.get("move_capacity")
 
 
+MIN_DRAG_FITNESS = 0.15  # fitness_stats.fitness_level floor to initiate a drag
+
+
+def can_drag(c):
+    """Minimal strength gate (systems/body_composition.py's "how fit"
+    reuse of fitness_stats.fitness_level): a character too unfit can't
+    initiate dragging at all, regardless of the prop's move_capacity.
+    Doesn't touch the existing 2-person move_capacity=2 crew mechanic --
+    both roles still go through this same gate, just individually."""
+    return c.get("fitness_stats", {}).get("fitness_level", 0.30) >= MIN_DRAG_FITNESS
+
+
 def get_drag_animation(world, prop):
     tpl = get_prop_template(world, prop)
     return tpl.get("drag_animation") if tpl else None

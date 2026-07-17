@@ -77,6 +77,7 @@ from systems.contagion       import tick_contagion_location, age_food_items
 from systems.child_care      import tick_child_needs
 from systems.bedroom_assignment import tick_bedroom_assignments
 from systems.plants           import tick_plants
+from systems.body_composition import tick_body_composition
 
 # -- Very slow (÷300) ─────────────────────────────────────────────
 from systems.crisis         import check_crises, process_crises
@@ -475,6 +476,10 @@ def tick(world):
     # -- Food freshness decay ─────────────────────────────────────────
     if every(world, CADENCE["food_aging"], offset=40):
         age_food_items(world)
+
+    # -- Body weight/fitness-trait sync ────────────────────────────────
+    if every(world, CADENCE["body_composition"], offset=41):
+        tick_body_composition(world)
 
     # -- Phone battery drain + charging (÷5) ───────────────
     if every(world, CADENCE["phone_battery"], offset=29):

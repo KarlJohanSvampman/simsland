@@ -214,6 +214,17 @@ VALID_ACTIONS = {
     # Generic container retrieval (see systems/containers.py) --
     # supersedes harvest's old direct-to-inventory grant.
     "collect",
+
+    # Exercise (see systems/exercise.py, systems/body_composition.py) --
+    # exercise.py was fully built but never reachable: satisfy_lt_need()
+    # was never called with need_id="exercise" from anywhere.
+    "jog",
+
+    "sit_ups",
+
+    "chin_ups",
+
+    "lift_weights",
 }
 
 

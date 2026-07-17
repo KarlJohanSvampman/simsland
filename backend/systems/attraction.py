@@ -480,11 +480,21 @@ def _appearance_score(c, other):
     # Fitness bonus — baked in by exercise system, pre-computed
     fitness_bonus = other.get("fitness_attractiveness_bonus", 0.0)
 
+    # Body-fat penalty (systems/body_composition.py) — both extremes count
+    # against appearance a little; a neutral band around the middle is
+    # penalty-free, same "small additive term" shape as fitness_bonus above.
+    BODY_FAT_NEUTRAL   = 0.40
+    BODY_FAT_TOLERANCE = 0.15
+    body_fat = other.get("body_composition", {}).get("body_fat_level", 0.35)
+    body_fat_excess = max(0.0, abs(body_fat - BODY_FAT_NEUTRAL) - BODY_FAT_TOLERANCE)
+    body_fat_penalty = min(0.15, body_fat_excess * 0.5)
+
     score = (base_attractiveness * base_w
              + age_factor        * age_w
              + fertility         * fertility_weight
              + fitness_bonus
-             - hygiene_penalty)
+             - hygiene_penalty
+             - body_fat_penalty)
     return max(0.0, min(1.0, score))
 
 

@@ -1640,6 +1640,28 @@ def complete_activity(
 
     elif activity_type == "eat_snack":
         on_eat_complete(c, nutrition=0.3)
+
+    # =====================================
+    # EXERCISE — jog/sit_ups/chin_ups/lift_weights (action_router.py) all
+    # land here. hobby_id maps into the pre-existing but previously-
+    # unreachable systems/exercise.py pipeline via satisfy_lt_need();
+    # jog/lift_weights reuse the existing running/weightlifting registry
+    # entries, sit_ups/chin_ups are new balanced-type entries.
+    # =====================================
+
+    elif activity_type in ("jog", "sit_ups", "chin_ups", "lift_weights"):
+        hobby_id = {
+            "jog":          "running",
+            "sit_ups":      "sit_ups",
+            "chin_ups":     "chin_ups",
+            "lift_weights": "weightlifting",
+        }[activity_type]
+        has_companion = any(
+            other.get("building_id") == c.get("building_id") and other["id"] != c["id"]
+            for other in world.get("characters", {}).values()
+        )
+        from systems.lt_needs import satisfy_lt_need
+        satisfy_lt_need(c, "exercise", world, hobby_id=hobby_id, has_companion=has_companion)
     elif activity_type == "check_mail":
 
         household = world[

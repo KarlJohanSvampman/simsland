@@ -116,6 +116,10 @@ def update_body_needs(c, dt=1.0):
         fatigue_rate *= 0.8
     if "disciplined" in tr or "determined" in tr:
         fatigue_rate *= 0.9
+    # Overweight (systems/body_composition.py's dynamic obese trait) tires
+    # faster -- the "become lazier" consequence of weight gain.
+    if "obese" in c.get("physical_traits", []):
+        fatigue_rate *= 1.2
     b["fatigue"] = min(100, b["fatigue"] + fatigue_rate * dt)
 
     # ── SLEEP DEBT ───────────────────────────────────────────────────────────
@@ -157,7 +161,10 @@ def update_body_needs(c, dt=1.0):
 
     # ── STAMINA REGEN  (passive recovery -- the only other stamina path,
     # health.py's injury stamina_penalty, is one-directional drain) ──────────
-    c["stamina"] = min(1.0, c.get("stamina", 1.0) + 0.01 * dt)
+    stamina_regen = 0.01
+    if "obese" in c.get("physical_traits", []):
+        stamina_regen *= 0.6
+    c["stamina"] = min(1.0, c.get("stamina", 1.0) + stamina_regen * dt)
 
     # ── APPLY SLEEP DEBT EFFECTS ─────────────────────────────────────────────
     _apply_sleep_debt_effects(c)
@@ -218,6 +225,9 @@ def on_eat_complete(c, nutrition=0.5):
     restore = 40 + nutrition * 40
     b["hunger"]       = max(0, b["hunger"] - restore)
     b["recent_intake"] = min(100, b["recent_intake"] + 50)
+
+    from systems.body_composition import record_calories_in
+    record_calories_in(c, nutrition)
 
 
 def on_drink_complete(c, hydration_value=40):
