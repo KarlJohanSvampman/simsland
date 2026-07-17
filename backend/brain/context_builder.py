@@ -406,6 +406,35 @@ def build_available_actions(c, world):
     if interactable:
         action_types.extend(["trash", "destroy"])
 
+    # Plants/gardening (see systems/plants.py) — water/pull_weed/harvest
+    # offered when a visible prop is an actual planted instance (has a
+    # live plant_state, checked against the real world prop rather than
+    # the perception-scanned tags, since plant_template/plant_state aren't
+    # part of the perceived-prop shape); harvest's own route handler
+    # no-ops unless the plant is actually mature, same "handler validates
+    # specifics" convention as trash/destroy above. plant_seed offered
+    # when a visible prop is an empty pot (category "pot", no
+    # plant_template yet) — soil-tile planting works via the same route
+    # (an x/y target) but isn't offered here yet since there's no
+    # nearby-tile scan in this function; garden/growhouse floorplan
+    # content is deferred, same as the bedroom-assignment round.
+    if interactable:
+        world_props_by_id = {p["id"]: p for p in world.get("props", [])}
+        has_plant = False
+        has_empty_pot = False
+        for entry in interactable:
+            live_prop = world_props_by_id.get(entry["id"])
+            if not live_prop:
+                continue
+            if live_prop.get("plant_state"):
+                has_plant = True
+            elif "pot" in entry.get("tags", []) and not live_prop.get("plant_template"):
+                has_empty_pot = True
+        if has_plant:
+            action_types.extend(["water", "pull_weed", "harvest"])
+        if has_empty_pot:
+            action_types.append("plant_seed")
+
     # Clothing in inventory — can put on
     wearable_in_inventory = [
         {"item_id": i["id"], "template_id": i.get("template_id"), "name": i.get("name"), "slot": i.get("slot")}

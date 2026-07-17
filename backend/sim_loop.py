@@ -76,6 +76,7 @@ from systems.social_contracts  import check_contract_violations
 from systems.contagion       import tick_contagion_location
 from systems.child_care      import tick_child_needs
 from systems.bedroom_assignment import tick_bedroom_assignments
+from systems.plants           import tick_plants
 
 # -- Very slow (÷300) ─────────────────────────────────────────────
 from systems.crisis         import check_crises, process_crises
@@ -466,6 +467,10 @@ def tick(world):
     # -- Age-based bedroom ownership ────────────────────────────────
     if every(world, CADENCE["bedroom_assignment"], offset=38):
         tick_bedroom_assignments(world)
+
+    # -- Plant growth/moisture/weeds ─────────────────────────────────
+    if every(world, CADENCE["plants"], offset=39):
+        tick_plants(world)
 
     # -- Phone battery drain + charging (÷5) ───────────────
     if every(world, CADENCE["phone_battery"], offset=29):

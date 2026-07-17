@@ -19876,9 +19876,23 @@
       "buildable": false,
       "interior": false,
       "floor": false
+    },
+    "soil": {
+      "walk_speed": 0.9,
+      "buildable": true,
+      "interior": true,
+      "floor": true,
+      "material": "soil_01"
     }
   },
   "material_templates": {
+    "soil_01": {
+      "name": "Soil",
+      "texture": "/resources/tiles/soil.jpg",
+      "category": "garden",
+      "interior": true,
+      "floor": true
+    },
     "asphalt_road_01": {
       "name": "Asphalt Road",
       "texture": "/resources/tiles/asphalt_road.jpg",
@@ -54865,6 +54879,30 @@
       "default_duration": 90,
       "default_active": false,
       "animation_state": "idle"
+    }
+  },
+  "plant_templates": {
+    "apple_tree": {
+      "name": "Apple Tree",
+      "pot_or_soil": "soil",
+      "days_to_sprout": 2,
+      "days_to_grow": 5,
+      "days_mature_before_overgrown": 4,
+      "moisture_decay_per_day": 15,
+      "weed_growth_per_day": 8,
+      "yield_item": "apple",
+      "yield_quantity": 3
+    },
+    "potted_herb": {
+      "name": "Potted Herb",
+      "pot_or_soil": "pot",
+      "days_to_sprout": 1,
+      "days_to_grow": 3,
+      "days_mature_before_overgrown": 3,
+      "moisture_decay_per_day": 20,
+      "weed_growth_per_day": 3,
+      "yield_item": "apple",
+      "yield_quantity": 1
     }
   },
   "chore_templates": {

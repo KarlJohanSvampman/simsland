@@ -87,6 +87,7 @@ CADENCE = {
     "contagion":            15,   # proximity disease-spread sweep, per building group
     "child_care":           15,   # child needs oversight + baseline accountability contract
     "bedroom_assignment":   60,   # age-based bedroom ownership -- changes rarely
+    "plants":               30,   # growth/moisture/weed tick (see systems/plants.py)
 
     # Individual wait activities (microwave, phone hold, etc.) — see
     # systems/activities.py's start_microwave/take_out_of_microwave and

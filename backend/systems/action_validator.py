@@ -200,6 +200,16 @@ VALID_ACTIONS = {
     "trash",
 
     "destroy",
+
+    # Plant/gardening actions (see systems/plants.py, action_router.py's
+    # _route_plant_seed/_route_water/_route_pull_weed/_route_harvest).
+    "plant_seed",
+
+    "water",
+
+    "pull_weed",
+
+    "harvest",
 }
 
 

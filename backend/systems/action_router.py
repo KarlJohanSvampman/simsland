@@ -880,6 +880,14 @@ def route_action(c, world, action, speech, definitions=None):
         _route_call_911(c, world, action)
     elif action_type == "call_parent":
         _route_call_parent(c, world, action)
+    elif action_type == "plant_seed":
+        _route_plant_seed(c, world, action)
+    elif action_type == "water":
+        _route_water(c, world, action)
+    elif action_type == "pull_weed":
+        _route_pull_weed(c, world, action)
+    elif action_type == "harvest":
+        _route_harvest(c, world, action)
     elif action_type in ("grab_offensive", "hold", "punch", "kick", "shove", "threaten", "stab", "knock"):
         _route_hostile_action(c, world, action)
     elif action_type == "dodge":
@@ -1287,6 +1295,90 @@ def _route_call_parent(c, world, action):
         incident["reported"] = True
     except Exception:
         pass
+
+
+# =========================================================
+# PLANTS — see systems/plants.py. Four simple, immediate interactions
+# (no _scaffold/multi-tick activity machinery -- same shape as
+# confront/call_911/call_parent above), each resolving a prop target and
+# calling straight into plants.py.
+# =========================================================
+
+def _route_plant_seed(c, world, action):
+    """
+    action: {"type": "plant_seed", "plant_template_id": "...",
+             "target_id": pot_prop_id}  -- plant into an existing empty pot
+    OR      {"type": "plant_seed", "plant_template_id": "...",
+             "x": ..., "y": ...}         -- new soil-grown plant at a tile
+    """
+    plant_template_id = action.get("plant_template_id")
+    if not plant_template_id:
+        return
+    from systems.plants import plant_seed
+    from systems.props import get_prop_by_id
+
+    target_id = action.get("target_id") or action.get("target")
+    if target_id:
+        prop = get_prop_by_id(world, target_id)
+        if not prop:
+            return
+        plant_seed(world, plant_template_id, target_prop=prop)
+    else:
+        x, y = action.get("x"), action.get("y")
+        if x is None or y is None:
+            return
+        plant_seed(world, plant_template_id, x=x, y=y)
+
+
+def _route_water(c, world, action):
+    """action: {"type": "water", "target_id": plant_prop_id}"""
+    target_id = action.get("target_id") or action.get("target")
+    if not target_id:
+        return
+    from systems.props import get_prop_by_id
+    prop = get_prop_by_id(world, target_id)
+    if not prop:
+        return
+    from systems.plants import water_plant
+    if not water_plant(prop):
+        return
+
+    # Closes the loop on an accepted "water_plants" chore proposal
+    # (systems/proposals.py) -- mirrors do_laundry_fill's _pending_chore
+    # hand-off in activities.py, but consumed right here since watering
+    # resolves immediately rather than through the multi-tick activity
+    # completion pipeline laundry uses.
+    household = world.get("households", {}).get(c.get("household_id"))
+    if household:
+        pending = household.get("_pending_chore")
+        if pending and pending.get("chore_id") == "water_plants":
+            household.pop("_pending_chore", None)
+
+
+def _route_pull_weed(c, world, action):
+    """action: {"type": "pull_weed", "target_id": plant_prop_id}"""
+    target_id = action.get("target_id") or action.get("target")
+    if not target_id:
+        return
+    from systems.props import get_prop_by_id
+    prop = get_prop_by_id(world, target_id)
+    if not prop:
+        return
+    from systems.plants import pull_weed
+    pull_weed(prop)
+
+
+def _route_harvest(c, world, action):
+    """action: {"type": "harvest", "target_id": plant_prop_id}"""
+    target_id = action.get("target_id") or action.get("target")
+    if not target_id:
+        return
+    from systems.props import get_prop_by_id
+    prop = get_prop_by_id(world, target_id)
+    if not prop:
+        return
+    from systems.plants import harvest_plant
+    harvest_plant(c, prop, world)
 
 
 # =========================================================
