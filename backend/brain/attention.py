@@ -109,6 +109,16 @@ def update_social_attention(
 
             strength += 0.1
 
+        # Suspicion (systems/worries.py) — a person the observer is
+        # actively worried about draws more scrutiny, which propagates
+        # into perception.py's visibility bonus and the "your attention
+        # keeps drifting to X" narrative line via the existing focus
+        # mechanism below -- no separate eavesdrop/watch-closer action
+        # needed.
+        worry = c.get("worries", {}).get(p["id"])
+        if worry:
+            strength += worry.get("suspicion_level", 0) * 0.3
+
         focus = c.get(
         "attention",
             {}

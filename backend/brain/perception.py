@@ -511,6 +511,33 @@ def perceive_people(
 
             vis += 0.25
 
+        # =====================================
+        # ROUTINE DEVIATION (systems/worries.py) — is what other is
+        # doing right now unusual for THEM at this hour, per their own
+        # tracked habits? Small per-firing bump; needs sustained
+        # observation across many perception cycles to add up to
+        # anything, same reasoning as secrets.py's decay-scale tuning.
+        # =====================================
+        try:
+            from systems.habits import get_dominant_habit_for_hour
+            from systems.worries import bump_suspicion
+            hour = world.get("calendar", {}).get("hour", 0)
+            dominant = get_dominant_habit_for_hour(other, hour)
+            if dominant:
+                dom_type, dom_strength = dominant
+                cur_type = (other.get("activity") or {}).get("type")
+                if cur_type and cur_type != dom_type:
+                    cur_strength = other.get("habits", {}).get(f"{cur_type}@{hour}", 0)
+                    if cur_strength < dom_strength * 0.2:
+                        bump_suspicion(
+                            c, other["id"], 0.005, "routine_deviation",
+                            f"{other.get('name', other['id'])} was doing something unusual "
+                            f"for this time of day",
+                            world,
+                        )
+        except Exception:
+            pass
+
         results.append({
 
             "id":
@@ -687,6 +714,30 @@ def perceive_audio(
             "distance":
                 d
         })
+
+    # context_builder.py only renders audible_events[:4] into narrative
+    # (a token-budget cap), so without a relevance sort a suspicious
+    # character's target conversation can be truncated out under plain
+    # insertion order even when attention.py is biased toward them —
+    # sort clarity-first, with a bonus for a speaker this character has
+    # an active worry about, so "watching closer" reliably survives the
+    # cap (systems/worries.py).
+    try:
+        worries = c.get("worries", {})
+        chars = world.get("characters", {})
+        name_to_id = {p.get("name"): pid for pid, p in chars.items()}
+
+        def _relevance(event):
+            clarity = event.get("clarity", 0.5) if event.get("type") == "speech" else 0.4
+            speaker_id = name_to_id.get(event.get("speaker"))
+            suspicion_bonus = 0.0
+            if speaker_id and speaker_id in worries:
+                suspicion_bonus = worries[speaker_id].get("suspicion_level", 0) * 0.5
+            return clarity + suspicion_bonus
+
+        heard.sort(key=_relevance, reverse=True)
+    except Exception:
+        pass
 
     return heard
 

@@ -73,6 +73,8 @@ from systems.grievances        import update_grievances
 from systems.conflict_pipeline import process_conflicts
 from systems.grapple         import process_grapples
 from systems.social_contracts  import check_contract_violations
+from systems.social_rules      import cleanup_expired_rule_exceptions
+from systems.worries           import decay_worries
 from systems.contagion       import tick_contagion_location, age_food_items
 from systems.child_care      import tick_child_needs
 from systems.bedroom_assignment import tick_bedroom_assignments
@@ -388,6 +390,8 @@ def tick(world):
 
     if every(world, CADENCE["contract_checks"], offset=26):
         check_contract_violations(world)  # emits contract_violated
+        cleanup_expired_rule_exceptions(world)  # GC only, see social_rules.py
+        decay_worries(world)  # passive suspicion decay, see worries.py
 
     # -- Daily stats drift ──────────────────────────────────
     if every(world, CADENCE["socioeconomics"], offset=19):

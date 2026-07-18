@@ -146,6 +146,19 @@ def _on_contract_violated(data, world):
 subscribe("contract_violated", _on_contract_violated)
 
 
+def _on_lie_detected(data, world):
+    """A lie caught by systems/excuses.py revives the dead "lied"
+    grievance preset -- the event was already emitted (docstring said
+    "for grievance system") but nothing subscribed to it until now."""
+    from systems.grievances import add_grievance
+    authority = world.get("characters", {}).get(data["authority_id"])
+    if authority:
+        add_grievance(authority, data["liar_id"], "lied", world,
+                      details={"lie": data.get("lie"), "truth": data.get("truth")})
+
+subscribe("lie_detected", _on_lie_detected)
+
+
 def _on_fight_physical(data, world):
     """Physical altercation — reliably create a real incident (not the
     dice-roll trigger_incident(), which almost never fires for the exact

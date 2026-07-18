@@ -647,6 +647,10 @@ def ensure_character_defaults(c):
 
     # Social conflict system
     c.setdefault("grievances",               [])
+    # Standing, unilateral policies this character holds toward others
+    # (e.g. "household members may borrow my car"), with per-subject
+    # exceptions carved out from precedent. See systems/social_rules.py.
+    c.setdefault("social_rules",             [])
     c.setdefault("portfolio",                {})
     c.setdefault("watched_stocks",           [])
     c.setdefault("last_stock_check",         0)
@@ -674,7 +678,10 @@ def ensure_character_defaults(c):
     c.setdefault("conditioning_profile",      [])   # conditioned behaviors
     c.setdefault("active_lies",               [])   # currently maintained lies
     c.setdefault("private_off_grid_history",  [])  # secret events from off-grid trips (not shared)
-    c.setdefault("suspicion_of",              {})   # {char_id: 0-1} authority's suspicion
+    # Behavior-based suspicion — routine deviation, caught lies, evasive
+    # answers, snooped devices. Keyed by subject_id. See systems/worries.py.
+    # Replaces the old "suspicion_of" field (was write-only, read by nothing).
+    c.setdefault("worries",                   {})
     c.setdefault("forbidden_locations",       [])   # locations this character has banned for subordinates
     c.setdefault("disliked_location_types",   [])   # location types authority dislikes
     c.setdefault("behavior_tags",             [])   # observable behavior habits (e.g. heavy_drinker)

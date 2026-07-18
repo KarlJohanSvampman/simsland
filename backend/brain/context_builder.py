@@ -601,9 +601,13 @@ def build_available_actions(c, world):
     for p in world.get("proposals", {}).values():
         if p.get("status") != "open":
             continue
-        is_social = p.get("kind") == "social_ask"
-        respond_action = "respond_social" if is_social else "respond_chore"
-        advance_action = "advance_social_round" if is_social else "advance_chore_round"
+        kind = p.get("kind")
+        if kind == "social_ask":
+            respond_action, advance_action = "respond_social", "advance_social_round"
+        elif kind == "request":
+            respond_action, advance_action = "respond_request", "advance_request_round"
+        else:
+            respond_action, advance_action = "respond_chore", "advance_chore_round"
         if p.get("responses", {}).get(cid) == "pending" and respond_action not in action_types:
             action_types.append(respond_action)
         elif (p.get("proposer_id") == cid
@@ -624,6 +628,24 @@ def build_available_actions(c, world):
     # same "route handler validates" pattern as give_excuse.
     if nearby_people:
         action_types.append("propose_social")
+
+    # Social rules (see systems/social_rules.py) — always available;
+    # self-authored, no target required for household scope, and the
+    # route itself validates an individual-scope target. propose_request
+    # gated on nearby_people, same convention as propose_social above.
+    action_types.append("propose_rule")
+    action_types.append("add_rule_exception")
+    if nearby_people:
+        action_types.append("propose_request")
+
+    # Behavior-based suspicion (see systems/worries.py) — form_theory
+    # only offered once there's actually something to have a theory
+    # about; check_device only once a real snoopable phone is found
+    # (radius/owner-elsewhere/suspicion-threshold gate, computed below
+    # alongside known_contacts/open_proposals as its own self-contained
+    # list so the LLM has a real item id to target).
+    if any(w.get("suspicion_level", 0) > 0.15 for w in c.get("worries", {}).values()):
+        action_types.append("form_theory")
 
     # Touch proposals (see systems/intimacy.py) — the six propose-touch
     # types listed whenever someone's nearby, same "route handler
@@ -823,11 +845,79 @@ def build_available_actions(c, world):
     known_contacts.sort(key=lambda k: -k["last_contact"])
     known_contacts = known_contacts[:15]
 
+    # -----------------------------------------------
+    # OPEN PROPOSALS (for respond_chore/respond_social/respond_request/
+    # advance_*_round) — the proposal_id itself was never actually
+    # surfaced to the LLM anywhere before this (the narrative note in
+    # _build_proposal_context() carries the id, but build_context() only
+    # pulls the note string out of it, discarding the id) — meaning
+    # respond_chore/respond_social had no real id to supply. Self-
+    # contained loop, same pattern as known_contacts above, not reused
+    # from _build_proposal_context()'s narrative-note loop.
+    # -----------------------------------------------
+    open_proposals = []
+    for p in world.get("proposals", {}).values():
+        if p.get("status") != "open" or p.get("responses", {}).get(c["id"]) != "pending":
+            continue
+        proposer = chars.get(p.get("proposer_id"))
+        open_proposals.append({
+            "proposal_id": p["id"],
+            "kind":        p.get("kind"),
+            "topic":       p.get("chore_id"),
+            "situation":   p.get("params", {}).get("situation"),
+            "urgency":     p.get("params", {}).get("urgency"),
+            "from_id":     p.get("proposer_id"),
+            "from_name":   proposer.get("name", p.get("proposer_id")) if proposer else None,
+        })
+
+    # -----------------------------------------------
+    # SNOOPABLE DEVICES (systems/worries.py's check_device) — a phone
+    # someone else set down, within reach, its owner elsewhere, and
+    # this character suspicious enough of the owner to actually check
+    # it. Full gate re-validated again at the route level (owner could
+    # walk back in before the action executes) -- this is only the
+    # availability-side pre-check, same relationship as open_proposals
+    # has to respond_chore's own re-validation.
+    # -----------------------------------------------
+    snoopable_devices = []
+    own_building = c.get("building_id")
+    for item in world.get("placed_items", {}).values():
+        if item.get("object_type") != "phone":
+            continue
+        owner_id = item.get("owner_id")
+        if not owner_id or owner_id == c["id"]:
+            continue
+        owner = chars.get(owner_id)
+        if not owner:
+            continue
+        worry = c.get("worries", {}).get(owner_id)
+        if not worry or worry.get("suspicion_level", 0) <= 0.3:
+            continue
+        loc = (owner.get("phone_state") or {}).get("last_known_location")
+        if not loc or loc.get("prop_id") != item["id"]:
+            continue
+        if owner.get("building_id") == loc.get("building_id"):
+            continue  # owner's right there, not actually unattended
+        if own_building != loc.get("building_id"):
+            continue
+        d = abs(c.get("x", 0) - item.get("x", 0)) + abs(c.get("y", 0) - item.get("y", 0))
+        if d > 3:
+            continue
+        snoopable_devices.append({
+            "item_id":    item["id"],
+            "owner_id":   owner_id,
+            "owner_name": owner.get("name", owner_id),
+        })
+    if snoopable_devices:
+        action_types.append("check_device")
+
     return {
         "action_types":          action_types,
         "interactable_props":    interactable,
         "nearby_characters":     nearby_people,
         "known_contacts":        known_contacts,
+        "open_proposals":        open_proposals,
+        "snoopable_devices":     snoopable_devices,
         "wearable_items":        wearable_in_inventory,
         "worn_slots":            worn_slots,
         "assembly_boxes":        prop_boxes,
@@ -1199,6 +1289,16 @@ def build_narrative(c, world):
         paragraphs.append(entry["note"])
     for entry in proposals.get("mediating", []):
         paragraphs.append(entry["note"])
+    for entry in proposals.get("resolved", []):
+        paragraphs.append(entry["note"])
+    for entry in proposals.get("rule_fired", []):
+        paragraphs.append(entry["note"])
+
+    for line in _build_social_rules_context(c, world):
+        paragraphs.append(line)
+
+    for line in _build_worries_context(c, world):
+        paragraphs.append(line)
 
     # ---- touch proposals + intimacy state — restores
     # _build_touch_proposal_context/_build_intimacy_context, previously
@@ -1292,68 +1392,213 @@ def _build_proposal_context(c, world):
     function IS wired in (see build_context() above) — don't repeat that
     mistake if this gets refactored later.
 
-    Surfaces two kinds of entries for a character:
+    Surfaces four kinds of entries for a character:
       - incoming: a proposal awaiting THIS character's response (accept/
         decline/counter).
       - mediating: a proposal THIS character made, where one or more
         recipients have countered and are waiting on a decision (see
         systems/proposals.py's "proposer-mediated reconciliation" rule —
         counters are proposals to the proposer, not to each other).
+      - resolved: a proposal THIS character made that just accepted/
+        declined — a pre-existing gap (nothing told the proposer the
+        outcome, for social_ask especially, which has no hand-off side
+        effect) fixed here with a one-time notification, gated by a
+        "proposer_notified" flag stamped onto the proposal so it only
+        narrates once.
+      - rule_fired: a "request"-kind proposal that auto-resolved against
+        THIS character's own systems/social_rules.py policy — auto-
+        resolution (see action_router.py::_route_propose_request) calls
+        respond() on the rule owner's behalf synchronously, so the normal
+        "responses[cid]==pending" incoming branch above never fires for
+        them; without this they'd have no way to learn their own rule
+        just governed someone's request. Gated by "owner_notified",
+        same one-time-narration pattern.
     """
     cid = c["id"]
-    incoming, mediating = [], []
+    chars = world.get("characters", {})
+    incoming, mediating, resolved, rule_fired = [], [], [], []
 
     for p in world.get("proposals", {}).values():
-        if p.get("status") != "open":
-            continue
-
         kind = p.get("kind")
 
-        if p.get("responses", {}).get(cid) == "pending":
-            if kind == "chore":
-                note = (f"Someone proposed {p.get('chore_id')} — you can accept, decline, "
-                        f"or counter with different details.")
-            elif kind == "social_ask":
-                note = (f"Someone is asking you: {p.get('chore_id')} — you can accept, "
-                        f"decline, or counter.")
-            else:
-                note = f"Someone offered to make {p.get('chore_id')} a recurring thing."
-            incoming.append({
-                "proposal_id": p["id"],
-                "kind":        kind,
-                "chore_id":    p.get("chore_id"),
-                "params":      p.get("params"),
-                "proposed_by": p.get("proposer_id"),
-                "round":       p.get("round"),
-                "note":        note,
-            })
-
-        elif p.get("proposer_id") == cid:
-            counters = {
-                rid: p["counter_params"].get(rid)
-                for rid, state in p.get("responses", {}).items()
-                if state == "counter"
-            }
-            if counters:
-                advance_action = "advance_social_round" if kind == "social_ask" else "advance_chore_round"
-                mediating.append({
+        if p.get("status") == "open":
+            if p.get("responses", {}).get(cid) == "pending":
+                if kind == "chore":
+                    note = (f"Someone proposed {p.get('chore_id')} — you can accept, decline, "
+                            f"or counter with different details.")
+                elif kind == "social_ask":
+                    note = (f"Someone is asking you: {p.get('chore_id')} — you can accept, "
+                            f"decline, or counter.")
+                elif kind == "request":
+                    proposer = chars.get(p.get("proposer_id"))
+                    params = p.get("params", {})
+                    note = (f"{proposer.get('name', 'Someone') if proposer else 'Someone'} is "
+                            f"asking you: {p.get('chore_id')} — {params.get('situation', '')} "
+                            f"(urgency {params.get('urgency', 0)}/100) — you can accept, "
+                            f"decline, or counter.")
+                else:
+                    note = f"Someone offered to make {p.get('chore_id')} a recurring thing."
+                incoming.append({
                     "proposal_id": p["id"],
                     "kind":        kind,
                     "chore_id":    p.get("chore_id"),
-                    "your_params": p.get("params"),
-                    "counters":    counters,
+                    "params":      p.get("params"),
+                    "proposed_by": p.get("proposer_id"),
                     "round":       p.get("round"),
-                    "note":        "One or more people countered your proposal with different "
-                                   f"details — decide new terms ({advance_action}) or let it "
-                                   "lapse.",
+                    "note":        note,
                 })
+
+            elif p.get("proposer_id") == cid:
+                counters = {
+                    rid: p["counter_params"].get(rid)
+                    for rid, state in p.get("responses", {}).items()
+                    if state == "counter"
+                }
+                if counters:
+                    if kind == "social_ask":
+                        advance_action = "advance_social_round"
+                    elif kind == "request":
+                        advance_action = "advance_request_round"
+                    else:
+                        advance_action = "advance_chore_round"
+                    mediating.append({
+                        "proposal_id": p["id"],
+                        "kind":        kind,
+                        "chore_id":    p.get("chore_id"),
+                        "your_params": p.get("params"),
+                        "counters":    counters,
+                        "round":       p.get("round"),
+                        "note":        "One or more people countered your proposal with different "
+                                       f"details — decide new terms ({advance_action}) or let it "
+                                       "lapse.",
+                    })
+
+        elif p.get("status") == "resolved":
+            if p.get("proposer_id") == cid and not p.get("proposer_notified"):
+                # participants = accepted recipients + the proposer (always
+                # included, see proposals.py::_maybe_resolve) -- so >1 means
+                # at least one recipient actually accepted.
+                accepted = len(p.get("participants", [])) > 1
+                verb = "accepted" if accepted else "declined"
+                resolved.append({
+                    "proposal_id": p["id"],
+                    "kind":        kind,
+                    "chore_id":    p.get("chore_id"),
+                    "note":        f"Your {p.get('chore_id')} request/proposal was {verb}.",
+                })
+                p["proposer_notified"] = True
+
+            if (kind == "request" and p.get("auto_resolved")
+                    and cid in p.get("recipients", []) and not p.get("owner_notified")):
+                proposer = chars.get(p.get("proposer_id"))
+                allowed = cid in p.get("participants", [])
+                reason = p.get("auto_resolution_reason") or "your standing rule"
+                rule_fired.append({
+                    "proposal_id": p["id"],
+                    "chore_id":    p.get("chore_id"),
+                    "note":        (f"{proposer.get('name', 'Someone') if proposer else 'Someone'} "
+                                     f"asked to {p.get('chore_id')}; your rule with them auto-"
+                                     f"{'allowed' if allowed else 'declined'} it "
+                                     f"({reason})."),
+                })
+                p["owner_notified"] = True
 
     result = {}
     if incoming:
         result["incoming"] = incoming
     if mediating:
         result["mediating"] = mediating
+    if resolved:
+        result["resolved"] = resolved
+    if rule_fired:
+        result["rule_fired"] = rule_fired
     return result or None
+
+
+def _build_social_rules_context(c, world):
+    """Surfaces this character's OWN standing social_rules.py policies
+    and any active per-person exceptions in prose, so the owner's LLM
+    remembers its own past decisions (e.g. "I already carved out an
+    exception for Alex") without having to re-derive them. Only ever
+    shows the owner's own rules -- someone learns another character's
+    rule exists in-fiction, as a consequence of a request being
+    resolved (see _build_proposal_context's rule_fired branch), not
+    omnisciently ahead of time."""
+    rules = c.get("social_rules", [])
+    if not rules:
+        return []
+
+    chars = world.get("characters", {})
+    households = world.get("households", {})
+    now = world.get("tick", 0)
+    lines = []
+
+    for rule in rules:
+        if rule["scope"] == "individual":
+            who = chars.get(rule["scope_ids"][0], {}).get("name", "someone specific")
+            scope_desc = who
+        else:
+            hh = households.get(rule["scope_ids"][0], {})
+            scope_desc = f"household members of {hh.get('name', 'your household')}" \
+                if len(rule["scope_ids"]) == 1 else "several households"
+        verb = "may" if rule["default"] == "allow" else "may NOT"
+        line = (f"Your rule on \"{rule['topic']}\": {scope_desc} {verb} "
+                f"(priority {rule['priority']}).")
+
+        exception_bits = []
+        for subject_id, exc in rule.get("exceptions", {}).items():
+            expires_tick = exc.get("expires_tick")
+            if expires_tick is not None and now > expires_tick:
+                continue   # expired, live-check consistent with resolve_request
+            subject_name = chars.get(subject_id, {}).get("name", subject_id)
+            exc_verb = "may" if exc["override"] == "allow" else "may NOT"
+            expiry = f", expires in {expires_tick - now} ticks" if expires_tick is not None else ""
+            reason = f" — {exc['reason']}" if exc.get("reason") else ""
+            exception_bits.append(
+                f"{subject_name} {exc_verb} (priority {exc['priority']}{expiry}){reason}"
+            )
+        if exception_bits:
+            line += " Exception: " + "; ".join(exception_bits) + "."
+        lines.append(line)
+
+    return lines
+
+
+def _build_worries_context(c, world):
+    """Surfaces this character's OWN active worries (systems/worries.py)
+    in prose -- their suspicion of someone else, why, and whatever
+    theory they've formed about it. Only ever the observer's own
+    worries; a subject never sees they're worried about, mirroring how
+    secrets.py's target context deliberately withholds the keeper's
+    actual content."""
+    from systems.worries import get_active_worries
+    active = get_active_worries(c)
+    if not active:
+        return []
+
+    chars = world.get("characters", {})
+    lines = []
+    for subject_id, worry in active.items():
+        level = worry.get("suspicion_level", 0)
+        if level > 0.6:
+            label = "seriously wrong"
+        elif level > 0.3:
+            label = "noticeably strange"
+        else:
+            label = "a little off"
+        subject_name = chars.get(subject_id, {}).get("name", subject_id)
+        line = f"Something feels {label} about {subject_name} lately."
+        triggers = worry.get("triggers", [])
+        if triggers:
+            line += f" ({triggers[-1].get('note')})"
+        if worry.get("false_belief"):
+            line += f" You suspect: {worry['false_belief']}."
+        if worry.get("suspicion_of"):
+            blamed = chars.get(worry["suspicion_of"], {}).get("name", worry["suspicion_of"])
+            line += f" You wonder if {blamed} is involved instead."
+        lines.append(line)
+
+    return lines
 
 
 # ─────────────────────────────────────────────────────────────────────────────

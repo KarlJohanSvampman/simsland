@@ -72,3 +72,31 @@ def decay_habits(c):
         c["habits"][k] *= 0.999
         if c["habits"][k] < 0.01:
             del c["habits"][k]
+
+
+# =========================================================
+# DOMINANT HABIT FOR AN HOUR  (for systems/worries.py's routine-
+# deviation check -- "is what I'm seeing them do right now unusual
+# for them at this time of day?")
+# =========================================================
+
+def get_dominant_habit_for_hour(c, hour, min_strength=5):
+    """Returns (activity_type, strength) for c's strongest habit at
+    this hour, or None if nothing there is established enough to
+    count as "routine". min_strength=5 is calibrated against
+    apply_habit_bias()'s own saturation point (strength~=10 already
+    maxes its boost) -- a raw counter, not 0-1, so a single completion
+    (strength=1) must NOT read as a routine."""
+    suffix = f"@{hour}"
+    habits = c.get("habits", {})
+    candidates = [
+        (key[: -len(suffix)], strength)
+        for key, strength in habits.items()
+        if key.endswith(suffix)
+    ]
+    if not candidates:
+        return None
+    dominant = max(candidates, key=lambda kv: kv[1])
+    if dominant[1] < min_strength:
+        return None
+    return dominant

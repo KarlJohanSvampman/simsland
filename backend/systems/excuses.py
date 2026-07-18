@@ -556,11 +556,20 @@ def _handle_caught_lying(c, authority, lie, world):
     except Exception:
         pass
 
-    # Authority suspicion rises
+    # Authority suspicion rises — routed through systems/worries.py
+    # (was auth["suspicion_of"], a field nothing else ever read; this
+    # is a real, confirmed event so the bump is much bigger than the
+    # ambiguous routine-deviation signal in perception.py).
     if auth:
-        auth.setdefault("suspicion_of", {})[c["id"]] = min(
-            1.0, auth.get("suspicion_of", {}).get(c["id"], 0.0) + 0.25
-        )
+        try:
+            from systems.worries import bump_suspicion
+            bump_suspicion(
+                auth, c["id"], 0.3, "caught_lying",
+                f"caught {c.get('name', c['id'])} in a lie: \"{lie.get('lie_text', 'something')}\"",
+                world,
+            )
+        except Exception:
+            pass
 
     # Emit event for grievance system
     try:

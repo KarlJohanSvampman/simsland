@@ -231,6 +231,7 @@ _INTERACTION_DURATIONS = {
     "interact":   600,
     "wait":       120,
     "retrieve_phone": 300,
+    "check_device": 300,
 }
 
 def _scaffold(c, world, activity_type, target_id=None,
@@ -815,6 +816,10 @@ def route_action(c, world, action, speech, definitions=None):
         _route_phone_read_text(c, world, action)
     elif action_type == "retrieve_phone":
         _route_retrieve_phone(c, world, action)
+    elif action_type == "check_device":
+        _route_check_device(c, world, action)
+    elif action_type == "form_theory":
+        _route_form_theory(c, world, action)
 
     # ── Computer ───────────────────────────────────────────────────────────────
     elif action_type == "computer_social_media":
@@ -937,6 +942,19 @@ def route_action(c, world, action, speech, definitions=None):
         # too rather than duplicating identical logic under a new name.
         _route_respond_chore(c, world, action)
     elif action_type == "advance_social_round":
+        _route_advance_chore_round(c, world, action)
+
+    elif action_type == "propose_rule":
+        _route_propose_rule(c, world, action)
+    elif action_type == "add_rule_exception":
+        _route_add_rule_exception(c, world, action)
+    elif action_type == "propose_request":
+        _route_propose_request(c, world, action)
+    elif action_type == "respond_request":
+        # Same reuse trick as respond_social above — respond() dispatches
+        # by proposal_id, not by the action-type string that invoked it.
+        _route_respond_chore(c, world, action)
+    elif action_type == "advance_request_round":
         _route_advance_chore_round(c, world, action)
 
     elif action_type == "breastfeed":
@@ -1076,6 +1094,16 @@ def _route_give_excuse(c, world, action):
         # Log if it was a lie
         if result.get("is_lie"):
             c.setdefault("_recent_lie_to", {})[target_id] = result["lie_detail"]
+        # Evasive but not an outright lie (vague deflection/refusal) —
+        # weaker evidence than a caught lie, still noticed by the asker
+        # who's already standing right here (systems/worries.py).
+        elif result.get("vagueness", 0) > 0.5:
+            from systems.worries import bump_suspicion
+            bump_suspicion(
+                authority, c["id"], 0.075, "evasive",
+                f"{c.get('name', c['id'])} was evasive when asked about something",
+                world,
+            )
     except Exception:
         pass
 
@@ -1723,6 +1751,104 @@ def _route_propose_recurring(c, world, action):
         pass
 
 
+def _route_propose_rule(c, world, action):
+    """
+    Character authors a standing policy about what they'll allow others
+    to do -- see systems/social_rules.py. Not a two-party contract: the
+    owner is the only party, the other side is simply expected to know
+    the rule applies to them.
+    action: {"type": "propose_rule", "topic": "borrow_car", "scope": "individual"|"household",
+             "target": character_id (required if scope=="individual"),
+             "default": "allow"|"deny", "priority": 50, "reason": "..."}
+    """
+    topic = action.get("topic")
+    scope = action.get("scope")
+    if not topic or scope not in ("individual", "household"):
+        return
+    try:
+        from systems.social_rules import create_rule
+        create_rule(
+            c, topic, scope,
+            target_id=action.get("target"),
+            default=action.get("default", "allow"),
+            priority=action.get("priority", 50),
+            reason=action.get("reason", ""),
+            world=world,
+        )
+    except Exception:
+        pass
+
+
+def _route_add_rule_exception(c, world, action):
+    """
+    Character carves an individual exception into one of their own
+    existing household-scope rules -- e.g. "not Alex, not for two more
+    weeks, they crashed it." No-ops if the owner has no household rule
+    for this topic yet (the base rule must exist before it can be
+    excepted).
+    action: {"type": "add_rule_exception", "topic": "borrow_car", "target": character_id,
+             "override": "allow"|"deny", "priority": 70, "reason": "...",
+             "duration_ticks": optional int}
+    """
+    topic = action.get("topic")
+    target_id = action.get("target")
+    override = action.get("override")
+    if not topic or not target_id or override not in ("allow", "deny"):
+        return
+    try:
+        from systems.social_rules import add_exception
+        add_exception(
+            c, topic, target_id, override,
+            priority=action.get("priority", 70),
+            reason=action.get("reason", ""),
+            duration_ticks=action.get("duration_ticks"),
+            world=world,
+        )
+    except Exception:
+        pass
+
+
+def _route_propose_request(c, world, action):
+    """
+    Character asks someone (nearby or not) for something. Checked
+    immediately against the recipient's own social_rules -- if a rule
+    cleanly resolves it (allow/deny), this auto-responds on the
+    recipient's behalf right away, no LLM turn needed on their side.
+    If no rule matches, the proposal stays open for real negotiation,
+    exactly like propose_social.
+    action: {"type": "propose_request", "target": character_id, "topic": "borrow_car",
+             "situation": "...", "urgency": 0-100}
+    """
+    target_id = action.get("target")
+    topic = action.get("topic")
+    situation = action.get("situation", "")
+    if not target_id or not topic:
+        return
+    recipient = world.get("characters", {}).get(target_id)
+    if not recipient:
+        return
+    urgency = action.get("urgency", 30)
+    try:
+        urgency = max(0, min(100, int(urgency)))
+    except (TypeError, ValueError):
+        urgency = 30
+
+    try:
+        from systems.proposals import propose_request, respond
+        from systems.social_rules import resolve_request
+
+        result = propose_request(c, recipient, world, topic, situation, urgency)
+        proposal = result["proposal"]
+
+        outcome, reason = resolve_request(recipient, c, topic, urgency, world)
+        if outcome in ("allow", "deny"):
+            respond(recipient, world, proposal["id"], "accept" if outcome == "allow" else "decline")
+            proposal["auto_resolved"] = True
+            proposal["auto_resolution_reason"] = reason
+    except Exception:
+        pass
+
+
 # =========================================================
 # CHILDCARE HANDLERS
 # =========================================================
@@ -1995,6 +2121,28 @@ def _route_phone_check(c, world, action):
                  if m.get("to_id") == c["id"] and not m.get("read"))
     c["activity"]["phone_check_result"] = {"missed_calls": missed, "unread_messages": unread}
     _set_phone_animation(c, "phone_check")
+    _maybe_notice_snooping(c, phone, world)
+
+
+def _maybe_notice_snooping(c, phone, world):
+    """~25% chance, once per snoop, that checking a phone someone else
+    used while it was left out (systems/worries.py's check_device)
+    raises this owner's suspicion of the snooper -- the other half of
+    the "behavior-based trust cuts both ways" loop."""
+    snooper_id = phone.get("_last_snooped_by")
+    if not snooper_id:
+        return
+    phone["_last_snooped_by"] = None
+    phone["_last_snooped_tick"] = None
+    if random.random() < 0.25:
+        from systems.worries import bump_suspicion
+        snooper = world.get("characters", {}).get(snooper_id)
+        bump_suspicion(
+            c, snooper_id, 0.2, "phone_tampered",
+            "your phone feels like someone's been using it"
+            + (f" — maybe {snooper['name']}" if snooper else ""),
+            world,
+        )
 
 
 def _route_phone_read_text(c, world, action):
@@ -2009,6 +2157,89 @@ def _route_phone_read_text(c, world, action):
                 m["read"] = True
     c["activity"] = _scaffold(c, world, "phone_read_text", interaction="phone_read_text")
     _set_phone_animation(c, "phone_read_text")
+
+
+def _route_check_device(c, world, action):
+    """
+    Character checks someone else's phone, left unattended, while
+    suspicious of them (systems/worries.py). Reveals recent text/call/
+    email conversation content via build_active_conversations() -- the
+    real, live message store post phone-system-phase-2, NOT the flat
+    world["messages"] log (that's only system notices like
+    call_parent now). Phones only -- laptops have no stable per-item
+    owner in this codebase today. Full gate re-validated here, not
+    just trusted from build_available_actions() (owner could have
+    walked back in between the action being offered and executed).
+    action: {"type": "check_device", "target": item_id}
+    """
+    item_id = action.get("target")
+    if not item_id:
+        return
+    item = world.get("placed_items", {}).get(item_id)
+    if not item or item.get("object_type") != "phone":
+        return
+    owner_id = item.get("owner_id")
+    if not owner_id or owner_id == c["id"]:
+        return
+    owner = world.get("characters", {}).get(owner_id)
+    if not owner:
+        return
+
+    # Owner must actually be elsewhere -- "left it out of sight", not
+    # just briefly out of arm's reach.
+    phone_state = owner.get("phone_state") or {}
+    loc = phone_state.get("last_known_location")
+    if not loc or loc.get("prop_id") != item_id:
+        return
+    if owner.get("building_id") == loc.get("building_id"):
+        return
+
+    # Observer must physically be right here, near the phone.
+    if c.get("building_id") != loc.get("building_id"):
+        return
+    d = abs(c.get("x", 0) - item.get("x", 0)) + abs(c.get("y", 0) - item.get("y", 0))
+    if d > 3:
+        return
+
+    worry = c.get("worries", {}).get(owner_id)
+    if not worry or worry.get("suspicion_level", 0) <= 0.3:
+        return
+
+    try:
+        from brain.context_builder import build_active_conversations
+        convs = [
+            conv for conv in build_active_conversations(owner, world)
+            if conv.get("medium") in ("text", "call", "email")
+        ]
+    except Exception:
+        convs = []
+
+    c["activity"] = _scaffold(c, world, "check_device", interaction="check_device")
+    c["activity"]["snooped_conversations"] = convs[:3]
+
+    item["_last_snooped_by"] = c["id"]
+    item["_last_snooped_tick"] = world.get("tick", 0)
+
+
+def _route_form_theory(c, world, action):
+    """
+    Character voices a theory about what's going on with someone
+    they're suspicious of -- deliberately the LLM's own judgment, not
+    a system-generated guess, so it can be wrong (systems/worries.py).
+    action: {"type": "form_theory", "target": subject_id, "false_belief": "...",
+             "suspicion_of": optional other_char_id to blame instead}
+    """
+    subject_id = action.get("target")
+    false_belief = action.get("false_belief")
+    if not subject_id or not false_belief:
+        return
+    worry = c.get("worries", {}).get(subject_id)
+    if not worry:
+        return
+    worry["false_belief"] = false_belief
+    suspicion_of = action.get("suspicion_of")
+    if suspicion_of:
+        worry["suspicion_of"] = suspicion_of
 
 
 def _route_retrieve_phone(c, world, action):

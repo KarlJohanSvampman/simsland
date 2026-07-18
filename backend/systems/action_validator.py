@@ -84,6 +84,26 @@ VALID_ACTIONS = {
 
     "advance_social_round",
 
+    # Social rules + request negotiation (see systems/social_rules.py,
+    # systems/proposals.py's "request" kind) — a standing, unilateral
+    # policy check layered on top of the same propose/respond engine
+    # social_ask uses.
+    "propose_rule",
+
+    "add_rule_exception",
+
+    "propose_request",
+
+    "respond_request",
+
+    "advance_request_round",
+
+    # Behavior-based suspicion (see systems/worries.py) — checking an
+    # unattended phone, and voicing a theory about what's going on.
+    "check_device",
+
+    "form_theory",
+
     # Touch proposals (see systems/intimacy.py) — the router code
     # (_route_propose_touch/_route_respond_touch in action_router.py) was
     # fully built but these were never registered, the exact gap

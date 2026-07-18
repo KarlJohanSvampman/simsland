@@ -23,6 +23,12 @@ kinds share this one engine rather than being near-duplicate modules:
                        no special hand-off (unlike chore/recurring_offer) —
                        it's visible via _build_proposal_context() and the
                        accepted/declined outcome is enough on its own.
+  "request"         — like social_ask, but checked against the recipient's
+                       systems/social_rules.py standing policies first (see
+                       propose_request()). When a rule cleanly resolves it,
+                       the caller (action_router.py) auto-responds on the
+                       recipient's behalf immediately, no LLM turn needed;
+                       otherwise it behaves exactly like social_ask.
 
 Built after finding the one existing negotiation precedent in this
 codebase — systems/intimacy.py's touch-proposal system (hug/kiss/etc.) —
@@ -145,7 +151,7 @@ def respond(recipient, world, proposal_id, response, counter_params=None):
         return {"ok": False, "reason": "already_resolved"}
 
     if response == "counter":
-        if proposal["kind"] not in ("chore", "social_ask"):
+        if proposal["kind"] not in ("chore", "social_ask", "request"):
             return {"ok": False, "reason": "counter_not_supported_for_this_kind"}
         proposal["responses"][rid] = "counter"
         proposal["counter_params"][rid] = dict(counter_params or {})
@@ -229,6 +235,27 @@ def propose_social_ask(proposer, recipient, world, ask, params=None):
     (the caller — action_router.py's _route_propose_social — is what
     ensures there's a real target)."""
     proposal = propose(proposer, [recipient], "social_ask", ask, params, world)
+    return {"ok": True, "proposal": proposal}
+
+
+# =========================================================
+# REQUEST — a one-sided ask evaluated against the recipient's own
+# systems/social_rules.py standing policies. See
+# action_router.py::_route_propose_request for the auto-resolution
+# call site: when a rule cleanly matches, the caller resolves this
+# proposal immediately (impersonating the recipient) rather than
+# waiting for their LLM turn. No locality/household gate, same as
+# social_ask. Counter-proposing is supported (see respond()).
+# =========================================================
+
+def propose_request(proposer, recipient, world, topic, situation, urgency):
+    """recipient: a single character dict. topic/situation/urgency are
+    stored in params — chore_id carries topic (mirrors how social_ask
+    reuses chore_id as its generic "what" field) so existing
+    kind-agnostic code (_maybe_resolve, narrative notes) can read the
+    same field regardless of kind."""
+    params = {"situation": situation, "urgency": urgency}
+    proposal = propose(proposer, [recipient], "request", topic, params, world)
     return {"ok": True, "proposal": proposal}
 
 
