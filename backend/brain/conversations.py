@@ -94,7 +94,9 @@ def create_conversation(
 
     topic="general",
 
-    tone="neutral"
+    tone="neutral",
+
+    medium="in_person"
 ):
 
     ensure_conversations(world)
@@ -117,6 +119,12 @@ def create_conversation(
         "topic": topic,
 
         "tone": tone,
+
+        # "in_person" | "call" | "text" | "email" — set by whichever
+        # action_router.py route created this conversation (apply_speech
+        # for in-person/call, phone_send_text, computer_send_email).
+        # Metadata only, doesn't change turn-taking/tone/history at all.
+        "medium": medium,
 
         # Optional LLM-set framing ("argument", "negotiation", "persuasion",
         # "competition", "gossip", ...) — see action_router.py::apply_speech()
@@ -212,7 +220,9 @@ def get_or_create_conversation(
 
     b_id,
 
-    topic="general"
+    topic="general",
+
+    medium="in_person"
 ):
 
     conv = find_conversation(
@@ -235,7 +245,9 @@ def get_or_create_conversation(
 
         b_id,
 
-        topic
+        topic,
+
+        medium=medium
     )
 
 

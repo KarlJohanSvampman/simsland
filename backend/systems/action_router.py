@@ -100,7 +100,8 @@ def apply_speech(c, world, speech):
         from systems.conversation_analysis import analyze_message, should_schedule_reflection
 
         conv = get_or_create_conversation(
-            world, c["id"], target_id, topic=topic or "general"
+            world, c["id"], target_id, topic=topic or "general",
+            medium=speech.get("medium", "in_person"),
         )
 
         # Optional LLM-set framing (argument, negotiation, persuasion, ...).
@@ -1954,17 +1955,30 @@ def _route_phone_answer(c, world, action):
 
 
 def _route_phone_send_text(c, world, action):
+    """Threads into the real conversation system (brain/conversations.py)
+    via apply_speech, medium="text" -- was previously calling
+    systems/social.py::send_message() directly, a separate flat log that
+    never touched conversations.py at all (no tone/turn-taking/
+    reflections, and the recipient never saw it in
+    build_active_conversations()). Works via a phone or a household
+    computer (_require_phone_or_computer) -- "send texts via computer
+    too, to represent other applications."""
     phone = _require_phone(c)
-    if not phone:
+    if phone:
+        phone["location"] = "held"
+    elif not _require_phone_or_computer(c, world):
         return
-    phone["location"] = "held"
     target_id = action.get("target_id") or action.get("target")
     message   = action.get("message", "")
     if target_id and message:
-        from systems.social import send_message
-        target = world.get("characters", {}).get(target_id)
-        if target:
-            send_message(c, target, message, world)
+        speech = {
+            "target":       target_id,
+            "utterance":    message,
+            "speech_act":   action.get("speech_act", "smalltalk"),
+            "topic":        action.get("topic", "general"),
+            "medium":       "text",
+        }
+        apply_speech(c, world, speech)
     c["activity"] = _scaffold(c, world, "phone_send_text", interaction="phone_send_text")
     _set_phone_animation(c, "phone_send_text")
 
@@ -2231,24 +2245,45 @@ def _route_computer_apply_for_job(c, world, action):
 # ─── email ────────────────────────────────────────────────────────────────────
 
 def _route_computer_email(c, world, action):
+    """Threads into the same conversation system as phone_send_text,
+    medium="email" -- was previously its own disconnected list
+    (world["emails"]), read by nothing else in the codebase (not even
+    computer_check_email itself, which had zero data behavior beyond
+    scaffolding the activity). Retired in favor of the same
+    apply_speech/conversations.py path everything else now uses."""
     if not _require_phone_or_computer(c, world):
         return
     atype = action.get("type", "computer_check_email")
     c["activity"] = _scaffold(c, world, atype, interaction=atype)
     c["animation_state"] = "sit_work"
+
     if atype == "computer_send_email":
-        # Queue email as a world message
         to   = action.get("to", "")
         subj = action.get("subject", "")
         body = action.get("body", "")
-        world.setdefault("emails", []).append({
-            "from_id":  c["id"],
-            "to":       to,
-            "subject":  subj,
-            "body":     body,
-            "tick":     world.get("tick", 0),
-            "read":     False,
-        })
+        if to and body:
+            speech = {
+                "target":     to,
+                "utterance":  body,
+                "speech_act": action.get("speech_act", "smalltalk"),
+                "topic":      subj or action.get("topic", "general"),
+                "medium":     "email",
+            }
+            apply_speech(c, world, speech)
+
+    elif atype in ("computer_check_email", "computer_respond_email"):
+        # Surface email-medium threads waiting on a reply, mirroring
+        # phone_check's missed-calls/unread pattern -- "unread" here is
+        # "your_turn" (the other side sent the last message).
+        from brain.context_builder import build_active_conversations
+        email_threads = [
+            conv for conv in build_active_conversations(c, world)
+            if conv.get("medium") == "email"
+        ]
+        c["activity"]["email_threads"] = email_threads
+        c["activity"]["unread_email_count"] = sum(
+            1 for t in email_threads if t.get("your_turn")
+        )
 
 
 # ─── stocks ───────────────────────────────────────────────────────────────────

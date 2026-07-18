@@ -302,9 +302,11 @@ def build_active_conversations(c, world):
         result.append({
             "conversation_id":    conv["id"],
             "with":               other.get("name", other_id),
+            "with_id":            other_id,
             "topic":              conv.get("topic"),
             "tone":               conv.get("tone"),
             "conversation_type":  conv.get("conversation_type"),
+            "medium":             conv.get("medium", "in_person"),
             "your_turn":       conv.get("turn_owner") == c["id"],
             "recent_messages": [
                 {
@@ -795,10 +797,37 @@ def build_available_actions(c, world):
         for w in walls_near(world, int(c.get("x", 0)), int(c.get("y", 0)), radius=3)
     ]
 
+    # -----------------------------------------------
+    # KNOWN CONTACTS (for phone_call/phone_send_text/computer_send_email
+    # targets not currently nearby) — nearby_characters is the only
+    # addressable-id list that existed before this; a character couldn't
+    # be phoned/texted at all unless they also happened to be visible.
+    # Same familiarity/interaction_count gate build_relationship_context()
+    # already uses, so the two stay in agreement about who counts as
+    # "known", sorted by most recent contact first, capped to keep this
+    # list from growing unbounded over a long-lived character's life.
+    # -----------------------------------------------
+    known_contacts = []
+    chars = world.get("characters", {})
+    for other_id, rel in c.get("relationships", {}).items():
+        if rel.get("familiarity", 0) < 1 and rel.get("interaction_count", 0) == 0:
+            continue
+        other = chars.get(other_id)
+        if not other:
+            continue
+        known_contacts.append({
+            "id":           other_id,
+            "name":         other.get("name", other_id),
+            "last_contact": rel.get("last_contact", 0),
+        })
+    known_contacts.sort(key=lambda k: -k["last_contact"])
+    known_contacts = known_contacts[:15]
+
     return {
         "action_types":          action_types,
         "interactable_props":    interactable,
         "nearby_characters":     nearby_people,
+        "known_contacts":        known_contacts,
         "wearable_items":        wearable_in_inventory,
         "worn_slots":            worn_slots,
         "assembly_boxes":        prop_boxes,
@@ -837,13 +866,32 @@ _CONVERSATION_TYPE_PHRASING = {
 }
 
 
+# Non-in-person conversation media (phone/computer round, phase 2) —
+# same "extend the dict, don't reinvent the function" pattern as
+# _CONVERSATION_TYPE_PHRASING above.
+_MEDIUM_VERB = {
+    "call":  "on a call",
+    "text":  "texting",
+    "email": "emailing",
+}
+
+
 def _conversation_frame_line(conv):
     who = conv["with"]
     topic = conv.get("topic") or "something"
+    medium = conv.get("medium", "in_person")
     template = _CONVERSATION_TYPE_PHRASING.get(conv.get("conversation_type"))
+    base = template.format(who=who, topic=topic) if template else \
+        f"You are in conversation with {who} about {topic}"
+    medium_verb = _MEDIUM_VERB.get(medium)
+    if not medium_verb:
+        return base
     if template:
-        return template.format(who=who, topic=topic)
-    return f"You are in conversation with {who} about {topic}"
+        # Richer conversation_type framing already carries its own verb
+        # ("negotiating", "gossiping", ...) — just note it isn't
+        # face-to-face rather than replacing the whole sentence.
+        return f"{base} ({medium_verb})"
+    return f"You're {medium_verb} with {who} about {topic}"
 
 
 def build_scene_description(c, world):

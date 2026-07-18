@@ -45,6 +45,20 @@ Rules:
   Pick based on tags: e.g. to sit → a prop tagged "seatable", to sleep → "sleepable".
   Set "interaction" to the matching entry in that prop's "interactions" list.
 - When you choose "speak" or "socialize", set "target" to a character "id" from nearby_characters.
+- "phone_call", "phone_answer", "phone_send_text", "computer_send_email" reach someone who isn't
+  nearby — target a character "id" from EITHER nearby_characters OR known_contacts (people you've
+  met before, whether or not they're around right now); unlike speak/socialize, nearby_characters
+  is not the only valid source here. Requires a working phone or computer (available_actions won't
+  offer these at all if you don't have one).
+  - "phone_call"/"phone_answer": attach "speech" exactly like in-person speak — action.target set
+    to who you're calling, speech.utterance is what you say.
+  - "phone_send_text": action.target = recipient character id, action.message = the text itself
+    (a text isn't a spoken bubble, so use "message" here, not "speech").
+  - "computer_send_email": action.to = recipient character id, action.subject = a short subject
+    line, action.body = the email's content.
+  - Deciding whether to call or text is yours to weigh, not a fixed rule: shy/introverted
+    characters and lower-stakes topics tend toward texting; urgent matters and close relationships
+    tend toward calling. Let personality and the situation drive it.
 - When you choose "move", set "target" to a prop id or character id you want to approach.
 - When you choose "eat" or "sleep", set "target" to a prop id tagged "eatable" or "sleepable".
 - If no suitable prop exists for your intended action, choose "wait" instead.
@@ -66,7 +80,10 @@ SPEECH
 - Populate "speech.utterance" whenever you speak or think out loud. Set "speech.target" to a
   character id from LEGAL_MOVES when you're speaking to someone specific — this actually threads
   your words into a real conversation with them (history, tone, relationship effects), not just a
-  bubble.
+  bubble. "phone_call"/"phone_answer" work exactly this same way — attach "speech" alongside the
+  action, targeting anyone from nearby_characters or known_contacts. "phone_send_text" and
+  "computer_send_email" are different: they do NOT use "speech" at all — put the text's content in
+  action.message, or the email's in action.to/action.subject/action.body, as described above.
 - If a conversation turn is active, strongly prioritize replying naturally.
 - Speech should be emotionally honest — characters may lie, deflect, ramble, or ask questions.
 - Keep utterances short (1-3 sentences). They appear as speech bubbles above your head.
@@ -100,7 +117,7 @@ OUTPUT FORMAT  (strict JSON, no other text)
   "intention":  { "type": "...", "reason": "...", "priority": 0 },
   "goal":       "short-term goal this tick",
   "action": {
-    "type":        "interact | speak | move | eat | sleep | wait | work | socialize | call | text | examine | search | carry | clean | trash | destroy | lean_against_wall | push_off_wall | sit_down | stand_up | lie_down",
+    "type":        "interact | speak | move | eat | sleep | wait | work | socialize | call | text | examine | search | carry | clean | trash | destroy | lean_against_wall | push_off_wall | sit_down | stand_up | lie_down | phone_call | phone_answer | phone_send_text | phone_check | phone_read_text | retrieve_phone | charge | computer_social_media | computer_videos | computer_game | computer_wiki_research | computer_window_shopping | computer_dating | computer_job_search | computer_apply_for_job | computer_send_email | computer_respond_email | computer_check_email",
     "target":      "prop_id or character_id — MUST be a real id from LEGAL_MOVES",
     "interaction": "interaction name from interactable_props (for interact actions only)",
     "destination": {"x": 0, "y": 0},
