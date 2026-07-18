@@ -5291,7 +5291,7 @@
     },
     "smartphone_budget": {
       "name": "Budget Smartphone",
-      "category": "electronics",
+      "category": "smartphone",
       "size": 3,
       "base_price": 250,
       "stackable": false,
@@ -5314,9 +5314,35 @@
       "battery_drain_idle": 0.05,
       "battery_drain_in_use": 0.3
     },
+    "smartphone_midrange": {
+      "name": "Midrange Smartphone",
+      "category": "smartphone",
+      "size": 3,
+      "base_price": 500,
+      "stackable": false,
+      "consumable": false,
+      "object_type": "phone",
+      "apps": [
+        "send_message",
+        "call_contact",
+        "check_stocks",
+        "browse_news",
+        "order_delivery",
+        "open_banking_app",
+        "use_rideshare"
+      ],
+      "quality": 0.75,
+      "placeable": true,
+      "initial_states": {
+        "battery": 100,
+        "powered_on": true
+      },
+      "battery_drain_idle": 0.05,
+      "battery_drain_in_use": 0.3
+    },
     "smartphone_premium": {
       "name": "Premium Smartphone",
-      "category": "electronics",
+      "category": "smartphone",
       "size": 3,
       "base_price": 900,
       "stackable": false,
@@ -5342,7 +5368,7 @@
     },
     "laptop_basic": {
       "name": "Basic Laptop",
-      "category": "electronics",
+      "category": "computer",
       "size": 4,
       "base_price": 700,
       "stackable": false,
@@ -5358,7 +5384,7 @@
     },
     "laptop_gaming": {
       "name": "Gaming Laptop",
-      "category": "electronics",
+      "category": "computer",
       "size": 4,
       "base_price": 1800,
       "stackable": false,
@@ -5383,6 +5409,18 @@
       "placeable": true,
       "initial_states": {},
       "charges_per_tick": 0.8
+    },
+    "laptop_charger": {
+      "name": "Laptop Charger",
+      "category": "electronics",
+      "object_type": "charger",
+      "size": 1,
+      "base_price": 40,
+      "stackable": false,
+      "consumable": false,
+      "placeable": true,
+      "initial_states": {},
+      "charges_per_tick": 0.5
     },
     "brush": {
       "name": "Brush",

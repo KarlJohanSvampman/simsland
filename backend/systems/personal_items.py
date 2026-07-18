@@ -300,6 +300,35 @@ def can_do_phone_action(c, action):
 
 
 # =========================================================
+# COMPUTER
+# =========================================================
+
+def get_computer(c, world):
+    """A laptop the character is carrying, or one left at home by someone
+    in their own household (world["placed_items"], the same drop_item/
+    pick_up_item mechanism systems/phone.py uses for a set-down phone) --
+    the "might use a computer instead if at home" alternative."""
+    for item in get_inventory(c):
+        if item.get("object_type") == "computer":
+            return item
+    household_id = c.get("household_id")
+    if not household_id:
+        return None
+    characters = world.get("characters", {})
+    for item in world.get("placed_items", {}).values():
+        if item.get("object_type") != "computer":
+            continue
+        owner = characters.get(item.get("placed_by"))
+        if owner and owner.get("household_id") == household_id:
+            return item
+    return None
+
+
+def has_computer(c, world):
+    return get_computer(c, world) is not None
+
+
+# =========================================================
 # WALLET / CASH
 # =========================================================
 

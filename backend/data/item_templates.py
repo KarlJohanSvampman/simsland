@@ -848,7 +848,7 @@ ITEM_TEMPLATES = {
 
     "smartphone_budget": {
         "name":       "Budget Smartphone",
-        "category":   "electronics",
+        "category":   "smartphone",
         "size":      3,
         "base_price": 250.0,
         "stackable":  False,
@@ -859,9 +859,23 @@ ITEM_TEMPLATES = {
         "battery":    1.0,
     },
 
+    "smartphone_midrange": {
+        "name":       "Midrange Smartphone",
+        "category":   "smartphone",
+        "size":      3,
+        "base_price": 500.0,
+        "stackable":  False,
+        "consumable": False,
+        "object_type":"phone",
+        "apps":       ["send_message", "call_contact", "check_stocks", "browse_news",
+                       "order_delivery", "open_banking_app", "use_rideshare"],
+        "battery":    1.0,
+        "quality":    0.75,
+    },
+
     "smartphone_premium": {
         "name":       "Premium Smartphone",
-        "category":   "electronics",
+        "category":   "smartphone",
         "size":      3,
         "base_price": 900.0,
         "stackable":  False,
@@ -875,7 +889,7 @@ ITEM_TEMPLATES = {
 
     "laptop_basic": {
         "name":       "Basic Laptop",
-        "category":   "electronics",
+        "category":   "computer",
         "size":      4,
         "base_price": 700.0,
         "stackable":  False,
@@ -886,13 +900,33 @@ ITEM_TEMPLATES = {
 
     "laptop_gaming": {
         "name":       "Gaming Laptop",
-        "category":   "electronics",
+        "category":   "computer",
         "size":      4,
         "base_price": 1800.0,
         "stackable":  False,
         "consumable": False,
         "object_type":"computer",
         "quality":    0.92,
+    },
+
+    "phone_charger": {
+        "name":       "Phone Charger",
+        "category":   "accessory",
+        "size":       1,
+        "base_price": 15.0,
+        "stackable":  False,
+        "consumable": False,
+        "object_type":"charger",
+    },
+
+    "laptop_charger": {
+        "name":       "Laptop Charger",
+        "category":   "accessory",
+        "size":       1,
+        "base_price": 30.0,
+        "stackable":  False,
+        "consumable": False,
+        "object_type":"charger",
     },
 }
 

@@ -506,6 +506,23 @@ def generate_character(defs, overrides=None):
         except Exception:
             pass
 
+    # Starting phone — personal_items.py::make_smartphone() existed but
+    # was never called from character generation, so no simulation ever
+    # actually had a phone in play. Adults and teens get one; weighted
+    # toward the budget tier, matching realistic ownership spread.
+    if age_group in ("adult", "elderly", "teen"):
+        try:
+            from systems.personal_items import make_smartphone
+            model = random.choices(
+                ["smartphone_budget", "smartphone_midrange", "smartphone_premium"],
+                weights=[0.55, 0.30, 0.15],
+            )[0]
+            phone = make_smartphone(owner_id=character["id"], model=model,
+                                     world={"definitions": defs})
+            character["inventory"].append(phone)
+        except Exception:
+            pass
+
     return character
 
 

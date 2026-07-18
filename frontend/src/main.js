@@ -850,6 +850,11 @@ const ANIM_LAYERS = {
   cook:          { lower: "idle",        upper: "cook"        },
   work:          { lower: "idle",        upper: "work"        },
   phone:         { lower: "idle",        upper: "phone"       },
+  // Screen-tap/read loop — texting/checking/reading on the phone,
+  // distinct from the ear-hold "phone" state above (calls/answering).
+  // New stem: no exported clip yet, falls back gracefully per this
+  // file's own documented ANIM_VARIANTS behavior until one is authored.
+  phone_screen:  { lower: "idle",        upper: "phone_screen" },
   examine:       { lower: "idle",        upper: "examine"     },
   search:        { lower: "idle",        upper: "search"      },
   wipe:          { lower: "idle",        upper: "wipe"        },
@@ -888,6 +893,7 @@ const ANIM_LAYERS = {
   sit_eat:       { lower: "sit_idle",    upper: "eat"         },
   sit_talk:      { lower: "sit_idle",    upper: "talk"        },
   sit_phone:     { lower: "sit_idle",    upper: "phone"       },
+  sit_phone_screen: { lower: "sit_idle", upper: "phone_screen" },
   sit_work:      { lower: "sit_idle",    upper: "work"        },
   read:          { lower: "sit_idle",    upper: "read"        },
 
@@ -925,6 +931,11 @@ const ANIM_VARIANTS = {
 
   // Phone call — alternate gestures
   phone:         ["phone", "phone_gesture"],
+
+  // Phone screen — texting/checking/reading (falls back gracefully if
+  // no dedicated "phone_type" clip is exported yet, same as any other
+  // variant pool entry with a missing clip)
+  phone_screen:  ["phone_screen", "phone_type"],
 
   // Standing idle — subtle fidgets
   idle:          ["idle", "idle_look", "idle_shift"],

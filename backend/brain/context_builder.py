@@ -418,6 +418,35 @@ def build_available_actions(c, world):
         if "lift_weights" in entry.get("interactions", []) and "lift_weights" not in action_types:
             action_types.append("lift_weights")
 
+    # Phone/computer "online actions" (see systems/phone.py,
+    # action_router.py's _route_computer* family + _require_phone_or_
+    # computer) — these routes and VALID_ACTIONS registration are both
+    # new this round (the routes were fully built already but
+    # unreachable). Offered together whenever either device is
+    # available -- e.g. at home with the phone in pocket -- so the LLM
+    # picks, rather than the game forcing a device choice.
+    from systems.personal_items import get_phone, get_computer
+    has_phone = get_phone(c) is not None
+    has_computer_device = get_computer(c, world) is not None
+    if has_phone:
+        action_types.extend([
+            "phone_call", "phone_answer", "phone_send_text",
+            "phone_check", "phone_read_text",
+        ])
+    if has_phone or has_computer_device:
+        action_types.extend([
+            "computer_social_media", "computer_videos", "computer_game",
+            "computer_wiki_research", "computer_window_shopping",
+            "computer_dating", "computer_job_search", "computer_apply_for_job",
+            "computer_send_email", "computer_respond_email", "computer_check_email",
+        ])
+
+    # retrieve_phone — offered only once the phone is actually away
+    # (systems/phone.py::maybe_set_phone_down/maybe_forget_phone).
+    phone_state = c.get("phone_state")
+    if not has_phone and phone_state and phone_state.get("last_known_location"):
+        action_types.append("retrieve_phone")
+
     # Plants/gardening (see systems/plants.py) — water/pull_weed offered
     # when a visible prop is an actual planted instance (has a live
     # plant_state, checked against the real world prop rather than the
@@ -1135,6 +1164,22 @@ def build_narrative(c, world):
     intimacy_lines = _build_intimacy_context(c, world)
     if intimacy_lines:
         paragraphs.append("; ".join(intimacy_lines) + ".")
+
+    # ---- phone location — systems/phone.py::get_phone_context(), new
+    # this round: "set down nearby" / "not sure where it is" (forgotten).
+    # Battery state (_build_phone_context(), pre-existing but never
+    # called from anywhere) only matters narratively once it's actually
+    # low, same "only mention what's notable" rule the rest of this
+    # function follows. ----
+    from systems.phone import get_phone_context
+    phone_location_line = get_phone_context(c)
+    if phone_location_line:
+        paragraphs.append(phone_location_line)
+    phone_battery = _build_phone_context(c)
+    if phone_battery and phone_battery.get("usable") is False:
+        paragraphs.append(f"Your phone's battery is dead ({phone_battery.get('battery', 0)}%).")
+    elif phone_battery and phone_battery.get("battery", 100) < 20:
+        paragraphs.append(f"Your phone's battery is low ({phone_battery.get('battery')}%).")
 
     return "\n\n".join(p for p in paragraphs if p)
 

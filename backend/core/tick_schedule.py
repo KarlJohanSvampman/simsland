@@ -90,6 +90,7 @@ CADENCE = {
     "plants":               30,   # growth/moisture/weed tick (see systems/plants.py)
     "food_aging":           24,   # freshness decay, ~once/sim-day (see systems/contagion.py)
     "body_composition":     24,   # weight/trait sync, ~once/sim-day (see systems/body_composition.py)
+    "phone_behavior":       30,   # set-down habit + forget-on-departure check (see systems/phone.py)
 
     # Individual wait activities (microwave, phone hold, etc.) — see
     # systems/activities.py's start_microwave/take_out_of_microwave and

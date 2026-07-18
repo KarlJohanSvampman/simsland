@@ -79,8 +79,38 @@ INTERACTION_ANIMATIONS = {
     "talk":         {"walking": "walk", "using": ["talk", "talk_gesture_a", "talk_gesture_b", "talk_nod"], "finishing": "idle"},
     "phone":        {"walking": "walk", "using": ["phone", "phone_gesture"], "finishing": "idle"},
 
+    # --- phone (real interaction strings action_router.py's phone_*
+    # routes scaffold with -- _scaffold() sets interaction=activity_type,
+    # which doesn't match the generic "phone"/"use_computer" keys above,
+    # so these fell through to the generic "interact" default before
+    # this. Two distinct loops per the animation-loops round: ear-hold
+    # for calls (reuses the existing "phone" stem/variants), screen-tap
+    # for texting/checking/reading (new "phone_screen" stem -- see
+    # frontend/src/main.js's ANIM_LAYERS/ANIM_VARIANTS). ---
+    "phone_call":       {"walking": "walk", "using": ["phone", "phone_gesture"], "finishing": "idle"},
+    "phone_answer":     {"walking": "walk", "using": ["phone", "phone_gesture"], "finishing": "idle"},
+    "phone_send_text":  {"walking": "walk", "using": "phone_screen", "finishing": "idle"},
+    "phone_check":      {"walking": "walk", "using": "phone_screen", "finishing": "idle"},
+    "phone_read_text":  {"walking": "walk", "using": "phone_screen", "finishing": "idle"},
+
     # --- work ---
     "work":         {"walking": "walk", "using": ["work", "work_type", "work_read"], "finishing": "idle"},
+
+    # --- computer (real interaction strings action_router.py's
+    # _route_computer* family scaffolds with -- same gap as phone above.
+    # Reuses "work"'s existing stem/variants (already includes
+    # "work_type") -- sitting-and-typing, no new frontend clips needed. ---
+    "computer_social_media":     {"walking": "walk", "using": ["work", "work_type", "work_read"], "finishing": "idle"},
+    "computer_videos":           {"walking": "walk", "using": ["work", "work_type", "work_read"], "finishing": "idle"},
+    "computer_game":             {"walking": "walk", "using": ["work", "work_type", "work_read"], "finishing": "idle"},
+    "computer_wiki_research":    {"walking": "walk", "using": ["work", "work_type", "work_read"], "finishing": "idle"},
+    "computer_window_shopping":  {"walking": "walk", "using": ["work", "work_type", "work_read"], "finishing": "idle"},
+    "computer_dating":           {"walking": "walk", "using": ["work", "work_type", "work_read"], "finishing": "idle"},
+    "computer_job_search":       {"walking": "walk", "using": ["work", "work_type", "work_read"], "finishing": "idle"},
+    "computer_apply_for_job":    {"walking": "walk", "using": ["work", "work_type", "work_read"], "finishing": "idle"},
+    "computer_send_email":       {"walking": "walk", "using": ["work", "work_type", "work_read"], "finishing": "idle"},
+    "computer_respond_email":    {"walking": "walk", "using": ["work", "work_type", "work_read"], "finishing": "idle"},
+    "computer_check_email":      {"walking": "walk", "using": ["work", "work_type", "work_read"], "finishing": "idle"},
 
     # --- reading / hobbies ---
     "read":         {"walking": "walk", "using": "read",       "finishing": "idle"},
@@ -1662,6 +1692,32 @@ def complete_activity(
         )
         from systems.lt_needs import satisfy_lt_need
         satisfy_lt_need(c, "exercise", world, hobby_id=hobby_id, has_companion=has_companion)
+
+    # =====================================
+    # PHONE — the phone actions (action_router.py) set the phone's
+    # location to "held" for the duration; put it back in the pocket
+    # once the activity finishes. retrieve_phone re-acquires a phone
+    # that was set down/forgotten (systems/phone.py) and clears the
+    # location memory -- pick_up_item already sets location="pocket".
+    # =====================================
+
+    elif activity_type in ("phone_call", "phone_answer", "phone_send_text",
+                            "phone_check", "phone_read_text"):
+        from systems.personal_items import get_phone
+        phone = get_phone(c)
+        if phone:
+            phone["location"] = "pocket"
+
+    elif activity_type == "retrieve_phone":
+        from systems.phone import ensure_phone_state
+        from systems.personal_items import pick_up_item
+        state = ensure_phone_state(c)
+        loc = state.get("last_known_location")
+        if loc and loc.get("prop_id"):
+            pick_up_item(c, loc["prop_id"], world)
+        state["last_known_location"] = None
+        state["forgotten"] = False
+
     elif activity_type == "check_mail":
 
         household = world[

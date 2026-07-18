@@ -225,6 +225,55 @@ VALID_ACTIONS = {
     "chin_ups",
 
     "lift_weights",
+
+    # Phone (see systems/phone.py, action_router.py) -- phone_call/
+    # phone_answer/phone_send_text/phone_check/phone_read_text routes
+    # already existed but were never registered here, same class of gap
+    # as everything else found this session; "call"/"text" were the only
+    # reachable aliases (both routed to phone_check). retrieve_phone is
+    # new this round: re-acquires a phone that was set down or forgotten.
+    "phone_call",
+
+    "phone_answer",
+
+    "phone_send_text",
+
+    "phone_check",
+
+    "phone_read_text",
+
+    "retrieve_phone",
+
+    # Computer / "online actions" (see action_router.py's _route_computer*
+    # family) -- also fully built, also never registered here. All now
+    # gated on _require_phone_or_computer (a phone or a household
+    # computer), previously ungated entirely.
+    "computer_social_media",
+
+    "computer_videos",
+
+    "computer_game",
+
+    "computer_wiki_research",
+
+    "computer_window_shopping",
+
+    "computer_dating",
+
+    "computer_job_search",
+
+    "computer_apply_for_job",
+
+    "computer_send_email",
+
+    "computer_respond_email",
+
+    "computer_check_email",
+
+    # Device charging (see systems/phone.py::charge_phone,
+    # action_router.py::_route_charge_device) -- never registered either;
+    # phone_charger item template didn't even exist until this round.
+    "charge",
 }
 
 

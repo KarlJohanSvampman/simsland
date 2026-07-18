@@ -229,6 +229,7 @@ _INTERACTION_DURATIONS = {
     "work":       28800,
     "interact":   600,
     "wait":       120,
+    "retrieve_phone": 300,
 }
 
 def _scaffold(c, world, activity_type, target_id=None,
@@ -811,6 +812,8 @@ def route_action(c, world, action, speech, definitions=None):
         _route_phone_check(c, world, action)
     elif action_type == "phone_read_text":
         _route_phone_read_text(c, world, action)
+    elif action_type == "retrieve_phone":
+        _route_retrieve_phone(c, world, action)
 
     # ── Computer ───────────────────────────────────────────────────────────────
     elif action_type == "computer_social_media":
@@ -1894,26 +1897,67 @@ def _require_phone(c):
     return phone
 
 
+def _require_phone_or_computer(c, world):
+    """Gate for "online action" routes (computer_* below) -- previously
+    ungated entirely (any character could browse/email/job-search with
+    no device at all). Usable phone takes priority (battery-checked,
+    same as _require_phone); a computer (personal_items.py::get_computer)
+    has no battery model yet, so just needs to exist. Returns True if
+    either is available."""
+    phone = _require_phone(c)
+    if phone:
+        return True
+    from systems.personal_items import has_computer
+    return has_computer(c, world)
+
+
+# Ear-hold (calls) vs screen-tap (text/check/read) -- two distinct loops
+# per the animation-loops round. Substituted to the seated variant when
+# already sitting (posture.py's "sitting_seat"); phones, unlike computer
+# use below, aren't inherently a desk activity so this only applies when
+# actually seated, not unconditionally.
+_SIT_ANIMATION_MAP = {
+    "phone": "sit_phone", "phone_gesture": "sit_phone",
+    "phone_screen": "sit_phone_screen",
+}
+
+
+def _set_phone_animation(c, interaction):
+    """_scaffold() starts phone/computer activities at phase "using"
+    directly, skipping the walking->using transition that's the only
+    place get_phase_animation() would otherwise get called -- same fix
+    _route_interact already applies for regular prop interactions."""
+    anim = get_phase_animation(interaction, "using")
+    if c.get("posture") == "sitting_seat":
+        anim = _SIT_ANIMATION_MAP.get(anim, anim)
+    c["animation_state"] = anim
+
+
 def _route_phone_call(c, world, action):
     phone = _require_phone(c)
     if not phone:
         return
+    phone["location"] = "held"
     target_id = action.get("target_id") or action.get("target")
     c["activity"] = _scaffold(c, world, "phone_call",
                                target_id=target_id, interaction="phone_call")
+    _set_phone_animation(c, "phone_call")
 
 
 def _route_phone_answer(c, world, action):
     phone = _require_phone(c)
     if not phone:
         return
+    phone["location"] = "held"
     c["activity"] = _scaffold(c, world, "phone_answer", interaction="phone_answer")
+    _set_phone_animation(c, "phone_answer")
 
 
 def _route_phone_send_text(c, world, action):
     phone = _require_phone(c)
     if not phone:
         return
+    phone["location"] = "held"
     target_id = action.get("target_id") or action.get("target")
     message   = action.get("message", "")
     if target_id and message:
@@ -1922,30 +1966,55 @@ def _route_phone_send_text(c, world, action):
         if target:
             send_message(c, target, message, world)
     c["activity"] = _scaffold(c, world, "phone_send_text", interaction="phone_send_text")
+    _set_phone_animation(c, "phone_send_text")
 
 
 def _route_phone_check(c, world, action):
     phone = _require_phone(c)
     if not phone:
         return
+    phone["location"] = "held"
     c["activity"] = _scaffold(c, world, "phone_check", interaction="phone_check")
     # Expose missed calls/messages count in activity data
     missed = len(c.get("social", {}).get("missed_calls", []))
     unread = sum(1 for m in world.get("messages", [])
                  if m.get("to_id") == c["id"] and not m.get("read"))
     c["activity"]["phone_check_result"] = {"missed_calls": missed, "unread_messages": unread}
+    _set_phone_animation(c, "phone_check")
 
 
 def _route_phone_read_text(c, world, action):
     phone = _require_phone(c)
     if not phone:
         return
+    phone["location"] = "held"
     msg_id = action.get("message_id") or action.get("target")
     if msg_id:
         for m in world.get("messages", []):
             if m.get("id") == msg_id and m.get("to_id") == c["id"]:
                 m["read"] = True
     c["activity"] = _scaffold(c, world, "phone_read_text", interaction="phone_read_text")
+    _set_phone_animation(c, "phone_read_text")
+
+
+def _route_retrieve_phone(c, world, action):
+    """action: {"type": "retrieve_phone"}. Goes and re-acquires a phone
+    that was set down (systems/phone.py::maybe_set_phone_down) or
+    forgotten in another building -- same immediate-pickup shape as the
+    pre-existing _route_pick_up_item (no distance/pathfinding gate
+    there either), scaffolded as a short duration activity since this
+    represents an actual "go find it" trip, not an instant action."""
+    from systems.phone import ensure_phone_state
+    state = ensure_phone_state(c)
+    loc = state.get("last_known_location")
+    if not loc:
+        return
+    c["activity"] = _scaffold(
+        c, world, "retrieve_phone",
+        target_id=loc.get("prop_id"),
+        interaction="retrieve_phone",
+        duration=_INTERACTION_DURATIONS.get("retrieve_phone", 300),
+    )
 
 
 # =========================================================
@@ -1954,16 +2023,41 @@ def _route_phone_read_text(c, world, action):
 
 def _route_charge_device(c, world, action):
     """
-    Start charging. The phone.charge_phone() is called each tick by phone.py
-    while activity interaction == "charge". Requires phone_charger in inventory.
+    Start charging. systems/power.py::charge_device() is called each tick
+    by sim_loop while activity interaction == "charge", reading
+    activity["device_item_id"] to know which item to charge and its
+    matching charger (systems/power.py::CHARGER_BY_OBJECT_TYPE) --
+    generalized from the old phone-only version so any battery-powered
+    item (phone, laptop, ...) works the same way. Requires a matching
+    charger in inventory AND the target actually being a wall_socket
+    prop -- neither was checked at all before the phone round (any prop
+    was accepted as a charging target).
+    action: {"type": "charge", "target": wall_socket_prop_id,
+             "device": optional item_id -- defaults to the phone}
     """
-    from systems.personal_items import has_item_template
-    if not has_item_template(c, "phone_charger"):
+    from systems.personal_items import get_phone, get_item_by_id
+    device_item_id = action.get("device")
+    device = get_item_by_id(c, device_item_id) if device_item_id else get_phone(c)
+    if not device:
         return
+    from systems.power import find_charger_for
+    if not find_charger_for(c, device):
+        return
+
     target_prop_id = action.get("target") or action.get("prop_id")
+    if not target_prop_id:
+        return
+    from systems.props import get_prop_by_id
+    prop = get_prop_by_id(world, target_prop_id)
+    if not prop:
+        return
+    tpl = world.get("definitions", {}).get("prop_templates", {}).get(prop.get("template"), {})
+    if "wall_socket" not in tpl.get("tags", []):
+        return
     c["activity"] = _scaffold(c, world, "charge", target_id=target_prop_id,
                                interaction="charge",
                                duration=_INTERACTION_DURATIONS.get("charge", 60))
+    c["activity"]["device_item_id"] = device["id"]
 
 
 # =========================================================
@@ -2059,18 +2153,27 @@ def _route_drive_car_to(c, world, action):
 # =========================================================
 
 def _route_computer(c, world, action, interaction_id):
+    if not _require_phone_or_computer(c, world):
+        return
     c["activity"] = _scaffold(c, world, interaction_id,
                                target_id=action.get("target"),
                                interaction=interaction_id)
+    # Computer use is inherently a desk activity -- unconditionally
+    # seated-and-typing, unlike the phone routes' posture-conditional
+    # substitution (see _set_phone_animation above).
+    c["animation_state"] = "sit_work"
 
 
 # ─── wikipedia research ───────────────────────────────────────────────────────
 
 def _route_computer_wiki_research(c, world, action):
+    if not _require_phone_or_computer(c, world):
+        return
     keyword = action.get("keyword") or action.get("args", {}).get("keyword", "")
     c["activity"] = _scaffold(c, world, "computer_wiki_research",
                                interaction="computer_wiki_research")
     c["activity"]["research_keyword"] = keyword
+    c["animation_state"] = "sit_work"
 
     if not keyword:
         return
@@ -2105,16 +2208,22 @@ def _route_computer_wiki_research(c, world, action):
 # ─── job search / apply ───────────────────────────────────────────────────────
 
 def _route_computer_job_search(c, world, action):
+    if not _require_phone_or_computer(c, world):
+        return
     listings = world.get("job_listings", [])
     c["activity"] = _scaffold(c, world, "computer_job_search", interaction="computer_job_search")
     c["activity"]["job_listings"] = listings[:10]
+    c["animation_state"] = "sit_work"
 
 
 def _route_computer_apply_for_job(c, world, action):
+    if not _require_phone_or_computer(c, world):
+        return
     from systems.jobs import apply_for_job
     job_id = action.get("job_id") or action.get("target")
     c["activity"] = _scaffold(c, world, "computer_apply_for_job",
                                interaction="computer_apply_for_job")
+    c["animation_state"] = "sit_work"
     if job_id:
         apply_for_job(c, job_id, world)
 
@@ -2122,8 +2231,11 @@ def _route_computer_apply_for_job(c, world, action):
 # ─── email ────────────────────────────────────────────────────────────────────
 
 def _route_computer_email(c, world, action):
+    if not _require_phone_or_computer(c, world):
+        return
     atype = action.get("type", "computer_check_email")
     c["activity"] = _scaffold(c, world, atype, interaction=atype)
+    c["animation_state"] = "sit_work"
     if atype == "computer_send_email":
         # Queue email as a world message
         to   = action.get("to", "")

@@ -107,7 +107,8 @@ from systems.conditioning import tick_conditioning_weekly
 from systems.scheduling import generate_week_schedule, adjust_for_household
 from systems.lt_needs   import update_lt_needs, reset_weekly_counts, distribute_lt_needs
 from systems.social_odor import apply_odor_social_pressure
-from systems.phone      import update_phone_battery, charge_phone
+from systems.phone      import update_phone_battery, maybe_set_phone_down, maybe_forget_phone
+from systems.power      import charge_device
 from systems.social_events import (
     check_event_completions, check_maybe_deadlines, generate_world_events
 )
@@ -481,14 +482,24 @@ def tick(world):
     if every(world, CADENCE["body_composition"], offset=41):
         tick_body_composition(world)
 
-    # -- Phone battery drain + charging (÷5) ───────────────
+    # -- Battery drain + charging (phone, laptop, ...) (÷5) ───────────
     if every(world, CADENCE["phone_battery"], offset=29):
         for c in characters:
             act = c.get("activity") or {}
             if act.get("interaction") == "charge":
-                charge_phone(c, world)
+                charge_device(c, world)
             else:
                 update_phone_battery(c)
+
+    # -- Phone carry/drop/forget behavior ────────────────────────────
+    if every(world, CADENCE["phone_behavior"], offset=30):
+        for c in characters:
+            maybe_set_phone_down(c, world)
+            last_building = c.get("_last_building_id")
+            current_building = c.get("building_id")
+            if last_building is not None and current_building != last_building:
+                maybe_forget_phone(c, world, last_building)
+            c["_last_building_id"] = current_building
 
     # -- Individual wait activities (microwave, phone hold, ...) ────
     # c["character_wait"] is deliberately its own field, not folded into
