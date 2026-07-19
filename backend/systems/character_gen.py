@@ -469,7 +469,8 @@ def generate_character(defs, overrides=None):
                      "current_hairstyle","education","job","skills",
                      "current_school","work_history","industry_experience",
                      "current_job_start_tick","job_template_id",
-                     "x","y","household_id","home_id","template"):
+                     "x","y","household_id","home_id","template",
+                     "worn","starting_inventory"):
             character[k] = v
 
     # Attractiveness score (age bell-curve + noise, baked in at generation)
@@ -521,6 +522,33 @@ def generate_character(defs, overrides=None):
                                      world={"definitions": defs})
             character["inventory"].append(phone)
         except Exception:
+            pass
+
+    # Starting worn clothing + carried equipment (Character Creator's
+    # Outfit/Equipment tab) — worn is set directly rather than via
+    # put_on_clothing (which requires the item to already be in
+    # inventory), so recompute_nudity_state must be called explicitly.
+    worn_overrides = overrides.get("worn") or {}
+    if worn_overrides:
+        from systems.clothing import CLOTHING_SLOTS, recompute_nudity_state
+        from systems.personal_items import make_item
+        worn = {slot: None for slot in CLOTHING_SLOTS}
+        for slot, template_id in worn_overrides.items():
+            if template_id and slot in CLOTHING_SLOTS:
+                try:
+                    worn[slot] = make_item(template_id, world={"definitions": defs},
+                                            owner_id=character["id"])
+                except ValueError:
+                    pass
+        character["worn"] = worn
+        recompute_nudity_state(character)
+
+    for template_id in overrides.get("starting_inventory") or []:
+        try:
+            from systems.personal_items import make_item
+            character["inventory"].append(
+                make_item(template_id, world={"definitions": defs}, owner_id=character["id"]))
+        except ValueError:
             pass
 
     return character

@@ -14,7 +14,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 // replacing whatever thinner fields (bone_slots etc.) already exist on
 // them -- only the fields this page's tabs manage are touched on save.
 
-let definitions = { character_templates: {}, trait_templates: {}, physical_trait_templates: {} };
+let definitions = { character_templates: {}, trait_templates: {}, physical_trait_templates: {}, item_templates: {} };
 let meshbank = {};
 let currentTemplateId = null;
 let working = null;   // in-memory working copy of the open template
@@ -32,6 +32,27 @@ function deriveAgeGroup(age) {
   }
   return "elderly";
 }
+
+// Mirrors backend/systems/clothing.py::CLOTHING_SLOTS's 14 keys exactly.
+// Grouped purely for display -- item_templates' own `slot` field (shared
+// by category:"clothing" and category:"hair" entries) is the only source
+// of truth for which items fill which slot.
+const CLOTHING_SLOT_GROUPS = [
+  { title: 'Head', slots: ['head', 'hair', 'neck'] },
+  { title: 'Torso', slots: ['torso', 'undershirt', 'outerwear'] },
+  { title: 'Lower body', slots: ['legs', 'underwear', 'socks', 'feet'] },
+  { title: 'Hands / Accessories', slots: ['hands', 'wrist_l', 'wrist_r', 'accessory'] },
+];
+const CLOTHING_SLOTS = CLOTHING_SLOT_GROUPS.flatMap(g => g.slots);
+
+// Non-clothing item_templates categories plausible as "starting equipment
+// a character carries" -- excludes household-placed categories
+// (kitchenware/dishware/food/cleaning/etc.) and "clothing"/"hair" (those
+// are handled by the Worn slots above, not carried loose in inventory).
+const INVENTORY_CATEGORIES = new Set([
+  'electronics', 'documents', 'hobby_supplies', 'tools', 'office_supplies',
+  'books_media', 'games', 'art_supplies', 'music_instrument', 'misc',
+]);
 
 // =====================================================
 // UI ELEMENTS
@@ -116,6 +137,8 @@ function openTemplate(id) {
     body_composition: { ...(raw.body_composition || {}) },
     traits: [...(raw.traits || [])],
     physical_traits: [...(raw.physical_traits || [])],
+    worn: { ...(raw.worn || {}) },
+    starting_inventory: [...(raw.starting_inventory || [])],
   };
   if (working.body_features.height_cm == null) working.body_features.height_cm = 170;
   if (working.body_composition.body_fat_level == null) working.body_composition.body_fat_level = 0.35;
@@ -124,6 +147,7 @@ function openTemplate(id) {
   renderBasicTab();
   renderPersonalityTab();
   renderPhysicalTab();
+  renderOutfitTab();
   updatePreview();
   setStatus(`Editing ${id}`);
 }
@@ -157,6 +181,7 @@ document.querySelectorAll('.sideTab').forEach(btn => {
     document.getElementById('tab-basic').classList.toggle('hidden', tab !== 'basic');
     document.getElementById('tab-personality').classList.toggle('hidden', tab !== 'personality');
     document.getElementById('tab-physical').classList.toggle('hidden', tab !== 'physical');
+    document.getElementById('tab-outfit').classList.toggle('hidden', tab !== 'outfit');
   });
 });
 
@@ -613,6 +638,112 @@ function renderPhysicalTab() {
     (ids) => { working.physical_traits = ids; },
   );
 }
+
+// =====================================================
+// TAB: OUTFIT / EQUIPMENT
+// =====================================================
+// Two sub-sections: Worn (one dropdown per clothing.py::CLOTHING_SLOTS
+// key, modeled on animbank.js's renderStancesPanel dropdown-per-slot
+// loop) and Starting Inventory (reuses the generic pool-picker as-is,
+// same as Personality/Physical Traits -- it already operates on a flat
+// assigned-array field, exactly starting_inventory's shape).
+//
+// Note: this tab is data-entry only. Clothing has never rendered in 3D
+// anywhere in this game (live game or this page's own preview) -- the
+// bone-attachment plumbing in main.js reads a different, dead slot
+// system (c.equipped + definitions.clothing_templates), not c.worn.
+// Wiring that up is a separate visual-rendering project, out of scope
+// here; what's assigned on this tab is real (backend-materialized into
+// c["worn"]/c["inventory"] at spawn time) but not previewable yet.
+
+function groupItemsBySlot(itemTemplates) {
+  const bySlot = {};
+  for (const [id, t] of Object.entries(itemTemplates || {})) {
+    if (!t.slot) continue;
+    (bySlot[t.slot] ||= []).push({ id, label: t.name || id });
+  }
+  for (const list of Object.values(bySlot)) list.sort((a, b) => a.label.localeCompare(b.label));
+  return bySlot;
+}
+
+function renderOutfitTab() {
+  if (!working) return;
+
+  // ── Worn slots ──────────────────────────────────────────
+  const bySlot = groupItemsBySlot(definitions.item_templates);
+  const wornContainer = document.getElementById('wornSlots');
+  wornContainer.innerHTML = '';
+
+  for (const group of CLOTHING_SLOT_GROUPS) {
+    const groupEl = document.createElement('div');
+    groupEl.className = 'slotGroup';
+    const heading = document.createElement('h5');
+    heading.textContent = group.title;
+    groupEl.appendChild(heading);
+
+    for (const slot of group.slots) {
+      const row = document.createElement('div');
+      row.className = 'slotRow';
+      const label = document.createElement('label');
+      label.textContent = slot;
+      const select = document.createElement('select');
+
+      const noneOpt = document.createElement('option');
+      noneOpt.value = '';
+      noneOpt.textContent = '— None —';
+      select.appendChild(noneOpt);
+
+      for (const entry of bySlot[slot] || []) {
+        const opt = document.createElement('option');
+        opt.value = entry.id;
+        opt.textContent = entry.label;
+        select.appendChild(opt);
+      }
+      select.value = working.worn[slot] || '';
+      select.addEventListener('change', () => {
+        if (select.value) working.worn[slot] = select.value;
+        else delete working.worn[slot];
+      });
+
+      row.append(label, select);
+      groupEl.appendChild(row);
+    }
+    wornContainer.appendChild(groupEl);
+  }
+
+  // ── Starting inventory ──────────────────────────────────
+  const invContainer = document.getElementById('inventoryPicker');
+  const invPool = Object.entries(definitions.item_templates || {})
+    .filter(([, t]) => INVENTORY_CATEGORIES.has(t.category))
+    .map(([id, t]) => ({ id, label: t.name || id }));
+  renderPoolPicker(
+    invContainer,
+    invPool,
+    () => working.starting_inventory,
+    (ids) => { working.starting_inventory = ids; },
+  );
+}
+
+window.randomizeOutfit = function () {
+  if (!working) return;
+  const bySlot = groupItemsBySlot(definitions.item_templates);
+  const worn = {};
+  for (const slot of CLOTHING_SLOTS) {
+    const options = bySlot[slot] || [];
+    if (options.length && Math.random() < 0.55) {
+      worn[slot] = options[Math.floor(Math.random() * options.length)].id;
+    }
+  }
+  working.worn = worn;
+
+  const invPool = Object.entries(definitions.item_templates || {})
+    .filter(([, t]) => INVENTORY_CATEGORIES.has(t.category))
+    .map(([id]) => id);
+  const count = Math.floor(Math.random() * 4); // 0-3
+  working.starting_inventory = sampleIds(invPool.map(id => ({ id })), count);
+
+  renderOutfitTab();
+};
 
 // =====================================================
 // INIT

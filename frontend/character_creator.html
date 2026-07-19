@@ -242,6 +242,62 @@ button:hover { background: #556170; }
 .randomizeRow input[type="number"] { width: 50px; }
 .randomizeRow label { font-size: 12px; color: #aab; }
 
+/* ── OUTFIT / EQUIPMENT ──────────────────────────── */
+
+.outfitSectionTitle {
+  margin: 0 0 8px 0;
+  font-size: 13px;
+  color: #9ab;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.slotGroups {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+
+.slotGroup {
+  background: #191d24;
+  border: 1px solid #333;
+  border-radius: 4px;
+  padding: 8px 10px;
+}
+
+.slotGroup h5 {
+  margin: 0 0 6px 0;
+  font-size: 11px;
+  color: #778;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.slotRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.slotRow label {
+  width: 70px;
+  flex-shrink: 0;
+  font-size: 11px;
+  color: #aab;
+}
+
+.slotRow select {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 5px;
+  background: #1a1e28;
+  border: 1px solid #3a4050;
+  color: #eee;
+  border-radius: 3px;
+  font-size: 11px;
+}
+
 /* ── RIGHT PREVIEW ────────────────────────────── */
 
 #previewPanel {
@@ -311,6 +367,7 @@ button:hover { background: #556170; }
     <button class="sideTab active" data-tab="basic">Basic Properties</button>
     <button class="sideTab" data-tab="personality">Personality Traits</button>
     <button class="sideTab" data-tab="physical">Physical Traits</button>
+    <button class="sideTab" data-tab="outfit">Outfit / Equipment</button>
   </div>
 
   <div id="tabPanels">
@@ -364,6 +421,20 @@ button:hover { background: #556170; }
     <div id="tab-physical" class="hidden">
       <h3 class="tabTitle">Physical Traits</h3>
       <div id="physicalPicker"></div>
+    </div>
+
+    <!-- OUTFIT / EQUIPMENT -->
+    <div id="tab-outfit" class="hidden">
+      <h3 class="tabTitle">Outfit / Equipment</h3>
+
+      <h4 class="outfitSectionTitle">Worn</h4>
+      <div id="wornSlots" class="slotGroups"></div>
+      <div style="margin:10px 0 20px;">
+        <button class="randomizeBtn" onclick="window.randomizeOutfit()">🎲 Randomize Outfit</button>
+      </div>
+
+      <h4 class="outfitSectionTitle">Starting Inventory</h4>
+      <div id="inventoryPicker"></div>
     </div>
 
   </div>
