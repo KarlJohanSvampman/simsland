@@ -7,7 +7,8 @@ export default defineConfig({
     proxy: {
       "/api": "http://localhost:8000",
       "/resources": "http://localhost:8000",
-      "/debug": "http://localhost:8000"
+      "/debug": "http://localhost:8000",
+      "/view": "http://localhost:8000"
     }
   },
 

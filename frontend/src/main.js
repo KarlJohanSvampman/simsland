@@ -267,6 +267,14 @@ const characterAnimations = {};
 const sims = {};
 const characterAttachments = {};
 const speechBubbles = {};   // id → { cssObject, div }
+const thoughtBubbles = {};  // id → { cssObject, div }  -- debug-only, see DEBUG OVERLAY SETTINGS
+const badges = {};          // id → { cssObject, div }  -- debug-only, see DEBUG OVERLAY SETTINGS
+
+// Currently selected character (perception debug overlay -- vision/hearing
+// rings + LOS lines, only ever shown for this one character). Nothing else
+// in this file previously tracked "who is selected" as real state -- the
+// inspector panel is otherwise transient DOM writes with no backing variable.
+let selectedCharacterId = null;
 const props = {};
 const propNodes = {};        // prop.id → { anchors, targets, ikHands } Maps of named Object3Ds
 const propAnimations = {};   // prop.id → { mixer, actions, currentState }
@@ -1972,6 +1980,495 @@ function updateSpeechBubbles(state){
   }
 }
 
+// =========================================================
+// DEBUG OVERLAY SETTINGS (localStorage-backed, per client)
+// =========================================================
+// New pattern for this file -- localStorage is otherwise unused
+// anywhere in the frontend. Versioned + merged with defaults on read
+// (not trusted outright) so a channel added later doesn't read as
+// undefined for a client with an older saved blob.
+
+const DEBUG_SETTINGS_KEY = "holosims_debug_settings";
+const DEBUG_SETTINGS_DEFAULTS = {
+  version: 1,
+  showThoughtBubbles: false,   // debug-only, off by default
+  showBadges: true,            // the whole point of this feature is seeing these work
+  thoughtChannels: { thought: true, reflection: true, current_intention: false },
+  badgeChannels:   { worries: true, current_intention: true },
+  // Gated behind a deliberate character selection first (unlike the two
+  // above, which apply ambiently to every character), so there's no
+  // ambient-clutter risk -- default all three on.
+  perceptionOverlays: { visionRange: true, hearingRange: true, lineOfSight: true },
+};
+
+function _loadDebugSettings(){
+  try{
+    const stored = JSON.parse(localStorage.getItem(DEBUG_SETTINGS_KEY) || "{}");
+    return {
+      ...DEBUG_SETTINGS_DEFAULTS,
+      ...stored,
+      thoughtChannels:    { ...DEBUG_SETTINGS_DEFAULTS.thoughtChannels,    ...(stored.thoughtChannels    || {}) },
+      badgeChannels:      { ...DEBUG_SETTINGS_DEFAULTS.badgeChannels,      ...(stored.badgeChannels      || {}) },
+      perceptionOverlays: { ...DEBUG_SETTINGS_DEFAULTS.perceptionOverlays, ...(stored.perceptionOverlays || {}) },
+    };
+  } catch(e){
+    return { ...DEBUG_SETTINGS_DEFAULTS };
+  }
+}
+
+function _saveDebugSettings(){
+  localStorage.setItem(DEBUG_SETTINGS_KEY, JSON.stringify(_debugSettings));
+}
+
+let _debugSettings = _loadDebugSettings();
+
+// =========================================================
+// DEBUG OVERLAY CHANNELS
+// =========================================================
+// Plain descriptor arrays -- adding a new debug data source later is a
+// one-line addition here, the settings modal renders checkboxes from
+// these arrays automatically (see openDebugSettingsModal below), no
+// new UI code needed per channel.
+
+function _formatIntention(c){
+  const i = c.current_intention;
+  if(!i) return null;
+  return `${i.type}${i.reason ? ": " + i.reason : ""}`;
+}
+
+// last_thought/last_reflection are genuinely one-shot LLM output
+// (agent_loop.py writes them unconditionally every think() call) --
+// current_intention is offered here too (off by default) for anyone
+// who wants the transient/log framing instead of (or alongside) the
+// persistent badge version below.
+const THOUGHT_CHANNELS = [
+  { id: "thought",            label: "Thought",           extract: c => c.last_thought },
+  { id: "reflection",         label: "Reflection",        extract: c => c.last_reflection },
+  { id: "current_intention",  label: "Current intention", extract: _formatIntention },
+];
+
+function _highestWorry(c){
+  const worries = c.worries || {};
+  let best = null;
+  for(const [subjectId, w] of Object.entries(worries)){
+    if((w.suspicion_level || 0) <= 0.1) continue;   // matches worries.py's ACTIVE_THRESHOLD
+    if(!best || w.suspicion_level > best.suspicion_level) best = { subjectId, ...w };
+  }
+  return best;
+}
+
+// worries is a dict keyed by subject_id (not a list) -- systems/worries.py.
+// current_intention persists across many ticks by nature, so it's the
+// natural badge candidate (stays indicated as long as it's in effect),
+// unlike the thought-bubble version above which times out on no change.
+const BADGE_CHANNELS = [
+  {
+    id: "worries", label: "Suspicion", icon: "\u{1F441}️", color: "#f87171",
+    active: c => !!_highestWorry(c),
+    detail: c => {
+      const w = _highestWorry(c);
+      return w ? `Suspicious of ${w.subjectId}` : "";
+    },
+  },
+  {
+    id: "current_intention", label: "Intention", icon: "\u{1F3AF}", color: "#60a5fa",
+    active: c => !!c.current_intention,
+    detail: c => _formatIntention(c) || "",
+  },
+];
+
+// =========================================================
+// DEBUG OVERLAY: THOUGHT BUBBLES
+// =========================================================
+// Debug-only -- shows internal LLM state as a transient, log-message-
+// style bubble above the character's head, distinct from real speech
+// bubbles. updateSpeechBubbles() above is never touched or gated by
+// this -- "if thought bubbles are disabled, only speech bubbles are
+// shown, only what the AI chooses to say."
+
+const _lastThoughtContent = {};   // id -> last shown combined string
+const _thoughtHideTimers  = {};   // id -> setTimeout handle
+const THOUGHT_BUBBLE_HIDE_MS = 6000;
+
+function getOrCreateThoughtBubble(id){
+  if(thoughtBubbles[id]) return thoughtBubbles[id];
+
+  const div = document.createElement("div");
+  div.className = "thought-bubble-debug";
+  div.style.cssText = `
+    background: rgba(30,34,41,0.92);
+    color: #d8e0ea;
+    padding: 4px 8px;
+    border-radius: 8px;
+    border: 1px solid #60a5fa;
+    font-size: 11px;
+    font-family: monospace;
+    max-width: 200px;
+    text-align: center;
+    white-space: normal;
+    pointer-events: none;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.35);
+    display: none;
+  `;
+
+  const cssObject = new CSS2DObject(div);
+  cssObject.position.set(0, 3.2, 0);   // above the speech bubble (2.6)
+  thoughtBubbles[id] = { cssObject, div };
+  return thoughtBubbles[id];
+}
+
+function updateThoughtBubbles(state){
+  const active = new Set(Object.keys(state.characters || {}));
+
+  if(!_debugSettings.showThoughtBubbles){
+    for(const id in thoughtBubbles){
+      thoughtBubbles[id].cssObject.visible = false;
+    }
+    return;
+  }
+
+  for(const [id, c] of Object.entries(state.characters || {})){
+    const model = sims[id];
+    if(!model) continue;
+
+    const { cssObject, div } = getOrCreateThoughtBubble(id);
+    if(!model.getObjectById(cssObject.id)) model.add(cssObject);
+
+    const enabledChannels = THOUGHT_CHANNELS.filter(
+      ch => _debugSettings.thoughtChannels[ch.id]
+    );
+    const combined = enabledChannels
+      .map(ch => ch.extract(c))
+      .filter(Boolean)
+      .join(" | ");
+
+    // Only (re)trigger the bubble when content actually changed -- a
+    // debug log message shows up when something new happens, not on
+    // every tick the same thing is still true. Bursty/irregular timing
+    // is expected here: last_thought/last_reflection only update on
+    // ticks the character actually gets an LLM turn, not a steady clock.
+    if(combined && combined !== _lastThoughtContent[id]){
+      _lastThoughtContent[id] = combined;
+      div.textContent = combined;
+      cssObject.visible = true;
+
+      clearTimeout(_thoughtHideTimers[id]);
+      _thoughtHideTimers[id] = setTimeout(() => {
+        cssObject.visible = false;
+      }, THOUGHT_BUBBLE_HIDE_MS);
+    }
+  }
+
+  for(const id in thoughtBubbles){
+    if(active.has(id)) continue;
+    const { cssObject } = thoughtBubbles[id];
+    const model = sims[id];
+    if(model) model.remove(cssObject);
+    clearTimeout(_thoughtHideTimers[id]);
+    delete _thoughtHideTimers[id];
+    delete _lastThoughtContent[id];
+    delete thoughtBubbles[id];
+  }
+}
+
+// =========================================================
+// DEBUG OVERLAY: BADGES
+// =========================================================
+// Debug-only -- persistent icons for "ongoing" conditions, visible for
+// as long as the underlying state is true. No timer/decay (unlike
+// thought bubbles above) -- just mirrors current backend state every
+// update. This is what actually shows worries/suspicion working
+// in-world.
+
+function getOrCreateBadge(id){
+  if(badges[id]) return badges[id];
+
+  const div = document.createElement("div");
+  div.className = "debug-badge-row";
+  div.style.cssText = `
+    display: flex;
+    flex-direction: row;
+    gap: 3px;
+    pointer-events: none;
+  `;
+
+  const cssObject = new CSS2DObject(div);
+  cssObject.position.set(0, 2.1, 0);   // below speech bubbles
+  badges[id] = { cssObject, div };
+  return badges[id];
+}
+
+function updateBadges(state){
+  const active = new Set(Object.keys(state.characters || {}));
+
+  if(!_debugSettings.showBadges){
+    for(const id in badges){
+      badges[id].cssObject.visible = false;
+    }
+    return;
+  }
+
+  for(const [id, c] of Object.entries(state.characters || {})){
+    const model = sims[id];
+    if(!model) continue;
+
+    const { cssObject, div } = getOrCreateBadge(id);
+    if(!model.getObjectById(cssObject.id)) model.add(cssObject);
+
+    const activeChannels = BADGE_CHANNELS.filter(
+      ch => _debugSettings.badgeChannels[ch.id] && ch.active(c)
+    );
+
+    if(activeChannels.length === 0){
+      cssObject.visible = false;
+      continue;
+    }
+
+    div.innerHTML = "";
+    for(const ch of activeChannels){
+      const span = document.createElement("span");
+      span.title = ch.detail(c) || ch.label;
+      span.style.cssText = `
+        background: rgba(30,34,41,0.9);
+        border: 1.5px solid ${ch.color};
+        border-radius: 50%;
+        width: 18px;
+        height: 18px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 11px;
+      `;
+      span.textContent = ch.icon;
+      div.appendChild(span);
+    }
+    cssObject.visible = true;
+  }
+
+  for(const id in badges){
+    if(active.has(id)) continue;
+    const { cssObject } = badges[id];
+    const model = sims[id];
+    if(model) model.remove(cssObject);
+    delete badges[id];
+  }
+}
+
+// =========================================================
+// DEBUG OVERLAY: PERCEPTION (vision/hearing/LOS, selected character only)
+// =========================================================
+// World-space geometry (ground-flat circles + lines), not CSS2D -- real
+// THREE.Line scene geometry, shown only for selectedCharacterId, unlike
+// thought bubbles/badges which apply to every character at once.
+// Materials built once and reused; only geometry is rebuilt+disposed per
+// update, mirroring censorBars.js's disposal idiom (the ported ring
+// technique's original home, definitions.js's _ixUpdateRadiusRing, is an
+// editor-only, low-frequency function that gets away without disposing --
+// not safe to copy here, where this runs every network tick for a whole
+// live viewer session).
+
+const PERCEPTION_OVERLAY_CHANNELS = [
+  { id: "visionRange",  label: "Vision range" },
+  { id: "hearingRange", label: "Hearing range" },
+  { id: "lineOfSight",  label: "Line of sight" },
+];
+
+let _perceptionRanges = null;         // { visual_range, hearing_range } | null
+let _lastSelectedBuildingId = undefined;
+let perceptionOverlay = { visionRing: null, hearingRing: null, losLines: [] };
+
+const _visionRingMaterial  = new THREE.LineBasicMaterial({ color: 0xf5c518 });
+const _hearingRingMaterial = new THREE.LineBasicMaterial({ color: 0x5ac8fa });
+const _losLineMaterial     = new THREE.LineBasicMaterial({ color: 0xff5a5a });
+
+function _buildRingGeometry(cx, cz, radius, segs = 48){
+  const pts = [];
+  for(let i = 0; i <= segs; i++){
+    const a = (i / segs) * Math.PI * 2;
+    pts.push(new THREE.Vector3(cx + Math.cos(a) * radius, 0.02, cz + Math.sin(a) * radius));
+  }
+  return new THREE.BufferGeometry().setFromPoints(pts);
+}
+
+function _disposeRing(ring){
+  if(!ring) return;
+  scene.remove(ring);
+  ring.geometry.dispose();
+}
+
+function _disposeLosLines(){
+  for(const line of perceptionOverlay.losLines){
+    scene.remove(line);
+    line.geometry.dispose();
+  }
+  perceptionOverlay.losLines = [];
+}
+
+// visual_range()/hearing_range() (brain/perception.py) are pure functions,
+// never persisted onto the character dict -- fetched from a small server
+// endpoint rather than replicated in JS, to avoid a two-language drift
+// bug between the Python formula and a client-side copy.
+async function fetchPerceptionRanges(id){
+  try{
+    // Relative path, proxied same-origin -- matches the established
+    // pattern every other HTTP endpoint in this app already uses
+    // (/api, /resources, /debug are all proxied through nginx in
+    // production and vite's dev-server proxy locally; /view is added
+    // alongside them in both nginx.conf and vite.config.js for this).
+    // The WS connection is the one deliberate exception (an absolute
+    // host:8000 URL) -- not a pattern to extend to plain fetches.
+    const resp = await fetch(`/view/perception-range/${encodeURIComponent(id)}?sim_id=default`);
+    if(!resp.ok) return;
+    const data = await resp.json();
+    if(selectedCharacterId === id) _perceptionRanges = data;
+  } catch(e){
+    // Network hiccup -- leave any previously-fetched ranges in place
+    // rather than blanking the overlay for one bad request.
+  }
+}
+
+// Coarse fallback poll, purely to catch a day/night threshold crossing
+// while a character stays selected across a day/night cycle -- NOT a
+// substitute for the building_id-diff immediate refetch below.
+// Deliberately infrequent: this value changes at most twice a day, and
+// event-triggering precisely on the hour cutoff would mean replicating
+// that threshold in JS too, the exact drift risk this endpoint exists
+// to avoid.
+setInterval(() => {
+  if(selectedCharacterId) fetchPerceptionRanges(selectedCharacterId);
+}, 45000);
+
+function updatePerceptionOverlay(state){
+  const settings = _debugSettings.perceptionOverlays;
+  const anyOn = settings.visionRange || settings.hearingRange || settings.lineOfSight;
+
+  if(!selectedCharacterId || !anyOn){
+    _disposeRing(perceptionOverlay.visionRing);
+    _disposeRing(perceptionOverlay.hearingRing);
+    _disposeLosLines();
+    perceptionOverlay.visionRing = null;
+    perceptionOverlay.hearingRing = null;
+    _lastSelectedBuildingId = undefined;
+    return;
+  }
+
+  const c = state.characters?.[selectedCharacterId];
+  const model = sims[selectedCharacterId];
+  if(!c || !model) return;
+
+  // Immediate refetch on building_id change -- zero drift risk, just a
+  // string diff, not reimplementing the night/indoor formula client-side.
+  if(c.building_id !== _lastSelectedBuildingId){
+    _lastSelectedBuildingId = c.building_id;
+    fetchPerceptionRanges(selectedCharacterId);
+  }
+
+  if(!_perceptionRanges) return;   // first fetch hasn't resolved yet
+
+  const cx = model.position.x;
+  const cz = model.position.z;
+
+  _disposeRing(perceptionOverlay.visionRing);
+  perceptionOverlay.visionRing = null;
+  if(settings.visionRange && _perceptionRanges.visual_range != null){
+    const geom = _buildRingGeometry(cx, cz, _perceptionRanges.visual_range);
+    perceptionOverlay.visionRing = new THREE.Line(geom, _visionRingMaterial);
+    scene.add(perceptionOverlay.visionRing);
+  }
+
+  _disposeRing(perceptionOverlay.hearingRing);
+  perceptionOverlay.hearingRing = null;
+  if(settings.hearingRange && _perceptionRanges.hearing_range != null){
+    const geom = _buildRingGeometry(cx, cz, _perceptionRanges.hearing_range);
+    perceptionOverlay.hearingRing = new THREE.Line(geom, _hearingRingMaterial);
+    scene.add(perceptionOverlay.hearingRing);
+  }
+
+  // c.perception.visible_people (brain/perception.py::perceive_people) is
+  // already gated by BOTH within-visual_range AND a real line_of_sight
+  // check before an entry appears there -- zero new backend work needed
+  // to know who to draw LOS lines to.
+  _disposeLosLines();
+  if(settings.lineOfSight){
+    const visiblePeople = c.perception?.visible_people || [];
+    for(const p of visiblePeople){
+      const otherModel = sims[p.id];
+      if(!otherModel) continue;
+      const geom = new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(cx, 0.02, cz),
+        new THREE.Vector3(otherModel.position.x, 0.02, otherModel.position.z),
+      ]);
+      const line = new THREE.Line(geom, _losLineMaterial);
+      scene.add(line);
+      perceptionOverlay.losLines.push(line);
+    }
+  }
+}
+
+// =========================================================
+// DEBUG OVERLAY SETTINGS MODAL
+// =========================================================
+
+function _renderChannelCheckboxes(channels, enabledMap, groupKey){
+  return channels.map(ch => `
+    <div class="modal-row">
+      <label style="cursor:pointer; flex:1;">
+        <input type="checkbox" data-group="${groupKey}" data-channel="${ch.id}"
+               ${enabledMap[ch.id] ? "checked" : ""} />
+        ${ch.label}
+      </label>
+    </div>
+  `).join("");
+}
+
+function renderDebugSettingsModal(){
+  const body = document.getElementById("debugSettingsModalBody");
+  if(!body) return;
+
+  body.innerHTML = `
+    <div class="modal-row">
+      <label style="cursor:pointer; flex:1;">
+        <input type="checkbox" id="dbgShowThoughtBubbles" ${_debugSettings.showThoughtBubbles ? "checked" : ""} />
+        Show thought bubbles
+      </label>
+    </div>
+    <div class="modal-row">
+      <label style="cursor:pointer; flex:1;">
+        <input type="checkbox" id="dbgShowBadges" ${_debugSettings.showBadges ? "checked" : ""} />
+        Show badges
+      </label>
+    </div>
+    <h4>Thought bubble sources</h4>
+    ${_renderChannelCheckboxes(THOUGHT_CHANNELS, _debugSettings.thoughtChannels, "thoughtChannels")}
+    <h4>Badge sources</h4>
+    ${_renderChannelCheckboxes(BADGE_CHANNELS, _debugSettings.badgeChannels, "badgeChannels")}
+    <h4>Perception overlays (selected character only)</h4>
+    ${_renderChannelCheckboxes(PERCEPTION_OVERLAY_CHANNELS, _debugSettings.perceptionOverlays, "perceptionOverlays")}
+  `;
+
+  document.getElementById("dbgShowThoughtBubbles").addEventListener("change", (e) => {
+    _debugSettings.showThoughtBubbles = e.target.checked;
+    _saveDebugSettings();
+  });
+  document.getElementById("dbgShowBadges").addEventListener("change", (e) => {
+    _debugSettings.showBadges = e.target.checked;
+    _saveDebugSettings();
+  });
+  body.querySelectorAll("input[data-group]").forEach(input => {
+    input.addEventListener("change", (e) => {
+      const group = e.target.dataset.group;
+      const channel = e.target.dataset.channel;
+      _debugSettings[group][channel] = e.target.checked;
+      _saveDebugSettings();
+    });
+  });
+}
+
+function openDebugSettingsModal(){
+  renderDebugSettingsModal();
+  openModal("modal-debug-settings");
+}
+
 function createFallbackCharacter(c){
 
   const mesh = new THREE.Mesh(
@@ -2374,6 +2871,18 @@ delete loadingCharacters[id];
       mesh.remove(speechBubbles[id].cssObject);
       delete speechBubbles[id];
     }
+    // Same orphaned-DOM-node risk applies to the debug overlay registries.
+    if(thoughtBubbles[id]){
+      mesh.remove(thoughtBubbles[id].cssObject);
+      clearTimeout(_thoughtHideTimers[id]);
+      delete _thoughtHideTimers[id];
+      delete _lastThoughtContent[id];
+      delete thoughtBubbles[id];
+    }
+    if(badges[id]){
+      mesh.remove(badges[id].cssObject);
+      delete badges[id];
+    }
 
     scene.remove(mesh);
 
@@ -2705,6 +3214,8 @@ renderer.domElement.addEventListener(
 
     if(!hits.length){
 
+      selectedCharacterId = null;
+
       document
         .getElementById(
           "viewerSelection"
@@ -2754,7 +3265,18 @@ renderer.domElement.addEventListener(
       `;
 
     if(d.type === "character" && d.id){
+      // A new character selection -- clear any cached radii from a
+      // previous selection so the perception overlay doesn't briefly
+      // show stale numbers before the fresh fetch resolves.
+      if(selectedCharacterId !== d.id) _perceptionRanges = null;
+      selectedCharacterId = d.id;
       showCharacterLLMLog(d.id);
+    } else {
+      // Selecting a prop/tile while a character was selected must also
+      // clear selectedCharacterId -- otherwise the perception rings stay
+      // anchored to the stale previous character while the inspector
+      // shows unrelated prop info.
+      selectedCharacterId = null;
     }
   }
 );
@@ -2775,12 +3297,24 @@ window.closeModal = function(id) {
 function openModal(id) {
   document.getElementById(id).classList.add("open");
 }
+// type="module" scripts don't leak top-level function names to global
+// scope -- closeModal was already exposed this way for its inline
+// onclick="closeModal(...)" consumers; openModal needs the same
+// treatment or any HTML-side caller throws "openModal is not defined".
+window.openModal = openModal;
 
 document.querySelectorAll(".modal-overlay").forEach(overlay => {
   overlay.addEventListener("click", (e) => {
     if (e.target === overlay) overlay.classList.remove("open");
   });
 });
+
+// Debug overlay settings trigger -- addEventListener, not an inline
+// onclick, to avoid the same module-scope pitfall openModal itself had.
+const debugSettingsBtn = document.getElementById("debugSettingsBtn");
+if(debugSettingsBtn){
+  debugSettingsBtn.addEventListener("click", openDebugSettingsModal);
+}
 
 renderer.domElement.addEventListener("dblclick", (event) => {
   mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
@@ -3164,6 +3698,9 @@ async function _applyState(state) {
   updateFloorplanWalls(state);
   await updateCharacters(state);
   updateSpeechBubbles(state);
+  updateThoughtBubbles(state);
+  updateBadges(state);
+  updatePerceptionOverlay(state);
 }
 
 async function _applyDelta(delta) {

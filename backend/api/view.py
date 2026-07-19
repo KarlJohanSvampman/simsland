@@ -6,6 +6,11 @@ from core.definitions import (
     load_definitions
 )
 
+from brain.perception import (
+    visual_range,
+    hearing_range
+)
+
 router = APIRouter()
 
 
@@ -324,4 +329,30 @@ def get_view(
 
         # semantic defs
         "definitions": definitions
+    }
+
+
+# =========================================================
+# PERCEPTION RANGE (debug overlay UI — vision/hearing rings)
+# =========================================================
+# visual_range()/hearing_range() (brain/perception.py) are pure functions,
+# never persisted onto the character dict -- computed fresh here against
+# the real live world, not replicated in JS, to avoid a two-language
+# drift bug between the Python formula and a client-side copy.
+
+@router.get("/view/perception-range/{char_id}")
+def get_perception_range(
+    char_id: str,
+    sim_id: str
+):
+    world = load_world(sim_id)
+
+    c = world.get("characters", {}).get(char_id)
+
+    if not c:
+        return {"visual_range": None, "hearing_range": None}
+
+    return {
+        "visual_range": visual_range(c, world),
+        "hearing_range": hearing_range(c)
     }

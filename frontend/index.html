@@ -39,6 +39,25 @@
     width: 480px;
   }
 
+  #debugSettingsBtn {
+    position: fixed;
+    top: 10px;
+    right: 280px;
+    z-index: 9999;
+    width: 34px;
+    height: 34px;
+    background: rgba(0,0,0,0.85);
+    color: white;
+    border: 1px solid #444;
+    border-radius: 6px;
+    font-size: 16px;
+    cursor: pointer;
+  }
+
+  #debugSettingsBtn:hover {
+    background: rgba(40,40,40,0.9);
+  }
+
   #viewerInspector pre {
     white-space: pre-wrap;
     word-break: break-word;
@@ -176,6 +195,8 @@
 
 </div>
 
+<button id="debugSettingsBtn" title="Debug overlay settings">⚙</button>
+
 <div class="modal-overlay" id="modal-household">
   <div class="modal-box">
     <div class="modal-header">
@@ -183,6 +204,16 @@
       <button class="modal-close" onclick="closeModal('modal-household')">✕</button>
     </div>
     <div class="modal-body" id="householdModalBody"></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-debug-settings">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3>Debug Overlay Settings</h3>
+      <button class="modal-close" onclick="closeModal('modal-debug-settings')">✕</button>
+    </div>
+    <div class="modal-body" id="debugSettingsModalBody"></div>
   </div>
 </div>
 
