@@ -37,7 +37,10 @@ export default defineConfig({
           resolve(__dirname, "animbank.html"),
 
         social_debug:
-          resolve(__dirname, "social_debug.html")
+          resolve(__dirname, "social_debug.html"),
+
+        character_creator:
+          resolve(__dirname, "character_creator.html")
       }
     }
   }

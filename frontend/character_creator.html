@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>HoloSims Character Creator</title>
+
+<style>
+html, body {
+  margin: 0;
+  height: 100%;
+  background: #1b1f24;
+  color: white;
+  font-family: Arial, sans-serif;
+  overflow: hidden;
+}
+
+body {
+  display: grid;
+  grid-template-columns: 280px 1fr 420px;
+  grid-template-rows: 100%;
+}
+
+/* ── LEFT SIDEBAR ───────────────────────────────── */
+
+#sidebar {
+  background: #252b33;
+  border-right: 1px solid #444;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+#sidebarHeader {
+  padding: 10px 12px;
+  border-bottom: 1px solid #444;
+  background: #1d2229;
+}
+
+#sidebarHeader h2 {
+  margin: 0 0 8px 0;
+  font-size: 15px;
+}
+
+#sidebarHeader button {
+  margin-right: 4px;
+  margin-bottom: 4px;
+}
+
+#templateActions {
+  padding: 8px 10px;
+  border-bottom: 1px solid #444;
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+#templateList {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.templateRow {
+  padding: 7px 8px;
+  margin-bottom: 4px;
+  background: #2c323a;
+  cursor: pointer;
+  border: 1px solid transparent;
+  font-size: 13px;
+  border-radius: 3px;
+}
+
+.templateRow:hover { background: #3a424e; }
+.templateRow.active { border-color: #7ab4f5; background: #33404e; }
+
+/* ── CENTER: TABS + FORM ─────────────────────────── */
+
+#editorPanel {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+#sidebarTabs {
+  display: flex;
+  border-bottom: 1px solid #2e3440;
+  flex-shrink: 0;
+}
+
+.sideTab {
+  flex: 1; padding: 9px 4px; background: #1e2430; border: none;
+  border-bottom: 2px solid transparent; color: #778; font-size: 12px;
+  cursor: pointer; border-radius: 0;
+}
+.sideTab:hover { background: #252d3a; color: #aaa; }
+.sideTab.active { color: #ddeeff; border-bottom-color: #4a90d9; background: #1a2030; }
+
+#tabPanels {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 20px;
+}
+
+.hidden { display: none !important; }
+
+h3.tabTitle {
+  margin: 0 0 14px 0;
+  font-size: 16px;
+  color: #ddeeff;
+}
+
+.formRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.formRow label {
+  width: 140px;
+  font-size: 13px;
+  color: #aab;
+  flex-shrink: 0;
+}
+
+.formRow input[type="text"],
+.formRow input[type="number"],
+.formRow select {
+  flex: 1;
+  max-width: 240px;
+  padding: 5px 7px;
+  background: #1a1e28;
+  border: 1px solid #3a4050;
+  color: #eee;
+  border-radius: 3px;
+  font-size: 13px;
+}
+
+.formRow .sliderValue {
+  font-size: 12px;
+  color: #8ab;
+  width: 90px;
+}
+
+.deriveNote {
+  font-size: 11px;
+  color: #778;
+  margin: -4px 0 14px 150px;
+}
+
+button {
+  padding: 6px 10px;
+  background: #3d4754;
+  border: 1px solid #555;
+  color: #eee;
+  cursor: pointer;
+  font-size: 12px;
+  border-radius: 3px;
+}
+button:hover { background: #556170; }
+
+.randomizeBtn {
+  background: #3a5a4a;
+  border-color: #4a7a5f;
+}
+.randomizeBtn:hover { background: #4a7a5f; }
+
+/* ── POOL PICKER (personality/physical traits) ───── */
+
+.poolPicker {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-top: 10px;
+}
+
+.poolColumn h4 {
+  margin: 0 0 8px 0;
+  font-size: 13px;
+  color: #9ab;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.poolSearch {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 6px 8px;
+  margin-bottom: 8px;
+  background: #1a1e28;
+  border: 1px solid #3a4050;
+  color: #eee;
+  border-radius: 3px;
+  font-size: 12px;
+}
+
+.poolList, .assignedList {
+  min-height: 320px;
+  max-height: 420px;
+  overflow-y: auto;
+  background: #191d24;
+  border: 1px solid #333;
+  border-radius: 4px;
+  padding: 6px;
+}
+
+.assignedList.dragOver { border-color: #4a90d9; background: #1a2432; }
+
+.traitChip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 5px 8px;
+  margin-bottom: 4px;
+  background: #262c36;
+  border: 1px solid #3a4050;
+  border-radius: 3px;
+  font-size: 12px;
+  cursor: grab;
+}
+.traitChip:active { cursor: grabbing; }
+.traitChip.positive { border-left: 3px solid #5fae6f; }
+.traitChip.negative { border-left: 3px solid #c0605f; }
+
+.traitChip .chipLabel { flex: 1; }
+.traitChip .chipRemove {
+  background: none; border: none; color: #999; cursor: pointer;
+  font-size: 13px; padding: 0 2px;
+}
+.traitChip .chipRemove:hover { color: #f66; }
+
+.emptyHint { color: #667; font-size: 12px; padding: 8px; }
+
+.randomizeRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 12px 0 4px 0;
+}
+.randomizeRow input[type="number"] { width: 50px; }
+.randomizeRow label { font-size: 12px; color: #aab; }
+
+/* ── RIGHT PREVIEW ────────────────────────────── */
+
+#previewPanel {
+  background: #20242a;
+  border-left: 1px solid #444;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+#previewHeader {
+  padding: 8px 10px;
+  background: #1d2229;
+  border-bottom: 1px solid #444;
+  font-size: 13px;
+  font-weight: bold;
+}
+
+#modelPreview {
+  width: 420px;
+  height: 350px;
+  flex-shrink: 0;
+}
+
+#statusBar {
+  padding: 6px 10px;
+  background: #16191d;
+  border-top: 1px solid #444;
+  font-size: 11px;
+  color: #888;
+  margin-top: auto;
+}
+</style>
+</head>
+
+<body>
+
+<!-- ── LEFT SIDEBAR ─────────────────────────────── -->
+
+<aside id="sidebar">
+
+  <div id="sidebarHeader">
+    <h2>Character Creator</h2>
+    <button onclick="window.location='/'">Viewer</button>
+    <button onclick="window.location='/editor.html'">World</button>
+    <button onclick="window.location='/meshbank.html'">Meshbank</button>
+    <button onclick="window.location='/animbank.html'">Anim Bank</button>
+    <button onclick="window.location='/definitions.html'">Templates</button>
+    <button onclick="window.location='/social_debug.html'">💬 Social Debug</button>
+  </div>
+
+  <div id="templateActions">
+    <button onclick="window.createTemplate()">New</button>
+    <button onclick="window.deleteTemplate()">Delete</button>
+    <button onclick="window.saveTemplate()">Save</button>
+  </div>
+
+  <div id="templateList"></div>
+
+</aside>
+
+<!-- ── CENTER: TABS + FORM ──────────────────────── -->
+
+<main id="editorPanel">
+
+  <div id="sidebarTabs">
+    <button class="sideTab active" data-tab="basic">Basic Properties</button>
+    <button class="sideTab" data-tab="personality">Personality Traits</button>
+    <button class="sideTab" data-tab="physical">Physical Traits</button>
+  </div>
+
+  <div id="tabPanels">
+
+    <!-- BASIC PROPERTIES -->
+    <div id="tab-basic">
+      <h3 class="tabTitle">Basic Properties</h3>
+
+      <div class="formRow">
+        <label>Name</label>
+        <input type="text" id="fldName" placeholder="Character name" />
+      </div>
+      <div class="formRow">
+        <label>Age</label>
+        <input type="number" id="fldAge" min="0" max="110" />
+      </div>
+      <div class="deriveNote" id="ageGroupNote">age group: —</div>
+
+      <div class="formRow">
+        <label>Sex</label>
+        <select id="fldSex">
+          <option value="male">Male</option>
+          <option value="female">Female</option>
+        </select>
+      </div>
+
+      <div class="formRow">
+        <label>Height (cm)</label>
+        <input type="number" id="fldHeight" min="120" max="220" />
+      </div>
+
+      <div class="formRow">
+        <label>Weight (body fat)</label>
+        <input type="range" id="fldWeight" min="0.05" max="0.95" step="0.01" style="flex:1; max-width:240px;" />
+        <span class="sliderValue" id="fldWeightLabel">—</span>
+      </div>
+      <div class="deriveNote">Stored, doesn't affect the model's visual shape yet.</div>
+
+      <div style="margin-top:16px;">
+        <button class="randomizeBtn" onclick="window.randomizeBasic()">🎲 Randomize</button>
+      </div>
+    </div>
+
+    <!-- PERSONALITY TRAITS -->
+    <div id="tab-personality" class="hidden">
+      <h3 class="tabTitle">Personality Traits</h3>
+      <div id="personalityPicker"></div>
+    </div>
+
+    <!-- PHYSICAL TRAITS -->
+    <div id="tab-physical" class="hidden">
+      <h3 class="tabTitle">Physical Traits</h3>
+      <div id="physicalPicker"></div>
+    </div>
+
+  </div>
+</main>
+
+<!-- ── RIGHT PREVIEW ────────────────────────────── -->
+
+<aside id="previewPanel">
+
+  <div id="previewHeader">Model Preview</div>
+
+  <div id="modelPreview"></div>
+
+  <div id="statusBar">Ready</div>
+
+</aside>
+
+<script type="module" src="/src/character_creator.js"></script>
+
+</body>
+</html>
