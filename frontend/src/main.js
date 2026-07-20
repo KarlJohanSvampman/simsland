@@ -164,6 +164,33 @@ function resolveLocomotionMap(modelKey) {
   return Object.keys(resolved).length ? resolved : null;
 }
 
+// Per-character-template override, one tier more specific than
+// resolveLocomotionMap()'s per-shared-model one — authored in the
+// Character Creator's Animation Mapping tab (animbank.json's
+// _character_overrides bucket), keyed by c["template"] (the
+// character_templates id a character was spawned from), not by the
+// shared model/mesh key. Unlike resolveLocomotionMap, each key's
+// lower/upper are resolved independently so a character can override
+// just the upper body (e.g. "eat") without forcing its lower body away
+// from whatever ANIM_LAYERS/locomotionMap would otherwise pick (many
+// interaction states are asymmetric, e.g. sit_eat's sit_idle legs).
+function resolveCharacterOverrideMap(templateId) {
+  const src = animBank._character_overrides?.[templateId];
+  if (!src) return null;
+
+  const templates = animBank._templates || {};
+  const clipOf = (id) => templates[id]?.chain?.[0]?.clip;
+  const resolved = {};
+
+  for (const [key, slots] of Object.entries(src)) {
+    const lower = slots.lower && clipOf(slots.lower);
+    const upper = slots.upper && clipOf(slots.upper);
+    if (lower || upper) resolved[key] = { lower, upper };
+  }
+
+  return Object.keys(resolved).length ? resolved : null;
+}
+
 function resolveModel(modelRef) {
   if (!modelRef) return null;
   // If it's a meshbank key, return the mesh path
@@ -1012,28 +1039,34 @@ function _setLayer(animData, layer, newStem) {
 // PLAY LAYERED ANIMATION
 // =========================================================
 
+// Resolves one layer (lower/upper) of a state key through three tiers,
+// most to least specific: 1) this character's own animbank override
+// (animData.characterMap, per character_template — can set just one of
+// lower/upper), 2) this character's shared body-model override
+// (animData.locomotionMap — a single clip applied to both layers, same
+// as before), 3) the global ANIM_LAYERS default for this layer.
+function _resolveAnimLayer(animData, key, slot) {
+  const charSlot = animData.characterMap?.[key]?.[slot];
+  if (charSlot) return charSlot.toLowerCase();
+  const modelOverride = animData.locomotionMap?.[key];
+  if (modelOverride) return modelOverride.toLowerCase();
+  return ANIM_LAYERS[key]?.[slot];
+}
+
 function playLayeredAnim(animData, animState) {
   const key = (animState || "idle").toLowerCase();
 
-  // A character's animbank stance/transition mapping (see animbank.html's
-  // Stances/Transitions panels) can override any state key, not just a
-  // fixed allowlist — any stance idle/move slot or any authored
-  // {from}_to_{to} transition pair resolves through here the same way.
-  // Each maps to a single clip used for both lower and upper layers (no
-  // separate upper-body variant for these, unlike interaction states).
-  const override = animData.locomotionMap?.[key];
-  const layers = override
-    ? { lower: override.toLowerCase(), upper: override.toLowerCase() }
-    : ANIM_LAYERS[key];
+  const lower = _resolveAnimLayer(animData, key, "lower");
+  const upper = _resolveAnimLayer(animData, key, "upper");
 
-  if (!layers) {
+  if (!lower && !upper) {
     // Unknown state — fall back to full-body single action
     _playSingleAction(animData, key);
     return;
   }
 
-  _setLayer(animData, "lower", layers.lower);
-  _setLayer(animData, "upper", layers.upper);
+  _setLayer(animData, "lower", lower);
+  _setLayer(animData, "upper", upper);
 }
 
 
@@ -2813,6 +2846,10 @@ await updateHeldItemAttachment(id, model, c.inventory, definitions?.item_templat
     // crouch_idle/crouch_walk), authored as animbank templates and
     // resolved to concrete clip names here — see resolveLocomotionMap().
     locomotionMap: resolveLocomotionMap(character?.model),
+    // Per-character-TEMPLATE override (finer-grained than locomotionMap
+    // above, which is shared by every character using the same body
+    // model) — see resolveCharacterOverrideMap().
+    characterMap: resolveCharacterOverrideMap(c?.template),
     // Two-layer tracking — current clip names (with _lower / _upper suffix)
     lowerCurrent:     null,
     upperCurrent:     null,

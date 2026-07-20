@@ -298,6 +298,67 @@ button:hover { background: #556170; }
   font-size: 11px;
 }
 
+/* ── ANIMATION MAPPING ───────────────────────────── */
+
+.animMapList {
+  margin-top: 10px;
+  max-height: calc(100vh - 260px);
+  overflow-y: auto;
+}
+
+.animMapGroupTitle {
+  font-size: 11px;
+  color: #6699cc;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 14px 0 4px 0;
+  padding-bottom: 2px;
+  border-bottom: 1px solid #333;
+}
+.animMapGroupTitle:first-child { margin-top: 0; }
+
+.animMapRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 0;
+  border-bottom: 1px solid #262c36;
+}
+
+.animMapRow .animMapKey {
+  width: 150px;
+  flex-shrink: 0;
+  font-size: 12px;
+  color: #ccd;
+  font-family: monospace;
+}
+
+.animMapRow .animMapSlot {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+
+.animMapRow .animMapSlot label {
+  font-size: 10px;
+  color: #778;
+  width: 40px;
+  flex-shrink: 0;
+}
+
+.animMapRow select {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 5px;
+  background: #1a1e28;
+  border: 1px solid #3a4050;
+  color: #eee;
+  border-radius: 3px;
+  font-size: 11px;
+}
+
 /* ── RIGHT PREVIEW ────────────────────────────── */
 
 #previewPanel {
@@ -368,6 +429,7 @@ button:hover { background: #556170; }
     <button class="sideTab" data-tab="personality">Personality Traits</button>
     <button class="sideTab" data-tab="physical">Physical Traits</button>
     <button class="sideTab" data-tab="outfit">Outfit / Equipment</button>
+    <button class="sideTab" data-tab="animations">Animation Mapping</button>
   </div>
 
   <div id="tabPanels">
@@ -435,6 +497,20 @@ button:hover { background: #556170; }
 
       <h4 class="outfitSectionTitle">Starting Inventory</h4>
       <div id="inventoryPicker"></div>
+    </div>
+
+    <!-- ANIMATION MAPPING -->
+    <div id="tab-animations" class="hidden">
+      <h3 class="tabTitle">Animation Mapping</h3>
+      <div class="deriveNote" style="margin:0 0 12px;">
+        Locomotion/stance keys and interaction keys share one abstract
+        vocabulary — this character can override which authored template
+        each key resolves to, independently for the lower and upper body.
+        Anything left as "— Use default —" falls back to the shared body
+        model's own animation, then to the game-wide default.
+      </div>
+      <input id="animSearch" class="poolSearch" type="text" placeholder="Search animation states (min 2 chars)..." />
+      <div id="animMapList" class="animMapList"></div>
     </div>
 
   </div>

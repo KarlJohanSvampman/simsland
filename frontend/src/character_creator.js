@@ -16,6 +16,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 
 let definitions = { character_templates: {}, trait_templates: {}, physical_trait_templates: {}, item_templates: {} };
 let meshbank = {};
+let animBank = { _templates: {} };
 let currentTemplateId = null;
 let working = null;   // in-memory working copy of the open template
 
@@ -54,6 +55,29 @@ const INVENTORY_CATEGORIES = new Set([
   'books_media', 'games', 'art_supplies', 'music_instrument', 'misc',
 ]);
 
+// Mirrors frontend/src/main.js's ANIM_LAYERS keys exactly (47 total),
+// grouped the same way as that file's own comment sections. This is the
+// complete, authoritative vocabulary of animation_state keys the game
+// ever sets on a character -- locomotion AND interaction keys share one
+// flat namespace there, so no separate reconciliation against the
+// backend's INTERACTION_ANIMATIONS is needed.
+const ANIM_STATE_GROUPS = [
+  { title: 'Locomotion', keys: ['idle', 'walk', 'run', 'crouch_idle', 'crouch_walk'] },
+  { title: 'Standing interactions', keys: [
+    'talk', 'eat', 'cook', 'work', 'phone', 'phone_screen', 'examine', 'search',
+    'wipe', 'mop', 'scrub', 'wash_dishes', 'window_wipe', 'clean_generic',
+    'pick_up', 'put_down', 'throw', 'smash',
+  ] },
+  { title: 'Item stack', keys: ['add_to_stack', 'put_down_stack', 'search_stack', 'take_from_stack'] },
+  { title: 'Carry', keys: ['carry_idle', 'carry_walk'] },
+  { title: 'Movable props', keys: ['drag_idle', 'drag_move', 'start_dragging', 'let_go', 'pushing'] },
+  { title: 'Seated', keys: [
+    'sit_idle', 'sit_watch', 'sit_eat', 'sit_talk', 'sit_phone', 'sit_phone_screen', 'sit_work', 'read',
+  ] },
+  { title: 'Lying / sleep', keys: ['lie_idle', 'sleep_idle', 'wake_up'] },
+  { title: 'Transitions', keys: ['stand_up', 'shower'] },
+];
+
 // =====================================================
 // UI ELEMENTS
 // =====================================================
@@ -88,18 +112,50 @@ async function loadMeshbank() {
   }
 }
 
+async function loadAnimBank() {
+  try {
+    const res = await fetch('/api/animbank');
+    animBank = await res.json();
+    animBank._templates = animBank._templates || {};
+    animBank._character_overrides = animBank._character_overrides || {};
+  } catch (err) {
+    console.warn('Animbank load failed', err);
+  }
+}
+
 window.saveTemplate = async function () {
   if (!currentTemplateId || !working) {
     setStatus('Nothing to save');
     return;
   }
-  definitions.character_templates[currentTemplateId] = working;
+  // _animOverrides is an in-memory-only convenience field on `working`
+  // (read by renderAnimMappingTab) -- it must NOT be written into
+  // definitions.json's character_templates, since that data belongs
+  // solely in animbank.json's _character_overrides bucket below.
+  const { _animOverrides, ...templateData } = working;
+  definitions.character_templates[currentTemplateId] = templateData;
+  // Animation overrides live in animbank.json's _character_overrides
+  // bucket (keyed by this same template id), not in definitions.json --
+  // see main.js's resolveCharacterOverrideMap(). Prune empty entries so
+  // untouched templates don't accumulate stray {} keys.
+  if (_animOverrides && Object.keys(_animOverrides).length) {
+    animBank._character_overrides[currentTemplateId] = _animOverrides;
+  } else {
+    delete animBank._character_overrides[currentTemplateId];
+  }
   try {
-    await fetch('/api/editor/definitions?sim_id=default', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(definitions),
-    });
+    await Promise.all([
+      fetch('/api/editor/definitions?sim_id=default', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(definitions),
+      }),
+      fetch('/api/animbank', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(animBank),
+      }),
+    ]);
     setStatus('Saved');
   } catch (err) {
     console.error(err);
@@ -139,6 +195,13 @@ function openTemplate(id) {
     physical_traits: [...(raw.physical_traits || [])],
     worn: { ...(raw.worn || {}) },
     starting_inventory: [...(raw.starting_inventory || [])],
+    // Animation overrides live in animbank.json, not definitions.json --
+    // see saveTemplate()/main.js's resolveCharacterOverrideMap(). Deep
+    // clone the per-key {lower, upper} objects so edits don't mutate
+    // animBank until Save.
+    _animOverrides: Object.fromEntries(
+      Object.entries(animBank._character_overrides?.[id] || {}).map(([k, v]) => [k, { ...v }])
+    ),
   };
   if (working.body_features.height_cm == null) working.body_features.height_cm = 170;
   if (working.body_composition.body_fat_level == null) working.body_composition.body_fat_level = 0.35;
@@ -148,6 +211,7 @@ function openTemplate(id) {
   renderPersonalityTab();
   renderPhysicalTab();
   renderOutfitTab();
+  renderAnimMappingTab();
   updatePreview();
   setStatus(`Editing ${id}`);
 }
@@ -182,6 +246,7 @@ document.querySelectorAll('.sideTab').forEach(btn => {
     document.getElementById('tab-personality').classList.toggle('hidden', tab !== 'personality');
     document.getElementById('tab-physical').classList.toggle('hidden', tab !== 'physical');
     document.getElementById('tab-outfit').classList.toggle('hidden', tab !== 'outfit');
+    document.getElementById('tab-animations').classList.toggle('hidden', tab !== 'animations');
   });
 });
 
@@ -325,11 +390,18 @@ function fixMixamoSkeletonQuirks(model) {
   });
 }
 
-function updatePreview() {
-  if (!working) return;
+// Mirrors character_gen.py's model resolution exactly -- also used by
+// the Animation Mapping tab to scope which animbank templates are
+// compatible with this character's body mesh (see resolveWorkingModelKey).
+function resolveWorkingModelKey() {
   const ageGroup = deriveAgeGroup(working.age ?? 25);
   const baseModels = definitions.character_base_models || {};
-  const modelKey = working.model || baseModels[working.sex]?.[ageGroup] || `${working.sex}_${ageGroup}_base`;
+  return working.model || baseModels[working.sex]?.[ageGroup] || `${working.sex}_${ageGroup}_base`;
+}
+
+function updatePreview() {
+  if (!working) return;
+  const modelKey = resolveWorkingModelKey();
   const asset = meshbank[modelKey];
 
   if (!asset?.mesh) {
@@ -746,9 +818,98 @@ window.randomizeOutfit = function () {
 };
 
 // =====================================================
+// TAB: ANIMATION MAPPING
+// =====================================================
+// Per-character-TEMPLATE override, one tier more specific than the
+// existing per-shared-model locomotion mapping (animbank.html's Stances
+// panel). Stored in animbank.json's _character_overrides bucket (see
+// saveTemplate()), resolved at runtime by main.js's
+// resolveCharacterOverrideMap(). Each of the 47 ANIM_STATE_GROUPS keys
+// gets independent lower/upper dropdowns so a character can override
+// just the upper body (e.g. a unique "eat" clip) without losing the
+// correct seated lower-body pose that ANIM_LAYERS/the model default
+// would otherwise supply.
+
+function animTemplateOptionsHTML(templates, selected) {
+  let html = `<option value=""${selected ? '' : ' selected'}>— Use default —</option>`;
+  for (const t of templates) {
+    const sel = t.id === selected ? ' selected' : '';
+    html += `<option value="${t.id}"${sel}>${t.name || t.id}</option>`;
+  }
+  return html;
+}
+
+function renderAnimMappingTab() {
+  if (!working) return;
+  const modelKey = resolveWorkingModelKey();
+  const templates = Object.values(animBank._templates || {})
+    .filter(t => t.source_key === modelKey)
+    .sort((a, b) => (a.name || a.id).localeCompare(b.name || b.id));
+
+  const listEl = document.getElementById('animMapList');
+  const searchEl = document.getElementById('animSearch');
+
+  function renderRows() {
+    const term = searchEl.value.trim().toLowerCase();
+    const filterActive = term.length >= 2;
+
+    listEl.innerHTML = '';
+    for (const group of ANIM_STATE_GROUPS) {
+      const visibleKeys = group.keys.filter(k => !filterActive || k.includes(term));
+      if (!visibleKeys.length) continue;
+
+      const titleEl = document.createElement('div');
+      titleEl.className = 'animMapGroupTitle';
+      titleEl.textContent = group.title;
+      listEl.appendChild(titleEl);
+
+      for (const key of visibleKeys) {
+        const row = document.createElement('div');
+        row.className = 'animMapRow';
+
+        const keyLabel = document.createElement('div');
+        keyLabel.className = 'animMapKey';
+        keyLabel.textContent = key;
+        row.appendChild(keyLabel);
+
+        for (const slot of ['lower', 'upper']) {
+          const slotWrap = document.createElement('div');
+          slotWrap.className = 'animMapSlot';
+          const label = document.createElement('label');
+          label.textContent = slot;
+          const select = document.createElement('select');
+          select.innerHTML = animTemplateOptionsHTML(templates, working._animOverrides[key]?.[slot] || '');
+          select.addEventListener('change', () => {
+            const entry = working._animOverrides[key] || {};
+            if (select.value) entry[slot] = select.value;
+            else delete entry[slot];
+            if (Object.keys(entry).length) working._animOverrides[key] = entry;
+            else delete working._animOverrides[key];
+          });
+          slotWrap.append(label, select);
+          row.appendChild(slotWrap);
+        }
+
+        listEl.appendChild(row);
+      }
+    }
+
+    if (!listEl.children.length) {
+      const hint = document.createElement('div');
+      hint.className = 'emptyHint';
+      hint.textContent = 'No matches.';
+      listEl.appendChild(hint);
+    }
+  }
+
+  searchEl.oninput = renderRows;
+  renderRows();
+}
+
+// =====================================================
 // INIT
 // =====================================================
 
 (async function init() {
-  await Promise.all([loadDefinitions(), loadMeshbank()]);
+  await Promise.all([loadDefinitions(), loadMeshbank(), loadAnimBank()]);
 })();
