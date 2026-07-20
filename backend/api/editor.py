@@ -137,6 +137,11 @@ def _spawn_character_locked(sim_id, template_id, x, y, body):
             if tmpl.get("traits"):   overrides["traits"] = tmpl["traits"]
             if tmpl.get("worn"):               overrides["worn"] = tmpl["worn"]
             if tmpl.get("starting_inventory"): overrides["starting_inventory"] = tmpl["starting_inventory"]
+            if tmpl.get("job"):            overrides["job"] = tmpl["job"]
+            if tmpl.get("education"):      overrides["education"] = tmpl["education"]
+            if tmpl.get("current_school"): overrides["current_school"] = tmpl["current_school"]
+            if tmpl.get("work_history"):   overrides["work_history"] = tmpl["work_history"]
+            if tmpl.get("legal"):          overrides["legal"] = tmpl["legal"]
             if tmpl.get("instance"): overrides.update(tmpl["instance"])
             character = generate_character(defs, overrides)
         else:

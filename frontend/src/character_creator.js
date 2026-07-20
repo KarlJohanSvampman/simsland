@@ -14,7 +14,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 // replacing whatever thinner fields (bone_slots etc.) already exist on
 // them -- only the fields this page's tabs manage are touched on save.
 
-let definitions = { character_templates: {}, trait_templates: {}, physical_trait_templates: {}, item_templates: {} };
+let definitions = { character_templates: {}, trait_templates: {}, physical_trait_templates: {}, item_templates: {}, job_templates: {}, school_templates: {} };
 let meshbank = {};
 let animBank = { _templates: {} };
 let currentTemplateId = null;
@@ -54,6 +54,39 @@ const INVENTORY_CATEGORIES = new Set([
   'electronics', 'documents', 'hobby_supplies', 'tools', 'office_supplies',
   'books_media', 'games', 'art_supplies', 'music_instrument', 'misc',
 ]);
+
+// Mirrors backend/systems/character_gen.py's _EDU_RANK vocabulary (post
+// Round-4 fix) -- the same vocabulary job_templates.degree_required and
+// school_templates.education_level already use. "none"/"none_completed"
+// omitted from the picker -- _attained_education() never produces them.
+const EDUCATION_LEVELS = [
+  'preschool', 'primary', 'middle_school', 'high_school', 'trade_school',
+  'certificate', 'associate', 'bachelor', 'master', 'doctorate', 'professional',
+];
+
+const RETIRED_JOB = {
+  id: 'retired', title: 'Retired', industry: null, average_salary: 0,
+  hourly_wage: 0, salary: 0, work_mode: 'none', income_class: 'Low',
+};
+
+// Mirrors _assign_job()'s dict-building exactly (character_gen.py:173-187).
+function jobDictFromTemplate(jid, t) {
+  return {
+    id: jid,
+    title: t.name || jid,
+    industry: t.industry ?? null,
+    income_class: t.income_class ?? null,
+    average_salary: t.average_salary ?? 0,
+    hourly_wage: t.hourly_wage ?? 0,
+    salary: t.salary ?? 0,
+    work_mode: t.work_mode || 'On-site',
+    physical_demand: t.physical_demand ?? 50,
+    social_demand: t.social_demand ?? 50,
+    hazard_level: t.hazard_level || 'Low',
+    illegal: t.illegal || false,
+    adult_industry: t.adult_industry || false,
+  };
+}
 
 // Mirrors frontend/src/main.js's ANIM_LAYERS keys exactly (47 total),
 // grouped the same way as that file's own comment sections. This is the
@@ -202,7 +235,13 @@ function openTemplate(id) {
     _animOverrides: Object.fromEntries(
       Object.entries(animBank._character_overrides?.[id] || {}).map(([k, v]) => [k, { ...v }])
     ),
+    job: raw.job ? { ...raw.job } : null,
+    education: raw.education || '',
+    current_school: raw.current_school || '',
+    work_history: (raw.work_history || []).map(e => ({ ...e })),
+    legal: { status: 'free', jail_until: null, record: [], ...(raw.legal || {}) },
   };
+  working.legal.record = working.legal.record.map(e => ({ ...e }));
   if (working.body_features.height_cm == null) working.body_features.height_cm = 170;
   if (working.body_composition.body_fat_level == null) working.body_composition.body_fat_level = 0.35;
 
@@ -212,6 +251,8 @@ function openTemplate(id) {
   renderPhysicalTab();
   renderOutfitTab();
   renderAnimMappingTab();
+  renderJobsTab();
+  renderLegalTab();
   updatePreview();
   setStatus(`Editing ${id}`);
 }
@@ -247,6 +288,8 @@ document.querySelectorAll('.sideTab').forEach(btn => {
     document.getElementById('tab-physical').classList.toggle('hidden', tab !== 'physical');
     document.getElementById('tab-outfit').classList.toggle('hidden', tab !== 'outfit');
     document.getElementById('tab-animations').classList.toggle('hidden', tab !== 'animations');
+    document.getElementById('tab-jobs').classList.toggle('hidden', tab !== 'jobs');
+    document.getElementById('tab-legal').classList.toggle('hidden', tab !== 'legal');
   });
 });
 
@@ -905,6 +948,199 @@ function renderAnimMappingTab() {
   searchEl.oninput = renderRows;
   renderRows();
 }
+
+// =====================================================
+// GENERALIZED OBJECT-LIST EDITOR (work history / criminal record)
+// =====================================================
+// Modeled on animbank.js's renderChainList/renderNotifyList pattern: one
+// row per list entry with a field-defined input/select per property,
+// wired to mutate the entry in place; a remove button per row; an "add"
+// button that pushes a fresh blank entry. No existing precedent for this
+// in character_creator.js/definitions.js/social_debug.js -- new, but
+// deliberately generic so both callers (work_history, legal.record)
+// share one implementation.
+//
+// fieldDefs: [{key, label, type: 'text'|'number'|'select', options?, placeholder?}]
+function renderObjectListEditor(container, list, fieldDefs, addLabel) {
+  container.innerHTML = '';
+
+  function renderRows() {
+    container.innerHTML = '';
+    if (!list.length) {
+      const hint = document.createElement('div');
+      hint.className = 'emptyHint';
+      hint.textContent = 'None yet.';
+      container.appendChild(hint);
+    }
+    list.forEach((entry, i) => {
+      const row = document.createElement('div');
+      row.className = 'objListRow';
+      for (const def of fieldDefs) {
+        let field;
+        if (def.type === 'select') {
+          field = document.createElement('select');
+          for (const opt of def.options) {
+            const o = document.createElement('option');
+            o.value = opt.value;
+            o.textContent = opt.label;
+            if (entry[def.key] === opt.value) o.selected = true;
+            field.appendChild(o);
+          }
+        } else {
+          field = document.createElement('input');
+          field.type = def.type === 'number' ? 'number' : 'text';
+          field.placeholder = def.placeholder || def.label;
+          field.value = entry[def.key] ?? '';
+          field.style.width = def.type === 'number' ? '80px' : '150px';
+        }
+        field.addEventListener(def.type === 'select' ? 'change' : 'input', () => {
+          entry[def.key] = def.type === 'number' ? (parseInt(field.value) || 0) : field.value;
+        });
+        row.appendChild(field);
+      }
+      const rm = document.createElement('button');
+      rm.className = 'objListRemove';
+      rm.textContent = '✕';
+      rm.onclick = () => { list.splice(i, 1); renderRows(); };
+      row.appendChild(rm);
+      container.appendChild(row);
+    });
+
+    const addBtn = document.createElement('button');
+    addBtn.textContent = '+ ' + (addLabel || 'Add');
+    addBtn.onclick = () => {
+      const blank = {};
+      for (const def of fieldDefs) blank[def.key] = def.type === 'number' ? 0 : (def.options?.[0]?.value ?? '');
+      list.push(blank);
+      renderRows();
+    };
+    container.appendChild(addBtn);
+  }
+
+  renderRows();
+}
+
+// =====================================================
+// TAB: JOBS / EDUCATION
+// =====================================================
+
+const fldJob = document.getElementById('fldJob');
+const jobSearch = document.getElementById('jobSearch');
+const jobInfoNote = document.getElementById('jobInfoNote');
+const fldEducation = document.getElementById('fldEducation');
+const fldSchool = document.getElementById('fldSchool');
+
+function jobOptionsHTML(term) {
+  const filterActive = term.length >= 2;
+  let html = '<option value="">— None / Unemployed —</option>';
+  html += '<option value="retired">Retired</option>';
+  const entries = Object.entries(definitions.job_templates || {})
+    .filter(([id, t]) => !filterActive || (t.name || id).toLowerCase().includes(term) || (t.industry || '').toLowerCase().includes(term))
+    .sort((a, b) => (a[1].name || a[0]).localeCompare(b[1].name || b[0]));
+  for (const [id, t] of entries) {
+    html += `<option value="${id}">${t.name || id}</option>`;
+  }
+  return html;
+}
+
+function renderJobInfoNote() {
+  const j = working.job;
+  jobInfoNote.textContent = j
+    ? `${j.industry || '—'} · $${j.hourly_wage || 0}/hr · ${j.income_class || '—'}`
+    : 'No current job.';
+}
+
+function renderJobsTab() {
+  if (!working) return;
+  fldJob.innerHTML = jobOptionsHTML(jobSearch.value.trim().toLowerCase());
+  fldJob.value = working.job?.id || '';
+  renderJobInfoNote();
+
+  fldEducation.innerHTML = '<option value="">— Unset (random) —</option>' +
+    EDUCATION_LEVELS.map(e => `<option value="${e}">${e.replace(/_/g, ' ')}</option>`).join('');
+  fldEducation.value = working.education || '';
+
+  fldSchool.innerHTML = '<option value="">— None —</option>' +
+    Object.entries(definitions.school_templates || {})
+      .map(([id, t]) => `<option value="${id}">${t.name || id}</option>`).join('');
+  fldSchool.value = working.current_school || '';
+
+  renderObjectListEditor(document.getElementById('workHistoryList'), working.work_history, [
+    { key: 'title', label: 'Title', type: 'text', placeholder: 'Title' },
+    { key: 'industry', label: 'Industry', type: 'text', placeholder: 'Industry' },
+    { key: 'years', label: 'Years', type: 'number' },
+    { key: 'reason_left', label: 'Reason left', type: 'select', options: [
+      { value: 'quit', label: 'Quit' },
+      { value: 'laid_off', label: 'Laid off' },
+      { value: 'career_change', label: 'Career change' },
+    ] },
+  ], 'Add past job');
+}
+
+jobSearch.addEventListener('input', () => {
+  fldJob.innerHTML = jobOptionsHTML(jobSearch.value.trim().toLowerCase());
+  fldJob.value = working.job?.id || '';
+});
+fldJob.addEventListener('change', () => {
+  if (!fldJob.value) working.job = null;
+  else if (fldJob.value === 'retired') working.job = { ...RETIRED_JOB };
+  else working.job = jobDictFromTemplate(fldJob.value, definitions.job_templates[fldJob.value] || {});
+  renderJobInfoNote();
+});
+fldEducation.addEventListener('change', () => { working.education = fldEducation.value; });
+fldSchool.addEventListener('change', () => { working.current_school = fldSchool.value; });
+
+window.randomizeJob = function () {
+  if (!working) return;
+  const ageGroup = deriveAgeGroup(working.age ?? 25);
+  working.education = EDUCATION_LEVELS[Math.floor(Math.random() * EDUCATION_LEVELS.length)];
+  if (ageGroup === 'child') {
+    working.job = null;
+  } else if (ageGroup === 'elderly' && Math.random() < 0.6) {
+    working.job = { ...RETIRED_JOB };
+  } else {
+    const eduRank = EDUCATION_LEVELS.indexOf(working.education);
+    // A job with a degree_required not in EDUCATION_LEVELS (e.g. "none" or
+    // missing) resolves to indexOf() === -1, which is always <= eduRank --
+    // i.e. requires-nothing jobs are always eligible, same as _assign_job()'s
+    // _EDU_RANK.get(..., 0) default-to-lowest-rank behavior.
+    let candidates = Object.entries(definitions.job_templates || {})
+      .filter(([, t]) => EDUCATION_LEVELS.indexOf(t.degree_required) <= eduRank);
+    if (ageGroup === 'teen') {
+      candidates = candidates.filter(([, t]) => t.service_job || ['none', 'high_school', undefined].includes(t.degree_required));
+    }
+    if (candidates.length) {
+      const [id, t] = candidates[Math.floor(Math.random() * candidates.length)];
+      working.job = jobDictFromTemplate(id, t);
+    } else {
+      working.job = null;
+    }
+  }
+  renderJobsTab();
+};
+
+// =====================================================
+// TAB: CRIMINAL RECORD
+// =====================================================
+
+const fldLegalStatus = document.getElementById('fldLegalStatus');
+const fldJailUntil = document.getElementById('fldJailUntil');
+
+function renderLegalTab() {
+  if (!working) return;
+  fldLegalStatus.value = working.legal.status;
+  fldJailUntil.value = working.legal.jail_until ?? '';
+
+  renderObjectListEditor(document.getElementById('legalRecordList'), working.legal.record, [
+    { key: 'crime', label: 'Crime', type: 'text', placeholder: 'Crime' },
+    { key: 'tick', label: 'Tick', type: 'number' },
+  ], 'Add record entry');
+}
+
+fldLegalStatus.addEventListener('change', () => { working.legal.status = fldLegalStatus.value; });
+fldJailUntil.addEventListener('input', () => {
+  working.legal.jail_until = fldJailUntil.value === '' ? null : parseInt(fldJailUntil.value) || 0;
+});
 
 // =====================================================
 // INIT

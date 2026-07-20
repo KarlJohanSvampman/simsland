@@ -359,6 +359,39 @@ button:hover { background: #556170; }
   font-size: 11px;
 }
 
+/* ── OBJECT LIST EDITOR (work history / criminal record) ─── */
+
+.objListRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  margin-bottom: 4px;
+  background: #191d24;
+  border: 1px solid #333;
+  border-radius: 4px;
+}
+
+.objListRow input, .objListRow select {
+  padding: 4px 6px;
+  background: #1a1e28;
+  border: 1px solid #3a4050;
+  color: #eee;
+  border-radius: 3px;
+  font-size: 12px;
+}
+
+.objListRow .objListRemove {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: #999;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 0 4px;
+}
+.objListRow .objListRemove:hover { color: #f66; }
+
 /* ── RIGHT PREVIEW ────────────────────────────── */
 
 #previewPanel {
@@ -430,6 +463,8 @@ button:hover { background: #556170; }
     <button class="sideTab" data-tab="physical">Physical Traits</button>
     <button class="sideTab" data-tab="outfit">Outfit / Equipment</button>
     <button class="sideTab" data-tab="animations">Animation Mapping</button>
+    <button class="sideTab" data-tab="jobs">Jobs / Education</button>
+    <button class="sideTab" data-tab="legal">Criminal Record</button>
   </div>
 
   <div id="tabPanels">
@@ -511,6 +546,60 @@ button:hover { background: #556170; }
       </div>
       <input id="animSearch" class="poolSearch" type="text" placeholder="Search animation states (min 2 chars)..." />
       <div id="animMapList" class="animMapList"></div>
+    </div>
+
+    <!-- JOBS / EDUCATION -->
+    <div id="tab-jobs" class="hidden">
+      <h3 class="tabTitle">Jobs / Education</h3>
+
+      <div class="formRow">
+        <label>Current Job</label>
+        <input id="jobSearch" class="poolSearch" type="text" placeholder="Search jobs (min 2 chars)..." style="max-width:240px;" />
+      </div>
+      <div class="formRow">
+        <label></label>
+        <select id="fldJob" style="max-width:320px;"></select>
+      </div>
+      <div class="deriveNote" id="jobInfoNote">—</div>
+
+      <div class="formRow">
+        <label>Education</label>
+        <select id="fldEducation"></select>
+      </div>
+
+      <div class="formRow">
+        <label>Current School</label>
+        <select id="fldSchool"></select>
+      </div>
+
+      <div style="margin:10px 0 16px;">
+        <button class="randomizeBtn" onclick="window.randomizeJob()">🎲 Randomize Job / Education</button>
+      </div>
+
+      <h4 class="outfitSectionTitle">Work History</h4>
+      <div id="workHistoryList"></div>
+    </div>
+
+    <!-- CRIMINAL RECORD -->
+    <div id="tab-legal" class="hidden">
+      <h3 class="tabTitle">Criminal Record</h3>
+      <div class="deriveNote" style="margin:0 0 12px;">Optional flavor data — mostly inert mechanically today (only affects partner-preference scoring), except jailed status gates movement.</div>
+
+      <div class="formRow">
+        <label>Status</label>
+        <select id="fldLegalStatus">
+          <option value="free">Free</option>
+          <option value="awaiting_trial">Awaiting Trial</option>
+          <option value="jailed">Jailed</option>
+        </select>
+      </div>
+      <div class="formRow">
+        <label>Jail Until (tick)</label>
+        <input type="number" id="fldJailUntil" min="0" style="max-width:240px;" />
+      </div>
+
+      <h4 class="outfitSectionTitle">Record</h4>
+      <div id="legalRecordList"></div>
     </div>
 
   </div>

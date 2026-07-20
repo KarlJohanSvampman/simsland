@@ -8,17 +8,15 @@ import uuid
 TICKS_PER_YEAR = 365 * 24  # ~8760 ticks per simulated year
 
 # ── Education rank (ascending) ────────────────────────────────────────────────
+# Mirrors jobs.py::apply_for_job()'s edu_rank dict exactly -- job_templates'
+# degree_required and school_templates' education_level both use this
+# vocabulary (preschool/primary/trade_school/certificate/...), not the old
+# elementary/some_college one that used to live here and had no matching
+# content anywhere.
 _EDU_RANK = {
-    "none":           0,
-    "elementary":     1,
-    "middle_school":  2,
-    "high_school":    3,
-    "some_college":   4,
-    "associate":      5,
-    "bachelor":       6,
-    "master":         7,
-    "doctorate":      8,
-    "professional":   9,
+    "none": 0, "none_completed": 0, "preschool": 0, "primary": 0,
+    "middle_school": 0, "high_school": 1, "trade_school": 2, "certificate": 2,
+    "associate": 3, "bachelor": 4, "master": 5, "doctorate": 6, "professional": 6,
 }
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -53,15 +51,15 @@ def _random_name(defs, sex):
     return first, last
 
 def _attained_education(age):
-    if age < 10:  return "elementary"
+    if age < 10:  return "primary"
     if age < 13:  return "middle_school"
     if age < 18:  return "high_school"
     r = random.random()
     if r < 0.10:  return "high_school"
-    if r < 0.22:  return "some_college"
+    if r < 0.22:  return "certificate"
     if r < 0.34:  return "associate"
     if r < 0.65:  return "bachelor"
-    if r < 0.80:  return "some_college"
+    if r < 0.80:  return "certificate"
     if r < 0.88:  return "bachelor"
     if r < 0.93:  return "master"
     if r < 0.98:  return "doctorate"
