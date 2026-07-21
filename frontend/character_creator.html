@@ -392,6 +392,48 @@ button:hover { background: #556170; }
 }
 .objListRow .objListRemove:hover { color: #f66; }
 
+/* ── DEBUG TERMINAL ──────────────────────────────── */
+
+.debugTextarea {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 160px;
+  margin-bottom: 8px;
+  padding: 8px;
+  background: #111;
+  color: #00ff99;
+  border: 1px solid #444;
+  font-family: monospace;
+  font-size: 12px;
+  resize: vertical;
+}
+.debugTextareaSmall { min-height: 60px; }
+
+.debugField {
+  margin-bottom: 12px;
+}
+.debugField h5 {
+  margin: 0 0 4px 0;
+  font-size: 11px;
+  color: #6699cc;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.debugField pre {
+  margin: 0;
+  padding: 8px;
+  background: #14181e;
+  border: 1px solid #333;
+  border-radius: 3px;
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 260px;
+  overflow-y: auto;
+}
+.debugField pre.debugError { color: #f77; border-color: #633; }
+.debugField pre.debugValid { color: #7f7; }
+
 /* ── RIGHT PREVIEW ────────────────────────────── */
 
 #previewPanel {
@@ -467,6 +509,8 @@ button:hover { background: #556170; }
     <button class="sideTab" data-tab="legal">Criminal Record</button>
     <button class="sideTab" data-tab="hobbies">Hobbies</button>
     <button class="sideTab" data-tab="household">Household</button>
+    <button class="sideTab" data-tab="llmconfig">LLM Config</button>
+    <button class="sideTab" data-tab="debugterminal">Debug Terminal</button>
   </div>
 
   <div id="tabPanels">
@@ -627,6 +671,34 @@ button:hover { background: #556170; }
         <input type="text" id="newHouseholdName" placeholder="Family name" style="max-width:240px;" />
       </div>
       <button onclick="window.createHousehold()">+ Create Household</button>
+    </div>
+
+    <!-- LLM CONFIG (stub) -->
+    <div id="tab-llmconfig" class="hidden">
+      <h3 class="tabTitle">LLM Config</h3>
+      <div class="deriveNote">Per-character LLM integration config — planned for a future round.</div>
+    </div>
+
+    <!-- DEBUG TERMINAL -->
+    <div id="tab-debugterminal" class="hidden">
+      <h3 class="tabTitle">Debug Terminal</h3>
+      <div class="deriveNote" style="margin:0 0 12px;">Sends the character patch below through the real context builder + system prompt, exactly as the live simulation would — no save or live world needed.</div>
+
+      <h4 class="outfitSectionTitle">Character Patch (JSON)</h4>
+      <textarea id="debugCharPatch" class="debugTextarea" spellcheck="false"></textarea>
+
+      <h4 class="outfitSectionTitle">World Patch (JSON, optional)</h4>
+      <textarea id="debugWorldPatch" class="debugTextarea debugTextareaSmall" spellcheck="false">{}</textarea>
+
+      <h4 class="outfitSectionTitle">System Prompt Override (optional)</h4>
+      <textarea id="debugSystemOverride" class="debugTextarea debugTextareaSmall" spellcheck="false" placeholder="Leave blank to use the real SYSTEM_PROMPT"></textarea>
+
+      <div style="margin:10px 0 16px;">
+        <button class="randomizeBtn" onclick="window.sendDebugPrompt()">▶ Send</button>
+      </div>
+      <div class="deriveNote" id="debugStatus"></div>
+
+      <div id="debugResponse"></div>
     </div>
 
   </div>

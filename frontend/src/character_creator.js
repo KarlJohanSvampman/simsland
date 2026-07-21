@@ -272,6 +272,7 @@ function openTemplate(id) {
   renderLegalTab();
   renderHobbiesTab();
   renderHouseholdTab();
+  renderDebugTab();
   updatePreview();
   setStatus(`Editing ${id}`);
 }
@@ -311,6 +312,8 @@ document.querySelectorAll('.sideTab').forEach(btn => {
     document.getElementById('tab-legal').classList.toggle('hidden', tab !== 'legal');
     document.getElementById('tab-hobbies').classList.toggle('hidden', tab !== 'hobbies');
     document.getElementById('tab-household').classList.toggle('hidden', tab !== 'household');
+    document.getElementById('tab-llmconfig').classList.toggle('hidden', tab !== 'llmconfig');
+    document.getElementById('tab-debugterminal').classList.toggle('hidden', tab !== 'debugterminal');
   });
 });
 
@@ -1222,6 +1225,110 @@ window.createHousehold = async function () {
   } catch (err) {
     console.error(err);
     setStatus('Household creation failed');
+  }
+};
+
+// =====================================================
+// TAB: DEBUG TERMINAL
+// =====================================================
+// POST /debug/llm-test (backend/api/debug.py) merges a `character` patch
+// onto a fully-defaulted skeleton and a `world` patch onto a skeleton
+// world, then runs the REAL build_context() + SYSTEM_PROMPT against it --
+// "the format the simulation will send it" per spec, with no live world
+// or saved template required. Fully stateless -- no prompt-log/char_id
+// concept to wire up, unlike /debug/prompt-send.
+
+const debugCharPatchEl = document.getElementById('debugCharPatch');
+const debugWorldPatchEl = document.getElementById('debugWorldPatch');
+const debugSystemOverrideEl = document.getElementById('debugSystemOverride');
+const debugStatusEl = document.getElementById('debugStatus');
+const debugResponseEl = document.getElementById('debugResponse');
+
+function buildDebugCharPatch() {
+  return {
+    id: 'debug_' + (currentTemplateId || 'preview'),
+    name: working.name || 'Debug Sim',
+    age: working.age ?? 25,
+    sex: working.sex || 'male',
+    traits: working.traits || [],
+    physical_traits: working.physical_traits || [],
+    hobbies: working.hobbies || [],
+    occupation: working.job?.title || 'none',
+    education: working.education || undefined,
+    legal: working.legal || undefined,
+  };
+}
+
+// Only regenerates the default patch when switching to a genuinely
+// different template -- re-opening the same template (or saving it)
+// must not clobber a designer's in-progress hand-edits in the textarea.
+let debugPatchForTemplate = null;
+
+function renderDebugTab() {
+  if (!working) return;
+  if (debugPatchForTemplate !== currentTemplateId) {
+    debugCharPatchEl.value = JSON.stringify(buildDebugCharPatch(), null, 2);
+    debugPatchForTemplate = currentTemplateId;
+  }
+}
+
+function debugField(title, content, cls) {
+  const wrap = document.createElement('div');
+  wrap.className = 'debugField';
+  const h = document.createElement('h5');
+  h.textContent = title;
+  const pre = document.createElement('pre');
+  if (cls) pre.className = cls;
+  pre.textContent = typeof content === 'string' ? content : JSON.stringify(content, null, 2);
+  wrap.append(h, pre);
+  return wrap;
+}
+
+window.sendDebugPrompt = async function () {
+  let character, world;
+  try {
+    character = JSON.parse(debugCharPatchEl.value || '{}');
+  } catch (err) {
+    debugStatusEl.textContent = 'Character patch is not valid JSON: ' + err.message;
+    return;
+  }
+  try {
+    world = JSON.parse(debugWorldPatchEl.value || '{}');
+  } catch (err) {
+    debugStatusEl.textContent = 'World patch is not valid JSON: ' + err.message;
+    return;
+  }
+
+  debugStatusEl.textContent = 'Sending...';
+  debugResponseEl.innerHTML = '';
+
+  try {
+    const res = await fetch('/debug/llm-test', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        character,
+        world,
+        system_prompt_override: debugSystemOverrideEl.value.trim() || null,
+        use_cache: false,
+      }),
+    });
+    const data = await res.json();
+
+    debugStatusEl.textContent = `${data.elapsed_s}s · valid=${data.valid}` +
+      (data.parse_error ? ` · ⚠ ${data.parse_error}` : '');
+
+    debugResponseEl.innerHTML = '';
+    if (data.context_errors && Object.keys(data.context_errors).length) {
+      debugResponseEl.appendChild(debugField('Context Errors', data.context_errors, 'debugError'));
+    }
+    debugResponseEl.appendChild(debugField('System Prompt', data.system_prompt));
+    debugResponseEl.appendChild(debugField('User Prompt (built narrative)', data.user_prompt));
+    debugResponseEl.appendChild(debugField('Raw Response', data.raw_response));
+    debugResponseEl.appendChild(debugField('Parsed Action', data.parsed_action, data.valid ? 'debugValid' : ''));
+  } catch (err) {
+    console.error(err);
+    debugStatusEl.textContent = 'Send failed: ' + err.message;
   }
 };
 
