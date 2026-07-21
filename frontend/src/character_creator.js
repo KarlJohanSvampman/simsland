@@ -14,7 +14,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 // replacing whatever thinner fields (bone_slots etc.) already exist on
 // them -- only the fields this page's tabs manage are touched on save.
 
-let definitions = { character_templates: {}, trait_templates: {}, physical_trait_templates: {}, item_templates: {}, job_templates: {}, school_templates: {} };
+let definitions = { character_templates: {}, trait_templates: {}, physical_trait_templates: {}, item_templates: {}, job_templates: {}, school_templates: {}, hobby_templates: {} };
 let meshbank = {};
 let animBank = { _templates: {} };
 let currentTemplateId = null;
@@ -226,6 +226,7 @@ function openTemplate(id) {
     body_composition: { ...(raw.body_composition || {}) },
     traits: [...(raw.traits || [])],
     physical_traits: [...(raw.physical_traits || [])],
+    hobbies: [...(raw.hobbies || [])],
     worn: { ...(raw.worn || {}) },
     starting_inventory: [...(raw.starting_inventory || [])],
     // Animation overrides live in animbank.json, not definitions.json --
@@ -253,6 +254,7 @@ function openTemplate(id) {
   renderAnimMappingTab();
   renderJobsTab();
   renderLegalTab();
+  renderHobbiesTab();
   updatePreview();
   setStatus(`Editing ${id}`);
 }
@@ -290,6 +292,7 @@ document.querySelectorAll('.sideTab').forEach(btn => {
     document.getElementById('tab-animations').classList.toggle('hidden', tab !== 'animations');
     document.getElementById('tab-jobs').classList.toggle('hidden', tab !== 'jobs');
     document.getElementById('tab-legal').classList.toggle('hidden', tab !== 'legal');
+    document.getElementById('tab-hobbies').classList.toggle('hidden', tab !== 'hobbies');
   });
 });
 
@@ -751,6 +754,24 @@ function renderPhysicalTab() {
     pool,
     () => working.physical_traits,
     (ids) => { working.physical_traits = ids; },
+  );
+}
+
+// =====================================================
+// TAB: HOBBIES
+// =====================================================
+// hobby_templates is schema-clean (name + category, no polarity) --
+// renderPoolPicker needs no changes for this, exactly as anticipated
+// by its own header comment above.
+
+function renderHobbiesTab() {
+  const container = document.getElementById('hobbyPicker');
+  const pool = poolFromTemplates(definitions.hobby_templates);
+  renderPoolPicker(
+    container,
+    pool,
+    () => working.hobbies,
+    (ids) => { working.hobbies = ids; },
   );
 }
 

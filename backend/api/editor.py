@@ -135,6 +135,8 @@ def _spawn_character_locked(sim_id, template_id, x, y, body):
             }
             if tmpl.get("model"):    overrides["model"]  = tmpl["model"]
             if tmpl.get("traits"):   overrides["traits"] = tmpl["traits"]
+            if tmpl.get("physical_traits"): overrides["physical_traits"] = tmpl["physical_traits"]
+            if tmpl.get("hobbies"):         overrides["hobbies"] = tmpl["hobbies"]
             if tmpl.get("worn"):               overrides["worn"] = tmpl["worn"]
             if tmpl.get("starting_inventory"): overrides["starting_inventory"] = tmpl["starting_inventory"]
             if tmpl.get("job"):            overrides["job"] = tmpl["job"]
