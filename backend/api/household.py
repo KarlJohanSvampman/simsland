@@ -23,12 +23,18 @@ def create(sim_id: str, payload: dict):
     with world_lock():
         world = load_world(sim_id)
 
-        mailbox = get_prop_by_id(world, payload["mailbox_prop_id"])
-        if not mailbox:
+        # mailbox_prop_id is optional -- a household is a valid data
+        # record without a physical mailbox (e.g. created ahead of time
+        # from the Character Creator, before any map location exists);
+        # only link one if the caller supplied a real prop id.
+        mailbox_id = payload.get("mailbox_prop_id")
+        mailbox = get_prop_by_id(world, mailbox_id) if mailbox_id else None
+        if mailbox_id and not mailbox:
             return {"ok": False, "error": "mailbox prop not found"}
 
         household = create_household(world, payload.get("name"))
-        mailbox["household_id"] = household["id"]
+        if mailbox:
+            mailbox["household_id"] = household["id"]
 
         save_world(sim_id, world)
         return {"ok": True, "household": household}
@@ -132,6 +138,17 @@ def remove_member(sim_id: str, payload: dict):
 # =========================================================
 # LISTINGS — available floorplans / all characters
 # =========================================================
+
+@router.get("/household/list")
+def list_households(sim_id: str):
+    world = load_world(sim_id)
+
+    households = [
+        {"id": hid, "name": h.get("name"), "member_count": len(h.get("members", []))}
+        for hid, h in world.get("households", {}).items()
+    ]
+    return {"ok": True, "households": households}
+
 
 @router.get("/household/available_buildings")
 def available_buildings(sim_id: str):

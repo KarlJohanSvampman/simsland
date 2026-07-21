@@ -466,6 +466,7 @@ button:hover { background: #556170; }
     <button class="sideTab" data-tab="jobs">Jobs / Education</button>
     <button class="sideTab" data-tab="legal">Criminal Record</button>
     <button class="sideTab" data-tab="hobbies">Hobbies</button>
+    <button class="sideTab" data-tab="household">Household</button>
   </div>
 
   <div id="tabPanels">
@@ -608,6 +609,24 @@ button:hover { background: #556170; }
       <h3 class="tabTitle">Hobbies</h3>
       <div class="deriveNote" style="margin:0 0 4px;">Hobbies affect household budget, social events, and attraction/rivalry — not just flavor.</div>
       <div id="hobbyPicker"></div>
+    </div>
+
+    <!-- HOUSEHOLD -->
+    <div id="tab-household" class="hidden">
+      <h3 class="tabTitle">Household</h3>
+      <div class="deriveNote" style="margin:0 0 12px;">Households are live world objects (created via the World Editor's mailbox, or below) — this list reflects the currently running default simulation, not template data.</div>
+
+      <div class="formRow">
+        <label>Household</label>
+        <select id="fldHousehold" style="max-width:280px;"></select>
+      </div>
+
+      <h4 class="outfitSectionTitle">Create New Household</h4>
+      <div class="formRow">
+        <label>Name</label>
+        <input type="text" id="newHouseholdName" placeholder="Family name" style="max-width:240px;" />
+      </div>
+      <button onclick="window.createHousehold()">+ Create Household</button>
     </div>
 
   </div>

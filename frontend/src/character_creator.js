@@ -17,6 +17,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 let definitions = { character_templates: {}, trait_templates: {}, physical_trait_templates: {}, item_templates: {}, job_templates: {}, school_templates: {}, hobby_templates: {} };
 let meshbank = {};
 let animBank = { _templates: {} };
+let households = [];   // live world["households"], not definitions.json -- see loadHouseholds()
 let currentTemplateId = null;
 let working = null;   // in-memory working copy of the open template
 
@@ -156,6 +157,20 @@ async function loadAnimBank() {
   }
 }
 
+// Households are live world objects, not definitions.json data -- no
+// design-time household_templates bucket exists (nothing to author
+// ahead of time, only assign to what already exists in the running sim).
+async function loadHouseholds() {
+  try {
+    const res = await fetch('/api/household/list?sim_id=default');
+    const data = await res.json();
+    households = data.ok ? data.households : [];
+  } catch (err) {
+    console.warn('Household list load failed', err);
+    households = [];
+  }
+}
+
 window.saveTemplate = async function () {
   if (!currentTemplateId || !working) {
     setStatus('Nothing to save');
@@ -241,6 +256,7 @@ function openTemplate(id) {
     current_school: raw.current_school || '',
     work_history: (raw.work_history || []).map(e => ({ ...e })),
     legal: { status: 'free', jail_until: null, record: [], ...(raw.legal || {}) },
+    household_id: raw.household_id || '',
   };
   working.legal.record = working.legal.record.map(e => ({ ...e }));
   if (working.body_features.height_cm == null) working.body_features.height_cm = 170;
@@ -255,6 +271,7 @@ function openTemplate(id) {
   renderJobsTab();
   renderLegalTab();
   renderHobbiesTab();
+  renderHouseholdTab();
   updatePreview();
   setStatus(`Editing ${id}`);
 }
@@ -293,6 +310,7 @@ document.querySelectorAll('.sideTab').forEach(btn => {
     document.getElementById('tab-jobs').classList.toggle('hidden', tab !== 'jobs');
     document.getElementById('tab-legal').classList.toggle('hidden', tab !== 'legal');
     document.getElementById('tab-hobbies').classList.toggle('hidden', tab !== 'hobbies');
+    document.getElementById('tab-household').classList.toggle('hidden', tab !== 'household');
   });
 });
 
@@ -1164,9 +1182,53 @@ fldJailUntil.addEventListener('input', () => {
 });
 
 // =====================================================
+// TAB: HOUSEHOLD
+// =====================================================
+// Unlike every other tab, this one's picker reflects LIVE world state
+// (world["households"]) fetched via loadHouseholds() -- there's no
+// design-time household_templates bucket to author ahead of time, only
+// existing households in the running default simulation to assign to.
+
+const fldHousehold = document.getElementById('fldHousehold');
+
+function renderHouseholdTab() {
+  if (!working) return;
+  fldHousehold.innerHTML = '<option value="">— None —</option>' +
+    households.map(h => `<option value="${h.id}">${h.name || '(unnamed)'} (${h.member_count} member${h.member_count === 1 ? '' : 's'})</option>`).join('');
+  fldHousehold.value = working.household_id || '';
+}
+
+fldHousehold.addEventListener('change', () => { working.household_id = fldHousehold.value; });
+
+window.createHousehold = async function () {
+  const nameInput = document.getElementById('newHouseholdName');
+  const name = nameInput.value.trim();
+  try {
+    const res = await fetch('/api/household/create?sim_id=default', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: name || null }),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      await loadHouseholds();
+      if (working) working.household_id = data.household.id;
+      renderHouseholdTab();
+      nameInput.value = '';
+      setStatus(`Household "${data.household.name || data.household.id}" created`);
+    } else {
+      setStatus('Household creation failed: ' + (data.error || 'unknown error'));
+    }
+  } catch (err) {
+    console.error(err);
+    setStatus('Household creation failed');
+  }
+};
+
+// =====================================================
 // INIT
 // =====================================================
 
 (async function init() {
-  await Promise.all([loadDefinitions(), loadMeshbank(), loadAnimBank()]);
+  await Promise.all([loadDefinitions(), loadMeshbank(), loadAnimBank(), loadHouseholds()]);
 })();

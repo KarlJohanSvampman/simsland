@@ -144,6 +144,7 @@ def _spawn_character_locked(sim_id, template_id, x, y, body):
             if tmpl.get("current_school"): overrides["current_school"] = tmpl["current_school"]
             if tmpl.get("work_history"):   overrides["work_history"] = tmpl["work_history"]
             if tmpl.get("legal"):          overrides["legal"] = tmpl["legal"]
+            if tmpl.get("household_id"):   overrides["household_id"] = tmpl["household_id"]
             if tmpl.get("instance"): overrides.update(tmpl["instance"])
             character = generate_character(defs, overrides)
         else:
@@ -154,6 +155,19 @@ def _spawn_character_locked(sim_id, template_id, x, y, body):
             character = generate_character(defs, overrides)
 
         world.setdefault("characters", {})[character["id"]] = character
+
+        # generate_character() only sets the character's own pointer --
+        # the household record's members list needs a separate sync or
+        # this character would be a dangling reference the household
+        # itself doesn't know about. No-op if the referenced household
+        # doesn't exist in this particular live world (e.g. a template
+        # built against a different/stale world snapshot).
+        if character.get("household_id"):
+            household = world.get("households", {}).get(character["household_id"])
+            if household:
+                from systems.household_manager import add_member_to_household
+                add_member_to_household(world, character, household)
+
         save_world(sim_id, world)
     return {"ok": True, "id": character["id"], "name": character.get("name")}
 
