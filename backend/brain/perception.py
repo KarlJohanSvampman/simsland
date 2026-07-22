@@ -1192,7 +1192,7 @@ def perceive(
         enriched = dict(other)
 
         enriched["description"] = (
-            build_visible_person_description(
+            systems.perception.descriptions.build_visible_person_description(
                 c,
                 target,
                 world.get(
