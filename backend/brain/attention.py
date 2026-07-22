@@ -178,30 +178,6 @@ def update_social_attention(
 
             strength
         )
-
-        social = c.get(
-            "social",
-            {}
-        )
-
-        rel = social.get(
-            p["id"],
-            {}
-        )
-
-        strength += (
-            rel.get(
-                "tension",
-                0
-            ) * 0.25
-        )
-
-        strength += (
-            rel.get(
-                "attraction",
-                0
-            ) * 0.15
-        )
 # =========================================================
 # SELECT FOCUS
 # =========================================================

@@ -3,6 +3,19 @@ from brain.memory import store_memory
 from core.event_bus import emit
 
 
+# Flat per-crime-type jail sentence (ticks), replacing the previous
+# hardcoded-80-for-everything constant -- still not per-incident-severity
+# (that would need the incident's own severity/injury data threaded through
+# schedule_trial/court_cases, a bigger data-model change), but at least a
+# property_damage conviction no longer costs the same time as an assault.
+_SENTENCE_LENGTH = {
+    "domestic_disturbance": 40,
+    "property_damage":      60,
+    "assault":               120,
+}
+_DEFAULT_SENTENCE = 80
+
+
 def schedule_trial(c, world, crime):
     case = {
         "id":           f"case_{uuid.uuid4().hex[:6]}",
@@ -16,6 +29,11 @@ def schedule_trial(c, world, crime):
     c["legal"]["trial_tick"] = case["trial_tick"]
     store_memory(c, f"Was charged with {crime} and scheduled for trial.", .9,
                  ["law", "trial"], "legal", world["tick"])
+    # This is the actual arrest moment (being charged and awaiting trial) --
+    # previously nothing ever emitted character_arrested, so the reputation
+    # system's "-0.12 arrested" weight (and its already-subscribed handler,
+    # core/event_handlers.py::_on_character_arrested) was unreachable.
+    emit("character_arrested", {"character_id": c["id"], "crime": crime})
     emit("trial_scheduled", {"character_id": c["id"], "case_id": case["id"], "crime": crime})
 
 
@@ -24,7 +42,12 @@ def maybe_arrest_from_incidents(world):
         if inc.get("arrest_checked"):
             continue
         inc["arrest_checked"] = True
-        if inc["type"] in ("domestic_disturbance", "crime", "assault"):
+        # "crime" dropped -- nothing in the codebase ever creates an
+        # incident of that type (see systems/emergency.py's incident
+        # producers); "property_damage" added so vandalism reported via the
+        # destroy action can actually lead to an arrest, not just a logged,
+        # consequence-free incident.
+        if inc["type"] in ("domestic_disturbance", "assault", "property_damage"):
             if random.random() < world["environment"].get("crime_solve_rate", .5):
                 for cid in inc.get("participants", [])[:1]:
                     c = world["characters"].get(cid)
@@ -41,8 +64,9 @@ def process_trials(world):
             continue
         guilty = random.random() < world["environment"].get("crime_solve_rate", .5)
         if guilty:
+            sentence = _SENTENCE_LENGTH.get(case["crime"], _DEFAULT_SENTENCE)
             c["legal"]["status"]    = "jailed"
-            c["legal"]["jail_until"] = world["tick"] + 80
+            c["legal"]["jail_until"] = world["tick"] + sentence
             c["off_grid"]           = True
             c["off_grid_reason"]    = "jail"
             c["status"]["reputation"] -= .25

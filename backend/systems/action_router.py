@@ -1222,22 +1222,6 @@ def _route_confront(c, world, action):
         pass
 
 
-# Incident type → (emergency call type, default report text). Mirrors the
-# mapping auto_report_incidents() (systems/emergency.py) already uses for
-# domestic_disturbance/injury; extended here with assault/fire so a
-# character-initiated call knows what to say for the new incident types
-# this round adds.
-_INCIDENT_CALL_TYPE = {
-    "domestic_disturbance": ("police",  "There is a serious disturbance."),
-    "assault":              ("police",  "Someone was just physically attacked."),
-    "crime":                ("police",  "A crime is in progress."),
-    "injury":               ("medical", "Someone is injured and needs help."),
-    "fire":                 ("fire",    "There's a fire!"),
-    "medical_emergency":    ("medical", "Someone needs urgent medical help."),
-    "property_damage":      ("police",  "Someone is destroying property."),
-}
-
-
 def _route_call_911(c, world, action):
     """
     Character calls 911 about a specific incident they're aware of.
@@ -1270,9 +1254,9 @@ def _route_call_911(c, world, action):
     if not (is_participant or is_nearby):
         return
 
-    emergency_type, report = _INCIDENT_CALL_TYPE.get(
-        incident.get("type"), ("police", "There's an emergency.")
-    )
+    from systems.emergency import INCIDENT_CALL_TYPE
+    entry = INCIDENT_CALL_TYPE.get(incident.get("type"))
+    emergency_type, report = (entry[0], entry[1]) if entry else ("police", "There's an emergency.")
 
     try:
         from systems.emergency import create_911_call

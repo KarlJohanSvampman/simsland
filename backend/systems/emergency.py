@@ -3,6 +3,24 @@ from brain.memory import store_memory
 from core.event_bus import emit
 
 
+# Single source of truth for "which service responds to this incident type,
+# what does the caller say, and how likely is a bystander to report it
+# unprompted" -- previously duplicated (and drifted) between this module's
+# auto_report_incidents() and action_router.py's now-removed
+# _INCIDENT_CALL_TYPE. action_router.py::_route_call_911 imports this same
+# dict rather than keeping its own copy. Only incident types something in
+# the codebase actually creates are listed (dead "injury"/"crime" entries
+# from the old duplicate dict are dropped -- nothing ever creates an
+# incident of either type).
+INCIDENT_CALL_TYPE = {
+    "domestic_disturbance": ("police",  "There is a serious disturbance.",       .2),
+    "assault":              ("police",  "Someone was just physically attacked.", .35),
+    "property_damage":      ("police",  "Someone is destroying property.",       .15),
+    "medical_emergency":    ("medical", "Someone needs urgent medical help.",    .6),
+    "fire":                 ("fire",    "There's a fire!",                       .6),
+}
+
+
 def create_911_call(world, caller, emergency_type, report, incident_id=None):
     call = {
         "id":          f"call_{uuid.uuid4().hex[:6]}",
@@ -182,11 +200,12 @@ def auto_report_incidents(world):
         caller = world["characters"].get(participants[0])
         if not caller:
             continue
-        if inc["type"] == "domestic_disturbance" and random.random() < .2:
-            create_911_call(world, caller, "police", "There is a serious disturbance.")
-            inc["reported"] = True
-        elif inc["type"] == "injury" and random.random() < .4:
-            create_911_call(world, caller, "medical", "Someone is injured and needs help.")
+        entry = INCIDENT_CALL_TYPE.get(inc["type"])
+        if not entry:
+            continue
+        service, report, chance = entry
+        if random.random() < chance:
+            create_911_call(world, caller, service, report, incident_id=inc["id"])
             inc["reported"] = True
 
 
@@ -217,9 +236,28 @@ def resolve(world):
                     if abs(c["x"] - loc["x"]) + abs(c["y"] - loc["y"]) < 4:
                         c["emotional_temperature"] = max(0, c.get("emotional_temperature", 20) - 20)
             elif r["type"] == "medical":
-                for c in world["characters"].values():
-                    if abs(c["x"] - loc["x"]) + abs(c["y"] - loc["y"]) < 4:
-                        c["health"]["treatment"] = "first_response"
+                # The actual payoff of the health-severity spine reaching all
+                # the way to a physical consequence: an ambulance resolving
+                # for a medical_emergency incident now sends anyone still
+                # severe/critical to the hospital (systems/offgrid.py),
+                # instead of writing a health["treatment"] flag nothing ever
+                # read. Only the incident's own participants are checked --
+                # not everyone in the blast radius -- since this ambulance
+                # was dispatched for them specifically.
+                inc = next(
+                    (i for i in world.get("incidents", [])
+                     if i["id"] == r.get("incident_id")),
+                    None,
+                )
+                for cid in (inc.get("participants", []) if inc else []):
+                    patient = world["characters"].get(cid)
+                    if not patient or not patient.get("alive", True):
+                        continue
+                    from systems.health import compute_severity
+                    _, tier = compute_severity(patient)
+                    if tier in ("severe", "critical") and not patient.get("off_grid"):
+                        from systems.offgrid import send_offgrid
+                        send_offgrid(patient, world, "hospital", 90 if tier == "critical" else 45)
             elif r["type"] == "fire":
                 inc = next(
                     (i for i in world.get("incidents", [])

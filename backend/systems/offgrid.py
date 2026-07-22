@@ -312,6 +312,38 @@ def process_return(c, world):
                     meds[med] = {"tick": world["tick"], "treats": cond_key}
                     treated_any.append(med)
                     break
+
+        # A hospital visit (unlike a routine doctor visit) also addresses
+        # acute trauma -- systems/health.py::compute_severity()'s
+        # blade/blunt/burn injuries and blood-loss/pain signals previously
+        # had zero connection to this mechanic, so a character rushed to
+        # hospital for a stabbing came back just as stabbed. Only the
+        # acute-trauma cluster is touched here (unconscious/bleeding/
+        # agonizing_pain, plus the injuries list itself) -- heart_attack/
+        # stroke/coma/cardiac_arrest each have their own dedicated
+        # resolution arcs (resolve_heart_attack/tick_stroke/tick_coma) and
+        # are left alone so this doesn't short-circuit that narrative.
+        # Treatment is substantial but not total, so a severe enough wound
+        # can still need a second visit rather than being trivialized.
+        acute_treated = False
+        if reason == "hospital":
+            hs = c.setdefault("health_state", {})
+            em = hs.setdefault("active_emergencies", {})
+            for key in ("unconscious", "bleeding", "agonizing_pain"):
+                if em.pop(key, None) is not None:
+                    acute_treated = True
+            for inj in hs.get("injuries", []):
+                for field in ("bleeding_severity", "force", "severity"):
+                    if inj.get(field, 0) > 0:
+                        inj[field] = max(0, inj[field] - 0.6)
+                        acute_treated = True
+            if hs.get("total_blood_lost", 0) > 0:
+                hs["total_blood_lost"] = max(0, hs["total_blood_lost"] - 0.5)
+                acute_treated = True
+            if hs.get("pain", 0) > 0:
+                hs["pain"] = max(0, hs["pain"] - 40)
+                acute_treated = True
+
         company = defs.get("company_templates", {}).get(
             "hospital" if reason == "hospital" else "gp_clinic", {})
         lo, hi = company.get("cost_range", [50, 300])
@@ -321,6 +353,8 @@ def process_return(c, world):
             h["wealth"] = max(0, h.get("wealth", 0) - cost)
         if treated_any:
             story["summary"] += f" Was prescribed {', '.join(treated_any)}. Cost ${cost:.0f}."
+        elif acute_treated:
+            story["summary"] += f" Received emergency treatment. Cost ${cost:.0f}."
         else:
             story["summary"] += f" Routine checkup. Cost ${cost:.0f}."
 
