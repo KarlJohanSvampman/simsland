@@ -207,9 +207,9 @@ def _update_nearby_relationships(characters, world):
             if (abs(c.get("x", 0) - o.get("x", 0)) +
                     abs(c.get("y", 0) - o.get("y", 0))) <= _RELATIONSHIP_RADIUS:
                 first_impression(c, o)
-                update_relationship_state(c, o)
+                update_relationship_state(c, o["id"])
                 first_impression(o, c)
-                update_relationship_state(o, c)
+                update_relationship_state(o, c["id"])
 
 
 # =========================================================
