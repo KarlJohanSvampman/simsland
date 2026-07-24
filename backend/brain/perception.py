@@ -136,7 +136,7 @@ def line_of_sight(a, b, world):
 
     x, y = x0, y0
 
-    n = 1 + dx + dy
+    n = int(dx + dy) + 1
 
     x_inc = 1 if x1 > x0 else -1
     y_inc = 1 if y1 > y0 else -1

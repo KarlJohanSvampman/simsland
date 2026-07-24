@@ -1,6 +1,7 @@
 import random, uuid
 from brain.memory import store_memory
 from core.event_bus import emit
+from systems.offgrid import send_offgrid
 
 
 # Flat per-crime-type jail sentence (ticks), replacing the previous
@@ -65,10 +66,14 @@ def process_trials(world):
         guilty = random.random() < world["environment"].get("crime_solve_rate", .5)
         if guilty:
             sentence = _SENTENCE_LENGTH.get(case["crime"], _DEFAULT_SENTENCE)
+            # Must run before legal.status flips to "jailed" -- send_offgrid's
+            # own guard no-ops if it's already "jailed", which previously
+            # meant return_tick never got set here at all (process_return()
+            # would then fire one tick after sentencing instead of waiting
+            # out the sentence).
+            send_offgrid(c, world, "jail", sentence)
             c["legal"]["status"]    = "jailed"
             c["legal"]["jail_until"] = world["tick"] + sentence
-            c["off_grid"]           = True
-            c["off_grid_reason"]    = "jail"
             c["status"]["reputation"] -= .25
             c["legal"].setdefault("record", []).append({"crime": case["crime"], "tick": world["tick"]})
             store_memory(c, f"Was found guilty of {case['crime']} and sent to jail.", .95,

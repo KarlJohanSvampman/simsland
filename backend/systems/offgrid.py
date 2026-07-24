@@ -1,5 +1,33 @@
 import random, uuid
 from brain.memory import store_memory
+from systems.offgrid_narrative import request_offgrid_summary, roll_normalcy, _find_trip_cover_lie
+
+# ── LLM narrator pilot ──────────────────────────────────────────────────────
+# First category migrated off the procedural _story() dice-roller onto the
+# real narrator pipeline (systems/offgrid_narrative.py) -- chosen because it
+# needs no new data plumbing (no coworker/venue/inmate lookups to build),
+# so the pipeline itself gets proven before other categories migrate in
+# later rounds. Everything else still resolves via _story() below.
+_PILOT_CATEGORIES = {"shopping", "leisure", "gym", "cafe", "job_search"}
+_PILOT_NORMALCY_WEIGHTS = {"normal": 0.85, "notable": 0.13, "rare": 0.02}
+_VENUE_FLAVOR = {
+    "shopping":   ["the mall", "a corner store", "a big-box store", "an outdoor market"],
+    "leisure":    ["a park", "a movie theater", "downtown", "a friend's neighborhood"],
+    "gym":        ["the gym"],
+    "cafe":       ["a coffee shop", "a diner"],
+    "job_search": ["a job fair", "a few offices downtown", "a staffing agency"],
+}
+
+
+def _shopping_leisure_details(c, world, reason):
+    """Stage-1 detail generator for the pilot category -- deliberately thin,
+    since no venue/participant data exists for these reasons today
+    (maybe_go_offgrid() sends characters off with only a reason string)."""
+    return {
+        "reason": reason,
+        "venue_flavor": random.choice(_VENUE_FLAVOR.get(reason, ["somewhere in town"])),
+    }
+
 
 # ── Private event catalogue ────────────────────────────────────────────────
 # Each entry: (tag_or_trait, activity_key, description_template, fear_tag)
@@ -269,16 +297,43 @@ def process_return(c, world):
         return
 
     reason = c.get("off_grid_reason") or "outing"
-    story  = _story(c, world, reason)
 
-    # Generate private events — things that happened but mustn't get out
-    private_events = _private_story(c, world, reason)
-    if private_events:
-        story["private"] = private_events
-        # Pre-seed cover lies for vice/context/location events
+    if reason in _PILOT_CATEGORIES:
+        # New LLM narrator pipeline. Private events + lie-seeding run FIRST
+        # (unlike the branch below) so the public narration can be made
+        # consistent with any cover story that results -- the old order
+        # (public story before private/lies) meant no lie existed yet when
+        # the public account was built.
+        private_events = _private_story(c, world, reason)
         for ev in private_events:
             if ev.get("source") in ("vice", "context", "location"):
                 ev["lie_id"] = _seed_lie_for_private_event(c, world, ev)
+
+        cover_story = _find_trip_cover_lie(c, world["tick"])
+        details     = _shopping_leisure_details(c, world, reason)
+        normalcy    = roll_normalcy(_PILOT_NORMALCY_WEIGHTS)
+
+        story = request_offgrid_summary(
+            c, world, reason, details, normalcy,
+            enforced_cover_story=cover_story,
+        )
+        if story is None:
+            # LLM unreachable/failed -- graceful fallback to the existing
+            # procedural narrator.
+            story = _story(c, world, reason)
+        if private_events:
+            story["private"] = private_events
+    else:
+        story = _story(c, world, reason)
+
+        # Generate private events — things that happened but mustn't get out
+        private_events = _private_story(c, world, reason)
+        if private_events:
+            story["private"] = private_events
+            # Pre-seed cover lies for vice/context/location events
+            for ev in private_events:
+                if ev.get("source") in ("vice", "context", "location"):
+                    ev["lie_id"] = _seed_lie_for_private_event(c, world, ev)
 
     c["off_grid"]        = False
     c["off_grid_reason"] = None

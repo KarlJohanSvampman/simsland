@@ -9,6 +9,8 @@ import random
 
 from systems.activities import get_phase_animation, get_clean_animation
 from systems.navigation import plan_character_route
+from systems.offgrid import send_offgrid
+from core.tick_schedule import TICK_RATE_SECONDS
 
 
 # =========================================================
@@ -2804,9 +2806,12 @@ def _route_social_event_attend(c, world, action):
                 item["cash"] = round(cash - cost, 2)
                 break
     rsvp(c, world, event_id, "yes")
-    c["off_grid"]       = True
-    c["off_grid_reason"] = f"event:{event_id}"
-    c["off_grid_until"] = evt.get("end_ts") or (evt.get("start_ts", time.time()) + 3 * 3600)
+    # duration in ticks, not off_grid_until (a real timestamp nothing ever
+    # read) -- process_return() only waits on return_tick.
+    now            = time.time()
+    end_ts         = evt.get("end_ts") or (evt.get("start_ts", now) + 3 * 3600)
+    duration_ticks = max(1, int((end_ts - now) / TICK_RATE_SECONDS))
+    send_offgrid(c, world, f"event:{event_id}", duration_ticks)
 
 
 def _route_social_event_plan(c, world, action):
