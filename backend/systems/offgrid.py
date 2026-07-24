@@ -2,14 +2,14 @@ import random, uuid
 from brain.memory import store_memory
 from systems.offgrid_narrative import request_offgrid_summary, roll_normalcy, _find_trip_cover_lie
 
-# ── LLM narrator pilot ──────────────────────────────────────────────────────
-# First category migrated off the procedural _story() dice-roller onto the
-# real narrator pipeline (systems/offgrid_narrative.py) -- chosen because it
-# needs no new data plumbing (no coworker/venue/inmate lookups to build),
-# so the pipeline itself gets proven before other categories migrate in
-# later rounds. Everything else still resolves via _story() below.
-_PILOT_CATEGORIES = {"shopping", "leisure", "gym", "cafe", "job_search"}
-_PILOT_NORMALCY_WEIGHTS = {"normal": 0.85, "notable": 0.13, "rare": 0.02}
+# ── LLM narrator ─────────────────────────────────────────────────────────────
+# Off-grid categories migrated off the procedural _story() dice-roller onto
+# the real narrator pipeline (systems/offgrid_narrative.py). Each category
+# owns a stage-1 detail generator (c, world, reason, normalcy) -> dict and
+# its own normalcy weights; _NARRATOR_CATEGORIES is the registry
+# process_return() dispatches through. Categories not in this registry
+# still resolve via _story() below.
+_ERRANDS_NORMALCY_WEIGHTS = {"normal": 0.85, "notable": 0.13, "rare": 0.02}
 _VENUE_FLAVOR = {
     "shopping":   ["the mall", "a corner store", "a big-box store", "an outdoor market"],
     "leisure":    ["a park", "a movie theater", "downtown", "a friend's neighborhood"],
@@ -19,14 +19,78 @@ _VENUE_FLAVOR = {
 }
 
 
-def _shopping_leisure_details(c, world, reason):
-    """Stage-1 detail generator for the pilot category -- deliberately thin,
-    since no venue/participant data exists for these reasons today
+def _shopping_leisure_details(c, world, reason, normalcy):
+    """Stage-1 detail generator for the errands categories -- deliberately
+    thin, since no venue/participant data exists for these reasons today
     (maybe_go_offgrid() sends characters off with only a reason string)."""
     return {
         "reason": reason,
         "venue_flavor": random.choice(_VENUE_FLAVOR.get(reason, ["somewhere in town"])),
     }
+
+
+_WORK_NORMALCY_WEIGHTS = {"normal": 0.82, "notable": 0.15, "rare": 0.03}
+_WORK_SITUATIONAL_HOOKS = [
+    "a customer or client complained about something",
+    "a piece of equipment broke down",
+    "got praised by a manager for something",
+    "a coworker called in sick, leaving things short-staffed",
+    "there was an unannounced inspection or visit",
+    "a deadline got moved up unexpectedly",
+    "there was a mix-up with a delivery or order",
+]
+
+
+def _find_colleagues(c, world, limit=3):
+    """
+    Best-effort "who else works with this character" -- there is no real
+    per-company employee roster in this codebase: c["company_id"] is only
+    ever set via jobs.py::process_interview() (characters hired through the
+    job-market flow), and c["job"] itself carries no company reference at
+    all. Falls back to same-industry characters as a colleague proxy when
+    no literal company match exists.
+    """
+    job = c.get("job") or {}
+    my_company = c.get("company_id")
+    my_industry = job.get("industry")
+
+    same_company, same_industry = [], []
+    for oc in world.get("characters", {}).values():
+        if oc.get("id") == c.get("id"):
+            continue
+        if my_company and oc.get("company_id") == my_company:
+            same_company.append(oc)
+        elif my_industry and (oc.get("job") or {}).get("industry") == my_industry:
+            same_industry.append(oc)
+
+    pool = same_company or same_industry
+    random.shuffle(pool)
+    return [oc.get("name", "a coworker") for oc in pool[:limit]]
+
+
+def _work_details(c, world, reason, normalcy):
+    """Stage-1 detail generator for work. A situational hook is only
+    included on notable/rare normalcy rolls -- a normal day gets none."""
+    job = c.get("job") or {}
+    details = {
+        "reason": "work",
+        "job_title": job.get("title", "their job"),
+        "industry": job.get("industry"),
+        "coworkers_present": _find_colleagues(c, world),
+    }
+    if normalcy != "normal":
+        details["situational_hook"] = random.choice(_WORK_SITUATIONAL_HOOKS)
+    return details
+
+
+_NARRATOR_CATEGORIES = {
+    "shopping":   (_shopping_leisure_details, _ERRANDS_NORMALCY_WEIGHTS),
+    "leisure":    (_shopping_leisure_details, _ERRANDS_NORMALCY_WEIGHTS),
+    "gym":        (_shopping_leisure_details, _ERRANDS_NORMALCY_WEIGHTS),
+    "cafe":       (_shopping_leisure_details, _ERRANDS_NORMALCY_WEIGHTS),
+    "job_search": (_shopping_leisure_details, _ERRANDS_NORMALCY_WEIGHTS),
+    "work":       (_work_details,             _WORK_NORMALCY_WEIGHTS),
+}
 
 
 # ── Private event catalogue ────────────────────────────────────────────────
@@ -298,7 +362,7 @@ def process_return(c, world):
 
     reason = c.get("off_grid_reason") or "outing"
 
-    if reason in _PILOT_CATEGORIES:
+    if reason in _NARRATOR_CATEGORIES:
         # New LLM narrator pipeline. Private events + lie-seeding run FIRST
         # (unlike the branch below) so the public narration can be made
         # consistent with any cover story that results -- the old order
@@ -310,8 +374,9 @@ def process_return(c, world):
                 ev["lie_id"] = _seed_lie_for_private_event(c, world, ev)
 
         cover_story = _find_trip_cover_lie(c, world["tick"])
-        details     = _shopping_leisure_details(c, world, reason)
-        normalcy    = roll_normalcy(_PILOT_NORMALCY_WEIGHTS)
+        details_fn, weights = _NARRATOR_CATEGORIES[reason]
+        normalcy = roll_normalcy(weights)
+        details  = details_fn(c, world, reason, normalcy)
 
         story = request_offgrid_summary(
             c, world, reason, details, normalcy,
