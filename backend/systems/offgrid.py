@@ -83,6 +83,55 @@ def _work_details(c, world, reason, normalcy):
     return details
 
 
+_DOCTOR_NORMALCY_WEIGHTS   = {"normal": 0.90, "notable": 0.09, "rare": 0.01}
+_HOSPITAL_NORMALCY_WEIGHTS = {"normal": 0.55, "notable": 0.30, "rare": 0.15}
+_MEDICAL_SITUATIONAL_HOOKS = {
+    "doctor": [
+        "the waiting room was unusually crowded",
+        "the doctor ordered an extra test",
+        "there was a mix-up with the appointment scheduling",
+        "the doctor mentioned something unexpected",
+    ],
+    "hospital": [
+        "the ER was busy when they arrived",
+        "a complication came up during treatment",
+        "the stay ran longer than expected",
+        "a nurse or doctor took extra time to explain things",
+    ],
+}
+
+
+def _medical_details(c, world, reason, normalcy):
+    """
+    Stage-1 detail generator for doctor/hospital visits. No real clinic or
+    hospital identity data exists in this codebase -- company_templates
+    isn't populated in this checked-out repo (process_return()'s own
+    cost_range lookup already defends against that with a fallback range)
+    -- so this stays grounded in what's actually tracked: which conditions
+    are being treated and how severe things currently are.
+    """
+    from core.definitions import load_definitions
+    from systems.health import compute_severity
+
+    defs = load_definitions(world.get("sim_id", "default"))
+    ph_templates = defs.get("physical_health_templates", {})
+
+    conditions = [
+        ph_templates.get(cond_key, {}).get("name", cond_key)
+        for cond_key in c.get("physical_health", [])
+    ]
+    _, tier = compute_severity(c)
+
+    details = {
+        "reason": reason,
+        "conditions_being_treated": conditions or ["a general checkup"],
+        "severity_tier": tier,
+    }
+    if normalcy != "normal":
+        details["situational_hook"] = random.choice(_MEDICAL_SITUATIONAL_HOOKS[reason])
+    return details
+
+
 _NARRATOR_CATEGORIES = {
     "shopping":   (_shopping_leisure_details, _ERRANDS_NORMALCY_WEIGHTS),
     "leisure":    (_shopping_leisure_details, _ERRANDS_NORMALCY_WEIGHTS),
@@ -90,6 +139,8 @@ _NARRATOR_CATEGORIES = {
     "cafe":       (_shopping_leisure_details, _ERRANDS_NORMALCY_WEIGHTS),
     "job_search": (_shopping_leisure_details, _ERRANDS_NORMALCY_WEIGHTS),
     "work":       (_work_details,             _WORK_NORMALCY_WEIGHTS),
+    "doctor":     (_medical_details,          _DOCTOR_NORMALCY_WEIGHTS),
+    "hospital":   (_medical_details,          _HOSPITAL_NORMALCY_WEIGHTS),
 }
 
 
