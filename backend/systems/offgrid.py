@@ -1,5 +1,6 @@
 import random, uuid
 from brain.memory import store_memory
+from core.event_bus import emit
 from systems.offgrid_narrative import request_offgrid_summary, roll_normalcy, _find_trip_cover_lie
 
 # ── LLM narrator ─────────────────────────────────────────────────────────────
@@ -132,6 +133,48 @@ def _medical_details(c, world, reason, normalcy):
     return details
 
 
+# Higher variance than the other categories -- jail time has more inherent
+# tension than a shopping trip, so "notable"/"rare" are rolled more often.
+_JAIL_NORMALCY_WEIGHTS = {"normal": 0.70, "notable": 0.22, "rare": 0.08}
+_JAIL_SITUATIONAL_HOOKS = [
+    "got into a tense confrontation with another inmate",
+    "made an unlikely ally among the other inmates",
+    "had a rough encounter with a guard",
+    "spent time in solitary for a rule violation",
+    "helped someone out and earned a bit of respect",
+    "kept mostly to themselves and stayed out of trouble",
+]
+
+
+def _find_fellow_inmates(c, world, limit=2):
+    """Best-effort 'who else is in jail right now' proxy -- there is no real
+    jail/facility model in this codebase (c["legal"] tracks only status/
+    jail_until/record, no location or inmate roster)."""
+    pool = [
+        oc for oc in world.get("characters", {}).values()
+        if oc.get("id") != c.get("id") and oc.get("legal", {}).get("status") == "jailed"
+    ]
+    random.shuffle(pool)
+    return [oc.get("name", "another inmate") for oc in pool[:limit]]
+
+
+def _jail_details(c, world, reason, normalcy):
+    """Stage-1 detail generator for jail. Crime comes from the most recent
+    legal.record entry -- schedule_trial()/process_trials() append to it at
+    the exact moment this sentence was handed down, so the last entry is
+    always this stint's crime."""
+    record = c.get("legal", {}).get("record", [])
+    crime = record[-1]["crime"] if record else "an offense"
+    details = {
+        "reason": "jail",
+        "crime": crime,
+        "fellow_inmates": _find_fellow_inmates(c, world),
+    }
+    if normalcy != "normal":
+        details["situational_hook"] = random.choice(_JAIL_SITUATIONAL_HOOKS)
+    return details
+
+
 _NARRATOR_CATEGORIES = {
     "shopping":   (_shopping_leisure_details, _ERRANDS_NORMALCY_WEIGHTS),
     "leisure":    (_shopping_leisure_details, _ERRANDS_NORMALCY_WEIGHTS),
@@ -141,6 +184,7 @@ _NARRATOR_CATEGORIES = {
     "work":       (_work_details,             _WORK_NORMALCY_WEIGHTS),
     "doctor":     (_medical_details,          _DOCTOR_NORMALCY_WEIGHTS),
     "hospital":   (_medical_details,          _HOSPITAL_NORMALCY_WEIGHTS),
+    "jail":       (_jail_details,             _JAIL_NORMALCY_WEIGHTS),
 }
 
 
@@ -414,6 +458,19 @@ def process_return(c, world):
     reason = c.get("off_grid_reason") or "outing"
 
     if reason in _NARRATOR_CATEGORIES:
+        if reason == "jail":
+            # law.py::process_jail() only checks jail_until on a cadence
+            # (CADENCE["trials"], ~every 60 ticks), while this function
+            # checks return_tick every tick -- since Round 0's fix made
+            # jail_until and return_tick the same value, this function now
+            # reliably wins the race and would otherwise leave
+            # legal.status=="jailed" for up to ~60 ticks after off_grid
+            # actually clears below. Release immediately so the two never
+            # drift apart; process_jail()'s own release becomes a safe
+            # no-op afterward (its guard requires status=="jailed").
+            c["legal"]["status"] = "free"
+            emit("character_released", {"character_id": c["id"]})
+
         # New LLM narrator pipeline. Private events + lie-seeding run FIRST
         # (unlike the branch below) so the public narration can be made
         # consistent with any cover story that results -- the old order
