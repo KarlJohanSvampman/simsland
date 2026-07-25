@@ -175,6 +175,64 @@ def _jail_details(c, world, reason, normalcy):
     return details
 
 
+# Social events are more eventful than a routine errand -- gatherings are
+# where drama/chemistry/conflict actually happens -- so this skews closer
+# to jail's variance than the errand categories.
+_SOCIAL_EVENT_NORMALCY_WEIGHTS = {"normal": 0.60, "notable": 0.28, "rare": 0.12}
+_SOCIAL_EVENT_SITUATIONAL_HOOKS = [
+    "had a great conversation with someone new",
+    "there was some tension between two attendees",
+    "ran into someone unexpected",
+    "the event ran later than planned",
+    "something about the venue or setup went wrong",
+    "made a real connection with someone there",
+]
+
+
+def _social_event_details(c, world, reason, normalcy):
+    """
+    Stage-1 detail generator for social events. reason is
+    f"event:{event_id}" (see action_router.py::_route_social_event_attend)
+    -- unlike every other off-grid category, real event data (title,
+    category, location, who else is attending) already exists in
+    social_events.py, so this is mostly a matter of reading it rather than
+    building a proxy.
+    """
+    from systems.social_events import get_event
+
+    event_id = reason.split(":", 1)[1] if ":" in reason else None
+    evt = get_event(world, event_id) if event_id else None
+    if not evt:
+        return {"reason": "social_event", "title": "a social event"}
+
+    chars = world.get("characters", {})
+    other_attendees = [
+        chars[cid].get("name", "someone")
+        for cid, resp in evt.get("attendees", {}).items()
+        if resp == "yes" and cid != c.get("id") and cid in chars
+    ]
+
+    details = {
+        "reason": "social_event",
+        "title": evt.get("title", "a social event"),
+        "category": evt.get("category", "other"),
+        "location": evt.get("location", "somewhere"),
+        "description": evt.get("description", ""),
+        "other_attendees": other_attendees[:4],
+    }
+    if normalcy != "normal":
+        details["situational_hook"] = random.choice(_SOCIAL_EVENT_SITUATIONAL_HOOKS)
+    return details
+
+
+# Not a literal off_grid_reason key like the others -- reason for events is
+# dynamic (f"event:{event_id}"), matched by prefix in process_return() and
+# bucketed under this one stable category name so continuity accumulates
+# across every event attended, rather than each unique event id getting
+# its own single-use, never-reused memory bucket.
+_SOCIAL_EVENT_NARRATOR = (_social_event_details, _SOCIAL_EVENT_NORMALCY_WEIGHTS)
+
+
 _NARRATOR_CATEGORIES = {
     "shopping":   (_shopping_leisure_details, _ERRANDS_NORMALCY_WEIGHTS),
     "leisure":    (_shopping_leisure_details, _ERRANDS_NORMALCY_WEIGHTS),
@@ -456,8 +514,9 @@ def process_return(c, world):
         return
 
     reason = c.get("off_grid_reason") or "outing"
+    is_event = reason.startswith("event:")
 
-    if reason in _NARRATOR_CATEGORIES:
+    if reason in _NARRATOR_CATEGORIES or is_event:
         if reason == "jail":
             # law.py::process_jail() only checks jail_until on a cadence
             # (CADENCE["trials"], ~every 60 ticks), while this function
@@ -482,18 +541,27 @@ def process_return(c, world):
                 ev["lie_id"] = _seed_lie_for_private_event(c, world, ev)
 
         cover_story = _find_trip_cover_lie(c, world["tick"])
-        details_fn, weights = _NARRATOR_CATEGORIES[reason]
+        if is_event:
+            details_fn, weights = _SOCIAL_EVENT_NARRATOR
+            category = "social_event"
+        else:
+            details_fn, weights = _NARRATOR_CATEGORIES[reason]
+            category = reason
         normalcy = roll_normalcy(weights)
         details  = details_fn(c, world, reason, normalcy)
 
         story = request_offgrid_summary(
-            c, world, reason, details, normalcy,
+            c, world, category, details, normalcy,
             enforced_cover_story=cover_story,
         )
         if story is None:
             # LLM unreachable/failed -- graceful fallback to the existing
-            # procedural narrator.
-            story = _story(c, world, reason)
+            # procedural narrator. _story() doesn't recognize the dynamic
+            # "event:<id>" reason format (would render it literally, e.g.
+            # "had a routine event:evt_a1b2c3 trip"), so events fall back
+            # to a clean generic label instead -- same "social_event"
+            # framing the success path already uses for tags.
+            story = _story(c, world, "social event" if is_event else reason)
         if private_events:
             story["private"] = private_events
     else:
