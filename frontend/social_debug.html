@@ -168,16 +168,13 @@ html,body { width:100%; height:100%; overflow:hidden; background:#1a1e24; color:
   <h1>💬 Social Sandbox</h1>
   <button class="topBtn" onclick="window.location='/definitions.html'">← Editor</button>
   <div class="sep"></div>
-  <label style="font-size:11px;color:#778">Scenario</label>
-  <select id="scenarioSelect">
-    <option value="conversation">Conversation</option>
-    <option value="group_conversation">Group Conversation</option>
-  </select>
-  <button class="topBtn go" id="btnStart" onclick="startScenario()">▶ Start</button>
-  <button class="topBtn" id="btnPause" onclick="pauseScenario()" disabled>⏸ Pause</button>
-  <button class="topBtn danger" id="btnStop" onclick="stopScenario()" disabled>■ Stop</button>
+  <label style="font-size:11px;color:#778">Turn</label>
+  <select id="turnCharSelect" title="Whose turn is next"></select>
+  <button class="topBtn go" id="btnStart" onclick="startScenario()">▶ Next Turn</button>
+  <button class="topBtn" id="btnPause" onclick="pauseScenario()" disabled>🔁 Auto: Off</button>
+  <button class="topBtn danger" id="btnStop" onclick="stopScenario()" disabled>■ Stop Auto</button>
   <div class="sep"></div>
-  <span id="speedLabel">Interval: <b id="speedVal">8</b>s</span>
+  <span id="speedLabel">Auto interval: <b id="speedVal">8</b>s</span>
   <input id="speedSlider" type="range" min="2" max="60" value="8" oninput="document.getElementById('speedVal').textContent=this.value; speechInterval=+this.value">
   <div class="sep"></div>
   <button class="topBtn danger" id="btnEscalate" onclick="triggerEscalation()" disabled>⚡ Escalate</button>
@@ -204,43 +201,26 @@ html,body { width:100%; height:100%; overflow:hidden; background:#1a1e24; color:
     <!-- Spawner drawer -->
     <div id="spawnerDrawer">
       <div id="spawnerToggle" onclick="toggleSpawner()">
-        <b>＋ Character Spawner</b>
+        <b>＋ Stage Character</b>
         <span id="spawnerArrow">▲</span>
       </div>
       <div id="spawnerForm">
         <div class="spawnerField">
-          <label>Name</label>
-          <input id="spName" placeholder="e.g. Alex" style="width:100px">
+          <label>Template</label>
+          <select id="spTemplate" style="width:180px"></select>
         </div>
-        <div class="spawnerField">
-          <label>Sex</label>
-          <select id="spSex">
-            <option value="male">Male</option>
-            <option value="female">Female</option>
-            <option value="other">Other</option>
-          </select>
+        <button id="spawnBtn" onclick="stageSelectedTemplate()">＋ Stage</button>
+        <span id="stageStatus" style="font-size:11px;color:#556;align-self:center"></span>
+      </div>
+      <div id="absentSection" style="padding:6px 10px 10px;border-top:1px solid #2a3040">
+        <div style="font-size:11px;color:#778;margin-bottom:4px;">Absent relationships (mocked, not staged)</div>
+        <div id="absentList" style="display:flex;flex-direction:column;gap:3px;margin-bottom:6px;"></div>
+        <div class="spawnerField" style="flex-wrap:wrap">
+          <select id="absentRelTo" style="width:110px"></select>
+          <input id="absentName" placeholder="Name" style="width:90px">
+          <input id="absentLabel" placeholder="e.g. mother" style="width:80px">
+          <button onclick="addAbsentRelationship()" style="font-size:11px">+ Add</button>
         </div>
-        <div class="spawnerField">
-          <label>Age</label>
-          <input id="spAge" type="number" value="28" min="16" max="90">
-        </div>
-        <div class="spawnerField">
-          <label>Starting Mood</label>
-          <select id="spMood"></select>
-        </div>
-        <div class="spawnerField">
-          <label>Traits (pick up to 5)</label>
-          <div class="chipArea" id="traitChips"></div>
-        </div>
-        <div class="spawnerField">
-          <label>Hobbies (pick up to 3)</label>
-          <div class="chipArea" id="hobbyChips"></div>
-        </div>
-        <div class="spawnerField">
-          <label>Appearance notes</label>
-          <input id="spAppearance" placeholder="tall, dark hair..." style="width:140px">
-        </div>
-        <button id="spawnBtn" onclick="spawnCharacter()">＋ Spawn</button>
       </div>
     </div>
   </div>
@@ -278,6 +258,7 @@ html,body { width:100%; height:100%; overflow:hidden; background:#1a1e24; color:
       <div class="tab" data-tab="template"   onclick="switchTab(this)">Template</div>
       <div class="tab" data-tab="log"        onclick="switchTab(this)">Log</div>
       <div class="tab" data-tab="prompts"    onclick="switchTab(this)">Prompts</div>
+      <div class="tab" data-tab="offgrid"    onclick="switchTab(this)">Offgrid</div>
       <div class="tab" data-tab="family"     onclick="switchTab(this)">Family</div>
     </div>
     <div id="tabContent">
@@ -331,6 +312,47 @@ html,body { width:100%; height:100%; overflow:hidden; background:#1a1e24; color:
           <div style="font-size:11px;color:#778;margin:8px 0 3px;">Response</div>
           <pre id="promptResponseBox" style="background:#111;border:1px solid #2e3440;color:#aef;padding:8px;border-radius:4px;font-size:11px;max-height:220px;overflow:auto;white-space:pre-wrap;word-break:break-all;">—</pre>
         </div>
+      </div>
+
+      <!-- Offgrid tab -->
+      <div id="tab-offgrid" style="display:none">
+        <div class="fieldGrid">
+          <label>Category</label>
+          <select id="offgridCategory" onchange="document.getElementById('offgridEventRow').style.display = this.value==='event' ? '' : 'none'">
+            <option value="shopping">shopping</option>
+            <option value="leisure">leisure</option>
+            <option value="gym">gym</option>
+            <option value="cafe">cafe</option>
+            <option value="job_search">job_search</option>
+            <option value="work">work</option>
+            <option value="doctor">doctor</option>
+            <option value="hospital">hospital</option>
+            <option value="jail">jail</option>
+            <option value="event">event:&lt;id&gt;</option>
+          </select>
+          <label>Duration (ticks)</label>
+          <input id="offgridDuration" type="number" value="20" min="1" style="width:80px">
+        </div>
+        <div id="offgridEventRow" class="fieldGrid" style="display:none">
+          <label>Event ID</label>
+          <input id="offgridEventId" placeholder="evt_a1b2c3">
+        </div>
+        <button onclick="sendOffgrid()" style="background:#2e86c1;border:none;color:#fff;padding:6px 16px;border-radius:4px;cursor:pointer;font-size:12px;margin-top:8px;">▶ Send Off-Grid</button>
+        <span id="offgridStatus" style="font-size:11px;color:#556;margin-left:10px;"></span>
+        <div class="sectionHead" style="margin-top:14px">Narration</div>
+        <div id="offgridNarration" style="color:#ccd;font-size:13px;line-height:1.5;padding:8px 0">Send a character off-grid to see the result here.</div>
+        <div class="sectionHead">Character after return</div>
+        <pre id="offgridCharJson" style="color:#445;font-size:11px;max-height:220px;overflow:auto">—</pre>
+      </div>
+
+      <!-- Family tab -->
+      <div id="tab-family" style="display:none">
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap;">
+          <button onclick="generateFamilyTree()" style="background:#2e86c1;border:none;color:#fff;padding:5px 14px;border-radius:4px;cursor:pointer;font-size:12px;">Generate Family Tree</button>
+          <label style="font-size:11px;color:#778"><input type="checkbox" id="familyDepth2"> Depth 2 (extended)</label>
+          <span id="familyStatus" style="font-size:11px;color:#556;margin-left:auto;"></span>
+        </div>
+        <div id="familyTree"></div>
       </div>
     </div>
   </div>

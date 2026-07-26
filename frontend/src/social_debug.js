@@ -6,14 +6,29 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 // STATE
 // =====================================================================
 let definitions    = {};
-let sandboxChars   = [];          // { id, name, sex, age, traits, hobbies, mood, mesh, position, template, instance }
+// { id, sandboxId, serverChar /* trimmed view from stage/turn */, mesh, color,
+//   _fullChar /* cached full character dict, fetched on demand -- see fetchFullChar() */ }
+let sandboxChars   = [];
+let currentSandboxId = null;      // all staged characters currently share one sandbox
 let selectedChar   = null;
-let scenarioState  = 'idle';      // idle | running | paused
 let showThoughts   = true;
 let outfitMode     = false;       // true when Outfit tab is active
 let detailItemKey  = null;        // item key currently shown in detail overlay
 let detailIsEquipped = false;
 window.speechInterval = 8;
+
+// ── turn engine (Round 3) ──
+let turnInFlight     = false;   // in-flight guard -- never overlap /turn calls
+let autoAdvanceOn    = false;
+let autoAdvanceTimer = null;
+
+// ── absent relationships (Round 5) ──
+// { name, relation_label, charIndex } -- charIndex is a position into
+// sandboxChars, replayed as relationship_to_index on every /stage call
+// (see stageSelectedTemplate() -- staged ids are re-minted every call, but
+// sandboxChars' own ordering is stable since characters are only ever
+// appended, never removed or reordered).
+let pendingAbsent = [];
 
 // ── log filters ──
 const logFilters   = new Set(['speech','thought','event','system']);
@@ -203,7 +218,7 @@ function buildOutfitMeshes(char) {
   if (!pvMesh) return;
   // Remove old outfit pieces
   pvMesh.children.filter(c=>c.userData.outfitSlot).forEach(c=>pvMesh.remove(c));
-  const slots = char.instance?.outfitSlots || {};
+  const slots = char._fullChar?.worn || {};
   for (const [slot, itemKey] of Object.entries(slots)) {
     if (!itemKey) continue;
     const m = makeSlotMesh(slot);
@@ -268,36 +283,50 @@ window.equipFromDetail = function() {
   if (!detailItemKey || !selectedChar) return;
   equipItem(detailItemKey);
   showItemDetail(detailItemKey, true);
-  renderOutfitTab();
 };
 
 window.unequipFromDetail = function() {
   if (!detailItemKey || !selectedChar) return;
+  const char = selectedChar;
   const tmpl = definitions.item_templates?.[detailItemKey] || {};
   const slot = tmpl.slot || '?';
-  if (selectedChar.instance.outfitSlots[slot] === detailItemKey) {
-    selectedChar.instance.outfitSlots[slot] = null;
-    buildOutfitMeshes(selectedChar);
-    closeItemDetail();
-    renderOutfitTab();
-  }
+  if (char._fullChar?.worn?.[slot] !== detailItemKey) return;
+  patchChar(char, { worn: { [slot]: null } })
+    .then(() => {
+      buildOutfitMeshes(char);
+      closeItemDetail();
+      renderOutfitTab();
+    })
+    .catch(e => addLog('system', char.id, 'unequip error: ' + e.message));
 };
 
 function equipItem(itemKey) {
   if (!selectedChar) return;
+  const char = selectedChar;
   const tmpl = definitions.item_templates?.[itemKey] || {};
   const slot = tmpl.slot || '?';
-  selectedChar.instance.outfitSlots[slot] = itemKey;
-  buildOutfitMeshes(selectedChar);
-  addLog('system', selectedChar.id, selectedChar.name + ' equipped: ' + (tmpl.name||itemKey) + ' [' + slot + ']');
+  patchChar(char, { worn: { [slot]: itemKey } })
+    .then(() => {
+      buildOutfitMeshes(char);
+      renderOutfitTab();
+      addLog('system', char.id, char.serverChar.name + ' equipped: ' + (tmpl.name||itemKey) + ' [' + slot + ']');
+    })
+    .catch(e => addLog('system', char.id, 'equip error: ' + e.message));
 }
 
 // =====================================================================
 // OUTFIT TAB RENDER
 // =====================================================================
-function renderOutfitTab() {
+async function renderOutfitTab() {
   if (!selectedChar) return;
-  const slots = selectedChar.instance.outfitSlots || {};
+  const char = selectedChar;
+  if (!char._fullChar) {
+    document.getElementById('outfitSlots').innerHTML = '<span style="color:#3a4050;font-size:12px">Loading…</span>';
+    document.getElementById('clothingList').innerHTML = '';
+    await fetchFullChar(char);
+    if (selectedChar !== char) return; // selection changed while awaiting
+  }
+  const slots = char._fullChar?.worn || {};
 
   // Worn slots chips
   const slotsDiv = document.getElementById('outfitSlots');
@@ -341,8 +370,6 @@ function renderOutfitTab() {
     row.ondblclick = (e) => {
       e.preventDefault();
       equipItem(key);
-      renderOutfitTab();
-      showItemDetail(key, true);
     };
     listDiv.appendChild(row);
   }
@@ -394,6 +421,16 @@ const MOOD_COLORS = {
 };
 function moodColor(mood) { return MOOD_COLORS[mood] || 0x7986cb; }
 
+// Mirrors backend/brain/emotion.py::EMOTION_TEMP's key list -- the
+// canonical set of c["emotion"] labels. Small acceptable duplication for
+// a debug tool rather than adding a fetch just for this.
+const EMOTION_TEMP = {
+  ecstatic:95, euphoric:88, excited:78, cheerful:65, content:50, calm:35,
+  neutral:20, bored:25, melancholy:40, anxious:55, annoyed:60, sad:45,
+  angry:72, furious:88, fearful:70, smug:55, suspicious:50, awkward:45,
+  curious:35, warm:28,
+};
+
 // =====================================================================
 // CHARACTER CAPSULE MESH
 // =====================================================================
@@ -434,50 +471,86 @@ function makeNameSprite(name, color) {
   return sprite;
 }
 
+function showSpeechBubble(char, text, isThought=false) {
+  if (!char || !char.mesh) return;
+  if (char.mesh.userData.speechSprite) {
+    char.mesh.remove(char.mesh.userData.speechSprite);
+    char.mesh.userData.speechSprite = null;
+  }
+  clearTimeout(char.mesh.userData.speechTimer);
+  const sprite = makeSpeechSprite(text, isThought);
+  char.mesh.add(sprite);
+  char.mesh.userData.speechSprite = sprite;
+  char.mesh.userData.speechTimer = setTimeout(() => {
+    if (char.mesh.userData.speechSprite === sprite) {
+      char.mesh.remove(sprite);
+      char.mesh.userData.speechSprite = null;
+    }
+  }, 6000);
+}
+
+function makeSpeechSprite(text, isThought) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 512; canvas.height = 128;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = isThought ? 'rgba(30,20,50,0.85)' : 'rgba(10,20,35,0.9)';
+  ctx.roundRect(4,4,504,120,16);
+  ctx.fill();
+  ctx.strokeStyle = isThought ? '#7986cb' : '#4caf80';
+  ctx.lineWidth = 2;
+  ctx.roundRect(4,4,504,120,16);
+  ctx.stroke();
+  ctx.fillStyle = '#eef';
+  ctx.font = '22px Arial';
+  ctx.textAlign = 'center';
+  _wrapCanvasText(ctx, text, 256, 40, 470, 28);
+  const tex = new THREE.CanvasTexture(canvas);
+  const mat = new THREE.SpriteMaterial({ map: tex, depthTest: false });
+  const sprite = new THREE.Sprite(mat);
+  sprite.scale.set(1.8, 0.45, 1);
+  sprite.position.set(0, 2.55, 0);
+  return sprite;
+}
+
+function _wrapCanvasText(ctx, text, x, y, maxWidth, lineHeight) {
+  const words = String(text).split(' ');
+  let line = '';
+  let lines = [];
+  for (const w of words) {
+    const test = line ? line + ' ' + w : w;
+    if (ctx.measureText(test).width > maxWidth && line) {
+      lines.push(line);
+      line = w;
+    } else {
+      line = test;
+    }
+  }
+  if (line) lines.push(line);
+  lines = lines.slice(0, 3);
+  const startY = y - (lines.length - 1) * lineHeight / 2;
+  lines.forEach((l, i) => ctx.fillText(l, x, startY + i * lineHeight));
+}
+
 // =====================================================================
-// SPAWNER UI
+// TEMPLATE PICKER
 // =====================================================================
 function buildSpawnerUI() {
-  // Mood select
-  const moodSel = document.getElementById('spMood');
-  moodSel.innerHTML = '';
-  for (const key of Object.keys(definitions.mood_templates||{})) {
+  const sel = document.getElementById('spTemplate');
+  sel.innerHTML = '';
+  const templates = definitions.character_templates || {};
+  const ids = Object.keys(templates);
+  if (!ids.length) {
     const o = document.createElement('option');
-    o.value = key; o.textContent = key.replace(/_/g,' ');
-    moodSel.appendChild(o);
+    o.textContent = '(no character_templates found)';
+    sel.appendChild(o);
+    return;
   }
-  if (!moodSel.value) { const o=document.createElement('option'); o.value='content'; o.textContent='content'; moodSel.appendChild(o); }
-
-  // Trait chips
-  const tc = document.getElementById('traitChips');
-  tc.innerHTML = '';
-  for (const [key, tmpl] of Object.entries(definitions.trait_templates||{})) {
-    const chip = document.createElement('span');
-    chip.className = 'chip trait-' + (tmpl.polarity==='negative'?'neg':'pos');
-    chip.textContent = tmpl.name || key;
-    chip.dataset.key = key;
-    chip.onclick = () => {
-      const selected = tc.querySelectorAll('.chip.on').length;
-      if (!chip.classList.contains('on') && selected >= 5) return;
-      chip.classList.toggle('on');
-    };
-    tc.appendChild(chip);
-  }
-
-  // Hobby chips
-  const hc = document.getElementById('hobbyChips');
-  hc.innerHTML = '';
-  for (const [key] of Object.entries(definitions.hobby_templates||{})) {
-    const chip = document.createElement('span');
-    chip.className = 'chip';
-    chip.textContent = key.replace(/_/g,' ');
-    chip.dataset.key = key;
-    chip.onclick = () => {
-      const selected = hc.querySelectorAll('.chip.on').length;
-      if (!chip.classList.contains('on') && selected >= 3) return;
-      chip.classList.toggle('on');
-    };
-    hc.appendChild(chip);
+  for (const id of ids) {
+    const tmpl = templates[id];
+    const o = document.createElement('option');
+    o.value = id;
+    o.textContent = (tmpl.name || id) + ` (${id})`;
+    sel.appendChild(o);
   }
 }
 
@@ -493,93 +566,189 @@ window.toggleSpawner = function() {
 };
 
 // =====================================================================
-// SPAWN CHARACTER
+// STAGE CHARACTER (real backend call -- POST /debug/sandbox/stage)
 // =====================================================================
-let charIdCounter = 0;
-window.spawnCharacter = function() {
-  const name    = document.getElementById('spName').value.trim() || ('Char_' + (++charIdCounter));
-  const sex     = document.getElementById('spSex').value;
-  const age     = parseInt(document.getElementById('spAge').value) || 28;
-  const mood    = document.getElementById('spMood').value || 'content';
-  const app     = document.getElementById('spAppearance').value.trim();
-  const traits  = [...document.querySelectorAll('#traitChips .chip.on')].map(c=>c.dataset.key);
-  const hobbies = [...document.querySelectorAll('#hobbyChips .chip.on')].map(c=>c.dataset.key);
+// Each call stages ONE additional character. If a sandbox already exists
+// (currentSandboxId set), the new character is staged into a FRESH
+// sandbox alongside every character already in sandboxChars, re-using
+// each one's own template id + position -- /stage has no "add to existing
+// sandbox" endpoint (by design, see the Round 1 plan), so growing the
+// scene means restaging everyone together every time.
+window.stageSelectedTemplate = async function() {
+  const sel = document.getElementById('spTemplate');
+  const templateId = sel.value;
+  const statusEl = document.getElementById('stageStatus');
+  if (!templateId) { statusEl.textContent = 'No template selected'; return; }
 
-  const id = 'char_' + Date.now().toString(36);
-  const color = moodColor(mood);
+  statusEl.textContent = 'Staging…';
 
-  const template = {
-    id, name, sex, age, appearance: app,
-    traits, hobbies,
-    model: 'adult_male',
-    base_animations: { idle:'idle', walk:'walk' },
-    inventory_slots: { left_hand:1, right_hand:1, back:1, belt:4, pockets:4 }
-  };
-
-  const instance = buildInstance(id, name, sex, age, mood, traits, hobbies);
-
-  // Build mesh
-  const mesh = makeCapsule(color);
-  const sprite = makeNameSprite(name, color);
-  mesh.add(sprite);
-  mesh.userData = { charId:id };
-
-  // Default position: cluster near center with jitter
   const angle = Math.random() * Math.PI * 2;
   const r     = sandboxChars.length === 0 ? 0 : 1.5 + sandboxChars.length * 0.4;
-  const px    = Math.cos(angle) * r;
-  const pz    = Math.sin(angle) * r;
-  mesh.position.set(px, 0, pz);
+  const newSpec = {
+    template_id: templateId,
+    x: Math.cos(angle) * r,
+    y: Math.sin(angle) * r,
+  };
 
-  sbScene.add(mesh);
+  // Re-stage every existing character (by their own template + position)
+  // plus the new one, in one combined /stage call.
+  const specs = sandboxChars.map(c => ({
+    template_id: c.serverChar.template,
+    x: c.serverChar.x, y: c.serverChar.y,
+  }));
+  specs.push(newSpec);
 
-  const char = { id, name, sex, age, mood, traits, hobbies, appearance:app, color, mesh, template, instance };
-  sandboxChars.push(char);
+  const absent = pendingAbsent.map(a => ({
+    name: a.name, relationship_to_index: a.charIndex, relation_label: a.relation_label,
+  }));
 
-  updateCharCount();
-  addLog('system', null, name + ' spawned (' + sex + ', ' + age + ', ' + mood + ')');
-  selectChar(id);
+  try {
+    const res = await fetch('/debug/sandbox/stage', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sim_id: 'default', characters: specs, absent }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || res.statusText);
 
-  // Enable scenario if >= 2 chars
-  if (sandboxChars.length >= 2) {
-    document.getElementById('btnStart').disabled = false;
-    document.getElementById('scenarioStatus').textContent = sandboxChars.length + ' characters ready';
+    // Rebuild sandboxChars from scratch against the new sandbox_id --
+    // old meshes are removed and re-added so ids stay in sync with the
+    // freshly-staged world (staging always mints new sandbox character
+    // ids, even for characters that were already present).
+    for (const old of sandboxChars) sbScene.remove(old.mesh);
+    sandboxChars = [];
+    currentSandboxId = data.sandbox_id;
+
+    for (const serverChar of data.characters) {
+      const color = moodColor(serverChar.emotion);
+      const mesh = makeCapsule(color);
+      const sprite = makeNameSprite(serverChar.name, color);
+      mesh.add(sprite);
+      mesh.userData = { charId: serverChar.id };
+      mesh.position.set(serverChar.x || 0, 0, serverChar.y || 0);
+      sbScene.add(mesh);
+
+      sandboxChars.push({
+        id: serverChar.id, sandboxId: currentSandboxId,
+        serverChar, mesh, color, _fullChar: null,
+      });
+    }
+
+    updateCharCount();
+    populateTurnCharSelect();
+    addLog('system', null, `Staged ${data.characters.length} character(s) -- sandbox ${currentSandboxId}`);
+    statusEl.textContent = `${data.characters.length} staged`;
+    selectChar(sandboxChars[sandboxChars.length - 1].id);
+
+    if (sandboxChars.length >= 2) {
+      document.getElementById('btnStart').disabled = false;
+      document.getElementById('scenarioStatus').textContent = sandboxChars.length + ' characters ready';
+    }
+  } catch (e) {
+    statusEl.textContent = 'Error: ' + e.message;
+    console.error('[stage]', e);
   }
 };
-
-function buildInstance(id, name, sex, age, mood, traits, hobbies) {
-  return {
-    id, name, sex, age,
-    posture:   'standing',
-    location:  'sandbox',
-    activity:  null,
-    mood:      mood,
-    mood_intensity: 0.6,
-    traits,
-    hobbies,
-    needs: { hunger:0.6, energy:0.8, social:0.5, hygiene:0.9, fun:0.5, bladder:0.8 },
-    emotions: { happiness:0.6, anger:0.0, fear:0.0, sadness:0.0, surprise:0.0 },
-    relationships: {},
-    memory:    [],
-    inventory: {},
-    outfitSlots: {
-      hair:null, head:null, torso:null, outerwear:null, undershirt:null,
-      legs:null, feet:null, socks:null, hands:null, neck:null,
-      wrist_l:null, underwear:null, accessory:null
-    },
-    current_thought: null,
-    last_speech: null,
-  };
-}
 
 function updateCharCount() {
   document.getElementById('charCountBadge').textContent = sandboxChars.length + ' character' + (sandboxChars.length!==1?'s':'');
 }
 
+// Whose turn is next -- the turn engine defaults to whatever's selected
+// here, but a completed turn that touched a conversation snaps the select
+// forward to the real turn_owner (see takeNextTurn()).
+function populateTurnCharSelect() {
+  const sel = document.getElementById('turnCharSelect');
+  const prev = sel.value;
+  sel.innerHTML = '';
+  for (const c of sandboxChars) {
+    const o = document.createElement('option');
+    o.value = c.id;
+    o.textContent = c.serverChar.name;
+    sel.appendChild(o);
+  }
+  if (sandboxChars.some(c => c.id === prev)) sel.value = prev;
+  populateAbsentRelToSelect();
+}
+
+// =====================================================================
+// ABSENT RELATIONSHIPS (mocked people not physically staged) --
+// replayed into every /stage call's "absent" list, see stageSelectedTemplate().
+// =====================================================================
+function populateAbsentRelToSelect() {
+  const sel = document.getElementById('absentRelTo');
+  if (!sel) return;
+  const prev = sel.value;
+  sel.innerHTML = '';
+  sandboxChars.forEach((c, i) => {
+    const o = document.createElement('option');
+    o.value = String(i);
+    o.textContent = c.serverChar.name;
+    sel.appendChild(o);
+  });
+  if (prev && +prev < sandboxChars.length) sel.value = prev;
+}
+
+window.addAbsentRelationship = function() {
+  const relSel  = document.getElementById('absentRelTo');
+  const nameInp = document.getElementById('absentName');
+  const lblInp  = document.getElementById('absentLabel');
+  if (!sandboxChars.length) { addLog('system', null, 'Stage a character first.'); return; }
+  const name = nameInp.value.trim();
+  if (!name) { addLog('system', null, 'Absent relationship needs a name.'); return; }
+
+  pendingAbsent.push({
+    name,
+    charIndex: +relSel.value || 0,
+    relation_label: lblInp.value.trim(),
+  });
+  nameInp.value = '';
+  lblInp.value = '';
+  renderAbsentList();
+};
+
+window.removeAbsentRelationship = function(idx) {
+  pendingAbsent.splice(idx, 1);
+  renderAbsentList();
+};
+
+function renderAbsentList() {
+  const el = document.getElementById('absentList');
+  if (!el) return;
+  if (!pendingAbsent.length) {
+    el.innerHTML = '<span style="color:#3a4050;font-size:11px">None</span>';
+    return;
+  }
+  el.innerHTML = pendingAbsent.map((a, i) => {
+    const relTo = sandboxChars[a.charIndex]?.serverChar.name || '?';
+    return '<span class="traitBadge" style="background:#241a1a;border-color:#7a4d2e;color:#f8c8ad">' +
+      escHtml(a.name) + (a.relation_label ? ' (' + escHtml(a.relation_label) + ')' : '') +
+      ' → ' + escHtml(relTo) +
+      ' <a onclick="removeAbsentRelationship(' + i + ')" style="cursor:pointer;color:#f66;margin-left:4px">✕</a></span>';
+  }).join(' ');
+}
+
+// =====================================================================
+// FULL CHARACTER FETCH (real backend schema -- trimmed serverChar doesn't
+// carry everything the Runtime/Template/Outfit tabs need, e.g. "worn")
+// =====================================================================
+async function fetchFullChar(char) {
+  if (!char.sandboxId) return null;
+  try {
+    const res = await fetch(`/debug/sandbox/${char.sandboxId}/characters/${char.id}`);
+    if (!res.ok) throw new Error(res.statusText);
+    char._fullChar = await res.json();
+  } catch (e) {
+    console.error('[fetchFullChar]', e);
+    char._fullChar = null;
+  }
+  return char._fullChar;
+}
+
 // =====================================================================
 // SELECTION
 // =====================================================================
-function selectChar(id) {
+async function selectChar(id) {
   selectedChar = sandboxChars.find(c=>c.id===id) || null;
   // Highlight selected
   sandboxChars.forEach(c => {
@@ -590,12 +759,15 @@ function selectChar(id) {
     });
   });
   if (selectedChar) {
-    document.getElementById('charHeaderName').textContent = selectedChar.name;
-    document.getElementById('charHeaderName').style.color = '#' + selectedChar.color.toString(16).padStart(6,'0');
+    const char = selectedChar;
+    document.getElementById('charHeaderName').textContent = char.serverChar.name;
+    document.getElementById('charHeaderName').style.color = '#' + char.color.toString(16).padStart(6,'0');
     document.getElementById('noCharMsg').style.display = 'none';
-    buildPreviewChar(selectedChar);
-    refreshAllTabs();
     document.getElementById('btnEscalate').disabled = false;
+    await fetchFullChar(char);
+    if (selectedChar !== char) return; // selection changed while awaiting
+    buildPreviewChar(char);
+    refreshAllTabs();
   }
 }
 
@@ -656,11 +828,27 @@ function refreshTab(tab) {
   if (tab==='outfit')     renderOutfitTab();
   if (tab==='appearance') renderAppearanceTab();
   if (tab==='state')      renderStateTab();
-  if (tab==='runtime')    document.getElementById('runtimeJson').textContent = JSON.stringify(selectedChar.instance, null,2);
-  if (tab==='template')   document.getElementById('templateJson').textContent = JSON.stringify(selectedChar.template, null,2);
+  if (tab==='runtime')    renderRuntimeTab();
+  if (tab==='template')   renderTemplateTab();
   if (tab==='log')        renderLogTab();
   if (tab==='prompts')    renderPromptsTab();
   if (tab==='family')     window._refreshFamilyTab && window._refreshFamilyTab();
+}
+
+async function renderRuntimeTab() {
+  const char = selectedChar;
+  const el = document.getElementById('runtimeJson');
+  el.textContent = 'Loading…';
+  const full = await fetchFullChar(char);
+  if (char !== selectedChar) return; // selection changed while awaiting
+  el.textContent = full ? JSON.stringify(full, null, 2) : 'Error loading character';
+}
+
+function renderTemplateTab() {
+  const el = document.getElementById('templateJson');
+  const templateId = selectedChar.serverChar.template;
+  const tmpl = (definitions.character_templates || {})[templateId];
+  el.textContent = tmpl ? JSON.stringify(tmpl, null, 2) : `(template '${templateId}' not found)`;
 }
 
 // =====================================================================
@@ -800,93 +988,188 @@ window.sendCustomPrompt = async function() {
   }
 };
 
+// =====================================================================
+// OFFGRID TAB
+// =====================================================================
+window.sendOffgrid = async function() {
+  if (!selectedChar) return;
+  const catSel   = document.getElementById('offgridCategory');
+  const category = catSel.value === 'event'
+    ? 'event:' + (document.getElementById('offgridEventId').value.trim() || 'evt_unknown')
+    : catSel.value;
+  const duration = +document.getElementById('offgridDuration').value || 20;
+  const statusEl = document.getElementById('offgridStatus');
+  const narrEl   = document.getElementById('offgridNarration');
+  const jsonEl   = document.getElementById('offgridCharJson');
+  const charId   = selectedChar.id;
+
+  statusEl.textContent = 'Sending off-grid…';
+  try {
+    const res = await fetch(`/debug/sandbox/${currentSandboxId}/offgrid`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ char_id: charId, category, duration }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || res.statusText);
+
+    if (!data.ok) {
+      statusEl.textContent = 'Not sent: ' + data.reason;
+      return;
+    }
+
+    statusEl.textContent = 'Returned';
+    narrEl.textContent = data.narration;
+    jsonEl.textContent = JSON.stringify(data.character, null, 2);
+    addLog('event', charId, data.narration);
+
+    const char = sandboxChars.find(c => c.id === charId);
+    if (char) {
+      Object.assign(char.serverChar, data.character);
+      char._fullChar = null;
+      if (selectedChar.id === charId) refreshAllTabs();
+    }
+  } catch (e) {
+    statusEl.textContent = 'Error: ' + e.message;
+    console.error('[offgrid]', e);
+  }
+};
+
+// =====================================================================
+// PATCH -- generic setter, all State/Appearance edits collapse into this.
+// PATCH /debug/sandbox/{sandboxId}/characters/{id} does a shallow +
+// one-level-nested merge server-side and returns the full updated
+// character, which we use to refresh both the trimmed serverChar (so
+// Log/Runtime/etc. stay in sync) and the mesh color (mirrors the old
+// setInstField's mood-recolor behavior, now against a real field).
+// =====================================================================
+async function patchChar(char, patch) {
+  const res = await fetch(`/debug/sandbox/${char.sandboxId}/characters/${char.id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(patch),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.detail || res.statusText);
+
+  char._fullChar = data;
+  char.serverChar.name = data.name;
+  char.serverChar.sex = data.sex;
+  char.serverChar.age = data.age;
+  char.serverChar.health = data.health;
+  char.serverChar.emotion = data.emotion;
+  char.serverChar.mood = data.mood;
+
+  const newColor = moodColor(data.emotion);
+  char.color = newColor;
+  char.mesh.traverse(o => { if (o.isMesh) o.material.color.set(newColor); });
+  if (char === selectedChar) {
+    document.getElementById('charHeaderName').textContent = data.name;
+    document.getElementById('charHeaderName').style.color = '#' + newColor.toString(16).padStart(6,'0');
+  }
+  populateTurnCharSelect();
+  return data;
+}
+
+async function patchSelectedChar(patch, refreshTabName) {
+  if (!selectedChar) return;
+  try {
+    await patchChar(selectedChar, patch);
+    if (refreshTabName) refreshTab(refreshTabName);
+  } catch (e) {
+    addLog('system', selectedChar.id, 'patch error: ' + e.message);
+  }
+}
+
+window.setNameField  = v => patchSelectedChar({ name: v }, 'appearance');
+window.setSexField   = v => patchSelectedChar({ sex: v }, 'appearance');
+window.setAgeField   = v => patchSelectedChar({ age: v }, 'appearance');
+window.setEmotionField = v => patchSelectedChar({ emotion: v }, 'state');
+window.setEmotionalTemp = v => patchSelectedChar({ emotional_temperature: v });
+window.setHealthField = (k, v) => patchSelectedChar({ health: { [k]: v } }, 'state');
+
 // ── Appearance tab ──
-function renderAppearanceTab() {
-  const c = selectedChar;
+async function renderAppearanceTab() {
+  const char = selectedChar;
+  if (!char._fullChar) await fetchFullChar(char);
+  if (selectedChar !== char) return; // selection changed while awaiting
+
+  const c = char.serverChar;
+  const full = char._fullChar;
   const traits = (c.traits||[]).map(t=>{
     const tmpl = definitions.trait_templates?.[t] || {};
     const cls  = tmpl.polarity==='negative' ? 'traitBadge neg' : 'traitBadge';
     return '<span class="' + cls + '">' + (tmpl.name||t) + '</span>';
   }).join('');
   const hobbies = (c.hobbies||[]).map(h=>'<span class="traitBadge" style="background:#1a2040;border-color:#2e4da4;color:#adf">' + h.replace(/_/g,' ') + '</span>').join('');
+  const physTraits = (full?.physical_traits||[]).map(t=>{
+    const tmpl = definitions.physical_trait_templates?.[t] || {};
+    return '<span class="traitBadge" style="background:#20261a;border-color:#4d7a2e;color:#adf8ad">' + (tmpl.name||t) + '</span>';
+  }).join('');
+  const appearance = full?.appearance || {};
+  const appearanceBits = ['height','build','hair_color','hair_style','eye_color','clothing_style']
+    .filter(k => appearance[k]).map(k => k.replace(/_/g,' ') + ': ' + appearance[k]).join(', ');
+
   document.getElementById('tab-appearance').innerHTML = '<div class="fieldGrid">' +
-    '<label>Name</label><input value="' + c.name + '" oninput="updateCharField(\'name\',this.value)">' +
-    '<label>Sex</label><select onchange="updateCharField(\'sex\',this.value)">' +
+    '<label>Name</label><input value="' + escHtml(c.name||'') + '" onchange="setNameField(this.value)">' +
+    '<label>Sex</label><select onchange="setSexField(this.value)">' +
     ['male','female','other'].map(s=>'<option'+(c.sex===s?' selected':'')+'>'+s+'</option>').join('') + '</select>' +
-    '<label>Age</label><input type="number" value="' + c.age + '" style="width:70px" oninput="updateCharField(\'age\',+this.value)">' +
-    '<label>Appearance</label><input value="' + (c.appearance||'') + '" oninput="updateCharField(\'appearance\',this.value)">' +
+    '<label>Age</label><input type="number" value="' + (c.age ?? '') + '" style="width:70px" onchange="setAgeField(+this.value)">' +
     '</div>' +
     '<div class="sectionHead">Traits</div><div>' + (traits||'<span style="color:#445">None selected</span>') + '</div>' +
-    '<div class="sectionHead">Hobbies</div><div>' + (hobbies||'<span style="color:#445">None selected</span>') + '</div>';
+    '<div class="sectionHead">Physical Traits</div><div>' + (physTraits||'<span style="color:#445">None</span>') + '</div>' +
+    '<div class="sectionHead">Hobbies</div><div>' + (hobbies||'<span style="color:#445">None selected</span>') + '</div>' +
+    '<div class="sectionHead">Physical Appearance</div><div style="color:#778;font-size:12px">' +
+    (appearanceBits || '<span style="color:#445">Not generated — these fields are unpopulated by character_gen.py today</span>') + '</div>';
 }
 
-window.updateCharField = function(field, val) {
-  if (!selectedChar) return;
-  selectedChar[field] = val;
-  selectedChar.template[field] = val;
-  selectedChar.instance[field] = val;
-  if (field==='name') {
-    document.getElementById('charHeaderName').textContent = val;
-  }
-};
-
 // ── State tab ──
-const NEED_COLORS = { hunger:'#ef6c00', energy:'#fdd835', social:'#42a5f5', hygiene:'#66bb6a', fun:'#ab47bc', bladder:'#26c6da' };
-const EMO_COLORS  = { happiness:'#4caf50', anger:'#f44336', fear:'#ff9800', sadness:'#607d8b', surprise:'#ce93d8' };
+const HEALTH_FIELDS = ['hunger','energy','hydration','hygiene','bladder','fatigue','stress','pain'];
 
-function renderStateTab() {
-  const c = selectedChar;
-  const inst = c.instance;
-  const moodCol = moodColor(inst.mood);
-  let html = '<div class="moodPill" style="background:#' + moodCol.toString(16).padStart(6,'0') + '22;border:1px solid #' + moodCol.toString(16).padStart(6,'0') + ';color:#fff">' +
-    '\u{1F636} Mood: <b>' + (inst.mood||'unknown') + '</b> ' +
-    '<input class="editableVal" type="number" min="0" max="1" step="0.05" value="' + (inst.mood_intensity||0.5).toFixed(2) + '" oninput="setInstField(\'mood_intensity\',+this.value)" style="width:55px"></div>';
+async function renderStateTab() {
+  const char = selectedChar;
+  if (!char._fullChar) await fetchFullChar(char);
+  if (selectedChar !== char) return; // selection changed while awaiting
 
-  html += '<div class="sectionHead">Needs</div>';
-  for (const [k,v] of Object.entries(inst.needs||{})) {
-    const col = NEED_COLORS[k]||'#aaa';
-    const pct  = Math.round((v||0)*100);
-    html += '<div class="meterRow"><span class="meterLabel">' + k + '</span>' +
-      '<div class="meterBar"><div class="meterFill" style="width:' + pct + '%;background:' + col + '"></div></div>' +
-      '<input class="editableVal" type="number" min="0" max="1" step="0.05" value="' + (v||0).toFixed(2) + '" oninput="setNeed(\'' + k + '\',+this.value)">' +
-      '</div>';
-  }
+  const c = char.serverChar;
+  const health = c.health || {};
+  const mood = c.mood;
+  const temp = c.emotional_temperature ?? char._fullChar?.emotional_temperature ?? 20;
 
-  html += '<div class="sectionHead">Emotions</div>';
-  for (const [k,v] of Object.entries(inst.emotions||{})) {
-    const col = EMO_COLORS[k]||'#aaa';
-    const pct  = Math.round((v||0)*100);
-    html += '<div class="meterRow"><span class="meterLabel">' + k + '</span>' +
-      '<div class="meterBar"><div class="meterFill" style="width:' + pct + '%;background:' + col + '"></div></div>' +
-      '<input class="editableVal" type="number" min="0" max="1" step="0.05" value="' + (v||0).toFixed(2) + '" oninput="setEmotion(\'' + k + '\',+this.value)">' +
-      '</div>';
-  }
-
-  html += '<div class="sectionHead">Mood override</div>';
-  html += '<select onchange="setInstField(\'mood\',this.value)" style="background:#1a1e24;border:1px solid #3a3f48;color:#ccc;padding:4px 8px;border-radius:4px;width:100%;font-size:12px">';
-  for (const key of Object.keys(definitions.mood_templates||{content:{}})) {
-    html += '<option' + (inst.mood===key?' selected':'') + ' value="' + key + '">' + key + '</option>';
+  let html = '<div class="sectionHead">Emotion</div>';
+  html += '<select onchange="setEmotionField(this.value)" style="background:#1a1e24;border:1px solid #3a3f48;color:#ccc;padding:4px 8px;border-radius:4px;font-size:12px">';
+  for (const label of Object.keys(EMOTION_TEMP)) {
+    html += '<option' + (c.emotion===label?' selected':'') + '>' + label + '</option>';
   }
   html += '</select>';
 
+  html += '<div class="sectionHead">Emotional Temperature</div>';
+  html += '<div style="display:flex;align-items:center;gap:8px">' +
+    '<input type="range" min="0" max="100" value="' + temp + '" style="flex:1" ' +
+    'oninput="document.getElementById(\'etVal\').textContent=this.value" onchange="setEmotionalTemp(+this.value)">' +
+    '<span id="etVal" style="color:#ccd;width:28px">' + temp + '</span></div>';
+
+  html += '<div class="sectionHead">Mood</div>' +
+    '<div style="padding:4px 0 12px;color:#ccd">' +
+    (mood ? escHtml(mood.name || mood.id) + ' <span style="color:#556;font-size:11px">(data-driven, read-only)</span>' : '<span style="color:#445">none</span>') + '</div>';
+
+  html += '<div class="sectionHead">Health</div>';
+  for (const k of HEALTH_FIELDS) {
+    if (!(k in health)) continue;
+    const v = health[k];
+    html += '<div class="meterRow"><span class="meterLabel">' + k + '</span>' +
+      '<input class="editableVal" type="number" step="0.05" value="' + (typeof v==='number'?v.toFixed(2):v) + '" onchange="setHealthField(\'' + k + '\',+this.value)"></div>';
+  }
+  if ('sick' in health) {
+    html += '<div class="meterRow"><span class="meterLabel">sick</span>' +
+      '<input type="checkbox" ' + (health.sick?'checked':'') + ' onchange="setHealthField(\'sick\',this.checked)"></div>';
+  }
+  if (health.conditions?.length) {
+    html += '<div style="color:#f44336;padding:6px 0">Conditions: ' + escHtml(JSON.stringify(health.conditions)) + '</div>';
+  }
+
   document.getElementById('tab-state').innerHTML = html;
 }
-
-window.setNeed      = function(k,v) { if(selectedChar) { selectedChar.instance.needs[k]=v; refreshTab('state'); } };
-window.setEmotion   = function(k,v) { if(selectedChar) { selectedChar.instance.emotions[k]=v; refreshTab('state'); } };
-window.setInstField = function(k,v) {
-  if (!selectedChar) return;
-  selectedChar.instance[k] = v;
-  if (k==='mood') {
-    selectedChar.mood = v;
-    const col = moodColor(v);
-    selectedChar.color = col;
-    selectedChar.mesh.traverse(o => { if(o.isMesh) o.material.color.set(col); });
-    // Only recolor base capsule, not outfit pieces
-    if (pvMesh) pvMesh.traverse(o => { if(o.isMesh && !o.userData.outfitSlot) o.material.color.set(col); });
-    refreshTab('state');
-  }
-};
 
 // =====================================================================
 // LOG
@@ -907,7 +1190,7 @@ function renderLogTab() {
     const div = document.createElement('div');
     div.className = 'logEntry ' + e.type;
     const ts = e.ts.toTimeString().slice(0,8);
-    const charName = sandboxChars.find(c=>c.id===e.charId)?.name || '';
+    const charName = sandboxChars.find(c=>c.id===e.charId)?.serverChar.name || '';
     div.innerHTML = '<div class="logMeta"><span class="logCharName">' + (charName||'System') + '</span> ' +
       '<span class="logType ' + e.type + '">' + e.type + '</span> <span style="color:#445">' + ts + '</span></div>' +
       '<div style="color:#ccd">' + escHtml(e.text) + '</div>';
@@ -926,109 +1209,127 @@ window.clearLog = function() { logAll = []; renderLogTab(); };
 function escHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
 // =====================================================================
-// SCENARIO CONTROLS
+// TURN ENGINE -- click-driven by default; "Auto" is an off-by-default
+// interval loop (never overlaps calls, guarded by turnInFlight) rather
+// than a blind setTimeout loop, since each turn is a real Ollama
+// round-trip that can take tens of seconds.
 // =====================================================================
-let scenarioTimer = null;
 
 window.startScenario = function() {
-  if (sandboxChars.length < 2) { addLog('system',null,'Need at least 2 characters'); return; }
-  scenarioState = 'running';
-  document.getElementById('btnStart').disabled  = true;
-  document.getElementById('btnPause').disabled  = false;
-  document.getElementById('btnStop').disabled   = false;
-  document.getElementById('scenarioStatus').textContent = 'Running — ' + document.getElementById('scenarioSelect').value;
-  addLog('system', null, 'Scenario started: ' + document.getElementById('scenarioSelect').value);
-  scheduleNextTurn();
+  takeNextTurn();
 };
 
 window.pauseScenario = function() {
-  if (scenarioState === 'running') {
-    scenarioState = 'paused';
-    clearTimeout(scenarioTimer);
-    document.getElementById('btnStart').textContent = '▶ Resume';
-    document.getElementById('btnStart').disabled    = false;
-    document.getElementById('btnPause').disabled    = true;
-    document.getElementById('scenarioStatus').textContent = 'Paused';
-    addLog('system', null, 'Scenario paused');
-  } else if (scenarioState === 'paused') {
-    scenarioState = 'running';
-    document.getElementById('btnStart').textContent = '▶ Start';
-    document.getElementById('btnStart').disabled    = true;
-    document.getElementById('btnPause').disabled    = false;
-    document.getElementById('scenarioStatus').textContent = 'Resumed';
-    scheduleNextTurn();
+  autoAdvanceOn = !autoAdvanceOn;
+  const btn = document.getElementById('btnPause');
+  const stopBtn = document.getElementById('btnStop');
+  if (autoAdvanceOn) {
+    btn.textContent = '🔁 Auto: On';
+    stopBtn.disabled = false;
+    document.getElementById('scenarioStatus').textContent = 'Auto-advancing every ' + window.speechInterval + 's';
+    scheduleAutoAdvance();
+  } else {
+    btn.textContent = '🔁 Auto: Off';
+    stopBtn.disabled = true;
+    clearTimeout(autoAdvanceTimer);
+    document.getElementById('scenarioStatus').textContent = 'Auto-advance stopped';
   }
 };
 
 window.stopScenario = function() {
-  scenarioState = 'idle';
-  clearTimeout(scenarioTimer);
-  document.getElementById('btnStart').textContent = '▶ Start';
-  document.getElementById('btnStart').disabled    = sandboxChars.length < 2;
-  document.getElementById('btnPause').disabled    = true;
-  document.getElementById('btnStop').disabled     = true;
-  document.getElementById('scenarioStatus').textContent = 'Stopped';
-  addLog('system', null, 'Scenario stopped');
+  autoAdvanceOn = false;
+  clearTimeout(autoAdvanceTimer);
+  document.getElementById('btnPause').textContent = '🔁 Auto: Off';
+  document.getElementById('btnStop').disabled = true;
+  document.getElementById('scenarioStatus').textContent = 'Auto-advance stopped';
 };
 
-window.triggerEscalation = function() {
+function scheduleAutoAdvance() {
+  if (!autoAdvanceOn) return;
+  autoAdvanceTimer = setTimeout(async () => {
+    if (!turnInFlight) await takeNextTurn();
+    scheduleAutoAdvance();
+  }, window.speechInterval * 1000);
+}
+
+async function takeNextTurn() {
+  if (turnInFlight) return;
+  const sel = document.getElementById('turnCharSelect');
+  const charId = sel.value;
+  const statusEl = document.getElementById('scenarioStatus');
+  if (!currentSandboxId || !charId) {
+    statusEl.textContent = 'Stage at least 2 characters first';
+    return;
+  }
+
+  turnInFlight = true;
+  document.getElementById('btnStart').disabled = true;
+  statusEl.textContent = 'Thinking…';
+
+  try {
+    const res = await fetch(`/debug/sandbox/${currentSandboxId}/turn`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ char_id: charId }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || res.statusText);
+
+    const char = sandboxChars.find(c => c.id === charId);
+    if (char) {
+      Object.assign(char.serverChar, data.character);
+      char._fullChar = null; // health/emotion may have changed -- refetch on next tab view
+    }
+
+    const thought = data.decision?.thought;
+    if (thought) {
+      addLog('thought', charId, thought);
+      if (showThoughts) showSpeechBubble(char, '💭 ' + thought, true);
+    }
+    const speech = data.character?.current_speech;
+    if (speech?.utterance) {
+      addLog('speech', charId, speech.utterance);
+      showSpeechBubble(char, speech.utterance, false);
+    } else if (!thought) {
+      addLog('system', charId, `did: ${data.decision?.action?.type || 'nothing'}`);
+    }
+    if (data.action_error) {
+      addLog('system', charId, 'action error: ' + data.action_error);
+    }
+
+    if (data.conversation) {
+      populateTurnCharSelect();
+      sel.value = data.conversation.turn_owner;
+      const nextName = sandboxChars.find(c => c.id === data.conversation.turn_owner)?.serverChar.name
+        || data.conversation.turn_owner;
+      statusEl.textContent = `Conversation ongoing — next: ${nextName}`;
+    } else {
+      statusEl.textContent = 'Turn complete';
+    }
+
+    if (selectedChar && selectedChar.id === charId) {
+      refreshAllTabs();
+    }
+  } catch (e) {
+    statusEl.textContent = 'Error: ' + e.message;
+    console.error('[turn]', e);
+  } finally {
+    turnInFlight = false;
+    document.getElementById('btnStart').disabled = false;
+  }
+}
+
+window.triggerEscalation = async function() {
   if (!selectedChar) return;
-  selectedChar.instance.emotions.anger = Math.min(1, (selectedChar.instance.emotions.anger||0) + 0.4);
-  selectedChar.instance.mood = 'furious';
-  setInstField('mood', 'furious');
-  addLog('event', selectedChar.id, selectedChar.name + ' mood escalated to FURIOUS');
-  refreshTab('state');
+  const char = selectedChar;
+  try {
+    await patchChar(char, { emotion: 'furious', emotional_temperature: 90 });
+    addLog('event', char.id, char.serverChar.name + ' mood escalated to FURIOUS');
+    if (selectedChar === char) refreshTab('state');
+  } catch (e) {
+    addLog('system', char.id, 'escalate error: ' + e.message);
+  }
 };
-
-function scheduleNextTurn() {
-  if (scenarioState !== 'running') return;
-  const jitter = (Math.random() * 0.4 + 0.8);
-  scenarioTimer = setTimeout(() => {
-    runConversationTurn();
-    scheduleNextTurn();
-  }, window.speechInterval * 1000 * jitter);
-}
-
-// Stub — Phase 2 will call backend LLM
-function runConversationTurn() {
-  if (!sandboxChars.length) return;
-  const speaker  = sandboxChars[Math.floor(Math.random()*sandboxChars.length)];
-  const listener = sandboxChars.find(c=>c.id!==speaker.id);
-  const placeholders = [
-    'Interesting weather today, right?',
-    'I was just thinking about that earlier.',
-    'Do you come here often?',
-    'That reminds me of something.',
-    'I completely agree with that.',
-    'Hmm, not sure about that one.',
-    'Have you heard about the news?',
-    'Tell me more.',
-    '... (silence)',
-  ];
-  const thought_phs = [
-    'This conversation is going well.',
-    'I wonder if they trust me.',
-    'Should I bring up the topic?',
-    'I feel a bit nervous.',
-    'This person seems interesting.',
-  ];
-  const said = placeholders[Math.floor(Math.random()*placeholders.length)];
-  addLog('speech', speaker.id, said);
-  speaker.instance.last_speech = said;
-  if (showThoughts && Math.random() > 0.5) {
-    const thought = thought_phs[Math.floor(Math.random()*thought_phs.length)];
-    addLog('thought', speaker.id, thought);
-    speaker.instance.current_thought = thought;
-  }
-  if (speaker.instance.needs.social < 1)
-    speaker.instance.needs.social = Math.min(1,(speaker.instance.needs.social||0.5)+0.05);
-  if (listener && listener.instance.needs.social < 1)
-    listener.instance.needs.social = Math.min(1,(listener.instance.needs.social||0.5)+0.03);
-  if (document.querySelector('.tab.active')?.dataset.tab==='log') renderLogTab();
-  if (selectedChar && (selectedChar.id===speaker.id || selectedChar.id===listener?.id)) {
-    if (document.querySelector('.tab.active')?.dataset.tab==='state') renderStateTab();
-  }
-}
 
 // =====================================================================
 // THOUGHTS TOGGLE
@@ -1044,9 +1345,10 @@ await loadDefinitions();
 // FAMILY TAB
 // =====================================================================
 
-window.generateFamilyTree = async function(replace=false) {
+window.generateFamilyTree = async function() {
   if (!selectedChar) { alert('Select a character first.'); return; }
-  const charId  = selectedChar.id;
+  const char    = selectedChar;
+  const charId  = char.id;
   const depth   = document.getElementById('familyDepth2')?.checked ? 2 : 1;
   const statusEl = document.getElementById('familyStatus');
   const treeEl   = document.getElementById('familyTree');
@@ -1055,10 +1357,8 @@ window.generateFamilyTree = async function(replace=false) {
   treeEl.innerHTML = '';
 
   try {
-    const res = await fetch(`/api/editor/characters/${charId}/generate_family`, {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ sim_id: 'default', depth, replace }),
+    const res = await fetch(`/debug/sandbox/${char.sandboxId}/characters/${charId}/generate_family?depth=${depth}`, {
+      method: 'POST',
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.detail || res.statusText);
@@ -1071,11 +1371,7 @@ window.generateFamilyTree = async function(replace=false) {
     // Render the tree
     treeEl.innerHTML = _renderFamilyHTML(fam, charId);
 
-    // Refresh instance data (family_id is now set)
-    const worldRes = await fetch('/api/editor/world?sim_id=default');
-    const world    = await worldRes.json();
-    const updated  = world?.characters?.[charId];
-    if (updated) selectedChar.instance = updated;
+    char._fullChar = null; // family_id changed on the character -- refetch on next full-char need
 
   } catch(e) {
     statusEl.textContent = '⚠ ' + e.message;
@@ -1125,16 +1421,19 @@ function _renderFamilyHTML(fam, focusId) {
   return html;
 }
 
-// Hook into refreshTab
-const _origRefreshTab = refreshTab;
-// Patch refreshTab by re-declaring (module scope safe via closure)
-window._refreshFamilyTab = function() {
+window._refreshFamilyTab = async function() {
   if (!selectedChar) return;
-  const fam_id = selectedChar.instance?.family_id;
+  const char = selectedChar;
+  if (!char._fullChar) await fetchFullChar(char);
+  if (selectedChar !== char) return; // selection changed while awaiting
+
   const statusEl = document.getElementById('familyStatus');
   const treeEl   = document.getElementById('familyTree');
-  if (!fam_id) {
+  if (!char._fullChar?.family_id) {
     if (statusEl) statusEl.textContent = 'No family tree yet — click Generate.';
     if (treeEl)   treeEl.innerHTML = '';
   }
+  // If a family_id exists, leave whatever generateFamilyTree() last wrote
+  // to #familyTree in place -- there's no GET-family-by-id endpoint to
+  // re-render from on a tab switch alone.
 };
