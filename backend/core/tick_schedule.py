@@ -48,6 +48,7 @@ CADENCE = {
     "memory_decay":         15,
     "polarization":         15,
     "relationships":        15,   # replaces every-tick O(N²) loop
+    "influence_exposure":   30,   # trust-gated resolution of exposure_ticks (see systems/influence.py)
     "health":               30,
     "item_knowledge":       10,
 

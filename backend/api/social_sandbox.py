@@ -42,7 +42,7 @@ _SANDBOX_MAX = 20
 _TEMPLATE_OVERRIDE_FIELDS = [
     "model", "traits", "physical_traits", "hobbies", "worn",
     "starting_inventory", "job", "education", "current_school",
-    "work_history", "legal", "household_id",
+    "work_history", "legal", "household_id", "bio",
 ]
 
 

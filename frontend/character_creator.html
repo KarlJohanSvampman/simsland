@@ -491,6 +491,20 @@ button:hover { background: #556170; }
     <button onclick="window.saveTemplate()">Save</button>
   </div>
 
+  <div id="generateRelativeRow" style="display:flex; gap:6px; padding:8px 10px; align-items:center;">
+    <select id="fldRelationType" style="flex:1; background:#1a1e28; border:1px solid #3a4050; color:#eee; border-radius:3px; padding:4px; font-size:12px;">
+      <option value="parent">Parent</option>
+      <option value="sibling">Sibling</option>
+      <option value="child">Child</option>
+      <option value="spouse">Spouse</option>
+      <option value="grandparent">Grandparent</option>
+      <option value="aunt_uncle">Aunt / Uncle</option>
+      <option value="cousin">Cousin</option>
+      <option value="ex_spouse">Ex-Spouse</option>
+    </select>
+    <button onclick="window.generateRelative()">Generate Relative</button>
+  </div>
+
   <div id="templateList"></div>
 
 </aside>
@@ -548,6 +562,11 @@ button:hover { background: #556170; }
         <span class="sliderValue" id="fldWeightLabel">—</span>
       </div>
       <div class="deriveNote">Stored, doesn't affect the model's visual shape yet.</div>
+
+      <div class="formRow" style="align-items:flex-start;">
+        <label>Bio</label>
+        <textarea id="fldBio" rows="5" placeholder="Backstory, personality notes, life history..." style="flex:1; max-width:480px; padding:5px 7px; background:#1a1e28; border:1px solid #3a4050; color:#eee; border-radius:3px; font-size:13px; resize:vertical; font-family:inherit;"></textarea>
+      </div>
 
       <div style="margin-top:16px;">
         <button class="randomizeBtn" onclick="window.randomizeBasic()">🎲 Randomize</button>

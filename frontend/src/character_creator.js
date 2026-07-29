@@ -251,6 +251,7 @@ function openTemplate(id) {
     _animOverrides: Object.fromEntries(
       Object.entries(animBank._character_overrides?.[id] || {}).map(([k, v]) => [k, { ...v }])
     ),
+    bio: raw.bio || '',
     job: raw.job ? { ...raw.job } : null,
     education: raw.education || '',
     current_school: raw.current_school || '',
@@ -283,6 +284,34 @@ window.createTemplate = function () {
   while (definitions.character_templates[id]) { id = `new_character_${n++}`; }
   definitions.character_templates[id] = { name: id, age: 25, sex: "male" };
   openTemplate(id);
+};
+
+window.generateRelative = async function () {
+  if (!currentTemplateId) {
+    setStatus('Select a template first');
+    return;
+  }
+  const relationType = document.getElementById('fldRelationType').value;
+  setStatus('Generating relative...');
+  try {
+    const res = await fetch(`/api/editor/character_templates/${currentTemplateId}/generate_relative?sim_id=default`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sim_id: 'default', relation_type: relationType }),
+    });
+    const data = await res.json();
+    if (!data.ok) {
+      setStatus('Generate relative failed');
+      return;
+    }
+    definitions.character_templates[data.template_id] = data.template;
+    renderTemplateList();
+    openTemplate(data.template_id);
+    setStatus(`Generated ${data.template_id} (not yet saved)`);
+  } catch (err) {
+    console.error(err);
+    setStatus('Generate relative failed');
+  }
 };
 
 window.deleteTemplate = function () {
@@ -472,7 +501,7 @@ function updatePreview() {
   const asset = meshbank[modelKey];
 
   if (!asset?.mesh) {
-    showPlaceholder(`No preview available for ${working.sex}/${ageGroup} yet (model key: ${modelKey})`);
+    showPlaceholder(`No preview available for ${working.sex}/${deriveAgeGroup(working.age ?? 25)} yet (model key: ${modelKey})`);
     return;
   }
 
@@ -506,6 +535,7 @@ const fldHeight = document.getElementById('fldHeight');
 const fldWeight = document.getElementById('fldWeight');
 const fldWeightLabel = document.getElementById('fldWeightLabel');
 const ageGroupNote = document.getElementById('ageGroupNote');
+const fldBio    = document.getElementById('fldBio');
 
 function weightLabelFor(bodyFat) {
   if (bodyFat >= 0.70) return 'obese';
@@ -521,9 +551,11 @@ function renderBasicTab() {
   fldWeight.value = working.body_composition.body_fat_level;
   fldWeightLabel.textContent = `${working.body_composition.body_fat_level.toFixed(2)} (${weightLabelFor(working.body_composition.body_fat_level)})`;
   ageGroupNote.textContent = `age group: ${deriveAgeGroup(working.age ?? 25)}`;
+  fldBio.value = working.bio || '';
 }
 
 fldName.addEventListener('input', () => { working.name = fldName.value; });
+fldBio.addEventListener('input', () => { working.bio = fldBio.value; });
 fldAge.addEventListener('input', () => {
   working.age = parseInt(fldAge.value) || 0;
   ageGroupNote.textContent = `age group: ${deriveAgeGroup(working.age)}`;

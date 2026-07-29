@@ -93,10 +93,15 @@ def _random_char_for_role(world, defs, age_lo, age_hi, sex=None, exclude_ids=Non
     ]
     return random.choice(candidates) if candidates else None
 
-def _stub_npc(world, defs, age, sex, surname=None):
+def _stub_npc(world, defs, age, sex, surname=None, seed_char=None, relation_type=None):
     """
     Generate a minimal off-screen NPC character (no position, not active).
     Used for relatives who aren't in the simulation proper.
+
+    When seed_char/relation_type are both given, traits/hobbies/
+    physical_traits are derived from seed_char via
+    relative_gen.derive_relative() instead of being fully random, and a
+    small templated bio is attached -- see relative_gen.py.
     """
     from systems.character_gen import generate_character
     overrides = {
@@ -105,6 +110,13 @@ def _stub_npc(world, defs, age, sex, surname=None):
         "x": -9999, "y": -9999,
         "is_offscreen": True,
     }
+    if seed_char is not None and relation_type is not None:
+        from systems.relative_gen import derive_relative, _fallback_bio
+        derived = derive_relative(seed_char, relation_type, defs, sex=sex)
+        overrides["traits"]          = derived["traits"]
+        overrides["hobbies"]         = derived["hobbies"]
+        overrides["physical_traits"] = derived["physical_traits"]
+        overrides["bio"]             = _fallback_bio(seed_char, relation_type, derived["traits"])
     if surname:
         c = generate_character(defs, overrides)
         c["family_name"] = surname
@@ -177,7 +189,8 @@ def generate_family_for_character(char, world, defs, depth=1):
         # Father
         father = _random_char_for_role(world, defs, parent_age_lo, parent_age_hi, sex="male", exclude_ids=[char_id])
         if father is None:
-            father = _stub_npc(world, defs, random.randint(parent_age_lo, min(parent_age_hi, 90)), "male", surname)
+            father = _stub_npc(world, defs, random.randint(parent_age_lo, min(parent_age_hi, 90)), "male", surname,
+                                seed_char=char, relation_type="parent")
         father["family_id"]   = fam_id
         father["family_role"] = "parent"
         _add_member(family, father["id"])
@@ -187,7 +200,8 @@ def generate_family_for_character(char, world, defs, depth=1):
         mother_surname = surname if random.random() < 0.5 else f"{surname}-{'Smith'}"
         mother = _random_char_for_role(world, defs, parent_age_lo, parent_age_hi, sex="female", exclude_ids=[char_id, father["id"]])
         if mother is None:
-            mother = _stub_npc(world, defs, random.randint(parent_age_lo, min(parent_age_hi, 90)), "female")
+            mother = _stub_npc(world, defs, random.randint(parent_age_lo, min(parent_age_hi, 90)), "female",
+                                seed_char=char, relation_type="parent")
         mother["family_id"]   = fam_id
         mother["family_role"] = "parent"
         _add_member(family, mother["id"])
@@ -199,9 +213,10 @@ def generate_family_for_character(char, world, defs, depth=1):
             for parent_c, label_from_char in [(father, "grandparent"), (mother, "grandparent")]:
                 p_age = parent_c.get("age", 50)
                 for gp_sex in ("male", "female"):
-                    gp_age_lo = max(40, p_age + 18)
-                    gp_age_hi = p_age + 40
-                    gp = _stub_npc(world, defs, random.randint(gp_age_lo, min(gp_age_hi, 100)), gp_sex)
+                    gp_age_hi = min(p_age + 40, 100)
+                    gp_age_lo = min(max(40, p_age + 18), gp_age_hi)
+                    gp = _stub_npc(world, defs, random.randint(gp_age_lo, gp_age_hi), gp_sex,
+                                    seed_char=char, relation_type="grandparent")
                     gp["family_id"]   = fam_id
                     gp["family_role"] = "grandparent"
                     _add_member(family, gp["id"])
@@ -218,7 +233,8 @@ def generate_family_for_character(char, world, defs, depth=1):
             sib = _random_char_for_role(world, defs, sib_age_lo, sib_age_hi, sex=sib_sex,
                                         exclude_ids=list(family["members"]))
             if sib is None:
-                sib = _stub_npc(world, defs, random.randint(sib_age_lo, sib_age_hi), sib_sex, surname)
+                sib = _stub_npc(world, defs, random.randint(sib_age_lo, sib_age_hi), sib_sex, surname,
+                                 seed_char=char, relation_type="sibling")
             sib["family_id"]   = fam_id
             sib["family_role"] = "sibling"
             _add_member(family, sib["id"])
@@ -251,7 +267,8 @@ def generate_family_for_character(char, world, defs, depth=1):
                                        max(18, age - 12), age + 12,
                                        sex=sp_sex, exclude_ids=list(family["members"]))
             if sp is None:
-                sp = _stub_npc(world, defs, random.randint(max(18, age - 12), age + 12), sp_sex)
+                sp = _stub_npc(world, defs, random.randint(max(18, age - 12), age + 12), sp_sex,
+                                seed_char=char, relation_type="spouse")
             sp["family_id"]   = fam_id
             sp["family_role"] = "spouse"
             _add_member(family, sp["id"])
@@ -268,7 +285,8 @@ def generate_family_for_character(char, world, defs, depth=1):
                     kid = _random_char_for_role(world, defs, max(1, kid_age - 2), kid_age + 2,
                                                 sex=kid_sex, exclude_ids=list(family["members"]))
                     if kid is None:
-                        kid = _stub_npc(world, defs, kid_age, kid_sex, surname)
+                        kid = _stub_npc(world, defs, kid_age, kid_sex, surname,
+                                         seed_char=char, relation_type="child")
                     kid["family_id"]   = fam_id
                     kid["family_role"] = "child"
                     _add_member(family, kid["id"])
@@ -284,7 +302,8 @@ def generate_family_for_character(char, world, defs, depth=1):
         elif age >= 30 and random.random() < 0.20:
             # Divorced
             sp_sex = "female" if sex == "male" else "male"
-            ex = _stub_npc(world, defs, random.randint(max(18, age - 10), age + 10), sp_sex)
+            ex = _stub_npc(world, defs, random.randint(max(18, age - 10), age + 10), sp_sex,
+                            seed_char=char, relation_type="ex_spouse")
             ex["family_id"]   = fam_id
             ex["family_role"] = "ex_spouse"
             _add_member(family, ex["id"])
@@ -301,7 +320,7 @@ def generate_family_for_character(char, world, defs, depth=1):
             for _ in range(num_au):
                 au_sex = random.choice(["male", "female"])
                 au_age = random.randint(max(20, p_age - 12), p_age + 12)
-                au = _stub_npc(world, defs, au_age, au_sex)
+                au = _stub_npc(world, defs, au_age, au_sex, seed_char=char, relation_type="aunt_uncle")
                 au["family_id"]   = fam_id
                 au["family_role"] = "aunt_uncle"
                 _add_member(family, au["id"])
@@ -313,7 +332,7 @@ def generate_family_for_character(char, world, defs, depth=1):
                 for _ in range(num_cousins):
                     c_age = random.randint(max(1, age - 15), age + 15)
                     c_sex = random.choice(["male", "female"])
-                    cous  = _stub_npc(world, defs, c_age, c_sex)
+                    cous  = _stub_npc(world, defs, c_age, c_sex, seed_char=char, relation_type="cousin")
                     cous["family_id"]   = fam_id
                     cous["family_role"] = "cousin"
                     _add_member(family, cous["id"])

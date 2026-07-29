@@ -1300,6 +1300,9 @@ def build_narrative(c, world):
     for line in _build_worries_context(c, world):
         paragraphs.append(line)
 
+    for line in _build_influence_context(c, world):
+        paragraphs.append(line)
+
     # ---- touch proposals + intimacy state — restores
     # _build_touch_proposal_context/_build_intimacy_context, previously
     # unused (dead code, same gap as relationships/memories above) ----
@@ -1598,6 +1601,29 @@ def _build_worries_context(c, world):
             line += f" You wonder if {blamed} is involved instead."
         lines.append(line)
 
+    return lines
+
+
+def _build_influence_context(c, world):
+    """Surfaces recent trait absorptions from trusted, frequently-around
+    people (systems/peer_influence.py). The negative (distrust/paranoia)
+    branch needs no equivalent here -- it rides through the existing
+    worries.py plumbing above automatically, since resolve_exposure_influence()
+    reuses bump_suspicion()'s "prolonged_exposure" trigger note."""
+    absorbed = c.get("absorbed_traits", [])
+    if not absorbed:
+        return []
+
+    chars = world.get("characters", {})
+    recent = absorbed[-2:]
+    lines = []
+    for entry in recent:
+        source_name = chars.get(entry.get("source_person_id"), {}).get("name", "someone you're often around")
+        trait = entry.get("trait", "")
+        lines.append(
+            f"You've noticed yourself becoming more {trait.replace('_', ' ')} lately, "
+            f"since spending so much time around {source_name}."
+        )
     return lines
 
 

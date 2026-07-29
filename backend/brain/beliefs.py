@@ -1,4 +1,4 @@
-IDEOLOGY_AXES={"economic":["taxes","economy","cost_of_living","welfare"],"security":["crime","police","safety"],"social":["immigration","homelessness"],"institutional":["justice","government","media"]}
+IDEOLOGY_AXES={"economic":["taxes","economy","cost_of_living","welfare"],"security":["crime","police","safety"],"social":["immigration","homelessness"],"institutional":["justice","government","media"],"personal_conduct":["honor","loyalty","ambition","integrity","self_reliance"]}
 def update_belief(c, topic, sentiment, intensity, tick=0):
     b=c.setdefault("beliefs",{}).setdefault(topic,{"value":0.0,"certainty":0.1,"last_updated":tick})
     delta=0.2*float(intensity)

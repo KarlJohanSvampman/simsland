@@ -145,6 +145,7 @@ def _spawn_character_locked(sim_id, template_id, x, y, body):
             if tmpl.get("work_history"):   overrides["work_history"] = tmpl["work_history"]
             if tmpl.get("legal"):          overrides["legal"] = tmpl["legal"]
             if tmpl.get("household_id"):   overrides["household_id"] = tmpl["household_id"]
+            if tmpl.get("bio"):             overrides["bio"] = tmpl["bio"]
             if tmpl.get("instance"): overrides.update(tmpl["instance"])
             character = generate_character(defs, overrides)
         else:
@@ -270,3 +271,64 @@ async def generate_family(char_id: str, request: Request):
     return await asyncio.get_event_loop().run_in_executor(
         None, _generate_family_locked, sim_id, char_id, depth, replace
     )
+
+
+# =====================================
+# GENERATE RELATIVE TEMPLATE (Character Creator only)
+# =====================================
+
+@router.post("/character_templates/{template_id}/generate_relative")
+async def generate_relative(template_id: str, request: Request):
+    """
+    Derive a new character_template for a relative of an existing template,
+    using relative_gen's procedural trait/hobby/physical_trait inheritance
+    plus an LLM-written bio consistent with those picks (falling back to a
+    small templated bio on any LLM failure).
+
+    Stays read-only on the backend -- returns the new template dict, the
+    frontend's existing saveTemplate()/POST /api/editor/definitions flow
+    persists it, same as every other Character Creator edit.
+
+    Body: {sim_id, relation_type}
+    """
+    from systems.relative_gen import derive_relative, estimate_age_sex, _fallback_bio
+    from llm.relative_narration import generate_relative_narration
+
+    body = await request.json() if request.headers.get("content-length", "0") != "0" else {}
+    sim_id = body.get("sim_id", "default")
+    relation_type = body.get("relation_type")
+    if not relation_type:
+        raise HTTPException(status_code=400, detail="relation_type is required")
+
+    defs = load_definitions(sim_id)
+    source = defs.get("character_templates", {}).get(template_id)
+    if not source:
+        raise HTTPException(status_code=404, detail=f"Character template '{template_id}' not found")
+
+    derived = derive_relative(source, relation_type, defs)
+    derived_age, derived_sex = estimate_age_sex(source.get("age", 25), source.get("sex", "male"), relation_type)
+
+    bio = await generate_relative_narration(
+        source, relation_type, derived["traits"], derived["hobbies"], derived_age, derived_sex,
+    )
+    if not bio:
+        bio = _fallback_bio(source, relation_type, derived["traits"])
+
+    new_id = f"{template_id}_{relation_type}"
+    n = 1
+    while new_id in defs.get("character_templates", {}):
+        n += 1
+        new_id = f"{template_id}_{relation_type}_{n}"
+
+    source_name = source.get("name", template_id)
+    new_template = {
+        "name": f"{source_name}'s {relation_type.replace('_', ' ')}",
+        "age": derived_age,
+        "sex": derived_sex,
+        "bio": bio,
+        "traits": derived["traits"],
+        "hobbies": derived["hobbies"],
+        "physical_traits": derived["physical_traits"],
+    }
+
+    return {"ok": True, "template_id": new_id, "template": new_template}

@@ -87,6 +87,11 @@ def ensure_relationship(
 
             "interaction_count": 0,
 
+            # Cumulative proximity/exposure ticks, distinct from
+            # interaction_count -- incremented just by being visibly nearby,
+            # not by actually interacting. See systems/influence.py.
+            "exposure_ticks": 0,
+
             "positive_interactions": 0,
 
             "negative_interactions": 0,

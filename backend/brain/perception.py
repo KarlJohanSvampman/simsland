@@ -504,6 +504,15 @@ def perceive_people(
         )
 
         # =====================================
+        # EXPOSURE TRACKING (systems/influence.py) — cumulative proximity,
+        # distinct from trust/familiarity. Deliberately asymmetric: only
+        # bumps the observer's own relationship entry, same as the rest of
+        # this function's effects.
+        # =====================================
+        from brain.relationships import ensure_relationship
+        ensure_relationship(c, other["id"])["exposure_ticks"] += 1
+
+        # =====================================
         # ATTENTION REINFORCEMENT
         # =====================================
 

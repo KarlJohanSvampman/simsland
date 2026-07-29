@@ -84,7 +84,7 @@ from systems.body_composition import tick_body_composition
 # -- Very slow (÷300) ─────────────────────────────────────────────
 from systems.crisis         import check_crises, process_crises
 from systems.politics       import process_pending_effects, check_election
-from systems.influence      import apply_public_figure_influence, apply_social_influence
+from systems.influence      import apply_public_figure_influence, apply_social_influence, resolve_exposure_influence
 from systems.socioeconomics import tick_socioeconomics
 from systems.reputation     import tick_reputation
 from systems.secrets        import tick_secrets
@@ -282,6 +282,13 @@ def tick(world):
 
     if every(world, CADENCE["relationships"], offset=4):
         _update_nearby_relationships(characters, world)
+
+    # Trust-gated influence resolution -- who each character is around the
+    # most (perception.py's exposure_ticks) shapes whether they adopt that
+    # person's beliefs/traits (trusted) or grow suspicious (distrusted).
+    # See systems/influence.py.
+    if every(world, CADENCE["influence_exposure"], offset=21):
+        resolve_exposure_influence(world)
 
     # -- Medium: household systems (÷10) ────────────────────
     if every(world, CADENCE["cooking"], offset=5):
