@@ -252,8 +252,8 @@ async def llm_test_ep(req: LLMTestReq):
 
     try:
         raw_response = await asyncio.wait_for(
-            call_llm(messages, use_cache=req.use_cache),
-            timeout=60,
+            call_llm(messages, use_cache=req.use_cache, timeout=180.0),
+            timeout=200,
         )
         if isinstance(raw_response, dict):
             parsed = raw_response

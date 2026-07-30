@@ -510,7 +510,8 @@ def perceive_people(
         # this function's effects.
         # =====================================
         from brain.relationships import ensure_relationship
-        ensure_relationship(c, other["id"])["exposure_ticks"] += 1
+        exposure_rel = ensure_relationship(c, other["id"])
+        exposure_rel["exposure_ticks"] = exposure_rel.get("exposure_ticks", 0) + 1
 
         # =====================================
         # ATTENTION REINFORCEMENT
