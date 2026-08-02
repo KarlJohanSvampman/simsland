@@ -22,6 +22,7 @@ See core/event_handlers.py for all subscriptions.
 """
 
 from datetime import datetime
+import os
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -29,6 +30,9 @@ import core.event_handlers  # noqa: F401 — registers all subscriptions on impo
 
 from core.tick_schedule import every, CADENCE, TICK_RATE_SECONDS
 from core.event_bus     import flush as flush_events
+
+# Kill switch for the event bus flush — in case a newly-live handler misbehaves.
+EVENT_BUS_ENABLED = os.getenv("EVENT_BUS_ENABLED", "1") != "0"
 
 # -- Per-tick (always) -------------------------------------------
 from brain.agent_loop   import update_agent
@@ -525,6 +529,8 @@ def tick(world):
             wait = c.get("character_wait")
             if wait and not wait.get("ready") and world["tick"] >= wait.get("ready_at_tick", 0):
                 wait["ready"] = True
+                from brain.cognition_scheduler import wake_character
+                wake_character(c, world, "wait_ready")
 
     # -- Maybe-RSVP deadline nudges ──────────────────────────────
     if every(world, CADENCE["maybe_deadlines"], offset=31):
@@ -536,3 +542,9 @@ def tick(world):
     # Story arcs are lightweight — keep per-tick
     for c in characters:
         update_story_arc(c)
+
+    # Process events queued this tick (emitted from worker threads during
+    # agent updates and from the systems above) — must run last, main-thread
+    # only, after every emit() site for this tick has had a chance to fire.
+    if EVENT_BUS_ENABLED:
+        flush_events(world)

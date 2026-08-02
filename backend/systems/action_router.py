@@ -134,6 +134,40 @@ def apply_speech(c, world, speech):
                 "observations":   result.get("observations", []),
             })
 
+    # =====================================================
+    # WAKE LISTENERS — see brain/cognition_scheduler.py. A directed line
+    # wakes only its target; an untargeted/ambient line wakes up to 4
+    # nearby people by visibility (capped so a shout in a crowded room
+    # doesn't stampede everyone present into a simultaneous LLM call on a
+    # 2-slot Ollama budget).
+    #
+    # Deliberately emit-only here, not a direct wake_character() call —
+    # this runs inside the speaker's own agent worker thread, but the
+    # listener(s) may be a different character concurrently being
+    # processed by their own worker thread this same tick. Mutating
+    # another character's cognition dict from off-thread would race;
+    # routing through core/event_bus.py's emit() (thread-safe) + the
+    # heard_speech subscription in core/event_handlers.py (applied at
+    # flush(), main-thread-only, after all workers finish) avoids that.
+    # =====================================================
+    from core.event_bus import emit
+
+    if listener:
+        emit("heard_speech", {
+            "listener_id": listener["id"], "speaker_id": c["id"],
+            "speaker_name": c.get("name") or c["id"], "utterance": utterance,
+        })
+    else:
+        nearby = (c.get("perception") or {}).get("visible_people", [])[:4]
+        for entry in nearby:
+            listener_id = entry.get("id")
+            if not listener_id:
+                continue
+            emit("heard_speech", {
+                "listener_id": listener_id, "speaker_id": c["id"],
+                "speaker_name": c.get("name") or c["id"], "utterance": utterance,
+            })
+
 
 # =========================================================
 # CLEAR EXPIRED SPEECH
@@ -396,6 +430,154 @@ def _route_wait(c, world, action):
         interaction="wait",
         duration=ticks,
     )
+
+
+# =========================================================
+# ROUTE DESCRIBE (Round 8) — costs no in-world time, only yields more
+# description; never sets c["activity"] and never emits activity_* events
+# (that would trigger the c["activity"]-truthy gate in agent_loop.py and
+# swallow the character's very next think() for the activity's whole
+# duration — the exact bug the older _route_examine already has, worth
+# not repeating here).
+# =========================================================
+
+def _route_describe(c, world, action):
+    from brain.describe_registry import produce_description
+    from brain.cognition_scheduler import stage_and_wake, record_describe_or_recall
+
+    record_describe_or_recall("describe")
+
+    target_id = action.get("target")
+    aspect = action.get("aspect") or "default"
+
+    if not target_id:
+        # No target — room, self, or activity, disambiguated by aspect.
+        if aspect in ("inventory", "equipped", "body", "feelings"):
+            target_kind = "self"
+        elif aspect == "activity":
+            target_kind, aspect = "activity", "default"
+        else:
+            target_kind, aspect = "room", "default"
+    elif target_id in world.get("characters", {}):
+        target_kind = "character"
+    else:
+        from systems.props import get_prop_by_id
+        target_kind = "prop" if get_prop_by_id(world, target_id) else "item"
+
+    text = produce_description(c, world, target_kind, aspect, target_id)
+    stage_and_wake(c, world, text, "describe_result")
+
+
+# =========================================================
+# ROUTE RECALL (Round 9) — costs no in-world time, same no-activity rule
+# as _route_describe above. No target_description: surfaces last_thought
+# + the highest-priority active intention. With one: tries resolving it
+# against a nearby/known character's name first (recall's overwhelmingly
+# common subject — matching a proper name against memory text works far
+# better than matching a vague description against it), falling back to
+# the raw query text if that doesn't resolve. Deliberately does NOT go
+# through action_resolver.resolve_and_apply()'s normal resolve-or-fail
+# path (see action_registry.py's "recall" spec, target="none") — an
+# unresolvable subject here should still search memory text, not stage a
+# "nothing matches" retry and drop the recall entirely.
+# =========================================================
+
+def _route_recall(c, world, action, available_actions=None):
+    from brain.memory import biased_recall
+    from brain.cognition_scheduler import stage_and_wake, record_describe_or_recall
+
+    record_describe_or_recall("recall")
+
+    query = (action.get("target_description") or "").strip()
+
+    if not query:
+        text = _default_recall_text(c)
+        stage_and_wake(c, world, text, "recall_result")
+        return
+
+    subject_name = _resolve_recall_subject(c, world, query, available_actions)
+    memories = biased_recall(c, query=subject_name or query, limit=5)
+    text = _render_recall_result(query, memories)
+    stage_and_wake(c, world, text, "recall_result")
+
+
+def _default_recall_text(c):
+    parts = []
+
+    thought = c.get("last_thought")
+    if thought:
+        parts.append(f'Your last thought: "{thought}"')
+
+    active = c.get("active_intentions") or []
+    if active:
+        from brain.intentions import final_priority
+        top = max(active, key=final_priority)
+        reason = top.get("reason")
+        if reason:
+            parts.append(f"You'd been meaning to: {reason}")
+
+    if not parts:
+        return "Nothing in particular comes to mind right now."
+    return " ".join(parts)
+
+
+def _resolve_recall_subject(c, world, query, available_actions):
+    from brain.action_resolver import _score, ACCEPT_THRESHOLD
+
+    chars = world.get("characters", {})
+    pool = []
+    if available_actions:
+        for entry in available_actions.get("nearby_characters") or []:
+            eid = entry.get("id")
+            if eid and entry.get("name"):
+                pool.append((eid, [entry["name"]]))
+        for entry in available_actions.get("known_contacts") or []:
+            eid = entry.get("id")
+            if eid and entry.get("name"):
+                pool.append((eid, [entry["name"]]))
+    else:
+        for other_id in c.get("relationships", {}):
+            other = chars.get(other_id)
+            if other and other.get("name"):
+                pool.append((other_id, [other["name"]]))
+
+    best_id, best_score = None, 0.0
+    for cid, bag in pool:
+        s = _score(query, bag)
+        if s > best_score:
+            best_id, best_score = cid, s
+
+    if best_id is not None and best_score >= ACCEPT_THRESHOLD:
+        target = chars.get(best_id)
+        if target:
+            return target.get("name")
+    return None
+
+
+def _render_recall_result(query, memories):
+    if not memories:
+        return f'You try to recall something about "{query}", but nothing comes.'
+
+    now = time.time()
+    lines = []
+    for m in memories:
+        age = _humanize_memory_age(now - m.get("created_at", now))
+        text = m.get("text", "")
+        if text:
+            lines.append(f"({age}) {text}")
+
+    if not lines:
+        return f'You try to recall something about "{query}", but nothing comes.'
+    return "What you remember:\n" + "\n".join(lines)
+
+
+def _humanize_memory_age(seconds):
+    seconds = max(0, seconds)
+    if seconds < 3600:
+        return f"{max(1, int(seconds // 60))}m ago"
+    if seconds < 86400:
+        return f"{int(seconds // 3600)}h ago"
+    return f"{int(seconds // 86400)}d ago"
 
 
 # =========================================================
@@ -690,7 +872,7 @@ def _route_hire_service(c, world, action):
 # MAIN ROUTER
 # =========================================================
 
-def route_action(c, world, action, speech, definitions=None):
+def route_action(c, world, action, speech, definitions=None, available_actions=None):
     """
     Dispatch the LLM's action and speech into world state.
 
@@ -756,6 +938,12 @@ def route_action(c, world, action, speech, definitions=None):
 
     elif action_type == "work":
         c["activity"] = _scaffold(c, world, "work", interaction="work")
+
+    elif action_type == "describe":
+        _route_describe(c, world, action)
+
+    elif action_type == "recall":
+        _route_recall(c, world, action, available_actions)
 
     elif action_type == "examine":
         _route_examine(c, world, action)

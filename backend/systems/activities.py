@@ -1200,6 +1200,9 @@ def start_activity(
         anchor
     )
 
+    from core.event_bus import emit
+    emit("activity_started", {"character_id": c["id"], "activity_type": activity_type})
+
     return True
 
 # =========================================================
@@ -1443,6 +1446,22 @@ def execute_activity(
             complete_activity(c, world, act)
             set_activity_phase(act, "finishing", world)
             c["animation_state"] = get_phase_animation(interaction, "finishing")
+
+            # Wake the character for a fresh (brief-mode) think() once the
+            # finishing animation plays out — see brain/cognition_scheduler.py.
+            # Deliberately only fired on this specific transition, not every
+            # set_activity_phase() call (walking/picking_up/delivering/etc.
+            # are still mid-activity and the existing c["activity"] gate
+            # already short-circuits update_agent() for those).
+            from core.event_bus import emit
+            from brain.cognition_scheduler import wake_character
+            emit("activity_phase_changed", {
+                "character_id": c["id"],
+                "activity_type": act.get("type"),
+                "from_phase": "using",
+                "to_phase": "finishing",
+            })
+            wake_character(c, world, "activity_phase_changed")
 
         return True
 
@@ -1775,6 +1794,9 @@ def complete_activity(
     from systems.habits import record_habit
     record_habit(c, activity_type, world)
 
+    from core.event_bus import emit
+    emit("activity_completed", {"character_id": c["id"], "activity_type": activity_type})
+
 
 # =========================================================
 # FINISH ACTIVITY
@@ -1788,6 +1810,19 @@ def finish_activity(c, world):
     (from the "using" -> "finishing" transition); this just releases the
     activity slot once the finishing animation's single tick has played.
     """
+    activity_type = (c.get("activity") or {}).get("type")
+
     c["activity"] = None
     c["current_intention"] = None
     c["animation_state"] = "idle"
+
+    # Wake the character now that it's actually free to decide again — see
+    # brain/cognition_scheduler.py. activity_phase_changed (fired one tick
+    # earlier, at the using->finishing transition) already woke it for a
+    # brief-mode think(), but that think() would have hit the still-truthy
+    # c["activity"] gate in agent_loop.py and bounced straight to
+    # execute_activity(); this is the actual free-to-act moment.
+    from core.event_bus import emit
+    from brain.cognition_scheduler import wake_character
+    emit("activity_finished", {"character_id": c["id"], "activity_type": activity_type})
+    wake_character(c, world, "activity_finished")

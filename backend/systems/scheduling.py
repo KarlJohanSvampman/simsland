@@ -290,6 +290,9 @@ def update_schedule_runtime(c, world):
 
     c["active_schedule_block"] = current
 
+    from brain.cognition_scheduler import wake_character
+    wake_character(c, world, "schedule_block")
+
     if not current:
         return
 

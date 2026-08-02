@@ -51,6 +51,11 @@ from brain.llm_brain import (
     think
 )
 
+from brain.cognition_scheduler import (
+    should_think,
+    note_think,
+)
+
 from brain.memory import (
     decay_memories,
     store_memory
@@ -304,7 +309,9 @@ def process_decision(
 
     world,
 
-    decision
+    decision,
+
+    available_actions=None
 ):
 
     from systems.action_validator import (
@@ -394,6 +401,27 @@ def process_decision(
 
     if action:
 
+        # Resolve action["target_description"] -> action["target"] against
+        # the real candidate ids, if the envelope set one and didn't
+        # already supply a target — see brain/action_resolver.py. On
+        # failure this clears `action` (falling through to the `elif
+        # speech:` below, same as the LLM having given no action at all —
+        # a target that couldn't be resolved must not also silently
+        # swallow a real utterance).
+        if available_actions is not None:
+            from brain.action_resolver import resolve_and_apply
+            if not resolve_and_apply(c, world, action, available_actions):
+                action = None
+
+        # brain/llm_brain.py::_to_legacy_decision() gives speech the same
+        # target_description as the action when they're plausibly the
+        # same person (speak/socialize/phone_*), rather than resolving it
+        # a second time — reuse the action's already-resolved target here.
+        if action and speech and not speech.get("target") and speech.get("target_description") and action.get("target"):
+            speech["target"] = action["target"]
+
+    if action:
+
         valid = validate_action(
             c,
             world,
@@ -407,7 +435,8 @@ def process_decision(
                 world,
                 action,
                 speech,
-                definitions=world.get("definitions", {})
+                definitions=world.get("definitions", {}),
+                available_actions=available_actions
             )
 
             # route_action() above scaffolds c["activity"] for activity-style
@@ -432,8 +461,13 @@ def process_decision(
 
             c["last_invalid_action"] = action
 
+            if speech:
+                from systems.action_router import apply_speech
+                apply_speech(c, world, speech)
+
     elif speech:
-        # LLM wants to speak but gave no movement action
+        # LLM wants to speak but gave no action (or its target failed to
+        # resolve, see above)
         from systems.action_router import apply_speech
         apply_speech(c, world, speech)
 
@@ -658,12 +692,30 @@ def update_agent(
             return
 
     # =====================================
+    # COGNITION GATE
+    # =====================================
+    # Only call the LLM if there's actually something to decide — an idle
+    # cadence interval elapsed, an urgent body need just crossed threshold,
+    # or an event (perception/activity/speech) woke this character. See
+    # brain/cognition_scheduler.py for why this replaced calling think()
+    # on every single tick.
+
+    wake_reason = should_think(c, world)
+
+    if not wake_reason:
+        return
+
+    # =====================================
     # BUILD CONTEXT
     # =====================================
 
+    from brain.cognition_scheduler import wake_line as _wake_line
     context = build_context(
         c,
-        world
+        world,
+        trigger_reason=wake_reason,
+        wake_line=_wake_line(c),
+        staged=c.get("cognition", {}).get("staged_knowledge") or (),
     )
 
     # =====================================
@@ -676,6 +728,11 @@ def update_agent(
         session=c.get("_llm_session")
     )
 
+    # Clear the wake state and schedule the next idle check-in regardless
+    # of whether the LLM call succeeded — a failed call must not leave the
+    # character re-triggering should_think() every tick forever.
+    note_think(c, world, decision, wake_reason=wake_reason)
+
     if not decision:
         return
 
@@ -686,7 +743,8 @@ def update_agent(
     process_decision(
         c,
         world,
-        decision
+        decision,
+        available_actions=context.get("available_actions")
     )
 
     # =====================================

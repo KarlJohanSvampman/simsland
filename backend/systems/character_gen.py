@@ -408,7 +408,6 @@ def generate_character(defs, overrides=None):
         "memories":        [],
         "conversation_memory": [],
         "pending_reflections": [],
-        "recent_perception_memory": [],
         "intentions":      [],
         "activity":        None,
         "activity_queue":  [],

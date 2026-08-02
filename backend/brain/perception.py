@@ -1272,19 +1272,28 @@ def perceive(
 
     c["perception"] = perception
 
-    c["last_perception_tick"] = (
-        world.get(
-            "tick",
-            0
-        )
-    )
+    # Diff this tick's visible people against last tick's to fire
+    # person_entered_view wakes (see brain/cognition_scheduler.py) for
+    # newly-visible people only — not a poll every tick regardless of
+    # change, and not every tick someone merely stays in view.
+    current_visible_ids = {p["id"] for p in visible_people if p.get("id")}
+    prev_visible_ids_list = c.get("_prev_visible_ids")
 
-    c["recent_perception_memory"] = (
+    if prev_visible_ids_list is not None:
+        from core.event_bus import emit
+        newly_visible = current_visible_ids - set(prev_visible_ids_list)
+        for other_id in newly_visible:
+            other_entry = next((p for p in visible_people if p["id"] == other_id), None)
+            emit("person_entered_view", {
+                "observer_id": c["id"],
+                "subject_id": other_id,
+                "subject_name": (other_entry or {}).get("name") or other_id,
+            })
+    # else: first-ever perception pass for this character — seed silently,
+    # don't fire a wake for every person already in view on world load.
 
-        perception.get(
-            "visible_people",
-            []
-        )[:5]
-    )
+    # Stored as a list, not a set — the world is persisted as JSON
+    # (core/cache.py::validate_json_safe), which rejects Python sets.
+    c["_prev_visible_ids"] = list(current_visible_ids)
 
     return perception

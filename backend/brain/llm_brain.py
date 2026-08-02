@@ -1,4 +1,5 @@
 import json
+import difflib
 
 from llm.llm_client import (
     call_llm_safe
@@ -10,8 +11,81 @@ from llm.llm_gate import (
 
 
 # =========================================================
-# SYSTEM PROMPT
+# GENERATED SYSTEM PROMPT
 # =========================================================
+# Replaces the old static SYSTEM_PROMPT (below, kept only for the one-round
+# compatibility branch in think() — see there). Built fresh per call from
+# whatever this specific character can actually do right now (systems/
+# action_registry.py + brain/context_builder.py::build_available_actions())
+# instead of a single ~12KB enum covering every action type in the game.
+# Real per-character sizes run ~2-4KB.
+
+_PREAMBLE = """You are a persistent simulated person living inside a dynamic world.
+You ARE the character — not a narrator, not an observer.
+
+Stay consistent with your memories, intentions, emotions, relationships, beliefs, and personality.
+The world persists — consequences carry forward.
+
+You'll be given a scene described like a game master narrating it: what you perceive, remember,
+and feel right now. Respond the same way — describe your turn in your own words, the way a player
+narrates what their character does, says, and thinks. Then translate that into the small JSON
+shape below so the game can actually move your character.
+
+Never invent or guess an id or a number you weren't given. When your action needs to refer to a
+specific person, prop, or thing, describe it in your own words — a separate system matches your
+description to the right one. A few things (proposals, unattended phones, worn/carried items,
+walls — see "reference by exact id" below, if present) don't have a natural way to describe them
+in words, so those are given to you with real ids; use those exact ids only for those things."""
+
+
+def _format_action_menu(available_actions):
+    from systems.action_registry import ACTION_SPECS
+
+    offered = available_actions.get("action_types") or []
+    by_group = {}
+    for t in offered:
+        spec = ACTION_SPECS.get(t)
+        if not spec:
+            continue
+        by_group.setdefault(spec.get("group", "other"), []).append((t, spec))
+
+    lines = []
+    for group in sorted(by_group):
+        for t, spec in sorted(by_group[group]):
+            doc = spec.get("doc", "")
+            detail = spec.get("detail")
+            if detail:
+                doc = f"{doc} (set \"detail\" to the {detail})"
+            lines.append(f"- {t} — {doc}")
+    return "\n".join(lines)
+
+
+_ENVELOPE_FORMAT = """
+Respond with ONLY this JSON object — no markdown, no extra text, nothing outside the braces:
+{
+  "narration": "what you do, say, and think this turn, in your own words — 1-3 sentences",
+  "action": {
+    "type": "<one action type from the list above>",
+    "target_description": "who or what you're acting on, in your own words (omit if no target is needed)",
+    "detail": "extra detail the action needs, if the list above says so (omit otherwise)"
+  },
+  "say": "the exact words you say aloud this turn, if any (omit or leave empty if you don't speak)",
+  "then": "a short phrase for what you intend to do next, once this is done (optional)"
+}
+"""
+
+
+def build_system_prompt(available_actions):
+    menu = _format_action_menu(available_actions or {})
+    return f"{_PREAMBLE}\n\nActions you can take right now:\n{menu}\n{_ENVELOPE_FORMAT}"
+
+
+# =========================================================
+# LEGACY STATIC SYSTEM PROMPT
+# =========================================================
+# Kept only as the source for req.system_prompt_override defaults in
+# api/debug.py and for reference — think() itself always calls
+# build_system_prompt() now. Not otherwise used.
 
 SYSTEM_PROMPT = """
 You are a persistent simulated person living inside a dynamic world.
@@ -188,34 +262,65 @@ OUTPUT FORMAT  (strict JSON, no other text)
 # =========================================================
 # BUILD USER PROMPT
 # =========================================================
+# Scene actors/props/contacts (people, interactable props, known contacts)
+# are rendered as plain prose — brain/action_resolver.py fuzzy-matches
+# target_description against these same three pools, so the model never
+# needs their ids. A handful of remaining fields genuinely have no natural
+# language handle (which exact proposal, which specific unattended phone,
+# which worn/carried item, which wall) — those stay compact JSON under one
+# clearly-labeled block, same "opaque id, no paraphrase" reasoning the
+# overhaul plan applies to proposals/devices, extended here to the other
+# id-only pools rather than pretending the resolver covers them today.
+_ID_ONLY_KEYS = (
+    "open_proposals", "snoopable_devices", "wearable_items", "worn_slots",
+    "assembly_boxes", "tile_boxes", "paint_buckets", "nearby_walls",
+    "held_stack_names", "held_item", "active_incidents",
+)
+
+
+def _prose_scene(available_actions):
+    lines = []
+    people = available_actions.get("nearby_characters") or []
+    if people:
+        names = ", ".join(p.get("name") or p["id"] for p in people)
+        lines.append(f"People here: {names}.")
+    props = available_actions.get("interactable_props") or []
+    if props:
+        names = sorted({p.get("template") or p["id"] for p in props})
+        lines.append(f"Things here: {', '.join(names)}.")
+    contacts = available_actions.get("known_contacts") or []
+    if contacts:
+        names = ", ".join(c.get("name") or c["id"] for c in contacts[:15])
+        lines.append(f"People you could call or text (not here right now): {names}.")
+    return "\n".join(lines)
+
+
+def _id_only_block(available_actions):
+    payload = {k: available_actions[k] for k in _ID_ONLY_KEYS if available_actions.get(k)}
+    if not payload:
+        return ""
+    compact = json.dumps(payload, separators=(",", ":"))
+    return (
+        "\n\nThings below have no natural way to describe in words — reference them by "
+        f"their exact id when you need to:\n{compact}"
+    )
+
 
 def build_prompt(context):
 
     # context = {"narrative": "<prose>", "available_actions": {...}}
-    # (brain/context_builder.py::build_context). The narrative is sent as
-    # plain text — prose is denser per-token than the equivalent JSON (no
-    # repeated keys/braces/quotes), which is what actually motivated the
-    # older compact-JSON-only encoding this replaced. available_actions is
-    # still compact JSON (no pretty-print whitespace, same reasoning as
-    # before) — it's the one place literal ids appear, and those must stay
-    # exact.
+    # (brain/context_builder.py::build_context).
     narrative = context.get("narrative", "")
+    available_actions = context.get("available_actions", {}) or {}
 
-    legal_moves = json.dumps(
+    scene = _prose_scene(available_actions)
+    id_only = _id_only_block(available_actions)
 
-        context.get("available_actions", {}),
+    parts = [narrative]
+    if scene:
+        parts.append(scene)
 
-        separators=(",", ":")
-    )
-
-    return (
-
-        f"{narrative}\n\n"
-
-        f"LEGAL_MOVES (the only source of real ids — reference these "
-
-        f"exactly, never invent an id):\n{legal_moves}"
-    )
+    return "\n\n".join(p for p in parts if p) + id_only
 
 
 # =========================================================
@@ -223,23 +328,19 @@ def build_prompt(context):
 # =========================================================
 
 def validate_response(data):
-
-    required = [
-
-        "thought",
-
-        "emotion",
-
-        "goal",
-
-        "action"
-    ]
-
-    for r in required:
-
-        if r not in data:
-            return False
-
+    """Validates the new envelope shape only — narration (non-empty str)
+    and action.type (str) are the only hard requirements; say/then/
+    action.target_description/action.detail are all optional. A stale
+    prompt-cache hit returning the OLD shape is detected separately in
+    think() (via "thought" in data) and never reaches this function."""
+    if not isinstance(data, dict):
+        return False
+    narration = data.get("narration")
+    if not isinstance(narration, str) or not narration.strip():
+        return False
+    action = data.get("action")
+    if not isinstance(action, dict) or not isinstance(action.get("type"), str):
+        return False
     return True
 
 
@@ -254,8 +355,9 @@ def fallback_response():
         "thought":
             "I should wait and observe.",
 
-        "emotion":
-            "neutral",
+        # emotion deliberately absent — brain/emotion.py owns this now,
+        # see plan's "drop the field" decision. process_decision() only
+        # overwrites c["emotion"] when the key is present.
 
         "goal":
             "idle",
@@ -304,6 +406,104 @@ def _condense_turn(data):
     return " — ".join(bits) if bits else None
 
 
+# =========================================================
+# ENVELOPE -> LEGACY DECISION ADAPTER
+# =========================================================
+# Translates the new 4-key envelope (narration/action/say/then) into the
+# same shape process_decision() has always consumed — everything
+# downstream (validate_action -> route_action -> the 100+ _route_*
+# handlers) is untouched by this round. action.target_description is
+# passed through unresolved; brain/agent_loop.py::process_decision() runs
+# it through brain/action_resolver.py after this returns.
+
+_SPEAK_LIKE_TYPES = {"speak", "socialize", "phone_call", "phone_answer"}
+
+
+def _match_intention_type(phrase):
+    """Fuzzy-match a free-text "then" phrase against real activity types
+    (systems/activities.py::ACTIVITIES) using the same scorer brain/
+    action_resolver.py uses for targets — reused here for its exact same
+    strength (candidate pool is small, vocabulary overlap is the signal).
+    Falls back to the raw phrase as a free-text intention type if nothing
+    scores well; store_intention() already clamps/handles arbitrary
+    intention types safely."""
+    try:
+        from systems.activities import ACTIVITIES
+        from brain.action_resolver import _score
+    except ImportError:
+        return phrase
+
+    best_type, best_score = None, 0.0
+    for activity_type in ACTIVITIES:
+        s = _score(phrase, [activity_type.replace("_", " ")])
+        if s > best_score:
+            best_type, best_score = activity_type, s
+
+    return best_type if best_score >= 0.55 else phrase
+
+
+def _to_legacy_decision(envelope, char_id=None):
+    narration = (envelope.get("narration") or "").strip()
+
+    decision = {
+        "thought": narration,
+        "action": None,
+        "speech": None,
+        "intention": None,
+        "reflection": None,
+        # emotion deliberately dropped — brain/emotion.py::update_emotion()
+        # already runs every tick and owns this now, see plan.
+    }
+
+    action_in = envelope.get("action") or {}
+    action_type = action_in.get("type")
+    if action_type:
+        from systems.action_registry import ACTION_SPECS
+        spec = ACTION_SPECS.get(action_type, {})
+        legacy_action = {"type": action_type, "reason": narration[:200]}
+
+        target_description = action_in.get("target_description")
+        if target_description:
+            legacy_action["target_description"] = target_description
+
+        detail = action_in.get("detail")
+        if detail:
+            detail_field = spec.get("detail") or (
+                "interaction" if action_type == "interact" else "reason"
+            )
+            legacy_action[detail_field] = detail
+
+        decision["action"] = legacy_action
+
+    say = (envelope.get("say") or "").strip()
+    if say:
+        speech = {
+            "utterance": say,
+            "speech_act": "declare",
+            "topic": "",
+            "target": None,
+        }
+        # If the action targets a character and speech has no target of
+        # its own, they're almost certainly the same person — share the
+        # description so process_decision() can reuse the action's
+        # already-resolved target instead of resolving twice.
+        if action_type in _SPEAK_LIKE_TYPES:
+            action_target_desc = (decision["action"] or {}).get("target_description")
+            if action_target_desc:
+                speech["target_description"] = action_target_desc
+        decision["speech"] = speech
+
+    then = (envelope.get("then") or "").strip()
+    if then:
+        decision["intention"] = {
+            "type": _match_intention_type(then),
+            "reason": then,
+            "priority": 40,
+        }
+
+    return decision
+
+
 def think(
 
     context,
@@ -313,12 +513,18 @@ def think(
     session=None
 ):
 
+    available_actions = context.get("available_actions") or {}
+    system_prompt = build_system_prompt(available_actions)
+
     prompt = build_prompt(
         context
     )
 
+    from brain.cognition_scheduler import record_prompt_bytes
+    record_prompt_bytes(len(system_prompt.encode("utf-8")) + len(prompt.encode("utf-8")))
+
     messages = [
-        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "system", "content": system_prompt},
         {"role": "user",   "content": prompt},
     ]
 
@@ -362,13 +568,32 @@ def think(
 
         return fallback_response()
 
-    if not validate_response(data):
+    if not isinstance(data, dict):
 
         return fallback_response()
 
+    # Compatibility branch: llm_client.py caches by exact message hash for
+    # 5 minutes, so a call landing just after this round's schema flip
+    # could still return the OLD ("thought"/"emotion"/"goal"/"action")
+    # shape from a pre-flip cache entry. Detect and pass it straight
+    # through — process_decision() already understands it — rather than
+    # hard-failing into fallback_response(). Safe to delete any time after
+    # this round ships (once the cache window has cycled out).
+    if "thought" in data and "action" in data:
+
+        decision = data
+
+    else:
+
+        if not validate_response(data):
+
+            return fallback_response()
+
+        decision = _to_legacy_decision(data, char_id=char_id)
+
     if session is not None:
 
-        digest = _condense_turn(data)
+        digest = _condense_turn(decision)
 
         if digest:
 
@@ -376,4 +601,4 @@ def think(
 
             session["history"] = session["history"][-20:]
 
-    return data
+    return decision

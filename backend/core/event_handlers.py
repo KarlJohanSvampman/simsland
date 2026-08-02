@@ -17,9 +17,39 @@ Event chain overview:
   interview_scheduled       → process_interview (on its tick)
   bills_overdue             → evict_household
   household_wants_to_move   → _do_migrate
+  person_entered_view       → wake_character(observer, "person_entered_view")
+  heard_speech               → wake_character(listener, "heard_speech")
+
+Latency note on the last two: emit() is called from inside a character's own
+agent worker thread (brain/perception.py::perceive(), systems/
+action_router.py::apply_speech()), but the target of the wake is a
+*different* character who may be concurrently processed by their own worker
+thread this same tick. Mutating another character's c["cognition"] dict
+off-thread would race. Routing through emit() (thread-safe, see
+core/event_bus.py) and applying the actual wake_character() call here, at
+flush() (main-thread-only, after every worker for the tick has finished),
+avoids that at the cost of the wake landing one tick later than the emit —
+invisible at 1 tick == 1 simulated second. Self-wakes (a character's own
+activity finishing/aborting) don't have this problem — see
+systems/activities.py / systems/activity_queue.py, which call
+wake_character() directly, immediately, no bus round-trip needed.
 """
 
 from core.event_bus import subscribe
+
+
+def _wake(char_key, reason):
+    """Build a handler that resolves world["characters"][data[char_key]]
+    and marks it due for a think() call, tagging the wake with the event's
+    own payload so cognition_scheduler/context_builder can render a
+    wake_line without a second lookup."""
+    def handler(data, world, _char_key=char_key, _reason=reason):
+        from brain.cognition_scheduler import wake_character
+        c = world.get("characters", {}).get(data.get(_char_key))
+        if not c:
+            return
+        wake_character(c, world, _reason, data)
+    return handler
 
 
 # ── Health ────────────────────────────────────────────────
@@ -251,3 +281,9 @@ def _on_social_transgression_gossip(data, world):
         )
 
 subscribe("social_transgression_gossip", _on_social_transgression_gossip)
+
+
+# ── Cognition wakes (see brain/cognition_scheduler.py) ─────────────────────
+
+subscribe("person_entered_view", _wake("observer_id", "person_entered_view"))
+subscribe("heard_speech", _wake("listener_id", "heard_speech"))

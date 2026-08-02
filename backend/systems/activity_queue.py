@@ -191,6 +191,13 @@ def suspend_activity_queue(c, world, reason="interruption"):
     c["activity_queue"] = []
     c["activity"]       = None
 
+    # The character is now free (its activity gate cleared) and has a real
+    # reason to think right away — see brain/cognition_scheduler.py.
+    from core.event_bus import emit
+    from brain.cognition_scheduler import wake_character
+    emit("activity_aborted", {"character_id": c["id"], "reason": reason})
+    wake_character(c, world, "activity_aborted")
+
 
 # =========================================================
 # RESUME SUSPENDED SESSION

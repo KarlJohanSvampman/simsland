@@ -122,11 +122,22 @@ class CharWorldReq(BaseModel):
     world: Dict[str, Any] = {}
 
 
+class ResolveTargetReq(BaseModel):
+    character: Dict[str, Any] = {}
+    world: Dict[str, Any] = {}
+    action_type: str
+    description: str
+
+
 class LLMTestReq(BaseModel):
     character: Dict[str, Any] = {}
     world: Dict[str, Any] = {}
     system_prompt_override: Optional[str] = None
     use_cache: bool = False
+    # Route through llm/llm_gate.py's shared OLLAMA_MAX_CONCURRENCY semaphore
+    # so debug calls compete fairly with the live sim's own think() calls
+    # instead of sneaking in an extra unaccounted-for concurrent request.
+    use_gate: bool = True
 
 
 class LLMSendReq(BaseModel):
@@ -159,6 +170,12 @@ def architecture_page():
     return JSONResponse({"error": "architecture.html not found"}, status_code=404)
 
 
+@router.get("/events")
+def events_stats_ep():
+    from core.event_bus import stats
+    return stats()
+
+
 @router.get("")
 @router.get("/")
 def debug_page():
@@ -187,6 +204,24 @@ def build_context_ep(req: CharWorldReq):
         _partial_context(c, world, context, errors)
 
     return {"context": context, "errors": errors}
+
+
+@router.post("/resolve-target")
+def resolve_target_ep(req: ResolveTargetReq):
+    """Deterministic, LLM-free — the verification + threshold-tuning tool
+    for brain/action_resolver.py."""
+    from brain.action_resolver import resolve_target
+    from brain.context_builder import build_available_actions
+    from systems.schema_defaults import ensure_world_defaults
+
+    world = _build_world(req.world)
+    c = _build_char(req.character)
+    ensure_world_defaults(world)
+    world["characters"][c["id"]] = c
+
+    available_actions = build_available_actions(c, world)
+    result = resolve_target(c, world, req.action_type, req.description, available_actions)
+    return {"result": result, "available_actions": available_actions}
 
 
 def _partial_context(c, world, out, errors):
@@ -219,8 +254,9 @@ def _partial_context(c, world, out, errors):
 @router.post("/llm-test")
 async def llm_test_ep(req: LLMTestReq):
     from brain.context_builder import build_context
-    from brain.llm_brain import SYSTEM_PROMPT, validate_response
+    from brain.llm_brain import build_system_prompt, build_prompt, validate_response
     from llm.llm_client import call_llm
+    from llm.llm_gate import run_llm_call_async
     from systems.schema_defaults import ensure_world_defaults
 
     world = _build_world(req.world)
@@ -236,8 +272,19 @@ async def llm_test_ep(req: LLMTestReq):
         ctx_errors["build_context"] = f"{type(e).__name__}: {e}"
         _partial_context(c, world, context, ctx_errors)
 
-    system_prompt = req.system_prompt_override or SYSTEM_PROMPT
-    user_prompt = json.dumps(context, indent=2, default=str)
+    # Use the real prompt-assembly path (brain/llm_brain.py::build_prompt/
+    # build_system_prompt) — this used to be a bare json.dumps(context)
+    # here, then later a stale reference to the old static SYSTEM_PROMPT
+    # constant, both of which meant this debug tool never actually
+    # exercised the same prompt shape the live sim sends via think().
+    system_prompt = req.system_prompt_override or build_system_prompt(
+        context.get("available_actions", {})
+    )
+    try:
+        user_prompt = build_prompt(context)
+    except Exception as e:
+        ctx_errors["build_prompt"] = f"{type(e).__name__}: {e}"
+        user_prompt = json.dumps(context, indent=2, default=str)
 
     messages = [
         {"role": "system", "content": system_prompt},
@@ -251,10 +298,10 @@ async def llm_test_ep(req: LLMTestReq):
     valid = False
 
     try:
-        raw_response = await asyncio.wait_for(
-            call_llm(messages, use_cache=req.use_cache, timeout=180.0),
-            timeout=200,
-        )
+        call_coro = call_llm(messages, use_cache=req.use_cache, timeout=180.0)
+        if req.use_gate:
+            call_coro = run_llm_call_async(call_coro)
+        raw_response = await asyncio.wait_for(call_coro, timeout=200)
         if isinstance(raw_response, dict):
             parsed = raw_response
         elif isinstance(raw_response, str):

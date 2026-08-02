@@ -400,6 +400,16 @@ def build_available_actions(c, world):
         "text",
     ]
 
+    # describe (Round 8) / recall (Round 9) — cost no in-world time but do
+    # cost one of a small per-decision-cycle turn budget (see
+    # brain/cognition_scheduler.py::stage_and_wake/note_think), so they're
+    # only offered while budget remains; otherwise a character could drill
+    # describe -> describe -> describe (or recall -> recall -> ...) forever
+    # without ever doing anything.
+    if c.get("cognition", {}).get("turn_budget", 0) > 0:
+        action_types.append("describe")
+        action_types.append("recall")
+
     # Prop disposal/destruction (see activities.py's trash/destroy
     # completion handler) — offered generically whenever a prop is visible,
     # same "route handler validates the specific target" convention as
@@ -407,6 +417,38 @@ def build_available_actions(c, world):
     # real property_damage incident (systems/emergency.py).
     if interactable:
         action_types.extend(["trash", "destroy"])
+        # examine/search/carry/clean (see action_router.py's _route_examine/
+        # _route_search/_route_carry/_route_clean) — fully routed but never
+        # offered before this round, same class of gap as trash/destroy
+        # above; the route handler validates the specific target the same
+        # way.
+        action_types.extend(["examine", "search", "carry", "clean"])
+
+    # sit_down/lie_down (see action_router.py's _route_sit_down/
+    # _route_lie_down) — routed but never offered before this round. The
+    # route handlers themselves don't validate the target is actually
+    # seatable/sleepable, so this gate is the only check; SYSTEM_PROMPT
+    # already documents "seatable"/"sleepable" tags to the LLM
+    # (llm_brain.py) for the eat/sleep actions, reused here.
+    if any("seatable" in entry.get("tags", []) for entry in interactable):
+        action_types.append("sit_down")
+    if any("sleepable" in entry.get("tags", []) for entry in interactable):
+        action_types.append("lie_down")
+
+    # lean_against_wall/push_off_wall (see action_router.py's
+    # _route_lean_against_wall/_route_push_off_wall, systems/posture.py) —
+    # reuses the exact detection _build_posture_context() already computes
+    # (can_lean / current == "leaning_wall") so narrative and available
+    # actions never disagree about what's live.
+    if c.get("posture") == "standing":
+        try:
+            from systems.walls import find_leanable_wall
+            if find_leanable_wall(c, world) is not None:
+                action_types.append("lean_against_wall")
+        except Exception:
+            pass
+    elif c.get("posture") == "leaning_wall":
+        action_types.append("push_off_wall")
 
     # Exercise (see systems/exercise.py, action_router.py) — jog/sit_ups
     # need no target, offered unconditionally like hire_service/
@@ -442,6 +484,31 @@ def build_available_actions(c, world):
             "computer_dating", "computer_job_search", "computer_apply_for_job",
             "computer_send_email", "computer_respond_email", "computer_check_email",
         ])
+        # Stock trading (see systems/stock_market.py, systems/investments.py)
+        # and ordering (systems/procurement.py, systems/services.py) —
+        # fully routed but never offered before this round, same class of
+        # gap as the rest of the computer_* family above. No extra
+        # world-state prerequisite: c["portfolio"] always exists (defaults
+        # to {}) and the item/service catalogs are static data, not
+        # per-character state.
+        action_types.extend([
+            "computer_list_stocks", "computer_buy_stock", "computer_sell_stock",
+            "computer_check_stock_value", "computer_order_item", "computer_order_service",
+        ])
+        # Social events (systems/social_events.py) — browsing/planning need
+        # no pre-existing state (same "route validates" pattern as
+        # hire_service); rsvp/comment/attend need a real event_id, only
+        # available once browsing has actually surfaced one.
+        action_types.extend(["social_browse_events", "social_event_plan"])
+        if c.get("last_discovered_events"):
+            action_types.extend([
+                "social_event_rsvp", "social_event_comment", "social_event_attend",
+            ])
+        # Hobby session organizing (systems/hobbies.py) — both routes need
+        # a hobby_id; only meaningful for a character who actually has a
+        # hobby to organize around.
+        if c.get("hobbies"):
+            action_types.extend(["organize_hobby_session", "plan_hobby_session"])
 
     # retrieve_phone — offered only once the phone is actually away
     # (systems/phone.py::maybe_set_phone_down/maybe_forget_phone).
@@ -581,6 +648,22 @@ def build_available_actions(c, world):
     # offered when a co-located child actually has a flagged need, mirroring
     # propose_recurring's "only appears once there's something to act on"
     # shape above.
+    #
+    # Baby care (see systems/baby.py) — breastfeed/bottle_feed/hold_baby
+    # routed but never offered before this round; gated on a co-located
+    # character actually being a baby (c["baby_needs"] is only ever set —
+    # non-None — on infants, see systems/schema_defaults.py). The route
+    # handlers use current_location for their own locality re-check (not
+    # building_id, which nothing else in this file relies on either) —
+    # this offering-side gate uses building_id like feed_child/
+    # remind_child above; a mismatch just means the route's own check
+    # declines a stale offer, same "offer is a pre-check" pattern as
+    # snoopable_devices/open_proposals elsewhere in this function.
+    # put_baby_in_carriage additionally needs a pushable prop nearby.
+    has_pushable_prop = any(
+        world_props_by_id.get(entry["id"], {}).get("move_capacity") is not None
+        for entry in interactable
+    )
     for other in world.get("characters", {}).values():
         if other.get("building_id") != c.get("building_id"):
             continue
@@ -588,6 +671,12 @@ def build_available_actions(c, world):
             action_types.append("feed_child")
         if other.get("_awaiting_reminder") and "remind_child" not in action_types:
             action_types.append("remind_child")
+        if other.get("baby_needs") is not None:
+            for a in ("breastfeed", "bottle_feed", "hold_baby"):
+                if a not in action_types:
+                    action_types.append(a)
+            if has_pushable_prop and "put_baby_in_carriage" not in action_types:
+                action_types.append("put_baby_in_carriage")
 
     # respond_chore/advance_chore_round only make sense (and only appear)
     # when this character actually has something pending — see
@@ -622,6 +711,13 @@ def build_available_actions(c, world):
     if nearby_people:
         action_types.append("give_excuse")
     action_types.append("leave_note")
+
+    # announce_departure (see action_router.py's _route_announce_departure)
+    # — routed but never offered before this round; unconditional, same
+    # "route handler finds its own target/no-ops harmlessly" pattern as
+    # leave_note above (it searches for a nearby authority itself when no
+    # target is given).
+    action_types.append("announce_departure")
 
     # Social negotiation (see systems/proposals.py's "social_ask" kind) —
     # propose_social listed whenever there's someone nearby to propose to,
@@ -1046,127 +1142,148 @@ def build_scene_description(c, world):
 # intoxication, ...) stay out for now — see the LLM pipeline plan for
 # follow-up scope.
 
-def build_narrative(c, world):
+# =========================================================
+# NARRATIVE SECTIONS
+# =========================================================
+# Each _sec_<name>(c, world) returns the paragraph(s) that section
+# contributes — a str, a list[str] (for sections that emit several
+# separate paragraphs, e.g. one per pending proposal), or None/[] to
+# contribute nothing this call. NARRATIVE_SECTIONS below drives both
+# build_narrative()'s assembly order and its brief/full tiering (see
+# TIER_SETS) — "core" sections always run; "full" sections are skipped in
+# brief mode (event-driven wakes that don't need the whole scene re-told,
+# see brain/cognition_scheduler.py / BRIEF_REASONS below). This table is
+# also what brain/describe_registry.py (Round 8) draws room-description
+# content from.
 
-    paragraphs = [build_scene_description(c, world)]
+def _sec_scene(c, world):
+    return build_scene_description(c, world)
 
-    # ---- hearing — restores perceive_audio()'s audible_events, computed
-    # every perception cadence tick but never surfaced anywhere before this
-    # (not in the old flat context, not consumed by attention.py either).
-    # event["speaker"]/["topic"] already carry perceive_audio()'s mishearing
-    # (perception.py::_perceived_topic) — a corrupted topic is reported
-    # with full confidence here, same as a correct one, because that's
-    # what an unintended misunderstanding actually is; only the very-low-
-    # clarity case (speaker is None) gets an explicit hedge. ----
+
+def _sec_hearing(c, world):
+    # restores perceive_audio()'s audible_events, computed every perception
+    # cadence tick but never surfaced anywhere before this (not in the old
+    # flat context, not consumed by attention.py either). event["speaker"]/
+    # ["topic"] already carry perceive_audio()'s mishearing (perception.py::
+    # _perceived_topic) — a corrupted topic is reported with full
+    # confidence here, same as a correct one, because that's what an
+    # unintended misunderstanding actually is; only the very-low-clarity
+    # case (speaker is None) gets an explicit hedge.
     audible = c.get("perception", {}).get("audible_events", [])
-    if audible:
-        lines = []
-        for event in audible[:4]:
-            if event.get("type") == "speech":
-                speaker = event.get("speaker")
-                topic = event.get("topic")
-                if not speaker:
-                    lines.append(
-                        "You hear muffled talking nearby, but can't "
-                        "make out who or what."
-                    )
-                elif topic:
-                    lines.append(
-                        f"You hear {speaker} mention something about {topic}."
-                    )
-                else:
-                    lines.append(f"You hear {speaker} talking somewhere nearby.")
-            elif event.get("type") == "ambient" and event.get("sound"):
+    if not audible:
+        return None
+    lines = []
+    for event in audible[:4]:
+        if event.get("type") == "speech":
+            speaker = event.get("speaker")
+            topic = event.get("topic")
+            if not speaker:
                 lines.append(
-                    f"You hear a {event['sound'].replace('_', ' ')}."
+                    "You hear muffled talking nearby, but can't "
+                    "make out who or what."
                 )
-        if lines:
-            paragraphs.append(" ".join(lines))
-
-    # ---- active incidents (fire, assault, ...) — see
-    # _build_incident_context() below. Only incidents this character is a
-    # participant in or physically close enough to have witnessed. ----
-    incidents = _build_incident_context(c, world)
-    if incidents:
-        lines = []
-        for inc in incidents:
-            if inc["type"] == "fire":
+            elif topic:
                 lines.append(
-                    f"There's a fire{' spreading' if inc['severity'] >= 40 else ''} here"
-                    f"{' — you could call 911.' if not inc['reported'] else ' — it has already been reported.'}"
+                    f"You hear {speaker} mention something about {topic}."
                 )
             else:
-                label = inc["type"].replace("_", " ")
-                lines.append(
-                    f"There's a {label} happening nearby"
-                    f"{' — you could call 911.' if not inc['reported'] else ' — it has already been reported.'}"
-                )
-            # Self-incrimination nudge — narrative only, the LLM stays
-            # free to call anyway (per the fluid-reactions design
-            # constraint). Only relevant while nobody's called it in yet.
-            if inc.get("offender_id") == c["id"] and not inc["reported"]:
-                lines.append("Calling attention to this could implicate you.")
-            # Flee-on-arrival nudge — same "nudge, not a forced behavior"
-            # rule; turn_and_run is a real action they can choose in
-            # response.
-            if inc.get("offender_id") == c["id"] and inc.get("responder_status") == "arrived":
-                lines.append("The police have arrived — you might want to get out of here.")
-        paragraphs.append(" ".join(lines))
+                lines.append(f"You hear {speaker} talking somewhere nearby.")
+        elif event.get("type") == "ambient" and event.get("sound"):
+            lines.append(
+                f"You hear a {event['sound'].replace('_', ' ')}."
+            )
+    return " ".join(lines) if lines else None
 
-    # ---- active grapple — see systems/grapple.py. Explains why
-    # move/turn_and_run disappeared and release_hold/dodge showed up. ----
+
+def _sec_incidents(c, world):
+    # active incidents (fire, assault, ...) — see _build_incident_context()
+    # below. Only incidents this character is a participant in or
+    # physically close enough to have witnessed.
+    incidents = _build_incident_context(c, world)
+    if not incidents:
+        return None
+    lines = []
+    for inc in incidents:
+        if inc["type"] == "fire":
+            lines.append(
+                f"There's a fire{' spreading' if inc['severity'] >= 40 else ''} here"
+                f"{' — you could call 911.' if not inc['reported'] else ' — it has already been reported.'}"
+            )
+        else:
+            label = inc["type"].replace("_", " ")
+            lines.append(
+                f"There's a {label} happening nearby"
+                f"{' — you could call 911.' if not inc['reported'] else ' — it has already been reported.'}"
+            )
+        # Self-incrimination nudge — narrative only, the LLM stays free to
+        # call anyway (per the fluid-reactions design constraint). Only
+        # relevant while nobody's called it in yet.
+        if inc.get("offender_id") == c["id"] and not inc["reported"]:
+            lines.append("Calling attention to this could implicate you.")
+        # Flee-on-arrival nudge — same "nudge, not a forced behavior" rule;
+        # turn_and_run is a real action they can choose in response.
+        if inc.get("offender_id") == c["id"] and inc.get("responder_status") == "arrived":
+            lines.append("The police have arrived — you might want to get out of here.")
+    return " ".join(lines)
+
+
+def _sec_grapple(c, world):
+    # active grapple — see systems/grapple.py. Explains why move/
+    # turn_and_run disappeared and release_hold/dodge showed up.
     if c.get("grappled_by"):
         holder = world.get("characters", {}).get(c["grappled_by"])
         holder_name = holder.get("name", "someone") if holder else "someone"
-        paragraphs.append(
-            f"{holder_name} is holding you in place — you're struggling to break free."
-        )
-    elif c.get("grappling"):
+        return f"{holder_name} is holding you in place — you're struggling to break free."
+    if c.get("grappling"):
         held = world.get("characters", {}).get(c["grappling"])
         held_name = held.get("name", "them") if held else "them"
-        paragraphs.append(
-            f"You're holding {held_name} in place — they're struggling to get free."
-        )
+        return f"You're holding {held_name} in place — they're struggling to get free."
+    return None
 
-    # ---- body composition + fitness — systems/body_composition.py and
+
+def _sec_body_fitness(c, world):
+    # body composition + fitness — systems/body_composition.py and
     # systems/exercise.py, both fully built in earlier rounds but never
-    # actually surfaced to the LLM until now. Self-conscious framing at
-    # the extremes is the "impacts motivation" ask -- not a hard mechanical
+    # actually surfaced to the LLM until now. Self-conscious framing at the
+    # extremes is the "impacts motivation" ask -- not a hard mechanical
     # block on any action, just narrative pressure, same as every other
-    # nudge-not-force pattern in this file. ----
+    # nudge-not-force pattern in this file.
     from systems.body_composition import get_body_composition_context
     from systems.exercise import get_exercise_context
     body_lines = get_body_composition_context(c).get("body_composition", [])
     fitness_lines = get_exercise_context(c).get("fitness", [])
-    if body_lines or fitness_lines:
-        paragraphs.append(" ".join(body_lines + fitness_lines))
+    return " ".join(body_lines + fitness_lines) if (body_lines or fitness_lines) else None
 
-    # ---- active aggressor — see _has_recent_aggressor(). Explains why
-    # dodge/block/turn_and_run suddenly appeared, same "gate the action +
-    # explain it in prose" pattern as every other gated action this
-    # session (touch proposals, chore proposals, ...). ----
+
+def _sec_aggressor(c, world):
+    # active aggressor — see _has_recent_aggressor(). Explains why dodge/
+    # block/turn_and_run suddenly appeared, same "gate the action + explain
+    # it in prose" pattern as every other gated action this session (touch
+    # proposals, chore proposals, ...).
     if _has_recent_aggressor(c, world):
-        paragraphs.append(
-            "Someone nearby just came at you — you could dodge, block, "
-            "or turn and run."
-        )
+        return "Someone nearby just came at you — you could dodge, block, or turn and run."
+    return None
 
-    # ---- witnessed offenses — see
-    # systems/excuses.py::check_witnessed_hostility_for_observer(). Purely
-    # a "who did I just see do something hostile" cue; confront/call_911
-    # were already reachable via nearby_people/proximity (§ above), this
-    # just gives the LLM a name and a reason. ----
-    witnessed_line = _build_witnessed_offense_line(c, world)
-    if witnessed_line:
-        paragraphs.append(witnessed_line)
 
-    # ---- attention/focus — restores build_attention_summary, previously
-    # unused (dead code, same gap as relationships/memories above) ----
+def _sec_witnessed(c, world):
+    # witnessed offenses — see systems/excuses.py::
+    # check_witnessed_hostility_for_observer(). Purely a "who did I just
+    # see do something hostile" cue; confront/call_911 were already
+    # reachable via nearby_people/proximity (§ above), this just gives the
+    # LLM a name and a reason.
+    return _build_witnessed_offense_line(c, world)
+
+
+def _sec_attention(c, world):
+    # attention/focus — restores build_attention_summary, previously
+    # unused (dead code, same gap as relationships/memories above)
     focus = build_attention_summary(c, world).get("focus")
     if focus and focus.get("strength", 0) > 0.4 and focus.get("on"):
-        paragraphs.append(f"Your attention keeps drifting to {focus['on']}.")
+        return f"Your attention keeps drifting to {focus['on']}."
+    return None
 
-    # ---- identity + emotional state ----
+
+def _sec_identity(c, world):
     name = c.get("name", "You")
     bits = [f"You are {name}"]
     if c.get("age") is not None:
@@ -1180,157 +1297,266 @@ def build_narrative(c, world):
     bits.append(f"Right now you feel {c.get('emotion', 'neutral')}.")
     if c.get("stress", 0) > 60:
         bits.append("You're under real stress.")
-    paragraphs.append(" ".join(bits))
+    return " ".join(bits)
 
-    # ---- body / needs — reuse the already-prose build_body_context ----
+
+def _sec_body(c, world):
+    # reuse the already-prose build_body_context
     body_issues = build_body_context(c)
-    if body_issues:
-        paragraphs.append(" ".join(body_issues))
+    return " ".join(body_issues) if body_issues else None
 
-    # ---- injury/illness severity — see systems/health.py::
-    # compute_severity(). Previously the LLM had zero visibility into
-    # physical_health/mental_health/health_state/injuries at all. ----
-    health_line = _build_health_context(c, world)
-    if health_line:
-        paragraphs.append(health_line)
 
-    # ---- bedroom ownership — see systems/bedroom_assignment.py ----
+def _sec_health(c, world):
+    # injury/illness severity — see systems/health.py::compute_severity().
+    # Previously the LLM had zero visibility into physical_health/
+    # mental_health/health_state/injuries at all.
+    return _build_health_context(c, world)
+
+
+def _sec_bedroom(c, world):
+    # bedroom ownership — see systems/bedroom_assignment.py
     bedroom_id = c.get("bedroom_id")
-    if bedroom_id:
-        roommates = [
-            other.get("name", "someone")
-            for other in world.get("characters", {}).values()
-            if other["id"] != c["id"] and other.get("bedroom_id") == bedroom_id
-        ]
-        if roommates:
-            paragraphs.append(f"You share your room with {', '.join(roommates)}.")
-        else:
-            paragraphs.append("You have your own room.")
+    if not bedroom_id:
+        return None
+    roommates = [
+        other.get("name", "someone")
+        for other in world.get("characters", {}).values()
+        if other["id"] != c["id"] and other.get("bedroom_id") == bedroom_id
+    ]
+    if roommates:
+        return f"You share your room with {', '.join(roommates)}."
+    return "You have your own room."
 
-    # ---- active intentions/goals ----
+
+def _sec_intentions(c, world):
     intentions = build_intentions(c)
-    if intentions:
-        top = intentions[0]
-        line = f"Right now you're mainly focused on {top.get('type')}"
-        if top.get("reason"):
-            line += f" ({top['reason']})"
-        line += "."
-        rest = [i.get("type") for i in intentions[1:4] if i.get("type")]
-        if rest:
-            line += f" You're also thinking about: {', '.join(rest)}."
-        paragraphs.append(line)
+    if not intentions:
+        return None
+    top = intentions[0]
+    line = f"Right now you're mainly focused on {top.get('type')}"
+    if top.get("reason"):
+        line += f" ({top['reason']})"
+    line += "."
+    rest = [i.get("type") for i in intentions[1:4] if i.get("type")]
+    if rest:
+        line += f" You're also thinking about: {', '.join(rest)}."
+    return line
 
-    # ---- relationships — restores build_relationship_context, which was
-    # already fully built but never called from build_context() ----
+
+def _sec_turn_budget(c, world):
+    # describe/recall (Rounds 8-9) are withheld from the action menu once
+    # cognition.turn_budget hits 0 (see build_available_actions()) — this
+    # is the only thing that tells the character *why* those options just
+    # vanished, so it doesn't read as an unexplained restriction mid-chain.
+    if c.get("cognition", {}).get("turn_budget", 0) > 0:
+        return None
+    return "You've already taken time to look and think this round — better to act now."
+
+
+def _sec_relationships(c, world):
+    # restores build_relationship_context, which was already fully built
+    # but never called from build_context()
     relationships = build_relationship_context(c, world, limit=5)
-    if relationships:
-        paragraphs.append(" ".join(r["summary"] for r in relationships))
+    return " ".join(r["summary"] for r in relationships) if relationships else None
 
-    # ---- grievances — restores build_grievance_context, previously
-    # unused (same "defined but never wired in" gap as everything else in
-    # this function). Surfaced so the LLM has visible motive before ever
-    # reaching for the "confront" action. ----
+
+def _sec_grievances(c, world):
+    # restores build_grievance_context, previously unused (same "defined
+    # but never wired in" gap as everything else in this function).
+    # Surfaced so the LLM has visible motive before ever reaching for the
+    # "confront" action.
     grievances = build_grievance_context(c, world)
-    if grievances:
-        top = grievances[0]
-        line = f"You're still bothered by {top['with']} over {', '.join(top['top_issues'])}."
-        paragraphs.append(line)
+    if not grievances:
+        return None
+    top = grievances[0]
+    return f"You're still bothered by {top['with']} over {', '.join(top['top_issues'])}."
 
-    # ---- active conflict — restores build_conflict_context, previously
-    # unused. Purely reflects the trait/dice-driven conflict_pipeline.py
-    # state machine; the LLM cannot alter this resolution, only decide
-    # whether to have entered it (via "confront") and how to react. ----
+
+def _sec_conflict(c, world):
+    # restores build_conflict_context, previously unused. Purely reflects
+    # the trait/dice-driven conflict_pipeline.py state machine; the LLM
+    # cannot alter this resolution, only decide whether to have entered it
+    # (via "confront") and how to react.
     conflict = build_conflict_context(c, world)
-    if conflict:
-        other = conflict["with"]
-        phase = conflict["phase"]
-        if phase == "deliberation":
-            paragraphs.append(
-                f"You're privately weighing whether to work things out with {other} "
-                f"or let it turn into a fight."
-            )
-        elif phase == "negotiation":
-            issues = ", ".join(conflict.get("issues", [])) or "what's been bothering you"
-            paragraphs.append(f"You're negotiating with {other} about {issues}.")
-        elif phase == "fight":
-            stage = (conflict.get("fight_stage") or "verbal_dispute").replace("_", " ")
-            paragraphs.append(f"You're in a {stage} with {other}.")
-
-    # ---- memories — restores build_memory_context, previously unused ----
-    memories = build_memory_context(c)
-    if memories:
-        top_memories = sorted(
-            memories, key=lambda m: m.get("importance", 0), reverse=True
-        )[:3]
-        mem_text = "; ".join(m["text"] for m in top_memories if m.get("text"))
-        if mem_text:
-            paragraphs.append(f"You recall: {mem_text}.")
-
-    # ---- family — restores _build_family_context, previously unused ----
-    family = _build_family_context(c, world)
-    if family and family.get("members"):
-        fam_bits = [
-            f"{m['name']} ({m['kinship']})"
-            for m in family["members"] if m.get("kinship")
-        ]
-        if fam_bits:
-            paragraphs.append(f"Your family: {', '.join(fam_bits)}.")
-
-    # ---- household processes + proposals — already carry descriptive
-    # fields; inlined as sentences instead of nested JSON ----
-    for p in _build_household_process_context(c, world) or []:
-        paragraphs.append(
-            f"There's a {p.get('type')} in progress, currently at the "
-            f"{p.get('stage')} stage, waiting on {p.get('waiting')}."
+    if not conflict:
+        return None
+    other = conflict["with"]
+    phase = conflict["phase"]
+    if phase == "deliberation":
+        return (
+            f"You're privately weighing whether to work things out with {other} "
+            f"or let it turn into a fight."
         )
+    if phase == "negotiation":
+        issues = ", ".join(conflict.get("issues", [])) or "what's been bothering you"
+        return f"You're negotiating with {other} about {issues}."
+    if phase == "fight":
+        stage = (conflict.get("fight_stage") or "verbal_dispute").replace("_", " ")
+        return f"You're in a {stage} with {other}."
+    return None
 
+
+def _sec_memories(c, world):
+    # restores build_memory_context, previously unused
+    memories = build_memory_context(c)
+    if not memories:
+        return None
+    top_memories = sorted(
+        memories, key=lambda m: m.get("importance", 0), reverse=True
+    )[:3]
+    mem_text = "; ".join(m["text"] for m in top_memories if m.get("text"))
+    return f"You recall: {mem_text}." if mem_text else None
+
+
+def _sec_family(c, world):
+    # restores _build_family_context, previously unused
+    family = _build_family_context(c, world)
+    if not family or not family.get("members"):
+        return None
+    fam_bits = [
+        f"{m['name']} ({m['kinship']})"
+        for m in family["members"] if m.get("kinship")
+    ]
+    return f"Your family: {', '.join(fam_bits)}." if fam_bits else None
+
+
+def _sec_household_processes(c, world):
+    # already carry descriptive fields; inlined as sentences instead of
+    # nested JSON
+    procs = _build_household_process_context(c, world) or []
+    lines = [
+        f"There's a {p.get('type')} in progress, currently at the "
+        f"{p.get('stage')} stage, waiting on {p.get('waiting')}."
+        for p in procs
+    ]
+    return lines or None
+
+
+def _sec_proposals(c, world):
     proposals = _build_proposal_context(c, world) or {}
-    for entry in proposals.get("incoming", []):
-        paragraphs.append(entry["note"])
-    for entry in proposals.get("mediating", []):
-        paragraphs.append(entry["note"])
-    for entry in proposals.get("resolved", []):
-        paragraphs.append(entry["note"])
-    for entry in proposals.get("rule_fired", []):
-        paragraphs.append(entry["note"])
+    out = []
+    for key in ("incoming", "mediating", "resolved", "rule_fired"):
+        for entry in proposals.get(key, []):
+            out.append(entry["note"])
+    return out or None
 
-    for line in _build_social_rules_context(c, world):
-        paragraphs.append(line)
 
-    for line in _build_worries_context(c, world):
-        paragraphs.append(line)
+def _sec_social_rules(c, world):
+    lines = _build_social_rules_context(c, world)
+    return list(lines) if lines else None
 
-    for line in _build_influence_context(c, world):
-        paragraphs.append(line)
 
-    # ---- touch proposals + intimacy state — restores
-    # _build_touch_proposal_context/_build_intimacy_context, previously
-    # unused (dead code, same gap as relationships/memories above) ----
+def _sec_worries(c, world):
+    lines = _build_worries_context(c, world)
+    return list(lines) if lines else None
+
+
+def _sec_influence(c, world):
+    lines = _build_influence_context(c, world)
+    return list(lines) if lines else None
+
+
+def _sec_touch(c, world):
+    # restores _build_touch_proposal_context/_build_intimacy_context,
+    # previously unused (dead code, same gap as relationships/memories
+    # above)
     touch = _build_touch_proposal_context(c, world) or {}
+    out = []
     if touch.get("incoming"):
-        paragraphs.append(touch["incoming"]["note"])
+        out.append(touch["incoming"]["note"])
     if touch.get("outgoing"):
-        paragraphs.append(touch["outgoing"]["note"])
+        out.append(touch["outgoing"]["note"])
+    return out or None
 
+
+def _sec_intimacy(c, world):
     intimacy_lines = _build_intimacy_context(c, world)
-    if intimacy_lines:
-        paragraphs.append("; ".join(intimacy_lines) + ".")
+    return "; ".join(intimacy_lines) + "." if intimacy_lines else None
 
-    # ---- phone location — systems/phone.py::get_phone_context(), new
-    # this round: "set down nearby" / "not sure where it is" (forgotten).
-    # Battery state (_build_phone_context(), pre-existing but never
-    # called from anywhere) only matters narratively once it's actually
+
+def _sec_phone(c, world):
+    # phone location — systems/phone.py::get_phone_context(): "set down
+    # nearby" / "not sure where it is" (forgotten). Battery state
+    # (_build_phone_context()) only matters narratively once it's actually
     # low, same "only mention what's notable" rule the rest of this
-    # function follows. ----
+    # function follows.
     from systems.phone import get_phone_context
+    out = []
     phone_location_line = get_phone_context(c)
     if phone_location_line:
-        paragraphs.append(phone_location_line)
+        out.append(phone_location_line)
     phone_battery = _build_phone_context(c)
     if phone_battery and phone_battery.get("usable") is False:
-        paragraphs.append(f"Your phone's battery is dead ({phone_battery.get('battery', 0)}%).")
+        out.append(f"Your phone's battery is dead ({phone_battery.get('battery', 0)}%).")
     elif phone_battery and phone_battery.get("battery", 100) < 20:
-        paragraphs.append(f"Your phone's battery is low ({phone_battery.get('battery')}%).")
+        out.append(f"Your phone's battery is low ({phone_battery.get('battery')}%).")
+    return out or None
+
+
+# (key, tier, fn) — order is the assembly order (matches the pre-refactor
+# sequence exactly). tier "core" sections always run; "full" sections are
+# skipped in brief mode — see TIER_SETS / BRIEF_REASONS.
+NARRATIVE_SECTIONS = [
+    ("scene",                "core", _sec_scene),
+    ("hearing",               "full", _sec_hearing),
+    ("incidents",             "full", _sec_incidents),
+    ("grapple",               "full", _sec_grapple),
+    ("body_fitness",          "full", _sec_body_fitness),
+    ("aggressor",             "full", _sec_aggressor),
+    ("witnessed",             "full", _sec_witnessed),
+    ("attention",             "full", _sec_attention),
+    ("identity",              "core", _sec_identity),
+    ("body",                  "core", _sec_body),
+    ("health",                "core", _sec_health),
+    ("bedroom",               "full", _sec_bedroom),
+    ("intentions",            "core", _sec_intentions),
+    ("turn_budget",           "core", _sec_turn_budget),
+    ("relationships",         "full", _sec_relationships),
+    ("grievances",            "full", _sec_grievances),
+    ("conflict",              "full", _sec_conflict),
+    ("memories",              "full", _sec_memories),
+    ("family",                "full", _sec_family),
+    ("household_processes",   "full", _sec_household_processes),
+    ("proposals",             "full", _sec_proposals),
+    ("social_rules",          "full", _sec_social_rules),
+    ("worries",               "full", _sec_worries),
+    ("influence",             "full", _sec_influence),
+    ("touch",                 "full", _sec_touch),
+    ("intimacy",              "full", _sec_intimacy),
+    ("phone",                 "full", _sec_phone),
+]
+
+TIER_SETS = {"brief": {"core"}, "full": {"core", "full"}}
+
+# Wake reasons that only need the character re-oriented, not the whole
+# scene re-told — see brain/cognition_scheduler.py. Deliberately NOT brief:
+# idle, urgent_need, activity_finished, activity_aborted, schedule_block
+# (real "what next" decisions needing full context), describe_result/
+# recall_result (the whole point is more detail).
+BRIEF_REASONS = {
+    "person_entered_view", "heard_speech", "wait_ready", "activity_phase_changed",
+}
+
+
+def build_narrative(c, world, mode="full", wake_line=None, staged=()):
+    paragraphs = [wake_line] if wake_line else []
+    paragraphs.extend(staged)
+
+    tiers = TIER_SETS.get(mode, TIER_SETS["full"])
+    for _key, tier, fn in NARRATIVE_SECTIONS:
+        if tier not in tiers:
+            continue
+        try:
+            out = fn(c, world)
+        except Exception:
+            # One broken section must not kill the whole narrative.
+            continue
+        if not out:
+            continue
+        if isinstance(out, list):
+            paragraphs.extend(p for p in out if p)
+        else:
+            paragraphs.append(out)
 
     return "\n\n".join(p for p in paragraphs if p)
 
@@ -1343,17 +1569,31 @@ def build_narrative(c, world):
 # place literal prop/character ids appear, kept as strict JSON because the
 # model must echo those back exactly (see llm_brain.py::build_prompt,
 # which assembles the two into one prompt).
+#
+# trigger_reason (default "idle" — matches the old always-full behavior
+# for callers that don't pass one, e.g. api/debug.py) selects brief vs
+# full narrative mode via BRIEF_REASONS above. wake_line/staged pass
+# through to build_narrative() — see brain/cognition_scheduler.py::
+# wake_line() and Round 8/9's staged_knowledge (describe/recall results).
 
 def build_context(
 
     c,
 
-    world
+    world,
+
+    trigger_reason="idle",
+
+    wake_line=None,
+
+    staged=()
 ):
+
+    mode = "brief" if trigger_reason in BRIEF_REASONS else "full"
 
     return {
 
-        "narrative": build_narrative(c, world),
+        "narrative": build_narrative(c, world, mode=mode, wake_line=wake_line, staged=staged),
 
         "available_actions": build_available_actions(c, world),
     }

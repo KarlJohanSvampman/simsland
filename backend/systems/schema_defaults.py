@@ -576,6 +576,21 @@ def ensure_character_defaults(c):
     # per-tick context every turn.
     c.setdefault("_llm_session", {"history": []})
 
+    # Per-character cognition scheduler state (see
+    # brain/cognition_scheduler.py). Governs when this character's next
+    # think() call happens — replaces the old "every idle tick" behavior
+    # with an idle cadence plus event-driven wakes.
+    c.setdefault("cognition", {
+        "next_think_tick": 0,
+        "last_think_tick": -1,
+        "wake_reason": None,
+        "wake_payload": None,
+        "idle_streak": 0,
+        "last_urgent_need": None,
+        "turn_budget": 0,
+        "staged_knowledge": [],
+    })
+
     # Sense-related physical traits (poor_eyesight, keen_hearing, ...) —
     # see brain/perception.py's SENSE_TRAIT_MODIFIERS. Kept separate from
     # c["traits"] (personality) since build_narrative() describes them
@@ -706,11 +721,6 @@ def ensure_character_defaults(c):
 
     c.setdefault(
         "pending_reflections",
-        []
-    )
-
-    c.setdefault(
-        "recent_perception_memory",
         []
     )
 

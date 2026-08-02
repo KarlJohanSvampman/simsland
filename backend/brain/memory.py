@@ -1,11 +1,6 @@
 import uuid
 import time
 
-from brain.embeddings import (
-    add_memory_vector,
-    search
-)
-
 
 # =========================================================
 # IMPORTANCE SCORING
@@ -233,25 +228,6 @@ def store_memory(
 
     prune_memories(c)
 
-    # =====================================
-    # VECTOR INDEX
-    # =====================================
-
-    try:
-
-        add_memory_vector(
-
-            c["id"],
-
-            mem["id"],
-
-            text
-        )
-
-    except Exception:
-
-        pass
-
     return mem
 
 
@@ -284,26 +260,12 @@ def recall(
         query.split()
     )
 
-    # =====================================
-    # SEMANTIC SEARCH
-    # =====================================
-
-    try:
-
-        sem_ids = {
-
-            r["memory_id"]
-
-            for r in search(
-                c["id"],
-                query,
-                limit
-            )
-        }
-
-    except Exception:
-
-        sem_ids = set()
+    # Text-similarity bonus — was a fake-embedding "semantic search" (a
+    # SHA-256 hash tiled into floats, confirmed non-functional, see
+    # brain/action_resolver.py's docstring) that scored 5 pseudo-random
+    # memories +6 regardless of actual relevance. Reuses the same fuzzy
+    # scorer the target resolver and describe/recall aspect matching use.
+    from brain.action_resolver import _score as _text_score
 
     scored = []
 
@@ -348,14 +310,10 @@ def recall(
 
             +
 
-            (
-                6
-
-                if m.get("id")
-                in sem_ids
-
-                else 0
-            )
+            _text_score(
+                query,
+                [m.get("text", "")]
+            ) * 6
         )
 
         scored.append(
