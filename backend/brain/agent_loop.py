@@ -332,6 +332,15 @@ def process_decision(
         )
     )
 
+    # brain/llm_brain.py::_to_legacy_decision() maps the envelope's
+    # "narration" straight into decision["thought"] unchanged -- the plan
+    # for the Round 7 envelope called for narration to also land in its
+    # own c["last_narration"] (for a future narration-feed UI, distinct
+    # from last_thought's other historical readers) but that half of the
+    # wiring was never actually added. Same source value today; kept as
+    # its own field since the two are conceptually separate.
+    c["last_narration"] = c["last_thought"]
+
     # =====================================
     # EMOTION
     # =====================================

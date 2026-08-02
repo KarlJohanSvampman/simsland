@@ -260,14 +260,20 @@ def init_db():
 
             exists = cur.fetchone()
 
-            if not exists:
+    # save_world() acquires _conn_lock and re-enters `conn` as its own
+    # context manager -- both of which are already held by the `with`
+    # block above, and neither is reentrant (a plain threading.Lock isn't,
+    # and psycopg2 raises "the connection cannot be re-entered
+    # recursively" for the connection). Must run after that block has
+    # released both, not inside it.
+    if not exists:
 
-                world = generate_initial_world()
+        world = generate_initial_world()
 
-                save_world(
-                    "default",
-                    world
-                )
+        save_world(
+            "default",
+            world
+        )
 
 def load_world(sim_id):
 
