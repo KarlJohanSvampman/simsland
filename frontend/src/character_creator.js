@@ -239,6 +239,11 @@ function openTemplate(id) {
     sex: raw.sex || "male",
     body_features: { ...(raw.body_features || {}) },
     body_composition: { ...(raw.body_composition || {}) },
+    // Preserved verbatim except the locomotion speed fields this tab
+    // edits directly -- instance also carries health_state/immune_score/
+    // current_hairstyle/etc. (see api/editor.py::_spawn_character_locked,
+    // which copies this whole dict onto a newly spawned character).
+    instance: { ...(raw.instance || {}) },
     traits: [...(raw.traits || [])],
     physical_traits: [...(raw.physical_traits || [])],
     hobbies: [...(raw.hobbies || [])],
@@ -537,6 +542,19 @@ const fldWeightLabel = document.getElementById('fldWeightLabel');
 const ageGroupNote = document.getElementById('ageGroupNote');
 const fldBio    = document.getElementById('fldBio');
 
+const fldWalkSpeed   = document.getElementById('fldWalkSpeed');
+const fldJogSpeed    = document.getElementById('fldJogSpeed');
+const fldSprintSpeed = document.getElementById('fldSprintSpeed');
+const fldCrawlSpeed  = document.getElementById('fldCrawlSpeed');
+const fldSneakSpeed  = document.getElementById('fldSneakSpeed');
+
+// Tiles/tick -- must match backend/systems/movement.py's DEFAULT_*_SPEED
+// constants and schema_defaults.py::ensure_character_defaults().
+const LOCOMOTION_SPEED_DEFAULTS = {
+  walk_speed: 0.05, jog_speed: 0.09, sprint_speed: 0.18,
+  crawl_speed: 0.02, sneak_speed: 0.025,
+};
+
 function weightLabelFor(bodyFat) {
   if (bodyFat >= 0.70) return 'obese';
   if (bodyFat <= 0.15) return 'underweight';
@@ -552,6 +570,12 @@ function renderBasicTab() {
   fldWeightLabel.textContent = `${working.body_composition.body_fat_level.toFixed(2)} (${weightLabelFor(working.body_composition.body_fat_level)})`;
   ageGroupNote.textContent = `age group: ${deriveAgeGroup(working.age ?? 25)}`;
   fldBio.value = working.bio || '';
+
+  fldWalkSpeed.value   = working.instance.walk_speed   ?? LOCOMOTION_SPEED_DEFAULTS.walk_speed;
+  fldJogSpeed.value    = working.instance.jog_speed    ?? LOCOMOTION_SPEED_DEFAULTS.jog_speed;
+  fldSprintSpeed.value = working.instance.sprint_speed ?? LOCOMOTION_SPEED_DEFAULTS.sprint_speed;
+  fldCrawlSpeed.value  = working.instance.crawl_speed  ?? LOCOMOTION_SPEED_DEFAULTS.crawl_speed;
+  fldSneakSpeed.value  = working.instance.sneak_speed  ?? LOCOMOTION_SPEED_DEFAULTS.sneak_speed;
 }
 
 fldName.addEventListener('input', () => { working.name = fldName.value; });
@@ -568,6 +592,18 @@ fldWeight.addEventListener('input', () => {
   working.body_composition.body_fat_level = v;
   fldWeightLabel.textContent = `${v.toFixed(2)} (${weightLabelFor(v)})`;
 });
+
+function bindSpeedField(input, key) {
+  input.addEventListener('input', () => {
+    const v = parseFloat(input.value);
+    working.instance[key] = Number.isFinite(v) && v >= 0 ? v : LOCOMOTION_SPEED_DEFAULTS[key];
+  });
+}
+bindSpeedField(fldWalkSpeed,   'walk_speed');
+bindSpeedField(fldJogSpeed,    'jog_speed');
+bindSpeedField(fldSprintSpeed, 'sprint_speed');
+bindSpeedField(fldCrawlSpeed,  'crawl_speed');
+bindSpeedField(fldSneakSpeed,  'sneak_speed');
 
 // Mirrors character_gen.py::_gen_body_features()'s height distribution
 // (gauss 164±7 female / 177±8 male, clamped 140-210) and a plausible

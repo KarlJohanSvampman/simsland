@@ -77,6 +77,12 @@ from systems.scheduling import (
     update_schedule_runtime
 )
 
+from systems.travel import (
+    update_travel,
+    TRAVEL_FROZEN_STATES,
+    TRAVEL_WALKING_STATES,
+)
+
 from systems.offgrid import (
     maybe_go_offgrid,
     maybe_schedule_doctor_visit,
@@ -240,6 +246,11 @@ def update_offgrid(
 ):
 
     process_return(
+        c,
+        world
+    )
+
+    update_travel(
         c,
         world
     )
@@ -522,7 +533,9 @@ def update_agent(
 
     if c.get(
         "off_grid"
-    ):
+    ) or c.get(
+        "travel_state"
+    ) in TRAVEL_FROZEN_STATES:
         return
 
     # =====================================
@@ -665,7 +678,7 @@ def update_agent(
         world
     )
 
-    if moving:
+    if moving or c.get("travel_state") in TRAVEL_WALKING_STATES:
         return
 
     # =====================================

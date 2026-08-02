@@ -878,6 +878,14 @@ const ANIM_LAYERS = {
   run:           { lower: "run",         upper: "run"         },
   crouch_idle:   { lower: "crouch_idle", upper: "crouch_idle" },
   crouch_walk:   { lower: "crouch_walk", upper: "crouch_walk" },
+  // jog_to/sneak_to (see systems/movement.py's jog_speed/sneak_speed) --
+  // no dedicated clips exist yet, so these reuse the closest existing gait
+  // as a placeholder (walk for jog, the crouched crouch_walk for sneak's
+  // "trying not to be noticed" read) until real ones are authored. Same
+  // "not yet authored, falls back gracefully" pattern as phone_screen
+  // above -- per-character overrides in animbank.html still win over this.
+  jog:           { lower: "walk",        upper: "walk"        },
+  sneak:         { lower: "crouch_walk", upper: "crouch_walk" },
 
   // ── Standing interactions (idle legs + active upper) ──
   talk:          { lower: "idle",        upper: "talk"        },
@@ -1750,6 +1758,8 @@ function createFallbackProp(prop){
     template: prop.template
   };
 
+  mesh.visible = !prop.hidden;
+
   selectable.push(mesh);
   scene.add(mesh);
 
@@ -1775,6 +1785,11 @@ async function updateProps(state){
         0.5,
         prop.y - 7
       );
+
+      // Off-grid physical travel: server sets prop.hidden explicitly
+      // (garage/car/bus while mid-trip or off-map) -- see systems/travel.py
+      // and systems/transit.py.
+      props[prop.id].visible = !prop.hidden;
 
       // ── Prop animation state sync ──
       // If the server changed anim_state, cross-fade to the new clip.
@@ -2580,6 +2595,11 @@ async function updateCharacters(state){
         );
       }
 
+      // Off-grid physical travel: hidden while riding in/on a car or bus
+      // (walking to/from the garage or bus stop stays visible) -- see
+      // systems/travel.py and systems/transit.py.
+      sims[id].visible = !c.travel_hidden;
+
             // =========================
       // ANIMATION STATE
       // =========================
@@ -3289,6 +3309,9 @@ renderer.domElement.addEventListener(
           ? `Doing: ${liveState.activity.type}`
           : `State: ${liveState.animation_state || "idle"}`)
       : "";
+    const moodLabel = liveState?.emotion
+      ? `Mood: ${liveState.emotion}`
+      : "";
 
     document
       .getElementById(
@@ -3298,6 +3321,7 @@ renderer.domElement.addEventListener(
         ${d.tileType ? `Type: ${d.tileType}<br>` : ""}
         ${d.id || ""}<br>
         ${d.name || ""}<br>
+        ${moodLabel ? `${moodLabel}<br>` : ""}
         ${activityLabel}
       `;
 

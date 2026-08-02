@@ -94,15 +94,38 @@ def generate_world_tiles(world):
         300
     )
 
+    # The off-grid travel road: one dedicated row running the full width
+    # of the map (left edge to right edge), distinct from the procedural
+    # x%20/y%20 striping below -- a car/bus needs a real, continuous,
+    # gateway-connected road to drive off the map on, and the procedural
+    # grid's roads are all interior (every 20 tiles), never reaching the
+    # true edge. Must run inline in this loop (not as a post-pass) since
+    # build_world_tile_lookup()/build_traffic_network() -- which build the
+    # road graph and edge gateways this row needs to be part of -- run
+    # immediately after this function returns.
+    road_y = world.get("road_y", 10)
+
     for x in range(width):
 
         for y in range(height):
 
             # =====================================
+            # OFF-GRID TRAVEL ROAD (+ its sidewalk)
+            # =====================================
+
+            if y == road_y:
+
+                tile = create_world_tile(x, y, "road", "urban")
+
+            elif y == road_y + 1:
+
+                tile = create_world_tile(x, y, "sidewalk", "urban")
+
+            # =====================================
             # ROADS
             # =====================================
 
-            if x % 20 == 0 or y % 20 == 0:
+            elif x % 20 == 0 or y % 20 == 0:
 
                 tile = create_world_tile(
 

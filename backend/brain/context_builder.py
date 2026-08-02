@@ -389,6 +389,8 @@ def build_available_actions(c, world):
     # -----------------------------------------------
     action_types = [
         "move",
+        "jog_to",
+        "sneak_to",
         "speak",
         "interact",
         "wait",
@@ -865,7 +867,7 @@ def build_available_actions(c, world):
 
     from systems.action_router import _movement_blocked
     if _movement_blocked(c):
-        action_types = [a for a in action_types if a not in ("move", "turn_and_run")]
+        action_types = [a for a in action_types if a not in ("move", "jog_to", "sneak_to", "turn_and_run")]
 
     # Wall actions — always contextually available
     action_types.extend(["build_wall", "remove_wall"])

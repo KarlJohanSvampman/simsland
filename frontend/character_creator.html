@@ -563,6 +563,29 @@ button:hover { background: #556170; }
       </div>
       <div class="deriveNote">Stored, doesn't affect the model's visual shape yet.</div>
 
+      <h4 class="outfitSectionTitle">Movement Speeds</h4>
+      <div class="deriveNote">Tiles per tick. Crawl/sneak apply automatically (crawling posture / sneak animation); jog/sprint apply when something sets that animation state (e.g. fleeing already uses sprint).</div>
+      <div class="formRow">
+        <label>Walk Speed</label>
+        <input type="number" id="fldWalkSpeed" min="0" step="0.005" />
+      </div>
+      <div class="formRow">
+        <label>Jog Speed</label>
+        <input type="number" id="fldJogSpeed" min="0" step="0.005" />
+      </div>
+      <div class="formRow">
+        <label>Sprint Speed</label>
+        <input type="number" id="fldSprintSpeed" min="0" step="0.005" />
+      </div>
+      <div class="formRow">
+        <label>Crawl Speed</label>
+        <input type="number" id="fldCrawlSpeed" min="0" step="0.005" />
+      </div>
+      <div class="formRow">
+        <label>Sneak Speed</label>
+        <input type="number" id="fldSneakSpeed" min="0" step="0.005" />
+      </div>
+
       <div class="formRow" style="align-items:flex-start;">
         <label>Bio</label>
         <textarea id="fldBio" rows="5" placeholder="Backstory, personality notes, life history..." style="flex:1; max-width:480px; padding:5px 7px; background:#1a1e28; border:1px solid #3a4050; color:#eee; border-radius:3px; font-size:13px; resize:vertical; font-family:inherit;"></textarea>

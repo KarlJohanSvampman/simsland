@@ -12,6 +12,55 @@ import math
 OFFSET_DRAG = 0.6   # matches the pre-existing baby-carriage "in front" offset
 OFFSET_PUSH = 1.1   # pusher trails further back than the dragged prop itself
 
+# Per-character-template locomotion speeds, in tiles/tick (see
+# schema_defaults.py::ensure_character_defaults() for the matching
+# defaults applied when a template doesn't set its own, and
+# simulations/default/definitions.json's character_templates[...].instance
+# for the per-template override values). Ratios are real-world-plausible
+# relative to walk (jog ~1.8x, sprint ~3.6x, crawl/sneak both well under
+# half walk speed) at the existing deliberately-slow pacing (walk=0.05
+# already meant 4 tiles took ~80 real seconds at 1x time_scale before any
+# of this existed -- these keep that same scale, not a real m/s figure).
+DEFAULT_WALK_SPEED   = 0.05
+DEFAULT_JOG_SPEED    = 0.09
+DEFAULT_SPRINT_SPEED = 0.18
+DEFAULT_CRAWL_SPEED  = 0.02
+DEFAULT_SNEAK_SPEED  = 0.025
+
+# animation_state values that select the jog/sprint/sneak speeds. "run" is
+# kept as an alias for sprint since action_router.py's turn_and_run (panic
+# flight) already sets animation_state="run" -- sprint_speed applies there
+# for free. Nothing today drives "jog"/"sneak" as a real route-walking
+# animation_state (jog only exists as the stationary jog exercise
+# activity) -- the fields/lookup are ready for whatever sets it next.
+_JOG_STATES    = ("jog",)
+_SPRINT_STATES = ("sprint", "run")
+_SNEAK_STATES  = ("sneak",)
+
+
+def _current_move_speed(c):
+    """Picks the active per-tile speed for c: an explicit c["move_speed"]
+    always wins (baby.py's age-stage locomotion and pregnancy.py's
+    penalty multiplier both manage that field directly and must keep
+    overriding everything else); otherwise crawling posture and the
+    jog/sprint/sneak animation states each pick their own template-driven
+    speed, defaulting to walk."""
+    if c.get("move_speed") is not None:
+        return c["move_speed"]
+
+    if c.get("posture") == "crawling":
+        return c.get("crawl_speed", DEFAULT_CRAWL_SPEED)
+
+    anim = c.get("animation_state")
+    if anim in _SPRINT_STATES:
+        return c.get("sprint_speed", DEFAULT_SPRINT_SPEED)
+    if anim in _JOG_STATES:
+        return c.get("jog_speed", DEFAULT_JOG_SPEED)
+    if anim in _SNEAK_STATES:
+        return c.get("sneak_speed", DEFAULT_SNEAK_SPEED)
+
+    return c.get("walk_speed", DEFAULT_WALK_SPEED)
+
 
 def _auto_lock_on_exit(c, world):
     """Lock home when character transitions from their home building to outdoor."""
@@ -168,10 +217,7 @@ def update_character_movement(
     # speed constant even though more ticks are being processed per second
     # -- the one place this file needs to know about time_scale at all.
     time_scale = max(1, min(10, world.get("time_scale", 1)))
-    speed = c.get(
-        "move_speed",
-        0.05
-    ) / time_scale
+    speed = _current_move_speed(c) / time_scale
 
     # =====================================
     # STUCK DETECTION

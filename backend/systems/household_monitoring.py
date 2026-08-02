@@ -383,10 +383,20 @@ def create_household_procurement_desire(
     importance
 ):
 
-    members = household.get(
-        "members",
-        []
-    )
+    # household["members"] is a list of character ids (see
+    # household_manager.py::add_member_to_household() and every other
+    # consumer of this field, e.g. bedroom_assignment.py/economy.py) --
+    # choose_responsible_member() below needs the actual character dicts.
+    # This resolution step was missing entirely, crashing on the first
+    # tick that ever ran against a real household (confirmed live: no
+    # household existed in a freshly generated world before this plan
+    # added one, so this path had never actually executed).
+    chars = world.get("characters", {})
+    members = [
+        chars[mid]
+        for mid in household.get("members", [])
+        if mid in chars
+    ]
 
     if not members:
         return

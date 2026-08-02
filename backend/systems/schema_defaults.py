@@ -555,6 +555,19 @@ def ensure_character_defaults(c):
     c.setdefault("prenatal_prep",      None)           # set during pregnancy
     c.setdefault("school_enrollment",  None)           # school_template id when enrolled
 
+    # Locomotion speeds, tiles/tick -- see movement.py::_current_move_speed()
+    # for how these get selected (crawling posture / jog|sprint|sneak
+    # animation_state / default walk) and DEFAULT_*_SPEED for the values
+    # these must match. c["move_speed"] is deliberately left unset here --
+    # it's an override hook baby.py/pregnancy.py write to directly, and
+    # movement.py treats its mere presence as "this character's speed is
+    # externally managed", which a blanket default here would break.
+    c.setdefault("walk_speed",   0.05)
+    c.setdefault("jog_speed",    0.09)
+    c.setdefault("sprint_speed", 0.18)
+    c.setdefault("crawl_speed",  0.02)
+    c.setdefault("sneak_speed",  0.025)
+
     # Pushable prop (baby carriage / lawnmower — separate mechanic from drag/push below)
     c.setdefault("pushed_prop_id",         None)       # prop instance id when pushing carriage/mower etc.
     c.setdefault("_active_locomotion_override", None)  # animation override while pushing

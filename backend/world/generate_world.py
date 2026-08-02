@@ -32,6 +32,21 @@ def generate_initial_world():
             "height": 100
         },
 
+        # world_tiles.py::generate_road_gateways() falls back to
+        # world["grid"]["width"/"height"] (then a hardcoded 100) when these
+        # are unset, but generate_world_tiles() itself defaults to 300 --
+        # leaving them unset meant the 300x300 tile field's road-edge
+        # gateways only ever landed at x/y==0/99, nowhere near where most
+        # of the map actually renders. Setting them explicitly keeps both
+        # functions consistent at the same 100x100 field.
+        "world_width": 100,
+        "world_height": 100,
+
+        # Shared by world_tiles.py::generate_world_tiles() (carves the
+        # through-road tile row) and this function's bus-stop placement
+        # below -- one source of truth for where the road sits.
+        "road_y": 10,
+
         # =====================================================
         # DEFINITIONS / TEMPLATES
         # =====================================================
@@ -610,5 +625,27 @@ def generate_initial_world():
     from systems.social_events import generate_world_events
     world["social_events"] = {}
     generate_world_events(world)
+
+    # Household + garage/car/bus-stop -- generate_initial_world() never
+    # created a household before (household_manager.create_household() is
+    # otherwise only ever called from the World Editor's admin API), so a
+    # freshly generated world had house_1/c1 with no household to own
+    # anything. Create one here so "a car belonging to the household" has
+    # a household to belong to.
+    from systems.household_manager import (
+        create_household,
+        assign_building_to_household,
+        add_member_to_household,
+    )
+    from systems.vehicles import spawn_household_garage_and_car, spawn_bus_stop
+
+    world.setdefault("households", {})
+    house_1 = world["buildings"][0]
+    household = create_household(world, "The " + c1["name"] + " Household")
+    assign_building_to_household(world, house_1, household)
+    add_member_to_household(world, c1, household)
+
+    spawn_household_garage_and_car(world, household, house_1)
+    spawn_bus_stop(world, world["road_y"])
 
     return world

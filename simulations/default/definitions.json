@@ -4303,6 +4303,77 @@
       "base_price": 8,
       "celebrity_id": "celeb_athlete_marco",
       "description": "A poster of Marco Diaz. Popular bedroom wall decoration."
+    },
+    "garage_a": {
+      "category": "structure",
+      "footprint": [
+        {
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "dx": 1,
+          "dy": 0
+        },
+        {
+          "dx": 2,
+          "dy": 0
+        },
+        {
+          "dx": 0,
+          "dy": 1
+        },
+        {
+          "dx": 1,
+          "dy": 1
+        },
+        {
+          "dx": 2,
+          "dy": 1
+        }
+      ],
+      "tags": [
+        "structure",
+        "garage"
+      ]
+    },
+    "bus_stop_a": {
+      "category": "transit",
+      "footprint": [
+        {
+          "dx": 0,
+          "dy": 0
+        }
+      ],
+      "tags": [
+        "transit",
+        "bus_stop"
+      ]
+    },
+    "bus_a": {
+      "category": "vehicle",
+      "footprint": [
+        {
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "dx": 1,
+          "dy": 0
+        },
+        {
+          "dx": 2,
+          "dy": 0
+        },
+        {
+          "dx": 3,
+          "dy": 0
+        }
+      ],
+      "tags": [
+        "vehicle",
+        "bus"
+      ]
     }
   },
   "item_templates": {
@@ -10161,16 +10232,6 @@
         "fetishes": [],
         "allergies": [],
         "problems": [],
-        "locomotion": {
-          "style": "normal",
-          "current_mode": "walk",
-          "walk_speed": 1,
-          "run_speed": 3,
-          "sneak_speed": 0.4,
-          "crawl_speed": 0.25,
-          "limp_walk_speed": 0.6,
-          "override_style": null
-        },
         "natural_talents": [],
         "sexual_orientation": "straight",
         "gender_identity": "cisgender",
@@ -10178,7 +10239,12 @@
           "style_id": "short_neat",
           "color": "brown",
           "mesh": null
-        }
+        },
+        "walk_speed": 0.05,
+        "jog_speed": 0.09,
+        "sprint_speed": 0.18,
+        "crawl_speed": 0.02,
+        "sneak_speed": 0.025
       },
       "traits": [
         "wise",
@@ -10190,7 +10256,31 @@
       "abnormal_traits": [
         "double_jointed",
         "sensitive_stomach"
-      ]
+      ],
+      "name": "adult_male_a",
+      "age": 25,
+      "sex": "male",
+      "body_features": {
+        "height_cm": 170
+      },
+      "body_composition": {
+        "body_fat_level": 0.35
+      },
+      "physical_traits": [],
+      "hobbies": [],
+      "worn": {},
+      "starting_inventory": [],
+      "bio": "",
+      "job": null,
+      "education": "",
+      "current_school": "",
+      "work_history": [],
+      "legal": {
+        "status": "free",
+        "jail_until": null,
+        "record": []
+      },
+      "household_id": ""
     },
     "adult_female": {
       "name": "Mary Jane",
@@ -10237,7 +10327,14 @@
           17
         ]
       },
-      "starting_inventory": []
+      "starting_inventory": [],
+      "instance": {
+        "walk_speed": 0.05,
+        "jog_speed": 0.09,
+        "sprint_speed": 0.18,
+        "crawl_speed": 0.02,
+        "sneak_speed": 0.025
+      }
     }
   },
   "interaction_templates": {
@@ -13663,7 +13760,7 @@
       "effectiveness_modifiers": [
         {
           "condition": "actor.held_item.category == 'melee_weapon_blunt'",
-          "multiplier": 2.0
+          "multiplier": 2
         },
         {
           "condition": "actor.held_item == null",
@@ -54351,12 +54448,18 @@
       "social": true
     },
     "sit_ups": {
-      "type": ["cardio", "strength"],
+      "type": [
+        "cardio",
+        "strength"
+      ],
       "intensity": 1,
       "social": false
     },
     "chin_ups": {
-      "type": ["cardio", "strength"],
+      "type": [
+        "cardio",
+        "strength"
+      ],
       "intensity": 2,
       "social": false
     }

@@ -33,6 +33,8 @@ selection):
 ACTION_SPECS = {
     # ---- movement / core ----------------------------------------------
     "move":       {"group": "core", "target": "prop_or_character", "doc": "Walk toward a person or prop."},
+    "jog_to":     {"group": "core", "target": "prop_or_character", "doc": "Jog toward a person or prop -- faster than walking, use when in a hurry (running late, urgent need)."},
+    "sneak_to":   {"group": "core", "target": "prop_or_character", "doc": "Move toward a person or prop slowly and carefully, trying not to be noticed -- e.g. slipping out at night, avoiding someone without confronting them."},
     "speak":      {"group": "core", "target": "character", "doc": "Say something (use the `say` field)."},
     "interact":   {"group": "core", "target": "prop", "doc": "Use/interact with a prop."},
     "wait":       {"group": "core", "target": "none", "doc": "Do nothing this turn."},

@@ -854,5 +854,6 @@
       "leaning_wall": {}
     },
     "transitions": []
-  }
+  },
+  "_character_overrides": {}
 }

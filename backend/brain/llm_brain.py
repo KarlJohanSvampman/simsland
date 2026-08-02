@@ -141,6 +141,7 @@ Rules:
     characters and lower-stakes topics tend toward texting; urgent matters and close relationships
     tend toward calling. Let personality and the situation drive it.
 - When you choose "move", set "target" to a prop id or character id you want to approach.
+- "jog_to" and "sneak_to" work exactly like "move" (same "target" field) but change your pace: jog_to when you're in a hurry (running late, an urgent need), sneak_to when you're deliberately moving quietly and trying not to be noticed (slipping out, avoiding someone without confronting them). Use plain "move" otherwise.
 - When you choose "eat" or "sleep", set "target" to a prop id tagged "eatable" or "sleepable".
 - If no suitable prop exists for your intended action, choose "wait" instead.
 - "examine" or "search": target a prop or character id. Use examine to look closely at something; search to rummage a container (fridge, cabinet, drawer).

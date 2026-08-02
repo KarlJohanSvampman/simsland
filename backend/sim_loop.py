@@ -66,6 +66,7 @@ from systems.law        import process_jail, process_trials, maybe_arrest_from_i
 from systems.jobs       import generate_job_listings, tick_job_market, maybe_fire, process_interview, init_company_slots
 from systems.postal_service     import update_postal_service
 from systems.service_vehicles   import update_service_vehicles
+from systems.transit            import update_bus
 from systems.appliance_degradation import update_appliance_degradation
 from systems.messaging  import deliver_messages
 from systems.migration  import check_migration_desires
@@ -339,6 +340,10 @@ def tick(world):
 
     if every(world, CADENCE["traffic"], offset=11):
         update_ambient_traffic(world)
+
+    # Not every()-gated -- the 15-sim-minute bus schedule (see transit.py)
+    # needs single-tick precision to catch the boundary reliably.
+    update_bus(world)
 
     if every(world, CADENCE["postal"], offset=12):
         update_postal_service(world)

@@ -422,7 +422,30 @@ def _seed_lie_for_private_event(c, world, event):
     return lie["id"]
 
 
+# Reasons routed through a real physical trip (garage/car or bus stop --
+# see travel.py) instead of vanishing instantly. jail/hospital are excluded:
+# both already imply involuntary transport (police custody / ambulance),
+# so routing an incapacitated or arrested character through "walk to the
+# garage and drive yourself" would be narratively wrong.
+_TRAVEL_ELIGIBLE_REASONS = {
+    "work", "job_search", "shopping", "leisure", "gym", "cafe", "doctor",
+}
+
+
 def send_offgrid(c, world, reason, duration):
+    if c.get("off_grid") or c.get("legal", {}).get("status") == "jailed":
+        return False
+    if c.get("travel_state"):
+        return False
+
+    if reason in _TRAVEL_ELIGIBLE_REASONS or reason.startswith("event:"):
+        from systems.travel import begin_travel
+        return begin_travel(c, world, reason, duration)
+
+    return _send_offgrid_immediate(c, world, reason, duration)
+
+
+def _send_offgrid_immediate(c, world, reason, duration):
     if c.get("off_grid") or c.get("legal", {}).get("status") == "jailed":
         return False
     c["off_grid"]      = True
@@ -667,3 +690,12 @@ def process_return(c, world):
         "tick":         world["tick"],
         "story":        public_story,
     })
+
+    # Errand is narratively complete, but a travel-mode character (see
+    # travel.py) isn't home yet -- defer their visible reveal to the
+    # driving-back / bus-arrival leg instead of popping back in place.
+    if c.get("travel_mode") == "car":
+        from systems.travel import _start_driving_back
+        _start_driving_back(c, world)
+    elif c.get("travel_mode") == "bus":
+        c["travel_state"] = "awaiting_bus_arrival"

@@ -208,7 +208,15 @@ def _movement_blocked(c):
     return False
 
 
-def _route_move(c, world, action):
+def _route_move(c, world, action, mode="walk"):
+    """
+    action: {"type": "move"|"jog_to"|"sneak_to", "target": id}
+    mode selects the animation_state (and, via
+    movement.py::_current_move_speed(), the matching speed field) --
+    "walk" for plain move, "jog"/"sneak" for the two faster/quieter modes.
+    Sprint isn't offered here: it's reserved for turn_and_run's panic
+    flight, not a voluntary pace choice.
+    """
     if _movement_blocked(c):
         return
 
@@ -233,13 +241,19 @@ def _route_move(c, world, action):
             "target_type": "character",
         }
         if plan_character_route(world, c, t.get("x", 0), t.get("y", 0)):
-            c["animation_state"] = "walk"
+            c["animation_state"] = mode
             c["is_moving"]       = True
         return
 
-    props = world.get("props", {})
-    if target_id in props:
-        p = props[target_id]
+    # world["props"] is a list, not a dict keyed by id -- see
+    # systems/props.py::get_prop_by_id() (the convention used everywhere
+    # else in this file). The previous `target_id in world["props"]`
+    # dict-style lookup here always failed silently, meaning "move"
+    # targeting a prop has never actually worked; jog_to/sneak_to share
+    # this same fix.
+    from systems.props import get_prop_by_id
+    p = get_prop_by_id(world, target_id)
+    if p:
         c["move_target"] = {
             "x": p.get("x", 0),
             "y": p.get("y", 0),
@@ -247,7 +261,7 @@ def _route_move(c, world, action):
             "target_type": "prop",
         }
         if plan_character_route(world, c, p.get("x", 0), p.get("y", 0)):
-            c["animation_state"] = "walk"
+            c["animation_state"] = mode
             c["is_moving"]       = True
         return
 
@@ -901,6 +915,12 @@ def route_action(c, world, action, speech, definitions=None, available_actions=N
 
     if action_type == "move":
         _route_move(c, world, action)
+
+    elif action_type == "jog_to":
+        _route_move(c, world, action, mode="jog")
+
+    elif action_type == "sneak_to":
+        _route_move(c, world, action, mode="sneak")
 
     elif action_type == "interact":
         _route_interact(c, world, action, definitions)
