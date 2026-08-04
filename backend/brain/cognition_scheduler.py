@@ -45,6 +45,7 @@ WAKE_PRIORITY = {
     "urgent_need": 90,
     "activity_aborted": 80,
     "activity_finished": 70,
+    "waiting_timed_out": 68,
     "describe_result": 65,
     "recall_result": 65,
     "resolution_failed": 60,
@@ -134,6 +135,7 @@ _WAKE_LINE_TEMPLATES = {
     "heard_speech": '{speaker_name} just said to you: "{utterance}"',
     "activity_phase_changed": "You're finishing up what you were doing.",
     "wait_ready": "What you were waiting on is ready now.",
+    "waiting_timed_out": "You've been waiting a while now and your patience is running out.",
 }
 
 

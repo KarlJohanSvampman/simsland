@@ -819,7 +819,7 @@ def compute_severity(char):
     signal rather than purely additive -- one severe emergency should
     dominate five mild ones, not average them away.
     """
-    if not char.get("alive", True):
+    if char.get("alive") is False:
         return 100.0, "dead"
 
     hs = char.get("health_state", {})

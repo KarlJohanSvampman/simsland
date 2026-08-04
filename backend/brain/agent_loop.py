@@ -195,6 +195,9 @@ def update_internal_state(
         world
     )
 
+    from systems.waiting import tick_waiting
+    tick_waiting(c, world)
+
     consolidate_relationship_narratives(c)
 
     consolidate_life_narratives(c)

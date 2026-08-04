@@ -167,10 +167,22 @@ def all_characters(sim_id: str):
     world = load_world(sim_id)
 
     characters = [
-        {"id": c["id"], "name": c.get("name"), "household_id": c.get("household_id")}
+        {
+            "id": c["id"],
+            "name": c.get("name"),
+            "household_id": c.get("household_id"),
+            "x": c.get("x"),
+            "y": c.get("y"),
+            "alive": c.get("alive") is not False,
+            "posture": c.get("posture"),
+            "off_grid": c.get("off_grid", False),
+            "off_grid_reason": c.get("off_grid_reason"),
+            "return_tick": c.get("return_tick"),
+            "travel_state": c.get("travel_state"),
+        }
         for c in world.get("characters", {}).values()
     ]
-    return {"ok": True, "characters": characters}
+    return {"ok": True, "tick": world.get("tick", 0), "characters": characters}
 
 
 # =========================================================

@@ -2,7 +2,10 @@ import random, uuid
 from brain.memory import store_memory
 def create_shared_event(world, participants, event_type, location_id=None):
     event={"id":f"evt_{uuid.uuid4().hex[:8]}","type":event_type,"participants":participants,"location_id":location_id,"tick":world["tick"],"outcome":generate_outcome(world,event_type)}
-    world.setdefault("shared_events",[]).append(event); world.setdefault("events",[]).append(event)
+    world.setdefault("shared_events",[]).append(event)
+    events = world.setdefault("events", [])
+    events.append(event)
+    del events[:-300]  # world["events"] otherwise grows forever
     for cid in participants:
         c=world["characters"].get(cid)
         if c: store_memory(c,f"Was involved in {event_type}; outcome was {event['outcome']['type']}.",.8,["shared_event",event_type,event["outcome"]["type"]],"shared_event",world["tick"],event_id=event["id"])

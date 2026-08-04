@@ -89,7 +89,7 @@ def tick_child_needs(world):
     from brain.intentions import add_intention
 
     for c in world.get("characters", {}).values():
-        if c.get("age_group") != "child" or not c.get("alive", True):
+        if c.get("age_group") != "child" or c.get("alive") is False:
             continue
 
         parents = _find_parents_for_child(c, world)

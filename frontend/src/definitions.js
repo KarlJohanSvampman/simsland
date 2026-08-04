@@ -1086,7 +1086,12 @@ const DEFAULT_TEMPLATES = {
     sector: "services",
     job_slots: [],
     starting_funds: 10000,
-    tags: []
+    tags: [],
+    business_kind: "product",
+    presence: "physical",
+    opening_hours: { open: 9, close: 17 },
+    phone_hours: { open: 9, close: 17 },
+    reason_options: []
   },
 
   vehicle_templates: {

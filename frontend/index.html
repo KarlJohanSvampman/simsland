@@ -58,6 +58,252 @@
     background: rgba(40,40,40,0.9);
   }
 
+  /* =========================
+     EVENT TIMELINE
+     Hideable horizontal bar under the top icon row -- see
+     api/events.py (GET /api/events) for the data this renders.
+  ========================= */
+
+  #timelineToggleBtn {
+    position: fixed;
+    top: 10px;
+    right: 324px;
+    z-index: 9999;
+    width: 34px;
+    height: 34px;
+    background: rgba(0,0,0,0.85);
+    color: white;
+    border: 1px solid #444;
+    border-radius: 6px;
+    font-size: 16px;
+    cursor: pointer;
+  }
+
+  #timelineToggleBtn:hover {
+    background: rgba(40,40,40,0.9);
+  }
+
+  #eventTimeline {
+    position: fixed;
+    top: 54px;
+    left: 0;
+    right: 0;
+    height: 56px;
+    background: rgba(0,0,0,0.82);
+    border-bottom: 1px solid #444;
+    z-index: 9000;
+    font-family: monospace;
+    color: white;
+    box-sizing: border-box;
+    padding: 6px 16px;
+  }
+
+  #eventTimelineTrack {
+    position: relative;
+    height: 26px;
+    margin: 2px 0;
+  }
+
+  #eventTimelineAxis {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: #444;
+  }
+
+  #eventTimelinePoints {
+    position: absolute;
+    inset: 0;
+  }
+
+  .eventTimelinePoint {
+    position: absolute;
+    top: 50%;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #6cf;
+    border: 1px solid #0a1a24;
+    transform: translate(-50%, -50%);
+    cursor: pointer;
+  }
+
+  .eventTimelinePoint:hover {
+    background: #9df;
+  }
+
+  .eventTimelinePoint.eventTimelinePointCluster {
+    width: 13px;
+    height: 13px;
+    background: #fc6;
+  }
+
+  .eventTimelinePoint.eventTimelinePointCluster:hover {
+    background: #fd9;
+  }
+
+  .eventTimelineLabels {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    color: #999;
+  }
+
+  #eventTimelineTooltip {
+    position: fixed;
+    z-index: 9500;
+    background: rgba(0,0,0,0.92);
+    color: white;
+    border: 1px solid #444;
+    padding: 8px 10px;
+    font-family: monospace;
+    font-size: 12px;
+    max-width: 280px;
+    display: none;
+    pointer-events: none;
+  }
+
+  #eventTimelineTooltip .eventTimelineTooltipRow + .eventTimelineTooltipRow {
+    margin-top: 6px;
+    padding-top: 6px;
+    border-top: 1px solid #333;
+  }
+
+  #eventTimelineTooltip .eventTimelineTooltipTitle {
+    color: #9cf;
+    font-weight: bold;
+  }
+
+  #eventTimelineTooltip .eventTimelineTooltipMeta {
+    color: #888;
+    font-size: 11px;
+  }
+
+  /* =========================
+     OUTLINER SIDEBAR
+     Collapsible left-docked Blender-outliner-style tree -- see
+     api/household.py (GET /household/list, GET /household/characters)
+     for the data this renders.
+  ========================= */
+
+  #outlinerToggleBtn {
+    position: fixed;
+    top: 10px;
+    left: 10px;
+    z-index: 9999;
+    width: 34px;
+    height: 34px;
+    background: rgba(0,0,0,0.85);
+    color: white;
+    border: 1px solid #444;
+    border-radius: 6px;
+    font-size: 16px;
+    cursor: pointer;
+  }
+
+  #outlinerToggleBtn:hover {
+    background: rgba(40,40,40,0.9);
+  }
+
+  #outlinerSidebar {
+    position: fixed;
+    left: 0;
+    bottom: 0;
+    width: 260px;
+    background: rgba(0,0,0,0.82);
+    border-right: 1px solid #444;
+    z-index: 9000;
+    font-family: monospace;
+    color: white;
+    box-sizing: border-box;
+    padding: 8px;
+    overflow-y: auto;
+  }
+
+  #outlinerSearch {
+    width: 100%;
+    box-sizing: border-box;
+    background: #1a1a1a;
+    border: 1px solid #444;
+    color: #eee;
+    padding: 5px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    margin-bottom: 8px;
+  }
+
+  .outlinerGroup {
+    margin-bottom: 2px;
+  }
+
+  .outlinerGroupHeader {
+    cursor: pointer;
+    font-weight: bold;
+    color: #9cf;
+    padding: 3px 2px;
+    user-select: none;
+  }
+
+  .outlinerGroupHeader:hover {
+    color: #cdf;
+  }
+
+  .outlinerGroupCount {
+    color: #678;
+    font-weight: normal;
+    font-size: 11px;
+  }
+
+  .outlinerMembers {
+    padding-left: 14px;
+  }
+
+  .outlinerMembers.collapsed {
+    display: none;
+  }
+
+  .outlinerRow {
+    padding: 3px 4px;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 12px;
+    display: flex;
+    justify-content: space-between;
+    gap: 6px;
+  }
+
+  .outlinerRow:hover {
+    background: rgba(255,255,255,0.08);
+  }
+
+  .outlinerRow.selected {
+    background: rgba(100,180,255,0.22);
+  }
+
+  .outlinerRowName {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .outlinerRowStatus {
+    color: #999;
+    font-size: 11px;
+    white-space: nowrap;
+  }
+
+  .outlinerRowStatus.offgrid { color: #fc6; }
+  .outlinerRowStatus.traveling { color: #6cf; }
+  .outlinerRowStatus.dead { color: #f66; }
+
+  .outlinerEmpty {
+    color: #777;
+    font-size: 12px;
+    padding: 8px 2px;
+  }
+
   #viewerInspector pre {
     white-space: pre-wrap;
     word-break: break-word;
@@ -196,6 +442,26 @@
 </div>
 
 <button id="debugSettingsBtn" title="Debug overlay settings">⚙</button>
+<button id="timelineToggleBtn" title="Toggle event timeline">🕒</button>
+<button id="outlinerToggleBtn" title="Toggle outliner">☰</button>
+
+<div id="outlinerSidebar">
+  <input id="outlinerSearch" type="text" placeholder="Search households / characters..." />
+  <div id="outlinerTree"></div>
+</div>
+
+<div id="eventTimeline">
+  <div id="eventTimelineTrack">
+    <div id="eventTimelineAxis"></div>
+    <div id="eventTimelinePoints"></div>
+  </div>
+  <div class="eventTimelineLabels">
+    <span id="eventTimelineLabelLeft">—</span>
+    <span id="eventTimelineLabelRight">now</span>
+  </div>
+</div>
+
+<div id="eventTimelineTooltip"></div>
 
 <div class="modal-overlay" id="modal-household">
   <div class="modal-box">

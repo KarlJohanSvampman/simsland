@@ -298,7 +298,7 @@ def perceived_activity(other):
     # observer can read directly, same as the character's own narrative
     # does), so it's handled separately from the flat lookup below.
     if other.get("posture") == "incapacitated":
-        return "lying unconscious" if other.get("alive", True) else "lying motionless — not breathing"
+        return "lying unconscious" if other.get("alive") is not False else "lying motionless — not breathing"
 
     posture_labels = {
         "leaning_wall":  "leaning against the wall",

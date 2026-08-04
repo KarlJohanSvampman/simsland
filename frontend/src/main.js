@@ -3298,39 +3298,13 @@ renderer.domElement.addEventListener(
     const inspector = document.getElementById("viewerInspector");
     inspector.classList.toggle("expanded", d.type === "character");
 
-    // Activity/animation state come from the last server tick's character
-    // payload (cached on characterAnimations[id].state), not userData —
-    // userData is set once at load time and never carries live sim state.
-    const liveState = d.type === "character"
-      ? characterAnimations[d.id]?.state
-      : null;
-    const activityLabel = liveState
-      ? (liveState.activity?.type
-          ? `Doing: ${liveState.activity.type}`
-          : `State: ${liveState.animation_state || "idle"}`)
-      : "";
-    const moodLabel = liveState?.emotion
-      ? `Mood: ${liveState.emotion}`
-      : "";
-
-    document
-      .getElementById(
-        "viewerSelection"
-      ).innerHTML = `
-        <b>${d.type}</b><br>
-        ${d.tileType ? `Type: ${d.tileType}<br>` : ""}
-        ${d.id || ""}<br>
-        ${d.name || ""}<br>
-        ${moodLabel ? `${moodLabel}<br>` : ""}
-        ${activityLabel}
-      `;
-
     if(d.type === "character" && d.id){
       // A new character selection -- clear any cached radii from a
       // previous selection so the perception overlay doesn't briefly
       // show stale numbers before the fresh fetch resolves.
       if(selectedCharacterId !== d.id) _perceptionRanges = null;
       selectedCharacterId = d.id;
+      renderCharacterInspector(d.id);
       showCharacterLLMLog(d.id);
     } else {
       // Selecting a prop/tile while a character was selected must also
@@ -3338,9 +3312,112 @@ renderer.domElement.addEventListener(
       // anchored to the stale previous character while the inspector
       // shows unrelated prop info.
       selectedCharacterId = null;
+      document
+        .getElementById(
+          "viewerSelection"
+        ).innerHTML = `
+          <b>${d.type}</b><br>
+          ${d.tileType ? `Type: ${d.tileType}<br>` : ""}
+          ${d.id || ""}<br>
+          ${d.name || ""}
+        `;
     }
   }
 );
+
+// Re-centers the orbit camera on a world (x,y) point at a fixed default
+// framing -- same angle every time (the initial-load offset, camera.position
+// .set(20,20,20) looking at (0,0,0)), not whatever pan the user left the
+// camera at. Note camera.zoom, not position distance, controls apparent
+// size for an OrthographicCamera -- position distance from target is
+// basically invisible in orthographic projection, so "closer" has to come
+// from raising zoom (matches the zoom tiers OrbitControls' scroll wheel
+// already drives -- see the `camera.zoom > 1.8 ? 3 : ...` mapping in
+// _updateViewport()). controls.update() dispatches its own "change" event,
+// which the existing debounced listener in connectWS() picks up to resync
+// the viewport with the server -- no separate network call needed here.
+const _DEFAULT_CAMERA_OFFSET = new THREE.Vector3(20, 20, 20);
+const _DEFAULT_CAMERA_ZOOM = 3;
+
+function focusCameraOn(x, y){
+  // World (x,y) -> scene (x,z) uses the same (-10,-7) map-centering offset
+  // every mesh placement in this file applies (tile/prop/character
+  // .position.set(x - 10, 0, y - 7)) -- without it the camera centers on
+  // raw world coordinates instead of where the character's mesh actually
+  // sits on screen.
+  controls.target.set(x - 10, 0, y - 7);
+  camera.position.copy(controls.target).add(_DEFAULT_CAMERA_OFFSET);
+  camera.zoom = _DEFAULT_CAMERA_ZOOM;
+  camera.updateProjectionMatrix();
+  controls.update();
+}
+
+// Comprehensive current-state dump for a selected character, pulled from
+// _worldState.characters[id] -- the raw per-tick character dict the server
+// sends (get_view()/​_build_delta() forward it unfiltered), not just the
+// sparse activity/mood fields userData carries from load time. Re-invoked
+// on every subsequent state/delta apply while this character stays
+// selected (see the updateSelectionInspector() hook in _applyState), so
+// the panel tracks the character live rather than freezing at click time.
+function renderCharacterInspector(id){
+  const el = document.getElementById("viewerSelection");
+  if(!el) return;
+  const c = _worldState.characters?.[id];
+  if(!c){
+    el.innerHTML = `<b>character</b><br>${id}<br>(out of view)`;
+    return;
+  }
+
+  const rows = [];
+  rows.push(`<b>${c.name || c.id}</b>`);
+  rows.push(c.id);
+
+  if(c.alive === false){
+    rows.push(`<span style="color:#f66">DEAD</span>`);
+  }
+
+  if(c.posture) rows.push(`Posture: ${c.posture}`);
+  const activity = c.activity?.type
+    ? `Doing: ${c.activity.type}`
+    : `State: ${c.animation_state || "idle"}`;
+  rows.push(activity);
+  if(c.emotion) rows.push(`Mood: ${c.emotion}`);
+
+  if(c.off_grid){
+    const tick = _worldState.tick || 0;
+    const remain = (c.return_tick || tick) - tick;
+    const backIn = remain > 0 ? `~${Math.max(1, Math.round(remain / 60))}m` : "due now";
+    rows.push(`<span style="color:#fc6">Off-grid: ${(c.off_grid_reason || "?").replace(/_/g, " ")} — back in ${backIn}</span>`);
+  } else if(c.travel_state){
+    rows.push(`<span style="color:#6cf">Traveling: ${c.travel_state}</span>`);
+  }
+
+  const h = c.health || {};
+  const needs = [];
+  if(h.energy   != null) needs.push(`energy ${Math.round(h.energy * 100)}%`);
+  if(h.hunger   != null) needs.push(`hunger ${Math.round(h.hunger * 100)}%`);
+  if(h.hygiene  != null) needs.push(`hygiene ${Math.round(h.hygiene * 100)}%`);
+  if(h.bladder  != null) needs.push(`bladder ${Math.round(h.bladder * 100)}%`);
+  if(h.fatigue  != null) needs.push(`fatigue ${Math.round(h.fatigue * 100)}%`);
+  if(h.stress   != null) needs.push(`stress ${Math.round(h.stress * 100)}%`);
+  if(needs.length) rows.push(`Needs: ${needs.join(", ")}`);
+  if(h.sick) rows.push(`<span style="color:#fc6">Sick</span>`);
+
+  const hs = c.health_state || {};
+  if(hs.pain) rows.push(`Pain: ${Math.round(hs.pain)}%`);
+  if(hs.severity_index) rows.push(`Severity: ${hs.severity_index.toFixed(2)}`);
+  const emergencies = Object.keys(hs.active_emergencies || {});
+  if(emergencies.length) rows.push(`<span style="color:#f66">Emergency: ${emergencies.join(", ")}</span>`);
+
+  if(c.household_id) rows.push(`Household: ${c.household_id}`);
+
+  el.innerHTML = rows.join("<br>");
+}
+
+function updateSelectionInspector(state){
+  if(!selectedCharacterId) return;
+  renderCharacterInspector(selectedCharacterId);
+}
 
 // =========================================================
 // HOUSEHOLD ADMIN MODAL (mailbox double-click)
@@ -3762,6 +3839,7 @@ async function _applyState(state) {
   updateThoughtBubbles(state);
   updateBadges(state);
   updatePerceptionOverlay(state);
+  updateSelectionInspector(state);
 }
 
 async function _applyDelta(delta) {
@@ -3810,20 +3888,342 @@ function connectWS() {
     setTimeout(connectWS, 2000);
   };
 
-  // Report viewport when camera moves (throttled to once per second)
+  // Report viewport when camera moves (throttled, not on every frame of a
+  // drag/zoom gesture). This used to be 1000ms, which meant up to a full
+  // second where the server kept filtering delta updates against a stale
+  // viewport center after the camera had already moved -- newly-visible
+  // tiles got no updates in that window, then the eventual resync tore
+  // down and rebuilt everything outside the new radius in one synchronous
+  // swap (see updateTiles() below). Combined with the server no longer
+  // resyncing on trivial drift (see main.py's movement-threshold check),
+  // a shorter throttle here keeps that stale window small without
+  // spamming the socket on every mouse-move tick.
   let _vpTimer = null;
   controls.addEventListener("change", () => {
     if (_vpTimer) return;
     _vpTimer = setTimeout(() => {
       _vpTimer = null;
       _updateViewport(ws);
-    }, 1000);
+    }, 300);
   });
 
   return ws;
 }
 
 connectWS();
+
+// =========================================================
+// EVENT TIMELINE
+// Plain REST poll against api/events.py -- events aren't tied to a
+// viewport radius the way characters/props/tiles are, so this doesn't
+// ride the WS snapshot/delta protocol at all.
+// =========================================================
+
+const EVENT_TIMELINE_VISIBLE_KEY = "holosims_timeline_visible";
+let _timelineVisible = localStorage.getItem(EVENT_TIMELINE_VISIBLE_KEY) !== "0";
+
+const eventTimelineEl          = document.getElementById("eventTimeline");
+const timelineToggleBtn        = document.getElementById("timelineToggleBtn");
+const eventTimelinePointsEl    = document.getElementById("eventTimelinePoints");
+const eventTimelineLabelLeftEl = document.getElementById("eventTimelineLabelLeft");
+const eventTimelineTooltipEl   = document.getElementById("eventTimelineTooltip");
+
+function _applyTimelineVisibility(){
+  if(eventTimelineEl) eventTimelineEl.style.display = _timelineVisible ? "block" : "none";
+}
+_applyTimelineVisibility();
+
+if(timelineToggleBtn){
+  timelineToggleBtn.addEventListener("click", () => {
+    _timelineVisible = !_timelineVisible;
+    localStorage.setItem(EVENT_TIMELINE_VISIBLE_KEY, _timelineVisible ? "1" : "0");
+    _applyTimelineVisibility();
+  });
+}
+
+function _ticksAgoLabel(ticks){
+  // 1 tick == 1 nominal sim-second (see core/tick_schedule.py).
+  if(ticks < 60) return `${Math.max(0, Math.round(ticks))}s ago`;
+  const mins = ticks / 60;
+  if(mins < 60) return `${Math.round(mins)}m ago`;
+  return `${Math.round(mins / 60)}h ago`;
+}
+
+async function fetchEvents(){
+  if(!eventTimelineEl) return;
+  try{
+    const res = await fetch("/api/events?sim_id=default&limit=50");
+    const data = await res.json();
+    if(data.ok) renderEventTimeline(data);
+  } catch(e){
+    // Auxiliary panel -- a failed poll just leaves the last render in place.
+  }
+}
+
+function renderEventTimeline(data){
+  const events  = data.events || [];
+  const nowTick = data.tick || 0;
+
+  eventTimelinePointsEl.innerHTML = "";
+
+  if(events.length === 0){
+    eventTimelineLabelLeftEl.textContent = "no events yet";
+    return;
+  }
+
+  const minTick = Math.min(...events.map(e => e.tick));
+  const span = Math.max(1, nowTick - minTick);
+
+  // Real time-scaled axis: position by actual elapsed ticks, not just
+  // "Nth most recent" order. Points landing within ~1.5% of each other
+  // (e.g. several events in the same handful of ticks) get bucketed into
+  // one cluster marker rather than overlapping illegibly -- hover shows
+  // every event in the cluster.
+  const positioned = events
+    .map(e => ({ event: e, pct: ((e.tick - minTick) / span) * 100 }))
+    .sort((a, b) => a.pct - b.pct);
+
+  const clusters = [];
+  for(const p of positioned){
+    const last = clusters[clusters.length - 1];
+    if(last && (p.pct - last.pct) < 1.5){
+      last.items.push(p.event);
+    } else {
+      clusters.push({ pct: p.pct, items: [p.event] });
+    }
+  }
+
+  for(const cluster of clusters){
+    const dot = document.createElement("div");
+    dot.className = "eventTimelinePoint" + (cluster.items.length > 1 ? " eventTimelinePointCluster" : "");
+    dot.style.left = `${cluster.pct}%`;
+    dot.addEventListener("mouseenter", (e) => _showTimelineTooltip(e, cluster.items, nowTick));
+    dot.addEventListener("mousemove", _positionTimelineTooltip);
+    dot.addEventListener("mouseleave", _hideTimelineTooltip);
+    eventTimelinePointsEl.appendChild(dot);
+  }
+
+  eventTimelineLabelLeftEl.textContent = _ticksAgoLabel(nowTick - minTick);
+}
+
+function _showTimelineTooltip(e, items, nowTick){
+  if(!eventTimelineTooltipEl) return;
+  eventTimelineTooltipEl.innerHTML = "";
+  for(const ev of items){
+    const row = document.createElement("div");
+    row.className = "eventTimelineTooltipRow";
+
+    const title = document.createElement("div");
+    title.className = "eventTimelineTooltipTitle";
+    title.textContent = ev.title || ev.type || "Event";
+    row.appendChild(title);
+
+    const meta = document.createElement("div");
+    meta.className = "eventTimelineTooltipMeta";
+    meta.textContent = _ticksAgoLabel(nowTick - ev.tick);
+    row.appendChild(meta);
+
+    const summary = document.createElement("div");
+    summary.textContent = ev.summary || "";
+    row.appendChild(summary);
+
+    eventTimelineTooltipEl.appendChild(row);
+  }
+  eventTimelineTooltipEl.style.display = "block";
+  _positionTimelineTooltip(e);
+}
+
+function _positionTimelineTooltip(e){
+  if(!eventTimelineTooltipEl) return;
+  eventTimelineTooltipEl.style.left = `${e.clientX + 12}px`;
+  eventTimelineTooltipEl.style.top  = `${e.clientY + 12}px`;
+}
+
+function _hideTimelineTooltip(){
+  if(eventTimelineTooltipEl) eventTimelineTooltipEl.style.display = "none";
+}
+
+fetchEvents();
+setInterval(fetchEvents, 5000);
+
+// =========================================================
+// OUTLINER SIDEBAR
+// Blender-outliner-style collapsible tree: Households -> Characters.
+// Joins GET /household/list (id/name/member_count) with the extended
+// GET /household/characters (id/name/household_id + off-grid/status
+// fields) client-side -- see api/household.py.
+// =========================================================
+
+const OUTLINER_VISIBLE_KEY = "holosims_outliner_visible";
+let _outlinerVisible = localStorage.getItem(OUTLINER_VISIBLE_KEY) !== "0";
+const _outlinerCollapsedGroups = new Set();
+let _outlinerSearchTerm = "";
+
+const outlinerSidebarEl    = document.getElementById("outlinerSidebar");
+const outlinerToggleBtn    = document.getElementById("outlinerToggleBtn");
+const outlinerSearchEl     = document.getElementById("outlinerSearch");
+const outlinerTreeEl       = document.getElementById("outlinerTree");
+
+function _applyOutlinerLayout(){
+  if(!outlinerSidebarEl) return;
+  outlinerSidebarEl.style.display = _outlinerVisible ? "block" : "none";
+  // Sits below the top icon row, and below the event timeline bar too
+  // when it's showing, so the two panels never overlap.
+  outlinerSidebarEl.style.top = (_timelineVisible ? 110 : 54) + "px";
+}
+_applyOutlinerLayout();
+
+if(outlinerToggleBtn){
+  outlinerToggleBtn.addEventListener("click", () => {
+    _outlinerVisible = !_outlinerVisible;
+    localStorage.setItem(OUTLINER_VISIBLE_KEY, _outlinerVisible ? "1" : "0");
+    _applyOutlinerLayout();
+  });
+}
+
+if(timelineToggleBtn){
+  timelineToggleBtn.addEventListener("click", _applyOutlinerLayout);
+}
+
+if(outlinerSearchEl){
+  outlinerSearchEl.addEventListener("input", () => {
+    _outlinerSearchTerm = outlinerSearchEl.value.trim().toLowerCase();
+    renderOutliner(_outlinerLastData);
+  });
+}
+
+function _outlinerStatus(c, tick){
+  if(c.alive === false) return { text: "dead", cls: "dead" };
+  if(c.off_grid){
+    const remain = (c.return_tick || tick) - tick;
+    const backIn = remain > 0 ? `back in ~${Math.max(1, Math.round(remain / 60))}m` : "due back";
+    const reason = c.off_grid_reason ? c.off_grid_reason.replace(/_/g, " ") : "off-grid";
+    return { text: `${reason} — ${backIn}`, cls: "offgrid" };
+  }
+  if(c.travel_state) return { text: "traveling", cls: "traveling" };
+  return { text: "home", cls: "" };
+}
+
+let _outlinerLastData = null;
+
+async function fetchOutliner(){
+  if(!outlinerSidebarEl) return;
+  try{
+    const [householdsRes, charsRes] = await Promise.all([
+      fetch("/api/household/list?sim_id=default"),
+      fetch("/api/household/characters?sim_id=default"),
+    ]);
+    const householdsData = await householdsRes.json();
+    const charsData = await charsRes.json();
+    if(householdsData.ok && charsData.ok){
+      _outlinerLastData = {
+        households: householdsData.households || [],
+        characters: charsData.characters || [],
+        tick: charsData.tick || 0,
+      };
+      renderOutliner(_outlinerLastData);
+    }
+  } catch(e){
+    // Auxiliary panel -- a failed poll just leaves the last render in place.
+  }
+}
+
+function renderOutliner(data){
+  if(!outlinerTreeEl || !data) return;
+  outlinerTreeEl.innerHTML = "";
+
+  const term = _outlinerSearchTerm;
+  const groups = new Map();
+  for(const h of data.households) groups.set(h.id, { id: h.id, name: h.name, members: [] });
+  const noHousehold = { id: null, name: "No Household", members: [] };
+
+  for(const c of data.characters){
+    const g = c.household_id ? groups.get(c.household_id) : null;
+    (g || noHousehold).members.push(c);
+  }
+
+  const allGroups = [...groups.values(), noHousehold].filter(g => g.members.length > 0);
+
+  let anyRendered = false;
+  for(const g of allGroups){
+    const nameMatches = g.name.toLowerCase().includes(term);
+    const filteredMembers = term && !nameMatches
+      ? g.members.filter(c => (c.name || "").toLowerCase().includes(term))
+      : g.members;
+    if(term && filteredMembers.length === 0) continue;
+
+    anyRendered = true;
+    const groupEl = document.createElement("div");
+    groupEl.className = "outlinerGroup";
+
+    const header = document.createElement("div");
+    header.className = "outlinerGroupHeader";
+    const collapsed = _outlinerCollapsedGroups.has(g.id) && !term;
+    header.textContent = `${collapsed ? "▸" : "▾"} ${g.name} `;
+    const count = document.createElement("span");
+    count.className = "outlinerGroupCount";
+    count.textContent = `(${filteredMembers.length})`;
+    header.appendChild(count);
+    header.addEventListener("click", () => {
+      if(_outlinerCollapsedGroups.has(g.id)) _outlinerCollapsedGroups.delete(g.id);
+      else _outlinerCollapsedGroups.add(g.id);
+      renderOutliner(_outlinerLastData);
+    });
+    groupEl.appendChild(header);
+
+    const membersEl = document.createElement("div");
+    membersEl.className = "outlinerMembers" + (collapsed ? " collapsed" : "");
+    for(const c of filteredMembers){
+      const row = document.createElement("div");
+      row.className = "outlinerRow";
+
+      const name = document.createElement("span");
+      name.className = "outlinerRowName";
+      name.textContent = c.name || c.id;
+      row.appendChild(name);
+
+      const status = _outlinerStatus(c, data.tick);
+      const statusEl = document.createElement("span");
+      statusEl.className = "outlinerRowStatus" + (status.cls ? " " + status.cls : "");
+      statusEl.textContent = status.text;
+      row.appendChild(statusEl);
+
+      row.addEventListener("click", () => {
+        for(const el of outlinerTreeEl.querySelectorAll(".outlinerRow.selected")) el.classList.remove("selected");
+        row.classList.add("selected");
+
+        // Same selection path a 3D-viewport click takes (see the
+        // pointerdown handler above) -- inspector + perception overlay +
+        // LLM log all key off selectedCharacterId, not off anything
+        // outliner-local.
+        if(selectedCharacterId !== c.id) _perceptionRanges = null;
+        selectedCharacterId = c.id;
+        renderCharacterInspector(c.id);
+        showCharacterLLMLog(c.id);
+
+        // Off-grid characters have no loaded mesh to frame a camera on --
+        // x/y here is still their real last-known world position (from
+        // GET /household/characters), so jumping the camera there is
+        // still useful: it's where they'll reappear when they return.
+        if(c.x != null && c.y != null) focusCameraOn(c.x, c.y);
+      });
+
+      membersEl.appendChild(row);
+    }
+    groupEl.appendChild(membersEl);
+    outlinerTreeEl.appendChild(groupEl);
+  }
+
+  if(!anyRendered){
+    const empty = document.createElement("div");
+    empty.className = "outlinerEmpty";
+    empty.textContent = term ? "No matches." : "No households or characters yet.";
+    outlinerTreeEl.appendChild(empty);
+  }
+}
+
+fetchOutliner();
+setInterval(fetchOutliner, 5000);
 
 // =========================================================
 // RENDER LOOP

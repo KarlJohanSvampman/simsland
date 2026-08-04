@@ -37,7 +37,7 @@ ACTION_SPECS = {
     "sneak_to":   {"group": "core", "target": "prop_or_character", "doc": "Move toward a person or prop slowly and carefully, trying not to be noticed -- e.g. slipping out at night, avoiding someone without confronting them."},
     "speak":      {"group": "core", "target": "character", "doc": "Say something (use the `say` field)."},
     "interact":   {"group": "core", "target": "prop", "doc": "Use/interact with a prop."},
-    "wait":       {"group": "core", "target": "none", "doc": "Do nothing this turn."},
+    "wait":       {"group": "core", "target": "none", "doc": "Do nothing this turn. Optionally set waiting_for: {kind: person|business|delivery, ref} if you're blocked on something specific rather than just idling -- arms a patience timer that nudges a follow-up once it runs out."},
     "eat":        {"group": "core", "target": "any", "doc": "Eat available food."},
     "sleep":      {"group": "core", "target": "none", "doc": "Go to sleep."},
     "work":       {"group": "core", "target": "none", "doc": "Work your job."},
@@ -83,6 +83,8 @@ ACTION_SPECS = {
     "phone_read_text":   {"group": "phone", "target": "none", "doc": "Read a text you received."},
     "retrieve_phone":    {"group": "phone", "target": "none", "doc": "Go get your phone from where you left it."},
     "charge":            {"group": "phone", "target": "prop", "doc": "Charge a device at an outlet."},
+    "contact_business":  {"group": "phone", "target": "any", "detail": "reason", "doc": "Call or message a business's customer support -- deliveries, complaints, general questions. Target a company_templates key. If they're unreachable (closed, or you're an online-only business's caller and it happened to skip straight to email), your message lands in their inbox and they call/email you back later, during their business hours -- you won't get an answer right away."},
+    "book_appointment":  {"group": "phone", "target": "any", "detail": "reason", "doc": "Call a service business (doctor, lawyer, therapist, ...) to book an appointment. Target a company_templates key, and state your reason -- ideally one of that business's reason_options. Only resolves to a confirmed appointment if you call during their phone hours; otherwise it's left as a request for them to get back to you."},
 
     # ---- computer / online actions --------------------------------------
     "computer_social_media":     {"group": "computer", "target": "none", "doc": "Browse social media."},

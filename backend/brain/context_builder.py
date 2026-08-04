@@ -400,6 +400,8 @@ def build_available_actions(c, world):
         "socialize",
         "call",
         "text",
+        "contact_business",
+        "book_appointment",
     ]
 
     # describe (Round 8) / recall (Round 9) — cost no in-world time but do
@@ -1009,11 +1011,35 @@ def build_available_actions(c, world):
     if snoopable_devices:
         action_types.append("check_device")
 
+    # -----------------------------------------------
+    # KNOWN BUSINESSES (for contact_business/book_appointment targets)
+    # -- every customer-facing company_templates entry (off_grid businesses
+    # only; pure background employers like tech_company have no phone
+    # line to call). Whether the business is actually open right now is
+    # deliberately NOT resolved here -- the character doesn't know a
+    # business's hours in advance any more than a real person does; that
+    # only gets checked once the call is actually placed (see
+    # systems/business_hours.py), same "find out by trying" realism as
+    # the answering-machine feature itself.
+    # -----------------------------------------------
+    known_businesses = []
+    for key, biz in (world.get("definitions", {}).get("company_templates") or {}).items():
+        if not biz.get("off_grid"):
+            continue
+        known_businesses.append({
+            "id":              key,
+            "name":            biz.get("name", key),
+            "business_kind":   biz.get("business_kind"),
+            "presence":        biz.get("presence"),
+            "reason_options":  biz.get("reason_options"),
+        })
+
     return {
         "action_types":          action_types,
         "interactable_props":    interactable,
         "nearby_characters":     nearby_people,
         "known_contacts":        known_contacts,
+        "known_businesses":      known_businesses,
         "open_proposals":        open_proposals,
         "snoopable_devices":     snoopable_devices,
         "wearable_items":        wearable_in_inventory,
@@ -2584,7 +2610,7 @@ def _build_family_context(c, world):
             "name":    other.get("name", mid),
             "kinship": kinship,
             "age":     other.get("age"),
-            "alive":   other.get("alive", True),
+            "alive":   other.get("alive") is not False,
             "offscreen": other.get("is_offscreen", False),
         })
     return {

@@ -432,11 +432,31 @@ _TRAVEL_ELIGIBLE_REASONS = {
 }
 
 
+MAX_OFFGRID_TRIPS_PER_DAY = 3
+
+# jail/hospital are consequences, not discretionary outings -- a character
+# facing arrest or a medical emergency must always be able to go, regardless
+# of how many voluntary trips they've already taken today.
+_UNCAPPED_REASONS = {"jail", "hospital"}
+
+
+def _offgrid_trips_today(c, world):
+    today = world.get("calendar", {}).get("day")
+    if c.get("off_grid_trip_day") != today:
+        c["off_grid_trip_day"] = today
+        c["off_grid_trip_count"] = 0
+    return c["off_grid_trip_count"]
+
+
 def send_offgrid(c, world, reason, duration):
     if c.get("off_grid") or c.get("legal", {}).get("status") == "jailed":
         return False
     if c.get("travel_state"):
         return False
+    if reason not in _UNCAPPED_REASONS:
+        if _offgrid_trips_today(c, world) >= MAX_OFFGRID_TRIPS_PER_DAY:
+            return False
+        c["off_grid_trip_count"] += 1
 
     if reason in _TRAVEL_ELIGIBLE_REASONS or reason.startswith("event:"):
         from systems.travel import begin_travel
@@ -472,21 +492,44 @@ def maybe_go_offgrid(c, world):
 
 
 def maybe_schedule_doctor_visit(c, world):
-    """Send a character off-grid for a doctor/hospital visit, frequency
-    scaled by systems/health.py::_compute_doctor_visits_needed's severity-
-    weighted target (see process_return's "doctor"/"hospital" branch below
-    for the treatment applied on return)."""
+    """Doctor/hospital visits now go through a real booked appointment
+    (systems/appointments.py) instead of an instant teleport -- a
+    character doesn't know gp_clinic/hospital's hours in advance any
+    more than a real person does, so this can't resolve immediately.
+    Frequency of *deciding* they need to be seen is still scaled by
+    systems/health.py::_compute_doctor_visits_needed's severity-weighted
+    target, same as before; process_return's "doctor"/"hospital" branch
+    still applies the treatment once the trip actually happens. True
+    emergencies go through emergency.py's 911 dispatch instead and are
+    unaffected by this gate."""
     if c.get("off_grid") or c.get("conversation"):
         return
-    if not c.get("alive", True) or c.get("posture") in ("incapacitated", "crawling"):
+    if c.get("alive") is False or c.get("posture") in ("incapacitated", "crawling"):
         return
     needed = c.get("health_state", {}).get("doctor_visits_needed", 0)
     if needed <= 0:
         return
+
+    business_key = "hospital" if needed >= 4 else "gp_clinic"
+    reason       = "hospital" if needed >= 4 else "doctor"
+
+    from systems.appointments import has_upcoming_appointment, is_appointment_due, book
+    appt = has_upcoming_appointment(c, business_key)
+    if appt:
+        if is_appointment_due(appt, world):
+            appt["fulfilled"] = True
+            duration = 60 if reason == "hospital" else 20
+            send_offgrid(c, world, reason, duration)
+        return
+
+    # No appointment booked yet -- same probability gate as before decides
+    # *whether* the character now realizes they need to be seen, but the
+    # trip itself waits for the booked slot rather than firing instantly.
     if random.random() < 0.002 * needed:
-        reason = "hospital" if needed >= 4 else "doctor"
-        duration = 60 if reason == "hospital" else 20
-        send_offgrid(c, world, reason, duration)
+        from core.definitions import load_definitions
+        business = (load_definitions("default").get("company_templates") or {}).get(business_key)
+        if business:
+            book(c, world, business_key, business, reason)
 
 
 def _story(c, world, reason):
@@ -683,13 +726,15 @@ def process_return(c, world):
     public_story = {k: v for k, v in story.items() if k != "private"}
     store_memory(c, story["summary"], .75, ["offgrid"] + story["tags"],
                  "offgrid_story", world["tick"], story=public_story)
-    world.setdefault("events", []).append({
+    events = world.setdefault("events", [])
+    events.append({
         "id":           story["id"],
         "type":         "offgrid_story",
         "character_id": c["id"],
         "tick":         world["tick"],
         "story":        public_story,
     })
+    del events[:-300]  # world["events"] otherwise grows forever
 
     # Errand is narratively complete, but a travel-mode character (see
     # travel.py) isn't home yet -- defer their visible reveal to the

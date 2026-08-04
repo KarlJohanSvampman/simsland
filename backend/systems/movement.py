@@ -88,7 +88,7 @@ def update_character_movement(
     # happened — action_router.py's _movement_blocked() already stops a
     # *new* move/turn_and_run from being issued, this covers one already
     # underway.
-    if not c.get("alive", True) or c.get("posture") == "incapacitated":
+    if c.get("alive") is False or c.get("posture") == "incapacitated":
         c["route"] = []
         c["is_moving"] = False
         return False

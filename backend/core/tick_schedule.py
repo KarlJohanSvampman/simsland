@@ -58,6 +58,7 @@ CADENCE = {
     "traffic":              30,
     "deliveries":           10,
     "postal":               30,
+    "business_support":     30,
     "service_workers":      10,
     "appliance_degradation":60,
     "household_monitoring": 20,

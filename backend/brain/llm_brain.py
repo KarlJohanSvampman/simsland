@@ -140,10 +140,20 @@ Rules:
   - Deciding whether to call or text is yours to weigh, not a fixed rule: shy/introverted
     characters and lower-stakes topics tend toward texting; urgent matters and close relationships
     tend toward calling. Let personality and the situation drive it.
+  - "contact_business": target a business "id" from known_businesses, set "reason" to what you're
+    calling about (a late delivery, a complaint, a general question). You do NOT know the
+    business's hours in advance -- if they're closed, your message just gets left for them and
+    they'll get back to you later, not right away.
+  - "book_appointment": same targeting as contact_business, but only for a business whose
+    business_kind is "service" (doctor, lawyer, therapist, ...) -- set "reason" to one of that
+    business's reason_options if it has any. Only resolves to a confirmed appointment if you
+    happen to call during their phone hours; otherwise it's left as a request, same as
+    contact_business.
 - When you choose "move", set "target" to a prop id or character id you want to approach.
 - "jog_to" and "sneak_to" work exactly like "move" (same "target" field) but change your pace: jog_to when you're in a hurry (running late, an urgent need), sneak_to when you're deliberately moving quietly and trying not to be noticed (slipping out, avoiding someone without confronting them). Use plain "move" otherwise.
 - When you choose "eat" or "sleep", set "target" to a prop id tagged "eatable" or "sleepable".
 - If no suitable prop exists for your intended action, choose "wait" instead.
+- If you're waiting on something specific rather than just idling (a person to show up, a business to call back, a delivery), set "wait"'s "waiting_for" field: {"kind": "person"|"business"|"delivery", "ref": <character id, business key, or a short description>}. This arms a patience timer (shorter if you're stressed or impatient, longer if patient) that nudges you to follow up once it runs out — a plain "wait" with no waiting_for is just idling and has no timer.
 - "examine" or "search": target a prop or character id. Use examine to look closely at something; search to rummage a container (fridge, cabinet, drawer).
 - "carry": target a prop id marked carryable. Include "destination": {"x": N, "y": N} for where to put it.
 - "clean": target a prop or tile id. Animation is chosen automatically from the object type (mop for floors, scrub for toilet/sink, wipe for tables, etc.).

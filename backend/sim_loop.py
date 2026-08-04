@@ -65,6 +65,7 @@ from systems.emergency  import trigger_incident, resolve, tick_fire_incidents   
 from systems.law        import process_jail, process_trials, maybe_arrest_from_incidents
 from systems.jobs       import generate_job_listings, tick_job_market, maybe_fire, process_interview, init_company_slots
 from systems.postal_service     import update_postal_service
+from systems.business_support   import process_business_inboxes
 from systems.service_vehicles   import update_service_vehicles
 from systems.transit            import update_bus
 from systems.appliance_degradation import update_appliance_degradation
@@ -262,7 +263,7 @@ def tick(world):
     agent_chars = [
         c for c in characters
         if not c.get("is_service_worker")
-        and c.get("alive", True)
+        and c.get("alive") is not False
         and c.get("posture") != "incapacitated"
     ]
     futs = {_agent_pool.submit(_run_agent, c, world, t): c for c in agent_chars}
@@ -347,6 +348,9 @@ def tick(world):
 
     if every(world, CADENCE["postal"], offset=12):
         update_postal_service(world)
+
+    if every(world, CADENCE["business_support"], offset=14):
+        process_business_inboxes(world)
 
     if every(world, CADENCE["appliance_degradation"], offset=13):
         update_appliance_degradation(world)

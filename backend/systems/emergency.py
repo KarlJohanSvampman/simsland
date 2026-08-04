@@ -251,7 +251,7 @@ def resolve(world):
                 )
                 for cid in (inc.get("participants", []) if inc else []):
                     patient = world["characters"].get(cid)
-                    if not patient or not patient.get("alive", True):
+                    if not patient or patient.get("alive") is False:
                         continue
                     from systems.health import compute_severity
                     _, tier = compute_severity(patient)

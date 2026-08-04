@@ -402,6 +402,14 @@ def ensure_market_defaults(market):
 
 def ensure_character_defaults(c):
 
+    # setdefault only fills a *missing* key -- if "alive" is present but
+    # explicitly None (seen from ad-hoc debug/patch scripts), every
+    # `c.get("alive", True)` check across the codebase treats that as
+    # falsy and silently excludes the character from the LLM decision
+    # loop, health processing, etc. forever, with no error anywhere.
+    if c.get("alive") is None:
+        c["alive"] = True
+
     c.setdefault(
         "household_id",
         None
@@ -706,6 +714,9 @@ def ensure_character_defaults(c):
     c.setdefault("conditioning_profile",      [])   # conditioned behaviors
     c.setdefault("active_lies",               [])   # currently maintained lies
     c.setdefault("private_off_grid_history",  [])  # secret events from off-grid trips (not shared)
+    c.setdefault("off_grid_trip_day",         None)  # calendar day of last voluntary off-grid trip
+    c.setdefault("off_grid_trip_count",       0)      # voluntary trips taken that day -- see offgrid.py MAX_OFFGRID_TRIPS_PER_DAY
+    c.setdefault("inbox",                     [])     # shared call/text/email/voicemail log -- see systems/inbox.py
     # Behavior-based suspicion — routine deviation, caught lies, evasive
     # answers, snooped devices. Keyed by subject_id. See systems/worries.py.
     # Replaces the old "suspicion_of" field (was write-only, read by nothing).

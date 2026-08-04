@@ -94,6 +94,25 @@ def apply_speech(c, world, speech):
     # =====================================================
     listener = world.get("characters", {}).get(target_id) if target_id else None
 
+    # Reachability -- only meaningful for a live call: a text/email always
+    # "sends" and just sits unread, matching how those mediums really work,
+    # but a call needs someone to actually answer. Previously apply_speech()
+    # connected unconditionally regardless of the recipient's phone state
+    # (phone_is_usable() already existed and gated the *caller's* own use at
+    # _require_phone(), but was never consulted for the listener side) --
+    # this is the answering-machine gate: no answer leaves a voicemail in
+    # the recipient's inbox instead of threading a live conversation.
+    medium = speech.get("medium", "in_person")
+    if listener and medium == "call":
+        from systems.personal_items import phone_is_usable
+        if not phone_is_usable(listener):
+            from systems.inbox import get_character_inbox, add_message as add_inbox_message
+            add_inbox_message(
+                get_character_inbox(listener), "voicemail", c["id"], target_id,
+                utterance, tick, metadata={"topic": topic, "missed_call": True},
+            )
+            return
+
     if listener:
 
         from brain.conversations import get_or_create_conversation, add_message
@@ -195,7 +214,7 @@ def _movement_blocked(c):
     context_builder.py::build_available_actions() never disagree about
     what's live.
     """
-    if not c.get("alive", True):
+    if c.get("alive") is False:
         return True
     if c.get("posture") == "incapacitated":
         return True
@@ -444,6 +463,15 @@ def _route_wait(c, world, action):
         interaction="wait",
         duration=ticks,
     )
+
+    # Optional "waiting for a reason" -- distinguishes blocked-on-something
+    # waiting (a person, a business, a delivery) from plain idle waiting.
+    # See systems/waiting.py for the patience timer + backlog-stress this
+    # arms; a bare "wait" with no waiting_for behaves exactly as before.
+    waiting_for = action.get("waiting_for")
+    if waiting_for and waiting_for.get("kind"):
+        from systems.waiting import start_waiting_for
+        start_waiting_for(c, world, waiting_for["kind"], waiting_for.get("ref"))
 
 
 # =========================================================
@@ -1030,6 +1058,10 @@ def route_action(c, world, action, speech, definitions=None, available_actions=N
         _route_check_device(c, world, action)
     elif action_type == "form_theory":
         _route_form_theory(c, world, action)
+    elif action_type == "contact_business":
+        _route_contact_business(c, world, action)
+    elif action_type == "book_appointment":
+        _route_book_appointment(c, world, action)
 
     # ── Computer ───────────────────────────────────────────────────────────────
     elif action_type == "computer_social_media":
@@ -2309,10 +2341,14 @@ def _route_phone_check(c, world, action):
         return
     phone["location"] = "held"
     c["activity"] = _scaffold(c, world, "phone_check", interaction="phone_check")
-    # Expose missed calls/messages count in activity data
-    missed = len(c.get("social", {}).get("missed_calls", []))
-    unread = sum(1 for m in world.get("messages", [])
-                 if m.get("to_id") == c["id"] and not m.get("read"))
+    # Expose missed calls/messages count in activity data -- reads the
+    # real shared inbox (systems/inbox.py); world["messages"] and
+    # c["social"]["missed_calls"] were both permanently empty (nothing
+    # ever wrote to either), so this always read 0 before.
+    from systems.inbox import get_character_inbox, unread_count
+    inbox = get_character_inbox(c)
+    missed = unread_count(inbox, "voicemail")
+    unread = unread_count(inbox)
     c["activity"]["phone_check_result"] = {"missed_calls": missed, "unread_messages": unread}
     _set_phone_animation(c, "phone_check")
     _maybe_notice_snooping(c, phone, world)
@@ -2346,11 +2382,102 @@ def _route_phone_read_text(c, world, action):
     phone["location"] = "held"
     msg_id = action.get("message_id") or action.get("target")
     if msg_id:
-        for m in world.get("messages", []):
-            if m.get("id") == msg_id and m.get("to_id") == c["id"]:
+        from systems.inbox import get_character_inbox
+        for m in get_character_inbox(c):
+            if m.get("id") == msg_id:
                 m["read"] = True
     c["activity"] = _scaffold(c, world, "phone_read_text", interaction="phone_read_text")
     _set_phone_animation(c, "phone_read_text")
+
+
+# Placeholder split for "assumed nobody would pick up, wrote an email
+# instead" on purely-online businesses -- a flat constant for now, per
+# the plan; a future refinement could weight this by how urgent the
+# character's reason is instead of a coin flip.
+_ONLINE_BUSINESS_EMAIL_SHORTCUT_CHANCE = 0.5
+
+
+def _route_contact_business(c, world, action):
+    """Generic customer-support contact -- deliveries, complaints, general
+    questions, or a business someone was told to call back
+    (waiting_for={"kind":"business",...}, see systems/waiting.py). Always
+    lands as a message in the business's inbox; the real tailored
+    response/excuse/solution is generated later by
+    systems/business_support.py's background job during the business's
+    phone hours, not synchronously here -- that's an LLM call, and this
+    route runs inside a character's synchronous per-tick agent turn."""
+    business_key = action.get("target")
+    reason = action.get("reason", "")
+    if not business_key:
+        return
+
+    from core.definitions import load_definitions
+    defs = load_definitions("default")
+    business = (defs.get("company_templates") or {}).get(business_key)
+    if not business:
+        return
+
+    from systems.inbox import get_business_inbox, add_message as add_inbox_message
+    tick = world.get("tick", 0)
+    inbox = get_business_inbox(world, business_key)
+    metadata = {"reason": reason, "caller_name": c.get("name") or c["id"]}
+
+    if (business.get("presence") == "online"
+            and random.random() < _ONLINE_BUSINESS_EMAIL_SHORTCUT_CHANCE):
+        add_inbox_message(inbox, "email", c["id"], business_key, reason, tick, metadata)
+        c["activity"] = _scaffold(c, world, "contact_business", interaction="contact_business", duration=60)
+        return
+
+    phone = _require_phone(c)
+    if not phone:
+        return
+
+    from systems.business_hours import is_open
+    kind = "call" if is_open(business, world, "phone") else "voicemail"
+    add_inbox_message(inbox, kind, c["id"], business_key, reason, tick, metadata)
+
+    c["activity"] = _scaffold(c, world, "contact_business", interaction="contact_business", duration=60)
+    _set_phone_animation(c, "phone_call")
+
+
+def _route_book_appointment(c, world, action):
+    """Book a service-business appointment -- resolves immediately
+    (deterministic slot pick, no LLM) if the business's phone line is
+    currently open; otherwise falls through to a voicemail request,
+    same as contact_business, for the background job to follow up on."""
+    business_key = action.get("target")
+    reason = action.get("reason", "")
+    if not business_key:
+        return
+
+    from core.definitions import load_definitions
+    defs = load_definitions("default")
+    business = (defs.get("company_templates") or {}).get(business_key)
+    if not business or business.get("business_kind") != "service":
+        return
+
+    phone = _require_phone(c)
+    if not phone:
+        return
+
+    from systems.business_hours import is_open
+    tick = world.get("tick", 0)
+
+    if is_open(business, world, "phone"):
+        from systems.appointments import book
+        appt = book(c, world, business_key, business, reason)
+        c["activity"] = _scaffold(c, world, "book_appointment", interaction="book_appointment", duration=60)
+        c["activity"]["state"]["appointment"] = appt
+    else:
+        from systems.inbox import get_business_inbox, add_message as add_inbox_message
+        add_inbox_message(
+            get_business_inbox(world, business_key), "voicemail", c["id"], business_key,
+            reason, tick,
+            {"reason": reason, "wants_appointment": True, "caller_name": c.get("name") or c["id"]},
+        )
+        c["activity"] = _scaffold(c, world, "book_appointment", interaction="book_appointment", duration=60)
+
+    _set_phone_animation(c, "phone_call")
 
 
 def _route_check_device(c, world, action):

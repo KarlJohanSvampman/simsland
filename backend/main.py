@@ -46,6 +46,7 @@ from api.debug     import router as debug_router
 from api.household import router as household_router
 from api.admin     import router as admin_router
 from api.social_sandbox import router as social_sandbox_router
+from api.events    import router as events_router
 
 app = FastAPI(title="Simsland")
 app.add_middleware(
@@ -67,6 +68,7 @@ app.include_router(debug_router)
 app.include_router(household_router, prefix="/api")
 app.include_router(admin_router)
 app.include_router(social_sandbox_router)
+app.include_router(events_router, prefix="/api")
 
 frontend_dir = Path(__file__).parent / "frontend"
 if frontend_dir.exists():
@@ -84,7 +86,12 @@ _clients: list[dict] = []
 
 
 def _view_radius(zoom: int) -> int:
-    return {1: 25, 2: 15, 3: 8}.get(zoom, 15)
+    # ~25-30% wider than the strict "what's visible at this zoom" figure --
+    # slack so ordinary pan/zoom drift stays inside the already-loaded
+    # window instead of immediately falling outside it (see the WS
+    # handler's movement-threshold check above, which relies on this
+    # margin existing). Kept in sync with api/view.py's copy of this table.
+    return {1: 32, 2: 20, 3: 12}.get(zoom, 20)
 
 
 def _build_full_snapshot(world, definitions, cx, cy, zoom):
@@ -286,9 +293,23 @@ async def ws_endpoint(ws: WebSocket):
                 new_cy   = int(msg.get("cy",   client["cy"]))
                 new_zoom = int(msg.get("zoom", client["zoom"]))
 
-                # If viewport moved meaningfully, request a fresh full snapshot
-                if (new_cx != client["cx"] or new_cy != client["cy"]
-                        or new_zoom != client["zoom"]):
+                # A full resnapshot tears down and rebuilds every tile mesh
+                # outside the new radius window in one synchronous swap (see
+                # main.js::updateTiles()) -- visibly "popping" whatever was
+                # just at the edge. Re-triggering that on *any* cx/cy change
+                # at all (even a 1-tile drift) made this happen constantly
+                # during normal pan/zoom. Only resync once the camera has
+                # moved far enough that the old radius window would actually
+                # be stale -- a real move still resyncs immediately, small
+                # drift just keeps riding deltas against the still-valid
+                # window instead.
+                radius = _view_radius(client["zoom"])
+                moved = (
+                    abs(new_cx - client["cx"]) > radius // 3
+                    or abs(new_cy - client["cy"]) > radius // 3
+                    or new_zoom != client["zoom"]
+                )
+                if moved:
                     client["cx"]         = new_cx
                     client["cy"]         = new_cy
                     client["zoom"]       = new_zoom

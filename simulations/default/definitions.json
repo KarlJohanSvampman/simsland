@@ -45660,7 +45660,18 @@
         "hospital_administrator"
       ],
       "max_staff": 120,
-      "turnover_rate": 0.005
+      "turnover_rate": 0.005,
+      "business_kind": "service",
+      "presence": "physical",
+      "phone_hours": {
+        "open": 0,
+        "close": 24
+      },
+      "reason_options": [
+        "emergency",
+        "surgery",
+        "specialist_consultation"
+      ]
     },
     "gp_clinic": {
       "name": "GP / Doctor's Clinic",
@@ -45689,7 +45700,18 @@
         "medical_technician"
       ],
       "max_staff": 12,
-      "turnover_rate": 0.005
+      "turnover_rate": 0.005,
+      "business_kind": "service",
+      "presence": "physical",
+      "phone_hours": {
+        "open": 8,
+        "close": 17
+      },
+      "reason_options": [
+        "checkup",
+        "illness",
+        "follow_up"
+      ]
     },
     "pharmacy": {
       "name": "Pharmacy",
@@ -45716,7 +45738,13 @@
         "cashier"
       ],
       "max_staff": 8,
-      "turnover_rate": 0.01
+      "turnover_rate": 0.01,
+      "business_kind": "product",
+      "presence": "physical",
+      "phone_hours": {
+        "open": 8,
+        "close": 20
+      }
     },
     "law_firm": {
       "name": "Law Firm",
@@ -45743,7 +45771,18 @@
         "legal_secretary"
       ],
       "max_staff": 20,
-      "turnover_rate": 0.008
+      "turnover_rate": 0.008,
+      "business_kind": "service",
+      "presence": "physical",
+      "phone_hours": {
+        "open": 9,
+        "close": 17
+      },
+      "reason_options": [
+        "legal_advice",
+        "contract_review",
+        "criminal_defense"
+      ]
     },
     "accounting_firm": {
       "name": "Accounting Firm",
@@ -45770,7 +45809,18 @@
         "bookkeeper"
       ],
       "max_staff": 15,
-      "turnover_rate": 0.01
+      "turnover_rate": 0.01,
+      "business_kind": "service",
+      "presence": "physical",
+      "phone_hours": {
+        "open": 9,
+        "close": 17
+      },
+      "reason_options": [
+        "tax_filing",
+        "financial_planning",
+        "audit"
+      ]
     },
     "bank": {
       "name": "Bank",
@@ -45797,7 +45847,18 @@
         "bank_manager"
       ],
       "max_staff": 25,
-      "turnover_rate": 0.01
+      "turnover_rate": 0.01,
+      "business_kind": "service",
+      "presence": "physical",
+      "phone_hours": {
+        "open": 9,
+        "close": 16
+      },
+      "reason_options": [
+        "loan_application",
+        "account_setup",
+        "financial_consultation"
+      ]
     },
     "clothing_store": {
       "name": "Clothing Store",
@@ -45828,7 +45889,13 @@
         "cashier"
       ],
       "max_staff": 10,
-      "turnover_rate": 0.03
+      "turnover_rate": 0.03,
+      "business_kind": "product",
+      "presence": "physical",
+      "phone_hours": {
+        "open": 9,
+        "close": 20
+      }
     },
     "shoe_store": {
       "name": "Shoe Store",
@@ -45856,7 +45923,13 @@
         "cashier"
       ],
       "max_staff": 6,
-      "turnover_rate": 0.03
+      "turnover_rate": 0.03,
+      "business_kind": "product",
+      "presence": "physical",
+      "phone_hours": {
+        "open": 9,
+        "close": 20
+      }
     },
     "department_store": {
       "name": "Department Store",
@@ -45887,7 +45960,13 @@
         "security_guard"
       ],
       "max_staff": 35,
-      "turnover_rate": 0.025
+      "turnover_rate": 0.025,
+      "business_kind": "product",
+      "presence": "physical",
+      "phone_hours": {
+        "open": 9,
+        "close": 21
+      }
     },
     "thrift_store": {
       "name": "Thrift / Second-Hand Store",
@@ -45914,7 +45993,13 @@
         "cashier"
       ],
       "max_staff": 5,
-      "turnover_rate": 0.04
+      "turnover_rate": 0.04,
+      "business_kind": "product",
+      "presence": "physical",
+      "phone_hours": {
+        "open": 10,
+        "close": 18
+      }
     },
     "retail_store": {
       "name": "General Retail Store",
@@ -45941,7 +46026,13 @@
         "cashier"
       ],
       "max_staff": 8,
-      "turnover_rate": 0.03
+      "turnover_rate": 0.03,
+      "business_kind": "product",
+      "presence": "physical",
+      "phone_hours": {
+        "open": 8,
+        "close": 21
+      }
     },
     "grocery_store": {
       "name": "Grocery Store / Supermarket",
@@ -45969,7 +46060,13 @@
         "truck_driver"
       ],
       "max_staff": 20,
-      "turnover_rate": 0.03
+      "turnover_rate": 0.03,
+      "business_kind": "product",
+      "presence": "physical",
+      "phone_hours": {
+        "open": 7,
+        "close": 22
+      }
     },
     "electronics_store": {
       "name": "Electronics Store",
@@ -45997,7 +46094,13 @@
         "cashier"
       ],
       "max_staff": 12,
-      "turnover_rate": 0.02
+      "turnover_rate": 0.02,
+      "business_kind": "product",
+      "presence": "physical",
+      "phone_hours": {
+        "open": 9,
+        "close": 20
+      }
     },
     "furniture_store": {
       "name": "Furniture Store",
@@ -46025,7 +46128,13 @@
         "truck_driver"
       ],
       "max_staff": 10,
-      "turnover_rate": 0.02
+      "turnover_rate": 0.02,
+      "business_kind": "product",
+      "presence": "physical",
+      "phone_hours": {
+        "open": 9,
+        "close": 19
+      }
     },
     "cafe": {
       "name": "Caf\u00e9",
@@ -46061,7 +46170,13 @@
         "chef"
       ],
       "max_staff": 8,
-      "turnover_rate": 0.06
+      "turnover_rate": 0.06,
+      "business_kind": "product",
+      "presence": "physical",
+      "phone_hours": {
+        "open": 7,
+        "close": 18
+      }
     },
     "restaurant": {
       "name": "Restaurant",
@@ -46101,7 +46216,13 @@
         "restaurant_manager"
       ],
       "max_staff": 18,
-      "turnover_rate": 0.06
+      "turnover_rate": 0.06,
+      "business_kind": "product",
+      "presence": "physical",
+      "phone_hours": {
+        "open": 11,
+        "close": 22
+      }
     },
     "bar": {
       "name": "Bar / Pub",
@@ -46138,7 +46259,13 @@
         "bouncer"
       ],
       "max_staff": 10,
-      "turnover_rate": 0.05
+      "turnover_rate": 0.05,
+      "business_kind": "product",
+      "presence": "physical",
+      "phone_hours": {
+        "open": 16,
+        "close": 2
+      }
     },
     "nightclub": {
       "name": "Nightclub",
@@ -46179,7 +46306,13 @@
         "event_coordinator"
       ],
       "max_staff": 20,
-      "turnover_rate": 0.05
+      "turnover_rate": 0.05,
+      "business_kind": "product",
+      "presence": "physical",
+      "phone_hours": {
+        "open": 22,
+        "close": 4
+      }
     },
     "tech_company": {
       "name": "Tech Company",
@@ -46250,7 +46383,13 @@
         "janitor"
       ],
       "max_staff": 35,
-      "turnover_rate": 0.005
+      "turnover_rate": 0.005,
+      "business_kind": "product",
+      "presence": "physical",
+      "phone_hours": {
+        "open": 8,
+        "close": 16
+      }
     },
     "gym": {
       "name": "Gym / Fitness Center",
@@ -46285,7 +46424,13 @@
         "gym_manager"
       ],
       "max_staff": 12,
-      "turnover_rate": 0.04
+      "turnover_rate": 0.04,
+      "business_kind": "product",
+      "presence": "physical",
+      "phone_hours": {
+        "open": 6,
+        "close": 22
+      }
     },
     "spa": {
       "name": "Spa / Wellness Center",
@@ -46321,7 +46466,18 @@
         "spa_manager"
       ],
       "max_staff": 10,
-      "turnover_rate": 0.035
+      "turnover_rate": 0.035,
+      "business_kind": "service",
+      "presence": "physical",
+      "phone_hours": {
+        "open": 9,
+        "close": 20
+      },
+      "reason_options": [
+        "massage",
+        "facial",
+        "relaxation_treatment"
+      ]
     },
     "logistics_co": {
       "name": "Logistics Company",
@@ -46425,7 +46581,18 @@
         "hair_stylist"
       ],
       "max_staff": 4,
-      "turnover_rate": 0.02
+      "turnover_rate": 0.02,
+      "business_kind": "service",
+      "presence": "physical",
+      "phone_hours": {
+        "open": 9,
+        "close": 18
+      },
+      "reason_options": [
+        "haircut",
+        "shave",
+        "grooming"
+      ]
     },
     "hair_salon": {
       "name": "Hair Salon",
@@ -46457,7 +46624,18 @@
         "receptionist"
       ],
       "max_staff": 8,
-      "turnover_rate": 0.025
+      "turnover_rate": 0.025,
+      "business_kind": "service",
+      "presence": "physical",
+      "phone_hours": {
+        "open": 9,
+        "close": 19
+      },
+      "reason_options": [
+        "haircut",
+        "coloring",
+        "styling"
+      ]
     },
     "strip_club": {
       "name": "The Velvet Lounge",
@@ -46473,7 +46651,9 @@
         "cashier"
       ],
       "max_staff": 25,
-      "turnover_rate": 0.08
+      "turnover_rate": 0.08,
+      "business_kind": "product",
+      "presence": "physical"
     },
     "adult_cinema": {
       "name": "Paradise Adult Theater",
@@ -46487,7 +46667,9 @@
         "janitor"
       ],
       "max_staff": 5,
-      "turnover_rate": 0.04
+      "turnover_rate": 0.04,
+      "business_kind": "product",
+      "presence": "physical"
     },
     "sex_shop": {
       "name": "Pleasure Palace",
@@ -46501,7 +46683,9 @@
         "store_manager"
       ],
       "max_staff": 4,
-      "turnover_rate": 0.04
+      "turnover_rate": 0.04,
+      "business_kind": "product",
+      "presence": "physical"
     },
     "criminal_gang": {
       "name": "Street Crew",
@@ -46559,6 +46743,17 @@
         "prenatal",
         "maternity",
         "healthcare"
+      ],
+      "business_kind": "service",
+      "presence": "physical",
+      "phone_hours": {
+        "open": 8,
+        "close": 17
+      },
+      "reason_options": [
+        "prenatal_checkup",
+        "ultrasound",
+        "consultation"
       ]
     },
     "maternity_ward": {
@@ -46582,6 +46777,16 @@
         "birth",
         "maternity",
         "healthcare"
+      ],
+      "business_kind": "service",
+      "presence": "physical",
+      "phone_hours": {
+        "open": 0,
+        "close": 24
+      },
+      "reason_options": [
+        "delivery",
+        "postnatal_care"
       ]
     },
     "kindergarten": {
@@ -46608,7 +46813,77 @@
         "childcare",
         "early_education",
         "education"
-      ]
+      ],
+      "business_kind": "product",
+      "presence": "physical",
+      "phone_hours": {
+        "open": 7,
+        "close": 18
+      }
+    },
+    "therapist": {
+      "name": "Therapist",
+      "industry": "healthcare",
+      "off_grid": true,
+      "service_category": "mental_health",
+      "business_kind": "service",
+      "presence": "physical",
+      "opening_hours": {
+        "open": 9,
+        "close": 18
+      },
+      "phone_hours": {
+        "open": 9,
+        "close": 18
+      },
+      "reason_options": [
+        "individual_therapy",
+        "couples_therapy",
+        "crisis_session"
+      ],
+      "staff_roles": [
+        "therapist"
+      ],
+      "avg_visit_duration_ticks": 45,
+      "cost_range": [
+        80,
+        250
+      ],
+      "visit_mood_boost": {
+        "relieved": 0.15
+      },
+      "description": "Talk therapy -- individual, couples, and crisis sessions.",
+      "typical_roles": [
+        "therapist",
+        "counselor",
+        "receptionist"
+      ],
+      "max_staff": 6,
+      "turnover_rate": 0.01
+    },
+    "online_retailer": {
+      "name": "Online Retailer",
+      "industry": "retail",
+      "off_grid": false,
+      "service_category": "general",
+      "business_kind": "product",
+      "presence": "online",
+      "phone_hours": {
+        "open": 9,
+        "close": 17
+      },
+      "cost_range": [
+        10,
+        300
+      ],
+      "description": "No storefront -- orders and support are handled online or by phone/email.",
+      "typical_roles": [
+        "customer_support_rep",
+        "warehouse_worker",
+        "logistics_coordinator"
+      ],
+      "max_staff": 40,
+      "turnover_rate": 0.02
     }
   },
   "need_templates": {

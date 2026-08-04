@@ -68,13 +68,16 @@ def get_view(
     # VIEW RADIUS
     # =====================================
 
+    # Kept in sync with main.py::_view_radius() -- the ~25-30% buffer over
+    # the strict "what's visible" figure gives pan/zoom drift slack before
+    # it falls outside the loaded window (see that function's comment).
     radius = {
 
-        1: 25,
-        2: 15,
-        3: 8
+        1: 32,
+        2: 20,
+        3: 12
 
-    }.get(zoom, 15)
+    }.get(zoom, 20)
 
     # =====================================
     # CHARACTERS
