@@ -868,6 +868,17 @@ def compute_severity(char):
 
 _MEDICAL_INCIDENT_TIERS = ("severe", "critical")
 
+# Pain-driven posture thresholds (health_state["pain"], 0-100). Distinct
+# from the severity-critical branch below -- pain alone can force these
+# postures even when the character's aggregate severity blend hasn't
+# reached "critical" (e.g. isolated chronic/neglect pain with no active
+# emergency). "crawling" here is self-healing every tick the same way the
+# severity-critical branch always has been: an LLM-issued stand_up/move
+# while pain is still >= PAIN_CRAWL_THRESHOLD just gets silently
+# overridden back on the very next tick.
+PAIN_CRAWL_THRESHOLD         = 60
+PAIN_INCAPACITATED_THRESHOLD = 80
+
 
 def apply_severity_consequences(char, world):
     from systems.posture import set_posture
@@ -878,16 +889,19 @@ def apply_severity_consequences(char, world):
 
     score, tier = compute_severity(char)
     em = char.get("health_state", {}).get("active_emergencies", {})
+    pain = char.get("health_state", {}).get("pain", 0.0)
 
     if "unconscious" in em or "coma" in em:
         set_posture(char, world, "incapacitated")
-    elif tier == "critical":
+    elif pain >= PAIN_INCAPACITATED_THRESHOLD:
+        set_posture(char, world, "incapacitated_pain")
+    elif pain >= PAIN_CRAWL_THRESHOLD or tier == "critical":
         set_posture(char, world, "crawling")
-    elif char.get("posture") == "crawling":
-        # Severity has receded below critical -- this posture was
-        # severity-driven, not a deliberate choice (sitting/lying for
+    elif char.get("posture") in ("crawling", "incapacitated_pain"):
+        # Pain/severity has receded below threshold -- this posture was
+        # pain/severity-driven, not a deliberate choice (sitting/lying for
         # other reasons is untouched, since posture won't be "crawling"
-        # in that case).
+        # or "incapacitated_pain" in that case).
         set_posture(char, world, "standing")
     elif char.get("posture") == "incapacitated":
         # Recovered from unconscious/coma (still alive, since the alive

@@ -64,7 +64,15 @@ SPEECH_ACTS = [
     # Secondhand witness alert (systems/excuses.py's witnessed_offenses,
     # systems/conversation_analysis.py's apply_speech_act_analysis) — a
     # witness relaying a hostile act they saw to someone who wasn't there.
-    "urgent_report"
+    "urgent_report",
+
+    # Values/opinions discourse (systems/action_router.py's make_argument,
+    # brain/opinions.py) — countering the last argument on a topic, or
+    # introducing a new supporting point for one's own stance. Carries
+    # extra metadata beyond speech_act alone: {topic, stance,
+    # move: "counter"|"new_point", target_argument_id}, set on the
+    # conversation message by the make_argument route.
+    "argue"
 ]
 
 

@@ -27,6 +27,16 @@ DEFAULT_SPRINT_SPEED = 0.18
 DEFAULT_CRAWL_SPEED  = 0.02
 DEFAULT_SNEAK_SPEED  = 0.025
 
+# Fatigue speed penalty for moderate pain (health_state["pain"], 0-100).
+# Below systems/health.py's PAIN_CRAWL_THRESHOLD (60) -- above that,
+# apply_severity_consequences() already force-sets posture="crawling",
+# which takes over via the crawl_speed branch below. Local constants
+# (not imported from health.py) to avoid a circular import; keep the
+# lower bound in sync with health.py's own pain-threshold comment.
+PAIN_FATIGUE_THRESHOLD = 20
+PAIN_FATIGUE_CEILING    = 60
+_FATIGUE_MIN_MULTIPLIER = 0.6
+
 # animation_state values that select the jog/sprint/sneak speeds. "run" is
 # kept as an alias for sprint since action_router.py's turn_and_run (panic
 # flight) already sets animation_state="run" -- sprint_speed applies there
@@ -59,7 +69,15 @@ def _current_move_speed(c):
     if anim in _SNEAK_STATES:
         return c.get("sneak_speed", DEFAULT_SNEAK_SPEED)
 
-    return c.get("walk_speed", DEFAULT_WALK_SPEED)
+    walk = c.get("walk_speed", DEFAULT_WALK_SPEED)
+    if c.get("posture") == "standing":
+        pain = c.get("health_state", {}).get("pain", 0.0)
+        if PAIN_FATIGUE_THRESHOLD <= pain < PAIN_FATIGUE_CEILING:
+            span = PAIN_FATIGUE_CEILING - PAIN_FATIGUE_THRESHOLD
+            frac = (pain - PAIN_FATIGUE_THRESHOLD) / span
+            multiplier = 1.0 - (1.0 - _FATIGUE_MIN_MULTIPLIER) * frac
+            walk *= multiplier
+    return walk
 
 
 def _auto_lock_on_exit(c, world):
@@ -88,7 +106,7 @@ def update_character_movement(
     # happened — action_router.py's _movement_blocked() already stops a
     # *new* move/turn_and_run from being issued, this covers one already
     # underway.
-    if c.get("alive") is False or c.get("posture") == "incapacitated":
+    if c.get("alive") is False or c.get("posture") in ("incapacitated", "incapacitated_pain"):
         c["route"] = []
         c["is_moving"] = False
         return False

@@ -124,10 +124,13 @@ def spawn_child(mother, father_id, world):
 
     try:
         from systems.character_gen import generate_character
+        father = world.get("characters", {}).get(father_id) if father_id else None
+        parent_values = [p["values"] for p in (mother, father) if p and p.get("values")]
         child = generate_character(defs, overrides={
             "age": 0, "age_months": 0.0,
             "sex": random.choice(["male", "female"]),
             "family_id": mother.get("family_id"),
+            "parent_values": parent_values or None,
         })
     except Exception:
         child = {

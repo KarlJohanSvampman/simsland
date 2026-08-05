@@ -97,6 +97,14 @@ def handle_reflection(
     reflection
 ):
 
+    # "type" already existed on scheduled reflection dicts (set by every
+    # caller, e.g. action_router.py::apply_speech's "conversation" kind)
+    # but was never actually branched on until form_opinion -- default
+    # preserves the original always-social-reflection behavior exactly.
+    if reflection.get("type") == "form_opinion":
+        _handle_opinion_reflection(c, world, reflection)
+        return
+
     target_id = reflection.get(
         "target_id"
     )
@@ -212,6 +220,41 @@ def handle_reflection(
             }
         )
     )
+
+# =========================================================
+# HANDLE OPINION REFLECTION (systems/action_router.py::apply_speech's
+# form_opinion scheduling, see above) -- forms a fresh opinion via
+# llm/opinion_formation.py::generate_opinion(), applied onto
+# brain/opinions.py's per-topic store. Same run_llm_call() bridging
+# rationale as handle_reflection() above: this also runs inside a
+# ThreadPoolExecutor worker with no running event loop.
+# =========================================================
+
+def _handle_opinion_reflection(c, world, reflection):
+    topic = reflection.get("topic")
+    if not topic:
+        return
+
+    from brain.opinions import update_opinion, get_current_opinion
+    from llm.opinion_formation import generate_opinion
+
+    if get_current_opinion(c, topic) is not None:
+        return  # formed in the meantime (e.g. duplicate scheduling) -- skip
+
+    session = c.setdefault("llm_session", {"history": []})
+    context = {"reason": reflection.get("reason", ""), "prior_stance": None}
+
+    result = run_llm_call(generate_opinion(c, topic, context, world, session))
+    if not result:
+        return
+
+    update_opinion(
+        c, topic,
+        result.get("stance", 0), result.get("confidence", 0.3),
+        result.get("reasoning", ""), result.get("relevant_values", []),
+        world.get("tick", 0),
+    )
+
 
 from brain.memory import (
     biased_recall,

@@ -117,6 +117,8 @@ def _stub_npc(world, defs, age, sex, surname=None, seed_char=None, relation_type
         overrides["hobbies"]         = derived["hobbies"]
         overrides["physical_traits"] = derived["physical_traits"]
         overrides["bio"]             = _fallback_bio(seed_char, relation_type, derived["traits"])
+        if relation_type == "child" and seed_char.get("values"):
+            overrides["parent_values"] = [seed_char["values"]]
     if surname:
         c = generate_character(defs, overrides)
         c["family_name"] = surname

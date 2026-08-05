@@ -49,6 +49,7 @@ CADENCE = {
     "polarization":         15,
     "relationships":        15,   # replaces every-tick O(N²) loop
     "influence_exposure":   30,   # trust-gated resolution of exposure_ticks (see systems/influence.py)
+    "value_influence":      24,   # daily trust/respect/similarity weighted value influence (see systems/influence.py::resolve_value_influence)
     "health":               30,
     "item_knowledge":       10,
 

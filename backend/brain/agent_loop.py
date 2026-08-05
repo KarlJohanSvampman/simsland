@@ -198,6 +198,12 @@ def update_internal_state(
     from systems.waiting import tick_waiting
     tick_waiting(c, world)
 
+    from systems.pain_fatigue import tick_pain_fatigue
+    tick_pain_fatigue(c, world)
+
+    from systems.pain_complaints import tick_pain_complaints
+    tick_pain_complaints(c, world)
+
     consolidate_relationship_narratives(c)
 
     consolidate_life_narratives(c)

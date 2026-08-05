@@ -45,6 +45,10 @@ REACTION_ANIMATIONS = {
     "breathless":   ["react_breathless"],
     "dizzy":        ["react_dizzy", "react_stumble"],
 
+    # ── Pain (systems/pain_complaints.py) ──
+    "wince":        ["react_wince"],
+    "cry_out":      ["react_cry_out", "react_wince"],
+
     # ── Nudity / sexual ──
     "saw_nudity":          ["react_shocked",      "react_gasp",       "react_look_away"],
     "walked_in_on_sex":    ["react_shocked",      "react_gasp",       "react_back_away"],
@@ -97,6 +101,9 @@ REACTION_PRIORITIES = {
     "sweating":    1,
     "breathless":  2,
     "dizzy":       2,
+
+    "wince":       1,
+    "cry_out":     2,
 
     "saw_nudity":       3,
     "walked_in_on_sex": 3,

@@ -747,6 +747,16 @@ def build_available_actions(c, world):
     if any(w.get("suspicion_level", 0) > 0.15 for w in c.get("worries", {}).values()):
         action_types.append("form_theory")
 
+    # Values/opinions discourse (systems/action_router.py's
+    # make_argument, brain/opinions.py) — only offered when a nearby
+    # person actually holds an opposing conform stance on a category
+    # both of them care about (mirrors systems/influence.py's own
+    # min-shared-importance gate), so the LLM isn't offered an argument
+    # with nobody real to disagree with.
+    if any(_has_values_disagreement(c, world.get("characters", {}).get(p["id"]))
+           for p in nearby_people):
+        action_types.append("make_argument")
+
     # Touch proposals (see systems/intimacy.py) — the six propose-touch
     # types listed whenever someone's nearby, same "route handler
     # validates the rest" pattern (propose_touch() already does its own
@@ -1479,6 +1489,11 @@ def _sec_worries(c, world):
     return list(lines) if lines else None
 
 
+def _sec_values(c, world):
+    lines = _build_values_context(c, world)
+    return list(lines) if lines else None
+
+
 def _sec_influence(c, world):
     lines = _build_influence_context(c, world)
     return list(lines) if lines else None
@@ -1548,6 +1563,7 @@ NARRATIVE_SECTIONS = [
     ("proposals",             "full", _sec_proposals),
     ("social_rules",          "full", _sec_social_rules),
     ("worries",               "full", _sec_worries),
+    ("values",                "full", _sec_values),
     ("influence",             "full", _sec_influence),
     ("touch",                 "full", _sec_touch),
     ("intimacy",              "full", _sec_intimacy),
@@ -1869,6 +1885,71 @@ def _build_worries_context(c, world):
             line += f" You wonder if {blamed} is involved instead."
         lines.append(line)
 
+    return lines
+
+
+_VALUE_IMPORTANCE_SURFACE_THRESHOLD = 0.65
+_VALUE_CATEGORY_BLURB = {
+    "family":     "family",
+    "friends":    "friendships",
+    "work":       "your work",
+    "leisure":    "leisure/free time",
+    "education":  "education",
+    "romance":    "romance",
+    "children":   "raising children",
+    "religion":   "religion",
+    "politics":   "politics",
+    "community":  "your wider community",
+    "solidarity": "solidarity with others",
+    "traditions": "traditions",
+}
+
+
+_VALUES_DISAGREEMENT_MIN_IMPORTANCE = 0.5
+
+
+def _has_values_disagreement(c, other):
+    """True if `other` (a real character dict, or None) holds an
+    opposing conform stance from `c` on any category both of them care
+    about enough (mirrors systems/influence.py's shared-importance gate)
+    -- used to only offer make_argument when there's someone real to
+    actually disagree with."""
+    if not other:
+        return False
+    mine = c.get("values") or {}
+    theirs = other.get("values") or {}
+    for category, v in mine.items():
+        ov = theirs.get(category)
+        if not ov:
+            continue
+        if v.get("conform") == ov.get("conform"):
+            continue
+        if (v.get("importance", 0) >= _VALUES_DISAGREEMENT_MIN_IMPORTANCE
+                and ov.get("importance", 0) >= _VALUES_DISAGREEMENT_MIN_IMPORTANCE):
+            return True
+    return False
+
+
+def _build_values_context(c, world):
+    """Surfaces this character's OWN personal values (systems/schema_defaults.py's
+    12-category VALUE_CATEGORIES) in prose -- only categories that actually
+    matter to them (importance above threshold), not all 12 every turn,
+    mirroring _build_health_context's "only mention when notable" framing.
+    Each line explains what conform/non-conform means in context, since
+    the LLM has no other way to know the category's semantics."""
+    values = c.get("values", {})
+    lines = []
+    for category, v in values.items():
+        importance = v.get("importance", 0)
+        if importance < _VALUE_IMPORTANCE_SURFACE_THRESHOLD:
+            continue
+        blurb = _VALUE_CATEGORY_BLURB.get(category, category)
+        stance = (
+            "and you think it should be structured by shared rules/expectations"
+            if v.get("conform")
+            else "and you think it's a personal matter people should be free to decide for themselves"
+        )
+        lines.append(f"You care a lot about {blurb}, {stance}.")
     return lines
 
 

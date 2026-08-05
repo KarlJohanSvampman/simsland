@@ -90,7 +90,7 @@ from systems.body_composition import tick_body_composition
 # -- Very slow (÷300) ─────────────────────────────────────────────
 from systems.crisis         import check_crises, process_crises
 from systems.politics       import process_pending_effects, check_election
-from systems.influence      import apply_public_figure_influence, apply_social_influence, resolve_exposure_influence
+from systems.influence      import apply_public_figure_influence, apply_social_influence, resolve_exposure_influence, resolve_value_influence
 from systems.socioeconomics import tick_socioeconomics
 from systems.reputation     import tick_reputation
 from systems.secrets        import tick_secrets
@@ -295,6 +295,14 @@ def tick(world):
     # See systems/influence.py.
     if every(world, CADENCE["influence_exposure"], offset=21):
         resolve_exposure_influence(world)
+
+    # Daily trust/respect/exposure/value-similarity weighted influence on
+    # personal values (systems/schema_defaults.py's VALUE_CATEGORIES) --
+    # deliberately a separate, once-a-day cadence from the exposure
+    # resolver above, per the "impact over time... sum it all up maybe on
+    # a daily basis" ask. See systems/influence.py::resolve_value_influence.
+    if every(world, CADENCE["value_influence"], offset=13):
+        resolve_value_influence(world)
 
     # -- Medium: household systems (÷10) ────────────────────
     if every(world, CADENCE["cooking"], offset=5):

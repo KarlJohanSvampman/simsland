@@ -4,6 +4,17 @@
 
 from uuid import uuid4
 
+# 12 fixed personal-value life domains -- see c["values"] default below.
+# Shared constant, imported from here by character_gen.py (seeding),
+# brain/context_builder.py (narrative surfacing), systems/influence.py
+# (daily value-influence resolution), and systems/peer_influence.py
+# (child trait-hint mapping) to keep the category list in one place.
+VALUE_CATEGORIES = [
+    "family", "friends", "work", "leisure", "education", "romance",
+    "children", "religion", "politics", "community", "solidarity",
+    "traditions",
+]
+
 
 def ensure_world_defaults(world, defs=None):
     # Server-side time-scale control (see api/admin.py) -- 1x is realtime.
@@ -680,6 +691,30 @@ def ensure_character_defaults(c):
         "social_models",
         {}
     )
+
+    # Personal values -- 12 fixed life-domain categories, each scored by
+    # importance (0-1, how much this character cares) and conform (bool:
+    # True = thinks this domain should be governed by shared rules/
+    # structure, False = thinks it should be left to individual choice).
+    # Real per-character seeding (randomized, or nudged toward parents'
+    # values for children) happens at generation time in character_gen.py
+    # -- this flat neutral default only backfills characters that predate
+    # the system. Distinct from family.py's generate_family_values() dict
+    # (religious_strictness/sex_negative/homophobic) -- that's a static,
+    # family-level structure unrelated to this per-character one.
+    c.setdefault("values", {cat: {"importance": 0.5, "conform": True} for cat in VALUE_CATEGORIES})
+
+    # Opinions formed on specific topics/questions, informed by the values
+    # above. Keyed by topic, each value a capped history of past-formed-
+    # opinion snapshots (mirrors offgrid_category_memory's two-level
+    # dict-of-capped-lists shape) -- see brain/opinions.py.
+    c.setdefault("opinions", {})
+
+    # Accumulator for the daily trust/respect/exposure/value-similarity
+    # weighted influence pass -- see systems/influence.py::resolve_value_influence().
+    # Keyed by value category, mirrors influence_profile/conditioning_profile's
+    # accumulate-then-threshold-promote shape.
+    c.setdefault("value_influence_profile", {})
 
     # Social conflict system
     c.setdefault("grievances",               [])

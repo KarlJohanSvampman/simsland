@@ -173,6 +173,7 @@ ACTION_SPECS = {
     "announce_departure":  {"group": "social", "target": "any", "doc": "Tell someone you're heading out."},
     "check_device":        {"group": "social", "target": "device", "doc": "Check a suspicious unattended phone."},
     "form_theory":         {"group": "social", "target": "any", "doc": "Voice a theory about what's going on."},
+    "make_argument":       {"group": "social", "target": "character", "detail": "topic", "doc": "Argue your side of a topic you disagree with someone about -- counters their last point, or raises a new one for your own stance. Only offered when there's a real disagreement live (see the values/opinions section of your context). Whoever's listening forms their own reaction based on their own values, not yours."},
 
     # ---- touch --------------------------------------------------------
     "hug":            {"group": "touch", "target": "character", "doc": "Propose a hug."},

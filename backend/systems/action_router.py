@@ -153,6 +153,20 @@ def apply_speech(c, world, speech):
                 "observations":   result.get("observations", []),
             })
 
+        # A real (non-generic) topic surfaced and the listener has no
+        # opinion on it yet -- schedule an automatic, spontaneous
+        # opinion-forming reflection (systems/reflection.py's
+        # "form_opinion" kind), independent of the relationship-
+        # significance gate above. See brain/opinions.py.
+        topic_str = topic or conv.get("topic", "general")
+        if topic_str not in ("general", "incidental") and topic_str not in listener.get("opinions", {}):
+            listener.setdefault("pending_reflections", []).append({
+                "type":           "form_opinion",
+                "topic":          topic_str,
+                "reason":         f"{c.get('name', 'Someone')} brought this up in conversation.",
+                "scheduled_tick": tick + random.randint(20, 120),
+            })
+
     # =====================================================
     # WAKE LISTENERS — see brain/cognition_scheduler.py. A directed line
     # wakes only its target; an untargeted/ambient line wakes up to 4
@@ -216,7 +230,7 @@ def _movement_blocked(c):
     """
     if c.get("alive") is False:
         return True
-    if c.get("posture") == "incapacitated":
+    if c.get("posture") in ("incapacitated", "incapacitated_pain"):
         return True
     if c.get("grappled_by") or c.get("grappling"):
         return True
@@ -1058,6 +1072,8 @@ def route_action(c, world, action, speech, definitions=None, available_actions=N
         _route_check_device(c, world, action)
     elif action_type == "form_theory":
         _route_form_theory(c, world, action)
+    elif action_type == "make_argument":
+        _route_make_argument(c, world, action)
     elif action_type == "contact_business":
         _route_contact_business(c, world, action)
     elif action_type == "book_appointment":
@@ -2561,6 +2577,136 @@ def _route_form_theory(c, world, action):
     suspicion_of = action.get("suspicion_of")
     if suspicion_of:
         worry["suspicion_of"] = suspicion_of
+
+
+def _co_present_characters(c, world):
+    """Everyone else physically here right now -- room_id match
+    preferred, building_id fallback -- mirrors
+    core/event_handlers.py:159-163's same_room/same_building idiom.
+    Used to broadcast an argument's effect to bystanders, not just the
+    named target (see _route_make_argument)."""
+    room_id = c.get("room_id")
+    building_id = c.get("building_id")
+    if not room_id and not building_id:
+        return []
+    result = []
+    for other_id, other in world.get("characters", {}).items():
+        if other_id == c["id"] or other.get("alive") is False:
+            continue
+        if room_id and other.get("room_id") == room_id:
+            result.append(other)
+        elif not room_id and building_id and other.get("building_id") == building_id:
+            result.append(other)
+    return result
+
+
+def _relationship_credibility(listener, speaker_id):
+    """0..1 -- how much weight this listener gives the speaker, blending
+    trust and respect (same terms systems/influence.py's daily value-
+    influence resolver uses for its own relationship-quality weight)."""
+    rel = listener.get("relationships", {}).get(speaker_id, {})
+    return max(0.0, min(1.0, (rel.get("trust", 0) + rel.get("respect", 0)) / 200.0))
+
+
+def _topic_resistance(listener, relevant_values):
+    """0..1 -- how hard this listener's OWN values make them to move on
+    this topic (mirrors brain/beliefs.py's resistance=1-certainty
+    concept, adapted: high personal importance in the topic's relevant
+    value categories = harder to move)."""
+    if not relevant_values:
+        return 0.3  # mild default when the topic isn't tied to a known category
+    values = listener.get("values", {})
+    importances = [values.get(cat, {}).get("importance", 0.5) for cat in relevant_values]
+    return sum(importances) / len(importances)
+
+
+def _route_make_argument(c, world, action):
+    """
+    action: {"type": "make_argument", "target": character_id, "topic": "..."}
+
+    Counters the target's last "argue" message on this topic if there's
+    one live in their conversation, otherwise introduces a new
+    supporting point for the speaker's own stance -- see
+    llm/opinion_formation.py's argument_mode. Resolution (does anyone's
+    opinion actually shift) runs independently per co-present listener,
+    INCLUDING the named target, using THEIR OWN values/opinion state,
+    never the speaker's -- "this goes for anyone in the room," scored
+    and tested separately per character.
+    """
+    from brain.conversations import find_conversation
+    from brain.opinions import get_current_opinion, update_opinion, shift_opinion
+    from llm.opinion_formation import generate_opinion
+    from llm.llm_gate import run_llm_call
+
+    target_id = action.get("target")
+    topic = action.get("topic")
+    if not target_id or not topic:
+        return
+    target = world.get("characters", {}).get(target_id)
+    if not target:
+        return
+
+    tick = world.get("tick", 0)
+
+    conv = find_conversation(world, c["id"], target_id)
+    prior_argument = None
+    argument_mode = "new_point"
+    if conv:
+        for msg in reversed(conv.get("history", [])):
+            if msg.get("speech_act") == "argue" and msg.get("speaker") == target_id:
+                prior_argument = msg.get("utterance")
+                argument_mode = "counter"
+                break
+
+    session = c.setdefault("llm_session", {"history": []})
+    context = {
+        "reason":         f"Discussing this with {target.get('name', 'someone')}.",
+        "prior_stance":   get_current_opinion(c, topic),
+        "argument_mode":  argument_mode,
+        "prior_argument": prior_argument,
+        "speaker_name":   target.get("name"),
+    }
+
+    result = run_llm_call(generate_opinion(c, topic, context, world, session))
+    if not result:
+        return
+
+    speaker_stance = result.get("stance", 0)
+    relevant_values = result.get("relevant_values", [])
+    update_opinion(
+        c, topic, speaker_stance, result.get("confidence", 0.4),
+        result.get("reasoning", ""), relevant_values, tick,
+    )
+
+    argument_text = (result.get("argument_text") or result.get("reasoning") or "").strip()
+    if not argument_text:
+        return
+    argument_strength = max(0.0, min(1.0, result.get("argument_strength", 0.5)))
+
+    # Threads into the real conversation + fires the speech bubble --
+    # also what triggers apply_speech's own form_opinion scheduling for
+    # any listener who doesn't have an opinion on this topic yet.
+    apply_speech(c, world, {
+        "target": target_id, "utterance": argument_text,
+        "speech_act": "argue", "topic": topic,
+    })
+
+    for listener in _co_present_characters(c, world):
+        listener_opinion = get_current_opinion(listener, topic)
+        if listener_opinion is None:
+            continue  # nothing to shift yet -- apply_speech above already
+                      # scheduled them a form_opinion reflection
+        credibility = _relationship_credibility(listener, c["id"])
+        resistance = _topic_resistance(listener, relevant_values)
+        persuasion = credibility * argument_strength * (1 - resistance)
+        delta = (speaker_stance - listener_opinion["stance"]) * persuasion
+        if delta == 0:
+            continue
+        shift_opinion(
+            listener, topic, delta, tick,
+            reasoning=f"Heard {c.get('name', 'someone')}'s argument.",
+            relevant_values=relevant_values,
+        )
 
 
 def _route_retrieve_phone(c, world, action):

@@ -86,6 +86,41 @@ def _random_traits(defs):
     if not keys: return []
     return random.sample(keys, min(3, len(keys)))
 
+# ── Values (systems/schema_defaults.py::VALUE_CATEGORIES) ──────────────────────
+# Fully random per category for unrelated/adult-generated characters.
+# parent_values (a list of 1-2 parent c["values"] dicts, passed by
+# baby.py/relative_gen.py for an actual birth/derivation) nudges each
+# category's importance toward the parents' average with jitter, and
+# biases conform toward a parent's with above-chance probability -- nature
+# + nurture, not a straight copy, matching how trait inheritance elsewhere
+# in this codebase (e.g. relative_gen.py) already avoids exact cloning.
+_VALUE_PARENT_JITTER      = 0.15   # +/- random spread around parent average
+_VALUE_PARENT_CONFORM_BIAS = 0.70  # chance conform matches a (random) parent's
+
+
+def _seed_values(defs, parent_values=None):
+    from systems.schema_defaults import VALUE_CATEGORIES
+
+    if not parent_values:
+        return {cat: {"importance": round(random.uniform(0.0, 1.0), 2),
+                       "conform": random.random() < 0.5}
+                for cat in VALUE_CATEGORIES}
+
+    values = {}
+    for cat in VALUE_CATEGORIES:
+        parent_importances = [pv.get(cat, {}).get("importance", 0.5) for pv in parent_values]
+        avg = sum(parent_importances) / len(parent_importances)
+        importance = avg + random.uniform(-_VALUE_PARENT_JITTER, _VALUE_PARENT_JITTER)
+        importance = max(0.0, min(1.0, round(importance, 2)))
+
+        if random.random() < _VALUE_PARENT_CONFORM_BIAS:
+            conform = random.choice(parent_values).get(cat, {}).get("conform", True)
+        else:
+            conform = random.random() < 0.5
+
+        values[cat] = {"importance": importance, "conform": conform}
+    return values
+
 def _random_hobbies(defs):
     pool = defs.get("hobby_templates", {})
     keys = [k for k in pool if not k.startswith("_")] if isinstance(pool, dict) else list(pool)
@@ -277,6 +312,7 @@ def generate_character(defs, overrides=None):
         or f"{sex}_{age_group}_base"
     )
 
+    values          = overrides.get("values")              or _seed_values(defs, overrides.get("parent_values"))
     traits          = overrides.get("traits")             or _random_traits(defs)
     physical_traits = overrides.get("physical_traits")    or _random_physical_traits(defs)
     hobbies      = overrides.get("hobbies")            or _random_hobbies(defs)
@@ -351,6 +387,7 @@ def generate_character(defs, overrides=None):
         "rotation": 0,
         "facing":   "south",
         # Personality & social
+        "values":              values,
         "traits":             traits,
         "physical_traits":    physical_traits,
         "hobbies":            hobbies,

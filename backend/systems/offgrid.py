@@ -504,7 +504,7 @@ def maybe_schedule_doctor_visit(c, world):
     unaffected by this gate."""
     if c.get("off_grid") or c.get("conversation"):
         return
-    if c.get("alive") is False or c.get("posture") in ("incapacitated", "crawling"):
+    if c.get("alive") is False or c.get("posture") in ("incapacitated", "incapacitated_pain", "crawling"):
         return
     needed = c.get("health_state", {}).get("doctor_visits_needed", 0)
     if needed <= 0:

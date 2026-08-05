@@ -55132,6 +55132,13 @@
       "idle_key": "incapacitated_idle",
       "moves": []
     },
+    "incapacitated_pain": {
+      "key": "incapacitated_pain",
+      "label": "Incapacitated (Pain)",
+      "is_posture": true,
+      "idle_key": "lie_idle",
+      "moves": []
+    },
     "intoxicated": {
       "key": "intoxicated",
       "label": "Intoxicated",
