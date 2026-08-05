@@ -121,6 +121,22 @@ def _seed_values(defs, parent_values=None):
         values[cat] = {"importance": importance, "conform": conform}
     return values
 
+# ── Curiosity (systems/schema_defaults.py's 0-100 curiosity field) ─────────────
+# Trait-correlated jitter, mirroring _seed_values()'s style -- no parent-nudge
+# (unlike values, curiosity isn't modeled as generationally transmitted here;
+# easy to add later if wanted).
+_CURIOSITY_BASELINE_RANGE = (30, 70)
+_CURIOSITY_TRAIT_BOOST_RANGE = (15, 25)
+_CURIOSITY_TRAIT_BOOST_TRAITS = ("curious", "intellectual")
+
+
+def _seed_curiosity(traits):
+    curiosity = random.randint(*_CURIOSITY_BASELINE_RANGE)
+    if any(t in traits for t in _CURIOSITY_TRAIT_BOOST_TRAITS):
+        curiosity += random.randint(*_CURIOSITY_TRAIT_BOOST_RANGE)
+    return max(0, min(100, curiosity))
+
+
 def _random_hobbies(defs):
     pool = defs.get("hobby_templates", {})
     keys = [k for k in pool if not k.startswith("_")] if isinstance(pool, dict) else list(pool)
@@ -314,6 +330,7 @@ def generate_character(defs, overrides=None):
 
     values          = overrides.get("values")              or _seed_values(defs, overrides.get("parent_values"))
     traits          = overrides.get("traits")             or _random_traits(defs)
+    curiosity       = overrides.get("curiosity")           if overrides.get("curiosity") is not None else _seed_curiosity(traits)
     physical_traits = overrides.get("physical_traits")    or _random_physical_traits(defs)
     hobbies      = overrides.get("hobbies")            or _random_hobbies(defs)
     orientation  = overrides.get("sexual_orientation") or _random_orientation()
@@ -388,6 +405,7 @@ def generate_character(defs, overrides=None):
         "facing":   "south",
         # Personality & social
         "values":              values,
+        "curiosity":           curiosity,
         "traits":             traits,
         "physical_traits":    physical_traits,
         "hobbies":            hobbies,

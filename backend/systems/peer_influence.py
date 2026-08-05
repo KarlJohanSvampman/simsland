@@ -94,8 +94,16 @@ VALUE_CATEGORY_TRAIT_HINTS = {
     ("politics",   False): "independent_minded",
     ("community",  True):  "community_minded",
     ("community",  False): "self_reliant",
-    ("solidarity", True):  "generous",
-    ("solidarity", False): "individualistic",
+    # Solidarity's conform/non-conform axis is selective (in-group,
+    # order-minded) vs. universal (open, not selective about who
+    # deserves it) -- not generosity vs. individualism, which actively
+    # contradicted the refined meaning (non-conform solidarity is still
+    # solidarity, just unbounded). Reuses real trait_templates entries
+    # already mapped from other categories -- see this dict's
+    # ("work", False)/("romance", False) both already sharing
+    # "free_spirited", so cross-category reuse is an established pattern.
+    ("solidarity", True):  "loyal",
+    ("solidarity", False): "open_minded",
     ("traditions", True):  "traditional",
     ("traditions", False): "unconventional",
 }

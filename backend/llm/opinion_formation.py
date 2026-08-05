@@ -29,7 +29,7 @@ _VALUE_EXPLANATIONS = {
     "religion":   "how much this person values religion, and whether it's a matter that should be governed by shared rules/structure (conform) or a personal matter (non-conform)",
     "politics":   "how much this person values politics, and whether political life should be governed by shared rules/structure (conform) or left to individual choice (non-conform)",
     "community":  "how much this person values their wider community (neighborhood/municipality/region), and whether community life should be governed by shared rules (conform) or left to individual choice (non-conform)",
-    "solidarity": "how much this person values solidarity with others, and whether it should be a matter of shared obligation (conform) or personal choice (non-conform)",
+    "solidarity": "how much this person values solidarity with others, and who that solidarity extends to -- conform means it's selective, extended mainly to people like them, in exchange for order and shared standards; non-conform means it's universal, extended to the wider community without being selective about who deserves it",
     "traditions": "how much this person values traditions, and whether they should be upheld by shared expectation (conform) or are a personal matter (non-conform)",
 }
 
@@ -38,7 +38,13 @@ def _format_values(values):
     lines = []
     for category, v in (values or {}).items():
         blurb = _VALUE_EXPLANATIONS.get(category, category)
-        stance = "favors shared rules/structure" if v.get("conform") else "favors individual freedom of choice"
+        if category == "solidarity":
+            # Solidarity's conform/non-conform axis is selective vs.
+            # universal, not rules vs. freedom -- see _VALUE_EXPLANATIONS
+            # above and context_builder.py's _build_values_context.
+            stance = "selective, in-group solidarity" if v.get("conform") else "open, universal solidarity"
+        else:
+            stance = "favors shared rules/structure" if v.get("conform") else "favors individual freedom of choice"
         lines.append(f"- {category} (importance {v.get('importance', 0.5):.2f}, {stance}): {blurb}")
     return "\n".join(lines)
 

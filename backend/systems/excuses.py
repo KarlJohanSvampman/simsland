@@ -692,3 +692,38 @@ def leave_note(c, world, text=None):
         pass
 
     return note
+
+
+# =========================================================
+# APPROACH PRETEXT (systems/curiosity.py)
+# =========================================================
+# "Why am I walking over here" for a curiosity-driven investigation --
+# distinct from every other function in this module, which all answer
+# "where was I / what was I doing" questions about a character's OWN
+# past whereabouts. This is a forward-looking self-justification a
+# curious character gives themselves before approaching a commotion,
+# same templated-lines shape as _vague_deflection() above.
+
+_APPROACH_PRETEXT_TEMPLATES = {
+    "incident": [
+        "I should check that's nothing serious.",
+        "Just making sure everyone's alright over there.",
+        "I'll go see what's going on.",
+        "Better take a look, just in case.",
+    ],
+    "ambient": [
+        "What was that?",
+        "I should see what that noise was.",
+        "Let me take a look outside.",
+        "I wonder what's going on out there.",
+    ],
+}
+
+
+def generate_approach_pretext(c, world, source_kind, source_label=None):
+    """source_kind: "incident" | "ambient" -- picks the matching
+    templated line. source_label (e.g. an incident type or sound name)
+    is accepted for future flavor but not required by the current
+    templates."""
+    options = _APPROACH_PRETEXT_TEMPLATES.get(source_kind, _APPROACH_PRETEXT_TEMPLATES["ambient"])
+    return random.choice(options)

@@ -109,6 +109,7 @@ from systems.baby     import tick_baby_hourly, tick_baby_daily, tick_baby_weekly
 from systems.nudity_perception import tick_nudity_perception
 from systems.crushes import tick_crushes
 from systems.incidental_speech import tick_incidental_speech, clear_departure_flags
+from brain.perception import cleanup_ambient_sounds
 from systems.conditioning import tick_conditioning_weekly
 
 # -- Weekly ───────────────────────────────────────────────────────
@@ -445,6 +446,10 @@ def tick(world):
 
     # -- Clear one-tick departure flags (must be first) ────
     clear_departure_flags(world)
+
+    # -- Prune expired transient ambient sounds (see brain/perception.py's
+    # emit_ambient_sound/VOLUME_TIERS) ──────────────────────
+    cleanup_ambient_sounds(world)
 
     # -- Intimacy arousal decay (every tick) ───────────────
     tick_intimacy(world)

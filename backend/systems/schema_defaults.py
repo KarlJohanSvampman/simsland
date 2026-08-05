@@ -481,6 +481,19 @@ def ensure_character_defaults(c):
     # Self-confidence — degraded by negging/manipulation; affects assertiveness
     c.setdefault("self_confidence", 0.60)   # 0-1; 0.60 default healthy baseline
 
+    # Curiosity — 0-100 (explicit user spec, unlike most scalars on this
+    # page which are 0-1), how much this character wants to understand
+    # what's going on around them: notices/investigates the out-of-the-
+    # ordinary, follows the news, asks personal questions, trades gossip.
+    # Distinct from the "curious" personality trait (character_gen.py's
+    # trait_templates entry, which only nudges the "learning" lt_need's
+    # weight) -- this is the measurable driver behind actual behavior,
+    # seeded with a trait-correlated jitter in character_gen.py::
+    # _seed_curiosity(). Also distinct from the "solidarity" value
+    # category (schema below) -- wanting to know what's going on is not
+    # the same axis as in-group vs. universal solidarity.
+    c.setdefault("curiosity", 50)
+
     # Masculinity confidence — separate axis targeted by emasculation tactics
     c.setdefault("masculinity_confidence", 0.65)  # males only; attacks via ridicule/emasculation
 

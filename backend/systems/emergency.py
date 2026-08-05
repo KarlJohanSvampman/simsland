@@ -189,6 +189,17 @@ def trigger_incident(world, c):
                 world.setdefault("incidents", []).append(inc)
                 emit("incident_created", {"incident_id": inc["id"], "type": inc["type"]})
 
+                # Curiosity hook (systems/curiosity.py) -- a smoke alarm
+                # is a genuinely piercing, real audible event, unlike the
+                # fire itself (which has no live "explosion" trigger yet
+                # -- see brain/perception.py's VOLUME_TIERS "intense"
+                # tier, deliberately left without a producer for now).
+                try:
+                    from brain.perception import emit_ambient_sound
+                    emit_ambient_sound(world, inc["location"]["x"], inc["location"]["y"], "smoke_alarm", "high")
+                except Exception:
+                    pass
+
 
 def auto_report_incidents(world):
     for inc in world.get("incidents", []):

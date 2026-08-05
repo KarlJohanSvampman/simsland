@@ -9,7 +9,8 @@ def apply_public_figure_influence(world):
             pf=next((p for p in world.get("public_figures",[]) if p["id"]==pfid), None)
             if not pf: continue
             for c in world["characters"].values():
-                for tag in pf.get("tags",[])[:2]: update_belief(c,tag,news.get("sentiment","neutral"),news.get("intensity",.3)*pf.get("influence_power",.5),world["tick"])
+                curiosity_scale=c.get("curiosity",50)/100.0
+                for tag in pf.get("tags",[])[:2]: update_belief(c,tag,news.get("sentiment","neutral"),news.get("intensity",.3)*pf.get("influence_power",.5)*curiosity_scale,world["tick"])
 def apply_social_influence(world):
     for c in world["characters"].values():
         for tid,weight in c.get("influence_given",{}).items():

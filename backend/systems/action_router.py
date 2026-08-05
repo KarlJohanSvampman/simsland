@@ -66,11 +66,33 @@ def apply_speech(c, world, speech):
     topic = speech.get("topic", "")
     target_id = speech.get("target")
 
+    # Volume (see brain/perception.py's VOLUME_TIERS) -- explicit caller
+    # value wins (e.g. a future hostile-action shout), otherwise inferred
+    # from the same signals already tracked elsewhere: an "argument"
+    # conversation_type on this message, or an active conflict between
+    # these two parties already in its heated_argument/shouting_match
+    # fight_stage (systems/conflict_pipeline.py). Plain conversation stays
+    # "medium" (default speaking volume).
+    volume = speech.get("volume")
+    if not volume:
+        if speech.get("conversation_type") == "argument":
+            volume = "high"
+        else:
+            volume = "medium"
+            if target_id:
+                for conflict in world.get("conflicts", {}).values():
+                    parties = conflict.get("parties", [])
+                    if (c["id"] in parties and target_id in parties
+                            and conflict.get("fight_stage") in ("heated_argument", "shouting_match")):
+                        volume = "high"
+                        break
+
     c["current_speech"] = {
         "utterance":      utterance,
         "speech_act":     speech_act,
         "topic":          topic,
         "target":         target_id,
+        "volume":         volume,
         "expires_at_tick": tick + SPEECH_BUBBLE_TICKS,
     }
 
@@ -1088,6 +1110,8 @@ def route_action(c, world, action, speech, definitions=None, available_actions=N
         _route_computer(c, world, action, "computer_game")
     elif action_type == "computer_wiki_research":
         _route_computer_wiki_research(c, world, action)
+    elif action_type == "computer_news":
+        _route_computer_news(c, world, action)
     elif action_type == "computer_window_shopping":
         _route_computer(c, world, action, "computer_window_shopping")
     elif action_type == "computer_dating":
@@ -2915,6 +2939,26 @@ def _route_computer_wiki_research(c, world, action):
             c["activity"]["research_result"] = extract[:200]
     except Exception:
         pass   # silently ignore network failures in sim tick
+
+
+# ─── news (see systems/curiosity.py -- only offered to curious characters) ────
+
+def _route_computer_news(c, world, action):
+    if not _require_phone_or_computer(c, world):
+        return
+    c["activity"] = _scaffold(c, world, "computer_news", interaction="computer_news")
+    c["animation_state"] = "sit_work"
+
+    curiosity_scale = c.get("curiosity", 50) / 100.0
+    n_headlines = max(1, round(1 + curiosity_scale * 4))  # 1-5 headlines
+    headlines = [n.get("headline") for n in world.get("news", [])[-n_headlines:] if n.get("headline")]
+    if not headlines:
+        return
+
+    seen = c.setdefault("_seen_headlines", [])
+    seen.extend(h for h in headlines if h not in seen)
+    c["_seen_headlines"] = seen[-20:]
+    c["activity"]["headlines"] = headlines
 
 
 # ─── job search / apply ───────────────────────────────────────────────────────

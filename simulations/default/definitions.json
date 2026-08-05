@@ -739,6 +739,27 @@
         "entertainment"
       ]
     },
+    "window_a": {
+      "name": "Window",
+      "category": "furniture",
+      "footprint": [
+        {
+          "dx": 0,
+          "dy": 0
+        }
+      ],
+      "anchors": [
+        {
+          "name": "anchor_look_out",
+          "interaction": "look_out_window"
+        }
+      ],
+      "storage": null,
+      "tags": [
+        "furniture",
+        "window"
+      ]
+    },
     "armchair": {
       "name": "Armchair",
       "category": "furniture",

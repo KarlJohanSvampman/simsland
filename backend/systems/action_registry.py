@@ -91,6 +91,7 @@ ACTION_SPECS = {
     "computer_videos":           {"group": "computer", "target": "none", "doc": "Watch videos online."},
     "computer_game":             {"group": "computer", "target": "none", "doc": "Play an online game."},
     "computer_wiki_research":    {"group": "computer", "target": "none", "doc": "Look something up."},
+    "computer_news":             {"group": "computer", "target": "none", "doc": "Catch up on the news."},
     "computer_window_shopping":  {"group": "computer", "target": "none", "doc": "Browse shops online."},
     "computer_dating":           {"group": "computer", "target": "none", "doc": "Use a dating app/site."},
     "computer_job_search":       {"group": "computer", "target": "none", "doc": "Search job listings."},

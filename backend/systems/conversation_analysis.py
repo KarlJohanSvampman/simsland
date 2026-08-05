@@ -439,6 +439,89 @@ def apply_speech_act_analysis(
                 0.6
         })
 
+        # Curiosity-scaled secret transfer (see systems/secrets.py's
+        # dormant reveal_secret) -- a curious teller is more willing to
+        # share what they've heard, a curious listener is more likely
+        # to actually get it out of them. Only ever relays a secret the
+        # speaker genuinely already knows; never fabricates one.
+        if world is not None:
+
+            speaker_curiosity = speaker.get("curiosity", 50) / 100.0
+            listener_curiosity = listener.get("curiosity", 50) / 100.0
+
+            candidates = []
+            for keeper in world.get("characters", {}).values():
+                for secret in keeper.get("secrets", []):
+                    known_by = secret.get("known_by", [])
+                    speaker_knows = speaker["id"] == keeper["id"] or speaker["id"] in known_by
+                    listener_knows = listener["id"] == keeper["id"] or listener["id"] in known_by
+                    if not speaker_knows or listener_knows:
+                        continue
+                    if listener["id"] in secret.get("subject_ids", []):
+                        continue
+                    candidates.append(secret)
+
+            if candidates:
+                juiciest = max(candidates, key=lambda s: s.get("severity", 0))
+                chance = 0.15 + 0.35 * speaker_curiosity + 0.25 * listener_curiosity
+                if random.random() < chance:
+                    from systems.secrets import reveal_secret
+                    reveal_secret(juiciest, listener["id"], world, method="told")
+
+                    result[
+                        "observations"
+                    ].append({
+
+                        "text":
+                            f"{name} let slip something you didn't know before.",
+
+                        "weight":
+                            0.5
+                    })
+
+    # =====================================================
+    # QUESTION -- curious characters lean personal/prying (family,
+    # background, "where are you from"); see systems/curiosity.py and
+    # the matching narrative nudge in context_builder.py's
+    # _build_curiosity_context. Bias via a mild social nuance rather
+    # than parsing the literal utterance for topic -- the LLM decides
+    # what to actually ask, this just reflects the tone landing.
+    # =====================================================
+
+    elif speech_act == "question":
+
+        result[
+            "observations"
+        ].append({
+
+            "text":
+                f"{name} asked you something.",
+
+            "weight":
+                0.2
+        })
+
+        if speaker.get("curiosity", 50) >= 70:
+
+            result[
+                "observations"
+            ].append({
+
+                "text":
+                    f"{name} seemed genuinely curious about your life -- "
+                    "a bit personal, but not unkind.",
+
+                "weight":
+                    0.3
+            })
+
+            result[
+                "relationship_effects"
+            ] = {
+
+                "friendship": 1
+            }
+
     # =====================================================
     # AWKWARD
     # =====================================================

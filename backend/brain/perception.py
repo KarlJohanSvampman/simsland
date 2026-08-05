@@ -93,14 +93,56 @@ def hearing_range(c):
 
 
 # =========================================================
+# VOLUME TIERS
+# =========================================================
+# Fixed vocabulary, each mapped to a base detection radius in tiles --
+# "these levels also reflect a radius around the source," per the design
+# ask. This REPLACES hearing_range() as the primary distance gate in
+# perceive_audio() below (hearing_range() is kept for any other existing
+# caller, unchanged); a sound's own volume now decides how far it carries,
+# scaled by the listener's own hearing acuity, same as before.
+VOLUME_TIERS = {
+    "low":     3,   # whisper
+    "medium":  6,   # default speaking volume
+    "high":    12,  # yell
+    "loud":    20,  # a window breaking
+    "intense": 35,  # gunshot / explosion / car crash
+}
+
+DEFAULT_VOLUME = "medium"
+
+
+def volume_range(c, volume=DEFAULT_VOLUME):
+    """Max tiles this character could possibly hear a sound of this
+    volume at, before muffling (see sound_modifier)."""
+    base = VOLUME_TIERS.get(volume, VOLUME_TIERS[DEFAULT_VOLUME])
+    return base * _sense_modifier(c, "hearing")
+
+
+# =========================================================
 # SOUND MODIFIER
 # =========================================================
+# Louder sounds punch through walls/rooms better -- _VOLUME_MUFFLE_RELIEF
+# blends the base building/room penalty toward 1.0 (no muffling) as
+# volume rises. volume="medium" (the default) reproduces the exact
+# pre-existing behavior, so every call site that doesn't pass volume is
+# unaffected.
+_VOLUME_MUFFLE_RELIEF = {
+    "low":     0.0,
+    "medium":  0.0,
+    "high":    0.5,
+    "loud":    1.0,
+    "intense": 1.0,
+}
+
 
 def sound_modifier(
 
     c,
 
-    other
+    other,
+
+    volume=DEFAULT_VOLUME
 ):
 
     if c.get(
@@ -109,17 +151,70 @@ def sound_modifier(
         "building_id"
     ):
 
-        return 0.5
+        base = 0.5
 
-    if c.get(
+    elif c.get(
         "room_id"
     ) != other.get(
         "room_id"
     ):
 
-        return 0.7
+        base = 0.7
 
-    return 1.0
+    else:
+
+        base = 1.0
+
+    relief = _VOLUME_MUFFLE_RELIEF.get(volume, 0.0)
+    return base + (1.0 - base) * relief
+
+
+# =========================================================
+# TRANSIENT AMBIENT SOUNDS
+# =========================================================
+# world["ambient_sounds"] -- one-off events (a window breaking, a smoke
+# alarm going off) as opposed to props.active_sound's persistent-source
+# model. Short-lived by design (a few ticks), pruned by
+# cleanup_ambient_sounds() rather than accumulating forever.
+
+AMBIENT_SOUND_DURATION_TICKS = 3
+
+
+def emit_ambient_sound(world, x, y, sound, volume=DEFAULT_VOLUME, duration=AMBIENT_SOUND_DURATION_TICKS):
+    tick = world.get("tick", 0)
+    world.setdefault("ambient_sounds", []).append({
+        "x": x, "y": y, "sound": sound, "volume": volume,
+        "tick": tick, "expires_at_tick": tick + duration,
+    })
+
+
+def cleanup_ambient_sounds(world):
+    tick = world.get("tick", 0)
+    sounds = world.get("ambient_sounds")
+    if not sounds:
+        return
+    world["ambient_sounds"] = [e for e in sounds if e.get("expires_at_tick", 0) >= tick]
+
+
+# =========================================================
+# SOUND DIRECTION
+# =========================================================
+# 8-point compass bearing from a source position to the listener --
+# only meaningful once a sound clears a localization threshold (very
+# faint/distant sounds can be heard without being placeable), so callers
+# gate this the same way heard_speaker's clarity>=0.3 threshold already
+# works.
+_COMPASS = ["E", "NE", "N", "NW", "W", "SW", "S", "SE"]
+
+
+def sound_direction(listener, source):
+    dx = source["x"] - listener["x"]
+    dy = source["y"] - listener["y"]
+    if dx == 0 and dy == 0:
+        return None
+    angle = math.degrees(math.atan2(dy, dx)) % 360
+    index = int((angle + 22.5) // 45) % 8
+    return _COMPASS[index]
 
 
 # =========================================================
@@ -611,8 +706,6 @@ def perceive_audio(
 
     heard = []
 
-    hrange = hearing_range(c)
-
     # =====================================
     # SPEECH
     # =====================================
@@ -632,6 +725,9 @@ def perceive_audio(
         if not speech:
             continue
 
+        volume = speech.get("volume", DEFAULT_VOLUME)
+        hrange = volume_range(c, volume)
+
         d = manhattan(
             c,
             other
@@ -639,7 +735,8 @@ def perceive_audio(
 
         modifier = sound_modifier(
             c,
-            other
+            other,
+            volume
         )
 
         effective = d / modifier
@@ -647,9 +744,9 @@ def perceive_audio(
         if effective > hrange:
             continue
 
-        # 1.0 = right next to the source, 0.0 = at the very edge of
-        # hearing_range() (which already bakes in sense-trait/night
-        # multipliers from perception.py's visual/hearing range work).
+        # 1.0 = right next to the source, 0.0 = at the very edge of this
+        # sound's volume-tiered range (see volume_range() -- bakes in
+        # sense-trait/night multipliers same as before).
         clarity = max(0.0, 1 - (effective / hrange)) if hrange else 0.0
 
         real_topic = speech.get("topic")
@@ -661,6 +758,11 @@ def perceive_audio(
         # Below the mishearing band entirely, the character can't even
         # tell who's talking — distinct from mishearing *what* was said.
         heard_speaker = other.get("name") if clarity >= 0.3 else None
+        direction = sound_direction(c, other) if clarity >= 0.3 else None
+        # Localizable enough to know who -> localizable enough to know
+        # where, for systems/curiosity.py to path toward if it wants to
+        # (a live id, not a snapshot x/y, since the speaker keeps moving).
+        source_id = other["id"] if clarity >= 0.3 else None
 
         heard.append({
 
@@ -670,6 +772,9 @@ def perceive_audio(
             "speaker":
                 heard_speaker,
 
+            "source_id":
+                source_id,
+
             "topic":
                 heard_topic,
 
@@ -677,6 +782,12 @@ def perceive_audio(
                 speech.get(
                     "speech_act"
                 ),
+
+            "volume":
+                volume,
+
+            "direction":
+                direction,
 
             "distance":
                 round(
@@ -691,6 +802,34 @@ def perceive_audio(
     # =====================================
     # AMBIENT SOUNDS
     # =====================================
+    # Two sources: props.active_sound is a PERSISTENT source (e.g. a radio
+    # or TV left on -- not currently populated by anything, but the field
+    # stays live for that future use); world["ambient_sounds"] is
+    # TRANSIENT one-off events (a window breaking, a smoke alarm) --
+    # see emit_ambient_sound()/cleanup_ambient_sounds() below. Both go
+    # through the same distance/volume/direction math.
+
+    def _hear_ambient(x, y, sound, volume):
+        hrange = volume_range(c, volume)
+        d = abs(x - c["x"]) + abs(y - c["y"])
+        if d > hrange:
+            return None
+        clarity = max(0.0, 1 - (d / hrange)) if hrange else 0.0
+        direction = sound_direction(c, {"x": x, "y": y}) if clarity >= 0.3 else None
+        return {
+            "type":     "ambient",
+            "sound":    sound,
+            "volume":   volume,
+            "direction": direction,
+            # Real source coordinates (unlike speech's source_id, ambient
+            # sources have no persistent "id" to re-look-up later, so the
+            # position is captured directly) -- systems/curiosity.py paths
+            # toward this.
+            "x":        x,
+            "y":        y,
+            "distance": d,
+            "clarity":  round(clarity, 2),
+        }
 
     for p in world.get(
         "props",
@@ -704,26 +843,17 @@ def perceive_audio(
         if not sound:
             continue
 
-        d = abs(
-            p["x"] - c["x"]
-        ) + abs(
-            p["y"] - c["y"]
-        )
+        event = _hear_ambient(p["x"], p["y"], sound, p.get("active_sound_volume", DEFAULT_VOLUME))
+        if event:
+            heard.append(event)
 
-        if d > hrange:
+    tick = world.get("tick", 0)
+    for entry in world.get("ambient_sounds", []):
+        if entry.get("expires_at_tick", 0) < tick:
             continue
-
-        heard.append({
-
-            "type":
-                "ambient",
-
-            "sound":
-                sound,
-
-            "distance":
-                d
-        })
+        event = _hear_ambient(entry["x"], entry["y"], entry["sound"], entry.get("volume", DEFAULT_VOLUME))
+        if event:
+            heard.append(event)
 
     # context_builder.py only renders audible_events[:4] into narrative
     # (a token-budget cap), so without a relevance sort a suspicious
@@ -738,7 +868,10 @@ def perceive_audio(
         name_to_id = {p.get("name"): pid for pid, p in chars.items()}
 
         def _relevance(event):
-            clarity = event.get("clarity", 0.5) if event.get("type") == "speech" else 0.4
+            # Ambient events now carry a real clarity value too (see the
+            # volume-tiered rewrite above) -- uniform lookup, 0.4 default
+            # only for any event shape that somehow lacks the field.
+            clarity = event.get("clarity", 0.4)
             speaker_id = name_to_id.get(event.get("speaker"))
             suspicion_bonus = 0.0
             if speaker_id and speaker_id in worries:
@@ -1251,9 +1384,15 @@ def perceive(
                 world
             ),
 
+        # "news_feed" was the key read here previously, but nothing in
+        # the codebase ever writes to it (media.py/crisis.py/politics.py
+        # all append to world["news"] instead) -- so this always returned
+        # empty, and no character's LLM context ever actually saw a news
+        # item despite the architecture docs claiming otherwise.
+        # Repointed to the real, populated key.
         "news":
             world.get(
-                "news_feed",
+                "news",
                 []
             )[-5:],
 

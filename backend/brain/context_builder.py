@@ -488,6 +488,12 @@ def build_available_actions(c, world):
             "computer_dating", "computer_job_search", "computer_apply_for_job",
             "computer_send_email", "computer_respond_email", "computer_check_email",
         ])
+        # computer_news (see systems/curiosity.py) -- only offered to
+        # characters actually inclined to seek out the news cycle;
+        # same threshold _sec_news uses to decide whether to surface a
+        # headline unprompted.
+        if c.get("curiosity", 50) >= _NEWS_CURIOSITY_THRESHOLD:
+            action_types.append("computer_news")
         # Stock trading (see systems/stock_market.py, systems/investments.py)
         # and ordering (systems/procurement.py, systems/services.py) —
         # fully routed but never offered before this round, same class of
@@ -1212,25 +1218,73 @@ def _sec_hearing(c, world):
         return None
     lines = []
     for event in audible[:4]:
+        direction_phrase = _direction_phrase(event.get("direction"))
         if event.get("type") == "speech":
             speaker = event.get("speaker")
             topic = event.get("topic")
+            volume = event.get("volume", "medium")
+            verb = "yelling" if volume in ("high", "loud", "intense") else "talking"
             if not speaker:
                 lines.append(
                     "You hear muffled talking nearby, but can't "
                     "make out who or what."
                 )
             elif topic:
+                mention = "yell something about" if verb == "yelling" else "mention something about"
                 lines.append(
-                    f"You hear {speaker} mention something about {topic}."
+                    f"You hear {speaker} {mention} {topic}{direction_phrase}."
                 )
             else:
-                lines.append(f"You hear {speaker} talking somewhere nearby.")
+                lines.append(f"You hear {speaker} {verb} somewhere nearby{direction_phrase}.")
         elif event.get("type") == "ambient" and event.get("sound"):
+            adjective = _VOLUME_ADJECTIVE.get(event.get("volume", "medium"), "")
+            sound = event["sound"].replace("_", " ")
+            descriptor = f"{adjective} {sound}".strip()
             lines.append(
-                f"You hear a {event['sound'].replace('_', ' ')}."
+                f"You hear a {descriptor}{direction_phrase}."
             )
     return " ".join(lines) if lines else None
+
+
+_VOLUME_ADJECTIVE = {
+    "low":     "faint",
+    "medium":  "",
+    "high":    "loud",
+    "loud":    "loud",
+    "intense": "deafening",
+}
+
+_DIRECTION_WORDS = {
+    "N": "north", "NE": "northeast", "E": "east", "SE": "southeast",
+    "S": "south", "SW": "southwest", "W": "west", "NW": "northwest",
+}
+
+
+def _direction_phrase(direction):
+    word = _DIRECTION_WORDS.get(direction)
+    return f" from the {word}" if word else ""
+
+
+_NEWS_CURIOSITY_THRESHOLD = 40
+
+
+def _sec_news(c, world):
+    """Ambient awareness of the news cycle (world["news"], see
+    systems/influence.py::apply_public_figure_influence for the belief-
+    shift side of this) -- curiosity-gated: below the threshold, a
+    character just doesn't pay attention to background news even when
+    it's around them. Distinct from the deliberate computer_news action
+    (systems/action_router.py), which is an active look-it-up choice
+    with its own per-character seen_headlines list."""
+    if c.get("curiosity", 50) < _NEWS_CURIOSITY_THRESHOLD:
+        return None
+    news = c.get("perception", {}).get("news", [])
+    if not news:
+        return None
+    headline = news[-1].get("headline")
+    if not headline:
+        return None
+    return f'You caught a bit of news: "{headline}"'
 
 
 def _sec_incidents(c, world):
@@ -1494,6 +1548,11 @@ def _sec_values(c, world):
     return list(lines) if lines else None
 
 
+def _sec_curiosity(c, world):
+    lines = _build_curiosity_context(c, world)
+    return list(lines) if lines else None
+
+
 def _sec_influence(c, world):
     lines = _build_influence_context(c, world)
     return list(lines) if lines else None
@@ -1542,6 +1601,7 @@ def _sec_phone(c, world):
 NARRATIVE_SECTIONS = [
     ("scene",                "core", _sec_scene),
     ("hearing",               "full", _sec_hearing),
+    ("news",                  "full", _sec_news),
     ("incidents",             "full", _sec_incidents),
     ("grapple",               "full", _sec_grapple),
     ("body_fitness",          "full", _sec_body_fitness),
@@ -1564,6 +1624,7 @@ NARRATIVE_SECTIONS = [
     ("social_rules",          "full", _sec_social_rules),
     ("worries",               "full", _sec_worries),
     ("values",                "full", _sec_values),
+    ("curiosity",             "full", _sec_curiosity),
     ("influence",             "full", _sec_influence),
     ("touch",                 "full", _sec_touch),
     ("intimacy",              "full", _sec_intimacy),
@@ -1900,7 +1961,7 @@ _VALUE_CATEGORY_BLURB = {
     "religion":   "religion",
     "politics":   "politics",
     "community":  "your wider community",
-    "solidarity": "solidarity with others",
+    "solidarity": "who you feel solidarity with",
     "traditions": "traditions",
 }
 
@@ -1944,13 +2005,52 @@ def _build_values_context(c, world):
         if importance < _VALUE_IMPORTANCE_SURFACE_THRESHOLD:
             continue
         blurb = _VALUE_CATEGORY_BLURB.get(category, category)
-        stance = (
-            "and you think it should be structured by shared rules/expectations"
-            if v.get("conform")
-            else "and you think it's a personal matter people should be free to decide for themselves"
-        )
+        if category == "solidarity":
+            # Solidarity's conform/non-conform axis is selective
+            # (in-group, order-minded) vs. universal (open, not
+            # selective about who deserves it) -- not the generic
+            # rules-vs-freedom framing every other category uses.
+            stance = (
+                "and you extend it selectively -- to people more like you, "
+                "in exchange for order and shared standards"
+                if v.get("conform")
+                else "and you extend it universally -- to the wider community, "
+                "without being selective about who deserves it"
+            )
+        else:
+            stance = (
+                "and you think it should be structured by shared rules/expectations"
+                if v.get("conform")
+                else "and you think it's a personal matter people should be free to decide for themselves"
+            )
         lines.append(f"You care a lot about {blurb}, {stance}.")
     return lines
+
+
+_CURIOSITY_HIGH_THRESHOLD = 70
+_CURIOSITY_LOW_THRESHOLD  = 30
+
+
+def _build_curiosity_context(c, world):
+    """Surfaces this character's OWN curiosity score (systems/schema_defaults.py's
+    0-100 "curiosity" field) only when notably high/low, mirroring
+    _build_values_context's "only mention when it actually matters"
+    framing -- most characters sit in the unremarkable middle and get no
+    line at all. Distinct from the "curious" trait and from the
+    "solidarity" value category (see schema_defaults.py's comment)."""
+    curiosity = c.get("curiosity", 50)
+    if curiosity >= _CURIOSITY_HIGH_THRESHOLD:
+        return ["You're the type who wants to know what's going on around "
+                "you -- odd noises, gossip, the news, other people's business.",
+                "In conversation you tend to ask around: personal questions "
+                "about someone's family, what they do, where they're from -- "
+                "and you're just as ready to share what you've heard as to "
+                "ask what someone else knows."]
+    if curiosity <= _CURIOSITY_LOW_THRESHOLD:
+        return ["You're not particularly interested in what's going on "
+                "around you -- other people's business, gossip, the news "
+                "cycle, none of it holds your attention much."]
+    return None
 
 
 def _build_influence_context(c, world):

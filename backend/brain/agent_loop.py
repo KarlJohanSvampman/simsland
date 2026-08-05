@@ -204,6 +204,9 @@ def update_internal_state(
     from systems.pain_complaints import tick_pain_complaints
     tick_pain_complaints(c, world)
 
+    from systems.curiosity import tick_curiosity
+    tick_curiosity(c, world)
+
     consolidate_relationship_narratives(c)
 
     consolidate_life_narratives(c)

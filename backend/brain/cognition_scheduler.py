@@ -43,6 +43,7 @@ TURN_BUDGET_DEFAULT = int(os.getenv("COGNITION_TURN_BUDGET", "2"))
 WAKE_PRIORITY = {
     "heard_speech": 100,
     "urgent_need": 90,
+    "noticed_commotion": 75,   # systems/curiosity.py -- a curious character just noticed something worth investigating
     "activity_aborted": 80,
     "activity_finished": 70,
     "waiting_timed_out": 68,
@@ -136,6 +137,7 @@ _WAKE_LINE_TEMPLATES = {
     "activity_phase_changed": "You're finishing up what you were doing.",
     "wait_ready": "What you were waiting on is ready now.",
     "waiting_timed_out": "You've been waiting a while now and your patience is running out.",
+    "noticed_commotion": "{summary}",
 }
 
 

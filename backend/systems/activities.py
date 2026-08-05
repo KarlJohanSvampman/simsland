@@ -104,6 +104,7 @@ INTERACTION_ANIMATIONS = {
     "computer_videos":           {"walking": "walk", "using": ["work", "work_type", "work_read"], "finishing": "idle"},
     "computer_game":             {"walking": "walk", "using": ["work", "work_type", "work_read"], "finishing": "idle"},
     "computer_wiki_research":    {"walking": "walk", "using": ["work", "work_type", "work_read"], "finishing": "idle"},
+    "computer_news":             {"walking": "walk", "using": ["work", "work_type", "work_read"], "finishing": "idle"},
     "computer_window_shopping":  {"walking": "walk", "using": ["work", "work_type", "work_read"], "finishing": "idle"},
     "computer_dating":           {"walking": "walk", "using": ["work", "work_type", "work_read"], "finishing": "idle"},
     "computer_job_search":       {"walking": "walk", "using": ["work", "work_type", "work_read"], "finishing": "idle"},
@@ -1436,6 +1437,15 @@ def execute_activity(
                         try:
                             from systems.emergency import report_property_damage_incident
                             report_property_damage_incident(world, c, prop)
+                        except Exception:
+                            pass
+                        # Curiosity hook (systems/curiosity.py): a real
+                        # audible event a nearby character could notice
+                        # and go investigate -- see brain/perception.py's
+                        # VOLUME_TIERS.
+                        try:
+                            from brain.perception import emit_ambient_sound
+                            emit_ambient_sound(world, prop["x"], prop["y"], "breaking_glass", "loud")
                         except Exception:
                             pass
 
