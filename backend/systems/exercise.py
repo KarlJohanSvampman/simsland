@@ -149,14 +149,14 @@ def complete_exercise_session(c, hobby_id, world, has_companion=False):
         fs["injury_cooldown"] = inj_days * TICKS_PER_GAME_DAY
         result["status"]      = "injured"
         result["injury_days"] = inj_days
-        # Real injury, not just an activity-blocking cooldown -- low force so
-        # this is always a sprain/strain, never a broken bone or a knockout.
+        # Real injury, not just an activity-blocking cooldown -- always a
+        # sprain/strain, never a broken bone or a knockout, matching the
+        # "strained_muscle" injury_template exactly (low severity, its own
+        # possible_body_parts pool of the 4 limbs -- see health.py::
+        # apply_injury, Round 3 of the damage-system rework).
         try:
-            from systems.health import apply_blunt_trauma
-            body_part = {"cardio": "leg", "strength": "back", "flexibility": "back"}.get(ex_types[0], "leg")
-            apply_blunt_trauma(c, world, body_part,
-                                force_normalized=random.uniform(0.15, 0.35),
-                                tick=world.get("tick", 0))
+            from systems.health import apply_injury
+            apply_injury(c, world, "strained_muscle", "exercise", tick=world.get("tick", 0))
         except ImportError:
             pass
         # Emit event so simulation can narrate / react

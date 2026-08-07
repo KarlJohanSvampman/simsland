@@ -28,6 +28,7 @@ from core.event_bus import emit
 from systems.templates import get_interaction_template, resolve_item
 from systems.posture import set_posture
 from systems.body import drain_stamina
+from systems.health import weighted_pick
 
 DEFENSE_STANCE_WINDOW_TICKS = 10
 MAX_RECENT_HOSTILE_ACTS = 5
@@ -294,28 +295,31 @@ def resolve_hostile_action(actor, target, action_id, world):
             drain_stamina(target, 0.05)
             set_posture(target, world, "crawling")
 
-        # Real injury for weapon-gated strikes -- health.py's
-        # apply_blade_injury()/apply_blunt_trauma() were fully built
-        # against definitions.json's physical_injury_schema but had zero
-        # call sites before this round. Only fires when the actor is
-        # actually holding the right weapon category -- an unarmed
-        # "stab"/"knock" (already heavily penalized by
+        # Real injury outcomes -- health.py::apply_injury(), driven by
+        # definitions.json's interaction_templates[*].possible_injuries
+        # (Round 1/3 of the damage-system rework). Every combat template
+        # now rolls a real outcome, not just weapon-gated stab/knock --
+        # this is what finally gives unarmed punch/kick/shove real injury
+        # outcomes (previously only knockdown_chance touched health_state
+        # at all). stab/knock keep their existing weapon-required gate:
+        # an unarmed "stab"/"knock" (already heavily penalized by
         # effectiveness_modifiers) is a weak strike, not a real wound.
+        # Which body part gets hit is now decided by the rolled
+        # injury_template itself (its own possible_body_parts array), not
+        # by the interaction's target_region -- so no body_part lookup
+        # is needed here at all.
         required_weapon = _REQUIRED_WEAPON_CATEGORY.get(template_id)
-        if required_weapon and _resolve_field(actor, "held_item.category", world) == required_weapon:
-            body_part = tpl.get("target_region", "torso")
-            try:
-                if template_id == "stab":
-                    from systems.health import apply_blade_injury
-                    apply_blade_injury(target, world, body_part,
-                                        sharpness=0.7, size=0.5,
-                                        irregular_shape=False, tick=tick)
-                elif template_id == "knock":
-                    from systems.health import apply_blunt_trauma
-                    force_normalized = max(0.0, min(1.0, effectiveness / 3.0))
-                    apply_blunt_trauma(target, world, body_part, force_normalized, tick)
-            except Exception:
-                pass
+        injury_eligible = not required_weapon or (
+            _resolve_field(actor, "held_item.category", world) == required_weapon
+        )
+        if injury_eligible:
+            injury_pick = weighted_pick(tpl.get("possible_injuries", []))
+            if injury_pick:
+                try:
+                    from systems.health import apply_injury
+                    apply_injury(target, world, injury_pick.get("injury_template"), "combat", tick)
+                except Exception:
+                    pass
 
         # hold_down landing a hit used to be purely cosmetic (twin
         # animation write, then nothing persisted -- its authored

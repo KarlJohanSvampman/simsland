@@ -18,6 +18,7 @@ let definitions = { character_templates: {}, trait_templates: {}, physical_trait
 let meshbank = {};
 let animBank = { _templates: {} };
 let households = [];   // live world["households"], not definitions.json -- see loadHouseholds()
+let availableBuildings = []; // live world["buildings"] with no owner_household_id -- see loadAvailableBuildings()
 let currentTemplateId = null;
 let working = null;   // in-memory working copy of the open template
 
@@ -171,6 +172,34 @@ async function loadHouseholds() {
   }
 }
 
+async function loadAvailableBuildings() {
+  try {
+    const res = await fetch('/api/household/available_buildings?sim_id=default');
+    const data = await res.json();
+    availableBuildings = data.ok ? data.buildings : [];
+  } catch (err) {
+    console.warn('Available buildings load failed', err);
+    availableBuildings = [];
+  }
+}
+
+// household.py's admin_detail endpoint resolves the household's assigned
+// building(s) -- used here just to read the first one's address, since a
+// household's own /list entry doesn't carry building_ids.
+async function fetchHouseholdAddress(householdId) {
+  if (!householdId) return null;
+  try {
+    const res = await fetch(`/api/household/${householdId}/admin?sim_id=default`);
+    const data = await res.json();
+    if (!data.ok) return null;
+    const buildings = data.household.buildings || [];
+    return buildings[0] || null;
+  } catch (err) {
+    console.warn('Household admin fetch failed', err);
+    return null;
+  }
+}
+
 window.saveTemplate = async function () {
   if (!currentTemplateId || !working) {
     setStatus('Nothing to save');
@@ -235,6 +264,9 @@ function openTemplate(id) {
   working = {
     ...raw,
     name: raw.name || id,
+    first_name: raw.first_name || '',
+    family_name: raw.family_name || '',
+    ssn: raw.ssn || '',
     age: raw.age ?? 25,
     sex: raw.sex || "male",
     body_features: { ...(raw.body_features || {}) },
@@ -533,7 +565,9 @@ function updatePreview() {
 // TAB: BASIC PROPERTIES
 // =====================================================
 
-const fldName   = document.getElementById('fldName');
+const fldFirstName = document.getElementById('fldFirstName');
+const fldLastName  = document.getElementById('fldLastName');
+const fldSsn       = document.getElementById('fldSsn');
 const fldAge    = document.getElementById('fldAge');
 const fldSex    = document.getElementById('fldSex');
 const fldHeight = document.getElementById('fldHeight');
@@ -562,7 +596,9 @@ function weightLabelFor(bodyFat) {
 }
 
 function renderBasicTab() {
-  fldName.value = working.name || '';
+  fldFirstName.value = working.first_name || '';
+  fldLastName.value  = working.family_name || '';
+  fldSsn.value = working.ssn || '';
   fldAge.value = working.age ?? 25;
   fldSex.value = working.sex || 'male';
   fldHeight.value = working.body_features.height_cm;
@@ -578,7 +614,12 @@ function renderBasicTab() {
   fldSneakSpeed.value  = working.instance.sneak_speed  ?? LOCOMOTION_SPEED_DEFAULTS.sneak_speed;
 }
 
-fldName.addEventListener('input', () => { working.name = fldName.value; });
+function syncFullName() {
+  working.name = [working.first_name, working.family_name].filter(Boolean).join(' ');
+}
+fldFirstName.addEventListener('input', () => { working.first_name = fldFirstName.value; syncFullName(); });
+fldLastName.addEventListener('input', () => { working.family_name = fldLastName.value; syncFullName(); });
+fldSsn.addEventListener('input', () => { working.ssn = fldSsn.value; });
 fldBio.addEventListener('input', () => { working.bio = fldBio.value; });
 fldAge.addEventListener('input', () => {
   working.age = parseInt(fldAge.value) || 0;
@@ -710,7 +751,7 @@ function renderPoolPicker(container, pool, getAssigned, setAssigned, onChange) {
     });
     const label = document.createElement('span');
     label.className = 'chipLabel';
-    label.textContent = entry.label;
+    label.textContent = entry.icon ? `${entry.icon} ${entry.label}` : entry.label;
     chip.appendChild(label);
     if (removable) {
       const rm = document.createElement('button');
@@ -881,11 +922,19 @@ function renderHobbiesTab() {
 // here; what's assigned on this tab is real (backend-materialized into
 // c["worn"]/c["inventory"] at spawn time) but not previewable yet.
 
+// Category-level icon (disease-schema-overhaul round's icon_templates
+// registry, extended to item_templates/prop_templates) -- every template
+// carries an `icon` key resolving into definitions.icon_templates.
+function iconEmoji(tmpl) {
+  return definitions.icon_templates?.[tmpl?.icon]?.emoji || '';
+}
+
 function groupItemsBySlot(itemTemplates) {
   const bySlot = {};
   for (const [id, t] of Object.entries(itemTemplates || {})) {
     if (!t.slot) continue;
-    (bySlot[t.slot] ||= []).push({ id, label: t.name || id });
+    const icon = iconEmoji(t);
+    (bySlot[t.slot] ||= []).push({ id, label: t.name || id, icon });
   }
   for (const list of Object.values(bySlot)) list.sort((a, b) => a.label.localeCompare(b.label));
   return bySlot;
@@ -921,7 +970,7 @@ function renderOutfitTab() {
       for (const entry of bySlot[slot] || []) {
         const opt = document.createElement('option');
         opt.value = entry.id;
-        opt.textContent = entry.label;
+        opt.textContent = entry.icon ? `${entry.icon} ${entry.label}` : entry.label;
         select.appendChild(opt);
       }
       select.value = working.worn[slot] || '';
@@ -940,7 +989,7 @@ function renderOutfitTab() {
   const invContainer = document.getElementById('inventoryPicker');
   const invPool = Object.entries(definitions.item_templates || {})
     .filter(([, t]) => INVENTORY_CATEGORIES.has(t.category))
-    .map(([id, t]) => ({ id, label: t.name || id }));
+    .map(([id, t]) => ({ id, label: t.name || id, icon: iconEmoji(t) }));
   renderPoolPicker(
     invContainer,
     invPool,
@@ -1261,15 +1310,105 @@ fldJailUntil.addEventListener('input', () => {
 // existing households in the running default simulation to assign to.
 
 const fldHousehold = document.getElementById('fldHousehold');
+const fldAvailableBuildings = document.getElementById('fldAvailableBuildings');
+const householdAddressNote = document.getElementById('householdAddressNote');
+const householdAddressRow = document.getElementById('householdAddressRow');
+const fldHouseAddress = document.getElementById('fldHouseAddress');
+const btnSaveAddress = document.getElementById('btnSaveAddress');
 
-function renderHouseholdTab() {
+// The building currently shown in the address row -- set by
+// renderHouseholdAddress(), read by saveHouseAddress() below.
+let currentHouseholdBuildingId = null;
+
+async function renderHouseholdTab() {
   if (!working) return;
   fldHousehold.innerHTML = '<option value="">— None —</option>' +
     households.map(h => `<option value="${h.id}">${h.name || '(unnamed)'} (${h.member_count} member${h.member_count === 1 ? '' : 's'})</option>`).join('');
   fldHousehold.value = working.household_id || '';
+
+  fldAvailableBuildings.innerHTML = availableBuildings.map(b =>
+    `<option value="${b.id}">${b.address || `(${b.template}, unaddressed)`}</option>`
+  ).join('') || '<option value="">— None available —</option>';
+
+  await renderHouseholdAddress();
 }
 
-fldHousehold.addEventListener('change', () => { working.household_id = fldHousehold.value; });
+async function renderHouseholdAddress() {
+  const building = await fetchHouseholdAddress(working?.household_id);
+  currentHouseholdBuildingId = building?.id || null;
+  if (!building) {
+    householdAddressNote.style.display = '';
+    householdAddressNote.textContent = working?.household_id
+      ? 'No building assigned to this household yet.'
+      : 'Select a household to see its address.';
+    householdAddressRow.style.display = 'none';
+    btnSaveAddress.style.display = 'none';
+    return;
+  }
+  householdAddressNote.style.display = 'none';
+  householdAddressRow.style.display = '';
+  btnSaveAddress.style.display = '';
+  fldHouseAddress.value = building.address || '';
+}
+
+fldHousehold.addEventListener('change', () => {
+  working.household_id = fldHousehold.value;
+  renderHouseholdAddress();
+});
+
+window.assignBuilding = async function () {
+  if (!working?.household_id) {
+    setStatus('Select a household first');
+    return;
+  }
+  const buildingId = fldAvailableBuildings.value;
+  if (!buildingId) {
+    setStatus('No available building selected');
+    return;
+  }
+  try {
+    const res = await fetch('/api/household/assign_building?sim_id=default', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ household_id: working.household_id, building_id: buildingId }),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      await loadAvailableBuildings();
+      await loadHouseholds();
+      renderHouseholdTab();
+      setStatus(`Building assigned (${data.building.address || data.building.id})`);
+    } else {
+      setStatus('Assign building failed: ' + (data.error || 'unknown error'));
+    }
+  } catch (err) {
+    console.error(err);
+    setStatus('Assign building failed');
+  }
+};
+
+window.saveHouseAddress = async function () {
+  if (!currentHouseholdBuildingId) {
+    setStatus('No building to address');
+    return;
+  }
+  try {
+    const res = await fetch('/api/household/set_building_address?sim_id=default', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ building_id: currentHouseholdBuildingId, address: fldHouseAddress.value }),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      setStatus(`Address saved: ${data.building.address}`);
+    } else {
+      setStatus('Save address failed: ' + (data.error || 'unknown error'));
+    }
+  } catch (err) {
+    console.error(err);
+    setStatus('Save address failed');
+  }
+};
 
 window.createHousehold = async function () {
   const nameInput = document.getElementById('newHouseholdName');
@@ -1405,5 +1544,5 @@ window.sendDebugPrompt = async function () {
 // =====================================================
 
 (async function init() {
-  await Promise.all([loadDefinitions(), loadMeshbank(), loadAnimBank(), loadHouseholds()]);
+  await Promise.all([loadDefinitions(), loadMeshbank(), loadAnimBank(), loadHouseholds(), loadAvailableBuildings()]);
 })();

@@ -3412,12 +3412,162 @@ function renderCharacterInspector(id){
   if(c.household_id) rows.push(`Household: ${c.household_id}`);
 
   el.innerHTML = rows.join("<br>");
+
+  renderEffectIconRow(c);
+  renderBodyTab(c);
+}
+
+// Effect-icon row (disease-schema-overhaul round, frontend Round 7) --
+// always visible under #viewerTabs regardless of active tab, per spec.
+// One icon per active disease (definitions.icon_templates via physical_
+// health_templates[key].icon) plus one per active hazard instance that
+// carries expires_tick (health_state.body_parts[*].hazards / systemic_
+// hazards, mirrored at onset by health.py::_tick_disease_symptom).
+// Tooltips reuse the native title= pattern BADGE_CHANNELS already
+// established (main.js's only tooltip mechanism) -- no new hover component.
+function renderEffectIconRow(c){
+  const rowEl = document.getElementById("viewerEffectIcons");
+  if(!rowEl) return;
+
+  const iconTemplates = definitions.icon_templates || {};
+  const phTemplates = definitions.physical_health_templates || {};
+  const hazardTemplates = definitions.health_hazard_templates || {};
+  const tick = _worldState.tick || 0;
+
+  const icons = [];
+
+  for(const condKey of (c?.physical_health || [])){
+    const tmpl = phTemplates[condKey];
+    if(!tmpl) continue;
+    const icon = iconTemplates[tmpl.icon];
+    const emoji = icon?.emoji || "❓";
+    const title = tmpl.description ? `${tmpl.name}: ${tmpl.description}` : (tmpl.name || condKey);
+    icons.push({ emoji, title });
+  }
+
+  const hs = c?.health_state || {};
+  const hazardInstances = [];
+  for(const bp of Object.values(hs.body_parts || {})){
+    for(const [key, hz] of Object.entries(bp?.hazards || {})){
+      hazardInstances.push([key, hz]);
+    }
+  }
+  for(const [key, hz] of Object.entries(hs.systemic_hazards || {})){
+    hazardInstances.push([key, hz]);
+  }
+
+  for(const [key, hz] of hazardInstances){
+    const tmpl = hazardTemplates[key];
+    if(!tmpl) continue;
+    const icon = iconTemplates[tmpl.icon];
+    const emoji = icon?.emoji || "⚠️";
+    let title = tmpl.description ? `${tmpl.name}: ${tmpl.description}` : (tmpl.name || key);
+    if(hz.expires_tick != null){
+      const remain = hz.expires_tick - tick;
+      title += remain > 0 ? ` (${Math.max(1, Math.round(remain / 60))}m remaining)` : " (resolving)";
+    }
+    icons.push({ emoji, title });
+  }
+
+  rowEl.innerHTML = icons
+    .map(({ emoji, title }) => `<span class="effectIcon" title="${title.replace(/"/g, "&quot;")}">${emoji}</span>`)
+    .join("");
+}
+
+// Per-bodypart damage diagram (per-bodypart damage/health/disease rework,
+// Round 7) -- colors the inline SVG humanoid in index.html by each part's
+// severity_level, then lists hazards/pain%/functional-status per part
+// below it, plus active diseases + whatever symptom is currently felt
+// (health_state.body_parts / c.physical_health, both forwarded unfiltered
+// by the server same as every other character field). Called from
+// renderCharacterInspector() so it stays live on every WS delta exactly
+// like the rest of the Inspector, regardless of whether the Body tab is
+// the one currently visible.
+const _BODY_PART_NAMES = [
+  "head", "neck", "chest", "abdomen", "pelvis",
+  "left_arm", "right_arm", "left_leg", "right_leg",
+];
+const _SEVERITY_COLORS = {
+  null:     "#2e5", // no damage
+  low:      "#dd4",
+  medium:   "#e80",
+  severe:   "#d33",
+};
+
+function renderBodyTab(c){
+  const svgRoot = document.querySelector("#viewerBodyTab svg");
+  const summaryEl = document.getElementById("bodyTabSummary");
+  const rowsEl = document.getElementById("bodyTabRows");
+  const diseaseEl = document.getElementById("bodyTabDiseases");
+  if(!svgRoot || !summaryEl || !rowsEl || !diseaseEl) return;
+
+  const hs = c?.health_state || {};
+  const bodyParts = hs.body_parts || {};
+
+  for(const part of _BODY_PART_NAMES){
+    const shape = document.getElementById(`bodypart-${part}`);
+    if(!shape) continue;
+    const bp = bodyParts[part];
+    const color = _SEVERITY_COLORS[bp?.severity_level] || _SEVERITY_COLORS[null];
+    shape.setAttribute("fill", color);
+  }
+
+  const summaryBits = [];
+  if(hs.pain != null) summaryBits.push(`Pain: ${Math.round(hs.pain)}%`);
+  if(hs.painkiller_relief) summaryBits.push(`Painkiller relief: ${Math.round(hs.painkiller_relief)}`);
+  summaryEl.innerHTML = summaryBits.join("<br>") || "No pain.";
+
+  const rows = [];
+  for(const part of _BODY_PART_NAMES){
+    const bp = bodyParts[part];
+    if(!bp || (!bp.severity_level && !Object.keys(bp.hazards || {}).length)) continue;
+    const hazardNames = Object.entries(bp.hazards || {})
+      .map(([key, hz]) => `${key.replace(/_/g, " ")}${hz.treated ? " (treated)" : ""}`)
+      .join(", ") || "none";
+    const status = bp.functional_status || "normal";
+    const statusColor = status === "unusable" ? "#d33" : status === "impaired" ? "#e80" : "#8c8";
+    rows.push(`
+      <div class="bodyPartRow">
+        <span class="partName">${part.replace(/_/g, " ")}</span>
+        (${bp.severity_level || "none"}) —
+        <span style="color:${statusColor}">${status}</span><br>
+        Hazards: ${hazardNames}<br>
+        Pain contribution: ${Math.round(bp.pain_contribution || 0)}%
+      </div>
+    `);
+  }
+  rowsEl.innerHTML = rows.join("") || `<div class="bodyPartRow">No injuries.</div>`;
+
+  const conditions = c?.physical_health || [];
+  if(conditions.length){
+    const conditionState = c?.condition_state || {};
+    const lines = conditions.map(key => {
+      const symptom = conditionState[key]?.current_symptom;
+      return symptom ? `${key.replace(/_/g, " ")} (${symptom.replace(/_/g, " ")})` : key.replace(/_/g, " ");
+    });
+    diseaseEl.innerHTML = `<b>Diseases:</b> ${lines.join(", ")}`;
+  } else {
+    diseaseEl.innerHTML = "";
+  }
 }
 
 function updateSelectionInspector(state){
   if(!selectedCharacterId) return;
   renderCharacterInspector(selectedCharacterId);
 }
+
+document.getElementById("viewerTabStatus")?.addEventListener("click", () => {
+  document.getElementById("viewerTabStatus").classList.add("active");
+  document.getElementById("viewerTabBody").classList.remove("active");
+  document.getElementById("viewerSelection").classList.remove("hidden");
+  document.getElementById("viewerBodyTab").classList.add("hidden");
+});
+document.getElementById("viewerTabBody")?.addEventListener("click", () => {
+  document.getElementById("viewerTabBody").classList.add("active");
+  document.getElementById("viewerTabStatus").classList.remove("active");
+  document.getElementById("viewerBodyTab").classList.remove("hidden");
+  document.getElementById("viewerSelection").classList.add("hidden");
+});
 
 // =========================================================
 // HOUSEHOLD ADMIN MODAL (mailbox double-click)

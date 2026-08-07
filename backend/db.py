@@ -4,7 +4,8 @@ from fastapi import HTTPException
 from core.cache import get_world_cache, set_world_cache
 from core.cache import get_char_cache, set_char_cache
 from systems.schema_defaults import (
-    ensure_world_defaults
+    ensure_world_defaults,
+    ensure_character_defaults,
 )
 from world.generate_world import generate_initial_world
 from systems.prop_index import (
@@ -461,136 +462,20 @@ def save_character_safe(c, sim_id="default"):
 # =====================================================
 # CHARACTER DEFAULTS
 # =====================================================
-
-def ensure_character_defaults(c):
-
-    # =====================================
-    # LEGAL
-    # =====================================
-
-    legal = c.setdefault(
-        "legal",
-        {}
-    )
-
-    legal.setdefault(
-        "status",
-        "free"
-    )
-
-    legal.setdefault(
-        "jail_until",
-        None
-    )
-
-    legal.setdefault(
-        "trial_tick",
-        None
-    )
-
-    legal.setdefault(
-        "record",
-        []
-    )
-
-    # =====================================
-    # STATUS
-    # =====================================
-
-    status = c.setdefault(
-        "status",
-        {}
-    )
-
-    status.setdefault(
-        "reputation",
-        0.5
-    )
-
-    # =====================================
-    # ECONOMY
-    # =====================================
-
-    c.setdefault(
-        "money",
-        100
-    )
-
-    c.setdefault(
-        "hourly_wage",
-        0
-    )
-
-    c.setdefault(
-        "employed",
-        False
-    )
-
-    c.setdefault(
-        "job_searching",
-        False
-    )
-
-    # =====================================
-    # SOCIAL
-    # =====================================
-
-    c.setdefault(
-        "relationships",
-        {}
-    )
-
-    c.setdefault(
-        "social_models",
-        {}
-    )
-
-    c.setdefault(
-        "conversation_memory",
-        []
-    )
-
-    # =====================================
-    # MEMORY
-    # =====================================
-
-    c.setdefault(
-        "memories",
-        []
-    )
-
-    c.setdefault(
-        "story_arc",
-        []
-    )
-
-    # =====================================
-    # ACTIVITIES
-    # =====================================
-
-    c.setdefault(
-        "activity",
-        None
-    )
-
-    c.setdefault(
-        "intentions",
-        []
-    )
-
-    # =====================================
-    # OFFGRID
-    # =====================================
-
-    c.setdefault(
-        "off_grid",
-        False
-    )
-
-    c.setdefault(
-        "off_grid_reason",
-        None
-    )
+# ensure_character_defaults() used to be its own ~130-line copy here,
+# maintained separately from systems/schema_defaults.py's version of the
+# same function -- the two drifted (this copy never picked up newer
+# fields like health_state's per-bodypart damage shape, Round 2 of the
+# damage-system rework), so a character loaded cold from the DB (cache
+# miss inside load_world()/load_character() below) wouldn't get backfilled
+# with current defaults until schema_defaults.ensure_world_defaults()
+# happened to also run that tick (main.py's loop() always does, but not
+# every load_world()/load_character() caller does). Now imported directly
+# from the one real, actively-maintained copy instead of duplicating it --
+# any field only this copy used to set (off_grid/off_grid_reason,
+# hourly_wage, legal.trial_tick, status.reputation, story_arc) has been
+# folded into schema_defaults.ensure_character_defaults() so nothing here
+# regresses.
 
 def load_character(
 

@@ -39,6 +39,81 @@
     width: 480px;
   }
 
+  .hidden { display: none !important; }
+
+  #viewerTabs {
+    display: flex;
+    gap: 4px;
+    margin: 6px 0 10px;
+  }
+
+  #viewerTabs button {
+    flex: 1;
+    background: #2a2e36;
+    border: 1px solid #444;
+    color: #ccc;
+    padding: 4px 6px;
+    font-size: 11px;
+    font-family: monospace;
+    cursor: pointer;
+    border-radius: 3px;
+  }
+
+  #viewerTabs button.active {
+    background: #3a4250;
+    color: #fff;
+    border-color: #6cf;
+  }
+
+  #viewerEffectIcons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin: 0 0 10px;
+  }
+
+  #viewerEffectIcons .effectIcon {
+    font-size: 16px;
+    line-height: 1;
+    padding: 3px 5px;
+    background: #2a2e36;
+    border: 1px solid #444;
+    border-radius: 4px;
+    cursor: default;
+  }
+
+  #viewerBodyTab svg {
+    display: block;
+    margin: 0 auto 8px;
+    width: 100%;
+    max-width: 160px;
+  }
+
+  #viewerBodyTab .bodyPartRow {
+    padding: 4px 0;
+    border-bottom: 1px solid #333;
+    font-size: 12px;
+  }
+
+  #viewerBodyTab .bodyPartRow .partName {
+    font-weight: bold;
+    text-transform: capitalize;
+  }
+
+  #viewerBodyTab .bodySummary {
+    font-size: 12px;
+    margin-bottom: 8px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #444;
+  }
+
+  #viewerBodyTab .diseaseList {
+    font-size: 12px;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid #444;
+  }
+
   #debugSettingsBtn {
     position: fixed;
     top: 10px;
@@ -86,8 +161,9 @@
   #eventTimeline {
     position: fixed;
     top: 54px;
-    left: 0;
-    right: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 50%;
     height: 56px;
     background: rgba(0,0,0,0.82);
     border-bottom: 1px solid #444;
@@ -435,8 +511,32 @@
 
   <h3>Inspector</h3>
 
+  <div id="viewerTabs">
+    <button id="viewerTabStatus" class="active" data-tab="status">Status</button>
+    <button id="viewerTabBody" data-tab="body">Body</button>
+  </div>
+
+  <div id="viewerEffectIcons"></div>
+
   <div id="viewerSelection">
     Nothing selected
+  </div>
+
+  <div id="viewerBodyTab" class="hidden">
+    <svg viewBox="0 0 120 220" xmlns="http://www.w3.org/2000/svg">
+      <circle id="bodypart-head" cx="60" cy="20" r="14" stroke="#222" stroke-width="1"/>
+      <rect   id="bodypart-neck" x="53" y="32" width="14" height="10" stroke="#222" stroke-width="1"/>
+      <rect   id="bodypart-left_arm"  x="16" y="44" width="16" height="68" rx="4" stroke="#222" stroke-width="1"/>
+      <rect   id="bodypart-right_arm" x="88" y="44" width="16" height="68" rx="4" stroke="#222" stroke-width="1"/>
+      <rect   id="bodypart-chest"   x="38" y="42" width="44" height="38" rx="3" stroke="#222" stroke-width="1"/>
+      <rect   id="bodypart-abdomen" x="41" y="80" width="38" height="26" rx="3" stroke="#222" stroke-width="1"/>
+      <rect   id="bodypart-pelvis"  x="39" y="106" width="42" height="18" rx="3" stroke="#222" stroke-width="1"/>
+      <rect   id="bodypart-left_leg"  x="42" y="124" width="16" height="82" rx="4" stroke="#222" stroke-width="1"/>
+      <rect   id="bodypart-right_leg" x="62" y="124" width="16" height="82" rx="4" stroke="#222" stroke-width="1"/>
+    </svg>
+    <div id="bodyTabSummary" class="bodySummary"></div>
+    <div id="bodyTabRows"></div>
+    <div id="bodyTabDiseases" class="diseaseList"></div>
   </div>
 
 </div>

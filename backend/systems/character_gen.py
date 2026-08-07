@@ -50,6 +50,11 @@ def _random_name(defs, sex):
     last  = random.choice(last_list)  if last_list  else "Smith"
     return first, last
 
+def _random_ssn():
+    """Format XXX-XX-XXXX, flavor-only identity data (not validated against
+    any real SSA allocation rules)."""
+    return f"{random.randint(0, 999):03d}-{random.randint(0, 99):02d}-{random.randint(0, 9999):04d}"
+
 def _attained_education(age):
     if age < 10:  return "primary"
     if age < 13:  return "middle_school"
@@ -318,8 +323,11 @@ def generate_character(defs, overrides=None):
     age       = overrides.get("age")       or _random_age(defs)
     age_group = _age_group(age)
 
-    first_name, family_name = _random_name(defs, sex)
-    full_name = overrides.get("name") or f"{first_name} {family_name}"
+    _rand_first, _rand_family = _random_name(defs, sex)
+    first_name  = overrides.get("first_name")  or _rand_first
+    family_name = overrides.get("family_name") or _rand_family
+    full_name   = overrides.get("name") or f"{first_name} {family_name}"
+    ssn         = overrides.get("ssn")  or _random_ssn()
 
     base_models = defs.get("character_base_models", {})
     model = (
@@ -393,6 +401,7 @@ def generate_character(defs, overrides=None):
         "name":         full_name,
         "first_name":   first_name,
         "family_name":  family_name,
+        "ssn":          ssn,
         "sex":          sex,
         "age":          age,
         "age_group":    age_group,
@@ -534,6 +543,11 @@ def generate_character(defs, overrides=None):
 
     # Physical body features — fertility signals and build
     character["body_features"] = _gen_body_features(character)
+
+    # Weight (kg) — BMI 22 baseline off the height just rolled above, ±jitter
+    # (see systems/nutrition.py for the BMI band spectrum this feeds).
+    height_m = character["body_features"]["height_cm"] / 100.0
+    character["weight_kg"] = round(22.0 * height_m ** 2 * random.uniform(0.85, 1.15), 1)
 
     # Impulse state — derive self_control + sexism_level from traits
     try:

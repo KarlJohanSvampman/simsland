@@ -93,7 +93,7 @@ def ensure_world_defaults(world, defs=None):
     # so build_world_geometry() can resolve them instead of silently
     # skipping them every load. Runs before build_world_geometry, so it
     # patches already-persisted world data, not just freshly generated worlds.
-    for building in world.get("buildings", []):
+    for i, building in enumerate(world.get("buildings", [])):
         building.setdefault("template", "small_house")
         building.setdefault("x", 0)
         building.setdefault("y", 0)
@@ -106,6 +106,13 @@ def ensure_world_defaults(world, defs=None):
         # lookups key on it — backfill defensively so a legacy/hand-edited
         # entry without one doesn't KeyError there.
         building.setdefault("id", str(uuid4()))
+        # Address — assigned once per building (setdefault, so an address
+        # a user hand-edited via the Household tab is never overwritten on
+        # a later load). One town-wide placeholder street; house numbers
+        # derived from each building's position in the list so every
+        # building gets a distinct one. See building_manager.py:129, which
+        # already forwards this into the runtime building dict.
+        building.setdefault("address", f"{100 + i * 2} Placeholder Street")
 
     # A mailbox prop is the in-game control point for one household (see
     # systems/household_manager.py) — distinct from a building's
@@ -426,6 +433,12 @@ def ensure_character_defaults(c):
         None
     )
 
+    # law.py's arrest handler does `c["status"]["reputation"] -= .25` --
+    # a bare key subtraction that KeyErrors if "reputation" isn't already
+    # present, so this needs a real default rather than a `.get()` fallback.
+    status = c.setdefault("status", {})
+    status.setdefault("reputation", 0.5)
+
     c.setdefault(
         "wealth",
         100
@@ -434,6 +447,11 @@ def ensure_character_defaults(c):
     c.setdefault(
         "money",
         100
+    )
+
+    c.setdefault(
+        "hourly_wage",
+        0
     )
 
     c.setdefault(
@@ -667,6 +685,30 @@ def ensure_character_defaults(c):
     # Male chars: build, height_cm assigned at gen
     c.setdefault("body_features", {})
 
+    # Weight (kg) — real-kilograms field driving the BMI band spectrum in
+    # systems/nutrition.py (character_gen.py seeds this properly at
+    # creation; this is only a migration fallback for older characters).
+    if not c.get("weight_kg"):
+        height_cm = c.get("body_features", {}).get("height_cm", 170)
+        c["weight_kg"] = round(22.0 * (height_cm / 100.0) ** 2, 1)
+
+    # Full name split + SSN (character_gen.py seeds both properly at
+    # creation; these are migration fallbacks for older characters, from
+    # back before simulations/default/definitions.json had a "names"
+    # registry -- see decision #1/#2 of the names/SSN/address round).
+    if not c.get("first_name") or not c.get("family_name"):
+        parts = (c.get("name") or "Alex Smith").split(" ", 1)
+        c.setdefault("first_name",  parts[0])
+        c.setdefault("family_name", parts[1] if len(parts) > 1 else "Smith")
+    if not c.get("ssn"):
+        import random as _random
+        c["ssn"] = f"{_random.randint(0, 999):03d}-{_random.randint(0, 99):02d}-{_random.randint(0, 9999):04d}"
+
+    # Substance-use/craving tracking — see systems/addictions.py.
+    # {addiction_key: {"usages": int, "last_used_sim_time": float|None,
+    #                   "next_decay_sim_time": float|None}}
+    c.setdefault("addictions", {})
+
     # Sexual preferences: positions liked/disliked, kinks, partner experience counter
     c.setdefault("sexual_preferences", {
         "positions_liked":    [],   # list of position keys from positions_registry
@@ -761,6 +803,8 @@ def ensure_character_defaults(c):
     c.setdefault("social_contract_ids",      [])
     c.setdefault("conditioning_profile",      [])   # conditioned behaviors
     c.setdefault("active_lies",               [])   # currently maintained lies
+    c.setdefault("off_grid",                  False)  # currently away (work/errand/hospital/jail/...)
+    c.setdefault("off_grid_reason",           None)
     c.setdefault("private_off_grid_history",  [])  # secret events from off-grid trips (not shared)
     c.setdefault("off_grid_trip_day",         None)  # calendar day of last voluntary off-grid trip
     c.setdefault("off_grid_trip_count",       0)      # voluntary trips taken that day -- see offgrid.py MAX_OFFGRID_TRIPS_PER_DAY
@@ -783,6 +827,11 @@ def ensure_character_defaults(c):
 
     c.setdefault(
         "memories",
+        []
+    )
+
+    c.setdefault(
+        "story_arc",
         []
     )
 
@@ -832,6 +881,11 @@ def ensure_character_defaults(c):
 
     legal.setdefault(
         "jail_until",
+        None
+    )
+
+    legal.setdefault(
+        "trial_tick",
         None
     )
 
@@ -896,6 +950,95 @@ def ensure_character_defaults(c):
     health.setdefault(
         "pain",
         0.0
+    )
+
+    # =====================================================
+    # HEALTH_STATE -- the real per-bodypart damage/health engine
+    # (systems/health.py). Distinct from the legacy c["health"] dict
+    # above (still written by domestic_control.py/impulse.py/
+    # rival_cascade.py, unchanged by this round) and from
+    # c["body"]["pain"] (body.py, a separate dead tracker). Registered
+    # here so a freshly generated character always has the full shape
+    # instead of health.py's functions lazily setdefault()-ing individual
+    # fields the first time something touches them.
+    # =====================================================
+
+    health_state = c.setdefault(
+        "health_state",
+        {}
+    )
+
+    health_state.setdefault(
+        "active_emergencies",
+        {}
+    )
+
+    body_parts = health_state.setdefault(
+        "body_parts",
+        {}
+    )
+
+    for _part in (
+        "head", "neck", "chest", "abdomen", "pelvis",
+        "left_arm", "right_arm", "left_leg", "right_leg",
+    ):
+        body_parts.setdefault(
+            _part,
+            {
+                "hazards": {},
+                "damage_type": None,
+                "severity_level": None,
+                "pain_contribution": 0.0,
+                "functional_status": "normal",
+                "injury_template": None,
+                "cause": None,
+                "tick": None,
+            }
+        )
+
+    health_state.setdefault(
+        "pain",
+        0.0
+    )
+
+    health_state.setdefault(
+        "systemic_pain",
+        0.0
+    )
+
+    health_state.setdefault(
+        "painkiller_relief",
+        0.0
+    )
+
+    health_state.setdefault(
+        "total_blood_lost",
+        0.0
+    )
+
+    health_state.setdefault(
+        "doctor_visits_needed",
+        0
+    )
+
+    health_state.setdefault(
+        "medications_taken",
+        {}
+    )
+
+    health_state.setdefault(
+        "systemic_hazards",
+        {}
+    )
+
+    health_state.setdefault(
+        "temporary_traits",
+        {}
+    )
+
+    health_state.setdefault(
+        "treatment_progress",
+        {}
     )
 
     c.setdefault(

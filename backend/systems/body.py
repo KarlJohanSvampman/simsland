@@ -4,7 +4,7 @@ body.py — unified physical body simulation
 c["body"] is the single source of truth for all physical needs.
 Long-term psychological drives (socialize, play, romance, …) live in c["lt_needs"].
 
-Body fields (all 0-100):
+Body fields (all 0-100 unless noted):
   hunger            0=full,        100=starving
   hydration         100=hydrated,  0=dehydrated
   bladder           0=empty,       100=urgent
@@ -18,6 +18,17 @@ Body fields (all 0-100):
   stomach_discomfort 0=fine,       100=painful
   pain              0=none,        100=severe
   sickness          0=healthy,     100=very ill
+  energy            0=depleted,    100=full (nutrition/gain overhaul round -- see
+                    on_consume_complete; decays faster with high hunger and the
+                    longer a character has been awake)
+  hours_awake       float hours since the last on_sleep_complete(), driven off
+                    world["sim_time"] (seconds) rather than raw ticks
+  nutrients_today   running sum of consumed items' nutrition (0-1 fraction of a
+                    day's recommended nutrition each), uncapped, reset at the
+                    real calendar midnight (see systems/nutrition.py)
+  toilet_visits_needed_today  int, set by the midnight settlement, scales the
+                    bowels fill rate below (excess-nutrition days need more
+                    bathroom trips)
 """
 
 import math
@@ -46,7 +57,23 @@ _BODY_DEFAULTS = {
     "stomach_discomfort":  0,
     "pain":                0,
     "sickness":            0,
+    "energy":             70,
+    "hours_awake":         0,
+    "nutrients_today":     0,
+    "toilet_visits_needed_today": 1,
 }
+
+# Fields on c["body"] that are NOT 0-100 percentages, so clamp_body() must
+# leave them alone (hours_awake/nutrients_today are unbounded accumulators;
+# the private trackers are timestamps/day-numbers, not meters).
+_NON_PERCENT_BODY_FIELDS = {
+    "hours_awake", "nutrients_today", "toilet_visits_needed_today",
+    "_wake_sim_time", "_nutrients_reset_day",
+}
+
+# ── energy tuning ────────────────────────────────────────────────────────────
+BASE_ENERGY_DECAY        = 0.03   # per sim-hour equivalent (dt units), before multipliers
+ENERGY_PER_FULL_DAY_NUTRITION = 60  # a full day's nutrition (nutrition==1.0) restores this much energy
 
 
 def ensure_body(c):
@@ -60,8 +87,8 @@ def ensure_body(c):
 # ── helpers ───────────────────────────────────────────────────────────────────
 
 def body_energy(c):
-    """0-1 energy level derived from fatigue (for backward-compat reads)."""
-    return max(0.0, 1.0 - c.get("body", {}).get("fatigue", 0) / 100)
+    """0-1 energy level (real c["body"]["energy"] meter)."""
+    return max(0.0, c.get("body", {}).get("energy", 70) / 100)
 
 def body_hunger_norm(c):
     """0-1 hunger urgency (1=starving)."""
@@ -83,10 +110,16 @@ def drain_stamina(c, amount):
 
 # ── main tick ─────────────────────────────────────────────────────────────────
 
-def update_body_needs(c, dt=1.0):
+def update_body_needs(c, dt=1.0, world=None):
     ensure_body(c)
     b  = c["body"]
     tr = c.get("traits", [])
+
+    # ── HOURS AWAKE  (real-seconds based, not tick-rate dependent) ───────────
+    if world is not None:
+        wake_at = b.get("_wake_sim_time")
+        if wake_at is not None:
+            b["hours_awake"] = max(0.0, (world.get("sim_time", 0.0) - wake_at) / 3600.0)
 
     # ── HUNGER ───────────────────────────────────────────────────────────────
     rate = 0.03
@@ -107,8 +140,10 @@ def update_body_needs(c, dt=1.0):
     hydration_factor = max(0, b["hydration"] / 100)
     b["bladder"] = min(100, b["bladder"] + 0.05 * hydration_factor * intake_factor * dt)
 
-    # ── BOWELS ───────────────────────────────────────────────────────────────
-    b["bowels"] = min(100, b["bowels"] + 0.012 * dt)
+    # ── BOWELS  (scaled by yesterday's excess-nutrition toilet-visit load,
+    # see systems/nutrition.py::settle_nutrition_day) ────────────────────────
+    bowel_mult = max(1, b.get("toilet_visits_needed_today", 1))
+    b["bowels"] = min(100, b["bowels"] + 0.012 * bowel_mult * dt)
 
     # ── FATIGUE ──────────────────────────────────────────────────────────────
     fatigue_rate = 0.02
@@ -166,8 +201,33 @@ def update_body_needs(c, dt=1.0):
         stamina_regen *= 0.6
     c["stamina"] = min(1.0, c.get("stamina", 1.0) + stamina_regen * dt)
 
+    # ── ENERGY  (drops faster with high hunger and the longer a character
+    # has been awake; consumption/caffeine restore it -- see
+    # on_consume_complete) ────────────────────────────────────────────────
+    hunger_mult = 1.0 + (b["hunger"] / 100) * 1.5   # 1.0 → 2.5
+    hours_awake = b.get("hours_awake", 0)
+    if hours_awake >= 15:
+        wake_mult = 2.0
+    elif hours_awake >= 12:
+        wake_mult = 1.5
+    else:
+        wake_mult = 1.0
+    b["energy"] = max(0, b["energy"] - BASE_ENERGY_DECAY * hunger_mult * wake_mult * dt)
+
     # ── APPLY SLEEP DEBT EFFECTS ─────────────────────────────────────────────
     _apply_sleep_debt_effects(c)
+
+    # ── DAILY NUTRITION/WEIGHT/ADDICTION SETTLEMENT  (real calendar-midnight
+    # detection, immune to CADENCE/tick-rate drift -- see systems/nutrition.py) ──
+    if world is not None:
+        calendar = world.get("calendar", {})
+        today_key = (calendar.get("year"), calendar.get("month"), calendar.get("day"))
+        if today_key[0] is not None:
+            last_key = b.get("_nutrients_reset_day")
+            if last_key is not None and last_key != today_key:
+                from systems.nutrition import settle_nutrition_day
+                settle_nutrition_day(c, world)
+            b["_nutrients_reset_day"] = today_key
 
     clamp_body(c)
     _check_health_thresholds(c)
@@ -185,7 +245,7 @@ def _apply_sleep_debt_effects(c):
 
 # ── activity completions ──────────────────────────────────────────────────────
 
-def on_sleep_complete(c, duration_minutes):
+def on_sleep_complete(c, duration_minutes, world=None):
     """Called when a sleep activity finishes."""
     b = c["body"]
     # Full 8hr sleep clears fatigue. Proportional for naps.
@@ -194,6 +254,10 @@ def on_sleep_complete(c, duration_minutes):
     b["sleep_debt"] = max(0, b["sleep_debt"] - 60 * recovery)
     # Hygiene decreases slightly during sleep (night sweat)
     b["hygiene"] = max(0, b["hygiene"] - 3 * recovery)
+    # Waking moment: reset the hours-awake clock (see update_body_needs).
+    b["hours_awake"] = 0.0
+    if world is not None:
+        b["_wake_sim_time"] = world.get("sim_time", 0.0)
 
 
 def on_shower_complete(c):
@@ -230,10 +294,64 @@ def on_eat_complete(c, nutrition=0.5):
     record_calories_in(c, nutrition)
 
 
-def on_drink_complete(c, hydration_value=40):
+def on_drink_complete(c, hydration_value=40, volume=0):
     b = c["body"]
     b["hydration"]    = min(100, b["hydration"] + hydration_value)
     b["recent_intake"] = min(100, b["recent_intake"] + 30)
+    if volume:
+        b["bladder"] = min(100, b["bladder"] + volume)
+
+
+def on_consume_complete(c, world, item_tmpl):
+    """Unified item-driven consumption hook -- called by activities.py for
+    every eat/drink branch once the real item template has been resolved.
+    Fans out to on_eat_complete/on_drink_complete (kept for back-compat with
+    any other caller) plus the new energy/nutrition-tracking/addiction/
+    caffeine/alcohol/volume effects, all driven by the item's own fields."""
+    ensure_body(c)
+    b = c["body"]
+    category   = item_tmpl.get("category")
+    nutrition  = item_tmpl.get("nutrition", 0.0) or 0.0
+    hydration_restore = item_tmpl.get("hydration_restore")
+    energy_restore     = item_tmpl.get("energy_restore", 0) or 0
+    volume             = item_tmpl.get("volume", 0) or 0
+    alcohol_units       = item_tmpl.get("alcohol_units", 0) or 0
+    addiction_type      = item_tmpl.get("addiction_type")
+
+    # Only food/drink items move hunger/hydration -- medicine (painkillers)
+    # and drug items (cigarettes, cocaine, ...) have neither field and are
+    # handled purely through their addiction_type/drug_id hooks below.
+    if category == "drink" or hydration_restore is not None or volume:
+        on_drink_complete(c, hydration_value=hydration_restore or 0, volume=volume)
+    elif category == "food" or nutrition:
+        on_eat_complete(c, nutrition=nutrition)
+
+    # ── nutrition-day tally (fraction of a daily requirement) ───────────────
+    b["nutrients_today"] = b.get("nutrients_today", 0) + nutrition
+
+    # ── energy gain: nutrition-driven, halved for the first 2h after waking,
+    # plus an immediate flat bump from caffeine/energy-drink items ─────────
+    if nutrition:
+        gain = nutrition * ENERGY_PER_FULL_DAY_NUTRITION
+        if b.get("hours_awake", 0) < 2:
+            gain *= 0.5
+        b["energy"] = min(100, b["energy"] + gain)
+    if energy_restore:
+        b["energy"] = min(100, b["energy"] + energy_restore)
+
+    # ── alcohol/drugs → harassment.py's existing intoxication_state ─────────
+    if alcohol_units:
+        from systems.harassment import consume_alcohol
+        consume_alcohol(c, alcohol_units, world)
+    drug_id = item_tmpl.get("drug_id")
+    if drug_id:
+        from systems.harassment import consume_drug
+        consume_drug(c, drug_id, world)
+
+    # ── addiction usage tracking ─────────────────────────────────────────────
+    if addiction_type:
+        from systems.addictions import record_usage
+        record_usage(c, addiction_type, world)
 
 
 def on_toilet_complete(c):
@@ -271,6 +389,8 @@ def get_breath_label(mouth_hygiene):
 
 def clamp_body(c):
     for k, v in c["body"].items():
+        if k in _NON_PERCENT_BODY_FIELDS or v is None:
+            continue
         c["body"][k] = max(0, min(100, v))
 
 

@@ -191,6 +191,10 @@ ACTION_SPECS = {
     "confront":         {"group": "hostile", "target": "character", "doc": "Confront someone over a grievance."},
     "call_911":         {"group": "hostile", "target": "incident", "doc": "Call emergency services about an incident."},
     "call_parent":      {"group": "hostile", "target": "character", "doc": "Call a minor offender's parent instead of 911."},
+
+    # ---- medical (systems/health.py's per-bodypart damage rework) ------
+    "administer_first_aid": {"group": "medical", "target": "character", "doc": "Apply first aid to a damaged body part -- your own or someone nearby's. Requires a first aid kit or bandages."},
+    "take_painkiller":      {"group": "medical", "target": "none", "doc": "Take pain medication for global pain relief."},
     "grab_offensive":   {"group": "hostile", "target": "character", "doc": "Grab at someone aggressively."},
     "hold":             {"group": "hostile", "target": "character", "doc": "Hold someone down."},
     "punch":            {"group": "hostile", "target": "character", "doc": "Punch someone."},

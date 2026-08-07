@@ -290,6 +290,36 @@ def attempt_infection(source_char, target_char, risk, world, mode="airborne"):
     return None
 
 
+def attempt_manifestation_contagion_burst(source_char, world, cond_key, tick, radius=None):
+    """One-off infection roll fired by a symptom manifestation (e.g. a
+    cough, health_hazard_templates' spreads_contagion==True) -- layered on
+    top of the ambient per-tick proximity sweep tick_contagion_location
+    already runs, rather than replacing it. The parent disease's
+    contagion_probability field (0-1) gates whether this particular burst
+    attempts transmission at all; reuses attempt_infection (and therefore
+    its own immune_modifier-scaled roll) for the actual per-target outcome,
+    so exposure and susceptibility stay two separate rolls rather than one
+    combined probability."""
+    if not source_char.get("contagion_state", {}).get("is_contagious"):
+        return
+    defs = world.get("definitions", {})
+    tmpl = defs.get("physical_health_templates", {}).get(cond_key, {})
+    if not tmpl.get("contagious"):
+        return
+    prob = tmpl.get("contagion_probability", 0)
+    if not prob or random.random() >= prob:
+        return
+    radius = RADIUS_MEDIUM if radius is None else radius
+    src_tile = source_char.get("location_tile", "0,0")
+    for target in world.get("characters", {}).values():
+        if target is source_char or not target.get("alive", True):
+            continue
+        tgt_tile = target.get("location_tile", "0,0")
+        if _tile_distance(src_tile, tgt_tile) > radius:
+            continue
+        attempt_infection(source_char, target, 1.0, world, mode="airborne")
+
+
 # ---------------------------------------------------------------------------
 # Tick: proximity sweep (called from sim_loop for all chars in same location)
 # ---------------------------------------------------------------------------

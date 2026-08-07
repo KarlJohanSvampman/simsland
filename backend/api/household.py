@@ -62,6 +62,20 @@ def set_name(sim_id: str, payload: dict):
 # ASSIGN / UNASSIGN BUILDING (floorplan)
 # =========================================================
 
+@router.post("/household/set_building_address")
+def set_building_address(sim_id: str, payload: dict):
+    with world_lock():
+        world = load_world(sim_id)
+
+        building = get_building_by_id(world, payload["building_id"])
+        if not building:
+            return {"ok": False, "error": "building not found"}
+
+        building["address"] = payload.get("address")
+        save_world(sim_id, world)
+        return {"ok": True, "building": building}
+
+
 @router.post("/household/assign_building")
 def assign_building(sim_id: str, payload: dict):
     with world_lock():
@@ -155,7 +169,8 @@ def available_buildings(sim_id: str):
     world = load_world(sim_id)
 
     buildings = [
-        {"id": b["id"], "template": b.get("template"), "x": b.get("x"), "y": b.get("y")}
+        {"id": b["id"], "template": b.get("template"), "x": b.get("x"), "y": b.get("y"),
+         "address": b.get("address")}
         for b in world.get("buildings", [])
         if b.get("owner_household_id") is None
     ]
@@ -211,7 +226,8 @@ def admin_detail(household_id: str, sim_id: str):
     buildings_by_id = {b["id"]: b for b in world.get("buildings", [])}
     buildings = [
         {"id": bid, "template": buildings_by_id[bid].get("template"),
-         "x": buildings_by_id[bid].get("x"), "y": buildings_by_id[bid].get("y")}
+         "x": buildings_by_id[bid].get("x"), "y": buildings_by_id[bid].get("y"),
+         "address": buildings_by_id[bid].get("address")}
         for bid in household.get("building_ids", [])
         if bid in buildings_by_id
     ]

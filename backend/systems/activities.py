@@ -1548,7 +1548,7 @@ def complete_activity(
 
     if activity_type == "sleep":
         duration = c.get("activity", {}).get("duration", 28800) / 60
-        on_sleep_complete(c, duration)
+        on_sleep_complete(c, duration, world=world)
         # Posture bookkeeping — set_posture() also writes a transient
         # "lying_to_standing" animation_state, but the very next line in
         # the caller (the "using" phase's completion branch) immediately
@@ -1592,8 +1592,14 @@ def complete_activity(
     # DRINK
     # =====================================
 
-    elif activity_type == "drink":
-        on_drink_complete(c, hydration_value=35)
+    elif activity_type in ("drink", "drink_alcohol", "have_drink"):
+        from systems.body import on_consume_complete
+        target_id = act.get("target_id")
+        item = world.get("items", {}).get(target_id) if target_id else None
+        if item:
+            on_consume_complete(c, world, item)
+        else:
+            on_drink_complete(c, hydration_value=35)
 
     # =====================================
     # MEAL
@@ -1614,8 +1620,8 @@ def complete_activity(
             )
 
             if meal:
-                nutrition = meal.get("nutrition", 0.5)
-                on_eat_complete(c, nutrition=nutrition)
+                from systems.body import on_consume_complete
+                on_consume_complete(c, world, meal)
                 meal["servings"] -= 1
                 if meal["servings"] <= 0:
                     remove_household_resource(household, meal, 1)
@@ -1698,7 +1704,13 @@ def complete_activity(
     # =====================================
 
     elif activity_type == "eat_snack":
-        on_eat_complete(c, nutrition=0.3)
+        from systems.body import on_consume_complete
+        target_id = act.get("target_id")
+        item = world.get("items", {}).get(target_id) if target_id else None
+        if item:
+            on_consume_complete(c, world, item)
+        else:
+            on_eat_complete(c, nutrition=0.05)
 
     # =====================================
     # EXERCISE — jog/sit_ups/chin_ups/lift_weights (action_router.py) all
@@ -1781,20 +1793,22 @@ def complete_activity(
             pass
 
     # =====================================
-    # ALCOHOL / DRUG CONSUMPTION
+    # EAT (LLM-driven "eat" action, action_router.py::_route_eat) — the one
+    # real item-targeted consumption path an LLM can pick directly
+    # (target: any item; covers food, drinks, and drug items alike). The
+    # "eat_meal"/"eat_snack"/"drink" branches above are the separate body-
+    # need-strategy dispatch (start_activity/ACTIVITIES), whose target_id
+    # is always a PROP (fridge/counter/sink), never a consumable item --
+    # on_consume_complete already routes alcohol_units/drug_id/
+    # addiction_type generically, so this one branch covers every item
+    # category.
     # =====================================
-    elif activity_type in ("drink", "drink_alcohol", "have_drink"):
-        # Check if consumed item has alcohol_units
-        try:
-            from systems.harassment import consume_alcohol
-            target_id = c.get("activity", {}).get("target_id")
-            items     = world.get("items", {})
-            item      = items.get(target_id, {}) if target_id else {}
-            units     = item.get("alcohol_units", 0)
-            if units > 0:
-                consume_alcohol(c, units, world)
-        except Exception:
-            pass
+    elif activity_type == "eat":
+        target_id = act.get("target_id")
+        item = world.get("items", {}).get(target_id) if target_id else None
+        if item:
+            from systems.body import on_consume_complete
+            on_consume_complete(c, world, item)
 
     # =====================================
     # RECORD HABIT

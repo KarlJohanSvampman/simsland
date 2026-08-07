@@ -1,42 +1,42 @@
 """
 accidents.py -- non-violent, activity-grounded injury triggers.
 
-Mirrors hostile_actions.py's shape but for accidents rather than attacks:
-reuses health.py's apply_blade_injury/apply_burn_injury as the mechanism,
-tied to activities already happening in the sim (currently: cooking's
-knife/heat stage_primitives -- see cooking_process.py's active-stage block).
+Mirrors hostile_actions.py's shape but for accidents rather than attacks.
+Fully data-driven (Round 3 of the damage-system rework): rolls the acting
+interaction/stage_primitive's `possible_accidents` array (definitions.json,
+{accident_template, probability}), then rolls the chosen accident_template's
+own `possible_injuries` array, and hands off to health.py::apply_injury --
+the same chain combat interactions use, just via an accident_template
+middleman instead of going straight to an injury_template. Generalizes to
+any future interaction with a possible_accidents array, not just cooking's
+stage_primitives (currently the only content authored, see cooking_process.py's
+active-stage block).
 """
 
-import random
-
-from systems.health import apply_blade_injury, apply_burn_injury
-
-# stage_primitives key -> (injury kind, per-tick chance while the stage is
-# active, body part). Chances are per-tick, not per-session -- stages run
-# several ticks (see stage_primitives' default_duration in definitions.json),
-# so these stay rare flavor events rather than a routine occurrence.
-COOKING_HAZARDS = {
-    "chop":              ("blade", 0.003, "hand"),
-    "fry":                ("burn", 0.002, "hand"),
-    "put_on_stove":       ("burn", 0.004, "hand"),
-    "take_off_stove":     ("burn", 0.004, "hand"),
-    "put_in_oven":        ("burn", 0.004, "hand"),
-    "take_out_of_oven":   ("burn", 0.004, "hand"),
-}
+from systems.health import apply_injury, weighted_pick
 
 
 def maybe_trigger_cooking_accident(c, world, primitive_key):
-    hazard = COOKING_HAZARDS.get(primitive_key)
-    if not hazard:
+    defs = world.get("definitions", {})
+    tpl = defs.get("stage_primitives", {}).get(primitive_key)
+    if not tpl:
         return
-    kind, chance, body_part = hazard
-    if random.random() >= chance:
+    possible_accidents = tpl.get("possible_accidents", [])
+    if not possible_accidents:
         return
+
+    accident_pick = weighted_pick(possible_accidents)
+    if not accident_pick:
+        return
+
+    accident_key = accident_pick.get("accident_template")
+    accident_tmpl = defs.get("accident_templates", {}).get(accident_key)
+    if not accident_tmpl:
+        return
+
+    injury_pick = weighted_pick(accident_tmpl.get("possible_injuries", []))
+    if not injury_pick:
+        return
+
     tick = world.get("tick", 0)
-    if kind == "blade":
-        # Household-knife scale -- well under stab/knock's weapon-grade
-        # sharpness/size values.
-        apply_blade_injury(c, world, body_part, sharpness=0.3, size=0.2,
-                            irregular_shape=False, tick=tick)
-    else:
-        apply_burn_injury(c, world, body_part, severity=random.uniform(0.15, 0.4), tick=tick)
+    apply_injury(c, world, injury_pick.get("injury_template"), accident_key, tick=tick)

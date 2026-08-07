@@ -50,6 +50,15 @@
   }
 
   .status { margin-top: 16px; font-size: 11px; color: var(--text-dim); min-height: 14px; }
+
+  .card + .card { margin-top: 16px; }
+  .danger-label { font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 10px; }
+  .danger-btn {
+    background: rgba(248,81,73,.10); border: 1px solid #f85149; border-radius: 6px;
+    color: #f85149; padding: 12px 16px; font-size: 13px; font-family: var(--sans);
+    cursor: pointer; transition: all .12s; width: 100%;
+  }
+  .danger-btn:hover { background: rgba(248,81,73,.20); }
 </style>
 </head>
 <body>
@@ -65,6 +74,12 @@
     <div class="speed-grid" id="speedGrid"></div>
 
     <div class="status" id="status"></div>
+  </div>
+
+  <div class="card">
+    <div class="danger-label">Danger Zone</div>
+    <button class="danger-btn" id="resetBtn">Reset Characters &amp; Households</button>
+    <div class="status" id="resetStatus"></div>
   </div>
 
 <script>
@@ -125,6 +140,21 @@ async function setTimeScale(value) {
 
 refreshState();
 setInterval(refreshState, 2000);
+
+const resetBtn = document.getElementById('resetBtn');
+const resetStatusEl = document.getElementById('resetStatus');
+
+resetBtn.addEventListener('click', async () => {
+  if (!confirm('This permanently deletes ALL characters and households (buildings/roads/map are unaffected). Continue?')) return;
+  resetStatusEl.textContent = 'Resetting...';
+  try {
+    const res = await fetch('/admin/reset_characters', { method: 'POST' });
+    const data = await res.json();
+    resetStatusEl.textContent = data.ok ? 'Reset complete.' : 'Reset failed.';
+  } catch (e) {
+    resetStatusEl.textContent = 'Failed to reach server.';
+  }
+});
 </script>
 </body>
 </html>

@@ -86,6 +86,11 @@ def _work_details(c, world, reason, normalcy):
 
 _DOCTOR_NORMALCY_WEIGHTS   = {"normal": 0.90, "notable": 0.09, "rare": 0.01}
 _HOSPITAL_NORMALCY_WEIGHTS = {"normal": 0.55, "notable": 0.30, "rare": 0.15}
+# Riskier than a routine hospital stay -- an operating table is where
+# treatments[]' side_effects (including a "death" key, decision #9) can
+# actually resolve, so "rare" gets weighted higher than any other category.
+_SURGERY_NORMALCY_WEIGHTS  = {"normal": 0.45, "notable": 0.30, "rare": 0.25}
+_PHARMACY_NORMALCY_WEIGHTS = {"normal": 0.92, "notable": 0.07, "rare": 0.01}
 _MEDICAL_SITUATIONAL_HOOKS = {
     "doctor": [
         "the waiting room was unusually crowded",
@@ -98,6 +103,23 @@ _MEDICAL_SITUATIONAL_HOOKS = {
         "a complication came up during treatment",
         "the stay ran longer than expected",
         "a nurse or doctor took extra time to explain things",
+    ],
+    "hospital_treatment": [
+        "the treatment took longer than expected",
+        "a nurse checked in more than once to monitor progress",
+        "there was a scheduling delay before the treatment began",
+        "the care team adjusted the treatment plan partway through",
+    ],
+    "surgery": [
+        "the surgery ran longer than the surgeon expected",
+        "the anesthesia took a while to fully wear off afterward",
+        "the surgical team explained the risks again beforehand",
+        "recovery in the immediate aftermath was rockier than usual",
+    ],
+    "pharmacy": [
+        "the pharmacy was out of the usual brand and had to substitute",
+        "there was a short wait for the prescription to be filled",
+        "the pharmacist gave an unusually detailed rundown of side effects",
     ],
 }
 
@@ -242,6 +264,9 @@ _NARRATOR_CATEGORIES = {
     "work":       (_work_details,             _WORK_NORMALCY_WEIGHTS),
     "doctor":     (_medical_details,          _DOCTOR_NORMALCY_WEIGHTS),
     "hospital":   (_medical_details,          _HOSPITAL_NORMALCY_WEIGHTS),
+    "hospital_treatment": (_medical_details,  _HOSPITAL_NORMALCY_WEIGHTS),
+    "surgery":    (_medical_details,          _SURGERY_NORMALCY_WEIGHTS),
+    "pharmacy":   (_medical_details,          _PHARMACY_NORMALCY_WEIGHTS),
     "jail":       (_jail_details,             _JAIL_NORMALCY_WEIGHTS),
 }
 
@@ -428,7 +453,7 @@ def _seed_lie_for_private_event(c, world, event):
 # so routing an incapacitated or arrested character through "walk to the
 # garage and drive yourself" would be narratively wrong.
 _TRAVEL_ELIGIBLE_REASONS = {
-    "work", "job_search", "shopping", "leisure", "gym", "cafe", "doctor",
+    "work", "job_search", "shopping", "leisure", "gym", "cafe", "doctor", "pharmacy",
 }
 
 
@@ -436,8 +461,10 @@ MAX_OFFGRID_TRIPS_PER_DAY = 3
 
 # jail/hospital are consequences, not discretionary outings -- a character
 # facing arrest or a medical emergency must always be able to go, regardless
-# of how many voluntary trips they've already taken today.
-_UNCAPPED_REASONS = {"jail", "hospital"}
+# of how many voluntary trips they've already taken today. hospital_treatment/
+# surgery (treatments[] step types, health.py::advance_treatment_progress)
+# join them for the same reason -- a scheduled procedure isn't optional.
+_UNCAPPED_REASONS = {"jail", "hospital", "hospital_treatment", "surgery"}
 
 
 def _offgrid_trips_today(c, world):
@@ -677,33 +704,38 @@ def process_return(c, world):
 
         # A hospital visit (unlike a routine doctor visit) also addresses
         # acute trauma -- systems/health.py::compute_severity()'s
-        # blade/blunt/burn injuries and blood-loss/pain signals previously
-        # had zero connection to this mechanic, so a character rushed to
+        # per-bodypart hazards and blood-loss/pain signals previously had
+        # zero connection to this mechanic, so a character rushed to
         # hospital for a stabbing came back just as stabbed. Only the
         # acute-trauma cluster is touched here (unconscious/bleeding/
-        # agonizing_pain, plus the injuries list itself) -- heart_attack/
+        # agonizing_pain, plus every body part's hazards) -- heart_attack/
         # stroke/coma/cardiac_arrest each have their own dedicated
         # resolution arcs (resolve_heart_attack/tick_stroke/tick_coma) and
         # are left alone so this doesn't short-circuit that narrative.
-        # Treatment is substantial but not total, so a severe enough wound
-        # can still need a second visit rather than being trivialized.
+        # Re-pointed at the per-bodypart damage rework's body_parts/hazards
+        # shape (Round 8) -- the old flat injuries[]/bleeding_severity/
+        # force/severity fields this used to mutate don't exist anymore.
+        # treat_body_part(method="hospital") matches every hazard's
+        # treatable_by (hospital treats everything first_aid can plus the
+        # hospital-only ones like broken_bone/internal_bleeding) and keeps
+        # the same partial-not-full-healing philosophy -- a severe enough
+        # wound can still need a second visit rather than being trivialized.
         acute_treated = False
         if reason == "hospital":
+            from systems.health import treat_body_part, add_pain
             hs = c.setdefault("health_state", {})
             em = hs.setdefault("active_emergencies", {})
             for key in ("unconscious", "bleeding", "agonizing_pain"):
                 if em.pop(key, None) is not None:
                     acute_treated = True
-            for inj in hs.get("injuries", []):
-                for field in ("bleeding_severity", "force", "severity"):
-                    if inj.get(field, 0) > 0:
-                        inj[field] = max(0, inj[field] - 0.6)
-                        acute_treated = True
+            for part in list(hs.get("body_parts", {}).keys()):
+                if treat_body_part(c, world, part, method="hospital"):
+                    acute_treated = True
             if hs.get("total_blood_lost", 0) > 0:
                 hs["total_blood_lost"] = max(0, hs["total_blood_lost"] - 0.5)
                 acute_treated = True
             if hs.get("pain", 0) > 0:
-                hs["pain"] = max(0, hs["pain"] - 40)
+                add_pain(c, -40)
                 acute_treated = True
 
         company = defs.get("company_templates", {}).get(
@@ -719,6 +751,46 @@ def process_return(c, world):
             story["summary"] += f" Received emergency treatment. Cost ${cost:.0f}."
         else:
             story["summary"] += f" Routine checkup. Cost ${cost:.0f}."
+    elif reason in ("hospital_treatment", "surgery"):
+        # treatments[] step resolution (health.py::advance_treatment_progress,
+        # _drive_appointment_step) -- distinct from the legacy "doctor"/
+        # "hospital" branch above, which is keyed off physical_health_
+        # templates' own top-level medicine[] list. The step object itself
+        # was stashed on health_state["_active_treatment_step"] right before
+        # send_offgrid() so it survives the off-grid round trip.
+        step = c.setdefault("health_state", {}).pop("_active_treatment_step", None) or {}
+        cost = step.get("cost", 0)
+        h = world.get("households", {}).get(c.get("household_id"))
+        if h and cost:
+            h["wealth"] = max(0, h.get("wealth", 0) - cost)
+
+        died = False
+        for hazard_key, prob in (step.get("side_effects") or {}).items():
+            if random.random() >= prob:
+                continue
+            if hazard_key == "death":
+                from systems.health import _trigger_death
+                _trigger_death(c, world, f"{reason}_complication")
+                died = True
+                break
+            from systems.health import add_pain
+            add_pain(c, 15)
+            story.setdefault("tags", []).append(f"side_effect:{hazard_key}")
+
+        if died:
+            story["summary"] += " Complications proved fatal."
+        elif cost:
+            story["summary"] += f" Cost ${cost:.0f}."
+    elif reason == "pharmacy":
+        from core.definitions import load_definitions
+        defs = load_definitions(world.get("sim_id", "default"))
+        company = defs.get("company_templates", {}).get("pharmacy", {})
+        lo, hi = company.get("cost_range", [10, 60])
+        cost = random.uniform(lo, hi)
+        h = world.get("households", {}).get(c.get("household_id"))
+        if h:
+            h["wealth"] = max(0, h.get("wealth", 0) - cost)
+        story["summary"] += f" Cost ${cost:.0f}."
 
     handle_return_transport(c, world)
 

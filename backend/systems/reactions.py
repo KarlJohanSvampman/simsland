@@ -44,6 +44,7 @@ REACTION_ANIMATIONS = {
     "sweating":     ["react_sweating", "react_wipe_brow"],
     "breathless":   ["react_breathless"],
     "dizzy":        ["react_dizzy", "react_stumble"],
+    "vomit":        ["react_vomit"],
 
     # ── Pain (systems/pain_complaints.py) ──
     "wince":        ["react_wince"],
@@ -101,6 +102,7 @@ REACTION_PRIORITIES = {
     "sweating":    1,
     "breathless":  2,
     "dizzy":       2,
+    "vomit":       2,
 
     "wince":       1,
     "cry_out":     2,

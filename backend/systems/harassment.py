@@ -81,6 +81,18 @@ REP_DAMAGE_BY_ACT = {
     "explicit_proposition": "sexual_harassment",
 }
 
+# ── intoxication posture/effects (decision #12) ─────────────────────────────
+# intoxication_pct = min(1.0, alcohol_level + drug_level). Same priority-
+# ladder shape as health.py's PAIN_CRAWL_THRESHOLD/PAIN_INCAPACITATED_
+# THRESHOLD -- never overrides a real injury posture (checked below via
+# apply_severity_consequences' own signals).
+INTOX_POSTURE_THRESHOLD       = 0.25   # -> "intoxicated" stance
+INTOX_CRAWL_THRESHOLD         = 0.85   # -> "crawling" (80-90% band midpoint)
+INTOX_INCAPACITATED_THRESHOLD = 1.0    # -> "incapacitated" (blackout)
+
+_INTOX_FALL_CHANCE_PER_TICK   = 0.0006   # small per-tick roll once crawling-band+
+_INTOX_VOMIT_CHANCE_PER_TICK  = 0.0004
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Public API
 # ─────────────────────────────────────────────────────────────────────────────
@@ -155,6 +167,8 @@ def tick_harassment(world):
             state["drug_level"]    = max(0.0, state["drug_level"]    - DRUG_DECAY_PER_TICK)
 
         _recompute_libido_boost(c)
+        _apply_intoxication_posture(c, world)
+        _check_hangover_expiry(c, world)
 
         # Only evaluate harassment for adults
         if c.get("age", 0) < 18:
@@ -210,10 +224,27 @@ def get_harassment_context(c, world):
     sexism = imp.get("sexism_level", 0.0)
     sc     = imp.get("self_control", 0.5)
 
+    intox = min(1.0, al + dl)
     if al >= 0.25:
         lines.append(
             f"Intoxicated (alcohol level {al:.2f}) — inhibitions lowered, "
             "libido elevated, self-control impaired."
+        )
+    if intox >= INTOX_CRAWL_THRESHOLD:
+        lines.append(
+            "Severely intoxicated — barely able to stand or speak coherently, "
+            "at real risk of blacking out."
+        )
+    elif intox >= 0.5:
+        lines.append(
+            "Very drunk/high — mood swings between reckless euphoria and sudden "
+            "aggression or self-pitying depression are plausible; slurred, blunt, "
+            "or provocative speech is likely."
+        )
+    elif intox >= INTOX_POSTURE_THRESHOLD:
+        lines.append(
+            "Buzzed — looser-lipped and bolder than usual, mildly more likely to "
+            "say something crude or provoking without meaning to."
         )
     if dl >= 0.20:
         lines.append(
@@ -248,6 +279,97 @@ def _recompute_libido_boost(c):
               + DRUG_LIBIDO_BOOST  * dl
               + PORN_LIBIDO_BOOST  * ph)
     state["libido_boost"] = min(1.0, boost)
+
+
+def _apply_intoxication_posture(c, world):
+    """Posture/effects ladder driven by intoxication_pct (decision #12).
+    Mirrors health.py::apply_severity_consequences' priority-ladder shape,
+    but for intoxication instead of pain/severity -- and, like that
+    function, never overrides a real injury/emergency posture (checked via
+    the same active_emergencies/pain signals apply_severity_consequences
+    itself reads, so a badly hurt-AND-drunk character stays on the more
+    urgent injury posture)."""
+    from systems.posture import set_posture
+
+    if not c.get("alive", True):
+        return
+
+    state = c.get("intoxication_state", {})
+    intox = min(1.0, state.get("alcohol_level", 0.0) + state.get("drug_level", 0.0))
+
+    # Hangover bookkeeping -- track how long intoxication stayed above the
+    # posture threshold so the comedown disease (decision #13) can last
+    # exactly that long once it drops back below.
+    since = state.get("over_threshold_since_sim_time")
+    sim_time = world.get("sim_time", 0.0)
+    if intox >= INTOX_POSTURE_THRESHOLD and since is None:
+        state["over_threshold_since_sim_time"] = sim_time
+    elif intox < INTOX_POSTURE_THRESHOLD and since is not None:
+        hours_over = max(0.0, (sim_time - since) / 3600.0)
+        state["over_threshold_since_sim_time"] = None
+        if hours_over >= 0.5:
+            _apply_hangover(c, world, hours_over)
+
+    if intox < INTOX_POSTURE_THRESHOLD:
+        if c.get("posture") == "intoxicated":
+            set_posture(c, world, "standing")
+        return
+
+    # Never override a real injury/emergency posture -- pain/severity takes
+    # priority (apply_severity_consequences runs its own tick and will keep
+    # re-asserting crawling/incapacitated_pain/incapacitated as needed).
+    pain = c.get("health_state", {}).get("pain", 0.0)
+    em = c.get("health_state", {}).get("active_emergencies", {})
+    if em or pain >= 60 or c.get("posture") in ("crawling", "incapacitated_pain", "incapacitated"):
+        return
+
+    if intox >= INTOX_INCAPACITATED_THRESHOLD:
+        set_posture(c, world, "incapacitated")
+        return
+    if intox >= INTOX_CRAWL_THRESHOLD:
+        set_posture(c, world, "crawling")
+        return
+
+    # 0.25-0.85 band: the "intoxicated" stance, plus small per-tick fall/
+    # vomit risk that scales with how far into the band the character is.
+    if c.get("posture") not in ("intoxicated",):
+        set_posture(c, world, "intoxicated")
+
+    band_frac = (intox - INTOX_POSTURE_THRESHOLD) / (INTOX_CRAWL_THRESHOLD - INTOX_POSTURE_THRESHOLD)
+    if random.random() < _INTOX_FALL_CHANCE_PER_TICK * (1 + band_frac):
+        from systems.health import add_pain
+        from systems.reactions import push_reaction
+        add_pain(c, 3)
+        push_reaction(c, "wince", world.get("tick", 0))
+    if random.random() < _INTOX_VOMIT_CHANCE_PER_TICK * (1 + band_frac):
+        from systems.reactions import push_reaction
+        push_reaction(c, "vomit", world.get("tick", 0))
+
+
+def _apply_hangover(c, world, duration_hours):
+    """New passive 'hangover' disease lasting exactly as long as
+    intoxication stayed above the posture threshold. physical_health_
+    templates has no per-instance dynamic-duration field, so expiry is
+    tracked here directly (sim_time-based, per decision #0) and checked
+    each tick from _check_hangover_expiry below -- self_resolves/curable
+    are both false on the template so _check_recoveries never touches it."""
+    conditions = c.setdefault("physical_health", [])
+    if "hangover" not in conditions:
+        conditions.append("hangover")
+    state = c.setdefault("condition_state", {}).setdefault("hangover", {
+        "severity_index": 0.0, "days_elapsed": 0,
+    })
+    state["hangover_expires_sim_time"] = world.get("sim_time", 0.0) + duration_hours * 3600.0
+
+
+def _check_hangover_expiry(c, world):
+    if "hangover" not in c.get("physical_health", []):
+        return
+    state = c.get("condition_state", {}).get("hangover", {})
+    expires = state.get("hangover_expires_sim_time")
+    if expires is not None and world.get("sim_time", 0.0) >= expires:
+        c["physical_health"].remove("hangover")
+        c.get("condition_state", {}).pop("hangover", None)
 
 
 def _compute_harassment_drive(c):

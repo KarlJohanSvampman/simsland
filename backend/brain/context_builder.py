@@ -808,6 +808,31 @@ def build_available_actions(c, world):
     ):
         action_types.append("call_parent")
 
+    # First aid / painkiller (systems/health.py's per-bodypart damage
+    # rework, Round 4 -- treat_body_part/apply_painkiller). first_aid is
+    # offered when the actor carries a usable item AND either they or
+    # someone nearby has an untreated hazard; the route resolves which
+    # body part automatically if the LLM doesn't name one. painkiller is
+    # offered whenever the actor carries pain_medication and is in pain.
+    from systems.personal_items import has_item_template
+
+    def _has_untreated_hazard(ch):
+        for bp in ch.get("health_state", {}).get("body_parts", {}).values():
+            if any(not h.get("treated") for h in bp.get("hazards", {}).values()):
+                return True
+        return False
+
+    if has_item_template(c, "first_aid_kit") or has_item_template(c, "bandages"):
+        chars = world.get("characters", {})
+        if _has_untreated_hazard(c) or any(
+            _has_untreated_hazard(chars[p["id"]])
+            for p in nearby_people if p["id"] in chars
+        ):
+            action_types.append("administer_first_aid")
+
+    if has_item_template(c, "pain_medication") and c.get("health_state", {}).get("pain", 0) > 0:
+        action_types.append("take_painkiller")
+
     # Hostile actions (see systems/hostile_actions.py) — the six offensive
     # types listed whenever someone's nearby, same "route handler
     # validates the rest" pattern as propose_touch/confront. dodge/block/
@@ -1576,6 +1601,16 @@ def _sec_intimacy(c, world):
     return "; ".join(intimacy_lines) + "." if intimacy_lines else None
 
 
+def _sec_intoxication(c, world):
+    lines = _build_intoxication_context(c, world)
+    return list(lines) if lines else None
+
+
+def _sec_addictions(c, world):
+    lines = _build_addiction_context(c, world)
+    return list(lines) if lines else None
+
+
 def _sec_phone(c, world):
     # phone location — systems/phone.py::get_phone_context(): "set down
     # nearby" / "not sure where it is" (forgotten). Battery state
@@ -1629,6 +1664,8 @@ NARRATIVE_SECTIONS = [
     ("touch",                 "full", _sec_touch),
     ("intimacy",              "full", _sec_intimacy),
     ("phone",                 "full", _sec_phone),
+    ("intoxication",          "full", _sec_intoxication),
+    ("addictions",            "full", _sec_addictions),
 ]
 
 TIER_SETS = {"brief": {"core"}, "full": {"core", "full"}}
@@ -2970,12 +3007,14 @@ def _build_witnessed_offense_line(c, world):
 def _build_health_context(c, world):
     """
     Self-awareness of injury/illness severity — see systems/health.py::
-    compute_severity(), the first unified "how badly hurt is this
-    character" aggregate in the codebase. Healthy/mild tiers get no
-    paragraph (keeps token cost down, matches every other narrative
+    compute_severity(), the aggregate "how badly hurt is this character"
+    signal computed from per-bodypart damage + active disease (the
+    per-bodypart damage/disease rework, Round 6). Healthy/mild tiers get
+    no paragraph (keeps token cost down, matches every other narrative
     section this session); moderate-or-worse names the tier and the
-    worst active emergency/injury so the LLM understands why dodge/
-    call_911/its own reduced options are showing up.
+    worst active emergency or body-part injury so the LLM understands why
+    dodge/call_911/its own reduced options are showing up. Bounded to
+    ~3 lines: tier/emergency, active diseases + worst felt symptom, pain.
     """
     try:
         from systems.health import compute_severity
@@ -2993,11 +3032,28 @@ def _build_health_context(c, world):
             worst_key = max(em, key=lambda k: em[k].get("severity", 0))
             worst_label = worst_key.replace("_", " ")
         else:
-            injuries = hs.get("injuries", [])
-            if injuries:
-                last = injuries[-1]
-                part = last.get("body_part", "body").replace("_", " ")
-                worst_label = f"{last.get('type')} injury to your {part}"
+            # Worst body_parts entry -- unusable/severe first, then by
+            # pain_contribution -- named after its dominant untreated
+            # hazard, or the injury itself if it has none.
+            body_parts = hs.get("body_parts", {})
+            candidates = [
+                (part, bp) for part, bp in body_parts.items()
+                if bp.get("severity_level") or bp.get("hazards")
+            ]
+            if candidates:
+                candidates.sort(key=lambda pb: (
+                    pb[1].get("functional_status") == "unusable",
+                    pb[1].get("severity_level") == "severe",
+                    pb[1].get("pain_contribution", 0),
+                ), reverse=True)
+                part, bp = candidates[0]
+                part_label = part.replace("_", " ")
+                hazards = bp.get("hazards", {})
+                if hazards:
+                    dominant = max(hazards, key=lambda k: 0 if hazards[k].get("treated") else 1)
+                    worst_label = f"{dominant.replace('_', ' ')} in your {part_label}"
+                elif bp.get("injury_template"):
+                    worst_label = f"{bp['injury_template'].replace('_', ' ')} to your {part_label}"
 
         tier_phrase = {
             "moderate": "You're in noticeable pain and not at full strength.",
@@ -3009,6 +3065,52 @@ def _build_health_context(c, world):
             tier_phrase += f" ({worst_label})"
         if tier_phrase:
             lines.append(tier_phrase)
+
+    # Active diseases + whatever symptom is currently felt (Round 5's
+    # possible_symptoms driver, where authored) -- a separate line from
+    # the tier phrase above, since a mild cold is worth naming even when
+    # it doesn't move the aggregate severity tier.
+    conditions = c.get("physical_health", [])
+    if conditions:
+        defs = world.get("definitions", {})
+        ph_templates = defs.get("physical_health_templates", {})
+        symptom_templates = defs.get("symptom_templates", {})
+        hazard_templates = defs.get("health_hazard_templates", {})
+        names = [ph_templates.get(k, {}).get("name", k) for k in conditions]
+        symptom_bits = []
+        for k in conditions:
+            current = c.get("condition_state", {}).get(k, {}).get("current_symptom")
+            if current:
+                # current_symptom holds a symptom_templates key for legacy
+                # diseases (active_symptoms loop) or a health_hazard_templates
+                # key directly for diseases migrated onto symptoms[] (the
+                # 2-level chain collapse) -- try both registries.
+                name = (symptom_templates.get(current, {}).get("name")
+                        or hazard_templates.get(current, {}).get("name")
+                        or current)
+                symptom_bits.append(name)
+        line = f"You have {', '.join(names)}."
+        if symptom_bits:
+            line += f" Currently feeling: {', '.join(symptom_bits)}."
+        lines.append(line)
+
+        # preferred_postures advisory (decision #8) -- narrative-only
+        # suggestion surfaced from the currently-selected hazard's dominant
+        # manifestation; never mechanically enforced (apply_severity_
+        # consequences stays the sole posture authority).
+        _POSTURE_PHRASE = {"sit": "sitting down", "lean": "leaning against something",
+                            "crouch": "crouching", "lie_down": "lying down"}
+        for k in conditions:
+            current = c.get("condition_state", {}).get(k, {}).get("current_symptom")
+            hazard_tmpl = hazard_templates.get(current, {}) if current else {}
+            manifestations = hazard_tmpl.get("manifestations")
+            if not manifestations:
+                continue
+            best = max(manifestations.values(), key=lambda m: m.get("probability", 0))
+            postures = [_POSTURE_PHRASE[p] for p in best.get("preferred_postures", []) if p in _POSTURE_PHRASE]
+            if postures:
+                lines.append(f"You'd feel better {' or '.join(postures)}.")
+            break
 
     # Pain-specific line — independent of overall severity tier (pain is
     # only one of several signals compute_severity() weighs, so real pain
@@ -3259,6 +3361,37 @@ def _build_intoxication_context(c, world):
         return get_harassment_context(c, world)
     except Exception:
         return []
+
+
+def _build_addiction_context(c, world):
+    """Narrative-only craving nudges (decision #10 of the nutrition/
+    addiction overhaul) -- biases the LLM toward satisfying strong
+    cravings without hijacking action-scoring code, same convention as
+    curiosity/worries. Only surfaces addictions past a noticeable craving
+    level, strongest first."""
+    from systems.addictions import craving as _craving
+    templates = world.get("definitions", {}).get("addiction_templates", {})
+    addictions = c.get("addictions", {})
+    scored = []
+    for key, entry in addictions.items():
+        if entry.get("usages", 0) <= 0:
+            continue
+        cr = _craving(c, key, world)
+        if cr < 0.4:
+            continue
+        name = templates.get(key, {}).get("name", key)
+        scored.append((cr, name))
+    scored.sort(reverse=True)
+
+    lines = []
+    for cr, name in scored[:3]:
+        if cr >= 0.85:
+            lines.append(f"You're craving {name.lower()} badly — it's hard to think about much else.")
+        elif cr >= 0.6:
+            lines.append(f"You have a nagging urge for {name.lower()}.")
+        else:
+            lines.append(f"You could go for {name.lower()} right about now.")
+    return lines
 
 
 def _build_posture_context(c, world):

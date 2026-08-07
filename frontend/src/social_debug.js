@@ -257,7 +257,8 @@ window.showItemDetail = function(itemKey, isEquipped=false) {
   detailItemKey    = itemKey;
   detailIsEquipped = isEquipped;
   const tmpl = definitions.item_templates?.[itemKey] || {};
-  document.getElementById('detailItemName').textContent = tmpl.name || itemKey;
+  const detailIcon = definitions.icon_templates?.[tmpl.icon]?.emoji || '';
+  document.getElementById('detailItemName').textContent = detailIcon ? `${detailIcon} ${tmpl.name || itemKey}` : (tmpl.name || itemKey);
   const rows = [
     ['Slot',   tmpl.slot   || '—'],
     ['Price',  tmpl.base_price != null ? '$' + tmpl.base_price : null],
@@ -336,8 +337,9 @@ async function renderOutfitTab() {
   } else {
     slotsDiv.innerHTML = worn.map(([slot, key]) => {
       const t = definitions.item_templates?.[key] || {};
+      const icon = definitions.icon_templates?.[t.icon]?.emoji || '';
       return '<span class="slotChip worn" onclick="showItemDetail(\'' + key + '\',true)" title="Click to inspect / remove">' +
-        slot + ': ' + escHtml(t.name||key) + '</span>';
+        slot + ': ' + (icon ? icon + ' ' : '') + escHtml(t.name||key) + '</span>';
     }).join('');
   }
 
@@ -360,10 +362,11 @@ async function renderOutfitTab() {
       listDiv.appendChild(lbl);
     }
     const isEquipped = slots[slot] === key;
+    const icon = definitions.icon_templates?.[tmpl.icon]?.emoji || '';
     const row = document.createElement('div');
     row.className = 'clothingRow' + (isEquipped ? ' equipped' : '');
     row.innerHTML =
-      '<div><div class="cName">' + escHtml(tmpl.name||key) + '</div>' +
+      '<div><div class="cName">' + (icon ? icon + ' ' : '') + escHtml(tmpl.name||key) + '</div>' +
       '<div class="cMeta">' + (tmpl.base_price?'$'+tmpl.base_price+' · ':'') + slot + '</div></div>' +
       '<div>' + (isEquipped ? '<span class="cEquipHint">✓ on</span>' : '<span class="cDblHint">dbl-click</span>') + '</div>';
     row.onclick    = () => showItemDetail(key, isEquipped);

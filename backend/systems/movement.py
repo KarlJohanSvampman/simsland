@@ -37,6 +37,12 @@ PAIN_FATIGUE_THRESHOLD = 20
 PAIN_FATIGUE_CEILING    = 60
 _FATIGUE_MIN_MULTIPLIER = 0.6
 
+# Intoxication speed penalty (systems/harassment.py's intoxication_state) --
+# starts biting at the same 25% "intoxicated" posture threshold used
+# elsewhere (systems/harassment.py::_apply_intoxication_posture).
+_INTOX_SPEED_THRESHOLD  = 0.25
+_INTOX_MIN_MULTIPLIER   = 0.5
+
 # animation_state values that select the jog/sprint/sneak speeds. "run" is
 # kept as an alias for sprint since action_router.py's turn_and_run (panic
 # flight) already sets animation_state="run" -- sprint_speed applies there
@@ -72,11 +78,32 @@ def _current_move_speed(c):
     walk = c.get("walk_speed", DEFAULT_WALK_SPEED)
     if c.get("posture") == "standing":
         pain = c.get("health_state", {}).get("pain", 0.0)
-        if PAIN_FATIGUE_THRESHOLD <= pain < PAIN_FATIGUE_CEILING:
-            span = PAIN_FATIGUE_CEILING - PAIN_FATIGUE_THRESHOLD
-            frac = (pain - PAIN_FATIGUE_THRESHOLD) / span
+        in_pain_band = PAIN_FATIGUE_THRESHOLD <= pain < PAIN_FATIGUE_CEILING
+        # A disease hazard's passive "dizzy" trait (health.py::
+        # _apply_passive_traits, health_state.temporary_traits) piggybacks
+        # on this exact curve rather than adding a second one -- treated as
+        # a fixed mid-band pain level when there's no real pain driving it.
+        is_dizzy = "dizzy" in c.get("health_state", {}).get("temporary_traits", {})
+        if in_pain_band or is_dizzy:
+            frac = (pain - PAIN_FATIGUE_THRESHOLD) / (PAIN_FATIGUE_CEILING - PAIN_FATIGUE_THRESHOLD) \
+                if in_pain_band else 0.5
             multiplier = 1.0 - (1.0 - _FATIGUE_MIN_MULTIPLIER) * frac
             walk *= multiplier
+
+    # Intoxication (systems/harassment.py's alcohol_level/drug_level,
+    # decision #12 of the nutrition/intoxication overhaul) -- an
+    # independent second multiplier, same shape as the pain/dizzy curve
+    # above but keyed to intoxication_pct instead of pain. Checked for both
+    # "standing" and "intoxicated" postures, since intoxication_pct >=
+    # INTOX_POSTURE_THRESHOLD (harassment.py) is exactly what puts a
+    # character into the "intoxicated" posture in the first place.
+    if c.get("posture") in ("standing", "intoxicated"):
+        state = c.get("intoxication_state")
+        if state:
+            intox = min(1.0, state.get("alcohol_level", 0.0) + state.get("drug_level", 0.0))
+            if intox >= _INTOX_SPEED_THRESHOLD:
+                frac = min(1.0, (intox - _INTOX_SPEED_THRESHOLD) / (1.0 - _INTOX_SPEED_THRESHOLD))
+                walk *= 1.0 - (1.0 - _INTOX_MIN_MULTIPLIER) * frac
     return walk
 
 

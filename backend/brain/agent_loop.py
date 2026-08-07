@@ -173,7 +173,7 @@ def update_internal_state(
     world
 ):
     ensure_body(c)           # migrate old characters; no-op on new ones
-    update_body_needs(c)
+    update_body_needs(c, world=world)
     update_emotion(
         c,
         world

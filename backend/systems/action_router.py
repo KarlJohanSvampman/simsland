@@ -1173,6 +1173,10 @@ def route_action(c, world, action, speech, definitions=None, available_actions=N
         _route_call_911(c, world, action)
     elif action_type == "call_parent":
         _route_call_parent(c, world, action)
+    elif action_type == "administer_first_aid":
+        _route_administer_first_aid(c, world, action)
+    elif action_type == "take_painkiller":
+        _route_take_painkiller(c, world, action)
     elif action_type == "plant_seed":
         _route_plant_seed(c, world, action)
     elif action_type == "water":
@@ -1608,6 +1612,117 @@ def _route_call_parent(c, world, action):
 
 
 # =========================================================
+# FIRST AID / PAINKILLER — see systems/health.py's per-bodypart damage
+# rework (treat_body_part/apply_painkiller, Round 2). Same "immediate,
+# no _scaffold activity" shape as confront/call_911/call_parent above --
+# these resolve in a single tick rather than spawning an ongoing activity.
+# =========================================================
+
+_FIRST_AID_ITEM_TEMPLATES = ("first_aid_kit", "bandages")
+_SEVERITY_RANK = {"severe": 3, "medium": 2, "low": 1}
+
+
+def _worst_untreated_body_part(target):
+    """Pick the body part with the highest-severity untreated hazard, so
+    administer_first_aid can be called without the LLM having to name a
+    specific body_part."""
+    hs = target.get("health_state", {})
+    best = None
+    best_rank = -1
+    for part, bp in hs.get("body_parts", {}).items():
+        if not any(not h.get("treated") for h in bp.get("hazards", {}).values()):
+            continue
+        rank = _SEVERITY_RANK.get(bp.get("severity_level"), 0)
+        if rank > best_rank:
+            best, best_rank = part, rank
+    return best
+
+
+def _route_administer_first_aid(c, world, action):
+    """
+    Character applies first aid to a damaged body part -- their own, or a
+    nearby other's. Requires a first_aid_kit or bandages item with
+    uses > 0 in inventory; one use is consumed per attempt (mirrors
+    containers.py's bucket["uses"] decrement pattern -- see
+    systems/health.py::treat_body_part for what it actually does:
+    marks treatable hazards on that part "treated" and reduces its pain,
+    it doesn't cure them outright).
+    action: {"type": "administer_first_aid", "target_id": char_id
+             (optional, defaults to self), "body_part": one of
+             health.BODY_PARTS (optional, defaults to the target's
+             worst untreated part)}
+    """
+    from systems.personal_items import get_item_by_template, remove_item
+    from systems.health import treat_body_part, BODY_PARTS
+
+    target_id = action.get("target_id") or action.get("target") or c["id"]
+    target = c if target_id == c["id"] else world.get("characters", {}).get(target_id)
+    if not target:
+        return
+    if target is not c and c.get("building_id") != target.get("building_id"):
+        return
+
+    item = None
+    for template_id in _FIRST_AID_ITEM_TEMPLATES:
+        item = get_item_by_template(c, template_id)
+        if item and item.get("uses", 0) > 0:
+            break
+        item = None
+    if not item:
+        return
+
+    body_part = action.get("body_part")
+    if body_part not in BODY_PARTS:
+        body_part = _worst_untreated_body_part(target)
+    if not body_part:
+        return
+
+    treated = treat_body_part(target, world, body_part, method="first_aid")
+
+    item["uses"] = item.get("uses", 1) - 1
+    if item["uses"] <= 0:
+        remove_item(c, item["id"])
+
+    if treated:
+        try:
+            from brain.memory import store_memory
+            who = "myself" if target is c else target.get("name", "someone")
+            store_memory(
+                c, f"Gave first aid to {who}'s {body_part.replace('_', ' ')}.",
+                0.6, ["health", "first_aid"], "health", world.get("tick", 0),
+            )
+        except Exception:
+            pass
+
+
+def _route_take_painkiller(c, world, action):
+    """
+    Character takes pain medication -- global, non-bodypart pain relief
+    that decays over time (health.py::apply_painkiller/
+    _decay_painkiller_relief). Requires pain_medication with uses > 0.
+    action: {"type": "take_painkiller"}
+    """
+    from systems.personal_items import get_item_by_template, remove_item
+    from systems.health import apply_painkiller
+
+    item = get_item_by_template(c, "pain_medication")
+    if not item or item.get("uses", 0) <= 0:
+        return
+
+    item["uses"] = item.get("uses", 1) - 1
+    if item["uses"] <= 0:
+        remove_item(c, item["id"])
+
+    apply_painkiller(c, 30.0)
+
+    try:
+        from brain.memory import store_memory
+        store_memory(c, "Took pain medication.", 0.5, ["health", "painkiller"], "health", world.get("tick", 0))
+    except Exception:
+        pass
+
+
+# =========================================================
 # PLANTS — see systems/plants.py. Four simple, immediate interactions
 # (no _scaffold/multi-tick activity machinery -- same shape as
 # confront/call_911/call_parent above), each resolving a prop target and
@@ -1887,7 +2002,7 @@ def _route_release_hold(c, world, action):
 
 # =========================================================
 # WEAPONS — see systems/hostile_actions.py's stab/knock branch and
-# systems/health.py's apply_blade_injury/apply_blunt_trauma.
+# systems/health.py's apply_injury().
 # =========================================================
 
 def _route_wield_item(c, world, action):

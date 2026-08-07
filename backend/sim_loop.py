@@ -519,6 +519,10 @@ def tick(world):
     if every(world, CADENCE["body_composition"], offset=41):
         tick_body_composition(world)
 
+    if every(world, CADENCE["addictions"], offset=47):
+        from systems.addictions import tick_addictions
+        tick_addictions(world)
+
     # -- Battery drain + charging (phone, laptop, ...) (÷5) ───────────
     if every(world, CADENCE["phone_battery"], offset=29):
         for c in characters:

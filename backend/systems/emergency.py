@@ -264,7 +264,13 @@ def resolve(world):
                     patient = world["characters"].get(cid)
                     if not patient or patient.get("alive") is False:
                         continue
-                    from systems.health import compute_severity
+                    from systems.health import compute_severity, treat_all_by_method
+                    # On-scene ambulance clearance (decision #13's new
+                    # "ambulance" treatable_by value) -- an indefinite hazard
+                    # (one that ignores duration_hours and never self-
+                    # resolves) can be cleared right here rather than only
+                    # via a first-aid/hospital visit.
+                    treat_all_by_method(patient, world, "ambulance")
                     _, tier = compute_severity(patient)
                     if tier in ("severe", "critical") and not patient.get("off_grid"):
                         from systems.offgrid import send_offgrid
@@ -278,15 +284,6 @@ def resolve(world):
                 if inc:
                     inc["severity"] = 0
                     inc["extinguished"] = True
-                    building_id = inc.get("building_id")
-                    for c in world["characters"].values():
-                        if building_id and c.get("building_id") != building_id:
-                            continue
-                        hs = c.setdefault("health_state", {})
-                        hs["injuries"] = [
-                            inj for inj in hs.get("injuries", [])
-                            if not (inj.get("type") == "burn" and inj.get("incident_id") == inc["id"])
-                        ]
             emit("incident_resolved", {"responder_id": r["id"], "type": r["type"]})
 
 
@@ -294,11 +291,11 @@ def tick_fire_incidents(world):
     """Advance active fire incidents: severity climbs each tick until a
     'fire' responder extinguishes it (see resolve() above); harm applies to
     anyone still in the building at higher severity thresholds. Feeds the
-    real health_state pipeline (apply_burn_injury/add_pain) instead of the
+    real health_state pipeline (apply_injury/add_pain) instead of the
     disconnected legacy c["health"]["conditions"] list, so a fire actually
     registers in compute_severity() and can trip the 911 medical-emergency
     bridge like any other injury."""
-    from systems.health import apply_burn_injury, add_pain
+    from systems.health import apply_injury, add_pain
     chars = world.get("characters", {})
     for inc in world.get("incidents", []):
         if inc.get("type") != "fire" or inc.get("extinguished"):
@@ -312,8 +309,13 @@ def tick_fire_incidents(world):
             if inc["severity"] >= 40:
                 add_pain(c, 2)
             if inc["severity"] >= 70:
-                injuries = c.setdefault("health_state", {}).setdefault("injuries", [])
-                if not any(inj.get("type") == "burn" and inj.get("incident_id") == inc["id"]
-                           for inj in injuries):
-                    burn = apply_burn_injury(c, world, "torso", severity=0.5, tick=world["tick"])
-                    burn["incident_id"] = inc["id"]
+                # Dedup via a small tag list independent of body_parts --
+                # the old flat injuries-list dedup pattern (tagging one
+                # entry with incident_id) doesn't map onto the new
+                # per-bodypart shape, so this is the minimal equivalent.
+                # A list (not a set) so this stays JSON-serializable like
+                # every other piece of character state.
+                treated = c.setdefault("health_state", {}).setdefault("_treated_fire_incidents", [])
+                if inc["id"] not in treated:
+                    apply_injury(c, world, "severe_burn", "fire", tick=world["tick"])
+                    treated.append(inc["id"])

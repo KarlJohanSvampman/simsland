@@ -637,7 +637,8 @@ function populatePropTemplates() {
   for (const [id, tpl] of Object.entries(definitions.prop_templates || {})) {
     const opt       = document.createElement("option");
     opt.value       = id;
-    opt.textContent = tpl.name || id;
+    const icon      = definitions.icon_templates?.[tpl.icon]?.emoji || "";
+    opt.textContent = icon ? `${icon} ${tpl.name || id}` : (tpl.name || id);
     select.appendChild(opt);
   }
   select.onchange = () => {

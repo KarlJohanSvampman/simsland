@@ -12,6 +12,8 @@ GET  /admin/state              -> current time_scale + simulated calendar
 POST /admin/time_scale          -> set time_scale (clamped 1-10)
 GET  /admin/cognition           -> world-level cognition-scheduler histogram
 GET  /admin/cognition/{char_id} -> one character's live cognition state
+POST /admin/reset_characters    -> wipe all characters/households (keeps
+                                    the hand-placed map/buildings/roads)
 """
 
 from fastapi import APIRouter
@@ -41,6 +43,23 @@ def set_time_scale(payload: dict, sim_id: str = DEFAULT_SIM_ID):
         world["time_scale"] = value
         save_world(sim_id, world)
     return {"time_scale": value}
+
+
+@router.post("/reset_characters")
+def reset_characters(sim_id: str = DEFAULT_SIM_ID):
+    """Wipes all characters and households -- the map/buildings/roads/props
+    are hand-placed via the World Editor and aren't code-regenerable, so
+    this deliberately leaves them untouched, only unassigning each
+    building's owner_household_id since the households that owned them no
+    longer exist."""
+    with world_lock():
+        world = load_world(sim_id)
+        world["characters"] = {}
+        world["households"] = {}
+        for building in world.get("buildings", []):
+            building["owner_household_id"] = None
+        save_world(sim_id, world)
+    return {"ok": True}
 
 
 @router.get("/cognition")

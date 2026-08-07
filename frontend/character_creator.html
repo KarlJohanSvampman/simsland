@@ -534,8 +534,16 @@ button:hover { background: #556170; }
       <h3 class="tabTitle">Basic Properties</h3>
 
       <div class="formRow">
-        <label>Name</label>
-        <input type="text" id="fldName" placeholder="Character name" />
+        <label>First Name</label>
+        <input type="text" id="fldFirstName" placeholder="First name" />
+      </div>
+      <div class="formRow">
+        <label>Last Name</label>
+        <input type="text" id="fldLastName" placeholder="Last name" />
+      </div>
+      <div class="formRow">
+        <label>SSN</label>
+        <input type="text" id="fldSsn" placeholder="XXX-XX-XXXX" />
       </div>
       <div class="formRow">
         <label>Age</label>
@@ -713,6 +721,20 @@ button:hover { background: #556170; }
         <input type="text" id="newHouseholdName" placeholder="Family name" style="max-width:240px;" />
       </div>
       <button onclick="window.createHousehold()">+ Create Household</button>
+
+      <h4 class="outfitSectionTitle">House / Address</h4>
+      <div class="formRow">
+        <label>Available Buildings</label>
+        <select id="fldAvailableBuildings" style="max-width:280px;"></select>
+      </div>
+      <button onclick="window.assignBuilding()">Assign Building</button>
+
+      <div class="deriveNote" id="householdAddressNote" style="margin-top:12px;">No building assigned.</div>
+      <div class="formRow" id="householdAddressRow" style="display:none;">
+        <label>Address</label>
+        <input type="text" id="fldHouseAddress" placeholder="123 Placeholder Street" style="max-width:280px;" />
+      </div>
+      <button id="btnSaveAddress" style="display:none;" onclick="window.saveHouseAddress()">Save Address</button>
     </div>
 
     <!-- LLM CONFIG (stub) -->
