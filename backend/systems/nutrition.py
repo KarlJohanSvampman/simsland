@@ -90,6 +90,9 @@ def _sync_weight_band_disease(c, band):
         conditions.append(wanted)
 
 
+_UNDERWEIGHT_BANDS = {"thin", "skinny"}
+
+
 def _roll_weight_band_hazards(c, world, band):
     defs = world.get("definitions", {})
     hazard_registry = defs.get("health_hazard_templates", {})
@@ -97,7 +100,11 @@ def _roll_weight_band_hazards(c, world, band):
         if hazard_key not in hazard_registry or random.random() >= prob:
             continue
         hazard_tmpl = hazard_registry[hazard_key]
-        amount = hazard_tmpl.get("pain_flat", 0)
+        # Explicit user direction: hunger must never cause pain. thin/skinny
+        # are hunger's own bands, so their hazard rolls skip the pain_flat
+        # hit (fat/obese bands are overeating-driven, not hunger, and keep
+        # theirs).
+        amount = 0 if band in _UNDERWEIGHT_BANDS else hazard_tmpl.get("pain_flat", 0)
         if amount:
             from systems.health import add_pain
             add_pain(c, amount)

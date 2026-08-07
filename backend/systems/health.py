@@ -256,7 +256,7 @@ def tick_physical_conditions(char, world):
         # vocabulary injuries use. Diseases not yet migrated onto this shape
         # keep the old always-on active_symptoms list unchanged.
         if tmpl.get("symptoms"):
-            _tick_disease_symptom(char, world, defs, tmpl, state, tick)
+            _tick_disease_symptom(char, world, defs, tmpl, state, tick, cond_key)
         else:
             for symptom_key in tmpl.get("active_symptoms", []):
                 _apply_symptom_penalties(char, world, symptom_key, defs)
@@ -535,7 +535,13 @@ def _apply_manifestation(char, world, cond_key, m, tick):
         except Exception:
             pass
 
-    pain_mod = m.get("pain_mod", 0)
+    # Explicit, repeated user direction: hunger must never cause pain.
+    # Malnutrition is hunger's own downstream disease -- exempted from
+    # every pain-adding branch below, not just the symptom-selection one
+    # in _tick_disease_symptom (see _NO_PAIN_CONDITIONS).
+    no_pain = cond_key in _NO_PAIN_CONDITIONS
+
+    pain_mod = 0 if no_pain else m.get("pain_mod", 0)
     target = m.get("pain_target", "all")
     if pain_mod:
         if target in BODY_PARTS:
@@ -549,18 +555,18 @@ def _apply_manifestation(char, world, cond_key, m, tick):
         for leg in ("left_leg", "right_leg"):
             bp = hs.setdefault("body_parts", {}).setdefault(leg, _blank_body_part())
             bp["functional_status"] = "unusable"
-    elif restrict == "limp" and not pain_mod:
+    elif restrict == "limp" and not pain_mod and not no_pain:
         # Piggybacks on the existing pain-fatigue speed curve -- no new
         # movement code, just make sure there IS pain to drive it.
         add_pain(char, 3)
 
-    if m.get("blocks_movement"):
+    if m.get("blocks_movement") and not no_pain:
         hs = char.setdefault("health_state", {})
         current_pain = hs.get("pain", 0.0)
         if current_pain < PAIN_INCAPACITATED_THRESHOLD:
             add_pain(char, PAIN_INCAPACITATED_THRESHOLD - current_pain + 1)
 
-    if random.random() < m.get("incapacitation_probability", 0):
+    if not no_pain and random.random() < m.get("incapacitation_probability", 0):
         add_pain(char, 20)
 
     if m.get("spreads_contagion"):
@@ -686,7 +692,10 @@ def _hazard_locality(hazard_tmpl):
     return "systemic"
 
 
-def _tick_disease_symptom(char, world, defs, tmpl, state, tick):
+_NO_PAIN_CONDITIONS = {"malnutrition"}
+
+
+def _tick_disease_symptom(char, world, defs, tmpl, state, tick, cond_key=None):
     """Disease-side driver of the shared symptom/hazard machinery: on
     symptom_refresh_interval cadence, rolls symptoms[] (weighted_pick --
     same mutually-exclusive {ref, probability} pool convention as
@@ -731,7 +740,12 @@ def _tick_disease_symptom(char, world, defs, tmpl, state, tick):
         if current:
             state["symptom_started_tick"] = tick
             hazard_tmpl = hazard_registry.get(current, {})
-            amount = hazard_tmpl.get("pain_flat", 0)
+            # Explicit, repeated user direction: hunger must never cause
+            # pain. Malnutrition is hunger's own downstream disease, so its
+            # symptom rolls are exempted here rather than zeroing pain_flat
+            # on the shared hazard_templates (tiredness/dehydration/etc.
+            # are also used by unrelated diseases that should keep hurting).
+            amount = 0 if cond_key in _NO_PAIN_CONDITIONS else hazard_tmpl.get("pain_flat", 0)
             locality = _hazard_locality(hazard_tmpl)
             state["symptom_pain_amount"] = amount
             state["symptom_pain_locality"] = locality
@@ -1515,13 +1529,13 @@ def _decay_pain(char):
 
 def apply_body_neglect_pain(char, world):
     """Continuous pain contribution from severely neglected physical needs
-    (starvation cramps, dehydration headache, exhaustion). Proportional to
-    how far past threshold the need is; naturally self-corrects once the
-    need is met, same as the symptom-reaction pain contribution."""
+    (dehydration headache, exhaustion). Proportional to how far past
+    threshold the need is; naturally self-corrects once the need is met,
+    same as the symptom-reaction pain contribution.
+
+    Hunger deliberately does NOT contribute here -- explicit user
+    direction, repeated more than once: hunger should not add pain."""
     b = char.get("body", {})
-    hunger = b.get("hunger", 0)
-    if hunger > 85:
-        add_pain(char, (hunger - 85) / 15 * 3)
     hydration = b.get("hydration", 100)
     if hydration < 20:
         add_pain(char, (20 - hydration) / 20 * 4)
@@ -1792,7 +1806,23 @@ def apply_severity_consequences(char, world):
         # no common posture to revert from.
         set_posture(char, world, "standing")
 
-    if tier in _MEDICAL_INCIDENT_TIERS:
+    if char.get("posture") in ("incapacitated", "incapacitated_pain") and char.get("travel_state"):
+        try:
+            from systems.travel import interrupt_travel_for_incapacitation
+            interrupt_travel_for_incapacitation(char, world)
+        except Exception:
+            pass
+
+    # Pain-driven incapacitation (e.g. from an untreated injury) never
+    # necessarily pushes compute_severity()'s tier to "severe"/"critical"
+    # (see the PAIN_CRAWL_THRESHOLD/PAIN_INCAPACITATED_THRESHOLD comment
+    # above) -- without this, a character fully incapacitated_pain with no
+    # one around to notice just stays stuck forever, since nothing ever
+    # creates the medical_emergency incident auto_report_incidents()/
+    # dispatch()/resolve() (systems/emergency.py) need to send an
+    # ambulance. Reuses that exact same pipeline -- no new dispatch logic.
+    needs_medical_report = tier in _MEDICAL_INCIDENT_TIERS or char.get("posture") == "incapacitated_pain"
+    if needs_medical_report:
         if not char.get("_medical_incident_reported"):
             char["_medical_incident_reported"] = True
             try:

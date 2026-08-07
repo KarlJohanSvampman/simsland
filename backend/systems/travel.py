@@ -336,6 +336,34 @@ def _abort_travel_to_immediate(c, world):
         _send_offgrid_immediate(c, world, pending["reason"], pending["duration"])
 
 
+def interrupt_travel_for_incapacitation(c, world):
+    """Incapacitation (unconscious/coma/pain-driven, see health.py::
+    apply_severity_consequences) always cancels an in-progress trip
+    outright -- unlike _abort_travel_to_immediate()'s infrastructure-
+    failure path above, this does NOT redirect into an instant off-grid
+    stay; an incapacitated character isn't going to work/the cafe/etc
+    after all, so any _pending_offgrid is just dropped.
+
+    Without this, a character who becomes incapacitated mid-trip is left
+    stuck with travel_state still set to a TRAVEL_FROZEN_STATES value
+    (driving_out/driving_back/waiting_for_bus/on_bus_departing/
+    awaiting_bus_arrival) forever -- a frozen travel_state makes
+    agent_loop.py::update_agent() skip update_internal_state entirely,
+    including the very pain/posture processing that would otherwise let
+    them recover or get rescued (health.py's 911 bridge)."""
+    if not c.get("travel_state"):
+        return
+    if c.get("travel_mode") == "car":
+        car = household_car(world, c.get("household_id"))
+        if car:
+            car["state"]["in_use"] = False
+    c["travel_state"]  = None
+    c["travel_mode"]   = None
+    c["travel_hidden"] = False
+    c["riding_bus_id"] = None
+    c.pop("_pending_offgrid", None)
+
+
 # =========================================================
 # WALKING HOME (shared tail for car + bus, Round 3)
 # =========================================================

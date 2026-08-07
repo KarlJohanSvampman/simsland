@@ -274,7 +274,7 @@ def resolve(world):
                     _, tier = compute_severity(patient)
                     if tier in ("severe", "critical") and not patient.get("off_grid"):
                         from systems.offgrid import send_offgrid
-                        send_offgrid(patient, world, "hospital", 90 if tier == "critical" else 45)
+                        send_offgrid(patient, world, "hospital", 6 * 60 if tier == "critical" else 3 * 60)
             elif r["type"] == "fire":
                 inc = next(
                     (i for i in world.get("incidents", [])

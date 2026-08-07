@@ -1,7 +1,34 @@
 import random, uuid
 from brain.memory import store_memory
 from core.event_bus import emit
+from core.tick_schedule import TICK_RATE_SECONDS
 from systems.offgrid_narrative import request_offgrid_summary, roll_normalcy, _find_trip_cover_lie
+
+# Every send_offgrid()/_send_offgrid_immediate() "duration" argument across
+# the codebase (maybe_go_offgrid, law.py's jail sentences, emergency.py's
+# ambulance hospital stay, appointments-driven doctor/hospital/pharmacy
+# visits) was always authored as a plausible number of MINUTES (15-120) --
+# but _send_offgrid_immediate() was setting return_tick = tick + duration
+# directly, silently treating that number as raw ticks instead. At 1 tick =
+# 1 TICK_RATE_SECONDS (see core/tick_schedule.py), that made every off-grid
+# trip resolve in seconds. Converting once here, at the single lowest-level
+# function that actually sets return_tick, fixes every call site at once
+# without needing to touch any of their already-correctly-scaled numbers.
+_TICKS_PER_MINUTE = 60 / TICK_RATE_SECONDS
+
+
+def _minutes_to_ticks(minutes):
+    return round(minutes * _TICKS_PER_MINUTE)
+
+
+# Explicit user direction: no discretionary off-grid trip should eat more
+# than 2 hours of sim time -- a work shift, a school day, a hospital
+# admission, or a jail sentence are all legitimately long by nature; a
+# cafe/shopping/leisure/errand trip is not. Enforced as a hard ceiling
+# inside _send_offgrid_immediate() itself (not just at each call site) so
+# it holds regardless of caller, present or future.
+MAX_OFFGRID_MINUTES = 120
+_UNCAPPED_DURATION_REASONS = {"work", "school", "hospital", "hospital_treatment", "surgery", "jail"}
 
 # ── LLM narrator ─────────────────────────────────────────────────────────────
 # Off-grid categories migrated off the procedural _story() dice-roller onto
@@ -475,7 +502,13 @@ def _offgrid_trips_today(c, world):
     return c["off_grid_trip_count"]
 
 
-def send_offgrid(c, world, reason, duration):
+def send_offgrid(c, world, reason, duration_minutes):
+    """duration_minutes: how long this trip should take, in minutes (see
+    _minutes_to_ticks/MAX_OFFGRID_MINUTES above) -- converted to ticks and
+    capped at the single lowest-level function that actually sets
+    return_tick (_send_offgrid_immediate), so every call site here just
+    authors a plausible real-world duration and doesn't need to think about
+    ticks at all."""
     if c.get("off_grid") or c.get("legal", {}).get("status") == "jailed":
         return False
     if c.get("travel_state"):
@@ -487,21 +520,56 @@ def send_offgrid(c, world, reason, duration):
 
     if reason in _TRAVEL_ELIGIBLE_REASONS or reason.startswith("event:"):
         from systems.travel import begin_travel
-        return begin_travel(c, world, reason, duration)
+        return begin_travel(c, world, reason, duration_minutes)
 
-    return _send_offgrid_immediate(c, world, reason, duration)
+    return _send_offgrid_immediate(c, world, reason, duration_minutes)
 
 
-def _send_offgrid_immediate(c, world, reason, duration):
+def send_offgrid_chain(c, world, stops):
+    """Send a character off-grid through multiple stops in a row -- e.g. the
+    bank, then the grocery store, then home -- without walking back in
+    between each one. stops: a list of (reason, duration_minutes) pairs,
+    run in order. Only the FIRST stop's physical trip (bus/car, see
+    travel.py) is actually simulated; process_return() below chains
+    straight into each subsequent stop's own off-grid clock the moment the
+    previous one's story resolves (skipping the "go home" leg), and only
+    does the real drive/bus-ride home once every stop is done."""
+    if not stops:
+        return False
+    first_reason, first_minutes = stops[0]
+    if not send_offgrid(c, world, first_reason, first_minutes):
+        return False
+    c["offgrid_queue"] = list(stops[1:])
+    return True
+
+
+def _send_offgrid_immediate(c, world, reason, duration_minutes):
     if c.get("off_grid") or c.get("legal", {}).get("status") == "jailed":
         return False
+    if reason not in _UNCAPPED_DURATION_REASONS:
+        duration_minutes = min(duration_minutes, MAX_OFFGRID_MINUTES)
     c["off_grid"]      = True
     c["off_grid_reason"] = reason
-    c["return_tick"]   = world["tick"] + duration
+    c["return_tick"]   = world["tick"] + _minutes_to_ticks(duration_minutes)
     world.setdefault("offmap", []).append({
         "character_id": c["id"], "reason": reason, "return_tick": c["return_tick"],
     })
     return True
+
+
+_ERRAND_CHAIN_POOL = ("shopping", "leisure", "gym", "cafe", "job_search")
+
+
+def _send_errand(c, world, reason, minutes):
+    """Sends a single errand off-grid, with a modest chance of chaining one
+    more short stop onto it (see send_offgrid_chain) -- e.g. "went shopping,
+    then swung by a cafe" as one continuous trip instead of two separate
+    round trips home in between."""
+    stops = [(reason, minutes)]
+    if random.random() < 0.25:
+        extra = random.choice([r for r in _ERRAND_CHAIN_POOL if r != reason])
+        stops.append((extra, random.randint(20, 45)))
+    send_offgrid_chain(c, world, stops)
 
 
 def maybe_go_offgrid(c, world):
@@ -509,13 +577,13 @@ def maybe_go_offgrid(c, world):
         return
     r = random.random()
     if c.get("employed") and world["calendar"]["minute_of_day"] in [480, 490]:
-        send_offgrid(c, world, "work", 48)
+        send_offgrid(c, world, "work", 8 * 60)
     elif not c.get("employed") and r < 0.01:
-        send_offgrid(c, world, "job_search", 20)
+        send_offgrid(c, world, "job_search", 60)
     elif r < 0.004:
-        send_offgrid(c, world, "shopping", 18)
+        _send_errand(c, world, "shopping", 45)
     elif r < 0.008:
-        send_offgrid(c, world, random.choice(["leisure", "gym", "cafe"]), 28)
+        _send_errand(c, world, random.choice(["leisure", "gym", "cafe"]), random.randint(30, 60))
 
 
 def maybe_schedule_doctor_visit(c, world):
@@ -545,7 +613,7 @@ def maybe_schedule_doctor_visit(c, world):
     if appt:
         if is_appointment_due(appt, world):
             appt["fulfilled"] = True
-            duration = 60 if reason == "hospital" else 20
+            duration = 4 * 60 if reason == "hospital" else 45
             send_offgrid(c, world, reason, duration)
         return
 
@@ -807,6 +875,21 @@ def process_return(c, world):
         "story":        public_story,
     })
     del events[:-300]  # world["events"] otherwise grows forever
+
+    # Chained multi-stop outing (see send_offgrid_chain()): this leg's story/
+    # money/treatment effects just applied above like any other, but instead
+    # of heading home, go straight from this stop to the next one -- still
+    # off the grid, no drive/bus-ride home in between. travel_mode/
+    # travel_state are left exactly as they are (still "car"/"bus", still
+    # hidden) so the eventual real trip home, once the queue empties, is the
+    # only physical leg simulated.
+    queue = c.get("offgrid_queue")
+    if queue:
+        next_reason, next_minutes = queue[0]
+        c["offgrid_queue"] = queue[1:]
+        _send_offgrid_immediate(c, world, next_reason, next_minutes)
+        return
+    c.pop("offgrid_queue", None)
 
     # Errand is narratively complete, but a travel-mode character (see
     # travel.py) isn't home yet -- defer their visible reveal to the
