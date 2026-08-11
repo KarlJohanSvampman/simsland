@@ -3392,16 +3392,20 @@ function renderCharacterInspector(id){
     rows.push(`<span style="color:#6cf">Traveling: ${c.travel_state}</span>`);
   }
 
-  const h = c.health || {};
+  // c.body is the real, live 0-100 needs simulation (systems/body.py) --
+  // c.health is a dead legacy dict that schema_defaults only ever
+  // defaults to 0.0 and nothing since updates, which made every one of
+  // these always read as ~0% regardless of the character's actual state.
+  const b = c.body || {};
   const needs = [];
-  if(h.energy   != null) needs.push(`energy ${Math.round(h.energy * 100)}%`);
-  if(h.hunger   != null) needs.push(`hunger ${Math.round(h.hunger * 100)}%`);
-  if(h.hygiene  != null) needs.push(`hygiene ${Math.round(h.hygiene * 100)}%`);
-  if(h.bladder  != null) needs.push(`bladder ${Math.round(h.bladder * 100)}%`);
-  if(h.fatigue  != null) needs.push(`fatigue ${Math.round(h.fatigue * 100)}%`);
-  if(h.stress   != null) needs.push(`stress ${Math.round(h.stress * 100)}%`);
+  if(b.energy   != null) needs.push(`energy ${Math.round(b.energy)}%`);
+  if(b.hunger   != null) needs.push(`hunger ${Math.round(b.hunger)}%`);
+  if(b.hygiene  != null) needs.push(`hygiene ${Math.round(b.hygiene)}%`);
+  if(b.bladder  != null) needs.push(`bladder ${Math.round(b.bladder)}%`);
+  if(b.fatigue  != null) needs.push(`fatigue ${Math.round(b.fatigue)}%`);
+  if(c.stress   != null) needs.push(`stress ${Math.round(c.stress)}%`);
   if(needs.length) rows.push(`Needs: ${needs.join(", ")}`);
-  if(h.sick) rows.push(`<span style="color:#fc6">Sick</span>`);
+  if(b.sickness > 30) rows.push(`<span style="color:#fc6">Sick</span>`);
 
   const hs = c.health_state || {};
   if(hs.pain) rows.push(`Pain: ${Math.round(hs.pain)}%`);

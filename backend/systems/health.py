@@ -1536,23 +1536,6 @@ def _decay_pain(char):
     _recompute_pain(char)
 
 
-def apply_body_neglect_pain(char, world):
-    """Continuous pain contribution from severely neglected physical needs
-    (dehydration headache, exhaustion). Proportional to how far past
-    threshold the need is; naturally self-corrects once the need is met,
-    same as the symptom-reaction pain contribution.
-
-    Hunger deliberately does NOT contribute here -- explicit user
-    direction, repeated more than once: hunger should not add pain."""
-    b = char.get("body", {})
-    hydration = b.get("hydration", 100)
-    if hydration < 20:
-        add_pain(char, (20 - hydration) / 20 * 4)
-    sleep_debt = b.get("sleep_debt", 0)
-    if sleep_debt > 75:
-        add_pain(char, (sleep_debt - 75) / 25 * 2)
-
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -1853,7 +1836,6 @@ def process_health(char, world):
                 return
     _decay_pain(char)
     _decay_painkiller_relief(char)
-    apply_body_neglect_pain(char, world)
     tick_health_hazards(char, world)
     tick_hazard_manifestations(char, world)
     tick = world.get("tick", 0)
