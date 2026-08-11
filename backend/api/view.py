@@ -331,7 +331,11 @@ def get_view(
         "props": props,
 
         # semantic defs
-        "definitions": definitions
+        "definitions": definitions,
+
+        # current world tick -- frontend needs this for off-grid/travel
+        # "back in Nm" countdowns (see main.js::renderCharacterInspector).
+        "tick": world.get("tick", 0)
     }
 
 

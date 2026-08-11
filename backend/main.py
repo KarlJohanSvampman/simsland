@@ -100,7 +100,7 @@ def _build_full_snapshot(world, definitions, cx, cy, zoom):
     return get_view(sim_id=SIM_ID, cx=cx, cy=cy, zoom=zoom)
 
 
-def _build_delta(dirty: dict, cx: int, cy: int, zoom: int) -> dict | None:
+def _build_delta(world: dict, dirty: dict, cx: int, cy: int, zoom: int) -> dict | None:
     """
     Filter the dirty entities to only what falls within this client's viewport.
     Returns None if nothing in the delta is visible to this client.
@@ -123,6 +123,9 @@ def _build_delta(dirty: dict, cx: int, cy: int, zoom: int) -> dict | None:
         "type":       "delta",
         "characters": visible_chars,
         "props":      visible_props,
+        # current world tick -- see api/view.py::get_view()'s matching
+        # field, both feed main.js's _worldState.tick.
+        "tick":       world.get("tick", 0),
     }
 
 
@@ -229,7 +232,7 @@ async def loop():
                         await ws.send_json(snapshot)
                         client["needs_full"] = False
                     else:
-                        delta = _build_delta(dirty, cx, cy, zoom)
+                        delta = _build_delta(world, dirty, cx, cy, zoom)
                         if delta:
                             await ws.send_json(delta)
                 except Exception:

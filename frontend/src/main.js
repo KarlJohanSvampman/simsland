@@ -3998,6 +3998,9 @@ async function _applyState(state) {
 
 async function _applyDelta(delta) {
   // Merge changed characters and props into cached world state
+  if (delta.tick != null) {
+    _worldState.tick = delta.tick;
+  }
   if (delta.characters) {
     _worldState.characters = { ...(_worldState.characters || {}), ...delta.characters };
   }
