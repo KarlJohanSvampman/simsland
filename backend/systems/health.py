@@ -1206,10 +1206,19 @@ def weighted_pick(options):
 def add_bodypart_pain(char, body_part, amount):
     """Adds pain to a specific body part's contribution (used by
     apply_injury and, from Round 5, disease symptoms with a body-part
-    locality) and recomputes the aggregate hs["pain"]."""
+    locality) and recomputes the aggregate hs["pain"].
+
+    Capped at 100 -- same reasoning as add_pain()'s cap: pain_contribution
+    doesn't decay on its own (only treat_body_part reduces it), and
+    tick_hazard_manifestations() can call this repeatedly on its own
+    interval_minutes cadence with no cap of its own, so an untreated
+    condition left running would otherwise accumulate a body part's
+    contribution into the thousands -- 100x more than the aggregate scale
+    hs["pain"] actually reads on, and 100x longer to work back off with
+    first aid/treatment once it finally is treated."""
     hs = char.setdefault("health_state", {})
     bp = hs.setdefault("body_parts", {}).setdefault(body_part, _blank_body_part())
-    bp["pain_contribution"] = max(0.0, bp.get("pain_contribution", 0.0) + amount)
+    bp["pain_contribution"] = max(0.0, min(100.0, bp.get("pain_contribution", 0.0) + amount))
     _recompute_pain(char)
 
 
@@ -1301,11 +1310,11 @@ def apply_injury(char, world, injury_template_key, cause, tick=None):
 
     pain_flat = tmpl.get("health_state_impact", {}).get("pain", 0.0)
     weight = 1.0 if body_part in _CORE_BODY_PARTS else 0.5
-    bp["pain_contribution"] = bp.get("pain_contribution", 0.0) + pain_flat * weight
+    add_bodypart_pain(char, body_part, pain_flat * weight)
     if "internal_bleeding" in bp["hazards"]:
         # internal bleeding ignores the core/extremity weighting -- it's
         # "more serious... regardless of bodypart" per the user's spec.
-        bp["pain_contribution"] += hazard_registry.get("internal_bleeding", {}).get("pain_flat", 15)
+        add_bodypart_pain(char, body_part, hazard_registry.get("internal_bleeding", {}).get("pain_flat", 15))
 
     bp["functional_status"] = _functional_status_for(severity_level, bp["hazards"])
 
@@ -1436,7 +1445,7 @@ def tick_health_hazards(char, world):
             pain_add = tmpl.get("pain_per_tick", 0) * relief_mult
             weight = 1.0 if part in _CORE_BODY_PARTS else 0.5
             if pain_add:
-                bp["pain_contribution"] = bp.get("pain_contribution", 0.0) + pain_add * weight
+                add_bodypart_pain(char, part, pain_add * weight)
                 changed = True
             if not tmpl.get("superficial", True):
                 escalation = tmpl.get("escalation_per_tick", 0) * relief_mult
