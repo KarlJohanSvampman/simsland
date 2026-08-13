@@ -682,7 +682,50 @@ function poolFromTemplates(templatesDict) {
     id,
     label: t.name || t.label || id,
     polarity: t.polarity,   // undefined for the categoryless-polarity trait_templates entries
+    raw: t,                 // full template -- descriptions/learn_chance/modifiers/conditions
   }));
+}
+
+// Color coding for cognitive_modifiers/belief_modifiers/trait_modifiers,
+// per the cognition/trait-learning plan: 0% = incompatible (grey), 100% =
+// automatic (white), positive <100 = boost (green), negative = penalty
+// (red).
+function _modifierColor(modifier) {
+  if (modifier === 0) return '#888';
+  if (modifier === 100) return '#eee';
+  if (modifier > 0) return '#6c6';
+  return '#f66';
+}
+
+function _modifierBadges(entry) {
+  const raw = entry.raw;
+  if (!raw) return null;
+  const mods = [
+    ...(raw.cognitive_modifiers || []).map(m => ({ target: m.trait, modifier: m.modifier })),
+    ...(raw.belief_modifiers || []).map(m => ({ target: m.belief, modifier: m.modifier })),
+    ...(raw.trait_modifiers || []).map(m => ({ target: m.trait, modifier: m.modifier })),
+  ];
+  if (!mods.length) return null;
+
+  const wrap = document.createElement('div');
+  wrap.className = 'chipModifiers';
+  for (const m of mods) {
+    const badge = document.createElement('span');
+    badge.className = 'modBadge';
+    badge.style.color = _modifierColor(m.modifier);
+    badge.style.borderColor = _modifierColor(m.modifier);
+    const sign = m.modifier > 0 && m.modifier !== 100 ? '+' : '';
+    badge.textContent = `${m.target} ${sign}${m.modifier}%`;
+    wrap.appendChild(badge);
+  }
+  return wrap;
+}
+
+function _chipTooltip(entry) {
+  const raw = entry.raw;
+  if (!raw) return entry.label;
+  const desc = (raw.descriptions && raw.descriptions.balanced) || raw.description;
+  return desc ? `${entry.label}\n${desc}` : entry.label;
 }
 
 function sampleIds(pool, count) {
@@ -746,6 +789,7 @@ function renderPoolPicker(container, pool, getAssigned, setAssigned, onChange) {
     chip.className = 'traitChip' + (entry.polarity ? ` ${entry.polarity}` : '');
     chip.draggable = true;
     chip.dataset.id = entry.id;
+    chip.title = _chipTooltip(entry);
     chip.addEventListener('dragstart', (e) => {
       e.dataTransfer.setData('text/plain', entry.id);
     });
@@ -753,6 +797,8 @@ function renderPoolPicker(container, pool, getAssigned, setAssigned, onChange) {
     label.className = 'chipLabel';
     label.textContent = entry.icon ? `${entry.icon} ${entry.label}` : entry.label;
     chip.appendChild(label);
+    const badges = _modifierBadges(entry);
+    if (badges) chip.appendChild(badges);
     if (removable) {
       const rm = document.createElement('button');
       rm.className = 'chipRemove';

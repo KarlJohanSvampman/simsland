@@ -3359,6 +3359,29 @@ function focusCameraOn(x, y){
 // on every subsequent state/delta apply while this character stays
 // selected (see the updateSelectionInspector() hook in _applyState), so
 // the panel tracks the character live rather than freezing at click time.
+// Mirrors backend/systems/schema_defaults.py's COGNITION_CORE_TRAITS and
+// this session's description-flavor mapping (Balanced->balanced,
+// Logical->positive, Self-Aware->negative -- see the cognition/trait
+// learning plan). Kept in sync manually; there are only 3 entries.
+const COGNITION_CORE_IDS = {
+  cognition_logical:   "logical",
+  cognition_balanced:  "balanced",
+  cognition_selfaware: "self_aware",
+};
+const COGNITION_FLAVOR = { logical: "positive", balanced: "balanced", self_aware: "negative" };
+
+function _cognitionInfo(traits){
+  for(const t of traits || []){
+    if(COGNITION_CORE_IDS[t]) return { key: COGNITION_CORE_IDS[t], id: t };
+  }
+  return { key: "balanced", id: null };
+}
+
+function _templateDescription(tmpl, flavorKey){
+  if(!tmpl) return null;
+  return (tmpl.descriptions && tmpl.descriptions[flavorKey]) || tmpl.description || null;
+}
+
 function renderCharacterInspector(id){
   const el = document.getElementById("viewerSelection");
   if(!el) return;
@@ -3412,6 +3435,39 @@ function renderCharacterInspector(id){
   if(hs.severity_index) rows.push(`Severity: ${hs.severity_index.toFixed(2)}`);
   const emergencies = Object.keys(hs.active_emergencies || {});
   if(emergencies.length) rows.push(`<span style="color:#f66">Emergency: ${emergencies.join(", ")}</span>`);
+
+  // Traits/beliefs -- flavored by the character's cognition-core trait
+  // (Logical/Balanced/Self-Aware, see backend/systems/schema_defaults.py's
+  // COGNITION_CORE_TRAITS): each trait_templates/belief_templates entry
+  // carries 3 description flavors, one per cognition type.
+  const traitTemplates = definitions.trait_templates || {};
+  const beliefTemplates = definitions.belief_templates || {};
+  const allTraits = [...(c.traits || []), ...(c.personality_traits || [])];
+  const cogInfo = _cognitionInfo(allTraits);
+  const cogTmpl = traitTemplates[cogInfo.id];
+  if(cogTmpl) rows.push(`Cognition: <b>${cogTmpl.name}</b>`);
+
+  const otherTraits = allTraits.filter(t => !COGNITION_CORE_IDS[t]);
+  if(otherTraits.length){
+    const traitLines = otherTraits.map(tid => {
+      const tmpl = traitTemplates[tid];
+      const label = tmpl?.name || tid;
+      const desc = _templateDescription(tmpl, COGNITION_FLAVOR[cogInfo.key]);
+      return desc ? `${label} <span style="opacity:.65">— ${desc}</span>` : label;
+    });
+    rows.push(`Traits:<br>&nbsp;&nbsp;${traitLines.join("<br>&nbsp;&nbsp;")}`);
+  }
+
+  const heldBeliefs = c.held_beliefs || [];
+  if(heldBeliefs.length){
+    const beliefLines = heldBeliefs.map(bid => {
+      const tmpl = beliefTemplates[bid];
+      const label = tmpl?.name || bid;
+      const desc = _templateDescription(tmpl, COGNITION_FLAVOR[cogInfo.key]);
+      return desc ? `${label} <span style="opacity:.65">— ${desc}</span>` : label;
+    });
+    rows.push(`Beliefs:<br>&nbsp;&nbsp;${beliefLines.join("<br>&nbsp;&nbsp;")}`);
+  }
 
   if(c.household_id) rows.push(`Household: ${c.household_id}`);
 

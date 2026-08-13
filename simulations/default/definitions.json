@@ -26217,6 +26217,43 @@
     }
   },
   "trait_templates": {
+    "cognition_logical": {
+      "name": "Logical Cognition",
+      "polarity": "neutral",
+      "is_cognition_core": true,
+      "description": "Reasons things through step by step; leans on evidence and consistency over gut feeling.",
+      "need_modifiers": {},
+      "skill_modifiers": {
+        "logic": 0.1
+      },
+      "behavior_flags": [
+        "cognition_logical"
+      ]
+    },
+    "cognition_balanced": {
+      "name": "Balanced Cognition",
+      "polarity": "neutral",
+      "is_cognition_core": true,
+      "description": "Draws on both reason and feeling in roughly equal measure; adapts its approach to the situation.",
+      "need_modifiers": {},
+      "skill_modifiers": {},
+      "behavior_flags": [
+        "cognition_balanced"
+      ]
+    },
+    "cognition_selfaware": {
+      "name": "Self-Aware Cognition",
+      "polarity": "neutral",
+      "is_cognition_core": true,
+      "description": "Reads emotional undercurrents easily, in itself and others; decisions are shaped by that awareness.",
+      "need_modifiers": {},
+      "skill_modifiers": {
+        "charisma": 0.1
+      },
+      "behavior_flags": [
+        "cognition_selfaware"
+      ]
+    },
     "honest": {
       "name": "Honest",
       "polarity": "positive",
@@ -26229,7 +26266,30 @@
       },
       "behavior_flags": [
         "honest"
-      ]
+      ],
+      "descriptions": {
+        "positive": "Seen clearly, it's a strength worth leaning into: Tells the truth even when it is uncomfortable; avoids deception.",
+        "negative": "It isn't purely a virtue -- it can backfire: Tells the truth even when it is uncomfortable; avoids deception.",
+        "balanced": "Plainly put: Tells the truth even when it is uncomfortable; avoids deception."
+      },
+      "learn_chance": {
+        "balanced": 20.0,
+        "logical": 20.0,
+        "self_aware": 26.0
+      },
+      "cognitive_modifiers": [
+        {
+          "trait": "dishonest",
+          "modifier": 0
+        }
+      ],
+      "belief_modifiers": [
+        {
+          "belief": "honesty_is_always_best",
+          "modifier": 100
+        }
+      ],
+      "conditions": []
     },
     "loyal": {
       "name": "Loyal",
@@ -26241,7 +26301,25 @@
       "skill_modifiers": {},
       "behavior_flags": [
         "loyal"
-      ]
+      ],
+      "descriptions": {
+        "positive": "It works in Loyal's favor more often than not: Stays committed to friends and family; unlikely to betray trust.",
+        "negative": "There's a downside once it overshoots: Stays committed to friends and family; unlikely to betray trust.",
+        "balanced": "Plainly put: Stays committed to friends and family; unlikely to betray trust."
+      },
+      "learn_chance": {
+        "balanced": 20.0,
+        "logical": 20.0,
+        "self_aware": 26.0
+      },
+      "cognitive_modifiers": [
+        {
+          "trait": "independent",
+          "modifier": -15
+        }
+      ],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "compassionate": {
       "name": "Compassionate",
@@ -26256,7 +26334,30 @@
       },
       "behavior_flags": [
         "compassionate"
-      ]
+      ],
+      "descriptions": {
+        "positive": "At its best, this is a real asset: Deeply affected by others' suffering; quick to offer help.",
+        "negative": "Taken too far, it curdles: Deeply affected by others' suffering; quick to offer help.",
+        "balanced": "Deeply affected by others' suffering; quick to offer help."
+      },
+      "learn_chance": {
+        "balanced": 20.0,
+        "logical": 20.0,
+        "self_aware": 26.0
+      },
+      "cognitive_modifiers": [
+        {
+          "trait": "cruel",
+          "modifier": 0
+        }
+      ],
+      "belief_modifiers": [
+        {
+          "belief": "people_are_good",
+          "modifier": 15
+        }
+      ],
+      "conditions": []
     },
     "generous": {
       "name": "Generous",
@@ -26268,7 +26369,25 @@
       "skill_modifiers": {},
       "behavior_flags": [
         "generous"
-      ]
+      ],
+      "descriptions": {
+        "positive": "A dependable part of who they are: Freely shares money, time, and resources with others.",
+        "negative": "It isn't purely a virtue -- it can backfire: Freely shares money, time, and resources with others.",
+        "balanced": "Plainly put: Freely shares money, time, and resources with others."
+      },
+      "learn_chance": {
+        "balanced": 20.0,
+        "logical": 20.0,
+        "self_aware": 23.0
+      },
+      "cognitive_modifiers": [
+        {
+          "trait": "greedy",
+          "modifier": 0
+        }
+      ],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "patient": {
       "name": "Patient",
@@ -26282,7 +26401,20 @@
       },
       "behavior_flags": [
         "patient"
-      ]
+      ],
+      "descriptions": {
+        "positive": "At its best, this is a real asset: Tolerates delays and frustration without becoming agitated.",
+        "negative": "It isn't purely a virtue -- it can backfire: Tolerates delays and frustration without becoming agitated.",
+        "balanced": "Plainly put: Tolerates delays and frustration without becoming agitated."
+      },
+      "learn_chance": {
+        "balanced": 20.0,
+        "logical": 20.0,
+        "self_aware": 20.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "courageous": {
       "name": "Courageous",
@@ -26294,7 +26426,20 @@
       "skill_modifiers": {},
       "behavior_flags": [
         "courageous"
-      ]
+      ],
+      "descriptions": {
+        "positive": "A dependable part of who they are: Acts despite fear; willing to take risks for the right reasons.",
+        "negative": "Taken too far, it curdles: Acts despite fear; willing to take risks for the right reasons.",
+        "balanced": "Plainly put: Acts despite fear; willing to take risks for the right reasons."
+      },
+      "learn_chance": {
+        "balanced": 20.0,
+        "logical": 20.0,
+        "self_aware": 20.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "curious": {
       "name": "Curious",
@@ -26309,7 +26454,25 @@
       },
       "behavior_flags": [
         "curious"
-      ]
+      ],
+      "descriptions": {
+        "positive": "At its best, this is a real asset: Driven to explore and learn; asks questions and investigates.",
+        "negative": "Taken too far, it curdles: Driven to explore and learn; asks questions and investigates.",
+        "balanced": "Driven to explore and learn; asks questions and investigates."
+      },
+      "learn_chance": {
+        "balanced": 20.0,
+        "logical": 32.5,
+        "self_aware": 20.0
+      },
+      "cognitive_modifiers": [
+        {
+          "trait": "wise",
+          "modifier": 30
+        }
+      ],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "creative": {
       "name": "Creative",
@@ -26324,7 +26487,20 @@
       },
       "behavior_flags": [
         "creative"
-      ]
+      ],
+      "descriptions": {
+        "positive": "A dependable part of who they are: Generates novel ideas and finds unconventional solutions.",
+        "negative": "Taken too far, it curdles: Generates novel ideas and finds unconventional solutions.",
+        "balanced": "Plainly put: Generates novel ideas and finds unconventional solutions."
+      },
+      "learn_chance": {
+        "balanced": 20.0,
+        "logical": 27.5,
+        "self_aware": 20.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "diligent": {
       "name": "Diligent",
@@ -26339,7 +26515,25 @@
       },
       "behavior_flags": [
         "diligent"
-      ]
+      ],
+      "descriptions": {
+        "positive": "At its best, this is a real asset: Works steadily and carefully; completes tasks without cutting corners.",
+        "negative": "It isn't purely a virtue -- it can backfire: Works steadily and carefully; completes tasks without cutting corners.",
+        "balanced": "In practice: Works steadily and carefully; completes tasks without cutting corners."
+      },
+      "learn_chance": {
+        "balanced": 20.0,
+        "logical": 25.0,
+        "self_aware": 20.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [
+        {
+          "belief": "hard_work_pays_off",
+          "modifier": 20
+        }
+      ],
+      "conditions": []
     },
     "optimistic": {
       "name": "Optimistic",
@@ -26352,7 +26546,30 @@
       "skill_modifiers": {},
       "behavior_flags": [
         "optimistic"
-      ]
+      ],
+      "descriptions": {
+        "positive": "Seen clearly, it's a strength worth leaning into: Expects positive outcomes; maintains high spirits in adversity.",
+        "negative": "Taken too far, it curdles: Expects positive outcomes; maintains high spirits in adversity.",
+        "balanced": "Plainly put: Expects positive outcomes; maintains high spirits in adversity."
+      },
+      "learn_chance": {
+        "balanced": 20.0,
+        "logical": 20.0,
+        "self_aware": 20.0
+      },
+      "cognitive_modifiers": [
+        {
+          "trait": "pessimistic",
+          "modifier": -30
+        }
+      ],
+      "belief_modifiers": [
+        {
+          "belief": "everything_happens_for_a_reason",
+          "modifier": 15
+        }
+      ],
+      "conditions": []
     },
     "humble": {
       "name": "Humble",
@@ -26362,7 +26579,20 @@
       "skill_modifiers": {},
       "behavior_flags": [
         "humble"
-      ]
+      ],
+      "descriptions": {
+        "positive": "Seen clearly, it's a strength worth leaning into: Does not boast or seek status; acknowledges own limitations.",
+        "negative": "Taken too far, it curdles: Does not boast or seek status; acknowledges own limitations.",
+        "balanced": "Does not boast or seek status; acknowledges own limitations."
+      },
+      "learn_chance": {
+        "balanced": 20.0,
+        "logical": 20.0,
+        "self_aware": 20.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "forgiving": {
       "name": "Forgiving",
@@ -26374,7 +26604,20 @@
       "skill_modifiers": {},
       "behavior_flags": [
         "forgiving"
-      ]
+      ],
+      "descriptions": {
+        "positive": "A dependable part of who they are: Lets go of grudges and gives others second chances.",
+        "negative": "Taken too far, it curdles: Lets go of grudges and gives others second chances.",
+        "balanced": "In practice: Lets go of grudges and gives others second chances."
+      },
+      "learn_chance": {
+        "balanced": 20.0,
+        "logical": 20.0,
+        "self_aware": 20.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "disciplined": {
       "name": "Disciplined",
@@ -26389,7 +26632,25 @@
       },
       "behavior_flags": [
         "disciplined"
-      ]
+      ],
+      "descriptions": {
+        "positive": "It works in Disciplined's favor more often than not: Follows routines and resists impulses to stay on track.",
+        "negative": "It isn't purely a virtue -- it can backfire: Follows routines and resists impulses to stay on track.",
+        "balanced": "Plainly put: Follows routines and resists impulses to stay on track."
+      },
+      "learn_chance": {
+        "balanced": 20.0,
+        "logical": 25.0,
+        "self_aware": 20.0
+      },
+      "cognitive_modifiers": [
+        {
+          "trait": "low_self_control",
+          "modifier": -25
+        }
+      ],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "responsible": {
       "name": "Responsible",
@@ -26399,7 +26660,20 @@
       "skill_modifiers": {},
       "behavior_flags": [
         "responsible"
-      ]
+      ],
+      "descriptions": {
+        "positive": "At its best, this is a real asset: Takes ownership of duties; reliably handles household obligations.",
+        "negative": "There's a downside once it overshoots: Takes ownership of duties; reliably handles household obligations.",
+        "balanced": "In practice: Takes ownership of duties; reliably handles household obligations."
+      },
+      "learn_chance": {
+        "balanced": 20.0,
+        "logical": 20.0,
+        "self_aware": 20.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "reliable": {
       "name": "Reliable",
@@ -26409,7 +26683,20 @@
       "skill_modifiers": {},
       "behavior_flags": [
         "reliable"
-      ]
+      ],
+      "descriptions": {
+        "positive": "A dependable part of who they are: Consistently follows through on commitments and promises.",
+        "negative": "There's a downside once it overshoots: Consistently follows through on commitments and promises.",
+        "balanced": "In practice: Consistently follows through on commitments and promises."
+      },
+      "learn_chance": {
+        "balanced": 20.0,
+        "logical": 20.0,
+        "self_aware": 20.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "adaptable": {
       "name": "Adaptable",
@@ -26421,7 +26708,25 @@
       "skill_modifiers": {},
       "behavior_flags": [
         "adaptable"
-      ]
+      ],
+      "descriptions": {
+        "positive": "At its best, this is a real asset: Adjusts quickly to new situations and changing circumstances.",
+        "negative": "Taken too far, it curdles: Adjusts quickly to new situations and changing circumstances.",
+        "balanced": "Adjusts quickly to new situations and changing circumstances."
+      },
+      "learn_chance": {
+        "balanced": 20.0,
+        "logical": 20.0,
+        "self_aware": 20.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [
+        {
+          "belief": "change_is_good",
+          "modifier": 20
+        }
+      ],
+      "conditions": []
     },
     "resourceful": {
       "name": "Resourceful",
@@ -26434,7 +26739,20 @@
       },
       "behavior_flags": [
         "resourceful"
-      ]
+      ],
+      "descriptions": {
+        "positive": "Seen clearly, it's a strength worth leaning into: Finds clever solutions using whatever is available; improvises well.",
+        "negative": "It isn't purely a virtue -- it can backfire: Finds clever solutions using whatever is available; improvises well.",
+        "balanced": "In practice: Finds clever solutions using whatever is available; improvises well."
+      },
+      "learn_chance": {
+        "balanced": 20.0,
+        "logical": 27.5,
+        "self_aware": 20.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "perceptive": {
       "name": "Perceptive",
@@ -26446,7 +26764,25 @@
       },
       "behavior_flags": [
         "perceptive"
-      ]
+      ],
+      "descriptions": {
+        "positive": "It works in Perceptive's favor more often than not: Notices details others miss; reads situations and people accurately.",
+        "negative": "It isn't purely a virtue -- it can backfire: Notices details others miss; reads situations and people accurately.",
+        "balanced": "Notices details others miss; reads situations and people accurately."
+      },
+      "learn_chance": {
+        "balanced": 20.0,
+        "logical": 30.0,
+        "self_aware": 20.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [
+        {
+          "belief": "know_thyself",
+          "modifier": 15
+        }
+      ],
+      "conditions": []
     },
     "ambitious": {
       "name": "Ambitious",
@@ -26458,7 +26794,25 @@
       "skill_modifiers": {},
       "behavior_flags": [
         "ambitious"
-      ]
+      ],
+      "descriptions": {
+        "positive": "A dependable part of who they are: Sets high goals and works hard to advance career and wealth.",
+        "negative": "There's a downside once it overshoots: Sets high goals and works hard to advance career and wealth.",
+        "balanced": "Plainly put: Sets high goals and works hard to advance career and wealth."
+      },
+      "learn_chance": {
+        "balanced": 20.0,
+        "logical": 20.0,
+        "self_aware": 20.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [
+        {
+          "belief": "self_made_success",
+          "modifier": 20
+        }
+      ],
+      "conditions": []
     },
     "confident": {
       "name": "Confident",
@@ -26472,7 +26826,20 @@
       },
       "behavior_flags": [
         "confident"
-      ]
+      ],
+      "descriptions": {
+        "positive": "It works in Confident's favor more often than not: Believes in own abilities; acts decisively without excessive doubt.",
+        "negative": "It isn't purely a virtue -- it can backfire: Believes in own abilities; acts decisively without excessive doubt.",
+        "balanced": "Plainly put: Believes in own abilities; acts decisively without excessive doubt."
+      },
+      "learn_chance": {
+        "balanced": 20.0,
+        "logical": 20.0,
+        "self_aware": 29.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "charismatic": {
       "name": "Charismatic",
@@ -26486,7 +26853,20 @@
       },
       "behavior_flags": [
         "charismatic"
-      ]
+      ],
+      "descriptions": {
+        "positive": "A dependable part of who they are: Naturally draws people in; persuasive and socially magnetic.",
+        "negative": "There's a downside once it overshoots: Naturally draws people in; persuasive and socially magnetic.",
+        "balanced": "Plainly put: Naturally draws people in; persuasive and socially magnetic."
+      },
+      "learn_chance": {
+        "balanced": 20.0,
+        "logical": 20.0,
+        "self_aware": 35.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "polite": {
       "name": "Polite",
@@ -26500,7 +26880,20 @@
       },
       "behavior_flags": [
         "polite"
-      ]
+      ],
+      "descriptions": {
+        "positive": "Seen clearly, it's a strength worth leaning into: Uses courteous language and manners in all interactions.",
+        "negative": "Taken too far, it curdles: Uses courteous language and manners in all interactions.",
+        "balanced": "Plainly put: Uses courteous language and manners in all interactions."
+      },
+      "learn_chance": {
+        "balanced": 20.0,
+        "logical": 20.0,
+        "self_aware": 26.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "tactful": {
       "name": "Tactful",
@@ -26512,7 +26905,20 @@
       },
       "behavior_flags": [
         "tactful"
-      ]
+      ],
+      "descriptions": {
+        "positive": "It works in Tactful's favor more often than not: Delivers difficult truths with care to avoid unnecessary offense.",
+        "negative": "It isn't purely a virtue -- it can backfire: Delivers difficult truths with care to avoid unnecessary offense.",
+        "balanced": "Delivers difficult truths with care to avoid unnecessary offense."
+      },
+      "learn_chance": {
+        "balanced": 20.0,
+        "logical": 20.0,
+        "self_aware": 23.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "cooperative": {
       "name": "Cooperative",
@@ -26524,7 +26930,20 @@
       "skill_modifiers": {},
       "behavior_flags": [
         "cooperative"
-      ]
+      ],
+      "descriptions": {
+        "positive": "It works in Cooperative's favor more often than not: Works well with others; prioritises group success over personal gain.",
+        "negative": "There's a downside once it overshoots: Works well with others; prioritises group success over personal gain.",
+        "balanced": "Plainly put: Works well with others; prioritises group success over personal gain."
+      },
+      "learn_chance": {
+        "balanced": 20.0,
+        "logical": 20.0,
+        "self_aware": 26.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "protective": {
       "name": "Protective",
@@ -26536,7 +26955,20 @@
       "skill_modifiers": {},
       "behavior_flags": [
         "protective"
-      ]
+      ],
+      "descriptions": {
+        "positive": "It works in Protective's favor more often than not: Prioritises the safety of family and loved ones above other concerns.",
+        "negative": "Taken too far, it curdles: Prioritises the safety of family and loved ones above other concerns.",
+        "balanced": "In practice: Prioritises the safety of family and loved ones above other concerns."
+      },
+      "learn_chance": {
+        "balanced": 20.0,
+        "logical": 20.0,
+        "self_aware": 23.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "independent": {
       "name": "Independent",
@@ -26548,7 +26980,20 @@
       "skill_modifiers": {},
       "behavior_flags": [
         "independent"
-      ]
+      ],
+      "descriptions": {
+        "positive": "At its best, this is a real asset: Prefers self-reliance; does not need others' approval to act.",
+        "negative": "Taken too far, it curdles: Prefers self-reliance; does not need others' approval to act.",
+        "balanced": "Prefers self-reliance; does not need others' approval to act."
+      },
+      "learn_chance": {
+        "balanced": 20.0,
+        "logical": 20.0,
+        "self_aware": 14.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "rational": {
       "name": "Rational",
@@ -26562,7 +27007,25 @@
       },
       "behavior_flags": [
         "rational"
-      ]
+      ],
+      "descriptions": {
+        "positive": "It works in Rational's favor more often than not: Bases decisions on logic and evidence rather than emotion.",
+        "negative": "It isn't purely a virtue -- it can backfire: Bases decisions on logic and evidence rather than emotion.",
+        "balanced": "Plainly put: Bases decisions on logic and evidence rather than emotion."
+      },
+      "learn_chance": {
+        "balanced": 20.0,
+        "logical": 35.0,
+        "self_aware": 20.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [
+        {
+          "belief": "everything_happens_for_a_reason",
+          "modifier": -15
+        }
+      ],
+      "conditions": []
     },
     "practical": {
       "name": "Practical",
@@ -26572,7 +27035,20 @@
       "skill_modifiers": {},
       "behavior_flags": [
         "practical"
-      ]
+      ],
+      "descriptions": {
+        "positive": "It works in Practical's favor more often than not: Focuses on what works; avoids over-complicating simple problems.",
+        "negative": "Taken too far, it curdles: Focuses on what works; avoids over-complicating simple problems.",
+        "balanced": "Focuses on what works; avoids over-complicating simple problems."
+      },
+      "learn_chance": {
+        "balanced": 20.0,
+        "logical": 20.0,
+        "self_aware": 20.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "calm": {
       "name": "Calm",
@@ -26584,7 +27060,25 @@
       "skill_modifiers": {},
       "behavior_flags": [
         "calm"
-      ]
+      ],
+      "descriptions": {
+        "positive": "At its best, this is a real asset: Remains composed under pressure; rarely loses temper.",
+        "negative": "It isn't purely a virtue -- it can backfire: Remains composed under pressure; rarely loses temper.",
+        "balanced": "Plainly put: Remains composed under pressure; rarely loses temper."
+      },
+      "learn_chance": {
+        "balanced": 20.0,
+        "logical": 20.0,
+        "self_aware": 20.0
+      },
+      "cognitive_modifiers": [
+        {
+          "trait": "hot_tempered",
+          "modifier": -40
+        }
+      ],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "resilient": {
       "name": "Resilient",
@@ -26597,7 +27091,25 @@
       "skill_modifiers": {},
       "behavior_flags": [
         "resilient"
-      ]
+      ],
+      "descriptions": {
+        "positive": "Seen clearly, it's a strength worth leaning into: Bounces back quickly from setbacks and hardship.",
+        "negative": "It isn't purely a virtue -- it can backfire: Bounces back quickly from setbacks and hardship.",
+        "balanced": "In practice: Bounces back quickly from setbacks and hardship."
+      },
+      "learn_chance": {
+        "balanced": 20.0,
+        "logical": 20.0,
+        "self_aware": 20.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [
+        {
+          "belief": "hard_times_build_character",
+          "modifier": 20
+        }
+      ],
+      "conditions": []
     },
     "selfless": {
       "name": "Selfless",
@@ -26610,7 +27122,25 @@
       "skill_modifiers": {},
       "behavior_flags": [
         "selfless"
-      ]
+      ],
+      "descriptions": {
+        "positive": "Seen clearly, it's a strength worth leaning into: Puts others' needs before own; sacrifices personal comfort to help.",
+        "negative": "It isn't purely a virtue -- it can backfire: Puts others' needs before own; sacrifices personal comfort to help.",
+        "balanced": "In practice: Puts others' needs before own; sacrifices personal comfort to help."
+      },
+      "learn_chance": {
+        "balanced": 20.0,
+        "logical": 20.0,
+        "self_aware": 23.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [
+        {
+          "belief": "community_over_self",
+          "modifier": 20
+        }
+      ],
+      "conditions": []
     },
     "fair": {
       "name": "Fair",
@@ -26620,7 +27150,25 @@
       "skill_modifiers": {},
       "behavior_flags": [
         "fair"
-      ]
+      ],
+      "descriptions": {
+        "positive": "It works in Fair's favor more often than not: Treats everyone by the same standard; resists favouritism.",
+        "negative": "Taken too far, it curdles: Treats everyone by the same standard; resists favouritism.",
+        "balanced": "Treats everyone by the same standard; resists favouritism."
+      },
+      "learn_chance": {
+        "balanced": 20.0,
+        "logical": 20.0,
+        "self_aware": 20.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [
+        {
+          "belief": "justice_is_attainable",
+          "modifier": 20
+        }
+      ],
+      "conditions": []
     },
     "respectful": {
       "name": "Respectful",
@@ -26632,7 +27180,20 @@
       "skill_modifiers": {},
       "behavior_flags": [
         "respectful"
-      ]
+      ],
+      "descriptions": {
+        "positive": "It works in Respectful's favor more often than not: Acknowledges others' dignity and personal boundaries.",
+        "negative": "It isn't purely a virtue -- it can backfire: Acknowledges others' dignity and personal boundaries.",
+        "balanced": "Plainly put: Acknowledges others' dignity and personal boundaries."
+      },
+      "learn_chance": {
+        "balanced": 20.0,
+        "logical": 20.0,
+        "self_aware": 23.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "organized": {
       "name": "Organized",
@@ -26644,7 +27205,20 @@
       "skill_modifiers": {},
       "behavior_flags": [
         "organized"
-      ]
+      ],
+      "descriptions": {
+        "positive": "Seen clearly, it's a strength worth leaning into: Keeps living spaces tidy and schedules structured.",
+        "negative": "It isn't purely a virtue -- it can backfire: Keeps living spaces tidy and schedules structured.",
+        "balanced": "Plainly put: Keeps living spaces tidy and schedules structured."
+      },
+      "learn_chance": {
+        "balanced": 20.0,
+        "logical": 20.0,
+        "self_aware": 20.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "decisive": {
       "name": "Decisive",
@@ -26654,7 +27228,20 @@
       "skill_modifiers": {},
       "behavior_flags": [
         "decisive"
-      ]
+      ],
+      "descriptions": {
+        "positive": "A dependable part of who they are: Makes choices quickly and commits to them without second-guessing.",
+        "negative": "There's a downside once it overshoots: Makes choices quickly and commits to them without second-guessing.",
+        "balanced": "Makes choices quickly and commits to them without second-guessing."
+      },
+      "learn_chance": {
+        "balanced": 20.0,
+        "logical": 20.0,
+        "self_aware": 20.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "determined": {
       "name": "Determined",
@@ -26668,7 +27255,20 @@
       },
       "behavior_flags": [
         "determined"
-      ]
+      ],
+      "descriptions": {
+        "positive": "A dependable part of who they are: Pursues goals with unwavering focus even when obstacles arise.",
+        "negative": "There's a downside once it overshoots: Pursues goals with unwavering focus even when obstacles arise.",
+        "balanced": "In practice: Pursues goals with unwavering focus even when obstacles arise."
+      },
+      "learn_chance": {
+        "balanced": 20.0,
+        "logical": 20.0,
+        "self_aware": 20.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "open_minded": {
       "name": "Open-minded",
@@ -26680,7 +27280,20 @@
       },
       "behavior_flags": [
         "open_minded"
-      ]
+      ],
+      "descriptions": {
+        "positive": "Seen clearly, it's a strength worth leaning into: Considers opposing views seriously and updates beliefs when warranted.",
+        "negative": "There's a downside once it overshoots: Considers opposing views seriously and updates beliefs when warranted.",
+        "balanced": "Plainly put: Considers opposing views seriously and updates beliefs when warranted."
+      },
+      "learn_chance": {
+        "balanced": 20.0,
+        "logical": 25.0,
+        "self_aware": 20.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "thoughtful": {
       "name": "Thoughtful",
@@ -26690,7 +27303,20 @@
       "skill_modifiers": {},
       "behavior_flags": [
         "thoughtful"
-      ]
+      ],
+      "descriptions": {
+        "positive": "A dependable part of who they are: Considers consequences carefully before acting or speaking.",
+        "negative": "It isn't purely a virtue -- it can backfire: Considers consequences carefully before acting or speaking.",
+        "balanced": "Considers consequences carefully before acting or speaking."
+      },
+      "learn_chance": {
+        "balanced": 20.0,
+        "logical": 20.0,
+        "self_aware": 20.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "cheerful": {
       "name": "Cheerful",
@@ -26705,7 +27331,20 @@
       },
       "behavior_flags": [
         "cheerful"
-      ]
+      ],
+      "descriptions": {
+        "positive": "Seen clearly, it's a strength worth leaning into: Maintains a bright, upbeat mood that lifts those around them.",
+        "negative": "There's a downside once it overshoots: Maintains a bright, upbeat mood that lifts those around them.",
+        "balanced": "Maintains a bright, upbeat mood that lifts those around them."
+      },
+      "learn_chance": {
+        "balanced": 20.0,
+        "logical": 20.0,
+        "self_aware": 23.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "empathetic": {
       "name": "Empathetic",
@@ -26720,7 +27359,20 @@
       },
       "behavior_flags": [
         "empathetic"
-      ]
+      ],
+      "descriptions": {
+        "positive": "At its best, this is a real asset: Accurately senses what others feel and responds with care.",
+        "negative": "It isn't purely a virtue -- it can backfire: Accurately senses what others feel and responds with care.",
+        "balanced": "Accurately senses what others feel and responds with care."
+      },
+      "learn_chance": {
+        "balanced": 20.0,
+        "logical": 20.0,
+        "self_aware": 29.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "trustworthy": {
       "name": "Trustworthy",
@@ -26730,7 +27382,20 @@
       "skill_modifiers": {},
       "behavior_flags": [
         "trustworthy"
-      ]
+      ],
+      "descriptions": {
+        "positive": "A dependable part of who they are: Keeps confidences and never breaks promises without good reason.",
+        "negative": "There's a downside once it overshoots: Keeps confidences and never breaks promises without good reason.",
+        "balanced": "In practice: Keeps confidences and never breaks promises without good reason."
+      },
+      "learn_chance": {
+        "balanced": 20.0,
+        "logical": 20.0,
+        "self_aware": 20.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "supportive": {
       "name": "Supportive",
@@ -26742,7 +27407,20 @@
       "skill_modifiers": {},
       "behavior_flags": [
         "supportive"
-      ]
+      ],
+      "descriptions": {
+        "positive": "It works in Supportive's favor more often than not: Encourages and assists others through difficult moments.",
+        "negative": "It isn't purely a virtue -- it can backfire: Encourages and assists others through difficult moments.",
+        "balanced": "Plainly put: Encourages and assists others through difficult moments."
+      },
+      "learn_chance": {
+        "balanced": 20.0,
+        "logical": 20.0,
+        "self_aware": 23.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "innovative": {
       "name": "Innovative",
@@ -26757,7 +27435,20 @@
       },
       "behavior_flags": [
         "innovative"
-      ]
+      ],
+      "descriptions": {
+        "positive": "It works in Innovative's favor more often than not: Seeks new and better ways to do things; embraces change.",
+        "negative": "There's a downside once it overshoots: Seeks new and better ways to do things; embraces change.",
+        "balanced": "Seeks new and better ways to do things; embraces change."
+      },
+      "learn_chance": {
+        "balanced": 20.0,
+        "logical": 30.0,
+        "self_aware": 20.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "frugal": {
       "name": "Frugal",
@@ -26767,7 +27458,25 @@
       "skill_modifiers": {},
       "behavior_flags": [
         "frugal"
-      ]
+      ],
+      "descriptions": {
+        "positive": "A dependable part of who they are: Spends money carefully; avoids waste and seeks the best value.",
+        "negative": "It isn't purely a virtue -- it can backfire: Spends money carefully; avoids waste and seeks the best value.",
+        "balanced": "Spends money carefully; avoids waste and seeks the best value."
+      },
+      "learn_chance": {
+        "balanced": 20.0,
+        "logical": 20.0,
+        "self_aware": 20.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [
+        {
+          "belief": "money_buys_happiness",
+          "modifier": -10
+        }
+      ],
+      "conditions": []
     },
     "adventurous": {
       "name": "Adventurous",
@@ -26781,7 +27490,29 @@
       },
       "behavior_flags": [
         "adventurous"
-      ]
+      ],
+      "descriptions": {
+        "positive": "A dependable part of who they are: Seeks new experiences; willing to leave comfort zones.",
+        "negative": "Taken too far, it curdles: Seeks new experiences; willing to leave comfort zones.",
+        "balanced": "Plainly put: Seeks new experiences; willing to leave comfort zones."
+      },
+      "learn_chance": {
+        "balanced": 20.0,
+        "logical": 20.0,
+        "self_aware": 20.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [
+        {
+          "belief": "experiences_over_possessions",
+          "modifier": 20
+        },
+        {
+          "belief": "tradition_matters",
+          "modifier": -15
+        }
+      ],
+      "conditions": []
     },
     "playful": {
       "name": "Playful",
@@ -26794,7 +27525,20 @@
       "skill_modifiers": {},
       "behavior_flags": [
         "playful"
-      ]
+      ],
+      "descriptions": {
+        "positive": "A dependable part of who they are: Brings levity and humour; enjoys games and light-hearted interaction.",
+        "negative": "There's a downside once it overshoots: Brings levity and humour; enjoys games and light-hearted interaction.",
+        "balanced": "In practice: Brings levity and humour; enjoys games and light-hearted interaction."
+      },
+      "learn_chance": {
+        "balanced": 20.0,
+        "logical": 20.0,
+        "self_aware": 23.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "persistent": {
       "name": "Persistent",
@@ -26806,7 +27550,20 @@
       "skill_modifiers": {},
       "behavior_flags": [
         "persistent"
-      ]
+      ],
+      "descriptions": {
+        "positive": "It works in Persistent's favor more often than not: Keeps trying despite repeated failure or resistance.",
+        "negative": "It isn't purely a virtue -- it can backfire: Keeps trying despite repeated failure or resistance.",
+        "balanced": "Keeps trying despite repeated failure or resistance."
+      },
+      "learn_chance": {
+        "balanced": 20.0,
+        "logical": 20.0,
+        "self_aware": 20.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "observant": {
       "name": "Observant",
@@ -26818,7 +27575,20 @@
       },
       "behavior_flags": [
         "observant"
-      ]
+      ],
+      "descriptions": {
+        "positive": "At its best, this is a real asset: Notices unusual details in the environment and in people's behaviour.",
+        "negative": "Taken too far, it curdles: Notices unusual details in the environment and in people's behaviour.",
+        "balanced": "Notices unusual details in the environment and in people's behaviour."
+      },
+      "learn_chance": {
+        "balanced": 20.0,
+        "logical": 25.0,
+        "self_aware": 20.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "diplomatic": {
       "name": "Diplomatic",
@@ -26830,7 +27600,20 @@
       },
       "behavior_flags": [
         "diplomatic"
-      ]
+      ],
+      "descriptions": {
+        "positive": "A dependable part of who they are: Navigates conflicts and disagreements to reach peaceful resolutions.",
+        "negative": "It isn't purely a virtue -- it can backfire: Navigates conflicts and disagreements to reach peaceful resolutions.",
+        "balanced": "Navigates conflicts and disagreements to reach peaceful resolutions."
+      },
+      "learn_chance": {
+        "balanced": 20.0,
+        "logical": 20.0,
+        "self_aware": 26.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "wise": {
       "name": "Wise",
@@ -26842,7 +27625,30 @@
       },
       "behavior_flags": [
         "wise"
-      ]
+      ],
+      "descriptions": {
+        "positive": "Seen clearly, it's a strength worth leaning into: Applies experience and judgement to make sound long-term decisions.",
+        "negative": "It isn't purely a virtue -- it can backfire: Applies experience and judgement to make sound long-term decisions.",
+        "balanced": "Applies experience and judgement to make sound long-term decisions."
+      },
+      "learn_chance": {
+        "balanced": 20.0,
+        "logical": 30.0,
+        "self_aware": 20.0
+      },
+      "cognitive_modifiers": [
+        {
+          "trait": "curious",
+          "modifier": 100
+        }
+      ],
+      "belief_modifiers": [
+        {
+          "belief": "know_thyself",
+          "modifier": 20
+        }
+      ],
+      "conditions": []
     },
     "dishonest": {
       "name": "Dishonest",
@@ -26852,7 +27658,30 @@
       "skill_modifiers": {},
       "behavior_flags": [
         "dishonest"
-      ]
+      ],
+      "descriptions": {
+        "positive": "There's a version of this that serves them: Lies or conceals truth to serve self-interest.",
+        "negative": "There's a sharper edge to it than it first appears: Lies or conceals truth to serve self-interest.",
+        "balanced": "Lies or conceals truth to serve self-interest."
+      },
+      "learn_chance": {
+        "balanced": 13.0,
+        "logical": 12.0,
+        "self_aware": 15.0
+      },
+      "cognitive_modifiers": [
+        {
+          "trait": "honest",
+          "modifier": 0
+        }
+      ],
+      "belief_modifiers": [
+        {
+          "belief": "honesty_is_always_best",
+          "modifier": 0
+        }
+      ],
+      "conditions": []
     },
     "selfish": {
       "name": "Selfish",
@@ -26864,7 +27693,25 @@
       "skill_modifiers": {},
       "behavior_flags": [
         "selfish"
-      ]
+      ],
+      "descriptions": {
+        "positive": "There's a version of this that serves them: Prioritises personal gain over others' needs or feelings.",
+        "negative": "Left unchecked, it becomes a real liability: Prioritises personal gain over others' needs or feelings.",
+        "balanced": "Prioritises personal gain over others' needs or feelings."
+      },
+      "learn_chance": {
+        "balanced": 13.0,
+        "logical": 12.0,
+        "self_aware": 9.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [
+        {
+          "belief": "community_over_self",
+          "modifier": 0
+        }
+      ],
+      "conditions": []
     },
     "arrogant": {
       "name": "Arrogant",
@@ -26876,7 +27723,20 @@
       "skill_modifiers": {},
       "behavior_flags": [
         "arrogant"
-      ]
+      ],
+      "descriptions": {
+        "positive": "It can work in their favor under the right circumstances: Overestimates own abilities and dismisses others' input.",
+        "negative": "There's a sharper edge to it than it first appears: Overestimates own abilities and dismisses others' input.",
+        "balanced": "In practice: Overestimates own abilities and dismisses others' input."
+      },
+      "learn_chance": {
+        "balanced": 13.0,
+        "logical": 12.0,
+        "self_aware": 9.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "impulsive": {
       "name": "Impulsive",
@@ -26888,7 +27748,20 @@
       },
       "behavior_flags": [
         "impulsive"
-      ]
+      ],
+      "descriptions": {
+        "positive": "Even so, it isn't without an upside: Acts without thinking; makes snap decisions that cause problems.",
+        "negative": "It can quietly work against Impulsive: Acts without thinking; makes snap decisions that cause problems.",
+        "balanced": "Acts without thinking; makes snap decisions that cause problems."
+      },
+      "learn_chance": {
+        "balanced": 13.0,
+        "logical": 2.0,
+        "self_aware": 15.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "lazy": {
       "name": "Lazy",
@@ -26902,7 +27775,25 @@
       },
       "behavior_flags": [
         "lazy"
-      ]
+      ],
+      "descriptions": {
+        "positive": "There's a version of this that serves them: Avoids effort; skips tasks and prefers rest over responsibility.",
+        "negative": "Left unchecked, it becomes a real liability: Avoids effort; skips tasks and prefers rest over responsibility.",
+        "balanced": "Avoids effort; skips tasks and prefers rest over responsibility."
+      },
+      "learn_chance": {
+        "balanced": 13.0,
+        "logical": 12.0,
+        "self_aware": 15.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [
+        {
+          "belief": "hard_work_pays_off",
+          "modifier": -25
+        }
+      ],
+      "conditions": []
     },
     "cowardly": {
       "name": "Cowardly",
@@ -26914,7 +27805,20 @@
       "skill_modifiers": {},
       "behavior_flags": [
         "cowardly"
-      ]
+      ],
+      "descriptions": {
+        "positive": "It can work in their favor under the right circumstances: Avoids risk and confrontation even when action is clearly needed.",
+        "negative": "It has a cost that's easy to underestimate: Avoids risk and confrontation even when action is clearly needed.",
+        "balanced": "In practice: Avoids risk and confrontation even when action is clearly needed."
+      },
+      "learn_chance": {
+        "balanced": 13.0,
+        "logical": 12.0,
+        "self_aware": 15.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "jealous": {
       "name": "Jealous",
@@ -26927,7 +27831,20 @@
       "skill_modifiers": {},
       "behavior_flags": [
         "jealous"
-      ]
+      ],
+      "descriptions": {
+        "positive": "Even so, it isn't without an upside: Resents others' success or attention; prone to envy-driven conflict.",
+        "negative": "Left unchecked, it becomes a real liability: Resents others' success or attention; prone to envy-driven conflict.",
+        "balanced": "Resents others' success or attention; prone to envy-driven conflict."
+      },
+      "learn_chance": {
+        "balanced": 13.0,
+        "logical": 12.0,
+        "self_aware": 9.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "greedy": {
       "name": "Greedy",
@@ -26937,7 +27854,25 @@
       "skill_modifiers": {},
       "behavior_flags": [
         "greedy"
-      ]
+      ],
+      "descriptions": {
+        "positive": "It can work in their favor under the right circumstances: Accumulates wealth and resources far beyond personal need.",
+        "negative": "Left unchecked, it becomes a real liability: Accumulates wealth and resources far beyond personal need.",
+        "balanced": "Accumulates wealth and resources far beyond personal need."
+      },
+      "learn_chance": {
+        "balanced": 13.0,
+        "logical": 12.0,
+        "self_aware": 15.0
+      },
+      "cognitive_modifiers": [
+        {
+          "trait": "generous",
+          "modifier": 0
+        }
+      ],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "vindictive": {
       "name": "Vindictive",
@@ -26949,7 +27884,20 @@
       "skill_modifiers": {},
       "behavior_flags": [
         "vindictive"
-      ]
+      ],
+      "descriptions": {
+        "positive": "It can work in their favor under the right circumstances: Seeks revenge and holds grudges long after an offence.",
+        "negative": "It has a cost that's easy to underestimate: Seeks revenge and holds grudges long after an offence.",
+        "balanced": "Seeks revenge and holds grudges long after an offence."
+      },
+      "learn_chance": {
+        "balanced": 13.0,
+        "logical": 12.0,
+        "self_aware": 15.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "cruel": {
       "name": "Cruel",
@@ -26961,7 +27909,25 @@
       "skill_modifiers": {},
       "behavior_flags": [
         "cruel"
-      ]
+      ],
+      "descriptions": {
+        "positive": "It can work in their favor under the right circumstances: Derives satisfaction from others' pain; acts with deliberate harshness.",
+        "negative": "It has a cost that's easy to underestimate: Derives satisfaction from others' pain; acts with deliberate harshness.",
+        "balanced": "Plainly put: Derives satisfaction from others' pain; acts with deliberate harshness."
+      },
+      "learn_chance": {
+        "balanced": 13.0,
+        "logical": 12.0,
+        "self_aware": 6.0
+      },
+      "cognitive_modifiers": [
+        {
+          "trait": "compassionate",
+          "modifier": 0
+        }
+      ],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "manipulative": {
       "name": "Manipulative",
@@ -26973,7 +27939,20 @@
       },
       "behavior_flags": [
         "manipulative"
-      ]
+      ],
+      "descriptions": {
+        "positive": "Even so, it isn't without an upside: Uses deception and psychological pressure to control others.",
+        "negative": "Left unchecked, it becomes a real liability: Uses deception and psychological pressure to control others.",
+        "balanced": "Uses deception and psychological pressure to control others."
+      },
+      "learn_chance": {
+        "balanced": 13.0,
+        "logical": 12.0,
+        "self_aware": 18.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "cynical": {
       "name": "Cynical",
@@ -26985,7 +27964,29 @@
       "skill_modifiers": {},
       "behavior_flags": [
         "cynical"
-      ]
+      ],
+      "descriptions": {
+        "positive": "Even so, it isn't without an upside: Assumes selfish motives behind every action; distrusts goodwill.",
+        "negative": "Left unchecked, it becomes a real liability: Assumes selfish motives behind every action; distrusts goodwill.",
+        "balanced": "In practice: Assumes selfish motives behind every action; distrusts goodwill."
+      },
+      "learn_chance": {
+        "balanced": 13.0,
+        "logical": 12.0,
+        "self_aware": 9.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [
+        {
+          "belief": "people_are_good",
+          "modifier": -20
+        },
+        {
+          "belief": "justice_is_attainable",
+          "modifier": -15
+        }
+      ],
+      "conditions": []
     },
     "pessimistic": {
       "name": "Pessimistic",
@@ -26998,7 +27999,25 @@
       "skill_modifiers": {},
       "behavior_flags": [
         "pessimistic"
-      ]
+      ],
+      "descriptions": {
+        "positive": "Even so, it isn't without an upside: Expects the worst; defaults to negative interpretations of events.",
+        "negative": "It has a cost that's easy to underestimate: Expects the worst; defaults to negative interpretations of events.",
+        "balanced": "Expects the worst; defaults to negative interpretations of events."
+      },
+      "learn_chance": {
+        "balanced": 13.0,
+        "logical": 12.0,
+        "self_aware": 15.0
+      },
+      "cognitive_modifiers": [
+        {
+          "trait": "optimistic",
+          "modifier": -30
+        }
+      ],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "stubborn": {
       "name": "Stubborn",
@@ -27010,7 +28029,25 @@
       "skill_modifiers": {},
       "behavior_flags": [
         "stubborn"
-      ]
+      ],
+      "descriptions": {
+        "positive": "It can work in their favor under the right circumstances: Refuses to change position even when evidence demands it.",
+        "negative": "It has a cost that's easy to underestimate: Refuses to change position even when evidence demands it.",
+        "balanced": "In practice: Refuses to change position even when evidence demands it."
+      },
+      "learn_chance": {
+        "balanced": 13.0,
+        "logical": 12.0,
+        "self_aware": 15.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [
+        {
+          "belief": "change_is_good",
+          "modifier": -20
+        }
+      ],
+      "conditions": []
     },
     "reckless": {
       "name": "Reckless",
@@ -27022,7 +28059,25 @@
       "skill_modifiers": {},
       "behavior_flags": [
         "reckless"
-      ]
+      ],
+      "descriptions": {
+        "positive": "Even so, it isn't without an upside: Takes unnecessary risks with little regard for consequences.",
+        "negative": "It has a cost that's easy to underestimate: Takes unnecessary risks with little regard for consequences.",
+        "balanced": "Takes unnecessary risks with little regard for consequences."
+      },
+      "learn_chance": {
+        "balanced": 13.0,
+        "logical": 12.0,
+        "self_aware": 15.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [
+        {
+          "belief": "rules_are_meant_to_be_tested",
+          "modifier": 15
+        }
+      ],
+      "conditions": []
     },
     "naive": {
       "name": "Naive",
@@ -27034,7 +28089,29 @@
       },
       "behavior_flags": [
         "naive"
-      ]
+      ],
+      "descriptions": {
+        "positive": "Even so, it isn't without an upside: Trusts others too easily and misses obvious red flags.",
+        "negative": "It has a cost that's easy to underestimate: Trusts others too easily and misses obvious red flags.",
+        "balanced": "Plainly put: Trusts others too easily and misses obvious red flags."
+      },
+      "learn_chance": {
+        "balanced": 13.0,
+        "logical": 7.0,
+        "self_aware": 15.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [
+        {
+          "belief": "skeptical_of_authority",
+          "modifier": 0
+        },
+        {
+          "belief": "world_is_dangerous",
+          "modifier": 0
+        }
+      ],
+      "conditions": []
     },
     "paranoid": {
       "name": "Paranoid",
@@ -27047,7 +28124,25 @@
       "skill_modifiers": {},
       "behavior_flags": [
         "paranoid"
-      ]
+      ],
+      "descriptions": {
+        "positive": "There's a version of this that serves them: Assumes hidden threats and malicious intent without evidence.",
+        "negative": "It has a cost that's easy to underestimate: Assumes hidden threats and malicious intent without evidence.",
+        "balanced": "Plainly put: Assumes hidden threats and malicious intent without evidence."
+      },
+      "learn_chance": {
+        "balanced": 13.0,
+        "logical": 12.0,
+        "self_aware": 9.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [
+        {
+          "belief": "world_is_dangerous",
+          "modifier": 25
+        }
+      ],
+      "conditions": []
     },
     "suspicious": {
       "name": "Suspicious",
@@ -27059,7 +28154,25 @@
       "skill_modifiers": {},
       "behavior_flags": [
         "suspicious"
-      ]
+      ],
+      "descriptions": {
+        "positive": "It can work in their favor under the right circumstances: Slow to trust; questions others' motives before accepting help.",
+        "negative": "Left unchecked, it becomes a real liability: Slow to trust; questions others' motives before accepting help.",
+        "balanced": "In practice: Slow to trust; questions others' motives before accepting help."
+      },
+      "learn_chance": {
+        "balanced": 13.0,
+        "logical": 12.0,
+        "self_aware": 12.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [
+        {
+          "belief": "skeptical_of_authority",
+          "modifier": 20
+        }
+      ],
+      "conditions": []
     },
     "deceitful": {
       "name": "Deceitful",
@@ -27070,7 +28183,20 @@
       "behavior_flags": [
         "deceitful",
         "dishonest"
-      ]
+      ],
+      "descriptions": {
+        "positive": "It can work in their favor under the right circumstances: Actively creates false impressions to gain advantage.",
+        "negative": "It has a cost that's easy to underestimate: Actively creates false impressions to gain advantage.",
+        "balanced": "Plainly put: Actively creates false impressions to gain advantage."
+      },
+      "learn_chance": {
+        "balanced": 13.0,
+        "logical": 12.0,
+        "self_aware": 15.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "rude": {
       "name": "Rude",
@@ -27084,7 +28210,20 @@
       },
       "behavior_flags": [
         "rude"
-      ]
+      ],
+      "descriptions": {
+        "positive": "There's a version of this that serves them: Disregards social norms; speaks bluntly and offensively.",
+        "negative": "Left unchecked, it becomes a real liability: Disregards social norms; speaks bluntly and offensively.",
+        "balanced": "Plainly put: Disregards social norms; speaks bluntly and offensively."
+      },
+      "learn_chance": {
+        "balanced": 13.0,
+        "logical": 12.0,
+        "self_aware": 3.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "aggressive": {
       "name": "Aggressive",
@@ -27096,7 +28235,20 @@
       "skill_modifiers": {},
       "behavior_flags": [
         "aggressive"
-      ]
+      ],
+      "descriptions": {
+        "positive": "Even so, it isn't without an upside: Defaults to confrontation and hostility when challenged.",
+        "negative": "There's a sharper edge to it than it first appears: Defaults to confrontation and hostility when challenged.",
+        "balanced": "Plainly put: Defaults to confrontation and hostility when challenged."
+      },
+      "learn_chance": {
+        "balanced": 13.0,
+        "logical": 12.0,
+        "self_aware": 15.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "controlling": {
       "name": "Controlling",
@@ -27108,7 +28260,20 @@
       "skill_modifiers": {},
       "behavior_flags": [
         "controlling"
-      ]
+      ],
+      "descriptions": {
+        "positive": "Even so, it isn't without an upside: Micromanages others and resents loss of authority.",
+        "negative": "It can quietly work against Controlling: Micromanages others and resents loss of authority.",
+        "balanced": "Plainly put: Micromanages others and resents loss of authority."
+      },
+      "learn_chance": {
+        "balanced": 13.0,
+        "logical": 12.0,
+        "self_aware": 15.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "possessive": {
       "name": "Possessive",
@@ -27121,7 +28286,20 @@
       "skill_modifiers": {},
       "behavior_flags": [
         "possessive"
-      ]
+      ],
+      "descriptions": {
+        "positive": "Even so, it isn't without an upside: Treats relationships as ownership; smothers partners or friends.",
+        "negative": "There's a sharper edge to it than it first appears: Treats relationships as ownership; smothers partners or friends.",
+        "balanced": "Treats relationships as ownership; smothers partners or friends."
+      },
+      "learn_chance": {
+        "balanced": 13.0,
+        "logical": 12.0,
+        "self_aware": 12.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "judgmental": {
       "name": "Judgmental",
@@ -27133,7 +28311,20 @@
       "skill_modifiers": {},
       "behavior_flags": [
         "judgmental"
-      ]
+      ],
+      "descriptions": {
+        "positive": "It can work in their favor under the right circumstances: Forms negative opinions about others quickly and voices them freely.",
+        "negative": "It can quietly work against Judgmental: Forms negative opinions about others quickly and voices them freely.",
+        "balanced": "In practice: Forms negative opinions about others quickly and voices them freely."
+      },
+      "learn_chance": {
+        "balanced": 13.0,
+        "logical": 12.0,
+        "self_aware": 12.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "impatient": {
       "name": "Impatient",
@@ -27147,7 +28338,20 @@
       },
       "behavior_flags": [
         "impatient"
-      ]
+      ],
+      "descriptions": {
+        "positive": "Even so, it isn't without an upside: Cannot tolerate delay; becomes frustrated when things take time.",
+        "negative": "It can quietly work against Impatient: Cannot tolerate delay; becomes frustrated when things take time.",
+        "balanced": "Cannot tolerate delay; becomes frustrated when things take time."
+      },
+      "learn_chance": {
+        "balanced": 13.0,
+        "logical": 12.0,
+        "self_aware": 15.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "moody": {
       "name": "Moody",
@@ -27160,7 +28364,20 @@
       "skill_modifiers": {},
       "behavior_flags": [
         "moody"
-      ]
+      ],
+      "descriptions": {
+        "positive": "Even so, it isn't without an upside: Mood shifts unpredictably; hard to read and difficult to rely on emotionally.",
+        "negative": "Left unchecked, it becomes a real liability: Mood shifts unpredictably; hard to read and difficult to rely on emotionally.",
+        "balanced": "Mood shifts unpredictably; hard to read and difficult to rely on emotionally."
+      },
+      "learn_chance": {
+        "balanced": 13.0,
+        "logical": 12.0,
+        "self_aware": 15.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "nervous": {
       "name": "Nervous",
@@ -27173,7 +28390,20 @@
       "skill_modifiers": {},
       "behavior_flags": [
         "nervous"
-      ]
+      ],
+      "descriptions": {
+        "positive": "Even so, it isn't without an upside: Experiences heightened anxiety in uncertain or social situations.",
+        "negative": "Left unchecked, it becomes a real liability: Experiences heightened anxiety in uncertain or social situations.",
+        "balanced": "In practice: Experiences heightened anxiety in uncertain or social situations."
+      },
+      "learn_chance": {
+        "balanced": 13.0,
+        "logical": 12.0,
+        "self_aware": 12.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "indecisive": {
       "name": "Indecisive",
@@ -27187,7 +28417,20 @@
       },
       "behavior_flags": [
         "indecisive"
-      ]
+      ],
+      "descriptions": {
+        "positive": "It can work in their favor under the right circumstances: Struggles to commit to choices; constantly second-guesses decisions.",
+        "negative": "There's a sharper edge to it than it first appears: Struggles to commit to choices; constantly second-guesses decisions.",
+        "balanced": "In practice: Struggles to commit to choices; constantly second-guesses decisions."
+      },
+      "learn_chance": {
+        "balanced": 13.0,
+        "logical": 7.0,
+        "self_aware": 15.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "careless": {
       "name": "Careless",
@@ -27197,7 +28440,20 @@
       "skill_modifiers": {},
       "behavior_flags": [
         "careless"
-      ]
+      ],
+      "descriptions": {
+        "positive": "There's a version of this that serves them: Neglects quality and detail; causes accidents through inattention.",
+        "negative": "Left unchecked, it becomes a real liability: Neglects quality and detail; causes accidents through inattention.",
+        "balanced": "Neglects quality and detail; causes accidents through inattention."
+      },
+      "learn_chance": {
+        "balanced": 13.0,
+        "logical": 12.0,
+        "self_aware": 15.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "irresponsible": {
       "name": "Irresponsible",
@@ -27207,7 +28463,20 @@
       "skill_modifiers": {},
       "behavior_flags": [
         "irresponsible"
-      ]
+      ],
+      "descriptions": {
+        "positive": "It can work in their favor under the right circumstances: Fails to fulfil duties; avoids accountability for own actions.",
+        "negative": "It can quietly work against Irresponsible: Fails to fulfil duties; avoids accountability for own actions.",
+        "balanced": "Fails to fulfil duties; avoids accountability for own actions."
+      },
+      "learn_chance": {
+        "balanced": 13.0,
+        "logical": 12.0,
+        "self_aware": 15.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "inconsiderate": {
       "name": "Inconsiderate",
@@ -27219,7 +28488,20 @@
       "skill_modifiers": {},
       "behavior_flags": [
         "inconsiderate"
-      ]
+      ],
+      "descriptions": {
+        "positive": "Even so, it isn't without an upside: Acts without regard for how actions affect those around them.",
+        "negative": "There's a sharper edge to it than it first appears: Acts without regard for how actions affect those around them.",
+        "balanced": "Acts without regard for how actions affect those around them."
+      },
+      "learn_chance": {
+        "balanced": 13.0,
+        "logical": 12.0,
+        "self_aware": 12.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "apathetic": {
       "name": "Apathetic",
@@ -27235,7 +28517,20 @@
       "behavior_flags": [
         "apathetic",
         "lazy"
-      ]
+      ],
+      "descriptions": {
+        "positive": "There's a version of this that serves them: Lacks motivation or interest; indifferent to most outcomes.",
+        "negative": "It has a cost that's easy to underestimate: Lacks motivation or interest; indifferent to most outcomes.",
+        "balanced": "Plainly put: Lacks motivation or interest; indifferent to most outcomes."
+      },
+      "learn_chance": {
+        "balanced": 13.0,
+        "logical": 12.0,
+        "self_aware": 15.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "obnoxious": {
       "name": "Obnoxious",
@@ -27250,7 +28545,20 @@
       "behavior_flags": [
         "obnoxious",
         "rude"
-      ]
+      ],
+      "descriptions": {
+        "positive": "Even so, it isn't without an upside: Loud, intrusive behaviour that irritates and alienates others.",
+        "negative": "There's a sharper edge to it than it first appears: Loud, intrusive behaviour that irritates and alienates others.",
+        "balanced": "Loud, intrusive behaviour that irritates and alienates others."
+      },
+      "learn_chance": {
+        "balanced": 13.0,
+        "logical": 12.0,
+        "self_aware": 3.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "vain": {
       "name": "Vain",
@@ -27264,7 +28572,20 @@
       },
       "behavior_flags": [
         "vain"
-      ]
+      ],
+      "descriptions": {
+        "positive": "Even so, it isn't without an upside: Excessively concerned with own appearance and social image.",
+        "negative": "It can quietly work against Vain: Excessively concerned with own appearance and social image.",
+        "balanced": "In practice: Excessively concerned with own appearance and social image."
+      },
+      "learn_chance": {
+        "balanced": 13.0,
+        "logical": 12.0,
+        "self_aware": 18.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "gullible": {
       "name": "Gullible",
@@ -27277,7 +28598,20 @@
       "behavior_flags": [
         "gullible",
         "naive"
-      ]
+      ],
+      "descriptions": {
+        "positive": "It can work in their favor under the right circumstances: Accepts claims at face value; easily manipulated or deceived.",
+        "negative": "It can quietly work against Gullible: Accepts claims at face value; easily manipulated or deceived.",
+        "balanced": "Plainly put: Accepts claims at face value; easily manipulated or deceived."
+      },
+      "learn_chance": {
+        "balanced": 13.0,
+        "logical": 2.0,
+        "self_aware": 15.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "secretive": {
       "name": "Secretive",
@@ -27289,7 +28623,20 @@
       "skill_modifiers": {},
       "behavior_flags": [
         "secretive"
-      ]
+      ],
+      "descriptions": {
+        "positive": "It can work in their favor under the right circumstances: Withholds information unnecessarily; hard to read or trust.",
+        "negative": "It has a cost that's easy to underestimate: Withholds information unnecessarily; hard to read or trust.",
+        "balanced": "In practice: Withholds information unnecessarily; hard to read or trust."
+      },
+      "learn_chance": {
+        "balanced": 13.0,
+        "logical": 12.0,
+        "self_aware": 9.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "overcritical": {
       "name": "Overcritical",
@@ -27301,7 +28648,20 @@
       "skill_modifiers": {},
       "behavior_flags": [
         "overcritical"
-      ]
+      ],
+      "descriptions": {
+        "positive": "Even so, it isn't without an upside: Finds fault in everything and everyone; rarely satisfied.",
+        "negative": "Left unchecked, it becomes a real liability: Finds fault in everything and everyone; rarely satisfied.",
+        "balanced": "Plainly put: Finds fault in everything and everyone; rarely satisfied."
+      },
+      "learn_chance": {
+        "balanced": 13.0,
+        "logical": 12.0,
+        "self_aware": 12.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "short_tempered": {
       "name": "Short-tempered",
@@ -27314,7 +28674,20 @@
       "behavior_flags": [
         "short_tempered",
         "aggressive"
-      ]
+      ],
+      "descriptions": {
+        "positive": "There's a version of this that serves them: Loses composure rapidly; small irritations trigger outsized reactions.",
+        "negative": "Left unchecked, it becomes a real liability: Loses composure rapidly; small irritations trigger outsized reactions.",
+        "balanced": "In practice: Loses composure rapidly; small irritations trigger outsized reactions."
+      },
+      "learn_chance": {
+        "balanced": 13.0,
+        "logical": 12.0,
+        "self_aware": 15.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "materialistic": {
       "name": "Materialistic",
@@ -27324,7 +28697,29 @@
       "skill_modifiers": {},
       "behavior_flags": [
         "materialistic"
-      ]
+      ],
+      "descriptions": {
+        "positive": "Even so, it isn't without an upside: Values wealth and possessions above relationships or principles.",
+        "negative": "It can quietly work against Materialistic: Values wealth and possessions above relationships or principles.",
+        "balanced": "In practice: Values wealth and possessions above relationships or principles."
+      },
+      "learn_chance": {
+        "balanced": 13.0,
+        "logical": 12.0,
+        "self_aware": 15.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [
+        {
+          "belief": "money_buys_happiness",
+          "modifier": 25
+        },
+        {
+          "belief": "experiences_over_possessions",
+          "modifier": -20
+        }
+      ],
+      "conditions": []
     },
     "conforming": {
       "name": "Conforming",
@@ -27338,7 +28733,29 @@
       },
       "behavior_flags": [
         "conforming"
-      ]
+      ],
+      "descriptions": {
+        "positive": "There's a version of this that serves them: Follows the crowd; avoids standing out or challenging norms.",
+        "negative": "There's a sharper edge to it than it first appears: Follows the crowd; avoids standing out or challenging norms.",
+        "balanced": "Plainly put: Follows the crowd; avoids standing out or challenging norms."
+      },
+      "learn_chance": {
+        "balanced": 13.0,
+        "logical": 7.0,
+        "self_aware": 18.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [
+        {
+          "belief": "tradition_matters",
+          "modifier": 20
+        },
+        {
+          "belief": "rules_are_meant_to_be_tested",
+          "modifier": -20
+        }
+      ],
+      "conditions": []
     },
     "distrustful": {
       "name": "Distrustful",
@@ -27351,7 +28768,20 @@
       "behavior_flags": [
         "distrustful",
         "suspicious"
-      ]
+      ],
+      "descriptions": {
+        "positive": "Even so, it isn't without an upside: Rarely trusts others' intentions; withholds cooperation.",
+        "negative": "It has a cost that's easy to underestimate: Rarely trusts others' intentions; withholds cooperation.",
+        "balanced": "In practice: Rarely trusts others' intentions; withholds cooperation."
+      },
+      "learn_chance": {
+        "balanced": 13.0,
+        "logical": 12.0,
+        "self_aware": 9.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "fanatical": {
       "name": "Fanatical",
@@ -27363,7 +28793,20 @@
       "skill_modifiers": {},
       "behavior_flags": [
         "fanatical"
-      ]
+      ],
+      "descriptions": {
+        "positive": "It can work in their favor under the right circumstances: Pursues beliefs or causes regardless of rational objection or cost.",
+        "negative": "There's a sharper edge to it than it first appears: Pursues beliefs or causes regardless of rational objection or cost.",
+        "balanced": "Pursues beliefs or causes regardless of rational objection or cost."
+      },
+      "learn_chance": {
+        "balanced": 13.0,
+        "logical": 12.0,
+        "self_aware": 15.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "deceptive": {
       "name": "Deceptive",
@@ -27374,7 +28817,20 @@
       "behavior_flags": [
         "deceptive",
         "dishonest"
-      ]
+      ],
+      "descriptions": {
+        "positive": "It can work in their favor under the right circumstances: Constructs false narratives to mislead others for personal gain.",
+        "negative": "It can quietly work against Deceptive: Constructs false narratives to mislead others for personal gain.",
+        "balanced": "In practice: Constructs false narratives to mislead others for personal gain."
+      },
+      "learn_chance": {
+        "balanced": 13.0,
+        "logical": 12.0,
+        "self_aware": 15.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "entitled": {
       "name": "Entitled",
@@ -27384,7 +28840,25 @@
       "skill_modifiers": {},
       "behavior_flags": [
         "entitled"
-      ]
+      ],
+      "descriptions": {
+        "positive": "Even so, it isn't without an upside: Expects special treatment and resents being held to normal standards.",
+        "negative": "It has a cost that's easy to underestimate: Expects special treatment and resents being held to normal standards.",
+        "balanced": "Expects special treatment and resents being held to normal standards."
+      },
+      "learn_chance": {
+        "balanced": 13.0,
+        "logical": 12.0,
+        "self_aware": 15.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [
+        {
+          "belief": "self_made_success",
+          "modifier": -15
+        }
+      ],
+      "conditions": []
     },
     "ruthless": {
       "name": "Ruthless",
@@ -27397,7 +28871,20 @@
       "behavior_flags": [
         "ruthless",
         "selfish"
-      ]
+      ],
+      "descriptions": {
+        "positive": "It can work in their favor under the right circumstances: Pursues goals without moral restraint; disregards collateral harm.",
+        "negative": "It can quietly work against Ruthless: Pursues goals without moral restraint; disregards collateral harm.",
+        "balanced": "Plainly put: Pursues goals without moral restraint; disregards collateral harm."
+      },
+      "learn_chance": {
+        "balanced": 13.0,
+        "logical": 12.0,
+        "self_aware": 9.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "spiteful": {
       "name": "Spiteful",
@@ -27410,7 +28897,20 @@
       "behavior_flags": [
         "spiteful",
         "vindictive"
-      ]
+      ],
+      "descriptions": {
+        "positive": "It can work in their favor under the right circumstances: Acts to harm others even at personal cost just to cause pain.",
+        "negative": "Left unchecked, it becomes a real liability: Acts to harm others even at personal cost just to cause pain.",
+        "balanced": "Plainly put: Acts to harm others even at personal cost just to cause pain."
+      },
+      "learn_chance": {
+        "balanced": 13.0,
+        "logical": 12.0,
+        "self_aware": 15.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "obsessive": {
       "name": "Obsessive",
@@ -27423,7 +28923,20 @@
       "skill_modifiers": {},
       "behavior_flags": [
         "obsessive"
-      ]
+      ],
+      "descriptions": {
+        "positive": "It can work in their favor under the right circumstances: Fixates on people or ideas to the detriment of balance and wellbeing.",
+        "negative": "There's a sharper edge to it than it first appears: Fixates on people or ideas to the detriment of balance and wellbeing.",
+        "balanced": "Plainly put: Fixates on people or ideas to the detriment of balance and wellbeing."
+      },
+      "learn_chance": {
+        "balanced": 13.0,
+        "logical": 12.0,
+        "self_aware": 15.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "defeatist": {
       "name": "Defeatist",
@@ -27438,7 +28951,20 @@
       "behavior_flags": [
         "defeatist",
         "pessimistic"
-      ]
+      ],
+      "descriptions": {
+        "positive": "Even so, it isn't without an upside: Gives up easily; assumes failure before properly attempting a task.",
+        "negative": "Left unchecked, it becomes a real liability: Gives up easily; assumes failure before properly attempting a task.",
+        "balanced": "Gives up easily; assumes failure before properly attempting a task."
+      },
+      "learn_chance": {
+        "balanced": 13.0,
+        "logical": 12.0,
+        "self_aware": 15.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "passive": {
       "name": "Passive",
@@ -27450,7 +28976,20 @@
       "skill_modifiers": {},
       "behavior_flags": [
         "passive"
-      ]
+      ],
+      "descriptions": {
+        "positive": "There's a version of this that serves them: Avoids asserting needs or opinions; lets others dictate outcomes.",
+        "negative": "Left unchecked, it becomes a real liability: Avoids asserting needs or opinions; lets others dictate outcomes.",
+        "balanced": "Plainly put: Avoids asserting needs or opinions; lets others dictate outcomes."
+      },
+      "learn_chance": {
+        "balanced": 13.0,
+        "logical": 12.0,
+        "self_aware": 12.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "egotistical": {
       "name": "Egotistical",
@@ -27466,7 +29005,20 @@
         "egotistical",
         "arrogant",
         "selfish"
-      ]
+      ],
+      "descriptions": {
+        "positive": "It can work in their favor under the right circumstances: Everything revolves around self; cannot genuinely consider others.",
+        "negative": "There's a sharper edge to it than it first appears: Everything revolves around self; cannot genuinely consider others.",
+        "balanced": "Plainly put: Everything revolves around self; cannot genuinely consider others."
+      },
+      "learn_chance": {
+        "balanced": 13.0,
+        "logical": 12.0,
+        "self_aware": 3.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "high_libido": {
       "label": "High Libido",
@@ -27476,7 +29028,20 @@
         "libido_modifier": 0.35,
         "arousal_threshold_modifier": -0.2,
         "initiation_bias": 0.3
-      }
+      },
+      "descriptions": {
+        "positive": "At its best, this is a real asset: Naturally high sexual drive; lower arousal thresholds and initiates more frequently.",
+        "negative": "It can quietly work against high_libido: Naturally high sexual drive; lower arousal thresholds and initiates more frequently.",
+        "balanced": "Plainly put: Naturally high sexual drive; lower arousal thresholds and initiates more frequently."
+      },
+      "learn_chance": {
+        "balanced": 15.0,
+        "logical": 15.0,
+        "self_aware": 15.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "low_libido": {
       "label": "Low Libido",
@@ -27486,7 +29051,20 @@
         "libido_modifier": -0.35,
         "arousal_threshold_modifier": 0.25,
         "initiation_bias": -0.3
-      }
+      },
+      "descriptions": {
+        "positive": "It works in low_libido's favor more often than not: Low sexual drive; higher arousal thresholds and rarely initiates.",
+        "negative": "Left unchecked, it becomes a real liability: Low sexual drive; higher arousal thresholds and rarely initiates.",
+        "balanced": "In practice: Low sexual drive; higher arousal thresholds and rarely initiates."
+      },
+      "learn_chance": {
+        "balanced": 15.0,
+        "logical": 15.0,
+        "self_aware": 15.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "promiscuous": {
       "label": "Promiscuous",
@@ -27496,7 +29074,20 @@
         "emotional_bond_requirement": -0.4,
         "intimacy_stage_gate_modifier": -1,
         "libido_modifier": 0.2
-      }
+      },
+      "descriptions": {
+        "positive": "A dependable part of who they are: Comfortable with casual intimacy; fewer emotional prerequisites, open to multiple partners.",
+        "negative": "Left unchecked, it becomes a real liability: Comfortable with casual intimacy; fewer emotional prerequisites, open to multiple partners.",
+        "balanced": "In practice: Comfortable with casual intimacy; fewer emotional prerequisites, open to multiple partners."
+      },
+      "learn_chance": {
+        "balanced": 15.0,
+        "logical": 15.0,
+        "self_aware": 15.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "flirtatious": {
       "label": "Flirtatious",
@@ -27505,7 +29096,20 @@
       "effects": {
         "flirt_frequency": 0.4,
         "flirt_weight_in_intimacy": -0.2
-      }
+      },
+      "descriptions": {
+        "positive": "Seen clearly, it's a strength worth leaning into: Enjoys flirting and light sexual tension; doesn't always intend follow-through.",
+        "negative": "It can quietly work against flirtatious: Enjoys flirting and light sexual tension; doesn't always intend follow-through.",
+        "balanced": "Plainly put: Enjoys flirting and light sexual tension; doesn't always intend follow-through."
+      },
+      "learn_chance": {
+        "balanced": 15.0,
+        "logical": 15.0,
+        "self_aware": 15.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "sexually_confident": {
       "label": "Sexually Confident",
@@ -27515,7 +29119,20 @@
         "sexual_anxiety_modifier": -0.5,
         "initiation_bias": 0.2,
         "rejection_resilience": 0.3
-      }
+      },
+      "descriptions": {
+        "positive": "It works in sexually_confident's favor more often than not: Comfortable with their sexuality; expresses desires clearly, no performance anxiety.",
+        "negative": "Left unchecked, it becomes a real liability: Comfortable with their sexuality; expresses desires clearly, no performance anxiety.",
+        "balanced": "In practice: Comfortable with their sexuality; expresses desires clearly, no performance anxiety."
+      },
+      "learn_chance": {
+        "balanced": 15.0,
+        "logical": 15.0,
+        "self_aware": 15.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "sexually_insecure": {
       "label": "Sexually Insecure",
@@ -27525,7 +29142,20 @@
         "sexual_anxiety_modifier": 0.5,
         "initiation_bias": -0.3,
         "rejection_resilience": -0.4
-      }
+      },
+      "descriptions": {
+        "positive": "It works in sexually_insecure's favor more often than not: Anxious about intimacy; may deflect advances even when interested, fears rejection.",
+        "negative": "It has a cost that's easy to underestimate: Anxious about intimacy; may deflect advances even when interested, fears rejection.",
+        "balanced": "Anxious about intimacy; may deflect advances even when interested, fears rejection."
+      },
+      "learn_chance": {
+        "balanced": 15.0,
+        "logical": 15.0,
+        "self_aware": 15.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "demisexual": {
       "label": "Demisexual",
@@ -27535,7 +29165,20 @@
         "requires_trust_for_attraction": 0.7,
         "libido_modifier": 0,
         "emotional_bond_requirement": 0.5
-      }
+      },
+      "descriptions": {
+        "positive": "A dependable part of who they are: Sexual attraction only activates after forming a strong emotional bond.",
+        "negative": "Left unchecked, it becomes a real liability: Sexual attraction only activates after forming a strong emotional bond.",
+        "balanced": "Plainly put: Sexual attraction only activates after forming a strong emotional bond."
+      },
+      "learn_chance": {
+        "balanced": 15.0,
+        "logical": 15.0,
+        "self_aware": 15.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "romantic": {
       "label": "Romantic",
@@ -27545,7 +29188,25 @@
         "emotional_bond_requirement": 0.3,
         "romance_weight": 0.4,
         "casual_sex_reluctance": 0.4
-      }
+      },
+      "descriptions": {
+        "positive": "Seen clearly, it's a strength worth leaning into: Values emotional intimacy and romantic connection deeply; prefers meaningful encounters.",
+        "negative": "There's a sharper edge to it than it first appears: Values emotional intimacy and romantic connection deeply; prefers meaningful encounters.",
+        "balanced": "Values emotional intimacy and romantic connection deeply; prefers meaningful encounters."
+      },
+      "learn_chance": {
+        "balanced": 15.0,
+        "logical": 15.0,
+        "self_aware": 15.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [
+        {
+          "belief": "love_conquers_all",
+          "modifier": 25
+        }
+      ],
+      "conditions": []
     },
     "exercise_overdoer": {
       "label": "Overdoer",
@@ -27555,7 +29216,20 @@
         "fitness_gain_mult": 1.4,
         "injury_chance_mult": 3,
         "recovery_gap_mult": 2
-      }
+      },
+      "descriptions": {
+        "positive": "At its best, this is a real asset: Goes all-out every session \u2014 rapid gains but high injury risk and long recovery gaps.",
+        "negative": "It has a cost that's easy to underestimate: Goes all-out every session \u2014 rapid gains but high injury risk and long recovery gaps.",
+        "balanced": "In practice: Goes all-out every session \u2014 rapid gains but high injury risk and long recovery gaps."
+      },
+      "learn_chance": {
+        "balanced": 15.0,
+        "logical": 15.0,
+        "self_aware": 15.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "exercise_consistent": {
       "label": "Consistent Trainer",
@@ -27565,7 +29239,20 @@
         "fitness_gain_mult": 1.1,
         "injury_chance_mult": 0.3,
         "streak_bonus": 0.05
-      }
+      },
+      "descriptions": {
+        "positive": "Seen clearly, it's a strength worth leaning into: Builds sustainable routines, rarely skips, rarely gets hurt. Slow and steady wins.",
+        "negative": "It has a cost that's easy to underestimate: Builds sustainable routines, rarely skips, rarely gets hurt. Slow and steady wins.",
+        "balanced": "In practice: Builds sustainable routines, rarely skips, rarely gets hurt. Slow and steady wins."
+      },
+      "learn_chance": {
+        "balanced": 15.0,
+        "logical": 15.0,
+        "self_aware": 15.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "exercise_social_only": {
       "label": "Social Exerciser",
@@ -27575,7 +29262,20 @@
         "solo_gain_mult": 0.35,
         "social_gain_mult": 1.2,
         "skips_solo": true
-      }
+      },
+      "descriptions": {
+        "positive": "At its best, this is a real asset: Goes reluctantly alone; needs a workout buddy. Full benefit only with a companion.",
+        "negative": "There's a sharper edge to it than it first appears: Goes reluctantly alone; needs a workout buddy. Full benefit only with a companion.",
+        "balanced": "Goes reluctantly alone; needs a workout buddy. Full benefit only with a companion."
+      },
+      "learn_chance": {
+        "balanced": 15.0,
+        "logical": 15.0,
+        "self_aware": 15.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "high_self_control": {
       "label": "High Self-Control",
@@ -27584,7 +29284,20 @@
       "effects": {
         "self_control": 0.4,
         "impulse_threshold_mult": 1.6
-      }
+      },
+      "descriptions": {
+        "positive": "At its best, this is a real asset: Rarely acts on impulse; can endure significant frustration before lashing out.",
+        "negative": "It can quietly work against high_self_control: Rarely acts on impulse; can endure significant frustration before lashing out.",
+        "balanced": "Rarely acts on impulse; can endure significant frustration before lashing out."
+      },
+      "learn_chance": {
+        "balanced": 15.0,
+        "logical": 15.0,
+        "self_aware": 15.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "low_self_control": {
       "label": "Low Self-Control",
@@ -27593,7 +29306,20 @@
       "effects": {
         "self_control": -0.35,
         "impulse_threshold_mult": 0.55
-      }
+      },
+      "descriptions": {
+        "positive": "It works in low_self_control's favor more often than not: Struggles to suppress impulses; minor provocations can spiral quickly.",
+        "negative": "There's a sharper edge to it than it first appears: Struggles to suppress impulses; minor provocations can spiral quickly.",
+        "balanced": "Plainly put: Struggles to suppress impulses; minor provocations can spiral quickly."
+      },
+      "learn_chance": {
+        "balanced": 15.0,
+        "logical": 15.0,
+        "self_aware": 15.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "hot_tempered": {
       "label": "Hot-Tempered",
@@ -27603,7 +29329,25 @@
         "self_control": -0.25,
         "anger_gain_mult": 1.5,
         "anger_decay_fast": true
-      }
+      },
+      "descriptions": {
+        "positive": "It works in hot_tempered's favor more often than not: Short fuse \u2014 anger spikes fast but may also cool quickly.",
+        "negative": "It has a cost that's easy to underestimate: Short fuse \u2014 anger spikes fast but may also cool quickly.",
+        "balanced": "In practice: Short fuse \u2014 anger spikes fast but may also cool quickly."
+      },
+      "learn_chance": {
+        "balanced": 15.0,
+        "logical": 15.0,
+        "self_aware": 15.0
+      },
+      "cognitive_modifiers": [
+        {
+          "trait": "calm",
+          "modifier": -40
+        }
+      ],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "sexist": {
       "label": "Sexist",
@@ -27612,7 +29356,25 @@
       "effects": {
         "sexism_level": 0.4,
         "female_target_aggression_mult": 1.5
-      }
+      },
+      "descriptions": {
+        "positive": "Seen clearly, it's a strength worth leaning into: Holds derogatory attitudes toward women; more likely to direct aggression at female targets.",
+        "negative": "It has a cost that's easy to underestimate: Holds derogatory attitudes toward women; more likely to direct aggression at female targets.",
+        "balanced": "In practice: Holds derogatory attitudes toward women; more likely to direct aggression at female targets."
+      },
+      "learn_chance": {
+        "balanced": 8.0,
+        "logical": 8.0,
+        "self_aware": 8.0
+      },
+      "cognitive_modifiers": [
+        {
+          "trait": "egalitarian",
+          "modifier": 0
+        }
+      ],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "egalitarian": {
       "label": "Egalitarian",
@@ -27620,7 +29382,25 @@
       "category": "personality",
       "effects": {
         "sexism_level": -0.3
-      }
+      },
+      "descriptions": {
+        "positive": "A dependable part of who they are: Treats all genders equitably; sexism_level near zero.",
+        "negative": "It has a cost that's easy to underestimate: Treats all genders equitably; sexism_level near zero.",
+        "balanced": "Plainly put: Treats all genders equitably; sexism_level near zero."
+      },
+      "learn_chance": {
+        "balanced": 15.0,
+        "logical": 15.0,
+        "self_aware": 15.0
+      },
+      "cognitive_modifiers": [
+        {
+          "trait": "sexist",
+          "modifier": 0
+        }
+      ],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "controlling_partner": {
       "label": "Controlling Partner",
@@ -27629,7 +29409,20 @@
       "effects": {
         "domestic_control_tendency": 0.6,
         "jealousy_monitor": true
-      }
+      },
+      "descriptions": {
+        "positive": "At its best, this is a real asset: Uses psychological pressure, jealousy, and isolation to dominate intimate partners.",
+        "negative": "Left unchecked, it becomes a real liability: Uses psychological pressure, jealousy, and isolation to dominate intimate partners.",
+        "balanced": "Uses psychological pressure, jealousy, and isolation to dominate intimate partners."
+      },
+      "learn_chance": {
+        "balanced": 15.0,
+        "logical": 15.0,
+        "self_aware": 15.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "domestic_abuser": {
       "label": "Domestic Abuser",
@@ -27639,7 +29432,20 @@
         "domestic_control_tendency": 0.9,
         "intimate_target_bias": 0.8,
         "sexism_level": 0.3
-      }
+      },
+      "descriptions": {
+        "positive": "A dependable part of who they are: Directs violence preferentially at intimate partners; uses shame, threats, and physical force to maintain control.",
+        "negative": "There's a sharper edge to it than it first appears: Directs violence preferentially at intimate partners; uses shame, threats, and physical force to maintain control.",
+        "balanced": "Directs violence preferentially at intimate partners; uses shame, threats, and physical force to maintain control."
+      },
+      "learn_chance": {
+        "balanced": 15.0,
+        "logical": 15.0,
+        "self_aware": 15.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "low_self_esteem": {
       "label": "Low Self-Esteem",
@@ -27648,7 +29454,20 @@
       "effects": {
         "self_confidence_base": -0.3,
         "manipulation_vulnerability": 0.25
-      }
+      },
+      "descriptions": {
+        "positive": "At its best, this is a real asset: Prone to self-doubt; more vulnerable to negging and psychological manipulation.",
+        "negative": "It can quietly work against low_self_esteem: Prone to self-doubt; more vulnerable to negging and psychological manipulation.",
+        "balanced": "In practice: Prone to self-doubt; more vulnerable to negging and psychological manipulation."
+      },
+      "learn_chance": {
+        "balanced": 15.0,
+        "logical": 15.0,
+        "self_aware": 15.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "codependent": {
       "label": "Codependent",
@@ -27657,7 +29476,20 @@
       "effects": {
         "leave_relationship_threshold_mult": 1.8,
         "dependency_gain_mult": 1.4
-      }
+      },
+      "descriptions": {
+        "positive": "Seen clearly, it's a strength worth leaning into: Ties self-worth to the relationship; tolerates mistreatment to avoid abandonment.",
+        "negative": "It has a cost that's easy to underestimate: Ties self-worth to the relationship; tolerates mistreatment to avoid abandonment.",
+        "balanced": "In practice: Ties self-worth to the relationship; tolerates mistreatment to avoid abandonment."
+      },
+      "learn_chance": {
+        "balanced": 15.0,
+        "logical": 15.0,
+        "self_aware": 15.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "authority_abuser": {
       "label": "Authority Abuser",
@@ -27667,7 +29499,20 @@
         "concealment_bonus": 0.5,
         "report_belief_penalty": 0.4,
         "retaliation_access": true
-      }
+      },
+      "descriptions": {
+        "positive": "Seen clearly, it's a strength worth leaning into: Exploits institutional position (police, boss, doctor) to control and conceal abuse. Reports are less believed; victim faces retaliatory consequences.",
+        "negative": "Left unchecked, it becomes a real liability: Exploits institutional position (police, boss, doctor) to control and conceal abuse. Reports are less believed; victim faces retaliatory consequences.",
+        "balanced": "Plainly put: Exploits institutional position (police, boss, doctor) to control and conceal abuse. Reports are less believed; victim faces retaliatory consequences."
+      },
+      "learn_chance": {
+        "balanced": 15.0,
+        "logical": 15.0,
+        "self_aware": 15.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "power_gatekeeper": {
       "label": "Power Gatekeeper",
@@ -27676,7 +29521,20 @@
       "effects": {
         "opportunity_leverage": 0.7,
         "quid_pro_quo_tendency": 0.65
-      }
+      },
+      "descriptions": {
+        "positive": "A dependable part of who they are: Controls career opportunities, contacts, or resources others depend on. Uses this leverage for coercive quid-pro-quo arrangements.",
+        "negative": "It has a cost that's easy to underestimate: Controls career opportunities, contacts, or resources others depend on. Uses this leverage for coercive quid-pro-quo arrangements.",
+        "balanced": "In practice: Controls career opportunities, contacts, or resources others depend on. Uses this leverage for coercive quid-pro-quo arrangements."
+      },
+      "learn_chance": {
+        "balanced": 15.0,
+        "logical": 15.0,
+        "self_aware": 15.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "career_ambitious": {
       "label": "Career Ambitious",
@@ -27685,7 +29543,20 @@
       "effects": {
         "career_drive": 0.4,
         "gatekeeper_vulnerability": 0.25
-      }
+      },
+      "descriptions": {
+        "positive": "Seen clearly, it's a strength worth leaning into: Strongly motivated by professional advancement; vulnerable to quid-pro-quo pressure from gatekeepers.",
+        "negative": "There's a sharper edge to it than it first appears: Strongly motivated by professional advancement; vulnerable to quid-pro-quo pressure from gatekeepers.",
+        "balanced": "Strongly motivated by professional advancement; vulnerable to quid-pro-quo pressure from gatekeepers."
+      },
+      "learn_chance": {
+        "balanced": 15.0,
+        "logical": 15.0,
+        "self_aware": 15.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "emotionally_controlling": {
       "label": "Emotionally Controlling",
@@ -27694,7 +29565,20 @@
       "effects": {
         "emotional_control_tendency": 0.75,
         "dominant_intimate": true
-      }
+      },
+      "descriptions": {
+        "positive": "Seen clearly, it's a strength worth leaning into: Uses psychological tactics \u2014 emasculation, ridicule, abandonment threats, affair humiliation \u2014 to dominate and diminish a partner.",
+        "negative": "There's a sharper edge to it than it first appears: Uses psychological tactics \u2014 emasculation, ridicule, abandonment threats, affair humiliation \u2014 to dominate and diminish a partner.",
+        "balanced": "In practice: Uses psychological tactics \u2014 emasculation, ridicule, abandonment threats, affair humiliation \u2014 to dominate and diminish a partner."
+      },
+      "learn_chance": {
+        "balanced": 15.0,
+        "logical": 15.0,
+        "self_aware": 15.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "financial_dominator": {
       "label": "Financial Dominator",
@@ -27703,7 +29587,20 @@
       "effects": {
         "career_drive": 0.3,
         "financial_control_tendency": 0.65
-      }
+      },
+      "descriptions": {
+        "positive": "At its best, this is a real asset: Ensures they always out-earn the partner; uses financial superiority as leverage.",
+        "negative": "There's a sharper edge to it than it first appears: Ensures they always out-earn the partner; uses financial superiority as leverage.",
+        "balanced": "Ensures they always out-earn the partner; uses financial superiority as leverage."
+      },
+      "learn_chance": {
+        "balanced": 15.0,
+        "logical": 15.0,
+        "self_aware": 15.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "emasculator": {
       "label": "Emasculator",
@@ -27712,7 +29609,20 @@
       "effects": {
         "emasculation_severity": 0.8,
         "emotional_control_tendency": 0.55
-      }
+      },
+      "descriptions": {
+        "positive": "A dependable part of who they are: Systematically attacks a male partner's sense of masculinity, competence, and attractiveness.",
+        "negative": "It can quietly work against emasculator: Systematically attacks a male partner's sense of masculinity, competence, and attractiveness.",
+        "balanced": "In practice: Systematically attacks a male partner's sense of masculinity, competence, and attractiveness."
+      },
+      "learn_chance": {
+        "balanced": 15.0,
+        "logical": 15.0,
+        "self_aware": 15.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "deeply_religious": {
       "name": "Deeply Religious",
@@ -27720,7 +29630,20 @@
       "description": "Strong religious faith shapes worldview, morality, and relationships.",
       "behavior_flags": [
         "deeply_religious"
-      ]
+      ],
+      "descriptions": {
+        "positive": "A dependable part of who they are: Strong religious faith shapes worldview, morality, and relationships.",
+        "negative": "It can quietly work against Deeply Religious: Strong religious faith shapes worldview, morality, and relationships.",
+        "balanced": "Plainly put: Strong religious faith shapes worldview, morality, and relationships."
+      },
+      "learn_chance": {
+        "balanced": 15.0,
+        "logical": 15.0,
+        "self_aware": 15.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "sex_negative": {
       "name": "Sex-Negative",
@@ -27728,7 +29651,20 @@
       "description": "Believes sex is shameful or only acceptable for reproduction within marriage.",
       "behavior_flags": [
         "sex_negative"
-      ]
+      ],
+      "descriptions": {
+        "positive": "It can work in their favor under the right circumstances: Believes sex is shameful or only acceptable for reproduction within marriage.",
+        "negative": "It can quietly work against Sex-Negative: Believes sex is shameful or only acceptable for reproduction within marriage.",
+        "balanced": "Plainly put: Believes sex is shameful or only acceptable for reproduction within marriage."
+      },
+      "learn_chance": {
+        "balanced": 13.0,
+        "logical": 12.0,
+        "self_aware": 15.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "homophobic": {
       "name": "Homophobic",
@@ -27736,7 +29672,20 @@
       "description": "Holds strongly negative views toward homosexuality and LGBT+ identities.",
       "behavior_flags": [
         "homophobic"
-      ]
+      ],
+      "descriptions": {
+        "positive": "There's a version of this that serves them: Holds strongly negative views toward homosexuality and LGBT+ identities.",
+        "negative": "There's a sharper edge to it than it first appears: Holds strongly negative views toward homosexuality and LGBT+ identities.",
+        "balanced": "Plainly put: Holds strongly negative views toward homosexuality and LGBT+ identities."
+      },
+      "learn_chance": {
+        "balanced": 13.0,
+        "logical": 12.0,
+        "self_aware": 15.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "sexually_repressed": {
       "name": "Sexually Repressed",
@@ -27747,7 +29696,20 @@
       ],
       "need_modifiers": {
         "intimacy": -0.15
-      }
+      },
+      "descriptions": {
+        "positive": "It can work in their favor under the right circumstances: Sexual desires suppressed by shame or religious upbringing; affects intimacy.",
+        "negative": "It can quietly work against Sexually Repressed: Sexual desires suppressed by shame or religious upbringing; affects intimacy.",
+        "balanced": "Sexual desires suppressed by shame or religious upbringing; affects intimacy."
+      },
+      "learn_chance": {
+        "balanced": 13.0,
+        "logical": 12.0,
+        "self_aware": 15.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "sexual_shame": {
       "name": "Sexual Shame",
@@ -27755,7 +29717,20 @@
       "description": "Experiences intense guilt or shame around sexuality and intimate desires.",
       "behavior_flags": [
         "sexual_shame"
-      ]
+      ],
+      "descriptions": {
+        "positive": "There's a version of this that serves them: Experiences intense guilt or shame around sexuality and intimate desires.",
+        "negative": "There's a sharper edge to it than it first appears: Experiences intense guilt or shame around sexuality and intimate desires.",
+        "balanced": "In practice: Experiences intense guilt or shame around sexuality and intimate desires."
+      },
+      "learn_chance": {
+        "balanced": 13.0,
+        "logical": 12.0,
+        "self_aware": 15.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "self_destructive": {
       "name": "Self-Destructive",
@@ -27763,7 +29738,20 @@
       "description": "Prone to behaviour that causes harm to oneself, often as a coping mechanism.",
       "behavior_flags": [
         "self_destructive"
-      ]
+      ],
+      "descriptions": {
+        "positive": "Even so, it isn't without an upside: Prone to behaviour that causes harm to oneself, often as a coping mechanism.",
+        "negative": "It has a cost that's easy to underestimate: Prone to behaviour that causes harm to oneself, often as a coping mechanism.",
+        "balanced": "Plainly put: Prone to behaviour that causes harm to oneself, often as a coping mechanism."
+      },
+      "learn_chance": {
+        "balanced": 13.0,
+        "logical": 12.0,
+        "self_aware": 15.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "addiction_prone": {
       "name": "Addiction-Prone",
@@ -27771,7 +29759,20 @@
       "description": "Susceptible to dependency on substances or compulsive behaviours under stress.",
       "behavior_flags": [
         "addiction_prone"
-      ]
+      ],
+      "descriptions": {
+        "positive": "There's a version of this that serves them: Susceptible to dependency on substances or compulsive behaviours under stress.",
+        "negative": "There's a sharper edge to it than it first appears: Susceptible to dependency on substances or compulsive behaviours under stress.",
+        "balanced": "Susceptible to dependency on substances or compulsive behaviours under stress."
+      },
+      "learn_chance": {
+        "balanced": 13.0,
+        "logical": 12.0,
+        "self_aware": 15.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "identity_crisis_prone": {
       "name": "Identity Crisis-Prone",
@@ -27779,7 +29780,20 @@
       "description": "Struggles with a coherent sense of self; vulnerable to existential destabilisation.",
       "behavior_flags": [
         "identity_crisis_prone"
-      ]
+      ],
+      "descriptions": {
+        "positive": "Even so, it isn't without an upside: Struggles with a coherent sense of self; vulnerable to existential destabilisation.",
+        "negative": "There's a sharper edge to it than it first appears: Struggles with a coherent sense of self; vulnerable to existential destabilisation.",
+        "balanced": "In practice: Struggles with a coherent sense of self; vulnerable to existential destabilisation."
+      },
+      "learn_chance": {
+        "balanced": 13.0,
+        "logical": 12.0,
+        "self_aware": 15.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "sexually_shy": {
       "description": "Becomes flustered and avoidant when sexuality or romance is raised; blushes easily and struggles to reciprocate flirting.",
@@ -27788,7 +29802,20 @@
         "casual_reluctance": 0.3,
         "blush_threshold": -0.25,
         "initiation_bias": -0.2
-      }
+      },
+      "descriptions": {
+        "positive": "Seen clearly, it's a strength worth leaning into: Becomes flustered and avoidant when sexuality or romance is raised; blushes easily and struggles to reciprocate flirting.",
+        "negative": "It can quietly work against sexually_shy: Becomes flustered and avoidant when sexuality or romance is raised; blushes easily and struggles to reciprocate flirting.",
+        "balanced": "Becomes flustered and avoidant when sexuality or romance is raised; blushes easily and struggles to reciprocate flirting."
+      },
+      "learn_chance": {
+        "balanced": 15.0,
+        "logical": 15.0,
+        "self_aware": 15.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "easily_embarrassed": {
       "description": "Flushes and becomes visibly flustered at mildly awkward or suggestive topics, even non-sexual ones.",
@@ -27796,7 +29823,20 @@
       "effects": {
         "blush_threshold": -0.35,
         "social_anxiety": 0.15
-      }
+      },
+      "descriptions": {
+        "positive": "It works in easily_embarrassed's favor more often than not: Flushes and becomes visibly flustered at mildly awkward or suggestive topics, even non-sexual ones.",
+        "negative": "Left unchecked, it becomes a real liability: Flushes and becomes visibly flustered at mildly awkward or suggestive topics, even non-sexual ones.",
+        "balanced": "Flushes and becomes visibly flustered at mildly awkward or suggestive topics, even non-sexual ones."
+      },
+      "learn_chance": {
+        "balanced": 15.0,
+        "logical": 15.0,
+        "self_aware": 15.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "asexual_tendency": {
       "description": "Little or no spontaneous sexual attraction; may engage for emotional closeness but rarely initiates. Distinct from low_libido \u2014 the motivation is absent, not just the drive.",
@@ -27805,7 +29845,20 @@
         "libido": -0.4,
         "initiation_bias": -0.5,
         "casual_reluctance": 0.5
-      }
+      },
+      "descriptions": {
+        "positive": "A dependable part of who they are: Little or no spontaneous sexual attraction; may engage for emotional closeness but rarely initiates. Distinct from low_libido \u2014 the motivation is absent, not just the drive.",
+        "negative": "It has a cost that's easy to underestimate: Little or no spontaneous sexual attraction; may engage for emotional closeness but rarely initiates. Distinct from low_libido \u2014 the motivation is absent, not just the drive.",
+        "balanced": "Little or no spontaneous sexual attraction; may engage for emotional closeness but rarely initiates. Distinct from low_libido \u2014 the motivation is absent, not just the drive."
+      },
+      "learn_chance": {
+        "balanced": 15.0,
+        "logical": 15.0,
+        "self_aware": 15.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "sexually_brazen": {
       "description": "Openly discusses and pursues sex without embarrassment; rarely blushes, comfortable making explicit suggestions.",
@@ -27814,14 +29867,40 @@
         "blush_threshold": 0.4,
         "initiation_bias": 0.25,
         "casual_reluctance": -0.2
-      }
+      },
+      "descriptions": {
+        "positive": "Seen clearly, it's a strength worth leaning into: Openly discusses and pursues sex without embarrassment; rarely blushes, comfortable making explicit suggestions.",
+        "negative": "It can quietly work against sexually_brazen: Openly discusses and pursues sex without embarrassment; rarely blushes, comfortable making explicit suggestions.",
+        "balanced": "Openly discusses and pursues sex without embarrassment; rarely blushes, comfortable making explicit suggestions."
+      },
+      "learn_chance": {
+        "balanced": 15.0,
+        "logical": 15.0,
+        "self_aware": 15.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "daydreamer": {
       "description": "Frequently lost in fantasy and imagination; prone to vivid romantic or sexual daydreams about specific people.",
       "category": "temperament",
       "effects": {
         "daydream_frequency": 0.4
-      }
+      },
+      "descriptions": {
+        "positive": "At its best, this is a real asset: Frequently lost in fantasy and imagination; prone to vivid romantic or sexual daydreams about specific people.",
+        "negative": "It can quietly work against daydreamer: Frequently lost in fantasy and imagination; prone to vivid romantic or sexual daydreams about specific people.",
+        "balanced": "Frequently lost in fantasy and imagination; prone to vivid romantic or sexual daydreams about specific people."
+      },
+      "learn_chance": {
+        "balanced": 15.0,
+        "logical": 15.0,
+        "self_aware": 15.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
     },
     "infatuation_prone": {
       "description": "Develops intense crushes quickly; fixates on a person and fantasizes about them at length, often out of proportion to actual closeness.",
@@ -27829,7 +29908,20 @@
       "effects": {
         "crush_intensity_multiplier": 0.5,
         "daydream_frequency": 0.2
-      }
+      },
+      "descriptions": {
+        "positive": "A dependable part of who they are: Develops intense crushes quickly; fixates on a person and fantasizes about them at length, often out of proportion to actual closeness.",
+        "negative": "Left unchecked, it becomes a real liability: Develops intense crushes quickly; fixates on a person and fantasizes about them at length, often out of proportion to actual closeness.",
+        "balanced": "In practice: Develops intense crushes quickly; fixates on a person and fantasizes about them at length, often out of proportion to actual closeness."
+      },
+      "learn_chance": {
+        "balanced": 15.0,
+        "logical": 15.0,
+        "self_aware": 15.0
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
     }
   },
   "recipe_templates": {
@@ -53380,6 +55472,436 @@
         "social_withdrawal",
         "self_destructive_risk"
       ]
+    }
+  },
+  "belief_templates": {
+    "hard_work_pays_off": {
+      "name": "Hard Work Pays Off",
+      "descriptions": {
+        "positive": "A conviction that steady effort compounds into real results, and it's worth betting on.",
+        "negative": "A stubborn insistence that failure just means not trying hard enough yet.",
+        "balanced": "Believes that consistent effort is usually rewarded over time, without expecting it to be guaranteed."
+      },
+      "learn_chance": {
+        "balanced": 16,
+        "logical": 24,
+        "self_aware": 14
+      },
+      "trait_modifiers": [
+        {
+          "trait": "diligent",
+          "modifier": 20
+        },
+        {
+          "trait": "lazy",
+          "modifier": -25
+        }
+      ],
+      "conditions": []
+    },
+    "people_are_good": {
+      "name": "People Are Fundamentally Good",
+      "descriptions": {
+        "positive": "A grounding faith that most people mean well, even when they stumble.",
+        "negative": "A naivety that keeps them slow to notice when someone's taking advantage of it.",
+        "balanced": "Believes most people are decent at heart, even if they don't always act like it."
+      },
+      "learn_chance": {
+        "balanced": 18,
+        "logical": 10,
+        "self_aware": 22
+      },
+      "trait_modifiers": [
+        {
+          "trait": "compassionate",
+          "modifier": 15
+        },
+        {
+          "trait": "cynical",
+          "modifier": -20
+        }
+      ],
+      "conditions": []
+    },
+    "skeptical_of_authority": {
+      "name": "Skeptical of Authority",
+      "descriptions": {
+        "positive": "A healthy refusal to take institutions at their word just because they're in charge.",
+        "negative": "A reflexive distrust that makes it hard to accept help even when it's genuine.",
+        "balanced": "Distrusts institutions and those in power by default, wanting them to earn trust."
+      },
+      "learn_chance": {
+        "balanced": 15,
+        "logical": 20,
+        "self_aware": 14
+      },
+      "trait_modifiers": [
+        {
+          "trait": "suspicious",
+          "modifier": 20
+        },
+        {
+          "trait": "naive",
+          "modifier": 0
+        }
+      ],
+      "conditions": []
+    },
+    "money_buys_happiness": {
+      "name": "Money Buys Happiness",
+      "descriptions": {
+        "positive": "A clear-eyed recognition that financial security removes a lot of daily suffering.",
+        "negative": "A trap that keeps chasing more without ever feeling like enough.",
+        "balanced": "Believes financial security is central to a good life, though not the whole of it."
+      },
+      "learn_chance": {
+        "balanced": 14,
+        "logical": 16,
+        "self_aware": 10
+      },
+      "trait_modifiers": [
+        {
+          "trait": "materialistic",
+          "modifier": 25
+        },
+        {
+          "trait": "frugal",
+          "modifier": -10
+        }
+      ],
+      "conditions": []
+    },
+    "experiences_over_possessions": {
+      "name": "Experiences Over Possessions",
+      "descriptions": {
+        "positive": "A conviction that what's lived and shared outlasts what's owned.",
+        "negative": "An excuse to never build any financial cushion at all.",
+        "balanced": "Values memories and experiences over material things."
+      },
+      "learn_chance": {
+        "balanced": 17,
+        "logical": 12,
+        "self_aware": 20
+      },
+      "trait_modifiers": [
+        {
+          "trait": "adventurous",
+          "modifier": 20
+        },
+        {
+          "trait": "materialistic",
+          "modifier": -20
+        }
+      ],
+      "conditions": []
+    },
+    "everything_happens_for_a_reason": {
+      "name": "Everything Happens for a Reason",
+      "descriptions": {
+        "positive": "A comfort that turns setbacks into something bearable, even meaningful.",
+        "negative": "A way of dodging responsibility by outsourcing outcomes to fate.",
+        "balanced": "Believes life events unfold according to some larger pattern or purpose."
+      },
+      "learn_chance": {
+        "balanced": 16,
+        "logical": 6,
+        "self_aware": 18
+      },
+      "trait_modifiers": [
+        {
+          "trait": "optimistic",
+          "modifier": 15
+        },
+        {
+          "trait": "rational",
+          "modifier": -15
+        }
+      ],
+      "conditions": []
+    },
+    "self_made_success": {
+      "name": "Self-Made Success",
+      "descriptions": {
+        "positive": "A belief that gives real weight and pride to what someone builds themselves.",
+        "negative": "A blind spot that discounts luck, privilege, and the help of others.",
+        "balanced": "Believes people are mostly responsible for their own outcomes."
+      },
+      "learn_chance": {
+        "balanced": 15,
+        "logical": 22,
+        "self_aware": 12
+      },
+      "trait_modifiers": [
+        {
+          "trait": "ambitious",
+          "modifier": 20
+        },
+        {
+          "trait": "entitled",
+          "modifier": -15
+        }
+      ],
+      "conditions": []
+    },
+    "community_over_self": {
+      "name": "Community Over Self",
+      "descriptions": {
+        "positive": "A generosity that puts the group's wellbeing ahead of personal convenience.",
+        "negative": "A habit of self-erasure that leaves their own needs chronically unmet.",
+        "balanced": "Believes the group's wellbeing should generally come before individual wants."
+      },
+      "learn_chance": {
+        "balanced": 18,
+        "logical": 12,
+        "self_aware": 20
+      },
+      "trait_modifiers": [
+        {
+          "trait": "selfless",
+          "modifier": 20
+        },
+        {
+          "trait": "selfish",
+          "modifier": 0
+        }
+      ],
+      "conditions": []
+    },
+    "change_is_good": {
+      "name": "Change Is Good",
+      "descriptions": {
+        "positive": "An openness that keeps them adaptable when circumstances shift.",
+        "negative": "A restlessness that abandons things just as they start to work.",
+        "balanced": "Welcomes disruption and new ways of doing things."
+      },
+      "learn_chance": {
+        "balanced": 16,
+        "logical": 14,
+        "self_aware": 16
+      },
+      "trait_modifiers": [
+        {
+          "trait": "adaptable",
+          "modifier": 20
+        },
+        {
+          "trait": "stubborn",
+          "modifier": -20
+        }
+      ],
+      "conditions": []
+    },
+    "tradition_matters": {
+      "name": "Tradition Matters",
+      "descriptions": {
+        "positive": "A respect for what's been tested by time and passed down with care.",
+        "negative": "A resistance to anything new, useful or not.",
+        "balanced": "Believes established ways of doing things deserve respect and preservation."
+      },
+      "learn_chance": {
+        "balanced": 16,
+        "logical": 12,
+        "self_aware": 14
+      },
+      "trait_modifiers": [
+        {
+          "trait": "conforming",
+          "modifier": 20
+        },
+        {
+          "trait": "adventurous",
+          "modifier": -15
+        }
+      ],
+      "conditions": []
+    },
+    "justice_is_attainable": {
+      "name": "Justice Is Attainable",
+      "descriptions": {
+        "positive": "A confidence that fairness is worth pursuing because it's actually reachable.",
+        "negative": "A rigidity that struggles to accept when outcomes are simply unfair.",
+        "balanced": "Believes wrongdoing is eventually addressed and fairness generally prevails."
+      },
+      "learn_chance": {
+        "balanced": 16,
+        "logical": 20,
+        "self_aware": 14
+      },
+      "trait_modifiers": [
+        {
+          "trait": "fair",
+          "modifier": 20
+        },
+        {
+          "trait": "cynical",
+          "modifier": -15
+        }
+      ],
+      "conditions": []
+    },
+    "world_is_dangerous": {
+      "name": "The World Is Dangerous",
+      "descriptions": {
+        "positive": "A vigilance that keeps them prepared for real risks others miss.",
+        "negative": "A guardedness that makes it hard to ever fully relax or trust.",
+        "balanced": "Believes the world is fundamentally risky and people should stay alert."
+      },
+      "learn_chance": {
+        "balanced": 14,
+        "logical": 14,
+        "self_aware": 12
+      },
+      "trait_modifiers": [
+        {
+          "trait": "paranoid",
+          "modifier": 25
+        },
+        {
+          "trait": "naive",
+          "modifier": 0
+        }
+      ],
+      "conditions": []
+    },
+    "honesty_is_always_best": {
+      "name": "Honesty Is Always Best",
+      "descriptions": {
+        "positive": "A commitment to truth that makes them someone others can rely on completely.",
+        "negative": "A bluntness that forgets tact has its place too.",
+        "balanced": "Believes truth-telling should rarely, if ever, be compromised."
+      },
+      "learn_chance": {
+        "balanced": 15,
+        "logical": 18,
+        "self_aware": 15
+      },
+      "trait_modifiers": [
+        {
+          "trait": "honest",
+          "modifier": 100
+        },
+        {
+          "trait": "dishonest",
+          "modifier": 0
+        }
+      ],
+      "conditions": []
+    },
+    "rules_are_meant_to_be_tested": {
+      "name": "Rules Are Meant to Be Tested",
+      "descriptions": {
+        "positive": "A curiosity that questions rules instead of following them blindly.",
+        "negative": "A recklessness that treats every boundary as optional.",
+        "balanced": "Believes rules are starting points, not absolutes."
+      },
+      "learn_chance": {
+        "balanced": 14,
+        "logical": 16,
+        "self_aware": 12
+      },
+      "trait_modifiers": [
+        {
+          "trait": "reckless",
+          "modifier": 15
+        },
+        {
+          "trait": "conforming",
+          "modifier": -20
+        }
+      ],
+      "conditions": []
+    },
+    "love_conquers_all": {
+      "name": "Love Conquers All",
+      "descriptions": {
+        "positive": "A devotion that keeps them fighting for relationships worth keeping.",
+        "negative": "A blind spot that keeps them in situations they should have left.",
+        "balanced": "Believes strong relationships can overcome nearly any obstacle."
+      },
+      "learn_chance": {
+        "balanced": 16,
+        "logical": 8,
+        "self_aware": 22
+      },
+      "trait_modifiers": [
+        {
+          "trait": "romantic",
+          "modifier": 25
+        }
+      ],
+      "conditions": []
+    },
+    "hard_times_build_character": {
+      "name": "Hard Times Build Character",
+      "descriptions": {
+        "positive": "A perspective that turns struggle into something that ultimately strengthens them.",
+        "negative": "An excuse to romanticize suffering that didn't need to happen.",
+        "balanced": "Believes struggle and adversity are often necessary for personal growth."
+      },
+      "learn_chance": {
+        "balanced": 17,
+        "logical": 14,
+        "self_aware": 18
+      },
+      "trait_modifiers": [
+        {
+          "trait": "resilient",
+          "modifier": 20
+        }
+      ],
+      "conditions": []
+    },
+    "know_thyself": {
+      "name": "Know Thyself",
+      "descriptions": {
+        "positive": "A discipline of honest self-reflection that keeps their choices aligned with who they are.",
+        "negative": "A tendency to overanalyze everything until it's hard to just act.",
+        "balanced": "Believes self-understanding is the foundation of a good life."
+      },
+      "learn_chance": {
+        "balanced": 16,
+        "logical": 16,
+        "self_aware": 30
+      },
+      "trait_modifiers": [
+        {
+          "trait": "wise",
+          "modifier": 20
+        },
+        {
+          "trait": "perceptive",
+          "modifier": 15
+        }
+      ],
+      "conditions": []
+    }
+  },
+  "contact_designations": {
+    "order": ["stranger", "acquaintance", "friend", "close_friend", "best_friend"],
+    "stranger": {
+      "weekly_upkeep_hours": 0,
+      "upgrade_hours_week": 1,
+      "cognitive_bonus_per_hour": 0.0
+    },
+    "acquaintance": {
+      "weekly_upkeep_hours": 0.5,
+      "upgrade_hours_week": 3,
+      "cognitive_bonus_per_hour": 0.02
+    },
+    "friend": {
+      "weekly_upkeep_hours": 2,
+      "upgrade_hours_week": 6,
+      "cognitive_bonus_per_hour": 0.05
+    },
+    "close_friend": {
+      "weekly_upkeep_hours": 5,
+      "upgrade_hours_week": 10,
+      "cognitive_bonus_per_hour": 0.08
+    },
+    "best_friend": {
+      "weekly_upkeep_hours": 8,
+      "upgrade_hours_week": null,
+      "cognitive_bonus_per_hour": 0.12
     }
   },
   "physical_trait_templates": {

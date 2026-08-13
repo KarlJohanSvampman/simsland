@@ -85,11 +85,29 @@ def _random_skills(defs, job=None):
         return random.sample(flat, min(3, len(flat))) if flat else []
     return []
 
-def _random_traits(defs):
+def _random_traits(defs, sex=None, age=None):
+    from systems.schema_defaults import COGNITION_CORE_TRAITS
+    from systems.trait_chance import cognition_type_of, weighted_trait_pick
+
     pool = defs.get("trait_templates", {})
-    keys = [k for k in pool if not k.startswith("_")] if isinstance(pool, dict) else list(pool)
-    if not keys: return []
-    return random.sample(keys, min(3, len(keys)))
+    pool = {k: v for k, v in pool.items() if not k.startswith("_")} if isinstance(pool, dict) else {}
+    # Cognition core traits (Logical/Balanced/Self-Aware) are assigned
+    # separately below, one per character, and excluded from the general
+    # trait pool so the weighted pick can't also pick one as a "regular" trait.
+    pool = {k: v for k, v in pool.items() if k not in COGNITION_CORE_TRAITS}
+
+    cognition_trait = random.choice(list(COGNITION_CORE_TRAITS.keys()))
+    if not pool:
+        return [cognition_trait]
+
+    cognition_key = COGNITION_CORE_TRAITS[cognition_trait]
+    # Minimal character-shaped dict so per-trait `conditions` (sex/age) can
+    # be evaluated at generation time -- household/friend-based
+    # num_influencers conditions have nothing to check yet at this point
+    # and simply fail closed (see trait_chance.py).
+    pseudo_char = {"sex": sex, "age": age if age is not None else 0, "traits": [cognition_trait]}
+    picked = weighted_trait_pick(pool, pseudo_char, cognition_key, 3, existing=[cognition_trait])
+    return [cognition_trait] + picked
 
 # ── Values (systems/schema_defaults.py::VALUE_CATEGORIES) ──────────────────────
 # Fully random per category for unrelated/adult-generated characters.
@@ -337,7 +355,7 @@ def generate_character(defs, overrides=None):
     )
 
     values          = overrides.get("values")              or _seed_values(defs, overrides.get("parent_values"))
-    traits          = overrides.get("traits")             or _random_traits(defs)
+    traits          = overrides.get("traits")             or _random_traits(defs, sex=sex, age=age)
     curiosity       = overrides.get("curiosity")           if overrides.get("curiosity") is not None else _seed_curiosity(traits)
     physical_traits = overrides.get("physical_traits")    or _random_physical_traits(defs)
     hobbies      = overrides.get("hobbies")            or _random_hobbies(defs)

@@ -15,6 +15,19 @@ VALUE_CATEGORIES = [
     "traditions",
 ]
 
+# 3 mandatory "cognition" core personality traits -- every character has
+# exactly one (assigned at generation, see character_gen.py::generate_character,
+# backfilled below for pre-existing characters). Maps trait id -> the
+# learn_chance/cognitive_modifiers key used across trait_templates/
+# belief_templates content and consumed by systems/peer_influence.py's
+# adoption engine. Exempted from the personality-trait cap (also in
+# peer_influence.py) since it's fixed identity, not a learned trait.
+COGNITION_CORE_TRAITS = {
+    "cognition_logical":   "logical",
+    "cognition_balanced":  "balanced",
+    "cognition_selfaware": "self_aware",
+}
+
 
 def ensure_world_defaults(world, defs=None):
     # Server-side time-scale control (see api/admin.py) -- 1x is realtime.
@@ -704,6 +717,13 @@ def ensure_character_defaults(c):
         import random as _random
         c["ssn"] = f"{_random.randint(0, 999):03d}-{_random.randint(0, 99):02d}-{_random.randint(0, 9999):04d}"
 
+    # Cognition core trait (Logical/Balanced/Self-Aware) -- every character
+    # gets exactly one, assigned at generation (character_gen.py). Backfill
+    # for pre-existing characters that predate this system.
+    if not any(t in COGNITION_CORE_TRAITS for t in c.get("traits", [])):
+        import random as _random
+        c.setdefault("traits", []).append(_random.choice(list(COGNITION_CORE_TRAITS.keys())))
+
     # Substance-use/craving tracking — see systems/addictions.py.
     # {addiction_key: {"usages": int, "last_used_sim_time": float|None,
     #                   "next_decay_sim_time": float|None}}
@@ -764,6 +784,19 @@ def ensure_character_defaults(c):
     # opinion snapshots (mirrors offgrid_category_memory's two-level
     # dict-of-capped-lists shape) -- see brain/opinions.py.
     c.setdefault("opinions", {})
+
+    # General beliefs adopted from belief_templates (definitions.json) via
+    # social exposure -- see systems/peer_influence.py's adoption engine.
+    # Deliberately separate from c["beliefs"] (brain/beliefs.py -- narrow,
+    # fixed-axis political sentiment scalars consumed by systems/politics.py's
+    # elections/factions) and c["opinions"] (free-form, LLM-reasoned). A flat
+    # list of belief-template ids, mirroring c["personality_traits"].
+    c.setdefault("held_beliefs", [])
+
+    # Per-(source_person_id, belief) accumulator feeding the same
+    # dual-threshold promotion shape as c["influence_profile"] (traits) --
+    # see systems/peer_influence.py::record_positive_belief_exposure().
+    c.setdefault("belief_influence_profile", [])
 
     # Accumulator for the daily trust/respect/exposure/value-similarity
     # weighted influence pass -- see systems/influence.py::resolve_value_influence().

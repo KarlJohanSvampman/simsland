@@ -209,6 +209,7 @@ button:hover { background: #556170; }
 
 .traitChip {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 6px;
@@ -230,6 +231,24 @@ button:hover { background: #556170; }
   font-size: 13px; padding: 0 2px;
 }
 .traitChip .chipRemove:hover { color: #f66; }
+
+/* Cognitive/belief compatibility modifiers -- grey=incompatible,
+   white=automatic, green=boost, red=penalty. See trait_chance.py /
+   the cognition/trait-learning plan. */
+.traitChip .chipModifiers {
+  width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 2px;
+}
+.traitChip .modBadge {
+  border: 1px solid;
+  border-radius: 3px;
+  padding: 1px 5px;
+  font-size: 10px;
+  white-space: nowrap;
+}
 
 .emptyHint { color: #667; font-size: 12px; padding: 8px; }
 

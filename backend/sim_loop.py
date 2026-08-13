@@ -47,7 +47,10 @@ from systems.excuses    import check_visible_lies_for_observer, check_witnessed_
 # -- Medium (÷10-20) ---------------------------------------------
 from brain.memory       import decay_memories
 from brain.beliefs      import polarization_drift, compute_alignment
-from brain.relationships import first_impression, update_relationship_state
+from brain.relationships import first_impression, update_relationship_state, ensure_relationship
+from systems.contact_designation import accumulate_hours, evaluate_weekly_designations
+from systems.peer_influence import resolve_cognitive_adoption
+from systems.trait_budget import recompute_budget_on_birthday
 from systems.cooking_process import update_cooking_process
 from systems.task_process import update_household_processes
 from systems.market     import update_market, produce, consume_households
@@ -179,6 +182,11 @@ def _is_monday_midnight(world):
     return cal.get("weekday") == "Monday" and cal.get("hour") == 0
 
 
+def _is_month_start_midnight(world):
+    cal = world.get("calendar", {})
+    return cal.get("day") == 1 and cal.get("hour") == 0
+
+
 # =========================================================
 # DIRTY TRACKING
 # =========================================================
@@ -204,6 +212,14 @@ def collect_dirty(world) -> dict:
 
 _RELATIONSHIP_RADIUS = 8
 
+# Simulated hours of co-presence credited each time this sweep fires for a
+# nearby pair -- this cadence fires every CADENCE["relationships"] ticks,
+# and 1 tick == TICK_RATE_SECONDS simulated seconds (advance_calendar()),
+# so a pair that's nearby every single firing across a full week logs
+# exactly 168 hours. Feeds systems/contact_designation.py's weekly
+# promote/demote pass, not rel["state"] (that stays purely stat-driven).
+_HOURS_PER_RELATIONSHIP_SWEEP = (CADENCE["relationships"] * TICK_RATE_SECONDS) / 3600.0
+
 
 def _update_nearby_relationships(characters, world):
     n = len(characters)
@@ -215,8 +231,10 @@ def _update_nearby_relationships(characters, world):
                     abs(c.get("y", 0) - o.get("y", 0))) <= _RELATIONSHIP_RADIUS:
                 first_impression(c, o)
                 update_relationship_state(c, o["id"])
+                accumulate_hours(ensure_relationship(c, o["id"]), _HOURS_PER_RELATIONSHIP_SWEEP)
                 first_impression(o, c)
                 update_relationship_state(o, c["id"])
+                accumulate_hours(ensure_relationship(o, c["id"]), _HOURS_PER_RELATIONSHIP_SWEEP)
 
 
 # =========================================================
@@ -241,6 +259,30 @@ def tick(world):
         tick_pregnancy(world)   # weekly fitness decay + streak tracking
         tick_baby_weekly(world)
         tick_conditioning_weekly(world)
+        try:
+            from core.definitions import load_definitions
+            _defs_weekly = load_definitions(world.get("sim_id", "default"))
+            evaluate_weekly_designations(world, _defs_weekly)
+            # Trait/belief adoption is evaluated weekly for children/teens
+            # (more malleable -- mirrors peer_influence.py's existing
+            # CHILD_TRAIT_ACQUISITION_AGE_GROUPS), monthly for everyone
+            # else (see _is_month_start_midnight block below).
+            _weekly_learners = [c for c in characters if c.get("age_group") in ("child", "teen")]
+            if _weekly_learners:
+                resolve_cognitive_adoption(world, _defs_weekly, _weekly_learners)
+        except Exception:
+            pass
+
+    # -- Monthly: adult/elderly trait+belief adoption ──────
+    if _is_month_start_midnight(world):
+        try:
+            from core.definitions import load_definitions
+            _defs_monthly = load_definitions(world.get("sim_id", "default"))
+            _monthly_learners = [c for c in characters if c.get("age_group") in ("adult", "elderly")]
+            if _monthly_learners:
+                resolve_cognitive_adoption(world, _defs_monthly, _monthly_learners)
+        except Exception:
+            pass
 
     # -- Fast: perception + attention (÷5) ──────────────────
     if every(world, CADENCE["perception"]):
@@ -443,6 +485,14 @@ def tick(world):
         for _c in characters:
             sync_anger_from_grievances(_c, world)
             check_victim_revenge(_c, world)
+            # Annual trait/belief-learning budget refresh -- see
+            # systems/trait_budget.py. Checked at this existing daily-ish
+            # cadence rather than a dedicated one; guarded internally
+            # against re-firing on the same birthday.
+            bd = _c.get("birthday")
+            cal = world.get("calendar", {})
+            if bd and bd.get("month") == cal.get("month") and bd.get("day") == cal.get("day"):
+                recompute_budget_on_birthday(_c, world)
 
     # -- Clear one-tick departure flags (must be first) ────
     clear_departure_flags(world)

@@ -104,6 +104,19 @@ def ensure_relationship(
 
             "state": "stranger",
 
+            # Contact-designation tier (definitions.json's
+            # contact_designations) -- deliberately separate from "state"
+            # above (that's live stat-threshold-driven and gates 10+
+            # unrelated behavior systems). This is purely hours-in-room
+            # driven, re-evaluated once a week -- see
+            # systems/contact_designation.py.
+            "designation": "stranger",
+
+            # Real hours spent physically co-present this week, reset by
+            # the weekly designation-evaluation pass. See
+            # systems/contact_designation.py.
+            "hours_this_week": 0.0,
+
             "labels": [],
 
             "kinship": None,
