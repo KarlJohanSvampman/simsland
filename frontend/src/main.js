@@ -3423,6 +3423,10 @@ function renderCharacterInspector(id){
   const needs = [];
   if(b.energy   != null) needs.push(`energy ${Math.round(b.energy)}%`);
   if(b.hunger   != null) needs.push(`hunger ${Math.round(b.hunger)}%`);
+  // body.py stores this as "hydration" (100=hydrated, 0=dehydrated) -- the
+  // opposite polarity from hunger/bladder/fatigue (100=urgent). Inverted
+  // here so "thirst" reads the same way those already do: higher = worse.
+  if(b.hydration != null) needs.push(`thirst ${Math.round(100 - b.hydration)}%`);
   if(b.hygiene  != null) needs.push(`hygiene ${Math.round(b.hygiene)}%`);
   if(b.bladder  != null) needs.push(`bladder ${Math.round(b.bladder)}%`);
   if(b.fatigue  != null) needs.push(`fatigue ${Math.round(b.fatigue)}%`);
