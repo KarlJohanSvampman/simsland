@@ -100,12 +100,20 @@ def begin_travel(c, world, reason, duration):
             car["state"]["in_use"] = True
             c["travel_mode"] = "car"
             c["travel_state"] = "to_garage"
+            # Every other movement-initiating call site (activity_queue.py,
+            # curiosity.py, interactions.py, action_router.py) sets this the
+            # moment it starts a route -- this one didn't, so a character
+            # beginning a trip straight out of a seated/desk activity kept
+            # showing that stale animation (e.g. "sit_work") for the entire
+            # walk to the garage/bus stop instead of walking.
+            c["animation_state"] = "walk"
             return True
     else:
         stop = bus_stop(world)
         if stop and _route_or_already_there(c, world, stop):
             c["travel_mode"] = "bus"
             c["travel_state"] = "to_bus_stop"
+            c["animation_state"] = "walk"
             return True
 
     # No usable garage/bus-stop route -- e.g. a household with no garage

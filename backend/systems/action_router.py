@@ -2441,6 +2441,24 @@ def _set_phone_animation(c, interaction):
     c["animation_state"] = anim
 
 
+def _set_computer_animation(c, world):
+    """The computer_* routes below are gated by _require_phone_or_computer,
+    which accepts a phone as a substitute when no computer prop exists --
+    but they used to unconditionally play "sit_work" (a seated-at-a-desk
+    pose) even when the character has no computer and is actually just
+    holding a phone. Falls back to the same phone_screen/sit_phone_screen
+    animation phone_send_text/phone_check/phone_read_text already use in
+    that case."""
+    from systems.personal_items import has_computer
+    if has_computer(c, world):
+        c["animation_state"] = "sit_work"
+        return
+    anim = "phone_screen"
+    if c.get("posture") == "sitting_seat":
+        anim = _SIT_ANIMATION_MAP.get(anim, anim)
+    c["animation_state"] = anim
+
+
 def _route_phone_call(c, world, action):
     phone = _require_phone(c)
     if not phone:
@@ -3009,10 +3027,7 @@ def _route_computer(c, world, action, interaction_id):
     c["activity"] = _scaffold(c, world, interaction_id,
                                target_id=action.get("target"),
                                interaction=interaction_id)
-    # Computer use is inherently a desk activity -- unconditionally
-    # seated-and-typing, unlike the phone routes' posture-conditional
-    # substitution (see _set_phone_animation above).
-    c["animation_state"] = "sit_work"
+    _set_computer_animation(c, world)
 
 
 # ─── wikipedia research ───────────────────────────────────────────────────────
@@ -3024,7 +3039,7 @@ def _route_computer_wiki_research(c, world, action):
     c["activity"] = _scaffold(c, world, "computer_wiki_research",
                                interaction="computer_wiki_research")
     c["activity"]["research_keyword"] = keyword
-    c["animation_state"] = "sit_work"
+    _set_computer_animation(c, world)
 
     if not keyword:
         return
@@ -3062,7 +3077,7 @@ def _route_computer_news(c, world, action):
     if not _require_phone_or_computer(c, world):
         return
     c["activity"] = _scaffold(c, world, "computer_news", interaction="computer_news")
-    c["animation_state"] = "sit_work"
+    _set_computer_animation(c, world)
 
     curiosity_scale = c.get("curiosity", 50) / 100.0
     n_headlines = max(1, round(1 + curiosity_scale * 4))  # 1-5 headlines
@@ -3084,7 +3099,7 @@ def _route_computer_job_search(c, world, action):
     listings = world.get("job_listings", [])
     c["activity"] = _scaffold(c, world, "computer_job_search", interaction="computer_job_search")
     c["activity"]["job_listings"] = listings[:10]
-    c["animation_state"] = "sit_work"
+    _set_computer_animation(c, world)
 
 
 def _route_computer_apply_for_job(c, world, action):
@@ -3094,7 +3109,7 @@ def _route_computer_apply_for_job(c, world, action):
     job_id = action.get("job_id") or action.get("target")
     c["activity"] = _scaffold(c, world, "computer_apply_for_job",
                                interaction="computer_apply_for_job")
-    c["animation_state"] = "sit_work"
+    _set_computer_animation(c, world)
     if job_id:
         apply_for_job(c, job_id, world)
 
@@ -3112,7 +3127,7 @@ def _route_computer_email(c, world, action):
         return
     atype = action.get("type", "computer_check_email")
     c["activity"] = _scaffold(c, world, atype, interaction=atype)
-    c["animation_state"] = "sit_work"
+    _set_computer_animation(c, world)
 
     if atype == "computer_send_email":
         to   = action.get("to", "")
