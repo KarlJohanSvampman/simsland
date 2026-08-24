@@ -257,6 +257,29 @@
     font-size: 11px;
   }
 
+  .eventModalRow + .eventModalRow {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid #333;
+  }
+
+  .eventModalRowTitle {
+    color: #9cf;
+    font-weight: bold;
+    font-size: 14px;
+  }
+
+  .eventModalRowMeta {
+    color: #888;
+    font-size: 11px;
+    margin: 2px 0 6px;
+  }
+
+  .eventModalRowSummary {
+    color: #ddd;
+    line-height: 1.4;
+  }
+
   /* =========================
      OUTLINER SIDEBAR
      Collapsible left-docked Blender-outliner-style tree -- see
@@ -580,6 +603,16 @@
       <button class="modal-close" onclick="closeModal('modal-debug-settings')">✕</button>
     </div>
     <div class="modal-body" id="debugSettingsModalBody"></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-event">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3 id="eventModalTitle">Event</h3>
+      <button class="modal-close" onclick="closeModal('modal-event')">✕</button>
+    </div>
+    <div class="modal-body" id="eventModalBody"></div>
   </div>
 </div>
 

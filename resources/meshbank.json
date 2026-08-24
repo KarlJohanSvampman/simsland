@@ -9,48 +9,6 @@
       "mixamorigHips": {
         "name": "mixamorigHips"
       },
-      "mixamorigSpine": {
-        "name": "mixamorigSpine"
-      },
-      "mixamorigSpine1": {
-        "name": "mixamorigSpine1"
-      },
-      "mixamorigSpine2": {
-        "name": "mixamorigSpine2"
-      },
-      "mixamorigNeck": {
-        "name": "mixamorigNeck"
-      },
-      "mixamorigHead": {
-        "name": "mixamorigHead"
-      },
-      "mixamorigHeadTop_End": {
-        "name": "mixamorigHeadTop_End"
-      },
-      "mixamorigLeftShoulder": {
-        "name": "mixamorigLeftShoulder"
-      },
-      "mixamorigLeftArm": {
-        "name": "mixamorigLeftArm"
-      },
-      "mixamorigLeftForeArm": {
-        "name": "mixamorigLeftForeArm"
-      },
-      "mixamorigLeftHand": {
-        "name": "mixamorigLeftHand"
-      },
-      "mixamorigRightShoulder": {
-        "name": "mixamorigRightShoulder"
-      },
-      "mixamorigRightArm": {
-        "name": "mixamorigRightArm"
-      },
-      "mixamorigRightForeArm": {
-        "name": "mixamorigRightForeArm"
-      },
-      "mixamorigRightHand": {
-        "name": "mixamorigRightHand"
-      },
       "mixamorigLeftUpLeg": {
         "name": "mixamorigLeftUpLeg"
       },
@@ -80,6 +38,48 @@
       },
       "mixamorigRightToe_End": {
         "name": "mixamorigRightToe_End"
+      },
+      "mixamorigSpine": {
+        "name": "mixamorigSpine"
+      },
+      "mixamorigSpine1": {
+        "name": "mixamorigSpine1"
+      },
+      "mixamorigSpine2": {
+        "name": "mixamorigSpine2"
+      },
+      "mixamorigLeftShoulder": {
+        "name": "mixamorigLeftShoulder"
+      },
+      "mixamorigLeftArm": {
+        "name": "mixamorigLeftArm"
+      },
+      "mixamorigLeftForeArm": {
+        "name": "mixamorigLeftForeArm"
+      },
+      "mixamorigLeftHand": {
+        "name": "mixamorigLeftHand"
+      },
+      "mixamorigNeck": {
+        "name": "mixamorigNeck"
+      },
+      "mixamorigHead": {
+        "name": "mixamorigHead"
+      },
+      "mixamorigHeadTop_End": {
+        "name": "mixamorigHeadTop_End"
+      },
+      "mixamorigRightShoulder": {
+        "name": "mixamorigRightShoulder"
+      },
+      "mixamorigRightArm": {
+        "name": "mixamorigRightArm"
+      },
+      "mixamorigRightForeArm": {
+        "name": "mixamorigRightForeArm"
+      },
+      "mixamorigRightHand": {
+        "name": "mixamorigRightHand"
       }
     },
     "hasSkeleton": true,

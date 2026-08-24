@@ -11232,6 +11232,7 @@
       "body_features": {
         "height_cm": 170
       },
+      "model": "adult_male",
       "body_composition": {
         "body_fat_level": 0.35
       },
@@ -11239,8 +11240,21 @@
       "traits": [],
       "physical_traits": [],
       "hobbies": [],
-      "worn": {},
-      "starting_inventory": [],
+      "worn": {
+        "head": "beanie",
+        "hair": "hair_ponytail",
+        "torso": "shirt_dress",
+        "undershirt": "compression_shirt",
+        "outerwear": "jacket_winter",
+        "legs": "sweatpants",
+        "socks": "socks_dress",
+        "wrist_l": "friendship_bracelet",
+        "accessory": "antihistamine"
+      },
+      "starting_inventory": [
+        "rake",
+        "display_case"
+      ],
       "bio": "",
       "job": null,
       "education": "",
@@ -26273,9 +26287,9 @@
         "balanced": "Plainly put: Tells the truth even when it is uncomfortable; avoids deception."
       },
       "learn_chance": {
-        "balanced": 20.0,
-        "logical": 20.0,
-        "self_aware": 26.0
+        "balanced": 20,
+        "logical": 20,
+        "self_aware": 26
       },
       "cognitive_modifiers": [
         {
@@ -26308,9 +26322,9 @@
         "balanced": "Plainly put: Stays committed to friends and family; unlikely to betray trust."
       },
       "learn_chance": {
-        "balanced": 20.0,
-        "logical": 20.0,
-        "self_aware": 26.0
+        "balanced": 20,
+        "logical": 20,
+        "self_aware": 26
       },
       "cognitive_modifiers": [
         {
@@ -26341,9 +26355,9 @@
         "balanced": "Deeply affected by others' suffering; quick to offer help."
       },
       "learn_chance": {
-        "balanced": 20.0,
-        "logical": 20.0,
-        "self_aware": 26.0
+        "balanced": 20,
+        "logical": 20,
+        "self_aware": 26
       },
       "cognitive_modifiers": [
         {
@@ -26376,9 +26390,9 @@
         "balanced": "Plainly put: Freely shares money, time, and resources with others."
       },
       "learn_chance": {
-        "balanced": 20.0,
-        "logical": 20.0,
-        "self_aware": 23.0
+        "balanced": 20,
+        "logical": 20,
+        "self_aware": 23
       },
       "cognitive_modifiers": [
         {
@@ -26408,9 +26422,9 @@
         "balanced": "Plainly put: Tolerates delays and frustration without becoming agitated."
       },
       "learn_chance": {
-        "balanced": 20.0,
-        "logical": 20.0,
-        "self_aware": 20.0
+        "balanced": 20,
+        "logical": 20,
+        "self_aware": 20
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [],
@@ -26433,9 +26447,9 @@
         "balanced": "Plainly put: Acts despite fear; willing to take risks for the right reasons."
       },
       "learn_chance": {
-        "balanced": 20.0,
-        "logical": 20.0,
-        "self_aware": 20.0
+        "balanced": 20,
+        "logical": 20,
+        "self_aware": 20
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [],
@@ -26461,9 +26475,9 @@
         "balanced": "Driven to explore and learn; asks questions and investigates."
       },
       "learn_chance": {
-        "balanced": 20.0,
+        "balanced": 20,
         "logical": 32.5,
-        "self_aware": 20.0
+        "self_aware": 20
       },
       "cognitive_modifiers": [
         {
@@ -26494,9 +26508,9 @@
         "balanced": "Plainly put: Generates novel ideas and finds unconventional solutions."
       },
       "learn_chance": {
-        "balanced": 20.0,
+        "balanced": 20,
         "logical": 27.5,
-        "self_aware": 20.0
+        "self_aware": 20
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [],
@@ -26522,9 +26536,9 @@
         "balanced": "In practice: Works steadily and carefully; completes tasks without cutting corners."
       },
       "learn_chance": {
-        "balanced": 20.0,
-        "logical": 25.0,
-        "self_aware": 20.0
+        "balanced": 20,
+        "logical": 25,
+        "self_aware": 20
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [
@@ -26553,9 +26567,9 @@
         "balanced": "Plainly put: Expects positive outcomes; maintains high spirits in adversity."
       },
       "learn_chance": {
-        "balanced": 20.0,
-        "logical": 20.0,
-        "self_aware": 20.0
+        "balanced": 20,
+        "logical": 20,
+        "self_aware": 20
       },
       "cognitive_modifiers": [
         {
@@ -26586,9 +26600,9 @@
         "balanced": "Does not boast or seek status; acknowledges own limitations."
       },
       "learn_chance": {
-        "balanced": 20.0,
-        "logical": 20.0,
-        "self_aware": 20.0
+        "balanced": 20,
+        "logical": 20,
+        "self_aware": 20
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [],
@@ -26611,9 +26625,9 @@
         "balanced": "In practice: Lets go of grudges and gives others second chances."
       },
       "learn_chance": {
-        "balanced": 20.0,
-        "logical": 20.0,
-        "self_aware": 20.0
+        "balanced": 20,
+        "logical": 20,
+        "self_aware": 20
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [],
@@ -26639,9 +26653,9 @@
         "balanced": "Plainly put: Follows routines and resists impulses to stay on track."
       },
       "learn_chance": {
-        "balanced": 20.0,
-        "logical": 25.0,
-        "self_aware": 20.0
+        "balanced": 20,
+        "logical": 25,
+        "self_aware": 20
       },
       "cognitive_modifiers": [
         {
@@ -26667,9 +26681,9 @@
         "balanced": "In practice: Takes ownership of duties; reliably handles household obligations."
       },
       "learn_chance": {
-        "balanced": 20.0,
-        "logical": 20.0,
-        "self_aware": 20.0
+        "balanced": 20,
+        "logical": 20,
+        "self_aware": 20
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [],
@@ -26690,9 +26704,9 @@
         "balanced": "In practice: Consistently follows through on commitments and promises."
       },
       "learn_chance": {
-        "balanced": 20.0,
-        "logical": 20.0,
-        "self_aware": 20.0
+        "balanced": 20,
+        "logical": 20,
+        "self_aware": 20
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [],
@@ -26715,9 +26729,9 @@
         "balanced": "Adjusts quickly to new situations and changing circumstances."
       },
       "learn_chance": {
-        "balanced": 20.0,
-        "logical": 20.0,
-        "self_aware": 20.0
+        "balanced": 20,
+        "logical": 20,
+        "self_aware": 20
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [
@@ -26746,9 +26760,9 @@
         "balanced": "In practice: Finds clever solutions using whatever is available; improvises well."
       },
       "learn_chance": {
-        "balanced": 20.0,
+        "balanced": 20,
         "logical": 27.5,
-        "self_aware": 20.0
+        "self_aware": 20
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [],
@@ -26771,9 +26785,9 @@
         "balanced": "Notices details others miss; reads situations and people accurately."
       },
       "learn_chance": {
-        "balanced": 20.0,
-        "logical": 30.0,
-        "self_aware": 20.0
+        "balanced": 20,
+        "logical": 30,
+        "self_aware": 20
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [
@@ -26801,9 +26815,9 @@
         "balanced": "Plainly put: Sets high goals and works hard to advance career and wealth."
       },
       "learn_chance": {
-        "balanced": 20.0,
-        "logical": 20.0,
-        "self_aware": 20.0
+        "balanced": 20,
+        "logical": 20,
+        "self_aware": 20
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [
@@ -26833,9 +26847,9 @@
         "balanced": "Plainly put: Believes in own abilities; acts decisively without excessive doubt."
       },
       "learn_chance": {
-        "balanced": 20.0,
-        "logical": 20.0,
-        "self_aware": 29.0
+        "balanced": 20,
+        "logical": 20,
+        "self_aware": 29
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [],
@@ -26860,9 +26874,9 @@
         "balanced": "Plainly put: Naturally draws people in; persuasive and socially magnetic."
       },
       "learn_chance": {
-        "balanced": 20.0,
-        "logical": 20.0,
-        "self_aware": 35.0
+        "balanced": 20,
+        "logical": 20,
+        "self_aware": 35
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [],
@@ -26887,9 +26901,9 @@
         "balanced": "Plainly put: Uses courteous language and manners in all interactions."
       },
       "learn_chance": {
-        "balanced": 20.0,
-        "logical": 20.0,
-        "self_aware": 26.0
+        "balanced": 20,
+        "logical": 20,
+        "self_aware": 26
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [],
@@ -26912,9 +26926,9 @@
         "balanced": "Delivers difficult truths with care to avoid unnecessary offense."
       },
       "learn_chance": {
-        "balanced": 20.0,
-        "logical": 20.0,
-        "self_aware": 23.0
+        "balanced": 20,
+        "logical": 20,
+        "self_aware": 23
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [],
@@ -26937,9 +26951,9 @@
         "balanced": "Plainly put: Works well with others; prioritises group success over personal gain."
       },
       "learn_chance": {
-        "balanced": 20.0,
-        "logical": 20.0,
-        "self_aware": 26.0
+        "balanced": 20,
+        "logical": 20,
+        "self_aware": 26
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [],
@@ -26962,9 +26976,9 @@
         "balanced": "In practice: Prioritises the safety of family and loved ones above other concerns."
       },
       "learn_chance": {
-        "balanced": 20.0,
-        "logical": 20.0,
-        "self_aware": 23.0
+        "balanced": 20,
+        "logical": 20,
+        "self_aware": 23
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [],
@@ -26987,9 +27001,9 @@
         "balanced": "Prefers self-reliance; does not need others' approval to act."
       },
       "learn_chance": {
-        "balanced": 20.0,
-        "logical": 20.0,
-        "self_aware": 14.0
+        "balanced": 20,
+        "logical": 20,
+        "self_aware": 14
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [],
@@ -27014,9 +27028,9 @@
         "balanced": "Plainly put: Bases decisions on logic and evidence rather than emotion."
       },
       "learn_chance": {
-        "balanced": 20.0,
-        "logical": 35.0,
-        "self_aware": 20.0
+        "balanced": 20,
+        "logical": 35,
+        "self_aware": 20
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [
@@ -27042,9 +27056,9 @@
         "balanced": "Focuses on what works; avoids over-complicating simple problems."
       },
       "learn_chance": {
-        "balanced": 20.0,
-        "logical": 20.0,
-        "self_aware": 20.0
+        "balanced": 20,
+        "logical": 20,
+        "self_aware": 20
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [],
@@ -27067,9 +27081,9 @@
         "balanced": "Plainly put: Remains composed under pressure; rarely loses temper."
       },
       "learn_chance": {
-        "balanced": 20.0,
-        "logical": 20.0,
-        "self_aware": 20.0
+        "balanced": 20,
+        "logical": 20,
+        "self_aware": 20
       },
       "cognitive_modifiers": [
         {
@@ -27098,9 +27112,9 @@
         "balanced": "In practice: Bounces back quickly from setbacks and hardship."
       },
       "learn_chance": {
-        "balanced": 20.0,
-        "logical": 20.0,
-        "self_aware": 20.0
+        "balanced": 20,
+        "logical": 20,
+        "self_aware": 20
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [
@@ -27129,9 +27143,9 @@
         "balanced": "In practice: Puts others' needs before own; sacrifices personal comfort to help."
       },
       "learn_chance": {
-        "balanced": 20.0,
-        "logical": 20.0,
-        "self_aware": 23.0
+        "balanced": 20,
+        "logical": 20,
+        "self_aware": 23
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [
@@ -27157,9 +27171,9 @@
         "balanced": "Treats everyone by the same standard; resists favouritism."
       },
       "learn_chance": {
-        "balanced": 20.0,
-        "logical": 20.0,
-        "self_aware": 20.0
+        "balanced": 20,
+        "logical": 20,
+        "self_aware": 20
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [
@@ -27187,9 +27201,9 @@
         "balanced": "Plainly put: Acknowledges others' dignity and personal boundaries."
       },
       "learn_chance": {
-        "balanced": 20.0,
-        "logical": 20.0,
-        "self_aware": 23.0
+        "balanced": 20,
+        "logical": 20,
+        "self_aware": 23
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [],
@@ -27212,9 +27226,9 @@
         "balanced": "Plainly put: Keeps living spaces tidy and schedules structured."
       },
       "learn_chance": {
-        "balanced": 20.0,
-        "logical": 20.0,
-        "self_aware": 20.0
+        "balanced": 20,
+        "logical": 20,
+        "self_aware": 20
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [],
@@ -27235,9 +27249,9 @@
         "balanced": "Makes choices quickly and commits to them without second-guessing."
       },
       "learn_chance": {
-        "balanced": 20.0,
-        "logical": 20.0,
-        "self_aware": 20.0
+        "balanced": 20,
+        "logical": 20,
+        "self_aware": 20
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [],
@@ -27262,9 +27276,9 @@
         "balanced": "In practice: Pursues goals with unwavering focus even when obstacles arise."
       },
       "learn_chance": {
-        "balanced": 20.0,
-        "logical": 20.0,
-        "self_aware": 20.0
+        "balanced": 20,
+        "logical": 20,
+        "self_aware": 20
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [],
@@ -27287,9 +27301,9 @@
         "balanced": "Plainly put: Considers opposing views seriously and updates beliefs when warranted."
       },
       "learn_chance": {
-        "balanced": 20.0,
-        "logical": 25.0,
-        "self_aware": 20.0
+        "balanced": 20,
+        "logical": 25,
+        "self_aware": 20
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [],
@@ -27310,9 +27324,9 @@
         "balanced": "Considers consequences carefully before acting or speaking."
       },
       "learn_chance": {
-        "balanced": 20.0,
-        "logical": 20.0,
-        "self_aware": 20.0
+        "balanced": 20,
+        "logical": 20,
+        "self_aware": 20
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [],
@@ -27338,9 +27352,9 @@
         "balanced": "Maintains a bright, upbeat mood that lifts those around them."
       },
       "learn_chance": {
-        "balanced": 20.0,
-        "logical": 20.0,
-        "self_aware": 23.0
+        "balanced": 20,
+        "logical": 20,
+        "self_aware": 23
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [],
@@ -27366,9 +27380,9 @@
         "balanced": "Accurately senses what others feel and responds with care."
       },
       "learn_chance": {
-        "balanced": 20.0,
-        "logical": 20.0,
-        "self_aware": 29.0
+        "balanced": 20,
+        "logical": 20,
+        "self_aware": 29
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [],
@@ -27389,9 +27403,9 @@
         "balanced": "In practice: Keeps confidences and never breaks promises without good reason."
       },
       "learn_chance": {
-        "balanced": 20.0,
-        "logical": 20.0,
-        "self_aware": 20.0
+        "balanced": 20,
+        "logical": 20,
+        "self_aware": 20
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [],
@@ -27414,9 +27428,9 @@
         "balanced": "Plainly put: Encourages and assists others through difficult moments."
       },
       "learn_chance": {
-        "balanced": 20.0,
-        "logical": 20.0,
-        "self_aware": 23.0
+        "balanced": 20,
+        "logical": 20,
+        "self_aware": 23
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [],
@@ -27442,9 +27456,9 @@
         "balanced": "Seeks new and better ways to do things; embraces change."
       },
       "learn_chance": {
-        "balanced": 20.0,
-        "logical": 30.0,
-        "self_aware": 20.0
+        "balanced": 20,
+        "logical": 30,
+        "self_aware": 20
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [],
@@ -27465,9 +27479,9 @@
         "balanced": "Spends money carefully; avoids waste and seeks the best value."
       },
       "learn_chance": {
-        "balanced": 20.0,
-        "logical": 20.0,
-        "self_aware": 20.0
+        "balanced": 20,
+        "logical": 20,
+        "self_aware": 20
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [
@@ -27497,9 +27511,9 @@
         "balanced": "Plainly put: Seeks new experiences; willing to leave comfort zones."
       },
       "learn_chance": {
-        "balanced": 20.0,
-        "logical": 20.0,
-        "self_aware": 20.0
+        "balanced": 20,
+        "logical": 20,
+        "self_aware": 20
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [
@@ -27532,9 +27546,9 @@
         "balanced": "In practice: Brings levity and humour; enjoys games and light-hearted interaction."
       },
       "learn_chance": {
-        "balanced": 20.0,
-        "logical": 20.0,
-        "self_aware": 23.0
+        "balanced": 20,
+        "logical": 20,
+        "self_aware": 23
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [],
@@ -27557,9 +27571,9 @@
         "balanced": "Keeps trying despite repeated failure or resistance."
       },
       "learn_chance": {
-        "balanced": 20.0,
-        "logical": 20.0,
-        "self_aware": 20.0
+        "balanced": 20,
+        "logical": 20,
+        "self_aware": 20
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [],
@@ -27582,9 +27596,9 @@
         "balanced": "Notices unusual details in the environment and in people's behaviour."
       },
       "learn_chance": {
-        "balanced": 20.0,
-        "logical": 25.0,
-        "self_aware": 20.0
+        "balanced": 20,
+        "logical": 25,
+        "self_aware": 20
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [],
@@ -27607,9 +27621,9 @@
         "balanced": "Navigates conflicts and disagreements to reach peaceful resolutions."
       },
       "learn_chance": {
-        "balanced": 20.0,
-        "logical": 20.0,
-        "self_aware": 26.0
+        "balanced": 20,
+        "logical": 20,
+        "self_aware": 26
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [],
@@ -27632,9 +27646,9 @@
         "balanced": "Applies experience and judgement to make sound long-term decisions."
       },
       "learn_chance": {
-        "balanced": 20.0,
-        "logical": 30.0,
-        "self_aware": 20.0
+        "balanced": 20,
+        "logical": 30,
+        "self_aware": 20
       },
       "cognitive_modifiers": [
         {
@@ -27665,9 +27679,9 @@
         "balanced": "Lies or conceals truth to serve self-interest."
       },
       "learn_chance": {
-        "balanced": 13.0,
-        "logical": 12.0,
-        "self_aware": 15.0
+        "balanced": 13,
+        "logical": 12,
+        "self_aware": 15
       },
       "cognitive_modifiers": [
         {
@@ -27700,9 +27714,9 @@
         "balanced": "Prioritises personal gain over others' needs or feelings."
       },
       "learn_chance": {
-        "balanced": 13.0,
-        "logical": 12.0,
-        "self_aware": 9.0
+        "balanced": 13,
+        "logical": 12,
+        "self_aware": 9
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [
@@ -27730,9 +27744,9 @@
         "balanced": "In practice: Overestimates own abilities and dismisses others' input."
       },
       "learn_chance": {
-        "balanced": 13.0,
-        "logical": 12.0,
-        "self_aware": 9.0
+        "balanced": 13,
+        "logical": 12,
+        "self_aware": 9
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [],
@@ -27755,9 +27769,9 @@
         "balanced": "Acts without thinking; makes snap decisions that cause problems."
       },
       "learn_chance": {
-        "balanced": 13.0,
-        "logical": 2.0,
-        "self_aware": 15.0
+        "balanced": 13,
+        "logical": 2,
+        "self_aware": 15
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [],
@@ -27782,9 +27796,9 @@
         "balanced": "Avoids effort; skips tasks and prefers rest over responsibility."
       },
       "learn_chance": {
-        "balanced": 13.0,
-        "logical": 12.0,
-        "self_aware": 15.0
+        "balanced": 13,
+        "logical": 12,
+        "self_aware": 15
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [
@@ -27812,9 +27826,9 @@
         "balanced": "In practice: Avoids risk and confrontation even when action is clearly needed."
       },
       "learn_chance": {
-        "balanced": 13.0,
-        "logical": 12.0,
-        "self_aware": 15.0
+        "balanced": 13,
+        "logical": 12,
+        "self_aware": 15
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [],
@@ -27838,9 +27852,9 @@
         "balanced": "Resents others' success or attention; prone to envy-driven conflict."
       },
       "learn_chance": {
-        "balanced": 13.0,
-        "logical": 12.0,
-        "self_aware": 9.0
+        "balanced": 13,
+        "logical": 12,
+        "self_aware": 9
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [],
@@ -27861,9 +27875,9 @@
         "balanced": "Accumulates wealth and resources far beyond personal need."
       },
       "learn_chance": {
-        "balanced": 13.0,
-        "logical": 12.0,
-        "self_aware": 15.0
+        "balanced": 13,
+        "logical": 12,
+        "self_aware": 15
       },
       "cognitive_modifiers": [
         {
@@ -27891,9 +27905,9 @@
         "balanced": "Seeks revenge and holds grudges long after an offence."
       },
       "learn_chance": {
-        "balanced": 13.0,
-        "logical": 12.0,
-        "self_aware": 15.0
+        "balanced": 13,
+        "logical": 12,
+        "self_aware": 15
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [],
@@ -27916,9 +27930,9 @@
         "balanced": "Plainly put: Derives satisfaction from others' pain; acts with deliberate harshness."
       },
       "learn_chance": {
-        "balanced": 13.0,
-        "logical": 12.0,
-        "self_aware": 6.0
+        "balanced": 13,
+        "logical": 12,
+        "self_aware": 6
       },
       "cognitive_modifiers": [
         {
@@ -27946,9 +27960,9 @@
         "balanced": "Uses deception and psychological pressure to control others."
       },
       "learn_chance": {
-        "balanced": 13.0,
-        "logical": 12.0,
-        "self_aware": 18.0
+        "balanced": 13,
+        "logical": 12,
+        "self_aware": 18
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [],
@@ -27971,9 +27985,9 @@
         "balanced": "In practice: Assumes selfish motives behind every action; distrusts goodwill."
       },
       "learn_chance": {
-        "balanced": 13.0,
-        "logical": 12.0,
-        "self_aware": 9.0
+        "balanced": 13,
+        "logical": 12,
+        "self_aware": 9
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [
@@ -28006,9 +28020,9 @@
         "balanced": "Expects the worst; defaults to negative interpretations of events."
       },
       "learn_chance": {
-        "balanced": 13.0,
-        "logical": 12.0,
-        "self_aware": 15.0
+        "balanced": 13,
+        "logical": 12,
+        "self_aware": 15
       },
       "cognitive_modifiers": [
         {
@@ -28036,9 +28050,9 @@
         "balanced": "In practice: Refuses to change position even when evidence demands it."
       },
       "learn_chance": {
-        "balanced": 13.0,
-        "logical": 12.0,
-        "self_aware": 15.0
+        "balanced": 13,
+        "logical": 12,
+        "self_aware": 15
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [
@@ -28066,9 +28080,9 @@
         "balanced": "Takes unnecessary risks with little regard for consequences."
       },
       "learn_chance": {
-        "balanced": 13.0,
-        "logical": 12.0,
-        "self_aware": 15.0
+        "balanced": 13,
+        "logical": 12,
+        "self_aware": 15
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [
@@ -28096,9 +28110,9 @@
         "balanced": "Plainly put: Trusts others too easily and misses obvious red flags."
       },
       "learn_chance": {
-        "balanced": 13.0,
-        "logical": 7.0,
-        "self_aware": 15.0
+        "balanced": 13,
+        "logical": 7,
+        "self_aware": 15
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [
@@ -28131,9 +28145,9 @@
         "balanced": "Plainly put: Assumes hidden threats and malicious intent without evidence."
       },
       "learn_chance": {
-        "balanced": 13.0,
-        "logical": 12.0,
-        "self_aware": 9.0
+        "balanced": 13,
+        "logical": 12,
+        "self_aware": 9
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [
@@ -28161,9 +28175,9 @@
         "balanced": "In practice: Slow to trust; questions others' motives before accepting help."
       },
       "learn_chance": {
-        "balanced": 13.0,
-        "logical": 12.0,
-        "self_aware": 12.0
+        "balanced": 13,
+        "logical": 12,
+        "self_aware": 12
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [
@@ -28190,9 +28204,9 @@
         "balanced": "Plainly put: Actively creates false impressions to gain advantage."
       },
       "learn_chance": {
-        "balanced": 13.0,
-        "logical": 12.0,
-        "self_aware": 15.0
+        "balanced": 13,
+        "logical": 12,
+        "self_aware": 15
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [],
@@ -28217,9 +28231,9 @@
         "balanced": "Plainly put: Disregards social norms; speaks bluntly and offensively."
       },
       "learn_chance": {
-        "balanced": 13.0,
-        "logical": 12.0,
-        "self_aware": 3.0
+        "balanced": 13,
+        "logical": 12,
+        "self_aware": 3
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [],
@@ -28242,9 +28256,9 @@
         "balanced": "Plainly put: Defaults to confrontation and hostility when challenged."
       },
       "learn_chance": {
-        "balanced": 13.0,
-        "logical": 12.0,
-        "self_aware": 15.0
+        "balanced": 13,
+        "logical": 12,
+        "self_aware": 15
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [],
@@ -28267,9 +28281,9 @@
         "balanced": "Plainly put: Micromanages others and resents loss of authority."
       },
       "learn_chance": {
-        "balanced": 13.0,
-        "logical": 12.0,
-        "self_aware": 15.0
+        "balanced": 13,
+        "logical": 12,
+        "self_aware": 15
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [],
@@ -28293,9 +28307,9 @@
         "balanced": "Treats relationships as ownership; smothers partners or friends."
       },
       "learn_chance": {
-        "balanced": 13.0,
-        "logical": 12.0,
-        "self_aware": 12.0
+        "balanced": 13,
+        "logical": 12,
+        "self_aware": 12
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [],
@@ -28318,9 +28332,9 @@
         "balanced": "In practice: Forms negative opinions about others quickly and voices them freely."
       },
       "learn_chance": {
-        "balanced": 13.0,
-        "logical": 12.0,
-        "self_aware": 12.0
+        "balanced": 13,
+        "logical": 12,
+        "self_aware": 12
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [],
@@ -28345,9 +28359,9 @@
         "balanced": "Cannot tolerate delay; becomes frustrated when things take time."
       },
       "learn_chance": {
-        "balanced": 13.0,
-        "logical": 12.0,
-        "self_aware": 15.0
+        "balanced": 13,
+        "logical": 12,
+        "self_aware": 15
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [],
@@ -28371,9 +28385,9 @@
         "balanced": "Mood shifts unpredictably; hard to read and difficult to rely on emotionally."
       },
       "learn_chance": {
-        "balanced": 13.0,
-        "logical": 12.0,
-        "self_aware": 15.0
+        "balanced": 13,
+        "logical": 12,
+        "self_aware": 15
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [],
@@ -28397,9 +28411,9 @@
         "balanced": "In practice: Experiences heightened anxiety in uncertain or social situations."
       },
       "learn_chance": {
-        "balanced": 13.0,
-        "logical": 12.0,
-        "self_aware": 12.0
+        "balanced": 13,
+        "logical": 12,
+        "self_aware": 12
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [],
@@ -28424,9 +28438,9 @@
         "balanced": "In practice: Struggles to commit to choices; constantly second-guesses decisions."
       },
       "learn_chance": {
-        "balanced": 13.0,
-        "logical": 7.0,
-        "self_aware": 15.0
+        "balanced": 13,
+        "logical": 7,
+        "self_aware": 15
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [],
@@ -28447,9 +28461,9 @@
         "balanced": "Neglects quality and detail; causes accidents through inattention."
       },
       "learn_chance": {
-        "balanced": 13.0,
-        "logical": 12.0,
-        "self_aware": 15.0
+        "balanced": 13,
+        "logical": 12,
+        "self_aware": 15
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [],
@@ -28470,9 +28484,9 @@
         "balanced": "Fails to fulfil duties; avoids accountability for own actions."
       },
       "learn_chance": {
-        "balanced": 13.0,
-        "logical": 12.0,
-        "self_aware": 15.0
+        "balanced": 13,
+        "logical": 12,
+        "self_aware": 15
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [],
@@ -28495,9 +28509,9 @@
         "balanced": "Acts without regard for how actions affect those around them."
       },
       "learn_chance": {
-        "balanced": 13.0,
-        "logical": 12.0,
-        "self_aware": 12.0
+        "balanced": 13,
+        "logical": 12,
+        "self_aware": 12
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [],
@@ -28524,9 +28538,9 @@
         "balanced": "Plainly put: Lacks motivation or interest; indifferent to most outcomes."
       },
       "learn_chance": {
-        "balanced": 13.0,
-        "logical": 12.0,
-        "self_aware": 15.0
+        "balanced": 13,
+        "logical": 12,
+        "self_aware": 15
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [],
@@ -28552,9 +28566,9 @@
         "balanced": "Loud, intrusive behaviour that irritates and alienates others."
       },
       "learn_chance": {
-        "balanced": 13.0,
-        "logical": 12.0,
-        "self_aware": 3.0
+        "balanced": 13,
+        "logical": 12,
+        "self_aware": 3
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [],
@@ -28579,9 +28593,9 @@
         "balanced": "In practice: Excessively concerned with own appearance and social image."
       },
       "learn_chance": {
-        "balanced": 13.0,
-        "logical": 12.0,
-        "self_aware": 18.0
+        "balanced": 13,
+        "logical": 12,
+        "self_aware": 18
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [],
@@ -28605,9 +28619,9 @@
         "balanced": "Plainly put: Accepts claims at face value; easily manipulated or deceived."
       },
       "learn_chance": {
-        "balanced": 13.0,
-        "logical": 2.0,
-        "self_aware": 15.0
+        "balanced": 13,
+        "logical": 2,
+        "self_aware": 15
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [],
@@ -28630,9 +28644,9 @@
         "balanced": "In practice: Withholds information unnecessarily; hard to read or trust."
       },
       "learn_chance": {
-        "balanced": 13.0,
-        "logical": 12.0,
-        "self_aware": 9.0
+        "balanced": 13,
+        "logical": 12,
+        "self_aware": 9
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [],
@@ -28655,9 +28669,9 @@
         "balanced": "Plainly put: Finds fault in everything and everyone; rarely satisfied."
       },
       "learn_chance": {
-        "balanced": 13.0,
-        "logical": 12.0,
-        "self_aware": 12.0
+        "balanced": 13,
+        "logical": 12,
+        "self_aware": 12
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [],
@@ -28681,9 +28695,9 @@
         "balanced": "In practice: Loses composure rapidly; small irritations trigger outsized reactions."
       },
       "learn_chance": {
-        "balanced": 13.0,
-        "logical": 12.0,
-        "self_aware": 15.0
+        "balanced": 13,
+        "logical": 12,
+        "self_aware": 15
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [],
@@ -28704,9 +28718,9 @@
         "balanced": "In practice: Values wealth and possessions above relationships or principles."
       },
       "learn_chance": {
-        "balanced": 13.0,
-        "logical": 12.0,
-        "self_aware": 15.0
+        "balanced": 13,
+        "logical": 12,
+        "self_aware": 15
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [
@@ -28740,9 +28754,9 @@
         "balanced": "Plainly put: Follows the crowd; avoids standing out or challenging norms."
       },
       "learn_chance": {
-        "balanced": 13.0,
-        "logical": 7.0,
-        "self_aware": 18.0
+        "balanced": 13,
+        "logical": 7,
+        "self_aware": 18
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [
@@ -28775,9 +28789,9 @@
         "balanced": "In practice: Rarely trusts others' intentions; withholds cooperation."
       },
       "learn_chance": {
-        "balanced": 13.0,
-        "logical": 12.0,
-        "self_aware": 9.0
+        "balanced": 13,
+        "logical": 12,
+        "self_aware": 9
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [],
@@ -28800,9 +28814,9 @@
         "balanced": "Pursues beliefs or causes regardless of rational objection or cost."
       },
       "learn_chance": {
-        "balanced": 13.0,
-        "logical": 12.0,
-        "self_aware": 15.0
+        "balanced": 13,
+        "logical": 12,
+        "self_aware": 15
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [],
@@ -28824,9 +28838,9 @@
         "balanced": "In practice: Constructs false narratives to mislead others for personal gain."
       },
       "learn_chance": {
-        "balanced": 13.0,
-        "logical": 12.0,
-        "self_aware": 15.0
+        "balanced": 13,
+        "logical": 12,
+        "self_aware": 15
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [],
@@ -28847,9 +28861,9 @@
         "balanced": "Expects special treatment and resents being held to normal standards."
       },
       "learn_chance": {
-        "balanced": 13.0,
-        "logical": 12.0,
-        "self_aware": 15.0
+        "balanced": 13,
+        "logical": 12,
+        "self_aware": 15
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [
@@ -28878,9 +28892,9 @@
         "balanced": "Plainly put: Pursues goals without moral restraint; disregards collateral harm."
       },
       "learn_chance": {
-        "balanced": 13.0,
-        "logical": 12.0,
-        "self_aware": 9.0
+        "balanced": 13,
+        "logical": 12,
+        "self_aware": 9
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [],
@@ -28904,9 +28918,9 @@
         "balanced": "Plainly put: Acts to harm others even at personal cost just to cause pain."
       },
       "learn_chance": {
-        "balanced": 13.0,
-        "logical": 12.0,
-        "self_aware": 15.0
+        "balanced": 13,
+        "logical": 12,
+        "self_aware": 15
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [],
@@ -28930,9 +28944,9 @@
         "balanced": "Plainly put: Fixates on people or ideas to the detriment of balance and wellbeing."
       },
       "learn_chance": {
-        "balanced": 13.0,
-        "logical": 12.0,
-        "self_aware": 15.0
+        "balanced": 13,
+        "logical": 12,
+        "self_aware": 15
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [],
@@ -28958,9 +28972,9 @@
         "balanced": "Gives up easily; assumes failure before properly attempting a task."
       },
       "learn_chance": {
-        "balanced": 13.0,
-        "logical": 12.0,
-        "self_aware": 15.0
+        "balanced": 13,
+        "logical": 12,
+        "self_aware": 15
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [],
@@ -28983,9 +28997,9 @@
         "balanced": "Plainly put: Avoids asserting needs or opinions; lets others dictate outcomes."
       },
       "learn_chance": {
-        "balanced": 13.0,
-        "logical": 12.0,
-        "self_aware": 12.0
+        "balanced": 13,
+        "logical": 12,
+        "self_aware": 12
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [],
@@ -29012,9 +29026,9 @@
         "balanced": "Plainly put: Everything revolves around self; cannot genuinely consider others."
       },
       "learn_chance": {
-        "balanced": 13.0,
-        "logical": 12.0,
-        "self_aware": 3.0
+        "balanced": 13,
+        "logical": 12,
+        "self_aware": 3
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [],
@@ -29035,9 +29049,9 @@
         "balanced": "Plainly put: Naturally high sexual drive; lower arousal thresholds and initiates more frequently."
       },
       "learn_chance": {
-        "balanced": 15.0,
-        "logical": 15.0,
-        "self_aware": 15.0
+        "balanced": 15,
+        "logical": 15,
+        "self_aware": 15
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [],
@@ -29058,9 +29072,9 @@
         "balanced": "In practice: Low sexual drive; higher arousal thresholds and rarely initiates."
       },
       "learn_chance": {
-        "balanced": 15.0,
-        "logical": 15.0,
-        "self_aware": 15.0
+        "balanced": 15,
+        "logical": 15,
+        "self_aware": 15
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [],
@@ -29081,9 +29095,9 @@
         "balanced": "In practice: Comfortable with casual intimacy; fewer emotional prerequisites, open to multiple partners."
       },
       "learn_chance": {
-        "balanced": 15.0,
-        "logical": 15.0,
-        "self_aware": 15.0
+        "balanced": 15,
+        "logical": 15,
+        "self_aware": 15
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [],
@@ -29103,9 +29117,9 @@
         "balanced": "Plainly put: Enjoys flirting and light sexual tension; doesn't always intend follow-through."
       },
       "learn_chance": {
-        "balanced": 15.0,
-        "logical": 15.0,
-        "self_aware": 15.0
+        "balanced": 15,
+        "logical": 15,
+        "self_aware": 15
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [],
@@ -29126,9 +29140,9 @@
         "balanced": "In practice: Comfortable with their sexuality; expresses desires clearly, no performance anxiety."
       },
       "learn_chance": {
-        "balanced": 15.0,
-        "logical": 15.0,
-        "self_aware": 15.0
+        "balanced": 15,
+        "logical": 15,
+        "self_aware": 15
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [],
@@ -29149,9 +29163,9 @@
         "balanced": "Anxious about intimacy; may deflect advances even when interested, fears rejection."
       },
       "learn_chance": {
-        "balanced": 15.0,
-        "logical": 15.0,
-        "self_aware": 15.0
+        "balanced": 15,
+        "logical": 15,
+        "self_aware": 15
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [],
@@ -29172,9 +29186,9 @@
         "balanced": "Plainly put: Sexual attraction only activates after forming a strong emotional bond."
       },
       "learn_chance": {
-        "balanced": 15.0,
-        "logical": 15.0,
-        "self_aware": 15.0
+        "balanced": 15,
+        "logical": 15,
+        "self_aware": 15
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [],
@@ -29195,9 +29209,9 @@
         "balanced": "Values emotional intimacy and romantic connection deeply; prefers meaningful encounters."
       },
       "learn_chance": {
-        "balanced": 15.0,
-        "logical": 15.0,
-        "self_aware": 15.0
+        "balanced": 15,
+        "logical": 15,
+        "self_aware": 15
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [
@@ -29223,9 +29237,9 @@
         "balanced": "In practice: Goes all-out every session \u2014 rapid gains but high injury risk and long recovery gaps."
       },
       "learn_chance": {
-        "balanced": 15.0,
-        "logical": 15.0,
-        "self_aware": 15.0
+        "balanced": 15,
+        "logical": 15,
+        "self_aware": 15
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [],
@@ -29246,9 +29260,9 @@
         "balanced": "In practice: Builds sustainable routines, rarely skips, rarely gets hurt. Slow and steady wins."
       },
       "learn_chance": {
-        "balanced": 15.0,
-        "logical": 15.0,
-        "self_aware": 15.0
+        "balanced": 15,
+        "logical": 15,
+        "self_aware": 15
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [],
@@ -29269,9 +29283,9 @@
         "balanced": "Goes reluctantly alone; needs a workout buddy. Full benefit only with a companion."
       },
       "learn_chance": {
-        "balanced": 15.0,
-        "logical": 15.0,
-        "self_aware": 15.0
+        "balanced": 15,
+        "logical": 15,
+        "self_aware": 15
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [],
@@ -29291,9 +29305,9 @@
         "balanced": "Rarely acts on impulse; can endure significant frustration before lashing out."
       },
       "learn_chance": {
-        "balanced": 15.0,
-        "logical": 15.0,
-        "self_aware": 15.0
+        "balanced": 15,
+        "logical": 15,
+        "self_aware": 15
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [],
@@ -29313,9 +29327,9 @@
         "balanced": "Plainly put: Struggles to suppress impulses; minor provocations can spiral quickly."
       },
       "learn_chance": {
-        "balanced": 15.0,
-        "logical": 15.0,
-        "self_aware": 15.0
+        "balanced": 15,
+        "logical": 15,
+        "self_aware": 15
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [],
@@ -29336,9 +29350,9 @@
         "balanced": "In practice: Short fuse \u2014 anger spikes fast but may also cool quickly."
       },
       "learn_chance": {
-        "balanced": 15.0,
-        "logical": 15.0,
-        "self_aware": 15.0
+        "balanced": 15,
+        "logical": 15,
+        "self_aware": 15
       },
       "cognitive_modifiers": [
         {
@@ -29363,9 +29377,9 @@
         "balanced": "In practice: Holds derogatory attitudes toward women; more likely to direct aggression at female targets."
       },
       "learn_chance": {
-        "balanced": 8.0,
-        "logical": 8.0,
-        "self_aware": 8.0
+        "balanced": 8,
+        "logical": 8,
+        "self_aware": 8
       },
       "cognitive_modifiers": [
         {
@@ -29389,9 +29403,9 @@
         "balanced": "Plainly put: Treats all genders equitably; sexism_level near zero."
       },
       "learn_chance": {
-        "balanced": 15.0,
-        "logical": 15.0,
-        "self_aware": 15.0
+        "balanced": 15,
+        "logical": 15,
+        "self_aware": 15
       },
       "cognitive_modifiers": [
         {
@@ -29416,9 +29430,9 @@
         "balanced": "Uses psychological pressure, jealousy, and isolation to dominate intimate partners."
       },
       "learn_chance": {
-        "balanced": 15.0,
-        "logical": 15.0,
-        "self_aware": 15.0
+        "balanced": 15,
+        "logical": 15,
+        "self_aware": 15
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [],
@@ -29439,9 +29453,9 @@
         "balanced": "Directs violence preferentially at intimate partners; uses shame, threats, and physical force to maintain control."
       },
       "learn_chance": {
-        "balanced": 15.0,
-        "logical": 15.0,
-        "self_aware": 15.0
+        "balanced": 15,
+        "logical": 15,
+        "self_aware": 15
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [],
@@ -29461,9 +29475,9 @@
         "balanced": "In practice: Prone to self-doubt; more vulnerable to negging and psychological manipulation."
       },
       "learn_chance": {
-        "balanced": 15.0,
-        "logical": 15.0,
-        "self_aware": 15.0
+        "balanced": 15,
+        "logical": 15,
+        "self_aware": 15
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [],
@@ -29483,9 +29497,9 @@
         "balanced": "In practice: Ties self-worth to the relationship; tolerates mistreatment to avoid abandonment."
       },
       "learn_chance": {
-        "balanced": 15.0,
-        "logical": 15.0,
-        "self_aware": 15.0
+        "balanced": 15,
+        "logical": 15,
+        "self_aware": 15
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [],
@@ -29506,9 +29520,9 @@
         "balanced": "Plainly put: Exploits institutional position (police, boss, doctor) to control and conceal abuse. Reports are less believed; victim faces retaliatory consequences."
       },
       "learn_chance": {
-        "balanced": 15.0,
-        "logical": 15.0,
-        "self_aware": 15.0
+        "balanced": 15,
+        "logical": 15,
+        "self_aware": 15
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [],
@@ -29528,9 +29542,9 @@
         "balanced": "In practice: Controls career opportunities, contacts, or resources others depend on. Uses this leverage for coercive quid-pro-quo arrangements."
       },
       "learn_chance": {
-        "balanced": 15.0,
-        "logical": 15.0,
-        "self_aware": 15.0
+        "balanced": 15,
+        "logical": 15,
+        "self_aware": 15
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [],
@@ -29550,9 +29564,9 @@
         "balanced": "Strongly motivated by professional advancement; vulnerable to quid-pro-quo pressure from gatekeepers."
       },
       "learn_chance": {
-        "balanced": 15.0,
-        "logical": 15.0,
-        "self_aware": 15.0
+        "balanced": 15,
+        "logical": 15,
+        "self_aware": 15
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [],
@@ -29572,9 +29586,9 @@
         "balanced": "In practice: Uses psychological tactics \u2014 emasculation, ridicule, abandonment threats, affair humiliation \u2014 to dominate and diminish a partner."
       },
       "learn_chance": {
-        "balanced": 15.0,
-        "logical": 15.0,
-        "self_aware": 15.0
+        "balanced": 15,
+        "logical": 15,
+        "self_aware": 15
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [],
@@ -29594,9 +29608,9 @@
         "balanced": "Ensures they always out-earn the partner; uses financial superiority as leverage."
       },
       "learn_chance": {
-        "balanced": 15.0,
-        "logical": 15.0,
-        "self_aware": 15.0
+        "balanced": 15,
+        "logical": 15,
+        "self_aware": 15
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [],
@@ -29616,9 +29630,9 @@
         "balanced": "In practice: Systematically attacks a male partner's sense of masculinity, competence, and attractiveness."
       },
       "learn_chance": {
-        "balanced": 15.0,
-        "logical": 15.0,
-        "self_aware": 15.0
+        "balanced": 15,
+        "logical": 15,
+        "self_aware": 15
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [],
@@ -29637,9 +29651,9 @@
         "balanced": "Plainly put: Strong religious faith shapes worldview, morality, and relationships."
       },
       "learn_chance": {
-        "balanced": 15.0,
-        "logical": 15.0,
-        "self_aware": 15.0
+        "balanced": 15,
+        "logical": 15,
+        "self_aware": 15
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [],
@@ -29658,9 +29672,9 @@
         "balanced": "Plainly put: Believes sex is shameful or only acceptable for reproduction within marriage."
       },
       "learn_chance": {
-        "balanced": 13.0,
-        "logical": 12.0,
-        "self_aware": 15.0
+        "balanced": 13,
+        "logical": 12,
+        "self_aware": 15
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [],
@@ -29679,9 +29693,9 @@
         "balanced": "Plainly put: Holds strongly negative views toward homosexuality and LGBT+ identities."
       },
       "learn_chance": {
-        "balanced": 13.0,
-        "logical": 12.0,
-        "self_aware": 15.0
+        "balanced": 13,
+        "logical": 12,
+        "self_aware": 15
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [],
@@ -29703,9 +29717,9 @@
         "balanced": "Sexual desires suppressed by shame or religious upbringing; affects intimacy."
       },
       "learn_chance": {
-        "balanced": 13.0,
-        "logical": 12.0,
-        "self_aware": 15.0
+        "balanced": 13,
+        "logical": 12,
+        "self_aware": 15
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [],
@@ -29724,9 +29738,9 @@
         "balanced": "In practice: Experiences intense guilt or shame around sexuality and intimate desires."
       },
       "learn_chance": {
-        "balanced": 13.0,
-        "logical": 12.0,
-        "self_aware": 15.0
+        "balanced": 13,
+        "logical": 12,
+        "self_aware": 15
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [],
@@ -29745,9 +29759,9 @@
         "balanced": "Plainly put: Prone to behaviour that causes harm to oneself, often as a coping mechanism."
       },
       "learn_chance": {
-        "balanced": 13.0,
-        "logical": 12.0,
-        "self_aware": 15.0
+        "balanced": 13,
+        "logical": 12,
+        "self_aware": 15
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [],
@@ -29766,9 +29780,9 @@
         "balanced": "Susceptible to dependency on substances or compulsive behaviours under stress."
       },
       "learn_chance": {
-        "balanced": 13.0,
-        "logical": 12.0,
-        "self_aware": 15.0
+        "balanced": 13,
+        "logical": 12,
+        "self_aware": 15
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [],
@@ -29787,9 +29801,9 @@
         "balanced": "In practice: Struggles with a coherent sense of self; vulnerable to existential destabilisation."
       },
       "learn_chance": {
-        "balanced": 13.0,
-        "logical": 12.0,
-        "self_aware": 15.0
+        "balanced": 13,
+        "logical": 12,
+        "self_aware": 15
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [],
@@ -29809,9 +29823,9 @@
         "balanced": "Becomes flustered and avoidant when sexuality or romance is raised; blushes easily and struggles to reciprocate flirting."
       },
       "learn_chance": {
-        "balanced": 15.0,
-        "logical": 15.0,
-        "self_aware": 15.0
+        "balanced": 15,
+        "logical": 15,
+        "self_aware": 15
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [],
@@ -29830,9 +29844,9 @@
         "balanced": "Flushes and becomes visibly flustered at mildly awkward or suggestive topics, even non-sexual ones."
       },
       "learn_chance": {
-        "balanced": 15.0,
-        "logical": 15.0,
-        "self_aware": 15.0
+        "balanced": 15,
+        "logical": 15,
+        "self_aware": 15
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [],
@@ -29852,9 +29866,9 @@
         "balanced": "Little or no spontaneous sexual attraction; may engage for emotional closeness but rarely initiates. Distinct from low_libido \u2014 the motivation is absent, not just the drive."
       },
       "learn_chance": {
-        "balanced": 15.0,
-        "logical": 15.0,
-        "self_aware": 15.0
+        "balanced": 15,
+        "logical": 15,
+        "self_aware": 15
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [],
@@ -29874,9 +29888,9 @@
         "balanced": "Openly discusses and pursues sex without embarrassment; rarely blushes, comfortable making explicit suggestions."
       },
       "learn_chance": {
-        "balanced": 15.0,
-        "logical": 15.0,
-        "self_aware": 15.0
+        "balanced": 15,
+        "logical": 15,
+        "self_aware": 15
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [],
@@ -29894,9 +29908,9 @@
         "balanced": "Frequently lost in fantasy and imagination; prone to vivid romantic or sexual daydreams about specific people."
       },
       "learn_chance": {
-        "balanced": 15.0,
-        "logical": 15.0,
-        "self_aware": 15.0
+        "balanced": 15,
+        "logical": 15,
+        "self_aware": 15
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [],
@@ -29915,9 +29929,9 @@
         "balanced": "In practice: Develops intense crushes quickly; fixates on a person and fantasizes about them at length, often out of proportion to actual closeness."
       },
       "learn_chance": {
-        "balanced": 15.0,
-        "logical": 15.0,
-        "self_aware": 15.0
+        "balanced": 15,
+        "logical": 15,
+        "self_aware": 15
       },
       "cognitive_modifiers": [],
       "belief_modifiers": [],
@@ -55877,11 +55891,17 @@
     }
   },
   "contact_designations": {
-    "order": ["stranger", "acquaintance", "friend", "close_friend", "best_friend"],
+    "order": [
+      "stranger",
+      "acquaintance",
+      "friend",
+      "close_friend",
+      "best_friend"
+    ],
     "stranger": {
       "weekly_upkeep_hours": 0,
       "upgrade_hours_week": 1,
-      "cognitive_bonus_per_hour": 0.0
+      "cognitive_bonus_per_hour": 0
     },
     "acquaintance": {
       "weekly_upkeep_hours": 0.5,

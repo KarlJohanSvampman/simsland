@@ -513,6 +513,49 @@ async function loadSourceGLB(sourceKey) {
     }
 }
 
+// Some source GLBs (e.g. adult_male.glb) carry a root-bone scale mismatch
+// and/or a >5° rotation offset relative to its parent baked into their
+// skeleton -- without correcting for it the model renders lying on its
+// side instead of standing. character_creator.js's fixMixamoSkeletonQuirks
+// and main.js's inlined equivalent already fix this before display; this
+// mirrors that same correction (skeleton.pose() is already handled by
+// setupCharacter's own traversal above, so just the scale/rotation part).
+function fixSkeletonRootQuirks(model) {
+    model.traverse(o => {
+        if (!o.isSkinnedMesh || !o.skeleton || !o.skeleton.bones.length) return;
+        const rootBone = o.skeleton.bones.find(b => !b.parent?.isBone);
+        if (!rootBone) return;
+
+        const meshScale = new THREE.Vector3();
+        o.getWorldScale(meshScale);
+        const boneScale = new THREE.Vector3();
+        rootBone.getWorldScale(boneScale);
+        if (boneScale.x === 0) return;
+
+        const correction = meshScale.x / boneScale.x;
+        if (Math.abs(correction - 1) > 0.01) {
+            rootBone.scale.multiplyScalar(correction);
+            rootBone.updateMatrixWorld(true);
+        }
+    });
+
+    model.traverse(o => {
+        if (!o.isSkinnedMesh || !o.skeleton || !o.skeleton.bones.length) return;
+        const rootBone = o.skeleton.bones.find(b => !b.parent?.isBone);
+        if (!rootBone || !rootBone.parent) return;
+
+        const worldQuat = new THREE.Quaternion();
+        rootBone.getWorldQuaternion(worldQuat);
+        const angleDeg = 2 * Math.acos(Math.min(1, Math.abs(worldQuat.w))) * 180 / Math.PI;
+        if (angleDeg > 5) {
+            const parentWorldQuat = new THREE.Quaternion();
+            rootBone.parent.getWorldQuaternion(parentWorldQuat);
+            rootBone.quaternion.copy(parentWorldQuat.clone().invert());
+            rootBone.updateMatrixWorld(true);
+        }
+    });
+}
+
 function setupCharacter(gltf, offsetX) {
     const model = gltf.scene;
     model.position.x = offsetX;
@@ -535,6 +578,7 @@ function setupCharacter(gltf, offsetX) {
     model.traverse(o => {
         if (o.isSkinnedMesh && o.skeleton) o.skeleton.pose();
     });
+    fixSkeletonRootQuirks(model);
     scene.add(model);
 
     if (offsetX === 0) {

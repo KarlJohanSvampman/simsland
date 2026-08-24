@@ -4213,6 +4213,10 @@ function renderEventTimeline(data){
     dot.addEventListener("mouseenter", (e) => _showTimelineTooltip(e, cluster.items, nowTick));
     dot.addEventListener("mousemove", _positionTimelineTooltip);
     dot.addEventListener("mouseleave", _hideTimelineTooltip);
+    dot.addEventListener("click", () => {
+      _hideTimelineTooltip();
+      openEventModal(cluster.items, nowTick);
+    });
     eventTimelinePointsEl.appendChild(dot);
   }
 
@@ -4254,6 +4258,42 @@ function _positionTimelineTooltip(e){
 
 function _hideTimelineTooltip(){
   if(eventTimelineTooltipEl) eventTimelineTooltipEl.style.display = "none";
+}
+
+// Click-through detail view for the hover tooltip above -- same event
+// data (title/type/tick/summary from api/events.py), just persistent and
+// readable instead of disappearing on mouseleave. Reuses the shared
+// modal infrastructure (openModal/closeModal, see the mailbox household
+// modal) rather than inventing a second popup mechanism.
+function openEventModal(items, nowTick){
+  document.getElementById("eventModalTitle").textContent =
+    items.length > 1 ? `${items.length} Events` : (items[0].title || items[0].type || "Event");
+
+  const body = document.getElementById("eventModalBody");
+  body.innerHTML = "";
+  for(const ev of items){
+    const row = document.createElement("div");
+    row.className = "eventModalRow";
+
+    const title = document.createElement("div");
+    title.className = "eventModalRowTitle";
+    title.textContent = ev.title || ev.type || "Event";
+    row.appendChild(title);
+
+    const meta = document.createElement("div");
+    meta.className = "eventModalRowMeta";
+    meta.textContent = [ev.type, _ticksAgoLabel(nowTick - ev.tick)].filter(Boolean).join(" · ");
+    row.appendChild(meta);
+
+    const summary = document.createElement("div");
+    summary.className = "eventModalRowSummary";
+    summary.textContent = ev.summary || "(no details)";
+    row.appendChild(summary);
+
+    body.appendChild(row);
+  }
+
+  openModal("modal-event");
 }
 
 fetchEvents();
