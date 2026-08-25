@@ -11236,7 +11236,13 @@
       "body_composition": {
         "body_fat_level": 0.35
       },
-      "instance": {},
+      "instance": {
+        "walk_speed": 1,
+        "jog_speed": 1.2,
+        "sprint_speed": 1.5,
+        "crawl_speed": 0.5,
+        "sneak_speed": 0.5
+      },
       "traits": [],
       "physical_traits": [],
       "hobbies": [],

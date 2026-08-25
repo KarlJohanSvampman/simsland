@@ -94,6 +94,15 @@
       "alternatives": [],
       "notifies": [],
       "ik_targets": []
+    },
+    "2f2afb9e-96ab-48a5-b3c5-a7558218dc3e": {
+      "id": "2f2afb9e-96ab-48a5-b3c5-a7558218dc3e",
+      "name": "new_template",
+      "source_key": "adult_male",
+      "chain": [],
+      "alternatives": [],
+      "notifies": [],
+      "ik_targets": []
     }
   },
   "adult_female": {
@@ -851,9 +860,55 @@
       },
       "crawling": {},
       "fallen": {},
+      "leaning_wall": {},
+      "carry": {},
+      "held_down": {},
+      "holding_down": {},
+      "incapacitated": {},
+      "incapacitated_pain": {},
+      "intoxicated": {},
+      "pulling": {},
+      "pushing": {}
+    },
+    "transitions": []
+  },
+  "_character_overrides": {
+    "stances": {
+      "standing": {},
+      "sitting_seat": {},
+      "sitting_floor": {},
+      "lying": {},
+      "crouching": {},
+      "crawling": {},
+      "fallen_front": {},
+      "fallen_back": {},
       "leaning_wall": {}
     },
     "transitions": []
   },
-  "_character_overrides": {}
+  "adult_male": {
+    "display_name": "adult_male",
+    "path": "/resources/characters/adult_male.glb",
+    "clips": [],
+    "stances": {
+      "standing": {},
+      "sitting_seat": {},
+      "sitting_floor": {},
+      "lying": {},
+      "crouching": {},
+      "crawling": {},
+      "fallen_front": {},
+      "fallen_back": {},
+      "leaning_wall": {},
+      "carry": {},
+      "held_down": {},
+      "holding_down": {},
+      "incapacitated": {},
+      "incapacitated_pain": {},
+      "intoxicated": {},
+      "pulling": {},
+      "pushing": {}
+    },
+    "transitions": []
+  }
 }
