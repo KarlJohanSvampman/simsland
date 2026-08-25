@@ -2635,7 +2635,14 @@ async function updateCharacters(state){
       // before c.off_grid itself clears (that stays true for the whole
       // stay, e.g. a multi-hour hospital visit), so check both or the
       // model reappears on the map while the character is still away.
-      sims[id].visible = !c.travel_hidden && !c.off_grid;
+      const isHidden = c.travel_hidden || c.off_grid;
+      sims[id].visible = !isHidden;
+      // Being invisible didn't stop the raycaster from hitting the mesh --
+      // THREE.js raycasting ignores .visible entirely, it's a render-only
+      // flag -- so a hidden character stayed clickable/selectable. Reuses
+      // the same userData.ignoreRaycast flag the click handler already
+      // filters on (see the mailbox dblclick / character selection code).
+      sims[id].userData.ignoreRaycast = isHidden;
 
             // =========================
       // ANIMATION STATE
@@ -3330,6 +3337,18 @@ renderer.domElement.addEventListener(
 
     if(!obj) return;
 
+    // The raycast .filter() above only checks the actual leaf mesh that
+    // was hit, not the ancestor this loop just walked up to -- a hidden
+    // character's top-level model carries ignoreRaycast (see where
+    // sims[id].visible is set), but a ray can still land on one of its
+    // child meshes first, which doesn't have that flag itself. Check
+    // here too, now that obj is the resolved top-level character.
+    if(obj.userData?.ignoreRaycast){
+      selectedCharacterId = null;
+      document.getElementById("viewerSelection").innerHTML = "Nothing selected";
+      return;
+    }
+
     const d = obj.userData;
 
     const inspector = document.getElementById("viewerInspector");
@@ -3463,7 +3482,8 @@ function renderCharacterInspector(id){
       waiting_for_bus:      "waiting for the bus",
       on_bus_departing:     "riding the bus",
       driving_back:         "driving back",
-      awaiting_bus_arrival: "done with their errand, waiting for the bus to come back",
+      awaiting_bus_arrival: "waiting at the bus stop",
+      on_bus_returning:     "riding the bus home",
       walking_home:         "walking home",
     };
     const label = TRAVEL_STATE_LABELS[c.travel_state] || c.travel_state;

@@ -892,10 +892,21 @@ def process_return(c, world):
     c.pop("offgrid_queue", None)
 
     # Errand is narratively complete, but a travel-mode character (see
-    # travel.py) isn't home yet -- defer their visible reveal to the
-    # driving-back / bus-arrival leg instead of popping back in place.
+    # travel.py) isn't home yet.
     if c.get("travel_mode") == "car":
+        # Driving back still defers the visible reveal to that leg --
+        # nowhere sensible to place them mid-drive.
         from systems.travel import _start_driving_back
         _start_driving_back(c, world)
     elif c.get("travel_mode") == "bus":
+        # Unlike the car leg, the bus stop is a real, fixed place they can
+        # visibly stand and wait -- reveal them there now instead of
+        # staying hidden through the whole wait (see transit.py's
+        # _handle_bus_arrival/_handle_bus_departure for the rest of this
+        # leg: hidden again only while actually boarded and riding home).
+        from systems.vehicles import bus_stop
+        stop = bus_stop(world)
+        if stop:
+            c["x"], c["y"] = stop["x"], stop["y"]
+            c["travel_hidden"] = False
         c["travel_state"] = "awaiting_bus_arrival"

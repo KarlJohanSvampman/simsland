@@ -88,10 +88,17 @@ def _dispatch_bus(world):
 def _handle_bus_arrival(world, bus):
     from sim_loop import _mark_dirty
 
+    # Characters here are already visible and standing at the stop (see
+    # offgrid.py's process_return -- reveals them there the moment their
+    # errand ends, rather than staying hidden through the whole wait).
+    # Boarding hides them again, mirroring the outbound "waiting_for_bus"
+    # -> "on_bus_departing" transition below; _handle_bus_departure()
+    # reveals them again once the bus completes this stop and they're
+    # walked the rest of the way home.
     for c in _characters_in_state(world, "awaiting_bus_arrival"):
-        c["travel_hidden"] = False
-        c["x"], c["y"] = bus["x"], bus["y"]
-        _begin_walking_home(c, world)
+        c["riding_bus_id"] = bus["id"]
+        c["travel_hidden"] = True
+        c["travel_state"] = "on_bus_returning"
         _mark_dirty(world, char_ids={c["id"]})
 
     boarders = _characters_in_state(world, "waiting_for_bus")
@@ -139,11 +146,17 @@ def _handle_bus_departure(world, bus):
     for c in world.get("characters", {}).values():
         if c.get("riding_bus_id") != bus["id"]:
             continue
+        returning = c.get("travel_state") == "on_bus_returning"
         c["riding_bus_id"] = None
         c["travel_state"] = None
         pending = c.pop("_pending_offgrid", None)
         if pending:
             _send_offgrid_immediate(c, world, pending["reason"], pending["duration"])
+        elif returning:
+            # Bus has done its stop; last stretch home is visible, same
+            # as the outbound leg's initial walk to the stop was.
+            c["travel_hidden"] = False
+            _begin_walking_home(c, world)
         _mark_dirty(world, char_ids={c["id"]})
 
     world["_bus"] = {"phase": None}
