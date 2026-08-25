@@ -11283,6 +11283,43 @@
         "record": []
       },
       "household_id": "3ce13474-7572-40df-9483-52cd907ff9fe"
+    },
+    "char_template_3eda89a7": {
+      "name": "Jonathan Baker",
+      "age": 34,
+      "sex": "male",
+      "first_name": "Jonathan",
+      "family_name": "Baker",
+      "ssn": "379-36-1790",
+      "body_features": {
+        "height_cm": 187,
+        "build": "average"
+      },
+      "model": "adult_male",
+      "body_composition": {},
+      "instance": {},
+      "traits": [
+        "cognition_balanced",
+        "perceptive",
+        "homophobic",
+        "calm"
+      ],
+      "physical_traits": [],
+      "hobbies": [
+        "drums",
+        "roulette"
+      ],
+      "worn": {},
+      "starting_inventory": [],
+      "bio": "",
+      "job": null,
+      "education": "master",
+      "current_school": "",
+      "work_history": [],
+      "legal": {
+        "status": "free",
+        "jail_until": null
+      }
     }
   },
   "interaction_templates": {
@@ -21256,12 +21293,106 @@
             }
           }
         },
+        "0,1": {
+          "type": "floor",
+          "interior": true,
+          "floor": true,
+          "walls": {
+            "west": {
+              "type": "wall",
+              "material": "paint_white_matt"
+            }
+          }
+        },
+        "0,2": {
+          "type": "floor",
+          "interior": true,
+          "floor": true,
+          "walls": {
+            "west": {
+              "type": "wall",
+              "material": "paint_white_matt"
+            }
+          }
+        },
+        "0,3": {
+          "type": "floor",
+          "interior": true,
+          "floor": true,
+          "walls": {
+            "west": {
+              "type": "wall",
+              "material": "paint_white_matt"
+            }
+          }
+        },
+        "0,4": {
+          "type": "floor",
+          "interior": true,
+          "floor": true,
+          "walls": {
+            "west": {
+              "type": "wall",
+              "material": "paint_white_matt"
+            }
+          }
+        },
+        "0,5": {
+          "type": "floor",
+          "interior": true,
+          "floor": true,
+          "walls": {
+            "south": {
+              "type": "wall",
+              "material": "paint_white_matt"
+            },
+            "west": {
+              "type": "wall",
+              "material": "paint_white_matt"
+            }
+          }
+        },
         "1,0": {
           "type": "floor",
           "interior": true,
           "floor": true,
           "walls": {
             "north": {
+              "type": "wall",
+              "material": "paint_white_matt"
+            }
+          }
+        },
+        "1,1": {
+          "type": "floor",
+          "interior": true,
+          "floor": true,
+          "walls": {}
+        },
+        "1,2": {
+          "type": "floor",
+          "interior": true,
+          "floor": true,
+          "walls": {}
+        },
+        "1,3": {
+          "type": "floor",
+          "interior": true,
+          "floor": true,
+          "walls": {}
+        },
+        "1,4": {
+          "type": "floor",
+          "interior": true,
+          "floor": true,
+          "walls": {}
+        },
+        "1,5": {
+          "type": "floor",
+          "interior": true,
+          "floor": true,
+          "walls": {
+            "south": {
               "type": "wall",
               "material": "paint_white_matt"
             }
@@ -21275,67 +21406,191 @@
             "north": {
               "type": "wall",
               "material": "paint_white_matt"
-            },
-            "east": {
-              "type": "wall",
-              "material": "paint_white_matt"
             }
           }
-        },
-        "0,1": {
-          "type": "floor",
-          "interior": true,
-          "floor": true,
-          "walls": {
-            "west": {
-              "type": "wall",
-              "material": "paint_white_matt"
-            }
-          }
-        },
-        "1,1": {
-          "type": "floor",
-          "interior": true,
-          "floor": true
         },
         "2,1": {
           "type": "floor",
           "interior": true,
           "floor": true,
-          "walls": {
-            "east": {
-              "type": "window",
-              "material": "paint_white_matt"
-            }
-          }
+          "walls": {}
         },
-        "0,2": {
+        "2,2": {
+          "type": "floor",
+          "interior": true,
+          "floor": true,
+          "walls": {}
+        },
+        "2,3": {
+          "type": "floor",
+          "interior": true,
+          "floor": true,
+          "walls": {}
+        },
+        "2,4": {
+          "type": "floor",
+          "interior": true,
+          "floor": true,
+          "walls": {}
+        },
+        "2,5": {
           "type": "floor",
           "interior": true,
           "floor": true,
           "walls": {
             "south": {
+              "type": "wall",
+              "material": "paint_white_matt"
+            }
+          }
+        },
+        "3,0": {
+          "type": "floor",
+          "interior": true,
+          "floor": true,
+          "walls": {
+            "north": {
+              "type": "wall",
+              "material": "paint_white_matt"
+            }
+          }
+        },
+        "3,1": {
+          "type": "floor",
+          "interior": true,
+          "floor": true,
+          "walls": {}
+        },
+        "3,2": {
+          "type": "floor",
+          "interior": true,
+          "floor": true,
+          "walls": {}
+        },
+        "3,3": {
+          "type": "floor",
+          "interior": true,
+          "floor": true,
+          "walls": {}
+        },
+        "3,4": {
+          "type": "floor",
+          "interior": true,
+          "floor": true,
+          "walls": {}
+        },
+        "3,5": {
+          "type": "floor",
+          "interior": true,
+          "floor": true,
+          "walls": {
+            "south": {
+              "type": "wall",
+              "material": "paint_white_matt"
+            }
+          }
+        },
+        "4,0": {
+          "type": "floor",
+          "interior": true,
+          "floor": true,
+          "walls": {
+            "north": {
+              "type": "wall",
+              "material": "paint_white_matt"
+            }
+          }
+        },
+        "4,1": {
+          "type": "floor",
+          "interior": true,
+          "floor": true,
+          "walls": {}
+        },
+        "4,2": {
+          "type": "floor",
+          "interior": true,
+          "floor": true,
+          "walls": {}
+        },
+        "4,3": {
+          "type": "floor",
+          "interior": true,
+          "floor": true,
+          "walls": {}
+        },
+        "4,4": {
+          "type": "floor",
+          "interior": true,
+          "floor": true,
+          "walls": {}
+        },
+        "4,5": {
+          "type": "floor",
+          "interior": true,
+          "floor": true,
+          "walls": {
+            "south": {
+              "type": "wall",
+              "material": "paint_white_matt"
+            }
+          }
+        },
+        "5,0": {
+          "type": "floor",
+          "interior": true,
+          "floor": true,
+          "walls": {
+            "north": {
               "type": "wall",
               "material": "paint_white_matt"
             },
-            "west": {
+            "east": {
               "type": "wall",
               "material": "paint_white_matt"
             }
           }
         },
-        "1,2": {
+        "5,1": {
           "type": "floor",
           "interior": true,
           "floor": true,
           "walls": {
-            "south": {
-              "type": "door",
-              "material": "paint_beige_matt"
+            "east": {
+              "type": "wall",
+              "material": "paint_white_matt"
             }
           }
         },
-        "2,2": {
+        "5,2": {
+          "type": "floor",
+          "interior": true,
+          "floor": true,
+          "walls": {
+            "east": {
+              "type": "wall",
+              "material": "paint_white_matt"
+            }
+          }
+        },
+        "5,3": {
+          "type": "floor",
+          "interior": true,
+          "floor": true,
+          "walls": {}
+        },
+        "5,4": {
+          "type": "floor",
+          "interior": true,
+          "floor": true,
+          "walls": {
+            "east": {
+              "type": "wall",
+              "material": "paint_white_matt"
+            }
+          }
+        },
+        "5,5": {
           "type": "floor",
           "interior": true,
           "floor": true,

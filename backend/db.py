@@ -14,9 +14,6 @@ from systems.prop_index import (
 from core.definitions import (
     load_definitions
 )
-from systems.room_assignment import (
-    assign_prop_rooms
-)
 from systems.outdoor_navigation import (
     build_outdoor_navigation
 )
@@ -372,45 +369,20 @@ def load_world(sim_id):
     _ensure_static_world_data(world, sim_id)
 
     # =====================================
-    # FIND FLOORPLAN
-    # =====================================
-
-    floorplans = definitions.get(
-        "floorplan_templates",
-        {}
-    )
-
-    default_floorplan = None
-
-    if floorplans:
-
-        default_floorplan = next(
-            iter(floorplans.values())
-        )
-
-    # =====================================
-    # AUTO ASSIGN PROP ROOMS
-    # =====================================
-
-    if default_floorplan:
-
-        # Floorplan templates are position-less; inject world-origin defaults
-        # so world_to_local can compute local coords (buildings start at 0,0).
-        building_ctx = {"x": 0, "y": 0, "rotation": 0, **default_floorplan}
-
-        assign_prop_rooms(
-
-            building_ctx,
-
-            world.get(
-                "props",
-                []
-            )
-        )
-
-    # =====================================
     # BUILD PROP INDEX
     # =====================================
+    # (A previous "AUTO ASSIGN PROP ROOMS" step used to run here on every
+    # cache-miss load, reassigning EVERY prop in the world -- regardless
+    # of which building it actually belongs to -- to
+    # next(iter(floorplan_templates.values()))'s id (whichever floorplan
+    # happens to sort/insert first, e.g. "small_house"). That's not a
+    # per-building assignment at all; it silently overwrote every prop's
+    # real building_id/room_id (already set correctly at creation time by
+    # room_assignment.py::assign_prop_room, called against the ACTUAL
+    # building the prop belongs to) with that one arbitrary floorplan's
+    # id, every single time the Redis cache expired or the process
+    # restarted. Removed -- props keep whatever building_id/room_id they
+    # were actually assigned.
 
     cache_prop_index(
 
