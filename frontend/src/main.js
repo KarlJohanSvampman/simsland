@@ -1366,16 +1366,28 @@ async function attachItemToBone(
 // overlay sharing the character's skeleton instead.
 // =========================================================
 
-const CLOTHING_BONE_SLOTS = {
-    hat:           ["mixamorigHead"],
-    upper_layer1:  ["mixamorigSpine2"],
-    upper_layer2:  ["mixamorigSpine2"],
-    pants:         ["mixamorigHips"],
-    shoes:         ["mixamorigRightFoot", "mixamorigLeftFoot"],
-    gloves:        ["mixamorigRightHand", "mixamorigLeftHand"],
-    belt:          ["mixamorigHips"],
-    mask:          ["mixamorigHead"],
-    backpack:      ["mixamorigSpine2"],
+// Mirrors backend/systems/clothing.py's CLOTHING_SLOTS bone assignments
+// (the real, populated 14-slot vocabulary c["worn"]/item_templates use) --
+// prefixed for this rig's actual bone names and expanded to bone pairs for
+// the slots clothing.py flags "bilateral" (mirrored left/right pieces).
+// Replaces the old hat/upper_layer1/.../gloves mapping, which was for
+// c["equipped"] -- a separate, always-empty 6-slot dict nothing in the
+// backend ever actually writes to (see equipAllClothing below).
+const CLOTHING_SLOT_BONES = {
+    head:        ["mixamorigHead"],
+    hair:        ["mixamorigHead"],
+    neck:        ["mixamorigNeck"],
+    outerwear:   ["mixamorigSpine2"],
+    torso:       ["mixamorigSpine1"],
+    undershirt:  ["mixamorigSpine1"],
+    legs:        ["mixamorigHips"],
+    underwear:   ["mixamorigHips"],
+    socks:       ["mixamorigLeftFoot",     "mixamorigRightFoot"],
+    feet:        ["mixamorigLeftFoot",     "mixamorigRightFoot"],
+    hands:       ["mixamorigLeftHand",     "mixamorigRightHand"],
+    wrist_l:     ["mixamorigLeftForeArm"],
+    wrist_r:     ["mixamorigRightForeArm"],
+    accessory:   ["mixamorigSpine2"],
 };
 
 // =========================================================
@@ -1390,7 +1402,7 @@ const CLOTHING_BONE_SLOTS = {
 async function attachClothing(characterModel, slot, clothingTemplate, characterRoot) {
     if (!clothingTemplate || !clothingTemplate.model) return [];
 
-    const boneNames = CLOTHING_BONE_SLOTS[slot] || [];
+    const boneNames = CLOTHING_SLOT_BONES[slot] || [];
     const attached  = [];
 
     const loaded = await loadModelCached(clothingTemplate.model);
@@ -1455,13 +1467,22 @@ async function attachClothing(characterModel, slot, clothingTemplate, characterR
 
 // =========================================================
 // EQUIP ALL CLOTHING FOR A CHARACTER
-// Called on character load and again whenever equipped changes.
+// Called on character load and again whenever worn changes.
 // Stores attached meshes in characterAttachments[id].clothing
 // so they can be removed/replaced without reloading the character.
+//
+// Reads c["worn"] (systems/clothing.py's CLOTHING_SLOTS vocabulary --
+// what Character Creator's Outfit tab and the live game's actual
+// dressing/undressing actions both populate) against
+// definitions.item_templates, not c["equipped"]/definitions.
+// clothing_templates -- that pairing looked equivalent but nothing in
+// the backend ever writes to c["equipped"] (always all-null) and
+// clothing_templates has no entries at all, so it silently rendered
+// nothing regardless of what a character was actually wearing.
 // =========================================================
 
-async function equipAllClothing(id, characterModel, characterRoot, equipped, definitions) {
-    const clothingTemplates = definitions?.clothing_templates || {};
+async function equipAllClothing(id, characterModel, characterRoot, worn, definitions) {
+    const itemTemplates = definitions?.item_templates || {};
 
     // Remove any previously attached clothing
     const prev = (characterAttachments[id] || {}).clothing || {};
@@ -1472,10 +1493,16 @@ async function equipAllClothing(id, characterModel, characterRoot, equipped, def
     if (!characterAttachments[id]) characterAttachments[id] = {};
     characterAttachments[id].clothing = {};
 
-    for (const [slot, templateId] of Object.entries(equipped || {})) {
+    for (const [slot, item] of Object.entries(worn || {})) {
+        const templateId = item?.template_id;
         if (!templateId) continue;
-        const tpl = clothingTemplates[templateId];
-        if (!tpl) { console.warn("Clothing template not found:", templateId); continue; }
+        const tpl = itemTemplates[templateId];
+        if (!tpl) { console.warn("Item template not found:", templateId); continue; }
+        // Items without a .model (every clothing item_templates entry,
+        // today -- no clothing mesh assets exist in this project yet)
+        // are silently skipped by attachClothing()'s own guard; this
+        // wiring just makes them start rendering automatically the
+        // moment real meshes are added, no further code change needed.
 
         const meshes = await attachClothing(characterModel, slot, tpl, characterRoot);
         characterAttachments[id].clothing[slot] = meshes;
@@ -2574,11 +2601,16 @@ async function updateCharacters(state){
         const prev = characterAnimations[id].state;
         characterAnimations[id].state = c;
 
-        // Re-equip clothing if equipped dict changed
-        const prevEquipped = JSON.stringify(prev?.equipped || {});
-        const nextEquipped = JSON.stringify(c.equipped   || {});
-        if (prevEquipped !== nextEquipped) {
-          equipAllClothing(id, sims[id], sims[id], c.equipped || {}, definitions);
+        // Re-equip clothing if what's worn changed (diffed by template id
+        // per slot, not deep-equal, so per-item substate like quantity
+        // doesn't trigger a needless re-attach).
+        const wornTemplateIds = (worn) => Object.fromEntries(
+          Object.entries(worn || {}).map(([slot, item]) => [slot, item?.template_id || null])
+        );
+        const prevWorn = JSON.stringify(wornTemplateIds(prev?.worn));
+        const nextWorn = JSON.stringify(wornTemplateIds(c.worn));
+        if (prevWorn !== nextWorn) {
+          equipAllClothing(id, sims[id], sims[id], c.worn || {}, definitions);
         }
 
         updateStackAttachment(id, sims[id], c.held_stack, definitions?.item_templates || {});
@@ -2857,7 +2889,7 @@ await equipAllClothing(
     id,
     model,
     model,
-    c.equipped || {},
+    c.worn || {},
     definitions
 );
 

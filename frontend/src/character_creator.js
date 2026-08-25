@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { clone as cloneSkeleton } from 'three/examples/jsm/utils/SkeletonUtils.js';
 
 // =====================================================
 // STATE
@@ -523,6 +524,100 @@ function fixMixamoSkeletonQuirks(model) {
   });
 }
 
+// =====================================================
+// OUTFIT PREVIEW ATTACHMENT
+// =====================================================
+// Mirrors main.js's CLOTHING_SLOT_BONES/attachClothing/equipAllClothing
+// (own copy, not a shared import -- this page is a separate Vite entry,
+// same reason animbank.js carries its own copy of fixMixamoSkeletonQuirks
+// above). Reads working.worn, which here is a flat {slot: template_id}
+// map (renderOutfitTab's <select> values) rather than the live game's
+// {slot: {id, template_id, ...}} item-instance objects -- simpler since
+// there's no real inventory here, just a preset being authored.
+
+const CLOTHING_SLOT_BONES = {
+  head:       ['mixamorigHead'],
+  hair:       ['mixamorigHead'],
+  neck:       ['mixamorigNeck'],
+  outerwear:  ['mixamorigSpine2'],
+  torso:      ['mixamorigSpine1'],
+  undershirt: ['mixamorigSpine1'],
+  legs:       ['mixamorigHips'],
+  underwear:  ['mixamorigHips'],
+  socks:      ['mixamorigLeftFoot',    'mixamorigRightFoot'],
+  feet:       ['mixamorigLeftFoot',    'mixamorigRightFoot'],
+  hands:      ['mixamorigLeftHand',    'mixamorigRightHand'],
+  wrist_l:    ['mixamorigLeftForeArm'],
+  wrist_r:    ['mixamorigRightForeArm'],
+  accessory:  ['mixamorigSpine2'],
+};
+
+function findBonePreview(root, boneName) {
+  let found = null;
+  root.traverse(node => { if (node.isBone && node.name === boneName) found = node; });
+  return found;
+}
+
+async function attachClothingPreview(model, slot, itemTemplate) {
+  if (!itemTemplate || !itemTemplate.model) return [];
+  const boneNames = CLOTHING_SLOT_BONES[slot] || [];
+  const attached = [];
+
+  const loaded = await new Promise((resolve, reject) => {
+    previewLoader.load(itemTemplate.model, resolve, undefined, reject);
+  }).catch(() => null);
+  if (!loaded) return [];
+
+  if (itemTemplate.shared_skeleton) {
+    const clothingScene = cloneSkeleton(loaded.scene);
+    let skeleton = null;
+    model.traverse(n => { if (n.isSkinnedMesh && n.skeleton) skeleton = n.skeleton; });
+    if (skeleton) {
+      clothingScene.traverse(n => {
+        if (n.isSkinnedMesh) {
+          n.skeleton = skeleton;
+          n.bindMatrix.copy(model.matrixWorld);
+          n.bindMatrixInverse.copy(model.matrixWorld).invert();
+        }
+      });
+    }
+    model.add(clothingScene);
+    attached.push(clothingScene);
+    return attached;
+  }
+
+  for (const boneName of boneNames) {
+    const bone = findBonePreview(model, boneName);
+    if (!bone) continue;
+    const piece = cloneSkeleton(loaded.scene);
+    const offset = itemTemplate.offset || {};
+    piece.position.set(offset.x || 0, offset.y || 0, offset.z || 0);
+    const rot = itemTemplate.rotation || {};
+    piece.rotation.set(
+      (rot.x || 0) * Math.PI / 180,
+      (rot.y || 0) * Math.PI / 180,
+      (rot.z || 0) * Math.PI / 180,
+    );
+    const sc = itemTemplate.scale || 1;
+    piece.scale.setScalar(typeof sc === 'number' ? sc : 1);
+    if (boneName.includes('Left')) piece.scale.x *= -1;
+    bone.add(piece);
+    attached.push(piece);
+  }
+  return attached;
+}
+
+// No removal bookkeeping needed -- clearPreviewModel() disposes the whole
+// previewModel (attached clothing included) before every reload.
+async function equipPreviewClothing(model, worn, itemTemplates) {
+  for (const [slot, templateId] of Object.entries(worn || {})) {
+    if (!templateId) continue;
+    const tpl = (itemTemplates || {})[templateId];
+    if (!tpl) continue;
+    await attachClothingPreview(model, slot, tpl);
+  }
+}
+
 // Mirrors character_gen.py's model resolution exactly -- also used by
 // the Animation Mapping tab to scope which animbank templates are
 // compatible with this character's body mesh (see resolveWorkingModelKey).
@@ -544,11 +639,12 @@ function updatePreview() {
 
   clearPreviewModel();
   setStatus(`Loading ${modelKey}...`);
-  previewLoader.load(asset.mesh, (gltf) => {
+  previewLoader.load(asset.mesh, async (gltf) => {
     previewModel = gltf.scene;
     fixMixamoSkeletonQuirks(previewModel);
     previewScene.add(previewModel);
     framePreviewCamera(previewModel);
+    await equipPreviewClothing(previewModel, working.worn, definitions.item_templates);
     setStatus(`Preview: ${modelKey}`);
   }, undefined, () => {
     showPlaceholder(`Failed to load ${modelKey}`);
@@ -1023,6 +1119,7 @@ function renderOutfitTab() {
       select.addEventListener('change', () => {
         if (select.value) working.worn[slot] = select.value;
         else delete working.worn[slot];
+        updatePreview();
       });
 
       row.append(label, select);
@@ -1063,6 +1160,7 @@ window.randomizeOutfit = function () {
   working.starting_inventory = sampleIds(invPool.map(id => ({ id })), count);
 
   renderOutfitTab();
+  updatePreview();
 };
 
 // =====================================================
