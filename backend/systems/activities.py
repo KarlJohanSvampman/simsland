@@ -1486,6 +1486,105 @@ def execute_activity(
 
     return True
 #=======================================================
+# REAL ITEM RESOLUTION FOR EAT/DRINK COMPLETION
+# =========================================================
+# complete_activity()'s eat_snack/drink_water/eat branches used to look
+# up act["target_id"] (always a PROP id -- fridge/table/sink, see
+# start_activity() above) in world.get("items", {}), a dict nothing in
+# the backend ever writes to -- so real fridge/cabinet/bowl stock was
+# never actually consumed, only a small flat fallback applied regardless.
+# These helpers resolve against where items really live: prop storage
+# (systems/containers.py's ensure_prop_storage, e.g. fridge_a/
+# kitchen_cabinet), placed containers (a fruit bowl), and the character's
+# own inventory/held_stack.
+
+def _household_storage_containers(c, world):
+    """Yields every real storage container belonging to c's household --
+    fridge/cabinet/counter props and food-capable placed items (e.g. a
+    fruit bowl) -- the actual physical stock behind the abstract
+    household_storage.py resource-pool hints resolve_hunger_strategy()
+    checks to decide whether to pursue eating at all."""
+    from systems.containers import ensure_prop_storage, ensure_item_container
+
+    household = world.get("households", {}).get(c.get("household_id"))
+    building_ids = set(household.get("building_ids", [])) if household else set()
+
+    for prop in world.get("props", []):
+        if prop.get("building_id") not in building_ids:
+            continue
+        container = ensure_prop_storage(prop, world)
+        if container:
+            yield container
+
+    for item in world.get("placed_items", {}).values():
+        container = item if "items" in item else ensure_item_container(item, world)
+        if container:
+            yield container
+
+
+def _find_and_consume_food(c, world, category="food"):
+    """Pulls one matching item out of the character's household's real
+    storage, returns the removed item (make_item()'s flat template
+    fields -- category/nutrition/etc. -- are already merged onto it, so
+    on_consume_complete can read them directly), or None if nothing
+    matching exists anywhere in the household."""
+    from systems.containers import remove_from_container
+
+    for container in _household_storage_containers(c, world):
+        for entry in list(container.get("items", [])):
+            if entry.get("category") == category:
+                removed = remove_from_container(container, entry["id"], quantity=1)
+                if removed.get("success"):
+                    return removed["item"]
+    return None
+
+
+def _take_item_anywhere(c, world, item_id):
+    """Removes and returns the item instance matching item_id from
+    wherever it actually is -- the character's own inventory/held_stack,
+    a household storage container, or a bare placed item. Used by the
+    "eat"/"drink_alcohol"/"have_drink" LLM-direct actions
+    (action_router.py::_route_eat and friends) to resolve+consume the
+    one specific item the LLM referenced -- unlike
+    _find_and_consume_food() above, which picks ANY matching-category
+    item rather than a pre-chosen id."""
+    for pool in (c.get("inventory", []), c.get("held_stack", [])):
+        for i, item in enumerate(pool):
+            if item.get("id") == item_id:
+                return pool.pop(i)
+
+    from systems.containers import remove_from_container
+    for container in _household_storage_containers(c, world):
+        removed = remove_from_container(container, item_id)
+        if removed.get("success"):
+            return removed["item"]
+
+    placed = world.get("placed_items", {})
+    if item_id in placed:
+        return placed.pop(item_id)
+
+    return None
+
+
+_GLASS_TEMPLATE_IDS = ("glass_water", "glass_wine", "glass_rocks")
+
+
+def _find_clean_glass(c):
+    """A character's own clean drinking glass (pocket/held/worn) -- see
+    the DRINK completion branch below. Not removed/consumed -- glasses
+    are reusable, just marked dirty until washed (systems/activities.py's
+    existing wash_dishes activity)."""
+    for pool in (c.get("inventory", []), c.get("held_stack", [])):
+        for item in pool:
+            if item.get("template_id") in _GLASS_TEMPLATE_IDS and not item.get("states", {}).get("dirty"):
+                return item
+    for item in (c.get("worn") or {}).values():
+        if item and item.get("template_id") in _GLASS_TEMPLATE_IDS and not item.get("states", {}).get("dirty"):
+            return item
+    return None
+
+
+#=======================================================
 # COMPLETE ACTIVITY
 # =========================================================
 
@@ -1592,10 +1691,24 @@ def complete_activity(
     # DRINK
     # =====================================
 
-    elif activity_type in ("drink", "drink_alcohol", "have_drink"):
+    elif activity_type in ("drink", "drink_water"):
+        # Tap water at a sink -- see strategy.py::resolve_thirst_strategy
+        # and the new "drink" anchor on kitchen_sink/bathroom_sink.
+        # Properly filling and drinking from a glass hydrates well; no
+        # clean glass on hand still works (cupped hands), just less
+        # effectively -- never a hard block, so a character can't get
+        # soft-locked out of hydrating entirely.
+        glass = _find_clean_glass(c)
+        if glass:
+            glass.setdefault("states", {})["dirty"] = True
+            on_drink_complete(c, hydration_value=35, volume=20)
+        else:
+            on_drink_complete(c, hydration_value=15)
+
+    elif activity_type in ("drink_alcohol", "have_drink"):
         from systems.body import on_consume_complete
         target_id = act.get("target_id")
-        item = world.get("items", {}).get(target_id) if target_id else None
+        item = _take_item_anywhere(c, world, target_id) if target_id else None
         if item:
             on_consume_complete(c, world, item)
         else:
@@ -1705,8 +1818,7 @@ def complete_activity(
 
     elif activity_type == "eat_snack":
         from systems.body import on_consume_complete
-        target_id = act.get("target_id")
-        item = world.get("items", {}).get(target_id) if target_id else None
+        item = _find_and_consume_food(c, world, category="food")
         if item:
             on_consume_complete(c, world, item)
         else:
@@ -1805,7 +1917,7 @@ def complete_activity(
     # =====================================
     elif activity_type == "eat":
         target_id = act.get("target_id")
-        item = world.get("items", {}).get(target_id) if target_id else None
+        item = _take_item_anywhere(c, world, target_id) if target_id else None
         if item:
             from systems.body import on_consume_complete
             on_consume_complete(c, world, item)

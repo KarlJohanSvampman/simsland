@@ -247,7 +247,7 @@
       "anchors": [
         {
           "name": "anchor_eat",
-          "interaction": "eat_meal"
+          "interaction": "eat"
         }
       ],
       "tags": [
@@ -1196,6 +1196,10 @@
         {
           "name": "anchor_wash",
           "interaction": "wash_dishes"
+        },
+        {
+          "name": "anchor_drink",
+          "interaction": "drink"
         }
       ],
       "storage": null,
@@ -1318,6 +1322,10 @@
         {
           "name": "anchor_brush",
           "interaction": "brush_teeth"
+        },
+        {
+          "name": "anchor_drink",
+          "interaction": "drink"
         }
       ],
       "storage": null,
@@ -1677,7 +1685,7 @@
       "anchors": [
         {
           "name": "anchor_eat_meal",
-          "interaction": "eat_meal"
+          "interaction": "eat"
         }
       ],
       "storage": {
@@ -4188,27 +4196,27 @@
       "anchors": [
         {
           "name": "anchor_eat_1",
-          "interaction": "eat_meal"
+          "interaction": "eat"
         },
         {
           "name": "anchor_eat_2",
-          "interaction": "eat_meal"
+          "interaction": "eat"
         },
         {
           "name": "anchor_eat_3",
-          "interaction": "eat_meal"
+          "interaction": "eat"
         },
         {
           "name": "anchor_eat_4",
-          "interaction": "eat_meal"
+          "interaction": "eat"
         },
         {
           "name": "anchor_eat_5",
-          "interaction": "eat_meal"
+          "interaction": "eat"
         },
         {
           "name": "anchor_eat_6",
-          "interaction": "eat_meal"
+          "interaction": "eat"
         }
       ],
       "storage": {
@@ -7956,7 +7964,13 @@
       "base_price": 15,
       "stackable": false,
       "consumable": false,
-      "icon": "dishware"
+      "icon": "dishware",
+      "container": {
+        "slots": 6,
+        "accepted_categories": [
+          "food"
+        ]
+      }
     },
     "casserole_dish": {
       "name": "Casserole Dish",
@@ -11257,10 +11271,7 @@
         "wrist_l": "friendship_bracelet",
         "accessory": "antihistamine"
       },
-      "starting_inventory": [
-        "rake",
-        "display_case"
-      ],
+      "starting_inventory": [],
       "bio": "",
       "job": null,
       "education": "",

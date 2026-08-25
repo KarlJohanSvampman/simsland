@@ -97,9 +97,95 @@
     },
     "2f2afb9e-96ab-48a5-b3c5-a7558218dc3e": {
       "id": "2f2afb9e-96ab-48a5-b3c5-a7558218dc3e",
-      "name": "new_template",
+      "name": "idle_stand",
       "source_key": "adult_male",
-      "chain": [],
+      "chain": [
+        {
+          "id": "0a30d6a5-b3bf-44c6-a605-9c6a9d7c9b0e",
+          "clip": "idle_standing",
+          "start_frame": 0,
+          "end_frame": null,
+          "speed": 1,
+          "loop": "repeat",
+          "loop_count": -1
+        }
+      ],
+      "alternatives": [],
+      "notifies": [],
+      "ik_targets": []
+    },
+    "f5ceb67d-e8c8-4e03-a056-d93b916af02b": {
+      "id": "f5ceb67d-e8c8-4e03-a056-d93b916af02b",
+      "name": "walk",
+      "source_key": "adult_male",
+      "chain": [
+        {
+          "id": "bad4aa2e-7c42-4bf0-92cb-763c9b954640",
+          "clip": "locomotion_walk",
+          "start_frame": 0,
+          "end_frame": null,
+          "speed": 1,
+          "loop": "repeat",
+          "loop_count": -1
+        }
+      ],
+      "alternatives": [],
+      "notifies": [],
+      "ik_targets": []
+    },
+    "d4c0ca37-0b2e-4a9a-b8a6-e8d2a62a39bf": {
+      "id": "d4c0ca37-0b2e-4a9a-b8a6-e8d2a62a39bf",
+      "name": "walk_02",
+      "source_key": "adult_male",
+      "chain": [
+        {
+          "id": "5e1f66f5-4f4a-416f-a687-c9ec98d052cb",
+          "clip": "locomotion_walk_02",
+          "start_frame": 0,
+          "end_frame": null,
+          "speed": 1,
+          "loop": "repeat",
+          "loop_count": -1
+        }
+      ],
+      "alternatives": [],
+      "notifies": [],
+      "ik_targets": []
+    },
+    "24694785-8ae9-4464-aaae-cdc55086045a": {
+      "id": "24694785-8ae9-4464-aaae-cdc55086045a",
+      "name": "walk_03",
+      "source_key": "adult_male",
+      "chain": [
+        {
+          "id": "0fd63d2f-38ff-422a-bf57-2c94c666f311",
+          "clip": "locomotion_walk_03",
+          "start_frame": 0,
+          "end_frame": null,
+          "speed": 1,
+          "loop": "repeat",
+          "loop_count": -1
+        }
+      ],
+      "alternatives": [],
+      "notifies": [],
+      "ik_targets": []
+    },
+    "413e0e74-719d-4faa-8a5f-85bdacfbd97c": {
+      "id": "413e0e74-719d-4faa-8a5f-85bdacfbd97c",
+      "name": "interact",
+      "source_key": "adult_male",
+      "chain": [
+        {
+          "id": "e8e7ae7f-0a1a-4a79-91e4-74d4b47a5a97",
+          "clip": "action_interaxction",
+          "start_frame": 0,
+          "end_frame": null,
+          "speed": 1,
+          "loop": "once",
+          "loop_count": -1
+        }
+      ],
       "alternatives": [],
       "notifies": [],
       "ik_targets": []
@@ -884,12 +970,491 @@
       "fallen_back": {},
       "leaning_wall": {}
     },
-    "transitions": []
+    "transitions": [],
+    "new_character": {
+      "idle": {
+        "lower": "2f2afb9e-96ab-48a5-b3c5-a7558218dc3e",
+        "upper": "2f2afb9e-96ab-48a5-b3c5-a7558218dc3e"
+      },
+      "walk": {
+        "lower": "f5ceb67d-e8c8-4e03-a056-d93b916af02b",
+        "upper": "f5ceb67d-e8c8-4e03-a056-d93b916af02b"
+      }
+    }
   },
   "adult_male": {
     "display_name": "adult_male",
     "path": "/resources/characters/adult_male.glb",
-    "clips": [],
+    "clips": [
+      {
+        "id": "fa9bbaf8-d3dd-497a-8d27-aefe6a2020a0",
+        "name": " attack_stab",
+        "original_name": " attack_stab",
+        "category": "uncategorized",
+        "duration": 2.567,
+        "loop": false,
+        "paired": false,
+        "pair_role": null,
+        "pair_group": null,
+        "tags": [],
+        "notifies": []
+      },
+      {
+        "id": "757f5a78-993d-4766-8b25-20580e05189f",
+        "name": "action_diging",
+        "original_name": "action_diging",
+        "category": "action",
+        "duration": 2.733,
+        "loop": false,
+        "paired": false,
+        "pair_role": null,
+        "pair_group": null,
+        "tags": [],
+        "notifies": []
+      },
+      {
+        "id": "103852fc-5853-4024-bae3-62d024fbf4d8",
+        "name": "action_inspect_repair",
+        "original_name": "action_inspect_repair",
+        "category": "action",
+        "duration": 4.967,
+        "loop": false,
+        "paired": false,
+        "pair_role": null,
+        "pair_group": null,
+        "tags": [],
+        "notifies": []
+      },
+      {
+        "id": "9ccfa7a2-605d-42c5-8a94-17bac0374953",
+        "name": "action_interaxction",
+        "original_name": "action_interaxction",
+        "category": "action",
+        "duration": 2.967,
+        "loop": false,
+        "paired": false,
+        "pair_role": null,
+        "pair_group": null,
+        "tags": [],
+        "notifies": []
+      },
+      {
+        "id": "4c63bea8-2fd7-4405-8b44-721417d0fa77",
+        "name": "action_pick_up_item_ground",
+        "original_name": "action_pick_up_item_ground",
+        "category": "action",
+        "duration": 5.867,
+        "loop": false,
+        "paired": false,
+        "pair_role": null,
+        "pair_group": null,
+        "tags": [],
+        "notifies": []
+      },
+      {
+        "id": "d92d230b-ffdf-4733-8e22-6fd0daf08063",
+        "name": "action_pick_up_object",
+        "original_name": "action_pick_up_object",
+        "category": "action",
+        "duration": 2.367,
+        "loop": false,
+        "paired": false,
+        "pair_role": null,
+        "pair_group": null,
+        "tags": [],
+        "notifies": []
+      },
+      {
+        "id": "096e4dcd-e09f-46b9-b530-633684a397cf",
+        "name": "action_search_container_low",
+        "original_name": "action_search_container_low",
+        "category": "action",
+        "duration": 14.433,
+        "loop": false,
+        "paired": false,
+        "pair_role": null,
+        "pair_group": null,
+        "tags": [],
+        "notifies": []
+      },
+      {
+        "id": "35e3e688-da5c-4911-83c3-0de285a67488",
+        "name": "action_shower_loo",
+        "original_name": "action_shower_loo",
+        "category": "action",
+        "duration": 8.9,
+        "loop": false,
+        "paired": false,
+        "pair_role": null,
+        "pair_group": null,
+        "tags": [],
+        "notifies": []
+      },
+      {
+        "id": "19b49e37-bd51-4d15-90b8-a8358fa18b8b",
+        "name": "action_throw_object",
+        "original_name": "action_throw_object",
+        "category": "action",
+        "duration": 9.767,
+        "loop": false,
+        "paired": false,
+        "pair_role": null,
+        "pair_group": null,
+        "tags": [],
+        "notifies": []
+      },
+      {
+        "id": "b3d53206-9c28-4628-aa1a-a08acd593cc1",
+        "name": "action_throwequipped",
+        "original_name": "action_throwequipped",
+        "category": "action",
+        "duration": 4.4,
+        "loop": false,
+        "paired": false,
+        "pair_role": null,
+        "pair_group": null,
+        "tags": [],
+        "notifies": []
+      },
+      {
+        "id": "61820c90-d822-4bbc-9997-b2285b167b8f",
+        "name": "attack_punch",
+        "original_name": "attack_punch",
+        "category": "uncategorized",
+        "duration": 2.6,
+        "loop": false,
+        "paired": false,
+        "pair_role": null,
+        "pair_group": null,
+        "tags": [],
+        "notifies": []
+      },
+      {
+        "id": "47e32a59-1488-4d3c-aead-282a8d65719e",
+        "name": "gesture_angryt",
+        "original_name": "gesture_angryt",
+        "category": "gesture",
+        "duration": 19.2,
+        "loop": false,
+        "paired": false,
+        "pair_role": null,
+        "pair_group": null,
+        "tags": [],
+        "notifies": []
+      },
+      {
+        "id": "ad450e84-adcf-4f5b-b923-9f8b6ee6aaaf",
+        "name": "idle_crawling",
+        "original_name": "idle_crawling",
+        "category": "idle",
+        "duration": 0.067,
+        "loop": true,
+        "paired": false,
+        "pair_role": null,
+        "pair_group": null,
+        "tags": [],
+        "notifies": []
+      },
+      {
+        "id": "09f2d349-187c-456f-bcfc-1f315ac5b355",
+        "name": "idle_intoxicated",
+        "original_name": "idle_intoxicated",
+        "category": "idle",
+        "duration": 7.433,
+        "loop": true,
+        "paired": false,
+        "pair_role": null,
+        "pair_group": null,
+        "tags": [],
+        "notifies": []
+      },
+      {
+        "id": "42e74768-2a26-4cdb-a8a0-d27e0c8b5e90",
+        "name": "idle_kneeling",
+        "original_name": "idle_kneeling",
+        "category": "idle",
+        "duration": 4.3,
+        "loop": true,
+        "paired": false,
+        "pair_role": null,
+        "pair_group": null,
+        "tags": [],
+        "notifies": []
+      },
+      {
+        "id": "92e5ec3f-1b75-496c-b069-e73fdd7f9b7f",
+        "name": "idle_sleeping",
+        "original_name": "idle_sleeping",
+        "category": "idle",
+        "duration": 13.067,
+        "loop": true,
+        "paired": false,
+        "pair_role": null,
+        "pair_group": null,
+        "tags": [],
+        "notifies": []
+      },
+      {
+        "id": "b4bbc4ba-b505-4c14-9a0b-bbabc0f80c63",
+        "name": "idle_standing",
+        "original_name": "idle_standing",
+        "category": "idle",
+        "duration": 8.367,
+        "loop": true,
+        "paired": false,
+        "pair_role": null,
+        "pair_group": null,
+        "tags": [],
+        "notifies": []
+      },
+      {
+        "id": "262d9b18-17e9-4580-ba31-d4a552e417dd",
+        "name": "idle_standing_02",
+        "original_name": "idle_standing_02",
+        "category": "idle",
+        "duration": 10.8,
+        "loop": true,
+        "paired": false,
+        "pair_role": null,
+        "pair_group": null,
+        "tags": [],
+        "notifies": []
+      },
+      {
+        "id": "23cdf268-e3a7-422b-9d75-5016f1a2f042",
+        "name": "involuntary_action_sneeze",
+        "original_name": "involuntary_action_sneeze",
+        "category": "uncategorized",
+        "duration": 8.267,
+        "loop": false,
+        "paired": false,
+        "pair_role": null,
+        "pair_group": null,
+        "tags": [],
+        "notifies": []
+      },
+      {
+        "id": "5bd99a90-dcb6-4141-80cf-d9745d0d1a47",
+        "name": "locomotion_injured",
+        "original_name": "locomotion_injured",
+        "category": "locomotion",
+        "duration": 5.167,
+        "loop": true,
+        "paired": false,
+        "pair_role": null,
+        "pair_group": null,
+        "tags": [],
+        "notifies": []
+      },
+      {
+        "id": "eb2bebfd-aa9d-49ac-9603-1c443b3d701f",
+        "name": "locomotion_intoxicated_walk",
+        "original_name": "locomotion_intoxicated_walk",
+        "category": "locomotion",
+        "duration": 4.033,
+        "loop": true,
+        "paired": false,
+        "pair_role": null,
+        "pair_group": null,
+        "tags": [],
+        "notifies": []
+      },
+      {
+        "id": "283a6221-5954-456a-a763-37c8757e8b05",
+        "name": "locomotion_jog",
+        "original_name": "locomotion_jog",
+        "category": "locomotion",
+        "duration": 0.9,
+        "loop": true,
+        "paired": false,
+        "pair_role": null,
+        "pair_group": null,
+        "tags": [],
+        "notifies": []
+      },
+      {
+        "id": "ce0c4916-83dc-450c-ac05-45c3fd95ac9b",
+        "name": "locomotion_run",
+        "original_name": "locomotion_run",
+        "category": "locomotion",
+        "duration": 0.767,
+        "loop": true,
+        "paired": false,
+        "pair_role": null,
+        "pair_group": null,
+        "tags": [],
+        "notifies": []
+      },
+      {
+        "id": "669b5b1f-e53c-453f-a5b9-029dde91f15e",
+        "name": "locomotion_sneak",
+        "original_name": "locomotion_sneak",
+        "category": "locomotion",
+        "duration": 2.833,
+        "loop": true,
+        "paired": false,
+        "pair_role": null,
+        "pair_group": null,
+        "tags": [],
+        "notifies": []
+      },
+      {
+        "id": "7b9318fd-e12c-4fd3-8dc5-2f0980d95cd3",
+        "name": "locomotion_stairs",
+        "original_name": "locomotion_stairs",
+        "category": "locomotion",
+        "duration": 1.4,
+        "loop": true,
+        "paired": false,
+        "pair_role": null,
+        "pair_group": null,
+        "tags": [],
+        "notifies": []
+      },
+      {
+        "id": "6c4c4375-5d90-41fe-bd83-31bc4e4070a7",
+        "name": "locomotion_walk",
+        "original_name": "locomotion_walk",
+        "category": "locomotion",
+        "duration": 1.067,
+        "loop": true,
+        "paired": false,
+        "pair_role": null,
+        "pair_group": null,
+        "tags": [],
+        "notifies": []
+      },
+      {
+        "id": "4f38c9c9-ece2-4931-8ba8-1797ea7a4966",
+        "name": "locomotion_walk_02",
+        "original_name": "locomotion_walk_02",
+        "category": "locomotion",
+        "duration": 1.067,
+        "loop": true,
+        "paired": false,
+        "pair_role": null,
+        "pair_group": null,
+        "tags": [],
+        "notifies": []
+      },
+      {
+        "id": "a9207561-7e36-4d33-b0c0-1e06364cecca",
+        "name": "locomotion_walk_03",
+        "original_name": "locomotion_walk_03",
+        "category": "locomotion",
+        "duration": 1.2,
+        "loop": true,
+        "paired": false,
+        "pair_role": null,
+        "pair_group": null,
+        "tags": [],
+        "notifies": []
+      },
+      {
+        "id": "230aafae-a45e-4691-863f-eb06c5001e4f",
+        "name": "reaction_shoved",
+        "original_name": "reaction_shoved",
+        "category": "reaction",
+        "duration": 0.5,
+        "loop": false,
+        "paired": false,
+        "pair_role": null,
+        "pair_group": null,
+        "tags": [],
+        "notifies": []
+      },
+      {
+        "id": "fda786e6-ce78-4a7f-817b-d1aa2a9717b6",
+        "name": "reaction_thrown",
+        "original_name": "reaction_thrown",
+        "category": "reaction",
+        "duration": 4.367,
+        "loop": false,
+        "paired": false,
+        "pair_role": null,
+        "pair_group": null,
+        "tags": [],
+        "notifies": []
+      },
+      {
+        "id": "3d1431d7-b360-4ec8-839b-761a2d973dc1",
+        "name": "reaction_wake:up",
+        "original_name": "reaction_wake:up",
+        "category": "reaction",
+        "duration": 3.5,
+        "loop": false,
+        "paired": false,
+        "pair_role": null,
+        "pair_group": null,
+        "tags": [],
+        "notifies": []
+      },
+      {
+        "id": "c6424e4a-9cff-493a-8ba7-71d2c0fac671",
+        "name": "sex_pose_1a",
+        "original_name": "sex_pose_1a",
+        "category": "sex",
+        "duration": 0.1,
+        "loop": false,
+        "paired": false,
+        "pair_role": null,
+        "pair_group": null,
+        "tags": [],
+        "notifies": []
+      },
+      {
+        "id": "f6ccb250-f02b-4dba-90d2-77ccc373ea9e",
+        "name": "t-pose",
+        "original_name": "t-pose",
+        "category": "uncategorized",
+        "duration": 0.067,
+        "loop": false,
+        "paired": false,
+        "pair_role": null,
+        "pair_group": null,
+        "tags": [],
+        "notifies": []
+      },
+      {
+        "id": "a8af2ff5-610e-455a-80b4-a250d0faae73",
+        "name": "touch_kiss",
+        "original_name": "touch_kiss",
+        "category": "touch",
+        "duration": 3.767,
+        "loop": false,
+        "paired": false,
+        "pair_role": null,
+        "pair_group": null,
+        "tags": [],
+        "notifies": []
+      },
+      {
+        "id": "b8274509-2abc-4845-a144-53893e81413b",
+        "name": "transirtion_seated_to_sleep",
+        "original_name": "transirtion_seated_to_sleep",
+        "category": "uncategorized",
+        "duration": 5.767,
+        "loop": false,
+        "paired": false,
+        "pair_role": null,
+        "pair_group": null,
+        "tags": [],
+        "notifies": []
+      },
+      {
+        "id": "52bd9c18-e041-4bd7-ac2b-c25899524ece",
+        "name": "transition_standing_to_seated",
+        "original_name": "transition_standing_to_seated",
+        "category": "transition",
+        "duration": 2.667,
+        "loop": false,
+        "paired": false,
+        "pair_role": null,
+        "pair_group": null,
+        "tags": [],
+        "notifies": []
+      }
+    ],
     "stances": {
       "standing": {},
       "sitting_seat": {},
@@ -900,7 +1465,9 @@
       "fallen_front": {},
       "fallen_back": {},
       "leaning_wall": {},
-      "carry": {},
+      "carry": {
+        "idle": "2f2afb9e-96ab-48a5-b3c5-a7558218dc3e"
+      },
       "held_down": {},
       "holding_down": {},
       "incapacitated": {},

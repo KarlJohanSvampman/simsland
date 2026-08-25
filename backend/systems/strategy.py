@@ -21,10 +21,32 @@ def resolve_strategy(
     # =====================================================
     # HUNGER
     # =====================================================
+    # body_intentions.py::generate_body_intentions() actually creates
+    # {"type": "eat_food", ...} -- "satisfy_hunger" was never the real
+    # intention type anywhere, so this branch (and hunger's whole
+    # automatic strategy dispatch) was silently unreachable.
 
-    if t == "satisfy_hunger":
+    if t == "eat_food":
 
         return resolve_hunger_strategy(
+
+            c,
+
+            world
+        )
+
+    # =====================================================
+    # THIRST
+    # =====================================================
+    # Mirrors HUNGER above -- body_intentions.py creates {"type": "drink",
+    # ...} intentions once hydration drops, but nothing ever dispatched
+    # them (there was no branch here at all), so thirst never triggered
+    # automatic drinking behavior regardless of how dehydrated a character
+    # got.
+
+    if t == "drink":
+
+        return resolve_thirst_strategy(
 
             c,
 
@@ -218,6 +240,21 @@ def resolve_hunger_strategy(
         ])
 
     return "eat_snack"
+
+
+# =========================================================
+# THIRST
+# =========================================================
+
+def resolve_thirst_strategy(c, world):
+    # Tap water is always available at a sink -- unlike food, there's no
+    # household stock to check first. See activities.py's "drink_water"
+    # entry (interaction "drink", now a real anchor on kitchen_sink/
+    # bathroom_sink) and its completion handler for the
+    # glass-required-for-proper-hydration behavior.
+    return "drink_water"
+
+
 # =========================================================
 # SOCIAL
 # =========================================================
