@@ -3449,7 +3449,28 @@ function renderCharacterInspector(id){
     const backIn = remain > 0 ? `~${Math.max(1, Math.round(remain / 60))}m` : "due now";
     rows.push(`<span style="color:#fc6">Off-grid: ${(c.off_grid_reason || "?").replace(/_/g, " ")} — back in ${backIn}</span>`);
   } else if(c.travel_state){
-    rows.push(`<span style="color:#6cf">Traveling: ${c.travel_state}</span>`);
+    // Human-readable gloss per systems/travel.py + systems/transit.py's
+    // state machine -- "awaiting_bus_arrival" in particular used to just
+    // show its raw name with no indication the character is deliberately
+    // invisible right now (transit.py defers revealing them until the
+    // bus's return leg actually arrives, rather than having them idle
+    // visibly at the stop) and will resolve on its own within one bus
+    // cycle (<=15 sim-minutes), which read as a stuck/bugged character.
+    const TRAVEL_STATE_LABELS = {
+      to_garage:            "walking to the garage",
+      to_bus_stop:          "walking to the bus stop",
+      driving_out:          "driving out",
+      waiting_for_bus:      "waiting for the bus",
+      on_bus_departing:     "riding the bus",
+      driving_back:         "driving back",
+      awaiting_bus_arrival: "done with their errand, waiting for the bus to come back",
+      walking_home:         "walking home",
+    };
+    const label = TRAVEL_STATE_LABELS[c.travel_state] || c.travel_state;
+    const hiddenNote = c.travel_hidden
+      ? ` <span style="opacity:.65">(off-map until they arrive — normal, not stuck)</span>`
+      : "";
+    rows.push(`<span style="color:#6cf">Traveling: ${label}${hiddenNote}</span>`);
   }
 
   // c.body is the real, live 0-100 needs simulation (systems/body.py) --
