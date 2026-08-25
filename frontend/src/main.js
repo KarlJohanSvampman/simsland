@@ -2597,8 +2597,13 @@ async function updateCharacters(state){
 
       // Off-grid physical travel: hidden while riding in/on a car or bus
       // (walking to/from the garage or bus stop stays visible) -- see
-      // systems/travel.py and systems/transit.py.
-      sims[id].visible = !c.travel_hidden;
+      // systems/travel.py and systems/transit.py. travel_hidden only
+      // covers that brief ride, though -- it's cleared back to false the
+      // moment the character arrives at their off-grid destination, well
+      // before c.off_grid itself clears (that stays true for the whole
+      // stay, e.g. a multi-hour hospital visit), so check both or the
+      // model reappears on the map while the character is still away.
+      sims[id].visible = !c.travel_hidden && !c.off_grid;
 
             // =========================
       // ANIMATION STATE
