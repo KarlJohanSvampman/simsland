@@ -57,6 +57,9 @@ SEVERITY = {
     # Favor ledger (systems/favors.py) -- committed to helping repeatedly
     # with nothing given back.
     "favor_unreciprocated":    8.0,
+    # Life comparison (systems/life_comparison.py) -- repeated
+    # unfavorable-to-self comparisons crossing the jealousy threshold.
+    "life_envy":               6.0,
     "resource_conflict":  5.0,
     "ignored_me":         3.0,
     "romantic_envy":     10.0,

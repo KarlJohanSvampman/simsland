@@ -1355,6 +1355,15 @@ def perceive(
             enriched
         )
 
+        # systems/behavior_patterns.py -- log what c saw this person
+        # doing, riding on perception's own visible_people computation
+        # rather than a separate observation scan.
+        try:
+            from systems.behavior_patterns import log_observation
+            log_observation(c, target, world)
+        except Exception:
+            pass
+
     perception = {
 
         "visible_people":

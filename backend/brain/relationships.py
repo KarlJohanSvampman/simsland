@@ -141,6 +141,12 @@ def ensure_relationship(
             # to how they see this person.
             "creeped_out": 0.0,
 
+            # systems/life_comparison.py -- builds only from comparisons
+            # that land favorably for the OTHER person, never the
+            # observer's own wins. Decays like every other relationship-
+            # stat tracker this session has built.
+            "jealousy": 0.0,
+
             "known_secrets": [],
 
             "shared_groups": [],

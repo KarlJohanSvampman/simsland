@@ -940,6 +940,12 @@ def ensure_character_defaults(c, world=None):
     # character remembers); this is the tellable subset.
     c.setdefault("notable_stories", [])
 
+    # Behavior-pattern observation (see systems/behavior_patterns.py).
+    # _daily_observations is cleared every real calendar day after
+    # aggregating into behavior_patterns.
+    c.setdefault("_daily_observations", [])
+    c.setdefault("behavior_patterns", {})
+
     # Preliminary plans (steps/requirements/possible-solutions) for active
     # expectations -- see systems/expectation_planner.py, which queues
     # steps onto c["activity_queue"] the same way hobby_planner.py does.

@@ -320,6 +320,27 @@ def generate_social_intentions(
         })
 
     # =====================================================
+    # ASK ABOUT PATTERN (systems/behavior_patterns.py) -- scales with
+    # the highest-count unanswered pattern c has noticed on this
+    # person; a recurring, never-explained pattern presses harder.
+    # =====================================================
+
+    from systems.behavior_patterns import highest_unanswered_pattern
+    pattern = highest_unanswered_pattern(c, other["id"])
+    if pattern:
+        ask_pattern_score = min(100, pattern["count"] * 12)
+        if hostility > 20:
+            ask_pattern_score *= 0.3
+        if ask_pattern_score > 30:
+            add_social_intention(c, {
+                "type":      "ask_about_pattern",
+                "target_id": other["id"],
+                "priority":  int(ask_pattern_score),
+                "reason":    f"noticed_pattern:{pattern['activity']}",
+                "pattern_id": pattern["id"],
+            })
+
+    # =====================================================
     # SEEK COMFORT
     # =====================================================
 

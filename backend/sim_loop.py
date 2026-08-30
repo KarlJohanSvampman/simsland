@@ -98,6 +98,8 @@ from systems.persona_expectations import tick_persona_expectations
 from systems.libido import tick_libido
 from systems.intimate_item_discovery import tick_discovery_checks
 from systems.stories import decay_stories
+from systems.life_comparison import tick_life_comparison
+from systems.behavior_patterns import aggregate_daily_observations
 from systems.contagion       import tick_contagion_location, age_food_items
 from systems.child_care      import tick_child_needs
 from systems.bedroom_assignment import tick_bedroom_assignments
@@ -566,8 +568,10 @@ def tick(world):
         tick_harassment_daily(world)
         tick_libido(world)
         tick_discovery_checks(world)
+        tick_life_comparison(world)
         for c in characters:
             decay_stories(c)
+            aggregate_daily_observations(c, world)
         tick_baby_daily(world)
         for _c in characters:
             sync_anger_from_grievances(_c, world)

@@ -281,14 +281,89 @@ def generate_ideal_partner(c, defs):
     return c["ideal_partner"]
 
 
-def compute_ideal_match(c, other):
+LIFE_GOAL_CATEGORIES = ("happiness", "lovelife", "career", "patriot", "legacy", "grandchildren")
+
+
+def generate_ideal_child(c, defs):
+    """
+    A parent's ideal for what their child will become -- same desired/
+    undesired trait derivation as generate_ideal_partner() (reuses
+    _opposite_trait()/polarity fallback as-is), a lighter physical
+    window (build only -- the romantic fertility-signal fields don't
+    apply here), plus life_goals: loose 0-1 importances across
+    Happiness/Lovelife/Career/Patriot/Legacy/Grandchildren, nudged by
+    the parent's own values/traits (an ambitious parent skews career
+    higher, a traditional/religious one skews legacy/patriot). Called
+    lazily (once, cached) wherever it's first actually needed --
+    typically systems/parenting.py::derive_household_parenting_
+    guidelines() -- rather than requiring every marriage call site in
+    the codebase to be found and hooked.
+    """
+    trait_templates = defs.get("trait_templates", {})
+    pool = [tid for tid, t in trait_templates.items() if not t.get("is_cognition_core")]
+
+    if not pool:
+        c["ideal_child"] = {"desired_traits": [], "undesired_traits": [],
+                             "physical_ideal": {}, "life_goals": {}}
+        return c["ideal_child"]
+
+    num_desired = min(len(pool), random.randint(3, 5))
+    desired = random.sample(pool, num_desired)
+
+    undesired = []
+    for tid in desired:
+        opp = _opposite_trait(tid, pool)
+        if not opp:
+            polarity = trait_templates.get(tid, {}).get("polarity", "neutral")
+            inverse = {"positive": "negative", "negative": "positive"}.get(polarity)
+            candidates = [
+                t for t in pool if t not in desired and t not in undesired
+                and (trait_templates.get(t, {}).get("polarity") == inverse if inverse else True)
+            ]
+            opp = random.choice(candidates) if candidates else None
+        if opp and opp not in undesired:
+            undesired.append(opp)
+
+    physical_ideal = {"build": random.choice(_BUILD_SCALE)}
+
+    traits = set(c.get("traits", []) + c.get("personality_traits", []))
+    values = c.get("values", {})
+    life_goals = {}
+    for cat in LIFE_GOAL_CATEGORIES:
+        base = random.gauss(0.5, 0.15)
+        if cat == "career" and ("ambitious" in traits or values.get("work", {}).get("importance", 0.5) > 0.65):
+            base += 0.2
+        if cat in ("legacy", "patriot") and values.get("traditions", {}).get("importance", 0.5) > 0.65:
+            base += 0.2
+        if cat == "legacy" and values.get("religion", {}).get("importance", 0.5) > 0.65:
+            base += 0.15
+        if cat == "lovelife" and "romantic" in traits:
+            base += 0.15
+        if cat == "grandchildren" and values.get("family", {}).get("importance", 0.5) > 0.65:
+            base += 0.2
+        life_goals[cat] = round(max(0.0, min(1.0, base)), 3)
+
+    c["ideal_child"] = {
+        "desired_traits":   desired,
+        "undesired_traits": undesired,
+        "physical_ideal":   physical_ideal,
+        "life_goals":       life_goals,
+    }
+    return c["ideal_child"]
+
+
+def compute_ideal_match(c, other, ideal_key="ideal_partner"):
     """
     Returns {"trait": 0-1, "physical": 0-1} (0.5 = neutral/no data) for
-    how well `other` matches c's ideal_partner. 0 = as opposite-of-ideal
-    as this scoring can express (Confirmed Decision #2 — no separate
+    how well `other` matches c's ideal (ideal_partner by default; pass
+    ideal_key="ideal_child" to score against generate_ideal_child()'s
+    profile instead -- same shape, same scoring, systems/
+    life_comparison.py's children-vs-ideal dimension reuses this
+    directly rather than a second scorer). 0 = as opposite-of-ideal as
+    this scoring can express (Confirmed Decision #2 — no separate
     "off-putting" stat; this IS the low end of the same scale).
     """
-    ideal = c.get("ideal_partner")
+    ideal = c.get(ideal_key)
     if not ideal:
         return {"trait": 0.5, "physical": 0.5}
 

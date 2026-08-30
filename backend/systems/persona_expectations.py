@@ -83,6 +83,56 @@ def evaluate_persona_clashes(c, other, world):
     return flagged
 
 
+def evaluate_parenting_guideline_clash(parent, child, world):
+    """Real child's traits vs the household's derived parenting
+    guidelines (systems/parenting.py -- the intersection of both
+    spouses' ideal_child personas). A second, more concrete clash
+    source alongside evaluate_persona_clashes()'s opinion-based one,
+    same tracked/frustration/grievance shape."""
+    household = world.get("households", {}).get(parent.get("household_id"))
+    if not household:
+        return False
+
+    guidelines = household.get("parenting_guidelines")
+    if guidelines is None:
+        from systems.parenting import derive_household_parenting_guidelines
+        guidelines = derive_household_parenting_guidelines(household, world)
+    if not guidelines:
+        return False
+
+    desired = set(guidelines.get("desired_traits", []))
+    undesired = set(guidelines.get("undesired_traits", []))
+    total = len(desired) + len(undesired)
+    if not total:
+        return False
+
+    child_traits = set(child.get("traits", []) + child.get("personality_traits", []))
+    hits = len(child_traits & desired) - len(child_traits & undesired)
+    match = 0.5 + 0.5 * (hits / total)
+    if match >= CLASH_ALIGNMENT_THRESHOLD + 0.15:
+        return False  # decent-enough match, not a clash
+
+    rel = parent.setdefault("relationships", {}).setdefault(child["id"], {})
+    tracked = rel.setdefault("personal_expectations", {})
+    entry = tracked.setdefault("parenting_guidelines", {
+        "category":            "family",
+        "importance":          0.8,
+        "first_detected_tick": world.get("tick", 0),
+        "clash_count":         0,
+        "frustration":         0.0,
+    })
+    entry["clash_count"] += 1
+    entry["frustration"] = min(1.0, entry["frustration"] + CLASH_FRUSTRATION_DELTA)
+
+    if entry["frustration"] >= CLASH_GRIEVANCE_THRESHOLD:
+        from systems.grievances import add_grievance
+        add_grievance(parent, child["id"], "value_clash", world,
+                      severity=7.0, details={"topic": "parenting_guidelines"})
+        entry["frustration"] = 0.0
+
+    return True
+
+
 def tick_persona_expectations(world):
     """Slow-cadence sweep (see core/tick_schedule.py's
     CADENCE["persona_expectations"], sim_loop.py). Only checks close-kin
@@ -100,3 +150,5 @@ def tick_persona_expectations(world):
             if not other:
                 continue
             evaluate_persona_clashes(c, other, world)
+            if rel.get("kinship") == "parent":
+                evaluate_parenting_guideline_clash(c, other, world)

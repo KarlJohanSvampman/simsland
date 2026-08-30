@@ -1216,6 +1216,8 @@ def route_action(c, world, action, speech, definitions=None, available_actions=N
         _route_check_device(c, world, action)
     elif action_type == "check_computer_history":
         _route_check_computer_history(c, world, action)
+    elif action_type == "answer_about_pattern":
+        _route_answer_about_pattern(c, world, action)
     elif action_type == "form_theory":
         _route_form_theory(c, world, action)
     elif action_type == "make_argument":
@@ -3025,6 +3027,30 @@ def _route_check_device(c, world, action):
 
     item["_last_snooped_by"] = c["id"]
     item["_last_snooped_tick"] = world.get("tick", 0)
+
+
+def _route_answer_about_pattern(c, world, action):
+    """c (the person who was asked) answers -- writes into the ASKER's
+    own tracked pattern (systems/behavior_patterns.py), found by c's id
+    + the named activity. c's own LLM turn chooses the actual text,
+    honest or not -- this just routes it into the right slot, and
+    still says it out loud as a real conversational line."""
+    asker_id = action.get("target")
+    activity = action.get("activity")
+    answer = action.get("answer", "")
+    if not asker_id or not activity or not answer:
+        return
+    asker = world.get("characters", {}).get(asker_id)
+    if not asker:
+        return
+
+    from systems.behavior_patterns import answer_pattern
+    answer_pattern(asker, c["id"], activity, answer)
+
+    apply_speech(c, world, {
+        "target": asker_id, "speech_act": "supportive",
+        "topic": "pattern_answer", "utterance": answer,
+    })
 
 
 def _route_check_computer_history(c, world, action):
