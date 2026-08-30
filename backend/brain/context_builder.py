@@ -1797,6 +1797,41 @@ def _sec_addictions(c, world):
     return list(lines) if lines else None
 
 
+def _sec_attraction(c, world):
+    lines = _build_attraction_context(c, world)
+    return list(lines) if lines else None
+
+
+def _sec_domestic(c, world):
+    lines = _build_domestic_context(c, world)
+    return list(lines) if lines else None
+
+
+def _sec_emotional_control(c, world):
+    lines = _build_emotional_control_context(c, world)
+    return list(lines) if lines else None
+
+
+def _sec_repression(c, world):
+    lines = _build_repression_context(c, world)
+    return list(lines) if lines else None
+
+
+def _sec_pregnancy(c, world):
+    lines = _build_pregnancy_context(c, world)
+    return list(lines) if lines else None
+
+
+def _sec_rival(c, world):
+    lines = _build_rival_context(c, world)
+    return list(lines) if lines else None
+
+
+def _sec_impulse(c, world):
+    lines = _build_impulse_context(c, world)
+    return list(lines) if lines else None
+
+
 def _sec_phone(c, world):
     # phone location — systems/phone.py::get_phone_context(): "set down
     # nearby" / "not sure where it is" (forgotten). Battery state
@@ -1850,11 +1885,18 @@ NARRATIVE_SECTIONS = [
     ("values",                "full", _sec_values),
     ("curiosity",             "full", _sec_curiosity),
     ("influence",             "full", _sec_influence),
+    ("attraction",            "full", _sec_attraction),
     ("touch",                 "full", _sec_touch),
     ("intimacy",              "full", _sec_intimacy),
     ("phone",                 "full", _sec_phone),
     ("intoxication",          "full", _sec_intoxication),
     ("addictions",            "full", _sec_addictions),
+    ("domestic_situation",    "full", _sec_domestic),
+    ("emotional_control",     "full", _sec_emotional_control),
+    ("repression",            "full", _sec_repression),
+    ("pregnancy",             "full", _sec_pregnancy),
+    ("rival",                 "full", _sec_rival),
+    ("impulse",               "full", _sec_impulse),
 ]
 
 TIER_SETS = {"brief": {"core"}, "full": {"core", "full"}}
@@ -3568,7 +3610,7 @@ def _build_domestic_context(c, world):
 def _build_emotional_control_context(c, world):
     try:
         from systems.domestic_control import get_emotional_control_victim_context
-        return get_emotional_control_victim_context(c, world)
+        return get_emotional_control_victim_context(c, world).get("emotional_control_situation", [])
     except Exception:
         return []
 
