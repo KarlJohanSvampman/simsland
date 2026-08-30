@@ -105,12 +105,23 @@ def update_worker(
 
     if state == "depositing_mail":
 
-        deposit_mail(
+        if worker.get("service_type") == "newspaper":
 
-            worker,
+            deposit_newspaper(
 
-            world
-        )
+                worker,
+
+                world
+            )
+
+        else:
+
+            deposit_mail(
+
+                worker,
+
+                world
+            )
 
         worker["state"] = (
             "returning"
@@ -289,9 +300,15 @@ def deposit_mail(
         []
     )
 
+    import uuid
+    mail_bundle_id = f"wobj_mail_{uuid.uuid4().hex[:6]}"
+
     world[
         "world_objects"
     ].append({
+
+        "id":
+            mail_bundle_id,
 
         "type":
             "mail_bundle",
@@ -312,6 +329,36 @@ def deposit_mail(
         "household_id":
             household["id"]
     })
+
+    from sim_loop import _mark_dirty
+    _mark_dirty(world, world_object_ids={mail_bundle_id})
+
+
+# =========================================================
+# DEPOSIT NEWSPAPER
+# Paperboy's equivalent of deposit_mail() above -- see
+# systems/newspaper_delivery.py, branched to here from
+# update_worker()'s "depositing_mail" state on service_type=="newspaper".
+# =========================================================
+
+def deposit_newspaper(worker, world):
+    household = world["households"].get(worker["household_id"])
+    if not household:
+        return
+
+    mailbox = household.setdefault("mailbox", {})
+    mailbox["has_newspaper"] = True
+
+    from systems.personal_items import make_item
+    item = make_item("newspaper", world=world)
+    item["location"] = "placed"
+    item["x"] = mailbox.get("x", 0)
+    item["y"] = mailbox.get("y", 0)
+    item["placed_at_tick"] = world.get("tick", 0)
+    world.setdefault("placed_items", {})[item["id"]] = item
+
+    from sim_loop import _mark_dirty
+    _mark_dirty(world, placed_item_ids={item["id"]})
 
 
 # =========================================================
@@ -368,9 +415,15 @@ def drop_package(
         []
     )
 
+    import uuid
+    package_obj_id = f"wobj_package_{uuid.uuid4().hex[:6]}"
+
     world[
         "world_objects"
     ].append({
+
+        "id":
+            package_obj_id,
 
         "type":
             "package",
@@ -390,6 +443,9 @@ def drop_package(
         "package":
             package
     })
+
+    from sim_loop import _mark_dirty
+    _mark_dirty(world, world_object_ids={package_obj_id})
 
 
 # =========================================================

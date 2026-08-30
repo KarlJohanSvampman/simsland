@@ -223,7 +223,13 @@ def maybe_fire(c, world):
         emit("character_fired", {"character_id": c["id"]})
 
 
-def apply_for_job(c, world):
+def apply_for_job(c, world, job_id=None):
+    """job_id: when given (a character/LLM explicitly picked a specific
+    listing -- see action_router.py::_route_computer_apply_for_job),
+    applies to exactly that one if still open/eligible. When omitted
+    (the automatic per-economy-tick path, brain/agent_loop.py::
+    update_economy), picks among eligible listings via
+    systems/choice.py rather than always taking the highest wage."""
     if c.get("employed") or c.get("interview"):
         return
     if not world.get("job_listings"):
@@ -245,7 +251,25 @@ def apply_for_job(c, world):
     if not eligible:
         return
 
-    job = max(eligible, key=lambda j: j["hourly_wage"])
+    if job_id:
+        job = next((j for j in eligible if j["id"] == job_id), None)
+        if not job:
+            return
+    else:
+        options = [
+            {"id": j["id"], "label": j.get("title", j["id"]),
+             "tags": [t for t in (j.get("industry"), j.get("work_mode")) if t]}
+            for j in eligible
+        ]
+        from systems.choice import choose
+        picked = choose(c, world, "job to apply for", options)
+        if not picked:
+            return
+        job = next(j for j in eligible if j["id"] == picked["id"])
+
+    from systems.validation import queue_choice_for_validation
+    queue_choice_for_validation(c, world, "workplace", job.get("title", job["id"]))
+
     job.setdefault("applicants", []).append(c["id"])
     c["interview"] = {
         "job_id":     job["id"],

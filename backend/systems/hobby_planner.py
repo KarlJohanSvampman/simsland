@@ -89,6 +89,35 @@ def _item_uses(resource):
     return resource.get("uses_remaining", resource.get("quantity", 0))
 
 
+def consume_hobby_uses(c, world, hobby_params):
+    """Decrement one use off whichever supply item this hobby session
+    drew on, mirroring _item_uses()'s uses_remaining-or-quantity shape.
+    Called once per completed hobby_session task (activities.py
+    ::complete_activity()) -- was referenced there but never defined
+    anywhere in the codebase until now, so every hobby-queue completion
+    (and, via systems/expectation_planner.py, every planned-expectation
+    completion) crashed with a NameError. hobby_session tasks don't
+    carry an item_type of their own (that lives on the plan's separate
+    retrieve_item/examine_item tasks) -- no-ops safely when there's
+    nothing to identify, rather than guessing."""
+    if not hobby_params:
+        return
+    item_type = hobby_params.get("item_type")
+    if not item_type:
+        return
+    for item in c.get("inventory", []):
+        if item.get("template_id") != item_type and item.get("object_type") != item_type:
+            continue
+        remaining = _item_uses(item)
+        if remaining <= 0:
+            continue
+        if "uses_remaining" in item:
+            item["uses_remaining"] = remaining - 1
+        else:
+            item["quantity"] = remaining - 1
+        break
+
+
 # =========================================================
 # PLAN HOBBY
 # =========================================================

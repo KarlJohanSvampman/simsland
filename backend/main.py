@@ -115,14 +115,24 @@ def _build_delta(world: dict, dirty: dict, cx: int, cy: int, zoom: int) -> dict 
         pid: p for pid, p in dirty["props"].items()
         if in_view(p.get("x", 0), p.get("y", 0), cx, cy, radius)
     }
+    visible_placed_items = {
+        iid: i for iid, i in dirty["placed_items"].items()
+        if in_view(i.get("x", 0), i.get("y", 0), cx, cy, radius)
+    }
+    visible_world_objects = {
+        oid: o for oid, o in dirty["world_objects"].items()
+        if in_view(o.get("x", 0), o.get("y", 0), cx, cy, radius)
+    }
 
-    if not visible_chars and not visible_props:
+    if not visible_chars and not visible_props and not visible_placed_items and not visible_world_objects:
         return None
 
     return {
-        "type":       "delta",
-        "characters": visible_chars,
-        "props":      visible_props,
+        "type":          "delta",
+        "characters":    visible_chars,
+        "props":         visible_props,
+        "placed_items":  visible_placed_items,
+        "world_objects": visible_world_objects,
         # current world tick -- see api/view.py::get_view()'s matching
         # field, both feed main.js's _worldState.tick.
         "tick":       world.get("tick", 0),

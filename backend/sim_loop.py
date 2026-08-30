@@ -52,6 +52,7 @@ from systems.contact_designation import accumulate_hours, evaluate_weekly_design
 from systems.peer_influence import resolve_cognitive_adoption
 from systems.trait_budget import recompute_budget_on_birthday
 from systems.cooking_process import update_cooking_process
+from systems.reading_process import update_reading_process
 from systems.task_process import update_household_processes
 from systems.market     import update_market, produce, consume_households
 from systems.stock_market  import update_stocks, init_stocks
@@ -68,6 +69,7 @@ from systems.emergency  import trigger_incident, resolve, tick_fire_incidents   
 from systems.law        import process_jail, process_trials, maybe_arrest_from_incidents
 from systems.jobs       import generate_job_listings, tick_job_market, maybe_fire, process_interview, init_company_slots
 from systems.postal_service     import update_postal_service
+from systems.newspaper_delivery import update_newspaper_delivery
 from systems.business_support   import process_business_inboxes
 from systems.service_vehicles   import update_service_vehicles
 from systems.transit            import update_bus
@@ -76,6 +78,13 @@ from systems.messaging  import deliver_messages
 from systems.migration  import check_migration_desires
 from systems.eviction   import check_household_for_eviction
 from systems.services   import update_services
+from systems.economy    import apply_expenses
+from systems.government_debt import assess_monthly_tax, apply_debt_consequences
+from systems.credit     import tick_monthly_card_cycle
+from systems.personal_items import recall_overdue_loans
+from systems.validation    import tick_popularity_decay
+from systems.social_media  import tick_post_engagement
+from systems.convenience_store import update_convenience_store_staffing
 
 # -- Conflict / social drama ──────────────────────────────────────────────
 from systems.grievances        import update_grievances
@@ -84,6 +93,7 @@ from systems.grapple         import process_grapples
 from systems.social_contracts  import check_contract_violations
 from systems.social_rules      import cleanup_expired_rule_exceptions
 from systems.worries           import decay_worries
+from systems.persona_expectations import tick_persona_expectations
 from systems.contagion       import tick_contagion_location, age_food_items
 from systems.child_care      import tick_child_needs
 from systems.bedroom_assignment import tick_bedroom_assignments
@@ -178,32 +188,67 @@ def advance_calendar(world):
 
 
 def _is_monday_midnight(world):
+    # cal["hour"] stays 0 for a full 3600 ticks (the entire first hour of
+    # Monday, since one tick == one nominal game-second -- see
+    # advance_calendar()) -- a bare weekday+hour check used to fire every
+    # single one of those ticks, re-running weekly resets (schedule
+    # regen, apply_expenses, ...) thousands of times per week instead of
+    # once. Stamp the (year, month, day) it last fired on and only allow
+    # one hit per calendar day, same guard shape as the monthly check
+    # below. Stored as a string, not a tuple, so the Postgres JSON
+    # round-trip (tuples -> lists) can't silently break the comparison.
     cal = world.get("calendar", {})
-    return cal.get("weekday") == "Monday" and cal.get("hour") == 0
+    if not (cal.get("weekday") == "Monday" and cal.get("hour") == 0):
+        return False
+    stamp = f"{cal.get('year')}-{cal.get('month')}-{cal.get('day')}"
+    if world.get("_last_weekly_stamp") == stamp:
+        return False
+    world["_last_weekly_stamp"] = stamp
+    return True
 
 
 def _is_month_start_midnight(world):
+    # Same one-shot-per-period guard as _is_monday_midnight above, and for
+    # the same reason: day==1/hour==0 alone stays true for 3600 ticks.
     cal = world.get("calendar", {})
-    return cal.get("day") == 1 and cal.get("hour") == 0
+    if not (cal.get("day") == 1 and cal.get("hour") == 0):
+        return False
+    stamp = f"{cal.get('year')}-{cal.get('month')}"
+    if world.get("_last_monthly_stamp") == stamp:
+        return False
+    world["_last_monthly_stamp"] = stamp
+    return True
 
 
 # =========================================================
 # DIRTY TRACKING
 # =========================================================
 
-def _mark_dirty(world, char_ids=(), prop_ids=()):
-    dirty = world.setdefault("_dirty", {"chars": set(), "props": set()})
+_DIRTY_DEFAULT = {"chars": set(), "props": set(), "placed_items": set(), "world_objects": set()}
+
+
+def _mark_dirty(world, char_ids=(), prop_ids=(), placed_item_ids=(), world_object_ids=()):
+    dirty = world.setdefault("_dirty", dict(_DIRTY_DEFAULT))
     dirty["chars"].update(char_ids)
     dirty["props"].update(prop_ids)
+    dirty["placed_items"].update(placed_item_ids)
+    dirty["world_objects"].update(world_object_ids)
 
 
 def collect_dirty(world) -> dict:
-    dirty = world.pop("_dirty", {"chars": set(), "props": set()})
+    dirty = world.pop("_dirty", dict(_DIRTY_DEFAULT))
     chars = {cid: world["characters"][cid] for cid in dirty["chars"] if cid in world["characters"]}
     props_raw = world.get("props", {})
     props_map = props_raw if isinstance(props_raw, dict) else {p["id"]: p for p in props_raw}
     props = {pid: props_map[pid] for pid in dirty["props"] if pid in props_map}
-    return {"chars": chars, "props": props}
+    placed_items_map = world.get("placed_items", {})
+    placed_items = {iid: placed_items_map[iid] for iid in dirty["placed_items"] if iid in placed_items_map}
+    # world_objects has no stable id->entry map (it's a plain list, unlike
+    # placed_items) -- objects are matched by their own "id" field, which
+    # producers (e.g. service_worker_runtime.py) must stamp themselves.
+    world_objects_by_id = {o["id"]: o for o in world.get("world_objects", []) if o.get("id")}
+    world_objects = {oid: world_objects_by_id[oid] for oid in dirty["world_objects"] if oid in world_objects_by_id}
+    return {"chars": chars, "props": props, "placed_items": placed_items, "world_objects": world_objects}
 
 
 # =========================================================
@@ -259,6 +304,8 @@ def tick(world):
         tick_pregnancy(world)   # weekly fitness decay + streak tracking
         tick_baby_weekly(world)
         tick_conditioning_weekly(world)
+        apply_expenses(world)   # issues this week's household bills (rent/food/hobbies/credit cards/loans)
+        recall_overdue_loans(world)   # returns any borrowed item past its due date to its real owner
         try:
             from core.definitions import load_definitions
             _defs_weekly = load_definitions(world.get("sim_id", "default"))
@@ -283,6 +330,22 @@ def tick(world):
                 resolve_cognitive_adoption(world, _defs_monthly, _monthly_learners)
         except Exception:
             pass
+
+        # income_tax_rate (socioeconomics.py) was computed but never
+        # actually charged to anyone before this -- see
+        # systems/government_debt.py.
+        for c in characters:
+            assess_monthly_tax(c, world)
+            apply_debt_consequences(c)
+            tick_monthly_card_cycle(c)
+
+    # -- Every sim-minute: popularity decay (systems/validation.py) ──
+    if t % 60 == 0:
+        tick_popularity_decay(world)
+
+    # -- Every sim-hour: social post engagement (systems/social_media.py) --
+    if t % 3600 == 0:
+        tick_post_engagement(world)
 
     # -- Fast: perception + attention (÷5) ──────────────────
     if every(world, CADENCE["perception"]):
@@ -354,6 +417,10 @@ def tick(world):
             if hh:
                 update_cooking_process(c, hh, world)
 
+    if every(world, CADENCE["reading"], offset=9):
+        for c in characters:
+            update_reading_process(c, world)
+
     # Household-scoped multi-stage processes (laundry, etc.) — ticks
     # forward for every household regardless of who's nearby, same
     # cadence tier as cooking. See systems/task_process.py.
@@ -366,6 +433,9 @@ def tick(world):
 
     if every(world, CADENCE["service_workers"], offset=7):
         update_service_workers(world)
+
+    if every(world, CADENCE["service_workers"], offset=17):
+        update_convenience_store_staffing(world)
 
     if every(world, CADENCE["household_monitoring"], offset=8):
         update_household_monitoring(world)
@@ -399,6 +469,9 @@ def tick(world):
 
     if every(world, CADENCE["postal"], offset=12):
         update_postal_service(world)
+
+    if every(world, CADENCE["postal"], offset=34):
+        update_newspaper_delivery(world)
 
     if every(world, CADENCE["business_support"], offset=14):
         process_business_inboxes(world)
@@ -463,6 +536,9 @@ def tick(world):
         check_contract_violations(world)  # emits contract_violated
         cleanup_expired_rule_exceptions(world)  # GC only, see social_rules.py
         decay_worries(world)  # passive suspicion decay, see worries.py
+
+    if every(world, CADENCE["persona_expectations"], offset=42):
+        tick_persona_expectations(world)  # value-alignment clashes between close kin
 
     # -- Daily stats drift ──────────────────────────────────
     if every(world, CADENCE["socioeconomics"], offset=19):

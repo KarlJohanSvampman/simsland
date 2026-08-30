@@ -25,15 +25,20 @@ def create_form_request_mail(
         "source_event_id": source_event_id
     }
 
-    household.setdefault("mailbox", {
-        "has_mail": False,
-        "items": [],
-        "unopened_count": 0
-    })
+    # Per-key setdefault, not a whole-dict one -- household["mailbox"]
+    # may already exist with OTHER keys already set (e.g. the physical
+    # mailbox x/y position, schema_defaults.py's ensure_world_defaults),
+    # in which case a whole-dict setdefault("mailbox", {...}) is a no-op
+    # and silently never adds has_mail/items/unopened_count, crashing the
+    # very next line.
+    mailbox = household.setdefault("mailbox", {})
+    mailbox.setdefault("has_mail", False)
+    mailbox.setdefault("items", [])
+    mailbox.setdefault("unopened_count", 0)
 
-    household["mailbox"]["items"].append(mail)
-    household["mailbox"]["has_mail"] = True
-    household["mailbox"]["unopened_count"] += 1
+    mailbox["items"].append(mail)
+    mailbox["has_mail"] = True
+    mailbox["unopened_count"] += 1
 
     return mail
 
@@ -41,11 +46,10 @@ def create_form_request_mail(
 def sort_household_mail(household, world):
     """Open and categorise all unopened mail from the mailbox."""
 
-    mailbox = household.setdefault("mailbox", {
-        "has_mail": False,
-        "items": [],
-        "unopened_count": 0
-    })
+    mailbox = household.setdefault("mailbox", {})
+    mailbox.setdefault("has_mail", False)
+    mailbox.setdefault("items", [])
+    mailbox.setdefault("unopened_count", 0)
 
     for mail in mailbox.get("items", []):
 
@@ -81,6 +85,18 @@ def respond_to_mail(c, household, mail, world):
         household["pending_responses"].remove(mail)
 
 def attempt_pay_bills(c, world):
+    """Pays down household bills_due (economy.py::apply_expenses(), issued
+    weekly Monday-midnight) out of the household's shared wealth pool --
+    called per-member each cycle, so whichever member gets to it first
+    pays what the household can afford; bills_due entries created before
+    a member paid it off in full stay skipped (remaining already <= 0)
+    on every later call, so nothing double-pays.
+
+    Settling a bill fully doesn't just zero out an abstract total -- its
+    credit_card_payments/loan_payments slices (see economy.py) get
+    applied to the real card/loan balances right here, otherwise Round
+    C/D's debt would accrue every week but never actually go down even
+    though the household kept "paying" it."""
 
     hid = c.get("household_id")
     if not hid:
@@ -90,14 +106,53 @@ def attempt_pay_bills(c, world):
     if not household:
         return
 
-    for bill in household.get("bills_due", []):
+    bills = household.get("bills_due", [])
+    # Unbounded growth guard -- settled bills stay in the list forever
+    # otherwise (nothing here or in economy.py ever removes them), same
+    # trim pattern offgrid.py uses for world["events"].
+    if len(bills) > 60:
+        household["bills_due"] = bills = bills[-60:]
+
+    for bill in bills:
+
+        remaining = bill.get("remaining", 0)
+        if remaining <= 0:
+            continue
+
+        available = household.get("wealth", 0)
+        if available <= 0:
+            continue
+
+        pay = min(available, remaining)
+        household["wealth"] = round(available - pay, 2)
+        bill["remaining"] = round(remaining - pay, 2)
+        contributors = bill.setdefault("contributors", {})
+        contributors[c["id"]] = round(contributors.get(c["id"], 0) + pay, 2)
 
         if bill["remaining"] <= 0:
-            continue
+            _settle_bill_debts(household, world, bill)
 
-        wealth = c.get("wealth", 0)
-        if wealth <= 0:
-            continue
+    # Drop fully-settled bills instead of leaving them in the list forever
+    # at remaining==0 -- nothing here or in economy.py ever removes them
+    # otherwise, so bills_due would only ever grow (until the >60 cap
+    # above kicks in), never actually shrink as debt gets paid down.
+    household["bills_due"] = [b for b in bills if b.get("remaining", 0) > 0]
 
-        # simple share logic
-        members 
+
+def _settle_bill_debts(household, world, bill):
+    from systems.credit import get_credit_cards, make_payment as pay_credit_card
+    from systems.loans import make_payment as pay_loan
+
+    chars = world.get("characters", {})
+    for entry in bill.get("credit_card_payments", []):
+        member = chars.get(entry["character_id"])
+        if not member:
+            continue
+        card = next((c for c in get_credit_cards(member) if c["id"] == entry["card_id"]), None)
+        if card:
+            pay_credit_card(card, entry["amount"])
+
+    for entry in bill.get("loan_payments", []):
+        loan = household.get("loans", {}).get(entry["loan_id"])
+        if loan:
+            pay_loan(loan, entry["amount"]) 

@@ -96,9 +96,7 @@ def create_conversation(
 
     world,
 
-    a_id,
-
-    b_id,
+    participant_ids,
 
     topic="general",
 
@@ -106,6 +104,10 @@ def create_conversation(
 
     medium="in_person"
 ):
+    """participant_ids: list of 2+ character ids. Was a_id/b_id (fixed
+    pair) before group-conversation support -- the one real external
+    caller (get_or_create_conversation, called only from
+    action_router.py::apply_speech()) was updated alongside this."""
 
     ensure_conversations(world)
 
@@ -117,12 +119,7 @@ def create_conversation(
 
         "id": cid,
 
-        "participants": [
-
-            a_id,
-
-            b_id
-        ],
+        "participants": list(participant_ids),
 
         "topic": topic,
 
@@ -142,7 +139,7 @@ def create_conversation(
 
         "history": [],
 
-        "turn_owner": a_id,
+        "turn_owner": participant_ids[0],
 
         "active": True,
 
@@ -186,12 +183,15 @@ def find_conversation(
 
     world,
 
-    a_id,
-
-    b_id
+    participant_ids
 ):
+    """Matches by exact participant SET -- a 3-person conversation is a
+    different conversation from any 2-person subset of it, same as
+    before this generalized from a fixed pair."""
 
     ensure_conversations(world)
+
+    target = set(participant_ids)
 
     for conv in world[
         "conversations"
@@ -204,12 +204,7 @@ def find_conversation(
             conv["participants"]
         )
 
-        if participants == {
-
-            a_id,
-
-            b_id
-        }:
+        if participants == target:
 
             return conv
 
@@ -224,9 +219,7 @@ def get_or_create_conversation(
 
     world,
 
-    a_id,
-
-    b_id,
+    participant_ids,
 
     topic="general",
 
@@ -237,9 +230,7 @@ def get_or_create_conversation(
 
         world,
 
-        a_id,
-
-        b_id
+        participant_ids
     )
 
     if conv:
@@ -249,9 +240,7 @@ def get_or_create_conversation(
 
         world,
 
-        a_id,
-
-        b_id,
+        participant_ids,
 
         topic,
 
@@ -335,13 +324,28 @@ def add_message(
     # =====================================================
     # SWAP TURN
     # =====================================================
+    # Real round-robin (the old "first non-speaker in list order" logic
+    # always handed the turn to the same person in a 3+-participant
+    # conversation, never actually cycling past them) -- advance to
+    # whoever comes after the SPEAKER in participants order, wrapping
+    # around. For the 2-participant case this is identical to before
+    # (the only other participant, every time).
 
-    for p in conv["participants"]:
+    participants = conv["participants"]
 
-        if p != speaker_id:
+    if speaker_id in participants and len(participants) > 1:
 
-            conv["turn_owner"] = p
-            break
+        idx = participants.index(speaker_id)
+        conv["turn_owner"] = participants[(idx + 1) % len(participants)]
+
+    else:
+
+        for p in participants:
+
+            if p != speaker_id:
+
+                conv["turn_owner"] = p
+                break
 
     # =====================================================
     # MEMORY STORAGE

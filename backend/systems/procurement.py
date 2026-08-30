@@ -56,37 +56,42 @@ def choose_procurement_method(c, request):
 # CHOOSE FROM CATALOG
 # =========================================================
 
-def choose_from_catalog(c, world, category, budget=None, item_type=None):
+def choose_from_catalog(c, world, category, budget=None, item_type=None, occasion=None):
     """
-    Pick the best catalog entry within budget, scored by character traits.
+    Pick a catalog entry within budget via systems/choice.py -- the
+    character's own traits already ride along in that call's prompt, so
+    a "frugal" or "materialistic" character reasons about price the same
+    way the old hand-rolled scoring approximated, without a separate
+    heuristic to keep in sync. budget_friendly/premium tags (relative to
+    this candidate pool's own price spread) let an occasion like
+    "frugal" or "splurge" narrow the pool if a caller passes one.
     Returns the full catalog entry dict (with 'id' key), or None.
     """
     money = c.get("money", 0)
     if budget is None:
         budget = money
 
-    candidates = browse_catalog(world, category=category, budget=budget, item_type=item_type)
+    candidates = browse_catalog(world, category=category, budget=budget, item_type=item_type,
+                                 body_model=c.get("model"))
     if not candidates:
         return None
 
-    traits = c.get("traits", [])
-    scored = []
-
+    prices = [e["current_price"] for e in candidates]
+    lo, hi = min(prices), max(prices)
+    options = []
     for entry in candidates:
-        score   = 1.0
-        price   = entry["current_price"]
-        quality = 0.5  # catalog entries don't have quality; use price as proxy
+        tags = []
+        if hi > lo:
+            frac = (entry["current_price"] - lo) / (hi - lo)
+            tags.append("budget_friendly" if frac < 0.34 else "premium" if frac > 0.66 else "midrange")
+        options.append({"id": entry["id"], "label": entry.get("name", entry["id"]), "tags": tags,
+                          "_entry": entry})
 
-        if "frugal" in traits:
-            score += 100.0 / max(1.0, price)
-        if "materialistic" in traits:
-            score += price / 500.0
-
-        score += random.uniform(-0.3, 0.3)
-        scored.append((entry, score))
-
-    scored.sort(key=lambda x: x[1], reverse=True)
-    return scored[0][0]
+    from systems.choice import choose
+    picked = choose(c, world, category or "item", options, occasion=occasion)
+    if not picked:
+        return None
+    return picked["_entry"]
 
 
 # =========================================================
@@ -112,10 +117,20 @@ def purchase_from_catalog(c, household, world, catalog_id, method="in_person"):
         return False
 
     price = entry["current_price"]
-    if c.get("money", 0) < price:
-        return False
-
-    c["money"] = round(c["money"] - price, 2)
+    # Plain c["money"] stays the first-preference cash pool (unchanged
+    # behavior for the common case) -- only when that alone can't cover
+    # it do we fall back to the wallet's real cash/bank card/credit card
+    # (systems/personal_items.py::pay_from_wallet(), same fallback order
+    # systems/convenience_store.py's register checkout uses). Previously
+    # this branch just failed the whole purchase outright whenever
+    # c["money"] was short, even if the character was carrying a card
+    # with plenty of room.
+    if c.get("money", 0) >= price:
+        c["money"] = round(c["money"] - price, 2)
+    else:
+        from systems.personal_items import pay_from_wallet
+        if not pay_from_wallet(c, world, price):
+            return False
 
     # --- Container (paint bucket, generic box, backpack, etc.) ---
     if entry["type"] == "container":
@@ -157,9 +172,16 @@ def purchase_from_catalog(c, household, world, catalog_id, method="in_person"):
 
     # --- Discrete item ---
     if method == "online":
-        schedule_delivery_item(household, catalog_id, world)
+        schedule_delivery_item(household, catalog_id, world, buyer_id=c["id"], price=price)
     else:
-        item = make_item(catalog_id)
+        # create_generated_item() is a superset of make_item() -- it only
+        # makes an LLM call when the template has a "content_category"
+        # (book/magazine/dvd/music_disc), so this is safe for every item.
+        from systems.personal_items import create_generated_item
+        item = create_generated_item(catalog_id, world, c=c, owner_id=c["id"])
+        from systems.personal_items import record_item_history
+        record_item_history(item, world, "purchased", by=c["id"], from_source="market_in_person",
+                             price=price)
         add_item(c, item)
 
     return True
@@ -169,13 +191,17 @@ def purchase_from_catalog(c, household, world, catalog_id, method="in_person"):
 # DELIVERY SCHEDULING
 # =========================================================
 
-def schedule_delivery_item(household, catalog_id, world):
+def schedule_delivery_item(household, catalog_id, world, buyer_id=None, price=None):
     world.setdefault("deliveries", []).append({
         "household_id": household["id"],
         "type":         "item",
         "catalog_id":   catalog_id,
         "arrival_tick": world["tick"] + random.randint(12, 48) * 3600,
         "status":       "in_transit",
+        # Carried through to _deliver_item()'s history entry -- who
+        # actually placed the order, not just which household it lands in.
+        "buyer_id":     buyer_id,
+        "price":        price,
     })
 
 
@@ -212,27 +238,31 @@ def process_deliveries(world):
         dtype = delivery.get("type")
 
         if dtype == "item":
-            _deliver_item(h, cid, world)
+            _deliver_item(h, cid, world, buyer_id=delivery.get("buyer_id"), price=delivery.get("price"))
         elif dtype == "prop":
             _deliver_prop(h, cid, world)
 
     world["deliveries"] = remaining
 
 
-def _deliver_item(household, catalog_id, world):
-    """Deposit delivered item into the household owner's inventory."""
-    from systems.personal_items import add_item, make_item
+def _deliver_item(household, catalog_id, world, buyer_id=None, price=None):
+    """Deposit delivered item into the buyer's inventory (falling back to
+    the first available member if the buyer is no longer in this
+    household -- moved out, died, etc. -- since this fires much later
+    than the original order)."""
+    from systems.personal_items import add_item, create_generated_item, record_item_history
     members = household.get("members", [])
     if not members:
         return
-    # Give to first available member
     chars = world.get("characters", {})
-    for cid in members:
-        c = chars.get(cid)
-        if c:
-            item = make_item(catalog_id)
-            add_item(c, item)
-            return
+    recipient = chars.get(buyer_id) if buyer_id in members else None
+    if not recipient:
+        recipient = next((chars[cid] for cid in members if cid in chars), None)
+    if recipient:
+        item = create_generated_item(catalog_id, world, c=recipient, owner_id=recipient["id"])
+        record_item_history(item, world, "purchased", by=buyer_id or recipient["id"],
+                             from_source="market_online", price=price)
+        add_item(recipient, item)
 
 
 def _deliver_prop(household, catalog_id, world):
@@ -254,6 +284,7 @@ def _deliver_prop(household, catalog_id, world):
         "id":          f"prop_{catalog_id}_{uuid.uuid4().hex[:6]}",
         "template":    catalog_id,
         "building_id": home_id,
+        "household_id": household["id"],
         "x":           0,
         "y":           0,
         "rotation":    0,

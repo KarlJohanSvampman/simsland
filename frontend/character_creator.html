@@ -646,6 +646,12 @@ button:hover { background: #556170; }
       </div>
 
       <h4 class="outfitSectionTitle">Starting Inventory</h4>
+      <div class="deriveNote" style="margin:0 0 8px;">
+        Every character automatically gets a Wallet ($100 cash), ID Card,
+        and Bank Card at spawn regardless of what's picked below — that
+        part isn't optional, so there's no need to add them here. Use this
+        picker for anything else the character should start carrying.
+      </div>
       <div id="inventoryPicker"></div>
     </div>
 
@@ -754,6 +760,20 @@ button:hover { background: #556170; }
         <input type="text" id="fldHouseAddress" placeholder="123 Placeholder Street" style="max-width:280px;" />
       </div>
       <button id="btnSaveAddress" style="display:none;" onclick="window.saveHouseAddress()">Save Address</button>
+
+      <h4 class="outfitSectionTitle">Finances</h4>
+      <div class="deriveNote" style="margin:0 0 12px;">
+        Read-only — every spawned character automatically receives a Wallet
+        ($100 cash), an ID Card, and a Bank Card at a random starter bank
+        (JPMC, Morgan Stanley, Barclays, TD Bank, Bank of America); credit
+        score is calculated from age/employment. None of this is stored on
+        the template itself, so it only appears below once this household
+        has real spawned members in the running simulation. Loans are
+        recorded per-household, not per-character.
+      </div>
+      <div id="householdFinancesMembers"></div>
+      <h4 class="outfitSectionTitle" style="margin-top:14px;">Loans</h4>
+      <div id="householdFinancesLoans"></div>
     </div>
 
     <!-- LLM CONFIG (stub) -->

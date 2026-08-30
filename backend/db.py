@@ -6,6 +6,7 @@ from core.cache import get_char_cache, set_char_cache
 from systems.schema_defaults import (
     ensure_world_defaults,
     ensure_character_defaults,
+    ensure_prop_template_fields,
 )
 from world.generate_world import generate_initial_world
 from systems.prop_index import (
@@ -300,6 +301,8 @@ def load_world(sim_id):
         if "definitions" not in cached:
             cached["definitions"] = load_definitions(sim_id)
 
+        ensure_prop_template_fields(cached, cached["definitions"])
+
         return cached
 
     # =====================================
@@ -348,7 +351,7 @@ def load_world(sim_id):
     ).values():
 
         ensure_character_defaults(
-            c
+            c, world=world
         )
     # =====================================
     # LOAD DEFINITIONS
@@ -361,6 +364,7 @@ def load_world(sim_id):
     # expects world["definitions"] populated even though it's excluded
     # from what actually gets persisted.
     world["definitions"] = definitions
+    ensure_prop_template_fields(world, definitions)
     build_world_geometry(
         sim_id,
         world

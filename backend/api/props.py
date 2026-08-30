@@ -54,6 +54,19 @@ def create_prop(
         definitions
     )
 
+    # anchors/storage/footprint/category were never actually copied from
+    # the template here -- every prop created through this endpoint ended
+    # up with none of them, which meant find_nearest_anchor() (props.py)
+    # could never find any anchor on it (interaction gated: eat/drink/
+    # sit/shower/... all silently failed to start) and
+    # containers.ensure_prop_storage() had nothing to lazily stamp from.
+    # deepcopy the template's anchors so each prop instance gets its own
+    # mutable copy -- reserve_anchor() mutates anchor["occupied_by"]
+    # directly, and prop instances of the same template must not share
+    # that state.
+    import copy
+    template = definitions.get("prop_templates", {}).get(payload["template"], {})
+
     prop = {
         "id": str(uuid4()),
 
@@ -67,7 +80,13 @@ def create_prop(
         "rotation": payload.get(
             "rotation",
             0
-        )
+        ),
+
+        "anchors":   copy.deepcopy(template.get("anchors", [])),
+        "footprint": template.get("footprint"),
+        "category":  template.get("category"),
+        "storage":   copy.deepcopy(template.get("storage")),
+        "catalog":   template.get("catalog"),
     }
 
     with world_lock():

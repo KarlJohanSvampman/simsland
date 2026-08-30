@@ -1,5 +1,103 @@
 {
   "prop_templates": {
+    "register": {
+      "name": "Register",
+      "category": "commercial",
+      "footprint": [
+        {
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "dx": 1,
+          "dy": 0
+        }
+      ],
+      "anchors": [
+        {
+          "name": "anchor_checkout",
+          "interaction": "checkout",
+          "dx": 0,
+          "dy": 1
+        },
+        {
+          "name": "anchor_staff_register",
+          "interaction": "staff_register",
+          "dx": 1,
+          "dy": -1
+        }
+      ],
+      "catalog": [
+        {
+          "item_template": "milk",
+          "price": 4.5
+        },
+        {
+          "item_template": "bread",
+          "price": 4.2
+        },
+        {
+          "item_template": "candy_bar",
+          "price": 2.5
+        },
+        {
+          "item_template": "bag_of_chips_open",
+          "price": 5.0
+        },
+        {
+          "item_template": "can_of_soda",
+          "price": 3.5
+        },
+        {
+          "item_template": "bottle_of_beer",
+          "price": 5.5
+        },
+        {
+          "item_template": "cigarette_pack",
+          "price": 16.0
+        },
+        {
+          "item_template": "lighter",
+          "price": 4.5
+        },
+        {
+          "item_template": "coffee_beans",
+          "price": 16.0
+        }
+      ],
+      "storage": null,
+      "tags": [
+        "commercial",
+        "retail",
+        "register"
+      ],
+      "icon": "commercial"
+    },
+    "atm": {
+      "name": "ATM",
+      "category": "public_fixture",
+      "footprint": [
+        {
+          "dx": 0,
+          "dy": 0
+        }
+      ],
+      "anchors": [
+        {
+          "name": "anchor_use_atm",
+          "interaction": "use_atm",
+          "dx": 0,
+          "dy": 1
+        }
+      ],
+      "public": true,
+      "storage": null,
+      "tags": [
+        "public_fixture",
+        "finance"
+      ],
+      "icon": "public_fixture"
+    },
     "chair_modern_a": {
       "category": "furniture",
       "footprint": [
@@ -4557,6 +4655,76 @@
     }
   },
   "item_templates": {
+    "wallet": {
+      "name": "Wallet",
+      "category": "misc",
+      "size": 1,
+      "base_price": 20,
+      "stackable": false,
+      "consumable": false,
+      "container": {
+        "slots": 6,
+        "accepted_categories": [
+          "document",
+          "financial"
+        ]
+      },
+      "icon": "misc"
+    },
+    "id_card": {
+      "name": "ID Card",
+      "category": "document",
+      "size": 1,
+      "base_price": 0,
+      "stackable": false,
+      "consumable": false,
+      "icon": "document"
+    },
+    "bank_card": {
+      "name": "Bank Card",
+      "category": "financial",
+      "size": 1,
+      "base_price": 0,
+      "stackable": false,
+      "consumable": false,
+      "icon": "financial"
+    },
+    "credit_card": {
+      "name": "Credit Card",
+      "category": "financial",
+      "size": 1,
+      "base_price": 0,
+      "stackable": false,
+      "consumable": false,
+      "icon": "financial"
+    },
+    "house_key": {
+      "name": "House Key",
+      "category": "key",
+      "size": 1,
+      "base_price": 5,
+      "stackable": false,
+      "consumable": false,
+      "icon": "key"
+    },
+    "car_key": {
+      "name": "Car Key",
+      "category": "key",
+      "size": 1,
+      "base_price": 5,
+      "stackable": false,
+      "consumable": false,
+      "icon": "key"
+    },
+    "mailbox_key": {
+      "name": "Mailbox Key",
+      "category": "key",
+      "size": 1,
+      "base_price": 2,
+      "stackable": false,
+      "consumable": false,
+      "icon": "key"
+    },
     "toilet_paper_roll": {
       "name": "Toilet Paper Roll",
       "category": "hygiene",
@@ -5112,7 +5280,12 @@
       "price_new": 30,
       "price_range": "budget",
       "used_price": 12,
-      "icon": "clothing"
+      "icon": "clothing",
+      "tags": [
+        "casual",
+        "sport",
+        "outdoor"
+      ]
     },
     "beanie": {
       "name": "Beanie",
@@ -5128,7 +5301,12 @@
       "price_new": 25,
       "price_range": "budget",
       "used_price": 10,
-      "icon": "clothing"
+      "icon": "clothing",
+      "tags": [
+        "casual",
+        "cold_weather",
+        "winter"
+      ]
     },
     "hair_short_brown": {
       "name": "Short Brown Hair",
@@ -5174,7 +5352,12 @@
       "price_new": 30,
       "price_range": "budget",
       "used_price": 12,
-      "icon": "clothing"
+      "icon": "clothing",
+      "tags": [
+        "cold_weather",
+        "winter",
+        "casual"
+      ]
     },
     "jacket_hoodie": {
       "name": "Hoodie",
@@ -5191,7 +5374,11 @@
       "price_new": 75,
       "price_range": "mid",
       "used_price": 28,
-      "icon": "clothing"
+      "icon": "clothing",
+      "tags": [
+        "casual",
+        "sport"
+      ]
     },
     "jacket_denim": {
       "name": "Denim Jacket",
@@ -5208,7 +5395,10 @@
       "price_new": 80,
       "price_range": "mid",
       "used_price": 30,
-      "icon": "clothing"
+      "icon": "clothing",
+      "tags": [
+        "casual"
+      ]
     },
     "jacket_winter": {
       "name": "Winter Coat",
@@ -5224,7 +5414,11 @@
       "price_new": 130,
       "price_range": "premium",
       "used_price": 48,
-      "icon": "clothing"
+      "icon": "clothing",
+      "tags": [
+        "cold_weather",
+        "winter"
+      ]
     },
     "tshirt_white": {
       "name": "White T-Shirt",
@@ -5277,7 +5471,10 @@
           "hex": "#F1C40F"
         }
       ],
-      "icon": "clothing"
+      "icon": "clothing",
+      "tags": [
+        "casual"
+      ]
     },
     "tshirt_black": {
       "name": "Black T-Shirt",
@@ -5293,7 +5490,10 @@
       "price_new": 20,
       "price_range": "budget",
       "used_price": 6,
-      "icon": "clothing"
+      "icon": "clothing",
+      "tags": [
+        "casual"
+      ]
     },
     "shirt_flannel": {
       "name": "Flannel Shirt",
@@ -5309,7 +5509,11 @@
       "price_new": 50,
       "price_range": "mid",
       "used_price": 18,
-      "icon": "clothing"
+      "icon": "clothing",
+      "tags": [
+        "casual",
+        "outdoor"
+      ]
     },
     "shirt_dress": {
       "name": "Dress Shirt",
@@ -5325,7 +5529,11 @@
       "price_new": 70,
       "price_range": "mid",
       "used_price": 25,
-      "icon": "clothing"
+      "icon": "clothing",
+      "tags": [
+        "formal",
+        "work"
+      ]
     },
     "top_crop": {
       "name": "Crop Top",
@@ -5341,7 +5549,11 @@
       "price_new": 28,
       "price_range": "budget",
       "used_price": 9,
-      "icon": "clothing"
+      "icon": "clothing",
+      "tags": [
+        "casual",
+        "summer"
+      ]
     },
     "tank_top": {
       "name": "Tank Top",
@@ -5357,7 +5569,34 @@
       "price_new": 18,
       "price_range": "budget",
       "used_price": 6,
-      "icon": "clothing"
+      "icon": "clothing",
+      "tags": [
+        "casual",
+        "summer",
+        "sport"
+      ]
+    },
+    "boot_jeans": {
+      "name": "Boot Jeans",
+      "category": "clothing",
+      "slot": "legs",
+      "bone": "Hips",
+      "model": "/resources/items/clothing/Boot Jeans/boot_jeans.glb",
+      "shared_skeleton": true,
+      "body_model": "adult_male",
+      "base_price": 68,
+      "dirty": false,
+      "stackable": true,
+      "max_stack": 3,
+      "style": 0.6,
+      "size": 2,
+      "price_new": 68,
+      "price_range": "mid",
+      "used_price": 26,
+      "icon": "clothing",
+      "tags": [
+        "casual"
+      ]
     },
     "jeans_blue": {
       "name": "Blue Jeans",
@@ -5373,7 +5612,10 @@
       "price_new": 65,
       "price_range": "mid",
       "used_price": 24,
-      "icon": "clothing"
+      "icon": "clothing",
+      "tags": [
+        "casual"
+      ]
     },
     "jeans_black": {
       "name": "Black Jeans",
@@ -5389,7 +5631,11 @@
       "price_new": 65,
       "price_range": "mid",
       "used_price": 24,
-      "icon": "clothing"
+      "icon": "clothing",
+      "tags": [
+        "casual",
+        "work"
+      ]
     },
     "sweatpants": {
       "name": "Sweatpants",
@@ -5405,7 +5651,12 @@
       "price_new": 40,
       "price_range": "budget",
       "used_price": 14,
-      "icon": "clothing"
+      "icon": "clothing",
+      "tags": [
+        "casual",
+        "sleep",
+        "sport"
+      ]
     },
     "shorts_casual": {
       "name": "Casual Shorts",
@@ -5421,7 +5672,11 @@
       "price_new": 28,
       "price_range": "budget",
       "used_price": 10,
-      "icon": "clothing"
+      "icon": "clothing",
+      "tags": [
+        "casual",
+        "summer"
+      ]
     },
     "dress_casual": {
       "name": "Casual Dress",
@@ -5436,7 +5691,11 @@
       "price_new": 60,
       "price_range": "mid",
       "used_price": 22,
-      "icon": "clothing"
+      "icon": "clothing",
+      "tags": [
+        "casual",
+        "formal"
+      ]
     },
     "suit_trousers": {
       "name": "Suit Trousers",
@@ -5452,7 +5711,11 @@
       "price_new": 95,
       "price_range": "premium",
       "used_price": 35,
-      "icon": "clothing"
+      "icon": "clothing",
+      "tags": [
+        "formal",
+        "work"
+      ]
     },
     "pyjama_bottoms": {
       "name": "Pyjama Bottoms",
@@ -5468,7 +5731,10 @@
       "price_new": 32,
       "price_range": "budget",
       "used_price": 10,
-      "icon": "clothing"
+      "icon": "clothing",
+      "tags": [
+        "sleep"
+      ]
     },
     "underwear_basic": {
       "name": "Underwear",
@@ -5484,7 +5750,10 @@
       "price_new": 12,
       "price_range": "budget",
       "used_price": 0,
-      "icon": "clothing"
+      "icon": "clothing",
+      "tags": [
+        "underwear"
+      ]
     },
     "boxer_shorts": {
       "name": "Boxer Shorts",
@@ -5500,7 +5769,11 @@
       "price_new": 15,
       "price_range": "budget",
       "used_price": 0,
-      "icon": "clothing"
+      "icon": "clothing",
+      "tags": [
+        "underwear",
+        "sleep"
+      ]
     },
     "socks_white": {
       "name": "White Socks",
@@ -5517,7 +5790,11 @@
       "price_new": 8,
       "price_range": "budget",
       "used_price": 2,
-      "icon": "clothing"
+      "icon": "clothing",
+      "tags": [
+        "casual",
+        "sport"
+      ]
     },
     "socks_ankle": {
       "name": "Ankle Socks",
@@ -5534,7 +5811,11 @@
       "price_new": 10,
       "price_range": "budget",
       "used_price": 3,
-      "icon": "clothing"
+      "icon": "clothing",
+      "tags": [
+        "casual",
+        "sport"
+      ]
     },
     "sneakers_white": {
       "name": "White Sneakers",
@@ -5550,7 +5831,10 @@
       "price_new": 70,
       "price_range": "mid",
       "used_price": 25,
-      "icon": "clothing"
+      "icon": "clothing",
+      "tags": [
+        "casual"
+      ]
     },
     "shoes_casual": {
       "name": "Casual Shoes",
@@ -5566,7 +5850,10 @@
       "price_new": 60,
       "price_range": "mid",
       "used_price": 22,
-      "icon": "clothing"
+      "icon": "clothing",
+      "tags": [
+        "casual"
+      ]
     },
     "shoes_dress": {
       "name": "Dress Shoes",
@@ -5582,7 +5869,11 @@
       "price_new": 100,
       "price_range": "mid",
       "used_price": 35,
-      "icon": "clothing"
+      "icon": "clothing",
+      "tags": [
+        "formal",
+        "work"
+      ]
     },
     "slippers": {
       "name": "Slippers",
@@ -5598,7 +5889,11 @@
       "price_new": 22,
       "price_range": "budget",
       "used_price": 8,
-      "icon": "clothing"
+      "icon": "clothing",
+      "tags": [
+        "sleep",
+        "home"
+      ]
     },
     "gloves_winter": {
       "name": "Winter Gloves",
@@ -5615,7 +5910,11 @@
       "price_new": 32,
       "price_range": "budget",
       "used_price": 12,
-      "icon": "clothing"
+      "icon": "clothing",
+      "tags": [
+        "cold_weather",
+        "winter"
+      ]
     },
     "watch_casual": {
       "name": "Casual Watch",
@@ -5630,7 +5929,10 @@
       "price_new": 55,
       "price_range": "mid",
       "used_price": 22,
-      "icon": "clothing"
+      "icon": "clothing",
+      "tags": [
+        "casual"
+      ]
     },
     "backpack": {
       "name": "Backpack",
@@ -5649,7 +5951,12 @@
         "slots": 10,
         "accepted_categories": null
       },
-      "icon": "clothing"
+      "icon": "clothing",
+      "tags": [
+        "casual",
+        "school",
+        "travel"
+      ]
     },
     "smartphone_budget": {
       "name": "Budget Smartphone",
@@ -5962,7 +6269,11 @@
       "price_new": 95,
       "price_range": "mid",
       "used_price": 35,
-      "icon": "clothing"
+      "icon": "clothing",
+      "tags": [
+        "outdoor",
+        "casual"
+      ]
     },
     "water_bottle": {
       "name": "Water Bottle",
@@ -6165,7 +6476,11 @@
       "price_new": 25,
       "price_range": "budget",
       "used_price": 9,
-      "icon": "clothing"
+      "icon": "clothing",
+      "tags": [
+        "casual",
+        "cold_weather"
+      ]
     },
     "climbing_gear": {
       "name": "Climbing Gear",
@@ -6272,7 +6587,11 @@
       "price_new": 70,
       "price_range": "mid",
       "used_price": 25,
-      "icon": "clothing"
+      "icon": "clothing",
+      "tags": [
+        "sport",
+        "martial_arts"
+      ]
     },
     "belt": {
       "name": "Martial Arts Belt",
@@ -6286,7 +6605,12 @@
       "price_new": 28,
       "price_range": "budget",
       "used_price": 10,
-      "icon": "clothing"
+      "icon": "clothing",
+      "tags": [
+        "casual",
+        "formal",
+        "work"
+      ]
     },
     "foil": {
       "name": "Fencing Foil",
@@ -6364,7 +6688,11 @@
       "price_new": 90,
       "price_range": "mid",
       "used_price": 32,
-      "icon": "clothing"
+      "icon": "clothing",
+      "tags": [
+        "casual",
+        "outdoor"
+      ]
     },
     "goggles": {
       "name": "Goggles",
@@ -6387,7 +6715,12 @@
       "price_new": 190,
       "price_range": "premium",
       "used_price": 70,
-      "icon": "clothing"
+      "icon": "clothing",
+      "tags": [
+        "cold_weather",
+        "winter",
+        "outdoor"
+      ]
     },
     "surfboard": {
       "name": "Surfboard",
@@ -6410,7 +6743,11 @@
       "price_new": 230,
       "price_range": "premium",
       "used_price": 80,
-      "icon": "clothing"
+      "icon": "clothing",
+      "tags": [
+        "swim",
+        "sport"
+      ]
     },
     "surf_wax": {
       "name": "Surf Wax",
@@ -6480,7 +6817,11 @@
       "price_new": 48,
       "price_range": "mid",
       "used_price": 15,
-      "icon": "clothing"
+      "icon": "clothing",
+      "tags": [
+        "sport",
+        "casual"
+      ]
     },
     "football": {
       "name": "Football",
@@ -6503,7 +6844,11 @@
       "price_new": 65,
       "price_range": "mid",
       "used_price": 22,
-      "icon": "clothing"
+      "icon": "clothing",
+      "tags": [
+        "sport",
+        "athletic"
+      ]
     },
     "shin_guards": {
       "name": "Shin Guards",
@@ -6527,7 +6872,10 @@
       "price_new": 10,
       "price_range": "budget",
       "used_price": 2,
-      "icon": "clothing"
+      "icon": "clothing",
+      "tags": [
+        "casual"
+      ]
     },
     "pads": {
       "name": "Protective Pads",
@@ -6588,7 +6936,12 @@
       "price_new": 85,
       "price_range": "mid",
       "used_price": 30,
-      "icon": "clothing"
+      "icon": "clothing",
+      "tags": [
+        "sport",
+        "athletic",
+        "casual"
+      ]
     },
     "volleyball": {
       "name": "Volleyball",
@@ -6640,7 +6993,12 @@
       "price_new": 75,
       "price_range": "mid",
       "used_price": 26,
-      "icon": "clothing"
+      "icon": "clothing",
+      "tags": [
+        "sport",
+        "athletic",
+        "casual"
+      ]
     },
     "golf_clubs": {
       "name": "Golf Clubs",
@@ -6674,7 +7032,10 @@
       "price_new": 22,
       "price_range": "budget",
       "used_price": 8,
-      "icon": "clothing"
+      "icon": "clothing",
+      "tags": [
+        "sport"
+      ]
     },
     "tees": {
       "name": "Golf Tees",
@@ -6736,7 +7097,11 @@
       "price_new": 45,
       "price_range": "mid",
       "used_price": 14,
-      "icon": "clothing"
+      "icon": "clothing",
+      "tags": [
+        "swim",
+        "summer"
+      ]
     },
     "swim_cap": {
       "name": "Swim Cap",
@@ -6751,7 +7116,10 @@
       "price_new": 18,
       "price_range": "budget",
       "used_price": 6,
-      "icon": "clothing"
+      "icon": "clothing",
+      "tags": [
+        "swim"
+      ]
     },
     "running_shoes": {
       "name": "Running Shoes",
@@ -6765,7 +7133,12 @@
       "price_new": 95,
       "price_range": "mid",
       "used_price": 32,
-      "icon": "clothing"
+      "icon": "clothing",
+      "tags": [
+        "sport",
+        "athletic",
+        "casual"
+      ]
     },
     "gym_shoes": {
       "name": "Gym Shoes",
@@ -6779,7 +7152,12 @@
       "price_new": 70,
       "price_range": "mid",
       "used_price": 24,
-      "icon": "clothing"
+      "icon": "clothing",
+      "tags": [
+        "sport",
+        "athletic",
+        "casual"
+      ]
     },
     "yoga_mat": {
       "name": "Yoga Mat",
@@ -7005,7 +7383,11 @@
       "price_new": 80,
       "price_range": "mid",
       "used_price": 20,
-      "icon": "clothing"
+      "icon": "clothing",
+      "tags": [
+        "costume",
+        "special_event"
+      ]
     },
     "period_weapon": {
       "name": "Period Weapon (Replica)",
@@ -7074,6 +7456,77 @@
       "max_stack": 6,
       "consumable": false,
       "icon": "books_media"
+    },
+    "book": {
+      "name": "Book",
+      "category": "books_media",
+      "size": 1,
+      "base_price": 15,
+      "stackable": false,
+      "consumable": false,
+      "content_category": "book",
+      "model": "/resources/items/media/book/book.glb",
+      "icon": "books_media",
+      "tags": [
+        "reading"
+      ]
+    },
+    "magazine": {
+      "name": "Magazine",
+      "category": "books_media",
+      "size": 1,
+      "base_price": 6,
+      "stackable": false,
+      "consumable": false,
+      "content_category": "magazine",
+      "model": "/resources/items/media/magazine/magazine.glb",
+      "icon": "books_media",
+      "tags": [
+        "reading"
+      ]
+    },
+    "newspaper": {
+      "name": "Newspaper",
+      "category": "books_media",
+      "size": 1,
+      "base_price": 2,
+      "stackable": false,
+      "consumable": false,
+      "model": "/resources/items/media/newspaper/newspaper.glb",
+      "icon": "books_media",
+      "tags": [
+        "reading",
+        "news"
+      ]
+    },
+    "dvd": {
+      "name": "DVD",
+      "category": "books_media",
+      "size": 1,
+      "base_price": 12,
+      "stackable": false,
+      "consumable": false,
+      "content_category": "dvd",
+      "model": "/resources/items/media/dvd/dvd.glb",
+      "icon": "books_media",
+      "tags": [
+        "entertainment"
+      ]
+    },
+    "music_disc": {
+      "name": "Music CD",
+      "category": "books_media",
+      "size": 1,
+      "base_price": 10,
+      "stackable": false,
+      "consumable": false,
+      "content_category": "music_disc",
+      "model": "/resources/items/media/music_disc/music_disc.glb",
+      "icon": "books_media",
+      "tags": [
+        "entertainment",
+        "music"
+      ]
     },
     "pot": {
       "name": "Pot",
@@ -7817,7 +8270,11 @@
       "price_new": 140,
       "price_range": "premium",
       "used_price": 50,
-      "icon": "clothing"
+      "icon": "clothing",
+      "tags": [
+        "sport",
+        "formal"
+      ]
     },
     "riding_gear": {
       "name": "Riding Gear",
@@ -7831,7 +8288,10 @@
       "price_new": 220,
       "price_range": "premium",
       "used_price": 75,
-      "icon": "clothing"
+      "icon": "clothing",
+      "tags": [
+        "sport"
+      ]
     },
     "rolling_pin": {
       "name": "Rolling Pin",
@@ -8357,7 +8817,12 @@
       "price_new": 50,
       "price_range": "mid",
       "used_price": 16,
-      "icon": "clothing"
+      "icon": "clothing",
+      "tags": [
+        "sleep",
+        "home",
+        "casual"
+      ]
     },
     "air_freshener": {
       "name": "Air Freshener",
@@ -8462,7 +8927,11 @@
       "price_new": 8,
       "price_range": "budget",
       "used_price": 3,
-      "icon": "clothing"
+      "icon": "clothing",
+      "tags": [
+        "formal",
+        "work"
+      ]
     },
     "lint_roller": {
       "name": "Lint Roller",
@@ -8478,7 +8947,11 @@
       "price_new": 6,
       "price_range": "budget",
       "used_price": 2,
-      "icon": "clothing"
+      "icon": "clothing",
+      "tags": [
+        "work",
+        "formal"
+      ]
     },
     "handheld_mirror": {
       "name": "Handheld Mirror",
@@ -8501,7 +8974,12 @@
       "price_new": 32,
       "price_range": "budget",
       "used_price": 12,
-      "icon": "clothing"
+      "icon": "clothing",
+      "tags": [
+        "casual",
+        "summer",
+        "outdoor"
+      ]
     },
     "calculator": {
       "name": "Calculator",
@@ -9053,7 +9531,11 @@
       "max_stack": 4,
       "style": 0.68,
       "size": 1,
-      "icon": "clothing"
+      "icon": "clothing",
+      "tags": [
+        "formal",
+        "casual"
+      ]
     },
     "bucket_hat": {
       "name": "Bucket Hat",
@@ -9069,7 +9551,12 @@
       "max_stack": 4,
       "style": 0.42,
       "size": 1,
-      "icon": "clothing"
+      "icon": "clothing",
+      "tags": [
+        "casual",
+        "summer",
+        "outdoor"
+      ]
     },
     "wide_brim_hat": {
       "name": "Wide Brim Hat",
@@ -9085,7 +9572,12 @@
       "max_stack": 4,
       "style": 0.55,
       "size": 1,
-      "icon": "clothing"
+      "icon": "clothing",
+      "tags": [
+        "casual",
+        "summer",
+        "outdoor"
+      ]
     },
     "hair_curly_auburn": {
       "name": "Curly Auburn Hair",
@@ -9169,7 +9661,11 @@
       "max_stack": 6,
       "style": 0.2,
       "size": 1,
-      "icon": "clothing"
+      "icon": "clothing",
+      "tags": [
+        "casual",
+        "work"
+      ]
     },
     "sports_bra": {
       "name": "Sports Bra",
@@ -9185,7 +9681,11 @@
       "max_stack": 5,
       "style": 0.48,
       "size": 1,
-      "icon": "clothing"
+      "icon": "clothing",
+      "tags": [
+        "sport",
+        "athletic"
+      ]
     },
     "cami_top": {
       "name": "Cami Top",
@@ -9201,7 +9701,12 @@
       "max_stack": 5,
       "style": 0.38,
       "size": 1,
-      "icon": "clothing"
+      "icon": "clothing",
+      "tags": [
+        "casual",
+        "summer",
+        "sleep"
+      ]
     },
     "thermal_undershirt": {
       "name": "Thermal Undershirt",
@@ -9218,7 +9723,11 @@
       "style": 0.22,
       "size": 1,
       "warmth": 0.45,
-      "icon": "clothing"
+      "icon": "clothing",
+      "tags": [
+        "cold_weather",
+        "winter"
+      ]
     },
     "compression_shirt": {
       "name": "Compression Shirt",
@@ -9234,7 +9743,12 @@
       "max_stack": 4,
       "style": 0.32,
       "size": 1,
-      "icon": "clothing"
+      "icon": "clothing",
+      "tags": [
+        "sport",
+        "athletic",
+        "work"
+      ]
     },
     "socks_knee_high": {
       "name": "Knee-High Socks",
@@ -9250,7 +9764,10 @@
       "max_stack": 8,
       "style": 0.4,
       "size": 1,
-      "icon": "clothing"
+      "icon": "clothing",
+      "tags": [
+        "casual"
+      ]
     },
     "socks_no_show": {
       "name": "No-Show Socks",
@@ -9266,7 +9783,11 @@
       "max_stack": 10,
       "style": 0.2,
       "size": 1,
-      "icon": "clothing"
+      "icon": "clothing",
+      "tags": [
+        "casual",
+        "sport"
+      ]
     },
     "socks_dress": {
       "name": "Dress Socks",
@@ -9282,7 +9803,11 @@
       "max_stack": 8,
       "style": 0.3,
       "size": 1,
-      "icon": "clothing"
+      "icon": "clothing",
+      "tags": [
+        "formal",
+        "work"
+      ]
     },
     "mittens": {
       "name": "Wool Mittens",
@@ -9299,7 +9824,11 @@
       "style": 0.35,
       "size": 1,
       "warmth": 0.65,
-      "icon": "clothing"
+      "icon": "clothing",
+      "tags": [
+        "cold_weather",
+        "winter"
+      ]
     },
     "fingerless_gloves": {
       "name": "Fingerless Gloves",
@@ -9315,7 +9844,11 @@
       "max_stack": 4,
       "style": 0.52,
       "size": 1,
-      "icon": "clothing"
+      "icon": "clothing",
+      "tags": [
+        "casual",
+        "cold_weather"
+      ]
     },
     "work_gloves": {
       "name": "Work Gloves",
@@ -9331,7 +9864,11 @@
       "max_stack": 4,
       "style": 0.22,
       "size": 1,
-      "icon": "clothing"
+      "icon": "clothing",
+      "tags": [
+        "work",
+        "outdoor"
+      ]
     },
     "necktie": {
       "name": "Silk Necktie",
@@ -9347,7 +9884,11 @@
       "max_stack": 4,
       "style": 0.78,
       "size": 1,
-      "icon": "clothing"
+      "icon": "clothing",
+      "tags": [
+        "formal",
+        "work"
+      ]
     },
     "bow_tie": {
       "name": "Bow Tie",
@@ -9363,7 +9904,11 @@
       "max_stack": 4,
       "style": 0.72,
       "size": 1,
-      "icon": "clothing"
+      "icon": "clothing",
+      "tags": [
+        "formal",
+        "work"
+      ]
     },
     "necklace_chain": {
       "name": "Chain Necklace",
@@ -9379,7 +9924,11 @@
       "max_stack": 4,
       "style": 0.56,
       "size": 1,
-      "icon": "clothing"
+      "icon": "clothing",
+      "tags": [
+        "casual",
+        "formal"
+      ]
     },
     "choker": {
       "name": "Velvet Choker",
@@ -9395,7 +9944,11 @@
       "max_stack": 4,
       "style": 0.52,
       "size": 1,
-      "icon": "clothing"
+      "icon": "clothing",
+      "tags": [
+        "casual",
+        "formal"
+      ]
     },
     "bandana": {
       "name": "Bandana",
@@ -9411,7 +9964,11 @@
       "max_stack": 5,
       "style": 0.36,
       "size": 1,
-      "icon": "clothing"
+      "icon": "clothing",
+      "tags": [
+        "casual",
+        "western"
+      ]
     },
     "bracelet_leather": {
       "name": "Leather Bracelet",
@@ -9427,7 +9984,10 @@
       "max_stack": 1,
       "style": 0.46,
       "size": 1,
-      "icon": "clothing"
+      "icon": "clothing",
+      "tags": [
+        "casual"
+      ]
     },
     "sports_watch": {
       "name": "Sports Watch",
@@ -9443,7 +10003,11 @@
       "max_stack": 1,
       "style": 0.52,
       "size": 1,
-      "icon": "clothing"
+      "icon": "clothing",
+      "tags": [
+        "sport",
+        "athletic"
+      ]
     },
     "smartwatch": {
       "name": "Smartwatch",
@@ -9459,7 +10023,12 @@
       "max_stack": 1,
       "style": 0.68,
       "size": 1,
-      "icon": "clothing"
+      "icon": "clothing",
+      "tags": [
+        "casual",
+        "work",
+        "sport"
+      ]
     },
     "bangle": {
       "name": "Metal Bangle",
@@ -9475,7 +10044,11 @@
       "max_stack": 3,
       "style": 0.42,
       "size": 1,
-      "icon": "clothing"
+      "icon": "clothing",
+      "tags": [
+        "casual",
+        "formal"
+      ]
     },
     "friendship_bracelet": {
       "name": "Friendship Bracelet",
@@ -9491,7 +10064,10 @@
       "max_stack": 3,
       "style": 0.3,
       "size": 1,
-      "icon": "clothing"
+      "icon": "clothing",
+      "tags": [
+        "casual"
+      ]
     },
     "purse": {
       "name": "Leather Purse",
@@ -9507,7 +10083,11 @@
       "max_stack": 1,
       "style": 0.68,
       "size": 2,
-      "icon": "clothing"
+      "icon": "clothing",
+      "tags": [
+        "casual",
+        "formal"
+      ]
     },
     "thong": {
       "name": "Thong",
@@ -9523,7 +10103,10 @@
       "max_stack": 8,
       "style": 0.46,
       "size": 1,
-      "icon": "clothing"
+      "icon": "clothing",
+      "tags": [
+        "underwear"
+      ]
     },
     "boyshorts": {
       "name": "Boyshorts",
@@ -9539,7 +10122,10 @@
       "max_stack": 8,
       "style": 0.36,
       "size": 1,
-      "icon": "clothing"
+      "icon": "clothing",
+      "tags": [
+        "underwear"
+      ]
     },
     "bralette": {
       "name": "Soft Bralette",
@@ -9555,7 +10141,11 @@
       "max_stack": 6,
       "style": 0.52,
       "size": 1,
-      "icon": "clothing"
+      "icon": "clothing",
+      "tags": [
+        "underwear",
+        "casual"
+      ]
     },
     "briefs": {
       "name": "Classic Briefs",
@@ -9571,7 +10161,10 @@
       "max_stack": 8,
       "style": 0.22,
       "size": 1,
-      "icon": "clothing"
+      "icon": "clothing",
+      "tags": [
+        "underwear"
+      ]
     },
     "aspirin": {
       "name": "Aspirin",
@@ -21577,7 +22170,12 @@
           "type": "floor",
           "interior": true,
           "floor": true,
-          "walls": {}
+          "walls": {
+            "east": {
+              "type": "door",
+              "material": "paint_white_matt"
+            }
+          }
         },
         "5,4": {
           "type": "floor",
@@ -26500,6 +27098,216 @@
         ]
       },
       "prop_spawns": []
+    },
+    "convenience_store_a": {
+      "tiles": {
+        "0,0": {
+          "type": "floor",
+          "interior": true,
+          "floor": true,
+          "walls": {
+            "north": {
+              "type": "wall",
+              "material": "paint_white_matt"
+            },
+            "west": {
+              "type": "wall",
+              "material": "paint_white_matt"
+            }
+          }
+        },
+        "0,1": {
+          "type": "floor",
+          "interior": true,
+          "floor": true,
+          "walls": {
+            "west": {
+              "type": "wall",
+              "material": "paint_white_matt"
+            }
+          }
+        },
+        "0,2": {
+          "type": "floor",
+          "interior": true,
+          "floor": true,
+          "walls": {
+            "west": {
+              "type": "wall",
+              "material": "paint_white_matt"
+            }
+          }
+        },
+        "0,3": {
+          "type": "floor",
+          "interior": true,
+          "floor": true,
+          "walls": {
+            "south": {
+              "type": "wall",
+              "material": "paint_white_matt"
+            },
+            "west": {
+              "type": "wall",
+              "material": "paint_white_matt"
+            }
+          }
+        },
+        "1,0": {
+          "type": "floor",
+          "interior": true,
+          "floor": true,
+          "walls": {
+            "north": {
+              "type": "wall",
+              "material": "paint_white_matt"
+            }
+          }
+        },
+        "1,1": {
+          "type": "floor",
+          "interior": true,
+          "floor": true,
+          "walls": {}
+        },
+        "1,2": {
+          "type": "floor",
+          "interior": true,
+          "floor": true,
+          "walls": {}
+        },
+        "1,3": {
+          "type": "floor",
+          "interior": true,
+          "floor": true,
+          "walls": {
+            "south": {
+              "type": "wall",
+              "material": "paint_white_matt"
+            }
+          }
+        },
+        "2,0": {
+          "type": "floor",
+          "interior": true,
+          "floor": true,
+          "walls": {
+            "north": {
+              "type": "wall",
+              "material": "paint_white_matt"
+            }
+          }
+        },
+        "2,1": {
+          "type": "floor",
+          "interior": true,
+          "floor": true,
+          "walls": {}
+        },
+        "2,2": {
+          "type": "floor",
+          "interior": true,
+          "floor": true,
+          "walls": {}
+        },
+        "2,3": {
+          "type": "floor",
+          "interior": true,
+          "floor": true,
+          "walls": {
+            "south": {
+              "type": "door",
+              "material": "paint_white_matt"
+            }
+          }
+        },
+        "3,0": {
+          "type": "floor",
+          "interior": true,
+          "floor": true,
+          "walls": {
+            "north": {
+              "type": "wall",
+              "material": "paint_white_matt"
+            }
+          }
+        },
+        "3,1": {
+          "type": "floor",
+          "interior": true,
+          "floor": true,
+          "walls": {}
+        },
+        "3,2": {
+          "type": "floor",
+          "interior": true,
+          "floor": true,
+          "walls": {}
+        },
+        "3,3": {
+          "type": "floor",
+          "interior": true,
+          "floor": true,
+          "walls": {
+            "south": {
+              "type": "wall",
+              "material": "paint_white_matt"
+            }
+          }
+        },
+        "4,0": {
+          "type": "floor",
+          "interior": true,
+          "floor": true,
+          "walls": {
+            "north": {
+              "type": "wall",
+              "material": "paint_white_matt"
+            },
+            "east": {
+              "type": "wall",
+              "material": "paint_white_matt"
+            }
+          }
+        },
+        "4,1": {
+          "type": "floor",
+          "interior": true,
+          "floor": true,
+          "walls": {
+            "east": {
+              "type": "wall",
+              "material": "paint_white_matt"
+            }
+          }
+        },
+        "4,2": {
+          "type": "floor",
+          "interior": true,
+          "floor": true,
+          "walls": {
+            "east": {
+              "type": "wall",
+              "material": "paint_white_matt"
+            }
+          }
+        },
+        "4,3": {
+          "type": "floor",
+          "interior": true,
+          "floor": true,
+          "walls": {
+            "south": {
+              "type": "wall",
+              "material": "paint_white_matt"
+            },
+            "east": {
+              "type": "wall",
+              "material": "paint_white_matt"
+            }
+          }
+        }
+      }
     }
   },
   "trait_templates": {
@@ -49213,6 +50021,359 @@
         "financial_consultation"
       ]
     },
+    "bank_jpmc": {
+      "name": "JPMC",
+      "industry": "finance",
+      "off_grid": true,
+      "service_category": "banking",
+      "opening_hours": {
+        "open": 9,
+        "close": 16
+      },
+      "staff_roles": [
+        "bank_teller"
+      ],
+      "avg_visit_duration_ticks": 10,
+      "cost_range": [
+        0,
+        0
+      ],
+      "description": "Full-service bank: deposit accounts, bank cards, credit cards, secured loans.",
+      "typical_roles": [
+        "bank_teller",
+        "loan_officer",
+        "senior_loan_officer",
+        "mortgage_broker",
+        "bank_manager"
+      ],
+      "max_staff": 25,
+      "turnover_rate": 0.01,
+      "business_kind": "service",
+      "presence": "physical",
+      "phone_hours": {
+        "open": 9,
+        "close": 16
+      },
+      "financial_services": [
+        "banking",
+        "credit_card",
+        "secured_loan"
+      ],
+      "reason_options": [
+        "loan_application",
+        "account_setup",
+        "financial_consultation",
+        "credit_card_application"
+      ]
+    },
+    "bank_morgan_stanley": {
+      "name": "Morgan Stanley",
+      "industry": "finance",
+      "off_grid": true,
+      "service_category": "banking",
+      "opening_hours": {
+        "open": 9,
+        "close": 16
+      },
+      "staff_roles": [
+        "bank_teller"
+      ],
+      "avg_visit_duration_ticks": 10,
+      "cost_range": [
+        0,
+        0
+      ],
+      "description": "Full-service bank: deposit accounts, bank cards, credit cards, secured loans.",
+      "typical_roles": [
+        "bank_teller",
+        "loan_officer",
+        "senior_loan_officer",
+        "mortgage_broker",
+        "bank_manager"
+      ],
+      "max_staff": 25,
+      "turnover_rate": 0.01,
+      "business_kind": "service",
+      "presence": "physical",
+      "phone_hours": {
+        "open": 9,
+        "close": 16
+      },
+      "financial_services": [
+        "banking",
+        "credit_card",
+        "secured_loan"
+      ],
+      "reason_options": [
+        "loan_application",
+        "account_setup",
+        "financial_consultation",
+        "credit_card_application"
+      ]
+    },
+    "bank_barclays": {
+      "name": "Barclays",
+      "industry": "finance",
+      "off_grid": true,
+      "service_category": "banking",
+      "opening_hours": {
+        "open": 9,
+        "close": 16
+      },
+      "staff_roles": [
+        "bank_teller"
+      ],
+      "avg_visit_duration_ticks": 10,
+      "cost_range": [
+        0,
+        0
+      ],
+      "description": "Full-service bank: deposit accounts, bank cards, credit cards, secured loans.",
+      "typical_roles": [
+        "bank_teller",
+        "loan_officer",
+        "senior_loan_officer",
+        "mortgage_broker",
+        "bank_manager"
+      ],
+      "max_staff": 25,
+      "turnover_rate": 0.01,
+      "business_kind": "service",
+      "presence": "physical",
+      "phone_hours": {
+        "open": 9,
+        "close": 16
+      },
+      "financial_services": [
+        "banking",
+        "credit_card",
+        "secured_loan"
+      ],
+      "reason_options": [
+        "loan_application",
+        "account_setup",
+        "financial_consultation",
+        "credit_card_application"
+      ]
+    },
+    "bank_td_bank": {
+      "name": "TD Bank",
+      "industry": "finance",
+      "off_grid": true,
+      "service_category": "banking",
+      "opening_hours": {
+        "open": 9,
+        "close": 16
+      },
+      "staff_roles": [
+        "bank_teller"
+      ],
+      "avg_visit_duration_ticks": 10,
+      "cost_range": [
+        0,
+        0
+      ],
+      "description": "Full-service bank: deposit accounts, bank cards, credit cards, secured loans.",
+      "typical_roles": [
+        "bank_teller",
+        "loan_officer",
+        "senior_loan_officer",
+        "mortgage_broker",
+        "bank_manager"
+      ],
+      "max_staff": 25,
+      "turnover_rate": 0.01,
+      "business_kind": "service",
+      "presence": "physical",
+      "phone_hours": {
+        "open": 9,
+        "close": 16
+      },
+      "financial_services": [
+        "banking",
+        "credit_card",
+        "secured_loan"
+      ],
+      "reason_options": [
+        "loan_application",
+        "account_setup",
+        "financial_consultation",
+        "credit_card_application"
+      ]
+    },
+    "bank_of_america": {
+      "name": "Bank of America",
+      "industry": "finance",
+      "off_grid": true,
+      "service_category": "banking",
+      "opening_hours": {
+        "open": 9,
+        "close": 16
+      },
+      "staff_roles": [
+        "bank_teller"
+      ],
+      "avg_visit_duration_ticks": 10,
+      "cost_range": [
+        0,
+        0
+      ],
+      "description": "Full-service bank: deposit accounts, bank cards, credit cards, secured loans.",
+      "typical_roles": [
+        "bank_teller",
+        "loan_officer",
+        "senior_loan_officer",
+        "mortgage_broker",
+        "bank_manager"
+      ],
+      "max_staff": 25,
+      "turnover_rate": 0.01,
+      "business_kind": "service",
+      "presence": "physical",
+      "phone_hours": {
+        "open": 9,
+        "close": 16
+      },
+      "financial_services": [
+        "banking",
+        "credit_card",
+        "secured_loan"
+      ],
+      "reason_options": [
+        "loan_application",
+        "account_setup",
+        "financial_consultation",
+        "credit_card_application"
+      ]
+    },
+    "government": {
+      "name": "Government Revenue Office",
+      "industry": "government",
+      "off_grid": true,
+      "service_category": "government",
+      "opening_hours": {
+        "open": 9,
+        "close": 17
+      },
+      "staff_roles": [],
+      "avg_visit_duration_ticks": 15,
+      "cost_range": [
+        0,
+        0
+      ],
+      "description": "Assesses and collects income tax. Not a service you visit by choice.",
+      "typical_roles": [],
+      "max_staff": 0,
+      "turnover_rate": 0,
+      "business_kind": "service",
+      "presence": "physical",
+      "phone_hours": {
+        "open": 9,
+        "close": 17
+      },
+      "reason_options": []
+    },
+    "loan_provider_quicklend": {
+      "name": "QuickLend Financial",
+      "industry": "finance",
+      "off_grid": true,
+      "service_category": "lending",
+      "opening_hours": {
+        "open": 8,
+        "close": 18
+      },
+      "staff_roles": [
+        "loan_officer"
+      ],
+      "avg_visit_duration_ticks": 10,
+      "cost_range": [
+        0,
+        0
+      ],
+      "description": "Unsecured personal loans -- fixed terms, no collateral required.",
+      "typical_roles": [
+        "loan_officer",
+        "senior_loan_officer"
+      ],
+      "max_staff": 10,
+      "turnover_rate": 0.02,
+      "business_kind": "service",
+      "presence": "physical",
+      "phone_hours": {
+        "open": 8,
+        "close": 18
+      },
+      "financial_services": [
+        "unsecured_loan"
+      ],
+      "reason_options": [
+        "loan_application"
+      ]
+    },
+    "loan_provider_meridian": {
+      "name": "Meridian Financial",
+      "industry": "finance",
+      "off_grid": true,
+      "service_category": "lending",
+      "opening_hours": {
+        "open": 8,
+        "close": 18
+      },
+      "staff_roles": [
+        "loan_officer"
+      ],
+      "avg_visit_duration_ticks": 10,
+      "cost_range": [
+        0,
+        0
+      ],
+      "description": "Unsecured personal loans -- fixed terms, no collateral required.",
+      "typical_roles": [
+        "loan_officer",
+        "senior_loan_officer"
+      ],
+      "max_staff": 10,
+      "turnover_rate": 0.02,
+      "business_kind": "service",
+      "presence": "physical",
+      "phone_hours": {
+        "open": 8,
+        "close": 18
+      },
+      "financial_services": [
+        "unsecured_loan"
+      ],
+      "reason_options": [
+        "loan_application"
+      ]
+    },
+    "convenience_store": {
+      "name": "Convenience Store",
+      "industry": "retail",
+      "off_grid": false,
+      "service_category": "retail",
+      "opening_hours": {
+        "open": 6,
+        "close": 23
+      },
+      "staff_roles": [
+        "cashier"
+      ],
+      "avg_visit_duration_ticks": 15,
+      "cost_range": [
+        2,
+        20
+      ],
+      "description": "Small on-grid store with a real building and a staffed register -- pricier than the supermarket, but no off-grid trip needed for a quick or forgotten item (milk, cigarettes, a lighter).",
+      "typical_roles": [
+        "cashier"
+      ],
+      "max_staff": 2,
+      "turnover_rate": 0.08,
+      "business_kind": "product",
+      "presence": "physical",
+      "reason_options": []
+    },
     "clothing_store": {
       "name": "Clothing Store",
       "industry": "retail",
@@ -57604,14 +58765,14 @@
     "male": {
       "child": "male_child_base",
       "teen": "male_teen_base",
-      "adult": "male_adult_base",
-      "elderly": "male_elderly_base",
+      "adult": "adult_male",
+      "elderly": "elder_male",
       "portrait_url": null
     },
     "female": {
       "child": "female_child_base",
       "teen": "female_teen_base",
-      "adult": "female_adult_base",
+      "adult": "adult_female",
       "elderly": "female_elderly_base",
       "portrait_url": null
     }
@@ -60365,6 +61526,98 @@
       "mutual": false,
       "pleasure_bonus": 0,
       "aftercare_modifier": 0.3
+    }
+  },
+  "expectation_templates": {
+    "go_to_work": {
+      "label": "Go to work",
+      "cadence": "daily",
+      "value_category": "work",
+      "of_self": true,
+      "requires_others": false,
+      "tags": [
+        "employed"
+      ],
+      "base_priority": 60,
+      "category": "schedule",
+      "activity_type": "work_shift"
+    },
+    "get_kids_to_school": {
+      "label": "Get the kids to school",
+      "cadence": "daily",
+      "value_category": "children",
+      "of_self": true,
+      "requires_others": true,
+      "tags": [
+        "parent"
+      ],
+      "base_priority": 65,
+      "category": "schedule"
+    },
+    "make_dinner": {
+      "label": "Make dinner",
+      "cadence": "daily",
+      "value_category": "family",
+      "of_self": true,
+      "requires_others": false,
+      "tags": [
+        "parent",
+        "provider_archetype",
+        "cohabiting"
+      ],
+      "base_priority": 50,
+      "category": "schedule",
+      "activity_type": "cook_recipe"
+    },
+    "family_dinner_together": {
+      "label": "Have dinner together as a family",
+      "cadence": "daily",
+      "value_category": "family",
+      "of_self": true,
+      "requires_others": true,
+      "tags": [
+        "parent"
+      ],
+      "base_priority": 55,
+      "category": "social",
+      "activity_type": "family_dinner",
+      "grievance_event_type": "family_dinner_skipped"
+    },
+    "keep_a_promise": {
+      "label": "Do the errand you promised",
+      "cadence": "once",
+      "value_category": "friends",
+      "of_self": true,
+      "requires_others": false,
+      "tags": [
+        "social_contract"
+      ],
+      "base_priority": 70,
+      "category": "social"
+    },
+    "relax_with_someone": {
+      "label": "Unwind with your spouse or a friend",
+      "cadence": "daily",
+      "value_category": "leisure",
+      "of_self": true,
+      "requires_others": false,
+      "tags": [
+        "adult"
+      ],
+      "base_priority": 30,
+      "category": "leisure"
+    },
+    "spend_time_alone": {
+      "label": "Get some time to yourself",
+      "cadence": "weekly",
+      "value_category": "leisure",
+      "of_self": true,
+      "requires_others": false,
+      "tags": [
+        "adult"
+      ],
+      "base_priority": 25,
+      "category": "leisure"
     }
   },
   "exercise_type_registry": {

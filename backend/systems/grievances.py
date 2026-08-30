@@ -38,6 +38,25 @@ SEVERITY = {
     "lied":               7.0,
     "broke_promise":      8.0,
     "disrespected":       5.0,
+    # Missed self-expectations (systems/expectations.py) attributed to a
+    # specific responsible person -- see systems/expectation_planner.py's
+    # requires_others completion check.
+    "family_dinner_skipped":   6.0,
+    "promised_errand_broken":  9.0,
+    # Convenience/stability loss (systems/convenience.py) attributed to a
+    # specific responsible person -- e.g. a parent restricting freedom.
+    "restricted_freedom":      5.0,
+    # Personal/persona expectations of a specific individual
+    # (systems/persona_expectations.py) -- generic value-alignment clash,
+    # plus the pre-existing religious_repression.py conflict types now
+    # wired into the same grievance pipeline.
+    "value_clash":             7.0,
+    "identity_shame":         12.0,
+    "porn_shame":              7.0,
+    "sexual_curiosity_shame":  6.0,
+    # Favor ledger (systems/favors.py) -- committed to helping repeatedly
+    # with nothing given back.
+    "favor_unreciprocated":    8.0,
     "resource_conflict":  5.0,
     "ignored_me":         3.0,
     "romantic_envy":     10.0,

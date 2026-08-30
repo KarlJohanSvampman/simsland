@@ -47,6 +47,14 @@ from systems.persistent_desires import (
     update_desires
 )
 
+from systems.expectations import (
+    update_expectations
+)
+
+from systems.convenience import (
+    update_convenience
+)
+
 from brain.llm_brain import (
     think
 )
@@ -86,7 +94,13 @@ from systems.travel import (
 from systems.offgrid import (
     maybe_go_offgrid,
     maybe_schedule_doctor_visit,
+    resolve_due_appointments,
     process_return
+)
+
+from systems.validation import (
+    maybe_seek_validation_from_queue,
+    check_validation_refresh,
 )
 
 from systems.social_intentions import (
@@ -273,6 +287,21 @@ def update_offgrid(
     )
 
     maybe_schedule_doctor_visit(
+        c,
+        world
+    )
+
+    resolve_due_appointments(
+        c,
+        world
+    )
+
+    maybe_seek_validation_from_queue(
+        c,
+        world
+    )
+
+    check_validation_refresh(
         c,
         world
     )
@@ -568,6 +597,24 @@ def update_agent(
     update_desires(
     c,
     world
+    )
+
+    # =====================================
+    # EXPECTATIONS
+    # =====================================
+
+    update_expectations(
+        c,
+        world
+    )
+
+    # =====================================
+    # CONVENIENCE / STABILITY
+    # =====================================
+
+    update_convenience(
+        c,
+        world
     )
 
     # =====================================

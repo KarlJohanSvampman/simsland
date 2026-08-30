@@ -120,6 +120,19 @@ def _on_character_fired(data, world):
 subscribe("character_fired", _on_character_fired)
 
 
+def _on_character_fired_convenience(data, world):
+    """A layoff is an involuntary loss -- disrupts the established
+    employment convenience (systems/convenience.py). No specific person
+    to blame here (maybe_fire is an economy-wide roll, not a person's
+    decision) -- feeds a "rebuild employment" desire instead."""
+    from systems.convenience import disrupt_convenience
+    c = world.get("characters", {}).get(data["character_id"])
+    if c:
+        disrupt_convenience(c, "employment", world)
+
+subscribe("character_fired", _on_character_fired_convenience)
+
+
 def _on_interview_scheduled(data, world):
     """Nothing to do immediately — process_interview will fire on its tick."""
     pass

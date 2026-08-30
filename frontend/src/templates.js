@@ -48,7 +48,11 @@ export function getCharacterTemplate(definitions, character){
 }
 
 export function getItemTemplate(definitions, item){
-  return getTemplate(definitions, "item_templates", item?.template);
+  // Item instances carry "template_id", not "template" -- unlike props/
+  // characters/buildings (see backend/systems/personal_items.py::make_item()).
+  // Was previously unused anywhere in the frontend, so this mismatch never
+  // surfaced.
+  return getTemplate(definitions, "item_templates", item?.template_id);
 }
 
 export function getFloorplanTemplate(definitions, building){
@@ -110,7 +114,13 @@ export function resolveCharacter(definitions, character){
 }
 
 export function resolveItem(definitions, item){
-  return resolveInstance(definitions, "item_templates", item);
+  // Can't delegate to resolveInstance() -- it reads instance.template,
+  // but item instances carry template_id (see getItemTemplate() above).
+  const template = getItemTemplate(definitions, item);
+  if(!template){
+    return item;
+  }
+  return { ...template, ...item };
 }
 
 export function resolveFloorplan(definitions, building){

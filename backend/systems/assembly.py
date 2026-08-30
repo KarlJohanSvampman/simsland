@@ -115,6 +115,7 @@ def assemble_prop(c, world, item_id):
         "id":          prop_id,
         "template":    prop_template_id,
         "building_id": c.get("building_id"),
+        "household_id": c.get("household_id"),
         "x":           int(c.get("x", 0)),
         "y":           int(c.get("y", 0)),
         "rotation":    0,

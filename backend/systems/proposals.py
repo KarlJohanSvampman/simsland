@@ -151,7 +151,7 @@ def respond(recipient, world, proposal_id, response, counter_params=None):
         return {"ok": False, "reason": "already_resolved"}
 
     if response == "counter":
-        if proposal["kind"] not in ("chore", "social_ask", "request"):
+        if proposal["kind"] not in ("chore", "social_ask", "request", "item_loan", "item_sale"):
             return {"ok": False, "reason": "counter_not_supported_for_this_kind"}
         proposal["responses"][rid] = "counter"
         proposal["counter_params"][rid] = dict(counter_params or {})
@@ -221,6 +221,34 @@ def _maybe_resolve(proposal, world):
             }
     elif proposal["kind"] == "recurring_offer":
         _finalize_recurring_offer(proposal, world)
+    elif proposal["kind"] == "item_loan":
+        _finalize_item_loan(proposal, world)
+    elif proposal["kind"] == "item_sale":
+        _finalize_item_sale(proposal, world)
+    elif proposal["kind"] in ("social_ask", "request"):
+        recipient_id = proposal["recipients"][0]
+        accepted = proposal["responses"].get(recipient_id) == "accept"
+        if proposal["chore_id"].startswith("opinion_on_"):
+            # systems/validation.py::_ask_about_choice() -- an accepted
+            # "what do you think of X" ask counts as real validation
+            # received for the character who asked; a decline is a
+            # missed opportunity, no penalty. Not a real "favor" for the
+            # ledger below.
+            if accepted:
+                proposer = world.get("characters", {}).get(proposal["proposer_id"])
+                if proposer:
+                    from systems.validation import receive_validation, BASE_VALIDATION_POINTS
+                    receive_validation(proposer, world, points=BASE_VALIDATION_POINTS, source="social_ask")
+        elif accepted:
+            # systems/favors.py -- granting either kind is a real
+            # commitment; see on_favor_granted for the reciprocation
+            # check it does before opening a fresh debt.
+            chars = world.get("characters", {})
+            granter = chars.get(recipient_id)
+            asker = chars.get(proposal["proposer_id"])
+            if granter and asker:
+                from systems.favors import on_favor_granted
+                on_favor_granted(granter, asker, world, proposal["chore_id"])
 
 
 # =========================================================
@@ -271,6 +299,167 @@ def offer_recurring(proposer, participants, world, chore_id, schedule_params):
         return {"ok": False, "reason": "no_one_to_ask"}
     proposal = propose(proposer, recipients, "recurring_offer", chore_id, schedule_params, world)
     return {"ok": True, "proposal": proposal}
+
+
+# =========================================================
+# ITEM LOAN — proposer (the would-be borrower) asks the item's current
+# owner (recipient) to lend it for a fixed duration. Ownership
+# (item["owner_id"]) is untouched by a loan -- only physical possession
+# moves, with a due_tick; systems/personal_items.py::recall_overdue_loans()
+# (a periodic sweep, see sim_loop.py) automatically returns it once due.
+# Counter lets the owner propose a different duration instead of an
+# outright decline -- reuses respond()'s existing counter_params, no new
+# machinery needed there.
+# =========================================================
+
+def propose_item_loan(proposer, recipient, world, item_id, duration_ticks):
+    """recipient must currently hold item_id (checked here, not just
+    assumed) -- borrowing something recipient doesn't actually have
+    doesn't make sense as a proposal."""
+    from systems.personal_items import get_item_by_id
+    if not get_item_by_id(recipient, item_id):
+        return {"ok": False, "reason": "recipient_does_not_have_item"}
+    params = {"duration_ticks": duration_ticks}
+    proposal = propose(proposer, [recipient], "item_loan", item_id, params, world)
+    return {"ok": True, "proposal": proposal}
+
+
+def _finalize_item_loan(proposal, world):
+    owner_id = proposal["recipients"][0]
+    if proposal["responses"].get(owner_id) != "accept":
+        return
+    borrower_id = proposal["proposer_id"]
+    chars = world.get("characters", {})
+    owner, borrower = chars.get(owner_id), chars.get(borrower_id)
+    if not owner or not borrower:
+        return
+
+    from systems.personal_items import (
+        get_item_by_id, remove_item, add_item, record_item_history,
+    )
+    item_id = proposal["chore_id"]
+    item = get_item_by_id(owner, item_id)
+    if not item:
+        return  # owner no longer has it by the time the deal closed
+
+    remove_item(owner, item_id)
+    item["location"] = "pocket"
+    due_tick = world.get("tick", 0) + proposal["params"].get("duration_ticks", 0)
+    item["loan"] = {"owner_id": owner_id, "borrower_id": borrower_id, "due_tick": due_tick}
+    record_item_history(item, world, "loaned", by=owner_id, to_borrower=borrower_id, due_tick=due_tick)
+    add_item(borrower, item)  # owner_id untouched -- add_item()'s setdefault is a no-op, already set
+
+
+# =========================================================
+# ITEM SALE / TRADE — proposer (the interested buyer) asks the item's
+# current owner (recipient) if they'll sell. offer_price is the buyer's
+# cash offer (None = a pure "would you sell this, and for how much?"
+# inquiry, expecting the owner's counter to set a real price).
+# offer_item_id optionally names one of the BUYER's own items offered in
+# trade instead of/alongside cash -- same proposal, same accept/decline/
+# counter flow; the owner can counter with a different price exactly as
+# with a pure cash offer (respond()'s existing counter_params).
+# =========================================================
+
+def propose_item_sale(proposer, recipient, world, item_id, offer_price=None, offer_item_id=None):
+    from systems.personal_items import get_item_by_id
+    if not get_item_by_id(recipient, item_id):
+        return {"ok": False, "reason": "recipient_does_not_have_item"}
+    if offer_item_id and not get_item_by_id(proposer, offer_item_id):
+        return {"ok": False, "reason": "proposer_does_not_have_offered_item"}
+    params = {"offer_price": offer_price, "offer_item_id": offer_item_id}
+    proposal = propose(proposer, [recipient], "item_sale", item_id, params, world)
+    return {"ok": True, "proposal": proposal}
+
+
+def _finalize_item_sale(proposal, world):
+    owner_id = proposal["recipients"][0]
+    if proposal["responses"].get(owner_id) != "accept":
+        return
+    buyer_id = proposal["proposer_id"]
+    chars = world.get("characters", {})
+    owner, buyer = chars.get(owner_id), chars.get(buyer_id)
+    if not owner or not buyer:
+        return
+
+    from systems.personal_items import (
+        get_item_by_id, remove_item, add_item, record_item_history,
+    )
+    item_id = proposal["chore_id"]
+    item = get_item_by_id(owner, item_id)
+    if not item:
+        return  # owner no longer has it by the time the deal closed
+
+    params = proposal["params"]
+    # counter_params from the LAST round (whichever party countered most
+    # recently) take priority over the original opening params -- a
+    # counter that set/changed the price is the actual agreed price, not
+    # the buyer's original opening offer.
+    for cp in proposal.get("counter_params", {}).values():
+        params.update(cp)
+    price = params.get("offer_price") or 0
+    offer_item_id = params.get("offer_item_id")
+
+    # Pay first -- both sides "agreeing" doesn't mean the buyer can
+    # actually cover it (mirrors convenience_store.py's real payment
+    # check, not just a handshake). Deal falls through if they can't.
+    if price and not _pay_character(buyer, owner, world, price):
+        return
+
+    if offer_item_id:
+        traded_item = get_item_by_id(buyer, offer_item_id)
+        if traded_item:
+            remove_item(buyer, offer_item_id)
+            traded_item["owner_id"] = owner_id
+            traded_item["location"] = "pocket"
+            record_item_history(traded_item, world, "traded", by=buyer_id,
+                                 from_owner=buyer_id, to_owner=owner_id, paired_with_item=item_id)
+            add_item(owner, traded_item)
+
+    remove_item(owner, item_id)
+    item["owner_id"] = buyer_id
+    item["location"] = "pocket"
+    record_item_history(item, world, "sold", by=owner_id, from_owner=owner_id, to_owner=buyer_id,
+                         price=price, traded_for_item=offer_item_id)
+    add_item(buyer, item)
+
+
+def _pay_character(buyer, seller, world, price):
+    """Person-to-person payment -- mirrors convenience_store.py::_pay's
+    cash -> bank card -> credit card fallback, but credits the SELLER
+    (a business sink just deducts; a sale must actually pay someone).
+    Seller is always credited as cash for simplicity, regardless of how
+    the buyer paid -- no target-account concept for a casual sale."""
+    from systems.personal_items import wallet_cash, spend_cash, add_cash, get_item
+    if wallet_cash(buyer) >= price and spend_cash(buyer, price):
+        add_cash(seller, price)
+        return True
+
+    wallet = get_item(buyer, "wallet")
+    if not wallet:
+        return False
+
+    from systems.banking import get_balance, withdraw, BANK_NAME_TO_KEY
+    for card in wallet.get("items", []):
+        if card.get("object_type") != "bank_card":
+            continue
+        bank_key = BANK_NAME_TO_KEY.get(card.get("bank"))
+        if not bank_key:
+            continue
+        balance = get_balance(world, bank_key, card["account_number"])
+        if balance is not None and balance >= price and withdraw(world, bank_key, card["account_number"], price):
+            add_cash(seller, price)
+            return True
+
+    from systems.credit import charge as charge_credit_card
+    for card in wallet.get("items", []):
+        if card.get("object_type") != "credit_card":
+            continue
+        if charge_credit_card(card, price):
+            add_cash(seller, price)
+            return True
+
+    return False
 
 
 def _finalize_recurring_offer(proposal, world):

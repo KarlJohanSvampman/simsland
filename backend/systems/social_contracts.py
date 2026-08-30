@@ -505,6 +505,19 @@ def create_authority_contract(authority_id, subject_id, contract_type,
     if expires_ticks:
         contract["expires_tick"] = world.get("tick", 0) + expires_ticks
 
+    # A "chore" is mutual, not a restriction -- everything else here
+    # (curfew, grounding, presence_required, announce_departure, ...)
+    # genuinely narrows the subject's autonomy. Feeds
+    # systems/convenience.py so a restrictive authority contract is a
+    # real, resentment-building loss of freedom, not just flavor text --
+    # see the plan's "infringements on personal freedom" addition.
+    if contract_type != "chore":
+        subject = world.get("characters", {}).get(subject_id)
+        if subject:
+            from systems.convenience import disrupt_convenience
+            disrupt_convenience(subject, "autonomy", world,
+                                 cause=authority_id, event_type="restricted_freedom")
+
     return contract
 
 

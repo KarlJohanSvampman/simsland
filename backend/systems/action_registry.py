@@ -83,6 +83,7 @@ ACTION_SPECS = {
     "phone_read_text":   {"group": "phone", "target": "none", "doc": "Read a text you received."},
     "retrieve_phone":    {"group": "phone", "target": "none", "doc": "Go get your phone from where you left it."},
     "charge":            {"group": "phone", "target": "prop", "doc": "Charge a device at an outlet."},
+    "browse_news":       {"group": "phone", "target": "none", "doc": "Check the news on your phone -- picks a fresh recent headline every few minutes for as long as you keep at it."},
     "contact_business":  {"group": "phone", "target": "any", "detail": "reason", "doc": "Call or message a business's customer support -- deliveries, complaints, general questions. Target a company_templates key. If they're unreachable (closed, or you're an online-only business's caller and it happened to skip straight to email), your message lands in their inbox and they call/email you back later, during their business hours -- you won't get an answer right away."},
     "book_appointment":  {"group": "phone", "target": "any", "detail": "reason", "doc": "Call a service business (doctor, lawyer, therapist, ...) to book an appointment. Target a company_templates key, and state your reason -- ideally one of that business's reason_options. Only resolves to a confirmed appointment if you call during their phone hours; otherwise it's left as a request for them to get back to you."},
 
@@ -130,6 +131,7 @@ ACTION_SPECS = {
     "wield_item":       {"group": "item", "target": "item", "doc": "Ready a weapon-capable item in hand."},
     "trash":            {"group": "item", "target": "prop", "doc": "Throw a prop away."},
     "destroy":          {"group": "item", "target": "prop", "doc": "Destroy a prop (a real offense — reported)."},
+    "read_newspaper":   {"group": "item", "target": "none", "doc": "Read a physical newspaper you're carrying -- picks a fresh recent headline every few minutes for as long as you keep at it."},
 
     # ---- movable props / assembly / walls ---------------------------------
     "drag_prop":       {"group": "prop", "target": "prop", "doc": "Drag a movable prop."},
@@ -167,6 +169,18 @@ ACTION_SPECS = {
     "propose_request":        {"group": "proposal", "target": "character", "doc": "Ask someone for something specific."},
     "respond_request":        {"group": "proposal", "target": "proposal", "doc": "Respond to a pending request."},
     "advance_request_round":  {"group": "proposal", "target": "proposal", "doc": "Push a stalled request negotiation forward."},
+    "propose_item_loan":      {"group": "proposal", "target": "character", "detail": "item_id", "doc": "Ask to borrow one of someone's items for a while (duration_days, default 7). Ownership doesn't change -- it's returned automatically when due."},
+    "respond_item_loan":      {"group": "proposal", "target": "proposal", "doc": "Respond to a pending item-loan request."},
+    "advance_item_loan_round": {"group": "proposal", "target": "proposal", "doc": "Push a stalled item-loan negotiation forward."},
+    "propose_item_sale":      {"group": "proposal", "target": "character", "detail": "item_id", "doc": "Ask if someone will sell an item of theirs -- offer_price (omit to invite their asking price) and/or offer_item_id to propose a trade instead of/alongside cash."},
+    "respond_item_sale":      {"group": "proposal", "target": "proposal", "doc": "Respond to a pending item-sale/trade offer."},
+    "advance_item_sale_round": {"group": "proposal", "target": "proposal", "doc": "Push a stalled item-sale/trade negotiation forward."},
+
+    # ---- social media -------------------------------------------------------
+    "post_social_media":       {"group": "social", "target": "none", "doc": "Post to social media (text; media_description optional -- a photo/video isn't actually captured, just described)."},
+    "like_social_post":        {"group": "social", "target": "any", "doc": "Like a social media post (post_id)."},
+    "unlike_social_post":      {"group": "social", "target": "any", "doc": "Remove your like from a social media post (post_id)."},
+    "comment_on_social_post":  {"group": "social", "target": "any", "doc": "Comment on a social media post (post_id, text)."},
 
     # ---- lies / social contract -------------------------------------------
     "give_excuse":         {"group": "social", "target": "character", "doc": "Give someone an excuse."},

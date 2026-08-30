@@ -70,10 +70,14 @@ def begin_interaction(c, world, interaction_name):
 
     prop, anchor = result
 
-    ok = reserve_anchor(c, world, prop, anchor)
-
-    if not ok:
+    # find_nearest_anchor() picks the globally nearest matching anchor
+    # without checking occupancy (unlike find_free_anchor(), used by
+    # every other reserve_anchor() call site) -- guard here instead.
+    # reserve_anchor() itself has no return value to check.
+    if anchor.get("occupied_by") and anchor["occupied_by"] != c["id"]:
         return None
+
+    reserve_anchor(c, prop, anchor)
 
     request_route_to_anchor(c, world, prop, anchor)
 

@@ -333,8 +333,12 @@ def _build_work_history(defs, age, education, job):
 
 # ── Main entry point ──────────────────────────────────────────────────────────
 
-def generate_character(defs, overrides=None):
-    """Generate a fully randomised character dict."""
+def generate_character(defs, overrides=None, world=None):
+    """Generate a fully randomised character dict. `world`, when passed by
+    a caller that already holds one (editor.py/family.py/baby.py/
+    social_sandbox.py all generate inside a world_lock() span), lets the
+    starting bank card open a real ledger account (see banking.py) instead
+    of just carrying a placeholder account number nothing backs."""
     overrides = overrides or {}
 
     sex       = overrides.get("sex")       or _random_sex()
@@ -608,6 +612,37 @@ def generate_character(defs, overrides=None):
         except Exception:
             pass
 
+    # Starting wallet ($100 cash + ID card, per the banking-round spec) --
+    # make_wallet()/make_id_card()/make_bank_card() existed but, like
+    # make_smartphone() before the block above, were never called from
+    # character generation itself (only a one-off world-seed demo script
+    # used them). Every character gets one, unconditionally -- age-gating
+    # like the phone block above isn't needed here since even a child
+    # plausibly has a wallet with a couple dollars and an ID card.
+    try:
+        from systems.personal_items import make_wallet, make_id_card, make_bank_card, STARTER_BANKS
+        id_card = make_id_card(character["id"], character["name"], owner_id=character["id"])
+
+        # Real account when a live world is available (see this function's
+        # docstring) -- balance starts at $0, the $100 starting cash stays
+        # in the wallet per the original spec, not auto-deposited. Falls
+        # back to make_bank_card()'s own placeholder account_number
+        # (uninitialized -- no real ledger entry) when generating without
+        # a world, e.g. Character Creator preview/validation contexts.
+        bank_name = random.choice(STARTER_BANKS)
+        account_number = None
+        if world is not None:
+            from systems.banking import bank_key_for_name, open_account
+            bank_key = bank_key_for_name(bank_name)
+            if bank_key:
+                account_number = open_account(world, bank_key, character["id"], initial_balance=0.0)
+        bank_card = make_bank_card(bank=bank_name, account_number=account_number, owner_id=character["id"])
+
+        wallet = make_wallet(cash=100.0, owner_id=character["id"], contents=[id_card, bank_card])
+        character["inventory"].append(wallet)
+    except Exception:
+        pass
+
     # Starting worn clothing + carried equipment (Character Creator's
     # Outfit/Equipment tab) — worn is set directly rather than via
     # put_on_clothing (which requires the item to already be in
@@ -635,7 +670,47 @@ def generate_character(defs, overrides=None):
         except ValueError:
             pass
 
+    # Bio -- no default/generation path existed for a plain generate_character()
+    # call before this (only relative-derivation via family.py/relative_gen.py
+    # ever set one). Deterministic and grounded in this character's own
+    # traits/job/education/hobbies, not an LLM call: generate_character()
+    # runs synchronously and is sometimes called while api/editor.py's
+    # spawn_character (etc.) holds world_lock() -- a blocking LLM call in
+    # that critical section would stall the whole tick loop for however
+    # long it takes to respond. Only fills in if overrides didn't already
+    # supply one (Character Creator templates can still set a static bio).
+    if not character.get("bio"):
+        character["bio"] = _fallback_bio_for_character(character)
+
     return character
+
+
+def _fallback_bio_for_character(character):
+    """Deterministic 1-2 sentence bio grounded in the character's own
+    generated data. Mirrors relative_gen.py::_fallback_bio()'s shape but
+    for a primary character (no source/relation context to build off)."""
+    name = character.get("first_name") or (character.get("name") or "").split(" ")[0] or "They"
+    age = character.get("age")
+    age_clause = f"{name}, {age}." if age is not None else f"{name}."
+
+    core_traits = {"cognition_logical", "cognition_balanced", "cognition_selfaware"}
+    traits = [t for t in character.get("traits", []) if t not in core_traits]
+    trait_clause = f"Known for being {traits[0].replace('_', ' ')}." if traits else ""
+
+    job = character.get("job")
+    job_title = job.get("title") if isinstance(job, dict) else None
+    education = character.get("education")
+    if job_title:
+        work_clause = f"Works as a {job_title.lower()}."
+    elif education and education not in ("none", "none_completed"):
+        work_clause = f"Has a background in {education.replace('_', ' ')} education."
+    else:
+        work_clause = ""
+
+    hobbies = character.get("hobbies") or []
+    hobby_clause = f"Spends free time on {hobbies[0].replace('_', ' ')}." if hobbies else ""
+
+    return " ".join(p for p in (age_clause, work_clause, trait_clause, hobby_clause) if p)
 
 
 

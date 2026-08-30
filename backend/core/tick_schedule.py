@@ -52,6 +52,7 @@ CADENCE = {
     "value_influence":      24,   # daily trust/respect/similarity weighted value influence (see systems/influence.py::resolve_value_influence)
     "health":               30,
     "item_knowledge":       10,
+    "reading":               5,   # fine-grained enough to catch reading_process.py's 300-tick news-pick threshold promptly
 
     # world-level
     "market":               20,
@@ -114,3 +115,8 @@ CADENCE["calendar_events"]  = 60
 
 # Socioeconomics — once per simulated day (~24 ticks)
 CADENCE["socioeconomics"]   = 24
+
+# Persona/value-alignment expectations between close kin (see
+# systems/persona_expectations.py) — a slow drama-simmer check, same tier
+# as election/faction/hierarchy.
+CADENCE["persona_expectations"] = 300

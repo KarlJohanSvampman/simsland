@@ -165,6 +165,31 @@ def get_repression_context(c, world):
 # Internal helpers
 # ─────────────────────────────────────────────────────────────────────────────
 
+def _cohabiting_parents(c, family, world):
+    """Char ids of c's parents who currently share c's home -- the
+    responsible-party list for _trigger_family_conflict's grievance call.
+    relations[f"{mid}:{c_id}"] == "parent" means mid IS THE PARENT of c
+    (family.py::_set_relation(family, parent_id, child_id, "parent"))."""
+    if not family:
+        return []
+    c_id = c.get("id", "")
+    c_home = c.get("home_id")
+    if not c_home:
+        return []
+    members = family.get("members", [])
+    relations = family.get("relations", {})
+    characters = world.get("characters", {})
+    parents = []
+    for mid in members:
+        if mid == c_id:
+            continue
+        if relations.get(f"{mid}:{c_id}") == "parent":
+            other = characters.get(mid)
+            if other and other.get("home_id") == c_home:
+                parents.append(mid)
+    return parents
+
+
 def _is_cohabiting_with_family(c, family, world):
     """True if character shares a home location with at least one parent."""
     if not family:
@@ -321,6 +346,20 @@ def _trigger_family_conflict(c, conflict_type, strictness, world):
     # Self-confidence hit
     sc = c.get("self_confidence", 0.60)
     c["self_confidence"] = max(0.05, sc - 0.04 * strictness)
+
+    # Real resentment toward whoever enforces the family's strictness --
+    # this event fired but never fed the grievance/confrontation pipeline
+    # before, so it produced trauma in isolation with no drama payoff.
+    # Blames every cohabiting parent equally (family values are collective,
+    # not attributed to one parent specifically). See
+    # systems/grievances.py's CONFRONT_THRESHOLD -- repeated conflicts here
+    # can genuinely escalate into a real confrontation over time, same
+    # pipeline systems/expectations.py's blame wiring uses.
+    family = world.get("families", {}).get(c.get("family_id"))
+    for parent_id in _cohabiting_parents(c, family, world):
+        from systems.grievances import add_grievance
+        add_grievance(c, parent_id, conflict_type, world,
+                      severity=severity * 10, details={"strictness": strictness})
 
     # Emit event for context / other systems
     try:

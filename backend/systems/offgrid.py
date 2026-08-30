@@ -627,6 +627,35 @@ def maybe_schedule_doctor_visit(c, world):
             book(c, world, business_key, business, reason)
 
 
+# Reasons owned by a dedicated scheduler (maybe_schedule_doctor_visit above)
+# that decides on the character's own behalf, rather than the character/AI
+# consciously choosing to book -- excluded from resolve_due_appointments so
+# the two pollers never double-fire the same appointment.
+_DEDICATED_SCHEDULER_REASONS = {"doctor", "hospital"}
+
+
+def resolve_due_appointments(c, world):
+    """Generic appointment-due -> off-grid-trip trigger. Every reason NOT
+    already owned by a dedicated scheduler (doctor/hospital) reaches this
+    point purely through action_router.py::_route_book_appointment (the
+    character/AI actively chose to call and book, e.g. a bank visit for
+    "credit_card_application") -- nothing else currently polls those for
+    fulfillment, so without this they'd sit "booked" forever. Mirrors
+    maybe_schedule_doctor_visit's due-check, minus the need-driven booking
+    half (that already happened via the phone call)."""
+    if c.get("off_grid") or c.get("conversation"):
+        return
+    from systems.appointments import is_appointment_due
+    for appt in c.get("appointments", []):
+        if appt.get("fulfilled") or appt.get("reason") in _DEDICATED_SCHEDULER_REASONS:
+            continue
+        if is_appointment_due(appt, world):
+            appt["fulfilled"] = True
+            c["_pending_appointment_business"] = appt.get("business")
+            send_offgrid(c, world, appt.get("reason", "outing"), 30)
+            return
+
+
 def _story(c, world, reason):
     env    = world["environment"]
     parts  = []
@@ -849,6 +878,20 @@ def process_return(c, world):
             story["summary"] += " Complications proved fatal."
         elif cost:
             story["summary"] += f" Cost ${cost:.0f}."
+    elif reason == "shopping":
+        # choose_from_catalog()/purchase_from_catalog() (procurement.py)
+        # already existed as real, working infrastructure but had zero
+        # callers anywhere -- a "shopping" trip was pure narrative flavor
+        # text with no effect on money or inventory. This is that missing
+        # caller.
+        household = world.get("households", {}).get(c.get("household_id"))
+        if household:
+            from systems.procurement import choose_from_catalog, purchase_from_catalog
+            entry = choose_from_catalog(c, world, category=None, budget=c.get("money", 0))
+            if entry and purchase_from_catalog(c, household, world, entry["id"], method="in_person"):
+                from systems.validation import queue_choice_for_validation
+                queue_choice_for_validation(c, world, "purchase", entry.get("name", entry["id"]))
+                story["summary"] += f" Bought {entry.get('name', 'something')} for ${entry['current_price']:.0f}."
     elif reason == "pharmacy":
         from core.definitions import load_definitions
         defs = load_definitions(world.get("sim_id", "default"))
@@ -859,6 +902,67 @@ def process_return(c, world):
         if h:
             h["wealth"] = max(0, h.get("wealth", 0) - cost)
         story["summary"] += f" Cost ${cost:.0f}."
+    elif reason in ("credit_card_application", "account_setup", "loan_application"):
+        # _pending_appointment_business was stashed by
+        # resolve_due_appointments() right before send_offgrid() -- the
+        # book_appointment action only ever records reason+business on
+        # the appointment itself, not on the character, so this is the
+        # only way process_return() (which only gets `reason`) still
+        # knows which bank was actually called.
+        business_key = c.pop("_pending_appointment_business", None)
+        defs = world.get("definitions", {})
+        business = (defs.get("company_templates") or {}).get(business_key or "")
+        bank_name = business.get("name") if business else None
+
+        if reason == "credit_card_application" and bank_name:
+            from systems.credit import apply_for_credit_card, is_eligible
+            approved = apply_for_credit_card(c, world, bank_name)
+            if approved:
+                story["summary"] += f" Approved for a {bank_name} credit card (${approved['max_credit']:.0f} limit)."
+            elif is_eligible(c):
+                story["summary"] += f" Already had a {bank_name} credit card on file."
+            else:
+                story["summary"] += f" {bank_name} declined the application -- credit score too low."
+        elif reason == "account_setup" and bank_name:
+            from systems.banking import bank_key_for_name, open_account
+            from systems.personal_items import make_bank_card, add_item, get_item
+            bank_key = bank_key_for_name(bank_name)
+            if bank_key:
+                account_number = open_account(world, bank_key, c["id"], initial_balance=0.0)
+                card = make_bank_card(bank=bank_name, account_number=account_number, owner_id=c["id"])
+                wallet = get_item(c, "wallet")
+                if wallet:
+                    from systems.containers import add_to_container
+                    add_to_container(wallet, card)
+                else:
+                    add_item(c, card)
+                story["summary"] += f" Opened a new account at {bank_name}."
+        elif reason == "loan_application" and bank_name:
+            # Solo, unsecured application, requesting the max this
+            # character alone qualifies for. book_appointment's action
+            # shape (target + free-text reason, see action_registry.py)
+            # has no field for a requested amount, a co-borrower, or
+            # pledged collateral -- so neither a true joint application
+            # nor a secured loan (loans.py::take_loan() supports both)
+            # can reach the AI through this generic booking flow yet;
+            # this is the solo/unsecured path that's actually wired end
+            # to end today.
+            from systems.loans import take_loan, max_loan_amount, _eligible as loan_eligible
+            from systems.personal_items import get_item
+            amount = max_loan_amount([c], "unsecured")
+            wallet = get_item(c, "wallet")
+            target = next((i for i in (wallet.get("items", []) if wallet else [])
+                           if i.get("object_type") == "bank_card"), None)
+            loan = None
+            if target and amount > 0 and loan_eligible([c], "unsecured"):
+                from systems.banking import bank_key_for_name
+                loan = take_loan(world, [c], bank_name, "unsecured", amount,
+                                  bank_key_for_name(target["bank"]), target["account_number"])
+            if loan:
+                story["summary"] += (f" Took out a ${amount:.0f} loan from {bank_name} "
+                                      f"(${loan['monthly_payment']:.0f}/month).")
+            else:
+                story["summary"] += f" {bank_name} declined the loan application."
 
     handle_return_transport(c, world)
 

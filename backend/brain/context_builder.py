@@ -283,6 +283,7 @@ def build_attention_summary(c, world):
 def build_active_conversations(c, world):
 
     conversations = world.get("conversations", {})
+    characters = world.get("characters", {})
     result = []
 
     for conv in conversations.values():
@@ -293,27 +294,45 @@ def build_active_conversations(c, world):
         if c["id"] not in conv.get("participants", []):
             continue
 
-        other_id = next(
-            (pid for pid in conv["participants"] if pid != c["id"]),
-            None
-        )
-        other = world.get("characters", {}).get(other_id, {})
+        other_ids = [pid for pid in conv["participants"] if pid != c["id"]]
+        others = [characters.get(pid, {}) for pid in other_ids]
+        # "with" stays a single readable string (all downstream readers,
+        # e.g. _conversation_frame_line() below, only ever display it) --
+        # unchanged for the ordinary 2-person case (a lone name), joined
+        # for 3+ participants. with_id/with_ids give programmatic access
+        # to the same set for anything that wants it later.
+        with_names = [o.get("name", oid) for o, oid in zip(others, other_ids)]
+
+        # Every message correctly labeled by its OWN actual speaker id --
+        # previously this fell back to the single `other` var, which
+        # silently mislabeled a 3rd participant's lines with the 2nd
+        # participant's name.
+        def _speaker_label(speaker_id, _c_id=c["id"], _chars=characters):
+            if speaker_id == _c_id:
+                return "you"
+            return _chars.get(speaker_id, {}).get("name", speaker_id)
+
+        # systems/conversation_goals.py -- what THIS character is
+        # personally after in this conversation (genuine interest, a
+        # favor, making an impression, staying cordial, or just not
+        # interested) so their own replies can actually pursue it.
+        my_goal = (conv.get("goals") or {}).get(c["id"])
 
         result.append({
             "conversation_id":    conv["id"],
-            "with":               other.get("name", other_id),
-            "with_id":            other_id,
+            "with":               ", ".join(with_names) if with_names else None,
+            "with_id":            other_ids[0] if other_ids else None,
+            "with_ids":           other_ids,
+            "with_names":         with_names,
             "topic":              conv.get("topic"),
             "tone":               conv.get("tone"),
             "conversation_type":  conv.get("conversation_type"),
             "medium":             conv.get("medium", "in_person"),
+            "my_goal":            my_goal.get("label") if my_goal else None,
             "your_turn":       conv.get("turn_owner") == c["id"],
             "recent_messages": [
                 {
-                    "speaker": (
-                        "you" if m.get("speaker") == c["id"]
-                        else other.get("name", m.get("speaker"))
-                    ),
+                    "speaker": _speaker_label(m.get("speaker")),
                     "utterance": m.get("utterance"),
                 }
                 for m in conv.get("history", [])[-5:]
@@ -1131,8 +1150,25 @@ _MEDIUM_VERB = {
 }
 
 
+def _join_names_naturally(names):
+    """["Alice"] -> "Alice"; ["Alice","Bob"] -> "Alice and Bob";
+    ["Alice","Bob","Carol"] -> "Alice, Bob, and Carol". Byte-identical to
+    the plain single-name case that existed before group conversations,
+    only diverges once there are 2+ others."""
+    if not names:
+        return "someone"
+    if len(names) == 1:
+        return names[0]
+    if len(names) == 2:
+        return f"{names[0]} and {names[1]}"
+    return ", ".join(names[:-1]) + f", and {names[-1]}"
+
+
 def _conversation_frame_line(conv):
-    who = conv["with"]
+    # _join_names_naturally already renders "Alice, Bob, and Carol" for
+    # 3+, so the templates below (all "with {who}") read correctly for
+    # group conversations with no separate phrasing set needed.
+    who = _join_names_naturally(conv.get("with_names") or ([conv["with"]] if conv.get("with") else []))
     topic = conv.get("topic") or "something"
     medium = conv.get("medium", "in_person")
     template = _CONVERSATION_TYPE_PHRASING.get(conv.get("conversation_type"))
@@ -1568,6 +1604,156 @@ def _sec_worries(c, world):
     return list(lines) if lines else None
 
 
+def _sec_popularity(c, world):
+    # Own standing + a comparative note about nearby characters'
+    # popularity, deliberately narrative-only rather than hand-scripted
+    # jealousy/pity/avoidance logic -- the LLM's own existing
+    # conversation/relationship reasoning is what actually produces the
+    # reaction (a comment, a cold shoulder, spending more time with a
+    # popular person, gossiping about an unpopular one), this just
+    # gives it something true to react to.
+    lines = []
+    pop = c.get("popularity", 0.0)
+    followers = c.get("followers", 0)
+    lines.append(f"Your social media standing: popularity {pop:.0f}, {followers} followers.")
+
+    queue = c.get("validation_queue", [])
+    if queue:
+        recent = queue[-1]
+        lines.append(f"You're still curious what people think of your {recent['chosen_label']} "
+                      f"({recent['choice_type']}) — you could ask someone or post about it.")
+
+    chars = world.get("characters", {})
+    nearby = [o for o in chars.values() if o["id"] != c["id"] and o.get("building_id") == c.get("building_id")]
+    for o in nearby[:3]:
+        opop = o.get("popularity", 0.0)
+        oname = o.get("name", "Someone")
+        if opop - pop > 100:
+            lines.append(f"{oname} seems to be getting a lot of attention/popularity lately ({opop:.0f}).")
+        elif pop - opop > 100:
+            lines.append(f"{oname} hasn't been getting much attention lately ({opop:.0f}) — "
+                          f"some people might feel for them, others might tease or avoid them over it.")
+
+    return lines
+
+
+def _sec_social_feed(c, world):
+    # A handful of recent posts (see systems/social_media.py) not
+    # authored by this character -- gives the LLM something concrete to
+    # like/comment on rather than only ever being able to post blind.
+    from systems.social_media import recent_feed
+    chars = world.get("characters", {})
+    posts = [p for p in recent_feed(world, limit=10) if p["author_id"] != c["id"]][:3]
+    if not posts:
+        return None
+    lines = ["Recent social media posts:"]
+    for p in posts:
+        author = chars.get(p["author_id"])
+        author_name = author.get("name", p["author_id"]) if author else p["author_id"]
+        media_note = f" [photo: {p['media']['description']}]" if p.get("media") else ""
+        liked = " (you liked this)" if c["id"] in p.get("likes", []) else ""
+        lines.append(
+            f"- post_id {p['id']}: {author_name}: \"{p['text']}\"{media_note} "
+            f"-- {len(p.get('likes', []))} likes, {len(p.get('comments', []))} comments{liked}"
+        )
+    return lines
+
+
+def _sec_finances(c, world):
+    # Wallet cash/bank balance/credit cards/credit score, plus whether
+    # applying for a credit card is realistically on the table right now
+    # -- none of this reached the LLM before this round, so a character
+    # had no way to actually reason about their own financial situation
+    # (per explicit user direction: "it needs to be made clear to the AI
+    # when considering what a character would or wouldn't do"). Also
+    # surfaces OTHER household members' credit card debt riding on this
+    # week's shared bill -- the intended source of "why am I paying for
+    # your card" friction (see economy.py::apply_expenses()).
+    from systems.personal_items import get_item, wallet_cash
+    from systems.credit import get_credit_cards, is_eligible, CREDIT_SCORE_DEFAULT
+    from systems.banking import get_balance, BANK_NAME_TO_KEY
+
+    lines = []
+    cash = wallet_cash(c)
+    wallet = get_item(c, "wallet")
+    bank_lines = []
+    if wallet:
+        for item in wallet.get("items", []):
+            if item.get("object_type") != "bank_card":
+                continue
+            bank_key = BANK_NAME_TO_KEY.get(item.get("bank"))
+            balance = get_balance(world, bank_key, item.get("account_number")) if bank_key else None
+            if balance is not None:
+                bank_lines.append(f"${balance:.0f} in your {item.get('bank')} account")
+
+    score = c.get("credit_score", CREDIT_SCORE_DEFAULT)
+    summary = f"You're carrying ${cash:.0f} cash"
+    if bank_lines:
+        summary += " and " + ", ".join(bank_lines)
+    summary += f". Credit score: {score}."
+    lines.append(summary)
+
+    gov_debt = c.get("government_debt", 0.0)
+    if gov_debt > 0:
+        lines.append(f"You owe ${gov_debt:.0f} in unpaid income tax to the government -- "
+                      f"it's quietly hurting your credit score the longer it goes unpaid.")
+
+    cards = get_credit_cards(c)
+    if cards:
+        card_lines = [
+            f"{card.get('provider')} credit card: ${card.get('current_debt', 0):.0f} owed "
+            f"of ${card.get('max_credit', 0):.0f} limit"
+            for card in cards
+        ]
+        lines.append("Credit cards: " + "; ".join(card_lines) + ".")
+    elif is_eligible(c):
+        lines.append("Your credit score qualifies you to apply for a credit card at a bank, "
+                      "if you wanted one -- call a bank and book an appointment for a "
+                      "credit_card_application.")
+
+    household = world.get("households", {}).get(c.get("household_id"))
+    if household:
+        chars = world.get("characters", {})
+        own_loans = [l for l in household.get("loans", {}).values()
+                     if c["id"] in l.get("borrower_ids", []) and l.get("balance", 0) > 0]
+        if not own_loans:
+            from systems.loans import UNSECURED_MIN_CREDIT_SCORE
+            if score >= UNSECURED_MIN_CREDIT_SCORE:
+                lines.append("Your credit score qualifies you for an unsecured personal loan from "
+                              "a loan provider, if you needed one -- alone or jointly with another "
+                              "household member (combining income for a bigger loan). Call one and "
+                              "book an appointment for a loan_application.")
+        if own_loans:
+            loan_lines = []
+            for loan in own_loans:
+                co = [chars[cid].get("name", cid) for cid in loan["borrower_ids"]
+                      if cid != c["id"] and cid in chars]
+                joint_note = f" (joint with {', '.join(co)})" if co else ""
+                loan_lines.append(
+                    f"{loan['provider']} {loan['kind']} loan{joint_note}: ${loan['balance']:.0f} "
+                    f"balance, ${loan['monthly_payment']:.0f}/month"
+                )
+            lines.append("Loans: " + "; ".join(loan_lines) + ".")
+
+        bills = household.get("bills_due") or []
+        if bills:
+            latest = bills[-1]
+            others_debt = [m for m in (latest.get("credit_card_by_member") or [])
+                           if m.get("character_id") != c["id"]]
+            others_loans = [m for m in (latest.get("loan_by_borrower") or [])
+                             if m.get("character_id") != c["id"]]
+            others = others_debt + others_loans
+            if others:
+                parts = ", ".join(f"{m['name']} (${m['amount']:.0f}/wk)" for m in others)
+                lines.append(
+                    f"This week's household bill (${latest.get('amount', 0):.0f}) includes "
+                    f"personal debt payments for: {parts} -- paid from shared household funds "
+                    f"either way."
+                )
+
+    return lines
+
+
 def _sec_values(c, world):
     lines = _build_values_context(c, world)
     return list(lines) if lines else None
@@ -1658,6 +1844,9 @@ NARRATIVE_SECTIONS = [
     ("proposals",             "full", _sec_proposals),
     ("social_rules",          "full", _sec_social_rules),
     ("worries",               "full", _sec_worries),
+    ("finances",              "full", _sec_finances),
+    ("social_feed",           "full", _sec_social_feed),
+    ("popularity",            "full", _sec_popularity),
     ("values",                "full", _sec_values),
     ("curiosity",             "full", _sec_curiosity),
     ("influence",             "full", _sec_influence),
@@ -1812,8 +2001,16 @@ def _build_proposal_context(c, world):
                     note = (f"Someone proposed {p.get('chore_id')} — you can accept, decline, "
                             f"or counter with different details.")
                 elif kind == "social_ask":
-                    note = (f"Someone is asking you: {p.get('chore_id')} — you can accept, "
-                            f"decline, or counter.")
+                    # params.text carries the real question when the asker
+                    # supplied one (e.g. systems/choice.py::
+                    # maybe_seek_validation()'s "what do you think of X?"
+                    # asks) -- chore_id there is just a topic slug
+                    # ("opinion_on_outfit"), not readable prose. Falls back
+                    # to chore_id for social_ask uses that don't set text.
+                    proposer = chars.get(p.get("proposer_id"))
+                    question = (p.get("params") or {}).get("text") or p.get("chore_id")
+                    note = (f"{proposer.get('name', 'Someone') if proposer else 'Someone'} is "
+                            f"asking you: {question} — you can accept, decline, or counter.")
                 elif kind == "request":
                     proposer = chars.get(p.get("proposer_id"))
                     params = p.get("params", {})
@@ -1821,6 +2018,39 @@ def _build_proposal_context(c, world):
                             f"asking you: {p.get('chore_id')} — {params.get('situation', '')} "
                             f"(urgency {params.get('urgency', 0)}/100) — you can accept, "
                             f"decline, or counter.")
+                    # systems/favors.py -- real accumulated fatigue from
+                    # granting this person favors with little back, not
+                    # just flavor text; the LLM sees this and can
+                    # naturally lean toward declining/countering.
+                    from systems.favors import is_favor_worn_out
+                    if proposer and is_favor_worn_out(c, proposer["id"]):
+                        note += (" You've done a lot for them lately without much "
+                                 "coming back the other way.")
+                elif kind == "item_loan":
+                    # chore_id holds the item_id for this kind (see
+                    # systems/proposals.py::propose_item_loan) -- the item
+                    # is in THIS character's own inventory since they're
+                    # the one being asked to lend it out.
+                    proposer = chars.get(p.get("proposer_id"))
+                    from systems.personal_items import get_item_by_id
+                    item = get_item_by_id(c, p.get("chore_id"))
+                    item_name = item.get("name", p.get("chore_id")) if item else p.get("chore_id")
+                    days = round(p.get("params", {}).get("duration_ticks", 0) / 86400)
+                    note = (f"{proposer.get('name', 'Someone') if proposer else 'Someone'} wants "
+                            f"to borrow your {item_name} for about {days} day(s) — you can accept, "
+                            f"decline, or counter with a different duration.")
+                elif kind == "item_sale":
+                    proposer = chars.get(p.get("proposer_id"))
+                    from systems.personal_items import get_item_by_id
+                    item = get_item_by_id(c, p.get("chore_id"))
+                    item_name = item.get("name", p.get("chore_id")) if item else p.get("chore_id")
+                    params = p.get("params", {})
+                    price = params.get("offer_price")
+                    price_note = f"offering ${price:.0f}" if price else "asking what you'd want for it"
+                    trade_note = " (also offering to trade one of their items)" if params.get("offer_item_id") else ""
+                    note = (f"{proposer.get('name', 'Someone') if proposer else 'Someone'} wants "
+                            f"to buy your {item_name}, {price_note}{trade_note} — you can accept, "
+                            f"decline, or counter with a different price.")
                 else:
                     note = f"Someone offered to make {p.get('chore_id')} a recurring thing."
                 incoming.append({
@@ -1844,6 +2074,10 @@ def _build_proposal_context(c, world):
                         advance_action = "advance_social_round"
                     elif kind == "request":
                         advance_action = "advance_request_round"
+                    elif kind == "item_loan":
+                        advance_action = "advance_item_loan_round"
+                    elif kind == "item_sale":
+                        advance_action = "advance_item_sale_round"
                     else:
                         advance_action = "advance_chore_round"
                     mediating.append({

@@ -154,13 +154,13 @@ def _spawn_character_locked(sim_id, template_id, x, y, body):
             if tmpl.get("household_id"):   overrides["household_id"] = tmpl["household_id"]
             if tmpl.get("bio"):             overrides["bio"] = tmpl["bio"]
             if tmpl.get("instance"): overrides.update(tmpl["instance"])
-            character = generate_character(defs, overrides)
+            character = generate_character(defs, overrides, world=world)
         else:
             overrides = {k: v for k, v in body.items()
                          if k not in ("sim_id", "x", "y")}
             overrides["x"] = x
             overrides["y"] = y
-            character = generate_character(defs, overrides)
+            character = generate_character(defs, overrides, world=world)
 
         world.setdefault("characters", {})[character["id"]] = character
 

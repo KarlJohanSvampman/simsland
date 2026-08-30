@@ -120,11 +120,11 @@ def _stub_npc(world, defs, age, sex, surname=None, seed_char=None, relation_type
         if relation_type == "child" and seed_char.get("values"):
             overrides["parent_values"] = [seed_char["values"]]
     if surname:
-        c = generate_character(defs, overrides)
+        c = generate_character(defs, overrides, world=world)
         c["family_name"] = surname
         c["name"] = f"{c['first_name']} {surname}"
     else:
-        c = generate_character(defs, overrides)
+        c = generate_character(defs, overrides, world=world)
     world["characters"][c["id"]] = c
     return c
 

@@ -30,6 +30,12 @@ def assign_prop_room(
 
     prop["building_id"] = building_id
 
+    # A prop's household owner defaults to whichever household owns the
+    # building's floorplan -- setdefault so a prop already explicitly
+    # assigned elsewhere (e.g. a car/garage/bus prop under a specific
+    # household by systems/vehicles.py) isn't silently overwritten.
+    prop.setdefault("household_id", building.get("owner_household_id"))
+
     return room_id
 
 

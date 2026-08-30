@@ -126,14 +126,65 @@ def record_positive_exposure(observer, source, trait, world, strength_gain=STREN
     return entry
 
 
-def _promote_absorbed_trait(observer, entry, world):
-    """Promote an accumulated influence_profile entry to a permanent trait --
-    mirrors conditioning.py::_convert_to_trait()'s shape. Gated by cap
-    room (MAX_PERSONALITY_TRAITS, evicting if needed -- see
-    _make_room_for_trait()) and by the character's annual trait-learning
-    budget (systems/trait_budget.py). Either gate failing defers
-    promotion (NOT marked converted) so it's retried on the next
-    qualifying exposure."""
+def _select_ready_candidate(observer, world, entry, profile_key, id_key, converted_key, template_lookup, finalize):
+    """resolve_cognitive_adoption()'s loop evaluates every candidate
+    trait/belief from every relationship independently -- nothing ever
+    weighed simultaneously-ready candidates against each other, so two+
+    could cross threshold and promote in the very same cycle with no
+    "choice" involved at all. This is that missing choice: when more
+    than one candidate in `profile_key` is past threshold and not yet
+    converted, systems/choice.py decides which ONE actually gets adopted
+    this cycle.
+
+    Choosing a candidate OTHER than `entry` used to just defer `entry`
+    and return False, trusting the winner's own independent future
+    trigger to promote it later -- but that re-runs this same comparison
+    from scratch with no memory of the earlier decision, so the choice
+    could ping-pong between ready candidates indefinitely without either
+    one ever committing. Instead, the winner is finalized right here via
+    `finalize(observer, winning_entry, world)` (the caller's own
+    cap/budget-gated promotion mechanics, bypassing this gate so there's
+    no re-entrant re-choice) so a choice among ready candidates always
+    results in someone being promoted this cycle. Returns True if
+    `entry` itself is the one that should proceed to promotion right now
+    (the caller then finalizes `entry` itself); False otherwise."""
+    ready = [
+        e for e in observer.get(profile_key, [])
+        if not e.get(converted_key)
+        and e["strength"] >= TRAIT_CONVERSION_THRESHOLD
+        and e["exposure_count"] >= MIN_REINFORCEMENTS
+    ]
+    if len(ready) <= 1:
+        return True
+
+    options = [
+        {"id": e[id_key], "label": template_lookup.get(e[id_key], {}).get("name", e[id_key]), "tags": []}
+        for e in ready
+    ]
+    from systems.choice import choose
+    picked = choose(observer, world, f"which {id_key} to take on", options)
+    if not picked:
+        return True
+
+    from systems.validation import queue_choice_for_validation
+    queue_choice_for_validation(observer, world, f"personal_{id_key}_change", picked["label"])
+
+    if picked["id"] == entry[id_key]:
+        return True
+
+    winner = next((e for e in ready if e[id_key] == picked["id"]), None)
+    if winner is not None:
+        finalize(observer, winner, world)
+    return False
+
+
+def _finalize_trait_promotion(observer, entry, world):
+    """The actual cap/budget-gated promotion mechanics for an
+    influence_profile entry, factored out of _promote_absorbed_trait() so
+    _select_ready_candidate() can finalize a WINNING candidate directly
+    (bypassing the gate, no re-entrant re-choice) when it isn't the entry
+    that triggered the check. Either gate failing defers promotion (NOT
+    marked converted) so it's retried on the next qualifying exposure."""
     trait = entry["trait"]
     if trait in observer.get("personality_traits", []) or trait in observer.get("traits", []):
         entry["trait_converted"] = True
@@ -156,6 +207,27 @@ def _promote_absorbed_trait(observer, entry, world):
         "exposure_count":    entry["exposure_count"],
     })
     entry["trait_converted"] = True
+
+
+def _promote_absorbed_trait(observer, entry, world):
+    """Promote an accumulated influence_profile entry to a permanent trait --
+    mirrors conditioning.py::_convert_to_trait()'s shape. Gated by cap
+    room (MAX_PERSONALITY_TRAITS, evicting if needed -- see
+    _make_room_for_trait()) and by the character's annual trait-learning
+    budget (systems/trait_budget.py). Either gate failing defers
+    promotion (NOT marked converted) so it's retried on the next
+    qualifying exposure."""
+    trait = entry["trait"]
+    if trait in observer.get("personality_traits", []) or trait in observer.get("traits", []):
+        entry["trait_converted"] = True
+        return
+
+    trait_templates = world.get("definitions", {}).get("trait_templates", {})
+    if not _select_ready_candidate(observer, world, entry, "influence_profile", "trait",
+                                    "trait_converted", trait_templates, _finalize_trait_promotion):
+        return
+
+    _finalize_trait_promotion(observer, entry, world)
 
 
 # =========================================================
@@ -332,11 +404,11 @@ def record_positive_belief_exposure(observer, source, belief, world, strength_ga
     return entry
 
 
-def _promote_absorbed_belief(observer, entry, world):
-    """Promote an accumulated belief_influence_profile entry to a
-    permanent held belief -- mirrors _promote_absorbed_trait()'s shape,
-    sharing the same cap-eviction pool (_make_room_for_belief) and annual
-    trait+belief budget as trait promotion."""
+def _finalize_belief_promotion(observer, entry, world):
+    """Belief-side mirror of _finalize_trait_promotion() -- the actual
+    cap/budget-gated promotion mechanics, factored out so
+    _select_ready_candidate() can finalize a WINNING candidate directly
+    when it isn't the entry that triggered the check."""
     belief = entry["belief"]
     if belief in observer.get("held_beliefs", []):
         entry["belief_converted"] = True
@@ -360,6 +432,24 @@ def _promote_absorbed_belief(observer, entry, world):
             "exposure_count":    entry["exposure_count"],
         })
     entry["belief_converted"] = True
+
+
+def _promote_absorbed_belief(observer, entry, world):
+    """Promote an accumulated belief_influence_profile entry to a
+    permanent held belief -- mirrors _promote_absorbed_trait()'s shape,
+    sharing the same cap-eviction pool (_make_room_for_belief) and annual
+    trait+belief budget as trait promotion."""
+    belief = entry["belief"]
+    if belief in observer.get("held_beliefs", []):
+        entry["belief_converted"] = True
+        return
+
+    belief_templates = world.get("definitions", {}).get("belief_templates", {})
+    if not _select_ready_candidate(observer, world, entry, "belief_influence_profile", "belief",
+                                    "belief_converted", belief_templates, _finalize_belief_promotion):
+        return
+
+    _finalize_belief_promotion(observer, entry, world)
 
 
 def resolve_cognitive_adoption(world, defs, characters):

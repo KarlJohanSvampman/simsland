@@ -49,6 +49,32 @@ CLOTHING_SLOTS = {
 
 ALL_SLOTS = list(CLOTHING_SLOTS.keys())
 
+# =========================================================
+# BODY MODEL COMPATIBILITY
+# A rigged/shared_skeleton clothing mesh (see main.js::attachClothing's
+# shared_skeleton path) is fit and weight-painted against ONE specific
+# body rig's proportions -- it does not transfer to a differently-
+# proportioned skeleton even when bone names match (bind-pose bone
+# lengths differ per rig). item_templates therefore optionally tag which
+# single body this exact asset was rigged for; absent/None means
+# universal (today's rigid-bone-attachment-only clothing, which has no
+# model asset and no fitting concern, or a genuinely one-size item).
+# =========================================================
+
+BODY_MODELS = [
+    "child_male", "child_female",
+    "teen_male", "teen_female",
+    "adult_male", "adult_female",
+    "elder_male", "elder_female",
+]
+
+
+def is_body_compatible(item_template, model):
+    """True if item_template can be worn/sold to a character whose own
+    body model is `model`. An item with no body_model tag is universal."""
+    required = item_template.get("body_model")
+    return not required or required == model
+
 
 # =========================================================
 # WORN STATE INIT

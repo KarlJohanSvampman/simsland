@@ -625,6 +625,28 @@ ACTIVITIES = {
         "category": "leisure"
     },
 
+    "read_newspaper": {
+
+        "interaction": "read",
+
+        "base_duration_minutes": 30,
+
+        "interruptible": True,
+
+        "category": "leisure"
+    },
+
+    "browse_news": {
+
+        "interaction": "phone",
+
+        "base_duration_minutes": 30,
+
+        "interruptible": True,
+
+        "category": "leisure"
+    },
+
     "clean_house": {
 
         "interaction": "clean",
@@ -891,6 +913,46 @@ ACTIVITIES = {
         "interruptible": False,
 
         "category": "errands"
+    },
+
+    # Real on-grid walk-up-and-buy at the convenience store's register
+    # (systems/convenience_store.py) -- distinct from "go_shopping"/
+    # "buy_food" above, which are unimplemented placeholders tied to the
+    # abstracted off-grid errand system, not a physical prop.
+    "convenience_store_checkout": {
+
+        "interaction": "checkout",
+
+        "base_duration_minutes": 6,
+
+        "interruptible": False,
+
+        "category": "errands"
+    },
+
+    "use_atm": {
+
+        "interaction": "use_atm",
+
+        "base_duration_minutes": 3,
+
+        "interruptible": False,
+
+        "category": "errands"
+    },
+
+    # Reuses prop_templates["wardrobe"]'s existing "anchor_change_clothes"
+    # anchor (interaction "change_clothes") -- authored content that had
+    # no activity referencing it until systems/dressing.py.
+    "get_dressed": {
+
+        "interaction": "change_clothes",
+
+        "base_duration_minutes": 5,
+
+        "interruptible": False,
+
+        "category": "self_care"
     },
 
     "buy_food": {
@@ -1189,6 +1251,21 @@ def start_activity(
 
         "state": {}
     }
+
+    # convenience_store_checkout has no external caller-supplied item --
+    # pick from the register's own catalog (definitions.json's "register"
+    # prop_template) right here at start, same as every other activity
+    # resolves its own specifics without external input.
+    if activity_type == "convenience_store_checkout" and prop.get("catalog"):
+        import random as _random
+        from systems.clothing import is_body_compatible
+        item_templates = world.get("definitions", {}).get("item_templates", {})
+        stock = [
+            entry for entry in prop["catalog"]
+            if is_body_compatible(item_templates.get(entry["item_template"], {}), c.get("model"))
+        ]
+        if stock:
+            c["activity"]["state"]["catalog_entry"] = _random.choice(stock)
 
     request_route_to_anchor(
 
@@ -1606,6 +1683,12 @@ def complete_activity(
     from systems.activity_queue import mark_queue_task_done
     mark_queue_task_done(c, activity_type, success=True)
 
+    # Expectation completion -- must read _active_hobby_params BEFORE the
+    # "HOBBY SESSION" block below pops it. No-ops instantly if this
+    # activity wasn't dispatched for an expectation (the common case).
+    from systems.expectation_planner import on_expectation_activity_complete
+    on_expectation_activity_complete(c, world, c.get("_active_hobby_params"))
+
     # =====================================
     # HOBBY SESSION — consume item uses
     # and queue put-away for organized chars
@@ -1613,6 +1696,7 @@ def complete_activity(
 
     if activity_type == "hobby_session" or c.get("_active_hobby_params"):
         hobby_params = c.pop("_active_hobby_params", None) or act
+        from systems.hobby_planner import consume_hobby_uses
         consume_hobby_uses(c, world, hobby_params)
         # Stand up if the character was seated for this hobby
         if c.get("seat_prop_id"):
@@ -1747,12 +1831,12 @@ def complete_activity(
     # =====================================
     elif activity_type == "cook_recipe":
 
-        from systems.cooking_process import start_cooking_process
+        from systems.cooking_process import start_cooking_process, choose_recipe
 
         household = world["households"].get(c.get("household_id"))
 
         if household:
-            recipe_id = choose_recipe(c, household)
+            recipe_id = choose_recipe(c, world, household)
             if recipe_id:
                 start_cooking_process(c, household, recipe_id, world)
 
@@ -1892,7 +1976,7 @@ def complete_activity(
                 "has_mail"
                ] = False
 
-            sort_household_mail(household)
+            sort_household_mail(household, world)
 
     # =====================================
     # ADULT CONTENT — porn habit + sexism drift
@@ -1922,6 +2006,18 @@ def complete_activity(
             from systems.body import on_consume_complete
             on_consume_complete(c, world, item)
 
+    elif activity_type == "convenience_store_checkout":
+        from systems.convenience_store import resolve_checkout
+        resolve_checkout(c, world, act)
+
+    elif activity_type == "use_atm":
+        from systems.convenience_store import resolve_atm_use
+        resolve_atm_use(c, world, act)
+
+    elif activity_type == "get_dressed":
+        from systems.dressing import resolve_get_dressed
+        resolve_get_dressed(c, world, act)
+
     # =====================================
     # RECORD HABIT
     # Every completed activity reinforces a time-of-day habit so future
@@ -1947,6 +2043,15 @@ def finish_activity(c, world):
     activity slot once the finishing animation's single tick has played.
     """
     activity_type = (c.get("activity") or {}).get("type")
+
+    # Reading a physical newspaper naturally ending (as opposed to being
+    # interrupted by a debate -- see systems/reading_process.py's own
+    # put-away call on that path) still needs the paper put down.
+    process = c.get("active_process")
+    if process and process.get("type") == "reading_news":
+        from systems.reading_process import put_away_reading_item
+        put_away_reading_item(c, world)
+        c["active_process"] = None
 
     c["activity"] = None
     c["current_intention"] = None

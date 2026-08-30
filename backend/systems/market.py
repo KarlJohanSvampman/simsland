@@ -89,6 +89,10 @@ def init_market_catalog(world):
             "resource_type":     t.get("resource_type"),
             "storage_container": t.get("storage_container"),
             "quantity":          t.get("quantity", 1),
+            # See systems/clothing.py::is_body_compatible() -- only
+            # meaningful for clothing (rigged mesh fit to one body rig's
+            # proportions); None for everything else.
+            "body_model":        t.get("body_model"),
         }
 
     # Floor material templates (tile_white_01, wood_floor_01, etc.)
@@ -205,12 +209,16 @@ def get_item_price(world, template_id):
 # BROWSE CATALOG
 # =========================================================
 
-def browse_catalog(world, category=None, budget=None, item_type=None):
+def browse_catalog(world, category=None, budget=None, item_type=None, body_model=None):
     """
     Return list of catalog entries the character can afford.
 
     item_type: "item" | "prop" | None (both)
+    body_model: if given, excludes clothing rigged for a different body
+    (see systems/clothing.py::is_body_compatible) -- entries with no
+    body_model tag stay visible to everyone.
     """
+    from systems.clothing import is_body_compatible
     catalog = world.get("market", {}).get("catalog", {})
     results = []
     for tid, entry in catalog.items():
@@ -219,6 +227,8 @@ def browse_catalog(world, category=None, budget=None, item_type=None):
         if category and entry["category"] != category:
             continue
         if budget is not None and entry["current_price"] > budget:
+            continue
+        if body_model and not is_body_compatible(entry, body_model):
             continue
         results.append({"id": tid, **entry})
     return results

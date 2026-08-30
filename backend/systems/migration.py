@@ -79,9 +79,11 @@ def should_consider_moving(
     if not current:
         return True
 
+    # remaining, not amount -- see eviction.py::check_household_for_eviction
+    # for why (amount never decreases once a bill's paid down).
     debt = sum(
 
-        b.get("amount",0)
+        b.get("remaining",0)
 
         for b in household.get(
             "bills_due",
@@ -184,6 +186,6 @@ def _do_migrate(household, world):
     if old:
         old["vacant"]       = True
         old["household_id"] = None
-    assign_household_to_home(household, new_home)
+    assign_household_to_home(household, new_home, world=world)
     household["housing_stress"]    *= 0.5
     household["_migration_emitted"] = False  # reset so threshold can re-fi

@@ -82,10 +82,14 @@ def get_vacant_homes(world):
 # ASSIGN / VACATE
 # =========================================================
 
-def assign_household_to_home(household, home):
+def assign_household_to_home(household, home, world=None):
     home["household_id"]     = household["id"]
     home["vacant"]           = False
     household["home_id"]     = home["id"]
+    # Restarts the convenience-tracking "settling in" clock (see
+    # systems/convenience.py) -- whether this move was chosen or forced,
+    # stability toward "established housing" begins counting from here.
+    household["home_since_tick"] = world.get("tick", 0) if world else None
 
 
 def vacate_home(home, household=None):

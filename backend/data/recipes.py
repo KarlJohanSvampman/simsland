@@ -2,6 +2,10 @@ RECIPES = {
 
     "simple_pasta": {
 
+        "name": "Simple Pasta",
+
+        "tags": ["casual", "quick", "vegetarian_friendly"],
+
         "difficulty": 0.3,
 
         "time_minutes": 25,
@@ -65,6 +69,10 @@ RECIPES = {
     },
 
     "protein_plate": {
+
+        "name": "Protein Plate",
+
+        "tags": ["hearty", "high_protein"],
 
         "difficulty": 0.5,
 

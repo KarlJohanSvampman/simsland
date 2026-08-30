@@ -29,6 +29,37 @@ COGNITION_CORE_TRAITS = {
 }
 
 
+def ensure_prop_template_fields(world, defs):
+    """api/props.py::create_prop() never actually copied anchors/storage/
+    footprint/category from the template onto the instance until this
+    round -- every prop placed before that fix (which is every prop in
+    any already-persisted world) is missing them, so
+    find_nearest_anchor() (props.py) could never find a match on it
+    (eat/drink/sit/shower/... interactions all silently failed to even
+    start) and containers.ensure_prop_storage() had nothing to stamp
+    from. Separate from ensure_world_defaults() below because `defs`
+    isn't available at either of that function's call sites in db.py
+    (called before definitions load on cold load; called at all on cache
+    hit) -- call this once `defs`/world["definitions"] is actually in
+    hand instead."""
+    if not defs:
+        return
+    prop_templates = defs.get("prop_templates", {})
+    import copy
+    for prop in world.get("props", []):
+        template = prop_templates.get(prop.get("template"))
+        if not template:
+            continue
+        if prop.get("anchors") is None:
+            prop["anchors"] = copy.deepcopy(template.get("anchors", []))
+        if prop.get("storage") is None and template.get("storage") is not None:
+            prop["storage"] = copy.deepcopy(template.get("storage"))
+        prop.setdefault("footprint", template.get("footprint"))
+        prop.setdefault("category", template.get("category"))
+        if template.get("catalog") is not None:
+            prop.setdefault("catalog", template.get("catalog"))
+
+
 def ensure_world_defaults(world, defs=None):
     # Server-side time-scale control (see api/admin.py) -- 1x is realtime.
     world.setdefault("time_scale", 1)
@@ -135,6 +166,21 @@ def ensure_world_defaults(world, defs=None):
     from systems.props import get_props_by_template
     for mailbox in get_props_by_template(world, "mailbox"):
         mailbox.setdefault("household_id", None)
+
+    # Every OTHER prop's household_id (see room_assignment.py::
+    # assign_prop_room, which sets this at creation time going forward)
+    # -- backfilled here for props that existed before that fix, or that
+    # were placed through a path that never called it. household_id
+    # stays None for props with no building_id (public infrastructure --
+    # bus, bus stop -- which already explicitly set it to None) or whose
+    # building has no owning household (a vacant/unclaimed home).
+    buildings_by_id = {b["id"]: b for b in world.get("buildings", []) if b.get("id")}
+    for prop in world.get("props", []):
+        if "household_id" in prop:
+            continue
+        building = buildings_by_id.get(prop.get("building_id"))
+        prop["household_id"] = building.get("owner_household_id") if building else None
+
 
     # =====================================================
     # ENVIRONMENT
@@ -368,7 +414,7 @@ def ensure_world_defaults(world, defs=None):
     ].values():
 
         ensure_character_defaults(
-            c
+            c, world=world
         )
 
     # =====================================================
@@ -382,6 +428,35 @@ def ensure_world_defaults(world, defs=None):
         ensure_household_defaults(
             h
         )
+
+        # Physical mailbox position -- service_vehicles.py's route
+        # pathfinding (systems/newspaper_delivery.py, and the separately
+        # dormant systems/postal_service.py) needs a real x/y here, but
+        # nothing ever set one: mail.py's household.setdefault("mailbox",
+        # {...}) only ever gives it has_mail/items/unopened_count (an
+        # abstract inbox, unrelated shape) -- this backfill adds x/y
+        # alongside whatever mail.py already put there, never overwriting
+        # it. A simple fixed offset from the building origin, same
+        # pattern as vehicles.py::GARAGE_LOCAL_OFFSET.
+        mailbox = h.setdefault("mailbox", {})
+        if "x" not in mailbox or "y" not in mailbox:
+            building = next(
+                (b for b in world.get("buildings", [])
+                 if b.get("owner_household_id") == h["id"]),
+                None,
+            )
+            if building:
+                from systems.transforms import local_to_world
+                mx, my = local_to_world(building, 0, -1)
+                mailbox["x"] = mx
+                mailbox["y"] = my
+
+        # Convenience/stability tracking (systems/convenience.py) -- when a
+        # household already has a home, treat "established" as starting to
+        # accrue from now rather than backdating a fake history.
+        if "home_since_tick" not in h:
+            h["home_since_tick"] = world.get("tick", 0) if h.get("home_id") else None
+
     # =====================================================
     # MEDIA
     # =====================================================
@@ -431,7 +506,7 @@ def ensure_market_defaults(market):
 # CHARACTER DEFAULTS
 # =========================================================
 
-def ensure_character_defaults(c):
+def ensure_character_defaults(c, world=None):
 
     # setdefault only fills a *missing* key -- if "alive" is present but
     # explicitly None (seen from ad-hoc debug/patch scripts), every
@@ -461,6 +536,54 @@ def ensure_character_defaults(c):
         "money",
         100
     )
+
+    if c.get("credit_score") is None:
+        from systems.credit import initial_credit_score
+        c["credit_score"] = initial_credit_score(c.get("age"), c.get("employed", False))
+
+    c.setdefault("government_debt", 0.0)
+
+    # Retrofit -- character_gen.py::generate_character() only grants a
+    # starting wallet/ID/bank card/bio to characters generated AFTER the
+    # banking round shipped. Any character already saved before that
+    # (or created by an older code path that skips generate_character
+    # entirely) is missing all four; this backfills them the first time
+    # ensure_character_defaults() sees such a character, using the exact
+    # same factories/shape as generation-time so it's indistinguishable
+    # from a freshly generated character afterward.
+    inventory = c.setdefault("inventory", [])
+    if not any(i.get("object_type") == "wallet" for i in inventory):
+        try:
+            import random
+            from systems.personal_items import make_wallet, make_id_card, make_bank_card, STARTER_BANKS
+            id_card = make_id_card(c["id"], c.get("name", ""), owner_id=c["id"])
+            bank_name = random.choice(STARTER_BANKS)
+            account_number = None
+            if world is not None:
+                from systems.banking import bank_key_for_name, open_account
+                bank_key = bank_key_for_name(bank_name)
+                if bank_key:
+                    account_number = open_account(world, bank_key, c["id"], initial_balance=0.0)
+            bank_card = make_bank_card(bank=bank_name, account_number=account_number, owner_id=c["id"])
+            wallet = make_wallet(cash=100.0, owner_id=c["id"], contents=[id_card, bank_card])
+            inventory.append(wallet)
+        except Exception:
+            pass
+
+    if not c.get("bio"):
+        from systems.character_gen import _fallback_bio_for_character
+        c["bio"] = _fallback_bio_for_character(c)
+
+    # Validation-seeking (systems/validation.py) -- queue of choices a
+    # character might still ask someone's opinion on, plus the
+    # popularity/scoring fields that ride on top of it.
+    c.setdefault("validation_queue", [])
+    c.setdefault("validation_refresh_time", 48)     # hours -- see check_validation_refresh()
+    c.setdefault("last_validation_received", 0)     # tick
+    c.setdefault("validation_score_24h", [])        # [{"tick","points"}], pruned to a rolling 24h window
+    c.setdefault("validation_personal_record", 0.0)  # best single validation-event score ever
+    c.setdefault("popularity", 0.0)
+    c.setdefault("followers", 0)
 
     c.setdefault(
         "hourly_wage",
@@ -778,6 +901,37 @@ def ensure_character_defaults(c):
     # (religious_strictness/sex_negative/homophobic) -- that's a static,
     # family-level structure unrelated to this per-character one.
     c.setdefault("values", {cat: {"importance": 0.5, "conform": True} for cat in VALUE_CATEGORIES})
+
+    # Recurring self-expectations ("checkboxes") -- what this character
+    # tries to live up to, at daily/weekly/monthly/yearly/once cadences
+    # (definitions.json's expectation_templates). Keyed by template_id.
+    # See systems/expectations.py -- calendar-period-anchored (not a
+    # rolling next_due_tick), sibling in spirit to lt_needs.py's per-need
+    # frustration/satisfy shape (deliberately not merged into it):
+    #   {template_id, cadence, category, of_self, requires_others,
+    #    current_period_key, satisfied_this_period, last_satisfied_tick,
+    #    streak, missed_count, frustration,
+    #    status: "pending"|"satisfied"|"missed", last_missed_blame: [char_id,...]}
+    c.setdefault("expectations", {})
+
+    # Convenience/stability tracking -- things a character has come to rely
+    # on (a steady job, a stable home, personal freedom/autonomy) whose
+    # LOSS is a bigger stressor than never having had them. See
+    # systems/convenience.py. "autonomy" defaults established=True (a
+    # baseline you have unless something takes it away); employment/housing
+    # ramp up to established over time (see convenience.py::ESTABLISH_TICKS)
+    # rather than starting established, since those are genuinely built up.
+    c.setdefault("conveniences", {
+        "employment": {"established": False, "disrupted_count": 0, "frustration": 0.0},
+        "housing":    {"established": False, "disrupted_count": 0, "frustration": 0.0},
+        "autonomy":   {"established": True,  "disrupted_count": 0, "frustration": 0.0},
+    })
+
+    # Preliminary plans (steps/requirements/possible-solutions) for active
+    # expectations -- see systems/expectation_planner.py, which queues
+    # steps onto c["activity_queue"] the same way hobby_planner.py does.
+    # Keyed by expectation_id.
+    c.setdefault("expectation_plans", {})
 
     # Opinions formed on specific topics/questions, informed by the values
     # above. Keyed by topic, each value a capped history of past-formed-
@@ -1186,6 +1340,11 @@ def ensure_household_defaults(h):
     h.setdefault(
         "shared_funds",
         0
+    )
+
+    h.setdefault(
+        "newspaper_subscription",
+        False
     )
 
     h.setdefault(

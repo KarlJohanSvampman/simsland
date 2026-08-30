@@ -58,6 +58,20 @@ def set_name(sim_id: str, payload: dict):
         return {"ok": True, "household": household}
 
 
+@router.post("/household/set_newspaper_subscription")
+def set_newspaper_subscription(sim_id: str, payload: dict):
+    with world_lock():
+        world = load_world(sim_id)
+
+        household = world.get("households", {}).get(payload["household_id"])
+        if not household:
+            return {"ok": False, "error": "household not found"}
+
+        household["newspaper_subscription"] = bool(payload.get("subscribed"))
+        save_world(sim_id, world)
+        return {"ok": True, "household": household}
+
+
 # =========================================================
 # ASSIGN / UNASSIGN BUILDING (floorplan)
 # =========================================================
@@ -217,8 +231,31 @@ def admin_detail(household_id: str, sim_id: str):
         return {"ok": False, "error": "household not found"}
 
     characters = world.get("characters", {})
+
+    def _wallet_of(char):
+        return next((i for i in char.get("inventory", []) if i.get("object_type") == "wallet"), None)
+
+    def _credit_cards_of(char):
+        wallet = _wallet_of(char)
+        contents = wallet.get("items", []) if wallet else []
+        return [
+            {"provider": card.get("provider"), "current_debt": card.get("current_debt"),
+             "max_credit": card.get("max_credit")}
+            for card in contents if card.get("object_type") == "credit_card"
+        ]
+
     members = [
-        {"id": cid, "name": characters[cid].get("name")}
+        {
+            "id": cid, "name": characters[cid].get("name"),
+            # Finances -- read-only summary for Character Creator's Household
+            # tab (banking/credit/loan round). Cash lives on the wallet item
+            # instance (personal_items.py::make_wallet), not a bare c["money"]
+            # field -- see wallet_cash()/spend_cash()/add_cash().
+            "wallet_cash": (_wallet_of(characters[cid]) or {}).get("states", {}).get("cash"),
+            "credit_score": characters[cid].get("credit_score"),
+            "government_debt": characters[cid].get("government_debt"),
+            "credit_cards": _credit_cards_of(characters[cid]),
+        }
         for cid in household.get("members", [])
         if cid in characters
     ]
@@ -232,6 +269,23 @@ def admin_detail(household_id: str, sim_id: str):
         if bid in buildings_by_id
     ]
 
+    # Loans live on the household (systems/loans.py -- joint co-borrowers),
+    # not per-character. Resolve borrower names for display.
+    loans = [
+        {**loan, "borrower_names": [characters.get(bid, {}).get("name", bid)
+                                     for bid in loan.get("borrower_ids", [])]}
+        for loan in (household.get("loans") or {}).values()
+    ]
+
+    # Physical mailbox contents (systems/mail.py) -- bills/formal-request
+    # letters, distinct from c["inbox"] (per-character SMS/call/email/
+    # voicemail, systems/inbox.py). Never trimmed, so this list doubles
+    # as full history; "opened" tracks whether it's been picked up (see
+    # activities.py's "check_mail" activity, which sets it True via
+    # sort_household_mail()).
+    mailbox = household.get("mailbox") or {}
+    mail_items = list(mailbox.get("items", []))
+
     return {
         "ok": True,
         "household": {
@@ -239,5 +293,18 @@ def admin_detail(household_id: str, sim_id: str):
             "name": household.get("name"),
             "members": members,
             "buildings": buildings,
+            "loans": loans,
+            # Household-level aggregate finances -- distinct from each
+            # member's personal wallet/credit above. shared_funds/wealth
+            # are the pooled household pot (systems/economy.py); bills_due
+            # is the pending-bills queue attempt_pay_bills() works through.
+            "shared_funds": household.get("shared_funds", 0),
+            "wealth": household.get("wealth", 0),
+            "bills_due": household.get("bills_due", []),
+            "newspaper_subscription": household.get("newspaper_subscription", False),
+            "mail": {
+                "unopened_count": mailbox.get("unopened_count", 0),
+                "items": mail_items,
+            },
         },
     }

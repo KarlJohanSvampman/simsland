@@ -66,6 +66,28 @@ def make_item_stack(template_id, quantity, world=None, **overrides):
     return make_item(template_id, quantity=quantity, world=world, **overrides)
 
 
+def create_generated_item(template_id, world, c=None, **overrides):
+    """make_item() plus real per-instance LLM content for shared-model
+    media items (book/magazine/dvd/music_disc -- see item_templates'
+    "content_category" field and llm/item_content.py). `world` is
+    required (unlike make_item) since the generation session lives on
+    it. Bridges the async LLM call the same way action_router.py's
+    _route_make_argument() already does (run_llm_call, llm/llm_gate.py)
+    rather than a second bridging mechanism -- safe to call from sync
+    system code as long as the caller isn't itself holding world_lock()
+    (see this project's established constraint on real LLM calls)."""
+    item = make_item(template_id, world=world, **overrides)
+    content_category = item.get("content_category")
+    if not content_category:
+        return item
+
+    from llm.item_content import generate_item_content, fallback_content
+    from llm.llm_gate import run_llm_call
+    content = run_llm_call(generate_item_content(c, world, item))
+    item["content"] = content if isinstance(content, dict) and content else fallback_content(content_category)
+    return item
+
+
 # =========================================================
 # BACKWARD-COMPAT FACTORIES (used before template system)
 # =========================================================
@@ -102,7 +124,47 @@ def make_house_key(home_id, building_id=None, owner_id=None):
     }
 
 
-def make_wallet(cash=100.0, owner_id=None):
+def make_key(kind, ref_id, owner_id=None):
+    """Generic key factory for car/mailbox. House keys keep using
+    make_house_key() above -- has_key_for()/lock_home()/unlock_home()/
+    can_unlock_door() below are all built around its home_id-matching
+    semantics specifically (a real door-lock mechanic), and there's no
+    equivalent car/mailbox lock to integrate with yet, just possession."""
+    labels = {"car": "Car Key", "mailbox": "Mailbox Key"}
+    return {
+        "id":          f"item_key_{kind}_{uuid.uuid4().hex[:6]}",
+        "template_id": f"{kind}_key",
+        "object_type": "key",
+        "key_kind":    kind,
+        "name":        labels.get(kind, "Key"),
+        "location":    "pocket",
+        "states":      {},
+        "quantity":    1,
+        "ref_id":      ref_id,
+        "owner_id":    owner_id,
+    }
+
+
+def has_key_for_ref(c, kind, ref_id):
+    """Car/mailbox key check -- see make_key(). Separate from
+    has_key_for() (house-only, keyed on home_id)."""
+    return any(
+        i.get("object_type") == "key" and i.get("key_kind") == kind and i.get("ref_id") == ref_id
+        for i in get_inventory(c)
+    )
+
+
+def make_wallet(cash=100.0, owner_id=None, contents=None):
+    """Cash stays on the simpler, already-wired states.cash path (see
+    wallet_cash/spend_cash/add_cash below) rather than becoming a discrete
+    item -- there's no real-world benefit to a "$1 bill" item instance.
+    ID/bank/credit cards, though, are genuinely held *inside* the wallet:
+    pre-stamped with the same items/capacity/accepted_categories shape
+    containers.py's add_to_container/remove_from_container expect (mirrors
+    item_templates["wallet"]["container"]), so this works with the
+    existing generic container machinery from the moment it's created,
+    not just once something happens to call ensure_item_container() on it.
+    """
     return {
         "id":       f"item_wallet_{uuid.uuid4().hex[:6]}",
         "template_id": "wallet",
@@ -114,6 +176,9 @@ def make_wallet(cash=100.0, owner_id=None):
         "owner_id": owner_id,
         # legacy flat key for backward compat
         "cash":     round(float(cash), 2),
+        "items":    contents or [],
+        "capacity": 6,
+        "accepted_categories": ["document", "financial"],
     }
 
 
@@ -122,13 +187,77 @@ def make_id_card(char_id, char_name, owner_id=None):
         "id":        f"item_idcard_{uuid.uuid4().hex[:6]}",
         "template_id": "id_card",
         "object_type": "document",
+        "category":  "document",
         "name":      "ID Card",
         "location":  "pocket",
         "states":    {},
         "quantity":  1,
+        "size":      1,
         "char_id":   char_id,
         "char_name": char_name,
         "owner_id":  owner_id,
+    }
+
+
+# Starter financial institutions -- each acts as both a bank (accounts/
+# secured loans, see banking.py once that round ships) and a credit card
+# provider. Defined here (not just in definitions.json's company_templates,
+# which don't exist yet for these) so make_bank_card() has something real
+# to reference immediately; the banking round replaces "bank" from a bare
+# name string with a resolved company_templates lookup + a real account
+# record, without needing to change this factory's call sites.
+STARTER_BANKS = ("JPMC", "Morgan Stanley", "Barclays", "TD Bank", "Bank of America")
+
+
+def make_bank_card(bank=None, account_number=None, owner_id=None):
+    import random
+    bank = bank or random.choice(STARTER_BANKS)
+    return {
+        "id":        f"item_bankcard_{uuid.uuid4().hex[:6]}",
+        "template_id": "bank_card",
+        "object_type": "bank_card",
+        "category":  "financial",
+        "name":      f"{bank} Bank Card",
+        "location":  "pocket",
+        "states":    {},
+        "quantity":  1,
+        "size":      1,
+        "bank":      bank,
+        "account_number": account_number or f"{random.randint(10**9, 10**10 - 1)}",
+        "owner_id":  owner_id,
+    }
+
+
+def make_credit_card(provider, max_credit, owner_id=None):
+    """Apply-only per credit.py's approval flow -- never starting
+    inventory (see character_gen.py, which only ever grants a bank_card).
+    The credit LINE lives directly on this item (max_credit/current_debt)
+    rather than referencing an external account, unlike make_bank_card()
+    -- a credit card isn't a deposit account, it's a lender's ledger of
+    what this one character owes."""
+    return {
+        "id":          f"item_creditcard_{uuid.uuid4().hex[:6]}",
+        "template_id": "credit_card",
+        "object_type": "credit_card",
+        "category":    "financial",
+        "name":        f"{provider} Credit Card",
+        "location":    "pocket",
+        "states":      {},
+        "quantity":    1,
+        "size":        1,
+        "provider":    provider,
+        "max_credit":  round(float(max_credit), 2),
+        "current_debt": 0.0,
+        # Baseline + accumulator for credit.py::tick_monthly_card_cycle()'s
+        # "was the minimum paid this month" check -- _payments_this_month
+        # is incremented by make_payment() and compared against
+        # _month_start_debt/12, deliberately NOT inferred from the
+        # current_debt delta (a new charge raises current_debt too, which
+        # would make someone who paid in full but also spent that month
+        # look delinquent).
+        "_month_start_debt": 0.0,
+        "_payments_this_month": 0.0,
+        "owner_id":    owner_id,
     }
 
 
@@ -174,12 +303,61 @@ def get_item_by_id(c, item_id):
 
 
 def add_item(c, item):
+    # setdefault, not a forced overwrite: an item created for one
+    # character but ending up in another's hands (found, borrowed,
+    # gifted, stolen) should keep tracking its real owner, not silently
+    # get reassigned just because someone else is now carrying it --
+    # action_router.py's "check someone else's device" snooping gate
+    # already depends on owner_id meaning the true owner, not the
+    # current holder. This is a backstop for the common case (a
+    # character's own purchase/creation never got owner_id stamped at
+    # all) covering every caller that funnels through here, rather than
+    # patching each item factory/call site individually.
+    item.setdefault("owner_id", c.get("id"))
     get_inventory(c).append(item)
 
 
 def remove_item(c, item_id):
     inv = get_inventory(c)
     c["inventory"] = [i for i in inv if i.get("id") != item_id]
+
+
+def recall_overdue_loans(world):
+    """Periodic sweep (see sim_loop.py) -- returns any item past its
+    loan due_tick (set by systems/proposals.py::_finalize_item_loan) to
+    the real owner's inventory automatically. Always honored, no
+    "borrower forgot to give it back" enforcement gap -- that kind of
+    friction (declined return, relationship hit) is a plausible future
+    addition, not implemented here."""
+    chars = world.get("characters", {})
+    tick = world.get("tick", 0)
+    for borrower in list(chars.values()):
+        for item in list(get_inventory(borrower)):
+            loan = item.get("loan")
+            if not loan or tick < loan.get("due_tick", 0):
+                continue
+            owner = chars.get(loan.get("owner_id"))
+            if not owner:
+                continue
+            remove_item(borrower, item["id"])
+            item.pop("loan", None)
+            item["location"] = "pocket"
+            record_item_history(item, world, "returned", by=borrower["id"], to_owner=owner["id"])
+            add_item(owner, item)
+
+
+def record_item_history(item, world, event, **fields):
+    """item["history"] -- a provenance log, not a state machine: every
+    purchase/gift/loan/sale appends one entry rather than overwriting
+    anything, so "how did this end up here" stays answerable later.
+    Callers that change ownership (give_item, a completed sale/trade)
+    are responsible for updating item["owner_id"] themselves alongside
+    calling this -- this function only logs, it never mutates owner_id."""
+    item.setdefault("history", []).append({
+        "tick": world.get("tick", 0),
+        "event": event,
+        **fields,
+    })
 
 
 # =========================================================
@@ -202,6 +380,8 @@ def drop_item(c, item_id, world):
     item["placed_by"]     = c.get("id")
     item["placed_at_tick"]= world.get("tick", 0)
     world.setdefault("placed_items", {})[item_id] = item
+    from sim_loop import _mark_dirty
+    _mark_dirty(world, placed_item_ids={item_id})
     return item
 
 
@@ -217,6 +397,8 @@ def place_item(c, item_id, x, y, world):
     item["placed_by"]      = c.get("id")
     item["placed_at_tick"] = world.get("tick", 0)
     world.setdefault("placed_items", {})[item_id] = item
+    from sim_loop import _mark_dirty
+    _mark_dirty(world, placed_item_ids={item_id})
     return item
 
 
@@ -250,12 +432,18 @@ def break_item(c, item_id, world):
 
 
 def give_item(giver, receiver, item_id, world):
-    """Transfer item from giver to receiver's inventory."""
+    """Transfer item from giver to receiver's inventory -- a real
+    ownership change (unlike add_item()'s setdefault backstop), so
+    owner_id is reassigned outright and logged."""
     item = get_item_by_id(giver, item_id)
     if not item:
         return False
     remove_item(giver, item_id)
     item["location"] = "pocket"
+    prior_owner = item.get("owner_id")
+    item["owner_id"] = receiver.get("id")
+    record_item_history(item, world, "gifted",
+                         by=giver.get("id"), from_owner=prior_owner, to_owner=receiver.get("id"))
     add_item(receiver, item)
     return True
 
@@ -361,6 +549,45 @@ def add_cash(c, amount):
     new_cash = round(cash + amount, 2)
     w.setdefault("states", {})["cash"] = new_cash
     w["cash"] = new_cash
+
+
+def pay_from_wallet(c, world, price):
+    """Pay `price` the way a real person reaches for their wallet: cash
+    first, then a bank card (debits the linked account via
+    systems/banking.py), then a credit card (charges it via
+    systems/credit.py). Shared by every checkout path in the game --
+    originally written just for systems/convenience_store.py's register,
+    factored out here so systems/procurement.py's general market
+    purchases (which used to only ever deduct c["money"]) use the exact
+    same fallback logic rather than a second, divergent copy. Returns
+    True if any method covered the full price."""
+    if wallet_cash(c) >= price and spend_cash(c, price):
+        return True
+
+    wallet = get_item(c, "wallet")
+    if not wallet:
+        return False
+
+    from systems.banking import get_balance, withdraw, BANK_NAME_TO_KEY
+    for item in wallet.get("items", []):
+        if item.get("object_type") != "bank_card":
+            continue
+        bank_key = BANK_NAME_TO_KEY.get(item.get("bank"))
+        if not bank_key:
+            continue
+        balance = get_balance(world, bank_key, item["account_number"])
+        if balance is not None and balance >= price:
+            if withdraw(world, bank_key, item["account_number"], price):
+                return True
+
+    from systems.credit import charge as charge_credit_card
+    for item in wallet.get("items", []):
+        if item.get("object_type") != "credit_card":
+            continue
+        if charge_credit_card(item, price):
+            return True
+
+    return False
 
 
 # =========================================================

@@ -144,6 +144,58 @@ def get_view(
     ]
 
     # =====================================
+    # PLACED ITEMS (dropped/delivered items)
+    # =====================================
+    # Dict keyed by id, same reasoning as characters above -- merges
+    # cleanly with delta payloads without an array-index collision.
+
+    placed_items = {
+
+        iid: item
+
+        for iid, item in world.get(
+            "placed_items",
+            {}
+        ).items()
+
+        if in_view(
+
+            item.get("x", 0),
+            item.get("y", 0),
+
+            cx,
+            cy,
+
+            radius
+        )
+    }
+
+    # =====================================
+    # WORLD OBJECTS (service-worker-spawned props, e.g. mail bundles)
+    # =====================================
+
+    world_objects = [
+
+        o
+
+        for o in world.get(
+            "world_objects",
+            []
+        )
+
+        if in_view(
+
+            o.get("x", 0),
+            o.get("y", 0),
+
+            cx,
+            cy,
+
+            radius
+        )
+    ]
+
+    # =====================================
     # RUNTIME TILES (floorplan interiors)
     # =====================================
 
@@ -329,6 +381,10 @@ def get_view(
         "characters": characters,
 
         "props": props,
+
+        "placed_items": placed_items,
+
+        "world_objects": world_objects,
 
         # semantic defs
         "definitions": definitions,

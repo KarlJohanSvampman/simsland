@@ -185,8 +185,8 @@ def stage_sandbox(req: StageRequest):
             if tmpl.get(field):
                 overrides[field] = tmpl[field]
 
-        character = generate_character(defs, overrides)
-        ensure_character_defaults(character)
+        character = generate_character(defs, overrides, world=world)
+        ensure_character_defaults(character, world=world)
 
         # generate_character()'s output has a full "job" dict but no
         # top-level "employment" key, which build_visible_person_description

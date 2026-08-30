@@ -18,6 +18,44 @@ from systems.resource_runtime import (
 
 
 # =========================================================
+# CHOOSE RECIPE
+# =========================================================
+# activities.py's "cook_recipe" completion branch called an undefined
+# choose_recipe(c, household) -- this would NameError the moment a
+# character's activity actually resolved to cook_recipe. Filters to
+# recipes the household can actually make right now (every stage's
+# required resource_type present in storage), then picks via
+# systems/choice.py's generic utility.
+
+def _recipe_is_feasible(household, recipe):
+    from systems.household_storage import find_household_resource
+    required = set()
+    for stage in recipe.get("stages", []):
+        required.update(stage.get("inputs", {}).keys())
+    return all(find_household_resource(household, resource_type=rt) for rt in required)
+
+
+def choose_recipe(c, world, household, occasion=None):
+    recipes = _get_recipes(world)
+    feasible = [
+        {"id": rid, "label": r.get("name", rid), "tags": r.get("tags", [])}
+        for rid, r in recipes.items()
+        if _recipe_is_feasible(household, r)
+    ]
+    if not feasible:
+        return None
+
+    from systems.choice import choose
+    picked = choose(c, world, "meal", feasible, occasion=occasion)
+    if not picked:
+        return None
+
+    from systems.validation import queue_choice_for_validation
+    queue_choice_for_validation(c, world, "meal", picked["label"], occasion=occasion)
+    return picked["id"]
+
+
+# =========================================================
 # START COOKING PROCESS
 # =========================================================
 

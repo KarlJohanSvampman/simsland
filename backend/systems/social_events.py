@@ -587,6 +587,113 @@ def suggest_event_in_person(speaker_c, listener_c, world, event_id):
 # CONTEXT FOR LLM
 # =========================================================
 
+# Event category -> the VALUE_CATEGORIES domain it most implies caring
+# about (schema_defaults.py's 12 fixed life domains). Used only to weigh
+# evaluate_attendance_tradeoff()'s pros -- not every category needs an
+# entry; uncategorized events just skip that pro.
+_EVENT_VALUE_CATEGORY = {
+    "party": "leisure", "dinner": "family", "concert": "leisure",
+    "sports": "leisure", "meetup": "community", "festival": "community",
+    "exhibition": "leisure", "online_event": "leisure", "trip": "leisure",
+}
+
+# Expectation categories (systems/expectations.py, mirrors
+# brain/intentions.py's CATEGORY_PRIORITY) whose conflict with an event is
+# serious enough to fast-path auto-decline rather than leave to the LLM --
+# see _hard_conflict() below.
+_HARD_CONFLICT_CATEGORIES = {"survival", "health"}
+
+
+def evaluate_attendance_tradeoff(c, event, world):
+    """Deterministic pros/cons for whether c should attend `event`, using
+    systems/social_intentions.py::generate_social_intentions()'s weighted-
+    sum-scoring idiom (relationship stats * fixed coefficients) rather
+    than a hardcoded yes/no gate. Narrated into build_events_context()
+    below so the LLM's own RSVP/attend choice is actually informed by
+    it -- the "intention reflects the pros/cons weighed" design from the
+    expectations/intentions plan. Returns {"score": float,
+    "pros": [str,...], "cons": [str,...]}."""
+    chars = world.get("characters", {})
+    profile = c.get("attraction_profile") or {}
+    pros, cons = [], []
+    score = 0.0
+
+    # -- Pros --------------------------------------------------------
+    party_disposition = profile.get("party_disposition", 0.3)
+    score += party_disposition * 20
+    if party_disposition >= 0.5:
+        pros.append("the kind of thing you enjoy")
+
+    close_attendees = []
+    rel_bonus = 0.0
+    for aid, resp in event.get("attendees", {}).items():
+        if aid == c["id"] or resp != "yes":
+            continue
+        rel = c.get("relationships", {}).get(aid, {})
+        friendship = rel.get("friendship", 0)
+        if friendship > 30:
+            rel_bonus += friendship * 0.15
+            other = chars.get(aid)
+            if other:
+                close_attendees.append(other.get("name", aid))
+    score += rel_bonus
+    if close_attendees:
+        pros.append(f"{', '.join(close_attendees[:3])} will be there")
+
+    value_cat = _EVENT_VALUE_CATEGORY.get(event.get("category"))
+    if value_cat:
+        importance = c.get("values", {}).get(value_cat, {}).get("importance", 0.5)
+        score += importance * 15
+        if importance >= 0.7:
+            pros.append(f"matters to you ({value_cat})")
+
+    # -- Cons ----------------------------------------------------------
+    cost = event.get("cost_per_person", 0.0)
+    score -= cost * 0.3
+    if cost >= 20:
+        cons.append(f"costs ${cost:.0f}")
+
+    for eid, nd in c.get("expectations", {}).items():
+        if nd.get("category") in _HARD_CONFLICT_CATEGORIES and nd.get("status") in ("pending", "missed"):
+            score -= 40
+            cons.append(f"conflicts with {eid}")
+        elif nd.get("status") == "missed":
+            score -= 10
+            cons.append(f"you're already behind on {eid}")
+
+    # systems/persona_expectations.py -- someone attending holds a value-
+    # alignment clash against c; being seen there is itself a cost.
+    for aid, resp in event.get("attendees", {}).items():
+        if aid == c["id"] or resp != "yes":
+            continue
+        clashes = c.get("relationships", {}).get(aid, {}).get("personal_expectations", {})
+        if clashes:
+            score -= 8 * len(clashes)
+            other = chars.get(aid)
+            name = other.get("name", "someone") if other else "someone"
+            cons.append(f"{name} there disapproves of choices you've made")
+
+    casual_reluctance = profile.get("casual_reluctance", 0.5)
+    score -= casual_reluctance * 10
+
+    return {"score": round(score, 1), "pros": pros, "cons": cons}
+
+
+def _hard_conflict(c, world):
+    """The ONE-SIDED case worth fast-path auto-declining without a real
+    LLM turn -- a genuinely unaffordable event is already handled
+    separately in action_router.py::_route_social_event_attend (cost
+    check). This covers the other one-sided case: a due/overdue
+    survival- or health-category expectation the event would clash with.
+    Returns the conflicting expectation's label, or None."""
+    defs = world.get("definitions", {})
+    templates = defs.get("expectation_templates", {})
+    for eid, nd in c.get("expectations", {}).items():
+        if nd.get("category") in _HARD_CONFLICT_CATEGORIES and nd.get("status") in ("pending", "missed"):
+            return templates.get(eid, {}).get("label", eid)
+    return None
+
+
 def build_events_context(c, world, limit=4):
     """
     Returns a compact list of events the character knows about,
@@ -612,6 +719,7 @@ def build_events_context(c, world, limit=4):
             "tomorrow" if days_until == 1 else
             f"in {days_until} days" if days_until is not None else "unscheduled"
         )
+        tradeoff = evaluate_attendance_tradeoff(c, evt, world)
         out.append({
             "id":            evt["id"],
             "title":         evt["title"],
@@ -623,6 +731,8 @@ def build_events_context(c, world, limit=4):
             "when":          when,
             "pending_approval": evt.get("draft_approvals", {}).get(cid) == "pending",
             "has_pending_changes": bool(evt.get("pending_changes")),
+            "pros":          tradeoff["pros"],
+            "cons":          tradeoff["cons"],
         })
 
     # Social disposition hint — tells the LLM how likely this character is to want to go out

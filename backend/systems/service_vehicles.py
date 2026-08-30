@@ -189,17 +189,26 @@ def assign_next_vehicle_route(
 
     household = targets[idx]
 
+    mailbox = household.get("mailbox") or {}
+
+    # A household with no resolvable physical mailbox position (no
+    # building assigned, or schema_defaults.py's backfill hasn't run for
+    # it yet) can't be routed to -- skip it rather than crashing the
+    # whole vehicle (and, since this runs off the shared tick loop, the
+    # whole simulation) on a bare KeyError.
+    if "x" not in mailbox or "y" not in mailbox:
+
+        vehicle["current_target"] = idx + 1
+
+        return assign_next_vehicle_route(vehicle, world)
+
     road_target = nearest_road_tile(
 
         world,
 
-        household[
-            "mailbox"
-        ]["x"],
+        mailbox["x"],
 
-        household[
-            "mailbox"
-        ]["y"]
+        mailbox["y"]
     )
 
     current = (

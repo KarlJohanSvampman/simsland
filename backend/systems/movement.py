@@ -179,7 +179,18 @@ def update_character_movement(
 
         c["route"] = []
 
-        c["activity"] = None
+        # NOT c["activity"] = None here -- activities.py::execute_activity()
+        # runs BEFORE this function each tick (see agent_loop.py) and is the
+        # sole authority over the activity lifecycle: its "walking" phase
+        # handler waits for is_moving to clear, then transitions to "using"
+        # itself. Clearing activity here raced it -- since this function
+        # sets is_moving False in this exact same tick, execute_activity()
+        # would only ever see is_moving turn False on the tick immediately
+        # after activity was already wiped, so no walk-to-anchor activity
+        # (i.e. nearly all of them, via begin_interaction/
+        # request_route_to_anchor) could ever reach its "using" phase. A
+        # standalone move with no activity attached (c["activity"] already
+        # None) is unaffected either way.
 
         c["is_moving"] = False
 

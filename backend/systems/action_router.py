@@ -143,9 +143,17 @@ def apply_speech(c, world, speech):
         from systems.conversation_analysis import analyze_message, should_schedule_reflection
 
         conv = get_or_create_conversation(
-            world, c["id"], target_id, topic=topic or "general",
+            world, [c["id"], target_id], topic=topic or "general",
             medium=speech.get("medium", "in_person"),
         )
+
+        # Personal per-participant conversation goals (systems/
+        # conversation_goals.py) -- assigned lazily/idempotently for
+        # whichever side hasn't formed one yet, so both directions are
+        # populated from the first exchange rather than only the speaker.
+        from systems.conversation_goals import assign_conversation_goal, check_goal_trending
+        assign_conversation_goal(c, world, conv, target_id)
+        assign_conversation_goal(listener, world, conv, c["id"])
 
         # Optional LLM-set framing (argument, negotiation, persuasion, ...).
         # Simple overwrite, not a state machine — a conversation drifting
@@ -165,6 +173,12 @@ def apply_speech(c, world, speech):
         apply_interaction(c, listener, speech_act)
 
         result = analyze_message(world, conv, c, listener, utterance, speech_act)
+
+        # Is this trending toward the LISTENER's own goal for talking to
+        # c? A sustained "no" from a not_interested participant retires
+        # the conversation for them without spending a real LLM turn on
+        # it -- see conversation_goals.py::check_goal_trending.
+        check_goal_trending(conv, listener, topic or conv.get("topic", "general"))
 
         if should_schedule_reflection(result):
             listener.setdefault("pending_reflections", []).append({
@@ -222,6 +236,108 @@ def apply_speech(c, world, speech):
                 "listener_id": listener_id, "speaker_id": c["id"],
                 "speaker_name": c.get("name") or c["id"], "utterance": utterance,
             })
+
+
+# =========================================================
+# APPLY SPEECH TO GROUP
+# A new, separate entry point for real 3+-participant conversations
+# (e.g. a news-triggered debate -- see systems/reading_process.py) --
+# apply_speech() above is left completely untouched, since every one of
+# its downstream calls (get_or_create_conversation before this change,
+# analyze_message, push_conversation_reaction, apply_interaction) is
+# written for exactly one listener. Rather than teach all of those
+# single-listener functions about groups, this loops each of them once
+# per OTHER participant -- each listener gets their own analysis/
+# reaction/relationship update off the one shared conversation object,
+# which is actually more correct than a single blended one would be.
+# =========================================================
+
+def apply_speech_to_group(c, world, speech, participant_ids):
+    """speech: same shape as apply_speech()'s, but "target" is ignored --
+    participant_ids (list, including the speaker c) defines who's in the
+    conversation. Returns the conversation dict, or None if the speech
+    was empty."""
+    if not speech:
+        return None
+
+    utterance = speech.get("utterance", "").strip()
+    if not utterance:
+        return None
+
+    tick = world.get("tick", 0)
+    speech_act = speech.get("speech_act", "speak")
+    topic = speech.get("topic", "")
+
+    c["current_speech"] = {
+        "utterance":       utterance,
+        "speech_act":      speech_act,
+        "topic":           topic,
+        "target":          None,
+        "volume":          speech.get("volume") or "high",
+        "expires_at_tick": tick + SPEECH_BUBBLE_TICKS,
+    }
+
+    c.setdefault("speech_log", [])
+    c["speech_log"].append({"tick": tick, "utterance": utterance, "target": None})
+    c["speech_log"] = c["speech_log"][-20:]
+
+    from brain.conversations import get_or_create_conversation, add_message
+    from systems.reactions import push_conversation_reaction
+    from brain.relationships import apply_interaction
+    from systems.conversation_analysis import analyze_message, should_schedule_reflection
+    from systems.conversation_goals import assign_conversation_goal, check_goal_trending
+    from core.event_bus import emit
+
+    conv = get_or_create_conversation(
+        world, participant_ids, topic=topic or "general", medium="in_person",
+    )
+    conversation_type = speech.get("conversation_type")
+    if conversation_type:
+        conv["conversation_type"] = conversation_type
+
+    add_message(world, conv, c["id"], utterance, speech_act, topic or conv.get("topic", "general"), tick)
+
+    characters = world.get("characters", {})
+    topic_str = topic or conv.get("topic", "general")
+    for listener_id in participant_ids:
+        if listener_id == c["id"]:
+            continue
+        listener = characters.get(listener_id)
+        if not listener:
+            continue
+
+        assign_conversation_goal(c, world, conv, listener_id)
+        assign_conversation_goal(listener, world, conv, c["id"])
+
+        push_conversation_reaction(listener, speech_act, tick)
+        apply_interaction(c, listener, speech_act)
+        result = analyze_message(world, conv, c, listener, utterance, speech_act)
+        check_goal_trending(conv, listener, topic_str)
+
+        if should_schedule_reflection(result):
+            listener.setdefault("pending_reflections", []).append({
+                "type":           "conversation",
+                "target_id":      c["id"],
+                "reason":         speech_act,
+                "scheduled_tick": tick + random.randint(50, 300),
+                "observations":   result.get("observations", []),
+            })
+
+        topic_str = topic or conv.get("topic", "general")
+        if topic_str not in ("general", "incidental") and topic_str not in listener.get("opinions", {}):
+            listener.setdefault("pending_reflections", []).append({
+                "type":           "form_opinion",
+                "topic":          topic_str,
+                "reason":         f"{c.get('name', 'Someone')} brought this up in conversation.",
+                "scheduled_tick": tick + random.randint(20, 120),
+            })
+
+        emit("heard_speech", {
+            "listener_id": listener_id, "speaker_id": c["id"],
+            "speaker_name": c.get("name") or c["id"], "utterance": utterance,
+        })
+
+    return conv
 
 
 # =========================================================
@@ -1112,6 +1228,10 @@ def route_action(c, world, action, speech, definitions=None, available_actions=N
         _route_computer_wiki_research(c, world, action)
     elif action_type == "computer_news":
         _route_computer_news(c, world, action)
+    elif action_type == "read_newspaper":
+        _route_read_newspaper(c, world, action)
+    elif action_type == "browse_news":
+        _route_browse_news(c, world, action)
     elif action_type == "computer_window_shopping":
         _route_computer(c, world, action, "computer_window_shopping")
     elif action_type == "computer_dating":
@@ -1242,6 +1362,26 @@ def route_action(c, world, action, speech, definitions=None, available_actions=N
         _route_respond_chore(c, world, action)
     elif action_type == "advance_request_round":
         _route_advance_chore_round(c, world, action)
+    elif action_type == "propose_item_loan":
+        _route_propose_item_loan(c, world, action)
+    elif action_type == "respond_item_loan":
+        _route_respond_chore(c, world, action)
+    elif action_type == "advance_item_loan_round":
+        _route_advance_chore_round(c, world, action)
+    elif action_type == "propose_item_sale":
+        _route_propose_item_sale(c, world, action)
+    elif action_type == "respond_item_sale":
+        _route_respond_chore(c, world, action)
+    elif action_type == "advance_item_sale_round":
+        _route_advance_chore_round(c, world, action)
+    elif action_type == "post_social_media":
+        _route_post_social_media(c, world, action)
+    elif action_type == "like_social_post":
+        _route_like_social_post(c, world, action)
+    elif action_type == "unlike_social_post":
+        _route_unlike_social_post(c, world, action)
+    elif action_type == "comment_on_social_post":
+        _route_comment_on_social_post(c, world, action)
 
     elif action_type == "breastfeed":
         _route_breastfeed(c, world, action)
@@ -2222,10 +2362,130 @@ def _route_propose_request(c, world, action):
         proposal = result["proposal"]
 
         outcome, reason = resolve_request(recipient, c, topic, urgency, world)
+        if outcome is None:
+            # No standing rule matched -- fast-path auto-decline only the
+            # clearly one-sided case (low urgency + genuinely worn out),
+            # mirroring this file's other one-sided-only auto-resolves;
+            # everything else still goes to the recipient's own LLM turn,
+            # now informed by _build_proposal_context()'s favor-fatigue hint.
+            from systems.favors import is_favor_worn_out
+            if urgency < 40 and is_favor_worn_out(recipient, c["id"]):
+                outcome, reason = "deny", "worn out from unreciprocated favors"
         if outcome in ("allow", "deny"):
             respond(recipient, world, proposal["id"], "accept" if outcome == "allow" else "decline")
             proposal["auto_resolved"] = True
             proposal["auto_resolution_reason"] = reason
+    except Exception:
+        pass
+
+
+def _route_propose_item_loan(c, world, action):
+    """
+    Character asks someone to borrow one of their items for a while.
+    Ownership never changes -- only possession, until returned or the
+    loan's due date passes (systems/personal_items.py::
+    recall_overdue_loans() then returns it automatically).
+    action: {"type": "propose_item_loan", "target": character_id,
+             "item_id": ..., "duration_days": 7}
+    """
+    target_id = action.get("target")
+    item_id = action.get("item_id")
+    if not target_id or not item_id:
+        return
+    owner = world.get("characters", {}).get(target_id)
+    if not owner:
+        return
+    try:
+        duration_days = max(1, int(action.get("duration_days", 7)))
+    except (TypeError, ValueError):
+        duration_days = 7
+
+    from core.tick_schedule import TICK_RATE_SECONDS
+    duration_ticks = round(duration_days * 86400 / TICK_RATE_SECONDS)
+
+    try:
+        from systems.proposals import propose_item_loan
+        propose_item_loan(c, owner, world, item_id, duration_ticks)
+    except Exception:
+        pass
+
+
+def _route_propose_item_sale(c, world, action):
+    """
+    Character asks whether someone will sell one of their items -- an
+    open inquiry (no offer_price) invites the owner to counter with an
+    asking price; offer_item_id proposes a trade instead of/alongside
+    cash.
+    action: {"type": "propose_item_sale", "target": character_id,
+             "item_id": ..., "offer_price": optional, "offer_item_id": optional}
+    """
+    target_id = action.get("target")
+    item_id = action.get("item_id")
+    if not target_id or not item_id:
+        return
+    owner = world.get("characters", {}).get(target_id)
+    if not owner:
+        return
+    try:
+        from systems.proposals import propose_item_sale
+        propose_item_sale(c, owner, world, item_id,
+                           offer_price=action.get("offer_price"),
+                           offer_item_id=action.get("offer_item_id"))
+    except Exception:
+        pass
+
+
+def _route_post_social_media(c, world, action):
+    """
+    action: {"type": "post_social_media", "text": "...",
+             "media_description": optional str, "tags": optional [str]}
+    media_description becomes a photo post's description (see
+    systems/social_media.py's module docstring for why this is
+    descriptive metadata, not an actual rendered image).
+    """
+    text = action.get("text")
+    if not text:
+        return
+    media = None
+    if action.get("media_description"):
+        media = {"kind": "photo", "description": action["media_description"], "subjects": [c["id"]]}
+    try:
+        from systems.social_media import create_post
+        create_post(c, world, text, media=media, tags=action.get("tags"))
+    except Exception:
+        pass
+
+
+def _route_like_social_post(c, world, action):
+    post_id = action.get("post_id")
+    if not post_id:
+        return
+    try:
+        from systems.social_media import like_post
+        like_post(c, world, post_id)
+    except Exception:
+        pass
+
+
+def _route_unlike_social_post(c, world, action):
+    post_id = action.get("post_id")
+    if not post_id:
+        return
+    try:
+        from systems.social_media import unlike_post
+        unlike_post(c, world, post_id)
+    except Exception:
+        pass
+
+
+def _route_comment_on_social_post(c, world, action):
+    post_id = action.get("post_id")
+    text = action.get("text")
+    if not post_id or not text:
+        return
+    try:
+        from systems.social_media import comment_on_post
+        comment_on_post(c, world, post_id, text)
     except Exception:
         pass
 
@@ -2805,7 +3065,7 @@ def _route_make_argument(c, world, action):
 
     tick = world.get("tick", 0)
 
-    conv = find_conversation(world, c["id"], target_id)
+    conv = find_conversation(world, [c["id"], target_id])
     prior_argument = None
     argument_mode = "new_point"
     if conv:
@@ -3089,6 +3349,29 @@ def _route_computer_news(c, world, action):
     seen.extend(h for h in headlines if h not in seen)
     c["_seen_headlines"] = seen[-20:]
     c["activity"]["headlines"] = headlines
+
+
+# ─── recurring news reading (physical newspaper / phone) ──────────────────────
+# Distinct from computer_news above (one-shot headline dump from a
+# desktop computer) -- these keep picking a fresh item every few minutes
+# for as long as the activity continues, and can escalate into a real
+# debate. See systems/reading_process.py.
+
+def _route_read_newspaper(c, world, action):
+    from systems.personal_items import get_item_by_template
+    if not get_item_by_template(c, "newspaper"):
+        return
+    c["activity"] = _scaffold(c, world, "read_newspaper", interaction="read")
+    from systems.reading_process import start_reading_news
+    start_reading_news(c, world, medium="paper")
+
+
+def _route_browse_news(c, world, action):
+    if not _require_phone(c):
+        return
+    c["activity"] = _scaffold(c, world, "browse_news", interaction="phone")
+    from systems.reading_process import start_reading_news
+    start_reading_news(c, world, medium="phone")
 
 
 # ─── job search / apply ───────────────────────────────────────────────────────
@@ -3409,12 +3692,24 @@ def _route_social_browse_events(c, world, action):
 
 def _route_social_event_rsvp(c, world, action):
     """RSVP to an event: yes / no / maybe."""
-    from systems.social_events import rsvp
+    from systems.social_events import rsvp, _hard_conflict
     event_id  = action.get("event_id") or action.get("args", {}).get("event_id")
     response  = action.get("response") or action.get("args", {}).get("response", "yes")
     decide_ts = action.get("decide_ts") or action.get("args", {}).get("decide_ts")
-    if event_id and response in ("yes", "no", "maybe"):
-        rsvp(c, world, event_id, response, decide_ts=decide_ts)
+    if not (event_id and response in ("yes", "no", "maybe")):
+        return
+    if response == "yes":
+        # One-sided fast-path override (see social_events.py
+        # ::evaluate_attendance_tradeoff's docstring) -- mirrors
+        # _route_social_event_attend's unaffordability check below.
+        conflict = _hard_conflict(c, world)
+        if conflict:
+            response = "no"
+            c.setdefault("notifications", []).append({
+                "type": "event_conflict_declined", "event_id": event_id,
+                "conflict": conflict, "ts": time.time(),
+            })
+    rsvp(c, world, event_id, response, decide_ts=decide_ts)
 
 
 def _route_social_event_comment(c, world, action):
@@ -3436,13 +3731,19 @@ def _route_social_event_comment(c, world, action):
 
 def _route_social_event_attend(c, world, action):
     """Character attends an event — goes off-grid for the event duration."""
-    import time
-    from systems.social_events import get_event, rsvp
+    from systems.social_events import get_event, rsvp, _hard_conflict
     event_id = action.get("event_id") or action.get("args", {}).get("event_id")
     if not event_id:
         return
     evt = get_event(world, event_id)
     if not evt or evt["status"] != "published":
+        return
+    conflict = _hard_conflict(c, world)
+    if conflict:
+        c.setdefault("notifications", []).append({
+            "type": "event_conflict_declined", "event_id": event_id,
+            "conflict": conflict, "ts": time.time(),
+        })
         return
     cost = evt.get("cost_per_person", 0.0)
     if cost > 0:

@@ -58,7 +58,7 @@ def _seat_is_free(prop):
     if prop.get("carried_by"):
         return False
     for anchor in prop.get("anchors", []):
-        if anchor.get("interactionName") == "sit" and anchor.get("occupied_by"):
+        if anchor.get("interaction") == "sit" and anchor.get("occupied_by"):
             return False
     return True
 

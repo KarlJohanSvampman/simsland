@@ -249,7 +249,7 @@ def get_anchors_by_interaction(
         if (
 
             anchor.get(
-                "interactionName"
+                "interaction"
             )
 
             != interaction_name
@@ -350,10 +350,14 @@ def find_nearest_anchor(
             # INTERACTION FILTER
             # --------------------------------
 
+            # anchors store this as "interaction" (matches every prop_template
+            # entry in definitions.json) -- "interactionName" was never once
+            # written anywhere, so this filter always failed to match and
+            # find_nearest_anchor() has never actually found anything.
             if (
 
                 anchor.get(
-                    "interactionName"
+                    "interaction"
                 )
 
                 != interaction_name

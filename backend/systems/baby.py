@@ -109,13 +109,23 @@ def init_baby_state(c):
 
 
 def init_prenatal_prep(c):
-    c.setdefault("prenatal_prep", {
-        "visits_scheduled":  [],
-        "kindergarten_chosen": None,
-        "kindergarten_tick": None,
-        "gear_bought":  False,
-        "gear_tick":    None,
-    })
+    # NOT setdefault -- schema_defaults.py deliberately pre-seeds
+    # c["prenatal_prep"] = None ("set during pregnancy"), which means
+    # the key always already EXISTS by the time this runs, permanently
+    # defeating a setdefault() here. That made this a no-op forever:
+    # tick_prenatal_prep()'s prep = c["prenatal_prep"] always came back
+    # None, so OB-visit scheduling/gear shopping/kindergarten choice
+    # never actually ran for any pregnancy. Falsy-check instead, so a
+    # real dict only gets built once and never clobbers itself on
+    # repeat calls.
+    if not c.get("prenatal_prep"):
+        c["prenatal_prep"] = {
+            "visits_scheduled":  [],
+            "kindergarten_chosen": None,
+            "kindergarten_tick": None,
+            "gear_bought":  False,
+            "gear_tick":    None,
+        }
 
 
 def spawn_child(mother, father_id, world):
@@ -131,7 +141,7 @@ def spawn_child(mother, father_id, world):
             "sex": random.choice(["male", "female"]),
             "family_id": mother.get("family_id"),
             "parent_values": parent_values or None,
-        })
+        }, world=world)
     except Exception:
         child = {
             "id": str(uuid.uuid4()),
@@ -528,13 +538,41 @@ def _schedule_baby_gear_shopping(c, world):
 
 
 def _prompt_kindergarten_choice(c, prep, world):
+    """c is the pregnant PARENT (tick_prenatal_prep's caller) -- they're
+    choosing a preschool for their not-yet-born child. Used to only emit
+    a "kindergarten_choice_needed" event that nothing ever subscribed to
+    -- prep["kindergarten_chosen"] was consequently never set by
+    anything, so the weeks>=30 guard in tick_prenatal_prep() never
+    flipped and this re-fired every single weekly prenatal check for
+    the rest of the pregnancy. Now actually makes the choice and writes
+    it, via systems/choice.py, same as every other real choice in this
+    codebase."""
     try:
+        defs = world.get("definitions", {})
+        schools = defs.get("school_templates", {})
+        options = [
+            {"id": sid, "label": s.get("name", sid),
+             "tags": [t for t in (s.get("type"), s.get("prestige")) if t]}
+            for sid, s in schools.items()
+            if s.get("education_level") == "preschool"
+        ]
+        if not options:
+            prep["kindergarten_chosen"] = False  # nothing to pick -- don't keep re-asking
+            return
+
+        from systems.choice import choose
+        picked = choose(c, world, "preschool for your child", options)
+        if not picked:
+            return
+        prep["kindergarten_chosen"] = picked["id"]
+
+        from systems.validation import queue_choice_for_validation
+        queue_choice_for_validation(c, world, "childs_school", picked["label"])
+
         from core.events import emit
-        defs    = world.get("definitions", {})
-        options = list(defs.get("school_templates", {}).keys())
         emit("kindergarten_choice_needed", {
             "character_id": c.get("id"),
-            "options":      options,
+            "school_id":    picked["id"],
             "tick":         world.get("tick", 0),
         }, world)
     except Exception:

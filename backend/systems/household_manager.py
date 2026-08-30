@@ -48,6 +48,36 @@ def add_member_to_household(world, character, household):
     character["household_id"] = household["id"]
     if character["id"] not in household["members"]:
         household["members"].append(character["id"])
+    _grant_household_keys(world, character, household)
+
+
+def _grant_household_keys(world, character, household):
+    """House/car/mailbox keys, granted for whichever the household
+    actually has -- called on every join (not just generation-time) since
+    a household's building/car/mailbox can be assigned after a character
+    already lives there. has_key_for()/has_key_for_ref() guard against
+    duplicate grants on repeat calls (e.g. re-adding an existing member)."""
+    from systems.personal_items import (
+        make_house_key, has_key_for, make_key, has_key_for_ref,
+    )
+    from systems.vehicles import household_car
+    from systems.props import get_props_by_template
+
+    home_id = household["id"]
+    if household.get("building_ids") and not has_key_for(character, home_id):
+        character.setdefault("inventory", []).append(
+            make_house_key(home_id=home_id, building_id=household["building_ids"][0],
+                            owner_id=character["id"]))
+
+    car = household_car(world, home_id)
+    if car and not has_key_for_ref(character, "car", car["id"]):
+        character.setdefault("inventory", []).append(
+            make_key("car", car["id"], owner_id=character["id"]))
+
+    for mailbox in get_props_by_template(world, "mailbox"):
+        if mailbox.get("household_id") == home_id and not has_key_for_ref(character, "mailbox", mailbox["id"]):
+            character.setdefault("inventory", []).append(
+                make_key("mailbox", mailbox["id"], owner_id=character["id"]))
 
 
 def remove_member_from_household(character, household):

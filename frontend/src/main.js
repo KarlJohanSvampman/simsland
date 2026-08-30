@@ -18,6 +18,10 @@ import {
 
   resolveCharacter,
 
+  resolveItem,
+
+  getTemplate,
+
   getMaterialTemplate
 
 } from "./templates";
@@ -305,6 +309,10 @@ let selectedCharacterId = null;
 const props = {};
 const propNodes = {};        // prop.id → { anchors, targets, ikHands } Maps of named Object3Ds
 const propAnimations = {};   // prop.id → { mixer, actions, currentState }
+const placedItems = {};      // item.id → THREE object (dropped/delivered items, e.g. a newspaper)
+const loadingPlacedItems = {};
+const worldObjects = {};     // world_object.id → THREE object (service-worker-spawned props, e.g. mail bundles)
+const loadingWorldObjects = {};
 const tiles = {};
 
 // Reusable vectors for IK (avoid GC pressure)
@@ -1292,14 +1300,23 @@ function _playSingleAction(animData, name) {
 }
 
 
+function _normalizeBoneName(name){
+    // Real rigs disagree on "mixamorig:Head" vs "mixamorigHead" (colon or
+    // not) and casing -- strip everything but alphanumerics and lowercase
+    // so CLOTHING_SLOT_BONES/attachItemToBone callers match regardless of
+    // which convention a given .glb export used.
+    return (name || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
 function findBone(root, boneName){
 
     let found = null;
+    const target = _normalizeBoneName(boneName);
 
     root.traverse(node=>{
 
         if(node.isBone &&
-           node.name === boneName){
+           _normalizeBoneName(node.name) === target){
 
             found = node;
         }
@@ -1968,6 +1985,176 @@ delete loadingProps[prop.id];
   }
 }
 
+
+// =========================================================
+// PLACED ITEMS  (dropped/delivered personal items, e.g. a newspaper)
+// WORLD OBJECTS (service-worker-spawned props, e.g. a mail bundle)
+// Same shape as updateProps() above: update-in-place, loading guard,
+// fallback placeholder (the PRIMARY render path today -- no book/
+// newspaper/magazine/dvd/music_disc .glb assets exist yet), and
+// stale-entry cleanup. Note: unlike props/characters, an entry fully
+// disappearing from world state (e.g. an item picked back up) is only
+// guaranteed to be cleaned up on the next FULL snapshot, not the next
+// delta -- the delta channel only ever carries *changed* entries, the
+// same limitation every other entity type in this game already has
+// (nothing in this codebase signals "this id was removed" through a
+// delta; props/characters never hit this because nothing ever actually
+// deletes them from world state, only hides/moves them).
+// =========================================================
+
+function createFallbackPlacedItem(item){
+
+  // Amber placeholder, distinct from props' blue-grey and characters'
+  // cyan -- reads as "a document/media item" at a glance.
+  const mesh = new THREE.Mesh(
+    new THREE.BoxGeometry(0.3, 0.05, 0.4),
+    new THREE.MeshStandardMaterial({ color: 0xd9a441, roughness: 0.8 })
+  );
+
+  mesh.position.set(item.x - 10, 0.05, item.y - 7);
+  mesh.userData = { type: "placed_item", id: item.id, template: item.template_id };
+
+  selectable.push(mesh);
+  scene.add(mesh);
+
+  return mesh;
+}
+
+function createFallbackWorldObject(obj){
+
+  const mesh = new THREE.Mesh(
+    new THREE.BoxGeometry(0.4, 0.3, 0.3),
+    new THREE.MeshStandardMaterial({ color: 0xd9a441, roughness: 0.8 })
+  );
+
+  mesh.position.set(obj.x - 10, 0.15, obj.y - 7);
+  mesh.userData = { type: "world_object", id: obj.id, objType: obj.type };
+
+  selectable.push(mesh);
+  scene.add(mesh);
+
+  return mesh;
+}
+
+async function updatePlacedItems(state){
+
+  const active = new Set();
+
+  for(const [id, item] of Object.entries(state.placed_items || {})){
+
+    active.add(id);
+
+    if(placedItems[id]){
+      placedItems[id].position.set(item.x - 10, 0.05, item.y - 7);
+      continue;
+    }
+
+    if(loadingPlacedItems[id]) continue;
+    loadingPlacedItems[id] = true;
+
+    const resolved = resolveItem(definitions, item);
+    const modelPath = resolveModel(resolved?.model);
+
+    if(!modelPath){
+      placedItems[id] = createFallbackPlacedItem(item);
+      delete loadingPlacedItems[id];
+      continue;
+    }
+
+    try {
+      const loaded = await loadModelCached(modelPath);
+      const model = loaded.scene;
+
+      model.position.set(item.x - 10, 0.05, item.y - 7);
+      model.userData = { type: "placed_item", id: item.id, template: item.template_id };
+
+      model.traverse((o) => {
+        if(o.isMesh){
+          o.castShadow = true;
+          o.receiveShadow = true;
+        }
+      });
+
+      selectable.push(model);
+      scene.add(model);
+      placedItems[id] = model;
+    } catch(err){
+      console.error("Failed to load placed item:", resolved?.model, err);
+      placedItems[id] = createFallbackPlacedItem(item);
+    }
+
+    delete loadingPlacedItems[id];
+  }
+
+  for(const id in placedItems){
+    if(active.has(id)) continue;
+    scene.remove(placedItems[id]);
+    removeSelectable(placedItems[id]);
+    delete placedItems[id];
+  }
+}
+
+async function updateWorldObjects(state){
+
+  const active = new Set();
+
+  for(const obj of state.world_objects || []){
+
+    if(!obj.id) continue;   // can't track without a stable id -- skip
+    active.add(obj.id);
+
+    if(worldObjects[obj.id]){
+      worldObjects[obj.id].position.set(obj.x - 10, 0.15, obj.y - 7);
+      continue;
+    }
+
+    if(loadingWorldObjects[obj.id]) continue;
+    loadingWorldObjects[obj.id] = true;
+
+    // world_objects carry a bare "model" key (not a template id) -- see
+    // service_worker_runtime.py's deposit_mail()/drop_package(). Try it
+    // through the same meshbank-or-raw-path resolution as everything else.
+    const modelPath = resolveModel(obj.model);
+
+    if(!modelPath){
+      worldObjects[obj.id] = createFallbackWorldObject(obj);
+      delete loadingWorldObjects[obj.id];
+      continue;
+    }
+
+    try {
+      const loaded = await loadModelCached(modelPath);
+      const model = loaded.scene;
+
+      model.position.set(obj.x - 10, 0.15, obj.y - 7);
+      model.userData = { type: "world_object", id: obj.id, objType: obj.type };
+
+      model.traverse((o) => {
+        if(o.isMesh){
+          o.castShadow = true;
+          o.receiveShadow = true;
+        }
+      });
+
+      selectable.push(model);
+      scene.add(model);
+      worldObjects[obj.id] = model;
+    } catch(err){
+      console.error("Failed to load world object:", obj.model, err);
+      worldObjects[obj.id] = createFallbackWorldObject(obj);
+    }
+
+    delete loadingWorldObjects[obj.id];
+  }
+
+  for(const id in worldObjects){
+    if(active.has(id)) continue;
+    scene.remove(worldObjects[id]);
+    removeSelectable(worldObjects[id]);
+    delete worldObjects[id];
+  }
+}
+
 // =========================================================
 // SPEECH BUBBLES
 // =========================================================
@@ -2620,11 +2807,23 @@ async function updateCharacters(state){
       // Sync position from server unless the IK system has already taken
       // over fine-alignment (isAnchored flag set by updateIK once close).
       if (!characterAnimations[id]?.isAnchored) {
-        sims[id].position.set(
-          c.x - 10,
-          0,
-          c.y - 7
-        );
+        const newX = c.x - 10;
+        const newZ = c.y - 7;
+        const dx = newX - sims[id].position.x;
+        const dz = newZ - sims[id].position.z;
+        // Face the direction of actual movement -- updateIK()'s existing
+        // facing logic only fires while there's a specific interaction
+        // target to look at (activity.target_id); plain point-to-point
+        // walking (to the bus stop, home, wandering, ...) never rotated
+        // the model at all otherwise, since this position sync just set
+        // x/y/z with no corresponding turn. updateIK() still takes
+        // priority once a real target exists -- it runs every frame and
+        // overwrites rotation.y unconditionally when viewTargetId is set,
+        // this only matters on the (majority of) ticks where it isn't.
+        if (Math.abs(dx) > 0.01 || Math.abs(dz) > 0.01) {
+          sims[id].rotation.y = Math.atan2(dx, dz);
+        }
+        sims[id].position.set(newX, 0, newZ);
       }
 
       // Off-grid physical travel: hidden while riding in/on a car or bus
@@ -3469,12 +3668,7 @@ function renderCharacterInspector(id){
     rows.push(`<span style="color:#fc6">Off-grid: ${(c.off_grid_reason || "?").replace(/_/g, " ")} — back in ${backIn}</span>`);
   } else if(c.travel_state){
     // Human-readable gloss per systems/travel.py + systems/transit.py's
-    // state machine -- "awaiting_bus_arrival" in particular used to just
-    // show its raw name with no indication the character is deliberately
-    // invisible right now (transit.py defers revealing them until the
-    // bus's return leg actually arrives, rather than having them idle
-    // visibly at the stop) and will resolve on its own within one bus
-    // cycle (<=15 sim-minutes), which read as a stuck/bugged character.
+    // state machine.
     const TRAVEL_STATE_LABELS = {
       to_garage:            "walking to the garage",
       to_bus_stop:          "walking to the bus stop",
@@ -3487,10 +3681,7 @@ function renderCharacterInspector(id){
       walking_home:         "walking home",
     };
     const label = TRAVEL_STATE_LABELS[c.travel_state] || c.travel_state;
-    const hiddenNote = c.travel_hidden
-      ? ` <span style="opacity:.65">(off-map until they arrive — normal, not stuck)</span>`
-      : "";
-    rows.push(`<span style="color:#6cf">Traveling: ${label}${hiddenNote}</span>`);
+    rows.push(`<span style="color:#6cf">Traveling: ${label}</span>`);
   }
 
   // c.body is the real, live 0-100 needs simulation (systems/body.py) --
@@ -3549,6 +3740,30 @@ function renderCharacterInspector(id){
       return desc ? `${label} <span style="opacity:.65">— ${desc}</span>` : label;
     });
     rows.push(`Beliefs:<br>&nbsp;&nbsp;${beliefLines.join("<br>&nbsp;&nbsp;")}`);
+  }
+
+  // Finances -- wallet cash/credit score/cards/government debt already
+  // ride along on the character dict (inventory items + top-level
+  // fields), no separate fetch needed. Bank balance itself lives in
+  // world["banks"] (see backend/systems/banking.py), not on the
+  // character, so only the bank name is shown here, not a live balance.
+  const wallet = (c.inventory || []).find(i => i.object_type === "wallet");
+  if(wallet || c.credit_score != null){
+    const financeLines = [];
+    const cash = wallet?.states?.cash ?? wallet?.cash;
+    if(cash != null) financeLines.push(`$${Math.round(cash)} cash`);
+    if(c.credit_score != null) financeLines.push(`credit score ${c.credit_score}`);
+    if(c.government_debt > 0) financeLines.push(`<span style="color:#f96">$${Math.round(c.government_debt)} owed in taxes</span>`);
+
+    const walletItems = wallet?.items || [];
+    const bankCard = walletItems.find(i => i.object_type === "bank_card");
+    if(bankCard) financeLines.push(`${bankCard.bank} account`);
+    const creditCards = walletItems.filter(i => i.object_type === "credit_card");
+    for(const card of creditCards){
+      financeLines.push(`${card.provider} credit card: $${Math.round(card.current_debt || 0)} / $${Math.round(card.max_credit || 0)}`);
+    }
+
+    if(financeLines.length) rows.push(`Finances: ${financeLines.join(", ")}`);
   }
 
   if(c.household_id) rows.push(`Household: ${c.household_id}`);
@@ -3882,7 +4097,13 @@ function _renderHouseholdAdminPanel(h, mailboxPropId) {
     const row = document.createElement("div");
     row.className = "modal-row";
     const label = document.createElement("span");
-    label.textContent = m.name || m.id;
+    const cash = m.wallet_cash != null ? `$${m.wallet_cash.toFixed(2)}` : "no wallet";
+    const score = m.credit_score != null ? `credit ${m.credit_score}` : "";
+    const debt = m.government_debt ? `, $${m.government_debt.toFixed(2)} owed` : "";
+    label.textContent = `${m.name || m.id} — ${cash}${score ? ", " + score : ""}${debt}`;
+    label.title = (m.credit_cards || []).length
+      ? (m.credit_cards || []).map(c => `${c.provider}: $${(c.current_debt || 0).toFixed(2)}/$${(c.max_credit || 0).toFixed(2)}`).join(", ")
+      : "";
     const removeBtn = document.createElement("button");
     removeBtn.textContent = "Remove";
     removeBtn.addEventListener("click", async () => {
@@ -4007,6 +4228,127 @@ function _renderHouseholdAdminPanel(h, mailboxPropId) {
     });
     refresh();
   });
+
+  // --- Finances ---
+  const finH = document.createElement("h4");
+  finH.textContent = "Finances";
+  body.appendChild(finH);
+
+  const potRow = document.createElement("div");
+  potRow.className = "modal-row";
+  const billsOwed = (h.bills_due || []).reduce((sum, b) => sum + Math.max(0, b.remaining || 0), 0);
+  potRow.innerHTML = `<span>Household pot: $${(h.shared_funds || 0).toFixed(2)} · ` +
+    `Net worth: $${(h.wealth || 0).toFixed(2)} · ` +
+    `Bills owed: $${billsOwed.toFixed(2)}</span>`;
+  body.appendChild(potRow);
+
+  const subRow = document.createElement("div");
+  subRow.className = "modal-row";
+  const subLabel = document.createElement("span");
+  subLabel.textContent = "Newspaper subscription: " + (h.newspaper_subscription ? "active" : "none");
+  const subBtn = document.createElement("button");
+  subBtn.textContent = h.newspaper_subscription ? "Cancel" : "Subscribe";
+  subBtn.addEventListener("click", async () => {
+    await fetch("/api/household/set_newspaper_subscription?sim_id=default", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ household_id: h.id, subscribed: !h.newspaper_subscription }),
+    });
+    refresh();
+  });
+  subRow.appendChild(subLabel);
+  subRow.appendChild(subBtn);
+  body.appendChild(subRow);
+
+  const loanH = document.createElement("h5");
+  loanH.textContent = "Loans";
+  loanH.style.margin = "8px 0 4px";
+  body.appendChild(loanH);
+
+  if (!h.loans.length) {
+    const empty = document.createElement("div");
+    empty.className = "modal-empty";
+    empty.textContent = "No loans.";
+    body.appendChild(empty);
+  }
+  for (const l of h.loans) {
+    const row = document.createElement("div");
+    row.className = "modal-row";
+    const label = document.createElement("span");
+    label.textContent = `${l.provider} (${l.kind}) — $${(l.balance || 0).toFixed(2)} of ` +
+      `$${(l.principal || 0).toFixed(2)}, $${(l.monthly_payment || 0).toFixed(2)}/mo · ` +
+      `${(l.borrower_names || []).join(", ")}`;
+    row.appendChild(label);
+    body.appendChild(row);
+  }
+
+  // --- Mail ---
+  // household["mailbox"]["items"] (systems/mail.py) -- physical mail
+  // (bills, formal-request letters), distinct from a character's own
+  // c["inbox"] (SMS/call/email/voicemail, systems/inbox.py). Never
+  // trimmed server-side, so this doubles as full history.
+  const mail = h.mail || { unopened_count: 0, items: [] };
+  const mailH = document.createElement("h4");
+  mailH.textContent = "Mail" + (mail.unopened_count ? ` — ${mail.unopened_count} not picked up` : "");
+  mailH.style.margin = "10px 0 4px";
+  body.appendChild(mailH);
+
+  const mailControls = document.createElement("div");
+  mailControls.className = "modal-row";
+  const mailSearch = document.createElement("input");
+  mailSearch.type = "search";
+  mailSearch.placeholder = "Search mail (subject, sender)...";
+  mailSearch.style.flex = "1";
+  const mailTypeSelect = document.createElement("select");
+  const mailTypes = [...new Set(mail.items.map(m => m.type).filter(Boolean))].sort();
+  mailTypeSelect.innerHTML = `<option value="">All categories</option>` +
+    mailTypes.map(t => `<option value="${t}">${t}</option>`).join("");
+  mailControls.appendChild(mailSearch);
+  mailControls.appendChild(mailTypeSelect);
+  body.appendChild(mailControls);
+
+  const mailListEl = document.createElement("div");
+  mailListEl.style.maxHeight = "220px";
+  mailListEl.style.overflowY = "auto";
+  body.appendChild(mailListEl);
+
+  function renderMailList() {
+    const q = mailSearch.value.trim().toLowerCase();
+    const typeFilter = mailTypeSelect.value;
+    // Most recent first -- items arrive in tick order, never reordered/trimmed.
+    const filtered = [...mail.items].reverse().filter(m => {
+      if (typeFilter && m.type !== typeFilter) return false;
+      if (!q) return true;
+      const haystack = [m.subject, m.title, m.from, m.sender, m.type, m.subtype]
+        .filter(Boolean).join(" ").toLowerCase();
+      return haystack.includes(q);
+    });
+
+    mailListEl.innerHTML = "";
+    if (!filtered.length) {
+      const empty = document.createElement("div");
+      empty.className = "modal-empty";
+      empty.textContent = mail.items.length ? "No mail matches." : "No mail.";
+      mailListEl.appendChild(empty);
+      return;
+    }
+    for (const m of filtered) {
+      const row = document.createElement("div");
+      row.className = "modal-row";
+      const subject = m.subject || m.title || "(no subject)";
+      const from = m.from || m.sender || "unknown sender";
+      const amount = m.amount != null ? ` — $${Number(m.amount).toFixed(2)}` : "";
+      const badge = m.subtype ? `${m.type}/${m.subtype}` : m.type || "mail";
+      const span = document.createElement("span");
+      span.textContent = `[${badge}] ${subject}${amount} — from ${from}`;
+      if (!m.opened) span.style.fontWeight = "bold";   // not picked up yet
+      row.appendChild(span);
+      mailListEl.appendChild(row);
+    }
+  }
+  renderMailList();
+  mailSearch.addEventListener("input", renderMailList);
+  mailTypeSelect.addEventListener("change", renderMailList);
 }
 
 // Selection token guards against a slower, earlier fetch overwriting the
@@ -4124,6 +4466,8 @@ async function _applyState(state) {
   _rebuildStanceMaps(state.definitions);
   updateTiles(state);
   await updateProps(state);
+  await updatePlacedItems(state);
+  await updateWorldObjects(state);
   updateFloorplanFloors(state);
   updateFloorplanWalls(state);
   await updateCharacters(state);
@@ -4150,6 +4494,18 @@ async function _applyDelta(delta) {
     }
     Object.assign(_worldState._propsMap, delta.props);
     _worldState.props = Object.values(_worldState._propsMap);
+  }
+  if (delta.placed_items) {
+    _worldState.placed_items = { ...(_worldState.placed_items || {}), ...delta.placed_items };
+  }
+  if (delta.world_objects) {
+    // world_objects is a plain list (matches server shape) -- merge by id.
+    if (!_worldState._worldObjectsMap) {
+      _worldState._worldObjectsMap = {};
+      for (const o of (_worldState.world_objects || [])) if (o.id) _worldState._worldObjectsMap[o.id] = o;
+    }
+    Object.assign(_worldState._worldObjectsMap, delta.world_objects);
+    _worldState.world_objects = Object.values(_worldState._worldObjectsMap);
   }
   await _applyState(_worldState);
 }

@@ -1071,10 +1071,22 @@ function iconEmoji(tmpl) {
   return definitions.icon_templates?.[tmpl?.icon]?.emoji || '';
 }
 
-function groupItemsBySlot(itemTemplates) {
+// Mirrors backend/systems/clothing.py::is_body_compatible() -- a
+// rigged/shared_skeleton clothing mesh is fit to one specific body rig's
+// proportions and doesn't transfer to a differently-proportioned
+// skeleton even when bone names match. Items with no body_model tag
+// stay universal (today's rigid-bone-attachment-only clothing, no
+// fitting concern).
+function isBodyCompatible(itemTemplate, model) {
+  const required = itemTemplate.body_model;
+  return !required || required === model;
+}
+
+function groupItemsBySlot(itemTemplates, bodyModel) {
   const bySlot = {};
   for (const [id, t] of Object.entries(itemTemplates || {})) {
     if (!t.slot) continue;
+    if (bodyModel && !isBodyCompatible(t, bodyModel)) continue;
     const icon = iconEmoji(t);
     (bySlot[t.slot] ||= []).push({ id, label: t.name || id, icon });
   }
@@ -1086,9 +1098,22 @@ function renderOutfitTab() {
   if (!working) return;
 
   // ── Worn slots ──────────────────────────────────────────
-  const bySlot = groupItemsBySlot(definitions.item_templates);
+  const bodyModel = resolveWorkingModelKey();
+  const bySlot = groupItemsBySlot(definitions.item_templates, bodyModel);
   const wornContainer = document.getElementById('wornSlots');
   wornContainer.innerHTML = '';
+
+  // A previously-assigned item can become incompatible after the body
+  // model changes underneath it (sex/age edited after picking an outfit)
+  // -- clear it rather than leaving an invisible-but-still-assigned item
+  // that the dropdown (filtered to the new body) can no longer display
+  // as selected.
+  for (const slot of Object.keys(working.worn || {})) {
+    const assignedId = working.worn[slot];
+    if (assignedId && !(bySlot[slot] || []).some(e => e.id === assignedId)) {
+      delete working.worn[slot];
+    }
+  }
 
   for (const group of CLOTHING_SLOT_GROUPS) {
     const groupEl = document.createElement('div');
@@ -1143,7 +1168,7 @@ function renderOutfitTab() {
 
 window.randomizeOutfit = function () {
   if (!working) return;
-  const bySlot = groupItemsBySlot(definitions.item_templates);
+  const bySlot = groupItemsBySlot(definitions.item_templates, resolveWorkingModelKey());
   const worn = {};
   for (const slot of CLOTHING_SLOTS) {
     const options = bySlot[slot] || [];
@@ -1475,6 +1500,54 @@ async function renderHouseholdTab() {
   ).join('') || '<option value="">— None available —</option>';
 
   await renderHouseholdAddress();
+  await renderHouseholdFinances();
+}
+
+// Read-only wallet/credit/loan summary (banking round) -- pulls the SAME
+// admin_detail endpoint fetchHouseholdAddress() already hits, extended
+// server-side (api/household.py) to also carry each member's wallet cash/
+// credit_score/credit_cards and the household's loans. There's genuinely
+// nothing to show for a template that hasn't been spawned into the live
+// sim yet -- these fields only exist on real generated characters.
+async function renderHouseholdFinances() {
+  const membersEl = document.getElementById('householdFinancesMembers');
+  const loansEl = document.getElementById('householdFinancesLoans');
+  if (!working?.household_id) {
+    membersEl.innerHTML = '<div class="deriveNote">No household selected.</div>';
+    loansEl.innerHTML = '';
+    return;
+  }
+  try {
+    const res = await fetch(`/api/household/${working.household_id}/admin?sim_id=default`);
+    const data = await res.json();
+    if (!data.ok) {
+      membersEl.innerHTML = '<div class="deriveNote">Could not load finances.</div>';
+      loansEl.innerHTML = '';
+      return;
+    }
+    const members = data.household.members || [];
+    membersEl.innerHTML = members.length ? members.map(m => {
+      const cash = m.wallet_cash != null ? `$${m.wallet_cash.toFixed(2)}` : '— (no wallet yet)';
+      const score = m.credit_score != null ? m.credit_score : '—';
+      const debt = m.government_debt ? `$${m.government_debt.toFixed(2)} owed` : '$0 owed';
+      const cards = (m.credit_cards || []).map(c =>
+        `${c.provider}: $${(c.current_debt || 0).toFixed(2)} / $${(c.max_credit || 0).toFixed(2)}`
+      ).join(', ') || 'none';
+      return `<div class="deriveNote" style="margin-bottom:4px;">
+        <b>${m.name}</b> — wallet: ${cash} · credit score: ${score} · gov't debt: ${debt} · credit cards: ${cards}
+      </div>`;
+    }).join('') : '<div class="deriveNote">No members yet.</div>';
+
+    const loans = data.household.loans || [];
+    loansEl.innerHTML = loans.length ? loans.map(l => `<div class="deriveNote" style="margin-bottom:4px;">
+      <b>${l.provider}</b> (${l.kind}) — balance $${(l.balance || 0).toFixed(2)} of $${(l.principal || 0).toFixed(2)},
+      $${(l.monthly_payment || 0).toFixed(2)}/mo · borrowers: ${(l.borrower_names || []).join(', ')}
+    </div>`).join('') : '<div class="deriveNote">No loans.</div>';
+  } catch (err) {
+    console.warn('Household finances fetch failed', err);
+    membersEl.innerHTML = '<div class="deriveNote">Could not load finances.</div>';
+    loansEl.innerHTML = '';
+  }
 }
 
 async function renderHouseholdAddress() {
@@ -1498,6 +1571,7 @@ async function renderHouseholdAddress() {
 fldHousehold.addEventListener('change', () => {
   working.household_id = fldHousehold.value;
   renderHouseholdAddress();
+  renderHouseholdFinances();
 });
 
 window.assignBuilding = async function () {

@@ -121,6 +121,19 @@ def ensure_relationship(
 
             "kinship": None,
 
+            # Personal expectations THIS character holds of this specific
+            # other one (dress/friends/career/faith/partner-choice type
+            # value-alignment clashes, not the role-based checkboxes in
+            # c["expectations"]) -- keyed by topic string, see
+            # systems/persona_expectations.py.
+            "personal_expectations": {},
+
+            # Favor ledger -- recent favors THIS character granted TO the
+            # other party (systems/favors.py), plus the frustration that
+            # committing to (and not being repaid for) favors builds up.
+            "favors": [],
+            "favor_frustration": 0.0,
+
             "known_secrets": [],
 
             "shared_groups": [],

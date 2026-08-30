@@ -50,6 +50,9 @@ def evict_household(
 
         c["housing_insecure"] = True
 
+        from systems.convenience import disrupt_convenience
+        disrupt_convenience(c, "housing", world)
+
 
 # =========================================================
 # PROCESS EVICTIONS
@@ -90,7 +93,11 @@ def process_evictions(world):
 def check_household_for_eviction(household, world):
     """Emit bills_overdue when a household's debt crosses the threshold."""
     from core.event_bus import emit
-    debt = sum(b.get("amount", 0) for b in household.get("bills_due", []))
+    # remaining, not amount -- amount is the bill's original total and
+    # never decreases even after mail.py::attempt_pay_bills() pays it
+    # down, which would make eviction risk climb forever regardless of
+    # whether the household actually keeps up with bills.
+    debt = sum(b.get("remaining", 0) for b in household.get("bills_due", []))
     if debt > 5000 and not household.get("eviction_warned"):
         household["eviction_warned"] = True
         emit("bills_overdue", {"household_id": household["id"], "debt": debt})
