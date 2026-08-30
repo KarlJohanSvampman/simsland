@@ -21,5 +21,9 @@ def maybe_generate_shared_event(world):
     if random.random()>.01: return
     active=[c for c in world["characters"].values() if not c.get("off_grid") and c.get("legal",{}).get("status")!="jailed"]
     if len(active)>=2:
+        # world has no top-level "locations" registry (only "buildings"); source
+        # the location_id from there and degrade to None if there's nothing to pick.
+        buildings=world.get("buildings") or []
+        location_id=random.choice(buildings)["id"] if buildings else None
         pair=random.sample(active,2)
-        create_shared_event(world,[p["id"] for p in pair],random.choice(["store_encounter","cafe_meet","street_argument","gym_incident"]),random.choice(list(world["locations"].keys())))
+        create_shared_event(world,[p["id"] for p in pair],random.choice(["store_encounter","cafe_meet","street_argument","gym_incident"]),location_id)
