@@ -588,6 +588,14 @@ def generate_character(defs, overrides=None, world=None):
     except Exception:
         character.setdefault("attraction_profile", None)
 
+    # Ideal sexual partner profile — desired/undesired traits + physical
+    # window, folded into compute_attraction() (see attraction.py).
+    try:
+        from systems.attraction import generate_ideal_partner as _gen_ideal
+        _gen_ideal(character, defs)
+    except Exception:
+        character.setdefault("ideal_partner", None)
+
     # Sexual preferences — positions, kinks (adults only)
     if age_group not in ("child", "teen"):
         try:

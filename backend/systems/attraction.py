@@ -192,6 +192,138 @@ def generate_attraction_profile(c, defs):
     return c["attraction_profile"]
 
 
+# ── Ideal partner profile ─────────────────────────────────────────────────
+# A small curated table of well-known opposite pairs (extends
+# _personality_resonance()'s REPELS set below with more entries) —
+# checked first since it gives genuinely meaningful opposites; falls back
+# to sampling the opposite `polarity` bucket (definitions.json's
+# trait_templates only ever classify a trait "positive"/"negative"/
+# "neutral", there is no authored opposite-trait pointer) when a desired
+# trait has no curated partner, and finally to any other unused trait so
+# this never fails to produce an undesired list.
+_TRAIT_OPPOSITE_PAIRS = [
+    ("honest", "deceitful"), ("loyal", "promiscuous"), ("compassionate", "cruel"),
+    ("generous", "selfish"), ("calm", "short_tempered"), ("confident", "insecure"),
+    ("optimistic", "defeatist"), ("humble", "arrogant"), ("patient", "impulsive"),
+    ("diligent", "lazy"), ("responsible", "irresponsible"), ("forgiving", "vindictive"),
+    ("courageous", "cowardly"), ("adaptable", "stubborn"), ("disciplined", "reckless"),
+]
+
+_BUILD_SCALE = ["slim", "average", "athletic", "stocky", "heavy"]
+
+
+def _opposite_trait(tid, pool):
+    for a, b in _TRAIT_OPPOSITE_PAIRS:
+        if a == tid and b in pool:
+            return b
+        if b == tid and a in pool:
+            return a
+    return None
+
+
+def generate_ideal_partner(c, defs):
+    """
+    Explicit ideal-sexual-partner profile: 3-5 desired personality traits
+    + their (best-effort) opposites as undesired traits, plus a physical
+    preference window over body_features' existing vocabulary. Call once
+    at character generation, alongside generate_attraction_profile().
+
+    Deliberately NOT a second, parallel attraction score — see
+    compute_ideal_match() below, folded into compute_attraction()'s
+    existing personality/appearance terms so rel["attraction"] stays the
+    one subjective-attraction number everything else already reads.
+    """
+    trait_templates = defs.get("trait_templates", {})
+    pool = [tid for tid, t in trait_templates.items() if not t.get("is_cognition_core")]
+
+    if not pool:
+        c["ideal_partner"] = {"desired_traits": [], "undesired_traits": [], "physical_ideal": {}}
+        return c["ideal_partner"]
+
+    num_desired = min(len(pool), random.randint(3, 5))
+    desired = random.sample(pool, num_desired)
+
+    undesired = []
+    for tid in desired:
+        opp = _opposite_trait(tid, pool)
+        if not opp:
+            polarity = trait_templates.get(tid, {}).get("polarity", "neutral")
+            inverse = {"positive": "negative", "negative": "positive"}.get(polarity)
+            candidates = [
+                t for t in pool if t not in desired and t not in undesired
+                and (trait_templates.get(t, {}).get("polarity") == inverse if inverse else True)
+            ]
+            opp = random.choice(candidates) if candidates else None
+        if opp and opp not in undesired:
+            undesired.append(opp)
+
+    # Physical preference — breast/hip/thigh only meaningful when this
+    # character can plausibly be attracted to a female/intersex body,
+    # mirrors _appearance_score()'s own fertility_weight gate.
+    sex = c.get("sex", "male")
+    orientation = c.get("sexual_orientation", "heterosexual")
+    attracted_to_female = (
+        (sex == "male" and orientation in ("heterosexual", "bisexual")) or
+        (sex == "female" and orientation in ("homosexual", "bisexual")) or
+        sex == "intersex" or orientation == "bisexual"
+    )
+    physical_ideal = {"build": random.choice(_BUILD_SCALE)}
+    if attracted_to_female:
+        physical_ideal["breast_size"] = random.choice(list(BREAST_SCORES.keys()))
+        physical_ideal["hip_ratio"]   = random.choice(list(HIP_SCORES.keys()))
+        physical_ideal["thigh_build"] = random.choice(list(THIGH_SCORES.keys()))
+
+    c["ideal_partner"] = {
+        "desired_traits":   desired,
+        "undesired_traits": undesired,
+        "physical_ideal":   physical_ideal,
+    }
+    return c["ideal_partner"]
+
+
+def compute_ideal_match(c, other):
+    """
+    Returns {"trait": 0-1, "physical": 0-1} (0.5 = neutral/no data) for
+    how well `other` matches c's ideal_partner. 0 = as opposite-of-ideal
+    as this scoring can express (Confirmed Decision #2 — no separate
+    "off-putting" stat; this IS the low end of the same scale).
+    """
+    ideal = c.get("ideal_partner")
+    if not ideal:
+        return {"trait": 0.5, "physical": 0.5}
+
+    other_traits = set(other.get("traits", []) + other.get("personality_traits", []))
+    desired   = set(ideal.get("desired_traits", []))
+    undesired = set(ideal.get("undesired_traits", []))
+    total = len(desired) + len(undesired)
+    if total:
+        hits = len(other_traits & desired) - len(other_traits & undesired)
+        trait_score = max(0.0, min(1.0, 0.5 + 0.5 * (hits / total)))
+    else:
+        trait_score = 0.5
+
+    physical_ideal = ideal.get("physical_ideal") or {}
+    bf = other.get("body_features", {})
+    dims = 0
+    total_dist = 0.0
+    for field, scale in (("breast_size", BREAST_SCORES), ("hip_ratio", HIP_SCORES),
+                          ("thigh_build", THIGH_SCORES), ("build", _BUILD_SCALE)):
+        pref = physical_ideal.get(field)
+        actual = bf.get(field)
+        if not pref or not actual:
+            continue
+        keys = list(scale.keys()) if isinstance(scale, dict) else scale
+        try:
+            dist = abs(keys.index(pref) - keys.index(actual)) / max(1, len(keys) - 1)
+        except ValueError:
+            continue
+        total_dist += dist
+        dims += 1
+    physical_score = 1.0 - (total_dist / dims) if dims else 0.5
+
+    return {"trait": round(trait_score, 4), "physical": round(max(0.0, min(1.0, physical_score)), 4)}
+
+
 # ── Quirk evaluation ──────────────────────────────────────────────────────
 
 def _quirks_as_dict(defs):
@@ -369,6 +501,14 @@ def compute_attraction(c, other, world):
 
     # 3. Personality resonance
     personality_score = _personality_resonance(c, other)
+
+    # 2b/3b. Ideal-partner match (see generate_ideal_partner()) — blended
+    # into the appearance/personality terms rather than added as a new
+    # top-level weighted term, so the existing weights dict/normalization
+    # is untouched. An opposite-of-ideal match pulls both terms toward 0.
+    ideal_match = compute_ideal_match(c, other)
+    appearance_score  = (appearance_score  + ideal_match["physical"]) / 2.0
+    personality_score = (personality_score + ideal_match["trait"])    / 2.0
 
     # 4. Status differential
     status_score = _status_score(c, other)

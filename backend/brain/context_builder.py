@@ -318,6 +318,18 @@ def build_active_conversations(c, world):
         # interested) so their own replies can actually pursue it.
         my_goal = (conv.get("goals") or {}).get(c["id"])
 
+        # systems/libido.py -- the same-sex-only cruder-remarks hint
+        # needs to know who's actually being talked to, which only this
+        # per-conversation view has (see _sec_libido for the general,
+        # listener-agnostic "feeling horny" line).
+        libido_hint = None
+        if len(other_ids) == 1:
+            other_char = characters.get(other_ids[0])
+            if other_char:
+                from systems.libido import get_libido_context
+                lines = get_libido_context(c, world, listener=other_char).get("libido", [])
+                libido_hint = lines[1] if len(lines) > 1 else None
+
         result.append({
             "conversation_id":    conv["id"],
             "with":               ", ".join(with_names) if with_names else None,
@@ -329,6 +341,7 @@ def build_active_conversations(c, world):
             "conversation_type":  conv.get("conversation_type"),
             "medium":             conv.get("medium", "in_person"),
             "my_goal":            my_goal.get("label") if my_goal else None,
+            "libido_hint":        libido_hint,
             "your_turn":       conv.get("turn_owner") == c["id"],
             "recent_messages": [
                 {
@@ -1792,6 +1805,17 @@ def _sec_intoxication(c, world):
     return list(lines) if lines else None
 
 
+def _sec_libido(c, world):
+    # systems/libido.py -- only narrates anything while actually
+    # spiking. No specific listener known at this (whole-scene) level,
+    # so this only carries the general "feeling horny" line; the
+    # same-sex cruder-remarks hint is conversation-specific and lives in
+    # build_active_conversations() instead, where the listener is known.
+    from systems.libido import get_libido_context
+    lines = get_libido_context(c, world).get("libido", [])
+    return list(lines) if lines else None
+
+
 def _sec_addictions(c, world):
     lines = _build_addiction_context(c, world)
     return list(lines) if lines else None
@@ -1897,6 +1921,7 @@ NARRATIVE_SECTIONS = [
     ("pregnancy",             "full", _sec_pregnancy),
     ("rival",                 "full", _sec_rival),
     ("impulse",               "full", _sec_impulse),
+    ("libido",                "full", _sec_libido),
 ]
 
 TIER_SETS = {"brief": {"core"}, "full": {"core", "full"}}

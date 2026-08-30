@@ -287,6 +287,39 @@ def generate_social_intentions(
         )
 
     # =====================================================
+    # COMPLIMENT (looks vs. character) — see attraction.py
+    # ::compute_ideal_match(). Mirrors flirt_score's shape/thresholds;
+    # whichever half of the ideal-partner match is strong gets its own
+    # intention so the LLM knows what to actually praise.
+    # =====================================================
+
+    from systems.attraction import compute_ideal_match
+    ideal_match = compute_ideal_match(c, other)
+
+    compliment_looks_score = ideal_match["physical"] * 60 + familiarity * 0.2
+    compliment_character_score = ideal_match["trait"] * 60 + friendship * 0.2
+
+    if hostility > 20:
+        compliment_looks_score *= 0.2
+        compliment_character_score *= 0.2
+
+    if compliment_looks_score > 45:
+        add_social_intention(c, {
+            "type":      "compliment_looks",
+            "target_id": other["id"],
+            "priority":  int(compliment_looks_score),
+            "reason":    "ideal_physical_match",
+        })
+
+    if compliment_character_score > 45:
+        add_social_intention(c, {
+            "type":      "compliment_character",
+            "target_id": other["id"],
+            "priority":  int(compliment_character_score),
+            "reason":    "ideal_personality_match",
+        })
+
+    # =====================================================
     # SEEK COMFORT
     # =====================================================
 

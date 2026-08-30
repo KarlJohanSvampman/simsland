@@ -143,6 +143,9 @@ ACTION_SPECS = {
     "remove_wall":     {"group": "prop", "target": "wall", "doc": "Remove a wall."},
     "paint_wall":      {"group": "prop", "target": "wall", "detail": "item", "doc": "Paint a wall using a paint bucket you're carrying."},
     "hire_service":    {"group": "prop", "target": "none", "doc": "Hire an outside service (repair, cleaning, ...)."},
+    "order_taxi_by_phone_call": {"group": "social", "target": "none", "doc": "Call a taxi company to send a car to your current location (optional destination)."},
+    "order_taxi_by_phone_app":  {"group": "social", "target": "none", "doc": "Order a taxi through a rideshare app on your smartphone."},
+    "order_taxi":      {"group": "household", "target": "none", "doc": "Order a taxi, walk to the pickup spot, and wait for it to arrive -- uses order_taxi_by_phone_call/order_taxi_by_phone_app internally."},
 
     # ---- posture ------------------------------------------------------
     "sit_down":            {"group": "posture", "target": "prop", "doc": "Sit down on a seatable prop."},
@@ -187,6 +190,7 @@ ACTION_SPECS = {
     "leave_note":          {"group": "social", "target": "none", "doc": "Leave a note explaining where you are."},
     "announce_departure":  {"group": "social", "target": "any", "doc": "Tell someone you're heading out."},
     "check_device":        {"group": "social", "target": "device", "doc": "Check a suspicious unattended phone."},
+    "check_computer_history": {"group": "social", "target": "none", "doc": "Check the household computer's recent activity history."},
     "form_theory":         {"group": "social", "target": "any", "doc": "Voice a theory about what's going on."},
     "make_argument":       {"group": "social", "target": "character", "detail": "topic", "doc": "Argue your side of a topic you disagree with someone about -- counters their last point, or raises a new one for your own stance. Only offered when there's a real disagreement live (see the values/opinions section of your context). Whoever's listening forms their own reaction based on their own values, not yours."},
 

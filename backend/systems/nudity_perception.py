@@ -42,6 +42,14 @@ SOUND_RADIUS_SAME_ROOM    = True       # always hears if same room
 SOUND_BLEEDS_BUILDING     = True       # hears through walls within same building
 SOUND_COOLDOWN_TICKS      = 60 * 10   # 10 min between sound reactions per observer
 
+# Involuntary sounds (moaning etc) -- probabilistic, not "loud whenever
+# act_stage>=5" as this used to hard-gate. Applies uniformly to partnered
+# sex (by stage) and solo masturbation (treated as stage 4, see
+# _build_sex_locations() below) -- checked once per
+# tick_nudity_perception() pass per active session.
+INVOLUNTARY_SOUND_CHANCE = {4: 0.03, 5: 0.15}
+SOLO_SESSION_STAGE = 4  # masturbate/watch_porn have no negotiated act_stage
+
 # Reaction weighting by relationship distance
 REL_TYPES_INTIMATE   = {"partner", "spouse", "boyfriend", "girlfriend"}
 REL_TYPES_FAMILY     = {"parent", "child", "sibling", "grandparent", "grandchild"}
@@ -59,13 +67,23 @@ def tick_nudity_perception(world):
     # Build index of active sex locations from world state
     sex_locs = world.get("active_sex_locations", {})
 
-    # -- Rebuild active_sex_locations from character activities each tick
+    # -- Rebuild active_sex_locations from character activities each tick.
+    # Solo masturbate/watch_porn sessions count too (treated as
+    # SOLO_SESSION_STAGE, same as partnered act_stage>=4) -- this is what
+    # makes walking in on someone masturbating go through the exact same
+    # reaction pipeline (shame_level, intrusion_reaction_female/male,
+    # gendered escalation) as walking in on partnered sex, no separate
+    # logic needed.
     sex_locs = {}
     for cid, c in characters.items():
         act = c.get("activity", {})
         if not act:
             continue
-        stage = act.get("act_stage", 0)
+        interaction = act.get("interaction")
+        if interaction in ("masturbate", "watch_porn"):
+            stage = SOLO_SESSION_STAGE
+        else:
+            stage = act.get("act_stage", 0)
         if stage >= 4:
             loc = c.get("current_location")
             if loc:
@@ -74,6 +92,18 @@ def tick_nudity_perception(world):
                 })
                 entry["participants"].append(cid)
                 entry["act_stage"] = max(entry["act_stage"], stage)
+                # Involuntary sound roll -- climax-tier (5) is louder/more
+                # frequent than early-stage (4); a hit this pass makes the
+                # session audible through walls for THIS tick_nudity_
+                # perception() pass (see the hearing check below).
+                chance = INVOLUNTARY_SOUND_CHANCE.get(entry["act_stage"], 0.0)
+                if random.random() < chance:
+                    entry["_sound_this_pass"] = True
+                    # The person(s) actually making the sound get their own
+                    # reaction too -- previously only the OBSERVER's
+                    # "heard it through the wall" reaction fired; the
+                    # participant themselves never audibly reacted.
+                    _push_reaction(c, "moan_pleasure", tick, world)
     world["active_sex_locations"] = sex_locs
 
     # Process each location that has occupants
@@ -125,8 +155,7 @@ def tick_nudity_perception(world):
                         sloc_building = _get_location_building(sloc_id, world)
                         if sloc_building != building_id:
                             continue
-                        stage = sdata.get("act_stage", 0)
-                        if stage < 5:   # only climax-tier is loud enough
+                        if not sdata.get("_sound_this_pass"):   # no involuntary sound this pass
                             continue
                         last_sound = observer.get("_last_sound_react", 0)
                         if tick - last_sound < SOUND_COOLDOWN_TICKS:
@@ -161,7 +190,7 @@ def _react_to_nudity(observer, target, world, tick):
     # Determine reaction type
     if is_family:
         reaction = "shocked"
-        _push_reaction(observer, reaction, tick)
+        _push_reaction(observer, reaction, tick, world)
         _add_shame_trauma_to_observer(observer, "accidental_family_nudity", 0.04, world)
     elif is_stranger:
         # Could be aroused or offended depending on orientation + sexism
@@ -170,13 +199,15 @@ def _react_to_nudity(observer, target, world, tick):
             reaction = "aroused_react"
         else:
             reaction = "saw_nudity"
-        _push_reaction(observer, reaction, tick)
+        _push_reaction(observer, reaction, tick, world)
         if not aroused:
             _add_grievance(observer, t_id, "public_nudity", world)
+        else:
+            _awaken_libido(observer, world)
     else:
         # Friend / acquaintance — embarrassed
-        _push_reaction(observer, "embarrassed", tick)
-        _push_reaction(observer, "look_away", tick)
+        _push_reaction(observer, "embarrassed", tick, world)
+        _push_reaction(observer, "look_away", tick, world)
 
     # Emit event for LLM context
     _emit("nudity_witnessed", {
@@ -216,7 +247,22 @@ def _react_to_walking_in(observer, participant_ids, world, tick):
             is_family_involved = True
 
     # ── Observer reaction ──────────────────────────────────────────────────
-    _push_reaction(observer, "walked_in_on_sex", tick)
+    _push_reaction(observer, "walked_in_on_sex", tick, world)
+
+    # This event never called store_memory() at all before -- meaning it
+    # was invisible to systems/stories.py's worthiness evaluation
+    # (which hooks off store_memory()) no matter how notable it was.
+    try:
+        from brain.memory import store_memory
+        chars = world.get("characters", {})
+        names = ", ".join(chars.get(pid, {}).get("name", pid) for pid in participant_ids)
+        store_memory(
+            observer, f"Walked in on {names}.", importance=0.75,
+            tags=["walked_in_on", "caught"], kind="memory", tick=tick,
+            people=list(participant_ids),
+        )
+    except Exception:
+        pass
 
     if is_family_involved:
         _add_shame_trauma_to_observer(observer, "walked_in_on_family_sex", 0.12, world)
@@ -229,7 +275,7 @@ def _react_to_walking_in(observer, participant_ids, world, tick):
         imp = observer.setdefault("impulse_state", {})
         imp["anger_pressure"] = min(1.0, imp.get("anger_pressure", 0) + 0.50)
     else:
-        _push_reaction(observer, "embarrassed", tick)
+        _push_reaction(observer, "embarrassed", tick, world)
 
     # ── Participant reactions (person being walked in on) ──────────────────
     # Get shame_level from the active interaction template
@@ -263,7 +309,7 @@ def _react_to_walking_in(observer, participant_ids, world, tick):
             if intruder_is_stranger and shame_level >= 4:
                 base_reaction = "shocked"
 
-        _push_reaction(participant, base_reaction, tick)
+        _push_reaction(participant, base_reaction, tick, world)
 
         # Shame trauma scaled by shame_level (0–4 → 0–0.10)
         if shame_level >= 2 and intruder_is_stranger:
@@ -316,7 +362,7 @@ def _react_to_sex_sounds(observer, source_loc_id, world, tick):
         for pid in participants
     )
 
-    _push_reaction(observer, "heard_sex_sounds", tick)
+    _push_reaction(observer, "heard_sex_sounds", tick, world)
 
     if is_partner_involved:
         _emit("possible_affair_discovered_sound", {
@@ -354,28 +400,24 @@ def _get_active_shame_level(participant_ids, world):
     return 3   # default: high
 
 
-def _push_reaction(c, reaction_type, tick):
-    """Queue a reaction animation onto the character for the frontend to play."""
-    import random
+def _push_reaction(c, reaction_type, tick, world=None):
+    """Queue a reaction animation onto the character for the frontend to
+    play. Was writing to c["pending_reactions"] -- a dead-end queue the
+    frontend never actually reads (confirmed: only c["animation_reaction"],
+    written by systems/reactions.py::process_reaction_queue(), is
+    consumed by main.js) -- every nudity/walked-in-on/sex-sound reaction
+    in this module was therefore invisible to the player until this fix.
+    Now delegates to the real, live system; world (when available) also
+    gets the involuntary-sound/mood bundle via trigger_reaction()."""
     try:
-        from systems.reactions import REACTION_ANIMATIONS, REACTION_PRIORITIES
-        clips = REACTION_ANIMATIONS.get(reaction_type, [])
-        clip  = random.choice(clips) if clips else reaction_type
-        priority = REACTION_PRIORITIES.get(reaction_type, 1)
+        if world is not None:
+            from systems.reactions import trigger_reaction
+            trigger_reaction(c, world, reaction_type, tick=tick)
+        else:
+            from systems.reactions import push_reaction
+            push_reaction(c, reaction_type, tick)
     except Exception:
-        clip     = reaction_type
-        priority = 1
-
-    queue = c.setdefault("pending_reactions", [])
-    # Drop lower-priority reactions if queue is getting long
-    queue = [r for r in queue if r.get("priority", 1) >= priority]
-    queue.append({
-        "type":     reaction_type,
-        "clip":     clip,
-        "priority": priority,
-        "tick":     tick,
-    })
-    c["pending_reactions"] = queue[-4:]   # keep at most 4 queued
+        pass
 
 
 def _get_rel(observer, target_id):
@@ -386,6 +428,19 @@ def _get_location_building(loc_id, world):
     locs = world.get("locations", {})
     loc  = locs.get(loc_id, {})
     return loc.get("building_id")
+
+
+def _awaken_libido(observer, world):
+    """Unexpectedly seeing someone attractive nude/exposed nudges
+    systems/libido.py's standalone need directly, on top of the
+    aroused_react animation -- a real, if minor, spike toward "seeking
+    release" rather than just a one-off flavor reaction."""
+    try:
+        from systems.libido import ensure_libido_state
+        state = ensure_libido_state(observer)
+        state["current"] = min(1.0, state.get("current", 0.0) + 0.15)
+    except Exception:
+        pass
 
 
 def _would_be_aroused(observer, target):

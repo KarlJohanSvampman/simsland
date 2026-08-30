@@ -355,6 +355,8 @@ _SYMPTOM_REACTION_MAP = {
     "fever":                "sweating",
     "shortness_of_breath":  "breathless",
     "dizziness":            "dizzy",
+    "runny_nose":           "sneeze",   # previously skipped as having no
+                                         # clean cue -- sneeze fits it directly
 }
 
 
@@ -380,8 +382,8 @@ def tick_symptom_reactions(char, world, defs, symptom_key, severity_index):
     if not reaction_type:
         return
     try:
-        from systems.reactions import push_reaction
-        push_reaction(char, reaction_type, world.get("tick", 0))
+        from systems.reactions import trigger_reaction
+        trigger_reaction(char, world, reaction_type, tick=world.get("tick", 0))
     except Exception:
         pass
 
@@ -1830,12 +1832,60 @@ def apply_severity_consequences(char, world):
 # Main tick entry point
 # ---------------------------------------------------------------------------
 
+PAIN_REACTION_THRESHOLD = 40.0  # pain% above which an involuntary moan/cry becomes possible
+PAIN_REACTION_CHANCE    = 0.08  # per process_health call while above threshold -- "regular
+                                 # interval" test the user asked for, not a one-shot per pain rise
+
+
+def _maybe_pain_reaction(char, world):
+    """Regular-interval probability test while pain is high enough --
+    involuntary moaning/crying out, same shape as tick_symptom_reactions()
+    but on process_health's own (more frequent than daily) cadence,
+    since ongoing pain plausibly produces sounds more than once a day."""
+    pain = char.get("health_state", {}).get("pain", 0.0)
+    if pain < PAIN_REACTION_THRESHOLD:
+        return
+    if random.random() >= PAIN_REACTION_CHANCE:
+        return
+    reaction = "cry_out" if pain >= 70 else "moan_pain"
+    try:
+        from systems.reactions import trigger_reaction
+        trigger_reaction(char, world, reaction, tick=world.get("tick", 0))
+    except Exception:
+        pass
+
+
+DEHYDRATION_COUGH_THRESHOLD = 30.0  # body.py's hydration scale, 100=hydrated
+DEHYDRATION_COUGH_CHANCE    = 0.05
+
+
+def _maybe_dehydration_cough(char, world):
+    """Coughing "as a result of ... dehydration" per the user's ask --
+    smoking-driven coughing is already covered by the existing symptom
+    pipeline (_SYMPTOM_REACTION_MAP["coughing"]) whenever smoking
+    actually causes a tracked respiratory condition; there's no separate
+    standalone smoking-habit field in this codebase to hook a second,
+    independent trigger off of."""
+    hydration = char.get("body", {}).get("hydration", 100.0)
+    if hydration >= DEHYDRATION_COUGH_THRESHOLD:
+        return
+    if random.random() >= DEHYDRATION_COUGH_CHANCE:
+        return
+    try:
+        from systems.reactions import trigger_reaction
+        trigger_reaction(char, world, "cough", tick=world.get("tick", 0))
+    except Exception:
+        pass
+
+
 def process_health(char, world):
     apply_severity_consequences(char, world)
     if not char.get("alive", True):
                 return
     _decay_pain(char)
     _decay_painkiller_relief(char)
+    _maybe_pain_reaction(char, world)
+    _maybe_dehydration_cough(char, world)
     tick_health_hazards(char, world)
     tick_hazard_manifestations(char, world)
     tick = world.get("tick", 0)

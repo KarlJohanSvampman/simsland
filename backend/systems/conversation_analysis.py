@@ -24,6 +24,45 @@ from brain.memory import (
     store_memory
 )
 
+CUED_RECALL_CHANCE = 0.15
+_STOPWORDS = {
+    "the", "a", "an", "is", "was", "were", "to", "of", "in", "on", "for",
+    "and", "or", "but", "it", "this", "that", "i", "you", "he", "she",
+    "they", "we", "with", "at", "as", "be", "have", "had", "do", "did",
+    "not", "so", "if", "just", "really", "very", "your", "my", "me",
+}
+
+
+def _maybe_cue_recall(listener, utterance, world):
+    """Small chance per heard message: pick one real word, query the
+    listener's own memory with it (brain/memory.py::recall(), unchanged
+    -- a real tag/text-similarity/recency/importance scorer, nothing
+    new to build), and surface a "reminded of X" moment if it hits.
+    Doesn't force an immediate reaction -- being reminded of something
+    doesn't always mean saying it out loud right away."""
+    words = [w.strip(".,!?;:\"'").lower() for w in (utterance or "").split()]
+    words = [w for w in words if len(w) > 3 and w not in _STOPWORDS]
+    if not words or random.random() >= CUED_RECALL_CHANCE:
+        return
+
+    word = random.choice(words)
+    try:
+        from brain.memory import recall
+        hits = recall(listener, [word], limit=3)
+    except Exception:
+        hits = []
+    if not hits:
+        return
+
+    top = hits[0]
+    listener.setdefault("pending_reflections", []).append({
+        "type":           "remembered",
+        "memory_id":      top.get("id"),
+        "cue_word":       word,
+        "reason":         f"Something reminded them of: {top.get('text', '')[:80]}",
+        "scheduled_tick": world.get("tick", 0) + random.randint(5, 30),
+    })
+
 
 # =========================================================
 # ANALYZE MESSAGE
@@ -149,6 +188,15 @@ def analyze_message(
 
         world
     )
+
+    # =====================================================
+    # CUED RECALL -- a word just heard occasionally triggers a real
+    # memory query (brain/memory.py::recall(), already a working tag/
+    # text-similarity search), surfacing a "reminded of X" moment.
+    # =====================================================
+
+    if world is not None:
+        _maybe_cue_recall(listener, utterance, world)
 
     return result
 
@@ -478,6 +526,25 @@ def apply_speech_act_analysis(
                         "weight":
                             0.5
                     })
+
+        # Chain spread (systems/stories.py) -- the listener re-evaluates
+        # what was just said from THEIR OWN perspective (own relationship
+        # to whoever it's about, own interest weighting), NOT an
+        # inherited copy of the teller's value -- a story that thrilled
+        # the teller might land flat here, and vice versa.
+        if world is not None:
+            try:
+                from systems.stories import evaluate_story_worthiness
+                rel = listener.get("relationships", {}).get(speaker.get("id"), {})
+                trust_factor = max(0.3, rel.get("trust", 0) / 100.0)
+                fake_mem = {
+                    "text": utterance, "importance": 0.6 * trust_factor,
+                    "tags": [], "people": [speaker.get("id")],
+                    "tick": world.get("tick", 0), "id": None, "kind": "story_heard",
+                }
+                evaluate_story_worthiness(listener, fake_mem)
+            except Exception:
+                pass
 
     # =====================================================
     # QUESTION -- curious characters lean personal/prying (family,

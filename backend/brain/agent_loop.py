@@ -618,6 +618,17 @@ def update_agent(
     )
 
     # =====================================
+    # WHEREABOUTS -- ask a regular contact of whoever c is trying to
+    # reach, and deliver any relay message c is carrying (see
+    # systems/whereabouts.py). Relies on c["perception"] already being
+    # populated this tick (perception runs earlier in this same loop).
+    # =====================================
+
+    from systems.whereabouts import check_ask_whereabouts, deliver_pending_relays
+    deliver_pending_relays(c, world)
+    check_ask_whereabouts(c, world)
+
+    # =====================================
     # COOKING FOOD
     # =====================================
 

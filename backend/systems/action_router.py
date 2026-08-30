@@ -1198,6 +1198,12 @@ def route_action(c, world, action, speech, definitions=None, available_actions=N
         _route_phone_call(c, world, action)
     elif action_type == "phone_answer":
         _route_phone_answer(c, world, action)
+    elif action_type == "order_taxi_by_phone_call":
+        _route_order_taxi_by_phone_call(c, world, action)
+    elif action_type == "order_taxi_by_phone_app":
+        _route_order_taxi_by_phone_app(c, world, action)
+    elif action_type == "order_taxi":
+        _route_order_taxi(c, world, action)
     elif action_type == "phone_send_text":
         _route_phone_send_text(c, world, action)
     elif action_type in ("phone_check", "call", "text"):
@@ -1208,6 +1214,8 @@ def route_action(c, world, action, speech, definitions=None, available_actions=N
         _route_retrieve_phone(c, world, action)
     elif action_type == "check_device":
         _route_check_device(c, world, action)
+    elif action_type == "check_computer_history":
+        _route_check_computer_history(c, world, action)
     elif action_type == "form_theory":
         _route_form_theory(c, world, action)
     elif action_type == "make_argument":
@@ -2739,6 +2747,50 @@ def _route_phone_answer(c, world, action):
     _set_phone_animation(c, "phone_answer")
 
 
+def _route_order_taxi(c, world, action):
+    """Order a taxi, walk to the pickup spot, and wait for it -- see
+    activities.py's "order_taxi" phase block (ordering ->
+    walking_to_pickup -> waiting_for_taxi), which does the actual
+    order_taxi_by_phone_call/_app call once the activity starts ticking."""
+    act = _scaffold(c, world, "order_taxi", interaction="order_taxi")
+    act["phase"] = "ordering"
+    act["params"] = {
+        "method":      action.get("method", "phone_app"),
+        "destination": action.get("destination"),
+    }
+    c["activity"] = act
+
+
+def _route_order_taxi_by_phone_call(c, world, action):
+    """Call the taxi company -- see systems/rideshare.py::request_pickup.
+    Orders one to c's current position; action may optionally give a
+    "destination" {"x","y"}."""
+    phone = _require_phone(c)
+    if not phone:
+        return
+    phone["location"] = "held"
+    from systems.rideshare import request_pickup
+    request_pickup(c, world, {"x": c.get("x"), "y": c.get("y")},
+                    method="taxi", destination=action.get("destination"))
+    _set_phone_animation(c, "phone_call")
+
+
+def _route_order_taxi_by_phone_app(c, world, action):
+    """Order via a rideshare/taxi app on the smartphone -- same
+    dispatch as the phone-call route, gated on the phone actually
+    offering this app (see personal_items.py::can_do_phone_action)."""
+    from systems.personal_items import can_do_phone_action
+    if not can_do_phone_action(c, "order_taxi_by_phone_app"):
+        return
+    phone = _require_phone(c)
+    if phone:
+        phone["location"] = "held"
+    from systems.rideshare import request_pickup
+    request_pickup(c, world, {"x": c.get("x"), "y": c.get("y")},
+                    method="taxi", destination=action.get("destination"))
+    _set_phone_animation(c, "phone_app")
+
+
 def _route_phone_send_text(c, world, action):
     """Threads into the real conversation system (brain/conversations.py)
     via apply_speech, medium="text" -- was previously calling
@@ -2973,6 +3025,40 @@ def _route_check_device(c, world, action):
 
     item["_last_snooped_by"] = c["id"]
     item["_last_snooped_tick"] = world.get("tick", 0)
+
+
+def _route_check_computer_history(c, world, action):
+    """
+    Household computer has no stable single "owner" the way a phone does
+    (see _route_check_device's own docstring) -- gated on household
+    co-residency + physical proximity instead of owner-suspicion.
+    Reveals systems/personal_items.py::get_computer()'s logged
+    "states.history" entries (see activities.py's watch_porn completion
+    hook). Discovering an entry nudges the discoverer's opinion of the
+    viewer -- see systems/intimate_item_discovery.py's shared
+    "creeped_out" effect.
+    """
+    from systems.personal_items import get_computer
+    computer = get_computer(c, world)
+    if not computer:
+        return
+    history = computer.get("states", {}).get("history", [])
+    if not history:
+        return
+
+    d = abs(c.get("x", 0) - computer.get("x", c.get("x", 0))) + \
+        abs(c.get("y", 0) - computer.get("y", c.get("y", 0)))
+    if d > 3:
+        return
+
+    c["activity"] = _scaffold(c, world, "check_computer_history", interaction="check_computer_history")
+    c["activity"]["computer_history"] = history[-5:]
+
+    from systems.intimate_item_discovery import apply_creeped_out
+    for entry in history[-5:]:
+        viewer_id = entry.get("viewer")
+        if viewer_id and viewer_id != c["id"]:
+            apply_creeped_out(c, viewer_id, world)
 
 
 def _route_form_theory(c, world, action):

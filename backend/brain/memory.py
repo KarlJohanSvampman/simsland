@@ -228,6 +228,16 @@ def store_memory(
 
     prune_memories(c)
 
+    # systems/stories.py -- near-universal hook: most notable events in
+    # this codebase already call store_memory(), so this is where
+    # "is this worth telling someone" gets evaluated, rather than
+    # instrumenting every individual calling system separately.
+    try:
+        from systems.stories import evaluate_story_worthiness
+        evaluate_story_worthiness(c, mem)
+    except Exception:
+        pass
+
     return mem
 
 

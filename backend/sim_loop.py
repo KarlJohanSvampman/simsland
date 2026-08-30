@@ -72,6 +72,7 @@ from systems.postal_service     import update_postal_service
 from systems.newspaper_delivery import update_newspaper_delivery
 from systems.business_support   import process_business_inboxes
 from systems.service_vehicles   import update_service_vehicles
+from systems.rideshare          import update_rideshare_vehicles
 from systems.transit            import update_bus
 from systems.appliance_degradation import update_appliance_degradation
 from systems.messaging  import deliver_messages
@@ -94,6 +95,9 @@ from systems.social_contracts  import check_contract_violations
 from systems.social_rules      import cleanup_expired_rule_exceptions
 from systems.worries           import decay_worries
 from systems.persona_expectations import tick_persona_expectations
+from systems.libido import tick_libido
+from systems.intimate_item_discovery import tick_discovery_checks
+from systems.stories import decay_stories
 from systems.contagion       import tick_contagion_location, age_food_items
 from systems.child_care      import tick_child_needs
 from systems.bedroom_assignment import tick_bedroom_assignments
@@ -482,6 +486,9 @@ def tick(world):
     if every(world, CADENCE["service_workers"], offset=14):
         update_service_vehicles(world)
 
+    if every(world, CADENCE["service_workers"], offset=48):
+        update_rideshare_vehicles(world)
+
     if every(world, CADENCE["service_workers"], offset=18):
         update_services(world)
 
@@ -557,6 +564,10 @@ def tick(world):
         tick_emotional_control(world)
         tick_religious_repression(world)
         tick_harassment_daily(world)
+        tick_libido(world)
+        tick_discovery_checks(world)
+        for c in characters:
+            decay_stories(c)
         tick_baby_daily(world)
         for _c in characters:
             sync_anger_from_grievances(_c, world)

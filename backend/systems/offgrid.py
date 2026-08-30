@@ -689,6 +689,111 @@ def _story(c, world, reason):
     }
 
 
+_RETURN_MODE_WEIGHTS = {"bus": 0.65, "taxi": 0.20, "friend": 0.15}
+
+
+def _has_available_ride_contact(c, world):
+    """Loose proxy for "someone who could plausibly come get them" -- this
+    sim doesn't actually simulate who's physically present at an
+    off-grid destination (it's narrated, not simulated), so this checks
+    for a real close contact who's currently free (not off-grid
+    themselves) rather than trying to track true co-presence."""
+    chars = world.get("characters", {})
+    for oid, rel in c.get("relationships", {}).items():
+        other = chars.get(oid)
+        if not other or other.get("off_grid"):
+            continue
+        if rel.get("friendship", 0) > 50 or rel.get("kinship") in ("parent", "spouse", "sibling"):
+            return oid
+    return None
+
+
+def _resolve_return_mode(c, world):
+    """Weighted roll among bus/taxi/friend for a non-car departure.
+    Household members returning together (same household, same
+    off_grid_reason, resolved this same tick) share ONE roll rather than
+    each rolling independently -- see the shared cache below."""
+    household_id = c.get("household_id")
+    reason = c.get("off_grid_reason")
+    tick = world.get("tick", 0)
+    cache = world.setdefault("_return_mode_cache", {})
+    key = (household_id, reason, tick)
+    if key in cache:
+        return cache[key]
+
+    weights = dict(_RETURN_MODE_WEIGHTS)
+    if not _has_available_ride_contact(c, world):
+        weights["friend"] = 0.0
+    total = sum(weights.values()) or 1.0
+    roll = random.random() * total
+    upto = 0.0
+    mode = "bus"
+    for m, w in weights.items():
+        upto += w
+        if roll <= upto:
+            mode = m
+            break
+
+    cache[key] = mode
+    return mode
+
+
+def _return_via_taxi(c, world):
+    from systems.vehicles import household_home_entrance
+    from systems.rideshare import request_pickup
+    home = household_home_entrance(world, c.get("household_id"))
+    if not home:
+        return False
+    from systems.vehicles import bus_stop
+    stop = bus_stop(world)
+    pickup = stop or {"x": c.get("x", 0), "y": c.get("y", 0)}
+    result = request_pickup(c, world, {"x": pickup["x"], "y": pickup["y"]},
+                             method="taxi", destination={"x": home[0], "y": home[1]})
+    if not result.get("ok"):
+        return False
+    c["x"], c["y"] = pickup["x"], pickup["y"]
+    c["travel_hidden"] = False
+    c["travel_state"] = None
+    c["travel_mode"] = None
+    return True
+
+
+def _return_via_friend(c, world):
+    """propose_request() is asynchronous (resolved by the contact's own
+    AI turn later, not synchronously here), so this can't just wait for
+    the real proposal to resolve before deciding the return trip -- it
+    resolves willingness with the same lightweight, synchronous roll
+    systems/sexual_release.py::_booty_call_accepted() uses (attraction/
+    trust-driven), and still opens a real proposal via
+    systems/rideshare.py::request_pickup for the narrative/ledger
+    record. Consistent with sexual_release.py's _bring_together(): no
+    real "drive to and pick up from an off-grid destination" pathing
+    exists yet, so an accepted ride relocates the character home
+    directly rather than simulating the drive."""
+    contact_id = _has_available_ride_contact(c, world)
+    contact = world.get("characters", {}).get(contact_id) if contact_id else None
+    if not contact:
+        return False
+
+    rel = contact.get("relationships", {}).get(c["id"], {})
+    willingness = rel.get("friendship", 0) / 100.0 * 0.7 + rel.get("trust", 0) / 100.0 * 0.3
+    if random.random() >= max(0.15, min(0.95, willingness)):
+        return False
+
+    from systems.rideshare import request_pickup
+    request_pickup(c, world, {"x": c.get("x", 0), "y": c.get("y", 0)},
+                    method="friend", contact_id=contact_id)
+
+    from systems.vehicles import household_home_entrance
+    home = household_home_entrance(world, c.get("household_id"))
+    if home:
+        c["x"], c["y"] = home
+    c["travel_hidden"] = False
+    c["travel_state"] = None
+    c["travel_mode"] = None
+    return True
+
+
 def handle_return_transport(c, world):
     if c.get("transport", {}).get("mode") == "bus":
         bus_id = c["transport"]["bus_id"]
@@ -999,18 +1104,26 @@ def process_return(c, world):
     # travel.py) isn't home yet.
     if c.get("travel_mode") == "car":
         # Driving back still defers the visible reveal to that leg --
-        # nowhere sensible to place them mid-drive.
+        # nowhere sensible to place them mid-drive. A character who drove
+        # themselves off-grid always returns via that same car (there's
+        # only ever one car per household, claimed exclusively for the
+        # whole trip -- see travel.py::begin_travel()) -- no change here.
         from systems.travel import _start_driving_back
         _start_driving_back(c, world)
     elif c.get("travel_mode") == "bus":
-        # Unlike the car leg, the bus stop is a real, fixed place they can
-        # visibly stand and wait -- reveal them there now instead of
-        # staying hidden through the whole wait (see transit.py's
-        # _handle_bus_arrival/_handle_bus_departure for the rest of this
-        # leg: hidden again only while actually boarded and riding home).
-        from systems.vehicles import bus_stop
-        stop = bus_stop(world)
-        if stop:
-            c["x"], c["y"] = stop["x"], stop["y"]
-            c["travel_hidden"] = False
-        c["travel_state"] = "awaiting_bus_arrival"
+        # A bus/no-car departure gets a real return-mode evaluation
+        # (taxi / a contact's car / the default bus) instead of always
+        # assuming the bus back -- see _resolve_return_mode() below.
+        mode = _resolve_return_mode(c, world)
+        if mode == "taxi" and _return_via_taxi(c, world):
+            pass
+        elif mode == "friend" and _return_via_friend(c, world):
+            pass
+        else:
+            # Default/fallback -- unchanged existing behavior.
+            from systems.vehicles import bus_stop
+            stop = bus_stop(world)
+            if stop:
+                c["x"], c["y"] = stop["x"], stop["y"]
+                c["travel_hidden"] = False
+            c["travel_state"] = "awaiting_bus_arrival"

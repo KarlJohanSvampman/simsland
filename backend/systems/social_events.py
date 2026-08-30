@@ -603,6 +603,10 @@ _EVENT_VALUE_CATEGORY = {
 # see _hard_conflict() below.
 _HARD_CONFLICT_CATEGORIES = {"survival", "health"}
 
+# Event categories plausible for meeting a new sexual/romantic prospect
+# -- see systems/libido.py's spike tie-in below.
+_MEET_PEOPLE_CATEGORIES = {"party", "concert", "meetup", "festival"}
+
 
 def evaluate_attendance_tradeoff(c, event, world):
     """Deterministic pros/cons for whether c should attend `event`, using
@@ -675,6 +679,18 @@ def evaluate_attendance_tradeoff(c, event, world):
 
     casual_reluctance = profile.get("casual_reluctance", 0.5)
     score -= casual_reluctance * 10
+
+    # systems/libido.py -- spiking and unpartnered raises the appeal of
+    # events where meeting someone is plausible.
+    if event.get("category") in _MEET_PEOPLE_CATEGORIES:
+        from systems.libido import is_spiking
+        has_partner = any(
+            "partner" in r.get("labels", []) or "spouse" in r.get("labels", [])
+            for r in c.get("relationships", {}).values()
+        )
+        if is_spiking(c) and not has_partner:
+            score += 15
+            pros.append("a chance to meet someone")
 
     return {"score": round(score, 1), "pros": pros, "cons": cons}
 

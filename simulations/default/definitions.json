@@ -5973,7 +5973,8 @@
         "browse_news",
         "order_delivery",
         "open_banking_app",
-        "use_rideshare"
+        "use_rideshare",
+        "order_taxi_by_phone_app"
       ],
       "placeable": true,
       "initial_states": {
@@ -5999,7 +6000,8 @@
         "browse_news",
         "order_delivery",
         "open_banking_app",
-        "use_rideshare"
+        "use_rideshare",
+        "order_taxi_by_phone_app"
       ],
       "quality": 0.75,
       "placeable": true,
@@ -6026,7 +6028,8 @@
         "browse_news",
         "order_delivery",
         "open_banking_app",
-        "use_rideshare"
+        "use_rideshare",
+        "order_taxi_by_phone_app"
       ],
       "quality": 0.95,
       "placeable": true,
@@ -10899,6 +10902,57 @@
       },
       "icon": "adult"
     },
+    "fleshlight": {
+      "name": "Discreet Sleeve",
+      "category": "adult",
+      "slot": "hands",
+      "description": "A compact, discreetly-cased male masturbation aid.",
+      "material": "silicone_plastic",
+      "price_new": 60,
+      "price_range": "mid",
+      "used_price": null,
+      "appearances": [
+        {
+          "label": "Black",
+          "color": "black",
+          "hex": "#1A1A1A"
+        },
+        {
+          "label": "Flesh",
+          "color": "flesh",
+          "hex": "#E8B89A"
+        }
+      ],
+      "icon": "adult"
+    },
+    "vibrator": {
+      "name": "Vibrator",
+      "category": "adult",
+      "slot": "hands",
+      "description": "A battery-powered vibrating sex toy.",
+      "material": "silicone",
+      "price_new": 45,
+      "price_range": "mid",
+      "used_price": null,
+      "appearances": [
+        {
+          "label": "Pink",
+          "color": "pink",
+          "hex": "#FF69B4"
+        },
+        {
+          "label": "Purple",
+          "color": "purple",
+          "hex": "#9B59B6"
+        },
+        {
+          "label": "Black",
+          "color": "black",
+          "hex": "#222222"
+        }
+      ],
+      "icon": "adult"
+    },
     "strapon_harness": {
       "name": "Strap-on Harness",
       "category": "adult",
@@ -15576,7 +15630,9 @@
         "dildo_small",
         "dildo_medium",
         "dildo_large",
-        "strapon"
+        "strapon",
+        "fleshlight",
+        "vibrator"
       ],
       "privacy_required": true,
       "need_effects": {

@@ -134,6 +134,13 @@ def ensure_relationship(
             "favors": [],
             "favor_frustration": 0.0,
 
+            # systems/intimate_item_discovery.py -- stumbled onto
+            # evidence of the other person's private sex life (a found
+            # item, discovered computer history). Not a grievance --
+            # nothing was done TO the discoverer, just a standing dent
+            # to how they see this person.
+            "creeped_out": 0.0,
+
             "known_secrets": [],
 
             "shared_groups": [],

@@ -34,6 +34,27 @@ def _has_favor_motive(c):
     return bool(c.get("persistent_desires"))
 
 
+def _best_story_for(c, world, other_id):
+    """Highest-value live story (systems/stories.py) c hasn't already
+    told other_id, where other_id shows up in that story's own predicted
+    best_audience -- i.e. c specifically wants to tell THIS person, not
+    just anyone. Returns the story id, or None. Lazily computes
+    best_audience the first time a story is actually considered here
+    (add_story() itself has no `world` to do it at creation time)."""
+    from systems.stories import predict_best_audience
+    best = None
+    for story in c.get("notable_stories", []):
+        if other_id in story.get("told_to", []):
+            continue
+        if not story.get("best_audience"):
+            predict_best_audience(c, world, story)
+        if other_id not in story.get("best_audience", []):
+            continue
+        if best is None or story["value"] > best["value"]:
+            best = story
+    return best["id"] if best else None
+
+
 def _occasion_for(c, other, world):
     rel = c.get("relationships", {}).get(other["id"], {})
     if (rel.get("romantic_interest", 0) or rel.get("attraction", 0)) > 40:
@@ -74,14 +95,23 @@ def assign_conversation_goal(c, world, conv, other_id):
     if _has_favor_motive(c):
         options.append({"id": "favor", "tags": list(_FAVOR_TAGS),
                          "label": "hoping to find an opening to ask them for something"})
+    story_id = _best_story_for(c, world, other_id)
+    if story_id:
+        options.append({"id": "share_story", "tags": ["neutral", "acquaintance", "close", "coworker", "romantic"],
+                         "label": "eager to tell them something they'll want to hear",
+                         "story_id": story_id})
     if occasion == "close":
         options.append({"id": "not_interested", "tags": ["close"],
                          "label": "not really interested in this particular conversation right now"})
 
     from systems.choice import choose
     picked = choose(c, world, "conversation goal", options, occasion=occasion)
-    goal = {"type": picked["id"], "label": picked["label"]} if picked else \
-           {"type": "topic_interest", "label": "genuinely interested in the subject"}
+    if picked:
+        goal = {"type": picked["id"], "label": picked["label"]}
+        if picked["id"] == "share_story":
+            goal["story_id"] = picked.get("story_id")
+    else:
+        goal = {"type": "topic_interest", "label": "genuinely interested in the subject"}
     goals[other_id] = goal
     return goal
 

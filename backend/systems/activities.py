@@ -809,6 +809,23 @@ ACTIVITIES = {
     },
 
     # =====================================================
+    # TRANSPORTATION
+    # =====================================================
+
+    "order_taxi": {
+
+        # Multi-phase, see execute_activity()'s "order_taxi" phase block
+        # below -- order (call/app) -> walk to pickup spot -> wait.
+        "interaction": "order_taxi",
+
+        "base_duration_minutes": 30,
+
+        "interruptible": True,
+
+        "category": "errand"
+    },
+
+    # =====================================================
     # SOCIAL
     # =====================================================
 
@@ -1432,6 +1449,55 @@ def execute_activity(
         return True
 
     # =====================================================
+    # ORDER TAXI — order (call/app) -> walk to pickup spot -> wait for
+    # the vehicle (systems/rideshare.py). Placed before walking so it
+    # can manage its own movement, same as CARRY above.
+    # =====================================================
+
+    if interaction == "order_taxi":
+
+        phase = act.get("phase", "ordering")
+
+        if phase == "ordering":
+            method = act.get("params", {}).get("method", "phone_app")
+            if method == "phone_call":
+                from systems.action_router import _route_order_taxi_by_phone_call as _order
+            else:
+                from systems.action_router import _route_order_taxi_by_phone_app as _order
+            _order(c, world, {"destination": act.get("params", {}).get("destination")})
+
+            if not c.get("pickup_request", {}).get("vehicle_id"):
+                # Couldn't order (no phone/app/road network) -- bail out
+                # of the activity rather than waiting forever.
+                finish_activity(c, world)
+                return False
+
+            pickup = c["pickup_request"]["location"]
+            from systems.road_network import nearest_road_tile
+            spot = nearest_road_tile(world, pickup["x"], pickup["y"]) or (pickup["x"], pickup["y"])
+            c["move_target"] = {"x": spot[0], "y": spot[1], "target_type": "tile"}
+            c["is_moving"] = True
+            set_activity_phase(act, "walking_to_pickup", world)
+            c["animation_state"] = "walk"
+            return True
+
+        if phase == "walking_to_pickup":
+            if c.get("is_moving"):
+                return True
+            set_activity_phase(act, "waiting_for_taxi", world)
+            c["animation_state"] = "idle"
+            return True
+
+        if phase == "waiting_for_taxi":
+            status = c.get("pickup_request", {}).get("status")
+            if status in ("in_transit", "arrived"):
+                finish_activity(c, world)
+                return False
+            return True
+
+        return True
+
+    # =====================================================
     # SEARCH ROOM — walk to each container prop, check contents
     # Placed before walking so it can manage its own movement.
     # =====================================================
@@ -1750,6 +1816,12 @@ def complete_activity(
 
     elif activity_type in ("use_toilet", "use_toilet_bowels"):
         on_toilet_complete(c)
+        if activity_type == "use_toilet_bowels" and random.random() < 0.35:
+            try:
+                from systems.reactions import trigger_reaction
+                trigger_reaction(c, world, "gas_release", tick=world.get("tick", 0))
+            except Exception:
+                pass
 
     # =====================================
     # SHOWER / BATH
@@ -1987,6 +2059,27 @@ def complete_activity(
             on_porn_session(c, world)
         except Exception:
             pass
+
+        # Discoverable history if a shared household computer was used
+        # for this -- see action_router.py::_route_check_computer_history.
+        # No granular per-session device tracking exists yet (watch_porn's
+        # compatible_devices are computer/tv/phone, not distinguished at
+        # completion time), so this logs whenever the character has
+        # computer access at all -- real, if slightly opportunistic.
+        if activity_type == "watch_porn":
+            try:
+                from systems.personal_items import get_computer
+                computer = get_computer(c, world)
+                if computer:
+                    history = computer.setdefault("states", {}).setdefault("history", [])
+                    history.append({
+                        "tick":   world.get("tick", 0),
+                        "viewer": c["id"],
+                        "label":  "adult content",
+                    })
+                    del history[:-20]
+            except Exception:
+                pass
 
     # =====================================
     # EAT (LLM-driven "eat" action, action_router.py::_route_eat) — the one

@@ -290,10 +290,12 @@ def resolve_hostile_action(actor, target, action_id, world):
         _apply_relationship_impact(actor, target, outcome)
         drain_stamina(target, 0.02)
 
+        knocked_down = False
         knockdown_chance = _KNOCKDOWN_BASE.get(template_id, 0.0) * effectiveness
         if knockdown_chance > 0 and random.random() < knockdown_chance:
             drain_stamina(target, 0.05)
             set_posture(target, world, "crawling")
+            knocked_down = True
 
         # Real injury outcomes -- health.py::apply_injury(), driven by
         # definitions.json's interaction_templates[*].possible_injuries
@@ -336,8 +338,27 @@ def resolve_hostile_action(actor, target, action_id, world):
                 pass
 
         try:
-            from systems.reactions import push_reaction
-            push_reaction(target, "startled", tick, priority=2)
+            from systems.reactions import trigger_reaction
+            if knocked_down:
+                # Real physical outcome (avoid/stand/fall -- resolved
+                # above by evasion + knockdown_chance) gets its own
+                # animation + involuntary "oof" sound instead of sharing
+                # plain "startled".
+                trigger_reaction(target, world, "fall_down", tick=tick)
+            else:
+                trigger_reaction(target, world, "startled", tick=tick)
+
+            # Immediate mood nudge only -- the deliberate verbal comeback
+            # or violent retaliation stays a normal per-tick LLM choice
+            # (this file's own documented design boundary, see module
+            # docstring), now just better-informed: scared_verbal vs.
+            # angry_verbal is nudged by existing hostility/fear/trust
+            # toward the actor, not decided here.
+            rel = target.get("relationships", {}).get(actor["id"], {})
+            if rel.get("hostility", 0) > rel.get("fear", 0):
+                trigger_reaction(target, world, "angry_verbal", tick=tick, sound=False)
+            else:
+                trigger_reaction(target, world, "scared_verbal", tick=tick, sound=False)
         except Exception:
             pass
 

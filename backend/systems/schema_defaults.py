@@ -927,6 +927,19 @@ def ensure_character_defaults(c, world=None):
         "autonomy":   {"established": True,  "disrupted_count": 0, "frustration": 0.0},
     })
 
+    # Standalone sexual-release need (see systems/libido.py) -- separate
+    # from intimacy.py's relationship-scoped arousal_level. Lazily
+    # created there too (ensure_libido_state), this is just the backfill
+    # for characters that predate it.
+    if "libido_state" not in c:
+        from systems.libido import ensure_libido_state
+        ensure_libido_state(c)
+
+    # Ranked, capped list of stories worth telling others -- see
+    # systems/stories.py. Distinct from c["memories"] (everything a
+    # character remembers); this is the tellable subset.
+    c.setdefault("notable_stories", [])
+
     # Preliminary plans (steps/requirements/possible-solutions) for active
     # expectations -- see systems/expectation_planner.py, which queues
     # steps onto c["activity_queue"] the same way hobby_planner.py does.
