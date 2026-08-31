@@ -23,6 +23,7 @@ See core/event_handlers.py for all subscriptions.
 
 from datetime import datetime
 import os
+import random
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -99,6 +100,18 @@ from systems.libido import tick_libido
 from systems.intimate_item_discovery import tick_discovery_checks
 from systems.stories import decay_stories
 from systems.life_comparison import tick_life_comparison
+from systems.sports_leagues import tick_sports_leagues
+from systems.sports import schedule_game_day_events, kickoff_scheduled_games, apply_game_day_outcomes
+from systems.sports_broadcast import update_game_broadcast
+from systems.crime import (
+    maybe_recruit_into_crime, tick_criminal_career_progression, tick_gang_wars,
+    tick_pi_assignments, maybe_offer_corruption, tick_corruption_risk,
+)
+from systems.darknet import generate_darknet_listings
+from systems.sociopathy import (
+    is_sociopath, maybe_introduce_false_identity,
+    maybe_discover_persona_mismatch, maybe_plant_drama,
+)
 from systems.behavior_patterns import aggregate_daily_observations
 from systems.contagion       import tick_contagion_location, age_food_items
 from systems.child_care      import tick_child_needs
@@ -427,6 +440,16 @@ def tick(world):
         for c in characters:
             update_reading_process(c, world)
 
+    # Sports: move attendees into their game-day mode once kickoff arrives,
+    # and narrate periodic score updates for anyone currently watching
+    # on-grid. Same fine-grained cadence as reading (a game window is much
+    # longer than a news pick, but attendees shouldn't wait up to a full
+    # day to actually leave for kickoff).
+    if every(world, CADENCE["reading"], offset=17):
+        kickoff_scheduled_games(world)
+        for c in characters:
+            update_game_broadcast(c, world)
+
     # Household-scoped multi-stage processes (laundry, etc.) — ticks
     # forward for every household regardless of who's nearby, same
     # cadence tier as cooking. See systems/task_process.py.
@@ -569,9 +592,27 @@ def tick(world):
         tick_libido(world)
         tick_discovery_checks(world)
         tick_life_comparison(world)
+        tick_sports_leagues(world)
+        schedule_game_day_events(world)
+        apply_game_day_outcomes(world)
+        tick_criminal_career_progression(world)
+        tick_gang_wars(world)
+        generate_darknet_listings(world)
+        tick_pi_assignments(world)
+        tick_corruption_risk(world)
+        for c in characters:
+            maybe_offer_corruption(c, world)
         for c in characters:
             decay_stories(c)
             aggregate_daily_observations(c, world)
+            maybe_recruit_into_crime(c, world)
+            if is_sociopath(c):
+                contacts = [world["characters"][oid] for oid in c.get("relationships", {})
+                            if oid in world["characters"]]
+                if contacts:
+                    maybe_introduce_false_identity(c, random.choice(contacts), world)
+                maybe_discover_persona_mismatch(c, world)
+                maybe_plant_drama(c, world)
         tick_baby_daily(world)
         for _c in characters:
             sync_anger_from_grievances(_c, world)

@@ -492,6 +492,27 @@ def ensure_world_defaults(world, defs=None):
         "news_feed",
         []
     )
+
+    # Sports leagues (see systems/sports_leagues.py) -- per-sport schedule
+    # + standings for the 4 real pro leagues, keyed by sport
+    # ("football"/"basketball"/"hockey"/"soccer"). Local (invented) leagues
+    # share the same shape under their own sport key once generated.
+    world.setdefault("sports_leagues", {})
+
+    # Second-hand furniture marketplace (see systems/marketplace.py) --
+    # sims sell/buy household props to/from each other.
+    world.setdefault("marketplace_listings", [])
+
+    # Darknet listing board (see systems/darknet.py) -- drugs, stolen
+    # data/hacking, fake IDs/counterfeit money, hitman/PI services.
+    world.setdefault("darknet_listings", [])
+    world.setdefault("pi_assignments", [])
+    world.setdefault("surveillance_feeds", [])
+
+    # Invented local sports clubs for THIS simulation only (not real teams --
+    # see sports_teams in definitions.json for the real pro rosters). Lazily
+    # generated on first "play_*" hobby pickup -- see systems/sports.py.
+    world.setdefault("local_teams", {})
 # =========================================================
 # MARKET DEFAULTS
 # =========================================================
@@ -616,6 +637,12 @@ def ensure_character_defaults(c, world=None):
 
     # Faction memberships
     c.setdefault("faction_memberships", [])
+
+    # Standing among criminal contacts/gangs (see systems/crime.py) --
+    # rises from committing crimes without getting caught, decays
+    # slowly otherwise, gates promotion up a career track's tiers and
+    # (for the drug track) real recruitment into a faction.
+    c.setdefault("criminal_standing", 0.0)
 
     # Reputation
     c.setdefault("reputation", {
@@ -945,6 +972,31 @@ def ensure_character_defaults(c, world=None):
     # aggregating into behavior_patterns.
     c.setdefault("_daily_observations", [])
     c.setdefault("behavior_patterns", {})
+
+    # Sports hobbies (see systems/sports.py). supported_teams: sport ->
+    # sports_teams id (real pro team, picked when an "X Supporter" hobby is
+    # adopted). local_team: sport -> local_teams id (invented local club,
+    # picked when a "play_X" hobby is adopted). sports_injury_cooldown:
+    # sport -> tick the character is next eligible to risk another playing
+    # injury (mirrors exercise.py's injury-cooldown shape).
+    c.setdefault("supported_teams", {})
+    c.setdefault("local_team", {})
+    c.setdefault("sports_injury_cooldown", {})
+
+    # Cover persona (see systems/persona.py) -- None when "being
+    # themselves"; a real {name, occupation_label, cover_tags,
+    # adopted_tick} dict while playing an assumed identity.
+    c.setdefault("active_persona", None)
+
+    # Side-work corruption for eligible legal professionals (lawyer,
+    # bank_teller, accountant, mayor, police_officer) -- see
+    # systems/crime.py::maybe_offer_corruption().
+    c.setdefault("corruption", 0.0)
+
+    # Persistent alternate identities a sociopath maintains across
+    # multiple contacts (see systems/sociopathy.py) -- distinct from the
+    # single-activity active_persona above.
+    c.setdefault("persona_bank", [])
 
     # Preliminary plans (steps/requirements/possible-solutions) for active
     # expectations -- see systems/expectation_planner.py, which queues

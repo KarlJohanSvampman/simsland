@@ -162,6 +162,32 @@ SERVICE_CATALOG = {
         },
     },
 
+    # ── WEAPONS DEALER (systems/crime.py) ──────────────────────────────────
+    "weapons_dealer": {
+        "name":    "Weapons Dealer",
+        "illicit": True,
+        "subtypes": {
+
+            "firearm": {
+                "name":              "Firearm",
+                "price_mode":        "per_unit",
+                "unit_price":        900.0,
+                "duration_per_unit": 600,
+                "worker_trait":      "arms_dealer",
+                "item_template":     "firearm",
+            },
+
+            "rifle": {
+                "name":              "Rifle",
+                "price_mode":        "per_unit",
+                "unit_price":        1200.0,
+                "duration_per_unit": 600,
+                "worker_trait":      "arms_dealer",
+                "item_template":     "rifle",
+            },
+        },
+    },
+
     # ── ESCORT ───────────────────────────────────────────────────────────────
     "escort": {
         "name":    "Escort",
@@ -188,6 +214,7 @@ WORKER_NAMES = {
     "caregiver":  ["Sarah", "Amy", "Lisa", "Jan", "Priya"],
     "dealer":     ["Sal", "Rico", "Manny", "Dex", "Vince"],
     "escort":     ["Jade", "Remy", "Lena", "Marco", "Nico"],
+    "arms_dealer": ["Big Tony", "Cutter", "Ray", "Zeke", "Hollis"],
 }
 
 # ── Minimum cash required before illicit service is reachable ─────────────────
@@ -196,4 +223,6 @@ ILLICIT_MIN_CASH = {
     "stimulants":   45.0,
     "downers":      35.0,
     "companionship": 120.0,
+    "firearm":      900.0,
+    "rifle":        1200.0,
 }

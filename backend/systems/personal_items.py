@@ -95,6 +95,9 @@ def create_generated_item(template_id, world, c=None, **overrides):
 SMARTPHONE_ACTIONS = [
     "check_stocks", "browse_news", "order_delivery", "send_message",
     "call_contact", "open_banking_app", "use_rideshare", "order_taxi_by_phone_app",
+    "browse_second_hand_marketplace", "sell_prop_item_second_hand",
+    "buy_prop_item_second_hand", "estimate_avg_sell_value",
+    "browse_darknet_market", "order_darknet_listing",
 ]
 BASIC_PHONE_ACTIONS = ["send_message", "call_contact"]
 

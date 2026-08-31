@@ -264,6 +264,17 @@ def generate_social_intentions(
 
         flirt_score *= 0.2
 
+    # Sociopaths (systems/sociopathy.py) are disproportionately drawn to
+    # pursue vulnerable people -- reuses domestic_control.py's own
+    # _vulnerability_score() (low support network/confidence/codependent)
+    # rather than a second scoring model; today that score only shapes
+    # how an EXISTING partner gets controlled, not who gets targeted.
+    from systems.sociopathy import is_sociopath
+    if is_sociopath(c):
+        from systems.domestic_control import _vulnerability_score
+        vuln = _vulnerability_score(c, other, world.get("characters", {}))
+        flirt_score *= (1.0 + vuln)
+
     if flirt_score > 35:
 
         add_social_intention(

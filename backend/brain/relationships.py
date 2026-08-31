@@ -147,6 +147,12 @@ def ensure_relationship(
             # stat tracker this session has built.
             "jealousy": 0.0,
 
+            # systems/sociopathy.py -- what THIS character believes the
+            # other's name/identity actually is, when it differs from
+            # reality (a sociopath's persona_bank). None = knows them by
+            # their real name.
+            "known_as": None,
+
             "known_secrets": [],
 
             "shared_groups": [],

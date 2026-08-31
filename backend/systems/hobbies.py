@@ -44,6 +44,12 @@ def assign_hobbies(c, world, count=3):
     chosen      = random.sample(eligible, min(count, len(eligible)))
     c["hobbies"] = chosen
 
+    from systems.sports import sync_sports_hobbies
+    sync_sports_hobbies(c, world)
+
+    from systems.crime import sync_gun_hobbies
+    sync_gun_hobbies(c, world)
+
 
 # ----------------------------------------------------------
 # LOCATION RESOLUTION

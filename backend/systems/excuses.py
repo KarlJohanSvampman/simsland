@@ -306,6 +306,22 @@ def generate_excuse(c, authority, question_type, world):
          - honesty > 0.7 → refuse: "I'd rather not say"
          - else          → lie
     """
+    # Sociopaths are pathological liars with exactly one honesty
+    # exception -- the partner they're running the abusive relationship
+    # with (systems/sociopathy.py). Bypasses the normal sensitivity/
+    # honesty tree entirely rather than just nudging it, but still
+    # resolves through the SAME _generate_lie()/_record_lie() pipeline
+    # every other lie in this file uses.
+    authority_id = authority["id"] if isinstance(authority, dict) else authority
+    try:
+        from systems.sociopathy import is_sociopath, controlled_partner_id
+        if is_sociopath(c) and authority_id != controlled_partner_id(c, world):
+            lie_text, lie_truth = _generate_lie(c, question_type, authority, world)
+            lie_entry = _record_lie(c, question_type, lie_text, lie_truth, authority_id, world)
+            return {"text": lie_text, "vagueness": 0.0, "is_lie": True, "lie_detail": lie_entry}
+    except Exception:
+        pass
+
     privacy   = _privacy_score(c)
     honesty   = _honesty_score(c)
     sensitive = _detail_is_sensitive(question_type, c, world, authority=authority)
@@ -354,7 +370,22 @@ def _vague_deflection(question_type, c):
 
 
 def _get_true_detail(c, question_type, world):
-    """Return the actual truthful detail for the given question type."""
+    """Return the actual truthful detail for the given question type.
+
+    A character with an active cover persona (systems/persona.py --
+    burglary/PI-infiltration/production-front work) answers "who"/"what"
+    from that pre-committed cover instead of their real identity/
+    activity, so the answer stays consistent every time they're asked --
+    it still flows through the SAME generate_excuse()/_record_lie()/
+    check_lie_consistency() pipeline below, just with a different
+    starting "truth" to lie from."""
+    persona = c.get("active_persona")
+    if persona:
+        if question_type == "who":
+            return persona["name"]
+        if question_type == "what":
+            return persona["occupation_label"]
+
     chars = world.get("characters", {})
     if question_type == "where":
         dest = c.get("move_target", {})

@@ -2082,6 +2082,18 @@ def complete_activity(
                 pass
 
     # =====================================
+    # SPORTS BROADCAST — a watch_tv session carrying a watching_game tag
+    # (see systems/sports.py::kickoff_scheduled_games) resolves its
+    # outcome/mood/reaction the same way an off-grid game attendee does.
+    # =====================================
+    if activity_type == "watch_tv" and act.get("watching_game"):
+        try:
+            from systems.sports import resolve_watch_party
+            resolve_watch_party(c, world, act["watching_game"])
+        except Exception:
+            pass
+
+    # =====================================
     # EAT (LLM-driven "eat" action, action_router.py::_route_eat) — the one
     # real item-targeted consumption path an LLM can pick directly
     # (target: any item; covers food, drinks, and drug items alike). The

@@ -115,6 +115,26 @@ def tick_socioeconomics(world: dict, defs: dict) -> None:
         ), 3
     )
 
+    # Drug economy value (see systems/crime.py) -- a real number, not
+    # cosmetic: live drug_producer/drug_dealer_*/smuggler headcount times
+    # each job's own CRIME_PROFILES cash-range midpoint. Production's
+    # deliberately higher margins (Confirmed Decision #2) show up here
+    # directly, not just per-character.
+    try:
+        from systems.crime import CRIME_PROFILES
+        drug_jobs = ("drug_producer", "drug_dealer_low", "drug_dealer_mid", "smuggler")
+        total = 0.0
+        for c in world.get("characters", {}).values():
+            job_tid = c.get("job_template_id") or (c.get("job") or {}).get("id")
+            profile = CRIME_PROFILES.get(job_tid) if job_tid in drug_jobs else None
+            if not profile:
+                continue
+            lo, hi = profile.get("cash_range", (0, 0))
+            total += (lo + hi) / 2.0
+        env["drug_economy_value"] = round(total, 2)
+    except Exception:
+        pass
+
     # Population natural change (very slow)
     pop = env.get("population", 52000)
     births = (env.get("birth_rate", 1.2) / 100 / 365) * pop

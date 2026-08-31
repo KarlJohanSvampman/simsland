@@ -89,6 +89,9 @@ REACTION_ANIMATIONS = {
     "threat":          ["react_angry"],
     "impressed":       ["react_happy", "react_clap"],
     "disapproving":    ["react_shake_head", "react_disgust"],
+
+    # ── Sneaking (systems/stealth.py) ──
+    "sneak_noise":     ["react_startled"],
 }
 
 
@@ -159,6 +162,8 @@ REACTION_PRIORITIES = {
     "threat":          3,
     "impressed":       1,
     "disapproving":    1,
+
+    "sneak_noise":     2,
 }
 
 
@@ -182,6 +187,7 @@ REACTION_SOUNDS = {
     "fear":          (["!"], 1),
     "fall_down":     (["Oof!", "Ah!"], 2),
     "threat":        (["Back off!", "Don't push me."], 2),
+    "sneak_noise":   (["*creak*", "*bump*", "*rustle*", "*clink*"], 2),
 }
 
 # reaction_type -> generic stress nudge, applied alongside the animation
@@ -201,6 +207,12 @@ REACTION_MOOD_EFFECTS = {
     "angry_verbal":   {"stress": 4},
     "fall_down":      {"stress": 6},
     "stagger":        {"stress": 3},
+
+    # Sports game outcomes (systems/sports.py) -- reuses the existing
+    # generic impressed/disapproving pair rather than inventing a
+    # win/loss-specific reaction type.
+    "impressed":      {"stress": -3},
+    "disapproving":   {"stress": 3},
 }
 
 

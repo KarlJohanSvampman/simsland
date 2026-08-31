@@ -265,7 +265,7 @@ def _apply_outburst_consequences(actor, target, act_type, world):
     # Actor reputation hit (public acts visible to bystanders)
     rep_hit = {"threat": 0.05, "shove": 0.08, "assault": 0.15}
     apply_reputation_event(actor, act_type, world,
-                           severity=rep_hit[act_type], observer_id=tid)
+                           magnitude_override=-rep_hit[act_type])
 
     # Physical acts: target may be injured
     if act_type in ("shove", "assault"):

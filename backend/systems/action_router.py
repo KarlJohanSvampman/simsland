@@ -1252,6 +1252,18 @@ def route_action(c, world, action, speech, definitions=None, available_actions=N
         _route_computer_apply_for_job(c, world, action)
     elif action_type in ("computer_send_email", "computer_respond_email", "computer_check_email"):
         _route_computer_email(c, world, action)
+    elif action_type == "browse_second_hand_marketplace":
+        _route_browse_second_hand_marketplace(c, world, action)
+    elif action_type == "sell_prop_item_second_hand":
+        _route_sell_prop_item_second_hand(c, world, action)
+    elif action_type == "buy_prop_item_second_hand":
+        _route_buy_prop_item_second_hand(c, world, action)
+    elif action_type == "estimate_avg_sell_value":
+        _route_estimate_avg_sell_value(c, world, action)
+    elif action_type == "browse_darknet_market":
+        _route_browse_darknet_market(c, world, action)
+    elif action_type == "order_darknet_listing":
+        _route_order_darknet_listing(c, world, action)
     elif action_type == "computer_list_stocks":
         _route_computer_list_stocks(c, world, action)
     elif action_type == "computer_buy_stock":
@@ -1327,6 +1339,8 @@ def route_action(c, world, action, speech, definitions=None, available_actions=N
         _route_lift_weights(c, world, action)
     elif action_type in ("grab_offensive", "hold", "punch", "kick", "shove", "threaten", "stab", "knock"):
         _route_hostile_action(c, world, action)
+    elif action_type == "steal_from":
+        _route_steal_from(c, world, action)
     elif action_type == "dodge":
         _route_dodge(c, world, action)
     elif action_type == "block":
@@ -2059,6 +2073,38 @@ def _route_hostile_action(c, world, action):
     try:
         from systems.hostile_actions import resolve_hostile_action
         resolve_hostile_action(c, target, action["type"], world)
+    except Exception:
+        pass
+
+
+def _route_steal_from(c, world, action):
+    """
+    action: {"type": "steal_from", "target_id": other_id, "method":
+             "pickpocket"|"snatch"|"demand_at_knifepoint"|
+             "demand_at_gunpoint"} -- see interaction_templates
+    ["steal_from"] (a real, previously-dead entry) and
+    systems/crime.py::resolve_steal_from() for the actual resolution.
+    A gunpoint demand needs the actor to actually be holding a real
+    firearm; falls back to knifepoint otherwise.
+    """
+    target_id = action.get("target_id") or action.get("target")
+    if not target_id:
+        return
+    target = world.get("characters", {}).get(target_id)
+    if not target:
+        return
+    if c.get("building_id") != target.get("building_id"):
+        return
+
+    method = action.get("method", "pickpocket")
+    if method == "demand_at_gunpoint":
+        from systems.personal_items import get_item_by_template
+        if not (get_item_by_template(c, "firearm") or get_item_by_template(c, "rifle")):
+            method = "demand_at_knifepoint"
+
+    try:
+        from systems.crime import resolve_steal_from
+        resolve_steal_from(c, target, method, world)
     except Exception:
         pass
 
@@ -3551,6 +3597,98 @@ def _route_computer_email(c, world, action):
         c["activity"]["unread_email_count"] = sum(
             1 for t in email_threads if t.get("your_turn")
         )
+
+
+# ─── second-hand marketplace (systems/marketplace.py) ─────────────────────────
+# Sims sell/buy household furniture props to/from each other. Reachable from
+# phone or computer, same gating shape as every other online action above.
+
+def _route_browse_second_hand_marketplace(c, world, action):
+    if not _require_phone_or_computer(c, world):
+        return
+    from systems.marketplace import browse_listings
+    listings = browse_listings(world, exclude_household_id=c.get("household_id"))
+    c["activity"] = _scaffold(c, world, "browse_second_hand_marketplace",
+                               interaction="browse_second_hand_marketplace")
+    c["activity"]["marketplace_listings"] = listings
+    _set_computer_animation(c, world)
+
+
+def _route_sell_prop_item_second_hand(c, world, action):
+    if not _require_phone_or_computer(c, world):
+        return
+    prop_id = action.get("prop_id") or action.get("target")
+    if not prop_id:
+        return
+    asking_price = action.get("asking_price")
+    from systems.marketplace import list_prop_for_sale
+    listing = list_prop_for_sale(c, world, prop_id, asking_price=asking_price)
+    c["activity"] = _scaffold(c, world, "sell_prop_item_second_hand",
+                               interaction="sell_prop_item_second_hand")
+    c["activity"]["listing"] = listing
+    _set_computer_animation(c, world)
+
+
+def _route_buy_prop_item_second_hand(c, world, action):
+    if not _require_phone_or_computer(c, world):
+        return
+    listing_id = action.get("listing_id") or action.get("target")
+    if not listing_id:
+        return
+    from systems.marketplace import buy_marketplace_listing
+    result = buy_marketplace_listing(c, world, listing_id)
+    c["activity"] = _scaffold(c, world, "buy_prop_item_second_hand",
+                               interaction="buy_prop_item_second_hand")
+    c["activity"]["purchase_result"] = result
+    _set_computer_animation(c, world)
+
+
+def _route_estimate_avg_sell_value(c, world, action):
+    if not _require_phone_or_computer(c, world):
+        return
+    template_id = action.get("template_id") or action.get("target")
+    if not template_id:
+        prop_id = action.get("prop_id")
+        prop = next((p for p in world.get("props", []) if p.get("id") == prop_id), None)
+        template_id = prop.get("template") if prop else None
+    if not template_id:
+        return
+    from systems.marketplace import estimate_avg_sell_value
+    estimate = estimate_avg_sell_value(world, template_id)
+    c["activity"] = _scaffold(c, world, "estimate_avg_sell_value",
+                               interaction="estimate_avg_sell_value")
+    c["activity"]["estimated_value"] = estimate
+    _set_computer_animation(c, world)
+
+
+# ─── darknet marketplace (systems/darknet.py) ──────────────────────────────────
+# Reachable from phone or computer, same gating shape as the second-hand
+# marketplace above.
+
+def _route_browse_darknet_market(c, world, action):
+    if not _require_phone_or_computer(c, world):
+        return
+    from systems.darknet import browse_darknet_listings
+    listings = browse_darknet_listings(world, category=action.get("category"))
+    c["activity"] = _scaffold(c, world, "browse_darknet_market",
+                               interaction="browse_darknet_market")
+    c["activity"]["darknet_listings"] = listings
+    _set_computer_animation(c, world)
+
+
+def _route_order_darknet_listing(c, world, action):
+    if not _require_phone_or_computer(c, world):
+        return
+    listing_id = action.get("listing_id") or action.get("target")
+    if not listing_id:
+        return
+    target_id = action.get("target_id")
+    from systems.darknet import order_darknet_listing
+    result = order_darknet_listing(c, world, listing_id, target_id=target_id)
+    c["activity"] = _scaffold(c, world, "order_darknet_listing",
+                               interaction="order_darknet_listing")
+    c["activity"]["order_result"] = result
+    _set_computer_animation(c, world)
 
 
 # ─── stocks ───────────────────────────────────────────────────────────────────

@@ -890,6 +890,11 @@ def process_return(c, world):
         if h:
             h["wealth"] += earned
         story["summary"] += f" Earned ${earned:.0f}."
+
+        from systems.crime import resolve_criminal_shift
+        crime_note = resolve_criminal_shift(c, world)
+        if crime_note:
+            story["summary"] += crime_note
     elif reason in ("doctor", "hospital"):
         from core.definitions import load_definitions
         defs = load_definitions(world.get("sim_id", "default"))
@@ -1068,6 +1073,11 @@ def process_return(c, world):
                                       f"(${loan['monthly_payment']:.0f}/month).")
             else:
                 story["summary"] += f" {bank_name} declined the loan application."
+    elif reason in ("attend_game", "play_local_match"):
+        from systems.sports import resolve_attendee_return
+        note = resolve_attendee_return(c, world)
+        if note:
+            story["summary"] += " " + note
 
     handle_return_transport(c, world)
 

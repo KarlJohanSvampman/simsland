@@ -13,8 +13,33 @@ _SENTENCE_LENGTH = {
     "domestic_disturbance": 40,
     "property_damage":      60,
     "assault":               120,
+    # Criminal-career crime types (see systems/crime.py) -- proportional
+    # to real-world severity, matching this table's existing spirit.
+    "burglary":              90,
+    "car_theft":             80,
+    "robbery":               150,
+    "drug_dealing":          70,
+    "fraud":                 60,
+    "hacking":               50,
+    "arson":                 200,
+    "murder_for_hire":       400,
+    "gang_violence":         180,
+    "drug_production":       150,
+    "smuggling":              90,
+    "counterfeit_money":      70,
+    "bribery":               110,
 }
 _DEFAULT_SENTENCE = 80
+
+# Crime types systems/crime.py's shared shift framework (and its bespoke
+# mechanics) can produce -- fed into the same incident/arrest pipeline
+# every other crime type already uses below.
+_CRIME_CAREER_TYPES = (
+    "burglary", "car_theft", "robbery", "drug_dealing",
+    "fraud", "hacking", "arson", "murder_for_hire",
+    "gang_violence", "drug_production", "smuggling", "counterfeit_money",
+    "bribery",
+)
 
 
 def schedule_trial(c, world, crime):
@@ -37,6 +62,14 @@ def schedule_trial(c, world, crime):
     emit("character_arrested", {"character_id": c["id"], "crime": crime})
     emit("trial_scheduled", {"character_id": c["id"], "case_id": case["id"], "crime": crime})
 
+    # Criminal-career fallout (see systems/crime.py) -- an arrest is a
+    # real setback for standing, not just jail time.
+    try:
+        from systems.crime import apply_arrest_penalty
+        apply_arrest_penalty(c, world)
+    except Exception:
+        pass
+
 
 def maybe_arrest_from_incidents(world):
     for inc in world.get("incidents", []):
@@ -48,8 +81,17 @@ def maybe_arrest_from_incidents(world):
         # producers); "property_damage" added so vandalism reported via the
         # destroy action can actually lead to an arrest, not just a logged,
         # consequence-free incident.
-        if inc["type"] in ("domestic_disturbance", "assault", "property_damage"):
-            if random.random() < world["environment"].get("crime_solve_rate", .5):
+        if inc["type"] in ("domestic_disturbance", "assault", "property_damage") + _CRIME_CAREER_TYPES:
+            solve_rate = world["environment"].get("crime_solve_rate", .5)
+            if inc["type"] == "bribery":
+                # More likely to get caught the more corrupt they already
+                # are (Confirmed Decision #11b of the drug-economy plan) --
+                # a deeper paper/leverage trail, not a flat rate.
+                suspect_id = inc.get("participants", [None])[0]
+                suspect = world["characters"].get(suspect_id) if suspect_id else None
+                if suspect:
+                    solve_rate = min(0.95, solve_rate + suspect.get("corruption", 0.0) / 200.0)
+            if random.random() < solve_rate:
                 for cid in inc.get("participants", [])[:1]:
                     c = world["characters"].get(cid)
                     if c and c["legal"]["status"] == "free":

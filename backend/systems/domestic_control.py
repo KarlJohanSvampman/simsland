@@ -399,6 +399,37 @@ def on_abuse_revealed(abuser_id, victim_id, world):
             except Exception:
                 pass
 
+        # Report-abuse dilemma -- the witness may want to actually tell
+        # people or report to police, not just get privately angry. If
+        # the victim is right there, a real begging/pleading beat (fear
+        # of the abuser, shame) can suppress that urge -- a genuine
+        # tension, not an automatic report every time.
+        report_priority = int(anger * 100)
+        if report_priority > 20:
+            from brain.intentions import add_intention
+            victim_present = bool(c.get("building_id")) and c.get("building_id") == victim.get("building_id")
+            suppressed = False
+            if victim_present:
+                fear = victim.get("relationships", {}).get(abuser_id, {}).get("fear", 0)
+                plea_strength = 0.3 + (fear / 150.0)
+                if random.random() < plea_strength:
+                    suppressed = True
+                    try:
+                        from systems.incidental_speech import fire_incidental
+                        fire_incidental(victim, "plead",
+                                         "Please -- don't tell anyone. Just leave it.",
+                                         world, target_id=cid)
+                    except Exception:
+                        pass
+            if not suppressed:
+                add_intention(c, {
+                    "type":      f"report_abuse:{abuser_id}",
+                    "target_id": abuser_id,
+                    "category":  "social",
+                    "priority":  report_priority,
+                    "reason":    f"witnessed_abuse_of:{victim_id}",
+                })
+
 
 # ── Victim revenge paths ───────────────────────────────────────────────────
 

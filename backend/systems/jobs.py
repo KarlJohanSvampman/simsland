@@ -242,11 +242,18 @@ def apply_for_job(c, world, job_id=None):
     }
     my_rank = edu_rank.get(c.get("education", "none"), 0)
 
+    # Illegal listings (drug_dealer/mobster/etc -- see systems/crime.py)
+    # are deliberately invisible to the normal public job-board flow, same
+    # as the generation-time exclusion in character_gen.py::_assign_job.
+    # Entry into crime is an opportunity-driven runtime path
+    # (maybe_recruit_into_crime), not something a character just applies
+    # to off a listing.
     eligible = [
         j for j in world["job_listings"]
         if j.get("open")
         and edu_rank.get(j.get("degree_required", "none"), 0) <= my_rank
         and (c.get("age_group") != "child")
+        and not j.get("illegal")
     ]
     if not eligible:
         return

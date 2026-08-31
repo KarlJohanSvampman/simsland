@@ -100,6 +100,12 @@ ACTION_SPECS = {
     "computer_send_email":       {"group": "computer", "target": "character", "detail": "message", "doc": "Email a known contact."},
     "computer_respond_email":    {"group": "computer", "target": "character", "detail": "message", "doc": "Reply to an email."},
     "computer_check_email":      {"group": "computer", "target": "none", "doc": "Check your email."},
+    "browse_second_hand_marketplace": {"group": "computer", "target": "none", "doc": "Browse the second-hand marketplace for used furniture other sims are selling."},
+    "sell_prop_item_second_hand":     {"group": "computer", "target": "any", "doc": "List one of your own household's furniture props for sale on the second-hand marketplace."},
+    "buy_prop_item_second_hand":      {"group": "computer", "target": "any", "doc": "Buy a listed item from the second-hand marketplace."},
+    "estimate_avg_sell_value":        {"group": "computer", "target": "any", "doc": "Get an estimated resale value for a piece of furniture before listing it."},
+    "browse_darknet_market":          {"group": "computer", "target": "none", "doc": "Browse the darknet marketplace -- drugs, stolen data, fake IDs, counterfeit money, and hired-service listings."},
+    "order_darknet_listing":          {"group": "computer", "target": "any", "doc": "Order a darknet listing. Targeted categories (hitman/PI services) also need a target character."},
     # Stock trading — routed (action_router.py lines ~2542-2599) but never
     # offered/validated before this round.
     "computer_list_stocks":         {"group": "computer", "target": "none", "doc": "See available stocks and prices."},
@@ -222,6 +228,7 @@ ACTION_SPECS = {
     "threaten":         {"group": "hostile", "target": "character", "doc": "Threaten someone."},
     "stab":             {"group": "hostile", "target": "character", "doc": "Stab someone (requires a sharp weapon in hand)."},
     "knock":            {"group": "hostile", "target": "character", "doc": "Strike someone (requires a blunt weapon in hand)."},
+    "steal_from":       {"group": "hostile", "target": "character", "doc": "Attempt to take money from someone -- pickpocket/snatch quietly, or demand it at knife/gunpoint. A serious crime, real consequences if caught."},
     "dodge":            {"group": "defensive", "target": "none", "doc": "Dodge an incoming attack or struggle free."},
     "block":            {"group": "defensive", "target": "none", "doc": "Block an incoming attack."},
     "turn_and_run":     {"group": "defensive", "target": "none", "doc": "Flee the scene."},

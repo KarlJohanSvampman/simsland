@@ -231,9 +231,14 @@ def _assign_job(defs, age_group, education):
     jobs = defs.get("job_templates", {})
     if not jobs: return {}
     my_rank = _EDU_RANK.get(education, 0)
+    # Illegal jobs (see systems/crime.py) are deliberately excluded from the
+    # normal random hire pool -- nobody starts life as a Crime Boss purely
+    # by chance. Entry into crime is an opportunity-driven runtime path
+    # (maybe_recruit_into_crime), not something generation hands out.
     candidates = [
         (jid, j) for jid, j in jobs.items()
         if _EDU_RANK.get(j.get("degree_required", "none"), 0) <= my_rank
+        and not j.get("illegal")
     ]
     if age_group == "teen":
         candidates = [
@@ -595,6 +600,29 @@ def generate_character(defs, overrides=None, world=None):
         _gen_ideal(character, defs)
     except Exception:
         character.setdefault("ideal_partner", None)
+
+    # Sports team assignment — a "X Supporter"/team-sport hobby among the
+    # ones just picked above gets a real pro team or an invented local
+    # club (see systems/sports.py). Needs a real world dict (not just
+    # defs) since local-team rosters are per-simulation state; skipped
+    # when generating outside a live world (e.g. Character Creator preview).
+    if world is not None:
+        try:
+            from systems.sports import sync_sports_hobbies
+            sync_sports_hobbies(character, world)
+        except Exception:
+            pass
+        try:
+            from systems.crime import sync_gun_hobbies
+            sync_gun_hobbies(character, world)
+        except Exception:
+            pass
+
+    try:
+        from systems.sociopathy import maybe_diagnose_sociopath
+        maybe_diagnose_sociopath(character)
+    except Exception:
+        pass
 
     # Sexual preferences — positions, kinks (adults only)
     if age_group not in ("child", "teen"):

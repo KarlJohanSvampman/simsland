@@ -60,6 +60,10 @@ SEVERITY = {
     # Life comparison (systems/life_comparison.py) -- repeated
     # unfavorable-to-self comparisons crossing the jealousy threshold.
     "life_envy":               6.0,
+    # Rival sports fandom (systems/sports.py) -- opposing-team supporters
+    # sharing a game-day event, scaled up by a loss.
+    "team_rivalry":            5.0,
+    "gang_violence":           10.0,
     "resource_conflict":  5.0,
     "ignored_me":         3.0,
     "romantic_envy":     10.0,

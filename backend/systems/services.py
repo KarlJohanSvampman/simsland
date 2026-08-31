@@ -263,6 +263,9 @@ def _advance_working(contract, world):
     elif subtype == "companionship":
         _do_companionship(contract, world)
 
+    elif subtype in ("firearm", "rifle"):
+        _do_weapon_sale(contract, world)
+
     else:
         # Time-based passive service (gardening, childcare) — just tick forward
         contract["work_progress"] += 1
@@ -437,6 +440,47 @@ def _do_companionship(contract, world):
         satisfy_lt_need(buyer, "socialize", world)
         satisfy_lt_need(buyer, "play", world)
     contract["work_progress"] += 1
+
+    # Attribute real earnings to an actual prostitute-employed character
+    # if one exists (see systems/crime.py) -- the worker NPC itself stays
+    # the existing cosmetic spawn (rebinding the physical NPC to a real
+    # character's own position/schedule is a bigger, separate change),
+    # but a real provider now genuinely earns from this instead of the
+    # trade resolving to nobody every time.
+    if not contract.get("_earnings_attributed"):
+        contract["_earnings_attributed"] = True
+        provider = _find_real_prostitute(world)
+        if provider:
+            from systems.personal_items import add_cash
+            rate = SERVICE_CATALOG["escort"]["subtypes"]["companionship"]["hourly_rate"]
+            add_cash(provider, rate)
+            provider["criminal_standing"] = provider.get("criminal_standing", 0.0) + 2.0
+            contract["worker_character_id"] = provider["id"]
+
+
+def _find_real_prostitute(world):
+    for c in world.get("characters", {}).values():
+        job_tid = c.get("job_template_id") or (c.get("job") or {}).get("id")
+        if job_tid == "prostitute":
+            return c
+    return None
+
+
+def _do_weapon_sale(contract, world):
+    """Hand a real firearm/rifle item to the buyer immediately -- mirrors
+    _do_drug_deal's shape exactly. The general path for a character with
+    no criminal career or shooting_sports hobby to illegally acquire a
+    gun (see systems/crime.py)."""
+    subtype = contract["subtype"]
+    sub     = SERVICE_CATALOG["weapons_dealer"]["subtypes"].get(subtype, {})
+    template_id = sub.get("item_template", subtype)
+
+    buyer = world.get("characters", {}).get(contract["requested_by"])
+    if buyer:
+        from systems.personal_items import make_item, add_item
+        add_item(buyer, make_item(template_id, world=world))
+
+    contract["work_progress"] = contract["quantity"]
 
 
 # =========================================================

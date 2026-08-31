@@ -11570,7 +11570,7 @@
       "name": "Undercut",
       "category": "hair",
       "slot": "hair",
-      "description": "Short sides, longer top \u2014 can be styled various ways.",
+      "description": "Short sides, longer top — can be styled various ways.",
       "length": "medium",
       "sex_common": "neutral",
       "apply_via": "give_haircut",
@@ -11714,6 +11714,338 @@
       "addiction_type": "cannabis",
       "drug_id": "cannabis",
       "icon": "drug"
+    },
+    "lockpick": {
+      "name": "Lockpick Set",
+      "category": "tools",
+      "size": 1,
+      "base_price": 60,
+      "stackable": false,
+      "consumable": false,
+      "icon": "tools",
+      "tags": [
+        "criminal_tool",
+        "stealth"
+      ]
+    },
+    "glass_cutter": {
+      "name": "Glass Cutter",
+      "category": "tools",
+      "size": 1,
+      "base_price": 45,
+      "stackable": false,
+      "consumable": false,
+      "icon": "tools",
+      "tags": [
+        "criminal_tool",
+        "stealth"
+      ]
+    },
+    "hidden_camera": {
+      "name": "Hidden Camera",
+      "category": "electronics",
+      "size": 1,
+      "base_price": 150,
+      "stackable": false,
+      "consumable": false,
+      "icon": "electronics",
+      "tags": [
+        "surveillance",
+        "stealth"
+      ]
+    },
+    "spyware_software": {
+      "name": "Spyware Software",
+      "category": "digital_good",
+      "size": 0,
+      "base_price": 200,
+      "stackable": false,
+      "consumable": false,
+      "icon": "electronics",
+      "tags": [
+        "surveillance",
+        "digital",
+        "illegal"
+      ]
+    },
+    "delivery_worker_uniform": {
+      "name": "Delivery Worker Uniform",
+      "category": "clothing",
+      "slot": "outerwear",
+      "bone": "Spine1",
+      "base_price": 90,
+      "dirty": false,
+      "stackable": false,
+      "size": 1,
+      "price_new": 110,
+      "price_range": "mid",
+      "used_price": 40,
+      "icon": "clothing",
+      "tags": [
+        "uniform",
+        "disguise"
+      ],
+      "disguise": true,
+      "disguise_persona_tag": "delivery_worker"
+    },
+    "police_uniform": {
+      "name": "Police Uniform",
+      "category": "clothing",
+      "slot": "outerwear",
+      "bone": "Spine1",
+      "base_price": 90,
+      "dirty": false,
+      "stackable": false,
+      "size": 1,
+      "price_new": 110,
+      "price_range": "mid",
+      "used_price": 40,
+      "icon": "clothing",
+      "tags": [
+        "uniform",
+        "disguise"
+      ],
+      "disguise": true,
+      "disguise_persona_tag": "police_officer"
+    },
+    "nurse_scrubs": {
+      "name": "Nurse Scrubs",
+      "category": "clothing",
+      "slot": "outerwear",
+      "bone": "Spine1",
+      "base_price": 90,
+      "dirty": false,
+      "stackable": false,
+      "size": 1,
+      "price_new": 110,
+      "price_range": "mid",
+      "used_price": 40,
+      "icon": "clothing",
+      "tags": [
+        "uniform",
+        "disguise"
+      ],
+      "disguise": true,
+      "disguise_persona_tag": "nurse"
+    },
+    "doctor_coat": {
+      "name": "Doctor's Coat",
+      "category": "clothing",
+      "slot": "outerwear",
+      "bone": "Spine1",
+      "base_price": 90,
+      "dirty": false,
+      "stackable": false,
+      "size": 1,
+      "price_new": 110,
+      "price_range": "mid",
+      "used_price": 40,
+      "icon": "clothing",
+      "tags": [
+        "uniform",
+        "disguise"
+      ],
+      "disguise": true,
+      "disguise_persona_tag": "doctor"
+    },
+    "construction_uniform": {
+      "name": "Construction Worker Uniform",
+      "category": "clothing",
+      "slot": "outerwear",
+      "bone": "Spine1",
+      "base_price": 90,
+      "dirty": false,
+      "stackable": false,
+      "size": 1,
+      "price_new": 110,
+      "price_range": "mid",
+      "used_price": 40,
+      "icon": "clothing",
+      "tags": [
+        "uniform",
+        "disguise"
+      ],
+      "disguise": true,
+      "disguise_persona_tag": "construction_worker"
+    },
+    "janitor_uniform": {
+      "name": "Janitor Uniform",
+      "category": "clothing",
+      "slot": "outerwear",
+      "bone": "Spine1",
+      "base_price": 90,
+      "dirty": false,
+      "stackable": false,
+      "size": 1,
+      "price_new": 110,
+      "price_range": "mid",
+      "used_price": 40,
+      "icon": "clothing",
+      "tags": [
+        "uniform",
+        "disguise"
+      ],
+      "disguise": true,
+      "disguise_persona_tag": "janitor"
+    },
+    "military_uniform": {
+      "name": "Military Officer Uniform",
+      "category": "clothing",
+      "slot": "outerwear",
+      "bone": "Spine1",
+      "base_price": 90,
+      "dirty": false,
+      "stackable": false,
+      "size": 1,
+      "price_new": 110,
+      "price_range": "mid",
+      "used_price": 40,
+      "icon": "clothing",
+      "tags": [
+        "uniform",
+        "disguise"
+      ],
+      "disguise": true,
+      "disguise_persona_tag": "military_officer"
+    },
+    "paramedic_uniform": {
+      "name": "Paramedic Uniform",
+      "category": "clothing",
+      "slot": "outerwear",
+      "bone": "Spine1",
+      "base_price": 90,
+      "dirty": false,
+      "stackable": false,
+      "size": 1,
+      "price_new": 110,
+      "price_range": "mid",
+      "used_price": 40,
+      "icon": "clothing",
+      "tags": [
+        "uniform",
+        "disguise"
+      ],
+      "disguise": true,
+      "disguise_persona_tag": "paramedic"
+    },
+    "firefighter_uniform": {
+      "name": "Firefighter Uniform",
+      "category": "clothing",
+      "slot": "outerwear",
+      "bone": "Spine1",
+      "base_price": 90,
+      "dirty": false,
+      "stackable": false,
+      "size": 1,
+      "price_new": 110,
+      "price_range": "mid",
+      "used_price": 40,
+      "icon": "clothing",
+      "tags": [
+        "uniform",
+        "disguise"
+      ],
+      "disguise": true,
+      "disguise_persona_tag": "firefighter"
+    },
+    "hazmat_suit": {
+      "name": "Hazmat Suit",
+      "category": "clothing",
+      "slot": "outerwear",
+      "bone": "Spine1",
+      "base_price": 90,
+      "dirty": false,
+      "stackable": false,
+      "size": 1,
+      "price_new": 110,
+      "price_range": "mid",
+      "used_price": 40,
+      "icon": "clothing",
+      "tags": [
+        "uniform",
+        "disguise"
+      ],
+      "disguise": true,
+      "disguise_persona_tag": "lab_worker"
+    },
+    "amphetamine": {
+      "name": "Amphetamine",
+      "category": "drug",
+      "size": 1,
+      "base_price": 40,
+      "stackable": true,
+      "max_stack": 10,
+      "consumable": true,
+      "quantity": 1,
+      "effects": {
+        "energy": 0.6,
+        "fun": 0.3,
+        "stress": 0.2
+      },
+      "illicit": true,
+      "icon": "drug"
+    },
+    "heroin": {
+      "name": "Heroin",
+      "category": "drug",
+      "size": 1,
+      "base_price": 40,
+      "stackable": true,
+      "max_stack": 10,
+      "consumable": true,
+      "quantity": 1,
+      "effects": {
+        "stress": -0.5,
+        "energy": -0.2,
+        "fun": 0.2
+      },
+      "illicit": true,
+      "icon": "drug"
+    },
+    "weed": {
+      "name": "Weed",
+      "category": "drug",
+      "size": 1,
+      "base_price": 40,
+      "stackable": true,
+      "max_stack": 10,
+      "consumable": true,
+      "quantity": 1,
+      "effects": {
+        "fun": 0.4,
+        "stress": -0.3,
+        "hygiene": -0.05
+      },
+      "illicit": true,
+      "icon": "drug"
+    },
+    "fake_id": {
+      "name": "Fake ID",
+      "category": "document",
+      "size": 1,
+      "base_price": 0,
+      "stackable": false,
+      "consumable": false,
+      "icon": "document",
+      "illicit": true,
+      "tags": [
+        "forged",
+        "darknet"
+      ]
+    },
+    "counterfeit_cash_bundle": {
+      "name": "Counterfeit Cash Bundle",
+      "category": "document",
+      "size": 1,
+      "base_price": 0,
+      "stackable": false,
+      "consumable": true,
+      "icon": "document",
+      "illicit": true,
+      "tags": [
+        "counterfeit",
+        "darknet"
+      ]
     }
   },
   "character_templates": {
@@ -12348,7 +12680,7 @@
     },
     "computer_social_media": {
       "name": "Browse Social Media",
-      "description": "Scroll social feeds \u2014 mild fun boost, some stress relief",
+      "description": "Scroll social feeds — mild fun boost, some stress relief",
       "category": "computer",
       "duration_ticks": 20,
       "requires_prop_tags": [
@@ -12723,7 +13055,7 @@
     },
     "computer_order_item": {
       "name": "Order Item Online",
-      "description": "Purchase an item from the online store \u2014 delivered to home",
+      "description": "Purchase an item from the online store — delivered to home",
       "category": "computer",
       "duration_ticks": 8,
       "requires_prop_tags": [
@@ -15943,7 +16275,7 @@
     "kiss_peck": {
       "name": "Kiss (Peck)",
       "category": "romantic_physical",
-      "description": "Quick, light kiss \u2014 greeting or affection.",
+      "description": "Quick, light kiss — greeting or affection.",
       "has_target": true,
       "target_types": [
         "character"
@@ -16114,7 +16446,7 @@
     "caress": {
       "name": "Caress",
       "category": "romantic_physical",
-      "description": "Gentle, tender touch \u2014 face, hair or body.",
+      "description": "Gentle, tender touch — face, hair or body.",
       "has_target": true,
       "target_types": [
         "character"
@@ -16419,7 +16751,7 @@
     "perform_cpr": {
       "name": "Perform CPR",
       "category": "medical_emergency",
-      "description": "Administer cardiopulmonary resuscitation. Forced \u2014 performed on unconscious/cardiac-arrest targets.",
+      "description": "Administer cardiopulmonary resuscitation. Forced — performed on unconscious/cardiac-arrest targets.",
       "target": "character",
       "target_region": "torso",
       "initiation_type": "forced",
@@ -16597,7 +16929,7 @@
     "spit_on": {
       "name": "Spit On",
       "category": "social_hostile",
-      "description": "Spit on another character \u2014 deeply offensive and humiliating. Forced.",
+      "description": "Spit on another character — deeply offensive and humiliating. Forced.",
       "target": "character",
       "target_region": "face",
       "initiation_type": "forced",
@@ -30360,7 +30692,7 @@
     },
     "exercise_overdoer": {
       "label": "Overdoer",
-      "description": "Goes all-out every session \u2014 rapid gains but high injury risk and long recovery gaps.",
+      "description": "Goes all-out every session — rapid gains but high injury risk and long recovery gaps.",
       "category": "lifestyle",
       "effects": {
         "fitness_gain_mult": 1.4,
@@ -30368,9 +30700,9 @@
         "recovery_gap_mult": 2
       },
       "descriptions": {
-        "positive": "At its best, this is a real asset: Goes all-out every session \u2014 rapid gains but high injury risk and long recovery gaps.",
-        "negative": "It has a cost that's easy to underestimate: Goes all-out every session \u2014 rapid gains but high injury risk and long recovery gaps.",
-        "balanced": "In practice: Goes all-out every session \u2014 rapid gains but high injury risk and long recovery gaps."
+        "positive": "At its best, this is a real asset: Goes all-out every session — rapid gains but high injury risk and long recovery gaps.",
+        "negative": "It has a cost that's easy to underestimate: Goes all-out every session — rapid gains but high injury risk and long recovery gaps.",
+        "balanced": "In practice: Goes all-out every session — rapid gains but high injury risk and long recovery gaps."
       },
       "learn_chance": {
         "balanced": 15,
@@ -30473,7 +30805,7 @@
     },
     "hot_tempered": {
       "label": "Hot-Tempered",
-      "description": "Short fuse \u2014 anger spikes fast but may also cool quickly.",
+      "description": "Short fuse — anger spikes fast but may also cool quickly.",
       "category": "personality",
       "effects": {
         "self_control": -0.25,
@@ -30481,9 +30813,9 @@
         "anger_decay_fast": true
       },
       "descriptions": {
-        "positive": "It works in hot_tempered's favor more often than not: Short fuse \u2014 anger spikes fast but may also cool quickly.",
-        "negative": "It has a cost that's easy to underestimate: Short fuse \u2014 anger spikes fast but may also cool quickly.",
-        "balanced": "In practice: Short fuse \u2014 anger spikes fast but may also cool quickly."
+        "positive": "It works in hot_tempered's favor more often than not: Short fuse — anger spikes fast but may also cool quickly.",
+        "negative": "It has a cost that's easy to underestimate: Short fuse — anger spikes fast but may also cool quickly.",
+        "balanced": "In practice: Short fuse — anger spikes fast but may also cool quickly."
       },
       "learn_chance": {
         "balanced": 15,
@@ -30710,16 +31042,16 @@
     },
     "emotionally_controlling": {
       "label": "Emotionally Controlling",
-      "description": "Uses psychological tactics \u2014 emasculation, ridicule, abandonment threats, affair humiliation \u2014 to dominate and diminish a partner.",
+      "description": "Uses psychological tactics — emasculation, ridicule, abandonment threats, affair humiliation — to dominate and diminish a partner.",
       "category": "personality",
       "effects": {
         "emotional_control_tendency": 0.75,
         "dominant_intimate": true
       },
       "descriptions": {
-        "positive": "Seen clearly, it's a strength worth leaning into: Uses psychological tactics \u2014 emasculation, ridicule, abandonment threats, affair humiliation \u2014 to dominate and diminish a partner.",
-        "negative": "There's a sharper edge to it than it first appears: Uses psychological tactics \u2014 emasculation, ridicule, abandonment threats, affair humiliation \u2014 to dominate and diminish a partner.",
-        "balanced": "In practice: Uses psychological tactics \u2014 emasculation, ridicule, abandonment threats, affair humiliation \u2014 to dominate and diminish a partner."
+        "positive": "Seen clearly, it's a strength worth leaning into: Uses psychological tactics — emasculation, ridicule, abandonment threats, affair humiliation — to dominate and diminish a partner.",
+        "negative": "There's a sharper edge to it than it first appears: Uses psychological tactics — emasculation, ridicule, abandonment threats, affair humiliation — to dominate and diminish a partner.",
+        "balanced": "In practice: Uses psychological tactics — emasculation, ridicule, abandonment threats, affair humiliation — to dominate and diminish a partner."
       },
       "learn_chance": {
         "balanced": 15,
@@ -30989,7 +31321,7 @@
       "conditions": []
     },
     "asexual_tendency": {
-      "description": "Little or no spontaneous sexual attraction; may engage for emotional closeness but rarely initiates. Distinct from low_libido \u2014 the motivation is absent, not just the drive.",
+      "description": "Little or no spontaneous sexual attraction; may engage for emotional closeness but rarely initiates. Distinct from low_libido — the motivation is absent, not just the drive.",
       "category": "sexuality",
       "effects": {
         "libido": -0.4,
@@ -30997,9 +31329,9 @@
         "casual_reluctance": 0.5
       },
       "descriptions": {
-        "positive": "A dependable part of who they are: Little or no spontaneous sexual attraction; may engage for emotional closeness but rarely initiates. Distinct from low_libido \u2014 the motivation is absent, not just the drive.",
-        "negative": "It has a cost that's easy to underestimate: Little or no spontaneous sexual attraction; may engage for emotional closeness but rarely initiates. Distinct from low_libido \u2014 the motivation is absent, not just the drive.",
-        "balanced": "Little or no spontaneous sexual attraction; may engage for emotional closeness but rarely initiates. Distinct from low_libido \u2014 the motivation is absent, not just the drive."
+        "positive": "A dependable part of who they are: Little or no spontaneous sexual attraction; may engage for emotional closeness but rarely initiates. Distinct from low_libido — the motivation is absent, not just the drive.",
+        "negative": "It has a cost that's easy to underestimate: Little or no spontaneous sexual attraction; may engage for emotional closeness but rarely initiates. Distinct from low_libido — the motivation is absent, not just the drive.",
+        "balanced": "Little or no spontaneous sexual attraction; may engage for emotional closeness but rarely initiates. Distinct from low_libido — the motivation is absent, not just the drive."
       },
       "learn_chance": {
         "balanced": 15,
@@ -49842,6 +50174,587 @@
         "exploitation"
       ],
       "criminal_tier": 2
+    },
+    "car_thief": {
+      "name": "Car Thief",
+      "industry": "Criminal",
+      "sector": "criminal",
+      "income_class": "Low",
+      "average_salary": 22000,
+      "hourly_wage": 10.58,
+      "salary": 1833,
+      "work_mode": "On-site",
+      "work_hours": [
+        22,
+        6
+      ],
+      "work_days": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "degree_required": "none",
+      "physical_demand": 55,
+      "social_demand": 20,
+      "service_job": false,
+      "hazard_level": "Extreme",
+      "illegal": true,
+      "tags": [
+        "criminal",
+        "theft",
+        "illegal",
+        "extreme_risk"
+      ],
+      "criminal_tier": 1
+    },
+    "burglar": {
+      "name": "Burglar",
+      "industry": "Criminal",
+      "sector": "criminal",
+      "income_class": "Low",
+      "average_salary": 24000,
+      "hourly_wage": 11.54,
+      "salary": 2000,
+      "work_mode": "On-site",
+      "work_hours": [
+        23,
+        5
+      ],
+      "work_days": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "degree_required": "none",
+      "physical_demand": 50,
+      "social_demand": 15,
+      "service_job": false,
+      "hazard_level": "Extreme",
+      "illegal": true,
+      "tags": [
+        "criminal",
+        "theft",
+        "illegal",
+        "extreme_risk"
+      ],
+      "criminal_tier": 1
+    },
+    "street_robber": {
+      "name": "Street Robber",
+      "industry": "Criminal",
+      "sector": "criminal",
+      "income_class": "Low",
+      "average_salary": 16000,
+      "hourly_wage": 7.69,
+      "salary": 1333,
+      "work_mode": "On-site",
+      "work_hours": [
+        18,
+        4
+      ],
+      "work_days": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "degree_required": "none",
+      "physical_demand": 60,
+      "social_demand": 30,
+      "service_job": false,
+      "hazard_level": "Extreme",
+      "illegal": true,
+      "tags": [
+        "criminal",
+        "robbery",
+        "violent",
+        "illegal",
+        "extreme_risk"
+      ],
+      "criminal_tier": 1
+    },
+    "robber_establishments": {
+      "name": "Robber (Establishments)",
+      "industry": "Criminal",
+      "sector": "criminal",
+      "income_class": "Middle",
+      "average_salary": 40000,
+      "hourly_wage": 19.23,
+      "salary": 3333,
+      "work_mode": "On-site",
+      "work_hours": [
+        10,
+        22
+      ],
+      "work_days": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "degree_required": "none",
+      "physical_demand": 55,
+      "social_demand": 35,
+      "service_job": false,
+      "hazard_level": "Extreme",
+      "illegal": true,
+      "tags": [
+        "criminal",
+        "robbery",
+        "violent",
+        "illegal",
+        "armed",
+        "extreme_risk"
+      ],
+      "criminal_tier": 2
+    },
+    "street_fighter": {
+      "name": "Street Fighter",
+      "industry": "Criminal",
+      "sector": "criminal",
+      "income_class": "Low",
+      "average_salary": 30000,
+      "hourly_wage": 14.42,
+      "salary": 2500,
+      "work_mode": "On-site",
+      "work_hours": [
+        20,
+        4
+      ],
+      "work_days": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "degree_required": "none",
+      "physical_demand": 85,
+      "social_demand": 30,
+      "service_job": false,
+      "hazard_level": "High",
+      "illegal": true,
+      "tags": [
+        "criminal",
+        "violence",
+        "muscle",
+        "illegal"
+      ],
+      "criminal_tier": 1
+    },
+    "hitman": {
+      "name": "Hitman",
+      "industry": "Criminal",
+      "sector": "criminal",
+      "income_class": "Upper",
+      "average_salary": 150000,
+      "hourly_wage": 72.12,
+      "salary": 12500,
+      "work_mode": "On-site",
+      "work_hours": [
+        0,
+        24
+      ],
+      "work_days": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "degree_required": "none",
+      "physical_demand": 60,
+      "social_demand": 15,
+      "service_job": false,
+      "hazard_level": "Extreme",
+      "illegal": true,
+      "tags": [
+        "criminal",
+        "organized_crime",
+        "violent",
+        "illegal",
+        "lethal",
+        "extreme_risk"
+      ],
+      "criminal_tier": 3
+    },
+    "torpedo": {
+      "name": "Torpedo",
+      "industry": "Criminal",
+      "sector": "criminal",
+      "income_class": "Middle",
+      "average_salary": 50000,
+      "hourly_wage": 24.04,
+      "salary": 4167,
+      "work_mode": "On-site",
+      "work_hours": [
+        0,
+        24
+      ],
+      "work_days": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "degree_required": "none",
+      "physical_demand": 75,
+      "social_demand": 25,
+      "service_job": false,
+      "hazard_level": "Extreme",
+      "illegal": true,
+      "tags": [
+        "criminal",
+        "organized_crime",
+        "violent",
+        "illegal",
+        "extreme_risk"
+      ],
+      "criminal_tier": 2
+    },
+    "fraudster": {
+      "name": "Fraudster",
+      "industry": "Criminal",
+      "sector": "criminal",
+      "income_class": "Middle",
+      "average_salary": 45000,
+      "hourly_wage": 21.63,
+      "salary": 3750,
+      "work_mode": "On-site",
+      "work_hours": [
+        8,
+        20
+      ],
+      "work_days": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "degree_required": "none",
+      "physical_demand": 10,
+      "social_demand": 60,
+      "service_job": true,
+      "hazard_level": "Medium",
+      "illegal": true,
+      "tags": [
+        "criminal",
+        "fraud",
+        "white_collar",
+        "illegal"
+      ],
+      "criminal_tier": 1
+    },
+    "hacker": {
+      "name": "Hacker",
+      "industry": "Criminal",
+      "sector": "criminal",
+      "income_class": "Middle",
+      "average_salary": 55000,
+      "hourly_wage": 26.44,
+      "salary": 4583,
+      "work_mode": "Remote",
+      "work_hours": [
+        0,
+        24
+      ],
+      "work_days": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "degree_required": "none",
+      "physical_demand": 5,
+      "social_demand": 10,
+      "service_job": false,
+      "hazard_level": "Low",
+      "illegal": true,
+      "tags": [
+        "criminal",
+        "cybercrime",
+        "white_collar",
+        "illegal"
+      ],
+      "criminal_tier": 2
+    },
+    "arsonist": {
+      "name": "Arsonist",
+      "industry": "Criminal",
+      "sector": "criminal",
+      "income_class": "Middle",
+      "average_salary": 35000,
+      "hourly_wage": 16.83,
+      "salary": 2917,
+      "work_mode": "On-site",
+      "work_hours": [
+        22,
+        4
+      ],
+      "work_days": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "degree_required": "none",
+      "physical_demand": 40,
+      "social_demand": 10,
+      "service_job": false,
+      "hazard_level": "Extreme",
+      "illegal": true,
+      "tags": [
+        "criminal",
+        "arson",
+        "violent",
+        "illegal",
+        "extreme_risk"
+      ],
+      "criminal_tier": 2
+    },
+    "weapons_dealer": {
+      "name": "Weapons Dealer",
+      "industry": "Criminal",
+      "sector": "criminal",
+      "income_class": "Middle",
+      "average_salary": 70000,
+      "hourly_wage": 33.65,
+      "salary": 5833,
+      "work_mode": "On-site",
+      "work_hours": [
+        10,
+        22
+      ],
+      "work_days": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "degree_required": "none",
+      "physical_demand": 20,
+      "social_demand": 50,
+      "service_job": false,
+      "hazard_level": "High",
+      "illegal": true,
+      "tags": [
+        "criminal",
+        "arms_trade",
+        "illegal"
+      ],
+      "criminal_tier": 2
+    },
+    "prostitute": {
+      "name": "Prostitute",
+      "industry": "Criminal",
+      "sector": "criminal",
+      "income_class": "Low",
+      "average_salary": 40000,
+      "hourly_wage": 19.23,
+      "salary": 3333,
+      "work_mode": "On-site",
+      "work_hours": [
+        20,
+        6
+      ],
+      "work_days": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "degree_required": "none",
+      "physical_demand": 40,
+      "social_demand": 80,
+      "service_job": true,
+      "hazard_level": "High",
+      "illegal": true,
+      "adult_industry": true,
+      "tags": [
+        "criminal",
+        "adult",
+        "illegal",
+        "sex_work"
+      ],
+      "criminal_tier": 1
+    },
+    "drug_producer": {
+      "name": "Drug Producer",
+      "industry": "Criminal",
+      "sector": "criminal",
+      "income_class": "Middle",
+      "average_salary": 90000,
+      "hourly_wage": 43.27,
+      "salary": 7500,
+      "work_mode": "On-site",
+      "work_hours": [
+        0,
+        24
+      ],
+      "work_days": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "degree_required": "none",
+      "physical_demand": 55,
+      "social_demand": 20,
+      "service_job": false,
+      "hazard_level": "Extreme",
+      "illegal": true,
+      "tags": [
+        "criminal",
+        "drug_trade",
+        "production",
+        "illegal",
+        "extreme_risk"
+      ],
+      "criminal_tier": 2
+    },
+    "smuggler": {
+      "name": "Smuggler",
+      "industry": "Criminal",
+      "sector": "criminal",
+      "income_class": "Middle",
+      "average_salary": 75000,
+      "hourly_wage": 36.06,
+      "salary": 6250,
+      "work_mode": "On-site",
+      "work_hours": [
+        0,
+        24
+      ],
+      "work_days": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "degree_required": "none",
+      "physical_demand": 50,
+      "social_demand": 25,
+      "service_job": false,
+      "hazard_level": "Extreme",
+      "illegal": true,
+      "tags": [
+        "criminal",
+        "smuggling",
+        "logistics",
+        "illegal",
+        "extreme_risk"
+      ],
+      "criminal_tier": 2
+    },
+    "private_investigator": {
+      "name": "Private Investigator",
+      "industry": "Professional",
+      "sector": "professional",
+      "income_class": "Middle",
+      "average_salary": 58000,
+      "hourly_wage": 27.88,
+      "salary": 4833,
+      "work_mode": "On-site",
+      "work_hours": [
+        8,
+        22
+      ],
+      "work_days": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "degree_required": "none",
+      "physical_demand": 30,
+      "social_demand": 35,
+      "service_job": true,
+      "hazard_level": "Medium",
+      "illegal": false,
+      "tags": [
+        "investigation",
+        "surveillance",
+        "self_employed"
+      ]
+    },
+    "lawyer": {
+      "name": "Lawyer",
+      "industry": "Professional",
+      "sector": "professional",
+      "income_class": "Upper",
+      "average_salary": 145000,
+      "hourly_wage": 69.71,
+      "salary": 12083,
+      "work_mode": "On-site",
+      "work_hours": [
+        8,
+        20
+      ],
+      "work_days": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "degree_required": "professional",
+      "physical_demand": 10,
+      "social_demand": 65,
+      "service_job": false,
+      "hazard_level": "Low",
+      "illegal": false,
+      "tags": [
+        "legal",
+        "professional",
+        "corruptible"
+      ]
     }
   },
   "company_templates": {
@@ -50707,7 +51620,7 @@
       }
     },
     "cafe": {
-      "name": "Caf\u00e9",
+      "name": "Café",
       "industry": "food_and_drink",
       "off_grid": true,
       "service_category": "food",
@@ -50894,7 +51807,7 @@
         "product_manager",
         "designer"
       ],
-      "description": "Employer \u2014 sims with tech jobs work here off-screen.",
+      "description": "Employer — sims with tech jobs work here off-screen.",
       "typical_roles": [
         "software_engineer",
         "senior_software_engineer",
@@ -51269,7 +52182,10 @@
         "drug_dealer_mid",
         "getaway_driver",
         "mobster",
-        "pimp"
+        "pimp",
+        "car_thief",
+        "burglar",
+        "street_robber"
       ],
       "max_staff": 15,
       "turnover_rate": 0.12
@@ -51287,7 +52203,11 @@
         "getaway_driver",
         "bodyguard",
         "pimp",
-        "drug_dealer_mid"
+        "drug_dealer_mid",
+        "hitman",
+        "torpedo",
+        "weapons_dealer",
+        "fraudster"
       ],
       "max_staff": 20,
       "turnover_rate": 0.08
@@ -51378,7 +52298,7 @@
         1,
         3
       ],
-      "description": "Daycare and early education for children age 1\u20133 before preschool.",
+      "description": "Daycare and early education for children age 1–3 before preschool.",
       "tags": [
         "childcare",
         "early_education",
@@ -51459,7 +52379,7 @@
   "need_templates": {
     "socialize": {
       "name": "Socialise",
-      "description": "Spend quality time with other people \u2014 friends, neighbours, or family.",
+      "description": "Spend quality time with other people — friends, neighbours, or family.",
       "category": "social",
       "weekly_target": 1,
       "satisfying_activities": [
@@ -51486,7 +52406,7 @@
     },
     "exercise": {
       "name": "Physical Exercise",
-      "description": "Engage in physical activity \u2014 gym, running, sports, or home workout.",
+      "description": "Engage in physical activity — gym, running, sports, or home workout.",
       "category": "health",
       "weekly_target": 2,
       "satisfying_activities": [
@@ -51500,7 +52420,7 @@
     },
     "creative": {
       "name": "Creative Outlet",
-      "description": "Engage in a creative activity \u2014 art, music, writing, cooking, or crafting.",
+      "description": "Engage in a creative activity — art, music, writing, cooking, or crafting.",
       "category": "self_expression",
       "weekly_target": 1,
       "satisfying_activities": [
@@ -51514,7 +52434,7 @@
     },
     "romance": {
       "name": "Romance",
-      "description": "Seek or maintain a romantic relationship \u2014 quality one-on-one time with a partner, dating, or pursuing new connections.",
+      "description": "Seek or maintain a romantic relationship — quality one-on-one time with a partner, dating, or pursuing new connections.",
       "category": "relationships",
       "weekly_target": 1,
       "satisfying_activities": [
@@ -51640,7 +52560,7 @@
     },
     "cheerful": {
       "name": "Cheerful",
-      "description": "Upbeat and positive \u2014 prone to jokes and warmth.",
+      "description": "Upbeat and positive — prone to jokes and warmth.",
       "emotional_temperature_range": [
         15,
         40
@@ -52775,7 +53695,9 @@
       "max_participants": 22,
       "location": "ice_rink",
       "suggest_to_household": true,
-      "annual_cost": 1500
+      "annual_cost": 1500,
+      "sports_role": "player",
+      "sport": "hockey"
     },
     "boxing": {
       "name": "Boxing",
@@ -52934,7 +53856,9 @@
       "max_participants": 22,
       "location": "sports_ground",
       "suggest_to_household": true,
-      "annual_cost": 300
+      "annual_cost": 300,
+      "sports_role": "player",
+      "sport": "soccer"
     },
     "american_football": {
       "name": "American Football",
@@ -52955,7 +53879,9 @@
       "max_participants": 22,
       "location": "sports_ground",
       "suggest_to_household": true,
-      "annual_cost": 400
+      "annual_cost": 400,
+      "sports_role": "player",
+      "sport": "football"
     },
     "baseball": {
       "name": "Baseball",
@@ -52994,7 +53920,9 @@
       "max_participants": 10,
       "location": "court",
       "suggest_to_household": true,
-      "annual_cost": 200
+      "annual_cost": 200,
+      "sports_role": "player",
+      "sport": "basketball"
     },
     "volleyball": {
       "name": "Volleyball",
@@ -53510,6 +54438,74 @@
       "location": null,
       "suggest_to_household": false,
       "annual_cost": 200
+    },
+    "football_supporter": {
+      "name": "Football Supporter",
+      "category": "sports",
+      "required_props": [],
+      "required_items": [],
+      "off_grid": false,
+      "overnight": false,
+      "min_days": null,
+      "max_days": null,
+      "min_participants": 1,
+      "max_participants": 8,
+      "location": null,
+      "suggest_to_household": true,
+      "annual_cost": 400,
+      "sports_role": "supporter",
+      "sport": "football"
+    },
+    "basketball_supporter": {
+      "name": "Basketball Supporter",
+      "category": "sports",
+      "required_props": [],
+      "required_items": [],
+      "off_grid": false,
+      "overnight": false,
+      "min_days": null,
+      "max_days": null,
+      "min_participants": 1,
+      "max_participants": 8,
+      "location": null,
+      "suggest_to_household": true,
+      "annual_cost": 350,
+      "sports_role": "supporter",
+      "sport": "basketball"
+    },
+    "hockey_supporter": {
+      "name": "Hockey Supporter",
+      "category": "sports",
+      "required_props": [],
+      "required_items": [],
+      "off_grid": false,
+      "overnight": false,
+      "min_days": null,
+      "max_days": null,
+      "min_participants": 1,
+      "max_participants": 8,
+      "location": null,
+      "suggest_to_household": true,
+      "annual_cost": 350,
+      "sports_role": "supporter",
+      "sport": "hockey"
+    },
+    "soccer_supporter": {
+      "name": "Soccer Supporter",
+      "category": "sports",
+      "required_props": [],
+      "required_items": [],
+      "off_grid": false,
+      "overnight": false,
+      "min_days": null,
+      "max_days": null,
+      "min_participants": 1,
+      "max_participants": 8,
+      "location": null,
+      "suggest_to_household": true,
+      "annual_cost": 350,
+      "sports_role": "supporter",
+      "sport": "soccer"
     }
   },
   "default_item_interactions": [
@@ -53577,7 +54573,7 @@
       "consequences": {
         "short": "Reduced concentration, irritability, sensitivity to light and sound",
         "medium_long": "Chronic headaches can indicate hypertension, eye strain, or neurological deterioration",
-        "long": "Severe untreated headaches may signal a stroke, aneurysm, or brain tumour \u2014 risk of permanent neurological damage"
+        "long": "Severe untreated headaches may signal a stroke, aneurysm, or brain tumour — risk of permanent neurological damage"
       },
       "duration_ticks": 180,
       "interval_ticks": 0,
@@ -53667,7 +54663,7 @@
     },
     "mood_swings": {
       "name": "Mood Swings",
-      "description": "Rapid unpredictable shifts between emotional states \u2014 anger, sadness, elation",
+      "description": "Rapid unpredictable shifts between emotional states — anger, sadness, elation",
       "visual": true,
       "affects_mood": true,
       "need_penalties": {
@@ -53682,7 +54678,7 @@
     },
     "fever": {
       "name": "Fever",
-      "description": "Elevated body temperature (above 38\u00b0C/100.4\u00b0F), chills, sweating",
+      "description": "Elevated body temperature (above 38°C/100.4°F), chills, sweating",
       "visual": true,
       "affects_mood": true,
       "need_penalties": {
@@ -53693,7 +54689,7 @@
       "consequences": {
         "short": "Bed confinement, dehydration, inability to work",
         "medium_long": "Febrile seizures possible; sustained high fever causes protein denaturation",
-        "long": "Brain damage from extreme fever (>41\u00b0C); septic shock if infection is the root cause"
+        "long": "Brain damage from extreme fever (>41°C); septic shock if infection is the root cause"
       },
       "duration_ticks": 300,
       "interval_ticks": 0,
@@ -53839,7 +54835,7 @@
     },
     "rash": {
       "name": "Skin Rash",
-      "description": "Red, itchy, or painful skin eruption \u2014 may be localised or widespread",
+      "description": "Red, itchy, or painful skin eruption — may be localised or widespread",
       "visual": true,
       "affects_mood": false,
       "need_penalties": {
@@ -53855,7 +54851,7 @@
     },
     "internal_bleeding": {
       "name": "Internal Bleeding",
-      "description": "Blood accumulating inside the body cavity \u2014 not visible externally",
+      "description": "Blood accumulating inside the body cavity — not visible externally",
       "visual": false,
       "affects_mood": true,
       "need_penalties": {
@@ -53883,7 +54879,7 @@
       "consequences": {
         "short": "Loss of fine motor control, increased injury risk (cannot feel pain signals)",
         "medium_long": "Muscle wasting in affected area from disuse; nerve pathway degradation",
-        "long": "Permanent paralysis of affected limb if nerve supply is severed or chronically compressed; if facial \u2014 stroke indicator"
+        "long": "Permanent paralysis of affected limb if nerve supply is severed or chronically compressed; if facial — stroke indicator"
       }
     },
     "speech_difficulty": {
@@ -54464,7 +55460,7 @@
     },
     "handicap": {
       "name": "Physical Handicap",
-      "description": "Loss of function in a body part \u2014 may be from injury, birth defect, or disease",
+      "description": "Loss of function in a body part — may be from injury, birth defect, or disease",
       "icon": "wheelchair",
       "chronic": true,
       "curable": false,
@@ -54863,11 +55859,11 @@
       "surgery_hospital_days": 0,
       "survival_rate": 100,
       "worsening_rate_per_day": 0.003,
-      "notes": "Penicillin is curative. Late-stage (tertiary) syphilis causes cardiovascular and neurological damage \u2014 not fully reversible."
+      "notes": "Penicillin is curative. Late-stage (tertiary) syphilis causes cardiovascular and neurological damage — not fully reversible."
     },
     "concussion": {
       "name": "Concussion",
-      "description": "Traumatic brain injury from head impact \u2014 confusion, headache, sensitivity to light, short-term memory issues",
+      "description": "Traumatic brain injury from head impact — confusion, headache, sensitivity to light, short-term memory issues",
       "icon": "head_injury",
       "chronic": false,
       "curable": true,
@@ -54900,7 +55896,7 @@
       "mental_trait_risk": 0.2,
       "rest_required": true,
       "screen_ban": true,
-      "notes": "No screens, no alcohol, no strenuous activity. Multiple concussions greatly increase risk of CTE (chronic traumatic encephalopathy) \u2014 apply cumulative mental trait risk."
+      "notes": "No screens, no alcohol, no strenuous activity. Multiple concussions greatly increase risk of CTE (chronic traumatic encephalopathy) — apply cumulative mental trait risk."
     },
     "malnutrition": {
       "name": "Malnutrition",
@@ -55900,311 +56896,311 @@
   },
   "icon_templates": {
     "sniffles": {
-      "emoji": "\ud83e\udd27",
+      "emoji": "🤧",
       "label": "Sniffles"
     },
     "fever": {
-      "emoji": "\ud83e\udd12",
+      "emoji": "🤒",
       "label": "Fever"
     },
     "virus": {
-      "emoji": "\ud83e\udda0",
+      "emoji": "🦠",
       "label": "Virus"
     },
     "heart": {
-      "emoji": "\ud83e\udec0",
+      "emoji": "🫀",
       "label": "Heart"
     },
     "ribbon": {
-      "emoji": "\ud83c\udf97\ufe0f",
+      "emoji": "🎗️",
       "label": "Cancer Ribbon"
     },
     "seizure": {
-      "emoji": "\u26a1",
+      "emoji": "⚡",
       "label": "Seizure"
     },
     "bacteria": {
-      "emoji": "\ud83e\udda0",
+      "emoji": "🦠",
       "label": "Bacteria"
     },
     "nausea": {
-      "emoji": "\ud83e\udd22",
+      "emoji": "🤢",
       "label": "Nausea"
     },
     "blurred_eye": {
-      "emoji": "\ud83d\udc41\ufe0f",
+      "emoji": "👁️",
       "label": "Vision"
     },
     "muffled_ear": {
-      "emoji": "\ud83d\udc42",
+      "emoji": "👂",
       "label": "Hearing"
     },
     "wheelchair": {
-      "emoji": "\u267f",
+      "emoji": "♿",
       "label": "Handicap"
     },
     "liver": {
-      "emoji": "\ud83e\uded8",
+      "emoji": "🫘",
       "label": "Liver"
     },
     "tick_bite": {
-      "emoji": "\ud83d\udd77\ufe0f",
+      "emoji": "🕷️",
       "label": "Tick-borne"
     },
     "broken_heart": {
-      "emoji": "\ud83d\udc94",
+      "emoji": "💔",
       "label": "Dysfunction"
     },
     "no_baby": {
-      "emoji": "\ud83d\udeab",
+      "emoji": "🚫",
       "label": "Infertility"
     },
     "nerve_zap": {
-      "emoji": "\u26a1",
+      "emoji": "⚡",
       "label": "Nerve Damage"
     },
     "allergy_alert": {
-      "emoji": "\ud83d\udea8",
+      "emoji": "🚨",
       "label": "Allergy Alert"
     },
     "petri_dish": {
-      "emoji": "\ud83e\uddeb",
+      "emoji": "🧫",
       "label": "Infection"
     },
     "hiv_ribbon": {
-      "emoji": "\ud83c\udf97\ufe0f",
+      "emoji": "🎗️",
       "label": "HIV/AIDS"
     },
     "head_injury": {
-      "emoji": "\ud83e\udd15",
+      "emoji": "🤕",
       "label": "Head Injury"
     },
     "bone_injury": {
-      "emoji": "\ud83e\uddb4",
+      "emoji": "🦴",
       "label": "Bone Injury"
     },
     "blood_drop": {
-      "emoji": "\ud83e\ude78",
+      "emoji": "🩸",
       "label": "Bleeding"
     },
     "muscle_strain": {
-      "emoji": "\ud83d\udcaa",
+      "emoji": "💪",
       "label": "Muscle Strain"
     },
     "fatigue": {
-      "emoji": "\ud83d\ude34",
+      "emoji": "😴",
       "label": "Fatigue"
     },
     "head_pain": {
-      "emoji": "\ud83e\udd15",
+      "emoji": "🤕",
       "label": "Head Pain"
     },
     "sore_throat": {
-      "emoji": "\ud83d\udde3\ufe0f",
+      "emoji": "🗣️",
       "label": "Sore Throat"
     },
     "cough_soft": {
-      "emoji": "\ud83d\ude37",
+      "emoji": "😷",
       "label": "Cough"
     },
     "cough_harsh": {
-      "emoji": "\ud83d\ude37",
+      "emoji": "😷",
       "label": "Intense Cough"
     },
     "runny_nose": {
-      "emoji": "\ud83e\udd27",
+      "emoji": "🤧",
       "label": "Runny Nose"
     },
     "brain_fog": {
-      "emoji": "\ud83e\udde0",
+      "emoji": "🧠",
       "label": "Memory Lapses"
     },
     "motor_impair": {
-      "emoji": "\ud83e\udd1a",
+      "emoji": "🤚",
       "label": "Motor Skills"
     },
     "confusion": {
-      "emoji": "\ud83d\udcad",
+      "emoji": "💭",
       "label": "Confusion"
     },
     "no_appetite": {
-      "emoji": "\ud83c\udf7d\ufe0f",
+      "emoji": "🍽️",
       "label": "No Appetite"
     },
     "low_libido": {
-      "emoji": "\ud83d\udca4",
+      "emoji": "💤",
       "label": "Low Libido"
     },
     "dehydrated": {
-      "emoji": "\ud83d\udca7",
+      "emoji": "💧",
       "label": "Dehydration"
     },
     "breathless": {
-      "emoji": "\ud83d\ude2e\u200d\ud83d\udca8",
+      "emoji": "😮‍💨",
       "label": "Short of Breath"
     },
     "faint": {
-      "emoji": "\ud83d\ude35",
+      "emoji": "😵",
       "label": "Fainting"
     },
     "diarrhea": {
-      "emoji": "\ud83d\udebd",
+      "emoji": "🚽",
       "label": "Diarrhea"
     },
     "vomit": {
-      "emoji": "\ud83e\udd2e",
+      "emoji": "🤮",
       "label": "Vomiting"
     },
     "clothing": {
-      "emoji": "\ud83d\udc55",
+      "emoji": "👕",
       "label": "Clothing"
     },
     "sports_equipment": {
-      "emoji": "\ud83c\udfcb\ufe0f",
+      "emoji": "🏋️",
       "label": "Sports Equipment"
     },
     "kitchenware": {
-      "emoji": "\ud83c\udf73",
+      "emoji": "🍳",
       "label": "Kitchenware"
     },
     "electronics": {
-      "emoji": "\ud83d\udd0c",
+      "emoji": "🔌",
       "label": "Electronics"
     },
     "food": {
-      "emoji": "\ud83c\udf55",
+      "emoji": "🍕",
       "label": "Food"
     },
     "medicine_item": {
-      "emoji": "\ud83d\udc8a",
+      "emoji": "💊",
       "label": "Medicine"
     },
     "hygiene": {
-      "emoji": "\ud83e\uddfc",
+      "emoji": "🧼",
       "label": "Hygiene"
     },
     "tools": {
-      "emoji": "\ud83d\udd27",
+      "emoji": "🔧",
       "label": "Tools"
     },
     "hair": {
-      "emoji": "\ud83d\udc87",
+      "emoji": "💇",
       "label": "Hair"
     },
     "office_supplies": {
-      "emoji": "\ud83d\udcce",
+      "emoji": "📎",
       "label": "Office Supplies"
     },
     "outdoor": {
-      "emoji": "\ud83c\udfd5\ufe0f",
+      "emoji": "🏕️",
       "label": "Outdoor"
     },
     "misc": {
-      "emoji": "\ud83d\udce6",
+      "emoji": "📦",
       "label": "Misc"
     },
     "drink": {
-      "emoji": "\ud83e\udd64",
+      "emoji": "🥤",
       "label": "Drink"
     },
     "cleaning": {
-      "emoji": "\ud83e\uddf9",
+      "emoji": "🧹",
       "label": "Cleaning"
     },
     "dishware": {
-      "emoji": "\ud83c\udf7d\ufe0f",
+      "emoji": "🍽️",
       "label": "Dishware"
     },
     "hobby_supplies": {
-      "emoji": "\ud83e\uddf5",
+      "emoji": "🧵",
       "label": "Hobby Supplies"
     },
     "music": {
-      "emoji": "\ud83c\udfb8",
+      "emoji": "🎸",
       "label": "Music"
     },
     "decor": {
-      "emoji": "\ud83c\udffa",
+      "emoji": "🏺",
       "label": "Decor"
     },
     "art_supplies": {
-      "emoji": "\ud83c\udfa8",
+      "emoji": "🎨",
       "label": "Art Supplies"
     },
     "linen": {
-      "emoji": "\ud83e\uddfa",
+      "emoji": "🧺",
       "label": "Linen"
     },
     "games": {
-      "emoji": "\ud83c\udfb2",
+      "emoji": "🎲",
       "label": "Games"
     },
     "adult": {
-      "emoji": "\ud83d\udd1e",
+      "emoji": "🔞",
       "label": "Adult"
     },
     "smartphone": {
-      "emoji": "\ud83d\udcf1",
+      "emoji": "📱",
       "label": "Smartphone"
     },
     "groceries": {
-      "emoji": "\ud83d\uded2",
+      "emoji": "🛒",
       "label": "Groceries"
     },
     "computer": {
-      "emoji": "\ud83d\udcbb",
+      "emoji": "💻",
       "label": "Computer"
     },
     "documents": {
-      "emoji": "\ud83d\udcc4",
+      "emoji": "📄",
       "label": "Documents"
     },
     "books_media": {
-      "emoji": "\ud83d\udcda",
+      "emoji": "📚",
       "label": "Books & Media"
     },
     "appliance": {
-      "emoji": "\ud83e\uddf0",
+      "emoji": "🧰",
       "label": "Appliance"
     },
     "accessory": {
-      "emoji": "\ud83d\udc5c",
+      "emoji": "👜",
       "label": "Accessory"
     },
     "furniture": {
-      "emoji": "\ud83e\ude91",
+      "emoji": "🪑",
       "label": "Furniture"
     },
     "fixture": {
-      "emoji": "\ud83d\udebf",
+      "emoji": "🚿",
       "label": "Fixture"
     },
     "lighting": {
-      "emoji": "\ud83d\udca1",
+      "emoji": "💡",
       "label": "Lighting"
     },
     "wall_decor": {
-      "emoji": "\ud83d\uddbc\ufe0f",
+      "emoji": "🖼️",
       "label": "Wall Decor"
     },
     "vehicle": {
-      "emoji": "\ud83d\ude97",
+      "emoji": "🚗",
       "label": "Vehicle"
     },
     "equipment": {
-      "emoji": "\ud83d\udee0\ufe0f",
+      "emoji": "🛠️",
       "label": "Equipment"
     },
     "structure": {
-      "emoji": "\ud83c\udfdb\ufe0f",
+      "emoji": "🏛️",
       "label": "Structure"
     },
     "transit": {
-      "emoji": "\ud83d\ude8c",
+      "emoji": "🚌",
       "label": "Transit"
     },
     "drug": {
-      "emoji": "\ud83d\udeac",
+      "emoji": "🚬",
       "label": "Drug"
     }
   },
@@ -56799,7 +57795,7 @@
     },
     "dementia": {
       "name": "Dementia / Alzheimer's",
-      "description": "Progressive neurological decline \u2014 memory loss, confusion, personality changes",
+      "description": "Progressive neurological decline — memory loss, confusion, personality changes",
       "chronic": true,
       "treatable": false,
       "from_stroke": true,
@@ -56874,7 +57870,7 @@
         "social": -0.15,
         "fun": -0.12
       },
-      "notes": "Panic attacks mimic heart attacks \u2014 cause significant ER visits. Agoraphobia often develops as avoidance behaviour."
+      "notes": "Panic attacks mimic heart attacks — cause significant ER visits. Agoraphobia often develops as avoidance behaviour."
     },
     "paranoid_personality": {
       "name": "Paranoid Personality Disorder",
@@ -56975,6 +57971,28 @@
         "social_withdrawal",
         "self_destructive_risk"
       ]
+    },
+    "sociopath": {
+      "name": "Antisocial Personality Disorder",
+      "description": "A pervasive pattern of disregard for others' rights, deceitfulness, manipulation, and lack of remorse.",
+      "chronic": true,
+      "treatable": false,
+      "from_stroke": false,
+      "from_head_impact": false,
+      "medicine": [],
+      "medicine_frequency": null,
+      "common_sex": "any",
+      "common_age_range": [
+        18,
+        70
+      ],
+      "annual_cost": 0,
+      "doctor_visits_per_year": 0,
+      "severity": 7,
+      "urgency": 2,
+      "need_penalties": {},
+      "mood_lock": null,
+      "notes": "Not medication-responsive -- talk therapy has limited effect. See systems/sociopathy.py for behavioral modeling."
     }
   },
   "belief_templates": {
@@ -58008,8 +59026,8 @@
     "paedophile"
   ],
   "item_schema_notes": {
-    "appearances": "Optional array of visual variants. Each entry: {label, texture, color, hex}. The first entry is the default. Renderer picks variant by index. No new template needed per color \u2014 just add to appearances[].",
-    "combine": "combine: {with: item_key, result: item_key, order: int} \u2014 item can be combined with another item (in order if chained) to produce result. The result item should have components:[item_key1, item_key2] and split_into:[item_key1, item_key2] for the reverse operation."
+    "appearances": "Optional array of visual variants. Each entry: {label, texture, color, hex}. The first entry is the default. Renderer picks variant by index. No new template needed per color — just add to appearances[].",
+    "combine": "combine: {with: item_key, result: item_key, order: int} — item can be combined with another item (in order if chained) to produce result. The result item should have components:[item_key1, item_key2] and split_into:[item_key1, item_key2] for the reverse operation."
   },
   "locomotion_styles": {
     "normal": {
@@ -58571,7 +59589,7 @@
       },
       "undercut": {
         "name": "Undercut",
-        "description": "Short sides, longer top \u2014 can be styled various ways.",
+        "description": "Short sides, longer top — can be styled various ways.",
         "length": "medium",
         "sex_common": "neutral",
         "mesh": null,
@@ -60058,7 +61076,10 @@
       "recruitment_criteria": {
         "job_types": [
           "drug_dealer_low",
-          "drug_dealer_mid"
+          "drug_dealer_mid",
+          "car_thief",
+          "burglar",
+          "street_robber"
         ],
         "min_age": 14,
         "max_age": 35
@@ -60102,7 +61123,12 @@
           "mobster",
           "mobster_boss",
           "getaway_driver",
-          "pimp"
+          "pimp",
+          "hitman",
+          "torpedo",
+          "weapons_dealer",
+          "robber_establishments",
+          "fraudster"
         ],
         "min_age": 21
       },
@@ -60380,7 +61406,7 @@
     "hug_prolonged": {
       "name": "Prolonged Hug",
       "intimacy_tier": 3,
-      "description": "A long, close embrace \u2014 more than friendly.",
+      "description": "A long, close embrace — more than friendly.",
       "compatibility": "any",
       "requires_private": false,
       "reversible": true,
@@ -60405,7 +61431,7 @@
     "kiss_cheek": {
       "name": "Kiss on the Cheek",
       "intimacy_tier": 3,
-      "description": "A soft kiss on the cheek \u2014 affectionate or romantic.",
+      "description": "A soft kiss on the cheek — affectionate or romantic.",
       "compatibility": "any",
       "requires_private": false,
       "reversible": true,
@@ -60430,7 +61456,7 @@
     "kiss_forehead": {
       "name": "Kiss on the Forehead",
       "intimacy_tier": 3,
-      "description": "A tender forehead kiss \u2014 protective and intimate.",
+      "description": "A tender forehead kiss — protective and intimate.",
       "compatibility": "any",
       "requires_private": false,
       "reversible": false,
@@ -60558,7 +61584,7 @@
     "kiss_neck": {
       "name": "Kiss on the Neck",
       "intimacy_tier": 5,
-      "description": "Soft kisses along the neck \u2014 clearly intimate.",
+      "description": "Soft kisses along the neck — clearly intimate.",
       "compatibility": "any",
       "requires_private": true,
       "reversible": false,
@@ -60898,7 +61924,7 @@
     "frottage": {
       "name": "Frottage",
       "intimacy_tier": 6,
-      "description": "Mutual genital stimulation through grinding \u2014 male partners.",
+      "description": "Mutual genital stimulation through grinding — male partners.",
       "compatibility": "same_sex_male_only",
       "requires_private": true,
       "reversible": false,
@@ -60924,7 +61950,7 @@
     "cuddling": {
       "name": "Cuddling",
       "intimacy_tier": 5,
-      "description": "Lying together closely, bodies intertwined \u2014 intimate but not sexual.",
+      "description": "Lying together closely, bodies intertwined — intimate but not sexual.",
       "compatibility": "any",
       "requires_private": false,
       "reversible": false,
@@ -61148,7 +62174,7 @@
     },
     {
       "id": "sapiosexual",
-      "label": "Sapiosexual \u2014 brains over looks",
+      "label": "Sapiosexual — brains over looks",
       "condition": "bachelor_plus_education",
       "boost": 0.3
     },
@@ -61379,7 +62405,7 @@
     },
     "cuddling_intimate": {
       "label": "Intimate Cuddling",
-      "description": "Close holding with gentle touching \u2014 sensual rather than explicitly sexual.",
+      "description": "Close holding with gentle touching — sensual rather than explicitly sexual.",
       "compatible_with": [
         "heterosexual",
         "same_sex_male",
@@ -61484,7 +62510,7 @@
       "pleasure_bonus": 0.1
     },
     "size_preference_larger": {
-      "label": "Size Preference \u2014 Larger",
+      "label": "Size Preference — Larger",
       "category": "body_focus",
       "intensity": 1,
       "description": "Attracted to larger partners.",
@@ -61493,7 +62519,7 @@
       "pleasure_bonus": 0.05
     },
     "size_preference_smaller": {
-      "label": "Size Preference \u2014 Smaller",
+      "label": "Size Preference — Smaller",
       "category": "body_focus",
       "intensity": 1,
       "description": "Attracted to petite partners.",
@@ -61574,7 +62600,7 @@
       "pleasure_bonus": 0.12
     },
     "aftercare_important": {
-      "label": "Aftercare \u2014 High Need",
+      "label": "Aftercare — High Need",
       "category": "emotional",
       "intensity": 1,
       "description": "Needs significant emotional care and reassurance after intimate encounters.",
@@ -61900,7 +62926,7 @@
       "conditioning_response": "shame_anxiety",
       "shame_delta": 0.3,
       "resentment_delta": 15,
-      "description": "Scolded in front of others \u2014 humiliating."
+      "description": "Scolded in front of others — humiliating."
     },
     "early_curfew": {
       "name": "Earlier Curfew",
@@ -62561,6 +63587,985 @@
       "hazards": {
         "tiredness": 0.05
       }
+    }
+  },
+  "sports_teams": {
+    "nfl_buffalo_bills": {
+      "name": "Buffalo Bills",
+      "league": "NFL",
+      "sport": "football",
+      "division": "AFC East",
+      "strength": 0.43,
+      "rivals": []
+    },
+    "nfl_miami_dolphins": {
+      "name": "Miami Dolphins",
+      "league": "NFL",
+      "sport": "football",
+      "division": "AFC East",
+      "strength": 0.43,
+      "rivals": []
+    },
+    "nfl_new_england_patriots": {
+      "name": "New England Patriots",
+      "league": "NFL",
+      "sport": "football",
+      "division": "AFC East",
+      "strength": 0.56,
+      "rivals": []
+    },
+    "nfl_new_york_jets": {
+      "name": "New York Jets",
+      "league": "NFL",
+      "sport": "football",
+      "division": "AFC East",
+      "strength": 0.53,
+      "rivals": []
+    },
+    "nfl_baltimore_ravens": {
+      "name": "Baltimore Ravens",
+      "league": "NFL",
+      "sport": "football",
+      "division": "AFC North",
+      "strength": 0.38,
+      "rivals": [
+        "nfl_pittsburgh_steelers"
+      ]
+    },
+    "nfl_cincinnati_bengals": {
+      "name": "Cincinnati Bengals",
+      "league": "NFL",
+      "sport": "football",
+      "division": "AFC North",
+      "strength": 0.57,
+      "rivals": []
+    },
+    "nfl_cleveland_browns": {
+      "name": "Cleveland Browns",
+      "league": "NFL",
+      "sport": "football",
+      "division": "AFC North",
+      "strength": 0.67,
+      "rivals": []
+    },
+    "nfl_pittsburgh_steelers": {
+      "name": "Pittsburgh Steelers",
+      "league": "NFL",
+      "sport": "football",
+      "division": "AFC North",
+      "strength": 0.62,
+      "rivals": [
+        "nfl_baltimore_ravens",
+        "nfl_cleveland_browns"
+      ]
+    },
+    "nfl_houston_texans": {
+      "name": "Houston Texans",
+      "league": "NFL",
+      "sport": "football",
+      "division": "AFC South",
+      "strength": 0.58,
+      "rivals": []
+    },
+    "nfl_indianapolis_colts": {
+      "name": "Indianapolis Colts",
+      "league": "NFL",
+      "sport": "football",
+      "division": "AFC South",
+      "strength": 0.51,
+      "rivals": []
+    },
+    "nfl_jacksonville_jaguars": {
+      "name": "Jacksonville Jaguars",
+      "league": "NFL",
+      "sport": "football",
+      "division": "AFC South",
+      "strength": 0.65,
+      "rivals": []
+    },
+    "nfl_tennessee_titans": {
+      "name": "Tennessee Titans",
+      "league": "NFL",
+      "sport": "football",
+      "division": "AFC South",
+      "strength": 0.38,
+      "rivals": []
+    },
+    "nfl_denver_broncos": {
+      "name": "Denver Broncos",
+      "league": "NFL",
+      "sport": "football",
+      "division": "AFC West",
+      "strength": 0.67,
+      "rivals": []
+    },
+    "nfl_kansas_city_chiefs": {
+      "name": "Kansas City Chiefs",
+      "league": "NFL",
+      "sport": "football",
+      "division": "AFC West",
+      "strength": 0.68,
+      "rivals": [
+        "nfl_las_vegas_raiders",
+        "nfl_denver_broncos"
+      ]
+    },
+    "nfl_las_vegas_raiders": {
+      "name": "Las Vegas Raiders",
+      "league": "NFL",
+      "sport": "football",
+      "division": "AFC West",
+      "strength": 0.64,
+      "rivals": []
+    },
+    "nfl_los_angeles_chargers": {
+      "name": "Los Angeles Chargers",
+      "league": "NFL",
+      "sport": "football",
+      "division": "AFC West",
+      "strength": 0.62,
+      "rivals": []
+    },
+    "nfl_dallas_cowboys": {
+      "name": "Dallas Cowboys",
+      "league": "NFL",
+      "sport": "football",
+      "division": "NFC East",
+      "strength": 0.48,
+      "rivals": [
+        "nfl_philadelphia_eagles",
+        "nfl_washington_commanders"
+      ]
+    },
+    "nfl_new_york_giants": {
+      "name": "New York Giants",
+      "league": "NFL",
+      "sport": "football",
+      "division": "NFC East",
+      "strength": 0.44,
+      "rivals": []
+    },
+    "nfl_philadelphia_eagles": {
+      "name": "Philadelphia Eagles",
+      "league": "NFL",
+      "sport": "football",
+      "division": "NFC East",
+      "strength": 0.74,
+      "rivals": [
+        "nfl_dallas_cowboys",
+        "nfl_new_york_giants"
+      ]
+    },
+    "nfl_washington_commanders": {
+      "name": "Washington Commanders",
+      "league": "NFL",
+      "sport": "football",
+      "division": "NFC East",
+      "strength": 0.45,
+      "rivals": []
+    },
+    "nfl_chicago_bears": {
+      "name": "Chicago Bears",
+      "league": "NFL",
+      "sport": "football",
+      "division": "NFC North",
+      "strength": 0.6,
+      "rivals": [
+        "nfl_green_bay_packers"
+      ]
+    },
+    "nfl_detroit_lions": {
+      "name": "Detroit Lions",
+      "league": "NFL",
+      "sport": "football",
+      "division": "NFC North",
+      "strength": 0.41,
+      "rivals": []
+    },
+    "nfl_green_bay_packers": {
+      "name": "Green Bay Packers",
+      "league": "NFL",
+      "sport": "football",
+      "division": "NFC North",
+      "strength": 0.65,
+      "rivals": [
+        "nfl_chicago_bears"
+      ]
+    },
+    "nfl_minnesota_vikings": {
+      "name": "Minnesota Vikings",
+      "league": "NFL",
+      "sport": "football",
+      "division": "NFC North",
+      "strength": 0.5,
+      "rivals": []
+    },
+    "nfl_atlanta_falcons": {
+      "name": "Atlanta Falcons",
+      "league": "NFL",
+      "sport": "football",
+      "division": "NFC South",
+      "strength": 0.4,
+      "rivals": []
+    },
+    "nfl_carolina_panthers": {
+      "name": "Carolina Panthers",
+      "league": "NFL",
+      "sport": "football",
+      "division": "NFC South",
+      "strength": 0.68,
+      "rivals": []
+    },
+    "nfl_new_orleans_saints": {
+      "name": "New Orleans Saints",
+      "league": "NFL",
+      "sport": "football",
+      "division": "NFC South",
+      "strength": 0.44,
+      "rivals": []
+    },
+    "nfl_tampa_bay_buccaneers": {
+      "name": "Tampa Bay Buccaneers",
+      "league": "NFL",
+      "sport": "football",
+      "division": "NFC South",
+      "strength": 0.68,
+      "rivals": []
+    },
+    "nfl_arizona_cardinals": {
+      "name": "Arizona Cardinals",
+      "league": "NFL",
+      "sport": "football",
+      "division": "NFC West",
+      "strength": 0.73,
+      "rivals": []
+    },
+    "nfl_los_angeles_rams": {
+      "name": "Los Angeles Rams",
+      "league": "NFL",
+      "sport": "football",
+      "division": "NFC West",
+      "strength": 0.58,
+      "rivals": []
+    },
+    "nfl_san_francisco_49ers": {
+      "name": "San Francisco 49ers",
+      "league": "NFL",
+      "sport": "football",
+      "division": "NFC West",
+      "strength": 0.74,
+      "rivals": []
+    },
+    "nfl_seattle_seahawks": {
+      "name": "Seattle Seahawks",
+      "league": "NFL",
+      "sport": "football",
+      "division": "NFC West",
+      "strength": 0.66,
+      "rivals": []
+    },
+    "nba_boston_celtics": {
+      "name": "Boston Celtics",
+      "league": "NBA",
+      "sport": "basketball",
+      "division": "Atlantic",
+      "strength": 0.75,
+      "rivals": [
+        "nba_los_angeles_lakers",
+        "nba_philadelphia_76ers"
+      ]
+    },
+    "nba_brooklyn_nets": {
+      "name": "Brooklyn Nets",
+      "league": "NBA",
+      "sport": "basketball",
+      "division": "Atlantic",
+      "strength": 0.67,
+      "rivals": [
+        "nba_new_york_knicks"
+      ]
+    },
+    "nba_new_york_knicks": {
+      "name": "New York Knicks",
+      "league": "NBA",
+      "sport": "basketball",
+      "division": "Atlantic",
+      "strength": 0.48,
+      "rivals": [
+        "nba_brooklyn_nets"
+      ]
+    },
+    "nba_philadelphia_76ers": {
+      "name": "Philadelphia 76ers",
+      "league": "NBA",
+      "sport": "basketball",
+      "division": "Atlantic",
+      "strength": 0.53,
+      "rivals": []
+    },
+    "nba_toronto_raptors": {
+      "name": "Toronto Raptors",
+      "league": "NBA",
+      "sport": "basketball",
+      "division": "Atlantic",
+      "strength": 0.51,
+      "rivals": []
+    },
+    "nba_chicago_bulls": {
+      "name": "Chicago Bulls",
+      "league": "NBA",
+      "sport": "basketball",
+      "division": "Central",
+      "strength": 0.65,
+      "rivals": [
+        "nba_detroit_pistons"
+      ]
+    },
+    "nba_cleveland_cavaliers": {
+      "name": "Cleveland Cavaliers",
+      "league": "NBA",
+      "sport": "basketball",
+      "division": "Central",
+      "strength": 0.47,
+      "rivals": []
+    },
+    "nba_detroit_pistons": {
+      "name": "Detroit Pistons",
+      "league": "NBA",
+      "sport": "basketball",
+      "division": "Central",
+      "strength": 0.56,
+      "rivals": []
+    },
+    "nba_indiana_pacers": {
+      "name": "Indiana Pacers",
+      "league": "NBA",
+      "sport": "basketball",
+      "division": "Central",
+      "strength": 0.53,
+      "rivals": []
+    },
+    "nba_milwaukee_bucks": {
+      "name": "Milwaukee Bucks",
+      "league": "NBA",
+      "sport": "basketball",
+      "division": "Central",
+      "strength": 0.43,
+      "rivals": []
+    },
+    "nba_atlanta_hawks": {
+      "name": "Atlanta Hawks",
+      "league": "NBA",
+      "sport": "basketball",
+      "division": "Southeast",
+      "strength": 0.52,
+      "rivals": []
+    },
+    "nba_charlotte_hornets": {
+      "name": "Charlotte Hornets",
+      "league": "NBA",
+      "sport": "basketball",
+      "division": "Southeast",
+      "strength": 0.48,
+      "rivals": []
+    },
+    "nba_miami_heat": {
+      "name": "Miami Heat",
+      "league": "NBA",
+      "sport": "basketball",
+      "division": "Southeast",
+      "strength": 0.73,
+      "rivals": []
+    },
+    "nba_orlando_magic": {
+      "name": "Orlando Magic",
+      "league": "NBA",
+      "sport": "basketball",
+      "division": "Southeast",
+      "strength": 0.45,
+      "rivals": []
+    },
+    "nba_washington_wizards": {
+      "name": "Washington Wizards",
+      "league": "NBA",
+      "sport": "basketball",
+      "division": "Southeast",
+      "strength": 0.6,
+      "rivals": []
+    },
+    "nba_denver_nuggets": {
+      "name": "Denver Nuggets",
+      "league": "NBA",
+      "sport": "basketball",
+      "division": "Northwest",
+      "strength": 0.53,
+      "rivals": []
+    },
+    "nba_minnesota_timberwolves": {
+      "name": "Minnesota Timberwolves",
+      "league": "NBA",
+      "sport": "basketball",
+      "division": "Northwest",
+      "strength": 0.46,
+      "rivals": []
+    },
+    "nba_oklahoma_city_thunder": {
+      "name": "Oklahoma City Thunder",
+      "league": "NBA",
+      "sport": "basketball",
+      "division": "Northwest",
+      "strength": 0.73,
+      "rivals": []
+    },
+    "nba_portland_trail_blazers": {
+      "name": "Portland Trail Blazers",
+      "league": "NBA",
+      "sport": "basketball",
+      "division": "Northwest",
+      "strength": 0.4,
+      "rivals": []
+    },
+    "nba_utah_jazz": {
+      "name": "Utah Jazz",
+      "league": "NBA",
+      "sport": "basketball",
+      "division": "Northwest",
+      "strength": 0.72,
+      "rivals": []
+    },
+    "nba_golden_state_warriors": {
+      "name": "Golden State Warriors",
+      "league": "NBA",
+      "sport": "basketball",
+      "division": "Pacific",
+      "strength": 0.71,
+      "rivals": []
+    },
+    "nba_la_clippers": {
+      "name": "LA Clippers",
+      "league": "NBA",
+      "sport": "basketball",
+      "division": "Pacific",
+      "strength": 0.38,
+      "rivals": [
+        "nba_los_angeles_lakers"
+      ]
+    },
+    "nba_los_angeles_lakers": {
+      "name": "Los Angeles Lakers",
+      "league": "NBA",
+      "sport": "basketball",
+      "division": "Pacific",
+      "strength": 0.36,
+      "rivals": [
+        "nba_boston_celtics",
+        "nba_la_clippers"
+      ]
+    },
+    "nba_phoenix_suns": {
+      "name": "Phoenix Suns",
+      "league": "NBA",
+      "sport": "basketball",
+      "division": "Pacific",
+      "strength": 0.48,
+      "rivals": []
+    },
+    "nba_sacramento_kings": {
+      "name": "Sacramento Kings",
+      "league": "NBA",
+      "sport": "basketball",
+      "division": "Pacific",
+      "strength": 0.51,
+      "rivals": []
+    },
+    "nba_dallas_mavericks": {
+      "name": "Dallas Mavericks",
+      "league": "NBA",
+      "sport": "basketball",
+      "division": "Southwest",
+      "strength": 0.41,
+      "rivals": []
+    },
+    "nba_houston_rockets": {
+      "name": "Houston Rockets",
+      "league": "NBA",
+      "sport": "basketball",
+      "division": "Southwest",
+      "strength": 0.56,
+      "rivals": []
+    },
+    "nba_memphis_grizzlies": {
+      "name": "Memphis Grizzlies",
+      "league": "NBA",
+      "sport": "basketball",
+      "division": "Southwest",
+      "strength": 0.71,
+      "rivals": []
+    },
+    "nba_new_orleans_pelicans": {
+      "name": "New Orleans Pelicans",
+      "league": "NBA",
+      "sport": "basketball",
+      "division": "Southwest",
+      "strength": 0.61,
+      "rivals": []
+    },
+    "nba_san_antonio_spurs": {
+      "name": "San Antonio Spurs",
+      "league": "NBA",
+      "sport": "basketball",
+      "division": "Southwest",
+      "strength": 0.42,
+      "rivals": []
+    },
+    "nhl_boston_bruins": {
+      "name": "Boston Bruins",
+      "league": "NHL",
+      "sport": "hockey",
+      "division": "Atlantic",
+      "strength": 0.57,
+      "rivals": [
+        "nhl_montreal_canadiens"
+      ]
+    },
+    "nhl_buffalo_sabres": {
+      "name": "Buffalo Sabres",
+      "league": "NHL",
+      "sport": "hockey",
+      "division": "Atlantic",
+      "strength": 0.37,
+      "rivals": []
+    },
+    "nhl_detroit_red_wings": {
+      "name": "Detroit Red Wings",
+      "league": "NHL",
+      "sport": "hockey",
+      "division": "Atlantic",
+      "strength": 0.75,
+      "rivals": []
+    },
+    "nhl_florida_panthers": {
+      "name": "Florida Panthers",
+      "league": "NHL",
+      "sport": "hockey",
+      "division": "Atlantic",
+      "strength": 0.56,
+      "rivals": []
+    },
+    "nhl_montreal_canadiens": {
+      "name": "Montreal Canadiens",
+      "league": "NHL",
+      "sport": "hockey",
+      "division": "Atlantic",
+      "strength": 0.71,
+      "rivals": [
+        "nhl_boston_bruins",
+        "nhl_toronto_maple_leafs"
+      ]
+    },
+    "nhl_ottawa_senators": {
+      "name": "Ottawa Senators",
+      "league": "NHL",
+      "sport": "hockey",
+      "division": "Atlantic",
+      "strength": 0.52,
+      "rivals": []
+    },
+    "nhl_tampa_bay_lightning": {
+      "name": "Tampa Bay Lightning",
+      "league": "NHL",
+      "sport": "hockey",
+      "division": "Atlantic",
+      "strength": 0.5,
+      "rivals": []
+    },
+    "nhl_toronto_maple_leafs": {
+      "name": "Toronto Maple Leafs",
+      "league": "NHL",
+      "sport": "hockey",
+      "division": "Atlantic",
+      "strength": 0.59,
+      "rivals": [
+        "nhl_montreal_canadiens",
+        "nhl_ottawa_senators"
+      ]
+    },
+    "nhl_carolina_hurricanes": {
+      "name": "Carolina Hurricanes",
+      "league": "NHL",
+      "sport": "hockey",
+      "division": "Metropolitan",
+      "strength": 0.48,
+      "rivals": []
+    },
+    "nhl_columbus_blue_jackets": {
+      "name": "Columbus Blue Jackets",
+      "league": "NHL",
+      "sport": "hockey",
+      "division": "Metropolitan",
+      "strength": 0.52,
+      "rivals": []
+    },
+    "nhl_new_jersey_devils": {
+      "name": "New Jersey Devils",
+      "league": "NHL",
+      "sport": "hockey",
+      "division": "Metropolitan",
+      "strength": 0.64,
+      "rivals": []
+    },
+    "nhl_new_york_islanders": {
+      "name": "New York Islanders",
+      "league": "NHL",
+      "sport": "hockey",
+      "division": "Metropolitan",
+      "strength": 0.56,
+      "rivals": [
+        "nhl_new_york_rangers"
+      ]
+    },
+    "nhl_new_york_rangers": {
+      "name": "New York Rangers",
+      "league": "NHL",
+      "sport": "hockey",
+      "division": "Metropolitan",
+      "strength": 0.64,
+      "rivals": [
+        "nhl_new_york_islanders"
+      ]
+    },
+    "nhl_philadelphia_flyers": {
+      "name": "Philadelphia Flyers",
+      "league": "NHL",
+      "sport": "hockey",
+      "division": "Metropolitan",
+      "strength": 0.63,
+      "rivals": []
+    },
+    "nhl_pittsburgh_penguins": {
+      "name": "Pittsburgh Penguins",
+      "league": "NHL",
+      "sport": "hockey",
+      "division": "Metropolitan",
+      "strength": 0.63,
+      "rivals": []
+    },
+    "nhl_washington_capitals": {
+      "name": "Washington Capitals",
+      "league": "NHL",
+      "sport": "hockey",
+      "division": "Metropolitan",
+      "strength": 0.56,
+      "rivals": []
+    },
+    "nhl_chicago_blackhawks": {
+      "name": "Chicago Blackhawks",
+      "league": "NHL",
+      "sport": "hockey",
+      "division": "Central",
+      "strength": 0.59,
+      "rivals": []
+    },
+    "nhl_colorado_avalanche": {
+      "name": "Colorado Avalanche",
+      "league": "NHL",
+      "sport": "hockey",
+      "division": "Central",
+      "strength": 0.7,
+      "rivals": []
+    },
+    "nhl_dallas_stars": {
+      "name": "Dallas Stars",
+      "league": "NHL",
+      "sport": "hockey",
+      "division": "Central",
+      "strength": 0.36,
+      "rivals": []
+    },
+    "nhl_minnesota_wild": {
+      "name": "Minnesota Wild",
+      "league": "NHL",
+      "sport": "hockey",
+      "division": "Central",
+      "strength": 0.4,
+      "rivals": []
+    },
+    "nhl_nashville_predators": {
+      "name": "Nashville Predators",
+      "league": "NHL",
+      "sport": "hockey",
+      "division": "Central",
+      "strength": 0.67,
+      "rivals": []
+    },
+    "nhl_st_louis_blues": {
+      "name": "St. Louis Blues",
+      "league": "NHL",
+      "sport": "hockey",
+      "division": "Central",
+      "strength": 0.54,
+      "rivals": []
+    },
+    "nhl_utah_hockey_club": {
+      "name": "Utah Hockey Club",
+      "league": "NHL",
+      "sport": "hockey",
+      "division": "Central",
+      "strength": 0.71,
+      "rivals": []
+    },
+    "nhl_winnipeg_jets": {
+      "name": "Winnipeg Jets",
+      "league": "NHL",
+      "sport": "hockey",
+      "division": "Central",
+      "strength": 0.45,
+      "rivals": []
+    },
+    "nhl_anaheim_ducks": {
+      "name": "Anaheim Ducks",
+      "league": "NHL",
+      "sport": "hockey",
+      "division": "Pacific",
+      "strength": 0.59,
+      "rivals": []
+    },
+    "nhl_calgary_flames": {
+      "name": "Calgary Flames",
+      "league": "NHL",
+      "sport": "hockey",
+      "division": "Pacific",
+      "strength": 0.65,
+      "rivals": [
+        "nhl_edmonton_oilers"
+      ]
+    },
+    "nhl_edmonton_oilers": {
+      "name": "Edmonton Oilers",
+      "league": "NHL",
+      "sport": "hockey",
+      "division": "Pacific",
+      "strength": 0.68,
+      "rivals": [
+        "nhl_calgary_flames"
+      ]
+    },
+    "nhl_los_angeles_kings": {
+      "name": "Los Angeles Kings",
+      "league": "NHL",
+      "sport": "hockey",
+      "division": "Pacific",
+      "strength": 0.49,
+      "rivals": []
+    },
+    "nhl_san_jose_sharks": {
+      "name": "San Jose Sharks",
+      "league": "NHL",
+      "sport": "hockey",
+      "division": "Pacific",
+      "strength": 0.38,
+      "rivals": []
+    },
+    "nhl_seattle_kraken": {
+      "name": "Seattle Kraken",
+      "league": "NHL",
+      "sport": "hockey",
+      "division": "Pacific",
+      "strength": 0.68,
+      "rivals": []
+    },
+    "nhl_vancouver_canucks": {
+      "name": "Vancouver Canucks",
+      "league": "NHL",
+      "sport": "hockey",
+      "division": "Pacific",
+      "strength": 0.4,
+      "rivals": []
+    },
+    "nhl_vegas_golden_knights": {
+      "name": "Vegas Golden Knights",
+      "league": "NHL",
+      "sport": "hockey",
+      "division": "Pacific",
+      "strength": 0.54,
+      "rivals": []
+    },
+    "epl_arsenal": {
+      "name": "Arsenal",
+      "league": "Premier League",
+      "sport": "soccer",
+      "division": "Premier League",
+      "strength": 0.56,
+      "rivals": [
+        "epl_tottenham_hotspur"
+      ]
+    },
+    "epl_aston_villa": {
+      "name": "Aston Villa",
+      "league": "Premier League",
+      "sport": "soccer",
+      "division": "Premier League",
+      "strength": 0.72,
+      "rivals": []
+    },
+    "epl_bournemouth": {
+      "name": "Bournemouth",
+      "league": "Premier League",
+      "sport": "soccer",
+      "division": "Premier League",
+      "strength": 0.38,
+      "rivals": []
+    },
+    "epl_brentford": {
+      "name": "Brentford",
+      "league": "Premier League",
+      "sport": "soccer",
+      "division": "Premier League",
+      "strength": 0.43,
+      "rivals": []
+    },
+    "epl_brighton_hove_albion": {
+      "name": "Brighton & Hove Albion",
+      "league": "Premier League",
+      "sport": "soccer",
+      "division": "Premier League",
+      "strength": 0.5,
+      "rivals": []
+    },
+    "epl_burnley": {
+      "name": "Burnley",
+      "league": "Premier League",
+      "sport": "soccer",
+      "division": "Premier League",
+      "strength": 0.48,
+      "rivals": []
+    },
+    "epl_chelsea": {
+      "name": "Chelsea",
+      "league": "Premier League",
+      "sport": "soccer",
+      "division": "Premier League",
+      "strength": 0.63,
+      "rivals": [
+        "epl_tottenham_hotspur"
+      ]
+    },
+    "epl_crystal_palace": {
+      "name": "Crystal Palace",
+      "league": "Premier League",
+      "sport": "soccer",
+      "division": "Premier League",
+      "strength": 0.71,
+      "rivals": []
+    },
+    "epl_everton": {
+      "name": "Everton",
+      "league": "Premier League",
+      "sport": "soccer",
+      "division": "Premier League",
+      "strength": 0.38,
+      "rivals": [
+        "epl_liverpool"
+      ]
+    },
+    "epl_fulham": {
+      "name": "Fulham",
+      "league": "Premier League",
+      "sport": "soccer",
+      "division": "Premier League",
+      "strength": 0.58,
+      "rivals": []
+    },
+    "epl_leeds_united": {
+      "name": "Leeds United",
+      "league": "Premier League",
+      "sport": "soccer",
+      "division": "Premier League",
+      "strength": 0.75,
+      "rivals": []
+    },
+    "epl_liverpool": {
+      "name": "Liverpool",
+      "league": "Premier League",
+      "sport": "soccer",
+      "division": "Premier League",
+      "strength": 0.57,
+      "rivals": [
+        "epl_everton",
+        "epl_manchester_united"
+      ]
+    },
+    "epl_manchester_city": {
+      "name": "Manchester City",
+      "league": "Premier League",
+      "sport": "soccer",
+      "division": "Premier League",
+      "strength": 0.66,
+      "rivals": [
+        "epl_manchester_united"
+      ]
+    },
+    "epl_manchester_united": {
+      "name": "Manchester United",
+      "league": "Premier League",
+      "sport": "soccer",
+      "division": "Premier League",
+      "strength": 0.69,
+      "rivals": [
+        "epl_liverpool",
+        "epl_manchester_city"
+      ]
+    },
+    "epl_newcastle_united": {
+      "name": "Newcastle United",
+      "league": "Premier League",
+      "sport": "soccer",
+      "division": "Premier League",
+      "strength": 0.47,
+      "rivals": []
+    },
+    "epl_nottingham_forest": {
+      "name": "Nottingham Forest",
+      "league": "Premier League",
+      "sport": "soccer",
+      "division": "Premier League",
+      "strength": 0.46,
+      "rivals": []
+    },
+    "epl_sunderland": {
+      "name": "Sunderland",
+      "league": "Premier League",
+      "sport": "soccer",
+      "division": "Premier League",
+      "strength": 0.53,
+      "rivals": []
+    },
+    "epl_tottenham_hotspur": {
+      "name": "Tottenham Hotspur",
+      "league": "Premier League",
+      "sport": "soccer",
+      "division": "Premier League",
+      "strength": 0.53,
+      "rivals": [
+        "epl_arsenal",
+        "epl_chelsea"
+      ]
+    },
+    "epl_west_ham_united": {
+      "name": "West Ham United",
+      "league": "Premier League",
+      "sport": "soccer",
+      "division": "Premier League",
+      "strength": 0.75,
+      "rivals": []
+    },
+    "epl_wolverhampton_wanderers": {
+      "name": "Wolverhampton Wanderers",
+      "league": "Premier League",
+      "sport": "soccer",
+      "division": "Premier League",
+      "strength": 0.5,
+      "rivals": []
     }
   },
   "names": {
