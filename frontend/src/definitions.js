@@ -1212,13 +1212,29 @@ window.deleteTemplate = function(){
 
 window.saveDefinitions = async function(){
 
-  try {
+  if(currentTemplateId){
 
-    if(currentTemplateId){
+    try {
 
       definitions[currentTab][currentTemplateId] =
         JSON.parse(jsonEditor.value);
+
+    } catch(err){
+
+      // Surface the real JSON syntax error (V8 includes a position/
+      // context in err.message, e.g. "Unexpected token } in JSON at
+      // position 42") instead of failing the save with no explanation —
+      // and bail out before even attempting the network request, since
+      // there's nothing valid to send yet.
+      console.error(err);
+
+      setStatus('Invalid JSON in ' + currentTemplateId + ': ' + err.message);
+
+      return;
     }
+  }
+
+  try {
 
     await fetch(
       '/api/editor/definitions?sim_id=default',
@@ -1237,7 +1253,7 @@ window.saveDefinitions = async function(){
 
     console.error(err);
 
-    setStatus('Save failed');
+    setStatus('Save failed: ' + err.message);
   }
 }
 

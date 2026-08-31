@@ -1934,6 +1934,11 @@ function animate(){
         animate
     );
 
+    const delta = clock.getDelta();
+    if (mixer != null) {
+        mixer.update(delta);
+    }
+
     controls.update();
 
 const size =
