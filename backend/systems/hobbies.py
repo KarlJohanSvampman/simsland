@@ -50,6 +50,9 @@ def assign_hobbies(c, world, count=3):
     from systems.crime import sync_gun_hobbies
     sync_gun_hobbies(c, world)
 
+    from systems.diary import sync_diary_hobby
+    sync_diary_hobby(c, world)
+
 
 # ----------------------------------------------------------
 # LOCATION RESOLUTION

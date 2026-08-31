@@ -106,6 +106,7 @@ ACTION_SPECS = {
     "estimate_avg_sell_value":        {"group": "computer", "target": "any", "doc": "Get an estimated resale value for a piece of furniture before listing it."},
     "browse_darknet_market":          {"group": "computer", "target": "none", "doc": "Browse the darknet marketplace -- drugs, stolen data, fake IDs, counterfeit money, and hired-service listings."},
     "order_darknet_listing":          {"group": "computer", "target": "any", "doc": "Order a darknet listing. Targeted categories (hitman/PI services) also need a target character."},
+    "write_diary":                    {"group": "leisure", "target": "none", "doc": "Write a real entry in your diary, reflecting on your day. Requires owning a diary."},
     # Stock trading — routed (action_router.py lines ~2542-2599) but never
     # offered/validated before this round.
     "computer_list_stocks":         {"group": "computer", "target": "none", "doc": "See available stocks and prices."},

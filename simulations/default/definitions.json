@@ -42,7 +42,7 @@
         },
         {
           "item_template": "bag_of_chips_open",
-          "price": 5.0
+          "price": 5
         },
         {
           "item_template": "can_of_soda",
@@ -54,7 +54,7 @@
         },
         {
           "item_template": "cigarette_pack",
-          "price": 16.0
+          "price": 16
         },
         {
           "item_template": "lighter",
@@ -62,7 +62,7 @@
         },
         {
           "item_template": "coffee_beans",
-          "price": 16.0
+          "price": 16
         }
       ],
       "storage": null,
@@ -4652,6 +4652,23 @@
         "bus"
       ],
       "icon": "vehicle"
+    },
+    "stove_andf_oven": {
+      "name": "StoveAndOven",
+      "category": "appliance",
+      "model": "/resources/props/stove_and_oven.glb",
+      "tags": [
+        "Cooking",
+        "Oven",
+        "Stove",
+        "Food",
+        "Chef",
+        "Boil",
+        "Fry"
+      ],
+      "carryable": false,
+      "interactions": [],
+      "anchors": []
     }
   },
   "item_templates": {
@@ -11570,7 +11587,7 @@
       "name": "Undercut",
       "category": "hair",
       "slot": "hair",
-      "description": "Short sides, longer top — can be styled various ways.",
+      "description": "Short sides, longer top \u2014 can be styled various ways.",
       "length": "medium",
       "sex_common": "neutral",
       "apply_via": "give_haircut",
@@ -12680,7 +12697,7 @@
     },
     "computer_social_media": {
       "name": "Browse Social Media",
-      "description": "Scroll social feeds — mild fun boost, some stress relief",
+      "description": "Scroll social feeds \u2014 mild fun boost, some stress relief",
       "category": "computer",
       "duration_ticks": 20,
       "requires_prop_tags": [
@@ -13055,7 +13072,7 @@
     },
     "computer_order_item": {
       "name": "Order Item Online",
-      "description": "Purchase an item from the online store — delivered to home",
+      "description": "Purchase an item from the online store \u2014 delivered to home",
       "category": "computer",
       "duration_ticks": 8,
       "requires_prop_tags": [
@@ -16275,7 +16292,7 @@
     "kiss_peck": {
       "name": "Kiss (Peck)",
       "category": "romantic_physical",
-      "description": "Quick, light kiss — greeting or affection.",
+      "description": "Quick, light kiss \u2014 greeting or affection.",
       "has_target": true,
       "target_types": [
         "character"
@@ -16446,7 +16463,7 @@
     "caress": {
       "name": "Caress",
       "category": "romantic_physical",
-      "description": "Gentle, tender touch — face, hair or body.",
+      "description": "Gentle, tender touch \u2014 face, hair or body.",
       "has_target": true,
       "target_types": [
         "character"
@@ -16751,7 +16768,7 @@
     "perform_cpr": {
       "name": "Perform CPR",
       "category": "medical_emergency",
-      "description": "Administer cardiopulmonary resuscitation. Forced — performed on unconscious/cardiac-arrest targets.",
+      "description": "Administer cardiopulmonary resuscitation. Forced \u2014 performed on unconscious/cardiac-arrest targets.",
       "target": "character",
       "target_region": "torso",
       "initiation_type": "forced",
@@ -16929,7 +16946,7 @@
     "spit_on": {
       "name": "Spit On",
       "category": "social_hostile",
-      "description": "Spit on another character — deeply offensive and humiliating. Forced.",
+      "description": "Spit on another character \u2014 deeply offensive and humiliating. Forced.",
       "target": "character",
       "target_region": "face",
       "initiation_type": "forced",
@@ -27695,7 +27712,8 @@
             }
           }
         }
-      }
+      },
+      "id": "convenience_store_a"
     }
   },
   "trait_templates": {
@@ -30692,7 +30710,7 @@
     },
     "exercise_overdoer": {
       "label": "Overdoer",
-      "description": "Goes all-out every session — rapid gains but high injury risk and long recovery gaps.",
+      "description": "Goes all-out every session \u2014 rapid gains but high injury risk and long recovery gaps.",
       "category": "lifestyle",
       "effects": {
         "fitness_gain_mult": 1.4,
@@ -30700,9 +30718,9 @@
         "recovery_gap_mult": 2
       },
       "descriptions": {
-        "positive": "At its best, this is a real asset: Goes all-out every session — rapid gains but high injury risk and long recovery gaps.",
-        "negative": "It has a cost that's easy to underestimate: Goes all-out every session — rapid gains but high injury risk and long recovery gaps.",
-        "balanced": "In practice: Goes all-out every session — rapid gains but high injury risk and long recovery gaps."
+        "positive": "At its best, this is a real asset: Goes all-out every session \u2014 rapid gains but high injury risk and long recovery gaps.",
+        "negative": "It has a cost that's easy to underestimate: Goes all-out every session \u2014 rapid gains but high injury risk and long recovery gaps.",
+        "balanced": "In practice: Goes all-out every session \u2014 rapid gains but high injury risk and long recovery gaps."
       },
       "learn_chance": {
         "balanced": 15,
@@ -30805,7 +30823,7 @@
     },
     "hot_tempered": {
       "label": "Hot-Tempered",
-      "description": "Short fuse — anger spikes fast but may also cool quickly.",
+      "description": "Short fuse \u2014 anger spikes fast but may also cool quickly.",
       "category": "personality",
       "effects": {
         "self_control": -0.25,
@@ -30813,9 +30831,9 @@
         "anger_decay_fast": true
       },
       "descriptions": {
-        "positive": "It works in hot_tempered's favor more often than not: Short fuse — anger spikes fast but may also cool quickly.",
-        "negative": "It has a cost that's easy to underestimate: Short fuse — anger spikes fast but may also cool quickly.",
-        "balanced": "In practice: Short fuse — anger spikes fast but may also cool quickly."
+        "positive": "It works in hot_tempered's favor more often than not: Short fuse \u2014 anger spikes fast but may also cool quickly.",
+        "negative": "It has a cost that's easy to underestimate: Short fuse \u2014 anger spikes fast but may also cool quickly.",
+        "balanced": "In practice: Short fuse \u2014 anger spikes fast but may also cool quickly."
       },
       "learn_chance": {
         "balanced": 15,
@@ -31042,16 +31060,16 @@
     },
     "emotionally_controlling": {
       "label": "Emotionally Controlling",
-      "description": "Uses psychological tactics — emasculation, ridicule, abandonment threats, affair humiliation — to dominate and diminish a partner.",
+      "description": "Uses psychological tactics \u2014 emasculation, ridicule, abandonment threats, affair humiliation \u2014 to dominate and diminish a partner.",
       "category": "personality",
       "effects": {
         "emotional_control_tendency": 0.75,
         "dominant_intimate": true
       },
       "descriptions": {
-        "positive": "Seen clearly, it's a strength worth leaning into: Uses psychological tactics — emasculation, ridicule, abandonment threats, affair humiliation — to dominate and diminish a partner.",
-        "negative": "There's a sharper edge to it than it first appears: Uses psychological tactics — emasculation, ridicule, abandonment threats, affair humiliation — to dominate and diminish a partner.",
-        "balanced": "In practice: Uses psychological tactics — emasculation, ridicule, abandonment threats, affair humiliation — to dominate and diminish a partner."
+        "positive": "Seen clearly, it's a strength worth leaning into: Uses psychological tactics \u2014 emasculation, ridicule, abandonment threats, affair humiliation \u2014 to dominate and diminish a partner.",
+        "negative": "There's a sharper edge to it than it first appears: Uses psychological tactics \u2014 emasculation, ridicule, abandonment threats, affair humiliation \u2014 to dominate and diminish a partner.",
+        "balanced": "In practice: Uses psychological tactics \u2014 emasculation, ridicule, abandonment threats, affair humiliation \u2014 to dominate and diminish a partner."
       },
       "learn_chance": {
         "balanced": 15,
@@ -31321,7 +31339,7 @@
       "conditions": []
     },
     "asexual_tendency": {
-      "description": "Little or no spontaneous sexual attraction; may engage for emotional closeness but rarely initiates. Distinct from low_libido — the motivation is absent, not just the drive.",
+      "description": "Little or no spontaneous sexual attraction; may engage for emotional closeness but rarely initiates. Distinct from low_libido \u2014 the motivation is absent, not just the drive.",
       "category": "sexuality",
       "effects": {
         "libido": -0.4,
@@ -31329,9 +31347,9 @@
         "casual_reluctance": 0.5
       },
       "descriptions": {
-        "positive": "A dependable part of who they are: Little or no spontaneous sexual attraction; may engage for emotional closeness but rarely initiates. Distinct from low_libido — the motivation is absent, not just the drive.",
-        "negative": "It has a cost that's easy to underestimate: Little or no spontaneous sexual attraction; may engage for emotional closeness but rarely initiates. Distinct from low_libido — the motivation is absent, not just the drive.",
-        "balanced": "Little or no spontaneous sexual attraction; may engage for emotional closeness but rarely initiates. Distinct from low_libido — the motivation is absent, not just the drive."
+        "positive": "A dependable part of who they are: Little or no spontaneous sexual attraction; may engage for emotional closeness but rarely initiates. Distinct from low_libido \u2014 the motivation is absent, not just the drive.",
+        "negative": "It has a cost that's easy to underestimate: Little or no spontaneous sexual attraction; may engage for emotional closeness but rarely initiates. Distinct from low_libido \u2014 the motivation is absent, not just the drive.",
+        "balanced": "Little or no spontaneous sexual attraction; may engage for emotional closeness but rarely initiates. Distinct from low_libido \u2014 the motivation is absent, not just the drive."
       },
       "learn_chance": {
         "balanced": 15,
@@ -51620,7 +51638,7 @@
       }
     },
     "cafe": {
-      "name": "Café",
+      "name": "Caf\u00e9",
       "industry": "food_and_drink",
       "off_grid": true,
       "service_category": "food",
@@ -51807,7 +51825,7 @@
         "product_manager",
         "designer"
       ],
-      "description": "Employer — sims with tech jobs work here off-screen.",
+      "description": "Employer \u2014 sims with tech jobs work here off-screen.",
       "typical_roles": [
         "software_engineer",
         "senior_software_engineer",
@@ -52298,7 +52316,7 @@
         1,
         3
       ],
-      "description": "Daycare and early education for children age 1–3 before preschool.",
+      "description": "Daycare and early education for children age 1\u20133 before preschool.",
       "tags": [
         "childcare",
         "early_education",
@@ -52379,7 +52397,7 @@
   "need_templates": {
     "socialize": {
       "name": "Socialise",
-      "description": "Spend quality time with other people — friends, neighbours, or family.",
+      "description": "Spend quality time with other people \u2014 friends, neighbours, or family.",
       "category": "social",
       "weekly_target": 1,
       "satisfying_activities": [
@@ -52406,7 +52424,7 @@
     },
     "exercise": {
       "name": "Physical Exercise",
-      "description": "Engage in physical activity — gym, running, sports, or home workout.",
+      "description": "Engage in physical activity \u2014 gym, running, sports, or home workout.",
       "category": "health",
       "weekly_target": 2,
       "satisfying_activities": [
@@ -52420,7 +52438,7 @@
     },
     "creative": {
       "name": "Creative Outlet",
-      "description": "Engage in a creative activity — art, music, writing, cooking, or crafting.",
+      "description": "Engage in a creative activity \u2014 art, music, writing, cooking, or crafting.",
       "category": "self_expression",
       "weekly_target": 1,
       "satisfying_activities": [
@@ -52434,7 +52452,7 @@
     },
     "romance": {
       "name": "Romance",
-      "description": "Seek or maintain a romantic relationship — quality one-on-one time with a partner, dating, or pursuing new connections.",
+      "description": "Seek or maintain a romantic relationship \u2014 quality one-on-one time with a partner, dating, or pursuing new connections.",
       "category": "relationships",
       "weekly_target": 1,
       "satisfying_activities": [
@@ -52560,7 +52578,7 @@
     },
     "cheerful": {
       "name": "Cheerful",
-      "description": "Upbeat and positive — prone to jokes and warmth.",
+      "description": "Upbeat and positive \u2014 prone to jokes and warmth.",
       "emotional_temperature_range": [
         15,
         40
@@ -54506,6 +54524,23 @@
       "annual_cost": 350,
       "sports_role": "supporter",
       "sport": "soccer"
+    },
+    "keep_a_diary": {
+      "name": "Keep a Diary",
+      "category": "literary",
+      "required_props": [],
+      "required_items": [
+        "diary"
+      ],
+      "off_grid": false,
+      "overnight": false,
+      "min_days": null,
+      "max_days": null,
+      "min_participants": 1,
+      "max_participants": 1,
+      "location": null,
+      "suggest_to_household": false,
+      "annual_cost": 30
     }
   },
   "default_item_interactions": [
@@ -54573,7 +54608,7 @@
       "consequences": {
         "short": "Reduced concentration, irritability, sensitivity to light and sound",
         "medium_long": "Chronic headaches can indicate hypertension, eye strain, or neurological deterioration",
-        "long": "Severe untreated headaches may signal a stroke, aneurysm, or brain tumour — risk of permanent neurological damage"
+        "long": "Severe untreated headaches may signal a stroke, aneurysm, or brain tumour \u2014 risk of permanent neurological damage"
       },
       "duration_ticks": 180,
       "interval_ticks": 0,
@@ -54663,7 +54698,7 @@
     },
     "mood_swings": {
       "name": "Mood Swings",
-      "description": "Rapid unpredictable shifts between emotional states — anger, sadness, elation",
+      "description": "Rapid unpredictable shifts between emotional states \u2014 anger, sadness, elation",
       "visual": true,
       "affects_mood": true,
       "need_penalties": {
@@ -54678,7 +54713,7 @@
     },
     "fever": {
       "name": "Fever",
-      "description": "Elevated body temperature (above 38°C/100.4°F), chills, sweating",
+      "description": "Elevated body temperature (above 38\u00b0C/100.4\u00b0F), chills, sweating",
       "visual": true,
       "affects_mood": true,
       "need_penalties": {
@@ -54689,7 +54724,7 @@
       "consequences": {
         "short": "Bed confinement, dehydration, inability to work",
         "medium_long": "Febrile seizures possible; sustained high fever causes protein denaturation",
-        "long": "Brain damage from extreme fever (>41°C); septic shock if infection is the root cause"
+        "long": "Brain damage from extreme fever (>41\u00b0C); septic shock if infection is the root cause"
       },
       "duration_ticks": 300,
       "interval_ticks": 0,
@@ -54835,7 +54870,7 @@
     },
     "rash": {
       "name": "Skin Rash",
-      "description": "Red, itchy, or painful skin eruption — may be localised or widespread",
+      "description": "Red, itchy, or painful skin eruption \u2014 may be localised or widespread",
       "visual": true,
       "affects_mood": false,
       "need_penalties": {
@@ -54851,7 +54886,7 @@
     },
     "internal_bleeding": {
       "name": "Internal Bleeding",
-      "description": "Blood accumulating inside the body cavity — not visible externally",
+      "description": "Blood accumulating inside the body cavity \u2014 not visible externally",
       "visual": false,
       "affects_mood": true,
       "need_penalties": {
@@ -54879,7 +54914,7 @@
       "consequences": {
         "short": "Loss of fine motor control, increased injury risk (cannot feel pain signals)",
         "medium_long": "Muscle wasting in affected area from disuse; nerve pathway degradation",
-        "long": "Permanent paralysis of affected limb if nerve supply is severed or chronically compressed; if facial — stroke indicator"
+        "long": "Permanent paralysis of affected limb if nerve supply is severed or chronically compressed; if facial \u2014 stroke indicator"
       }
     },
     "speech_difficulty": {
@@ -54966,7 +55001,7 @@
           "expiry_days": 10
         }
       ],
-      "base_rate": 0.0,
+      "base_rate": 0,
       "age_progressive": false
     },
     "influenza": {
@@ -55042,7 +55077,7 @@
           "expiry_days": 7
         }
       ],
-      "base_rate": 0.0,
+      "base_rate": 0,
       "age_progressive": false
     },
     "coronavirus": {
@@ -55079,7 +55114,7 @@
       "survival_rate": 97,
       "typical_duration_days": 21,
       "notes": "Risk of 'long COVID' with lasting fatigue and breathing issues. Elderly/obese individuals at higher risk of hospitalisation.",
-      "base_rate": 0.0,
+      "base_rate": 0,
       "age_progressive": false
     },
     "heart_disease_low": {
@@ -55387,7 +55422,7 @@
       "survival_rate": 99,
       "typical_duration_days": 21,
       "notes": "Contagious through faecal-oral route. Antibiotic treatment usually effective. Risk of recurrence.",
-      "base_rate": 0.0,
+      "base_rate": 0,
       "age_progressive": false
     },
     "ibs": {
@@ -55488,7 +55523,7 @@
     },
     "handicap": {
       "name": "Physical Handicap",
-      "description": "Loss of function in a body part — may be from injury, birth defect, or disease",
+      "description": "Loss of function in a body part \u2014 may be from injury, birth defect, or disease",
       "icon": "wheelchair",
       "chronic": true,
       "curable": false,
@@ -55617,7 +55652,7 @@
       "typical_duration_days": 30,
       "becomes_chronic_after_days": 60,
       "notes": "Bull's-eye rash is diagnostic. Early antibiotic treatment is curative. Late-stage becomes chronic with neurological and joint damage.",
-      "base_rate": 0.0,
+      "base_rate": 0,
       "age_progressive": false
     },
     "impotency": {
@@ -55778,7 +55813,7 @@
       "surgery_hospital_days": 0,
       "survival_rate": 100,
       "notes": "Easily curable with antibiotics. Untreated: can cause pelvic inflammatory disease and infertility.",
-      "base_rate": 0.0,
+      "base_rate": 0,
       "age_progressive": false
     },
     "std_gonorrhea": {
@@ -55809,7 +55844,7 @@
       "surgery_hospital_days": 0,
       "survival_rate": 100,
       "notes": "Antibiotic-resistant strains emerging. Must treat sexual partners simultaneously.",
-      "base_rate": 0.0,
+      "base_rate": 0,
       "age_progressive": false
     },
     "std_herpes": {
@@ -55841,7 +55876,7 @@
       "surgery_hospital_days": 0,
       "survival_rate": 100,
       "notes": "Managed with antiviral suppression therapy. Highly contagious during outbreaks. Significant social stigma.",
-      "base_rate": 0.0,
+      "base_rate": 0,
       "age_progressive": false
     },
     "std_hiv": {
@@ -55876,7 +55911,7 @@
       "worsening_rate_per_day": 0.002,
       "immune_score_penalty": 30,
       "notes": "Modern ART (antiretroviral therapy) allows near-normal lifespan. Without treatment: immune collapse within years. Undetectable = uninfectious.",
-      "base_rate": 0.0,
+      "base_rate": 0,
       "age_progressive": false
     },
     "std_syphilis": {
@@ -55909,13 +55944,13 @@
       "surgery_hospital_days": 0,
       "survival_rate": 100,
       "worsening_rate_per_day": 0.003,
-      "notes": "Penicillin is curative. Late-stage (tertiary) syphilis causes cardiovascular and neurological damage — not fully reversible.",
-      "base_rate": 0.0,
+      "notes": "Penicillin is curative. Late-stage (tertiary) syphilis causes cardiovascular and neurological damage \u2014 not fully reversible.",
+      "base_rate": 0,
       "age_progressive": false
     },
     "concussion": {
       "name": "Concussion",
-      "description": "Traumatic brain injury from head impact — confusion, headache, sensitivity to light, short-term memory issues",
+      "description": "Traumatic brain injury from head impact \u2014 confusion, headache, sensitivity to light, short-term memory issues",
       "icon": "head_injury",
       "chronic": false,
       "curable": true,
@@ -55948,8 +55983,8 @@
       "mental_trait_risk": 0.2,
       "rest_required": true,
       "screen_ban": true,
-      "notes": "No screens, no alcohol, no strenuous activity. Multiple concussions greatly increase risk of CTE (chronic traumatic encephalopathy) — apply cumulative mental trait risk.",
-      "base_rate": 0.0,
+      "notes": "No screens, no alcohol, no strenuous activity. Multiple concussions greatly increase risk of CTE (chronic traumatic encephalopathy) \u2014 apply cumulative mental trait risk.",
+      "base_rate": 0,
       "age_progressive": false
     },
     "malnutrition": {
@@ -56019,7 +56054,7 @@
           "expiry_days": 14
         }
       ],
-      "base_rate": 0.0,
+      "base_rate": 0,
       "age_progressive": false
     },
     "obesity_metabolic_disorder": {
@@ -56129,7 +56164,7 @@
         }
       ],
       "symptom_refresh_interval": 120,
-      "base_rate": 0.0,
+      "base_rate": 0,
       "age_progressive": false
     },
     "diabetes_type1": {
@@ -57013,311 +57048,311 @@
   },
   "icon_templates": {
     "sniffles": {
-      "emoji": "🤧",
+      "emoji": "\ud83e\udd27",
       "label": "Sniffles"
     },
     "fever": {
-      "emoji": "🤒",
+      "emoji": "\ud83e\udd12",
       "label": "Fever"
     },
     "virus": {
-      "emoji": "🦠",
+      "emoji": "\ud83e\udda0",
       "label": "Virus"
     },
     "heart": {
-      "emoji": "🫀",
+      "emoji": "\ud83e\udec0",
       "label": "Heart"
     },
     "ribbon": {
-      "emoji": "🎗️",
+      "emoji": "\ud83c\udf97\ufe0f",
       "label": "Cancer Ribbon"
     },
     "seizure": {
-      "emoji": "⚡",
+      "emoji": "\u26a1",
       "label": "Seizure"
     },
     "bacteria": {
-      "emoji": "🦠",
+      "emoji": "\ud83e\udda0",
       "label": "Bacteria"
     },
     "nausea": {
-      "emoji": "🤢",
+      "emoji": "\ud83e\udd22",
       "label": "Nausea"
     },
     "blurred_eye": {
-      "emoji": "👁️",
+      "emoji": "\ud83d\udc41\ufe0f",
       "label": "Vision"
     },
     "muffled_ear": {
-      "emoji": "👂",
+      "emoji": "\ud83d\udc42",
       "label": "Hearing"
     },
     "wheelchair": {
-      "emoji": "♿",
+      "emoji": "\u267f",
       "label": "Handicap"
     },
     "liver": {
-      "emoji": "🫘",
+      "emoji": "\ud83e\uded8",
       "label": "Liver"
     },
     "tick_bite": {
-      "emoji": "🕷️",
+      "emoji": "\ud83d\udd77\ufe0f",
       "label": "Tick-borne"
     },
     "broken_heart": {
-      "emoji": "💔",
+      "emoji": "\ud83d\udc94",
       "label": "Dysfunction"
     },
     "no_baby": {
-      "emoji": "🚫",
+      "emoji": "\ud83d\udeab",
       "label": "Infertility"
     },
     "nerve_zap": {
-      "emoji": "⚡",
+      "emoji": "\u26a1",
       "label": "Nerve Damage"
     },
     "allergy_alert": {
-      "emoji": "🚨",
+      "emoji": "\ud83d\udea8",
       "label": "Allergy Alert"
     },
     "petri_dish": {
-      "emoji": "🧫",
+      "emoji": "\ud83e\uddeb",
       "label": "Infection"
     },
     "hiv_ribbon": {
-      "emoji": "🎗️",
+      "emoji": "\ud83c\udf97\ufe0f",
       "label": "HIV/AIDS"
     },
     "head_injury": {
-      "emoji": "🤕",
+      "emoji": "\ud83e\udd15",
       "label": "Head Injury"
     },
     "bone_injury": {
-      "emoji": "🦴",
+      "emoji": "\ud83e\uddb4",
       "label": "Bone Injury"
     },
     "blood_drop": {
-      "emoji": "🩸",
+      "emoji": "\ud83e\ude78",
       "label": "Bleeding"
     },
     "muscle_strain": {
-      "emoji": "💪",
+      "emoji": "\ud83d\udcaa",
       "label": "Muscle Strain"
     },
     "fatigue": {
-      "emoji": "😴",
+      "emoji": "\ud83d\ude34",
       "label": "Fatigue"
     },
     "head_pain": {
-      "emoji": "🤕",
+      "emoji": "\ud83e\udd15",
       "label": "Head Pain"
     },
     "sore_throat": {
-      "emoji": "🗣️",
+      "emoji": "\ud83d\udde3\ufe0f",
       "label": "Sore Throat"
     },
     "cough_soft": {
-      "emoji": "😷",
+      "emoji": "\ud83d\ude37",
       "label": "Cough"
     },
     "cough_harsh": {
-      "emoji": "😷",
+      "emoji": "\ud83d\ude37",
       "label": "Intense Cough"
     },
     "runny_nose": {
-      "emoji": "🤧",
+      "emoji": "\ud83e\udd27",
       "label": "Runny Nose"
     },
     "brain_fog": {
-      "emoji": "🧠",
+      "emoji": "\ud83e\udde0",
       "label": "Memory Lapses"
     },
     "motor_impair": {
-      "emoji": "🤚",
+      "emoji": "\ud83e\udd1a",
       "label": "Motor Skills"
     },
     "confusion": {
-      "emoji": "💭",
+      "emoji": "\ud83d\udcad",
       "label": "Confusion"
     },
     "no_appetite": {
-      "emoji": "🍽️",
+      "emoji": "\ud83c\udf7d\ufe0f",
       "label": "No Appetite"
     },
     "low_libido": {
-      "emoji": "💤",
+      "emoji": "\ud83d\udca4",
       "label": "Low Libido"
     },
     "dehydrated": {
-      "emoji": "💧",
+      "emoji": "\ud83d\udca7",
       "label": "Dehydration"
     },
     "breathless": {
-      "emoji": "😮‍💨",
+      "emoji": "\ud83d\ude2e\u200d\ud83d\udca8",
       "label": "Short of Breath"
     },
     "faint": {
-      "emoji": "😵",
+      "emoji": "\ud83d\ude35",
       "label": "Fainting"
     },
     "diarrhea": {
-      "emoji": "🚽",
+      "emoji": "\ud83d\udebd",
       "label": "Diarrhea"
     },
     "vomit": {
-      "emoji": "🤮",
+      "emoji": "\ud83e\udd2e",
       "label": "Vomiting"
     },
     "clothing": {
-      "emoji": "👕",
+      "emoji": "\ud83d\udc55",
       "label": "Clothing"
     },
     "sports_equipment": {
-      "emoji": "🏋️",
+      "emoji": "\ud83c\udfcb\ufe0f",
       "label": "Sports Equipment"
     },
     "kitchenware": {
-      "emoji": "🍳",
+      "emoji": "\ud83c\udf73",
       "label": "Kitchenware"
     },
     "electronics": {
-      "emoji": "🔌",
+      "emoji": "\ud83d\udd0c",
       "label": "Electronics"
     },
     "food": {
-      "emoji": "🍕",
+      "emoji": "\ud83c\udf55",
       "label": "Food"
     },
     "medicine_item": {
-      "emoji": "💊",
+      "emoji": "\ud83d\udc8a",
       "label": "Medicine"
     },
     "hygiene": {
-      "emoji": "🧼",
+      "emoji": "\ud83e\uddfc",
       "label": "Hygiene"
     },
     "tools": {
-      "emoji": "🔧",
+      "emoji": "\ud83d\udd27",
       "label": "Tools"
     },
     "hair": {
-      "emoji": "💇",
+      "emoji": "\ud83d\udc87",
       "label": "Hair"
     },
     "office_supplies": {
-      "emoji": "📎",
+      "emoji": "\ud83d\udcce",
       "label": "Office Supplies"
     },
     "outdoor": {
-      "emoji": "🏕️",
+      "emoji": "\ud83c\udfd5\ufe0f",
       "label": "Outdoor"
     },
     "misc": {
-      "emoji": "📦",
+      "emoji": "\ud83d\udce6",
       "label": "Misc"
     },
     "drink": {
-      "emoji": "🥤",
+      "emoji": "\ud83e\udd64",
       "label": "Drink"
     },
     "cleaning": {
-      "emoji": "🧹",
+      "emoji": "\ud83e\uddf9",
       "label": "Cleaning"
     },
     "dishware": {
-      "emoji": "🍽️",
+      "emoji": "\ud83c\udf7d\ufe0f",
       "label": "Dishware"
     },
     "hobby_supplies": {
-      "emoji": "🧵",
+      "emoji": "\ud83e\uddf5",
       "label": "Hobby Supplies"
     },
     "music": {
-      "emoji": "🎸",
+      "emoji": "\ud83c\udfb8",
       "label": "Music"
     },
     "decor": {
-      "emoji": "🏺",
+      "emoji": "\ud83c\udffa",
       "label": "Decor"
     },
     "art_supplies": {
-      "emoji": "🎨",
+      "emoji": "\ud83c\udfa8",
       "label": "Art Supplies"
     },
     "linen": {
-      "emoji": "🧺",
+      "emoji": "\ud83e\uddfa",
       "label": "Linen"
     },
     "games": {
-      "emoji": "🎲",
+      "emoji": "\ud83c\udfb2",
       "label": "Games"
     },
     "adult": {
-      "emoji": "🔞",
+      "emoji": "\ud83d\udd1e",
       "label": "Adult"
     },
     "smartphone": {
-      "emoji": "📱",
+      "emoji": "\ud83d\udcf1",
       "label": "Smartphone"
     },
     "groceries": {
-      "emoji": "🛒",
+      "emoji": "\ud83d\uded2",
       "label": "Groceries"
     },
     "computer": {
-      "emoji": "💻",
+      "emoji": "\ud83d\udcbb",
       "label": "Computer"
     },
     "documents": {
-      "emoji": "📄",
+      "emoji": "\ud83d\udcc4",
       "label": "Documents"
     },
     "books_media": {
-      "emoji": "📚",
+      "emoji": "\ud83d\udcda",
       "label": "Books & Media"
     },
     "appliance": {
-      "emoji": "🧰",
+      "emoji": "\ud83e\uddf0",
       "label": "Appliance"
     },
     "accessory": {
-      "emoji": "👜",
+      "emoji": "\ud83d\udc5c",
       "label": "Accessory"
     },
     "furniture": {
-      "emoji": "🪑",
+      "emoji": "\ud83e\ude91",
       "label": "Furniture"
     },
     "fixture": {
-      "emoji": "🚿",
+      "emoji": "\ud83d\udebf",
       "label": "Fixture"
     },
     "lighting": {
-      "emoji": "💡",
+      "emoji": "\ud83d\udca1",
       "label": "Lighting"
     },
     "wall_decor": {
-      "emoji": "🖼️",
+      "emoji": "\ud83d\uddbc\ufe0f",
       "label": "Wall Decor"
     },
     "vehicle": {
-      "emoji": "🚗",
+      "emoji": "\ud83d\ude97",
       "label": "Vehicle"
     },
     "equipment": {
-      "emoji": "🛠️",
+      "emoji": "\ud83d\udee0\ufe0f",
       "label": "Equipment"
     },
     "structure": {
-      "emoji": "🏛️",
+      "emoji": "\ud83c\udfdb\ufe0f",
       "label": "Structure"
     },
     "transit": {
-      "emoji": "🚌",
+      "emoji": "\ud83d\ude8c",
       "label": "Transit"
     },
     "drug": {
-      "emoji": "🚬",
+      "emoji": "\ud83d\udeac",
       "label": "Drug"
     }
   },
@@ -57924,7 +57959,7 @@
     },
     "dementia": {
       "name": "Dementia / Alzheimer's",
-      "description": "Progressive neurological decline — memory loss, confusion, personality changes",
+      "description": "Progressive neurological decline \u2014 memory loss, confusion, personality changes",
       "chronic": true,
       "treatable": false,
       "from_stroke": true,
@@ -58003,7 +58038,7 @@
         "social": -0.15,
         "fun": -0.12
       },
-      "notes": "Panic attacks mimic heart attacks — cause significant ER visits. Agoraphobia often develops as avoidance behaviour.",
+      "notes": "Panic attacks mimic heart attacks \u2014 cause significant ER visits. Agoraphobia often develops as avoidance behaviour.",
       "base_rate": 0.03,
       "age_progressive": false
     },
@@ -59245,8 +59280,8 @@
     "paedophile"
   ],
   "item_schema_notes": {
-    "appearances": "Optional array of visual variants. Each entry: {label, texture, color, hex}. The first entry is the default. Renderer picks variant by index. No new template needed per color — just add to appearances[].",
-    "combine": "combine: {with: item_key, result: item_key, order: int} — item can be combined with another item (in order if chained) to produce result. The result item should have components:[item_key1, item_key2] and split_into:[item_key1, item_key2] for the reverse operation."
+    "appearances": "Optional array of visual variants. Each entry: {label, texture, color, hex}. The first entry is the default. Renderer picks variant by index. No new template needed per color \u2014 just add to appearances[].",
+    "combine": "combine: {with: item_key, result: item_key, order: int} \u2014 item can be combined with another item (in order if chained) to produce result. The result item should have components:[item_key1, item_key2] and split_into:[item_key1, item_key2] for the reverse operation."
   },
   "locomotion_styles": {
     "normal": {
@@ -59808,7 +59843,7 @@
       },
       "undercut": {
         "name": "Undercut",
-        "description": "Short sides, longer top — can be styled various ways.",
+        "description": "Short sides, longer top \u2014 can be styled various ways.",
         "length": "medium",
         "sex_common": "neutral",
         "mesh": null,
@@ -61625,7 +61660,7 @@
     "hug_prolonged": {
       "name": "Prolonged Hug",
       "intimacy_tier": 3,
-      "description": "A long, close embrace — more than friendly.",
+      "description": "A long, close embrace \u2014 more than friendly.",
       "compatibility": "any",
       "requires_private": false,
       "reversible": true,
@@ -61650,7 +61685,7 @@
     "kiss_cheek": {
       "name": "Kiss on the Cheek",
       "intimacy_tier": 3,
-      "description": "A soft kiss on the cheek — affectionate or romantic.",
+      "description": "A soft kiss on the cheek \u2014 affectionate or romantic.",
       "compatibility": "any",
       "requires_private": false,
       "reversible": true,
@@ -61675,7 +61710,7 @@
     "kiss_forehead": {
       "name": "Kiss on the Forehead",
       "intimacy_tier": 3,
-      "description": "A tender forehead kiss — protective and intimate.",
+      "description": "A tender forehead kiss \u2014 protective and intimate.",
       "compatibility": "any",
       "requires_private": false,
       "reversible": false,
@@ -61803,7 +61838,7 @@
     "kiss_neck": {
       "name": "Kiss on the Neck",
       "intimacy_tier": 5,
-      "description": "Soft kisses along the neck — clearly intimate.",
+      "description": "Soft kisses along the neck \u2014 clearly intimate.",
       "compatibility": "any",
       "requires_private": true,
       "reversible": false,
@@ -62143,7 +62178,7 @@
     "frottage": {
       "name": "Frottage",
       "intimacy_tier": 6,
-      "description": "Mutual genital stimulation through grinding — male partners.",
+      "description": "Mutual genital stimulation through grinding \u2014 male partners.",
       "compatibility": "same_sex_male_only",
       "requires_private": true,
       "reversible": false,
@@ -62169,7 +62204,7 @@
     "cuddling": {
       "name": "Cuddling",
       "intimacy_tier": 5,
-      "description": "Lying together closely, bodies intertwined — intimate but not sexual.",
+      "description": "Lying together closely, bodies intertwined \u2014 intimate but not sexual.",
       "compatibility": "any",
       "requires_private": false,
       "reversible": false,
@@ -62393,7 +62428,7 @@
     },
     {
       "id": "sapiosexual",
-      "label": "Sapiosexual — brains over looks",
+      "label": "Sapiosexual \u2014 brains over looks",
       "condition": "bachelor_plus_education",
       "boost": 0.3
     },
@@ -62624,7 +62659,7 @@
     },
     "cuddling_intimate": {
       "label": "Intimate Cuddling",
-      "description": "Close holding with gentle touching — sensual rather than explicitly sexual.",
+      "description": "Close holding with gentle touching \u2014 sensual rather than explicitly sexual.",
       "compatible_with": [
         "heterosexual",
         "same_sex_male",
@@ -62729,7 +62764,7 @@
       "pleasure_bonus": 0.1
     },
     "size_preference_larger": {
-      "label": "Size Preference — Larger",
+      "label": "Size Preference \u2014 Larger",
       "category": "body_focus",
       "intensity": 1,
       "description": "Attracted to larger partners.",
@@ -62738,7 +62773,7 @@
       "pleasure_bonus": 0.05
     },
     "size_preference_smaller": {
-      "label": "Size Preference — Smaller",
+      "label": "Size Preference \u2014 Smaller",
       "category": "body_focus",
       "intensity": 1,
       "description": "Attracted to petite partners.",
@@ -62819,7 +62854,7 @@
       "pleasure_bonus": 0.12
     },
     "aftercare_important": {
-      "label": "Aftercare — High Need",
+      "label": "Aftercare \u2014 High Need",
       "category": "emotional",
       "intensity": 1,
       "description": "Needs significant emotional care and reassurance after intimate encounters.",
@@ -63145,7 +63180,7 @@
       "conditioning_response": "shame_anxiety",
       "shame_delta": 0.3,
       "resentment_delta": 15,
-      "description": "Scolded in front of others — humiliating."
+      "description": "Scolded in front of others \u2014 humiliating."
     },
     "early_curfew": {
       "name": "Earlier Curfew",
@@ -64946,5 +64981,55 @@
       "Carter",
       "Roberts"
     ]
+  },
+  "speech_style_registry": {
+    "terse_clipped": {
+      "name": "Terse and Clipped",
+      "description": "Speaks in short, clipped sentences. Rarely elaborates unless pressed."
+    },
+    "verbose_rambler": {
+      "name": "Verbose Rambler",
+      "description": "Long-winded and tangential -- often over-explains and drifts off-topic mid-thought."
+    },
+    "folksy_slang": {
+      "name": "Folksy Slang",
+      "description": "Casual, heavy on regional slang and colloquialisms ('y'know', 'reckon', 'ain't')."
+    },
+    "formal_archaic": {
+      "name": "Formal and Archaic",
+      "description": "Unusually formal and old-fashioned phrasing, as if speaking a generation or two out of time."
+    },
+    "sprinkles_puns": {
+      "name": "Sprinkles Puns",
+      "description": "Can't resist a pun or wordplay, even in serious moments."
+    },
+    "malapropism_prone": {
+      "name": "Malapropism-Prone",
+      "description": "Confidently misuses big or technical words in ways that are almost, but not quite, right."
+    },
+    "sarcastic_deadpan": {
+      "name": "Sarcastic Deadpan",
+      "description": "Dry, understated, and sarcastic -- delivers jokes and jabs with a flat affect."
+    },
+    "overly_polite": {
+      "name": "Overly Polite",
+      "description": "Excessively polite and apologetic, even when it isn't warranted."
+    },
+    "filler_heavy": {
+      "name": "Filler-Heavy",
+      "description": "Speech is peppered with filler words -- 'like', 'literally', 'um', 'you know'."
+    },
+    "blunt_no_filter": {
+      "name": "Blunt, No Filter",
+      "description": "Says exactly what they think, with little social softening or tact."
+    },
+    "technical_jargon": {
+      "name": "Technical Jargon",
+      "description": "Over-explains things with technical, analytical, or jargon-heavy language regardless of context."
+    },
+    "old_timey_sayings": {
+      "name": "Old-Timey Sayings",
+      "description": "Peppers speech with old proverbs, idioms, and sayings, often slightly mangled."
+    }
   }
 }

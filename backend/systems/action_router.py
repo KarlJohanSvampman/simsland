@@ -1264,6 +1264,8 @@ def route_action(c, world, action, speech, definitions=None, available_actions=N
         _route_browse_darknet_market(c, world, action)
     elif action_type == "order_darknet_listing":
         _route_order_darknet_listing(c, world, action)
+    elif action_type == "write_diary":
+        _route_write_diary(c, world, action)
     elif action_type == "computer_list_stocks":
         _route_computer_list_stocks(c, world, action)
     elif action_type == "computer_buy_stock":
@@ -3689,6 +3691,21 @@ def _route_order_darknet_listing(c, world, action):
                                interaction="order_darknet_listing")
     c["activity"]["order_result"] = result
     _set_computer_animation(c, world)
+
+
+# ─── diary (systems/diary.py) ──────────────────────────────────────────────────
+
+def _route_write_diary(c, world, action):
+    """A directly player/LLM-chosen write -- the automatic day-end
+    version is systems/diary.py::maybe_write_diary(), same underlying
+    generation function either way."""
+    from systems.personal_items import get_item_by_template
+    if not get_item_by_template(c, "diary"):
+        return
+    c["activity"] = _scaffold(c, world, "write_diary", interaction="write_diary")
+    from systems.diary import write_diary_entry
+    entry = write_diary_entry(c, world)
+    c["activity"]["diary_entry"] = entry
 
 
 # ─── stocks ───────────────────────────────────────────────────────────────────

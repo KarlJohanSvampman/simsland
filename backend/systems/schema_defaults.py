@@ -1004,6 +1004,16 @@ def ensure_character_defaults(c, world=None):
         "active": False, "intensity": 0.0, "trigger": None, "started_tick": None,
     })
 
+    # Diary (see systems/diary.py) -- a routine some sims have, gated on
+    # the keep_a_diary hobby + owning a real diary item.
+    c.setdefault("diary_entries", [])
+
+    # Speech/writing quirk (see speech_style_registry in definitions.json)
+    # -- most characters have none; a minority talk/write distinctly
+    # differently, narrated into every LLM turn via context_builder.py's
+    # _sec_identity and into diary entries via llm/diary_narration.py.
+    c.setdefault("speech_style", None)
+
     # Preliminary plans (steps/requirements/possible-solutions) for active
     # expectations -- see systems/expectation_planner.py, which queues
     # steps onto c["activity_queue"] the same way hobby_planner.py does.

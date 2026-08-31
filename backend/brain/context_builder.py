@@ -1460,6 +1460,11 @@ def _sec_identity(c, world):
     traits = c.get("traits", [])
     if traits:
         bits.append(f"Your personality: {', '.join(traits)}.")
+    style_id = c.get("speech_style")
+    if style_id:
+        style = world.get("definitions", {}).get("speech_style_registry", {}).get(style_id)
+        if style:
+            bits.append(f"How you talk and write: {style['description']}")
     bits.append(f"Right now you feel {c.get('emotion', 'neutral')}.")
     if c.get("stress", 0) > 60:
         bits.append("You're under real stress.")

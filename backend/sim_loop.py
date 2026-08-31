@@ -109,6 +109,7 @@ from systems.crime import (
 )
 from systems.darknet import generate_darknet_listings
 from systems.psychosis import tick_psychosis
+from systems.diary import maybe_write_diary
 from systems.sociopathy import (
     is_sociopath, maybe_introduce_false_identity,
     maybe_discover_persona_mismatch, maybe_plant_drama,
@@ -615,6 +616,7 @@ def tick(world):
             decay_stories(c)
             aggregate_daily_observations(c, world)
             maybe_recruit_into_crime(c, world)
+            maybe_write_diary(c, world)
             if is_sociopath(c):
                 contacts = [world["characters"][oid] for oid in c.get("relationships", {})
                             if oid in world["characters"]]

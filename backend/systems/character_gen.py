@@ -19,6 +19,11 @@ _EDU_RANK = {
     "associate": 3, "bachelor": 4, "master": 5, "doctorate": 6, "professional": 6,
 }
 
+# Fraction of characters who get a distinctive speech/writing quirk (see
+# speech_style_registry in definitions.json) -- most sims talk/write in
+# an unremarkable, generic way; this is deliberately a minority.
+SPEECH_STYLE_CHANCE = 0.15
+
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def _random_sex():
@@ -617,6 +622,20 @@ def generate_character(defs, overrides=None, world=None):
             sync_gun_hobbies(character, world)
         except Exception:
             pass
+        try:
+            from systems.diary import sync_diary_hobby
+            sync_diary_hobby(character, world)
+        except Exception:
+            pass
+
+    # Speech/writing quirk (see speech_style_registry) -- most characters
+    # have none; a minority talk/write distinctly differently.
+    try:
+        pool = list(defs.get("speech_style_registry", {}).keys())
+        if pool and random.random() < SPEECH_STYLE_CHANCE:
+            character["speech_style"] = random.choice(pool)
+    except Exception:
+        pass
 
     # Weighted-by-prevalence mental/physical health condition assignment
     # -- both registries already had real content, nothing ever assigned
