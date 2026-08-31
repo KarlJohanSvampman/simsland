@@ -998,6 +998,12 @@ def ensure_character_defaults(c, world=None):
     # single-activity active_persona above.
     c.setdefault("persona_bank", [])
 
+    # Temporary psychosis state (see systems/psychosis.py) -- any
+    # character can enter it; schizophrenia raises the baseline rate.
+    c.setdefault("psychosis_state", {
+        "active": False, "intensity": 0.0, "trigger": None, "started_tick": None,
+    })
+
     # Preliminary plans (steps/requirements/possible-solutions) for active
     # expectations -- see systems/expectation_planner.py, which queues
     # steps onto c["activity_queue"] the same way hobby_planner.py does.

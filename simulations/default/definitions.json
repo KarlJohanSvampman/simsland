@@ -54965,7 +54965,9 @@
           "llm_reason": "Rest and fluids until the cold passes on its own.",
           "expiry_days": 10
         }
-      ]
+      ],
+      "base_rate": 0.0,
+      "age_progressive": false
     },
     "influenza": {
       "name": "Influenza (Flu)",
@@ -55039,7 +55041,9 @@
           "llm_reason": "Take antiviral medication daily until symptoms clear.",
           "expiry_days": 7
         }
-      ]
+      ],
+      "base_rate": 0.0,
+      "age_progressive": false
     },
     "coronavirus": {
       "name": "Coronavirus (COVID-19)",
@@ -55074,7 +55078,9 @@
       "surgery_hospital_days": 0,
       "survival_rate": 97,
       "typical_duration_days": 21,
-      "notes": "Risk of 'long COVID' with lasting fatigue and breathing issues. Elderly/obese individuals at higher risk of hospitalisation."
+      "notes": "Risk of 'long COVID' with lasting fatigue and breathing issues. Elderly/obese individuals at higher risk of hospitalisation.",
+      "base_rate": 0.0,
+      "age_progressive": false
     },
     "heart_disease_low": {
       "name": "Heart Disease (Mild)",
@@ -55108,7 +55114,9 @@
       "survival_rate": 100,
       "worsening_rate_per_day": 0.001,
       "stamina_penalty": 0.1,
-      "notes": "Medication compliance critical. Poor diet or stress can accelerate to medium severity."
+      "notes": "Medication compliance critical. Poor diet or stress can accelerate to medium severity.",
+      "base_rate": 0.06,
+      "age_progressive": true
     },
     "heart_disease_medium": {
       "name": "Heart Disease (Moderate)",
@@ -55146,7 +55154,9 @@
       "survival_rate": 90,
       "worsening_rate_per_day": 0.003,
       "stamina_penalty": 0.35,
-      "notes": "50% chance of eventually needing bypass or stent surgery. Stamina noticeably reduced. Stress and exertion can trigger cardiac events."
+      "notes": "50% chance of eventually needing bypass or stent surgery. Stamina noticeably reduced. Stress and exertion can trigger cardiac events.",
+      "base_rate": 0.02,
+      "age_progressive": true
     },
     "heart_disease_high": {
       "name": "Heart Disease (Severe)",
@@ -55189,7 +55199,9 @@
       "stamina_penalty": 0.7,
       "heart_attack_risk_per_day": 0.08,
       "collapse_risk_per_day": 0.05,
-      "notes": "Each day without surgery: symptoms intensify (sweating, chest pain, anger, nausea), collapse risk rises. Without intervention will eventually trigger heart attack or unconscious collapse."
+      "notes": "Each day without surgery: symptoms intensify (sweating, chest pain, anger, nausea), collapse risk rises. Without intervention will eventually trigger heart attack or unconscious collapse.",
+      "base_rate": 0.005,
+      "age_progressive": true
     },
     "cancer_low": {
       "name": "Cancer (Early Stage)",
@@ -55222,7 +55234,9 @@
       "surgery_hospital_days": 3,
       "survival_rate": 92,
       "worsening_rate_per_day": 0.002,
-      "notes": "Early detection is key. Regular monitoring required. Chemotherapy causes fatigue and nausea as side effects."
+      "notes": "Early detection is key. Regular monitoring required. Chemotherapy causes fatigue and nausea as side effects.",
+      "base_rate": 0.01,
+      "age_progressive": true
     },
     "cancer_medium": {
       "name": "Cancer (Intermediate Stage)",
@@ -55259,7 +55273,9 @@
       "surgery_hospital_days": 7,
       "survival_rate": 60,
       "worsening_rate_per_day": 0.004,
-      "notes": "5-year survival rates vary by cancer type. Treatment side effects substantially reduce quality of life."
+      "notes": "5-year survival rates vary by cancer type. Treatment side effects substantially reduce quality of life.",
+      "base_rate": 0.004,
+      "age_progressive": true
     },
     "cancer_high": {
       "name": "Cancer (Advanced / Terminal)",
@@ -55300,7 +55316,9 @@
       "survival_rate": 20,
       "worsening_rate_per_day": 0.01,
       "mortality_risk_per_week": 0.03,
-      "notes": "Terminal prognosis. Goal shifts to pain management and quality of remaining life. Rapid physical decline expected."
+      "notes": "Terminal prognosis. Goal shifts to pain management and quality of remaining life. Rapid physical decline expected.",
+      "base_rate": 0.001,
+      "age_progressive": true
     },
     "epilepsy": {
       "name": "Epilepsy",
@@ -55332,7 +55350,9 @@
       "survival_rate": 98,
       "seizure_trigger_chance_per_day": 0.08,
       "seizure_chance_without_meds_per_day": 0.35,
-      "notes": "With medication, most patients lead normal lives. Seizures can cause injury. Cannot drive. Stress and sleep deprivation increase seizure frequency."
+      "notes": "With medication, most patients lead normal lives. Seizures can cause injury. Cannot drive. Stress and sleep deprivation increase seizure frequency.",
+      "base_rate": 0.012,
+      "age_progressive": false
     },
     "aggressive_gut_bacteria": {
       "name": "Aggressive Gut Bacteria (C. diff / H. pylori)",
@@ -55366,7 +55386,9 @@
       "surgery_hospital_days": 0,
       "survival_rate": 99,
       "typical_duration_days": 21,
-      "notes": "Contagious through faecal-oral route. Antibiotic treatment usually effective. Risk of recurrence."
+      "notes": "Contagious through faecal-oral route. Antibiotic treatment usually effective. Risk of recurrence.",
+      "base_rate": 0.0,
+      "age_progressive": false
     },
     "ibs": {
       "name": "Irritable Bowel Syndrome (IBS)",
@@ -55397,7 +55419,9 @@
       "needs_surgery": false,
       "surgery_hospital_days": 0,
       "survival_rate": 100,
-      "notes": "Triggered by stress, diet, and hormones. Diet management reduces flare-ups. Significantly impacts daily quality of life."
+      "notes": "Triggered by stress, diet, and hormones. Diet management reduces flare-ups. Significantly impacts daily quality of life.",
+      "base_rate": 0.1,
+      "age_progressive": false
     },
     "low_vision": {
       "name": "Low Vision",
@@ -55428,7 +55452,9 @@
       "surgery_hospital_days": 1,
       "survival_rate": 100,
       "worsening_rate_per_day": 0.0005,
-      "notes": "Glasses or contact lenses may partially compensate. Laser surgery may correct some cases. Affects ability to drive and recognise faces."
+      "notes": "Glasses or contact lenses may partially compensate. Laser surgery may correct some cases. Affects ability to drive and recognise faces.",
+      "base_rate": 0.08,
+      "age_progressive": true
     },
     "low_hearing": {
       "name": "Hearing Loss",
@@ -55456,7 +55482,9 @@
       "survival_rate": 100,
       "worsening_rate_per_day": 0.0003,
       "social_penalty": 0.15,
-      "notes": "Hearing aids can compensate significantly. Social isolation risk without treatment. May affect speech clarity over time."
+      "notes": "Hearing aids can compensate significantly. Social isolation risk without treatment. May affect speech clarity over time.",
+      "base_rate": 0.05,
+      "age_progressive": true
     },
     "handicap": {
       "name": "Physical Handicap",
@@ -55512,7 +55540,9 @@
         "brace",
         "walking_stick"
       ],
-      "notes": "Nature of handicap depends on affected body part and usability. Prosthetics or assistive devices can restore partial function."
+      "notes": "Nature of handicap depends on affected body part and usability. Prosthetics or assistive devices can restore partial function.",
+      "base_rate": 0.01,
+      "age_progressive": false
     },
     "low_liver_function": {
       "name": "Reduced Liver Function (Cirrhosis / Hepatic Insufficiency)",
@@ -55548,7 +55578,9 @@
       "survival_rate": 70,
       "worsening_rate_per_day": 0.003,
       "alcohol_multiplier": 5,
-      "notes": "Alcohol massively accelerates deterioration. Medication doses must be adjusted. Risk of hepatic coma in severe cases."
+      "notes": "Alcohol massively accelerates deterioration. Medication doses must be adjusted. Risk of hepatic coma in severe cases.",
+      "base_rate": 0.015,
+      "age_progressive": false
     },
     "borrelia": {
       "name": "Borrelia / Lyme Disease",
@@ -55584,7 +55616,9 @@
       "worsening_rate_per_day": 0.005,
       "typical_duration_days": 30,
       "becomes_chronic_after_days": 60,
-      "notes": "Bull's-eye rash is diagnostic. Early antibiotic treatment is curative. Late-stage becomes chronic with neurological and joint damage."
+      "notes": "Bull's-eye rash is diagnostic. Early antibiotic treatment is curative. Late-stage becomes chronic with neurological and joint damage.",
+      "base_rate": 0.0,
+      "age_progressive": false
     },
     "impotency": {
       "name": "Erectile Dysfunction / Impotency",
@@ -55613,7 +55647,9 @@
       "surgery_hospital_days": 1,
       "survival_rate": 100,
       "social_penalty": 0.1,
-      "notes": "Often psychological or vascular in origin. Treatable with medication. May indicate underlying cardiovascular disease."
+      "notes": "Often psychological or vascular in origin. Treatable with medication. May indicate underlying cardiovascular disease.",
+      "base_rate": 0.03,
+      "age_progressive": false
     },
     "sterility": {
       "name": "Sterility / Infertility",
@@ -55640,7 +55676,9 @@
       "needs_surgery": false,
       "surgery_hospital_days": 0,
       "survival_rate": 100,
-      "notes": "No direct health impact. IVF or adoption are alternatives for parenthood. Significant emotional and relationship impact."
+      "notes": "No direct health impact. IVF or adoption are alternatives for parenthood. Significant emotional and relationship impact.",
+      "base_rate": 0.01,
+      "age_progressive": false
     },
     "nerve_damage": {
       "name": "Peripheral Nerve Damage (Neuropathy)",
@@ -55673,7 +55711,9 @@
       "surgery_hospital_days": 3,
       "survival_rate": 100,
       "worsening_rate_per_day": 0.001,
-      "notes": "Caused by diabetes, alcohol, trauma or infection. Loss of protective pain sensation increases injury risk."
+      "notes": "Caused by diabetes, alcohol, trauma or infection. Loss of protective pain sensation increases injury risk.",
+      "base_rate": 0.01,
+      "age_progressive": false
     },
     "allergy_severe": {
       "name": "Severe Allergy (Anaphylaxis Risk)",
@@ -55708,7 +55748,9 @@
       "instance_fields": {
         "allergen": null
       },
-      "notes": "Always carry epinephrine auto-injector (EpiPen). Exposure must be strictly avoided. Anaphylaxis is a fatal emergency without treatment."
+      "notes": "Always carry epinephrine auto-injector (EpiPen). Exposure must be strictly avoided. Anaphylaxis is a fatal emergency without treatment.",
+      "base_rate": 0.02,
+      "age_progressive": false
     },
     "std_chlamydia": {
       "name": "Chlamydia (STI)",
@@ -55735,7 +55777,9 @@
       "needs_surgery": false,
       "surgery_hospital_days": 0,
       "survival_rate": 100,
-      "notes": "Easily curable with antibiotics. Untreated: can cause pelvic inflammatory disease and infertility."
+      "notes": "Easily curable with antibiotics. Untreated: can cause pelvic inflammatory disease and infertility.",
+      "base_rate": 0.0,
+      "age_progressive": false
     },
     "std_gonorrhea": {
       "name": "Gonorrhoea (STI)",
@@ -55764,7 +55808,9 @@
       "needs_surgery": false,
       "surgery_hospital_days": 0,
       "survival_rate": 100,
-      "notes": "Antibiotic-resistant strains emerging. Must treat sexual partners simultaneously."
+      "notes": "Antibiotic-resistant strains emerging. Must treat sexual partners simultaneously.",
+      "base_rate": 0.0,
+      "age_progressive": false
     },
     "std_herpes": {
       "name": "Herpes (HSV-1/HSV-2)",
@@ -55794,7 +55840,9 @@
       "needs_surgery": false,
       "surgery_hospital_days": 0,
       "survival_rate": 100,
-      "notes": "Managed with antiviral suppression therapy. Highly contagious during outbreaks. Significant social stigma."
+      "notes": "Managed with antiviral suppression therapy. Highly contagious during outbreaks. Significant social stigma.",
+      "base_rate": 0.0,
+      "age_progressive": false
     },
     "std_hiv": {
       "name": "HIV / AIDS",
@@ -55827,7 +55875,9 @@
       "survival_rate": 95,
       "worsening_rate_per_day": 0.002,
       "immune_score_penalty": 30,
-      "notes": "Modern ART (antiretroviral therapy) allows near-normal lifespan. Without treatment: immune collapse within years. Undetectable = uninfectious."
+      "notes": "Modern ART (antiretroviral therapy) allows near-normal lifespan. Without treatment: immune collapse within years. Undetectable = uninfectious.",
+      "base_rate": 0.0,
+      "age_progressive": false
     },
     "std_syphilis": {
       "name": "Syphilis (STI)",
@@ -55859,7 +55909,9 @@
       "surgery_hospital_days": 0,
       "survival_rate": 100,
       "worsening_rate_per_day": 0.003,
-      "notes": "Penicillin is curative. Late-stage (tertiary) syphilis causes cardiovascular and neurological damage — not fully reversible."
+      "notes": "Penicillin is curative. Late-stage (tertiary) syphilis causes cardiovascular and neurological damage — not fully reversible.",
+      "base_rate": 0.0,
+      "age_progressive": false
     },
     "concussion": {
       "name": "Concussion",
@@ -55896,7 +55948,9 @@
       "mental_trait_risk": 0.2,
       "rest_required": true,
       "screen_ban": true,
-      "notes": "No screens, no alcohol, no strenuous activity. Multiple concussions greatly increase risk of CTE (chronic traumatic encephalopathy) — apply cumulative mental trait risk."
+      "notes": "No screens, no alcohol, no strenuous activity. Multiple concussions greatly increase risk of CTE (chronic traumatic encephalopathy) — apply cumulative mental trait risk.",
+      "base_rate": 0.0,
+      "age_progressive": false
     },
     "malnutrition": {
       "name": "Malnutrition",
@@ -55964,7 +56018,9 @@
           "llm_reason": "Follow the nutrition plan and rest to regain weight.",
           "expiry_days": 14
         }
-      ]
+      ],
+      "base_rate": 0.0,
+      "age_progressive": false
     },
     "obesity_metabolic_disorder": {
       "name": "Obesity-Related Metabolic Disorder",
@@ -56028,7 +56084,9 @@
           "llm_reason": "Follow the weight-loss plan.",
           "expiry_days": 14
         }
-      ]
+      ],
+      "base_rate": 0.15,
+      "age_progressive": false
     },
     "hangover": {
       "name": "Hangover",
@@ -56070,7 +56128,66 @@
           "probability": 0.4
         }
       ],
-      "symptom_refresh_interval": 120
+      "symptom_refresh_interval": 120,
+      "base_rate": 0.0,
+      "age_progressive": false
+    },
+    "diabetes_type1": {
+      "name": "Type 1 Diabetes",
+      "description": "Autoimmune -- the pancreas produces little or no insulin. Lifelong, insulin-dependent.",
+      "chronic": true,
+      "treatable": true,
+      "from_stroke": false,
+      "from_head_impact": false,
+      "medicine": [
+        "insulin"
+      ],
+      "medicine_frequency": "daily",
+      "common_sex": "any",
+      "common_age_range": [
+        5,
+        30
+      ],
+      "annual_cost": 6000,
+      "doctor_visits_per_year": 6,
+      "severity": 6,
+      "urgency": 5,
+      "need_penalties": {
+        "energy": -0.15
+      },
+      "age_progressive": false,
+      "base_rate": 0.003,
+      "notes": "Early-onset, no strong sex skew. Requires consistent insulin management."
+    },
+    "diabetes_type2": {
+      "name": "Type 2 Diabetes",
+      "description": "Insulin resistance, strongly linked to age and weight. The common adult-onset form.",
+      "chronic": true,
+      "treatable": true,
+      "from_stroke": false,
+      "from_head_impact": false,
+      "medicine": [
+        "metformin"
+      ],
+      "medicine_frequency": "daily",
+      "common_sex": "any",
+      "common_age_range": [
+        35,
+        99
+      ],
+      "annual_cost": 4500,
+      "doctor_visits_per_year": 4,
+      "severity": 5,
+      "urgency": 3,
+      "need_penalties": {
+        "energy": -0.1
+      },
+      "age_progressive": true,
+      "base_rate": 0.05,
+      "risk_multiplier_conditions": [
+        "obesity_metabolic_disorder"
+      ],
+      "notes": "Rate climbs sharply with age; obesity_metabolic_disorder presence roughly doubles risk."
     }
   },
   "health_hazard_templates": {
@@ -57657,7 +57774,9 @@
         "energy": -0.15
       },
       "mood_lock": "depressed",
-      "notes": "Can be triggered by strokes, chronic illness, life events. Medication and therapy required. Suicide risk elevated."
+      "notes": "Can be triggered by strokes, chronic illness, life events. Medication and therapy required. Suicide risk elevated.",
+      "base_rate": 0.07,
+      "age_progressive": false
     },
     "anxiety_disorder": {
       "name": "Generalised Anxiety Disorder",
@@ -57684,7 +57803,9 @@
         "social": -0.2,
         "fun": -0.1
       },
-      "notes": "Avoidance behaviours worsen over time. Cognitive behavioural therapy alongside medication is most effective."
+      "notes": "Avoidance behaviours worsen over time. Cognitive behavioural therapy alongside medication is most effective.",
+      "base_rate": 0.12,
+      "age_progressive": false
     },
     "ptsd": {
       "name": "Post-Traumatic Stress Disorder (PTSD)",
@@ -57712,7 +57833,9 @@
         "fun": -0.2,
         "energy": -0.1
       },
-      "notes": "Triggered by head impacts, violent events, or severe psychological trauma. Nightmares disrupt sleep causing fatigue cascade."
+      "notes": "Triggered by head impacts, violent events, or severe psychological trauma. Nightmares disrupt sleep causing fatigue cascade.",
+      "base_rate": 0.02,
+      "age_progressive": false
     },
     "bipolar_disorder": {
       "name": "Bipolar Disorder",
@@ -57741,7 +57864,9 @@
         "manic_days": 7,
         "depressive_days": 14
       },
-      "notes": "Mania phase: impulsive spending, sexual recklessness, reduced sleep need. Depression phase: severe withdrawal. Medication critical."
+      "notes": "Mania phase: impulsive spending, sexual recklessness, reduced sleep need. Depression phase: severe withdrawal. Medication critical.",
+      "base_rate": 0.028,
+      "age_progressive": false
     },
     "ocd": {
       "name": "Obsessive-Compulsive Disorder (OCD)",
@@ -57764,7 +57889,9 @@
       "severity": 4,
       "urgency": 2,
       "time_cost_per_day_hours": 2,
-      "notes": "Rituals consume large amounts of time. Anxiety spikes if unable to complete compulsions. Interferes with social and work life."
+      "notes": "Rituals consume large amounts of time. Anxiety spikes if unable to complete compulsions. Interferes with social and work life.",
+      "base_rate": 0.012,
+      "age_progressive": false
     },
     "schizophrenia": {
       "name": "Schizophrenia",
@@ -57791,7 +57918,9 @@
         "fun": -0.2,
         "energy": -0.1
       },
-      "notes": "Hallucinations and paranoia can make character behave erratically and dangerously. Without medication: episodes of psychosis become more severe."
+      "notes": "Hallucinations and paranoia can make character behave erratically and dangerously. Without medication: episodes of psychosis become more severe.",
+      "base_rate": 0.005,
+      "age_progressive": false
     },
     "dementia": {
       "name": "Dementia / Alzheimer's",
@@ -57819,7 +57948,9 @@
         "social": -0.2,
         "fun": -0.1
       },
-      "notes": "Accumulates via strokes or ageing. Eventually cannot care for self. Wandering, aggression, forgetting family members."
+      "notes": "Accumulates via strokes or ageing. Eventually cannot care for self. Wandering, aggression, forgetting family members.",
+      "base_rate": 0.05,
+      "age_progressive": true
     },
     "adhd": {
       "name": "ADHD (Attention Deficit Hyperactivity Disorder)",
@@ -57842,7 +57973,9 @@
       "severity": 3,
       "urgency": 1,
       "task_completion_penalty": 0.25,
-      "notes": "Reduced task completion efficiency. Impulsive decisions increase risk-taking. Medication significantly improves focus."
+      "notes": "Reduced task completion efficiency. Impulsive decisions increase risk-taking. Medication significantly improves focus.",
+      "base_rate": 0.05,
+      "age_progressive": false
     },
     "panic_disorder": {
       "name": "Panic Disorder",
@@ -57870,7 +58003,9 @@
         "social": -0.15,
         "fun": -0.12
       },
-      "notes": "Panic attacks mimic heart attacks — cause significant ER visits. Agoraphobia often develops as avoidance behaviour."
+      "notes": "Panic attacks mimic heart attacks — cause significant ER visits. Agoraphobia often develops as avoidance behaviour.",
+      "base_rate": 0.03,
+      "age_progressive": false
     },
     "paranoid_personality": {
       "name": "Paranoid Personality Disorder",
@@ -57893,7 +58028,9 @@
       "need_penalties": {
         "social": -0.35
       },
-      "notes": "Cannot form close relationships. Hostile to helpers. Refuses medication believing it is harmful. Can emerge from stroke or head trauma."
+      "notes": "Cannot form close relationships. Hostile to helpers. Refuses medication believing it is harmful. Can emerge from stroke or head trauma.",
+      "base_rate": 0.025,
+      "age_progressive": false
     },
     "antisocial_personality": {
       "name": "Antisocial Personality Disorder",
@@ -57916,7 +58053,9 @@
       "need_penalties": {
         "social": -0.1
       },
-      "notes": "Increased aggression and social conflict. Can lead to violent acts. Head impacts a major trigger. No effective medication."
+      "notes": "Increased aggression and social conflict. Can lead to violent acts. Head impacts a major trigger. No effective medication.",
+      "base_rate": 0.02,
+      "age_progressive": false
     },
     "borderline_personality": {
       "name": "Borderline Personality Disorder (BPD)",
@@ -57944,7 +58083,9 @@
         "fun": -0.15
       },
       "mood_volatility": 3,
-      "notes": "Extreme mood swings in response to perceived slights. Relationships intensely unstable. Dialectical Behaviour Therapy (DBT) is primary treatment."
+      "notes": "Extreme mood swings in response to perceived slights. Relationships intensely unstable. Dialectical Behaviour Therapy (DBT) is primary treatment.",
+      "base_rate": 0.016,
+      "age_progressive": false
     },
     "sexual_repression_disorder": {
       "label": "Sexual Repression Disorder",
@@ -57957,7 +58098,9 @@
         "intimacy_avoidance",
         "depression_risk",
         "self_destructive_risk"
-      ]
+      ],
+      "base_rate": 0.03,
+      "age_progressive": false
     },
     "identity_crisis": {
       "label": "Identity Crisis",
@@ -57970,29 +58113,9 @@
         "depression_risk",
         "social_withdrawal",
         "self_destructive_risk"
-      ]
-    },
-    "sociopath": {
-      "name": "Antisocial Personality Disorder",
-      "description": "A pervasive pattern of disregard for others' rights, deceitfulness, manipulation, and lack of remorse.",
-      "chronic": true,
-      "treatable": false,
-      "from_stroke": false,
-      "from_head_impact": false,
-      "medicine": [],
-      "medicine_frequency": null,
-      "common_sex": "any",
-      "common_age_range": [
-        18,
-        70
       ],
-      "annual_cost": 0,
-      "doctor_visits_per_year": 0,
-      "severity": 7,
-      "urgency": 2,
-      "need_penalties": {},
-      "mood_lock": null,
-      "notes": "Not medication-responsive -- talk therapy has limited effect. See systems/sociopathy.py for behavioral modeling."
+      "base_rate": 0.03,
+      "age_progressive": false
     }
   },
   "belief_templates": {
@@ -58392,6 +58515,102 @@
         {
           "trait": "perceptive",
           "modifier": 15
+        }
+      ],
+      "conditions": []
+    },
+    "scripture_is_literal_truth": {
+      "name": "Scripture Is Literal Truth",
+      "descriptions": {
+        "positive": "A conviction that sacred text is the direct, inerrant word of the divine, and a firm anchor in an uncertain world.",
+        "negative": "A rigid refusal to question or reinterpret scripture even when it conflicts with plain evidence.",
+        "balanced": "Believes religious scripture should be read and followed literally, without reinterpretation."
+      },
+      "learn_chance": {
+        "balanced": 10,
+        "logical": 6,
+        "self_aware": 8
+      },
+      "trait_modifiers": [
+        {
+          "trait": "judgmental",
+          "modifier": 15
+        },
+        {
+          "trait": "open_minded",
+          "modifier": -25
+        }
+      ],
+      "conditions": []
+    },
+    "other_faiths_are_wrong": {
+      "name": "Other Faiths Are Wrong",
+      "descriptions": {
+        "positive": "A confidence that one's own faith holds the whole truth, and other paths lead people astray.",
+        "negative": "An intolerance for other beliefs that curdles into contempt for anyone who doesn't share them.",
+        "balanced": "Believes their own religion is correct and other faiths/beliefs are mistaken."
+      },
+      "learn_chance": {
+        "balanced": 9,
+        "logical": 5,
+        "self_aware": 6
+      },
+      "trait_modifiers": [
+        {
+          "trait": "judgmental",
+          "modifier": 20
+        },
+        {
+          "trait": "open_minded",
+          "modifier": -30
+        }
+      ],
+      "conditions": []
+    },
+    "moral_enforcement_duty": {
+      "name": "Moral Enforcement Duty",
+      "descriptions": {
+        "positive": "A sense of sacred responsibility to guide others back onto the right moral path, out of genuine care.",
+        "negative": "A self-appointed right to police and shame other people's private choices.",
+        "balanced": "Believes it's their duty to correct others' behavior when it violates their moral/religious code."
+      },
+      "learn_chance": {
+        "balanced": 8,
+        "logical": 4,
+        "self_aware": 5
+      },
+      "trait_modifiers": [
+        {
+          "trait": "judgmental",
+          "modifier": 25
+        },
+        {
+          "trait": "open_minded",
+          "modifier": -20
+        }
+      ],
+      "conditions": []
+    },
+    "end_times_are_near": {
+      "name": "End Times Are Near",
+      "descriptions": {
+        "positive": "A watchful conviction that the world is approaching a great reckoning, and it's worth living as though it matters.",
+        "negative": "A doom-laden certainty that ordinary setbacks are signs of imminent apocalypse.",
+        "balanced": "Believes a major religious/apocalyptic reckoning is imminent."
+      },
+      "learn_chance": {
+        "balanced": 7,
+        "logical": 3,
+        "self_aware": 6
+      },
+      "trait_modifiers": [
+        {
+          "trait": "judgmental",
+          "modifier": 10
+        },
+        {
+          "trait": "open_minded",
+          "modifier": -15
         }
       ],
       "conditions": []

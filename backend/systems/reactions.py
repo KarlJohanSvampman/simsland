@@ -92,6 +92,9 @@ REACTION_ANIMATIONS = {
 
     # ── Sneaking (systems/stealth.py) ──
     "sneak_noise":     ["react_startled"],
+
+    # ── Psychosis / hallucination (systems/psychosis.py) ──
+    "hallucinating":   ["react_shocked", "react_fear", "react_look_around"],
 }
 
 
@@ -164,6 +167,8 @@ REACTION_PRIORITIES = {
     "disapproving":    1,
 
     "sneak_noise":     2,
+
+    "hallucinating":   3,
 }
 
 
@@ -213,6 +218,8 @@ REACTION_MOOD_EFFECTS = {
     # win/loss-specific reaction type.
     "impressed":      {"stress": -3},
     "disapproving":   {"stress": 3},
+
+    "hallucinating":  {"stress": 8},
 }
 
 

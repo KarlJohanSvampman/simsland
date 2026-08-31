@@ -1,13 +1,24 @@
 """
 systems/sociopathy.py
 
-Sociopathy behavioral modeling -- see mental_health_templates["sociopath"]
-(definitions.json). Diagnosis auto-grants domestic_abuser, so the
-already-complete abuse-tactics engine (domestic_control.py's negging/
-shame-threat/isolation-pressure tick) just starts running for these
-characters with no logic changes there. Pathological lying is wired
-directly into excuses.py's generate_excuse(); this module owns the
-genuinely new pieces: diagnosis, multiple concurrent personas
+Sociopathy behavioral modeling -- see mental_health_templates
+["antisocial_personality"] (definitions.json). A separate "sociopath"
+entry existed briefly in an earlier round before this one -- antisocial
+personality disorder IS the clinical name for what's colloquially
+called sociopathy, so that was a real duplicate; removed in favor of
+this pre-existing, richer-authored entry (real common_sex/
+common_age_range fields already matching this module's own historical
+2%-ish/male-skewed assumptions).
+
+Diagnosis itself is now owned by systems/mental_health_gen.py's real
+weighted-by-prevalence assignment engine, not this module -- this file
+just applies the BEHAVIORAL side effect (auto-granting domestic_abuser
+so the already-complete abuse-tactics engine, domestic_control.py's
+negging/shame-threat/isolation-pressure tick, just starts running for
+these characters with no logic changes there) via sync_antisocial_
+trait(), called right after that assignment. Pathological lying is
+wired directly into excuses.py's generate_excuse(); this module owns
+the genuinely new pieces: the trait sync, multiple concurrent personas
 (persona_bank + per-relationship known_as), the honesty-exception
 lookup, and drama-planting.
 """
@@ -15,25 +26,18 @@ lookup, and drama-planting.
 import random
 import uuid
 
-SOCIOPATH_DIAGNOSIS_CHANCE = 0.02  # adults+ at generation -- real-world ASPD prevalence ~1-4%
 PLANT_DRAMA_CHANCE = 0.02          # per real conversation exchange
 PERSONA_INTRO_CHANCE = 0.15        # per new (low-familiarity) contact encountered
 DISCOVERY_CHANCE = 0.01            # per pair of contacts who know the sociopath under different names, per daily tick
 
 
-def maybe_diagnose_sociopath(c):
-    """Called at generation for adults+ (see character_gen.py's post-
-    build hook block). Auto-grants domestic_abuser (Confirmed Decision
-    #12) so domestic_control.py's existing engine just starts running,
-    no logic changes there."""
-    if c.get("age_group") not in ("adult", "elderly"):
+def sync_antisocial_trait(c):
+    """Idempotent -- called after mental_health_gen.py's assignment
+    engine decides who has antisocial_personality (real weighted
+    prevalence, not a bespoke roll here). Auto-grants domestic_abuser so
+    domestic_control.py's existing engine just starts running."""
+    if not is_sociopath(c):
         return False
-    if random.random() > SOCIOPATH_DIAGNOSIS_CHANCE:
-        return False
-
-    c.setdefault("mental_health", [])
-    if "sociopath" not in c["mental_health"]:
-        c["mental_health"].append("sociopath")
     traits = c.setdefault("traits", [])
     if "domestic_abuser" not in traits:
         traits.append("domestic_abuser")
@@ -41,7 +45,7 @@ def maybe_diagnose_sociopath(c):
 
 
 def is_sociopath(c):
-    return "sociopath" in c.get("mental_health", [])
+    return "antisocial_personality" in c.get("mental_health", [])
 
 
 def controlled_partner_id(c, world):

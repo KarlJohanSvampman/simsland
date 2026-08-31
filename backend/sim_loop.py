@@ -108,6 +108,7 @@ from systems.crime import (
     tick_pi_assignments, maybe_offer_corruption, tick_corruption_risk,
 )
 from systems.darknet import generate_darknet_listings
+from systems.psychosis import tick_psychosis
 from systems.sociopathy import (
     is_sociopath, maybe_introduce_false_identity,
     maybe_discover_persona_mismatch, maybe_plant_drama,
@@ -439,6 +440,14 @@ def tick(world):
     if every(world, CADENCE["reading"], offset=9):
         for c in characters:
             update_reading_process(c, world)
+
+    # Psychosis (see systems/psychosis.py) -- a temporary state any
+    # character can enter from stress/sleep-deprivation/intoxication;
+    # schizophrenia raises the baseline rate rather than getting a
+    # separate mechanic.
+    if every(world, CADENCE["health"], offset=19):
+        for c in characters:
+            tick_psychosis(c, world)
 
     # Sports: move attendees into their game-day mode once kickoff arrives,
     # and narrate periodic score updates for anyone currently watching

@@ -618,9 +618,20 @@ def generate_character(defs, overrides=None, world=None):
         except Exception:
             pass
 
+    # Weighted-by-prevalence mental/physical health condition assignment
+    # -- both registries already had real content, nothing ever assigned
+    # it (see systems/mental_health_gen.py). Runs before the antisocial-
+    # personality trait sync below since that sync just reacts to
+    # whatever this rolled.
     try:
-        from systems.sociopathy import maybe_diagnose_sociopath
-        maybe_diagnose_sociopath(character)
+        from systems.mental_health_gen import assign_all_conditions
+        assign_all_conditions(character, defs)
+    except Exception:
+        pass
+
+    try:
+        from systems.sociopathy import sync_antisocial_trait
+        sync_antisocial_trait(character)
     except Exception:
         pass
 

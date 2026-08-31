@@ -16,6 +16,7 @@ INCIDENT_CALL_TYPE = {
     "domestic_disturbance": ("police",  "There is a serious disturbance.",       .2),
     "assault":              ("police",  "Someone was just physically attacked.", .35),
     "property_damage":      ("police",  "Someone is destroying property.",       .15),
+    "burglary":             ("police",  "Someone just broke into my house!",     .3),
     "medical_emergency":    ("medical", "Someone needs urgent medical help.",    .6),
     "fire":                 ("fire",    "There's a fire!",                       .6),
 }

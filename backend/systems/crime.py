@@ -500,6 +500,82 @@ CRIME_PROFILES = {
 }
 
 
+REAL_TARGET_BURGLARY_CHANCE = 0.15
+
+
+def _pick_real_target_household(world, c):
+    if random.random() > REAL_TARGET_BURGLARY_CHANCE:
+        return None
+    households = world.get("households", {})
+    candidates = [h for hid, h in households.items()
+                  if hid != c.get("household_id") and h.get("members")]
+    return random.choice(candidates) if candidates else None
+
+
+def _resolve_real_target_burglary(c, world, target_hh, profile):
+    """A stranger lets themselves into a real house -- if a household
+    member is actually home, they get a real fear reaction and a real,
+    location-carrying incident they can call 911 about
+    (action_router.py::_route_call_911's existing awareness gate reads
+    incident["location"] + participants, both set here)."""
+    from systems.stealth import attempt_sneak_entry
+    entry = attempt_sneak_entry(c, world)
+
+    characters = world.get("characters", {})
+    home_building = target_hh.get("home_id")
+    present_members = [
+        characters[mid] for mid in target_hh.get("members", [])
+        if mid in characters and not characters[mid].get("off_grid")
+        and characters[mid].get("building_id") == home_building
+    ]
+
+    location = {"x": 0, "y": 0}
+    building = next((b for b in world.get("buildings", []) if b.get("id") == home_building), None)
+    if building:
+        location = {"x": building.get("x", 0), "y": building.get("y", 0)}
+
+    tick = world.get("tick", 0)
+    world.setdefault("incidents", []).append({
+        "id":             f"inc_{uuid.uuid4().hex[:8]}",
+        "type":           "burglary",
+        "tick":           tick,
+        "participants":   [c["id"]] + [m["id"] for m in present_members],
+        "location":       location,
+        "arrest_checked": False,
+    })
+
+    for member in present_members:
+        try:
+            from systems.reactions import trigger_reaction
+            trigger_reaction(member, world, "fear")
+        except Exception:
+            pass
+        try:
+            from brain.memory import store_memory
+            store_memory(member, "A stranger just broke into the house!", 0.95,
+                         ["crime", "burglary", "intrusion"], "crime", tick)
+        except Exception:
+            pass
+
+    if not entry["entered"]:
+        if present_members:
+            return " Someone was home -- had to bail before getting in."
+        return " Couldn't get into a real house -- had to bail."
+
+    lo, hi = profile.get("cash_range", (0, 0))
+    cash = random.uniform(lo, hi) if hi > 0 else 0.0
+    if cash:
+        household = world.get("households", {}).get(c.get("household_id"))
+        if household:
+            household["wealth"] = household.get("wealth", 0) + cash
+    c["criminal_standing"] = c.get("criminal_standing", 0.0) + profile.get("standing_gain", 0.0)
+
+    note = f" Broke into a house and made ${cash:.0f}."
+    if present_members:
+        note += " Someone was home -- they saw something."
+    return note
+
+
 def resolve_criminal_shift(c, world):
     """Called from offgrid.py's reason=="work" handling. Returns a short
     summary suffix, or None if this shift didn't produce anything
@@ -512,6 +588,16 @@ def resolve_criminal_shift(c, world):
         return None
 
     if job_tid == "burglar":
+        # A minority of shifts target a REAL household with real,
+        # present members who can actually notice and react -- "a
+        # stranger lets themselves in" becoming reactable, not just an
+        # abstract off-screen incident (Confirmed Decision #6 of the
+        # mental/physical health plan). Most stay the existing abstract
+        # flavor below.
+        target_hh = _pick_real_target_household(world, c)
+        if target_hh:
+            return _resolve_real_target_burglary(c, world, target_hh, profile)
+
         # A real sneak-entry roll (systems/stealth.py) instead of an
         # abstract chance -- shared with Private Investigator
         # infiltration (tick_pi_assignments below).
