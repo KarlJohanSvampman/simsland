@@ -83,8 +83,8 @@ REP_DAMAGE_BY_ACT = {
 
 # ── intoxication posture/effects (decision #12) ─────────────────────────────
 # intoxication_pct = min(1.0, alcohol_level + drug_level). Same priority-
-# ladder shape as health.py's PAIN_CRAWL_THRESHOLD/PAIN_INCAPACITATED_
-# THRESHOLD -- never overrides a real injury posture (checked below via
+# ladder shape as health.py's severity-driven posture thresholds -- never
+# overrides a real injury posture (checked below via
 # apply_severity_consequences' own signals).
 INTOX_POSTURE_THRESHOLD       = 0.25   # -> "intoxicated" stance
 INTOX_CRAWL_THRESHOLD         = 0.85   # -> "crawling" (80-90% band midpoint)
@@ -284,11 +284,11 @@ def _recompute_libido_boost(c):
 def _apply_intoxication_posture(c, world):
     """Posture/effects ladder driven by intoxication_pct (decision #12).
     Mirrors health.py::apply_severity_consequences' priority-ladder shape,
-    but for intoxication instead of pain/severity -- and, like that
-    function, never overrides a real injury/emergency posture (checked via
-    the same active_emergencies/pain signals apply_severity_consequences
-    itself reads, so a badly hurt-AND-drunk character stays on the more
-    urgent injury posture)."""
+    but for intoxication instead of severity -- and, like that function,
+    never overrides a real injury/emergency posture (checked via the
+    same active_emergencies signal apply_severity_consequences itself
+    reads, so a badly hurt-AND-drunk character stays on the more urgent
+    injury posture)."""
     from systems.posture import set_posture
 
     if not c.get("alive", True):
@@ -315,12 +315,11 @@ def _apply_intoxication_posture(c, world):
             set_posture(c, world, "standing")
         return
 
-    # Never override a real injury/emergency posture -- pain/severity takes
+    # Never override a real injury/emergency posture -- severity takes
     # priority (apply_severity_consequences runs its own tick and will keep
-    # re-asserting crawling/incapacitated_pain/incapacitated as needed).
-    pain = c.get("health_state", {}).get("pain", 0.0)
+    # re-asserting crawling/incapacitated as needed).
     em = c.get("health_state", {}).get("active_emergencies", {})
-    if em or pain >= 60 or c.get("posture") in ("crawling", "incapacitated_pain", "incapacitated"):
+    if em or c.get("posture") in ("crawling", "incapacitated"):
         return
 
     if intox >= INTOX_INCAPACITATED_THRESHOLD:
@@ -337,9 +336,7 @@ def _apply_intoxication_posture(c, world):
 
     band_frac = (intox - INTOX_POSTURE_THRESHOLD) / (INTOX_CRAWL_THRESHOLD - INTOX_POSTURE_THRESHOLD)
     if random.random() < _INTOX_FALL_CHANCE_PER_TICK * (1 + band_frac):
-        from systems.health import add_pain
         from systems.reactions import push_reaction
-        add_pain(c, 3)
         push_reaction(c, "wince", world.get("tick", 0))
     if random.random() < _INTOX_VOMIT_CHANCE_PER_TICK * (1 + band_frac):
         from systems.reactions import push_reaction

@@ -65,7 +65,7 @@ _CHAR_SKELETON: Dict[str, Any] = {
     "body": {"hunger": 20, "hydration": 80, "bladder": 10, "bowels": 5,
              "fatigue": 20, "sleep_debt": 0, "hygiene": 85, "odor": 5,
              "mouth_hygiene": 90, "recent_intake": 30,
-             "stomach_discomfort": 0, "pain": 0, "sickness": 0},
+             "stomach_discomfort": 0, "sickness": 0},
     "lt_needs": {},
     "relationships": {},
     "beliefs": {},

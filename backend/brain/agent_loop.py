@@ -212,12 +212,6 @@ def update_internal_state(
     from systems.waiting import tick_waiting
     tick_waiting(c, world)
 
-    from systems.pain_fatigue import tick_pain_fatigue
-    tick_pain_fatigue(c, world)
-
-    from systems.pain_complaints import tick_pain_complaints
-    tick_pain_complaints(c, world)
-
     from systems.curiosity import tick_curiosity
     tick_curiosity(c, world)
 
@@ -716,6 +710,18 @@ def update_agent(
     # =====================================
 
     if c.get("activity"):
+
+        # An activity's own "walking" phase (activities.py::execute_activity)
+        # only ever checks is_moving to decide whether the character has
+        # arrived -- it never itself advances position. update_character_
+        # movement() is what flips is_moving to False on arrival, but it's
+        # normally only reached below, past the `return` a couple of lines
+        # down -- unreachable the entire time an activity is active. Without
+        # this, any activity with a walking phase (eat/drink/sleep/shower/
+        # use_toilet/...) would queue a real route and then never move
+        # along it, leaving the character stuck mid-walk indefinitely.
+        if c.get("is_moving"):
+            update_character_movement(c, world)
 
         # Check whether an urgent body need should interrupt a queued hobby.
         # Only activities in queues flagged "interruptible" can be suspended;

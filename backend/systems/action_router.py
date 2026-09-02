@@ -368,7 +368,7 @@ def _movement_blocked(c):
     """
     if c.get("alive") is False:
         return True
-    if c.get("posture") in ("incapacitated", "incapacitated_pain"):
+    if c.get("posture") == "incapacitated":
         return True
     if c.get("grappled_by") or c.get("grappling"):
         return True
@@ -1319,8 +1319,6 @@ def route_action(c, world, action, speech, definitions=None, available_actions=N
         _route_call_parent(c, world, action)
     elif action_type == "administer_first_aid":
         _route_administer_first_aid(c, world, action)
-    elif action_type == "take_painkiller":
-        _route_take_painkiller(c, world, action)
     elif action_type == "plant_seed":
         _route_plant_seed(c, world, action)
     elif action_type == "water":
@@ -1778,10 +1776,10 @@ def _route_call_parent(c, world, action):
 
 
 # =========================================================
-# FIRST AID / PAINKILLER — see systems/health.py's per-bodypart damage
-# rework (treat_body_part/apply_painkiller, Round 2). Same "immediate,
-# no _scaffold activity" shape as confront/call_911/call_parent above --
-# these resolve in a single tick rather than spawning an ongoing activity.
+# FIRST AID — see systems/health.py's per-bodypart damage rework
+# (treat_body_part, Round 2). Same "immediate, no _scaffold activity"
+# shape as confront/call_911/call_parent above -- resolves in a single
+# tick rather than spawning an ongoing activity.
 # =========================================================
 
 _FIRST_AID_ITEM_TEMPLATES = ("first_aid_kit", "bandages")
@@ -1859,33 +1857,6 @@ def _route_administer_first_aid(c, world, action):
             )
         except Exception:
             pass
-
-
-def _route_take_painkiller(c, world, action):
-    """
-    Character takes pain medication -- global, non-bodypart pain relief
-    that decays over time (health.py::apply_painkiller/
-    _decay_painkiller_relief). Requires pain_medication with uses > 0.
-    action: {"type": "take_painkiller"}
-    """
-    from systems.personal_items import get_item_by_template, remove_item
-    from systems.health import apply_painkiller
-
-    item = get_item_by_template(c, "pain_medication")
-    if not item or item.get("uses", 0) <= 0:
-        return
-
-    item["uses"] = item.get("uses", 1) - 1
-    if item["uses"] <= 0:
-        remove_item(c, item["id"])
-
-    apply_painkiller(c, 30.0)
-
-    try:
-        from brain.memory import store_memory
-        store_memory(c, "Took pain medication.", 0.5, ["health", "painkiller"], "health", world.get("tick", 0))
-    except Exception:
-        pass
 
 
 # =========================================================

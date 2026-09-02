@@ -21,21 +21,33 @@ router = APIRouter()
 
 
 # =========================================================
-# GET DEFAULT FLOORPLAN
+# RESOLVE TARGET BUILDING
 # =========================================================
 
 
-def get_default_floorplan(definitions):
-
-    floorplans = definitions.get(
-        "floorplan_templates",
-        {}
-    )
-
-    if not floorplans:
+def _resolve_building(world, payload):
+    """Picks the real world["buildings"] entry this prop belongs to --
+    on_prop_created()/assign_prop_room() need the actual building
+    instance (id/x/y placement), not a floorplan_templates entry (which
+    has no world placement of its own). Prefers an explicit
+    payload["building_id"]; falls back to the first building whose
+    footprint contains (x, y) so a caller that only knows the tile
+    position still resolves correctly."""
+    buildings = world.get("buildings", [])
+    building_id = payload.get("building_id")
+    if building_id:
+        for b in buildings:
+            if b.get("id") == building_id:
+                return b
         return None
 
-    return next(iter(floorplans.values()))
+    x, y = payload.get("x"), payload.get("y")
+    for b in buildings:
+        bx, by = b.get("x", 0), b.get("y", 0)
+        w, h = b.get("width"), b.get("height")
+        if w and h and bx <= x < bx + w and by <= y < by + h:
+            return b
+    return buildings[0] if buildings else None
 
 
 # =========================================================
@@ -49,10 +61,6 @@ def create_prop(
 ):
 
     definitions = load_definitions(sim_id)
-
-    floorplan = get_default_floorplan(
-        definitions
-    )
 
     # anchors/storage/footprint/category were never actually copied from
     # the template here -- every prop created through this endpoint ended
@@ -82,6 +90,8 @@ def create_prop(
             0
         ),
 
+        "household_id": payload.get("household_id"),
+
         "anchors":   copy.deepcopy(template.get("anchors", [])),
         "footprint": template.get("footprint"),
         "category":  template.get("category"),
@@ -101,13 +111,15 @@ def create_prop(
         # SEMANTIC EVENT
         # =====================================
 
-        if floorplan:
+        building = _resolve_building(world, payload)
+
+        if building:
 
             on_prop_created(
 
                 sim_id,
 
-                floorplan,
+                building,
 
                 definitions,
 
@@ -134,14 +146,12 @@ def move_prop(
 
     definitions = load_definitions(sim_id)
 
-    floorplan = get_default_floorplan(
-        definitions
-    )
-
     prop_id = payload["id"]
 
     with world_lock():
         world = load_world(sim_id)
+
+        building = _resolve_building(world, payload)
 
         for prop in world.get(
             "props",
@@ -164,13 +174,13 @@ def move_prop(
             # SEMANTIC EVENT
             # =====================================
 
-            if floorplan:
+            if building:
 
                 on_prop_moved(
 
                     sim_id,
 
-                    floorplan,
+                    building,
 
                     definitions,
 

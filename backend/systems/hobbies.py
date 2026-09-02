@@ -338,7 +338,7 @@ def spawn_hobby_guests(world, evt):
                 "hunger": 30, "hydration": 75, "bladder": 10, "bowels": 5,
                 "fatigue": 15, "sleep_debt": 0, "hygiene": 90, "odor": 0,
                 "mouth_hygiene": 90, "recent_intake": 20,
-                "stomach_discomfort": 0, "pain": 0, "sickness": 0,
+                "stomach_discomfort": 0, "sickness": 0,
             },
             "hobbies":           [hobby_id] if hobby_id else [],
             "traits":            ["friendly"],

@@ -46,7 +46,7 @@ REACTION_ANIMATIONS = {
     "dizzy":        ["react_dizzy", "react_stumble"],
     "vomit":        ["react_vomit"],
 
-    # ── Pain (systems/pain_complaints.py) ──
+    # ── Pain/discomfort reactions ──
     "wince":        ["react_wince"],
     "cry_out":      ["react_cry_out", "react_wince"],
 

@@ -39,6 +39,14 @@ def _format_event(world, event):
         base["summary"] = story.get("summary", "")
         return base
 
+    if etype == "choice_made":
+        name = _character_name(world, event.get("character_id"))
+        choice_type = (event.get("choice_type") or "choice").replace("_", " ")
+        chosen = event.get("chosen_label") or "something"
+        base["title"] = f"{name} — {choice_type}"
+        base["summary"] = f"{name} picked {chosen} for {choice_type}."
+        return base
+
     # The 4 shared_event subtypes (store_encounter/cafe_meet/
     # street_argument/gym_incident) -- systems/events.py never generates a
     # summary sentence, only participants/location_id/outcome, so build a

@@ -35,15 +35,6 @@ EMOTION_TEMP = {
     "agony":      92,
 }
 
-# Pain (health_state["pain"], 0-100) at/above which update_emotion() forces
-# the emotion label away from anything that would read as calm/content --
-# see the module-level note in update_emotion() below.
-PAIN_MOOD_OVERRIDE_THRESHOLD = 80
-
-# Labels already intense enough that forcing "agony" on top would be a
-# downgrade, not an upgrade -- left alone at severe pain.
-_ALREADY_INTENSE_LABELS = {"furious", "agony", "fearful"}
-
 # ── temperature → label map (sorted by threshold descending) ─────────────────
 _TEMP_TO_LABEL = [
     (90, "furious"),
@@ -105,12 +96,6 @@ def apply_emotion_inertia(c, llm_emotion=None):
     sleep_debt = c.get("body", {}).get("sleep_debt", 0)
     current += max(0, sleep_debt - 25) * 0.008
 
-    # Pain pushes temperature up the same way, starting at the same pain
-    # level pain_complaints.py's complaint threshold kicks in (10) --
-    # health_state["pain"], see systems/health.py.
-    pain = c.get("health_state", {}).get("pain", 0)
-    current += max(0, pain - 10) * 0.01
-
     # Active mood can pin a floor
     mood = c.get("mood")
     if mood:
@@ -127,13 +112,6 @@ def update_emotion(c, world=None):
     temp        = float(c.get("emotional_temperature", 20))
     active_mood = c.get("mood")
     c["emotion"] = _temp_to_emotion(temp, active_mood)
-
-    # Severe pain guarantees a non-calm reading regardless of how
-    # temperature/mood-flags resolved above -- health_state["pain"], see
-    # systems/health.py's PAIN_INCAPACITATED_THRESHOLD (same cutoff).
-    pain = c.get("health_state", {}).get("pain", 0.0)
-    if pain >= PAIN_MOOD_OVERRIDE_THRESHOLD and c["emotion"] not in _ALREADY_INTENSE_LABELS:
-        c["emotion"] = "agony"
 
     # Tick down mood duration
     if active_mood:

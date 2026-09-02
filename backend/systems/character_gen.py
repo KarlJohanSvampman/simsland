@@ -478,7 +478,6 @@ def generate_character(defs, overrides=None, world=None):
             "bladder":     0.0,
             "fatigue":     0.0,
             "sick":        False,
-            "pain":        0.0,
         },
         "immune_score":    immune_score,
         "problems":        problems,

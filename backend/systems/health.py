@@ -362,19 +362,13 @@ _SYMPTOM_REACTION_MAP = {
 
 def tick_symptom_reactions(char, world, defs, symptom_key, severity_index):
     """
-    One active symptom's contribution to the unified pain field (see
-    add_pain() above) and, for the symptoms with a clean visual cue, a
-    real observable reaction. Called from tick_physical_conditions()'s
-    existing per-condition loop -- same daily cadence, no new cadence
-    machinery. severity_index (0-1, already tracked per-condition) scales
-    the pain contribution: a mild new cold barely hurts, a progressed one
-    does.
+    For the symptoms with a clean visual cue, fires a real observable
+    reaction. Called from tick_physical_conditions()'s existing
+    per-condition loop -- same daily cadence, no new cadence machinery.
     """
     tmpl = defs.get("symptom_templates", {}).get(symptom_key)
     if not tmpl:
         return
-
-    add_pain(char, 2 + severity_index * 6)
 
     if not tmpl.get("visual"):
         return
@@ -388,26 +382,13 @@ def tick_symptom_reactions(char, world, defs, symptom_key, severity_index):
         pass
 
 
-def _reverse_symptom_pain(char, state):
-    """Undoes exactly the pain _tick_disease_symptom added for the
+def _clear_symptom_hazard(char, state):
+    """Tears down the mirrored hazard instance (decision #11) for the
     currently-selected symptom (onset), called when that symptom expires
-    or gets rerolled away -- pain is a one-shot event tied to the
-    symptom's own duration_ticks window, not reapplied every day-check
-    (unlike a health_hazard_template's own interval_ticks re-tick, which
-    is for hazards that persist until treated -- a disease symptom
-    self-clears on a timer instead). Also tears down the mirrored hazard
-    instance (decision #11) and resets stage tracking (decision #12) --
+    or gets rerolled away, and resets stage tracking (decision #12) --
     called BEFORE state["current_symptom"] is overwritten at every call
     site, so hazard_key below is still the outgoing hazard."""
-    amount = state.get("symptom_pain_amount", 0)
     locality = state.get("symptom_pain_locality", "systemic")
-    if amount:
-        if locality in BODY_PARTS:
-            add_bodypart_pain(char, locality, -amount)
-        else:
-            add_pain(char, -amount)
-        state["symptom_pain_amount"] = 0
-
     hazard_key = state.get("current_symptom")
     if hazard_key:
         hs = char.get("health_state", {})
@@ -524,11 +505,11 @@ def _advance_hazard_stage(char, hazard_tmpl, state, tick):
 
 def _apply_manifestation(char, world, cond_key, m, tick):
     """Applies one rolled manifestation (decision #8) -- gesture reaction,
-    contagion burst, pain, and incapacitation/locomotion/blocks_movement,
-    all routed through existing primitives rather than a new posture-
-    setting path (apply_severity_consequences stays the sole set_posture
-    authority, reconciling posture from the pain/functional_status this
-    writes on its own very next call)."""
+    contagion burst, and locomotion restriction, routed through existing
+    primitives rather than a new posture-setting path
+    (apply_severity_consequences stays the sole set_posture authority,
+    reconciling posture from functional_status this writes on its own
+    very next call)."""
     gesture = m.get("gesture")
     if gesture:
         try:
@@ -537,39 +518,12 @@ def _apply_manifestation(char, world, cond_key, m, tick):
         except Exception:
             pass
 
-    # Explicit, repeated user direction: hunger must never cause pain.
-    # Malnutrition is hunger's own downstream disease -- exempted from
-    # every pain-adding branch below, not just the symptom-selection one
-    # in _tick_disease_symptom (see _NO_PAIN_CONDITIONS).
-    no_pain = cond_key in _NO_PAIN_CONDITIONS
-
-    pain_mod = 0 if no_pain else m.get("pain_mod", 0)
-    target = m.get("pain_target", "all")
-    if pain_mod:
-        if target in BODY_PARTS:
-            add_bodypart_pain(char, target, pain_mod)
-        else:
-            add_pain(char, pain_mod)
-
     restrict = m.get("locomotion_restricted_to")
     if restrict == "crawl":
         hs = char.setdefault("health_state", {})
         for leg in ("left_leg", "right_leg"):
             bp = hs.setdefault("body_parts", {}).setdefault(leg, _blank_body_part())
             bp["functional_status"] = "unusable"
-    elif restrict == "limp" and not pain_mod and not no_pain:
-        # Piggybacks on the existing pain-fatigue speed curve -- no new
-        # movement code, just make sure there IS pain to drive it.
-        add_pain(char, 3)
-
-    if m.get("blocks_movement") and not no_pain:
-        hs = char.setdefault("health_state", {})
-        current_pain = hs.get("pain", 0.0)
-        if current_pain < PAIN_INCAPACITATED_THRESHOLD:
-            add_pain(char, PAIN_INCAPACITATED_THRESHOLD - current_pain + 1)
-
-    if not no_pain and random.random() < m.get("incapacitation_probability", 0):
-        add_pain(char, 20)
 
     if m.get("spreads_contagion"):
         try:
@@ -594,11 +548,11 @@ def _apply_passive_traits(char, hazard_tmpl, tick):
     """Decision #7: type=='passive' hazards don't roll manifestations --
     they continuously nudge a real character field instead. tired/
     low_energy -> body.fatigue, low_stamina -> stamina, moody/short_temper
-    -> emotional_temperature (the same incremental way stress/sleep_debt/
-    pain already are), dizzy -> the one genuinely new piece of state,
+    -> emotional_temperature (the same incremental way stress/sleep_debt
+    already are), dizzy -> the one genuinely new piece of state,
     health_state.temporary_traits, self-renewed each visit and read by
-    movement.py's fatigue-curve multiplier (the same one pain already
-    drives) rather than duplicating that curve."""
+    movement.py's intoxication fatigue-curve multiplier rather than
+    duplicating that curve."""
     traits = hazard_tmpl.get("passive_traits")
     if not traits:
         return
@@ -679,10 +633,10 @@ def tick_hazard_manifestations(char, world):
 
 
 def _hazard_locality(hazard_tmpl):
-    """Picks a representative body locality for a hazard's onset pain
-    (pain_flat, applied once at selection) -- derived from its dominant
-    (highest-probability) manifestation's pain_target where the hazard has
-    manifestations (type=='active'), else systemic. This is a coarse
+    """Picks a representative body locality for a hazard instance --
+    derived from its dominant (highest-probability) manifestation's
+    pain_target where the hazard has manifestations (type=='active'),
+    else systemic. This is a coarse
     per-day-check signal distinct from the finer per-manifestation pain_mod
     rolls the manifestation cadence itself applies (Round 4)."""
     manifestations = hazard_tmpl.get("manifestations")
@@ -694,9 +648,6 @@ def _hazard_locality(hazard_tmpl):
     return "systemic"
 
 
-_NO_PAIN_CONDITIONS = {"malnutrition"}
-
-
 def _tick_disease_symptom(char, world, defs, tmpl, state, tick, cond_key=None):
     """Disease-side driver of the shared symptom/hazard machinery: on
     symptom_refresh_interval cadence, rolls symptoms[] (weighted_pick --
@@ -705,14 +656,11 @@ def _tick_disease_symptom(char, world, defs, tmpl, state, tick, cond_key=None):
     to decide which health_hazard_templates entry (if any) is currently
     felt -- the 2-level chain collapse: symptoms[] references
     health_hazard_templates DIRECTLY, no more symptom_templates middle
-    layer for diseases migrated onto this shape. The selected hazard's
-    pain_flat is applied once at onset and reversed once it expires
-    (duration_hours) or gets rerolled away, landing on a body part via
-    _hazard_locality() or on systemic_pain otherwise -- the same
-    add_bodypart_pain/add_pain plumbing injuries use. need_penalties keep
-    applying every day-check while a hazard stays selected, same
-    granularity the old always-on active_symptoms loop had. Gesture/
-    contagion-burst/incapacitation manifestation behavior is wired
+    layer for diseases migrated onto this shape. The selected hazard
+    lands on a body part via _hazard_locality() or systemic otherwise.
+    need_penalties keep applying every day-check while a hazard stays
+    selected, same granularity the old always-on active_symptoms loop
+    had. Gesture/contagion-burst manifestation behavior is wired
     separately on its own interval_minutes cadence (Round 4)."""
     interval = tmpl.get("symptom_refresh_interval", 240)
     hazard_registry = defs.get("health_hazard_templates", {})
@@ -727,7 +675,7 @@ def _tick_disease_symptom(char, world, defs, tmpl, state, tick, cond_key=None):
         duration = 0 if hazard_tmpl.get("indefinite") else hazard_tmpl.get("duration_hours", 0) * TICKS_PER_HOUR
         started = state.get("symptom_started_tick", tick)
         if duration and tick - started >= duration:
-            _reverse_symptom_pain(char, state)
+            _clear_symptom_hazard(char, state)
             current = None
             state["current_symptom"] = None
 
@@ -735,29 +683,17 @@ def _tick_disease_symptom(char, world, defs, tmpl, state, tick, cond_key=None):
     if tick - last_check >= interval:
         state["last_symptom_check_tick"] = tick
         if current:
-            _reverse_symptom_pain(char, state)
+            _clear_symptom_hazard(char, state)
         pick = weighted_pick(tmpl.get("symptoms", []))
         current = pick.get("hazard_template") if pick else None
         state["current_symptom"] = current
         if current:
             state["symptom_started_tick"] = tick
             hazard_tmpl = hazard_registry.get(current, {})
-            # Explicit, repeated user direction: hunger must never cause
-            # pain. Malnutrition is hunger's own downstream disease, so its
-            # symptom rolls are exempted here rather than zeroing pain_flat
-            # on the shared hazard_templates (tiredness/dehydration/etc.
-            # are also used by unrelated diseases that should keep hurting).
-            amount = 0 if cond_key in _NO_PAIN_CONDITIONS else hazard_tmpl.get("pain_flat", 0)
             locality = _hazard_locality(hazard_tmpl)
-            state["symptom_pain_amount"] = amount
             state["symptom_pain_locality"] = locality
             state["stage_index"] = -1
             state["stage_recovery_progress_tick"] = None
-            if amount:
-                if locality in BODY_PARTS:
-                    add_bodypart_pain(char, locality, amount)
-                else:
-                    add_pain(char, amount)
 
             # Mirror a lightweight hazard-instance entry (decision #11) --
             # reuses the exact shape apply_injury's body_parts[*].hazards
@@ -896,17 +832,23 @@ def _roll_medication_side_effects(char, world, med_key, tick):
     defs = world.get("definitions", {})
     item_tmpl = defs.get("item_templates", {}).get(med_key, {})
     hazard_registry = defs.get("health_hazard_templates", {})
+    hs = char.setdefault("health_state", {})
     for hazard_key, prob in item_tmpl.get("side_effects", {}).items():
         if hazard_key not in hazard_registry or random.random() >= prob:
             continue
-        hazard_tmpl = hazard_registry[hazard_key]
-        locality = _hazard_locality(hazard_tmpl)
-        amount = hazard_tmpl.get("pain_flat", 0)
-        if amount:
-            if locality in BODY_PARTS:
-                add_bodypart_pain(char, locality, amount)
-            else:
-                add_pain(char, amount)
+        locality = _hazard_locality(hazard_registry[hazard_key])
+        instance = {
+            "tick_applied": tick, "last_ticked": tick, "treated": False,
+            "hazard_template": hazard_key, "expires_tick": None, "current_stage": None,
+        }
+        if locality in BODY_PARTS:
+            bp = hs.setdefault("body_parts", {}).setdefault(locality, _blank_body_part())
+            bp["hazards"][hazard_key] = instance
+            if not bp.get("severity_level"):
+                bp["severity_level"] = "low"
+            bp["functional_status"] = _functional_status_for(bp["severity_level"], bp["hazards"])
+        else:
+            hs.setdefault("systemic_hazards", {})[hazard_key] = instance
 
 
 def _drive_treatment_step(char, world, cond_key, step, tp, tick):
@@ -1181,7 +1123,6 @@ def _blank_body_part():
         "hazards": {},
         "damage_type": None,
         "severity_level": None,
-        "pain_contribution": 0.0,
         "functional_status": "normal",
         "injury_template": None,
         "cause": None,
@@ -1205,36 +1146,10 @@ def weighted_pick(options):
     return None
 
 
-def add_bodypart_pain(char, body_part, amount):
-    """Adds pain to a specific body part's contribution (used by
-    apply_injury and, from Round 5, disease symptoms with a body-part
-    locality) and recomputes the aggregate hs["pain"].
-
-    Capped at 100 -- same reasoning as add_pain()'s cap: pain_contribution
-    doesn't decay on its own (only treat_body_part reduces it), and
-    tick_hazard_manifestations() can call this repeatedly on its own
-    interval_minutes cadence with no cap of its own, so an untreated
-    condition left running would otherwise accumulate a body part's
-    contribution into the thousands -- 100x more than the aggregate scale
-    hs["pain"] actually reads on, and 100x longer to work back off with
-    first aid/treatment once it finally is treated."""
-    hs = char.setdefault("health_state", {})
-    bp = hs.setdefault("body_parts", {}).setdefault(body_part, _blank_body_part())
-    bp["pain_contribution"] = max(0.0, min(100.0, bp.get("pain_contribution", 0.0) + amount))
-    _recompute_pain(char)
-
-
-def _recompute_pain(char):
-    hs = char.setdefault("health_state", {})
-    body_total = sum(bp.get("pain_contribution", 0.0) for bp in hs.get("body_parts", {}).values())
-    total = body_total + hs.get("systemic_pain", 0.0) - hs.get("painkiller_relief", 0.0)
-    hs["pain"] = max(0.0, min(100.0, total))
-
-
 def _functional_status_for(severity_level, hazards):
     """severe + an untreated hazard renders the part unusable until
-    treated (the user's explicit spec); medium is usable but generates
-    extra pain while in use ("impaired"); low/no hazards is normal."""
+    treated (the user's explicit spec); medium is usable but impaired;
+    low/no hazards is normal."""
     if severity_level == "severe" and any(not h.get("treated") for h in hazards.values()):
         return "unusable"
     if severity_level == "medium":
@@ -1250,8 +1165,7 @@ def apply_injury(char, world, injury_template_key, cause, tick=None):
     part gets hit) and possible_hazards (independent per-hazard rolls --
     a severe injury can plausibly produce more than one hazard at once,
     e.g. a stab_wound rolling both bleeding_wound AND internal_bleeding),
-    writes the target body_parts[part] entry, and recomputes the
-    aggregate hs["pain"]. Returns a small result dict, or None if the
+    writes the target body_parts[part] entry. Returns a small result dict, or None if the
     template/body-part roll didn't resolve to anything.
     """
     if tick is None:
@@ -1310,14 +1224,6 @@ def apply_injury(char, world, injury_template_key, cause, tick=None):
                 "hard_to_close": hkey == "internal_bleeding",
             }
 
-    pain_flat = tmpl.get("health_state_impact", {}).get("pain", 0.0)
-    weight = 1.0 if body_part in _CORE_BODY_PARTS else 0.5
-    add_bodypart_pain(char, body_part, pain_flat * weight)
-    if "internal_bleeding" in bp["hazards"]:
-        # internal bleeding ignores the core/extremity weighting -- it's
-        # "more serious... regardless of bodypart" per the user's spec.
-        add_bodypart_pain(char, body_part, hazard_registry.get("internal_bleeding", {}).get("pain_flat", 15))
-
     bp["functional_status"] = _functional_status_for(severity_level, bp["hazards"])
 
     # Severe blunt trauma to the torso / a severe head hit keep the old
@@ -1327,13 +1233,12 @@ def apply_injury(char, world, injury_template_key, cause, tick=None):
     # stay small Python branches here rather than becoming registry
     # content.
     if severity_level == "severe" and body_part in ("chest", "abdomen"):
-        hs.setdefault("active_emergencies", {})["agonizing_pain"] = {
+        hs.setdefault("active_emergencies", {})["severe_trauma"] = {
             "severity": 8, "source": injury_template_key
         }
     if severity_level == "severe" and body_part == "head" and random.random() < 0.35:
         _apply_trauma_mental_trait(char, world, tick, "head_trauma")
 
-    _recompute_pain(char)
     _remember(char, f"Sustained a {tmpl.get('name', injury_template_key).lower()} to the {body_part.replace('_', ' ')}.",
               0.85, ["health", "injury", damage_type or "injury"], "health", tick)
     return {"body_part": body_part, "injury_template": injury_template_key, "severity_level": severity_level}
@@ -1342,10 +1247,9 @@ def apply_injury(char, world, injury_template_key, cause, tick=None):
 def treat_body_part(char, world, body_part, method="first_aid"):
     """Applies first aid (or any other treatable_by method) to every
     treatable, untreated hazard on one body part -- marks each treated
-    (halving its future re-tick pain/escalation, see tick_health_hazards)
-    and reduces that part's pain_contribution by ~30%, matching the
-    user's "slows down bleeding, doesn't remove it" spec rather than an
-    instant cure."""
+    (halving its future re-tick escalation, see tick_health_hazards),
+    matching the user's "slows down bleeding, doesn't remove it" spec
+    rather than an instant cure."""
     hs = char.get("health_state", {})
     bp = hs.get("body_parts", {}).get(body_part)
     if not bp:
@@ -1362,9 +1266,7 @@ def treat_body_part(char, world, body_part, method="first_aid"):
         hazard["treated"] = True
         treated_any = True
     if treated_any:
-        bp["pain_contribution"] = max(0.0, bp.get("pain_contribution", 0.0) * 0.7)
         bp["functional_status"] = _functional_status_for(bp.get("severity_level"), bp.get("hazards", {}))
-        _recompute_pain(char)
     return treated_any
 
 
@@ -1395,25 +1297,7 @@ def treat_all_by_method(char, world, method):
     return treated_any
 
 
-def apply_painkiller(char, amount, duration_ticks=0):
-    """Global, non-bodypart pain relief (pain_medication item, action_router.py
-    Round 4) -- adds to a decaying flat-reduction pool rather than directly
-    subtracting from hs["pain"], so it wears off over time instead of
-    permanently erasing whatever caused the pain."""
-    hs = char.setdefault("health_state", {})
-    hs["painkiller_relief"] = hs.get("painkiller_relief", 0.0) + amount
-    _recompute_pain(char)
-
-
-PAINKILLER_RELIEF_DECAY_PER_TICK = 0.3
-
-
-def _decay_painkiller_relief(char):
-    hs = char.get("health_state")
-    if not hs or not hs.get("painkiller_relief"):
-        return
-    hs["painkiller_relief"] = max(0.0, hs["painkiller_relief"] - PAINKILLER_RELIEF_DECAY_PER_TICK)
-    _recompute_pain(char)
+_SEVERITY_LEVEL_LADDER = ("low", "medium", "severe")
 
 
 def tick_health_hazards(char, world):
@@ -1421,18 +1305,18 @@ def tick_health_hazards(char, world):
     defined intervals... the more serious things should push the health
     state to the next level over time until eventually it reaches
     death"). Static hazards (interval_ticks==0) never re-tick and never
-    self-heal -- they just sit until treated. Ticking hazards
-    (interval_ticks>0) reapply pain each interval; superficial:false ones
-    additionally feed systemic_pain and, once the aggregate tier has
-    reached critical, roll the same class of death-risk check
-    heart_attack/coma already use (generalized, not duplicated)."""
+    self-heal -- they just sit until treated. Ticking, non-superficial
+    hazards step their body part's severity_level up a tier each time
+    escalation_per_tick accumulates past 100 (treated hazards escalate
+    slower, not not at all); once the aggregate tier reaches critical,
+    rolls the same class of death-risk check heart_attack/coma already
+    use (generalized, not duplicated)."""
     hs = char.get("health_state")
     if not hs or not hs.get("body_parts"):
         return
     defs = world.get("definitions", {})
     hazard_registry = defs.get("health_hazard_templates", {})
     tick = world.get("tick", 0)
-    changed = False
     for part, bp in hs.get("body_parts", {}).items():
         for hkey, hazard in list(bp.get("hazards", {}).items()):
             tmpl = hazard_registry.get(hkey)
@@ -1443,25 +1327,25 @@ def tick_health_hazards(char, world):
             if tick - last < interval:
                 continue
             hazard["last_ticked"] = tick
+            if tmpl.get("superficial", True):
+                continue
             relief_mult = 0.4 if hazard.get("treated") else 1.0
-            pain_add = tmpl.get("pain_per_tick", 0) * relief_mult
-            weight = 1.0 if part in _CORE_BODY_PARTS else 0.5
-            if pain_add:
-                add_bodypart_pain(char, part, pain_add * weight)
-                changed = True
-            if not tmpl.get("superficial", True):
-                escalation = tmpl.get("escalation_per_tick", 0) * relief_mult
-                if escalation:
-                    add_pain(char, escalation)
-                    changed = True
-                    _, tier = compute_severity(char)
-                    if tier == "critical":
-                        death_risk = min(0.02, escalation * 0.002)
-                        if random.random() < death_risk:
-                            _trigger_death(char, world, f"untreated_{hkey}")
-                            return
-    if changed:
-        _recompute_pain(char)
+            escalation = tmpl.get("escalation_per_tick", 0) * relief_mult
+            if not escalation:
+                continue
+            hazard["escalation_accum"] = hazard.get("escalation_accum", 0.0) + escalation
+            if hazard["escalation_accum"] >= 100.0:
+                hazard["escalation_accum"] = 0.0
+                current = bp.get("severity_level") or "low"
+                idx = _SEVERITY_LEVEL_LADDER.index(current) if current in _SEVERITY_LEVEL_LADDER else 0
+                bp["severity_level"] = _SEVERITY_LEVEL_LADDER[min(idx + 1, len(_SEVERITY_LEVEL_LADDER) - 1)]
+                bp["functional_status"] = _functional_status_for(bp["severity_level"], bp.get("hazards", {}))
+            _, tier = compute_severity(char)
+            if tier == "critical":
+                death_risk = min(0.02, escalation * 0.002)
+                if random.random() < death_risk:
+                    _trigger_death(char, world, f"untreated_{hkey}")
+                    return
 
 
 def tick_bleeding(char, world):
@@ -1487,55 +1371,6 @@ def treat_bleeding(char, world, success_rate=0.85):
                   ["health", "injury"], "health", world.get("tick", 0))
         return True
     return False
-
-
-# ---------------------------------------------------------------------------
-# Unified pain -- health_state["pain"], 0-100. Consolidates what were three
-# disconnected trackers (c["body"]["pain"], never written by anything;
-# c["health"]["pain"], written additively by domestic_control.py/
-# impulse.py/rival_cascade.py, never decayed, never read anywhere; nothing
-# in health_state at all). This is now the one real pain field -- fed by
-# violence (below), redirected domestic-abuse/rivalry pain (see those
-# files), and symptoms (tick_symptom_reactions below). Accidents are a
-# documented future fourth source -- no accident-injury mechanic exists
-# yet anywhere in this codebase; whatever adds one just calls add_pain()
-# the same way.
-# ---------------------------------------------------------------------------
-
-PAIN_DECAY_PER_TICK = 0.15
-
-
-def add_pain(char, amount):
-    """Violence/neglect/symptom pain that isn't tied to a specific body
-    part -- writes into systemic_pain (not hs["pain"] directly) and lets
-    _recompute_pain fold it into the aggregate the same way body-part
-    pain_contribution does. Writing hs["pain"] directly here would get
-    silently discarded the next time anything (apply_injury,
-    treat_body_part, tick_health_hazards, apply_painkiller, ...) calls
-    _recompute_pain, since that always rebuilds hs["pain"] from
-    body_parts + systemic_pain - painkiller_relief from scratch.
-
-    Capped at 100 (the same 0-100 scale hs["pain"] displays on) --
-    uncapped, a character left neglected for a while racks up systemic_pain
-    far past what's needed to read as "100% pain"/incapacitated, and then
-    needs proportionally longer under _decay_pain's fixed per-tick rate to
-    ever drop back below the incapacitation threshold once the underlying
-    neglect is fixed. Capping bounds recovery time to a sane worst case
-    instead of scaling with how long the neglect went unnoticed."""
-    hs = char.setdefault("health_state", {})
-    hs["systemic_pain"] = max(0.0, min(100.0, hs.get("systemic_pain", 0.0) + amount))
-    _recompute_pain(char)
-
-
-def _decay_pain(char):
-    """Decays systemic_pain (the add_pain() bucket) toward 0 -- body-part
-    pain_contribution doesn't decay on its own; it only drops via
-    treat_body_part, per the "first aid slows it, doesn't erase it" spec."""
-    hs = char.get("health_state")
-    if not hs or not hs.get("systemic_pain"):
-        return
-    hs["systemic_pain"] = max(0.0, hs["systemic_pain"] - PAIN_DECAY_PER_TICK)
-    _recompute_pain(char)
 
 
 # ---------------------------------------------------------------------------
@@ -1714,10 +1549,6 @@ def compute_severity(char):
     if blood_lost:
         signals.append(min(100.0, blood_lost * 100))
 
-    pain = hs.get("pain", 0.0)
-    if pain:
-        signals.append(min(100.0, pain))
-
     if not signals:
         return 0.0, "healthy"
 
@@ -1742,16 +1573,9 @@ def compute_severity(char):
 
 _MEDICAL_INCIDENT_TIERS = ("severe", "critical")
 
-# Pain-driven posture thresholds (health_state["pain"], 0-100). Distinct
-# from the severity-critical branch below -- pain alone can force these
-# postures even when the character's aggregate severity blend hasn't
-# reached "critical" (e.g. isolated chronic/neglect pain with no active
-# emergency). "crawling" here is self-healing every tick the same way the
-# severity-critical branch always has been: an LLM-issued stand_up/move
-# while pain is still >= PAIN_CRAWL_THRESHOLD just gets silently
-# overridden back on the very next tick.
-PAIN_CRAWL_THRESHOLD         = 60
-PAIN_INCAPACITATED_THRESHOLD = 80
+# "crawling" here is self-healing every tick: an LLM-issued
+# stand_up/move while the character's severity tier is still "critical"
+# just gets silently overridden back on the very next tick.
 
 
 def apply_severity_consequences(char, world):
@@ -1763,7 +1587,6 @@ def apply_severity_consequences(char, world):
 
     score, tier = compute_severity(char)
     em = char.get("health_state", {}).get("active_emergencies", {})
-    pain = char.get("health_state", {}).get("pain", 0.0)
     body_parts = char.get("health_state", {}).get("body_parts", {})
 
     # Both legs unusable -> crawling (reuses the existing posture, no new
@@ -1783,15 +1606,16 @@ def apply_severity_consequences(char, world):
 
     if "unconscious" in em or "coma" in em:
         set_posture(char, world, "incapacitated")
-    elif pain >= PAIN_INCAPACITATED_THRESHOLD:
-        set_posture(char, world, "incapacitated_pain")
-    elif pain >= PAIN_CRAWL_THRESHOLD or tier == "critical" or legs_unusable:
+    elif tier == "critical" or legs_unusable:
         set_posture(char, world, "crawling")
     elif char.get("posture") in ("crawling", "incapacitated_pain"):
-        # Pain/severity has receded below threshold -- this posture was
-        # pain/severity-driven, not a deliberate choice (sitting/lying for
+        # Severity has receded below threshold -- this posture was
+        # severity-driven, not a deliberate choice (sitting/lying for
         # other reasons is untouched, since posture won't be "crawling"
-        # or "incapacitated_pain" in that case).
+        # in that case). "incapacitated_pain" is a retired posture value
+        # -- still matched here so any character with that value already
+        # saved from before the pain system's removal recovers instead
+        # of staying stuck on a value nothing sets anymore.
         set_posture(char, world, "standing")
     elif char.get("posture") == "incapacitated":
         # Recovered from unconscious/coma (still alive, since the alive
@@ -1800,22 +1624,14 @@ def apply_severity_consequences(char, world):
         # no common posture to revert from.
         set_posture(char, world, "standing")
 
-    if char.get("posture") in ("incapacitated", "incapacitated_pain") and char.get("travel_state"):
+    if char.get("posture") == "incapacitated" and char.get("travel_state"):
         try:
             from systems.travel import interrupt_travel_for_incapacitation
             interrupt_travel_for_incapacitation(char, world)
         except Exception:
             pass
 
-    # Pain-driven incapacitation (e.g. from an untreated injury) never
-    # necessarily pushes compute_severity()'s tier to "severe"/"critical"
-    # (see the PAIN_CRAWL_THRESHOLD/PAIN_INCAPACITATED_THRESHOLD comment
-    # above) -- without this, a character fully incapacitated_pain with no
-    # one around to notice just stays stuck forever, since nothing ever
-    # creates the medical_emergency incident auto_report_incidents()/
-    # dispatch()/resolve() (systems/emergency.py) need to send an
-    # ambulance. Reuses that exact same pipeline -- no new dispatch logic.
-    needs_medical_report = tier in _MEDICAL_INCIDENT_TIERS or char.get("posture") == "incapacitated_pain"
+    needs_medical_report = tier in _MEDICAL_INCIDENT_TIERS
     if needs_medical_report:
         if not char.get("_medical_incident_reported"):
             char["_medical_incident_reported"] = True
@@ -1831,29 +1647,6 @@ def apply_severity_consequences(char, world):
 # ---------------------------------------------------------------------------
 # Main tick entry point
 # ---------------------------------------------------------------------------
-
-PAIN_REACTION_THRESHOLD = 40.0  # pain% above which an involuntary moan/cry becomes possible
-PAIN_REACTION_CHANCE    = 0.08  # per process_health call while above threshold -- "regular
-                                 # interval" test the user asked for, not a one-shot per pain rise
-
-
-def _maybe_pain_reaction(char, world):
-    """Regular-interval probability test while pain is high enough --
-    involuntary moaning/crying out, same shape as tick_symptom_reactions()
-    but on process_health's own (more frequent than daily) cadence,
-    since ongoing pain plausibly produces sounds more than once a day."""
-    pain = char.get("health_state", {}).get("pain", 0.0)
-    if pain < PAIN_REACTION_THRESHOLD:
-        return
-    if random.random() >= PAIN_REACTION_CHANCE:
-        return
-    reaction = "cry_out" if pain >= 70 else "moan_pain"
-    try:
-        from systems.reactions import trigger_reaction
-        trigger_reaction(char, world, reaction, tick=world.get("tick", 0))
-    except Exception:
-        pass
-
 
 DEHYDRATION_COUGH_THRESHOLD = 30.0  # body.py's hydration scale, 100=hydrated
 DEHYDRATION_COUGH_CHANCE    = 0.05
@@ -1882,9 +1675,6 @@ def process_health(char, world):
     apply_severity_consequences(char, world)
     if not char.get("alive", True):
                 return
-    _decay_pain(char)
-    _decay_painkiller_relief(char)
-    _maybe_pain_reaction(char, world)
     _maybe_dehydration_cough(char, world)
     tick_health_hazards(char, world)
     tick_hazard_manifestations(char, world)

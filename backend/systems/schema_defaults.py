@@ -1221,20 +1221,12 @@ def ensure_character_defaults(c, world=None):
         False
     )
 
-    health.setdefault(
-        "pain",
-        0.0
-    )
-
     # =====================================================
     # HEALTH_STATE -- the real per-bodypart damage/health engine
-    # (systems/health.py). Distinct from the legacy c["health"] dict
-    # above (still written by domestic_control.py/impulse.py/
-    # rival_cascade.py, unchanged by this round) and from
-    # c["body"]["pain"] (body.py, a separate dead tracker). Registered
-    # here so a freshly generated character always has the full shape
-    # instead of health.py's functions lazily setdefault()-ing individual
-    # fields the first time something touches them.
+    # (systems/health.py). Registered here so a freshly generated
+    # character always has the full shape instead of health.py's
+    # functions lazily setdefault()-ing individual fields the first
+    # time something touches them.
     # =====================================================
 
     health_state = c.setdefault(
@@ -1262,28 +1254,12 @@ def ensure_character_defaults(c, world=None):
                 "hazards": {},
                 "damage_type": None,
                 "severity_level": None,
-                "pain_contribution": 0.0,
                 "functional_status": "normal",
                 "injury_template": None,
                 "cause": None,
                 "tick": None,
             }
         )
-
-    health_state.setdefault(
-        "pain",
-        0.0
-    )
-
-    health_state.setdefault(
-        "systemic_pain",
-        0.0
-    )
-
-    health_state.setdefault(
-        "painkiller_relief",
-        0.0
-    )
 
     health_state.setdefault(
         "total_blood_lost",

@@ -27,15 +27,10 @@ DEFAULT_SPRINT_SPEED = 0.18
 DEFAULT_CRAWL_SPEED  = 0.02
 DEFAULT_SNEAK_SPEED  = 0.025
 
-# Fatigue speed penalty for moderate pain (health_state["pain"], 0-100).
-# Below systems/health.py's PAIN_CRAWL_THRESHOLD (60) -- above that,
-# apply_severity_consequences() already force-sets posture="crawling",
-# which takes over via the crawl_speed branch below. Local constants
-# (not imported from health.py) to avoid a circular import; keep the
-# lower bound in sync with health.py's own pain-threshold comment.
-PAIN_FATIGUE_THRESHOLD = 20
-PAIN_FATIGUE_CEILING    = 60
-_FATIGUE_MIN_MULTIPLIER = 0.6
+# Fatigue speed penalty while dizzy (health.py::_apply_passive_traits,
+# health_state.temporary_traits) -- a flat mid-strength slowdown for the
+# duration of the effect.
+_DIZZY_SPEED_MULTIPLIER = 0.8
 
 # Intoxication speed penalty (systems/harassment.py's intoxication_state) --
 # starts biting at the same 25% "intoxicated" posture threshold used
@@ -77,23 +72,14 @@ def _current_move_speed(c):
 
     walk = c.get("walk_speed", DEFAULT_WALK_SPEED)
     if c.get("posture") == "standing":
-        pain = c.get("health_state", {}).get("pain", 0.0)
-        in_pain_band = PAIN_FATIGUE_THRESHOLD <= pain < PAIN_FATIGUE_CEILING
-        # A disease hazard's passive "dizzy" trait (health.py::
-        # _apply_passive_traits, health_state.temporary_traits) piggybacks
-        # on this exact curve rather than adding a second one -- treated as
-        # a fixed mid-band pain level when there's no real pain driving it.
         is_dizzy = "dizzy" in c.get("health_state", {}).get("temporary_traits", {})
-        if in_pain_band or is_dizzy:
-            frac = (pain - PAIN_FATIGUE_THRESHOLD) / (PAIN_FATIGUE_CEILING - PAIN_FATIGUE_THRESHOLD) \
-                if in_pain_band else 0.5
-            multiplier = 1.0 - (1.0 - _FATIGUE_MIN_MULTIPLIER) * frac
-            walk *= multiplier
+        if is_dizzy:
+            walk *= _DIZZY_SPEED_MULTIPLIER
 
     # Intoxication (systems/harassment.py's alcohol_level/drug_level,
     # decision #12 of the nutrition/intoxication overhaul) -- an
-    # independent second multiplier, same shape as the pain/dizzy curve
-    # above but keyed to intoxication_pct instead of pain. Checked for both
+    # independent multiplier, same shape as the dizzy curve above but
+    # keyed to intoxication_pct. Checked for both
     # "standing" and "intoxicated" postures, since intoxication_pct >=
     # INTOX_POSTURE_THRESHOLD (harassment.py) is exactly what puts a
     # character into the "intoxicated" posture in the first place.
@@ -133,7 +119,7 @@ def update_character_movement(
     # happened — action_router.py's _movement_blocked() already stops a
     # *new* move/turn_and_run from being issued, this covers one already
     # underway.
-    if c.get("alive") is False or c.get("posture") in ("incapacitated", "incapacitated_pain"):
+    if c.get("alive") is False or c.get("posture") == "incapacitated":
         c["route"] = []
         c["is_moving"] = False
         return False

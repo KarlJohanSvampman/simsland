@@ -1,5 +1,10 @@
 # SIMSLAND ARCHITECTURE MAP
 
+For step-by-step guides (using the GUI tools, adding templates, the
+Blender→.glb pipeline, anchors/animations), see `docs/wiki/README.md`
+instead — this document is a technical reference for how the simulation's
+systems work, not a how-to.
+
 ---
 
 # NEED ARCHITECTURE
@@ -22,7 +27,6 @@ Fields:
 - `mouth_hygiene` — 100=fresh, 0=bad breath; decays, reset by tooth brushing
 - `recent_intake` — spikes on eat/drink, decays ~3 hrs; accelerates bladder fill
 - `stomach_discomfort` — 0-100; raised by overeating, illness
-- `pain` — 0-100
 - `sickness` — 0-100
 
 Urgency rules (body_intentions.py):
@@ -63,6 +67,58 @@ Authoritative: `systems/lt_needs.py`
 Each drive has `frustration` (0-1). Frustration accrues when neglected >1 week, proportional to point weight. Cleared by `satisfy_lt_need()`. Acts as a weight that biases AI intention generation — never triggers hard interrupts.
 
 `c["needs"]` does not exist. It has been fully removed.
+
+---
+
+# HEALTH & INJURY
+
+Authoritative: `systems/health.py`
+
+## c["health_state"] — per-bodypart damage/disease engine
+Separate from `c["body"]` above. Tracks 9 body parts (`head`, `neck`, `chest`,
+`abdomen`, `pelvis`, `left_arm`, `right_arm`, `left_leg`, `right_leg`), each
+with `hazards` (a dict of active `health_hazard_templates` instances, each
+`{treated, hazard_template, current_stage, ...}`), `severity_level`
+(`None`/`low`/`medium`/`severe`), and `functional_status`
+(`normal`/`impaired`/`unusable`). Non-bodypart-localized hazards live in
+`health_state["systemic_hazards"]`. Also tracks `active_emergencies` (e.g.
+`bleeding`, `unconscious`, `coma`, `severe_trauma`), `total_blood_lost`, and
+`doctor_visits_needed`.
+
+**There is no unified "pain" field or mechanic.** It existed as
+`health_state["pain"]` (0-100, fed by violence/disease/neglect) through one
+prior round and was fully removed — see DEPRECATED.
+
+## Injury & hazard pipeline
+- `apply_injury(char, world, injury_template_key, cause, tick)` — the single
+  entry point for a real wound. Rolls `injury_templates[key]`'s
+  `possible_body_parts`/`possible_hazards`, writes the target body part.
+- `treat_body_part(char, world, body_part, method)` — first_aid/hospital/
+  ambulance treatment; marks matching-`treatable_by` hazards `treated`
+  (halves future escalation, does not instantly cure).
+- `tick_health_hazards(char, world)` — untreated, non-superficial hazards
+  accumulate `escalation_per_tick` and step `severity_level` up a tier
+  (`low → medium → severe`) every 100 points accumulated; can roll a death
+  check once the character's overall tier is `critical`.
+- `_tick_disease_symptom` / `tick_hazard_manifestations` — daily symptom
+  selection + finer-grained periodic manifestations (gestures, contagion
+  bursts, locomotion restriction) for `physical_health_templates` conditions.
+
+## compute_severity(char) → (score, tier)
+Aggregates several independent signals (active_emergencies severity,
+per-bodypart severity_level + hazard treated-state, hazard `current_stage`,
+condition `severity_index`, `total_blood_lost`) into one 0-100 score via a
+worst-signal-weighted blend, bucketed into 5 tiers: `healthy`, `mild`,
+`moderate`, `severe`, `critical` (`dead` if not alive).
+
+## apply_severity_consequences(char, world)
+The real posture/movement authority. Sets `posture = "incapacitated"` for
+unconscious/coma/dead; `"crawling"` when tier is `critical` or both legs are
+`functional_status: "unusable"`; reverts to `"standing"` once neither
+condition holds. This is the ONLY place posture gets set from health state —
+`action_router.py::_movement_blocked()` and `movement.py` both gate on
+`posture == "incapacitated"`. A `severe`/`critical` tier auto-reports a
+medical-emergency incident (systems/emergency.py's existing 911 bridge).
 
 ---
 
@@ -304,6 +360,219 @@ Fields per pair: friendship, trust, attraction, hostility, comfort, resentment, 
 ## Social contracts
 `systems/social_contracts.py` — commitments between characters; emits `contract_violated`.
 
+## Cognition core + trait/belief adoption
+Every character gets exactly one cognition-core trait at generation
+(Logical/Balanced/Self-Aware — `character_gen.py`, exempted from the
+learned-trait cap), which biases which OTHER traits/beliefs they're likely
+to pick up over time. `systems/peer_influence.py` runs the actual adoption
+engine: real co-presence hours (weighted by `rel["designation"]`, a 5-tier
+`stranger → acquaintance → friend → close_friend → best_friend` ladder
+promoted/demoted weekly) accumulate toward a dual strength/exposure-count
+threshold; trait similarity boosts belief adoption and vice versa. Evaluated
+monthly for adults, weekly for children/teens, gated by an annual
+per-character learning budget. Hard caps: 10 learned personality traits, 5
+physical traits, with eviction on overflow. General beliefs
+(`belief_templates`, `c["held_beliefs"]`) are a separate system from the
+political-only `brain/beliefs.py`.
+
+## Stories & cued recall
+`systems/stories.py` — each character keeps a capped, ranked
+`c["notable_stories"]` list (category-weighted value that decays daily);
+hooks off `store_memory()` for any sufficiently important memory. Eviction
+condenses a story into a short permanent memory (`llm/story_condensation.py`).
+Telling a story routes through the real `gossip` speech_act
+(`tell_story()`), and the listener independently re-scores it — a story can
+propagate organically. `predict_best_audience()` biases who a character
+brings a story up with first. Separately, `conversation_analysis.py` has a
+low-probability "cued recall" hook: a word just heard can trigger
+`recall()` against the listener's own memories, queuing a
+`pending_reflections` entry ("reminded of X").
+
+## Behavior-pattern observation
+`systems/behavior_patterns.py` — characters log what they observe others
+doing (`c["_daily_observations"]`, off the same data `brain/perception.py`
+already computes); aggregated once per calendar day into recurring
+`behavior_patterns[other_id]` entries (activity + hour-range + count). A
+NEW pattern gets one LLM-generated theory (`llm/behavior_theory.py`,
+classified optimistic/pessimistic — pessimistic feeds
+`worries.py::bump_suspicion()`). Recurrence count scales an
+`ask_about_pattern` conversational intention; the subject can genuinely
+answer (or lie) via `answer_about_pattern`, filling `pattern["answer"]`.
+
+## Life comparison & jealousy
+`systems/life_comparison.py` — compares a character against real contacts
+across belongings/spouse-match/children-match/appearance/work/intelligence/
+social-life/expectations-fulfillment/personality, using the SAME
+`compute_ideal_match()`/`ideal_partner` machinery attraction.py already has.
+Only dimensions where the OTHER scores better accumulate `rel["jealousy"]`;
+crossing a threshold fires a `"life_envy"` grievance.
+
+## Parenting & expectations
+`systems/parenting.py` — each spouse gets an independently generated
+`ideal_child` persona (mirrors `ideal_partner`) plus loose `life_goals`
+(Happiness/Lovelife/Career/Patriot/Legacy/Grandchildren, 0-1 each);
+`derive_household_parenting_guidelines()` intersects both spouses' ideals
+into `household["parenting_guidelines"]`, read by `persona_expectations.py`
+as one more real-child-vs-ideal clash source.
+`systems/expectations.py`/`expectation_planner.py` — recurring
+daily/weekly/monthly/yearly obligation "checkboxes" per role (parent/
+provider/etc.), each with a real dependency-graph plan
+(`activity_queue.py`) and a hard-blocker fallback to `add_desire()`. A
+missed `requires_others` expectation with an identifiable responsible party
+feeds `grievances.py` directly — this is the actual blame → resentment →
+confrontation pipeline (`grievances.py`'s existing `confrontation_desired`
+threshold → `conflict_pipeline.py::start_conflict()`).
+
+## Diary & speech quirks
+`systems/diary.py` — the `keep_a_diary` hobby grants a real `diary` item;
+`maybe_write_diary()` is day-key gated, gathers real recent memories
+(`DIARY_LOOKBACK_TICKS`), and calls `llm/diary_narration.py` (memory-
+grounded, with a deterministic fallback) — a hollow entry with no real
+memories behind it is itself a bug signal. `speech_style_registry` (12
+entries) is rolled onto ~15% of characters at generation
+(`SPEECH_STYLE_CHANCE`), surfaced both in `context_builder.py::
+_sec_identity()` ("How you talk and write: ...") and in diary generation.
+
+## Libido & sexual release
+`systems/libido.py` — a standalone `c["libido_state"]` need (baseline +
+randomized multi-day spikes, weighted by `attraction_profile.libido`),
+separate from relationship-scoped `arousal_level`. `systems/
+sexual_release.py::attempt_release()` runs a real priority cascade on
+spike: spouse/partner (via `intimacy.py`'s real
+`propose_act`/`recipient_decision` willingness engine) → a friends-with-
+benefits/booty-call text to a past intimate contact
+(`intimacy_stage >= 3`, no persisted FWB state) → masturbation (privacy-
+gated via `nudity_perception.py`, gendered aid preference, discoverable by
+housemates via `intimate_item_discovery.py`) → last-resort prostitute hire
+(`services.py` off-grid, or a real on-grid parking-lot NPC pickup via
+`rideshare.py::request_pickup()`) for a stressed heterosexual male once
+every prior step is exhausted.
+
+## Attraction & ideal partner
+`systems/attraction.py` — `generate_ideal_partner()`/`generate_ideal_child()`
+(desired/undesired traits + a physical preference window) feed directly
+into `compute_attraction()`'s existing scoring (folded into the
+personality/appearance weights, not a second parallel score) —
+`rel["attraction"]` stays the one subjective-attraction source of truth.
+
+---
+
+# MENTAL & PHYSICAL HEALTH
+
+## Weighted condition assignment
+`systems/mental_health_gen.py::assign_conditions()` — one shared
+weighted-roll engine (age/sex-gated via each `mental_health_templates`/
+`physical_health_templates` entry's `common_age_range`/`common_sex` +
+`base_rate`), called at generation for both registries. Real, independent
+per-condition rolls (comorbidity is normal, not mutually exclusive).
+
+## Psychosis
+`systems/psychosis.py` — a temporary STATE (`c["psychosis_state"]`), not a
+diagnosis; ANY character can enter it, rolled from stress/sleep-
+deprivation (via `body_energy()`)/intoxication. A diagnosed schizophrenia
+character has a permanently elevated baseline via the same mechanic, not a
+separate one. `trigger_hallucination()` fires a real, observable
+`"hallucinating"` reaction — others perceive the character reacting to
+nothing, not the hallucination itself.
+
+## Sociopathy
+`systems/sociopathy.py` — diagnosing `antisocial_personality` auto-grants
+`domestic_abuser`, which starts the already-existing `domestic_control.py`
+control-tactics engine running with no other wiring. Sociopaths get a
+`persona_bank` (multiple `generate_persona()` identities) and a per-
+relationship `known_as` field; honesty floors at 0 toward everyone except
+the one controlled partner (`excuses.py`). `maybe_plant_drama()` fabricates
+false claims about real third parties through the real gossip pipeline.
+
+---
+
+# CRIME & FACTIONS
+
+Authoritative: `systems/crime.py`
+
+Illegal `job_templates` are excluded from random generation-time hiring
+(`character_gen.py::_assign_job`) — entry into crime is opportunity-driven
+at runtime (`maybe_recruit_into_crime()`, daily, weighted by financial
+desperation/risk traits/having a criminal contact). `c["criminal_standing"]`
+accumulates from successful uncaught crimes and promotes a drug-dealer
+track up through real `world["factions"]` membership
+(`street_gang`/`crime_family`, actually populating `faction["members"]`
+for the first time). `CRIME_PROFILES` + `resolve_criminal_shift()` is the
+shared per-job-type shift resolution, hooked into `offgrid.py`'s existing
+`reason == "work"` branch — feeds real `world["incidents"]` into
+`law.py::maybe_arrest_from_incidents()`.
+
+## Darknet & stealth
+`systems/darknet.py` — `world["darknet_listings"]` (drugs mail-ordered via
+`procurement.py::schedule_delivery_item()`; every other category —
+hacking/fraud/hitman/PI — a lightweight contract), reachable from a phone
+app and a computer interaction. `systems/stealth.py::attempt_sneak_entry()`
+— shared lockpick/glass-cutter infiltration + noise-risk framework used by
+both Burglar shifts and Private Investigator surveillance jobs.
+
+## Cover personas
+`systems/persona.py::generate_persona()` — a temporary
+`c["active_persona"]` adopted for a cover-requiring activity; while set,
+`excuses.py::_get_true_detail()` reads the persona's cover instead of the
+character's real identity, so a "who are you" question resolves through
+the SAME `generate_excuse()` → `check_lie_consistency()` pipeline as any
+other lie — a persona is a pre-committed consistent answer, not a new
+consequence system.
+
+---
+
+# SPORTS
+
+Authoritative: `systems/sports.py`, `systems/sports_leagues.py`
+
+`sports_teams` (114 entries — real NFL/NBA/NHL/Premier League team
+identity content) for 4 supporter hobbies; 4 player hobbies get a
+per-simulation invented `world["local_teams"][sport]` roster instead.
+`sports_leagues.py::generate_season_schedule()` builds a round-robin
+fixture list on the sim's own calendar; `tick_sports_leagues()` resolves
+results via a `strength`-weighted roll. Game days become real
+`social_events`; off-grid attendance resolves through the normal
+`send_offgrid()` trip-summary path, on-grid attendance gets a live
+`sports_broadcast.py` score-update loop (mirrors `reading_process.py`'s
+periodic-narration shape). Rival-supporter hostility at a shared loss can
+escalate into a real fight via the existing
+`hostile_actions.py`/`conflict_pipeline.py` machinery.
+
+---
+
+# MARKETPLACE
+
+`systems/marketplace.py` — `world["marketplace_listings"]`, a flat
+second-hand furniture board. `estimate_avg_sell_value()` is read-only
+(a discount off `market.py::get_price()`); `list_prop_for_sale()` removes
+a prop from `world["props"]`; `buy_marketplace_listing()` transfers
+payment and delivers the prop via the same placement shape
+`procurement.py::_deliver_prop()` uses for new furniture.
+
+---
+
+# FINANCE
+
+Authoritative: `systems/banking.py`, `systems/credit.py`,
+`systems/government_debt.py`
+
+Every character gets a wallet ($100 cash), ID card, and a bank card tied
+to a real `world["banks"][bank]["accounts"][account_number]` record at one
+of 5 starter banks (JPMC, Morgan Stanley, Barclays, TD Bank, Bank of
+America) — set up unconditionally in `character_gen.py`, mirroring the
+existing unconditional phone-grant block. Credit cards are apply-only
+(`apply_for_credit_card()`, gated by `c["credit_score"]`), carrying
+`max_credit`/`current_debt` directly on the card item (a credit line, not
+a deposit account). Loans (`c["loans"]`) are secured (banks, needs
+collateral) or unsecured (loan providers, disbursed straight into a named
+bank account) — `systems/loans.py`. `government_debt.py` assesses a
+monthly tax bill per employed character from `socioeconomics.py`'s
+existing (previously uncharged) `income_tax_rate`; unpaid past a grace
+period dings `credit_score` and feeds `law.py`'s fine pipeline.
+`mail.py::attempt_pay_bills()` is the one real "pay down what's owed,
+priority order, bank balance falling back to wallet cash" function bills/
+credit minimums/loan payments all flow through.
+
 ---
 
 # ECONOMY
@@ -430,22 +699,44 @@ Body needs (`update_body_needs`) run every tick inside `update_internal_state`.
 
 # DEFINITIONS (definitions.json)
 
-All data-driven templates. Editable via the frontend definitions editor.
+All data-driven templates, ~73 top-level registries. Only about 25 of
+them (the ones marked with a * below) are reachable through the frontend
+Definitions Editor's tab row — everything else needs a direct JSON edit +
+backend restart. See `docs/wiki/adding-templates.md` for the actual
+step-by-step workflow, including that caveat.
 
-| Key                       | Count | Description                                                        |
-|---------------------------|-------|--------------------------------------------------------------------|
-| prop_templates            | 134   | Furniture and interactive objects (anchors, storage, tags)         |
-| item_templates            | 391   | Portable physical items                                            |
-| default_item_interactions | 9     | Universal item actions (pick_up, drop, put_in, give, throw, etc.)  |
-| hobby_templates           | 85    | Hobby definitions (props, items, cost, participants, off_grid)     |
-| interaction_templates     | 107   | Atomic interactions with prop requirements, body effects, anims    |
-| activity_templates        | 141   | Multi-step activity sequences (52 generic + 89 hobby)              |
-| recipe_templates          | —     | Cooking recipes                                                    |
-| service_templates         | —     | Hired services catalog                                             |
-| job_templates             | —     | Employment types                                                   |
-| company_templates         | —     | Business types                                                     |
-| need_templates            | 12    | Long-term need drive definitions                                   |
-| mood_templates            | 15    | Persistent mood states with triggers and durations                 |
+| Key                        | Count | Description                                                        |
+|-----------------------------|-------|--------------------------------------------------------------------|
+| prop_templates *            | 154   | Furniture and interactive objects (anchors, storage, tags)         |
+| item_templates *            | 517   | Portable physical items                                            |
+| default_item_interactions   | 9     | Universal item actions (pick_up, drop, put_in, give, throw, etc.)  |
+| hobby_templates *           | 90    | Hobby definitions (props, items, cost, participants, off_grid)     |
+| interaction_templates *     | 168   | Atomic interactions with prop requirements, body effects, anims    |
+| activity_templates *        | 141   | Multi-step activity sequences                                      |
+| recipe_templates *          | 2     | Cooking recipes                                                    |
+| service_templates *         | 13    | Hired services catalog                                             |
+| job_templates *             | 577   | Employment types, including ~18 criminal careers                   |
+| company_templates *         | 48    | Business types                                                     |
+| need_templates *            | 12    | Long-term need drive definitions                                   |
+| mood_templates *            | 15    | Persistent mood states with triggers and durations                 |
+| trait_templates *           | 143   | Personality traits (learn_chance/cognitive_modifiers/conditions)   |
+| belief_templates *          | 21    | General beliefs, separate from the political-only belief system    |
+| mental_health_templates     | 14    | Diagnosable conditions, weighted-assigned at generation             |
+| physical_health_templates * | 32    | Chronic/acute physical conditions                                   |
+| health_hazard_templates     | 25    | Injury/disease hazard instances (pain_flat/escalation/stages)       |
+| symptom_templates           | 20    | Legacy per-condition symptom vocabulary                             |
+| injury_templates            | 12    | `apply_injury()`'s body-part/hazard roll tables                     |
+| physical_trait_templates    | 43    | Physical (not personality) traits                                   |
+| sports_teams                | 114   | Real NFL/NBA/NHL/Premier League team identity content                |
+| faction_templates *         | 8     | Gang/crime-family/political faction shapes                          |
+| speech_style_registry       | 12    | Distinctive talk/write quirks, ~15% of characters                   |
+| contact_designations        | 6     | stranger→acquaintance→…→best_friend ladder                          |
+| expectation_templates       | 7     | Recurring role-based obligation "checkboxes"                        |
+| addiction_templates          | 13    | Substance/behavior addiction tracks                                 |
+| floorplan_templates *       | 3     | Room/wall/tile layouts a building instantiates                      |
+
+`*` = has a tab in the Definitions Editor. Everything else needs a direct
+`definitions.json` edit.
 
 ---
 
@@ -459,3 +750,16 @@ Do not use. Will be removed.
 - `schedule.py` legacy intention queues
 - `c["needs"]` — fully removed; was a legacy `{social, fun}` dict
 - `data/item_templates.py` — superseded by `definitions.json -> item_templates`
+- **The unified pain system** — `health_state["pain"]`/`systemic_pain`/
+  `painkiller_relief`/`pain_contribution`, `add_pain()`/`add_bodypart_pain()`/
+  `apply_painkiller()`, the `"incapacitated_pain"` posture value, the
+  `take_painkiller` action, `systems/pain_fatigue.py` and `systems/
+  pain_complaints.py` (deleted) — fully removed. Its posture-locking bug
+  (a character whose pain crossed 80 never reliably recovered posture)
+  was the proximate cause of characters looking permanently stuck.
+  `compute_severity()`/`apply_severity_consequences()` (see HEALTH &
+  INJURY) still work, driven by the other independent severity signals.
+  A replacement discomfort/pain mechanic has not been designed yet.
+- `c["body"]["pain"]` / `c["health"]["pain"]` — the two legacy pre-
+  unification pain trackers `health.py` itself once described as
+  disconnected/dead — also fully removed.

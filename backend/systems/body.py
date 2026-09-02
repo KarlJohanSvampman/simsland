@@ -16,7 +16,6 @@ Body fields (all 0-100 unless noted):
   mouth_hygiene     100=fresh,     0=bad breath
   recent_intake     0=empty,       100=just ate/drank (decays ~3hrs, accelerates bladder)
   stomach_discomfort 0=fine,       100=painful
-  pain              0=none,        100=severe
   sickness          0=healthy,     100=very ill
   energy            0=depleted,    100=full (nutrition/gain overhaul round -- see
                     on_consume_complete; decays faster with high hunger and the
@@ -39,7 +38,6 @@ _HEALTH_THRESHOLDS = {
     "fatigue":    88,
     "sleep_debt": 75,
     "sickness":   60,
-    "pain":       70,
 }
 
 # ── defaults ──────────────────────────────────────────────────────────────────
@@ -55,7 +53,6 @@ _BODY_DEFAULTS = {
     "mouth_hygiene":      90,
     "recent_intake":      30,
     "stomach_discomfort":  0,
-    "pain":                0,
     "sickness":            0,
     "energy":             70,
     "hours_awake":         0,

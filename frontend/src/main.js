@@ -2253,7 +2253,7 @@ function updateSpeechBubbles(state){
 const DEBUG_SETTINGS_KEY = "holosims_debug_settings";
 const DEBUG_SETTINGS_DEFAULTS = {
   version: 1,
-  showThoughtBubbles: false,   // debug-only, off by default
+  showThoughtBubbles: true,   // on by default -- distinguishes real speech (white bubble) from internal thought/reflection (blue bubble)
   showBadges: true,            // the whole point of this feature is seeing these work
   thoughtChannels: { thought: true, reflection: true, current_intention: false },
   badgeChannels:   { worries: true, current_intention: true },
@@ -2340,13 +2340,15 @@ const BADGE_CHANNELS = [
 ];
 
 // =========================================================
-// DEBUG OVERLAY: THOUGHT BUBBLES
+// THOUGHT BUBBLES
 // =========================================================
-// Debug-only -- shows internal LLM state as a transient, log-message-
-// style bubble above the character's head, distinct from real speech
-// bubbles. updateSpeechBubbles() above is never touched or gated by
-// this -- "if thought bubbles are disabled, only speech bubbles are
-// shown, only what the AI chooses to say."
+// Shows internal LLM state (thought/reflection, not spoken aloud) as a
+// transient blue bubble above the character's head, distinct from real
+// speech bubbles (updateSpeechBubbles() above, white background --
+// never touched or gated by this). White = actually uttered out loud;
+// blue = everything else (internal thought/reflection). Still toggleable
+// off via the debug settings modal for anyone who only wants to see
+// what's actually said.
 
 const _lastThoughtContent = {};   // id -> last shown combined string
 const _thoughtHideTimers  = {};   // id -> setTimeout handle
@@ -2358,11 +2360,11 @@ function getOrCreateThoughtBubble(id){
   const div = document.createElement("div");
   div.className = "thought-bubble-debug";
   div.style.cssText = `
-    background: rgba(30,34,41,0.92);
-    color: #d8e0ea;
+    background: rgba(59,110,207,0.92);
+    color: #f0f4ff;
     padding: 4px 8px;
     border-radius: 8px;
-    border: 1px solid #60a5fa;
+    border: 1px solid #82a6f5;
     font-size: 11px;
     font-family: monospace;
     max-width: 200px;
@@ -3704,7 +3706,6 @@ function renderCharacterInspector(id){
   if(b.sickness > 30) rows.push(`<span style="color:#fc6">Sick</span>`);
 
   const hs = c.health_state || {};
-  if(hs.pain) rows.push(`Pain: ${Math.round(hs.pain)}%`);
   if(hs.severity_index) rows.push(`Severity: ${hs.severity_index.toFixed(2)}`);
   const emergencies = Object.keys(hs.active_emergencies || {});
   if(emergencies.length) rows.push(`<span style="color:#f66">Emergency: ${emergencies.join(", ")}</span>`);
@@ -3833,8 +3834,8 @@ function renderEffectIconRow(c){
 
 // Per-bodypart damage diagram (per-bodypart damage/health/disease rework,
 // Round 7) -- colors the inline SVG humanoid in index.html by each part's
-// severity_level, then lists hazards/pain%/functional-status per part
-// below it, plus active diseases + whatever symptom is currently felt
+// severity_level, then lists hazards/functional-status per part below it,
+// plus active diseases + whatever symptom is currently felt
 // (health_state.body_parts / c.physical_health, both forwarded unfiltered
 // by the server same as every other character field). Called from
 // renderCharacterInspector() so it stays live on every WS delta exactly
@@ -3870,9 +3871,11 @@ function renderBodyTab(c){
   }
 
   const summaryBits = [];
-  if(hs.pain != null) summaryBits.push(`Pain: ${Math.round(hs.pain)}%`);
-  if(hs.painkiller_relief) summaryBits.push(`Painkiller relief: ${Math.round(hs.painkiller_relief)}`);
-  summaryEl.innerHTML = summaryBits.join("<br>") || "No pain.";
+  const untreatedCount = Object.values(bodyParts).reduce(
+    (n, bp) => n + Object.values(bp.hazards || {}).filter(h => !h.treated).length, 0
+  );
+  if(untreatedCount) summaryBits.push(`Untreated hazards: ${untreatedCount}`);
+  summaryEl.innerHTML = summaryBits.join("<br>") || "No injuries.";
 
   const rows = [];
   for(const part of _BODY_PART_NAMES){
@@ -3888,8 +3891,7 @@ function renderBodyTab(c){
         <span class="partName">${part.replace(/_/g, " ")}</span>
         (${bp.severity_level || "none"}) —
         <span style="color:${statusColor}">${status}</span><br>
-        Hazards: ${hazardNames}<br>
-        Pain contribution: ${Math.round(bp.pain_contribution || 0)}%
+        Hazards: ${hazardNames}
       </div>
     `);
   }

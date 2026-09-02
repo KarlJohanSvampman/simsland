@@ -292,11 +292,11 @@ def tick_fire_incidents(world):
     """Advance active fire incidents: severity climbs each tick until a
     'fire' responder extinguishes it (see resolve() above); harm applies to
     anyone still in the building at higher severity thresholds. Feeds the
-    real health_state pipeline (apply_injury/add_pain) instead of the
-    disconnected legacy c["health"]["conditions"] list, so a fire actually
-    registers in compute_severity() and can trip the 911 medical-emergency
-    bridge like any other injury."""
-    from systems.health import apply_injury, add_pain
+    real health_state pipeline (apply_injury) instead of the disconnected
+    legacy c["health"]["conditions"] list, so a fire actually registers
+    in compute_severity() and can trip the 911 medical-emergency bridge
+    like any other injury."""
+    from systems.health import apply_injury
     chars = world.get("characters", {})
     for inc in world.get("incidents", []):
         if inc.get("type") != "fire" or inc.get("extinguished"):
@@ -308,7 +308,10 @@ def tick_fire_incidents(world):
         present = [c for c in chars.values() if c.get("building_id") == building_id]
         for c in present:
             if inc["severity"] >= 40:
-                add_pain(c, 2)
+                smoke_treated = c.setdefault("health_state", {}).setdefault("_treated_fire_smoke", [])
+                if inc["id"] not in smoke_treated:
+                    apply_injury(c, world, "minor_burn", "fire", tick=world["tick"])
+                    smoke_treated.append(inc["id"])
             if inc["severity"] >= 70:
                 # Dedup via a small tag list independent of body_parts --
                 # the old flat injuries-list dedup pattern (tagging one

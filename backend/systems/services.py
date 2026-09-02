@@ -190,7 +190,7 @@ def _spawn_worker(contract, world):
             "hunger": 20, "hydration": 80, "bladder": 5, "bowels": 5,
             "fatigue": 10, "sleep_debt": 0, "hygiene": 95, "odor": 0,
             "mouth_hygiene": 95, "recent_intake": 20,
-            "stomach_discomfort": 0, "pain": 0, "sickness": 0,
+            "stomach_discomfort": 0, "sickness": 0,
         },
         "traits":          [trait],
         "inventory":       [],

@@ -345,7 +345,7 @@ def _abort_travel_to_immediate(c, world):
 
 
 def interrupt_travel_for_incapacitation(c, world):
-    """Incapacitation (unconscious/coma/pain-driven, see health.py::
+    """Incapacitation (unconscious/coma, see health.py::
     apply_severity_consequences) always cancels an in-progress trip
     outright -- unlike _abort_travel_to_immediate()'s infrastructure-
     failure path above, this does NOT redirect into an instant off-grid
@@ -357,7 +357,7 @@ def interrupt_travel_for_incapacitation(c, world):
     (driving_out/driving_back/waiting_for_bus/on_bus_departing/
     awaiting_bus_arrival) forever -- a frozen travel_state makes
     agent_loop.py::update_agent() skip update_internal_state entirely,
-    including the very pain/posture processing that would otherwise let
+    including the very posture processing that would otherwise let
     them recover or get rescued (health.py's 911 bridge)."""
     if not c.get("travel_state"):
         return

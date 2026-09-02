@@ -220,7 +220,6 @@ ACTION_SPECS = {
 
     # ---- medical (systems/health.py's per-bodypart damage rework) ------
     "administer_first_aid": {"group": "medical", "target": "character", "doc": "Apply first aid to a damaged body part -- your own or someone nearby's. Requires a first aid kit or bandages."},
-    "take_painkiller":      {"group": "medical", "target": "none", "doc": "Take pain medication for global pain relief."},
     "grab_offensive":   {"group": "hostile", "target": "character", "doc": "Grab at someone aggressively."},
     "hold":             {"group": "hostile", "target": "character", "doc": "Hold someone down."},
     "punch":            {"group": "hostile", "target": "character", "doc": "Punch someone."},

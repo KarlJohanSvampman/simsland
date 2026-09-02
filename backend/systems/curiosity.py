@@ -23,8 +23,7 @@ _NOTABLE_VOLUMES = ("high", "loud", "intense")
 
 
 def tick_curiosity(c, world):
-    """Call once per character per tick from agent_loop.py, same hook
-    point as tick_pain_fatigue/tick_pain_complaints."""
+    """Call once per character per tick from agent_loop.py."""
     if not c.get("alive", True):
         return
 

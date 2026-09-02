@@ -415,7 +415,6 @@ def generate_initial_world():
                     "mouth_hygiene":      90,
                     "recent_intake":      30,
                     "stomach_discomfort":  0,
-                    "pain":                0,
                     "sickness":            0,
                 },
 

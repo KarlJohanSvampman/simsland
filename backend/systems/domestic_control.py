@@ -581,17 +581,17 @@ def _execute_direct_attack(victim, abuser, world):
 
     victim_wins = v_str > a_str
 
-    from systems.health import add_pain
+    from systems.health import apply_injury
 
     if victim_wins:
         health = abuser.setdefault("health", {})
-        add_pain(abuser, 40)
+        apply_injury(abuser, world, "bruise", "domestic_revenge_direct", world.get("tick", 0))
         health.setdefault("conditions", [])
         if "injured" not in health["conditions"]:
             health["conditions"].append("injured")
     else:
         # Failed attack — abuser retaliates; victim takes more damage
-        add_pain(victim, 35)
+        apply_injury(victim, world, "bruise", "domestic_revenge_direct", world.get("tick", 0))
 
     # Trauma release — some relief regardless of outcome
     trauma = victim.get("trauma", {})
@@ -633,15 +633,14 @@ def _execute_covert_revenge(victim, abuser, method, world):
     success = random.random() < success_base
 
     if success:
-        from systems.health import add_pain
         health = abuser.setdefault("health", {})
-        severity = 0.55 if method == "poison" else 0.45
-        add_pain(abuser, severity * 100)
         conditions = health.setdefault("conditions", [])
         if method == "poison":
             if "poisoned" not in conditions:
                 conditions.append("poisoned")
         else:
+            from systems.health import apply_injury
+            apply_injury(abuser, world, "fall_fracture", "staged_accident", world.get("tick", 0))
             if "injured" not in conditions:
                 conditions.append("injured")
 

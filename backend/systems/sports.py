@@ -533,10 +533,6 @@ def _escalate_team_rivalry(char_a, char_b, world):
     add_grievance(loser, winner["id"], "fight_loss_humiliation", world,
                   severity=12.0, details={"context": "sports_rivalry_fight"})
 
-    if random.random() < 0.45:
-        from systems.health import add_pain
-        add_pain(loser, 20)
-
     try:
         from systems.reactions import trigger_reaction
         trigger_reaction(winner, world, "angry_verbal")

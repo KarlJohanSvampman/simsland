@@ -840,12 +840,11 @@ def build_available_actions(c, world):
     ):
         action_types.append("call_parent")
 
-    # First aid / painkiller (systems/health.py's per-bodypart damage
-    # rework, Round 4 -- treat_body_part/apply_painkiller). first_aid is
-    # offered when the actor carries a usable item AND either they or
-    # someone nearby has an untreated hazard; the route resolves which
-    # body part automatically if the LLM doesn't name one. painkiller is
-    # offered whenever the actor carries pain_medication and is in pain.
+    # First aid (systems/health.py's per-bodypart damage rework,
+    # Round 4 -- treat_body_part). Offered when the actor carries a
+    # usable item AND either they or someone nearby has an untreated
+    # hazard; the route resolves which body part automatically if the
+    # LLM doesn't name one.
     from systems.personal_items import has_item_template
 
     def _has_untreated_hazard(ch):
@@ -861,9 +860,6 @@ def build_available_actions(c, world):
             for p in nearby_people if p["id"] in chars
         ):
             action_types.append("administer_first_aid")
-
-    if has_item_template(c, "pain_medication") and c.get("health_state", {}).get("pain", 0) > 0:
-        action_types.append("take_painkiller")
 
     # Hostile actions (see systems/hostile_actions.py) — the six offensive
     # types listed whenever someone's nearby, same "route handler
@@ -3320,7 +3316,7 @@ def _build_health_context(c, world):
     section this session); moderate-or-worse names the tier and the
     worst active emergency or body-part injury so the LLM understands why
     dodge/call_911/its own reduced options are showing up. Bounded to
-    ~3 lines: tier/emergency, active diseases + worst felt symptom, pain.
+    ~2 lines: tier/emergency, active diseases + worst felt symptom.
     """
     try:
         from systems.health import compute_severity
@@ -3339,7 +3335,7 @@ def _build_health_context(c, world):
             worst_label = worst_key.replace("_", " ")
         else:
             # Worst body_parts entry -- unusable/severe first, then by
-            # pain_contribution -- named after its dominant untreated
+            # untreated-hazard count -- named after its dominant untreated
             # hazard, or the injury itself if it has none.
             body_parts = hs.get("body_parts", {})
             candidates = [
@@ -3350,7 +3346,7 @@ def _build_health_context(c, world):
                 candidates.sort(key=lambda pb: (
                     pb[1].get("functional_status") == "unusable",
                     pb[1].get("severity_level") == "severe",
-                    pb[1].get("pain_contribution", 0),
+                    sum(1 for h in pb[1].get("hazards", {}).values() if not h.get("treated")),
                 ), reverse=True)
                 part, bp = candidates[0]
                 part_label = part.replace("_", " ")
@@ -3417,13 +3413,6 @@ def _build_health_context(c, world):
             if postures:
                 lines.append(f"You'd feel better {' or '.join(postures)}.")
             break
-
-    # Pain-specific line — independent of overall severity tier (pain is
-    # only one of several signals compute_severity() weighs, so real pain
-    # — bad domestic-abuse bruising, a nasty fever — doesn't always push
-    # the aggregate tier past "moderate").
-    if hs.get("pain", 0) >= 50:
-        lines.append("You're in a lot of pain.")
 
     return " ".join(lines) or None
 

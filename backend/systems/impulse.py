@@ -268,17 +268,12 @@ def _apply_outburst_consequences(actor, target, act_type, world):
                            magnitude_override=-rep_hit[act_type])
 
     # Physical acts: target may be injured
-    if act_type in ("shove", "assault"):
-        from systems.health import add_pain
-        health = target.setdefault("health", {})
-        if act_type == "assault":
-            add_pain(target, 30)
-            health.setdefault("conditions", [])
-            if "bruised" not in health["conditions"]:
-                health["conditions"].append("bruised")
-        # Shove: minor chance of pain
-        elif random.random() < 0.30:
-            add_pain(target, 10)
+    if act_type == "assault":
+        from systems.health import apply_injury
+        apply_injury(target, world, "bruise", "assault", world.get("tick", 0))
+    elif act_type == "shove" and random.random() < 0.30:
+        from systems.health import apply_injury
+        apply_injury(target, world, "bruise", "shove", world.get("tick", 0))
 
     # Assault: legal record
     if act_type == "assault":

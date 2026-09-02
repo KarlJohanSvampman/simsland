@@ -94,20 +94,32 @@ _UNDERWEIGHT_BANDS = {"thin", "skinny"}
 
 
 def _roll_weight_band_hazards(c, world, band):
+    if band in _UNDERWEIGHT_BANDS:
+        # Explicit user direction: hunger must never inflict a hazard.
+        # thin/skinny are hunger's own bands (fat/obese bands are
+        # overeating-driven, not hunger, and keep theirs below).
+        return
     defs = world.get("definitions", {})
     hazard_registry = defs.get("health_hazard_templates", {})
+    from systems.health import BODY_PARTS, _blank_body_part, _functional_status_for, _hazard_locality
+    hs = c.setdefault("health_state", {})
     for hazard_key, prob in _WEIGHT_BAND_HAZARDS.get(band, []):
         if hazard_key not in hazard_registry or random.random() >= prob:
             continue
-        hazard_tmpl = hazard_registry[hazard_key]
-        # Explicit user direction: hunger must never cause pain. thin/skinny
-        # are hunger's own bands, so their hazard rolls skip the pain_flat
-        # hit (fat/obese bands are overeating-driven, not hunger, and keep
-        # theirs).
-        amount = 0 if band in _UNDERWEIGHT_BANDS else hazard_tmpl.get("pain_flat", 0)
-        if amount:
-            from systems.health import add_pain
-            add_pain(c, amount)
+        locality = _hazard_locality(hazard_registry[hazard_key])
+        instance = {
+            "tick_applied": world.get("tick", 0), "last_ticked": world.get("tick", 0),
+            "treated": False, "hazard_template": hazard_key,
+            "expires_tick": None, "current_stage": None,
+        }
+        if locality in BODY_PARTS:
+            bp = hs.setdefault("body_parts", {}).setdefault(locality, _blank_body_part())
+            bp["hazards"][hazard_key] = instance
+            if not bp.get("severity_level"):
+                bp["severity_level"] = "low"
+            bp["functional_status"] = _functional_status_for(bp["severity_level"], bp["hazards"])
+        else:
+            hs.setdefault("systemic_hazards", {})[hazard_key] = instance
 
 
 def settle_nutrition_day(c, world):

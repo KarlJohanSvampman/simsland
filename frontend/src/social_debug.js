@@ -1127,7 +1127,7 @@ async function renderAppearanceTab() {
 }
 
 // ── State tab ──
-const HEALTH_FIELDS = ['hunger','energy','hydration','hygiene','bladder','fatigue','stress','pain'];
+const HEALTH_FIELDS = ['hunger','energy','hydration','hygiene','bladder','fatigue','stress'];
 
 async function renderStateTab() {
   const char = selectedChar;

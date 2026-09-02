@@ -599,7 +599,7 @@ def maybe_schedule_doctor_visit(c, world):
     unaffected by this gate."""
     if c.get("off_grid") or c.get("conversation"):
         return
-    if c.get("alive") is False or c.get("posture") in ("incapacitated", "incapacitated_pain", "crawling"):
+    if c.get("alive") is False or c.get("posture") in ("incapacitated", "crawling"):
         return
     needed = c.get("health_state", {}).get("doctor_visits_needed", 0)
     if needed <= 0:
@@ -911,11 +911,11 @@ def process_return(c, world):
 
         # A hospital visit (unlike a routine doctor visit) also addresses
         # acute trauma -- systems/health.py::compute_severity()'s
-        # per-bodypart hazards and blood-loss/pain signals previously had
+        # per-bodypart hazards and blood-loss signals previously had
         # zero connection to this mechanic, so a character rushed to
         # hospital for a stabbing came back just as stabbed. Only the
         # acute-trauma cluster is touched here (unconscious/bleeding/
-        # agonizing_pain, plus every body part's hazards) -- heart_attack/
+        # severe_trauma, plus every body part's hazards) -- heart_attack/
         # stroke/coma/cardiac_arrest each have their own dedicated
         # resolution arcs (resolve_heart_attack/tick_stroke/tick_coma) and
         # are left alone so this doesn't short-circuit that narrative.
@@ -929,10 +929,10 @@ def process_return(c, world):
         # wound can still need a second visit rather than being trivialized.
         acute_treated = False
         if reason == "hospital":
-            from systems.health import treat_body_part, add_pain
+            from systems.health import treat_body_part
             hs = c.setdefault("health_state", {})
             em = hs.setdefault("active_emergencies", {})
-            for key in ("unconscious", "bleeding", "agonizing_pain"):
+            for key in ("unconscious", "bleeding", "severe_trauma"):
                 if em.pop(key, None) is not None:
                     acute_treated = True
             for part in list(hs.get("body_parts", {}).keys()):
@@ -940,9 +940,6 @@ def process_return(c, world):
                     acute_treated = True
             if hs.get("total_blood_lost", 0) > 0:
                 hs["total_blood_lost"] = max(0, hs["total_blood_lost"] - 0.5)
-                acute_treated = True
-            if hs.get("pain", 0) > 0:
-                add_pain(c, -40)
                 acute_treated = True
 
         company = defs.get("company_templates", {}).get(
@@ -980,8 +977,26 @@ def process_return(c, world):
                 _trigger_death(c, world, f"{reason}_complication")
                 died = True
                 break
-            from systems.health import add_pain
-            add_pain(c, 15)
+            defs = world.get("definitions", {})
+            hazard_registry = defs.get("health_hazard_templates", {})
+            hazard_tmpl = hazard_registry.get(hazard_key)
+            if hazard_tmpl:
+                from systems.health import BODY_PARTS, _blank_body_part, _functional_status_for, _hazard_locality
+                hs = c.setdefault("health_state", {})
+                locality = _hazard_locality(hazard_tmpl)
+                instance = {
+                    "tick_applied": world.get("tick", 0), "last_ticked": world.get("tick", 0),
+                    "treated": False, "hazard_template": hazard_key,
+                    "expires_tick": None, "current_stage": None,
+                }
+                if locality in BODY_PARTS:
+                    bp = hs.setdefault("body_parts", {}).setdefault(locality, _blank_body_part())
+                    bp["hazards"][hazard_key] = instance
+                    if not bp.get("severity_level"):
+                        bp["severity_level"] = "low"
+                    bp["functional_status"] = _functional_status_for(bp["severity_level"], bp["hazards"])
+                else:
+                    hs.setdefault("systemic_hazards", {})[hazard_key] = instance
             story.setdefault("tags", []).append(f"side_effect:{hazard_key}")
 
         if died:
