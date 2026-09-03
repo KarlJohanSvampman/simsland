@@ -582,6 +582,13 @@ def tick(world):
     if every(world, CADENCE["persona_expectations"], offset=42):
         tick_persona_expectations(world)  # value-alignment clashes between close kin
 
+    if every(world, CADENCE["cleanliness"], offset=43):
+        from systems.chores import tick_room_cleanliness_decay, maybe_react_to_mess
+        tick_room_cleanliness_decay(world)
+        for c in characters:
+            if c.get("alive", True) and not c.get("off_grid"):
+                maybe_react_to_mess(c, world)
+
     # -- Daily stats drift ──────────────────────────────────
     if every(world, CADENCE["socioeconomics"], offset=19):
         try:

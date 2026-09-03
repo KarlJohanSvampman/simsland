@@ -23,6 +23,7 @@ CATEGORY_PRIORITY = {
     "schedule": 75,
     "social":   60,
     "identity": 40,
+    "chores":   35,
     "leisure":  20,
     "impulse":  10,
 }

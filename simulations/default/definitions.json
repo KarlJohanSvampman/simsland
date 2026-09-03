@@ -62919,6 +62919,18 @@
       "activity_type": "family_dinner",
       "grievance_event_type": "family_dinner_skipped"
     },
+    "keep_room_clean": {
+      "label": "Keep your room clean",
+      "cadence": "weekly",
+      "value_category": "family",
+      "of_self": true,
+      "requires_others": false,
+      "tags": [
+        "child_or_teen"
+      ],
+      "base_priority": 35,
+      "category": "chores"
+    },
     "keep_a_promise": {
       "label": "Do the errand you promised",
       "cadence": "once",
@@ -63632,6 +63644,62 @@
       "default_duration": 90,
       "default_active": false,
       "animation_state": "idle"
+    },
+    "collect_dishes": {
+      "key": "collect_dishes",
+      "label": "Collect Dirty Dishes",
+      "default_duration": 4,
+      "default_active": true,
+      "animation_state": "collect_item"
+    },
+    "wash_dish": {
+      "key": "wash_dish",
+      "label": "Wash Dish",
+      "default_duration": 2,
+      "default_active": true,
+      "animation_state": "wash_dishes"
+    },
+    "rinse_dish": {
+      "key": "rinse_dish",
+      "label": "Rinse Dish",
+      "default_duration": 1,
+      "default_active": true,
+      "animation_state": "wash_dishes"
+    },
+    "dry_dish": {
+      "key": "dry_dish",
+      "label": "Dry Dish",
+      "default_duration": 1,
+      "default_active": true,
+      "animation_state": "wipe"
+    },
+    "sweep": {
+      "key": "sweep",
+      "label": "Sweep",
+      "default_duration": 8,
+      "default_active": true,
+      "animation_state": "sweep"
+    },
+    "vacuum": {
+      "key": "vacuum",
+      "label": "Vacuum",
+      "default_duration": 12,
+      "default_active": true,
+      "animation_state": "vacuum"
+    },
+    "scrub": {
+      "key": "scrub",
+      "label": "Scrub",
+      "default_duration": 10,
+      "default_active": true,
+      "animation_state": "scrub"
+    },
+    "wipe": {
+      "key": "wipe",
+      "label": "Wipe Surface",
+      "default_duration": 2,
+      "default_active": true,
+      "animation_state": "wipe"
     }
   },
   "plant_templates": {
@@ -63700,6 +63768,120 @@
         "resource_type": "CLEAN_LAUNDRY",
         "servings": 1
       }
+    },
+    "wash_dishes_machine": {
+      "category": "kitchen",
+      "time_minutes": 75,
+      "stages": [
+        {
+          "primitive": "collect_dishes",
+          "name": "collect_dishes",
+          "active": true
+        },
+        {
+          "primitive": "fill_container",
+          "name": "load_dishwasher",
+          "active": true
+        },
+        {
+          "primitive": "wash_cycle",
+          "name": "run_dishwasher",
+          "duration": 60,
+          "active": false
+        },
+        {
+          "primitive": "empty_container",
+          "name": "unload_dishwasher",
+          "active": true
+        },
+        {
+          "primitive": "put_away_item",
+          "name": "put_away",
+          "active": true
+        }
+      ],
+      "output": {
+        "resource_type": "CLEAN_DISHES",
+        "servings": 1
+      }
+    },
+    "wash_dishes_manual": {
+      "category": "kitchen",
+      "time_minutes": 20,
+      "stages": [
+        {
+          "primitive": "collect_dishes",
+          "name": "collect_dishes",
+          "active": true
+        },
+        {
+          "primitive": "fill_container",
+          "name": "fill_sink",
+          "active": true
+        }
+      ],
+      "per_item_stages": [
+        {
+          "primitive": "wash_dish",
+          "name": "wash_item",
+          "active": true
+        },
+        {
+          "primitive": "rinse_dish",
+          "name": "rinse_item",
+          "active": true
+        },
+        {
+          "primitive": "dry_dish",
+          "name": "dry_item",
+          "active": true
+        },
+        {
+          "primitive": "put_away_item",
+          "name": "put_away_item",
+          "active": true
+        }
+      ],
+      "_per_item_note": "per_item_stages repeats once per dirty dish (household['dirty_dishes'], capped -- see systems/chores.py::_dish_count_for_wash()); time_minutes above is a nominal fallback only, actual duration scales with dish count.",
+      "output": {
+        "resource_type": "CLEAN_DISHES",
+        "servings": 1
+      }
+    },
+    "clean_floors": {
+      "category": "housekeeping",
+      "time_minutes": 30,
+      "zone_scoped": true,
+      "stages": [
+        {
+          "primitive": "sweep",
+          "name": "sweep_floor",
+          "active": true
+        },
+        {
+          "primitive": "vacuum",
+          "name": "vacuum_floor",
+          "active": true
+        },
+        {
+          "primitive": "scrub",
+          "name": "scrub_floor",
+          "active": true
+        }
+      ]
+    },
+    "dust_and_wipe": {
+      "category": "housekeeping",
+      "time_minutes": 15,
+      "zone_scoped": true,
+      "per_item_stages": [
+        {
+          "primitive": "wipe",
+          "name": "wipe_surface",
+          "active": true
+        }
+      ],
+      "_per_item_note": "per_item_stages repeats once per dusty/dirty surface prop found in the target zone (tables, cabinets, shelves, sinks, toilets, tubs, showers, windows -- see systems/chores.py::_surface_props_in_zone()), capped; time_minutes above is a nominal fallback only."
     }
   },
   "addiction_templates": {

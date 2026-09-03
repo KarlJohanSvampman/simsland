@@ -88,6 +88,18 @@ def resolve_strategy(
             c
         )
 
+    # =====================================================
+    # MESS (systems/chores.py) -- a zone the character's own
+    # cleanliness_threshold judged too dirty. Picks dishes if any are
+    # actually piled up (household-wide, not zone-scoped), else a
+    # random floor/surface chore for the flagged zone.
+    # =====================================================
+
+    if t == "clean_zone":
+
+        from systems.chores import chore_activity_for_zone
+        return chore_activity_for_zone(world, c, intention.get("zone_key"))
+
     return None
 
 

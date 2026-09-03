@@ -121,6 +121,14 @@ def ensure_world_defaults(world, defs=None):
     world.setdefault("stock_sector_trends", {})
     world.setdefault("service_contracts",  [])
     world.setdefault("household_processes", [])
+
+    # Per-zone cleanliness (see systems/chores.py) -- keyed by
+    # prop["room_id"] where a building actually has real room
+    # subdivision, else falling back to the building_id itself (today's
+    # reality for most households, which have no rooms[] data at all).
+    # 0-100, 100=spotless; decays passively, raised by completing a
+    # cleaning chore in that zone.
+    world.setdefault("room_cleanliness", {})
     world.setdefault("proposals", {})
     world.setdefault("walls",              {})
 
@@ -563,6 +571,12 @@ def ensure_character_defaults(c, world=None):
         c["credit_score"] = initial_credit_score(c.get("age"), c.get("employed", False))
 
     c.setdefault("government_debt", 0.0)
+
+    if c.get("cleanliness_threshold") is None:
+        from systems.character_gen import cleanliness_threshold_for_traits
+        c["cleanliness_threshold"] = cleanliness_threshold_for_traits(
+            list(c.get("traits", [])) + list(c.get("personality_traits", []))
+        )
 
     # Retrofit -- character_gen.py::generate_character() only grants a
     # starting wallet/ID/bank card/bio to characters generated AFTER the
@@ -1408,6 +1422,14 @@ def ensure_household_defaults(h):
     h.setdefault(
         "newspaper_subscription",
         False
+    )
+
+    # See systems/chores.py -- a simple household-wide count, not real
+    # per-instance dirty plates/cups (deliberate scope decision, see
+    # chore_templates["wash_dishes_manual"]'s _per_item_note).
+    h.setdefault(
+        "dirty_dishes",
+        0
     )
 
     h.setdefault(

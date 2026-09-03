@@ -258,6 +258,17 @@ ACTION_SPECS = {
     "harvest":      {"group": "plant", "target": "prop", "doc": "Harvest a mature plant's fruit."},
     "collect":      {"group": "plant", "target": "prop", "doc": "Collect contents from any reachable container."},
 
+    # ---- chores (systems/chores.py, systems/task_process.py) --------------
+    # wash_dishes/load_dishwasher are ordinary ACTIVITIES-dict entries
+    # (real anchors -- kitchen_sink/dishwasher), routed the normal way.
+    # clean_floors/dust_and_wipe have no single prop to walk to (clean
+    # wherever you currently are), so they're scaffolded directly here
+    # like jog/sit_ups below rather than going through start_activity().
+    "clean_floors":   {"group": "chore", "target": "none", "doc": "Sweep, vacuum, and scrub the floor of the room you're in."},
+    "dust_and_wipe":  {"group": "chore", "target": "none", "doc": "Dust and wipe down surfaces in the room you're in."},
+    "wash_dishes":       {"group": "chore", "target": "none", "doc": "Wash dishes by hand at the sink."},
+    "load_dishwasher":   {"group": "chore", "target": "none", "doc": "Load and run the dishwasher."},
+
     # ---- exercise -----------------------------------------------------
     "jog":            {"group": "exercise", "target": "none", "doc": "Go for a jog."},
     "sit_ups":        {"group": "exercise", "target": "none", "doc": "Do sit-ups."},

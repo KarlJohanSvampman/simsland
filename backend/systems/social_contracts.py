@@ -65,12 +65,43 @@ def _check_schedule(term, party_char, world):
     return forbidden and current == forbidden
 
 
+def _check_recurring_activity(term, party_char, world):
+    """True if a committed recurring chore (see systems/proposals.py::
+    offer_recurring(), the "nag about mess -> negotiate -> contract"
+    pipeline in systems/chores.py) was skipped during its scheduled
+    window. Unlike the forbidden-activity checkers above, this is a
+    positive commitment ("you'll do X during this window") -- so rather
+    than checking the instant snapshot (which would false-positive on
+    every tick a multi-minute chore isn't literally running), this fires
+    once the window is past its midpoint and task_process.py's
+    finish_process() hasn't stamped today's date for this activity on
+    this character."""
+    params = term.get("params", {})
+    activity = params.get("activity")
+    cal = world.get("calendar", {})
+    day_name = cal.get("weekday")
+    if params.get("days") and day_name not in params["days"]:
+        return False
+
+    hour = cal.get("hour", 0)
+    start_h = params.get("start_hour", 0)
+    end_h = params.get("end_hour", 23)
+    midpoint = (start_h + end_h) / 2.0
+    if hour < midpoint or hour >= end_h:
+        return False
+
+    today = (cal.get("year"), cal.get("month"), cal.get("day"))
+    done_today = party_char.get("_chore_done_today", {}).get(activity)
+    return done_today != today
+
+
 _CHECKERS = {
-    "behavior_tag":   _check_behavior_tag,
-    "resource_state": _check_resource_state,
-    "activity":       _check_activity,
-    "schedule":       _check_schedule,
-    "manual":         lambda *_: False,
+    "behavior_tag":      _check_behavior_tag,
+    "resource_state":    _check_resource_state,
+    "activity":          _check_activity,
+    "schedule":          _check_schedule,
+    "recurring_activity": _check_recurring_activity,
+    "manual":            lambda *_: False,
 }
 
 

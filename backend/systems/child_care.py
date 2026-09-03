@@ -81,6 +81,43 @@ def _ensure_departure_contract(child, parents, world):
     )
 
 
+def _check_child_room_mess(c, parents, world):
+    """Parents typically hold their kid's room to a stricter standard
+    than the kid holds it themselves -- see systems/chores.py. Judged by
+    the PARENT's own cleanliness_threshold, not the child's, and only
+    once the child actually has a real assigned bedroom (see
+    systems/bedroom_assignment.py -- most households don't yet, since
+    it needs the building's floorplan to have real room data; this
+    silently no-ops until then, same as everything else keyed off
+    room_id today)."""
+    bedroom_id = c.get("bedroom_id")
+    building_id = c.get("building_id")
+    if not bedroom_id or not building_id:
+        return
+    if c.get("_awaiting_reminder") or c.get("_awaiting_caregiver"):
+        return
+
+    from systems.chores import get_room_cleanliness
+    zone_key = f"{building_id}:{bedroom_id}"
+    level = get_room_cleanliness(world, zone_key)
+
+    from brain.intentions import add_intention
+    for parent in parents:
+        threshold = parent.get("cleanliness_threshold", 40)
+        if level >= threshold:
+            continue
+        c["_awaiting_reminder"] = {"need": "clean_room", "tick": world.get("tick", 0), "zone_key": zone_key}
+        add_intention(parent, {
+            "type":     f"remind_child_{c['id']}",
+            "category": "health",
+            "priority": 55,
+            "reason":   f"{c.get('name', 'your child')}'s room could use cleaning",
+            "child_id": c["id"],
+            "need":     "clean_room",
+        })
+        break
+
+
 def tick_child_needs(world):
     """Called on a moderate cadence (see CADENCE["child_care"]). For every
     age_group=="child" character, checks body needs against
@@ -97,6 +134,8 @@ def tick_child_needs(world):
             continue
 
         _ensure_departure_contract(c, parents, world)
+
+        _check_child_room_mess(c, parents, world)
 
         body = c.get("body", {})
         for need, cfg in CHILD_NEED_CONFIG.items():

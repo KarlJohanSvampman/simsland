@@ -13,6 +13,11 @@ from systems.templates import (
     resolve_floorplan
 )
 
+from systems.navigation import (
+
+    cache_floorplan
+)
+
 
 # =========================================================
 # BUILD WORLD GEOMETRY
@@ -98,6 +103,22 @@ def build_world_geometry(
 
             resolved_building,
 
+            floorplan
+        )
+
+        # navigation.py's NAV_CACHE is keyed by whatever id gets passed to
+        # cache_floorplan() -- core/definitions.py and api/editor.py both
+        # only ever cache it under the floorplan TEMPLATE id (e.g.
+        # "small_house"), but systems/room_assignment.py::assign_prop_room()
+        # looks it up via get_room_at_position() using the BUILDING
+        # INSTANCE id (e.g. "house_1"). Those never matched, so every
+        # prop/character in every real building got room_id=None
+        # regardless of whether the floorplan actually had rooms defined.
+        # Caching it again here, once per real building instance, fixes
+        # room resolution without touching the template-id cache the
+        # editor/definitions-preview paths still rely on.
+        cache_floorplan(
+            building["id"],
             floorplan
         )
 

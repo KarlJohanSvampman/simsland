@@ -322,6 +322,15 @@ def on_consume_complete(c, world, item_tmpl):
         on_drink_complete(c, hydration_value=hydration_restore or 0, volume=volume)
     elif category == "food" or nutrition:
         on_eat_complete(c, nutrition=nutrition)
+        # A real plate/bowl/cutlery used for a meal -- see systems/
+        # chores.py, which tracks this as a simple household-wide count
+        # rather than real per-instance dishware (see that module's
+        # docstring for the scoping rationale).
+        if category == "food":
+            household = world.get("households", {}).get(c.get("household_id"))
+            if household:
+                from systems.chores import add_dirty_dishes
+                add_dirty_dishes(household)
 
     # ── nutrition-day tally (fraction of a daily requirement) ───────────────
     b["nutrients_today"] = b.get("nutrients_today", 0) + nutrition

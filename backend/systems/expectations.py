@@ -55,6 +55,8 @@ def _character_tags(c, world=None):
     age_group = c.get("age_group")
     if age_group in ("adult", "elderly"):
         tags.add("adult")
+    if age_group in ("child", "teen"):
+        tags.add("child_or_teen")
     if c.get("employed"):
         tags.add("employed")
 

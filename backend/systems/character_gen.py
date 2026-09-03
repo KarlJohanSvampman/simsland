@@ -90,6 +90,22 @@ def _random_skills(defs, job=None):
         return random.sample(flat, min(3, len(flat))) if flat else []
     return []
 
+# How low a zone's cleanliness (0-100, 100=spotless) has to fall before
+# this character reacts to it -- same shape as body_intentions.py's
+# per-trait shower_threshold (lazy tolerates more mess, organized reacts
+# sooner). Kept in one place rather than recomputed inline at every call
+# site, since the mess-reaction check runs from several places (self,
+# nagging, a parent judging a child's room by the PARENT's own threshold).
+def cleanliness_threshold_for_traits(traits):
+    tr = set(traits or [])
+    threshold = 40
+    if "lazy" in tr or "careless" in tr:
+        threshold = 65
+    if "organized" in tr:
+        threshold = 25
+    return threshold
+
+
 def _random_traits(defs, sex=None, age=None):
     from systems.schema_defaults import COGNITION_CORE_TRAITS
     from systems.trait_chance import cognition_type_of, weighted_trait_pick
@@ -448,6 +464,7 @@ def generate_character(defs, overrides=None, world=None):
         "values":              values,
         "curiosity":           curiosity,
         "traits":             traits,
+        "cleanliness_threshold": cleanliness_threshold_for_traits(traits),
         "physical_traits":    physical_traits,
         "hobbies":            hobbies,
         "sexual_orientation": orientation,

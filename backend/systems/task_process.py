@@ -39,7 +39,7 @@ def register_process_type(process_type, on_begin=None, on_complete=None):
 # START PROCESS
 # =========================================================
 
-def start_process(household, world, process_type, template_id, stages, prop_id=None, participants=None):
+def start_process(household, world, process_type, template_id, stages, prop_id=None, participants=None, **extra):
     """stages is a resolved list snapshotted at start time (already
     primitive-expanded — see resolve_stages() below), so a mid-process
     edit to the chore/recipe template in definitions.json doesn't shift
@@ -54,6 +54,11 @@ def start_process(household, world, process_type, template_id, stages, prop_id=N
     always equal this same initial list anyway. A caller resolving a
     multi-recipient chore proposal (systems/proposals.py) should pass the
     proposal's final accepted character-id list here.
+
+    **extra: process types that aren't scoped to one prop (systems/
+    chores.py's clean_floors/dust_and_wipe -- "wherever this zone is,"
+    not "at this one sink/washer") stash whatever they need (e.g.
+    zone_key) here instead of overloading prop_id.
     """
     process = {
         "id": str(uuid4()),
@@ -68,6 +73,7 @@ def start_process(household, world, process_type, template_id, stages, prop_id=N
         "stages": stages,
         "completed": False,
         "waiting": False,
+        **extra,
     }
     world.setdefault("household_processes", []).append(process)
     begin_stage(household, process, world)
@@ -136,9 +142,24 @@ def finish_process(household, process, world):
             "participants": list(process["participants"]),
         }
 
+    # Stamps every participant's "did chore X today" marker, regardless of
+    # process type -- the one thing systems/social_contracts.py's
+    # "recurring_activity" checker needs to tell an honored recurring
+    # chore commitment from a skipped one (see that file).
+    cal = world.get("calendar", {})
+    today = (cal.get("year"), cal.get("month"), cal.get("day"))
+    chars = world.get("characters", {})
+    for pid in process.get("participants", []):
+        char = chars.get(pid)
+        if char is not None:
+            char.setdefault("_chore_done_today", {})[process["template_id"]] = today
+
     on_complete = _PROCESS_HOOKS.get(process["type"], {}).get("on_complete")
     if on_complete:
         on_complete(household, process, world)
+
+    from systems.chores import maybe_inspire_witnesses
+    maybe_inspire_witnesses(household, process, world)
 
 
 # =========================================================
@@ -227,3 +248,43 @@ def _laundry_on_complete(household, process, world):
 
 
 register_process_type("laundry", on_begin=_laundry_on_begin, on_complete=_laundry_on_complete)
+
+
+# =========================================================
+# DISHES — machine (dishwasher) and manual (sink) variants. Same
+# unattended-background-progression shape as laundry above; the manual
+# variant's stages list is just longer (a wash/rinse/dry/put-away group
+# repeated once per dirty dish, built by the activities.py hand-off
+# before start_process() is ever called — see systems/chores.py).
+# =========================================================
+
+def _dishes_on_complete(household, process, world):
+    from systems.household_storage import create_household_resource
+    from systems.chores import clear_dirty_dishes, adjust_room_cleanliness, kitchen_zone_key
+
+    create_household_resource(household, "CLEAN_DISHES", quantity=1, container="cabinet")
+    clear_dirty_dishes(household)
+    zone_key = kitchen_zone_key(world, household)
+    if zone_key:
+        adjust_room_cleanliness(world, zone_key, 20.0)
+
+
+register_process_type("dishes_machine", on_complete=_dishes_on_complete)
+register_process_type("dishes_manual", on_complete=_dishes_on_complete)
+
+
+# =========================================================
+# FLOORS / SURFACES — zone-scoped, not prop-scoped (see start_process()'s
+# **extra -- these processes carry a "zone_key" instead of a prop_id).
+# =========================================================
+
+def _cleaning_on_complete(household, process, world):
+    from systems.chores import adjust_room_cleanliness, CLEAN_CHORE_RESTORE
+
+    zone_key = process.get("zone_key")
+    if zone_key:
+        adjust_room_cleanliness(world, zone_key, CLEAN_CHORE_RESTORE.get(process["template_id"], 30.0))
+
+
+register_process_type("floors", on_complete=_cleaning_on_complete)
+register_process_type("dusting", on_complete=_cleaning_on_complete)

@@ -133,6 +133,9 @@ INTERACTION_ANIMATIONS = {
     "scrub":        {"walking": "walk", "using": "scrub",         "finishing": "idle"},
     "wipe":         {"walking": "walk", "using": "wipe",          "finishing": "idle"},
     "wash_dishes":  {"walking": "walk", "using": "wash_dishes",   "finishing": "idle"},
+    "load_dishwasher": {"walking": "walk", "using": "fill_container", "finishing": "idle"},
+    "clean_floors": {"walking": "walk", "using": "sweep",         "finishing": "idle"},
+    "dust_and_wipe": {"walking": "walk", "using": "wipe",         "finishing": "idle"},
     "window_clean": {"walking": "walk", "using": "window_wipe",   "finishing": "idle"},
 
     # --- laundry (fill hand-off into systems/task_process.py; the rest of
@@ -696,15 +699,55 @@ ACTIVITIES = {
         "category": "maintenance"
     },
 
+    # Hand off into systems/task_process.py's "dishes_manual" process,
+    # mirroring do_laundry's fill-then-background-progress shape (see
+    # complete_activity()'s wash_dishes branch) -- "sink" was never a
+    # real anchor interaction name (kitchen_sink's own anchor is named
+    # "wash_dishes"), so this action never actually found a target before.
     "wash_dishes": {
 
-        "interaction": "sink",
+        "interaction": "wash_dishes",
 
-        "base_duration_minutes": 20,
+        "base_duration_minutes": 5,
 
         "interruptible": True,
 
-        "category": "maintenance"
+        "category": "chore"
+    },
+    # Hand off into "dishes_machine" -- see dishwasher's own anchor
+    # (interaction "load_dishwasher").
+    "load_dishwasher": {
+
+        "interaction": "load_dishwasher",
+
+        "base_duration_minutes": 5,
+
+        "interruptible": True,
+
+        "category": "chore"
+    },
+    # Zone-scoped, not prop-scoped -- "clean wherever you currently are"
+    # has no single prop to walk to. no_target tells start_activity() to
+    # skip begin_interaction()'s anchor search entirely (see there).
+    "clean_floors": {
+
+        "no_target": True,
+
+        "base_duration_minutes": 3,
+
+        "interruptible": True,
+
+        "category": "chore"
+    },
+    "dust_and_wipe": {
+
+        "no_target": True,
+
+        "base_duration_minutes": 3,
+
+        "interruptible": True,
+
+        "category": "chore"
     },
     "throw_away_trash": {
 
@@ -1223,6 +1266,31 @@ def start_activity(
     if not config:
         return False
 
+    duration = compute_duration_ticks(
+
+        c,
+
+        config[
+            "base_duration_minutes"
+        ]
+    )
+
+    # no_target activities (systems/chores.py's clean_floors/dust_and_wipe
+    # -- "clean wherever you currently are") have no prop to walk to at
+    # all, so there's no anchor to find -- start straight at "using",
+    # same as action_router.py's _scaffold()-based actions (jog, etc.).
+    if config.get("no_target"):
+        c["activity"] = {
+            "type": activity_type,
+            "phase": "using",
+            "phase_started_tick": world["tick"],
+            "duration": duration,
+            "state": {},
+        }
+        from core.event_bus import emit
+        emit("activity_started", {"character_id": c["id"], "activity_type": activity_type})
+        return True
+
     interaction = begin_interaction(
 
         c,
@@ -1236,15 +1304,6 @@ def start_activity(
 
     prop = interaction["prop"]
     anchor = interaction["anchor"]
-
-    duration = compute_duration_ticks(
-
-        c,
-
-        config[
-            "base_duration_minutes"
-        ]
-    )
 
     c["activity"] = {
 
@@ -1938,6 +1997,71 @@ def complete_activity(
                     participants = [c["id"]]
                 start_process(household, world, "laundry", "laundry_load", stages,
                                prop_id=act.get("target_id"), participants=participants)
+
+    # =====================================
+    # DISHES — manual (sink) and machine (dishwasher) variants, same
+    # hand-off shape as laundry above. Manual's per-item wash/rinse/dry/
+    # put-away group is repeated once per real dirty dish (see
+    # systems/chores.py::dish_count_for_wash()) rather than being a fixed
+    # stage count.
+    # =====================================
+    elif activity_type in ("wash_dishes", "load_dishwasher"):
+
+        from systems.task_process import start_process, resolve_stages
+        from systems.chores import dish_count_for_wash, kitchen_zone_key
+
+        household = world["households"].get(c.get("household_id"))
+
+        if household:
+            manual = activity_type == "wash_dishes"
+            template_id = "wash_dishes_manual" if manual else "wash_dishes_machine"
+            chore = (world.get("definitions") or {}).get("chore_templates", {}).get(template_id)
+            if chore:
+                stage_defs = list(chore.get("stages", []))
+                if manual:
+                    n = dish_count_for_wash(household)
+                    stage_defs = stage_defs + list(chore.get("per_item_stages", [])) * n
+                stages = resolve_stages(world, stage_defs)
+                pending = household.pop("_pending_chore", None)
+                if pending and pending.get("chore_id") == template_id:
+                    participants = pending.get("participants") or [c["id"]]
+                else:
+                    participants = [c["id"]]
+                start_process(household, world, "dishes_manual" if manual else "dishes_machine",
+                               template_id, stages, prop_id=act.get("target_id"),
+                               participants=participants,
+                               zone_key=kitchen_zone_key(world, household))
+
+    # =====================================
+    # ZONE CLEANING — floors / surfaces. Not prop-anchored (see
+    # action_router.py's _route_clean_floors/_route_dust_and_wipe --
+    # these are scaffolded actions, not ACTIVITIES-dict entries, since
+    # "clean wherever you currently are" has no single prop to walk to).
+    # =====================================
+    elif activity_type in ("clean_floors", "dust_and_wipe"):
+
+        from systems.task_process import start_process, resolve_stages
+        from systems.chores import zone_key_for_character, surface_count_in_zone
+
+        household = world["households"].get(c.get("household_id"))
+        zone_key = zone_key_for_character(c)
+
+        if household and zone_key:
+            chore = (world.get("definitions") or {}).get("chore_templates", {}).get(activity_type)
+            if chore:
+                stage_defs = list(chore.get("stages", []))
+                if activity_type == "dust_and_wipe":
+                    n = surface_count_in_zone(world, zone_key)
+                    stage_defs = stage_defs + list(chore.get("per_item_stages", [])) * max(1, n)
+                stages = resolve_stages(world, stage_defs)
+                pending = household.pop("_pending_chore", None)
+                if pending and pending.get("chore_id") == activity_type:
+                    participants = pending.get("participants") or [c["id"]]
+                else:
+                    participants = [c["id"]]
+                process_type = "floors" if activity_type == "clean_floors" else "dusting"
+                start_process(household, world, process_type, activity_type, stages,
+                               participants=participants, zone_key=zone_key)
 
     # =====================================
     # INDIVIDUAL WAIT — microwave

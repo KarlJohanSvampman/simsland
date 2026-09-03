@@ -605,6 +605,42 @@ def _route_do_laundry_fill(c, world, action):
 
 
 # =========================================================
+# ROUTE CHORES — dishes go through the normal start_activity() anchor
+# auto-resolution (kitchen_sink/dishwasher are real anchored props);
+# floor/surface cleaning has no single prop to walk to (clean wherever
+# you currently are), so those are scaffolded directly instead, same
+# shape as jog/sit_ups. See systems/chores.py for the driving mechanism
+# that also pushes these as real intentions once a zone's cleanliness
+# drops below a character's own threshold.
+# =========================================================
+
+def _route_wash_dishes(c, world, action):
+    from systems.activities import start_activity
+    start_activity(c, world, "wash_dishes")
+
+
+def _route_load_dishwasher(c, world, action):
+    from systems.activities import start_activity
+    start_activity(c, world, "load_dishwasher")
+
+
+# clean_floors/dust_and_wipe are ACTIVITIES entries flagged no_target
+# (see activities.py::start_activity) -- no anchor to walk to, so this
+# just kicks off the short "getting started" gesture; the real
+# multi-stage work (sweep/vacuum/scrub, or the per-surface wipe loop)
+# plays out afterward via task_process.py's background progression once
+# complete_activity()'s hand-off fires, same as laundry/dishes above.
+def _route_clean_floors(c, world, action):
+    from systems.activities import start_activity
+    start_activity(c, world, "clean_floors")
+
+
+def _route_dust_and_wipe(c, world, action):
+    from systems.activities import start_activity
+    start_activity(c, world, "dust_and_wipe")
+
+
+# =========================================================
 # ROUTE WAIT
 # =========================================================
 
@@ -1132,6 +1168,18 @@ def route_action(c, world, action, speech, definitions=None, available_actions=N
 
     elif action_type == "do_laundry_fill":
         _route_do_laundry_fill(c, world, action)
+
+    elif action_type == "wash_dishes":
+        _route_wash_dishes(c, world, action)
+
+    elif action_type == "load_dishwasher":
+        _route_load_dishwasher(c, world, action)
+
+    elif action_type == "clean_floors":
+        _route_clean_floors(c, world, action)
+
+    elif action_type == "dust_and_wipe":
+        _route_dust_and_wipe(c, world, action)
 
     elif action_type == "wait":
         _route_wait(c, world, action)
@@ -2670,13 +2718,22 @@ def _route_remind_child(c, world, action):
         return
 
     need = awaiting.get("need")
-    prompt_type = "go_to_sleep" if need == "fatigue" else "go_to_toilet"
-    add_intention(child, {
-        "type":     prompt_type,
-        "category": "survival",
-        "priority": 90,
-        "reason":   f"your parent just reminded you about {need}",
-    })
+    if need == "clean_room":
+        add_intention(child, {
+            "type":     "clean_zone",
+            "category": "chores",
+            "priority": 70,   # higher than a self-driven clean_zone (45) -- a parent just asked directly
+            "reason":   "your parent just reminded you to clean your room",
+            "zone_key": awaiting.get("zone_key"),
+        })
+    else:
+        prompt_type = "go_to_sleep" if need == "fatigue" else "go_to_toilet"
+        add_intention(child, {
+            "type":     prompt_type,
+            "category": "survival",
+            "priority": 90,
+            "reason":   f"your parent just reminded you about {need}",
+        })
     child.pop("_awaiting_reminder", None)
     _clear_parent_intention(c, f"remind_child_{child['id']}")
 
