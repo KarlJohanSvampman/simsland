@@ -33,6 +33,7 @@ SEVERITY = {
     "stole":             14.0,
     "loud_at_night":      4.0,
     "left_mess":          3.0,
+    "neglected_plants":   2.5,
     "flirting_with_partner": 12.0,
     "excluded":           4.0,
     "lied":               7.0,

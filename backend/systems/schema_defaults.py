@@ -52,6 +52,17 @@ def ensure_prop_template_fields(world, defs):
             continue
         if prop.get("anchors") is None:
             prop["anchors"] = copy.deepcopy(template.get("anchors", []))
+        else:
+            # A template can grow new anchors after a prop was already
+            # backfilled once (e.g. kitchen_sink/bathroom_sink gaining a
+            # "use_tap" anchor for the plant-watering chore) -- merge any
+            # anchor missing by name rather than leaving the instance
+            # permanently stuck with whatever the template looked like
+            # the first time this ran.
+            existing_names = {a.get("name") for a in prop["anchors"]}
+            for anchor in template.get("anchors", []):
+                if anchor.get("name") not in existing_names:
+                    prop["anchors"].append(copy.deepcopy(anchor))
         if prop.get("storage") is None and template.get("storage") is not None:
             prop["storage"] = copy.deepcopy(template.get("storage"))
         prop.setdefault("footprint", template.get("footprint"))

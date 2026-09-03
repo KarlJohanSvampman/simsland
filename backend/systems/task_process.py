@@ -288,3 +288,57 @@ def _cleaning_on_complete(household, process, world):
 
 register_process_type("floors", on_complete=_cleaning_on_complete)
 register_process_type("dusting", on_complete=_cleaning_on_complete)
+
+
+# =========================================================
+# PLANT CARE -- watering, weeding, harvesting. Same unattended-
+# background-progression shape as everything above; the actual mutation
+# (systems/plants.py::water_plant/pull_weed, or draining a mature
+# plant's fruit container) happens once, in on_complete, against the
+# real target plant props recorded in process["target_prop_ids"] (see
+# systems/chores.py's plants_needing_water/plants_needing_weeding/
+# plants_ready_to_harvest and systems/activities.py's hand-off).
+# =========================================================
+
+def _watering_on_complete(household, process, world):
+    from systems.plants import water_plant
+    from systems.props import get_prop_by_id
+
+    for pid in process.get("target_prop_ids", []):
+        prop = get_prop_by_id(world, pid)
+        if prop:
+            water_plant(prop)
+
+
+def _weeding_on_complete(household, process, world):
+    from systems.plants import pull_weed
+    from systems.props import get_prop_by_id
+
+    for pid in process.get("target_prop_ids", []):
+        prop = get_prop_by_id(world, pid)
+        if prop:
+            pull_weed(prop)
+
+
+def _harvest_on_complete(household, process, world):
+    from systems.containers import collect_item
+    from systems.props import get_prop_by_id
+
+    participants = process.get("participants") or []
+    c = world.get("characters", {}).get(participants[0]) if participants else None
+    if not c:
+        return
+    for pid in process.get("target_prop_ids", []):
+        prop = get_prop_by_id(world, pid)
+        if not prop:
+            continue
+        for _ in range(20):
+            if not prop.get("items"):
+                break
+            if not collect_item(c, world, prop):
+                break
+
+
+register_process_type("watering", on_complete=_watering_on_complete)
+register_process_type("weeding", on_complete=_weeding_on_complete)
+register_process_type("harvesting", on_complete=_harvest_on_complete)

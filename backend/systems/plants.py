@@ -69,10 +69,15 @@ def init_plant_state(prop, plant_template_id, tick, tmpl=None):
     prop["accepted_templates"] = [yield_item] if yield_item else None
 
 
-def plant_seed(world, plant_template_id, target_prop=None, x=None, y=None):
-    """target_prop: an existing empty pot prop to plant into directly.
-    Otherwise (x, y) creates a brand-new immovable soil-grown plant prop
-    at that tile. Returns the plant prop, or None if the template doesn't
+def plant_seed(world, plant_template_id, target_prop=None, x=None, y=None, household_id=None):
+    """target_prop: an existing empty pot prop to plant into directly
+    (its own household_id, already stamped at creation time -- see
+    room_assignment.py/schema_defaults.py -- is left untouched). Otherwise
+    (x, y) creates a brand-new immovable soil-grown plant prop at that
+    tile -- these have no building_id (outdoors, no floorplan), so
+    household_id is stamped directly here (see systems/chores.py::
+    household_plant_props(), the only thing that reads it) rather than
+    left unset. Returns the plant prop, or None if the template doesn't
     exist or the pot already has a plant."""
     tick = world.get("tick", 0)
     tmpl = world.get("definitions", {}).get("plant_templates", {}).get(plant_template_id)
@@ -92,6 +97,7 @@ def plant_seed(world, plant_template_id, target_prop=None, x=None, y=None):
         "template":  plant_template_id,
         "x": x, "y": y,
         "carryable": False,
+        "household_id": household_id,
     }
     init_plant_state(prop, plant_template_id, tick, tmpl=tmpl)
     _add_prop(world, prop)

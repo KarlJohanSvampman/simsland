@@ -707,9 +707,13 @@ def tick(world):
     if every(world, CADENCE["bedroom_assignment"], offset=38):
         tick_bedroom_assignments(world)
 
-    # -- Plant growth/moisture/weeds ─────────────────────────────────
+    # -- Plant growth/moisture/weeds + character reaction to neglect ──
     if every(world, CADENCE["plants"], offset=39):
         tick_plants(world)
+        from systems.chores import maybe_tend_plants
+        for c in characters:
+            if c.get("alive", True) and not c.get("off_grid"):
+                maybe_tend_plants(c, world)
 
     # -- Food freshness decay ─────────────────────────────────────────
     if every(world, CADENCE["food_aging"], offset=40):

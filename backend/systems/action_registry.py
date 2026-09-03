@@ -268,6 +268,9 @@ ACTION_SPECS = {
     "dust_and_wipe":  {"group": "chore", "target": "none", "doc": "Dust and wipe down surfaces in the room you're in."},
     "wash_dishes":       {"group": "chore", "target": "none", "doc": "Wash dishes by hand at the sink."},
     "load_dishwasher":   {"group": "chore", "target": "none", "doc": "Load and run the dishwasher."},
+    "water_plants":      {"group": "chore", "target": "none", "doc": "Fill a watering can at a tap and water plants that need it."},
+    "weed_plants":       {"group": "chore", "target": "none", "doc": "Pull weeds from plants that need it."},
+    "harvest_plants":    {"group": "chore", "target": "none", "doc": "Harvest all plants with ripe produce ready to pick."},
 
     # ---- exercise -----------------------------------------------------
     "jog":            {"group": "exercise", "target": "none", "doc": "Go for a jog."},

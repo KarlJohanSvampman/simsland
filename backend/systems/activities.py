@@ -143,6 +143,13 @@ INTERACTION_ANIMATIONS = {
     # through activities.py — see chore_templates["laundry_load"]) ---
     "do_laundry":   {"walking": "walk", "using": "fill_container", "finishing": "idle"},
 
+    # --- plant care (fill hand-off into systems/task_process.py for
+    # water_plants; weed_plants/harvest_plants are no_target, keyed by
+    # activity_type directly like clean_floors/dust_and_wipe above) ---
+    "use_tap":        {"walking": "walk", "using": "fill_container", "finishing": "idle"},
+    "weed_plants":    {"walking": "walk", "using": "pull_weed",      "finishing": "idle"},
+    "harvest_plants": {"walking": "walk", "using": "collect_item",   "finishing": "idle"},
+
     # --- generic fallback ---
     "interact":     {"walking": "walk", "using": "interact",   "finishing": "idle"},
 }
@@ -740,6 +747,43 @@ ACTIVITIES = {
         "category": "chore"
     },
     "dust_and_wipe": {
+
+        "no_target": True,
+
+        "base_duration_minutes": 3,
+
+        "interruptible": True,
+
+        "category": "chore"
+    },
+    # Real anchor hand-off, interaction "use_tap" -- matches kitchen_sink/
+    # bathroom_sink/outdoor_tap's own anchors (see definitions.json).
+    # Fills the character's watering can, then hands off into
+    # task_process.py's "watering" process to actually water the plants
+    # that need it (see complete_activity() below).
+    "water_plants": {
+
+        "interaction": "use_tap",
+
+        "base_duration_minutes": 3,
+
+        "interruptible": True,
+
+        "category": "chore"
+    },
+    # No single prop to walk to -- weeding/harvesting are household-wide,
+    # same "no_target" shape as clean_floors/dust_and_wipe above.
+    "weed_plants": {
+
+        "no_target": True,
+
+        "base_duration_minutes": 3,
+
+        "interruptible": True,
+
+        "category": "chore"
+    },
+    "harvest_plants": {
 
         "no_target": True,
 
@@ -2062,6 +2106,86 @@ def complete_activity(
                 process_type = "floors" if activity_type == "clean_floors" else "dusting"
                 start_process(household, world, process_type, activity_type, stages,
                                participants=participants, zone_key=zone_key)
+
+    # =====================================
+    # PLANT CARE — watering (needs a filled watering can, filled at a
+    # Tap-tagged prop — systems/containers.py's water capacity helpers),
+    # weeding, and harvesting. weed_plants/harvest_plants are no_target
+    # exactly like clean_floors/dust_and_wipe above — household-wide, not
+    # a single prop to walk to. water_plants is the one with a real
+    # anchor hand-off (interaction "use_tap"), mirroring wash_dishes's
+    # fill-then-background-progress shape.
+    # =====================================
+    elif activity_type == "water_plants":
+
+        from systems.task_process import start_process, resolve_stages
+        from systems.chores import find_watering_can, plants_needing_water, WATERING_CAN_CAPACITY
+        from systems.containers import fill_with_water
+
+        household = world["households"].get(c.get("household_id"))
+        if household:
+            can, _source = find_watering_can(c, world)
+            if can:
+                fill_with_water(can, WATERING_CAN_CAPACITY)
+                targets = plants_needing_water(world, household["id"], cap=can.get("uses", WATERING_CAN_CAPACITY))
+                if targets:
+                    can["uses"] = max(0, can.get("uses", 0) - len(targets))
+                    chore = (world.get("definitions") or {}).get("chore_templates", {}).get("water_plants")
+                    if chore:
+                        stage_defs = list(chore.get("stages", [])) + list(chore.get("per_item_stages", [])) * len(targets)
+                        stages = resolve_stages(world, stage_defs)
+                        pending = household.pop("_pending_chore", None)
+                        if pending and pending.get("chore_id") == "water_plants":
+                            participants = pending.get("participants") or [c["id"]]
+                        else:
+                            participants = [c["id"]]
+                        start_process(household, world, "watering", "water_plants", stages,
+                                       participants=participants,
+                                       target_prop_ids=[p["id"] for p in targets])
+
+    elif activity_type == "weed_plants":
+
+        from systems.task_process import start_process, resolve_stages
+        from systems.chores import plants_needing_weeding
+
+        household = world["households"].get(c.get("household_id"))
+        if household:
+            targets = plants_needing_weeding(world, household["id"])
+            if targets:
+                chore = (world.get("definitions") or {}).get("chore_templates", {}).get("weed_plants")
+                if chore:
+                    stage_defs = list(chore.get("per_item_stages", [])) * len(targets)
+                    stages = resolve_stages(world, stage_defs)
+                    pending = household.pop("_pending_chore", None)
+                    if pending and pending.get("chore_id") == "weed_plants":
+                        participants = pending.get("participants") or [c["id"]]
+                    else:
+                        participants = [c["id"]]
+                    start_process(household, world, "weeding", "weed_plants", stages,
+                                   participants=participants,
+                                   target_prop_ids=[p["id"] for p in targets])
+
+    elif activity_type == "harvest_plants":
+
+        from systems.task_process import start_process, resolve_stages
+        from systems.chores import plants_ready_to_harvest
+
+        household = world["households"].get(c.get("household_id"))
+        if household:
+            targets = plants_ready_to_harvest(world, household["id"])
+            if targets:
+                chore = (world.get("definitions") or {}).get("chore_templates", {}).get("harvest_plants")
+                if chore:
+                    stage_defs = list(chore.get("per_item_stages", [])) * len(targets)
+                    stages = resolve_stages(world, stage_defs)
+                    pending = household.pop("_pending_chore", None)
+                    if pending and pending.get("chore_id") == "harvest_plants":
+                        participants = pending.get("participants") or [c["id"]]
+                    else:
+                        participants = [c["id"]]
+                    start_process(household, world, "harvesting", "harvest_plants", stages,
+                                   participants=participants,
+                                   target_prop_ids=[p["id"] for p in targets])
 
     # =====================================
     # INDIVIDUAL WAIT — microwave

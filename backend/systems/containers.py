@@ -254,6 +254,42 @@ def find_bucket_for_material(c, material_id):
     return None
 
 
+# =========================================================
+# LIQUID CAPACITY -- a watering can (or, in principle, any future
+# glass/barrel/bucket-shaped container) filled at a Tap-tagged prop (see
+# systems/chores.py::find_watering_can + action_router.py's
+# use_tap-anchored fill activities). Reuses the same material/uses shape
+# create_bucket() already established for paint -- a "how many
+# applications/uses are left" countdown -- rather than a parallel field.
+# The one real difference: a liquid container isn't consumed/removed
+# from inventory when it hits 0 (see use_bucket() above); it just needs
+# refilling.
+# =========================================================
+
+WATER_CAPACITY = {
+    "watering_can": 10,
+}
+
+
+def fill_with_water(item, capacity=None):
+    cap = capacity if capacity is not None else WATER_CAPACITY.get(item.get("template_id"), 1)
+    item["material"] = "water"
+    item["uses"] = cap
+    return item
+
+
+def use_water(item, amount=1):
+    """Decrement uses by amount, floor at 0. Unlike use_bucket() (paint),
+    the item stays in inventory when empty -- caller doesn't remove it,
+    it just needs refilling at a tap again."""
+    item["uses"] = max(0, item.get("uses", 0) - amount)
+    return item["uses"]
+
+
+def water_uses_remaining(item):
+    return item.get("uses", 0) if item.get("material") == "water" else 0
+
+
 def containers_in_inventory(c):
     """Return all container items in character's top-level inventory."""
     return [i for i in c.get("inventory", []) if i.get("type") == "container"]

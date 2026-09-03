@@ -353,3 +353,168 @@ def maybe_inspire_witnesses(household, process, world):
                 "reason":   f"watching {source.get('name', 'them')} clean up made you want to tidy too",
                 "zone_key": zone_key,
             })
+
+
+# =========================================================
+# PLANT CARE -- watering, weeding, harvesting. Raw plant-state mechanics
+# (water_plant/pull_weed, growth/moisture/weed ticking) live in systems/
+# plants.py; this module owns the same "driving mechanism" role for
+# plants that it already does for room cleanliness -- deciding WHEN a
+# character bothers, and WHICH real plant props get acted on when they
+# do. "A household's plants" means every living plant prop
+# (plant_state present) whose household_id matches -- potted plants get
+# this via the ordinary building-ownership backfill (schema_defaults.py/
+# room_assignment.py) since they sit inside an owned building; outdoor
+# soil-grown plants have no building_id (no floorplan out there), so
+# plants.py::plant_seed() stamps it directly at planting time. No real
+# "garden room"/greenhouse floorplan concept exists in this codebase
+# (confirmed via grep) -- indoor vs. outdoor is just the pot/soil,
+# carryable/not-carryable distinction plants.py already has; both are
+# tended identically here.
+# =========================================================
+
+WATERING_CAN_TEMPLATE_ID = "watering_can"
+WATERING_CAN_CAPACITY = 10          # one full fill waters up to 10 plants
+PLANT_WATER_MOISTURE_CUTOFF = 90    # top up anything not near-full once actually watering
+MAX_PLANTS_PER_WEEDING = 8
+MAX_PLANTS_PER_HARVEST = 8
+
+
+def household_plant_props(world, household_id):
+    if not household_id:
+        return []
+    return [
+        p for p in world.get("props", [])
+        if p.get("plant_state") and p.get("household_id") == household_id
+    ]
+
+
+def find_watering_can(c, world):
+    """Character's own inventory/held_stack first, then any household
+    storage prop (e.g. the "garden" prop's outdoor_gear storage) in the
+    home building. Returns (item, source_container_or_None) -- source is
+    None when the can is directly on the character (nothing to write
+    back into)."""
+    for item in list(c.get("inventory", [])) + list(c.get("held_stack", [])):
+        if item.get("template_id") == WATERING_CAN_TEMPLATE_ID:
+            return item, None
+
+    household = world.get("households", {}).get(c.get("household_id"))
+    building_id = household.get("home_id") if household else None
+    if not building_id:
+        return None, None
+
+    from systems.containers import ensure_prop_storage
+    for prop in world.get("props", []):
+        if prop.get("building_id") != building_id:
+            continue
+        storage = ensure_prop_storage(prop, world)
+        if not storage:
+            continue
+        for item in storage.get("items", []):
+            if item.get("template_id") == WATERING_CAN_TEMPLATE_ID:
+                return item, storage
+    return None, None
+
+
+def plants_needing_water(world, household_id, cap=WATERING_CAN_CAPACITY):
+    plants = household_plant_props(world, household_id)
+    thirsty = [
+        p for p in plants
+        if p.get("plant_state", {}).get("moisture", 100) < PLANT_WATER_MOISTURE_CUTOFF
+    ]
+    thirsty.sort(key=lambda p: p["plant_state"]["moisture"])
+    return thirsty[:max(0, cap)]
+
+
+def plants_needing_weeding(world, household_id, cap=MAX_PLANTS_PER_WEEDING):
+    from systems.plants import HIGH_WEED_THRESHOLD
+    plants = household_plant_props(world, household_id)
+    weedy = [
+        p for p in plants
+        if p.get("plant_state", {}).get("weed_level", 0) >= HIGH_WEED_THRESHOLD
+    ]
+    weedy.sort(key=lambda p: -p["plant_state"]["weed_level"])
+    return weedy[:cap]
+
+
+def plants_ready_to_harvest(world, household_id, cap=MAX_PLANTS_PER_HARVEST):
+    plants = household_plant_props(world, household_id)
+    ready = [p for p in plants if p.get("items")]
+    return ready[:cap]
+
+
+def maybe_tend_plants(c, world):
+    """Called from sim_loop.py on the same cadence as tick_plants. Mirrors
+    maybe_react_to_mess's nag-vs-self-handle shape exactly, reusing the
+    SAME cleanliness_threshold trait field as the "how much do I tolerate
+    before I react" tolerance -- a deliberate reuse (both represent the
+    same underlying personality axis) rather than a second trait-derived
+    number. Checked worst-first: thirsty plants outrank weedy ones, which
+    outrank ripe-but-unpicked ones. Ripe produce sitting unpicked isn't
+    anyone's fault to nag about, so harvesting always just gets a direct
+    intention, no blame/grievance path."""
+    household_id = c.get("household_id")
+    if not household_id:
+        return
+    if not household_plant_props(world, household_id):
+        return
+
+    threshold = c.get("cleanliness_threshold", 40)
+    tick = world.get("tick", 0)
+
+    thirsty = plants_needing_water(world, household_id)
+    if thirsty and thirsty[0]["plant_state"]["moisture"] < threshold:
+        if _wants_to_nag(c):
+            last = c.get("_last_plant_nag", {})
+            if tick - last.get("water_plants", -NAG_COOLDOWN_TICKS) < NAG_COOLDOWN_TICKS:
+                return
+            target = _find_someone_to_blame(world, c)
+            if target:
+                from systems.grievances import add_grievance
+                add_grievance(c, target["id"], "neglected_plants", world,
+                               details={"chore": "water_plants"})
+                c.setdefault("_last_plant_nag", {})["water_plants"] = tick
+                return
+        can, _source = find_watering_can(c, world)
+        if can:
+            from brain.intentions import add_intention
+            add_intention(c, {
+                "type":     "water_plants",
+                "category": "chores",
+                "priority": 45,
+                "reason":   "the plants need watering",
+            })
+        return
+
+    weedy = plants_needing_weeding(world, household_id)
+    if weedy:
+        if _wants_to_nag(c):
+            last = c.get("_last_plant_nag", {})
+            if tick - last.get("weed_plants", -NAG_COOLDOWN_TICKS) < NAG_COOLDOWN_TICKS:
+                return
+            target = _find_someone_to_blame(world, c)
+            if target:
+                from systems.grievances import add_grievance
+                add_grievance(c, target["id"], "neglected_plants", world,
+                               details={"chore": "weed_plants"})
+                c.setdefault("_last_plant_nag", {})["weed_plants"] = tick
+                return
+        from brain.intentions import add_intention
+        add_intention(c, {
+            "type":     "weed_plants",
+            "category": "chores",
+            "priority": 40,
+            "reason":   "weeds are taking over the plants",
+        })
+        return
+
+    ready = plants_ready_to_harvest(world, household_id)
+    if ready:
+        from brain.intentions import add_intention
+        add_intention(c, {
+            "type":     "harvest_plants",
+            "category": "chores",
+            "priority": 35,
+            "reason":   "there's ripe produce ready to pick",
+        })

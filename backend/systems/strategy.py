@@ -100,6 +100,9 @@ def resolve_strategy(
         from systems.chores import chore_activity_for_zone
         return chore_activity_for_zone(world, c, intention.get("zone_key"))
 
+    if t in ("water_plants", "weed_plants", "harvest_plants"):
+        return t
+
     return None
 
 

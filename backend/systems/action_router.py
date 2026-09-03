@@ -640,6 +640,21 @@ def _route_dust_and_wipe(c, world, action):
     start_activity(c, world, "dust_and_wipe")
 
 
+def _route_water_plants(c, world, action):
+    from systems.activities import start_activity
+    start_activity(c, world, "water_plants")
+
+
+def _route_weed_plants(c, world, action):
+    from systems.activities import start_activity
+    start_activity(c, world, "weed_plants")
+
+
+def _route_harvest_plants(c, world, action):
+    from systems.activities import start_activity
+    start_activity(c, world, "harvest_plants")
+
+
 # =========================================================
 # ROUTE WAIT
 # =========================================================
@@ -1180,6 +1195,15 @@ def route_action(c, world, action, speech, definitions=None, available_actions=N
 
     elif action_type == "dust_and_wipe":
         _route_dust_and_wipe(c, world, action)
+
+    elif action_type == "water_plants":
+        _route_water_plants(c, world, action)
+
+    elif action_type == "weed_plants":
+        _route_weed_plants(c, world, action)
+
+    elif action_type == "harvest_plants":
+        _route_harvest_plants(c, world, action)
 
     elif action_type == "wait":
         _route_wait(c, world, action)
@@ -1937,11 +1961,16 @@ def _route_plant_seed(c, world, action):
         x, y = action.get("x"), action.get("y")
         if x is None or y is None:
             return
-        plant_seed(world, plant_template_id, x=x, y=y)
+        plant_seed(world, plant_template_id, x=x, y=y, household_id=c.get("household_id"))
 
 
 def _route_water(c, world, action):
-    """action: {"type": "water", "target_id": plant_prop_id}"""
+    """action: {"type": "water", "target_id": plant_prop_id} -- ad hoc,
+    single-plant watering (the multi-stage "water_plants" household
+    chore, systems/task_process.py, is the normal path for a whole
+    round). Still requires a filled watering can (systems/containers.py's
+    liquid-capacity helpers), consuming one use -- same capacity concept
+    either way."""
     target_id = action.get("target_id") or action.get("target")
     if not target_id:
         return
@@ -1949,9 +1978,15 @@ def _route_water(c, world, action):
     prop = get_prop_by_id(world, target_id)
     if not prop:
         return
+    from systems.chores import find_watering_can
+    from systems.containers import water_uses_remaining, use_water
+    can, _source = find_watering_can(c, world)
+    if not can or water_uses_remaining(can) <= 0:
+        return
     from systems.plants import water_plant
     if not water_plant(prop):
         return
+    use_water(can)
 
     # Closes the loop on an accepted "water_plants" chore proposal
     # (systems/proposals.py) -- mirrors do_laundry_fill's _pending_chore

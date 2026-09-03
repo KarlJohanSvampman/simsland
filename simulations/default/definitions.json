@@ -578,6 +578,30 @@
       ],
       "icon": "outdoor"
     },
+    "outdoor_tap": {
+      "name": "Outdoor Tap",
+      "category": "fixture",
+      "footprint": [
+        {
+          "dx": 0,
+          "dy": 0
+        }
+      ],
+      "anchors": [
+        {
+          "name": "anchor_tap",
+          "interaction": "use_tap"
+        }
+      ],
+      "storage": null,
+      "tags": [
+        "fixture",
+        "outdoor",
+        "garden",
+        "tap"
+      ],
+      "icon": "outdoor"
+    },
     "wardrobe": {
       "name": "Wardrobe",
       "category": "furniture",
@@ -1298,13 +1322,18 @@
         {
           "name": "anchor_drink",
           "interaction": "drink"
+        },
+        {
+          "name": "anchor_tap",
+          "interaction": "use_tap"
         }
       ],
       "storage": null,
       "tags": [
         "fixture",
         "kitchen",
-        "cleaning"
+        "cleaning",
+        "tap"
       ],
       "icon": "fixture"
     },
@@ -1424,13 +1453,18 @@
         {
           "name": "anchor_drink",
           "interaction": "drink"
+        },
+        {
+          "name": "anchor_tap",
+          "interaction": "use_tap"
         }
       ],
       "storage": null,
       "tags": [
         "fixture",
         "bathroom",
-        "hygiene"
+        "hygiene",
+        "tap"
       ],
       "icon": "fixture"
     },
@@ -63700,6 +63734,27 @@
       "default_duration": 2,
       "default_active": true,
       "animation_state": "wipe"
+    },
+    "water_plant": {
+      "key": "water_plant",
+      "label": "Water Plant",
+      "default_duration": 2,
+      "default_active": true,
+      "animation_state": "water_plant"
+    },
+    "pull_weed": {
+      "key": "pull_weed",
+      "label": "Pull Weeds",
+      "default_duration": 3,
+      "default_active": true,
+      "animation_state": "pull_weed"
+    },
+    "harvest_item": {
+      "key": "harvest_item",
+      "label": "Harvest Item",
+      "default_duration": 2,
+      "default_active": true,
+      "animation_state": "collect_item"
     }
   },
   "plant_templates": {
@@ -63882,6 +63937,49 @@
         }
       ],
       "_per_item_note": "per_item_stages repeats once per dusty/dirty surface prop found in the target zone (tables, cabinets, shelves, sinks, toilets, tubs, showers, windows -- see systems/chores.py::_surface_props_in_zone()), capped; time_minutes above is a nominal fallback only."
+    },
+    "water_plants": {
+      "category": "gardening",
+      "time_minutes": 15,
+      "stages": [
+        {
+          "primitive": "fill_container",
+          "name": "fill_watering_can",
+          "active": true
+        }
+      ],
+      "per_item_stages": [
+        {
+          "primitive": "water_plant",
+          "name": "water_item",
+          "active": true
+        }
+      ],
+      "_per_item_note": "per_item_stages repeats once per plant needing water this trip, capped by the watering can's capacity -- see systems/chores.py::plants_needing_water(). The fixed fill_watering_can stage is the real activities.py hand-off (interaction 'use_tap', see kitchen_sink/bathroom_sink/outdoor_tap's anchors); time_minutes above is a nominal fallback only."
+    },
+    "weed_plants": {
+      "category": "gardening",
+      "time_minutes": 12,
+      "per_item_stages": [
+        {
+          "primitive": "pull_weed",
+          "name": "weed_item",
+          "active": true
+        }
+      ],
+      "_per_item_note": "per_item_stages repeats once per household plant with a high weed_level -- see systems/chores.py::plants_needing_weeding(); time_minutes above is a nominal fallback only."
+    },
+    "harvest_plants": {
+      "category": "gardening",
+      "time_minutes": 10,
+      "per_item_stages": [
+        {
+          "primitive": "harvest_item",
+          "name": "harvest_item",
+          "active": true
+        }
+      ],
+      "_per_item_note": "per_item_stages repeats once per household plant with ripe, uncollected produce -- see systems/chores.py::plants_ready_to_harvest(); time_minutes above is a nominal fallback only."
     }
   },
   "addiction_templates": {
