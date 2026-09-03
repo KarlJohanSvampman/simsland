@@ -18,6 +18,20 @@ def get_world(sim_id: str):
 
 @router.post("/world")
 def save(sim_id: str, data: dict):
+    # Minimum-clearance check (systems/prop_placement.py) -- this editor
+    # edits a client-side buffer and posts the whole world back in one
+    # shot rather than calling api/props.py's per-prop create/move
+    # endpoints, so that's where check_placement() lives; this is its
+    # bulk equivalent. Rejects the WHOLE save on any violation (matches
+    # the same "force a minimum distance" intent) rather than silently
+    # dropping the offending props -- the editor keeps the user's
+    # unsaved edits in worldState either way.
+    from systems.prop_placement import check_all_placements
+    defs = _load_defs_core(sim_id)
+    violations = check_all_placements(defs, data.get("props", []))
+    if violations:
+        return {"status": "error", "error": "placement", "violations": violations}
+
     # world_tiles and its derived nav structures (world_tile_lookup,
     # outdoor_navigation, road_graph, etc.) are deliberately excluded from
     # the persisted world blob everywhere else (see main.py::loop()) so that

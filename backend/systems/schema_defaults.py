@@ -140,6 +140,9 @@ def ensure_world_defaults(world, defs=None):
     # 0-100, 100=spotless; decays passively, raised by completing a
     # cleaning chore in that zone.
     world.setdefault("room_cleanliness", {})
+    # Per-zone furniture-change tracking (systems/refurnishing.py) --
+    # {zone_key: {last_changed_tick, changes_today, day_stamp}}.
+    world.setdefault("zone_furniture_changes", {})
     world.setdefault("proposals", {})
     world.setdefault("walls",              {})
 
@@ -588,6 +591,10 @@ def ensure_character_defaults(c, world=None):
         c["cleanliness_threshold"] = cleanliness_threshold_for_traits(
             list(c.get("traits", [])) + list(c.get("personality_traits", []))
         )
+
+    if c.get("redecorate_threshold_days") is None:
+        from systems.refurnishing import random_redecorate_threshold_days
+        c["redecorate_threshold_days"] = random_redecorate_threshold_days()
 
     # Retrofit -- character_gen.py::generate_character() only grants a
     # starting wallet/ID/bank card/bio to characters generated AFTER the

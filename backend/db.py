@@ -302,6 +302,8 @@ def load_world(sim_id):
             cached["definitions"] = load_definitions(sim_id)
 
         ensure_prop_template_fields(cached, cached["definitions"])
+        from systems.electrical import ensure_power_outlets
+        ensure_power_outlets(cached, cached["definitions"])
 
         return cached
 
@@ -365,6 +367,8 @@ def load_world(sim_id):
     # from what actually gets persisted.
     world["definitions"] = definitions
     ensure_prop_template_fields(world, definitions)
+    from systems.electrical import ensure_power_outlets
+    ensure_power_outlets(world, definitions)
     build_world_geometry(
         sim_id,
         world

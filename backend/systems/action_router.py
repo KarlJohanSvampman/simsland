@@ -631,6 +631,9 @@ def _route_load_dishwasher(c, world, action):
 # plays out afterward via task_process.py's background progression once
 # complete_activity()'s hand-off fires, same as laundry/dishes above.
 def _route_clean_floors(c, world, action):
+    from systems.chores import clean_floors_ready, zone_key_for_character
+    if not clean_floors_ready(c, world, zone_key_for_character(c)):
+        return
     from systems.activities import start_activity
     start_activity(c, world, "clean_floors")
 
@@ -653,6 +656,11 @@ def _route_weed_plants(c, world, action):
 def _route_harvest_plants(c, world, action):
     from systems.activities import start_activity
     start_activity(c, world, "harvest_plants")
+
+
+def _route_redecorate_room(c, world, action):
+    from systems.activities import start_activity
+    start_activity(c, world, "redecorate_room")
 
 
 # =========================================================
@@ -1204,6 +1212,9 @@ def route_action(c, world, action, speech, definitions=None, available_actions=N
 
     elif action_type == "harvest_plants":
         _route_harvest_plants(c, world, action)
+
+    elif action_type == "redecorate_room":
+        _route_redecorate_room(c, world, action)
 
     elif action_type == "wait":
         _route_wait(c, world, action)

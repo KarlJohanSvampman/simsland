@@ -584,10 +584,12 @@ def tick(world):
 
     if every(world, CADENCE["cleanliness"], offset=43):
         from systems.chores import tick_room_cleanliness_decay, maybe_react_to_mess
+        from systems.refurnishing import maybe_want_to_redecorate
         tick_room_cleanliness_decay(world)
         for c in characters:
             if c.get("alive", True) and not c.get("off_grid"):
                 maybe_react_to_mess(c, world)
+                maybe_want_to_redecorate(c, world)
 
     # -- Daily stats drift ──────────────────────────────────
     if every(world, CADENCE["socioeconomics"], offset=19):

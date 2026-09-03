@@ -20,7 +20,9 @@ def on_prop_created(
 
     definitions,
 
-    prop
+    prop,
+
+    world=None,
 ):
 
     assign_prop_room(
@@ -36,6 +38,16 @@ def on_prop_created(
 
         definitions
     )
+
+    # Feeds the refurnishing drive (systems/refurnishing.py) -- a prop
+    # placed through the World Editor counts as a real furniture change,
+    # same as a sim doing it in-sim via the redecorate_room chore. world
+    # is optional (callers outside api/props.py may not have it handy)
+    # since this is purely a "nice to track," not load-bearing.
+    if world is not None:
+        from systems.chores import zone_key_for_prop
+        from systems.refurnishing import record_furniture_change
+        record_furniture_change(world, zone_key_for_prop(prop))
 
 
 # =========================================================
@@ -50,7 +62,9 @@ def on_prop_moved(
 
     definitions,
 
-    prop
+    prop,
+
+    world=None,
 ):
 
     assign_prop_room(
@@ -66,6 +80,11 @@ def on_prop_moved(
 
         definitions
     )
+
+    if world is not None:
+        from systems.chores import zone_key_for_prop
+        from systems.refurnishing import record_furniture_change
+        record_furniture_change(world, zone_key_for_prop(prop))
 
 
 # =========================================================

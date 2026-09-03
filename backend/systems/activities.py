@@ -149,6 +149,7 @@ INTERACTION_ANIMATIONS = {
     "use_tap":        {"walking": "walk", "using": "fill_container", "finishing": "idle"},
     "weed_plants":    {"walking": "walk", "using": "pull_weed",      "finishing": "idle"},
     "harvest_plants": {"walking": "walk", "using": "collect_item",   "finishing": "idle"},
+    "redecorate_room": {"walking": "walk", "using": "carry_idle",    "finishing": "idle"},
 
     # --- generic fallback ---
     "interact":     {"walking": "walk", "using": "interact",   "finishing": "idle"},
@@ -788,6 +789,20 @@ ACTIVITIES = {
         "no_target": True,
 
         "base_duration_minutes": 3,
+
+        "interruptible": True,
+
+        "category": "chore"
+    },
+    # Self-directed, household-wide -- see systems/refurnishing.py. No
+    # single prop to walk to (it either relocates something already in
+    # the zone or adds a new one), same no_target shape as the chores
+    # above.
+    "redecorate_room": {
+
+        "no_target": True,
+
+        "base_duration_minutes": 20,
 
         "interruptible": True,
 
@@ -2107,6 +2122,17 @@ def complete_activity(
                 start_process(household, world, process_type, activity_type, stages,
                                participants=participants, zone_key=zone_key)
 
+                if activity_type == "clean_floors":
+                    # Scrubbing used up a bucketful -- see systems/
+                    # chores.py::clean_floors_ready(), which already
+                    # confirmed a filled bucket was on hand before this
+                    # activity was ever allowed to start.
+                    from systems.chores import find_bucket
+                    from systems.containers import use_water
+                    bucket, _source = find_bucket(c, world)
+                    if bucket:
+                        use_water(bucket)
+
     # =====================================
     # PLANT CARE — watering (needs a filled watering can, filled at a
     # Tap-tagged prop — systems/containers.py's water capacity helpers),
@@ -2186,6 +2212,16 @@ def complete_activity(
                     start_process(household, world, "harvesting", "harvest_plants", stages,
                                    participants=participants,
                                    target_prop_ids=[p["id"] for p in targets])
+
+    # =====================================
+    # REDECORATE — self-directed, no background process (unlike the
+    # chores above, there's nothing left to progress once the character
+    # is done -- see systems/refurnishing.py::perform_redecoration()).
+    # =====================================
+    elif activity_type == "redecorate_room":
+
+        from systems.refurnishing import perform_redecoration
+        perform_redecoration(c, world)
 
     # =====================================
     # INDIVIDUAL WAIT — microwave

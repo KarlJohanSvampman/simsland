@@ -268,6 +268,7 @@ def find_bucket_for_material(c, material_id):
 
 WATER_CAPACITY = {
     "watering_can": 10,
+    "bucket": 10,
 }
 
 

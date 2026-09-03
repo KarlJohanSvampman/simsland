@@ -72,10 +72,66 @@ def create_prop(
     # mutable copy -- reserve_anchor() mutates anchor["occupied_by"]
     # directly, and prop instances of the same template must not share
     # that state.
-    import copy
     template = definitions.get("prop_templates", {}).get(payload["template"], {})
 
-    prop = {
+    with world_lock():
+        world = load_world(sim_id)
+
+        building = _resolve_building(world, payload)
+
+        # Minimum-clearance check (systems/prop_placement.py) -- no
+        # placement validation existed anywhere before this round;
+        # enforced going forward only, doesn't touch already-placed
+        # props. Skipped if this create isn't resolvable to a real
+        # building (public infrastructure etc., same as everywhere else
+        # building resolution is optional).
+        if building:
+            from systems.prop_placement import check_placement
+            ok, reason = check_placement(
+                world, definitions, building["id"],
+                payload["template"], payload["x"], payload["y"],
+                rotation=payload.get("rotation", 0),
+            )
+            if not ok:
+                return {"ok": False, "error": reason}
+
+        prop = _create_prop_dict(payload, template)
+
+        world.setdefault(
+            "props",
+            []
+        ).append(prop)
+
+        # =====================================
+        # SEMANTIC EVENT
+        # =====================================
+
+        if building:
+
+            on_prop_created(
+
+                sim_id,
+
+                building,
+
+                definitions,
+
+                prop,
+
+                world,
+            )
+
+        save_world(sim_id, world)
+
+    return {
+        "ok": True,
+        "prop": prop
+    }
+
+
+def _create_prop_dict(payload, template):
+    import copy
+    return {
         "id": str(uuid4()),
 
         "template": payload[
@@ -97,40 +153,6 @@ def create_prop(
         "category":  template.get("category"),
         "storage":   copy.deepcopy(template.get("storage")),
         "catalog":   template.get("catalog"),
-    }
-
-    with world_lock():
-        world = load_world(sim_id)
-
-        world.setdefault(
-            "props",
-            []
-        ).append(prop)
-
-        # =====================================
-        # SEMANTIC EVENT
-        # =====================================
-
-        building = _resolve_building(world, payload)
-
-        if building:
-
-            on_prop_created(
-
-                sim_id,
-
-                building,
-
-                definitions,
-
-                prop
-            )
-
-        save_world(sim_id, world)
-
-    return {
-        "ok": True,
-        "prop": prop
     }
 
 
@@ -161,6 +183,20 @@ def move_prop(
             if prop["id"] != prop_id:
                 continue
 
+            # Minimum-clearance check (systems/prop_placement.py) --
+            # same rule as create_prop above, excluding this prop itself
+            # from its own check.
+            if building:
+                from systems.prop_placement import check_placement
+                ok, reason = check_placement(
+                    world, definitions, building["id"],
+                    prop.get("template"), payload["x"], payload["y"],
+                    rotation=payload.get("rotation", prop.get("rotation", 0)),
+                    exclude_prop_id=prop_id,
+                )
+                if not ok:
+                    return {"ok": False, "error": reason}
+
             prop["x"] = payload["x"]
             prop["y"] = payload["y"]
 
@@ -184,7 +220,9 @@ def move_prop(
 
                     definitions,
 
-                    prop
+                    prop,
+
+                    world,
                 )
 
             save_world(sim_id, world)

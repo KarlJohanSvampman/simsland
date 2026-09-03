@@ -271,6 +271,7 @@ ACTION_SPECS = {
     "water_plants":      {"group": "chore", "target": "none", "doc": "Fill a watering can at a tap and water plants that need it."},
     "weed_plants":       {"group": "chore", "target": "none", "doc": "Pull weeds from plants that need it."},
     "harvest_plants":    {"group": "chore", "target": "none", "doc": "Harvest all plants with ripe produce ready to pick."},
+    "redecorate_room":   {"group": "chore", "target": "none", "doc": "Rearrange furniture or add a new decorative piece to freshen up the place."},
 
     # ---- exercise -----------------------------------------------------
     "jog":            {"group": "exercise", "target": "none", "doc": "Go for a jog."},

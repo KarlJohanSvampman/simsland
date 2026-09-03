@@ -49,6 +49,15 @@ _SURFACE_KEYWORDS = (
 MAX_SURFACES_PER_WIPE = 6
 MAX_DISHES_PER_WASH = 8
 
+# Tools clean_floors' combined sweep/vacuum/scrub needs -- the user's
+# own explicit ask: scrubbing needs a mop + a water-filled bucket,
+# vacuuming needs a vacuum cleaner AND a power outlet in the zone
+# (systems/electrical.py). Sweeping itself isn't gated on anything
+# (never asked for).
+MOP_TEMPLATE_ID = "mop"
+BUCKET_TEMPLATE_ID = "bucket"
+VACUUM_CLEANER_TEMPLATE_ID = "vacuum_cleaner"
+
 
 # =========================================================
 # ZONE RESOLUTION
@@ -175,15 +184,51 @@ def has_dishwasher(world, household):
 def chore_activity_for_zone(world, c, zone_key):
     """Which activity_type should this character start to clean this
     zone? Dishes are judged household-wide (dirty_dishes isn't zone-
-    scoped), everything else is a generic zone chore -- picked by
-    whichever of clean_floors/dust_and_wipe would restore the most
-    cleanliness right now (both are always "available" for any zone;
-    there's no floor-vs-surface distinction in the cleanliness value
-    itself)."""
+    scoped); dust_and_wipe needs no tools at all and is always available.
+    clean_floors additionally requires its tools (see clean_floors_ready
+    below) -- a household without them just never gets offered it,
+    falling back to dust_and_wipe instead."""
     household = world.get("households", {}).get(c.get("household_id"))
     if household and dirty_dish_count(household) > 0:
         return "load_dishwasher" if has_dishwasher(world, household) else "wash_dishes"
-    return random.choice(("clean_floors", "dust_and_wipe"))
+    if clean_floors_ready(c, world, zone_key):
+        return random.choice(("clean_floors", "dust_and_wipe"))
+    return "dust_and_wipe"
+
+
+def find_mop(c, world):
+    return _find_item_of_template(c, world, MOP_TEMPLATE_ID)
+
+
+def find_bucket(c, world):
+    return _find_item_of_template(c, world, BUCKET_TEMPLATE_ID)
+
+
+def find_vacuum_cleaner(c, world):
+    return _find_item_of_template(c, world, VACUUM_CLEANER_TEMPLATE_ID)
+
+
+def clean_floors_ready(c, world, zone_key):
+    """Everything clean_floors' combined sweep/vacuum/scrub needs is on
+    hand -- mop + a water-filled bucket (brought along, per the user's
+    own framing -- no literal live position/distance tracking during the
+    chore, same simplification every other multi-stage chore in this
+    engine already makes) for scrubbing, a vacuum cleaner + a power
+    outlet actually present in the zone for vacuuming."""
+    mop, _ = find_mop(c, world)
+    if not mop:
+        return False
+    bucket, _ = find_bucket(c, world)
+    from systems.containers import water_uses_remaining
+    if not bucket or water_uses_remaining(bucket) <= 0:
+        return False
+    vacuum, _ = find_vacuum_cleaner(c, world)
+    if not vacuum:
+        return False
+    from systems.electrical import zone_has_power_outlet
+    if not zone_has_power_outlet(world, zone_key):
+        return False
+    return True
 
 
 # =========================================================
@@ -389,14 +434,15 @@ def household_plant_props(world, household_id):
     ]
 
 
-def find_watering_can(c, world):
+def _find_item_of_template(c, world, template_id):
     """Character's own inventory/held_stack first, then any household
     storage prop (e.g. the "garden" prop's outdoor_gear storage) in the
     home building. Returns (item, source_container_or_None) -- source is
-    None when the can is directly on the character (nothing to write
-    back into)."""
+    None when the item is directly on the character (nothing to write
+    back into). Shared search shape for every "does anyone in this
+    household own a <tool>" chore-gating check below."""
     for item in list(c.get("inventory", [])) + list(c.get("held_stack", [])):
-        if item.get("template_id") == WATERING_CAN_TEMPLATE_ID:
+        if item.get("template_id") == template_id:
             return item, None
 
     household = world.get("households", {}).get(c.get("household_id"))
@@ -412,9 +458,13 @@ def find_watering_can(c, world):
         if not storage:
             continue
         for item in storage.get("items", []):
-            if item.get("template_id") == WATERING_CAN_TEMPLATE_ID:
+            if item.get("template_id") == template_id:
                 return item, storage
     return None, None
+
+
+def find_watering_can(c, world):
+    return _find_item_of_template(c, world, WATERING_CAN_TEMPLATE_ID)
 
 
 def plants_needing_water(world, household_id, cap=WATERING_CAN_CAPACITY):

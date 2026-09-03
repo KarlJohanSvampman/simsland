@@ -602,6 +602,44 @@
       ],
       "icon": "outdoor"
     },
+    "power_outlet": {
+      "name": "Power Outlet",
+      "category": "fixture",
+      "footprint": [
+        {
+          "dx": 0,
+          "dy": 0
+        }
+      ],
+      "anchors": [],
+      "storage": null,
+      "tags": [
+        "fixture",
+        "outlet",
+        "electrical"
+      ],
+      "icon": "fixture"
+    },
+    "wall_painting": {
+      "name": "Painting",
+      "category": "wall_decor",
+      "footprint": [
+        {
+          "dx": 0,
+          "dy": 0
+        }
+      ],
+      "wall_mounted": true,
+      "anchors": [],
+      "storage": null,
+      "tags": [
+        "decor",
+        "art",
+        "wall_art"
+      ],
+      "base_price": 60,
+      "icon": "decor"
+    },
     "wardrobe": {
       "name": "Wardrobe",
       "category": "furniture",
@@ -7933,6 +7971,24 @@
       "stackable": false,
       "consumable": false,
       "icon": "cleaning"
+    },
+    "bucket": {
+      "name": "Bucket",
+      "category": "cleaning",
+      "size": 2,
+      "base_price": 12,
+      "stackable": false,
+      "consumable": false,
+      "icon": "cleaning"
+    },
+    "vacuum_cleaner": {
+      "name": "Vacuum Cleaner",
+      "category": "electronics",
+      "size": 4,
+      "base_price": 90,
+      "stackable": false,
+      "consumable": false,
+      "icon": "electronics"
     },
     "sponge": {
       "name": "Sponge",

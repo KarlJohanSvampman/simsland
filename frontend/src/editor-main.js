@@ -942,11 +942,25 @@ async function loadWorld() {
 //
 
 window.saveWorld = async () => {
-  await fetch("/api/editor/world?sim_id=default", {
+  const res = await fetch("/api/editor/world?sim_id=default", {
     method:  "POST",
     headers: { "Content-Type": "application/json" },
     body:    JSON.stringify(worldState)
   });
+  const result = await res.json().catch(() => null);
+
+  // Minimum-clearance violations (systems/prop_placement.py) -- the
+  // save is rejected server-side rather than silently dropping the
+  // offending props, so the user's edits stay right where they are in
+  // worldState; surface exactly what's too close to what so they can
+  // fix it and re-save.
+  if (result && result.status === "error" && result.error === "placement") {
+    const lines = (result.violations || []).map(v => `- ${v.reason}`).join("\n");
+    setStatus(`Save rejected: ${result.violations.length} placement conflict(s)`);
+    alert(`World NOT saved -- fix these placement conflicts first:\n\n${lines}`);
+    return;
+  }
+
   alert("World saved");
 };
 
