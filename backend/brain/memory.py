@@ -1,6 +1,16 @@
 import uuid
 import time
 
+# world["tick"] advances by exactly 1 per nominal game-second (confirmed
+# in sim_loop.py::advance_calendar()'s own comment: "one tick == one
+# nominal game-second") -- this is the authoritative tick-to-real-time
+# ratio for anything that wants to reason in SIMULATED days from a
+# stored world["tick"], as apply_detail_fade() below does. Note this
+# does NOT match systems/health.py's own TICKS_PER_DAY=24 convention
+# (1 tick = 1 "hour" there) -- that's a separate, pre-existing
+# inconsistency in this codebase, not something this file follows.
+SECONDS_PER_DAY = 86400
+
 
 # =========================================================
 # IMPORTANCE SCORING
@@ -94,6 +104,9 @@ def score_importance(
 # STORE MEMORY
 # =========================================================
 
+DETAIL_FADE_DAYS = 5  # how many simulated days before fading_details fields hide -- deliberately shorter than the ~7-day full-text-intact window systems/social_memory.py's own content fade uses; peripheral detail (who told you) goes first.
+
+
 def store_memory(
 
     c,
@@ -113,6 +126,8 @@ def store_memory(
     emotional_impact=0,
 
     source=None,
+
+    fading_details=None,
 
     **extra
 ):
@@ -211,6 +226,18 @@ def store_memory(
             source,
 
         # =================================
+        # DETAIL FADE -- which of THIS memory's own fields (e.g.
+        # "source", "who told me") become hidden first as it ages, ahead
+        # of the memory's core text/importance decaying via
+        # decay_memories()/prune_memories() below. Opt-in, per memory --
+        # most callers never set this and nothing changes for them. See
+        # apply_detail_fade().
+        # =================================
+
+        "fading_details":
+            fading_details or [],
+
+        # =================================
         # EXTRA
         # =================================
 
@@ -242,6 +269,29 @@ def store_memory(
 
 
 # =========================================================
+# DETAIL FADE
+# Which of a memory's own fields (see store_memory's fading_details=)
+# have become unrecallable due to age. Read-only -- returns a shallow
+# copy with the listed fields nulled out; never mutates the stored
+# original, since a DIFFERENT recaller (or the same character later,
+# once more time has passed) may still legitimately see a different
+# fade state.
+# =========================================================
+
+def apply_detail_fade(mem, current_tick, fade_days=DETAIL_FADE_DAYS):
+    fading = mem.get("fading_details") or []
+    if not fading:
+        return mem
+    age_days = max(0, (current_tick - mem.get("tick", current_tick)) / SECONDS_PER_DAY)
+    if age_days < fade_days:
+        return mem
+    faded = dict(mem)
+    for field in fading:
+        faded[field] = None
+    return faded
+
+
+# =========================================================
 # BASIC RECALL
 # =========================================================
 
@@ -251,7 +301,9 @@ def recall(
 
     query_or_tags,
 
-    limit=6
+    limit=6,
+
+    world=None,
 ):
 
     query = (
@@ -340,12 +392,18 @@ def recall(
         reverse=True
     )
 
-    return [
+    results = [m for _, m in scored[:limit]]
 
-        m
+    # Detail fade (see apply_detail_fade above) only applies when a
+    # caller actually passes world -- most of recall()'s few call sites
+    # historically didn't need it, and skipping it there is a safe,
+    # backward-compatible no-op (fields only ever get hidden, never
+    # invented).
+    if world is not None:
+        current_tick = world.get("tick", 0)
+        results = [apply_detail_fade(m, current_tick) for m in results]
 
-        for _, m in scored[:limit]
-    ]
+    return results
 
 
 # =========================================================
@@ -358,13 +416,16 @@ def recall_relevant(
 
     query,
 
-    k=5
+    k=5,
+
+    world=None,
 ):
 
     return recall(
         c,
         query,
-        k
+        k,
+        world=world,
     )
 
 
@@ -480,7 +541,9 @@ def biased_recall(
 
     query="",
 
-    limit=10
+    limit=10,
+
+    world=None,
 ):
 
     memories = c.get(
@@ -609,12 +672,13 @@ def biased_recall(
         reverse=True
     )
 
-    return [
+    results = [m for _, m in scored[:limit]]
 
-        m
+    if world is not None:
+        current_tick = world.get("tick", 0)
+        results = [apply_detail_fade(m, current_tick) for m in results]
 
-        for _, m in scored[:limit]
-    ]
+    return results
 
 # =========================================================
 # REWRITE MEMORY SALIENCE

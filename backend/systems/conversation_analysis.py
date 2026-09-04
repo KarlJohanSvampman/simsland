@@ -48,7 +48,7 @@ def _maybe_cue_recall(listener, utterance, world):
     word = random.choice(words)
     try:
         from brain.memory import recall
-        hits = recall(listener, [word], limit=3)
+        hits = recall(listener, [word], limit=3, world=world)
     except Exception:
         hits = []
     if not hits:
@@ -197,6 +197,18 @@ def analyze_message(
 
     if world is not None:
         _maybe_cue_recall(listener, utterance, world)
+
+        # =====================================================
+        # HEARSAY -- unlike the probabilistic cue above, a substantive
+        # utterance naming someone the listener already knows always
+        # commits a real memory about that person (systems/
+        # social_memory.py::maybe_record_mentions()).
+        # =====================================================
+        try:
+            from systems.social_memory import maybe_record_mentions
+            maybe_record_mentions(listener, speaker, utterance, world)
+        except Exception:
+            pass
 
     return result
 

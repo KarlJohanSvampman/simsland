@@ -4,8 +4,14 @@ health.py -- Comprehensive health simulation system for HoloSims
 
 import random
 
-TICKS_PER_HOUR = 1
-TICKS_PER_DAY  = 24
+# world["tick"] advances by exactly 1 per nominal game-second (see
+# sim_loop.py::advance_calendar()'s own comment, and core/
+# tick_schedule.py's TICK_RATE_SECONDS) -- these were previously 1/24/168,
+# assuming 1 tick = 1 "hour," a pre-existing bug that made every
+# interval below (medication cadence, the daily immune/condition tick,
+# the weekly checks) fire roughly 3600x too often. Corrected here.
+TICKS_PER_HOUR = 3600
+TICKS_PER_DAY  = TICKS_PER_HOUR * 24
 TICKS_PER_WEEK = TICKS_PER_DAY * 7
 
 MIN_HEART_ATTACK_SURVIVAL_MINUTES = 15

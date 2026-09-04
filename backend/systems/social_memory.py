@@ -21,11 +21,19 @@ existing one, since other systems already read it for other purposes.
 """
 
 import random
+import re
 
 MEMORY_RECALL_LIMIT = 6
-TICKS_PER_DAY = 24            # matches health.py/plants.py/refurnishing.py's convention
+# world["tick"] advances by exactly 1 per nominal game-second (see
+# sim_loop.py::advance_calendar()'s own comment) -- 86400 ticks really
+# is one simulated day. The original version of this constant (24) was
+# copied from health.py/plants.py's own TICKS_PER_DAY, which turns out
+# to assume 1 tick = 1 "hour" instead -- a separate, pre-existing
+# inconsistency in THOSE files (not touched here), but a real bug to
+# carry into this one, caught and fixed before it shipped anywhere else.
+TICKS_PER_DAY = 86400
 VIOLATION_RECENCY_DAYS = 30   # only worth bringing up while it's still fresh
-RECALL_NARRATION_WINDOW_TICKS = 60   # how long a fresh sighting stays worth narrating into context
+RECALL_NARRATION_WINDOW_TICKS = 60   # how long a fresh sighting stays worth narrating into context (~1 minute -- this one was always tick-native, never ran through the buggy TICKS_PER_DAY conversion above)
 
 # Same shape as systems/chores.py's _wants_to_nag -- personality-leaning
 # coin flip, not a hard rule.
@@ -61,15 +69,28 @@ def _fade_text(text, days_old):
 def memories_about(c, other_id, world, limit=MEMORY_RECALL_LIMIT):
     """Newest first ("oldest last," per spec), each entry's text faded
     by age. Read-only -- doesn't mutate the character's real stored
-    memories, just how much of them gets surfaced right now."""
+    memories, just how much of them gets surfaced right now. Two
+    independent fade mechanisms apply, on different schedules: the core
+    text degrades via _fade_text() above (7/30/90-day tiers); a
+    memory's OWN fading_details fields (e.g. "source" -- see brain/
+    memory.py::store_memory()) hide sooner, via apply_detail_fade()."""
+    from brain.memory import apply_detail_fade
     tick = world.get("tick", 0)
     mine = [m for m in c.get("memories", []) if other_id in (m.get("people") or [])]
     mine.sort(key=lambda m: m.get("tick", 0), reverse=True)
 
+    chars = world.get("characters", {})
     out = []
     for m in mine[:limit]:
         days_old = max(0, (tick - m.get("tick", tick)) / TICKS_PER_DAY)
-        out.append({"text": _fade_text(m.get("text", ""), days_old), "days_old": round(days_old, 1)})
+        faded = apply_detail_fade(m, tick)
+        source_id = faded.get("source")
+        source_name = chars.get(source_id, {}).get("name") if source_id else None
+        out.append({
+            "text":        _fade_text(m.get("text", ""), days_old),
+            "days_old":    round(days_old, 1),
+            "source_name": source_name,
+        })
     return out
 
 
@@ -150,3 +171,72 @@ def maybe_review_on_sighting(c, other, world):
         }
 
     _review_social_contracts(c, other, world)
+
+
+# =========================================================
+# HEARSAY -- someone's name comes up in conversation, alongside real
+# content (an observation, fact, complaint, description -- whatever the
+# case). Unlike systems/conversation_analysis.py's own cued-recall
+# mechanic (~15% chance, one random word, just RECALLS an existing
+# memory), this is deterministic and STORES a new one: a substantive
+# utterance naming someone the listener already knows always commits a
+# real memory about that person. Called from analyze_message()
+# alongside the existing cued-recall check.
+# =========================================================
+
+MENTION_MIN_WORDS = 4  # skips bare greetings/one-word replies -- everything else counts
+
+_WORD_RE = re.compile(r"[A-Za-z']+")
+
+
+def _mentioned_character_ids(listener, speaker, utterance, world):
+    """Very simple name-matching -- no real NLP/entity-recognition
+    exists anywhere in this codebase (confirmed via grep), so this
+    mirrors the same soft, deterministic-keyword spirit systems/
+    chores.py's zone/surface matching already uses. Scoped to the
+    LISTENER's own known contacts (c["relationships"]) rather than every
+    character in the world -- you can't form a specific memory about a
+    particular "John" you've never met, even if a stranger's name
+    happens to be John, and scanning the whole world every utterance
+    would be needlessly expensive besides."""
+    words = set(w.lower() for w in _WORD_RE.findall(utterance or ""))
+    if not words:
+        return []
+
+    chars = world.get("characters", {})
+    speaker_id = speaker.get("id")
+    listener_id = listener.get("id")
+    found = []
+    for other_id in listener.get("relationships", {}):
+        if other_id in (listener_id, speaker_id):
+            continue
+        other = chars.get(other_id)
+        if not other:
+            continue
+        full_name = other.get("first_name") or other.get("name") or ""
+        first = full_name.split()[0].lower() if full_name else ""
+        if first and first in words:
+            found.append(other_id)
+    return found
+
+
+def maybe_record_mentions(listener, speaker, utterance, world):
+    if not utterance or len(utterance.split()) < MENTION_MIN_WORDS:
+        return
+    mentioned_ids = _mentioned_character_ids(listener, speaker, utterance, world)
+    if not mentioned_ids:
+        return
+
+    from brain.memory import store_memory
+    tick = world.get("tick", 0)
+    for other_id in mentioned_ids:
+        store_memory(
+            listener, utterance, importance=0.45,
+            tags=["mentioned", "conversation", "heard_about"],
+            tick=tick, people=[other_id], source=speaker.get("id"),
+            # The core content (what was said) fades on the same slow
+            # word-detail schedule memories_about()'s own _fade_text
+            # applies at recall time -- WHO told them fades first and
+            # separately, via brain/memory.py's fading_details mechanism.
+            fading_details=["source"],
+        )

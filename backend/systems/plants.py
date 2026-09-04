@@ -26,7 +26,11 @@ clears the container -- unharvested fruit rots and falls off.
 
 import uuid
 
-TICKS_PER_DAY = 24  # matches health.py's TICKS_PER_DAY convention
+# world["tick"] advances by exactly 1 per nominal game-second (see
+# sim_loop.py::advance_calendar()) -- this used to be 24, copied from
+# health.py's own (also wrong) TICKS_PER_DAY, making a plant's whole
+# growth/moisture/weed cycle run roughly 3600x too fast. Corrected here.
+TICKS_PER_DAY = 86400
 
 # days_to_grow is charged twice (sprout->growing, then growing->mature) --
 # both middle stages grow at the same pace; only the first (seed->sprout)

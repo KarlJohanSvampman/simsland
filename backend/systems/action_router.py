@@ -749,7 +749,7 @@ def _route_recall(c, world, action, available_actions=None):
         return
 
     subject_name = _resolve_recall_subject(c, world, query, available_actions)
-    memories = biased_recall(c, query=subject_name or query, limit=5)
+    memories = biased_recall(c, query=subject_name or query, limit=5, world=world)
     text = _render_recall_result(query, memories)
     stage_and_wake(c, world, text, "recall_result")
 

@@ -17,7 +17,11 @@ import copy
 import random
 import uuid
 
-TICKS_PER_DAY = 24  # matches health.py/plants.py's TICKS_PER_DAY convention
+# world["tick"] advances by exactly 1 per nominal game-second (see
+# sim_loop.py::advance_calendar()) -- this used to be 24, copied from
+# health.py/plants.py's own (also wrong) TICKS_PER_DAY, making the
+# refurnish threshold fire roughly 3600x too soon. Corrected here.
+TICKS_PER_DAY = 86400
 REDECORATE_NUDGE_PRIORITY = 30
 DEFAULT_REDECORATE_THRESHOLD_RANGE = (20, 60)  # days -- an arbitrary per-sim number, per the user's own framing
 

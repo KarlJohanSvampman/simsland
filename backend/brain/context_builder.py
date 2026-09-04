@@ -1565,7 +1565,7 @@ def _sec_conflict(c, world):
 
 def _sec_memories(c, world):
     # restores build_memory_context, previously unused
-    memories = build_memory_context(c)
+    memories = build_memory_context(c, world=world)
     if not memories:
         return None
     top_memories = sorted(
@@ -1586,10 +1586,17 @@ def _sec_sighting_recall(c, world):
     from systems.social_memory import RECALL_NARRATION_WINDOW_TICKS
     if world.get("tick", 0) - entry.get("tick", 0) > RECALL_NARRATION_WINDOW_TICKS:
         return None
-    texts = [m["text"] for m in entry.get("memories", []) if m.get("text")]
-    if not texts:
+    lines = []
+    for m in entry.get("memories", []):
+        if not m.get("text"):
+            continue
+        if m.get("source_name"):
+            lines.append(f"{m['text']} (you heard this from {m['source_name']})")
+        else:
+            lines.append(m["text"])
+    if not lines:
         return None
-    return f"Seeing {entry['other_name']} again reminds you: {'; '.join(texts)}."
+    return f"Seeing {entry['other_name']} again reminds you: {'; '.join(lines)}."
 
 
 def _sec_family(c, world):
@@ -2897,14 +2904,18 @@ def build_household_resource_context(
 
 def build_memory_context(
 
-    c
+    c,
+
+    world=None,
 ):
 
     memories = biased_recall(
 
         c,
 
-        limit=8
+        limit=8,
+
+        world=world,
     )
 
     results = []
