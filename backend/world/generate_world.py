@@ -636,7 +636,7 @@ def generate_initial_world():
         assign_building_to_household,
         add_member_to_household,
     )
-    from systems.vehicles import spawn_household_garage_and_car, spawn_bus_stop
+    from systems.vehicles import spawn_household_car, spawn_bus_stop
 
     world.setdefault("households", {})
     house_1 = world["buildings"][0]
@@ -644,7 +644,7 @@ def generate_initial_world():
     assign_building_to_household(world, house_1, household)
     add_member_to_household(world, c1, household)
 
-    spawn_household_garage_and_car(world, household, house_1)
+    spawn_household_car(world, household, house_1)
     spawn_bus_stop(world, world["road_y"])
 
     return world

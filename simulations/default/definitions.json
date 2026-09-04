@@ -297,6 +297,7 @@
       "icon": "electronics"
     },
     "car_sedan_a": {
+      "name": "Sedan",
       "category": "vehicle",
       "footprint": [
         {
@@ -316,11 +317,108 @@
         {
           "name": "anchor_drive",
           "interaction": "drive_car_to"
+        },
+        {
+          "name": "anchor_trunk",
+          "interaction": "use_trunk"
         }
       ],
       "tags": [
         "vehicle",
         "car"
+      ],
+      "storage": null,
+      "vehicle": {
+        "vehicle_class": "car",
+        "top_speed": 180,
+        "seats": 5,
+        "has_trunk_container": true,
+        "container_size": 20,
+        "gasoline_cost_per_use": 8,
+        "base_value": 18000
+      },
+      "icon": "vehicle"
+    },
+    "bike_a": {
+      "name": "Bicycle",
+      "category": "vehicle",
+      "footprint": [
+        {
+          "dx": 0,
+          "dy": 0
+        }
+      ],
+      "anchors": [
+        {
+          "name": "anchor_drive",
+          "interaction": "drive_car_to"
+        }
+      ],
+      "tags": [
+        "vehicle",
+        "bike"
+      ],
+      "storage": null,
+      "vehicle": {
+        "vehicle_class": "bike",
+        "top_speed": 25,
+        "seats": 1,
+        "has_trunk_container": false,
+        "container_size": 0,
+        "gasoline_cost_per_use": 0,
+        "base_value": 250
+      },
+      "icon": "vehicle"
+    },
+    "motorcycle_a": {
+      "name": "Motorcycle",
+      "category": "vehicle",
+      "footprint": [
+        {
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "dx": 1,
+          "dy": 0
+        }
+      ],
+      "anchors": [
+        {
+          "name": "anchor_drive",
+          "interaction": "drive_car_to"
+        }
+      ],
+      "tags": [
+        "vehicle",
+        "motorcycle"
+      ],
+      "storage": null,
+      "vehicle": {
+        "vehicle_class": "motorcycle",
+        "top_speed": 160,
+        "seats": 2,
+        "has_trunk_container": false,
+        "container_size": 0,
+        "gasoline_cost_per_use": 5,
+        "base_value": 8000
+      },
+      "icon": "vehicle"
+    },
+    "trunk": {
+      "name": "Trunk",
+      "category": "storage",
+      "footprint": [
+        {
+          "dx": 0,
+          "dy": 0
+        }
+      ],
+      "anchors": [],
+      "tags": [
+        "vehicle",
+        "trunk",
+        "container"
       ],
       "storage": {
         "slots": 20,
@@ -328,7 +426,7 @@
           "*"
         ]
       },
-      "icon": "vehicle"
+      "icon": "storage"
     },
     "dining_table_a": {
       "category": "furniture",
@@ -4650,40 +4748,6 @@
       "celebrity_id": "celeb_athlete_marco",
       "description": "A poster of Marco Diaz. Popular bedroom wall decoration.",
       "icon": "wall_decor"
-    },
-    "garage_a": {
-      "category": "structure",
-      "footprint": [
-        {
-          "dx": 0,
-          "dy": 0
-        },
-        {
-          "dx": 1,
-          "dy": 0
-        },
-        {
-          "dx": 2,
-          "dy": 0
-        },
-        {
-          "dx": 0,
-          "dy": 1
-        },
-        {
-          "dx": 1,
-          "dy": 1
-        },
-        {
-          "dx": 2,
-          "dy": 1
-        }
-      ],
-      "tags": [
-        "structure",
-        "garage"
-      ],
-      "icon": "structure"
     },
     "bus_stop_a": {
       "category": "transit",

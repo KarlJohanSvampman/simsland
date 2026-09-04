@@ -123,12 +123,32 @@ def create_bucket(material_id, world, uses=None):
 # SLOT ACCOUNTING
 # =========================================================
 
+# A stored PROP (not an item -- see store_prop_in_container below, e.g. a
+# vehicle's trunk holding a spare tire or a toolbox) always costs this
+# many slots, flat, regardless of its own footprint -- props are bulkier
+# than a typical item and never stack, unlike items (size * quantity,
+# some stackable). Distinguished from an item entry by the "template"
+# key -- props use "template", items use "template_id" (this codebase's
+# existing, consistent naming split), so no new discriminator field is
+# needed.
+PROP_SLOT_COST = 6
+
+
+def _is_prop_entry(entry):
+    return "template" in entry
+
+
+def _entry_slot_cost(entry, quantity=None):
+    if _is_prop_entry(entry):
+        return PROP_SLOT_COST
+    qty = quantity if quantity is not None else entry.get("quantity", 1)
+    return entry.get("size", 1) * qty
+
+
 def slots_used(container):
-    """Total slots occupied by items inside the container."""
-    total = 0
-    for item in container.get("items", []):
-        total += item.get("size", 1) * item.get("quantity", 1)
-    return total
+    """Total slots occupied by items (and any stored props) inside the
+    container."""
+    return sum(_entry_slot_cost(entry) for entry in container.get("items", []))
 
 
 def slots_available(container):
@@ -137,8 +157,9 @@ def slots_available(container):
 
 def can_fit(container, item, quantity=1):
     """
-    Return True if `quantity` units of item fit in container.
-    Does not allow containers inside containers. accepted_categories,
+    Return True if `quantity` units of item fit in container. (For a
+    prop entry, quantity is meaningless -- props never stack -- and is
+    ignored.) Does not allow containers inside containers. accepted_categories,
     when present on the container (storage furniture / bag items --
     see ensure_prop_storage/ensure_item_container below), restricts what
     category of item may enter; accepted_templates is the narrower,
@@ -150,14 +171,16 @@ def can_fit(container, item, quantity=1):
     there is unchanged.
     """
     if item.get("type") == "container":
-        return False  # no nesting
+        return False  # no nesting (container-type items)
+    if _is_prop_entry(item) and "capacity" in item:
+        return False  # no nesting (a storage-capable prop, e.g. another trunk)
     accepted_categories = container.get("accepted_categories")
     if accepted_categories is not None and item.get("category") not in accepted_categories:
         return False
     accepted_templates = container.get("accepted_templates")
     if accepted_templates is not None and item.get("template_id") not in accepted_templates:
         return False
-    needed = item.get("size", 1) * quantity
+    needed = _entry_slot_cost(item, quantity)
     return slots_available(container) >= needed
 
 
@@ -219,6 +242,51 @@ def remove_from_container(container, item_id, quantity=None):
                 partial["quantity"] = quantity
                 return {"success": True, "item": partial, "reason": "partial"}
     return {"success": False, "item": None, "reason": "not_found"}
+
+
+# =========================================================
+# STORE / RETRIEVE A PROP (not an item)
+# A prop being stored (e.g. a spare tire, a toolbox) stops being a
+# world-positioned object -- add_to_container/remove_from_container
+# above already handle a prop-shaped entry correctly once inside a
+# container (see PROP_SLOT_COST/_is_prop_entry), but getting it in and
+# out of world["props"] is a level these two wrappers handle.
+# =========================================================
+
+def store_prop_in_container(world, container, prop):
+    """Removes `prop` from world["props"] and adds it to `container`.
+    Strips x/y/room_id (no longer a world position while stored -- see
+    retrieve_prop_from_container for restoring them). Returns
+    add_to_container()'s result dict; on failure (no space / rejected),
+    the prop is left untouched in world["props"]."""
+    result = add_to_container(container, prop)
+    if not result.get("success"):
+        return result
+
+    props = world.get("props", [])
+    world["props"] = [p for p in props if p.get("id") != prop.get("id")]
+
+    stored = container["items"][-1]
+    stored["x"] = None
+    stored["y"] = None
+    stored["room_id"] = None
+    return result
+
+
+def retrieve_prop_from_container(world, container, prop_id, x, y, building_id=None):
+    """Pops prop_id out of `container` and places it back into
+    world["props"] at (x, y). Returns the restored prop dict, or None if
+    prop_id wasn't found in this container."""
+    removed = remove_from_container(container, prop_id)
+    if not removed.get("success"):
+        return None
+    prop = removed["item"]
+    prop["x"] = x
+    prop["y"] = y
+    if building_id is not None:
+        prop["building_id"] = building_id
+    world.setdefault("props", []).append(prop)
+    return prop
 
 
 # =========================================================
