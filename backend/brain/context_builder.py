@@ -1575,6 +1575,23 @@ def _sec_memories(c, world):
     return f"You recall: {mem_text}." if mem_text else None
 
 
+def _sec_sighting_recall(c, world):
+    # systems/social_memory.py -- fires once per real day, the first
+    # time c actually sees a specific person; narrated only for a short
+    # window afterward so it reads as "seeing them just now reminded
+    # you," not a permanently-stuck flag.
+    entry = c.get("_last_sighting_recall")
+    if not entry:
+        return None
+    from systems.social_memory import RECALL_NARRATION_WINDOW_TICKS
+    if world.get("tick", 0) - entry.get("tick", 0) > RECALL_NARRATION_WINDOW_TICKS:
+        return None
+    texts = [m["text"] for m in entry.get("memories", []) if m.get("text")]
+    if not texts:
+        return None
+    return f"Seeing {entry['other_name']} again reminds you: {'; '.join(texts)}."
+
+
 def _sec_family(c, world):
     # restores _build_family_context, previously unused
     family = _build_family_context(c, world)
@@ -1899,6 +1916,7 @@ NARRATIVE_SECTIONS = [
     ("grievances",            "full", _sec_grievances),
     ("conflict",              "full", _sec_conflict),
     ("memories",              "full", _sec_memories),
+    ("sighting_recall",       "full", _sec_sighting_recall),
     ("family",                "full", _sec_family),
     ("household_processes",   "full", _sec_household_processes),
     ("proposals",             "full", _sec_proposals),

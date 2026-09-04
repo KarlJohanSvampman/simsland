@@ -1364,6 +1364,15 @@ def perceive(
         except Exception:
             pass
 
+        # systems/social_memory.py -- once per real day, the FIRST time c
+        # actually sees this specific person, recall what's stored about
+        # them and review any social-contract obligations between them.
+        try:
+            from systems.social_memory import maybe_review_on_sighting
+            maybe_review_on_sighting(c, target, world)
+        except Exception:
+            pass
+
     perception = {
 
         "visible_people":

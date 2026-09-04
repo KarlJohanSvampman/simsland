@@ -160,9 +160,36 @@ def report_violation(contract, violator_id, term, world):
     })
     contract.setdefault("_last_violation_tick", {})[violator_id] = world["tick"]
 
+    # Nobody's stored memory ever recorded a missed commitment before
+    # this (confirmed via grep -- only add_grievance(), fired from
+    # core/event_handlers.py's own "contract_violated" listener, ever
+    # ran here) -- store one for the violator, each other contracting
+    # party, and (best-effort proxy -- no real per-instance attendee
+    # list exists on a contract/term) any OTHER household member of the
+    # violator's, who'd plausibly have noticed too.
+    from brain.memory import store_memory
+    chars = world.get("characters", {})
+    violator_char = chars.get(violator_id)
+    violator_name = violator_char.get("name", "someone") if violator_char else "someone"
+    commitment = term["commitment"]
+
+    if violator_char:
+        store_memory(
+            violator_char, f"You missed {commitment}.", importance=0.5,
+            tags=["social_contract", "violated", "obligation_missed"],
+            tick=world["tick"], people=[p for p in contract["parties"] if p != violator_id],
+        )
+
     # Notify the other parties
     for pid in contract["parties"]:
         if pid != violator_id:
+            victim_char = chars.get(pid)
+            if victim_char:
+                store_memory(
+                    victim_char, f"{violator_name} missed {commitment}.", importance=0.55,
+                    tags=["social_contract", "violated", "let_down"],
+                    tick=world["tick"], people=[violator_id],
+                )
             emit("contract_violated", {
                 "contract_id":  contract["id"],
                 "violator_id":  violator_id,
@@ -170,6 +197,21 @@ def report_violation(contract, violator_id, term, world):
                 "commitment":   term["commitment"],
                 "event_type":   "contract_violated",
             })
+
+    if violator_char:
+        hh_id = violator_char.get("household_id")
+        household = world.get("households", {}).get(hh_id) if hh_id else None
+        if household:
+            for member_id in household.get("members", []):
+                if member_id == violator_id or member_id in contract["parties"]:
+                    continue
+                member = chars.get(member_id)
+                if member:
+                    store_memory(
+                        member, f"{violator_name} missed {commitment}.", importance=0.35,
+                        tags=["social_contract", "violated", "household_news"],
+                        tick=world["tick"], people=[violator_id],
+                    )
 
     # Queue phone/text escalation if authority contract
     try:
