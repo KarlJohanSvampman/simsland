@@ -62,6 +62,7 @@ def init_plant_state(prop, plant_template_id, tick, tmpl=None):
         "stage_started_tick": tick,
         "moisture":           100,
         "weed_level":         0,
+        "last_decay_tick":    tick,
     }
     prop["items"] = prop.get("items", [])
     prop["capacity"] = PLANT_CONTAINER_SLOTS
@@ -159,8 +160,19 @@ def tick_plants(world):
         if not tmpl:
             continue
 
-        state["moisture"] = max(0, state["moisture"] - tmpl.get("moisture_decay_per_day", 10))
-        state["weed_level"] = min(100, state["weed_level"] + tmpl.get("weed_growth_per_day", 5))
+        # moisture/weed decay used to apply a flat "per day" amount on
+        # EVERY call to tick_plants() regardless of how much simulated
+        # time had actually passed since the last call (CADENCE["plants"]
+        # fires every 30 real ticks -- 30 seconds -- not once a day), so
+        # a plant dried out and weeded over in minutes no matter what
+        # TICKS_PER_DAY was set to. Scaled by real elapsed simulated
+        # days since the last decay tick instead; last_decay_tick is
+        # stamped at planting time (init_plant_state) so the very first
+        # tick after planting doesn't see a huge bogus elapsed window.
+        elapsed_days = max(0, (tick - state.get("last_decay_tick", tick)) / TICKS_PER_DAY)
+        state["moisture"] = max(0, state["moisture"] - tmpl.get("moisture_decay_per_day", 10) * elapsed_days)
+        state["weed_level"] = min(100, state["weed_level"] + tmpl.get("weed_growth_per_day", 5) * elapsed_days)
+        state["last_decay_tick"] = tick
 
         # Growth pauses entirely while bone dry.
         if state["moisture"] <= 0:
