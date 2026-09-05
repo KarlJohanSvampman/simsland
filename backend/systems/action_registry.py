@@ -258,6 +258,12 @@ ACTION_SPECS = {
     "harvest":      {"group": "plant", "target": "prop", "doc": "Harvest a mature plant's fruit."},
     "collect":      {"group": "plant", "target": "prop", "doc": "Collect contents from any reachable container."},
 
+    # ---- storage (systems/containers.py) -- generic put/stow/retrieve,
+    # not trunk-specific, but this is what a car's trunk actually uses ---
+    "put_in_container": {"group": "storage", "target": "prop", "doc": "Put a carried item into any reachable container (a car's trunk, a wardrobe, a chest, ...)."},
+    "stow_prop":         {"group": "storage", "target": "prop", "doc": "Pick up a nearby object and store it inside a container (e.g. a car's trunk)."},
+    "retrieve_prop":     {"group": "storage", "target": "prop", "doc": "Take a stored object back out of a container and set it down."},
+
     # ---- chores (systems/chores.py, systems/task_process.py) --------------
     # wash_dishes/load_dishwasher are ordinary ACTIVITIES-dict entries
     # (real anchors -- kitchen_sink/dishwasher), routed the normal way.

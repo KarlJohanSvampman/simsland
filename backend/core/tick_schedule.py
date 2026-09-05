@@ -117,6 +117,13 @@ CADENCE["calendar_events"]  = 60
 # Socioeconomics — once per simulated day (~24 ticks)
 CADENCE["socioeconomics"]   = 24
 
+# Police RSS feed poll (see systems/police_feed.py) — same slow,
+# community-level tier as socioeconomics; each poll only ever folds in
+# a handful of brand-new items (deduped by guid), so polling more often
+# than this wouldn't surface content any faster, just hit the external
+# feed more than courteous.
+CADENCE["police_feed"]      = 24
+
 # Persona/value-alignment expectations between close kin (see
 # systems/persona_expectations.py) — a slow drama-simmer check, same tier
 # as election/faction/hierarchy.

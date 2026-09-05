@@ -1412,6 +1412,12 @@ def route_action(c, world, action, speech, definitions=None, available_actions=N
         _route_harvest(c, world, action)
     elif action_type == "collect":
         _route_collect(c, world, action)
+    elif action_type == "put_in_container":
+        _route_put_in_container(c, world, action)
+    elif action_type == "stow_prop":
+        _route_stow_prop(c, world, action)
+    elif action_type == "retrieve_prop":
+        _route_retrieve_prop(c, world, action)
     elif action_type == "jog":
         _route_jog(c, world, action)
     elif action_type == "sit_ups":
@@ -2059,6 +2065,74 @@ def _route_collect(c, world, action):
     if not source:
         return
     collect_item(c, world, source, item_id=action.get("item_id"), dest_id=action.get("dest_id"))
+
+
+# =========================================================
+# STORE / RETRIEVE -- the reverse of collect above, plus whole-PROP
+# storage (systems/containers.py's PROP_SLOT_COST/store_prop_in_
+# container/retrieve_prop_from_container -- e.g. a car's trunk, but
+# generic to any reachable container). No walk/reachability gate here,
+# same as collect/harvest above -- this container system has never
+# needed one.
+# =========================================================
+
+def _route_put_in_container(c, world, action):
+    """action: {"type": "put_in_container", "item_id": ..., "container_id": ...}
+    -- take a carried/worn/stored item and put it in any reachable
+    container (a car's trunk, a wardrobe, a chest, ...). If the
+    container is full or rejects it, the item goes back to wherever it
+    came from rather than vanishing."""
+    item_id = action.get("item_id")
+    container_id = action.get("container_id") or action.get("target_id") or action.get("target")
+    if not item_id or not container_id:
+        return
+    from systems.containers import resolve_container, add_to_container
+    from systems.activities import _take_item_anywhere
+    container = resolve_container(c, world, container_id)
+    if not container:
+        return
+    item = _take_item_anywhere(c, world, item_id)
+    if not item:
+        return
+    result = add_to_container(container, item)
+    if not result.get("success"):
+        from systems.item_stack import add_to_held_stack
+        add_to_held_stack(c, item)
+
+
+def _route_stow_prop(c, world, action):
+    """action: {"type": "stow_prop", "target_id": prop_id, "container_id": ...}
+    -- pick up a whole prop from the world (not an item) and store it in
+    a reachable container, e.g. putting a spare tire in the trunk."""
+    target_id = action.get("target_id") or action.get("target")
+    container_id = action.get("container_id")
+    if not target_id or not container_id:
+        return
+    from systems.props import get_prop_by_id
+    from systems.containers import resolve_container, store_prop_in_container
+    prop = get_prop_by_id(world, target_id)
+    container = resolve_container(c, world, container_id)
+    if not prop or not container or prop is container:
+        return
+    store_prop_in_container(world, container, prop)
+
+
+def _route_retrieve_prop(c, world, action):
+    """action: {"type": "retrieve_prop", "container_id": ..., "prop_id": ...}
+    -- take a stored prop back out of a container and place it in the
+    world at the character's current position."""
+    container_id = action.get("container_id") or action.get("target_id") or action.get("target")
+    prop_id = action.get("prop_id")
+    if not container_id or not prop_id:
+        return
+    from systems.containers import resolve_container, retrieve_prop_from_container
+    container = resolve_container(c, world, container_id)
+    if not container:
+        return
+    retrieve_prop_from_container(
+        world, container, prop_id,
+        x=c.get("x"), y=c.get("y"), building_id=c.get("building_id"),
+    )
 
 
 # =========================================================

@@ -604,6 +604,18 @@ def tick(world):
         tick_envy(world)
         tick_trauma(world)
         tick_domestic_control(world)
+
+    # -- Police RSS feed (real-world-flavored news + crime/traffic stat
+    # nudges, see systems/police_feed.py) -- try/except-wrapped the same
+    # way the block above is; a network hiccup here must never take the
+    # sim down. ─────────────────────────────────────────
+    if every(world, CADENCE["police_feed"], offset=21):
+        try:
+            from core.definitions import load_definitions as _load_defs_pf
+            from systems.police_feed import tick_police_feed
+            tick_police_feed(world, _load_defs_pf(world.get("sim_id", "default")))
+        except Exception:
+            pass
         tick_quid_pro_quo(world)
         tick_emotional_control(world)
         tick_religious_repression(world)
