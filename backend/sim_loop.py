@@ -741,9 +741,19 @@ def tick(world):
         for c in characters:
             if not c.get("alive", True):
                 continue
-            tick_daily_data_usage(c)
+            tick_daily_data_usage(c, world)
             if not c.get("off_grid"):
                 maybe_grow_subscription_desire(c, world)
+
+    # -- Hourly home-presence sample (systems/home_presence.py) -- feeds
+    # the mobile-data home-wifi discount above, and is general-purpose
+    # for anything else that ever wants "how much of today has this
+    # character spent home." ───────────────────────────────────────────
+    if every(world, CADENCE["home_presence"], offset=46):
+        from systems.home_presence import tick_home_presence_sample
+        for c in characters:
+            if c.get("alive", True) and not c.get("off_grid"):
+                tick_home_presence_sample(c, world)
 
     # -- Body weight/fitness-trait sync ────────────────────────────────
     if every(world, CADENCE["body_composition"], offset=41):

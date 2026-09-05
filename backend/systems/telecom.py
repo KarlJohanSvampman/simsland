@@ -30,10 +30,32 @@ def daily_data_usage_gb(c):
     return DAILY_GB_MEDIUM
 
 
-def tick_daily_data_usage(c):
-    """Called once per real calendar day (see sim_loop.py)."""
+def tick_daily_data_usage(c, world):
+    """Called once per real calendar day (see sim_loop.py). Time spent
+    at home doesn't cost mobile data IF the household actually has a
+    home internet (ISP) subscription -- being home with no wifi to fall
+    back on still burns the phone's own data, same as being out. This is
+    the actual point of paying for home internet in the first place, per
+    the user's own framing -- without an ISP subscription, home time
+    buys no discount at all.
+
+    systems/home_presence.py tracks the fraction of today's hours spent
+    home; consuming it here (not just reading) is also what resets that
+    daily tally for tomorrow."""
+    from systems.home_presence import consume_home_fraction_today
+    from systems.subscriptions import household_subscription
+
+    home_fraction = consume_home_fraction_today(c)
+
+    household = world.get("households", {}).get(c.get("household_id"))
+    has_isp = bool(household and household_subscription(household, "internet"))
+
+    usage = daily_data_usage_gb(c)
+    if has_isp:
+        usage *= (1.0 - home_fraction)
+
     remaining = c.get("phone_data_gb_remaining", 0)
-    c["phone_data_gb_remaining"] = max(0, round(remaining - daily_data_usage_gb(c), 2))
+    c["phone_data_gb_remaining"] = max(0, round(remaining - usage, 2))
 
 
 def has_mobile_data(c):

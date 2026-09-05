@@ -129,6 +129,13 @@ CADENCE["police_feed"]      = 24
 # once-a-day-ish per-character checks, same tier as food_aging.
 CADENCE["daily_finance"]    = 24
 
+# Hourly "are they home right now" sample (systems/home_presence.py) --
+# 1 tick = 1 nominal game-second (sim_loop.py::advance_calendar()), so
+# an actual sim-hour is 3600 ticks, not 24 -- this one deliberately does
+# NOT reuse the "24 ticks" convention several other cadences in this
+# dict still (incorrectly) treat as a day/hour equivalent.
+CADENCE["home_presence"]    = 3600
+
 # Persona/value-alignment expectations between close kin (see
 # systems/persona_expectations.py) — a slow drama-simmer check, same tier
 # as election/faction/hierarchy.

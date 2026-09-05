@@ -52240,19 +52240,33 @@
       "employer": false,
       "description": "Sells home, vehicle, and life insurance at a lower premium, lower payout tier -- see service_templates."
     },
-    "bluewave_telecom": {
-      "name": "Bluewave Telecom",
-      "industry": "telecom",
+    "bluewave_isp": {
+      "name": "Bluewave Broadband",
+      "industry": "isp",
       "off_grid": true,
       "employer": false,
-      "description": "Sells home internet plans and mobile data -- see service_templates."
+      "description": "Home internet provider -- see service_templates."
     },
-    "skylark_telecom": {
+    "skylark_isp": {
       "name": "Skylark Fiber",
+      "industry": "isp",
+      "off_grid": true,
+      "employer": false,
+      "description": "Home internet provider, faster/pricier tier -- see service_templates."
+    },
+    "pulsemobile_telecom": {
+      "name": "PulseMobile",
       "industry": "telecom",
       "off_grid": true,
       "employer": false,
-      "description": "Sells home internet plans and mobile data, faster/pricier tier -- see service_templates."
+      "description": "Mobile data provider -- see service_templates."
+    },
+    "arcwave_telecom": {
+      "name": "Arcwave Wireless",
+      "industry": "telecom",
+      "off_grid": true,
+      "employer": false,
+      "description": "Mobile data provider, cheaper per-GB tier -- see service_templates."
     },
     "pixelforge_games": {
       "name": "Pixelforge Games",
@@ -52667,7 +52681,7 @@
     },
     "internet_bluewave": {
       "name": "Bluewave Broadband",
-      "provider_company_id": "bluewave_telecom",
+      "provider_company_id": "bluewave_isp",
       "category": "internet",
       "weekly_cost": 18,
       "throughput_mbps": 300,
@@ -52675,23 +52689,23 @@
     },
     "internet_skylark": {
       "name": "Skylark Fiber",
-      "provider_company_id": "skylark_telecom",
+      "provider_company_id": "skylark_isp",
       "category": "internet",
       "weekly_cost": 25,
       "throughput_mbps": 750,
       "description": "Faster, pricier home fiber connection."
     },
-    "mobile_data_bluewave": {
-      "name": "Bluewave Mobile Data",
-      "provider_company_id": "bluewave_telecom",
+    "mobile_data_pulsemobile": {
+      "name": "PulseMobile Data",
+      "provider_company_id": "pulsemobile_telecom",
       "category": "mobile_data",
       "cost_per_gb": 6,
       "throughput_mbps": 50,
       "description": "Pay-per-GB mobile data top-up."
     },
-    "mobile_data_skylark": {
-      "name": "Skylark Mobile Data",
-      "provider_company_id": "skylark_telecom",
+    "mobile_data_arcwave": {
+      "name": "Arcwave Mobile Data",
+      "provider_company_id": "arcwave_telecom",
       "category": "mobile_data",
       "cost_per_gb": 5,
       "throughput_mbps": 80,
