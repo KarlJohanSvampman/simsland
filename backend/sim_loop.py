@@ -734,16 +734,28 @@ def tick(world):
         age_food_items(world)
 
     # -- Mobile data consumption + entertainment-subscription peer
-    # desire (systems/telecom.py, systems/subscriptions.py) ───────────
+    # desire (systems/telecom.py, systems/subscriptions.py) + the daily
+    # home-presence rollover (systems/home_presence.py -- ONE owner of
+    # the daily reset now that a second consumer, withdrawal_concern.py
+    # below, also needs the rolling history) + depression's real
+    # symptoms (systems/mental_health_effects.py) + noticing a
+    # household member's sustained withdrawal (systems/
+    # withdrawal_concern.py) ─────────────────────────────────────────
     if every(world, CADENCE["daily_finance"], offset=45):
         from systems.telecom import tick_daily_data_usage
         from systems.subscriptions import maybe_grow_subscription_desire
+        from systems.home_presence import roll_over_home_presence_day
+        from systems.mental_health_effects import tick_depression_effects
+        from systems.withdrawal_concern import maybe_notice_withdrawal
         for c in characters:
             if not c.get("alive", True):
                 continue
-            tick_daily_data_usage(c, world)
+            home_fraction = roll_over_home_presence_day(c)
+            tick_daily_data_usage(c, world, home_fraction)
+            tick_depression_effects(c, world)
             if not c.get("off_grid"):
                 maybe_grow_subscription_desire(c, world)
+                maybe_notice_withdrawal(c, world)
 
     # -- Hourly home-presence sample (systems/home_presence.py) -- feeds
     # the mobile-data home-wifi discount above, and is general-purpose

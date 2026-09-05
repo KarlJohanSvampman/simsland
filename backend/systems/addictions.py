@@ -79,6 +79,25 @@ def _roll_hazards(c, world, key, tmpl):
             hs.setdefault("systemic_hazards", {})[hazard_key] = instance
 
 
+# Prolonged alcohol/hard-drug use is a real, likely cause of depression
+# -- per explicit user direction. Deliberately NOT caffeine/nicotine/
+# food-adjacent addictions (cigarettes, coffee, energy_drinks, candy,
+# soda, tea) or painkillers -- scoped to what was actually asked for
+# ("drug or alcohol"), not every substance this registry tracks.
+_DEPRESSION_INDUCING_ADDICTIONS = {"alcohol", "cocaine", "amphetamines", "ketamine", "cannabis"}
+DEPRESSION_INDUCTION_CHANCE = 0.03  # rolled each time usages cross threshold, same moment _roll_hazards() checks
+
+
+def maybe_induce_depression_from_addiction(c, key, world):
+    if key not in _DEPRESSION_INDUCING_ADDICTIONS:
+        return
+    mental_health = c.setdefault("mental_health", [])
+    if "depression" in mental_health:
+        return
+    if random.random() < DEPRESSION_INDUCTION_CHANCE:
+        mental_health.append("depression")
+
+
 def tick_addictions(world):
     """Hourly cadence (sim_time-gated, not a raw tick divisor -- see module
     docstring). Called from a moderate CADENCE entry in sim_loop.py; no-ops
@@ -120,3 +139,4 @@ def tick_addictions(world):
 
             if entry.get("usages", 0) >= tmpl.get("threshold", 9999):
                 _roll_hazards(c, world, key, tmpl)
+                maybe_induce_depression_from_addiction(c, key, world)

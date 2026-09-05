@@ -598,6 +598,9 @@ def generate_character(defs, overrides=None, world=None):
         max(0.10, min(0.99, random.gauss(0.50, 0.18) * 0.6 + age_factor * 0.4)), 3
     )
 
+    from systems.self_image import generate_body_confidence
+    character["body_confidence"] = generate_body_confidence(character)
+
     # Physical body features — fertility signals and build
     character["body_features"] = _gen_body_features(character)
 

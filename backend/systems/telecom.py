@@ -30,22 +30,21 @@ def daily_data_usage_gb(c):
     return DAILY_GB_MEDIUM
 
 
-def tick_daily_data_usage(c, world):
-    """Called once per real calendar day (see sim_loop.py). Time spent
-    at home doesn't cost mobile data IF the household actually has a
-    home internet (ISP) subscription -- being home with no wifi to fall
-    back on still burns the phone's own data, same as being out. This is
-    the actual point of paying for home internet in the first place, per
-    the user's own framing -- without an ISP subscription, home time
-    buys no discount at all.
+def tick_daily_data_usage(c, world, home_fraction=0.0):
+    """Called once per real calendar day (see sim_loop.py), with the day
+    that just completed's home fraction already rolled over by systems/
+    home_presence.py::roll_over_home_presence_day() -- that function
+    owns the one daily reset now (a second consumer, systems/
+    withdrawal_concern.py, needs the same underlying data, so this no
+    longer does its own destructive consume-and-reset).
 
-    systems/home_presence.py tracks the fraction of today's hours spent
-    home; consuming it here (not just reading) is also what resets that
-    daily tally for tomorrow."""
-    from systems.home_presence import consume_home_fraction_today
+    Time spent at home doesn't cost mobile data IF the household
+    actually has a home internet (ISP) subscription -- being home with
+    no wifi to fall back on still burns the phone's own data, same as
+    being out. This is the actual point of paying for home internet in
+    the first place, per the user's own framing -- without an ISP
+    subscription, home time buys no discount at all."""
     from systems.subscriptions import household_subscription
-
-    home_fraction = consume_home_fraction_today(c)
 
     household = world.get("households", {}).get(c.get("household_id"))
     has_isp = bool(household and household_subscription(household, "internet"))

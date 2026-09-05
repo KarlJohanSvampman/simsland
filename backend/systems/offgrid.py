@@ -580,10 +580,17 @@ def maybe_go_offgrid(c, world):
         send_offgrid(c, world, "work", 8 * 60)
     elif not c.get("employed") and r < 0.01:
         send_offgrid(c, world, "job_search", 60)
-    elif r < 0.004:
-        _send_errand(c, world, "shopping", 45)
-    elif r < 0.008:
-        _send_errand(c, world, random.choice(["leisure", "gym", "cafe"]), random.randint(30, 60))
+    else:
+        # Depression reduces (not zeroes) the chance of a leisure-flavored
+        # trip specifically -- work/job-search stay unaffected (systems/
+        # mental_health_effects.py::home_leaving_multiplier, feeding
+        # systems/withdrawal_concern.py's "staying home too much" drama).
+        from systems.mental_health_effects import home_leaving_multiplier
+        leave_mult = home_leaving_multiplier(c)
+        if r < 0.004 * leave_mult:
+            _send_errand(c, world, "shopping", 45)
+        elif r < 0.008 * leave_mult:
+            _send_errand(c, world, random.choice(["leisure", "gym", "cafe"]), random.randint(30, 60))
 
 
 def maybe_schedule_doctor_visit(c, world):

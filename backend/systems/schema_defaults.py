@@ -718,6 +718,15 @@ def ensure_character_defaults(c, world=None):
     # Self-confidence — degraded by negging/manipulation; affects assertiveness
     c.setdefault("self_confidence", 0.60)   # 0-1; 0.60 default healthy baseline
 
+    # Body confidence — the physical-appearance counterpart to self_confidence
+    # above (systems/self_image.py); no such self-facing appearance number
+    # existed anywhere before this round. Backfilled from attractiveness
+    # (generation-time characters get a personality-nudged version instead,
+    # see character_gen.py) for anyone who predates this field.
+    if c.get("body_confidence") is None:
+        from systems.self_image import generate_body_confidence
+        c["body_confidence"] = generate_body_confidence(c)
+
     # Curiosity — 0-100 (explicit user spec, unlike most scalars on this
     # page which are 0-1), how much this character wants to understand
     # what's going on around them: notices/investigates the out-of-the-
