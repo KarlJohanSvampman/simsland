@@ -91,6 +91,12 @@ SEVERITY = {
     "sexual_harassment":              14.0,
     "partner_harassed":               12.0,
     "verbal_harassment":               9.0,
+    # Suspicion of a partner's unexplained absences (systems/
+    # absence_suspicion.py) that a confrontation failed to put to rest --
+    # a real caught lie about it (excuses.py::_handle_caught_lying) hits
+    # much harder than an unresolved-but-not-provably-false confrontation.
+    "absence_unresolved":             10.0,
+    "absence_lie_caught":             20.0,
 }
 
 

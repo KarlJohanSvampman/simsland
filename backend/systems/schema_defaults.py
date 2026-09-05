@@ -691,6 +691,11 @@ def ensure_character_defaults(c, world=None):
     # Secrets
     c.setdefault("secrets", [])
 
+    # Temporary separation (systems/temporary_separation.py) -- staying
+    # with family/friends after a bad fight at home, without changing
+    # real household membership.
+    c.setdefault("temporary_residence", None)
+
     # Faction memberships
     c.setdefault("faction_memberships", [])
 

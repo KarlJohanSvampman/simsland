@@ -747,15 +747,24 @@ def tick(world):
         from systems.home_presence import roll_over_home_presence_day
         from systems.mental_health_effects import tick_depression_effects
         from systems.withdrawal_concern import maybe_notice_withdrawal
+        from systems.absence_suspicion import maybe_notice_absence
+        from systems.secret_keeping import maybe_generate_secret, tick_all_secrets
+        from systems.confiding import resolve_confide_opportunities
+        from systems.temporary_separation import maybe_return_from_separation
+        tick_all_secrets(world)
         for c in characters:
             if not c.get("alive", True):
                 continue
             home_fraction = roll_over_home_presence_day(c)
             tick_daily_data_usage(c, world, home_fraction)
             tick_depression_effects(c, world)
+            maybe_return_from_separation(c, world)
             if not c.get("off_grid"):
                 maybe_grow_subscription_desire(c, world)
                 maybe_notice_withdrawal(c, world)
+                maybe_notice_absence(c, world)
+                maybe_generate_secret(c, world)
+                resolve_confide_opportunities(c, world)
 
     # -- Hourly home-presence sample (systems/home_presence.py) -- feeds
     # the mobile-data home-wifi discount above, and is general-purpose

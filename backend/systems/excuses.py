@@ -82,6 +82,12 @@ def _detail_is_sensitive(detail_type, c, world, authority=None):
         if s.get("status", "hidden") == "hidden":
             if detail_type in ("who", "where"):
                 return True
+    # Generalized secret-keeping (systems/secret_keeping.py) -- a contact/
+    # hobby/activity/item marked secret specifically from THIS authority.
+    if auth_id:
+        from systems.secret_keeping import find_relevant_secret
+        if find_relevant_secret(c, detail_type, auth_id, world):
+            return True
     # Romantic meeting with someone hidden
     if detail_type == "who":
         for cid, rel in c.get("relationships", {}).items():
@@ -331,6 +337,25 @@ def generate_excuse(c, authority, question_type, world):
         detail = _get_true_detail(c, question_type, world)
         return {"text": detail, "vagueness": 0.0, "is_lie": False, "lie_detail": None}
 
+    # A generalized secret (systems/secret_keeping.py) already targets this
+    # exact authority for this exact question -- deliberately choosing to
+    # deceive THIS specific person about THIS specific thing was decided
+    # when the secret was created, independent of the character's general
+    # honesty trait (an otherwise-honest person can still stick to one
+    # rehearsed lie about the one thing they're actually hiding). Skip the
+    # generic vague-deflection/refuse-outright steps below, which would
+    # otherwise almost always fire first for anyone with honesty > 0.45
+    # and mean the secret's preferred_lie was never actually used.
+    auth_id_for_secret = authority["id"] if isinstance(authority, dict) else authority
+    from systems.secret_keeping import find_relevant_secret as _find_secret_for_excuse, get_consistent_lie
+    covering_secret = _find_secret_for_excuse(c, question_type, auth_id_for_secret, world)
+    if covering_secret:
+        lie_truth = _get_true_detail(c, question_type, world)
+        lie_text = get_consistent_lie(c, covering_secret, question_type, auth_id_for_secret, world)
+        lie_entry = _record_lie(c, question_type, lie_text, lie_truth, auth_id_for_secret, world,
+                                secret_id=covering_secret["id"])
+        return {"text": lie_text, "vagueness": 0.0, "is_lie": True, "lie_detail": lie_entry}
+
     # Sensitive detail — try vagueness first
     if honesty > 0.45:
         vague_text = _vague_deflection(question_type, c)
@@ -349,11 +374,11 @@ def generate_excuse(c, authority, question_type, world):
         return {"text": random.choice(refusals), "vagueness": 0.9,
                 "is_lie": False, "lie_detail": None}
 
-    # Lie
+    # Lie -- no generalized secret governs this question (that case already
+    # returned above), just an in-the-moment fabrication.
+    auth_id_for_lie = authority["id"] if isinstance(authority, dict) else authority
     lie_text, lie_truth = _generate_lie(c, question_type, authority, world)
-    lie_entry = _record_lie(c, question_type, lie_text, lie_truth,
-                            authority["id"] if isinstance(authority, dict) else authority,
-                            world)
+    lie_entry = _record_lie(c, question_type, lie_text, lie_truth, auth_id_for_lie, world)
     return {"text": lie_text, "vagueness": 0.0, "is_lie": True, "lie_detail": lie_entry}
 
 
@@ -412,6 +437,17 @@ def _generate_lie(c, question_type, authority, world):
     actual = _get_true_detail(c, question_type, world)
     chars  = world.get("characters", {})
 
+    # A generalized secret (systems/secret_keeping.py) governing this exact
+    # question from this exact authority takes priority over a freshly
+    # improvised lie -- this is what makes the same lie get told the same
+    # way every time, so a contradiction is a real, catchable event rather
+    # than an artifact of this function re-rolling a random cover story.
+    auth_id = authority["id"] if isinstance(authority, dict) else authority
+    from systems.secret_keeping import find_relevant_secret, get_consistent_lie
+    secret = find_relevant_secret(c, question_type, auth_id, world)
+    if secret:
+        return get_consistent_lie(c, secret, question_type, auth_id, world), actual
+
     if question_type == "who":
         # Pick a plausible cover name — someone they know platonically
         cover = None
@@ -439,8 +475,11 @@ def _generate_lie(c, question_type, authority, world):
     return "I'm not sure.", actual
 
 
-def _record_lie(c, question_type, lie_text, actual_truth, authority_id, world):
-    """Store the lie so consistency can be checked later."""
+def _record_lie(c, question_type, lie_text, actual_truth, authority_id, world, secret_id=None):
+    """Store the lie so consistency can be checked later. secret_id (if
+    the lie was a secret's preferred_lie, systems/secret_keeping.py) lets
+    _handle_caught_lying deepen suspicion on that specific secret when
+    this exact lie is later caught out."""
     entry = {
         "id":           f"lie_{uuid.uuid4().hex[:6]}",
         "question_type": question_type,
@@ -449,6 +488,7 @@ def _record_lie(c, question_type, lie_text, actual_truth, authority_id, world):
         "told_to":      [authority_id],
         "tick":         world.get("tick", 0),
         "detected":     False,
+        "secret_id":    secret_id,
     }
     c.setdefault("active_lies", []).append(entry)
     c["active_lies"] = c["active_lies"][-20:]
@@ -599,6 +639,23 @@ def _handle_caught_lying(c, authority, lie, world):
                 f"caught {c.get('name', c['id'])} in a lie: \"{lie.get('lie_text', 'something')}\"",
                 world,
             )
+        except Exception:
+            pass
+
+    # If this lie was a generalized secret's preferred_lie (systems/
+    # secret_keeping.py), being caught deepens suspicion on that specific
+    # secret and fires a real grievance -- much worse than an unresolved-
+    # but-unproven confrontation (systems/absence_suspicion.py).
+    secret_id = lie.get("secret_id")
+    if secret_id:
+        try:
+            from systems.secret_keeping import apply_confrontation_outcome
+            secret = next((s for s in c.get("secrets", []) if s.get("id") == secret_id), None)
+            if secret:
+                apply_confrontation_outcome(secret, auth_id, believed=False, world=world, delta=0.35)
+            from systems.grievances import add_grievance
+            if auth:
+                add_grievance(auth, c["id"], "absence_lie_caught", world)
         except Exception:
             pass
 

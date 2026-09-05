@@ -28,7 +28,14 @@ def _minutes_to_ticks(minutes):
 # inside _send_offgrid_immediate() itself (not just at each call site) so
 # it holds regardless of caller, present or future.
 MAX_OFFGRID_MINUTES = 120
-_UNCAPPED_DURATION_REASONS = {"work", "school", "hospital", "hospital_treatment", "surgery", "jail"}
+_UNCAPPED_DURATION_REASONS = {
+    "work", "school", "hospital", "hospital_treatment", "surgery", "jail",
+    # A multi-day stay with family/friends after a bad fight at home
+    # (systems/temporary_separation.py) -- fully abstract/off-screen, the
+    # same shape as every other uncapped reason above, just triggered by
+    # relationship drama instead of an obligation.
+    "temporary_separation",
+}
 
 # ── LLM narrator ─────────────────────────────────────────────────────────────
 # Off-grid categories migrated off the procedural _story() dice-roller onto

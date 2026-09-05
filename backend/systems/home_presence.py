@@ -80,3 +80,18 @@ def consecutive_high_home_days(c, threshold):
         else:
             break
     return count
+
+
+def consecutive_low_home_days(c, threshold):
+    """The mirror image of consecutive_high_home_days() -- how many of the
+    most recent COMPLETED days had a home fraction AT/BELOW threshold,
+    i.e. a sustained pattern of being away too much rather than staying
+    home too much. Used by systems/absence_suspicion.py."""
+    history = c.get("_home_fraction_history", [])
+    count = 0
+    for frac in reversed(history):
+        if frac <= threshold:
+            count += 1
+        else:
+            break
+    return count

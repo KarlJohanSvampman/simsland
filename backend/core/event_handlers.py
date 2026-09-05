@@ -35,6 +35,8 @@ systems/activities.py / systems/activity_queue.py, which call
 wake_character() directly, immediately, no bus round-trip needed.
 """
 
+import random
+
 from core.event_bus import subscribe
 
 
@@ -176,6 +178,40 @@ def _on_confrontation_desired(data, world):
         start_conflict(data["initiator_id"], data["target_id"], world)
 
 subscribe("confrontation_desired", _on_confrontation_desired)
+
+
+_BAD_CONFLICT_OUTCOMES = {"storm_off", "cold_shoulder", "physical_resolved", "suppressed"}
+
+
+def _on_conflict_resolved(data, world):
+    """Any resolved argument/fight gets committed to memory (with a real
+    validation/comfort need attached, systems/confiding.py) for everyone
+    involved -- not just the absence-suspicion confrontations that already
+    tag their own. A bad-enough outcome also gives each party a real
+    chance of moving out for a while (systems/temporary_separation.py)."""
+    from systems.confiding import tag_dramatic_memory
+    from systems.temporary_separation import begin_temporary_separation
+
+    chars = world.get("characters", {})
+    parties = [chars[pid] for pid in data.get("parties", []) if pid in chars]
+    if not parties:
+        return
+
+    outcome = data.get("outcome")
+    for c in parties:
+        others = [p["id"] for p in parties if p["id"] != c["id"]]
+        tag_dramatic_memory(
+            c, world,
+            f"Had a real fight that ended in {outcome or 'a mess'}.",
+            importance=0.65, people=others,
+        )
+
+    if outcome in _BAD_CONFLICT_OUTCOMES:
+        for c in parties:
+            if random.random() < 0.35:
+                begin_temporary_separation(c, world, reason="conflict")
+
+subscribe("conflict_resolved", _on_conflict_resolved)
 
 
 def _on_contract_violated(data, world):
