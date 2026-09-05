@@ -39,6 +39,17 @@ SECURED_INCOME_MULTIPLE = 0.6
 SECURED_LOAN_TO_VALUE = 0.9       # up to 90% of pledged collateral value
 SECURED_MIN_CREDIT_SCORE = 580
 
+# Mortgage -- the one property-equity-backed loan kind this file's own
+# original docstring flagged as missing ("this sim has no property-
+# equity mechanic"). Distinct from a plain secured loan (collateral =
+# real currently-held cash) because a mortgage's collateral IS the home
+# itself, at its own real home["value"] (see housing.py), not a caller-
+# supplied cash figure. Every household starts with one on their home
+# (see originate_mortgage() below) -- 30-year term, no down payment,
+# matching "everyone starts out with a loan on their home" verbatim.
+MORTGAGE_TERM_MONTHS = 360
+MORTGAGE_ANNUAL_RATE = 0.055
+
 
 def annual_income(c):
     job = c.get("job") or {}
@@ -122,6 +133,60 @@ def make_payment(loan, amount):
     applied = min(amount, loan.get("balance", 0.0))
     loan["balance"] = round(loan.get("balance", 0.0) - applied, 2)
     return applied
+
+
+def originate_mortgage(world, household, home):
+    """Every household starts with a mortgage on their home (see the
+    call site in household_manager.py/housing.py's home-assignment
+    flow). Unlike take_loan() above, this doesn't deposit cash anywhere
+    -- a mortgage finances the home purchase itself, which this sim
+    already just assigns for free, so there's no "the bank hands you
+    money" step to model. No credit-score/income eligibility gate
+    either -- everyone needs somewhere to live, matching "everyone
+    starts out with a loan on their home" verbatim; a real secured loan
+    (take_loan, above) remains fully gated as before.
+
+    home["rent"] is zeroed once a real mortgage exists -- it's the "rent
+    OR mortgage payment" field (see housing.py's own comment), and
+    weekly_loan_payments() below (already folded into economy.py's
+    weekly bill, unchanged) picks up the mortgage automatically from
+    here on purely because it's a loan with a positive balance; having
+    BOTH a flat rent AND a real mortgage payment would double-charge.
+
+    Returns the new loan dict, or None if the household already has a
+    mortgage, has no members to attach it to, or the home has no real
+    value set."""
+    if any(l.get("kind") == "mortgage" for l in household.get("loans", {}).values()):
+        return None
+    value = home.get("value", 0)
+    if value <= 0:
+        return None
+
+    chars = world.get("characters", {})
+    borrower_ids = [
+        cid for cid in household.get("members", [])
+        if (chars.get(cid) or {}).get("age_group") in ("adult", "elderly")
+    ] or list(household.get("members", []))[:1]
+    if not borrower_ids:
+        return None
+
+    import uuid
+    loan = {
+        "id":               f"loan_{uuid.uuid4().hex[:8]}",
+        "provider":         "starter_mortgage",
+        "kind":             "mortgage",
+        "borrower_ids":     borrower_ids,
+        "principal":        round(value, 2),
+        "balance":          round(value, 2),
+        "rate":             MORTGAGE_ANNUAL_RATE,
+        "term_months":      MORTGAGE_TERM_MONTHS,
+        "monthly_payment":  _monthly_payment(value, MORTGAGE_ANNUAL_RATE, MORTGAGE_TERM_MONTHS),
+        "start_tick":       world.get("tick", 0),
+        "collateral_value": round(value, 2),
+    }
+    household.setdefault("loans", {})[loan["id"]] = loan
+    home["rent"] = 0
+    return loan
 
 
 def weekly_loan_payments(household, world):

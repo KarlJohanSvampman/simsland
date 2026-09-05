@@ -486,8 +486,25 @@ def phone_actions(c):
     return []
 
 
-def can_do_phone_action(c, action):
-    return phone_is_usable(c) and action in phone_actions(c)
+# Basic cellular functions (SMS/calls) don't need mobile DATA the way
+# an internet-backed "app" action does -- everything else in
+# SMARTPHONE_ACTIONS is gated on either having mobile data left
+# (systems/telecom.py) or the household having a home internet
+# subscription (systems/subscriptions.py) once world is passed.
+_DATA_INDEPENDENT_PHONE_ACTIONS = {"send_message", "call_contact"}
+
+
+def can_do_phone_action(c, action, world=None):
+    if not phone_is_usable(c) or action not in phone_actions(c):
+        return False
+    if world is None or action in _DATA_INDEPENDENT_PHONE_ACTIONS:
+        return True
+    from systems.telecom import has_mobile_data
+    if has_mobile_data(c):
+        return True
+    from systems.subscriptions import household_subscription
+    household = world.get("households", {}).get(c.get("household_id"))
+    return bool(household and household_subscription(household, "internet"))
 
 
 # =========================================================

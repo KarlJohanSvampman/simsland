@@ -407,6 +407,9 @@ def generate_character(defs, overrides=None, world=None):
     from systems.refurnishing import random_redecorate_threshold_days
     redecorate_threshold_days = random_redecorate_threshold_days()
 
+    from systems.subscriptions import generate_online_profile
+    online_profile = generate_online_profile(defs)
+
     abnormal  = _pick_from_registry(defs.get("abnormal_traits_registry", []), 2, 0.70)
     phobias   = _pick_from_registry(defs.get("phobias_registry",          []), 2, 0.75)
     fetishes  = _pick_from_registry(defs.get("fetishes_registry",         []), 2, 0.80)
@@ -469,6 +472,8 @@ def generate_character(defs, overrides=None, world=None):
         "traits":             traits,
         "cleanliness_threshold": cleanliness_threshold_for_traits(traits),
         "redecorate_threshold_days": redecorate_threshold_days,
+        "online_profile":     online_profile,
+        "phone_data_gb_remaining": 0,
         "physical_traits":    physical_traits,
         "hobbies":            hobbies,
         "sexual_orientation": orientation,

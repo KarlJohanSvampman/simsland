@@ -718,6 +718,25 @@
       ],
       "icon": "fixture"
     },
+    "alarm_system": {
+      "name": "Alarm System",
+      "category": "fixture",
+      "footprint": [
+        {
+          "dx": 0,
+          "dy": 0
+        }
+      ],
+      "anchors": [],
+      "storage": null,
+      "base_price": 250,
+      "tags": [
+        "fixture",
+        "security",
+        "alarm"
+      ],
+      "icon": "fixture"
+    },
     "wall_painting": {
       "name": "Painting",
       "category": "wall_decor",
@@ -52198,7 +52217,7 @@
         "security_guard",
         "bodyguard"
       ],
-      "description": "Employer for security roles.",
+      "description": "Employer for security roles. Also sells a household home-monitoring subscription -- see service_templates['home_security_monitoring'].",
       "typical_roles": [
         "security_guard",
         "bodyguard",
@@ -52206,6 +52225,55 @@
       ],
       "max_staff": 30,
       "turnover_rate": 0.03
+    },
+    "meridian_insurance": {
+      "name": "Meridian Mutual Insurance",
+      "industry": "insurance",
+      "off_grid": true,
+      "employer": false,
+      "description": "Sells home, vehicle, and life insurance -- see service_templates."
+    },
+    "northstar_insurance": {
+      "name": "Northstar Assurance",
+      "industry": "insurance",
+      "off_grid": true,
+      "employer": false,
+      "description": "Sells home, vehicle, and life insurance at a lower premium, lower payout tier -- see service_templates."
+    },
+    "bluewave_telecom": {
+      "name": "Bluewave Telecom",
+      "industry": "telecom",
+      "off_grid": true,
+      "employer": false,
+      "description": "Sells home internet plans and mobile data -- see service_templates."
+    },
+    "skylark_telecom": {
+      "name": "Skylark Fiber",
+      "industry": "telecom",
+      "off_grid": true,
+      "employer": false,
+      "description": "Sells home internet plans and mobile data, faster/pricier tier -- see service_templates."
+    },
+    "pixelforge_games": {
+      "name": "Pixelforge Games",
+      "industry": "entertainment",
+      "off_grid": true,
+      "employer": false,
+      "description": "Game publisher -- sells a gaming subscription, see service_templates."
+    },
+    "harmonic_music": {
+      "name": "Harmonic Music",
+      "industry": "entertainment",
+      "off_grid": true,
+      "employer": false,
+      "description": "Music streaming service -- see service_templates."
+    },
+    "streamvista": {
+      "name": "StreamVista",
+      "industry": "entertainment",
+      "off_grid": true,
+      "employer": false,
+      "description": "Video streaming service -- see service_templates."
     },
     "barbershop": {
       "name": "Barbershop",
@@ -52546,6 +52614,119 @@
       ],
       "max_staff": 40,
       "turnover_rate": 0.02
+    }
+  },
+  "service_templates": {
+    "insurance_home_meridian": {
+      "name": "Meridian HomeGuard",
+      "provider_company_id": "meridian_insurance",
+      "category": "insurance_home",
+      "weekly_cost": 35,
+      "payout_max": 50000,
+      "description": "Covers fire and burglary damage to your home."
+    },
+    "insurance_home_northstar": {
+      "name": "Northstar Home Shield",
+      "provider_company_id": "northstar_insurance",
+      "category": "insurance_home",
+      "weekly_cost": 28,
+      "payout_max": 30000,
+      "description": "Basic home coverage at a lower premium."
+    },
+    "insurance_vehicle_meridian": {
+      "name": "Meridian AutoGuard",
+      "provider_company_id": "meridian_insurance",
+      "category": "insurance_vehicle",
+      "weekly_cost": 22,
+      "payout_max": 15000,
+      "description": "Covers vehicle damage and total loss."
+    },
+    "insurance_vehicle_northstar": {
+      "name": "Northstar Auto Shield",
+      "provider_company_id": "northstar_insurance",
+      "category": "insurance_vehicle",
+      "weekly_cost": 18,
+      "payout_max": 10000,
+      "description": "Basic vehicle coverage at a lower premium."
+    },
+    "insurance_life_meridian": {
+      "name": "Meridian LifeSecure",
+      "provider_company_id": "meridian_insurance",
+      "category": "insurance_life",
+      "weekly_cost": 15,
+      "payout_max": 100000,
+      "description": "Pays a beneficiary on the policyholder's death."
+    },
+    "insurance_life_northstar": {
+      "name": "Northstar Life Shield",
+      "provider_company_id": "northstar_insurance",
+      "category": "insurance_life",
+      "weekly_cost": 12,
+      "payout_max": 75000,
+      "description": "Basic life coverage at a lower premium."
+    },
+    "internet_bluewave": {
+      "name": "Bluewave Broadband",
+      "provider_company_id": "bluewave_telecom",
+      "category": "internet",
+      "weekly_cost": 18,
+      "throughput_mbps": 300,
+      "description": "Home internet connection."
+    },
+    "internet_skylark": {
+      "name": "Skylark Fiber",
+      "provider_company_id": "skylark_telecom",
+      "category": "internet",
+      "weekly_cost": 25,
+      "throughput_mbps": 750,
+      "description": "Faster, pricier home fiber connection."
+    },
+    "mobile_data_bluewave": {
+      "name": "Bluewave Mobile Data",
+      "provider_company_id": "bluewave_telecom",
+      "category": "mobile_data",
+      "cost_per_gb": 6,
+      "throughput_mbps": 50,
+      "description": "Pay-per-GB mobile data top-up."
+    },
+    "mobile_data_skylark": {
+      "name": "Skylark Mobile Data",
+      "provider_company_id": "skylark_telecom",
+      "category": "mobile_data",
+      "cost_per_gb": 5,
+      "throughput_mbps": 80,
+      "description": "Pay-per-GB mobile data top-up, cheaper per GB."
+    },
+    "home_security_monitoring": {
+      "name": "24/7 Home Monitoring",
+      "provider_company_id": "security_firm",
+      "category": "security",
+      "weekly_cost": 20,
+      "description": "Professional monitoring for a home alarm system (see the alarm_system prop)."
+    },
+    "subscription_pixelforge": {
+      "name": "Pixelforge Game Pass",
+      "provider_company_id": "pixelforge_games",
+      "category": "entertainment",
+      "interest": "gaming",
+      "weekly_cost": 10,
+      "description": "Gaming subscription."
+    },
+    "subscription_harmonic": {
+      "name": "Harmonic Music Premium",
+      "provider_company_id": "harmonic_music",
+      "category": "entertainment",
+      "interest": "music",
+      "weekly_cost": 6,
+      "description": "Music streaming subscription."
+    },
+    "subscription_streamvista": {
+      "name": "StreamVista",
+      "provider_company_id": "streamvista",
+      "category": "entertainment",
+      "interest": "streaming",
+      "weekly_cost": 8,
+      "description": "Video streaming subscription."
     }
   },
   "need_templates": {

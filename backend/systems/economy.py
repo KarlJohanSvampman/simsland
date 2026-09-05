@@ -92,7 +92,21 @@ def apply_expenses(world):
                     "amount": entry["amount"],
                 })
 
-        total = round(fixed + food + hobbies_weekly + credit_card_weekly + loan_weekly, 2)
+        # Subscriptions (home/life insurance, home internet, home
+        # security monitoring, entertainment -- systems/subscriptions.py)
+        # plus vehicle insurance (a per-vehicle field, not a household
+        # subscription record -- see that module's own docstring for
+        # why). Both are real recurring costs the same way rent/credit
+        # cards/loans already are.
+        from systems.subscriptions import weekly_subscriptions_total, household_vehicle_insurance_weekly
+        subscriptions_weekly = weekly_subscriptions_total(h)
+        vehicle_insurance_weekly = household_vehicle_insurance_weekly(world, h.get("id"))
+
+        total = round(
+            fixed + food + hobbies_weekly + credit_card_weekly + loan_weekly
+            + subscriptions_weekly + vehicle_insurance_weekly,
+            2,
+        )
 
         h.setdefault("bills_due", []).append({
             "type":         "weekly",
@@ -100,11 +114,13 @@ def apply_expenses(world):
             "remaining":    total,
             "contributors": {},
             "breakdown": {
-                "fixed_home":   round(fixed, 2),
-                "food":         round(food, 2),
-                "hobbies":      round(hobbies_weekly, 2),
-                "credit_cards": round(credit_card_weekly, 2),
-                "loans":        round(loan_weekly, 2),
+                "fixed_home":         round(fixed, 2),
+                "food":               round(food, 2),
+                "hobbies":            round(hobbies_weekly, 2),
+                "credit_cards":       round(credit_card_weekly, 2),
+                "loans":              round(loan_weekly, 2),
+                "subscriptions":      round(subscriptions_weekly, 2),
+                "vehicle_insurance":  round(vehicle_insurance_weekly, 2),
             },
             "credit_card_payments":  credit_card_payments,
             "credit_card_by_member": credit_card_by_member,

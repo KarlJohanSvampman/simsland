@@ -9,6 +9,11 @@ def ensure_home_defaults(home):
     home.setdefault("crime_risk",  0.3)
     home.setdefault("vacant",      True)
     home.setdefault("household_id", None)
+    # Real dollar value -- what a mortgage against this home is sized to
+    # (see systems/loans.py::originate_mortgage()). Not tied to any real
+    # square-footage/location model in this codebase; a flat, tunable
+    # figure like every other placeholder economic constant here.
+    home.setdefault("value",       220000)
     # Weekly recurring costs (currency units per week)
     home.setdefault("rent",        800)   # rent or mortgage payment
     home.setdefault("electricity", 60)    # power bill

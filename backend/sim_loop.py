@@ -733,6 +733,18 @@ def tick(world):
     if every(world, CADENCE["food_aging"], offset=40):
         age_food_items(world)
 
+    # -- Mobile data consumption + entertainment-subscription peer
+    # desire (systems/telecom.py, systems/subscriptions.py) ───────────
+    if every(world, CADENCE["daily_finance"], offset=45):
+        from systems.telecom import tick_daily_data_usage
+        from systems.subscriptions import maybe_grow_subscription_desire
+        for c in characters:
+            if not c.get("alive", True):
+                continue
+            tick_daily_data_usage(c)
+            if not c.get("off_grid"):
+                maybe_grow_subscription_desire(c, world)
+
     # -- Body weight/fitness-trait sync ────────────────────────────────
     if every(world, CADENCE["body_composition"], offset=41):
         tick_body_composition(world)

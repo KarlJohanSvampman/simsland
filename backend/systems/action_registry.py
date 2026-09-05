@@ -279,6 +279,13 @@ ACTION_SPECS = {
     "harvest_plants":    {"group": "chore", "target": "none", "doc": "Harvest all plants with ripe produce ready to pick."},
     "redecorate_room":   {"group": "chore", "target": "none", "doc": "Rearrange furniture or add a new decorative piece to freshen up the place."},
 
+    # ---- subscriptions / insurance / mobile data (systems/
+    # subscriptions.py, systems/telecom.py) ---------------------------
+    "subscribe_service":    {"group": "finance", "target": "none", "doc": "Subscribe your household to a service (home/life insurance, home internet, home security monitoring, or an entertainment subscription)."},
+    "cancel_subscription":  {"group": "finance", "target": "none", "doc": "Cancel one of your household's subscriptions."},
+    "insure_vehicle":       {"group": "finance", "target": "prop", "doc": "Buy insurance for a specific vehicle."},
+    "buy_mobile_data":      {"group": "finance", "target": "none", "doc": "Buy mobile data (GB) for your phone from a telecom provider."},
+
     # ---- exercise -----------------------------------------------------
     "jog":            {"group": "exercise", "target": "none", "doc": "Go for a jog."},
     "sit_ups":        {"group": "exercise", "target": "none", "doc": "Do sit-ups."},

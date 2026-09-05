@@ -306,6 +306,14 @@ def load_world(sim_id):
         ensure_power_outlets(cached, cached["definitions"])
         from systems.vehicles import ensure_vehicle_fields
         ensure_vehicle_fields(cached, cached["definitions"])
+        # init_market_catalog() was previously only ever called once, at
+        # true world creation (generate_world.py) -- new content added to
+        # it since (e.g. this round's service_templates) never reached an
+        # already-persisted world. Every one of its loops already guards
+        # with "if already in catalog: continue", so it's safe to re-run
+        # on every load, same as the ensure_* calls around it.
+        from systems.market import init_market_catalog
+        init_market_catalog(cached)
 
         return cached
 
@@ -373,6 +381,8 @@ def load_world(sim_id):
     ensure_power_outlets(world, definitions)
     from systems.vehicles import ensure_vehicle_fields
     ensure_vehicle_fields(world, definitions)
+    from systems.market import init_market_catalog
+    init_market_catalog(world)
     build_world_geometry(
         sim_id,
         world

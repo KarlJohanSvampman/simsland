@@ -664,6 +664,62 @@ def _route_redecorate_room(c, world, action):
 
 
 # =========================================================
+# SUBSCRIPTIONS / INSURANCE / MOBILE DATA (systems/subscriptions.py,
+# systems/telecom.py) -- household-level recurring services, vehicle
+# insurance, and mobile-data top-ups. No walk/reachability gate, same
+# as the other catalog-purchase-shaped actions in this router -- these
+# are phone-call/online-signup actions, not physical visits.
+# =========================================================
+
+def _route_subscribe_service(c, world, action):
+    """action: {"type": "subscribe_service", "service_id": ...} --
+    household-level subscription (home/life insurance, home internet,
+    home security monitoring, entertainment). Switching an existing
+    subscription in the same category is handled inside
+    subscribe_household() itself (replaces, doesn't stack)."""
+    service_id = action.get("service_id")
+    household = world.get("households", {}).get(c.get("household_id"))
+    if not service_id or not household:
+        return
+    from systems.subscriptions import subscribe_household
+    subscribe_household(world, household, service_id)
+
+
+def _route_cancel_subscription(c, world, action):
+    """action: {"type": "cancel_subscription", "sub_id": ...}"""
+    sub_id = action.get("sub_id")
+    household = world.get("households", {}).get(c.get("household_id"))
+    if not sub_id or not household:
+        return
+    from systems.subscriptions import cancel_household_subscription
+    cancel_household_subscription(household, sub_id)
+
+
+def _route_insure_vehicle(c, world, action):
+    """action: {"type": "insure_vehicle", "target_id": vehicle_id, "service_id": ...}"""
+    vehicle_id = action.get("target_id") or action.get("target")
+    service_id = action.get("service_id")
+    if not vehicle_id or not service_id:
+        return
+    from systems.props import get_prop_by_id
+    from systems.subscriptions import insure_vehicle
+    vehicle = get_prop_by_id(world, vehicle_id)
+    if not vehicle:
+        return
+    insure_vehicle(world, vehicle, service_id)
+
+
+def _route_buy_mobile_data(c, world, action):
+    """action: {"type": "buy_mobile_data", "service_id": ..., "gb_amount": float}"""
+    service_id = action.get("service_id")
+    gb_amount = action.get("gb_amount")
+    if not service_id or not gb_amount:
+        return
+    from systems.telecom import buy_mobile_data
+    buy_mobile_data(world, c, service_id, float(gb_amount))
+
+
+# =========================================================
 # ROUTE WAIT
 # =========================================================
 
@@ -1215,6 +1271,18 @@ def route_action(c, world, action, speech, definitions=None, available_actions=N
 
     elif action_type == "redecorate_room":
         _route_redecorate_room(c, world, action)
+
+    elif action_type == "subscribe_service":
+        _route_subscribe_service(c, world, action)
+
+    elif action_type == "cancel_subscription":
+        _route_cancel_subscription(c, world, action)
+
+    elif action_type == "insure_vehicle":
+        _route_insure_vehicle(c, world, action)
+
+    elif action_type == "buy_mobile_data":
+        _route_buy_mobile_data(c, world, action)
 
     elif action_type == "wait":
         _route_wait(c, world, action)
@@ -2978,7 +3046,7 @@ def _route_order_taxi_by_phone_app(c, world, action):
     dispatch as the phone-call route, gated on the phone actually
     offering this app (see personal_items.py::can_do_phone_action)."""
     from systems.personal_items import can_do_phone_action
-    if not can_do_phone_action(c, "order_taxi_by_phone_app"):
+    if not can_do_phone_action(c, "order_taxi_by_phone_app", world=world):
         return
     phone = _require_phone(c)
     if phone:

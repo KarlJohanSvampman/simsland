@@ -124,6 +124,11 @@ CADENCE["socioeconomics"]   = 24
 # feed more than courteous.
 CADENCE["police_feed"]      = 24
 
+# Daily mobile-data consumption (systems/telecom.py) + entertainment-
+# subscription peer-desire growth (systems/subscriptions.py) -- both
+# once-a-day-ish per-character checks, same tier as food_aging.
+CADENCE["daily_finance"]    = 24
+
 # Persona/value-alignment expectations between close kin (see
 # systems/persona_expectations.py) — a slow drama-simmer check, same tier
 # as election/faction/hierarchy.

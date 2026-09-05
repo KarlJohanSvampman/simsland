@@ -124,6 +124,24 @@ def ensure_world_defaults(world, defs=None):
         "vacant_homes",
         []
     )
+
+    # housing.py's home_id/homes economy (rent/electricity/water/gas/
+    # internet billing, plus this round's mortgage/home-insurance
+    # origination) used to never actually get populated for a real
+    # household (confirmed live -- home_id was never set anywhere),
+    # silently defaulting every household's weekly bill to a flat,
+    # uninformative placeholder. household_manager.py now sets this up
+    # at the two real household-creation call sites; this defense-in-
+    # depth backfill (self-healing, safe to re-run every load -- same
+    # shape as systems/electrical.py's power-outlet backfill) catches
+    # any household built through some other path.
+    for _household in world.get("households", {}).values():
+        try:
+            from systems.household_manager import _ensure_household_housing_setup
+            _ensure_household_housing_setup(world, _household)
+        except Exception:
+            pass
+
     world.setdefault("conflicts",          {})
     world.setdefault("social_contracts",        {})
     world.setdefault("pending_contract_proposals", [])
@@ -595,6 +613,12 @@ def ensure_character_defaults(c, world=None):
     if c.get("redecorate_threshold_days") is None:
         from systems.refurnishing import random_redecorate_threshold_days
         c["redecorate_threshold_days"] = random_redecorate_threshold_days()
+
+    c.setdefault("phone_data_gb_remaining", 0)
+
+    if c.get("online_profile") is None and world is not None:
+        from systems.subscriptions import generate_online_profile
+        c["online_profile"] = generate_online_profile(world.get("definitions", {}))
 
     # Retrofit -- character_gen.py::generate_character() only grants a
     # starting wallet/ID/bank card/bio to characters generated AFTER the
@@ -1436,6 +1460,8 @@ def ensure_household_defaults(h):
         "shared_funds",
         0
     )
+
+    h.setdefault("subscriptions", {})
 
     h.setdefault(
         "newspaper_subscription",

@@ -175,6 +175,47 @@ def init_market_catalog(world):
             "quantity":          1,
         }
 
+    # Service templates (insurance, telecom/ISP + mobile data, home
+    # security monitoring, entertainment subscriptions -- systems/
+    # subscriptions.py). Not a physical good -- no delivery, no
+    # requires_assembly/storage_container/quantity -- so this is its own
+    # "type": "service" entry shape rather than shoehorning into the
+    # item/prop fields above. "weekly_cost" (a recurring subscription) and
+    # "cost_per_gb" (mobile data, a one-off top-up purchase, see
+    # systems/telecom.py) are mutually exclusive per entry -- whichever
+    # the underlying service_template carries.
+    service_templates = (
+        world.get("definitions", {})
+             .get("service_templates", {})
+    )
+    for sid, st in service_templates.items():
+        if sid in catalog:
+            continue
+        # current_price/base_price mirror whichever of weekly_cost/
+        # cost_per_gb this service actually charges -- every OTHER
+        # catalog entry type has these two fields unconditionally
+        # (get_price()/browse_catalog()'s budget filter both read
+        # current_price directly), so service entries need them too
+        # rather than being a special case those functions have to guard
+        # against.
+        price = st.get("weekly_cost")
+        if price is None:
+            price = st.get("cost_per_gb", 0)
+        catalog[sid] = {
+            "type":                "service",
+            "name":                st.get("name", sid),
+            "category":            st.get("category", "service"),
+            "provider_company_id": st.get("provider_company_id"),
+            "base_price":          price,
+            "current_price":       price,
+            "weekly_cost":         st.get("weekly_cost"),
+            "cost_per_gb":         st.get("cost_per_gb"),
+            "payout_max":          st.get("payout_max"),
+            "throughput_mbps":     st.get("throughput_mbps"),
+            "interest":            st.get("interest"),
+            "description":         st.get("description", ""),
+        }
+
 
 # =========================================================
 # ENSURE DEFAULTS (called from schema_defaults)

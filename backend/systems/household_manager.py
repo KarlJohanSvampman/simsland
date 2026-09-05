@@ -5,10 +5,26 @@ Household administration: family name, owned floorplans (building_ids),
 and member characters — driven by the mailbox prop's admin modal
 (frontend), routed through backend/api/household.py.
 
-Deliberately independent of housing.py's home_id/homes system, which
-tracks a single abstract rent/bills unit per household. A household may
-have both a home_id (economy) and separately zero-or-more building_ids
-(placed floorplans this module manages) — the two are not reconciled.
+housing.py's home_id/homes system (a single abstract rent/bills unit per
+household) used to be genuinely disconnected from the real building a
+household actually lives in -- home_id was never set anywhere in this
+file, confirmed live (a household built through the real create_
+household -> assign_building_to_household -> add_member_to_household
+flow always had home_id=None), so get_household_home() always returned
+None and economy.py::apply_expenses() silently fell back to its flat
+$150/week placeholder for every household in the game regardless of
+their actual home. _ensure_household_housing_setup() below reconciles
+this -- home_id now tracks the first building a household is assigned
+(a household that later acquires a SECOND building keeps its original
+home_id, matching the spirit of "independent, not forced 1:1" this
+docstring used to describe) -- and, once the household actually has both
+a home and a member to be the borrower, originates its starter mortgage
+and enrolls mandatory home insurance (systems/loans.py::
+originate_mortgage, systems/subscriptions.py) -- per explicit user
+direction, every household starts with both. Idempotent, called from
+both assign_building_to_household() and add_member_to_household() since
+generate_world.py's real call order assigns the building BEFORE the
+member exists to borrow against.
 """
 
 from uuid import uuid4
@@ -22,6 +38,26 @@ def create_household(world, name):
     return h
 
 
+def _ensure_household_housing_setup(world, household):
+    home_id = household.get("home_id")
+    if not home_id:
+        return
+    from systems.housing import ensure_home_defaults
+    home = world.setdefault("homes", {}).setdefault(home_id, {"id": home_id})
+    ensure_home_defaults(home)
+    home["household_id"] = household["id"]
+    home["vacant"] = False
+
+    from systems.loans import originate_mortgage
+    originate_mortgage(world, household, home)
+
+    from systems.subscriptions import has_home_insurance, subscribe_household, default_home_insurance_service_id
+    if not has_home_insurance(household):
+        default_id = default_home_insurance_service_id(world.get("definitions", {}))
+        if default_id:
+            subscribe_household(world, household, default_id)
+
+
 def assign_building_to_household(world, building, household):
     old_hid = building.get("owner_household_id")
     if old_hid and old_hid != household["id"]:
@@ -31,6 +67,12 @@ def assign_building_to_household(world, building, household):
     building["owner_household_id"] = household["id"]
     if building["id"] not in household["building_ids"]:
         household["building_ids"].append(building["id"])
+    # NOT setdefault -- ensure_household_defaults() already puts a real
+    # "home_id": None key on every household at creation, so setdefault
+    # would be a no-op (the key already exists, just with a None value).
+    if household.get("home_id") is None:
+        household["home_id"] = building["id"]
+    _ensure_household_housing_setup(world, household)
 
 
 def unassign_building(building, household=None):
@@ -49,6 +91,7 @@ def add_member_to_household(world, character, household):
     if character["id"] not in household["members"]:
         household["members"].append(character["id"])
     _grant_household_keys(world, character, household)
+    _ensure_household_housing_setup(world, household)
 
 
 def _grant_household_keys(world, character, household):
