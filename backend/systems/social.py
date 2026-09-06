@@ -61,30 +61,25 @@ def get_relationship(
     target_id
 ):
 
+    # Delegates to brain.relationships.ensure_relationship() for the real,
+    # full relationship shape (20+ fields: hostility/fear/rivalry/
+    # jealousy/designation/labels/...) instead of this function's own,
+    # much smaller 7-key dict -- the two used to independently build the
+    # SAME c["relationships"][target_id] entry with incompatible shapes,
+    # and whichever ran first for a given pair "won," leaving the other
+    # shape's fields permanently missing (a real, live crash: e.g.
+    # sim_loop.py::_update_nearby_relationships reading rel["familiarity"]
+    # / rel["friendship"] unconditionally on a dict this function created
+    # first). "romance"/"last_contact" are this module's own extra
+    # legacy field names (kept, defaulted here) distinct from
+    # ensure_relationship's "romantic_interest"/"last_interaction".
     ensure_social_state(c)
 
-    rels = c["relationships"]
-
-    if target_id not in rels:
-
-        rels[target_id] = {
-
-            "friendship": 0,
-
-            "romance": 0,
-
-            "trust": 0,
-
-            "resentment": 0,
-
-            "attraction": 0,
-
-            "familiarity": 0,
-
-            "last_contact": None
-        }
-
-    return rels[target_id]
+    from brain.relationships import ensure_relationship
+    rel = ensure_relationship(c, target_id)
+    rel.setdefault("romance", rel.get("romantic_interest", 0))
+    rel.setdefault("last_contact", None)
+    return rel
 
 
 # =========================================================

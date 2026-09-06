@@ -43,20 +43,22 @@
 
   #viewerTabs {
     display: flex;
+    flex-wrap: wrap;
     gap: 4px;
     margin: 6px 0 10px;
   }
 
   #viewerTabs button {
-    flex: 1;
+    flex: 1 1 28%;
     background: #2a2e36;
     border: 1px solid #444;
     color: #ccc;
-    padding: 4px 6px;
+    padding: 4px 4px;
     font-size: 11px;
     font-family: monospace;
     cursor: pointer;
     border-radius: 3px;
+    white-space: nowrap;
   }
 
   #viewerTabs button.active {
@@ -113,6 +115,48 @@
     padding-top: 8px;
     border-top: 1px solid #444;
   }
+
+  #viewerRelationshipsTab, #viewerMindTab, #viewerMemoryTab, #viewerLifeTab {
+    font-size: 12px;
+  }
+
+  .viewerSection {
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #333;
+  }
+  .viewerSection:last-child { border-bottom: none; }
+
+  .viewerSectionTitle {
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    font-size: 11px;
+    color: #8ab4ff;
+    margin-bottom: 6px;
+  }
+
+  .viewerCard {
+    padding: 6px 0;
+    border-bottom: 1px solid #292d35;
+  }
+  .viewerCard:last-child { border-bottom: none; }
+
+  .viewerCardTitle { font-weight: bold; }
+
+  .viewerStatRow {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 10px;
+    opacity: .85;
+    margin-top: 2px;
+  }
+
+  .viewerEmpty { opacity: .5; font-style: italic; }
+
+  .viewerPos { color: #7ee787; }
+  .viewerNeg { color: #ff8080; }
+  .viewerWarn { color: #fc6; }
 
   #debugSettingsBtn {
     position: fixed;
@@ -535,8 +579,12 @@
   <h3>Inspector</h3>
 
   <div id="viewerTabs">
-    <button id="viewerTabStatus" class="active" data-tab="status">Status</button>
-    <button id="viewerTabBody" data-tab="body">Body</button>
+    <button class="viewerTabBtn active" data-tab="status">Status</button>
+    <button class="viewerTabBtn" data-tab="body">Body</button>
+    <button class="viewerTabBtn" data-tab="relationships">Relations</button>
+    <button class="viewerTabBtn" data-tab="mind">Mind</button>
+    <button class="viewerTabBtn" data-tab="memory">Memory</button>
+    <button class="viewerTabBtn" data-tab="life">Life</button>
   </div>
 
   <div id="viewerEffectIcons"></div>
@@ -561,6 +609,11 @@
     <div id="bodyTabRows"></div>
     <div id="bodyTabDiseases" class="diseaseList"></div>
   </div>
+
+  <div id="viewerRelationshipsTab" class="hidden"></div>
+  <div id="viewerMindTab" class="hidden"></div>
+  <div id="viewerMemoryTab" class="hidden"></div>
+  <div id="viewerLifeTab" class="hidden"></div>
 
 </div>
 

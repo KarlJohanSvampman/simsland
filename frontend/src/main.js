@@ -3743,36 +3743,369 @@ function renderCharacterInspector(id){
     rows.push(`Beliefs:<br>&nbsp;&nbsp;${beliefLines.join("<br>&nbsp;&nbsp;")}`);
   }
 
-  // Finances -- wallet cash/credit score/cards/government debt already
-  // ride along on the character dict (inventory items + top-level
-  // fields), no separate fetch needed. Bank balance itself lives in
-  // world["banks"] (see backend/systems/banking.py), not on the
-  // character, so only the bank name is shown here, not a live balance.
-  const wallet = (c.inventory || []).find(i => i.object_type === "wallet");
-  if(wallet || c.credit_score != null){
-    const financeLines = [];
-    const cash = wallet?.states?.cash ?? wallet?.cash;
-    if(cash != null) financeLines.push(`$${Math.round(cash)} cash`);
-    if(c.credit_score != null) financeLines.push(`credit score ${c.credit_score}`);
-    if(c.government_debt > 0) financeLines.push(`<span style="color:#f96">$${Math.round(c.government_debt)} owed in taxes</span>`);
-
-    const walletItems = wallet?.items || [];
-    const bankCard = walletItems.find(i => i.object_type === "bank_card");
-    if(bankCard) financeLines.push(`${bankCard.bank} account`);
-    const creditCards = walletItems.filter(i => i.object_type === "credit_card");
-    for(const card of creditCards){
-      financeLines.push(`${card.provider} credit card: $${Math.round(card.current_debt || 0)} / $${Math.round(card.max_credit || 0)}`);
-    }
-
-    if(financeLines.length) rows.push(`Finances: ${financeLines.join(", ")}`);
-  }
-
-  if(c.household_id) rows.push(`Household: ${c.household_id}`);
-
   el.innerHTML = rows.join("<br>");
 
   renderEffectIconRow(c);
   renderBodyTab(c);
+  renderRelationshipsTab(c);
+  renderMindTab(c);
+  renderMemoryTab(c);
+  renderLifeTab(c);
+}
+
+// =========================================================
+// Small shared helpers for the new category tabs below.
+// =========================================================
+
+function _charName(id){
+  if(!id) return null;
+  return _worldState.characters?.[id]?.name || id;
+}
+
+function _section(title, innerHTML){
+  return `<div class="viewerSection"><div class="viewerSectionTitle">${title}</div>${innerHTML}</div>`;
+}
+
+function _empty(text){
+  return `<div class="viewerEmpty">${text}</div>`;
+}
+
+function _signed(n, digits = 0){
+  const v = Number(n) || 0;
+  const cls = v > 0 ? "viewerPos" : (v < 0 ? "viewerNeg" : "");
+  const text = v.toFixed(digits);
+  return cls ? `<span class="${cls}">${v > 0 ? "+" : ""}${text}</span>` : text;
+}
+
+// =========================================================
+// RELATIONSHIPS TAB -- every c.relationships[otherId] entry (brain/
+// relationships.py::ensure_relationship's full shape). Sorted by how
+// "notable" the relationship is (sum of absolute values across the
+// dramatic stats) so the most eventful relationships surface first
+// instead of alphabetically -- with dozens of background contacts this
+// is the difference between useful and unreadable.
+// =========================================================
+
+const _REL_NOTABLE_FIELDS = [
+  "trust", "friendship", "attraction", "romantic_interest", "comfort",
+  "resentment", "hostility", "fear", "rivalry", "jealousy", "creeped_out",
+  "favor_frustration",
+];
+
+function renderRelationshipsTab(c){
+  const el = document.getElementById("viewerRelationshipsTab");
+  if(!el) return;
+
+  const rels = c.relationships || {};
+  const entries = Object.entries(rels);
+  if(!entries.length){
+    el.innerHTML = _section("Relationships", _empty("No relationships yet."));
+    return;
+  }
+
+  entries.sort((a, b) => {
+    const score = r => _REL_NOTABLE_FIELDS.reduce((s, f) => s + Math.abs(r[f] || 0), 0);
+    return score(b[1]) - score(a[1]);
+  });
+
+  const cards = entries.map(([otherId, rel]) => {
+    const name = _charName(otherId);
+    const labels = (rel.labels || []).join(", ");
+    const designation = rel.designation && rel.designation !== "stranger" ? rel.designation : null;
+
+    const stats = [];
+    const pushStat = (label, val, digits = 0) => {
+      if(!val) return;
+      stats.push(`${label} ${_signed(val, digits)}`);
+    };
+    pushStat("trust", rel.trust);
+    pushStat("friendship", rel.friendship);
+    pushStat("attraction", rel.attraction);
+    pushStat("romantic", rel.romantic_interest);
+    pushStat("comfort", rel.comfort);
+    pushStat("resentment", rel.resentment);
+    pushStat("hostility", rel.hostility);
+    pushStat("fear", rel.fear);
+    pushStat("rivalry", rel.rivalry);
+    pushStat("jealousy", rel.jealousy);
+    pushStat("creeped out", rel.creeped_out);
+    pushStat("favor frustration", rel.favor_frustration);
+
+    const knownAs = rel.known_as && rel.known_as !== name
+      ? `<div class="viewerWarn">Known to them as: ${rel.known_as}</div>` : "";
+
+    return `
+      <div class="viewerCard">
+        <div class="viewerCardTitle">${name || otherId}</div>
+        ${labels || designation ? `<div style="opacity:.7">${[designation, labels].filter(Boolean).join(" · ")}</div>` : ""}
+        ${stats.length ? `<div class="viewerStatRow">${stats.join(" · ")}</div>` : ""}
+        ${knownAs}
+      </div>`;
+  });
+
+  el.innerHTML = _section(`Relationships (${entries.length})`, cards.join(""));
+}
+
+// =========================================================
+// MIND TAB -- self-image/self-esteem, mental & behavioral health,
+// addictions, suspicion of others (worries.py), and what the character
+// currently wants/intends to do (persistent_desires.py / active
+// intentions). Everything here drives behavior but was previously only
+// visible by reading the raw world-state JSON.
+// =========================================================
+
+function renderMindTab(c){
+  const el = document.getElementById("viewerMindTab");
+  if(!el) return;
+
+  const sections = [];
+
+  // -- Self-image / self-esteem --
+  const selfLines = [];
+  if(c.self_confidence != null) selfLines.push(`psychological ${Math.round(c.self_confidence * 100)}%`);
+  if(c.body_confidence != null) selfLines.push(`physical ${Math.round(c.body_confidence * 100)}%`);
+  if(c.masculinity_confidence != null) selfLines.push(`masculinity ${Math.round(c.masculinity_confidence * 100)}%`);
+  sections.push(_section("Self-Esteem", selfLines.length
+    ? `<div class="viewerStatRow">${selfLines.join(" · ")}</div>` : _empty("Not generated yet.")));
+
+  // -- Mental & physical health conditions --
+  const mentalHealthTemplates = definitions.mental_health_templates || {};
+  const physicalHealthTemplates = definitions.physical_health_templates || {};
+  const conditionLines = [];
+  for(const key of (c.mental_health || [])){
+    const tmpl = mentalHealthTemplates[key];
+    const treatment = (c.mental_health_treatment || {})[key];
+    const treatLabel = treatment
+      ? ` <span class="viewerPos">(${[treatment.in_therapy && "therapy", treatment.on_medication && "medicated"].filter(Boolean).join(", ") || "in treatment"})</span>`
+      : "";
+    conditionLines.push(`${tmpl?.name || key}${treatLabel}`);
+  }
+  for(const key of (c.physical_health || [])){
+    const tmpl = physicalHealthTemplates[key];
+    conditionLines.push(tmpl?.name || key);
+  }
+  if(conditionLines.length){
+    sections.push(_section("Health Conditions", conditionLines.map(l => `<div class="viewerCard">${l}</div>`).join("")));
+  }
+
+  // -- Addictions --
+  const addictionTemplates = definitions.addiction_templates || {};
+  const addictionEntries = Object.entries(c.addictions || {}).filter(([, e]) => (e.usages || 0) > 0);
+  if(addictionEntries.length){
+    const lines = addictionEntries.map(([key, e]) => {
+      const tmpl = addictionTemplates[key];
+      const threshold = tmpl?.threshold;
+      const label = tmpl?.name || key;
+      return `<div class="viewerCard">${label}: ${e.usages}${threshold ? ` / ${threshold}` : ""} uses</div>`;
+    });
+    sections.push(_section("Addictions", lines.join("")));
+  }
+
+  // -- Suspicion of others (worries.py) --
+  const worries = Object.entries(c.worries || {}).filter(([, w]) => (w.suspicion_level || 0) > 0.05);
+  if(worries.length){
+    worries.sort((a, b) => (b[1].suspicion_level || 0) - (a[1].suspicion_level || 0));
+    const lines = worries.map(([subjectId, w]) => {
+      const lastTrigger = (w.triggers || [])[w.triggers.length - 1];
+      return `
+        <div class="viewerCard">
+          <div class="viewerCardTitle">${_charName(subjectId) || subjectId}</div>
+          <div>Suspicion: <span class="viewerWarn">${Math.round((w.suspicion_level || 0) * 100)}%</span></div>
+          ${lastTrigger ? `<div style="opacity:.7">${lastTrigger.note || lastTrigger.kind}</div>` : ""}
+        </div>`;
+    });
+    sections.push(_section("Suspicious Of", lines.join("")));
+  }
+
+  // -- Active intentions --
+  const intentions = c.active_intentions || [];
+  if(intentions.length){
+    const lines = intentions.map(i => `
+      <div class="viewerCard">
+        <div class="viewerCardTitle">${(i.type || "").replace(/_/g, " ")}</div>
+        ${i.reason ? `<div style="opacity:.7">${i.reason}</div>` : ""}
+      </div>`);
+    sections.push(_section(`Intentions (${intentions.length})`, lines.join("")));
+  }
+
+  // -- Persistent desires --
+  const desires = (c.persistent_desires || []).filter(d => d.active && !d.resolved);
+  if(desires.length){
+    const lines = desires.map(d => `
+      <div class="viewerCard">
+        ${(d.type || "").replace(/_/g, " ")}
+        <div class="viewerStatRow">importance ${(d.importance ?? 0).toFixed(2)}, frustration ${(d.frustration ?? 0).toFixed(2)}</div>
+      </div>`);
+    sections.push(_section(`Desires (${desires.length})`, lines.join("")));
+  }
+
+  el.innerHTML = sections.join("");
+}
+
+// =========================================================
+// MEMORY TAB -- recent memories, notable/tellable stories, and the
+// generalized secret-keeping system (secrets.py / secret_keeping.py):
+// what's being hidden, from whom, why, and the consistent cover lie.
+// A dev/debug view, so secrets are shown plainly rather than obscured --
+// same spirit as the LLM request/response log already exposed here.
+// =========================================================
+
+function renderMemoryTab(c){
+  const el = document.getElementById("viewerMemoryTab");
+  if(!el) return;
+
+  const sections = [];
+
+  // -- Recent memories --
+  const memories = [...(c.memories || [])].sort((a, b) => (b.tick || 0) - (a.tick || 0)).slice(0, 12);
+  if(memories.length){
+    const lines = memories.map(m => `
+      <div class="viewerCard">
+        ${m.text}
+        ${m.tags?.length ? `<div style="opacity:.6">${m.tags.join(", ")}</div>` : ""}
+      </div>`);
+    sections.push(_section("Recent Memories", lines.join("")));
+  } else {
+    sections.push(_section("Recent Memories", _empty("No memories yet.")));
+  }
+
+  // -- Notable stories --
+  const stories = c.notable_stories || [];
+  if(stories.length){
+    const lines = stories.map(s => `
+      <div class="viewerCard">
+        ${s.summary || s.text || ""}
+        <div style="opacity:.6">${s.category || ""}${s.value != null ? ` · value ${s.value.toFixed(1)}` : ""}</div>
+      </div>`);
+    sections.push(_section(`Notable Stories (${stories.length})`, lines.join("")));
+  }
+
+  // -- Secrets --
+  const secrets = c.secrets || [];
+  if(secrets.length){
+    const lines = secrets.map(s => {
+      const targets = Object.keys(s.deception_targets || {}).map(_charName).filter(Boolean);
+      return `
+        <div class="viewerCard">
+          <div class="viewerCardTitle">${s.label || s.content || s.category}</div>
+          <div style="opacity:.7">${s.category || ""}${s.severity != null ? ` · severity ${s.severity}` : ""}</div>
+          ${s.reason ? `<div>Reason: <i>${s.reason}</i></div>` : ""}
+          ${s.preferred_lie ? `<div>Cover story: <i>"${s.preferred_lie}"</i></div>` : ""}
+          ${targets.length ? `<div>Hidden from: ${targets.join(", ")}</div>` : ""}
+        </div>`;
+    });
+    sections.push(_section(`Secrets (${secrets.length})`, lines.join("")));
+  }
+
+  // -- Active lies --
+  const lies = (c.active_lies || []).filter(l => !l.detected);
+  if(lies.length){
+    const lines = lies.map(l => `
+      <div class="viewerCard">
+        "${l.lie_text}" <span style="opacity:.6">(${l.question_type})</span>
+        <div style="opacity:.6">told to: ${(l.told_to || []).map(_charName).filter(Boolean).join(", ")}</div>
+      </div>`);
+    sections.push(_section(`Active Lies (${lies.length})`, lines.join("")));
+  }
+
+  el.innerHTML = sections.join("");
+}
+
+// =========================================================
+// LIFE TAB -- career, household/family, finances (moved here from the
+// Status tab so Status stays focused on real-time vitals), grievances,
+// and household-owned vehicles.
+// =========================================================
+
+function renderLifeTab(c){
+  const el = document.getElementById("viewerLifeTab");
+  if(!el) return;
+
+  const sections = [];
+
+  // -- Career --
+  const jobTemplates = definitions.job_templates || {};
+  const jobTmpl = jobTemplates[c.job_template_id];
+  const careerLines = [];
+  const jobLabel = jobTmpl?.name || c.profession || c.occupation;
+  if(jobLabel) careerLines.push(`${jobLabel}${jobTmpl?.illegal ? " <span class=\"viewerWarn\">(illegal)</span>" : ""}`);
+  else careerLines.push("Unemployed");
+  if(c.hourly_wage != null) careerLines.push(`$${c.hourly_wage}/hr`);
+  if(c.criminal_standing > 0) careerLines.push(`criminal standing ${c.criminal_standing.toFixed(1)}`);
+  if(c.corruption > 0) careerLines.push(`corruption ${c.corruption.toFixed(1)}`);
+  sections.push(_section("Career", `<div class="viewerStatRow">${careerLines.join(" · ")}</div>`));
+
+  const factions = c.faction_memberships || [];
+  if(factions.length){
+    const lines = factions.map(f => `<div class="viewerCard">${f.role || "member"} — ${f.faction_id || f.id || ""}</div>`);
+    sections.push(_section("Factions", lines.join("")));
+  }
+
+  // -- Finances (moved from Status) --
+  const wallet = (c.inventory || []).find(i => i.object_type === "wallet");
+  const financeLines = [];
+  const cash = wallet?.states?.cash ?? wallet?.cash;
+  if(cash != null) financeLines.push(`$${Math.round(cash)} cash`);
+  if(c.credit_score != null) financeLines.push(`credit score ${c.credit_score}`);
+  if(c.government_debt > 0) financeLines.push(`<span class="viewerWarn">$${Math.round(c.government_debt)} owed in taxes</span>`);
+  const walletItems = wallet?.items || [];
+  const bankCard = walletItems.find(i => i.object_type === "bank_card");
+  if(bankCard) financeLines.push(`${bankCard.bank} account`);
+  const creditCards = walletItems.filter(i => i.object_type === "credit_card");
+  for(const card of creditCards){
+    financeLines.push(`${card.provider} credit card: $${Math.round(card.current_debt || 0)} / $${Math.round(card.max_credit || 0)}`);
+  }
+  sections.push(_section("Finances", financeLines.length
+    ? `<div class="viewerStatRow">${financeLines.join(" · ")}</div>` : _empty("No financial data.")));
+
+  // -- Household / family --
+  const householdLines = [];
+  if(c.household_id) householdLines.push(`Household: ${c.household_id}`);
+  if(c.family_role) householdLines.push(`Family role: ${c.family_role}`);
+  sections.push(_section("Household", householdLines.length ? householdLines.join("<br>") : _empty("No household.")));
+
+  const expectationTemplates = definitions.expectation_templates || {};
+  const expectations = Object.values(c.expectations || {});
+  if(expectations.length){
+    const lines = expectations.map(e => {
+      const tmpl = expectationTemplates[e.template_id];
+      const status = e.status === "missed"
+        ? `<span class="viewerNeg">missed ${e.missed_count || 0}x</span>`
+        : `<span class="viewerPos">streak ${e.streak || 0}</span>`;
+      return `<div class="viewerCard">${tmpl?.label || e.template_id} — ${status}</div>`;
+    });
+    sections.push(_section("Expectations", lines.join("")));
+  }
+
+  // -- Household vehicles --
+  const vehicles = (_worldState.props || []).filter(p => p.vehicle_class && p.household_id === c.household_id);
+  if(vehicles.length){
+    const lines = vehicles.map(v => {
+      const owner = v.owner_id ? _charName(v.owner_id) : null;
+      return `
+        <div class="viewerCard">
+          <div class="viewerCardTitle">${v.name}${v.model_name ? ` (${v.model_name})` : ""}</div>
+          <div style="opacity:.7">${v.condition}${owner ? ` · owned by ${owner}` : ""}${!v.is_legal ? ` · <span class="viewerNeg">unregistered</span>` : ""}</div>
+        </div>`;
+    });
+    sections.push(_section(`Vehicles (${vehicles.length})`, lines.join("")));
+  }
+
+  // -- Grievances --
+  const grievances = c.grievances || [];
+  if(grievances.length){
+    const byTarget = {};
+    for(const g of grievances){
+      byTarget[g.caused_by] = (byTarget[g.caused_by] || 0) + (g.weight || 0);
+    }
+    const lines = Object.entries(byTarget).map(([targetId, weight]) => `
+      <div class="viewerCard">
+        Against ${_charName(targetId) || targetId}: <span class="viewerNeg">${weight.toFixed(1)}</span>
+      </div>`);
+    sections.push(_section(`Grievances (${grievances.length})`, lines.join("")));
+  }
+
+  el.innerHTML = sections.join("");
 }
 
 // Effect-icon row (disease-schema-overhaul round, frontend Round 7) --
@@ -3915,17 +4248,27 @@ function updateSelectionInspector(state){
   renderCharacterInspector(selectedCharacterId);
 }
 
-document.getElementById("viewerTabStatus")?.addEventListener("click", () => {
-  document.getElementById("viewerTabStatus").classList.add("active");
-  document.getElementById("viewerTabBody").classList.remove("active");
-  document.getElementById("viewerSelection").classList.remove("hidden");
-  document.getElementById("viewerBodyTab").classList.add("hidden");
-});
-document.getElementById("viewerTabBody")?.addEventListener("click", () => {
-  document.getElementById("viewerTabBody").classList.add("active");
-  document.getElementById("viewerTabStatus").classList.remove("active");
-  document.getElementById("viewerBodyTab").classList.remove("hidden");
-  document.getElementById("viewerSelection").classList.add("hidden");
+// Generalized tab switcher -- one delegated handler + a name->panel-id
+// map, replacing the old pair of hardcoded Status/Body handlers so adding
+// a new Inspector tab is just one map entry + one button, not a new
+// hand-copied click handler each time.
+const VIEWER_TAB_PANELS = {
+  status:        "viewerSelection",
+  body:          "viewerBodyTab",
+  relationships: "viewerRelationshipsTab",
+  mind:          "viewerMindTab",
+  memory:        "viewerMemoryTab",
+  life:          "viewerLifeTab",
+};
+
+document.getElementById("viewerTabs")?.addEventListener("click", (e) => {
+  const btn = e.target.closest(".viewerTabBtn");
+  if(!btn) return;
+  const tab = btn.dataset.tab;
+  document.querySelectorAll(".viewerTabBtn").forEach(b => b.classList.toggle("active", b === btn));
+  for(const [name, panelId] of Object.entries(VIEWER_TAB_PANELS)){
+    document.getElementById(panelId)?.classList.toggle("hidden", name !== tab);
+  }
 });
 
 // =========================================================
