@@ -751,6 +751,7 @@ def tick(world):
         from systems.secret_keeping import maybe_generate_secret, tick_all_secrets
         from systems.confiding import resolve_confide_opportunities
         from systems.temporary_separation import maybe_return_from_separation
+        from systems.crushes import maybe_form_crush
         tick_all_secrets(world)
         for c in characters:
             if not c.get("alive", True):
@@ -765,6 +766,7 @@ def tick(world):
                 maybe_notice_absence(c, world)
                 maybe_generate_secret(c, world)
                 resolve_confide_opportunities(c, world)
+                maybe_form_crush(c, world)
 
     # -- Hourly home-presence sample (systems/home_presence.py) -- feeds
     # the mobile-data home-wifi discount above, and is general-purpose
@@ -779,6 +781,15 @@ def tick(world):
     # -- Body weight/fitness-trait sync ────────────────────────────────
     if every(world, CADENCE["body_composition"], offset=41):
         tick_body_composition(world)
+
+    # -- Autonomous intercourse-scene progression (systems/
+    # intercourse_session.py) -- foreplay -> main -> afterglow -> reroll,
+    # each session paced by its own next_action_tick, not this cadence's
+    # interval itself. ─────────────────────────────────────────────────
+    if every(world, CADENCE["intercourse_sessions"], offset=48):
+        if world.get("intercourse_sessions"):
+            from systems.intercourse_session import tick_intercourse_sessions
+            tick_intercourse_sessions(world)
 
     if every(world, CADENCE["addictions"], offset=47):
         from systems.addictions import tick_addictions

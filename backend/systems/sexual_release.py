@@ -129,14 +129,23 @@ def _try_booty_call(c, world):
 # ── Shared negotiation resolution (spouse + FWB paths) ───────────────────
 
 def _propose_and_resolve(c, target, world):
-    from systems.intimacy import get_available_acts, propose_act, recipient_decision, respond_to_proposal
+    """Kicks off the FIRST act of a scene -- always a foreplay-phase act
+    (systems/intercourse_session.py's phased redesign expects a scene to
+    always start there), and picked randomly rather than deterministically
+    so the same pair doesn't always open the same way. Everything past
+    this first act is handled autonomously by
+    intercourse_session.py::tick_intercourse_sessions(), not repeat calls
+    into this cascade."""
+    import random as _random
+    from systems.intimacy import get_available_acts, propose_act, recipient_decision, respond_to_proposal, execute_act
 
-    acts = get_available_acts(c, target, world)
+    acts = get_available_acts(c, target, world, phase="foreplay")
     if not acts:
         note_denied(c, world)
         return False
 
-    result = propose_act(c, target, acts[0]["id"], world)
+    act_id = _random.choice(acts)["id"]
+    result = propose_act(c, target, act_id, world)
     if not result.get("ok"):
         note_denied(c, world)
         return False
@@ -145,6 +154,12 @@ def _propose_and_resolve(c, target, world):
     respond_to_proposal(target, c, decision if decision != "conditional" else "reject", world)
 
     if decision == "accept":
+        # respond_to_proposal only records the negotiation outcome -- an
+        # accepted proposal doesn't perform itself. This was a real,
+        # pre-existing gap: nothing else in the codebase ever called
+        # execute_act() for this cascade, so a spouse/FWB "accept" never
+        # actually resulted in anything happening.
+        execute_act(c, target, act_id, world)
         note_released(c, world)
         note_released(target, world)
         return True

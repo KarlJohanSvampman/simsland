@@ -140,3 +140,10 @@ CADENCE["home_presence"]    = 3600
 # systems/persona_expectations.py) — a slow drama-simmer check, same tier
 # as election/faction/hierarchy.
 CADENCE["persona_expectations"] = 300
+
+# Autonomous intercourse-scene progression (systems/intercourse_session.py)
+# -- needs to run often in real ticks since each session's own
+# next_action_tick (minutes apart, real scheduling) does the actual
+# pacing; this is just "is anything due to advance" and is a cheap
+# early-exit when world["intercourse_sessions"] is empty.
+CADENCE["intercourse_sessions"] = 10

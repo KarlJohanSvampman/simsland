@@ -3,17 +3,32 @@ systems/intimacy.py
 
 Intimacy ladder (stages 0-6) and act proposal/negotiation engine.
 
-Stage gating:
+Stage gating (0-3 via the separate touch-proposal system further down
+this file; 4-6 via definitions.json["sexual_acts"] + this module):
   0 – strangers (no intimacy)
-  1 – social touch (hug_brief, handshake_lingering)
-  2 – affectionate touch (hug_long, kiss_cheek, cuddling)
-  3 – romantic touch (kiss_lips, kiss_passionate, lap_sitting)
-  4 – sensual (massage_sensual, undressing, mutual_touch)
-  5 – explicit foreplay (oral_sex, manual_stimulation, breast_play)
-  6 – intercourse (intercourse_*, tribadism, anal_intercourse, frottage)
+  1 – social touch (hug, handshake)
+  2 – affectionate touch (hug_long, kiss_peck)
+  3 – romantic touch (kiss_deep, cuddle)
+  4 – sensual (eligible to start a real sexual_acts scene at all)
+  5 – (unused by sexual_acts directly; a relationship can sit here)
+  6 – fully open (still gated per-act by can_advance_stage's thresholds)
 
-Each act in definitions.json["sexual_acts"] has a "tier" matching stage 4-6.
-Stages 1-3 are social/romantic acts defined in interaction_templates.
+Two fixed bugs, worth remembering since they meant NONE of this ever
+actually ran before: (1) every act/registry lookup here used to read
+world["defs"], a key nothing ever sets -- always empty, so
+get_available_acts() always returned []; (2) act tier lookups read
+act["tier"], but definitions.json stores it as "intimacy_tier" -- always
+absent, so every act silently resolved to the same stage. Both are fixed
+(world["definitions"], and the tier system replaced by "phase" below).
+
+Since the sexual_acts registry was trimmed to 13 explicit-only acts (the
+phased-intercourse redesign), each act now carries "phase":
+"foreplay" | "main" | "afterglow" instead of a numeric tier -- a real
+scene has its own internal foreplay -> main -> afterglow order
+(orchestrated by systems/intercourse_session.py, hooked from
+execute_act() below) independent of how far the relationship itself has
+progressed. SEXUAL_ACTS_MIN_STAGE (4) is the one remaining relationship-
+level gate: eligible to start a scene at all, full stop.
 
 Negotiation state machine per relationship:
   IDLE → PROPOSED → (ACCEPTED | REJECTED | COUNTER | CONDITIONAL)
@@ -52,9 +67,6 @@ STAGE_THRESHOLDS = {
     5: {"attraction": 72, "trust": 55, "comfort": 55, "familiarity": 40},
     6: {"attraction": 82, "trust": 65, "comfort": 65, "familiarity": 50},
 }
-
-# Acts available per tier (maps to definitions.json sexual_acts keys by tier)
-TIER_TO_STAGE = {3: 3, 4: 4, 5: 5, 6: 6}
 
 # Negotiation state values
 NEG_IDLE        = "idle"
@@ -130,30 +142,41 @@ def can_advance_stage(c, other, world):
 
 # ── Act catalog lookup ────────────────────────────────────────────────────
 
-def get_available_acts(c, other, world, max_stage=None):
+
+# All 13 remaining sexual_acts entries (systems/intercourse_session.py's
+# trimmed registry) are explicit content -- gated uniformly behind
+# reaching intimacy_stage 4 ("sensual"), the same bar the old tier-6
+# design used for its most explicit content. Which SPECIFIC acts are
+# offered within that is governed by phase (foreplay/main/afterglow),
+# tracked by systems/intercourse_session.py, not by a per-act stage
+# anymore -- a real scene has an internal foreplay->main->afterglow
+# order regardless of how far the relationship itself has progressed.
+SEXUAL_ACTS_MIN_STAGE = 4
+
+
+def get_available_acts(c, other, world, phase=None):
     """
-    Return list of act dicts from definitions.json that are available given:
-      - current intimacy stage
+    Return list of act dicts from definitions.json["sexual_acts"] that are
+    available given:
+      - the relationship has reached SEXUAL_ACTS_MIN_STAGE
       - sexual compatibility (orientation / act.compatibility)
-      - max_stage cap (if None, compute from can_advance_stage)
+      - phase filter (foreplay/main/afterglow), if given -- None returns all
     """
-    defs = world.get("defs", {})
+    defs = world.get("definitions", {})
     acts_registry = defs.get("sexual_acts", {})
     if not acts_registry:
         return []
 
-    if max_stage is None:
-        max_stage = can_advance_stage(c, other, world)
+    max_stage = can_advance_stage(c, other, world)
+    if max_stage < SEXUAL_ACTS_MIN_STAGE:
+        return []
 
     c_sex   = c.get("sex",   "male")
     o_sex   = other.get("sex", "female")
-    c_orient = c.get("sexual_orientation", "heterosexual")
 
     available = []
     for act_id, act in acts_registry.items():
-        tier = act.get("tier", 3)
-        stage = TIER_TO_STAGE.get(tier, tier)
-        if stage > max_stage:
+        if phase is not None and act.get("phase", "foreplay") != phase:
             continue
 
         # Compatibility check
@@ -302,12 +325,11 @@ def recipient_decision(recipient, proposer, world):
     if neg["state"] != NEG_PROPOSED:
         return None
 
-    defs      = world.get("defs", {})
+    defs      = world.get("definitions", {})
     acts_reg  = defs.get("sexual_acts", {})
     act_id    = neg["proposed_act"]
     act       = acts_reg.get(act_id, {})
-    act_tier  = act.get("tier", 3)
-    act_stage = TIER_TO_STAGE.get(act_tier, act_tier)
+    phase     = act.get("phase", "foreplay")
 
     # ── Preference-aware scoring ──────────────────────────────────────────
     prefs = recipient.get("sexual_preferences", {})
@@ -359,20 +381,19 @@ def recipient_decision(recipient, proposer, world):
     # Anxiety penalty
     willingness -= anxiety * 0.25
 
-    # Casual reluctance penalty for high stages without emotional bond
-    if act_stage >= 5 and gate > 0.2:
+    # Casual reluctance penalty for full intercourse without emotional bond
+    if phase == "main" and gate > 0.2:
         willingness -= casual_rel * 0.2
 
-    # Stage jump penalty — proposing too far beyond current stage
-    stage_jump = act_stage - current_stage
-    if stage_jump > 1:
-        willingness -= (stage_jump - 1) * 0.2 + stage_mod * 0.05
+    # Skipping straight to intercourse the moment the relationship first
+    # crosses the eligibility floor (no real foreplay this session yet)
+    # feels rushed -- mirrors the old "stage jump" penalty's intent.
+    if phase == "main" and current_stage <= SEXUAL_ACTS_MIN_STAGE:
+        willingness -= 0.15 - stage_mod * 0.05
 
     # Trait modifiers
     if "promiscuous" in r_traits:
         willingness += 0.15
-    if "romantic" in r_traits and act_stage < 3:
-        willingness -= 0.10   # romantic type wants romance first
     if "impulsive" in r_traits:
         willingness += 0.10
     if "cautious" in r_traits or "reserved" in r_traits:
@@ -386,7 +407,7 @@ def recipient_decision(recipient, proposer, world):
         return "accept"
     elif willingness > 0.45:
         # Maybe suggest a less intense act instead
-        if act_stage > 1 and rand < 0.35:
+        if rand < 0.35:
             return "counter"
         return "accept"
     elif willingness > 0.25:
@@ -420,55 +441,43 @@ def execute_act(initiator, recipient, act_id, world):
     r_rel = ensure_intimacy_state(
         recipient.setdefault("relationships", {}).setdefault(pid, {}))
 
-    defs     = world.get("defs", {})
+    defs     = world.get("definitions", {})
     acts_reg = defs.get("sexual_acts", {})
     act      = acts_reg.get(act_id)
     if not act:
         return {"ok": False, "reason": "act_not_found"}
 
-    act_tier  = act.get("tier", 3)
-    act_stage = TIER_TO_STAGE.get(act_tier, act_tier)
-    tick      = world.get("tick", 0)
+    phase = act.get("phase", "foreplay")
+    tick  = world.get("tick", 0)
 
-    # Apply effects from act definition
-    effects = act.get("effects", {})
-    for rel_obj in (p_rel, r_rel):
-        for stat, delta in effects.items():
-            if stat in rel_obj:
-                rel_obj[stat] = max(0, min(100, rel_obj[stat] + delta))
+    # Comfort/arousal gain by PHASE now, not a 1-6 tier -- foreplay warms
+    # things up, main is where it counts, afterglow is comfort without
+    # much arousal. Actual orgasm-meter progression during "main" acts is
+    # handled by systems/intercourse_session.py below, not here.
+    arousal_gain = {"foreplay": 0.08, "main": 0.20, "afterglow": 0.02}.get(phase, 0.05)
+    comfort_gain = {"foreplay": 5,    "main": 10,   "afterglow": 8}.get(phase, 4)
 
-    # Arousal gain
-    arousal_gain = AROUSAL_GAIN.get(act_stage, 0.05)
     p_rel["arousal_level"] = min(1.0, p_rel.get("arousal_level", 0) + arousal_gain)
     r_rel["arousal_level"] = min(1.0, r_rel.get("arousal_level", 0) + arousal_gain)
-
-    # Comfort + trust gain for both
-    comfort_gain = COMFORT_GAIN.get(act_stage, 4)
     p_rel["comfort"] = min(100, p_rel.get("comfort", 0) + comfort_gain)
     r_rel["comfort"] = min(100, r_rel.get("comfort", 0) + comfort_gain)
     p_rel["trust"]   = min(100, p_rel.get("trust",   0) + int(comfort_gain * 0.4))
     r_rel["trust"]   = min(100, r_rel.get("trust",   0) + int(comfort_gain * 0.4))
 
-    # Stage progression
-    progress_gain = 20.0 * (act_stage / 3.0)
+    # Stage progression -- reaching "main" acts at all is itself worth
+    # real progress toward intimacy_stage 6; foreplay/afterglow nudge it
+    # more gently.
+    progress_gain = {"foreplay": 8.0, "main": 20.0, "afterglow": 4.0}.get(phase, 8.0)
     for rel_obj in (p_rel, r_rel):
         cur_stage = rel_obj["intimacy_stage"]
-        if act_stage >= cur_stage:
-            rel_obj["intimacy_progress"] = min(100, rel_obj["intimacy_progress"] + progress_gain)
-            if rel_obj["intimacy_progress"] >= 100:
-                rel_obj["intimacy_stage"]    = min(6, cur_stage + 1)
-                rel_obj["intimacy_progress"] = 0.0
+        rel_obj["intimacy_progress"] = min(100, rel_obj["intimacy_progress"] + progress_gain)
+        if rel_obj["intimacy_progress"] >= 100 and cur_stage < 6:
+            rel_obj["intimacy_stage"]    = cur_stage + 1
+            rel_obj["intimacy_progress"] = 0.0
 
     # Log
-    record = {
-        "tick":      tick,
-        "act_id":    act_id,
-        "with":      rid if rel_obj is p_rel else pid,
-        "stage":     act_stage,
-        "formation": act.get("spatial", {}).get("formation", ""),
-    }
-    p_rel["intimacy_history"].append({"tick": tick, "act_id": act_id, "with": rid,   "stage": act_stage})
-    r_rel["intimacy_history"].append({"tick": tick, "act_id": act_id, "with": pid,   "stage": act_stage})
+    p_rel["intimacy_history"].append({"tick": tick, "act_id": act_id, "with": rid, "phase": phase})
+    r_rel["intimacy_history"].append({"tick": tick, "act_id": act_id, "with": pid, "phase": phase})
 
     # Reset negotiation to idle
     idle_neg = {"state": NEG_IDLE, "proposed_act": None, "proposed_by": None,
@@ -479,31 +488,29 @@ def execute_act(initiator, recipient, act_id, world):
     # If observed or in public → reputation hit
     location = world.get("characters_by_location", {})
     loc_id   = initiator.get("current_location")
-    if loc_id and act_stage >= 4:
+    if loc_id and phase in ("main", "afterglow"):
         occupants = location.get(loc_id, [])
         observers  = [oid for oid in occupants if oid not in (pid, rid)]
-        if observers and act_stage >= 5:
+        if observers and phase == "main":
             apply_reputation_event(initiator, "public_indecency", world)
             apply_reputation_event(recipient, "public_indecency", world)
 
-    # ── Pleasure + climax resolution ─────────────────────────────────────
-    pleasure_outcome = None
-    if act_stage >= 5:   # only for explicit stages
-        try:
-            from systems.pleasure import resolve_encounter_outcome
-            pleasure_outcome = resolve_encounter_outcome(
-                initiator, recipient, act_id,
-                position_id=None,    # position set separately by action_router
-                world=world
-            )
-        except Exception:
-            pass
+    # ── Scene orchestration (foreplay timing rolls, orgasm meters,
+    # moaning, climax animations, scoring, memory) -- the real work per
+    # the phased-intercourse redesign, everything above is just the
+    # underlying relationship-stat bookkeeping every act still does. ──
+    session_result = None
+    try:
+        from systems.intercourse_session import handle_act_execution
+        session_result = handle_act_execution(initiator, recipient, act_id, act, world)
+    except Exception:
+        pass
 
-    # ── Conception check ──────────────────────────────────────────────────
-    if act_stage >= 5:
+    # ── Conception check -- only the three penetrative position acts ──────
+    if act_id in ("missionary", "doggystyle", "riding"):
         try:
             from systems.pregnancy import maybe_conceive
-            female = initiator if initiator.get("sex") in ("female","intersex") else recipient
+            female = initiator if initiator.get("sex") in ("female", "intersex") else recipient
             male   = recipient if female is initiator else initiator
             maybe_conceive(female, male, world)
         except Exception:
@@ -513,11 +520,11 @@ def execute_act(initiator, recipient, act_id, world):
         "ok":         True,
         "act_id":     act_id,
         "act_name":   act.get("name", act_id),
-        "act_stage":  act_stage,
+        "phase":      phase,
         "formation":  act.get("spatial", {}).get("formation", ""),
         "initiator_animation": act.get("animations", {}).get("initiator", ""),
         "recipient_animation": act.get("animations", {}).get("recipient", ""),
-        "pleasure_outcome":    pleasure_outcome,
+        "session":    session_result,
     }
 
 
@@ -758,7 +765,7 @@ def _execute_touch(proposer, recipient, template_id, world):
     init_anim, recv_anim = TOUCH_ANIMATIONS.get(
         template_id, ("anim_hug_give", "anim_hug_receive"))
 
-    defs = world.get("defs", {})
+    defs = world.get("definitions", {})
     tpl  = defs.get("interaction_templates", {}).get(template_id, {})
     duration = tpl.get("duration_ticks", 4)
 

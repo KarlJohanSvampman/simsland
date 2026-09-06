@@ -731,7 +731,12 @@ def _resolve_return_mode(c, world):
     reason = c.get("off_grid_reason")
     tick = world.get("tick", 0)
     cache = world.setdefault("_return_mode_cache", {})
-    key = (household_id, reason, tick)
+    # String key, not a tuple -- world state gets JSON-serialized for the
+    # Redis cache/websocket broadcast (core/cache.py::safe_json_dumps),
+    # and a tuple dict key isn't valid JSON. A real, previously-live bug:
+    # this crashed every single tick's cache write once any household
+    # ever returned via bus/taxi/friend.
+    key = f"{household_id}|{reason}|{tick}"
     if key in cache:
         return cache[key]
 

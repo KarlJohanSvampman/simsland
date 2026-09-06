@@ -56,7 +56,7 @@ def compute_pleasure_score(c, other, act, position_id, world):
       - Kink mutual match
     Returns float 0-1.
     """
-    defs = world.get("defs", {})
+    defs = world.get("definitions", {})
     prefs     = c.get("sexual_preferences", {})
     o_prefs   = other.get("sexual_preferences", {})
     positions_reg = defs.get("positions_registry", {})
@@ -180,7 +180,7 @@ def resolve_encounter_outcome(initiator, recipient, act_id, position_id, world):
 
     Returns a dict with the full outcome for logging and animation use.
     """
-    defs    = world.get("defs", {})
+    defs    = world.get("definitions", {})
     acts_reg = defs.get("sexual_acts", {})
     act      = acts_reg.get(act_id, {})
 
@@ -286,7 +286,7 @@ def _needs_aftercare(c, world):
     """Return True if this character needs significant aftercare."""
     prefs    = c.get("sexual_preferences", {})
     kinks    = set(prefs.get("kinks", []))
-    defs     = world.get("defs", {})
+    defs     = world.get("definitions", {})
     kinks_reg = defs.get("kinks_registry", {})
 
     # High-need kinks

@@ -2243,6 +2243,78 @@ function updateSpeechBubbles(state){
 }
 
 // =========================================================
+// ORGASM METER (systems/intercourse_session.py) -- a small bar above a
+// character's head while c.orgasm_meter > 0, same CSS2DObject-per-
+// character pattern as the speech bubble above it, just parked a little
+// higher so the two never overlap.
+// =========================================================
+
+const orgasmMeters = {};   // id → { cssObject, div, fill }
+
+function getOrCreateOrgasmMeter(id){
+  if(orgasmMeters[id]) return orgasmMeters[id];
+
+  const div = document.createElement("div");
+  div.style.cssText = `
+    width: 46px;
+    height: 6px;
+    background: rgba(0,0,0,0.5);
+    border: 1px solid rgba(255,255,255,0.6);
+    border-radius: 3px;
+    overflow: hidden;
+    pointer-events: none;
+    display: none;
+  `;
+  const fill = document.createElement("div");
+  fill.style.cssText = `
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, #ff5fa8, #ff2f7c);
+  `;
+  div.appendChild(fill);
+
+  const cssObject = new CSS2DObject(div);
+  cssObject.position.set(0, 3.1, 0);   // above the speech bubble
+  orgasmMeters[id] = { cssObject, div, fill };
+  return orgasmMeters[id];
+}
+
+function updateOrgasmMeters(state){
+  const active = new Set();
+
+  for(const [id, c] of Object.entries(state.characters || {})){
+    const model = sims[id];
+    if(!model) continue;
+
+    const meter = c.orgasm_meter || 0;
+    if(meter <= 0){
+      if(orgasmMeters[id]) orgasmMeters[id].cssObject.visible = false;
+      continue;
+    }
+
+    active.add(id);
+    const { cssObject, div, fill } = getOrCreateOrgasmMeter(id);
+    if(!model.getObjectById(cssObject.id)) model.add(cssObject);
+
+    div.style.display = "block";
+    cssObject.visible = true;
+    fill.style.width = `${Math.max(0, Math.min(100, meter))}%`;
+    // Climbs toward a hotter color the closer to climax.
+    fill.style.background = meter >= 80
+      ? "linear-gradient(90deg, #ff2f7c, #ff2020)"
+      : "linear-gradient(90deg, #ff5fa8, #ff2f7c)";
+  }
+
+  for(const id in orgasmMeters){
+    if(active.has(id)) continue;
+    const { cssObject } = orgasmMeters[id];
+    const model = sims[id];
+    if(model) model.remove(cssObject);
+    delete orgasmMeters[id];
+  }
+}
+
+// =========================================================
 // DEBUG OVERLAY SETTINGS (localStorage-backed, per client)
 // =========================================================
 // New pattern for this file -- localStorage is otherwise unused
@@ -4817,6 +4889,7 @@ async function _applyState(state) {
   updateFloorplanWalls(state);
   await updateCharacters(state);
   updateSpeechBubbles(state);
+  updateOrgasmMeters(state);
   updateThoughtBubbles(state);
   updateBadges(state);
   updatePerceptionOverlay(state);

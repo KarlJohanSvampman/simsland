@@ -634,6 +634,14 @@ def generate_character(defs, overrides=None, world=None):
     except Exception:
         character.setdefault("ideal_partner", None)
 
+    # Two private "climax acts" (systems/intercourse_session.py) -- what
+    # actually gets THIS character to orgasm during a real scene.
+    try:
+        from systems.intercourse_session import generate_climax_acts
+        generate_climax_acts(character, defs)
+    except Exception:
+        character.setdefault("sexual_preferences", {}).setdefault("climax_acts", None)
+
     # Sports team assignment — a "X Supporter"/team-sport hobby among the
     # ones just picked above gets a real pro team or an invented local
     # club (see systems/sports.py). Needs a real world dict (not just

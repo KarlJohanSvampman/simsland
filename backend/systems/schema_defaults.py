@@ -75,6 +75,9 @@ def ensure_world_defaults(world, defs=None):
     # Server-side time-scale control (see api/admin.py) -- 1x is realtime.
     world.setdefault("time_scale", 1)
 
+    # Active intercourse scenes (systems/intercourse_session.py)
+    world.setdefault("intercourse_sessions", {})
+
     # Init community stats from definitions if provided
     if defs is not None:
         try:
@@ -956,7 +959,27 @@ def ensure_character_defaults(c, world=None):
         "kinks":              [],   # list of kink keys from kinks_registry
         "kinks_hard_no":      [],   # will never do these
         "partner_experience": {},   # {other_id: int} — sessions with that partner
+        # The two main-phase acts most likely to bring THIS character to
+        # orgasm (systems/intercourse_session.py) — rolled once, generation-
+        # time, from sexual_acts entries flagged climax_candidate. primary
+        # is needed to cross 80% on the orgasm meter, secondary to reach
+        # 100%. A partner only learns these once told mid-session (see
+        # rel["known_climax_acts"] below) -- this is the character's own
+        # private truth, not what a partner currently knows about them.
+        "climax_acts": None,
     })
+    # setdefault() above is a no-op for characters that already had a
+    # sexual_preferences dict from before this field existed -- explicit
+    # backfill so old saves get a real value instead of a KeyError.
+    if "climax_acts" not in c["sexual_preferences"]:
+        c["sexual_preferences"]["climax_acts"] = None
+
+    # Live intercourse-scene state (systems/intercourse_session.py) --
+    # None when not currently in a scene.
+    c.setdefault("active_intercourse_session_id", None)
+    c.setdefault("orgasm_meter", 0.0)      # 0-100, current scene only
+    c.setdefault("orgasm_stage", 0)        # 0=none, 1/2/3 = climax animation phase fired
+    c.setdefault("moan_intensity", 0.0)    # 0-1, read by frontend for moan volume/text
 
     # Trauma tracking
     c.setdefault("trauma", {

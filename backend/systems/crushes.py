@@ -155,6 +155,50 @@ def add_celebrity_idol(c, celebrity_id, world, intensity=None):
     return crush
 
 
+# ── Real interpersonal crushes (previously dead: add_crush(target_id=...)
+# for a REAL character_id was only ever exercised by tests, never called
+# by any live system -- every actual crush in the simulation was a
+# celebrity idol) ──────────────────────────────────────────────────────
+
+CRUSH_ATTRACTION_THRESHOLD    = 45   # rel["attraction"], 0-100 scale
+CRUSH_ROMANTIC_THRESHOLD      = 20   # rel["romantic_interest"], 0-100 scale
+CRUSH_DAILY_CHANCE            = 0.05
+CRUSH_SECRET_CHANCE           = 0.65  # most real-life crushes start secret
+
+
+def maybe_form_crush(c, world):
+    """Daily-cadence check (sim_loop.py): a real, sustained mutual-enough
+    attraction to someone c isn't already committed to has a small daily
+    chance of becoming a genuine crush -- the actual gap this closes is
+    that NPC-on-NPC crushes never formed at all before this; only
+    celebrity idols (add_celebrity_idol, generation-time only) did."""
+    chars = world.get("characters", {})
+    existing_ids = {x.get("character_id") for x in c.get("crushes", []) if not x.get("is_celebrity")}
+
+    for other_id, rel in c.get("relationships", {}).items():
+        if other_id in existing_ids or other_id == c.get("id"):
+            continue
+        if any(l in rel.get("labels", []) for l in ("partner", "spouse")):
+            continue  # already a real relationship, not a crush
+        attraction = rel.get("attraction", 0)
+        romantic   = rel.get("romantic_interest", 0)
+        if attraction < CRUSH_ATTRACTION_THRESHOLD and romantic < CRUSH_ROMANTIC_THRESHOLD:
+            continue
+        other = chars.get(other_id)
+        if not other or not other.get("alive", True):
+            continue
+        if random.random() >= CRUSH_DAILY_CHANCE:
+            continue
+
+        relation_label = "coworker" if rel.get("designation") in ("friend", "close_friend", "best_friend") else "acquaintance"
+        add_crush(
+            c, target_id=other_id, name=other.get("name", "them"),
+            relation_label=relation_label, attraction_type="both",
+            intensity=round(min(1.0, attraction / 100.0), 2),
+            is_secret=random.random() < CRUSH_SECRET_CHANCE,
+        )
+
+
 def remove_crush(c, target_id):
     c["crushes"] = [x for x in c.get("crushes", []) if x.get("character_id") != target_id]
 

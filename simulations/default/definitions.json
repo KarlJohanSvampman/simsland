@@ -31674,148 +31674,116 @@
     }
   },
   "service_templates": {
-    "floor_tiling": {
-      "name": "Floor Tiling",
-      "provider": "reconstruction",
-      "provider_name": "Renovation Firm",
-      "price_mode": "per_tile",
-      "labor_rate": 8,
-      "material_rate": 0,
-      "duration_per_unit": 1800,
-      "worker_trait": "contractor",
-      "illicit": false
+    "insurance_home_meridian": {
+      "name": "Meridian HomeGuard",
+      "provider_company_id": "meridian_insurance",
+      "category": "insurance_home",
+      "weekly_cost": 35,
+      "payout_max": 50000,
+      "description": "Covers fire and burglary damage to your home."
     },
-    "paint_wall": {
-      "name": "Wall Painting / Wallpaper",
-      "provider": "reconstruction",
-      "provider_name": "Renovation Firm",
-      "price_mode": "per_wall",
-      "labor_rate": 25,
-      "material_rate": 15,
-      "duration_per_unit": 3600,
-      "worker_trait": "contractor",
-      "illicit": false
+    "insurance_home_northstar": {
+      "name": "Northstar Home Shield",
+      "provider_company_id": "northstar_insurance",
+      "category": "insurance_home",
+      "weekly_cost": 28,
+      "payout_max": 30000,
+      "description": "Basic home coverage at a lower premium."
     },
-    "build_wall": {
-      "name": "Wall Construction",
-      "provider": "reconstruction",
-      "provider_name": "Renovation Firm",
-      "price_mode": "per_wall",
-      "labor_rate": 120,
-      "material_rate": 60,
-      "duration_per_unit": 7200,
-      "worker_trait": "contractor",
-      "illicit": false
+    "insurance_vehicle_meridian": {
+      "name": "Meridian AutoGuard",
+      "provider_company_id": "meridian_insurance",
+      "category": "insurance_vehicle",
+      "weekly_cost": 22,
+      "payout_max": 15000,
+      "description": "Covers vehicle damage and total loss."
     },
-    "remove_wall": {
-      "name": "Wall Removal / Demolition",
-      "provider": "reconstruction",
-      "provider_name": "Renovation Firm",
-      "price_mode": "per_wall",
-      "labor_rate": 80,
-      "material_rate": 0,
-      "duration_per_unit": 5400,
-      "worker_trait": "contractor",
-      "illicit": false
+    "insurance_vehicle_northstar": {
+      "name": "Northstar Auto Shield",
+      "provider_company_id": "northstar_insurance",
+      "category": "insurance_vehicle",
+      "weekly_cost": 18,
+      "payout_max": 10000,
+      "description": "Basic vehicle coverage at a lower premium."
     },
-    "insert_door": {
-      "name": "Door Installation",
-      "provider": "reconstruction",
-      "provider_name": "Renovation Firm",
-      "price_mode": "per_unit",
-      "labor_rate": 150,
-      "material_rate": 80,
-      "duration_per_unit": 10800,
-      "worker_trait": "contractor",
-      "illicit": false
+    "insurance_life_meridian": {
+      "name": "Meridian LifeSecure",
+      "provider_company_id": "meridian_insurance",
+      "category": "insurance_life",
+      "weekly_cost": 15,
+      "payout_max": 100000,
+      "description": "Pays a beneficiary on the policyholder's death."
     },
-    "insert_window": {
-      "name": "Window Installation",
-      "provider": "reconstruction",
-      "provider_name": "Renovation Firm",
-      "price_mode": "per_unit",
-      "labor_rate": 130,
-      "material_rate": 90,
-      "duration_per_unit": 10800,
-      "worker_trait": "contractor",
-      "illicit": false
+    "insurance_life_northstar": {
+      "name": "Northstar Life Shield",
+      "provider_company_id": "northstar_insurance",
+      "category": "insurance_life",
+      "weekly_cost": 12,
+      "payout_max": 75000,
+      "description": "Basic life coverage at a lower premium."
     },
-    "appliance_repair": {
-      "name": "Appliance / Prop Repair",
-      "provider": "repair",
-      "provider_name": "Repair Service",
-      "price_mode": "per_unit",
-      "labor_rate": 65,
-      "material_rate": 30,
-      "duration_per_unit": 5400,
-      "worker_trait": "repairman",
-      "illicit": false
+    "internet_bluewave": {
+      "name": "Bluewave Broadband",
+      "provider_company_id": "bluewave_isp",
+      "category": "internet",
+      "weekly_cost": 18,
+      "throughput_mbps": 300,
+      "description": "Home internet connection."
     },
-    "garden_maintenance": {
-      "name": "Garden Maintenance",
-      "provider": "gardening",
-      "provider_name": "Gardening Service",
-      "price_mode": "hourly",
-      "labor_rate": 0,
-      "material_rate": 0,
-      "duration_per_unit": 3600,
-      "worker_trait": "gardener",
-      "illicit": false
+    "internet_skylark": {
+      "name": "Skylark Fiber",
+      "provider_company_id": "skylark_isp",
+      "category": "internet",
+      "weekly_cost": 25,
+      "throughput_mbps": 750,
+      "description": "Faster, pricier home fiber connection."
     },
-    "childcare": {
-      "name": "Childcare",
-      "provider": "babysitting",
-      "provider_name": "Babysitting",
-      "price_mode": "hourly",
-      "labor_rate": 0,
-      "material_rate": 0,
-      "duration_per_unit": 3600,
-      "worker_trait": "caregiver",
-      "illicit": false
+    "mobile_data_pulsemobile": {
+      "name": "PulseMobile Data",
+      "provider_company_id": "pulsemobile_telecom",
+      "category": "mobile_data",
+      "cost_per_gb": 6,
+      "throughput_mbps": 50,
+      "description": "Pay-per-GB mobile data top-up."
     },
-    "cannabis": {
-      "name": "Cannabis",
-      "provider": "drug_dealer",
-      "provider_name": "Street Dealer",
-      "price_mode": "per_unit",
-      "labor_rate": 0,
-      "material_rate": 0,
-      "duration_per_unit": 300,
-      "worker_trait": "dealer",
-      "illicit": true
+    "mobile_data_arcwave": {
+      "name": "Arcwave Mobile Data",
+      "provider_company_id": "arcwave_telecom",
+      "category": "mobile_data",
+      "cost_per_gb": 5,
+      "throughput_mbps": 80,
+      "description": "Pay-per-GB mobile data top-up, cheaper per GB."
     },
-    "stimulants": {
-      "name": "Stimulants",
-      "provider": "drug_dealer",
-      "provider_name": "Street Dealer",
-      "price_mode": "per_unit",
-      "labor_rate": 0,
-      "material_rate": 0,
-      "duration_per_unit": 300,
-      "worker_trait": "dealer",
-      "illicit": true
+    "home_security_monitoring": {
+      "name": "24/7 Home Monitoring",
+      "provider_company_id": "security_firm",
+      "category": "security",
+      "weekly_cost": 20,
+      "description": "Professional monitoring for a home alarm system (see the alarm_system prop)."
     },
-    "downers": {
-      "name": "Downers",
-      "provider": "drug_dealer",
-      "provider_name": "Street Dealer",
-      "price_mode": "per_unit",
-      "labor_rate": 0,
-      "material_rate": 0,
-      "duration_per_unit": 300,
-      "worker_trait": "dealer",
-      "illicit": true
+    "subscription_pixelforge": {
+      "name": "Pixelforge Game Pass",
+      "provider_company_id": "pixelforge_games",
+      "category": "entertainment",
+      "interest": "gaming",
+      "weekly_cost": 10,
+      "description": "Gaming subscription."
     },
-    "companionship": {
-      "name": "Companionship",
-      "provider": "escort",
-      "provider_name": "Escort",
-      "price_mode": "hourly",
-      "labor_rate": 0,
-      "material_rate": 0,
-      "duration_per_unit": 3600,
-      "worker_trait": "escort",
-      "illicit": true
+    "subscription_harmonic": {
+      "name": "Harmonic Music Premium",
+      "provider_company_id": "harmonic_music",
+      "category": "entertainment",
+      "interest": "music",
+      "weekly_cost": 6,
+      "description": "Music streaming subscription."
+    },
+    "subscription_streamvista": {
+      "name": "StreamVista",
+      "provider_company_id": "streamvista",
+      "category": "entertainment",
+      "interest": "streaming",
+      "weekly_cost": 8,
+      "description": "Video streaming subscription."
     }
   },
   "job_templates": {
@@ -52630,119 +52598,6 @@
       "turnover_rate": 0.02
     }
   },
-  "service_templates": {
-    "insurance_home_meridian": {
-      "name": "Meridian HomeGuard",
-      "provider_company_id": "meridian_insurance",
-      "category": "insurance_home",
-      "weekly_cost": 35,
-      "payout_max": 50000,
-      "description": "Covers fire and burglary damage to your home."
-    },
-    "insurance_home_northstar": {
-      "name": "Northstar Home Shield",
-      "provider_company_id": "northstar_insurance",
-      "category": "insurance_home",
-      "weekly_cost": 28,
-      "payout_max": 30000,
-      "description": "Basic home coverage at a lower premium."
-    },
-    "insurance_vehicle_meridian": {
-      "name": "Meridian AutoGuard",
-      "provider_company_id": "meridian_insurance",
-      "category": "insurance_vehicle",
-      "weekly_cost": 22,
-      "payout_max": 15000,
-      "description": "Covers vehicle damage and total loss."
-    },
-    "insurance_vehicle_northstar": {
-      "name": "Northstar Auto Shield",
-      "provider_company_id": "northstar_insurance",
-      "category": "insurance_vehicle",
-      "weekly_cost": 18,
-      "payout_max": 10000,
-      "description": "Basic vehicle coverage at a lower premium."
-    },
-    "insurance_life_meridian": {
-      "name": "Meridian LifeSecure",
-      "provider_company_id": "meridian_insurance",
-      "category": "insurance_life",
-      "weekly_cost": 15,
-      "payout_max": 100000,
-      "description": "Pays a beneficiary on the policyholder's death."
-    },
-    "insurance_life_northstar": {
-      "name": "Northstar Life Shield",
-      "provider_company_id": "northstar_insurance",
-      "category": "insurance_life",
-      "weekly_cost": 12,
-      "payout_max": 75000,
-      "description": "Basic life coverage at a lower premium."
-    },
-    "internet_bluewave": {
-      "name": "Bluewave Broadband",
-      "provider_company_id": "bluewave_isp",
-      "category": "internet",
-      "weekly_cost": 18,
-      "throughput_mbps": 300,
-      "description": "Home internet connection."
-    },
-    "internet_skylark": {
-      "name": "Skylark Fiber",
-      "provider_company_id": "skylark_isp",
-      "category": "internet",
-      "weekly_cost": 25,
-      "throughput_mbps": 750,
-      "description": "Faster, pricier home fiber connection."
-    },
-    "mobile_data_pulsemobile": {
-      "name": "PulseMobile Data",
-      "provider_company_id": "pulsemobile_telecom",
-      "category": "mobile_data",
-      "cost_per_gb": 6,
-      "throughput_mbps": 50,
-      "description": "Pay-per-GB mobile data top-up."
-    },
-    "mobile_data_arcwave": {
-      "name": "Arcwave Mobile Data",
-      "provider_company_id": "arcwave_telecom",
-      "category": "mobile_data",
-      "cost_per_gb": 5,
-      "throughput_mbps": 80,
-      "description": "Pay-per-GB mobile data top-up, cheaper per GB."
-    },
-    "home_security_monitoring": {
-      "name": "24/7 Home Monitoring",
-      "provider_company_id": "security_firm",
-      "category": "security",
-      "weekly_cost": 20,
-      "description": "Professional monitoring for a home alarm system (see the alarm_system prop)."
-    },
-    "subscription_pixelforge": {
-      "name": "Pixelforge Game Pass",
-      "provider_company_id": "pixelforge_games",
-      "category": "entertainment",
-      "interest": "gaming",
-      "weekly_cost": 10,
-      "description": "Gaming subscription."
-    },
-    "subscription_harmonic": {
-      "name": "Harmonic Music Premium",
-      "provider_company_id": "harmonic_music",
-      "category": "entertainment",
-      "interest": "music",
-      "weekly_cost": 6,
-      "description": "Music streaming subscription."
-    },
-    "subscription_streamvista": {
-      "name": "StreamVista",
-      "provider_company_id": "streamvista",
-      "category": "entertainment",
-      "interest": "streaming",
-      "weekly_cost": 8,
-      "description": "Video streaming subscription."
-    }
-  },
   "need_templates": {
     "socialize": {
       "name": "Socialise",
@@ -61981,296 +61836,103 @@
     }
   },
   "sexual_acts": {
-    "hug_brief": {
-      "name": "Brief Hug",
-      "intimacy_tier": 3,
-      "description": "A short friendly or affectionate embrace.",
-      "compatibility": "any",
-      "requires_private": false,
-      "reversible": true,
-      "duration_ticks": 1,
-      "spatial": {
-        "formation": "face_to_face",
-        "distance": "contact",
-        "valid_positions": [
-          "standing"
-        ]
-      },
-      "animations": {
-        "initiator": "anim_hug_give",
-        "recipient": "anim_hug_receive"
-      },
-      "effects": {
-        "intimacy_progress_boost": 0.05,
-        "mood_boost_recipient": 0.05,
-        "trust_boost": 0.02
-      }
-    },
-    "hug_prolonged": {
-      "name": "Prolonged Hug",
-      "intimacy_tier": 3,
-      "description": "A long, close embrace \u2014 more than friendly.",
-      "compatibility": "any",
-      "requires_private": false,
-      "reversible": true,
-      "duration_ticks": 2,
-      "spatial": {
-        "formation": "face_to_face",
-        "distance": "contact",
-        "valid_positions": [
-          "standing"
-        ]
-      },
-      "animations": {
-        "initiator": "anim_hug_prolonged_give",
-        "recipient": "anim_hug_prolonged_receive"
-      },
-      "effects": {
-        "intimacy_progress_boost": 0.08,
-        "arousal_boost_initiator": 0.03,
-        "arousal_boost_recipient": 0.03
-      }
-    },
-    "kiss_cheek": {
-      "name": "Kiss on the Cheek",
-      "intimacy_tier": 3,
-      "description": "A soft kiss on the cheek \u2014 affectionate or romantic.",
-      "compatibility": "any",
-      "requires_private": false,
-      "reversible": true,
-      "duration_ticks": 1,
-      "spatial": {
-        "formation": "face_to_face",
-        "distance": "close",
-        "valid_positions": [
-          "standing",
-          "sitting"
-        ]
-      },
-      "animations": {
-        "initiator": "anim_kiss_cheek_give",
-        "recipient": "anim_kiss_cheek_receive"
-      },
-      "effects": {
-        "intimacy_progress_boost": 0.06,
-        "mood_boost_recipient": 0.06
-      }
-    },
-    "kiss_forehead": {
-      "name": "Kiss on the Forehead",
-      "intimacy_tier": 3,
-      "description": "A tender forehead kiss \u2014 protective and intimate.",
-      "compatibility": "any",
-      "requires_private": false,
-      "reversible": false,
-      "duration_ticks": 1,
-      "spatial": {
-        "formation": "face_to_face",
-        "distance": "close",
-        "valid_positions": [
-          "standing",
-          "sitting"
-        ]
-      },
-      "animations": {
-        "initiator": "anim_kiss_forehead_give",
-        "recipient": "anim_kiss_forehead_receive"
-      },
-      "effects": {
-        "intimacy_progress_boost": 0.07,
-        "comfort_boost": 0.05
-      }
-    },
-    "hold_hands": {
-      "name": "Hold Hands",
-      "intimacy_tier": 3,
-      "description": "Walking or sitting while holding hands.",
-      "compatibility": "any",
-      "requires_private": false,
-      "reversible": true,
-      "duration_ticks": 10,
-      "spatial": {
-        "formation": "side_by_side",
-        "distance": "touching",
-        "valid_positions": [
-          "standing",
-          "walking"
-        ]
-      },
-      "animations": {
-        "initiator": "anim_hold_hands",
-        "recipient": "anim_hold_hands"
-      },
-      "effects": {
-        "intimacy_progress_boost": 0.04,
-        "mood_boost_recipient": 0.04,
-        "trust_boost": 0.01
-      }
-    },
-    "kiss_lips": {
-      "name": "Kiss on the Lips",
-      "intimacy_tier": 4,
-      "description": "A brief but romantic kiss on the lips.",
-      "compatibility": "any",
-      "requires_private": false,
-      "reversible": true,
-      "duration_ticks": 1,
-      "spatial": {
-        "formation": "face_to_face",
-        "distance": "contact",
-        "valid_positions": [
-          "standing",
-          "sitting"
-        ]
-      },
-      "animations": {
-        "initiator": "anim_kiss_lips_give",
-        "recipient": "anim_kiss_lips_receive"
-      },
-      "effects": {
-        "intimacy_progress_boost": 0.12,
-        "arousal_boost_initiator": 0.05,
-        "arousal_boost_recipient": 0.05
-      }
-    },
-    "kiss_passionate": {
-      "name": "Passionate Kiss",
-      "intimacy_tier": 4,
-      "description": "A deep, lingering kiss.",
-      "compatibility": "any",
-      "requires_private": false,
-      "reversible": true,
-      "duration_ticks": 2,
-      "spatial": {
-        "formation": "face_to_face",
-        "distance": "contact",
-        "valid_positions": [
-          "standing",
-          "sitting"
-        ]
-      },
-      "animations": {
-        "initiator": "anim_kiss_passionate_give",
-        "recipient": "anim_kiss_passionate_receive"
-      },
-      "effects": {
-        "intimacy_progress_boost": 0.18,
-        "arousal_boost_initiator": 0.1,
-        "arousal_boost_recipient": 0.1
-      }
-    },
-    "embrace_close": {
-      "name": "Close Embrace",
-      "intimacy_tier": 4,
-      "description": "Pressing close together, arms wrapped around each other.",
-      "compatibility": "any",
-      "requires_private": false,
-      "reversible": true,
-      "duration_ticks": 3,
-      "spatial": {
-        "formation": "face_to_face",
-        "distance": "contact",
-        "valid_positions": [
-          "standing"
-        ]
-      },
-      "animations": {
-        "initiator": "anim_embrace_give",
-        "recipient": "anim_embrace_receive"
-      },
-      "effects": {
-        "intimacy_progress_boost": 0.1,
-        "arousal_boost_initiator": 0.06,
-        "arousal_boost_recipient": 0.06
-      }
-    },
-    "kiss_neck": {
-      "name": "Kiss on the Neck",
-      "intimacy_tier": 5,
-      "description": "Soft kisses along the neck \u2014 clearly intimate.",
+    "masturbation": {
+      "name": "Masturbation",
+      "phase": "foreplay",
+      "climax_candidate": false,
       "compatibility": "any",
       "requires_private": true,
-      "reversible": false,
-      "duration_ticks": 2,
-      "spatial": {
-        "formation": "from_behind",
-        "distance": "contact",
-        "valid_positions": [
-          "standing",
-          "sitting"
-        ]
-      },
-      "animations": {
-        "initiator": "anim_kiss_neck_give",
-        "recipient": "anim_kiss_neck_receive"
-      },
-      "effects": {
-        "intimacy_progress_boost": 0.2,
-        "arousal_boost_initiator": 0.12,
-        "arousal_boost_recipient": 0.18
-      }
-    },
-    "caress": {
-      "name": "Caress",
-      "intimacy_tier": 5,
-      "description": "Gentle stroking of the face, hair, or arms.",
-      "compatibility": "any",
-      "requires_private": false,
-      "reversible": true,
-      "duration_ticks": 2,
+      "duration_minutes": 5,
+      "base_score": 5,
+      "description": "Stimulating oneself while the partner watches.",
       "spatial": {
         "formation": "face_to_face",
         "distance": "close",
         "valid_positions": [
-          "standing",
+          "lying",
           "sitting",
-          "lying"
+          "standing"
         ]
       },
       "animations": {
-        "initiator": "anim_caress_give",
-        "recipient": "anim_caress_receive"
-      },
-      "effects": {
-        "intimacy_progress_boost": 0.15,
-        "arousal_boost_initiator": 0.08,
-        "arousal_boost_recipient": 0.1,
-        "comfort_boost": 0.05
+        "initiator": "anim_masturbation_self",
+        "recipient": "anim_watch_partner"
       }
     },
-    "undress_partner": {
-      "name": "Undress Partner",
-      "intimacy_tier": 5,
-      "description": "Removing the partner's clothing.",
+    "striptease": {
+      "name": "Striptease",
+      "phase": "foreplay",
+      "climax_candidate": false,
       "compatibility": "any",
       "requires_private": true,
-      "reversible": true,
-      "duration_ticks": 2,
+      "duration_minutes": 4,
+      "base_score": 8,
+      "description": "Slowly undressing for the partner.",
       "spatial": {
         "formation": "face_to_face",
-        "distance": "contact",
+        "distance": "close",
         "valid_positions": [
           "standing"
         ]
       },
       "animations": {
-        "initiator": "anim_undress_give",
-        "recipient": "anim_undress_receive"
-      },
-      "effects": {
-        "intimacy_progress_boost": 0.25,
-        "arousal_boost_initiator": 0.15,
-        "arousal_boost_recipient": 0.15
+        "initiator": "anim_striptease",
+        "recipient": "anim_watch_striptease"
       }
     },
-    "manual_stimulation": {
-      "name": "Manual Stimulation",
-      "intimacy_tier": 6,
-      "description": "Stimulation of partner using hands.",
+    "dry_humping": {
+      "name": "Dry Humping",
+      "phase": "foreplay",
+      "climax_candidate": false,
       "compatibility": "any",
       "requires_private": true,
-      "reversible": true,
-      "duration_ticks": 4,
+      "duration_minutes": 5,
+      "base_score": 7,
+      "description": "Grinding against each other, still clothed.",
+      "spatial": {
+        "formation": "face_to_face",
+        "distance": "contact",
+        "valid_positions": [
+          "standing",
+          "lying",
+          "sitting"
+        ]
+      },
+      "animations": {
+        "initiator": "anim_dry_hump_a",
+        "recipient": "anim_dry_hump_b"
+      }
+    },
+    "lapdance": {
+      "name": "Lapdance",
+      "phase": "foreplay",
+      "climax_candidate": false,
+      "compatibility": "any",
+      "requires_private": true,
+      "duration_minutes": 5,
+      "base_score": 8,
+      "description": "Grinding on the seated partner's lap.",
+      "spatial": {
+        "formation": "recipient_above_sitting",
+        "distance": "contact",
+        "valid_positions": [
+          "sitting"
+        ]
+      },
+      "animations": {
+        "initiator": "anim_lapdance_give",
+        "recipient": "anim_lapdance_receive"
+      }
+    },
+    "handjob": {
+      "name": "Handjob",
+      "phase": "foreplay",
+      "climax_candidate": false,
+      "compatibility": "any",
+      "requires_private": true,
+      "duration_minutes": 6,
+      "base_score": 10,
+      "description": "Manual stimulation of the partner's genitals.",
       "spatial": {
         "formation": "face_to_face",
         "distance": "contact",
@@ -62281,23 +61943,19 @@
         ]
       },
       "animations": {
-        "initiator": "anim_manual_give",
-        "recipient": "anim_manual_receive"
-      },
-      "effects": {
-        "arousal_boost_initiator": 0.1,
-        "arousal_boost_recipient": 0.25,
-        "intimacy_progress_boost": 0.15
+        "initiator": "anim_handjob_give",
+        "recipient": "anim_handjob_receive"
       }
     },
-    "oral_giving": {
-      "name": "Oral Sex (giving)",
-      "intimacy_tier": 6,
-      "description": "Performing oral stimulation on the partner.",
+    "blowjob": {
+      "name": "Blowjob",
+      "phase": "foreplay",
+      "climax_candidate": false,
       "compatibility": "any",
       "requires_private": true,
-      "reversible": true,
-      "duration_ticks": 6,
+      "duration_minutes": 8,
+      "base_score": 12,
+      "description": "Oral stimulation of the partner's genitals.",
       "spatial": {
         "formation": "one_kneeling",
         "distance": "contact",
@@ -62310,46 +61968,40 @@
       "animations": {
         "initiator": "anim_oral_give",
         "recipient": "anim_oral_receive"
-      },
-      "effects": {
-        "arousal_boost_initiator": 0.08,
-        "arousal_boost_recipient": 0.35,
-        "intimacy_progress_boost": 0.2
       }
     },
-    "kissing_all_over": {
-      "name": "Kissing All Over",
-      "intimacy_tier": 6,
-      "description": "Kissing the partner's body from head to toe.",
+    "naked_caressing": {
+      "name": "Naked Hugging & Caressing",
+      "phase": "foreplay",
+      "climax_candidate": false,
       "compatibility": "any",
       "requires_private": true,
-      "reversible": true,
-      "duration_ticks": 5,
+      "duration_minutes": 4,
+      "base_score": 6,
+      "description": "Bare skin contact, gentle stroking and holding.",
       "spatial": {
-        "formation": "one_above",
-        "distance": "contact",
+        "formation": "face_to_face",
+        "distance": "close",
         "valid_positions": [
+          "standing",
+          "sitting",
           "lying"
         ]
       },
       "animations": {
-        "initiator": "anim_kiss_body_give",
-        "recipient": "anim_kiss_body_receive"
-      },
-      "effects": {
-        "arousal_boost_initiator": 0.12,
-        "arousal_boost_recipient": 0.28,
-        "intimacy_progress_boost": 0.18
+        "initiator": "anim_caress_give",
+        "recipient": "anim_caress_receive"
       }
     },
-    "intercourse_missionary": {
-      "name": "Intercourse (Missionary)",
-      "intimacy_tier": 6,
-      "description": "Face-to-face penetrative intercourse.",
+    "missionary": {
+      "name": "Missionary",
+      "phase": "main",
+      "climax_candidate": true,
       "compatibility": "heterosexual_only",
       "requires_private": true,
-      "reversible": false,
-      "duration_ticks": 8,
+      "duration_minutes": 10,
+      "base_score": 15,
+      "description": "Face-to-face penetrative intercourse.",
       "spatial": {
         "formation": "face_to_face_lying",
         "distance": "contact",
@@ -62360,22 +62012,38 @@
       "animations": {
         "initiator": "anim_intercourse_missionary_top",
         "recipient": "anim_intercourse_missionary_bottom"
-      },
-      "effects": {
-        "arousal_boost_initiator": 0.3,
-        "arousal_boost_recipient": 0.3,
-        "intimacy_progress_boost": 0.3,
-        "mood_boost_recipient": 0.15
       }
     },
-    "intercourse_from_behind": {
-      "name": "Intercourse (From Behind)",
-      "intimacy_tier": 6,
-      "description": "Penetrative intercourse from behind.",
+    "sixty_nine": {
+      "name": "69",
+      "phase": "main",
+      "climax_candidate": true,
+      "compatibility": "any",
+      "requires_private": true,
+      "duration_minutes": 10,
+      "base_score": 16,
+      "description": "Simultaneous mutual oral stimulation.",
+      "spatial": {
+        "formation": "head_to_toe",
+        "distance": "contact",
+        "valid_positions": [
+          "lying"
+        ]
+      },
+      "animations": {
+        "initiator": "anim_mutual_oral_top",
+        "recipient": "anim_mutual_oral_bottom"
+      }
+    },
+    "doggystyle": {
+      "name": "Doggystyle",
+      "phase": "main",
+      "climax_candidate": true,
       "compatibility": "heterosexual_only",
       "requires_private": true,
-      "reversible": false,
-      "duration_ticks": 8,
+      "duration_minutes": 10,
+      "base_score": 15,
+      "description": "Penetrative intercourse from behind.",
       "spatial": {
         "formation": "from_behind_lying",
         "distance": "contact",
@@ -62388,176 +62056,65 @@
       "animations": {
         "initiator": "anim_intercourse_behind_give",
         "recipient": "anim_intercourse_behind_receive"
-      },
-      "effects": {
-        "arousal_boost_initiator": 0.28,
-        "arousal_boost_recipient": 0.28,
-        "intimacy_progress_boost": 0.28
       }
     },
-    "intercourse_on_top": {
-      "name": "Intercourse (On Top)",
-      "intimacy_tier": 6,
-      "description": "Penetrative intercourse with recipient on top.",
+    "riding": {
+      "name": "Riding",
+      "phase": "main",
+      "climax_candidate": true,
       "compatibility": "heterosexual_only",
       "requires_private": true,
-      "reversible": false,
-      "duration_ticks": 8,
+      "duration_minutes": 10,
+      "base_score": 16,
+      "description": "Penetrative intercourse with recipient on top, in control.",
       "spatial": {
         "formation": "recipient_above",
         "distance": "contact",
         "valid_positions": [
-          "lying"
+          "lying",
+          "sitting"
         ]
       },
       "animations": {
         "initiator": "anim_intercourse_bottom",
         "recipient": "anim_intercourse_ontop"
-      },
-      "effects": {
-        "arousal_boost_initiator": 0.28,
-        "arousal_boost_recipient": 0.32,
-        "intimacy_progress_boost": 0.3
       }
     },
-    "anal_intercourse": {
-      "name": "Anal Intercourse",
-      "intimacy_tier": 6,
-      "description": "Anal penetrative intercourse.",
+    "spanking": {
+      "name": "Spanking",
+      "phase": "main",
+      "climax_candidate": true,
       "compatibility": "any",
       "requires_private": true,
-      "reversible": true,
-      "duration_ticks": 8,
+      "duration_minutes": 6,
+      "base_score": 9,
+      "kinks": [
+        "light_bdsm"
+      ],
+      "description": "Light impact play during intercourse or foreplay.",
       "spatial": {
         "formation": "from_behind",
         "distance": "contact",
         "valid_positions": [
           "lying",
-          "kneeling",
-          "standing"
-        ]
-      },
-      "animations": {
-        "initiator": "anim_anal_give",
-        "recipient": "anim_anal_receive"
-      },
-      "effects": {
-        "arousal_boost_initiator": 0.28,
-        "arousal_boost_recipient": 0.22,
-        "intimacy_progress_boost": 0.28
-      }
-    },
-    "mutual_oral": {
-      "name": "Mutual Oral (69)",
-      "intimacy_tier": 6,
-      "description": "Simultaneous mutual oral stimulation.",
-      "compatibility": "any",
-      "requires_private": true,
-      "reversible": false,
-      "duration_ticks": 8,
-      "spatial": {
-        "formation": "head_to_toe",
-        "distance": "contact",
-        "valid_positions": [
-          "lying"
-        ]
-      },
-      "animations": {
-        "initiator": "anim_mutual_oral_top",
-        "recipient": "anim_mutual_oral_bottom"
-      },
-      "effects": {
-        "arousal_boost_initiator": 0.3,
-        "arousal_boost_recipient": 0.3,
-        "intimacy_progress_boost": 0.25
-      }
-    },
-    "masturbation_mutual": {
-      "name": "Mutual Masturbation",
-      "intimacy_tier": 6,
-      "description": "Each partner stimulates themselves while watching the other.",
-      "compatibility": "any",
-      "requires_private": true,
-      "reversible": false,
-      "duration_ticks": 5,
-      "spatial": {
-        "formation": "face_to_face",
-        "distance": "close",
-        "valid_positions": [
-          "lying",
-          "sitting",
-          "standing"
-        ]
-      },
-      "animations": {
-        "initiator": "anim_mutual_masturbation",
-        "recipient": "anim_mutual_masturbation"
-      },
-      "effects": {
-        "arousal_boost_initiator": 0.2,
-        "arousal_boost_recipient": 0.2,
-        "intimacy_progress_boost": 0.12
-      }
-    },
-    "tribadism": {
-      "name": "Tribadism",
-      "intimacy_tier": 6,
-      "description": "Genital-to-genital stimulation between two women.",
-      "compatibility": "same_sex_female_only",
-      "requires_private": true,
-      "reversible": false,
-      "duration_ticks": 8,
-      "spatial": {
-        "formation": "scissor",
-        "distance": "contact",
-        "valid_positions": [
-          "lying"
-        ]
-      },
-      "animations": {
-        "initiator": "anim_tribadism_a",
-        "recipient": "anim_tribadism_b"
-      },
-      "effects": {
-        "arousal_boost_initiator": 0.28,
-        "arousal_boost_recipient": 0.28,
-        "intimacy_progress_boost": 0.28
-      }
-    },
-    "frottage": {
-      "name": "Frottage",
-      "intimacy_tier": 6,
-      "description": "Mutual genital stimulation through grinding \u2014 male partners.",
-      "compatibility": "same_sex_male_only",
-      "requires_private": true,
-      "reversible": false,
-      "duration_ticks": 6,
-      "spatial": {
-        "formation": "face_to_face",
-        "distance": "contact",
-        "valid_positions": [
           "standing",
-          "lying"
+          "kneeling"
         ]
       },
       "animations": {
-        "initiator": "anim_frottage_a",
-        "recipient": "anim_frottage_b"
-      },
-      "effects": {
-        "arousal_boost_initiator": 0.25,
-        "arousal_boost_recipient": 0.25,
-        "intimacy_progress_boost": 0.22
+        "initiator": "anim_spank_give",
+        "recipient": "anim_spank_receive"
       }
     },
-    "cuddling": {
-      "name": "Cuddling",
-      "intimacy_tier": 5,
-      "description": "Lying together closely, bodies intertwined \u2014 intimate but not sexual.",
+    "cuddle": {
+      "name": "Cuddle",
+      "phase": "afterglow",
+      "climax_candidate": false,
       "compatibility": "any",
       "requires_private": false,
-      "reversible": false,
-      "duration_ticks": 10,
+      "duration_minutes": 10,
+      "base_score": 0,
+      "description": "Lying together closely after intimacy -- comfort, not sex.",
       "spatial": {
         "formation": "spooning",
         "distance": "contact",
@@ -62568,89 +62125,6 @@
       "animations": {
         "initiator": "anim_cuddle_big_spoon",
         "recipient": "anim_cuddle_little_spoon"
-      },
-      "effects": {
-        "intimacy_progress_boost": 0.12,
-        "comfort_boost": 0.1,
-        "mood_boost_recipient": 0.08,
-        "arousal_boost_initiator": 0.04,
-        "arousal_boost_recipient": 0.04
-      }
-    },
-    "lap_sitting": {
-      "name": "Sit on Lap",
-      "intimacy_tier": 4,
-      "description": "One person sits on the other's lap.",
-      "compatibility": "any",
-      "requires_private": false,
-      "reversible": false,
-      "duration_ticks": 5,
-      "spatial": {
-        "formation": "recipient_above_sitting",
-        "distance": "contact",
-        "valid_positions": [
-          "sitting"
-        ]
-      },
-      "animations": {
-        "initiator": "anim_lap_sit_base",
-        "recipient": "anim_lap_sit_top"
-      },
-      "effects": {
-        "intimacy_progress_boost": 0.1,
-        "arousal_boost_initiator": 0.05,
-        "arousal_boost_recipient": 0.05
-      }
-    },
-    "dance_close": {
-      "name": "Close Dancing",
-      "intimacy_tier": 4,
-      "description": "Slow dancing pressed close together.",
-      "compatibility": "any",
-      "requires_private": false,
-      "reversible": false,
-      "duration_ticks": 8,
-      "spatial": {
-        "formation": "face_to_face",
-        "distance": "contact",
-        "valid_positions": [
-          "standing"
-        ]
-      },
-      "animations": {
-        "initiator": "anim_dance_close_lead",
-        "recipient": "anim_dance_close_follow"
-      },
-      "effects": {
-        "intimacy_progress_boost": 0.12,
-        "arousal_boost_initiator": 0.06,
-        "arousal_boost_recipient": 0.06,
-        "mood_boost_recipient": 0.08
-      }
-    },
-    "whisper_intimate": {
-      "name": "Intimate Whisper",
-      "intimacy_tier": 5,
-      "description": "Whispering something intimate directly into the partner's ear.",
-      "compatibility": "any",
-      "requires_private": false,
-      "reversible": false,
-      "duration_ticks": 1,
-      "spatial": {
-        "formation": "side_by_side",
-        "distance": "close",
-        "valid_positions": [
-          "standing",
-          "sitting"
-        ]
-      },
-      "animations": {
-        "initiator": "anim_whisper_give",
-        "recipient": "anim_whisper_receive"
-      },
-      "effects": {
-        "intimacy_progress_boost": 0.1,
-        "arousal_boost_recipient": 0.08
       }
     }
   },
@@ -65625,6 +65099,20 @@
     "old_timey_sayings": {
       "name": "Old-Timey Sayings",
       "description": "Peppers speech with old proverbs, idioms, and sayings, often slightly mangled."
+    }
+  },
+  "orgasm_animations": {
+    "phase_1": {
+      "male": "anim_orgasm_build_male",
+      "female": "anim_orgasm_build_female"
+    },
+    "phase_2": {
+      "male": "anim_orgasm_peak_male",
+      "female": "anim_orgasm_peak_female"
+    },
+    "phase_3": {
+      "male": "anim_orgasm_climax_male",
+      "female": "anim_orgasm_climax_female"
     }
   }
 }
