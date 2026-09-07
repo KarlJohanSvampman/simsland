@@ -1,5 +1,36 @@
 import uuid
 
+
+def create_personal_letter(household, world, addressed_to_id, letter_type, content, sender_label="Unknown"):
+    """A piece of mail addressed to a SPECIFIC household member, not the
+    household generically -- everything else in this module (bills, form
+    requests) has no addressee concept at all. Used by systems/
+    detective_work.py's unsettling-letter trigger; general-purpose enough
+    for any future personal-mail content too."""
+    mail = {
+        "id": f"mail_{uuid.uuid4().hex[:8]}",
+        "type": "personal_letter",
+        "letter_type": letter_type,
+        "addressed_to": addressed_to_id,
+        "sender": sender_label,
+        "title": "A letter",
+        "content": content,
+        "requires_response": False,
+        "response_type": None,
+        "opened": False,
+        "responded": False,
+        "urgency": 0.3,
+    }
+    mailbox = household.setdefault("mailbox", {})
+    mailbox.setdefault("has_mail", False)
+    mailbox.setdefault("items", [])
+    mailbox.setdefault("unopened_count", 0)
+    mailbox["items"].append(mail)
+    mailbox["has_mail"] = True
+    mailbox["unopened_count"] += 1
+    return mail
+
+
 def create_form_request_mail(
     household,
     world,

@@ -147,3 +147,8 @@ CADENCE["persona_expectations"] = 300
 # pacing; this is just "is anything due to advance" and is a cheap
 # early-exit when world["intercourse_sessions"] is empty.
 CADENCE["intercourse_sessions"] = 10
+
+# Detective-story chapter progression (systems/detective_work.py) -- same
+# shape as intercourse_sessions above: each chapter's own resolve_at_tick
+# (hours apart) does the real pacing, this is just "is anything due."
+CADENCE["detective_work"] = 60

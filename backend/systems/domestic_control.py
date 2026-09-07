@@ -430,6 +430,36 @@ def on_abuse_revealed(abuser_id, victim_id, world):
                     "reason":    f"witnessed_abuse_of:{victim_id}",
                 })
 
+    # Detective work (systems/detective_work.py) -- deliberately a SEPARATE
+    # loop over every witness (not just the male-only community-response
+    # branch above, which stays exactly as it was) since noticing that
+    # something's wrong and wanting to actually get to the bottom of it
+    # isn't specific to one sex, unlike the anger/confrontation mechanic
+    # above.
+    try:
+        from systems.detective_work import start_detective_story
+        for cid, c in chars.items():
+            if cid in (abuser_id, victim_id) or c.get("is_offscreen"):
+                continue
+            knows_victim = c.get("relationships", {}).get(victim_id, {}).get("trust", 0) >= 20
+            knows_abuser = c.get("relationships", {}).get(abuser_id, {}).get("familiarity", 0) >= 10
+            if not (knows_victim or knows_abuser):
+                continue
+            existing = c.get("detective_stories", {})
+            if any(victim_id in s.get("involved_ids", []) and "domestic_abuse" in s.get("tags", [])
+                   for s in existing.values()):
+                continue
+            start_detective_story(
+                c, world, ["domestic_abuse"],
+                f"Something isn't right with how {abuser.get('name', 'they')} treats "
+                f"{victim.get('name', 'them')}.",
+                main_question="Is this actually abuse, and what should be done about it?",
+                involved_ids=[abuser_id, victim_id],
+                role="witness", goal="protect",
+            )
+    except Exception:
+        pass
+
 
 # ── Victim revenge paths ───────────────────────────────────────────────────
 

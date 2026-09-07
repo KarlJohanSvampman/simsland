@@ -752,7 +752,9 @@ def tick(world):
         from systems.confiding import resolve_confide_opportunities
         from systems.temporary_separation import maybe_return_from_separation
         from systems.crushes import maybe_form_crush
+        from systems.detective_work import maybe_send_unsettling_letter, check_personal_mail
         tick_all_secrets(world)
+        maybe_send_unsettling_letter(world)
         for c in characters:
             if not c.get("alive", True):
                 continue
@@ -760,6 +762,7 @@ def tick(world):
             tick_daily_data_usage(c, world, home_fraction)
             tick_depression_effects(c, world)
             maybe_return_from_separation(c, world)
+            check_personal_mail(c, world)
             if not c.get("off_grid"):
                 maybe_grow_subscription_desire(c, world)
                 maybe_notice_withdrawal(c, world)
@@ -790,6 +793,11 @@ def tick(world):
         if world.get("intercourse_sessions"):
             from systems.intercourse_session import tick_intercourse_sessions
             tick_intercourse_sessions(world)
+
+    # -- Detective-story chapter progression (systems/detective_work.py) --
+    if every(world, CADENCE["detective_work"], offset=49):
+        from systems.detective_work import tick_detective_work
+        tick_detective_work(world)
 
     if every(world, CADENCE["addictions"], offset=47):
         from systems.addictions import tick_addictions

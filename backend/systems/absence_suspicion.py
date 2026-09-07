@@ -140,6 +140,7 @@ def _confront_about_absence(observer, subject, world):
             f"asked {subject.get('name', subject['id'])} about it -- still doesn't sit right", world,
         )
         add_grievance(observer, subject["id"], "absence_unresolved", world)
+        _maybe_start_affair_investigation(observer, subject, world)
 
     secret = find_relevant_secret(subject, question_type, observer["id"], world)
     if secret:
@@ -204,3 +205,22 @@ def _has_corroborator(observer, subject, world):
     if not rel:
         return False
     return rel.get("trust", 0) > 40 or rel.get("designation") in ("friend", "close_friend", "best_friend")
+
+
+def _maybe_start_affair_investigation(observer, subject, world):
+    """An unresolved absence confrontation is exactly the "suspected
+    affair" case systems/detective_work.py's tag taxonomy names --
+    started once per pair, not re-created on every subsequent unresolved
+    confrontation."""
+    existing = observer.get("detective_stories", {})
+    if any(subject["id"] in s.get("suspect_ids", []) and "suspected_affair" in s.get("tags", [])
+           for s in existing.values()):
+        return
+    from systems.detective_work import start_detective_story
+    start_detective_story(
+        observer, world, ["suspected_affair"],
+        f"Something about where {subject.get('name', 'they')} disappears to doesn't add up.",
+        main_question=f"Is {subject.get('name', 'they')} seeing someone else?",
+        suspect_ids=[subject["id"]],
+        role="involved", goal="resolve",
+    )

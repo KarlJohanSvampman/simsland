@@ -1060,6 +1060,18 @@ def ensure_character_defaults(c, world=None):
     # character remembers); this is the tellable subset.
     c.setdefault("notable_stories", [])
 
+    # Detective work (see systems/detective_work.py) -- keyed by story id,
+    # each character's OWN independent copy/belief-state of a mystery,
+    # mirroring notable_stories' chain-spread shape (everyone who's told
+    # gets their own entry, not a shared pointer).
+    c.setdefault("detective_stories", {})
+
+    # A stable, personal payoff for actually working a mystery out --
+    # distinct from self_confidence (which already exists and mostly gets
+    # DAMAGED by abuse/harassment elsewhere; this is the one axis that
+    # only ever grows from doing real detective work).
+    c.setdefault("critical_thinking", 0.50)
+
     # Behavior-pattern observation (see systems/behavior_patterns.py).
     # _daily_observations is cleared every real calendar day after
     # aggregating into behavior_patterns.
@@ -1482,6 +1494,12 @@ def ensure_household_defaults(h):
         "name",
         None
     )
+
+    # Rises when the household solves a detective_work.py mystery as a
+    # team (2+ members contributed on the same origin story) -- no
+    # equivalent household-level "we figured it out together" stat
+    # existed before this.
+    h.setdefault("investigative_pride", 0.0)
 
     h.setdefault(
         "building_ids",
