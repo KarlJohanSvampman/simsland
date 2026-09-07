@@ -319,6 +319,13 @@ def _on_discovery(female, preg, world):
     # Notify family
     _fire_family_drama(female, preg, "discovery", world)
 
+    if is_teen:
+        try:
+            from systems.detective_work import notice_teen_pregnancy
+            notice_teen_pregnancy(female, world)
+        except Exception:
+            pass
+
     # LLM event
     try:
         from core.events import emit

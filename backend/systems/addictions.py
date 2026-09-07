@@ -140,3 +140,9 @@ def tick_addictions(world):
             if entry.get("usages", 0) >= tmpl.get("threshold", 9999):
                 _roll_hazards(c, world, key, tmpl)
                 maybe_induce_depression_from_addiction(c, key, world)
+                if key in _DEPRESSION_INDUCING_ADDICTIONS:
+                    try:
+                        from systems.detective_work import notice_substance_abuse
+                        notice_substance_abuse(c, key, world)
+                    except Exception:
+                        pass

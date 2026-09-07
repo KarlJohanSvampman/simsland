@@ -52,6 +52,11 @@ PORN_LIBIDO_BOOST       = 0.20
 ALCOHOL_DECAY_PER_TICK  = 0.00067   # ~0.04/hr at 1 tick/min → sober after ~25 hrs
 DRUG_DECAY_PER_TICK     = 0.00042   # slower — ~0.025/hr
 
+# Crossing this once (see on_porn_session below) is what systems/
+# detective_work.py's porn_addiction tag treats as "a partner would
+# actually start to notice this."
+_PORN_ADDICTION_DETECTIVE_THRESHOLD = 0.75
+
 PORN_HABIT_GAIN         = 0.015     # per session
 PORN_HABIT_DECAY        = 0.0003    # per day — very slow
 PORN_SEXISM_DRIFT       = 0.002     # per session — slow desensitisation
@@ -136,9 +141,17 @@ def on_porn_session(c, world):
     """
     init_intoxication_state(c)
     state = c["intoxication_state"]
+    was_below_threshold = state["porn_habit"] < _PORN_ADDICTION_DETECTIVE_THRESHOLD
     state["porn_habit"]    = min(1.0, state["porn_habit"] + PORN_HABIT_GAIN)
     state["sessions_today"] = state.get("sessions_today", 0) + 1
     _recompute_libido_boost(c)
+
+    if was_below_threshold and state["porn_habit"] >= _PORN_ADDICTION_DETECTIVE_THRESHOLD:
+        try:
+            from systems.detective_work import notice_porn_addiction
+            notice_porn_addiction(c, world)
+        except Exception:
+            pass
 
     # Sexism drift — treating women as objects reinforces sexist attitudes
     imp = c.setdefault("impulse_state", {})

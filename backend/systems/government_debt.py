@@ -65,12 +65,22 @@ def assess_monthly_tax(c, world):
         c["government_debt"] = round(c.get("government_debt", 0.0) + remaining, 2)
 
 
-def apply_debt_consequences(c):
+def apply_debt_consequences(c, world=None):
     """Monthly credit-score ding for carrying government debt past the
     threshold -- called alongside assess_monthly_tax for the same
-    character, same cycle."""
+    character, same cycle. world is optional (existing call sites may
+    not pass it) purely so the new detective_work.py hook below has
+    somewhere to write a story; the credit-score consequence itself
+    never needed it."""
     if c.get("government_debt", 0.0) <= CREDIT_PENALTY_THRESHOLD:
         return
     from systems.credit import CREDIT_SCORE_MIN, CREDIT_SCORE_MAX, CREDIT_SCORE_DEFAULT
     score = c.get("credit_score", CREDIT_SCORE_DEFAULT) + CREDIT_PENALTY_DELTA
     c["credit_score"] = max(CREDIT_SCORE_MIN, min(CREDIT_SCORE_MAX, score))
+
+    if world is not None:
+        try:
+            from systems.detective_work import notice_economic_concern
+            notice_economic_concern(c, world)
+        except Exception:
+            pass

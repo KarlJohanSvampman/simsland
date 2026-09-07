@@ -122,6 +122,15 @@ def _on_character_fired(data, world):
 subscribe("character_fired", _on_character_fired)
 
 
+def _on_character_fired_detective_work(data, world):
+    from systems.detective_work import notice_job_loss
+    c = world.get("characters", {}).get(data["character_id"])
+    if c:
+        notice_job_loss(c, world)
+
+subscribe("character_fired", _on_character_fired_detective_work)
+
+
 def _on_character_fired_convenience(data, world):
     """A layoff is an involuntary loss -- disrupts the established
     employment convenience (systems/convenience.py). No specific person

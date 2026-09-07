@@ -357,7 +357,7 @@ def tick(world):
         # systems/government_debt.py.
         for c in characters:
             assess_monthly_tax(c, world)
-            apply_debt_consequences(c)
+            apply_debt_consequences(c, world)
             tick_monthly_card_cycle(c)
 
     # -- Every sim-minute: popularity decay (systems/validation.py) ──
@@ -752,9 +752,12 @@ def tick(world):
         from systems.confiding import resolve_confide_opportunities
         from systems.temporary_separation import maybe_return_from_separation
         from systems.crushes import maybe_form_crush
-        from systems.detective_work import maybe_send_unsettling_letter, check_personal_mail
+        from systems.detective_work import (
+            maybe_send_unsettling_letter, check_personal_mail, maybe_report_missing_item,
+        )
         tick_all_secrets(world)
         maybe_send_unsettling_letter(world)
+        maybe_report_missing_item(world)
         for c in characters:
             if not c.get("alive", True):
                 continue

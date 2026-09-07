@@ -477,6 +477,169 @@ def check_personal_mail(c, world):
             )
 
 
+# ── More detection hooks (called from each host system directly) ─────────
+# Each is a small, additive call at a real existing signal this session
+# already built or found -- no new detection machinery invented, just a
+# real detective_story started at a moment that already meaningfully
+# happens. Every one guards against re-firing for the same underlying
+# fact via a light "already have a story about this" check.
+
+def _already_has_tagged_story(c, tag, about_id=None):
+    for s in c.get("detective_stories", {}).values():
+        if tag not in s.get("tags", []):
+            continue
+        if about_id is None or about_id in s.get("involved_ids", []) or about_id in s.get("suspect_ids", []):
+            return True
+    return False
+
+
+def notice_job_loss(c, world):
+    """Hooked from core/event_handlers.py's existing character_fired
+    subscriber. The fired character themselves, plus a spouse/partner if
+    one exists, each get their own copy of the worry."""
+    if _already_has_tagged_story(c, "job_loss"):
+        return
+    story = start_detective_story(
+        c, world, ["job_loss"], "Lost my job -- now what?",
+        main_question="How do we cover the bills from here?",
+        involved_ids=[c["id"]], role="involved", goal="resolve",
+    )
+    chars = world.get("characters", {})
+    for oid, rel in c.get("relationships", {}).items():
+        if any(l in rel.get("labels", []) for l in ("partner", "spouse")):
+            partner = chars.get(oid)
+            if partner:
+                share_detective_story(c, partner, story["id"], world, forced=True)
+
+
+_SUBSTANCE_ABUSE_NOTICE_CHANCE = 0.20
+
+
+def notice_substance_abuse(c, key, world):
+    """Hooked from addictions.py::tick_addictions at the same threshold-
+    crossing moment maybe_induce_depression_from_addiction already fires
+    on -- a co-resident household member (not the one using) has a real
+    chance of noticing and worrying about it."""
+    household = world.get("households", {}).get(c.get("household_id"))
+    if not household:
+        return
+    chars = world.get("characters", {})
+    for mid in household.get("members", []):
+        if mid == c["id"]:
+            continue
+        member = chars.get(mid)
+        if not member or member.get("age_group") == "child":
+            continue
+        if _already_has_tagged_story(member, "substance_abuse", c["id"]):
+            continue
+        if random.random() >= _SUBSTANCE_ABUSE_NOTICE_CHANCE:
+            continue
+        start_detective_story(
+            member, world, ["substance_abuse"],
+            f"{c.get('name', 'they')} has been drinking/using more than seems okay.",
+            main_question="How bad has this actually gotten, and what can I do?",
+            suspect_ids=[c["id"]], role="witness", goal="protect",
+        )
+
+
+def notice_teen_pregnancy(female, world):
+    """Hooked from pregnancy.py::_on_discovery, teen branch only."""
+    adult = _find_household_adult(female, world)
+    if not adult or _already_has_tagged_story(adult, "teen_pregnancy", female["id"]):
+        return
+    start_detective_story(
+        adult, world, ["teen_pregnancy"],
+        f"{female.get('name', 'they')} is pregnant, and there's a lot to figure out.",
+        main_question="What does the family actually do now?",
+        involved_ids=[female["id"]], role="involved", goal="protect",
+    )
+
+
+def notice_persona_mismatch(discoverer_a_id, discoverer_b_id, sociopath_id, world):
+    """Hooked from sociopathy.py::maybe_discover_persona_mismatch."""
+    chars = world.get("characters", {})
+    for did in (discoverer_a_id, discoverer_b_id):
+        discoverer = chars.get(did)
+        if not discoverer or _already_has_tagged_story(discoverer, "stalker_sociopath", sociopath_id):
+            continue
+        start_detective_story(
+            discoverer, world, ["stalker_sociopath"],
+            "Someone I know has been lying about who they are.",
+            main_question="What else haven't they been honest about?",
+            suspect_ids=[sociopath_id], role="witness", goal="resolve",
+        )
+
+
+_PORN_ADDICTION_THRESHOLD = 0.75
+
+
+def notice_porn_addiction(c, world):
+    """Hooked from harassment.py::on_porn_session, once porn_habit
+    crosses an obsessive threshold. A real partner notices, if there is
+    one -- otherwise no detector fires (nobody's watching)."""
+    if _already_has_tagged_story(c, "porn_addiction"):
+        return
+    chars = world.get("characters", {})
+    for oid, rel in c.get("relationships", {}).items():
+        if not any(l in rel.get("labels", []) for l in ("partner", "spouse")):
+            continue
+        partner = chars.get(oid)
+        if not partner:
+            continue
+        start_detective_story(
+            partner, world, ["porn_addiction"],
+            f"{c.get('name', 'they')}'s porn habit seems to be taking over.",
+            main_question="Is this actually a problem, and should I say something?",
+            suspect_ids=[c["id"]], role="witness", goal="resolve",
+        )
+        return
+
+
+def notice_economic_concern(c, world):
+    """Hooked from government_debt.py::apply_debt_consequences, once debt
+    crosses the same credit-penalty threshold that system already uses."""
+    if _already_has_tagged_story(c, "economic_concern"):
+        return
+    start_detective_story(
+        c, world, ["economic_concern"], "The debt keeps piling up faster than I can pay it down.",
+        main_question="Is there a real way out of this hole?",
+        involved_ids=[c["id"]], role="involved", goal="resolve",
+    )
+
+
+MISSING_ITEM_DAILY_CHANCE = 0.003
+
+
+def maybe_report_missing_item(world):
+    """Daily-cadence sweep (sim_loop.py): small chance per household with
+    real owned props of one going "missing" -- a household member
+    notices. Deliberately abstract (no real prop gets removed/relocated;
+    the mystery -- and its LLM-decided resolution -- is what's real, not
+    a physical object simulation)."""
+    chars = world.get("characters", {})
+    props = world.get("props", [])
+    prop_list = props.values() if isinstance(props, dict) else props
+    by_household = {}
+    for p in prop_list:
+        hid = p.get("household_id")
+        if hid:
+            by_household.setdefault(hid, []).append(p)
+
+    for hid, household in world.get("households", {}).items():
+        if random.random() >= MISSING_ITEM_DAILY_CHANCE:
+            continue
+        members = [chars[mid] for mid in household.get("members", []) if mid in chars]
+        if not members:
+            continue
+        owned = by_household.get(hid, [])
+        item_name = random.choice(owned)["name"] if owned and random.random() < 0.7 else "the missing item"
+        noticer = random.choice(members)
+        start_detective_story(
+            noticer, world, ["missing_item"], f"Can't find {item_name} anywhere.",
+            main_question="Did someone move it, or did it actually go missing?",
+        )
+
+
 # ── World-tick sweep ────────────────────────────────────────────────────────
 
 def tick_detective_work(world):

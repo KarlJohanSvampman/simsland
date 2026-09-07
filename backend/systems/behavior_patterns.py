@@ -133,6 +133,17 @@ def _generate_theory_for(c, other_id, pattern, world):
             bump_suspicion(c, other_id, 0.15, "behavior_pattern", pattern["activity"], world)
         except Exception:
             pass
+        try:
+            from systems.detective_work import _already_has_tagged_story, start_detective_story
+            if not _already_has_tagged_story(c, "behavior_change", other_id):
+                start_detective_story(
+                    c, world, ["behavior_change"],
+                    f"{other.get('name', 'they')} has been acting differently lately: {pattern['activity']}.",
+                    main_question="What's actually going on with them?",
+                    suspect_ids=[other_id], role="witness", goal="resolve",
+                )
+        except Exception:
+            pass
 
 
 def find_pattern(c, other_id, activity=None):

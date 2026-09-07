@@ -130,6 +130,13 @@ def maybe_discover_persona_mismatch(c, world):
             store_memory(discoverer, text, 0.85,
                          ["drama", "deception", "identity"], "sociopathy", tick,
                          people=[c["id"]])
+
+    try:
+        from systems.detective_work import notice_persona_mismatch
+        notice_persona_mismatch(a_id, b_id, c["id"], world)
+    except Exception:
+        pass
+
     return {"a": a_id, "b": b_id}
 
 
