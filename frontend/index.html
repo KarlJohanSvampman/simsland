@@ -144,6 +144,9 @@
 
   .viewerCardTitle { font-weight: bold; }
 
+  .viewerCardClickable { cursor: pointer; }
+  .viewerCardClickable:hover { background: rgba(255,255,255,0.06); }
+
   .viewerStatRow {
     display: flex;
     flex-wrap: wrap;
@@ -719,6 +722,16 @@
       <button class="modal-close" onclick="closeModal('modal-event')">✕</button>
     </div>
     <div class="modal-body" id="eventModalBody"></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-intention">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3 id="intentionModalTitle">Intention</h3>
+      <button class="modal-close" onclick="closeModal('modal-intention')">✕</button>
+    </div>
+    <div class="modal-body" id="intentionModalBody"></div>
   </div>
 </div>
 

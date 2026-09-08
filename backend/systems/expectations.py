@@ -26,6 +26,11 @@ c["expectations"][template_id] = {
     "last_missed_blame",        # [char_id, ...] -- populated by callers that
                                  # know who specifically didn't show (see
                                  # systems/expectation_planner.py)
+    "last_miss_reason",         # short real-cause string, read off the
+                                 # character's own state at miss-detection
+                                 # time (see _diagnose_miss_reason) --
+                                 # folded into the "missed" intention's
+                                 # reason text so it says WHY, not just that.
 }
 
 assign_expectations() is idempotent and safe to call every update pass
@@ -190,6 +195,9 @@ def _refresh_intention(c, nd, world):
 
     if nd["status"] == "missed":
         reason = f"You didn't get to \"{label}\" and it's still bothering you."
+        cause = nd.get("last_miss_reason")
+        if cause:
+            reason += f" ({cause.capitalize()}.)"
     else:
         reason = f"You still need to {label[0].lower()}{label[1:]}."
 
@@ -209,9 +217,35 @@ def _refresh_intention(c, nd, world):
     })
 
 
+def _diagnose_miss_reason(c, world):
+    """A real, specific cause for why an expectation was just missed,
+    read off the character's actual state at the moment the miss is
+    detected -- the generic "it's still bothering you" reason string gave
+    no indication of WHY, which a live report flagged as confusing (the
+    period-rollover check that calls this runs on the same cadence the
+    expectation's own period recurs on, so "at the moment" here really
+    does mean close to when the miss actually happened, not some
+    arbitrarily later check)."""
+    if c.get("off_grid"):
+        where = (c.get("off_grid_reason") or "away somewhere").replace("_", " ")
+        return f"you were {where}"
+    act = c.get("activity") or {}
+    if act.get("type") == "sleep":
+        return "you were asleep"
+    if act.get("type"):
+        return f"you were busy {act['type'].replace('_', ' ')}"
+    claustro = c.get("claustrophobia") or {}
+    if claustro.get("panic", 0) > 20:
+        return "you were stuck somewhere and starting to panic"
+    if c.get("stress", 0) >= 90:
+        return "you were too overwhelmed to get to it"
+    return "you just got caught up with other things"
+
+
 def _apply_miss_feedback(c, nd, world):
     c["stress"] = min(100.0, c.get("stress", 0.0) + MISS_STRESS_DELTA)
     nd["frustration"] = min(1.0, nd.get("frustration", 0.0) + FRUSTRATION_DELTA)
+    nd["last_miss_reason"] = _diagnose_miss_reason(c, world)
     _attribute_blame(c, nd, world)
 
 

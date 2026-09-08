@@ -418,6 +418,151 @@ window.addEventListener("resize", ()=>{
   camera.updateProjectionMatrix();
 });
 
+// =========================================================
+// CLOCK PANEL -- date/weekday above a round analog clock face, the
+// current time_scale multiplier below it. Neither world["calendar"] nor
+// time_scale are part of the WS snapshot/delta payload (api/view.py
+// doesn't carry either), so this polls the existing /admin/state
+// endpoint directly on a plain interval rather than needing a new field
+// threaded through the whole delta-broadcast path for something that
+// only needs to refresh a couple times a minute. Built entirely in JS
+// (not static HTML in index.html/operator_view.html) since it's shared,
+// generic UI with no page-specific behavior -- one function call here
+// covers both pages with nothing to keep in sync between two HTML files.
+// =========================================================
+
+// Shared with renderCharacterInspector()'s sleep-wake-time display below
+// (module scope, not inside the IIFE, so both can read/write it) -- the
+// most recently fetched calendar plus the world tick it corresponds to,
+// used to project "wake up at <tick>" into a real date/time-of-day.
+let _lastCalendar = null;
+let _lastCalendarWorldTick = null;
+
+(function setupClockPanel(){
+  const ADMIN_BASE = `http://${location.hostname}:8000/admin`;
+
+  const toggleBtn = document.createElement("button");
+  toggleBtn.id = "clockToggleBtn";
+  toggleBtn.title = "Toggle clock";
+  toggleBtn.textContent = "🕓";
+  Object.assign(toggleBtn.style, {
+    position: "fixed", top: "10px", left: "54px", zIndex: 9999,
+    width: "34px", height: "34px", background: "rgba(0,0,0,0.85)",
+    color: "white", border: "1px solid #444", borderRadius: "6px",
+    fontSize: "16px", cursor: "pointer",
+  });
+  document.body.appendChild(toggleBtn);
+
+  // Bottom-left, floating over the 3D viewport itself rather than
+  // docked in the top chrome row -- that row (icon buttons + the event
+  // timeline) and the left column (outliner, full viewport height once
+  // expanded) already fill essentially all available space at this
+  // window size; a game-HUD-style corner widget over the 3D view avoids
+  // fighting either for room. Clear of the Director Panel, which docks
+  // bottom-RIGHT on operator_view.html.
+  const panel = document.createElement("div");
+  panel.id = "clockPanel";
+  Object.assign(panel.style, {
+    position: "fixed", bottom: "10px", left: "270px", zIndex: 9000,
+    width: "150px", background: "rgba(0,0,0,0.82)", border: "1px solid #444",
+    borderRadius: "6px", color: "white", fontFamily: "monospace",
+    boxSizing: "border-box", padding: "8px", textAlign: "center",
+  });
+  panel.innerHTML = `
+    <div id="clockDateLine" style="font-size:12px; margin-bottom:4px;">--</div>
+    <svg id="clockFace" viewBox="0 0 100 100" width="110" height="110" style="display:block; margin:0 auto;">
+      <circle cx="50" cy="50" r="47" fill="#1a1a1a" stroke="#666" stroke-width="2"/>
+      ${Array.from({length: 12}, (_, i) => {
+        const angle = (i / 12) * Math.PI * 2;
+        const x1 = 50 + Math.sin(angle) * 41, y1 = 50 - Math.cos(angle) * 41;
+        const x2 = 50 + Math.sin(angle) * 46, y2 = 50 - Math.cos(angle) * 46;
+        return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#888" stroke-width="1.5"/>`;
+      }).join("")}
+      <line id="clockHourHand" x1="50" y1="50" x2="50" y2="28" stroke="#eee" stroke-width="3.5" stroke-linecap="round"/>
+      <line id="clockMinuteHand" x1="50" y1="50" x2="50" y2="16" stroke="#9cf" stroke-width="2.5" stroke-linecap="round"/>
+      <circle cx="50" cy="50" r="2.5" fill="#f66"/>
+    </svg>
+    <div id="clockScaleLine" style="font-size:11px; margin-top:6px; opacity:.8;">--</div>
+  `;
+  document.body.appendChild(panel);
+
+  toggleBtn.addEventListener("click", () => {
+    panel.style.display = panel.style.display === "none" ? "" : "none";
+  });
+
+  const WEEKDAY_ORDER = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+  const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+  async function refreshClock(){
+    let data;
+    try {
+      const res = await fetch(`${ADMIN_BASE}/state`);
+      data = await res.json();
+    } catch {
+      return;   // best-effort -- keep the last-known display rather than blanking it
+    }
+    const cal = data.calendar || {};
+    const hour = cal.hour ?? 0, minute = cal.minute ?? 0;
+    _lastCalendar = cal;
+    _lastCalendarWorldTick = _worldState.tick ?? null;
+
+    document.getElementById("clockDateLine").textContent =
+      `${(cal.weekday || WEEKDAY_ORDER[0]).slice(0, 3)}, ${MONTH_NAMES[(cal.month || 1) - 1]} ${cal.day ?? "?"}, ${cal.year ?? "?"}`;
+
+    const hourAngle = ((hour % 12) / 12) * 360 + (minute / 60) * 30;
+    const minuteAngle = (minute / 60) * 360;
+    document.getElementById("clockHourHand").setAttribute(
+      "transform", `rotate(${hourAngle} 50 50)`);
+    document.getElementById("clockMinuteHand").setAttribute(
+      "transform", `rotate(${minuteAngle} 50 50)`);
+
+    document.getElementById("clockScaleLine").textContent = `${data.time_scale ?? 1}x speed`;
+  }
+
+  refreshClock();
+  setInterval(refreshClock, 3000);
+})();
+
+const _WEEKDAY_ORDER = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+const _MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+// Projects the most recently fetched calendar (see _lastCalendar above)
+// forward by a number of seconds (1 tick == 1 sim-second, this project's
+// established convention) -- used to turn "wakes up in N ticks" into a
+// real date + time-of-day rather than a bare tick count. Standard
+// Gregorian month/leap-year math via a real Date object (the sim's own
+// calendar values look like an ordinary real calendar, e.g.
+// {year:2026,month:8,day:26,...}); weekday is advanced from the
+// calendar's OWN weekday field by whole days elapsed rather than trusting
+// JS Date's day-of-week, in case the sim's own convention ever drifts
+// from real-world Gregorian weekdays.
+function _projectCalendarForward(cal, seconds){
+  if(!cal || cal.year == null) return null;
+  const base = new Date(Date.UTC(cal.year, (cal.month || 1) - 1, cal.day || 1, cal.hour || 0, cal.minute || 0, cal.second || 0));
+  const daysBefore = Math.floor(base.getTime() / 86400000);
+  base.setUTCSeconds(base.getUTCSeconds() + seconds);
+  const daysAfter = Math.floor(base.getTime() / 86400000);
+  const daysElapsed = daysAfter - daysBefore;
+
+  const startIdx = _WEEKDAY_ORDER.indexOf(cal.weekday);
+  const weekday = startIdx >= 0
+    ? _WEEKDAY_ORDER[((startIdx + daysElapsed) % 7 + 7) % 7]
+    : null;
+
+  return {
+    year: base.getUTCFullYear(), month: base.getUTCMonth() + 1, day: base.getUTCDate(),
+    hour: base.getUTCHours(), minute: base.getUTCMinutes(), weekday,
+  };
+}
+
+function _formatProjectedTime(proj){
+  if(!proj) return null;
+  const ampmHour = ((proj.hour % 12) || 12);
+  const ampm = proj.hour < 12 ? "AM" : "PM";
+  const weekdayLabel = proj.weekday ? `${proj.weekday.slice(0, 3)}, ` : "";
+  return `${weekdayLabel}${_MONTH_NAMES[proj.month - 1]} ${proj.day} at ${ampmHour}:${String(proj.minute).padStart(2, "0")} ${ampm}`;
+}
+
 scene.add(
   new THREE.AmbientLight(0xffffff, 0.6)
 );
@@ -3917,6 +4062,19 @@ function renderCharacterInspector(id){
     ? `Doing: ${c.activity.type}`
     : `State: ${c.animation_state || "idle"}`;
   rows.push(activity);
+
+  // Wake-up date/time-of-day, while actually asleep -- systems/
+  // activities.py only tracks this as a raw tick count (phase_started_tick
+  // + duration), reported live as not useful on its own. Projects it
+  // through the last-fetched real calendar (see _lastCalendar/
+  // _projectCalendarForward above) instead of showing bare ticks.
+  if(c.activity?.type === "sleep" && c.activity.phase === "using" && _lastCalendar && _lastCalendarWorldTick != null){
+    const wakeTick = (c.activity.phase_started_tick || 0) + (c.activity.duration || 0);
+    const proj = _projectCalendarForward(_lastCalendar, wakeTick - _lastCalendarWorldTick);
+    const formatted = _formatProjectedTime(proj);
+    if(formatted) rows.push(`<span style="opacity:.75">Wakes up: ${formatted}</span>`);
+  }
+
   if(c.emotion) rows.push(`Mood: ${c.emotion}`);
 
   if(c.off_grid){
@@ -4100,6 +4258,10 @@ function renderRelationshipsTab(c){
 // visible by reading the raw world-state JSON.
 // =========================================================
 
+// Backing array for the Mind tab's clickable intention cards -- see the
+// "Active intentions" section below and openIntentionModal().
+let _lastRenderedIntentions = [];
+
 function renderMindTab(c){
   const el = document.getElementById("viewerMindTab");
   if(!el) return;
@@ -4164,10 +4326,23 @@ function renderMindTab(c){
   }
 
   // -- Active intentions --
+  // Cards are clickable -- an intention can carry fields the compact card
+  // has no room for (subscribe_service's service_id, a target_id, an
+  // expectation's full priority math, ...), reported live as confusing
+  // when they're silently dropped. Rather than hand-picking which extra
+  // field each intention TYPE deserves, every field is shown, resolved
+  // against real names/labels where recognizable (see openIntentionModal).
+  // el.innerHTML gets reassigned wholesale below (this function builds one
+  // big string and sets it once), so listeners can't be attached inline
+  // while building the string -- _lastRenderedIntentions stores the same
+  // array this render used, and a delegated click handler (registered
+  // once, outside this function) reads back data-intent-index to look the
+  // clicked card's original object back up.
   const intentions = c.active_intentions || [];
+  _lastRenderedIntentions = intentions;
   if(intentions.length){
-    const lines = intentions.map(i => `
-      <div class="viewerCard">
+    const lines = intentions.map((i, idx) => `
+      <div class="viewerCard viewerCardClickable" data-intent-index="${idx}">
         <div class="viewerCardTitle">${(i.type || "").replace(/_/g, " ")}</div>
         ${i.reason ? `<div style="opacity:.7">${i.reason}</div>` : ""}
       </div>`);
@@ -4186,6 +4361,86 @@ function renderMindTab(c){
   }
 
   el.innerHTML = sections.join("");
+}
+
+// Delegated click handler for the Mind tab's intention cards (registered
+// once here, not per-render -- renderMindTab() reassigns el.innerHTML
+// wholesale on every call, which would silently drop any listener
+// attached directly to a card element).
+document.getElementById("viewerMindTab")?.addEventListener("click", (e) => {
+  const card = e.target.closest(".viewerCardClickable");
+  if(!card) return;
+  const intention = _lastRenderedIntentions[Number(card.dataset.intentIndex)];
+  if(intention) openIntentionModal(intention);
+});
+
+// Fields that already read naturally as part of the card/title and don't
+// need repeating in the detail view.
+const _INTENTION_HIDDEN_FIELDS = new Set(["type", "reason"]);
+
+// Field names that hold a character id -- resolved to a real name rather
+// than shown as a bare char_xxxxx string.
+const _INTENTION_CHAR_ID_FIELDS = new Set(["target_id", "char_id"]);
+
+function _formatIntentionFieldLabel(key){
+  return key.replace(/_/g, " ").replace(/\b\w/g, ch => ch.toUpperCase());
+}
+
+function _formatIntentionFieldValue(key, value){
+  if(value == null || value === "") return "(none)";
+  if(key === "service_id"){
+    const tmpl = (definitions.service_templates || {})[value];
+    return tmpl?.name ? `${tmpl.name} (${value})` : String(value);
+  }
+  if(_INTENTION_CHAR_ID_FIELDS.has(key)){
+    const name = _charName(value);
+    return name ? `${name} (${value})` : String(value);
+  }
+  if(key === "context" && typeof value === "object"){
+    return Object.entries(value)
+      .map(([k, v]) => `${_formatIntentionFieldLabel(k)}: ${_formatIntentionFieldValue(k, v)}`)
+      .join(", ");
+  }
+  if(typeof value === "object") return JSON.stringify(value);
+  return String(value);
+}
+
+// Full-detail popup for one intention -- every field it carries, not just
+// the compact card's type+reason, since some intentions (subscribe_service's
+// service_id, anything with a target_id) had real information nowhere else
+// visible in the UI. Reuses the shared modal-overlay/openModal infrastructure
+// (see the mailbox household modal / event modal) via a new #modal-intention
+// container rather than inventing a second popup mechanism.
+function openIntentionModal(intention){
+  const titleEl = document.getElementById("intentionModalTitle");
+  if(titleEl) titleEl.textContent = (intention.type || "Intention").replace(/_/g, " ");
+
+  const body = document.getElementById("intentionModalBody");
+  if(!body) return;
+  body.innerHTML = "";
+
+  if(intention.reason){
+    const reason = document.createElement("div");
+    reason.className = "eventModalRowSummary";
+    reason.textContent = intention.reason;
+    body.appendChild(reason);
+  }
+
+  for(const [key, value] of Object.entries(intention)){
+    if(_INTENTION_HIDDEN_FIELDS.has(key)) continue;
+    const row = document.createElement("div");
+    row.className = "eventModalRow";
+    const label = document.createElement("div");
+    label.className = "eventModalRowMeta";
+    label.textContent = _formatIntentionFieldLabel(key);
+    const val = document.createElement("div");
+    val.textContent = _formatIntentionFieldValue(key, value);
+    row.appendChild(label);
+    row.appendChild(val);
+    body.appendChild(row);
+  }
+
+  openModal("modal-intention");
 }
 
 // =========================================================
