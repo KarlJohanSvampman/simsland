@@ -54,6 +54,29 @@ def resolve_strategy(
         )
 
     # =====================================================
+    # SLEEP / TOILET
+    # =====================================================
+    # body_intentions.py creates {"type": "sleep", ...}/{"type":
+    # "use_toilet"/"use_toilet_bowels", ...}/{"type": "take_nap", ...}
+    # intentions at real survival-tier priorities (98/95/55) once energy/
+    # bladder/bowels cross their own thresholds, but nothing here ever
+    # dispatched them (no branch existed at all -- both fell through to the
+    # final `return None`) -- a real gap that let a character stuck unable
+    # to resolve anything else (e.g. genuinely blocked from moving) also
+    # never mechanically nap/relieve themselves, since this loop tries each
+    # intention in priority order and `continue`s past anything that
+    # resolves to None. activities.py's "sleep"/"use_toilet" are real,
+    # fully-supported activity types (walking/using/finishing phases) --
+    # this just needed the dispatch. "take_nap" has no dedicated activity
+    # type of its own; a nap is just a shorter sleep, so it reuses "sleep".
+
+    if t in ("sleep", "take_nap"):
+        return "sleep"
+
+    if t in ("use_toilet", "use_toilet_bowels"):
+        return t
+
+    # =====================================================
     # SOCIAL
     # =====================================================
 
@@ -267,6 +290,16 @@ def resolve_thirst_strategy(c, world):
     # entry (interaction "drink", now a real anchor on kitchen_sink/
     # bathroom_sink) and its completion handler for the
     # glass-required-for-proper-hydration behavior.
+    #
+    # Real threshold check, added after a live bug: body_intentions.py
+    # only CREATES a "drink" intention once hydration drops below 55, but
+    # nothing ever re-validated it against CURRENT hydration once resolved
+    # here -- an intention that's gone stale (hydration recovered, but the
+    # entry hadn't yet decayed out of active_intentions) kept unconditionally
+    # resolving to "drink_water" forever. Mirrors the same 55 threshold used
+    # to create the intention in the first place.
+    if c.get("body", {}).get("hydration", 100) >= 55:
+        return None
     return "drink_water"
 
 

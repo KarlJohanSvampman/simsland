@@ -233,17 +233,18 @@ def update_economy(
     world
 ):
 
-    maybe_fire(
-        c,
-        world
-    )
+    # maybe_fire()/process_interview() are NOT called here -- sim_loop.py's
+    # dedicated job_market cadence block already calls both, once per 60
+    # ticks, for every character. This function used to also call them on
+    # every single tick (no cadence gate at all), inflating maybe_fire's
+    # per-check chance into an effective per-tick chance -- roughly a 60x
+    # amplification that produced jobs lasting under a minute and dozens of
+    # hire/fire cycles in a character's own memory log. apply_for_job() is
+    # correctly per-tick here (it's self-guarding: `if c.get("employed") or
+    # c.get("interview"): return`), matching its own docstring's "automatic
+    # per-economy-tick path" framing.
 
     apply_for_job(
-        c,
-        world
-    )
-
-    process_interview(
         c,
         world
     )
