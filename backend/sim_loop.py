@@ -754,10 +754,15 @@ def tick(world):
         from systems.crushes import maybe_form_crush
         from systems.detective_work import (
             maybe_send_unsettling_letter, check_personal_mail, maybe_report_missing_item,
+            maybe_report_mysterious_appearance, maybe_notice_gambling_problem,
+            tick_aggression_patterns,
         )
         tick_all_secrets(world)
         maybe_send_unsettling_letter(world)
         maybe_report_missing_item(world)
+        maybe_report_mysterious_appearance(world)
+        maybe_notice_gambling_problem(world)
+        tick_aggression_patterns(world)
         for c in characters:
             if not c.get("alive", True):
                 continue

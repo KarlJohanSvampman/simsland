@@ -368,6 +368,11 @@ def resolve_hostile_action(actor, target, action_id, world):
             _tag_minor_offender_incident(inc, actor, target, world)
         except Exception:
             pass
+        try:
+            from systems.detective_work import notice_threats_violence
+            notice_threats_violence(target, actor, world)
+        except Exception:
+            pass
 
     elif outcome == "evaded":
         try:
@@ -387,6 +392,11 @@ def resolve_hostile_action(actor, target, action_id, world):
             from systems.emergency import report_assault_incident
             inc = report_assault_incident(world, actor, victim=target)
             _tag_minor_offender_incident(inc, actor, target, world)
+        except Exception:
+            pass
+        try:
+            from systems.detective_work import notice_threats_violence
+            notice_threats_violence(target, actor, world)
         except Exception:
             pass
 

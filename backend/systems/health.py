@@ -253,6 +253,11 @@ def tick_physical_conditions(char, world):
                 char["physical_health"].remove("borrelia")
                 _remember(char, "Borrelia became chronic, causing nerve damage.", 0.9,
                           ["health", "borrelia"], "health", tick)
+                try:
+                    from systems.detective_work import notice_medical_diagnosis
+                    notice_medical_diagnosis(char, world, "chronic nerve damage")
+                except Exception:
+                    pass
 
         # symptoms[] (an array of {hazard_template, probability} referencing
         # health_hazard_templates DIRECTLY -- the 2-level chain collapse,
@@ -937,6 +942,11 @@ def _check_recoveries(char, world, ph_templates, tick):
             new_name = ph_templates.get(progresses_to, {}).get("name", progresses_to)
             _remember(char, f"{tmpl.get('name', cond_key)} worsened into {new_name} after going untreated.",
                       0.9, ["health", "progression"], "health", tick)
+            try:
+                from systems.detective_work import notice_medical_diagnosis
+                notice_medical_diagnosis(char, world, new_name)
+            except Exception:
+                pass
             continue
 
         recovered = False

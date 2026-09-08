@@ -640,6 +640,206 @@ def maybe_report_missing_item(world):
         )
 
 
+MYSTERIOUS_APPEARANCE_DAILY_CHANCE = 0.003
+
+
+def maybe_report_mysterious_appearance(world):
+    """Sibling to maybe_report_missing_item, inverted: something turns up
+    with no clear source. Same deliberate abstraction -- the mystery (and
+    its LLM-decided resolution) is what's real, not a physical prop
+    actually being created."""
+    chars = world.get("characters", {})
+    for hid, household in world.get("households", {}).items():
+        if random.random() >= MYSTERIOUS_APPEARANCE_DAILY_CHANCE:
+            continue
+        members = [chars[mid] for mid in household.get("members", []) if mid in chars]
+        if not members:
+            continue
+        noticer = random.choice(members)
+        start_detective_story(
+            noticer, world, ["mysterious_appearance"],
+            "Something showed up that nobody in the house remembers getting.",
+            main_question="Where did this actually come from?",
+        )
+
+
+# ── Threats & violence (hostile_actions.py's existing incident report) ───
+
+def notice_threats_violence(victim, offender, world):
+    """Hooked from hostile_actions.py, both call sites that already
+    create a real assault incident (hit AND fumble -- a fumbled attack
+    still reveals real intent) -- reuses that existing "serious enough to
+    matter" gate rather than firing on every playful shove."""
+    if _already_has_tagged_story(victim, "threats_violence", offender["id"]):
+        return
+    start_detective_story(
+        victim, world, ["threats_violence"],
+        f"{offender.get('name', 'someone')} came at me, for real this time.",
+        main_question="Is this going to happen again, and what do I do about it?",
+        involved_ids=[offender["id"]], role="involved", goal="protect",
+    )
+
+
+# ── Property damage (emergency.py's existing incident report) ────────────
+
+def notice_property_damage(offender, prop, world):
+    """Hooked from activities.py's existing report_property_damage_
+    incident call site -- the prop's owning household gets a real
+    story."""
+    hid = prop.get("household_id")
+    household = world.get("households", {}).get(hid)
+    if not household:
+        return
+    chars = world.get("characters", {})
+    members = [chars[mid] for mid in household.get("members", []) if mid in chars]
+    if not members:
+        return
+    victim = random.choice(members)
+    if _already_has_tagged_story(victim, "property_damage", offender["id"]):
+        return
+    start_detective_story(
+        victim, world, ["property_damage"],
+        f"Something of ours got wrecked, and {offender.get('name', 'someone')} might be behind it.",
+        main_question="Who actually did this, and do we do anything about it?",
+        suspect_ids=[offender["id"]], role="involved", goal="resolve",
+    )
+
+
+# ── Medical diagnosis (health.py's existing chronic/progression moments) ──
+
+def notice_medical_diagnosis(c, world, condition_label):
+    """Hooked from health.py -- a real "this got worse" or "this became
+    chronic" moment, not routine minor illness. A household adult who
+    isn't the patient gets their own copy (the patient's own reaction is
+    handled entirely by health.py itself; this is specifically the
+    "family finds out and worries" angle)."""
+    if _already_has_tagged_story(c, "medical_diagnosis"):
+        return
+    household = world.get("households", {}).get(c.get("household_id"))
+    chars = world.get("characters", {})
+    concerned = None
+    if household:
+        for mid in household.get("members", []):
+            if mid != c["id"] and mid in chars:
+                concerned = chars[mid]
+                break
+    target = concerned or c
+    start_detective_story(
+        target, world,
+        ["medical_diagnosis"],
+        f"{'I' if target is c else c.get('name', 'they')} just found out about {condition_label}.",
+        main_question="What does this actually mean going forward?",
+        involved_ids=[c["id"]], role="involved", goal="protect" if target is not c else "resolve",
+    )
+
+
+# ── Gambling (approximate -- no real per-session loss tracking exists) ───
+# No addiction_templates entry or session-completion handler tracks
+# gambling losses anywhere in this codebase (confirmed via research) --
+# unlike every other hook in this module, this one can't key off a real
+# threshold-crossing. Approximated instead: a real gambling-category
+# hobby plus a real, worsening household financial position (bills_due
+# actually growing) is treated as "probably related."
+
+GAMBLING_NOTICE_CHANCE = 0.01
+_GAMBLING_HOBBIES = {"poker", "blackjack"}
+
+
+def maybe_notice_gambling_problem(world):
+    chars = world.get("characters", {})
+    for c in chars.values():
+        hobbies = set(c.get("hobbies", []))
+        if not (hobbies & _GAMBLING_HOBBIES):
+            continue
+        household = world.get("households", {}).get(c.get("household_id"))
+        if not household or len(household.get("bills_due", [])) < 3:
+            continue
+        if random.random() >= GAMBLING_NOTICE_CHANCE:
+            continue
+        for oid, rel in c.get("relationships", {}).items():
+            if not any(l in rel.get("labels", []) for l in ("partner", "spouse")):
+                continue
+            partner = chars.get(oid)
+            if not partner or _already_has_tagged_story(partner, "gambling", c["id"]):
+                continue
+            start_detective_story(
+                partner, world, ["gambling"],
+                f"The bills keep piling up and {c.get('name', 'they')} keeps going out to play cards.",
+                main_question="Is the gambling actually the problem here?",
+                suspect_ids=[c["id"]], role="witness", goal="protect",
+            )
+            break
+
+
+# ── Aggression patterns: aggressive_partner / aggressive_neighbor / ──────
+# ── bullying -- one shared periodic scan, classified by relationship ─────
+# shape rather than three separate detectors. No real neighbor-adjacency
+# system exists in this codebase (confirmed via research) -- "aggressive_
+# neighbor" is approximated as a non-family, non-household contact with
+# real, sustained hostility, which is the closest honest fit without
+# inventing a geography system just for this tag.
+
+AGGRESSION_HOSTILITY_THRESHOLD = 45
+AGGRESSION_NOTICE_CHANCE = 0.05
+
+
+def tick_aggression_patterns(world):
+    chars = world.get("characters", {})
+    for c in chars.values():
+        for oid, rel in c.get("relationships", {}).items():
+            hostility = rel.get("hostility", 0)
+            if hostility < AGGRESSION_HOSTILITY_THRESHOLD:
+                continue
+            other = chars.get(oid)
+            if not other:
+                continue
+            if random.random() >= AGGRESSION_NOTICE_CHANCE:
+                continue
+
+            labels = rel.get("labels", [])
+            both_minors = c.get("age_group") in ("child", "teen") and other.get("age_group") in ("child", "teen")
+            is_partner = any(l in labels for l in ("partner", "spouse"))
+
+            if both_minors:
+                # c is the victim; a real household adult gets the story
+                # (per the kid-bypass rule -- c is the one being bullied,
+                # not the one investigating).
+                adult = _find_household_adult(c, world)
+                if not adult or _already_has_tagged_story(adult, "bullying", c["id"]):
+                    continue
+                start_detective_story(
+                    adult, world, ["bullying"],
+                    f"{c.get('name', 'they')} says {other.get('name', 'someone')} keeps being cruel to them.",
+                    main_question="How bad has this actually gotten?",
+                    involved_ids=[c["id"], oid], role="involved", goal="protect",
+                )
+
+            elif is_partner:
+                if "domestic_abuser" in other.get("traits", []):
+                    continue  # already the real domestic_abuse path's territory
+                if _already_has_tagged_story(c, "aggressive_partner", oid):
+                    continue
+                start_detective_story(
+                    c, world, ["aggressive_partner"],
+                    f"{other.get('name', 'my partner')} has been getting scary aggressive lately.",
+                    main_question="Is this going to keep getting worse?",
+                    suspect_ids=[oid], role="involved", goal="protect",
+                )
+
+            else:
+                household_id = c.get("household_id")
+                if oid in world.get("households", {}).get(household_id, {}).get("members", []):
+                    continue  # a hostile housemate isn't "the neighbor"
+                if _already_has_tagged_story(c, "aggressive_neighbor", oid):
+                    continue
+                start_detective_story(
+                    c, world, ["aggressive_neighbor"],
+                    f"{other.get('name', 'someone nearby')} keeps escalating things with me.",
+                    main_question="What's actually going on with them, and how do I handle it?",
+                    suspect_ids=[oid], role="involved", goal="resolve",
+                )
+
+
 # ── World-tick sweep ────────────────────────────────────────────────────────
 
 def tick_detective_work(world):

@@ -1700,6 +1700,11 @@ def execute_activity(
                             report_property_damage_incident(world, c, prop)
                         except Exception:
                             pass
+                        try:
+                            from systems.detective_work import notice_property_damage
+                            notice_property_damage(c, prop, world)
+                        except Exception:
+                            pass
                         # Curiosity hook (systems/curiosity.py): a real
                         # audible event a nearby character could notice
                         # and go investigate -- see brain/perception.py's
