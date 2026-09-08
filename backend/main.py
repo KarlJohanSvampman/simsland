@@ -47,6 +47,7 @@ from api.household import router as household_router
 from api.admin     import router as admin_router
 from api.social_sandbox import router as social_sandbox_router
 from api.events    import router as events_router
+from api.director  import router as director_router
 
 app = FastAPI(title="Simsland")
 app.add_middleware(
@@ -69,6 +70,7 @@ app.include_router(household_router, prefix="/api")
 app.include_router(admin_router)
 app.include_router(social_sandbox_router)
 app.include_router(events_router, prefix="/api")
+app.include_router(director_router)
 
 frontend_dir = Path(__file__).parent / "frontend"
 if frontend_dir.exists():

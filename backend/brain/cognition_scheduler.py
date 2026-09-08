@@ -41,6 +41,8 @@ TURN_BUDGET_DEFAULT = int(os.getenv("COGNITION_TURN_BUDGET", "2"))
 # before its next think() — e.g. a schedule_block wake pending and then
 # heard_speech arrives first; heard_speech should win and fire immediately.
 WAKE_PRIORITY = {
+    "director_attention": 110,  # systems/director_mode.py -- an external
+                                 # director interrupt always wins
     "heard_speech": 100,
     "urgent_need": 90,
     "noticed_commotion": 75,   # systems/curiosity.py -- a curious character just noticed something worth investigating
@@ -138,6 +140,7 @@ _WAKE_LINE_TEMPLATES = {
     "wait_ready": "What you were waiting on is ready now.",
     "waiting_timed_out": "You've been waiting a while now and your patience is running out.",
     "noticed_commotion": "{summary}",
+    "director_attention": "Something makes you stop and look up -- you have the odd feeling someone unseen is watching you, waiting for you to notice.",
 }
 
 
