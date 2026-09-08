@@ -35,7 +35,20 @@ def _has_schizophrenia(c):
 
 def tick_psychosis(c, world):
     """Called at a moderate per-character cadence (see sim_loop.py).
-    Rolls entry/exit and fires a hallucination while active."""
+    Rolls entry/exit and fires a hallucination while active.
+
+    Suppressed entirely while asleep -- a live bug report: a sleeping
+    character kept speaking hallucination lines out loud (fire_incidental
+    doesn't check activity/consciousness), which doesn't make sense for a
+    "did you hear that" spoken reaction. Rather than converting this into
+    a nightmare-specific variant (bigger, unrequested scope), this simply
+    pauses the whole mechanic while asleep -- no new episode starts, no
+    hallucination fires, and an already-active episode's clock doesn't
+    advance either, so nothing about it depends on exactly when the
+    character happened to fall asleep."""
+    if (c.get("activity") or {}).get("type") == "sleep":
+        return
+
     state = c.setdefault("psychosis_state", {
         "active": False, "intensity": 0.0, "trigger": None, "started_tick": None,
     })
