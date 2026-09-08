@@ -306,6 +306,13 @@ const badges = {};          // id → { cssObject, div }  -- debug-only, see DEB
 // in this file previously tracked "who is selected" as real state -- the
 // inspector panel is otherwise transient DOM writes with no backing variable.
 let selectedCharacterId = null;
+// Ground-ring highlight that follows whichever character is currently
+// selected -- created lazily on first use, re-parented onto the newly
+// selected character's own model (sims[id]) so it moves/rotates with them
+// for free instead of needing its own per-frame position sync against
+// world coordinates. See updateSelectionOverlay(), called from animate().
+let _selectionRing = null;
+let _selectionRingParent = null;
 const props = {};
 const propNodes = {};        // prop.id → { anchors, targets, ikHands } Maps of named Object3Ds
 const propAnimations = {};   // prop.id → { mixer, actions, currentState }
@@ -3711,6 +3718,44 @@ function _templateDescription(tmpl, flavorKey){
   return (tmpl.descriptions && tmpl.descriptions[flavorKey]) || tmpl.description || null;
 }
 
+// Vertical health-bar-style meters for the Inspector's Status tab, one per
+// systems/body.py need + c.stress. Bar HEIGHT always represents "how
+// satisfied is this need" (full = fine, empty = critical) so all seven
+// read the same way despite body.py storing them with different
+// polarities (energy/hygiene: high raw value = good; hunger/bladder/
+// fatigue/stress: high raw value = bad; hydration: high = good, but
+// displayed elsewhere in this file as "thirst" with the opposite sense --
+// _renderNeedsMeters always normalizes to "satisfaction" internally, this
+// isn't the same inverted-for-display value the old text line used).
+const _NEED_METERS = [
+  { key: "hydration", label: "Thirst",  color: "#3aa0ff", satisfied: v => v },            // blue
+  { key: "bladder",   label: "Bladder", color: "#e6c200", satisfied: v => 100 - v },       // yellow
+  { key: "hunger",    label: "Hunger",  color: "#e64545", satisfied: v => 100 - v },       // red
+  { key: "energy",    label: "Energy",  color: "#3ecf5e", satisfied: v => v },             // green
+  { key: "fatigue",   label: "Fatigue", color: "#9b5de5", satisfied: v => 100 - v },       // purple
+  { key: "_stress",   label: "Stress",  color: "#1a1a1a", satisfied: v => 100 - v },       // black
+  { key: "hygiene",   label: "Hygiene", color: "#d9c79e", satisfied: v => v },             // beige
+];
+
+function _renderNeedsMeters(body, stress){
+  const bars = _NEED_METERS.map(({ key, label, color, satisfied }) => {
+    const raw = key === "_stress" ? stress : body?.[key];
+    if (raw == null) return "";
+    const pct = Math.max(0, Math.min(100, satisfied(raw)));
+    const critical = pct < 20;
+    return `
+      <div class="needMeter" title="${label}: ${Math.round(pct)}% satisfied">
+        <div class="needMeterTrack">
+          <div class="needMeterFill${critical ? " needMeterCritical" : ""}"
+               style="height:${pct}%; background:${color};"></div>
+        </div>
+        <div class="needMeterLabel">${label[0]}</div>
+      </div>`;
+  }).filter(Boolean);
+
+  return bars.length ? `<div class="needMeters">${bars.join("")}</div>` : "";
+}
+
 function renderCharacterInspector(id){
   const el = document.getElementById("viewerSelection");
   if(!el) return;
@@ -3763,18 +3808,8 @@ function renderCharacterInspector(id){
   // defaults to 0.0 and nothing since updates, which made every one of
   // these always read as ~0% regardless of the character's actual state.
   const b = c.body || {};
-  const needs = [];
-  if(b.energy   != null) needs.push(`energy ${Math.round(b.energy)}%`);
-  if(b.hunger   != null) needs.push(`hunger ${Math.round(b.hunger)}%`);
-  // body.py stores this as "hydration" (100=hydrated, 0=dehydrated) -- the
-  // opposite polarity from hunger/bladder/fatigue (100=urgent). Inverted
-  // here so "thirst" reads the same way those already do: higher = worse.
-  if(b.hydration != null) needs.push(`thirst ${Math.round(100 - b.hydration)}%`);
-  if(b.hygiene  != null) needs.push(`hygiene ${Math.round(b.hygiene)}%`);
-  if(b.bladder  != null) needs.push(`bladder ${Math.round(b.bladder)}%`);
-  if(b.fatigue  != null) needs.push(`fatigue ${Math.round(b.fatigue)}%`);
-  if(c.stress   != null) needs.push(`stress ${Math.round(c.stress)}%`);
-  if(needs.length) rows.push(`Needs: ${needs.join(", ")}`);
+  const needsMeters = _renderNeedsMeters(b, c.stress);
+  if(needsMeters) rows.push(needsMeters);
   if(b.sickness > 30) rows.push(`<span style="color:#fc6">Sick</span>`);
 
   const hs = c.health_state || {};
@@ -5431,10 +5466,64 @@ function updateWallOcclusion() {
   for (const k of hitKeysThisFrame) _occludedWalls.add(k);
 }
 
+// Pulsing ground ring under whichever character is currently selected --
+// so it's obvious at a glance which one the Inspector/Director panel is
+// pointed at, even in a crowd. Re-parents onto sims[selectedCharacterId]
+// (rather than tracking world x/y itself) so it automatically follows
+// walking/rotation with zero extra bookkeeping here.
+function _ensureSelectionRing(){
+  if (_selectionRing) return _selectionRing;
+  const geo = new THREE.RingGeometry(0.55, 0.75, 32);
+  const mat = new THREE.MeshBasicMaterial({
+    color: 0xffe066,
+    transparent: true,
+    opacity: 0.9,
+    side: THREE.DoubleSide,
+    depthTest: false,   // stays visible even when standing behind a wall/prop
+  });
+  const ring = new THREE.Mesh(geo, mat);
+  ring.rotation.x = -Math.PI / 2;   // lie flat on the ground
+  ring.position.y = 0.04;           // just above the floor, avoids z-fighting
+  ring.renderOrder = 999;
+  ring.userData.ignoreRaycast = true;   // never itself intercept selection clicks
+  _selectionRing = ring;
+  return ring;
+}
+
+function updateSelectionOverlay(elapsedSeconds){
+  const ring = _ensureSelectionRing();
+  const targetSim = selectedCharacterId ? sims[selectedCharacterId] : null;
+
+  if (!targetSim) {
+    if (ring.parent) ring.parent.remove(ring);
+    _selectionRingParent = null;
+    return;
+  }
+
+  if (_selectionRingParent !== targetSim) {
+    if (ring.parent) ring.parent.remove(ring);
+    targetSim.add(ring);
+    _selectionRingParent = targetSim;
+  }
+
+  // Gentle pulse so it reads as "selected" rather than a static decal.
+  // (No counter-rotation needed against the parent's facing -- the ring's
+  // own local X-rotation already lies it flat with its normal along the
+  // parent's Y axis, and the parent only ever rotates around that same Y
+  // axis to face a direction, which spins a rotationally-symmetric ring
+  // around its own normal -- a no-op visually.)
+  const pulse = 1 + 0.12 * Math.sin(elapsedSeconds * 3);
+  ring.scale.set(pulse, pulse, 1);
+}
+
+let _animClockSeconds = 0;
+
 function animate() {
   requestAnimationFrame(animate);
   controls.update();
   const delta = 0.016;
+  _animClockSeconds += delta;
+  updateSelectionOverlay(_animClockSeconds);
 
   for (const id in characterAnimations) {
     const data = characterAnimations[id];
