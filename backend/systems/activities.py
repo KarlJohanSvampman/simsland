@@ -1305,6 +1305,23 @@ def compute_duration_ticks(
     return int(ticks)
 
 
+# Activity types dispatched through this generic function that imply a
+# real posture change -- action_router.py's LLM-decision routes for the
+# same activities (_route_sleep, etc.) already call set_posture()
+# directly, but this generic path (used by brain/agent_loop.py's
+# mechanical pre-LLM intention loop) never did, leaving c["posture"]
+# stale (e.g. "standing" while c["activity"]["type"] says "sleep") even
+# though the animation itself resolved correctly via ACTIVITIES' own
+# "using" clip. Only listing types with an unambiguous posture here --
+# sit/watch_tv/use_computer/etc. already go through _execute_use_seat's
+# own set_posture("sitting_seat") call, a separate path, not this one.
+_ACTIVITY_POSTURE = {
+    "sleep": "lying",
+    "use_toilet": "sitting_seat",
+    "use_toilet_bowels": "sitting_seat",
+}
+
+
 # =========================================================
 # START ACTIVITY
 # =========================================================
@@ -1663,6 +1680,21 @@ def execute_activity(
 
         # Trigger prop animation (door opens, button activates, etc.)
         _set_prop_anim(prop, _PROP_ANIM_STATES.get(interaction, (None, None))[0])
+
+        # Posture bookkeeping for activity types with an unambiguous
+        # posture (sleep/use_toilet -- see _ACTIVITY_POSTURE above this
+        # function). Called here, once the character has actually arrived,
+        # rather than at start_activity() time, so they aren't shown lying/
+        # sitting while still walking to the bed/toilet. c["animation_state"]
+        # gets overwritten by using_anim right below regardless of the
+        # transition key set_posture() writes -- that's fine, c["posture"]
+        # itself (what the Inspector displays) is what actually needed
+        # fixing; the missed transition clip is a minor, accepted cosmetic
+        # trade-off of reusing this one shared insertion point.
+        target_posture = _ACTIVITY_POSTURE.get(act.get("type"))
+        if target_posture:
+            from systems.posture import set_posture
+            set_posture(c, world, target_posture)
 
         set_activity_phase(act, "using", world)
         c["animation_state"] = using_anim
