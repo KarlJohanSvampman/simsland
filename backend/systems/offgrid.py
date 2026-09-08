@@ -555,6 +555,15 @@ def _send_offgrid_immediate(c, world, reason, duration_minutes):
         return False
     if reason not in _UNCAPPED_DURATION_REASONS:
         duration_minutes = min(duration_minutes, MAX_OFFGRID_MINUTES)
+    # A live bug: this never cleared c["activity"], so a character who was
+    # mid-activity (sleeping in their own bed, say) when something sent
+    # them off-grid (most visibly: emergency.py's ambulance dispatch)
+    # stayed frozen showing that activity forever -- update_agent() returns
+    # immediately once off_grid is True (see brain/agent_loop.py), so
+    # nothing was ever going to clear or progress it on its own. A
+    # genuinely simultaneous "asleep in bed" + "away at the hospital" state
+    # doesn't make sense regardless of reason, so this always clears it.
+    c["activity"]      = None
     c["off_grid"]      = True
     c["off_grid_reason"] = reason
     c["return_tick"]   = world["tick"] + _minutes_to_ticks(duration_minutes)

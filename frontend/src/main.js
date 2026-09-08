@@ -478,6 +478,7 @@ let _lastCalendarWorldTick = null;
         const x2 = 50 + Math.sin(angle) * 46, y2 = 50 - Math.cos(angle) * 46;
         return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#888" stroke-width="1.5"/>`;
       }).join("")}
+      <text id="clockDayNightIcon" x="50" y="70" text-anchor="middle" font-size="12">☀️</text>
       <line id="clockHourHand" x1="50" y1="50" x2="50" y2="28" stroke="#eee" stroke-width="3.5" stroke-linecap="round"/>
       <line id="clockMinuteHand" x1="50" y1="50" x2="50" y2="16" stroke="#9cf" stroke-width="2.5" stroke-linecap="round"/>
       <circle cx="50" cy="50" r="2.5" fill="#f66"/>
@@ -508,6 +509,13 @@ let _lastCalendarWorldTick = null;
 
     document.getElementById("clockDateLine").textContent =
       `${(cal.weekday || WEEKDAY_ORDER[0]).slice(0, 3)}, ${MONTH_NAMES[(cal.month || 1) - 1]} ${cal.day ?? "?"}, ${cal.year ?? "?"}`;
+
+    // Daytime taken as 6am-8pm, matching this project's own dusk/dawn
+    // framing elsewhere (e.g. streetlight/lighting logic) rather than a
+    // strict sunrise/sunset calc -- there's no real seasonal daylight
+    // model to compute an exact boundary from.
+    const isDaytime = hour >= 6 && hour < 20;
+    document.getElementById("clockDayNightIcon").textContent = isDaytime ? "☀️" : "🌙";
 
     const hourAngle = ((hour % 12) / 12) * 360 + (minute / 60) * 30;
     const minuteAngle = (minute / 60) * 360;

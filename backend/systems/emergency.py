@@ -275,7 +275,21 @@ def resolve(world):
                     _, tier = compute_severity(patient)
                     if tier in ("severe", "critical") and not patient.get("off_grid"):
                         from systems.offgrid import send_offgrid
-                        send_offgrid(patient, world, "hospital", 6 * 60 if tier == "critical" else 3 * 60)
+                        sent = send_offgrid(patient, world, "hospital", 6 * 60 if tier == "critical" else 3 * 60)
+                        # Live bug report: a patient hauled off by ambulance
+                        # had no memory, event, or intention anywhere
+                        # suggesting they'd gone to the hospital at all --
+                        # send_offgrid() itself is a generic primitive with
+                        # no idea WHY a given call happened, so the one real
+                        # caller here that actually knows ("your own medical
+                        # emergency just got you an ambulance ride") is the
+                        # right place to record it.
+                        if sent:
+                            store_memory(
+                                patient, "An ambulance rushed me to the hospital.", 0.8,
+                                ["medical", "emergency", "hospital"], "medical_emergency",
+                                world.get("tick", 0),
+                            )
             elif r["type"] == "fire":
                 inc = next(
                     (i for i in world.get("incidents", [])

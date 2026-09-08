@@ -51,13 +51,32 @@ def reset_characters(sim_id: str = DEFAULT_SIM_ID):
     are hand-placed via the World Editor and aren't code-regenerable, so
     this deliberately leaves them untouched, only unassigning each
     building's owner_household_id since the households that owned them no
-    longer exist."""
+    longer exist.
+
+    Also drops any placed_items/world_objects owned by a character this
+    wipes -- a live symptom of NOT doing this: phones a character dropped
+    (systems/phone.py::maybe_set_phone_down) kept sitting on the ground
+    forever after that character was gone, since nothing else ever
+    resolves an orphaned owner_id. Furniture-like placed_items with no
+    owner_id (newspapers set down mid-read, dishware, ...) are untouched --
+    only entries actually tied to a character being deleted here."""
     with world_lock():
         world = load_world(sim_id)
+        removed_ids = set(world["characters"].keys())
         world["characters"] = {}
         world["households"] = {}
         for building in world.get("buildings", []):
             building["owner_household_id"] = None
+
+        placed_items = world.get("placed_items", {})
+        if isinstance(placed_items, dict):
+            for item_id in [k for k, v in placed_items.items() if v.get("owner_id") in removed_ids]:
+                del placed_items[item_id]
+        world_objects = world.get("world_objects", {})
+        if isinstance(world_objects, dict):
+            for obj_id in [k for k, v in world_objects.items() if v.get("owner_id") in removed_ids]:
+                del world_objects[obj_id]
+
         save_world(sim_id, world)
     return {"ok": True}
 

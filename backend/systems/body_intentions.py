@@ -8,9 +8,20 @@ from brain.intentions import add_intention
 from systems.body import get_odor_label, get_breath_label
 
 
-def generate_body_intentions(c):
+def generate_body_intentions(c, world=None):
     b = c.get("body", {})
     tr = c.get("traits", [])
+
+    # Live bug report: characters were sleeping full multi-hour sessions
+    # in the middle of the day just as readily as at night -- this
+    # function had no access to world/the calendar at all, so the
+    # fatigue-driven "sleep" intention below couldn't have been time-aware
+    # even in principle. systems/scheduling.py already models a real
+    # 23:00-07:00 nighttime sleep block, but that's a separate, uncoordinated
+    # system -- this mirrors its exact window as the boundary here too, so
+    # "is it night" means the same thing in both places.
+    hour = (world or {}).get("calendar", {}).get("hour")
+    is_night = hour is None or hour >= 23 or hour < 7
 
     # ── BLADDER ──────────────────────────────────────────────────────────────
     bladder = b.get("bladder", 0)
@@ -44,23 +55,42 @@ def generate_body_intentions(c):
     fatigue    = b.get("fatigue", 0)
     sleep_debt = b.get("sleep_debt", 0)
 
-    if fatigue > 90:
+    # Daytime requires genuinely extreme exhaustion (95 vs. night's 90)
+    # before forcing a real multi-hour sleep, and at a lower priority so
+    # it competes more fairly with work/social intentions instead of
+    # always winning outright -- still allowed to happen (collapsing from
+    # real exhaustion during the day is realistic), just rarer.
+    critical_threshold = 90 if is_night else 95
+    if fatigue > critical_threshold:
         add_intention(c, {
             "type":       "sleep",
             "category":   "survival",
-            "priority":   98,
+            "priority":   98 if is_night else 85,
             "interrupts": True,
             "reason":     "exhausted"
         })
     elif fatigue > 75:
-        # Lazy/depressed characters cave earlier
-        priority = 70 if ("lazy" not in tr and "apathetic" not in tr) else 80
-        add_intention(c, {
-            "type":     "sleep",
-            "category": "survival",
-            "priority": priority,
-            "reason":   "very_tired"
-        })
+        if is_night:
+            # Lazy/depressed characters cave earlier
+            priority = 70 if ("lazy" not in tr and "apathetic" not in tr) else 80
+            add_intention(c, {
+                "type":     "sleep",
+                "category": "survival",
+                "priority": priority,
+                "reason":   "very_tired"
+            })
+        else:
+            # Daytime: a real nap instead of a full sleep session at this
+            # tier -- shorter, less disruptive, and this is exactly what
+            # take_nap already exists for (see the sleep_debt block below,
+            # merged into the same intention rather than adding a second
+            # competing one).
+            add_intention(c, {
+                "type":     "take_nap",
+                "category": "health",
+                "priority": 65,
+                "reason":   "very_tired"
+            })
 
     # Sleep debt makes them want a nap even when not fully fatigued
     if sleep_debt > 50 and fatigue > 55:
