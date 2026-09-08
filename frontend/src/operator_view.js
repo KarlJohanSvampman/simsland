@@ -165,42 +165,120 @@ endBtn.addEventListener("click", async () => {
 // way the desktop Director Panel above is kept separate from main.js's
 // viewer code.
 //
-// Known gap this round: there's no in-VR HUD/menu yet -- _setStatus()'s
-// text only shows on the flat desktop mirror of the session, not inside
-// the headset itself. Feedback in-headset is currently just the laser
-// ray's own color (see main.js's updateXRFrame -- green while hovering a
-// character) plus the real, observable effect on the sim (a character
-// pausing/reacting). A proper in-scene panel is future work once this
-// input layer is proven out.
+// Matches the original ask's gesture shape: hold a controller button to
+// ENTER director mode (calls every nearby character to attention); while
+// active, trigger-tap selects+interrupts whoever you're pointing at, and
+// holding the trigger on a selected character captures speech (Web Speech
+// API) and injects it as their line -- "instruct the AI via free-text
+// conversation," via real speech-to-text rather than an in-VR keyboard;
+// holding the SAME button again EXITS director mode and commits
+// (end_session) every character touched during the session, matching
+// "save the changes you made" on release.
+//
+// Known gap this round: there's still no in-VR HUD/menu -- _setStatus()'s
+// text only shows on the flat desktop mirror, not inside the headset.
+// In-headset feedback is the laser ray's color (yellow idle, orange/red
+// while director mode is active, green while hovering a character -- see
+// main.js's updateXRFrame/window.setDirectorModeActive) plus the real,
+// observable effect on the sim. A proper in-scene panel is future work.
 
-const CALL_ATTENTION_RADIUS = 8;      // tiles
-const CALL_ATTENTION_HOLD_MS = 1200;  // how long to hold squeeze
+const CALL_ATTENTION_RADIUS = 8;        // tiles
+const MODE_TOGGLE_HOLD_MS   = 1200;     // squeeze-hold to enter/exit director mode
+const SPEECH_CAPTURE_HOLD_MS = 350;     // trigger-hold longer than this starts speech capture
+
+const SpeechRecognitionCtor = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+let directorModeActive = false;
+const touchedCharacterIds = new Set();
 
 function setupXRControllerInput() {
   const ctx = window.getXRContext?.();
   if (!ctx) return;   // main.js hasn't loaded (shouldn't happen on this page) -- retry below
 
   ctx.controllers.forEach((controller, i) => {
-    let holdTimer = null;
+    let modeHoldTimer = null;
+    let speechHoldTimer = null;
+    let recognizer = null;
+    let capturingSpeech = false;
 
-    controller.addEventListener("selectstart", async () => {
+    // ---- Squeeze: hold to toggle director mode on/off ----
+    controller.addEventListener("squeezestart", () => {
+      clearTimeout(modeHoldTimer);
+      modeHoldTimer = setTimeout(() => _toggleDirectorMode(ctx), MODE_TOGGLE_HOLD_MS);
+    });
+    controller.addEventListener("squeezeend", () => {
+      clearTimeout(modeHoldTimer);
+      modeHoldTimer = null;
+    });
+
+    // ---- Trigger: tap to select+interrupt, hold to speak a line ----
+    controller.addEventListener("selectstart", () => {
+      if (!directorModeActive) return;
+      capturingSpeech = false;
+      clearTimeout(speechHoldTimer);
+      speechHoldTimer = setTimeout(() => {
+        const id = ctx.hover[i] || window.getSelectedCharacterId?.();
+        if (!id || !SpeechRecognitionCtor) return;
+        capturingSpeech = true;
+        recognizer = _startSpeechCapture((text) => {
+          if (text) _post("/inject_line", { char_id: id, text }).catch(() => {});
+        });
+      }, SPEECH_CAPTURE_HOLD_MS);
+    });
+
+    controller.addEventListener("selectend", async () => {
+      clearTimeout(speechHoldTimer);
+      if (capturingSpeech) {
+        recognizer?.stop();
+        capturingSpeech = false;
+        recognizer = null;
+        return;
+      }
+      if (!directorModeActive) return;
       const id = ctx.hover[i];
       if (!id) return;
       window.setSelectedCharacterId?.(id);
+      touchedCharacterIds.add(id);
       try {
         await _post("/interrupt_attention", { char_id: id });
       } catch { /* best-effort in VR -- no HUD to report failure to yet */ }
     });
-
-    controller.addEventListener("squeezestart", () => {
-      clearTimeout(holdTimer);
-      holdTimer = setTimeout(() => _triggerCallAttention(ctx), CALL_ATTENTION_HOLD_MS);
-    });
-    controller.addEventListener("squeezeend", () => {
-      clearTimeout(holdTimer);
-      holdTimer = null;
-    });
   });
+}
+
+function _startSpeechCapture(onResult) {
+  const recognizer = new SpeechRecognitionCtor();
+  recognizer.continuous = false;
+  recognizer.interimResults = false;
+  recognizer.lang = "en-US";
+  let finalTranscript = "";
+  recognizer.onresult = (event) => {
+    for (let i = event.resultIndex; i < event.results.length; i++) {
+      if (event.results[i].isFinal) finalTranscript += event.results[i][0].transcript;
+    }
+  };
+  recognizer.onend = () => onResult(finalTranscript.trim());
+  recognizer.onerror = () => onResult("");
+  recognizer.start();
+  return recognizer;
+}
+
+async function _toggleDirectorMode(ctx) {
+  directorModeActive = !directorModeActive;
+  window.setDirectorModeActive?.(directorModeActive);
+
+  if (directorModeActive) {
+    await _triggerCallAttention(ctx);
+    _setStatus("Director mode ON.");
+    return;
+  }
+
+  // Exiting -- commit (end_session) every character touched this session,
+  // matching "save the changes you made" on release.
+  const ids = [...touchedCharacterIds];
+  touchedCharacterIds.clear();
+  await Promise.all(ids.map(id => _post("/end_session", { char_id: id }).catch(() => {})));
+  _setStatus(`Director mode OFF -- ${ids.length} character(s) committed.`);
 }
 
 async function _triggerCallAttention(ctx) {
@@ -215,6 +293,7 @@ async function _triggerCallAttention(ctx) {
     // recent-movement render detail in main.js, nothing persists it).
     const sims = window.getXRContext?.().sims || {};
     for (const id of data.affected || []) {
+      touchedCharacterIds.add(id);
       const model = sims[id];
       if (!model) continue;
       const dx = model.position.x - pos.x;

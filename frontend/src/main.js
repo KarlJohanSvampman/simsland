@@ -297,6 +297,13 @@ const xrControllers = [0, 1].map(i => {
 // per controller per frame.
 const xrHover = { 0: null, 1: null };
 
+// Whether VR director-mode is currently toggled on (see
+// operator_view.js's squeeze-hold handler) -- purely a render-time cue
+// (ray tint) since this file has no other concept of "director mode" of
+// its own; operator_view.js owns the actual state and gesture logic.
+let _xrDirectorModeActive = false;
+window.setDirectorModeActive = (active) => { _xrDirectorModeActive = !!active; };
+
 function updateXRFrame(){
   if (!renderer.xr.isPresenting) return;
 
@@ -341,7 +348,8 @@ function updateXRFrame(){
       if (obj?.userData?.type === "character") hitCharId = obj.userData.id;
     }
     xrHover[i] = hitCharId;
-    controller.getObjectByName("ray").material.color.set(hitCharId ? 0x66ff99 : 0xffe066);
+    const rayColor = hitCharId ? 0x66ff99 : (_xrDirectorModeActive ? 0xff6644 : 0xffe066);
+    controller.getObjectByName("ray").material.color.set(rayColor);
   });
 }
 
