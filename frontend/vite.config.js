@@ -40,7 +40,10 @@ export default defineConfig({
           resolve(__dirname, "social_debug.html"),
 
         character_creator:
-          resolve(__dirname, "character_creator.html")
+          resolve(__dirname, "character_creator.html"),
+
+        operator_view:
+          resolve(__dirname, "operator_view.html")
       }
     }
   }

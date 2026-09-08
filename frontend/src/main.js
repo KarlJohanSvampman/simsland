@@ -4365,6 +4365,18 @@ function openModal(id) {
 // treatment or any HTML-side caller throws "openModal is not defined".
 window.openModal = openModal;
 
+// Read-only hooks for src/operator_view.js's Director Panel -- it has no
+// other way to know which character the existing click-to-select/Inspector
+// mechanism currently has selected, since selectedCharacterId/_worldState
+// are plain module-scope variables in this file, not exported (this
+// codebase's cross-script convention is window.* globals, matching
+// window.openModal/closeModal above, not ES module exports).
+window.getSelectedCharacterId = () => selectedCharacterId;
+window.getSelectedCharacterName = () => {
+  if (!selectedCharacterId) return null;
+  return _worldState.characters?.[selectedCharacterId]?.name || selectedCharacterId;
+};
+
 document.querySelectorAll(".modal-overlay").forEach(overlay => {
   overlay.addEventListener("click", (e) => {
     if (e.target === overlay) overlay.classList.remove("open");

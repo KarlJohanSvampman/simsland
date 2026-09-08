@@ -52,7 +52,13 @@ from api.director  import router as director_router
 app = FastAPI(title="Simsland")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    # localhost:5174 is the local `npm run dev` viewer (.claude/launch.json's
+    # "viewer-dev" config) -- used for testing pages like operator_view.html
+    # against this backend directly, without the nginx-built frontend
+    # container. Plain WebSocket connections (main.js's ws://.../ws) aren't
+    # subject to CORS, but director.py's fetch() calls from operator_view.js
+    # are, so this needs to be here for the Director Panel to work in dev.
+    allow_origins=["http://localhost:3000", "http://localhost:5174"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
