@@ -811,6 +811,14 @@ def tick(world):
         from systems.addictions import tick_addictions
         tick_addictions(world)
 
+    # -- Claustrophobia/panic sweep (systems/claustrophobia.py) -- catches
+    # ANY character stuck making no real position progress while trying to
+    # get somewhere, not just a room-specific case; escalates panic, climbs
+    # out a real window if one's found once panic's high enough. ─────────
+    if every(world, CADENCE["claustrophobia"], offset=50):
+        from systems.claustrophobia import tick_claustrophobia
+        tick_claustrophobia(world)
+
     # -- Battery drain + charging (phone, laptop, ...) (÷5) ───────────
     if every(world, CADENCE["phone_battery"], offset=29):
         for c in characters:

@@ -152,3 +152,8 @@ CADENCE["intercourse_sessions"] = 10
 # shape as intercourse_sessions above: each chapter's own resolve_at_tick
 # (hours apart) does the real pacing, this is just "is anything due."
 CADENCE["detective_work"] = 60
+
+# Claustrophobia/panic sweep (systems/claustrophobia.py) -- matches that
+# module's own STUCK_CHECK_INTERVAL exactly, so this cadence lines up with
+# every position-comparison check it makes rather than firing in between.
+CADENCE["claustrophobia"] = 30
