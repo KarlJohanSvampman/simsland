@@ -155,3 +155,89 @@ endBtn.addEventListener("click", async () => {
     _setStatus(err.message, true);
   }
 });
+
+// =========================================================
+// VR CONTROLLER INPUT (Phase 2)
+// =========================================================
+// main.js owns the actual WebXR session/render/locomotion/raycasting
+// plumbing (see window.getXRContext()) -- this is just the director-mode-
+// specific reaction to controller button events, kept separate the same
+// way the desktop Director Panel above is kept separate from main.js's
+// viewer code.
+//
+// Known gap this round: there's no in-VR HUD/menu yet -- _setStatus()'s
+// text only shows on the flat desktop mirror of the session, not inside
+// the headset itself. Feedback in-headset is currently just the laser
+// ray's own color (see main.js's updateXRFrame -- green while hovering a
+// character) plus the real, observable effect on the sim (a character
+// pausing/reacting). A proper in-scene panel is future work once this
+// input layer is proven out.
+
+const CALL_ATTENTION_RADIUS = 8;      // tiles
+const CALL_ATTENTION_HOLD_MS = 1200;  // how long to hold squeeze
+
+function setupXRControllerInput() {
+  const ctx = window.getXRContext?.();
+  if (!ctx) return;   // main.js hasn't loaded (shouldn't happen on this page) -- retry below
+
+  ctx.controllers.forEach((controller, i) => {
+    let holdTimer = null;
+
+    controller.addEventListener("selectstart", async () => {
+      const id = ctx.hover[i];
+      if (!id) return;
+      window.setSelectedCharacterId?.(id);
+      try {
+        await _post("/interrupt_attention", { char_id: id });
+      } catch { /* best-effort in VR -- no HUD to report failure to yet */ }
+    });
+
+    controller.addEventListener("squeezestart", () => {
+      clearTimeout(holdTimer);
+      holdTimer = setTimeout(() => _triggerCallAttention(ctx), CALL_ATTENTION_HOLD_MS);
+    });
+    controller.addEventListener("squeezeend", () => {
+      clearTimeout(holdTimer);
+      holdTimer = null;
+    });
+  });
+}
+
+async function _triggerCallAttention(ctx) {
+  const pos = ctx.dolly.position;
+  try {
+    const data = await _post("/call_attention_radius", {
+      x: pos.x + 10, y: pos.z + 7, radius: CALL_ATTENTION_RADIUS,
+    });
+    // Visual "turn to face the director" -- a courtesy render effect only
+    // (see systems/director_mode.py::call_attention_radius's own docstring
+    // on why this isn't backend state: character facing is a derived-from-
+    // recent-movement render detail in main.js, nothing persists it).
+    const sims = window.getXRContext?.().sims || {};
+    for (const id of data.affected || []) {
+      const model = sims[id];
+      if (!model) continue;
+      const dx = model.position.x - pos.x;
+      const dz = model.position.z - pos.z;
+      model.rotation.y = Math.atan2(-dx, -dz);
+    }
+    _setStatus(`Called ${(data.affected || []).length} nearby character(s) to attention.`);
+  } catch (err) {
+    _setStatus(err.message, true);
+  }
+}
+
+// window.getXRContext only exists once main.js's module body has fully
+// run (it's defined near the renderer setup, evaluated top-to-bottom at
+// import time) -- both scripts load as type="module" in the same
+// <head>/<body> order operator_view.html declares, so by the time this
+// file's own top-level code runs, main.js is already done. Retry briefly
+// regardless, in case that ordering assumption ever changes.
+(function waitForXRContext(attempts = 20) {
+  if (window.getXRContext) {
+    setupXRControllerInput();
+    return;
+  }
+  if (attempts <= 0) return;
+  setTimeout(() => waitForXRContext(attempts - 1), 100);
+})();

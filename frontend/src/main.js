@@ -6,6 +6,9 @@ import { clone }
 from "three/examples/jsm/utils/SkeletonUtils.js";
 import { CSS2DRenderer, CSS2DObject }
 from "three/examples/jsm/renderers/CSS2DRenderer.js";
+import { VRButton } from "three/examples/jsm/webxr/VRButton.js";
+import { XRControllerModelFactory }
+from "three/examples/jsm/webxr/XRControllerModelFactory.js";
 import {
 
   getPropTemplate,
@@ -235,6 +238,134 @@ const renderer = new THREE.WebGLRenderer({
 });
 
 renderer.setSize(window.innerWidth, window.innerHeight);
+
+// =========================================================
+// WEBXR (VR director-mode -- see frontend/src/operator_view.js)
+// =========================================================
+// The desktop `camera` above is Orthographic, isometric -- WebXR's
+// stereoscopic rendering requires a real PerspectiveCamera (confirmed via
+// research: an orthographic camera cannot drive a headset). Rather than
+// replacing the desktop view, this adds a genuinely separate render path
+// alongside it: a PerspectiveCamera parented inside `xrDolly` (the
+// player's rig -- moving the dolly moves the player through the world;
+// the headset's own head-tracking rides on top of that, same as any
+// standard three.js WebXR "room + locomotion" setup). `animate()` below
+// picks whichever camera is active each frame based on
+// renderer.xr.isPresenting.
+renderer.xr.enabled = true;
+
+const xrCamera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.05, 1000);
+const xrDolly = new THREE.Group();
+xrDolly.add(xrCamera);
+xrDolly.position.set(0, 1.6, 8);   // start a few tiles back from map origin, eye height
+scene.add(xrDolly);
+
+const xrControllerModelFactory = new XRControllerModelFactory();
+const xrControllers = [0, 1].map(i => {
+  const controller = renderer.xr.getController(i);
+  controller.userData.inputSource = null;
+  controller.addEventListener("connected", (event) => {
+    controller.userData.inputSource = event.data;
+  });
+  controller.addEventListener("disconnected", () => {
+    controller.userData.inputSource = null;
+  });
+
+  // Laser pointer -- a simple line from the controller into the scene,
+  // used both to show where it's aimed and as the raycast direction for
+  // character selection (see updateXRFrame() below).
+  const rayGeometry = new THREE.BufferGeometry().setFromPoints([
+    new THREE.Vector3(0, 0, 0),
+    new THREE.Vector3(0, 0, -5),
+  ]);
+  const ray = new THREE.Line(rayGeometry, new THREE.LineBasicMaterial({ color: 0xffe066 }));
+  ray.name = "ray";
+  ray.scale.z = 1;
+  controller.add(ray);
+
+  const grip = renderer.xr.getControllerGrip(i);
+  grip.add(xrControllerModelFactory.createControllerModel(grip));
+  xrDolly.add(controller);
+  xrDolly.add(grip);
+
+  return controller;
+});
+
+// The character (if any) each controller is currently pointed at --
+// operator_view.js reads this on a trigger/squeeze press rather than
+// re-raycasting itself, since updateXRFrame() below already does it once
+// per controller per frame.
+const xrHover = { 0: null, 1: null };
+
+function updateXRFrame(){
+  if (!renderer.xr.isPresenting) return;
+
+  // Thumbstick locomotion -- standard Quest/Touch axes layout (axes[2]/
+  // axes[3] on the primary/left stick; axes[0]/axes[1] are the touchpad
+  // on older profiles and unused here). Moves the dolly along the
+  // horizontal plane, oriented to the *camera's* current facing so
+  // "forward" always means "the way you're looking."
+  const raycaster = new THREE.Raycaster();
+  const tmpMatrix = new THREE.Matrix4();
+  const forward = new THREE.Vector3();
+  xrCamera.getWorldDirection(forward);
+  forward.y = 0;
+  forward.normalize();
+  const right = new THREE.Vector3().crossVectors(forward, new THREE.Vector3(0, 1, 0));
+
+  xrControllers.forEach((controller, i) => {
+    const gamepad = controller.userData.inputSource?.gamepad;
+    if (gamepad && gamepad.axes.length >= 4) {
+      const [, , stickX, stickY] = gamepad.axes;
+      const DEAD_ZONE = 0.15;
+      const SPEED = 0.06;
+      if (Math.abs(stickX) > DEAD_ZONE || Math.abs(stickY) > DEAD_ZONE) {
+        xrDolly.position.addScaledVector(right, stickX * SPEED);
+        xrDolly.position.addScaledVector(forward, -stickY * SPEED);
+      }
+    }
+
+    // Raycast from this controller's pointing direction against the
+    // character models (sims{}) so operator_view.js knows what a
+    // trigger/squeeze press should act on.
+    tmpMatrix.identity().extractRotation(controller.matrixWorld);
+    raycaster.ray.origin.setFromMatrixPosition(controller.matrixWorld);
+    raycaster.ray.direction.set(0, 0, -1).applyMatrix4(tmpMatrix);
+
+    const hits = raycaster.intersectObjects(Object.values(sims), true)
+      .filter(h => !h.object.userData?.ignoreRaycast);
+    let hitCharId = null;
+    if (hits.length) {
+      let obj = hits[0].object;
+      while (obj && !obj.userData?.type) obj = obj.parent;
+      if (obj?.userData?.type === "character") hitCharId = obj.userData.id;
+    }
+    xrHover[i] = hitCharId;
+    controller.getObjectByName("ray").material.color.set(hitCharId ? 0x66ff99 : 0xffe066);
+  });
+}
+
+// Read-only hooks for frontend/src/operator_view.js -- it has no other
+// way to reach this module's private renderer/scene/dolly/controller
+// state (this file's established convention is window.* getters, not ES
+// exports -- see window.getSelectedCharacterId above this session).
+window.getXRContext = () => ({
+  renderer, dolly: xrDolly, controllers: xrControllers, hover: xrHover, sims,
+});
+window.setSelectedCharacterId = (id) => {
+  selectedCharacterId = id;
+  if (id) renderCharacterInspector(id);
+};
+
+// VR entry is operator_view.html-only (director-mode's own surface, see
+// frontend/src/operator_view.js) -- the plain game viewer (index.html)
+// doesn't load operator_view.js and has no #directorPanel element, so
+// this button simply never appears there.
+if (document.getElementById("directorPanel")) {
+  const vrButton = VRButton.createButton(renderer);
+  vrButton.style.zIndex = "9999";
+  document.body.appendChild(vrButton);
+}
 
 // =========================================================
 // CSS2D RENDERER  (speech bubbles)
@@ -5519,11 +5650,17 @@ function updateSelectionOverlay(elapsedSeconds){
 let _animClockSeconds = 0;
 
 function animate() {
-  requestAnimationFrame(animate);
-  controls.update();
+  // renderer.setAnimationLoop() (below) replaces the old
+  // requestAnimationFrame(animate) self-scheduling -- required for WebXR
+  // (a plain requestAnimationFrame doesn't run at headset framerate or
+  // carry XRFrame pose data), and functionally identical to the old
+  // rAF-driven loop whenever no XR session is active.
+  const presenting = renderer.xr.isPresenting;
+  if (!presenting) controls.update();
   const delta = 0.016;
   _animClockSeconds += delta;
   updateSelectionOverlay(_animClockSeconds);
+  updateXRFrame();
 
   for (const id in characterAnimations) {
     const data = characterAnimations[id];
@@ -5539,8 +5676,12 @@ function animate() {
 
   updateWallOcclusion();
 
-  renderer.render(scene, camera);
-  cssRenderer.render(scene, camera);
+  const activeCamera = presenting ? xrCamera : camera;
+  renderer.render(scene, activeCamera);
+  // CSS2DRenderer (speech bubbles) is a DOM overlay, not part of WebGL's
+  // stereoscopic output -- it can't render correctly into a headset, so
+  // it's skipped while presenting rather than drawing garbage over one eye.
+  if (!presenting) cssRenderer.render(scene, activeCamera);
 }
 
-animate();
+renderer.setAnimationLoop(animate);

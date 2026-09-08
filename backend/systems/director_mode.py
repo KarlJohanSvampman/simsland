@@ -127,6 +127,31 @@ def set_preference(c, world, field, value):
     return True
 
 
+def call_attention_radius(world, x, y, radius):
+    """VR director-mode primitive: every living, on-grid character within
+    `radius` tiles of (x, y) -- the director's own position, holding the
+    gesture button long enough to trigger this -- gets interrupt_attention()
+    called on them (pauses what they're doing, wakes them so their next
+    think() actually notices the director). Turning to visually FACE the
+    director is left to the frontend (frontend/src/operator_view.js) --
+    character facing is purely a derived-from-recent-movement render
+    detail in main.js, there's no persisted "facing" field on the
+    character to set here, so this returns the affected ids and lets the
+    caller handle the visual turn directly. Returns the list of affected
+    character ids."""
+    affected = []
+    for other in world.get("characters", {}).values():
+        if not other.get("alive", True) or other.get("off_grid"):
+            continue
+        dx = other.get("x", 0) - x
+        dy = other.get("y", 0) - y
+        if (dx * dx + dy * dy) ** 0.5 <= radius:
+            interrupt_attention(other, world)
+            affected.append(other["id"])
+    _log(world, None, "call_attention_radius", {"x": x, "y": y, "radius": radius, "affected": affected})
+    return affected
+
+
 def end_director_session(c, world):
     """Commits every staged change and closes the session. Returns the
     dict of fields actually changed (empty if nothing was staged)."""

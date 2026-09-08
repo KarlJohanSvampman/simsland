@@ -13,6 +13,7 @@ POST /director/interrupt_attention {char_id}
 POST /director/inject_line        {char_id, text}
 POST /director/set_preference     {char_id, field, value}
 POST /director/end_session        {char_id}
+POST /director/call_attention_radius {x, y, radius}
 GET  /director/log                 -> recent world["director_log"] entries
 """
 
@@ -91,6 +92,21 @@ def end_session(payload: dict, sim_id: str = DEFAULT_SIM_ID):
         changed = director_mode.end_director_session(c, world)
         save_world(sim_id, world)
         return {"ok": True, "changed_fields": changed}
+
+
+@router.post("/call_attention_radius")
+def call_attention_radius(payload: dict, sim_id: str = DEFAULT_SIM_ID):
+    with world_lock():
+        world = load_world(sim_id)
+        try:
+            x = float(payload.get("x"))
+            y = float(payload.get("y"))
+            radius = float(payload.get("radius", 5))
+        except (TypeError, ValueError):
+            return JSONResponse({"error": "x, y, and radius must be numbers"}, status_code=400)
+        affected = director_mode.call_attention_radius(world, x, y, radius)
+        save_world(sim_id, world)
+        return {"ok": True, "affected": affected}
 
 
 @router.get("/log")
