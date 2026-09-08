@@ -171,3 +171,39 @@ def answer_pattern(asker, subject_id, activity, answer_text):
         return False
     pattern["answer"] = answer_text
     return True
+
+
+# ── Narrative context (brain/context_builder.py) ───────────────────────────
+
+_NOTICE_THRESHOLD = 3  # below this a single sighting isn't worth narrating
+
+
+def get_behavior_patterns_context(c, world):
+    """Surfaces the single most-recurring unanswered pattern c has
+    noticed about anyone -- "you've noticed X do Y repeatedly and want to
+    ask about it" -- want-to-ask scales with recurrence count, so this
+    only narrates once a pattern has actually repeated enough to be
+    worth bringing up."""
+    all_patterns = c.get("behavior_patterns", {})
+    if not all_patterns:
+        return []
+
+    chars = world.get("characters", {})
+    best_other, best_pattern = None, None
+    for other_id in all_patterns:
+        pattern = highest_unanswered_pattern(c, other_id)
+        if pattern and (best_pattern is None or pattern["count"] > best_pattern["count"]):
+            best_other, best_pattern = other_id, pattern
+
+    if not best_pattern or best_pattern["count"] < _NOTICE_THRESHOLD:
+        return []
+
+    name = chars.get(best_other, {}).get("name", "they")
+    line = (
+        f"You've noticed {name} {best_pattern['activity']} an awful lot lately "
+        f"(you've seen it {best_pattern['count']} times) -- part of you wants to just ask about it."
+    )
+    theory = best_pattern.get("theory") or {}
+    if theory.get("valence") == "pessimistic" and theory.get("text"):
+        line += f" You can't shake the thought: {theory['text']}"
+    return [line]

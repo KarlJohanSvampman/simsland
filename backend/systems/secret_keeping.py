@@ -230,3 +230,38 @@ def tick_all_secrets(world):
     """Thin wrapper so sim_loop.py has one obvious call site -- the real
     decay logic already exists and was simply never invoked."""
     secrets_engine.tick_secrets(world)
+
+
+# ── Narrative context (brain/context_builder.py) ───────────────────────────
+
+def get_secret_keeping_context(c, world):
+    """Surfaces this character's OWN active secrets -- what's hidden,
+    from whom, and the preferred_lie to stay consistent -- so the LLM
+    can actually keep the story straight instead of improvising a fresh
+    one each time. Deliberately keeper-side only: this section is always
+    built for a character narrating their OWN state, mirroring how
+    worries.py's target context never sees they're worried about (see
+    _build_worries_context's docstring) -- a deception target reading
+    their OWN context sees none of this, since it isn't their secret."""
+    secrets = c.get("secrets", [])
+    if not secrets:
+        return []
+
+    chars = world.get("characters", {})
+    lines = []
+    for secret in secrets:
+        if not isinstance(secret, dict):
+            continue
+        targets = secret.get("deception_targets", {})
+        if not targets:
+            continue
+        target_names = [chars.get(tid, {}).get("name", tid) for tid in targets]
+        label = secret.get("label") or secret.get("content", "something")
+        line = f"You're keeping {label} secret from {', '.join(target_names)}."
+        if secret.get("reason"):
+            line += f" ({secret['reason']})"
+        if secret.get("preferred_lie"):
+            line += f" If asked, your story is: \"{secret['preferred_lie']}\""
+        lines.append(line)
+
+    return lines

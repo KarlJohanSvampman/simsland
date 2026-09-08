@@ -840,6 +840,40 @@ def tick_aggression_patterns(world):
                 )
 
 
+# ── Narrative context (brain/context_builder.py) ───────────────────────────
+
+def get_detective_work_context(c, world):
+    """Surfaces this character's own OPEN detective_stories -- what the
+    current chapter's problem/question is, and their personal role/goal
+    in it (two people on the same mystery can want different things, see
+    module docstring) -- so the LLM can actually reason about ongoing
+    mysteries instead of them being invisible state."""
+    stories = c.get("detective_stories", {})
+    if not stories:
+        return []
+
+    chars = world.get("characters", {})
+    lines = []
+    for story in stories.values():
+        if story.get("resolved"):
+            continue
+        chapters = story.get("chapters", [])
+        idx = story.get("current_chapter", 0)
+        chapter = chapters[idx] if 0 <= idx < len(chapters) else None
+        if not chapter:
+            continue
+        role = story.get("role", "involved")
+        goal = story.get("goal", "resolve")
+        line = f"You're trying to figure out: {chapter.get('main_question', story.get('problem_statement'))}"
+        line += f" ({role}, trying to {goal} it)."
+        suspects = [chars.get(sid, {}).get("name", sid) for sid in story.get("suspect_ids", [])]
+        if suspects:
+            line += f" Suspect(s): {', '.join(suspects)}."
+        lines.append(line)
+
+    return lines
+
+
 # ── World-tick sweep ────────────────────────────────────────────────────────
 
 def tick_detective_work(world):

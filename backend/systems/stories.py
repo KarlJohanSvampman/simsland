@@ -224,3 +224,31 @@ def tell_story(c, listener, story_id, world):
     if listener["id"] not in story["told_to"]:
         story["told_to"].append(listener["id"])
     return True
+
+
+# ── Narrative context (brain/context_builder.py) ───────────────────────────
+
+def get_stories_context(c, world):
+    """Surfaces c's single best untold-or-partially-told story -- "you
+    have something worth telling someone, best told to X" -- deliberately
+    just the top one (not the whole list) so this doesn't crowd out other
+    context with routine gossip. Excludes anything already told to
+    everyone in its own predicted best_audience."""
+    stories = c.get("notable_stories", [])
+    if not stories:
+        return []
+
+    chars = world.get("characters", {})
+    for story in stories:  # already sorted by value descending
+        told = set(story.get("told_to", []))
+        audience = predict_best_audience(c, world, story)
+        untold_audience = [oid for oid in audience if oid not in told]
+        if not untold_audience and audience:
+            continue  # already told everyone worth telling
+        line = f"You've got a story worth telling: \"{story['summary']}\""
+        if untold_audience:
+            name = chars.get(untold_audience[0], {}).get("name", "someone")
+            line += f" -- {name} would probably be into it."
+        return [line]
+
+    return []

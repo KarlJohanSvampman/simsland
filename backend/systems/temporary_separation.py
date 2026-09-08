@@ -139,3 +139,21 @@ def maybe_return_from_separation(c, world):
             f"Decided it was time to head back home{host_suffix}.",
             importance=0.5,
         )
+
+
+# ── Narrative context (brain/context_builder.py) ───────────────────────────
+
+def get_temporary_separation_context(c, world):
+    """Surfaces c["temporary_residence"] -- you're currently staying at
+    someone else's place after things got bad at home."""
+    residence = c.get("temporary_residence")
+    if not residence:
+        return []
+
+    host = world.get("characters", {}).get(residence.get("host_id"))
+    host_name = host.get("name", "someone") if host else "someone"
+    host_type = "family" if residence.get("host_type") == "family" else "a friend"
+    return [
+        f"You're currently staying at {host_name}'s place (they're {host_type}) "
+        f"after things got bad at home -- you haven't gone back yet."
+    ]

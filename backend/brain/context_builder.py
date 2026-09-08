@@ -1876,6 +1876,48 @@ def _sec_rival(c, world):
     return list(lines) if lines else None
 
 
+def _sec_detective_work(c, world):
+    from systems.detective_work import get_detective_work_context
+    lines = get_detective_work_context(c, world)
+    return list(lines) if lines else None
+
+
+def _sec_secret_keeping(c, world):
+    from systems.secret_keeping import get_secret_keeping_context
+    lines = get_secret_keeping_context(c, world)
+    return list(lines) if lines else None
+
+
+def _sec_confiding(c, world):
+    from systems.confiding import get_confiding_context
+    lines = get_confiding_context(c, world)
+    return list(lines) if lines else None
+
+
+def _sec_self_image(c, world):
+    from systems.self_image import get_self_image_context
+    lines = get_self_image_context(c, world)
+    return list(lines) if lines else None
+
+
+def _sec_temporary_separation(c, world):
+    from systems.temporary_separation import get_temporary_separation_context
+    lines = get_temporary_separation_context(c, world)
+    return list(lines) if lines else None
+
+
+def _sec_notable_stories(c, world):
+    from systems.stories import get_stories_context
+    lines = get_stories_context(c, world)
+    return list(lines) if lines else None
+
+
+def _sec_behavior_patterns(c, world):
+    from systems.behavior_patterns import get_behavior_patterns_context
+    lines = get_behavior_patterns_context(c, world)
+    return list(lines) if lines else None
+
+
 def _sec_impulse(c, world):
     lines = _build_impulse_context(c, world)
     return list(lines) if lines else None
@@ -1948,6 +1990,13 @@ NARRATIVE_SECTIONS = [
     ("rival",                 "full", _sec_rival),
     ("impulse",               "full", _sec_impulse),
     ("libido",                "full", _sec_libido),
+    ("detective_work",        "full", _sec_detective_work),
+    ("secret_keeping",        "full", _sec_secret_keeping),
+    ("confiding",             "full", _sec_confiding),
+    ("self_image",            "full", _sec_self_image),
+    ("temporary_separation",  "full", _sec_temporary_separation),
+    ("notable_stories",       "full", _sec_notable_stories),
+    ("behavior_patterns",     "full", _sec_behavior_patterns),
 ]
 
 TIER_SETS = {"brief": {"core"}, "full": {"core", "full"}}

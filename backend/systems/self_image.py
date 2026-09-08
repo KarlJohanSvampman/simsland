@@ -64,3 +64,33 @@ def overall_self_esteem(c):
     psych = c.get("self_confidence", 0.6)
     body = c.get("body_confidence", 0.6)
     return round((psych + body) / 2, 3)
+
+
+# ── Narrative context (brain/context_builder.py) ───────────────────────────
+
+def get_self_image_context(c, world):
+    """A brief self-assessment blurb -- psychological confidence, body
+    confidence, and critical-thinking (systems/detective_work.py's
+    reward stat) -- only narrated at the extremes, since a middling
+    self-image isn't worth spending context on every turn."""
+    lines = []
+    psych = c.get("self_confidence", 0.6)
+    body = c.get("body_confidence", 0.6)
+    critical = c.get("critical_thinking", 0.5)
+
+    if psych < 0.35:
+        lines.append("You don't feel very confident in yourself lately.")
+    elif psych > 0.75:
+        lines.append("You feel good about who you are and what you're capable of.")
+
+    if body < 0.35:
+        lines.append("You're self-conscious about how you look.")
+    elif body > 0.75:
+        lines.append("You feel good about your looks.")
+
+    if critical > 0.7:
+        lines.append("You trust your own judgment and reasoning -- you're good at figuring things out.")
+    elif critical < 0.3:
+        lines.append("You second-guess your own reasoning a lot -- figuring things out doesn't come easily.")
+
+    return lines

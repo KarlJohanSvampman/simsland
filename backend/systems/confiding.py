@@ -158,3 +158,31 @@ def _do_confide(c, confidant, mem, world):
     conf_rel = confidant.setdefault("relationships", {}).setdefault(c["id"], {})
     conf_rel["trust"] = min(100, conf_rel.get("trust", 0) + 2)
     conf_rel["familiarity"] = min(100, conf_rel.get("familiarity", 0) + 1)
+
+
+# ── Narrative context (brain/context_builder.py) ───────────────────────────
+
+def get_confiding_context(c, world):
+    """Surfaces an active, unconfided confide_in_someone desire -- "you've
+    been wanting to talk to someone about X" -- so the LLM can bring it
+    up organically with a trusted contact rather than it only ever
+    resolving silently through the daily resolve_confide_opportunities()
+    sweep."""
+    desires = c.get("persistent_desires", [])
+    pending = [
+        d for d in desires
+        if d.get("type") == "confide_in_someone" and d.get("active") and not d.get("resolved")
+    ]
+    if not pending:
+        return []
+
+    memories = {m.get("id"): m for m in c.get("memories", [])}
+    lines = []
+    for desire in pending:
+        mem = memories.get(desire.get("target"))
+        if not mem or mem.get("confided"):
+            continue
+        text = mem.get("text", "something that happened")
+        lines.append(f"You've been wanting to talk to someone about this: \"{text}\"")
+
+    return lines
