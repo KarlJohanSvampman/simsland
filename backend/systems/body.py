@@ -72,6 +72,24 @@ _NON_PERCENT_BODY_FIELDS = {
 BASE_ENERGY_DECAY        = 0.03   # per sim-hour equivalent (dt units), before multipliers
 ENERGY_PER_FULL_DAY_NUTRITION = 60  # a full day's nutrition (nutrition==1.0) restores this much energy
 
+# ── sleep recovery tuning ─────────────────────────────────────────────────────
+# Fixed a real bug: update_body_needs() ran unconditionally every tick
+# regardless of activity, so fatigue kept RISING and energy kept DRAINING
+# for the entire duration of a sleep activity -- only "fixed" in one lump
+# sum at on_sleep_complete(), meaning a character got MORE tired while
+# asleep until the exact instant they woke up, and an INTERRUPTED sleep
+# (e.g. systems/director_mode.py's interrupt_attention, which clears
+# c["activity"] directly without ever calling complete_activity()) got
+# zero recovery credit at all, however long they'd actually been asleep.
+# Rates calibrated so a full 8-hour (28800-tick) sleep clears roughly what
+# on_sleep_complete() used to grant in one shot (fatigue -90, sleep_debt
+# -60) -- energy recovering from sleep is new behavior (nothing restored
+# it from sleep before at all, only eating/caffeine), matching the
+# ordinary expectation that sleep is what energy is *for*.
+SLEEP_FATIGUE_RECOVERY_PER_TICK    = 90 / 28800
+SLEEP_ENERGY_RECOVERY_PER_TICK     = 100 / 28800
+SLEEP_DEBT_RECOVERY_PER_TICK_ASLEEP = 60 / 28800
+
 
 def ensure_body(c):
     body = c.setdefault("body", {})
@@ -111,6 +129,7 @@ def update_body_needs(c, dt=1.0, world=None):
     ensure_body(c)
     b  = c["body"]
     tr = c.get("traits", [])
+    is_asleep = (c.get("activity") or {}).get("type") == "sleep"
 
     # ── HOURS AWAKE  (real-seconds based, not tick-rate dependent) ───────────
     if world is not None:
@@ -143,21 +162,26 @@ def update_body_needs(c, dt=1.0, world=None):
     b["bowels"] = min(100, b["bowels"] + 0.012 * bowel_mult * dt)
 
     # ── FATIGUE ──────────────────────────────────────────────────────────────
-    fatigue_rate = 0.02
-    if "lazy" in tr or "apathetic" in tr:
-        fatigue_rate *= 0.8
-    if "disciplined" in tr or "determined" in tr:
-        fatigue_rate *= 0.9
-    # Overweight (systems/body_composition.py's dynamic obese trait) tires
-    # faster -- the "become lazier" consequence of weight gain.
-    if "obese" in c.get("physical_traits", []):
-        fatigue_rate *= 1.2
-    b["fatigue"] = min(100, b["fatigue"] + fatigue_rate * dt)
+    if is_asleep:
+        b["fatigue"] = max(0, b["fatigue"] - SLEEP_FATIGUE_RECOVERY_PER_TICK * dt)
+    else:
+        fatigue_rate = 0.02
+        if "lazy" in tr or "apathetic" in tr:
+            fatigue_rate *= 0.8
+        if "disciplined" in tr or "determined" in tr:
+            fatigue_rate *= 0.9
+        # Overweight (systems/body_composition.py's dynamic obese trait) tires
+        # faster -- the "become lazier" consequence of weight gain.
+        if "obese" in c.get("physical_traits", []):
+            fatigue_rate *= 1.2
+        b["fatigue"] = min(100, b["fatigue"] + fatigue_rate * dt)
 
     # ── SLEEP DEBT ───────────────────────────────────────────────────────────
-    # Accumulates when exhausted and not sleeping; recovers slowly while awake
-    # after catching up (handled in activity completion)
-    if b["fatigue"] > 85:
+    # Recovers while actually asleep; accumulates when exhausted and awake,
+    # recovers slowly while awake and well-rested otherwise.
+    if is_asleep:
+        b["sleep_debt"] = max(0, b["sleep_debt"] - SLEEP_DEBT_RECOVERY_PER_TICK_ASLEEP * dt)
+    elif b["fatigue"] > 85:
         b["sleep_debt"] = min(100, b["sleep_debt"] + 0.005 * dt)
     elif b["fatigue"] < 40:
         b["sleep_debt"] = max(0, b["sleep_debt"] - 0.002 * dt)
@@ -199,17 +223,20 @@ def update_body_needs(c, dt=1.0, world=None):
     c["stamina"] = min(1.0, c.get("stamina", 1.0) + stamina_regen * dt)
 
     # ── ENERGY  (drops faster with high hunger and the longer a character
-    # has been awake; consumption/caffeine restore it -- see
-    # on_consume_complete) ────────────────────────────────────────────────
-    hunger_mult = 1.0 + (b["hunger"] / 100) * 1.5   # 1.0 → 2.5
-    hours_awake = b.get("hours_awake", 0)
-    if hours_awake >= 15:
-        wake_mult = 2.0
-    elif hours_awake >= 12:
-        wake_mult = 1.5
+    # has been awake; consumption/caffeine restore it while awake -- see
+    # on_consume_complete -- and sleep restores it while asleep) ───────────
+    if is_asleep:
+        b["energy"] = min(100, b["energy"] + SLEEP_ENERGY_RECOVERY_PER_TICK * dt)
     else:
-        wake_mult = 1.0
-    b["energy"] = max(0, b["energy"] - BASE_ENERGY_DECAY * hunger_mult * wake_mult * dt)
+        hunger_mult = 1.0 + (b["hunger"] / 100) * 1.5   # 1.0 → 2.5
+        hours_awake = b.get("hours_awake", 0)
+        if hours_awake >= 15:
+            wake_mult = 2.0
+        elif hours_awake >= 12:
+            wake_mult = 1.5
+        else:
+            wake_mult = 1.0
+        b["energy"] = max(0, b["energy"] - BASE_ENERGY_DECAY * hunger_mult * wake_mult * dt)
 
     # ── APPLY SLEEP DEBT EFFECTS ─────────────────────────────────────────────
     _apply_sleep_debt_effects(c)
@@ -243,12 +270,19 @@ def _apply_sleep_debt_effects(c):
 # ── activity completions ──────────────────────────────────────────────────────
 
 def on_sleep_complete(c, duration_minutes, world=None):
-    """Called when a sleep activity finishes."""
+    """Called when a sleep activity finishes naturally (the "using"->
+    "finishing" transition in systems/activities.py). Fatigue/sleep_debt/
+    energy recovery itself now happens gradually every tick while asleep
+    (see update_body_needs()'s is_asleep branch) rather than as a lump sum
+    here -- this used to be the ONLY place any of that recovery happened,
+    which meant an interrupted sleep (cleared directly via e.g.
+    systems/director_mode.py's interrupt_attention, never reaching this
+    function) got zero recovery credit no matter how long the character
+    had actually been asleep. Applying it again here would double-count
+    it for a sleep that runs to natural completion, so this now only
+    handles genuine wake-up bookkeeping."""
     b = c["body"]
-    # Full 8hr sleep clears fatigue. Proportional for naps.
     recovery = min(1.0, duration_minutes / 480)
-    b["fatigue"]    = max(0, b["fatigue"]    - 90 * recovery)
-    b["sleep_debt"] = max(0, b["sleep_debt"] - 60 * recovery)
     # Hygiene decreases slightly during sleep (night sweat)
     b["hygiene"] = max(0, b["hygiene"] - 3 * recovery)
     # Waking moment: reset the hours-awake clock (see update_body_needs).
