@@ -150,7 +150,8 @@ from systems.conditioning import tick_conditioning_weekly
 
 # -- Weekly ───────────────────────────────────────────────────────
 from systems.scheduling import generate_week_schedule, adjust_for_household
-from systems.lt_needs   import update_lt_needs, reset_weekly_counts, distribute_lt_needs
+from systems.lt_needs   import update_lt_needs, reset_weekly_counts, distribute_lt_needs, generate_lt_need_intentions
+from systems.social     import generate_social_intentions as generate_socialize_intention
 from systems.social_odor import apply_odor_social_pressure
 from systems.phone      import update_phone_battery, maybe_set_phone_down, maybe_forget_phone
 from systems.power      import charge_device
@@ -731,6 +732,13 @@ def tick(world):
     if every(world, CADENCE["lt_needs"], offset=27):
         for c in characters:
             update_lt_needs(c, world)
+            # generate_socialize_intention (systems/social.py) was fully
+            # built -- real target selection off relationship strength --
+            # but had no caller anywhere; generate_lt_need_intentions covers
+            # the other 11 lt_needs categories, none of which previously
+            # ever produced a real active_intentions entry either.
+            generate_socialize_intention(c, world)
+            generate_lt_need_intentions(c, world)
 
     if every(world, CADENCE["social_odor"], offset=28):
         for c in characters:

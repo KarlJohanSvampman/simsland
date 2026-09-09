@@ -29572,6 +29572,62 @@
       "belief_modifiers": [],
       "conditions": []
     },
+    "competitive": {
+      "name": "Competitive",
+      "polarity": "neutral",
+      "description": "Measures itself against others and is driven to come out ahead.",
+      "need_modifiers": {
+        "stress": 0.05
+      },
+      "skill_modifiers": {},
+      "behavior_flags": [
+        "competitive"
+      ],
+      "descriptions": {
+        "positive": "It can work in their favor under the right circumstances: Measures itself against others and is driven to come out ahead.",
+        "negative": "Left unchecked, it becomes a real liability: Measures itself against others and is driven to come out ahead.",
+        "balanced": "Measures itself against others and is driven to come out ahead."
+      },
+      "learn_chance": {
+        "balanced": 13,
+        "logical": 14,
+        "self_aware": 10
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
+    },
+    "envious": {
+      "name": "Envious",
+      "polarity": "negative",
+      "description": "Feels the pull of what others have and struggles to be content without it.",
+      "need_modifiers": {
+        "social": -0.05,
+        "stress": 0.1
+      },
+      "skill_modifiers": {},
+      "behavior_flags": [
+        "envious"
+      ],
+      "descriptions": {
+        "positive": "Even so, it isn't without an upside: Feels the pull of what others have and struggles to be content without it.",
+        "negative": "Left unchecked, it becomes a real liability: Feels the pull of what others have and struggles to be content without it.",
+        "balanced": "Feels the pull of what others have and struggles to be content without it."
+      },
+      "learn_chance": {
+        "balanced": 13,
+        "logical": 11,
+        "self_aware": 9
+      },
+      "cognitive_modifiers": [
+        {
+          "trait": "jealous",
+          "modifier": 60
+        }
+      ],
+      "belief_modifiers": [],
+      "conditions": []
+    },
     "cruel": {
       "name": "Cruel",
       "polarity": "negative",

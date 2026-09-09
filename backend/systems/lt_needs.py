@@ -202,6 +202,60 @@ def satisfy_lt_need(c, need_id, world, hobby_id=None, has_companion=False):
             pass
 
 
+# ── LT NEED -> INTENTION WIRING ──────────────────────────────────────────────
+# Mirrors body_intentions.py's threshold/priority/reason shape. "socialize" is
+# deliberately excluded here -- systems/social.py::generate_social_intentions()
+# already does the same job for it (and additionally picks a specific contact
+# to reach out to), it just wasn't being called from anywhere (see sim_loop.py's
+# lt_needs block, where it's now wired in alongside this). Before this, none of
+# the 12 lt_needs categories ever produced a real active_intentions entry --
+# frustration silently fed stress/mood but never became something a character
+# was shown wanting to actually go and do.
+_LT_NEED_INTENTION_CONFIG = {
+    "exercise":     {"type": "exercise",          "category": "leisure",  "label": "physical exercise"},
+    "creative":     {"type": "creative_outlet",   "category": "leisure",  "label": "a creative outlet"},
+    "nature":       {"type": "outdoor_time",      "category": "leisure",  "label": "time outdoors"},
+    "learning":     {"type": "learn_something",   "category": "identity", "label": "learning something new"},
+    "romance":      {"type": "seek_romance",      "category": "social",   "label": "romance"},
+    "intimacy":     {"type": "seek_intimacy",     "category": "social",   "label": "intimacy"},
+    "solitude":     {"type": "seek_solitude",     "category": "leisure",  "label": "time alone"},
+    "spirituality": {"type": "spiritual_practice","category": "identity", "label": "spiritual reflection"},
+    "purpose":      {"type": "pursue_purpose",    "category": "identity", "label": "a sense of purpose"},
+    "adventure":    {"type": "seek_adventure",    "category": "leisure",  "label": "adventure"},
+    "play":         {"type": "play",              "category": "leisure",  "label": "play and fun"},
+}
+
+
+def generate_lt_need_intentions(c, world):
+    """
+    Turn overdue lt_needs frustration into a real active_intentions entry,
+    the same way body_intentions.py does for survival needs. No resolve_
+    strategy mapping is needed -- these ride the existing active_intentions
+    -> _sec_intentions narration pipeline into LLM context as-is, letting
+    the LLM's own action choice decide how (or whether) to act on a Want.
+    """
+    from brain.intentions import add_intention
+
+    lt = c.get("lt_needs", {})
+    for need_id, cfg in _LT_NEED_INTENTION_CONFIG.items():
+        nd = lt.get(need_id)
+        if not nd or nd.get("points", 0) == 0:
+            continue
+
+        frustration = nd.get("frustration", 0.0)
+        if frustration < 0.3:
+            continue
+
+        priority = int(30 + frustration * 45)
+        add_intention(c, {
+            "type":     cfg["type"],
+            "category": cfg["category"],
+            "priority": priority,
+            "reason":   f"You've been neglecting {cfg['label']} lately -- you want to make time for it.",
+            "source":   "lt_need",
+        })
+
+
 def reset_weekly_counts(c):
     """Call at start of each game week."""
     for nd in c.get("lt_needs", {}).values():

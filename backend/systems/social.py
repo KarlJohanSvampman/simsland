@@ -286,13 +286,20 @@ def generate_social_intentions(
         "relationships"
     ].items():
 
+        # This function had no caller anywhere until now (see sim_loop.py),
+        # so its assumption that every relationship dict already carries
+        # friendship/romance/familiarity was never actually exercised --
+        # some relationships (e.g. built via older/partial code paths)
+        # don't, which crashed the whole tick loop the first time this
+        # ran for real. .get(..., 0) treats a missing dimension as neutral
+        # rather than requiring a broader relationship-schema migration.
         score = (
 
-            rel["friendship"]
+            rel.get("friendship", 0)
             +
-            rel["romance"]
+            rel.get("romance", 0)
             +
-            rel["familiarity"]
+            rel.get("familiarity", 0)
         )
 
         if score > strongest_score:
@@ -307,6 +314,9 @@ def generate_social_intentions(
         add_intention
     )
 
+    target_char = world.get("characters", {}).get(strongest_target)
+    target_name = target_char.get("name") if target_char else None
+
     add_intention(c, {
 
         "type":
@@ -320,6 +330,10 @@ def generate_social_intentions(
 
         "target_id":
             strongest_target,
+
+        "reason":
+            f"You've been craving more social contact -- {target_name} comes to mind."
+            if target_name else "You've been craving more social contact lately.",
 
         "source":
             "loneliness"
