@@ -8,15 +8,22 @@ _assign_job) and the normal runtime job-board flow (jobs.py::
 apply_for_job) -- entry is opportunity-driven, through this module, not
 something a character stumbles into or applies to off a listing.
 
-Phase B (this section): maybe_recruit_into_crime() -- a daily-cadence
-roll for unemployed/legally-employed teens+adults, weighted by financial
-desperation, risk-factor traits, and (the dominant factor) already
-knowing someone in a criminal job or faction. _hire_into_criminal_job()
-mirrors jobs.py::process_interview()'s real hire field shape (flat
-job_id/job_template_id/hourly_wage/employed/...) AND character_gen.py's
-nested c["job"] shape, since both exist in this codebase and different
-systems read one or the other -- see _is_in_illegal_job() below, which
-checks both so it stays correct regardless of how a character got hired.
+maybe_recruit_into_crime() -- a daily-cadence roll, but per explicit user
+feedback this is NOT an ambient dice roll anyone can stumble into: it now
+hard-gates on genuine, prolonged failure to find legitimate work
+(jobs.py::apply_for_job's job_search_attempts counter -- a real
+education/experience-scaled roll each application, not a one-shot
+qualification check) before a character is even eligible to roll at all.
+Financial desperation (debt, no income) is modeled as growing a real
+"sketchy contact" relationship -- leaning on a known criminal contact
+again and again while still broke and jobless makes crime MORE likely
+over time (sketchy_contact_uses), not a flat one-shot bonus for merely
+knowing someone. _hire_into_criminal_job() mirrors jobs.py::_hire()'s
+real hire field shape (flat job_id/job_template_id/hourly_wage/employed/
+...) AND its nested c["job"] shape, since both exist in this codebase
+and different systems read one or the other -- see _is_in_illegal_job()
+below, which checks both so it stays correct regardless of how a
+character got hired.
 """
 
 import random
@@ -27,17 +34,36 @@ RISK_TRAITS = {
     "reckless", "ambitious", "manipulative", "ruthless",
 }
 
-# Tuned down from the original values (0.0008/0.004/0.01/0.005/0.006/0.03) --
-# live play showed criminal careers snowballing through entire households
-# (everyone who knows a criminal gets CRIMINAL_CONTACT_BONUS, so one
-# recruitment was making the next one likely) far more than intended.
-BASE_RECRUIT_CHANCE   = 0.0003
-UNEMPLOYED_BONUS      = 0.0015
-DESPERATION_WEALTH    = 500.0
-DESPERATION_BONUS     = 0.004
-DEBT_BONUS            = 0.002
-RISK_TRAIT_BONUS      = 0.0025
-CRIMINAL_CONTACT_BONUS = 0.012
+# How many real, failed job applications (jobs.py::job_search_attempts)
+# before crime becomes eligible to roll AT ALL -- being unemployed for a
+# moment isn't "struggling", this is meant to represent genuine,
+# prolonged hardship. Below this, maybe_recruit_into_crime() always
+# returns False regardless of every other factor below.
+MIN_ATTEMPTS_BEFORE_CRIME = 8
+
+# Chance constants -- these only ever apply once the struggle-gate above
+# is cleared; none of them can independently trigger recruitment for an
+# employed or barely-job-searching character anymore (a real behavior
+# change from this system's original, purely-ambient version, which let
+# an EMPLOYED character with debt+risk-traits roll into crime with no
+# job-search struggle at all -- per user feedback, crime should only
+# become an option "due to mishaps and somehow struggling to find work").
+BASE_RECRUIT_CHANCE     = 0.0006
+STRUGGLE_ESCALATION_CAP = 0.02     # extra chance from attempts beyond the gate, capped
+STRUGGLE_ESCALATION_PER = 0.001    # ...per attempt beyond MIN_ATTEMPTS_BEFORE_CRIME
+DESPERATION_WEALTH      = 500.0
+DESPERATION_BONUS       = 0.006
+DEBT_BONUS              = 0.003
+RISK_TRAIT_BONUS        = 0.0025
+
+# "Sketchy contact network" (per user feedback): desperation (debt/no
+# income) is what actually drives a struggling, unemployed character
+# toward leaning on a known criminal contact -- and doing so repeatedly,
+# while still unemployed and still desperate, makes crime more likely
+# each time, not a flat one-shot bonus for merely knowing someone.
+# Cools back off (see below) the moment either condition stops holding.
+SKETCHY_CONTACT_USE_BONUS = 0.0015
+SKETCHY_CONTACT_USE_CAP   = 0.05
 
 _ENTRY_JOBS_BY_TRAIT = {
     "aggressive":   ["street_robber", "street_fighter"],
@@ -77,18 +103,42 @@ def _has_criminal_contact(c, world):
 
 def maybe_recruit_into_crime(c, world):
     """Daily-cadence opportunity roll -- see module docstring. No-ops for
-    children/elderly and anyone already in a criminal job."""
+    children/elderly, anyone already in a criminal job, anyone currently
+    employed (crime is a fallback FROM struggling to find legitimate
+    work, not a side hustle for someone who already has a job), and --
+    the real gate -- anyone who hasn't genuinely struggled to find work
+    yet (see MIN_ATTEMPTS_BEFORE_CRIME)."""
     if c.get("age_group") not in ("teen", "adult"):
         return False
     if _is_in_illegal_job(c, world):
         return False
+    if c.get("employed"):
+        return False
 
-    chance = BASE_RECRUIT_CHANCE
-
-    if not c.get("employed"):
-        chance += UNEMPLOYED_BONUS
+    attempts = c.get("job_search_attempts", 0)
+    if attempts < MIN_ATTEMPTS_BEFORE_CRIME:
+        return False
 
     household = world.get("households", {}).get(c.get("household_id"))
+    is_desperate = (
+        (household and household.get("wealth", 0) < DESPERATION_WEALTH)
+        or c.get("government_debt", 0) > 0
+    )
+    has_contact = _has_criminal_contact(c, world)
+
+    # Sketchy-contact relationship: escalates only while both conditions
+    # actually hold (still unemployed -- already required above --
+    # still desperate, still in contact); cools back off the moment
+    # either stops, rather than being a permanent scar from one rough
+    # patch.
+    if is_desperate and has_contact:
+        c["sketchy_contact_uses"] = c.get("sketchy_contact_uses", 0) + 1
+    else:
+        c["sketchy_contact_uses"] = max(0, c.get("sketchy_contact_uses", 0) - 1)
+
+    chance = BASE_RECRUIT_CHANCE
+    chance += min(STRUGGLE_ESCALATION_CAP, (attempts - MIN_ATTEMPTS_BEFORE_CRIME) * STRUGGLE_ESCALATION_PER)
+
     if household and household.get("wealth", 0) < DESPERATION_WEALTH:
         chance += DESPERATION_BONUS
     if c.get("government_debt", 0) > 0:
@@ -98,9 +148,8 @@ def maybe_recruit_into_crime(c, world):
     matching_traits = traits & RISK_TRAITS
     chance += len(matching_traits) * RISK_TRAIT_BONUS
 
-    has_contact = _has_criminal_contact(c, world)
     if has_contact:
-        chance += CRIMINAL_CONTACT_BONUS
+        chance += min(SKETCHY_CONTACT_USE_CAP, c.get("sketchy_contact_uses", 0) * SKETCHY_CONTACT_USE_BONUS)
 
     if random.random() > chance:
         return False
@@ -154,6 +203,11 @@ def _hire_into_criminal_job(c, world, job_id, company_id=None):
         "criminal_tier":   tmpl.get("criminal_tier"),
         "hired_tick":      tick,
     }
+    # Matches jobs.py::_hire()'s reset -- both counters exist to gate
+    # maybe_recruit_into_crime() on genuine, ongoing hardship, not a
+    # permanent scar from one past rough patch.
+    c["job_search_attempts"] = 0
+    c["sketchy_contact_uses"] = 0
 
     try:
         from brain.memory import store_memory

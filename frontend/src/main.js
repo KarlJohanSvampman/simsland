@@ -4599,6 +4599,47 @@ function renderLifeTab(c){
   if(c.corruption > 0) careerLines.push(`corruption ${c.corruption.toFixed(1)}`);
   sections.push(_section("Career", `<div class="viewerStatRow">${careerLines.join(" · ")}</div>`));
 
+  // -- Education --
+  const eduLabels = {
+    none: "No formal education", none_completed: "No formal education",
+    preschool: "Preschool", primary: "Primary school", middle_school: "Middle school",
+    high_school: "High school", trade_school: "Trade school", certificate: "Certificate",
+    associate: "Associate degree", bachelor: "Bachelor's degree", master: "Master's degree",
+    doctorate: "Doctorate", professional: "Professional degree (JD/MD/...)",
+  };
+  if(c.education){
+    const eduLines = [eduLabels[c.education] || c.education];
+    if(c.field_of_study) eduLines.push(`in ${c.field_of_study}`);
+    if(c.current_school) eduLines.push(`currently attending ${c.current_school}`);
+    sections.push(_section("Education", `<div class="viewerStatRow">${eduLines.join(" · ")}</div>`));
+  }
+
+  // -- Work history --
+  const workHistory = c.work_history || [];
+  if(workHistory.length){
+    const lines = workHistory.map(w => {
+      const years = w.years != null ? `${w.years}y` : "";
+      const reason = w.reason_left ? w.reason_left.replace(/_/g, " ") : "";
+      return `<div class="viewerCard">${w.title || w.job_template_id}${w.industry ? ` — ${w.industry}` : ""}
+        <div style="opacity:.7">${[years, reason].filter(Boolean).join(" · ")}</div></div>`;
+    });
+    sections.push(_section(`Work History (${workHistory.length})`, lines.join("")));
+  }
+  const industryExp = Object.entries(c.industry_experience || {});
+  if(industryExp.length){
+    // industry_experience ticks use jobs.py's own internal "years of
+    // experience" convention (TICKS_PER_YEAR = 365*24 = 8760) -- a
+    // separate, smaller unit than the sim's real tick-per-second clock,
+    // not real elapsed simulation ticks.
+    const lines = industryExp
+      .sort((a, b) => b[1] - a[1])
+      .map(([industry, ticks]) => `${industry} (${(ticks / 8760).toFixed(1)}y)`);
+    sections.push(_section("Industry Experience", `<div class="viewerStatRow">${lines.join(" · ")}</div>`));
+  }
+  if(c.job_search_attempts > 0){
+    sections.push(_section("Job Search", `<div class="viewerStatRow">${c.job_search_attempts} application${c.job_search_attempts===1?"":"s"} sent without an interview yet</div>`));
+  }
+
   const factions = c.faction_memberships || [];
   if(factions.length){
     const lines = factions.map(f => `<div class="viewerCard">${f.role || "member"} — ${f.faction_id || f.id || ""}</div>`);

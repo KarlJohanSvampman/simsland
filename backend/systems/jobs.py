@@ -272,7 +272,20 @@ def maybe_fire(c, world):
         emit("character_fired", {"character_id": c["id"]})
 
 
-MIN_QUALIFICATION_TO_APPLY = 0.15  # below this, no callback at all -- never reaches an interview
+# Per user feedback: getting invited to interview should be a real,
+# education/experience-scaled ROLL each time someone applies -- not a
+# single hard pass/fail line. A poorly qualified candidate can still
+# eventually land an interview, it just genuinely takes persistence
+# (many applications); a highly qualified one usually succeeds quickly,
+# often on the first try. APPLICATION_COOLDOWN_DAYS keeps repeat
+# attempts realistically paced (update_economy calls apply_for_job every
+# tick for anyone unemployed -- without a cooldown this would be
+# "reapplying" many times per simulated second).
+APPLICATION_COOLDOWN_DAYS = (1, 4)
+
+
+def _interview_invite_chance(fit):
+    return max(0.05, min(0.9, 0.08 + fit * 0.7))
 
 # Stage lists, keyed by complexity_tier (see job_complexity.py) --
 # interview_1 is always online, interview_2 (tier 3+ only) is a real
@@ -307,6 +320,8 @@ def apply_for_job(c, world, job_id=None):
     advance_job_application() for the real multi-day, multi-stage
     pipeline this now enters."""
     if c.get("employed") or c.get("job_application"):
+        return
+    if world.get("tick", 0) < c.get("_next_application_tick", 0):
         return
     if not world.get("job_listings"):
         generate_job_listings(world)
@@ -352,11 +367,18 @@ def apply_for_job(c, world, job_id=None):
     job.setdefault("applicants", []).append(c["id"])
 
     fit = _qualification_fit(c, job, world.get("definitions", {}))
-    if fit < MIN_QUALIFICATION_TO_APPLY:
-        # Rejected before ever reaching an interview -- not qualified
-        # enough for this one (see Confirmed Decision #5: education/
-        # field/experience mismatch gates pipeline entry, not just the
-        # interview-pass roll).
+    c["_next_application_tick"] = world["tick"] + _days_to_ticks(*APPLICATION_COOLDOWN_DAYS)
+
+    if random.random() > _interview_invite_chance(fit):
+        # Not invited THIS time -- a real, education/experience-scaled
+        # roll (see _interview_invite_chance), not a hard qualification
+        # cutoff. A poorly qualified candidate can still eventually land
+        # an interview, it just takes real persistence; job_search_attempts
+        # tracks that persistence (surfaced in the Inspector, and read by
+        # crime.py's recruitment gate -- genuine, prolonged struggle to
+        # find work is what makes crime an option, not just being
+        # unemployed for a moment).
+        c["job_search_attempts"] = c.get("job_search_attempts", 0) + 1
         store_memory(c, f"Applied for {job['title']} but never heard back.", 0.45,
                      ["job", "rejection"], "job", world["tick"])
         emit("job_application_rejected", {"character_id": c["id"], "job_id": job["id"], "stage": "screening"})
@@ -529,6 +551,11 @@ def _hire(c, world, job, wage):
     }
     job["open"] = False
     c["job_application"] = None
+    # The struggle is over -- both counters exist specifically to gate
+    # crime.py::maybe_recruit_into_crime() on genuine, ongoing hardship,
+    # not a permanent scar from one past rough patch.
+    c["job_search_attempts"] = 0
+    c["sketchy_contact_uses"] = 0
 
     store_memory(c, f"Got hired as {job['title']}.", 0.8, ["job", "success"], "job", world["tick"])
     emit("character_hired", {
