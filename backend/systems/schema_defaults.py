@@ -1186,8 +1186,8 @@ def ensure_character_defaults(c, world=None):
     c.setdefault("off_grid",                  False)  # currently away (work/errand/hospital/jail/...)
     c.setdefault("off_grid_reason",           None)
     c.setdefault("private_off_grid_history",  [])  # secret events from off-grid trips (not shared)
-    c.setdefault("off_grid_trip_day",         None)  # calendar day of last voluntary off-grid trip
-    c.setdefault("off_grid_trip_count",       0)      # voluntary trips taken that day -- see offgrid.py MAX_OFFGRID_TRIPS_PER_DAY
+    c.setdefault("off_grid_trip_day",         None)  # legacy -- offgrid.py's per-day trip cap was removed; harmless unused data on old characters
+    c.setdefault("off_grid_trip_count",       0)      # legacy -- see off_grid_trip_day
     c.setdefault("inbox",                     [])     # shared call/text/email/voicemail log -- see systems/inbox.py
     # Behavior-based suspicion — routine deviation, caught lies, evasive
     # answers, snooped devices. Keyed by subject_id. See systems/worries.py.

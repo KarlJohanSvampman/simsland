@@ -492,42 +492,29 @@ _TRAVEL_ELIGIBLE_REASONS = {
 }
 
 
-MAX_OFFGRID_TRIPS_PER_DAY = 3
-
-# jail/hospital are consequences, not discretionary outings -- a character
-# facing arrest or a medical emergency must always be able to go, regardless
-# of how many voluntary trips they've already taken today. hospital_treatment/
-# surgery (treatments[] step types, health.py::advance_treatment_progress)
-# join them for the same reason -- a scheduled procedure isn't optional.
-# "interview" joins them too -- a scheduled on-site interview stage
-# (jobs.py::advance_job_application) isn't a discretionary outing the
-# character chose on a whim, it's the employer's own timeline.
-_UNCAPPED_REASONS = {"jail", "hospital", "hospital_treatment", "surgery", "interview"}
-
-
-def _offgrid_trips_today(c, world):
-    today = world.get("calendar", {}).get("day")
-    if c.get("off_grid_trip_day") != today:
-        c["off_grid_trip_day"] = today
-        c["off_grid_trip_count"] = 0
-    return c["off_grid_trip_count"]
-
-
 def send_offgrid(c, world, reason, duration_minutes):
     """duration_minutes: how long this trip should take, in minutes (see
     _minutes_to_ticks/MAX_OFFGRID_MINUTES above) -- converted to ticks and
     capped at the single lowest-level function that actually sets
     return_tick (_send_offgrid_immediate), so every call site here just
     authors a plausible real-world duration and doesn't need to think about
-    ticks at all."""
+    ticks at all.
+
+    Live bug report: the old MAX_OFFGRID_TRIPS_PER_DAY counter treated a
+    scheduled work trip exactly the same as a shopping/leisure/gym trip --
+    whichever fired first each day could silently lock the others out for
+    the rest of the day, work included, with zero tracking of the miss.
+    Per user request, that flat daily cap is gone entirely; in its place,
+    every trip now costs real fatigue/energy on return (see
+    process_return()) which maybe_go_offgrid()'s own leisure-roll gate
+    reads directly -- a tired character organically stops volunteering
+    for another outing instead of being blocked by an arbitrary counter,
+    and work is never subject to this gate at all (see
+    _work_block_starting_now())."""
     if c.get("off_grid") or c.get("legal", {}).get("status") == "jailed":
         return False
     if c.get("travel_state"):
         return False
-    if reason not in _UNCAPPED_REASONS:
-        if _offgrid_trips_today(c, world) >= MAX_OFFGRID_TRIPS_PER_DAY:
-            return False
-        c["off_grid_trip_count"] += 1
 
     if reason in _TRAVEL_ELIGIBLE_REASONS or reason.startswith("event:"):
         from systems.travel import begin_travel
@@ -571,6 +558,11 @@ def _send_offgrid_immediate(c, world, reason, duration_minutes):
     c["off_grid"]      = True
     c["off_grid_reason"] = reason
     c["return_tick"]   = world["tick"] + _minutes_to_ticks(duration_minutes)
+    # Stashed so process_return() can charge a real fatigue/energy cost
+    # scaled by how long the trip actually took (see Confirmed Decision
+    # #8) -- this is the single lowest-level function every off-grid
+    # reason eventually funnels through, travel-based or immediate.
+    c["_offgrid_departure_tick"] = world["tick"]
     world.setdefault("offmap", []).append({
         "character_id": c["id"], "reason": reason, "return_tick": c["return_tick"],
     })
@@ -603,25 +595,99 @@ def _send_errand(c, world, reason, minutes):
     send_offgrid_chain(c, world, stops)
 
 
+def _todays_schedule_blocks(c, world):
+    cal = world.get("calendar", {})
+    day = cal.get("weekday", "").lower()
+    return c.get("schedule", {}).get("week", {}).get(day, [])
+
+
+def _work_block_starting_now(c, world):
+    """True for a real, generous window (the block's whole first 10
+    minutes) around THIS character's own scheduled work start time --
+    live bug report: this used to be a hardcoded calendar minute_of_day
+    check (480/490 -- a global 8:00am), completely independent of
+    scheduling.py::generate_week_schedule()'s real, trait-influenced,
+    per-character start time (a night owl's real start can be as late as
+    noon; housemates are staggered ±1h) -- so anyone whose actual
+    schedule didn't happen to start at 8am simply never went to work at
+    all. Falls back to the old global 8am check when a character has no
+    generated schedule yet, so this isn't a regression for anyone
+    schedule.py hasn't run for."""
+    now_minute = world.get("calendar", {}).get("minute_of_day", -1)
+    blocks = _todays_schedule_blocks(c, world)
+    if not blocks:
+        return now_minute in (480, 490)
+    work_block = next((b for b in blocks if b["activity"] == "work"), None)
+    if not work_block:
+        return False
+    start_minute = int(work_block["start"][:2]) * 60
+    return start_minute <= now_minute < start_minute + 10
+
+
+def _work_block_active_or_imminent(c, world):
+    """Used to gate LEISURE, not work itself -- true while a work or
+    contract-commitment block is currently active or starts within the
+    next hour, so a leisure/shopping/gym/cafe roll can't fire during (or
+    right before) time the character is actually supposed to be
+    working."""
+    now_minute = world.get("calendar", {}).get("minute_of_day", -1)
+    for b in _todays_schedule_blocks(c, world):
+        if b["activity"] != "work" and b.get("source") != "contract":
+            continue
+        start_minute = int(b["start"][:2]) * 60
+        end_minute = int(b["end"][:2]) * 60
+        if start_minute - 60 <= now_minute < end_minute:
+            return True
+    return False
+
+
+def _leisure_fatigue_multiplier(c):
+    """0-1 multiplier on leisure-trip likelihood -- replaces the old flat
+    MAX_OFFGRID_TRIPS_PER_DAY counter (removed from send_offgrid()) with
+    something that actually reads as "too tired to go out again so
+    soon", fed directly by the real fatigue/energy cost process_return()
+    now charges per trip."""
+    body = c.get("body", {})
+    fatigue = body.get("fatigue", 20.0)   # 0=rested, 100=exhausted
+    energy  = body.get("energy", 70.0)    # 0=depleted, 100=full
+    if fatigue >= 80 or energy <= 20:
+        return 0.0
+    return max(0.0, min(1.0, 1 - fatigue / 80)) * max(0.0, min(1.0, energy / 70))
+
+
 def maybe_go_offgrid(c, world):
     if c.get("off_grid") or c.get("conversation"):
         return
-    r = random.random()
-    if c.get("employed") and world["calendar"]["minute_of_day"] in [480, 490]:
+
+    if c.get("employed") and _work_block_starting_now(c, world):
         send_offgrid(c, world, "work", 8 * 60)
-    elif not c.get("employed") and r < 0.01:
+        return
+
+    r = random.random()
+    if not c.get("employed") and r < 0.01:
         send_offgrid(c, world, "job_search", 60)
-    else:
-        # Depression reduces (not zeroes) the chance of a leisure-flavored
-        # trip specifically -- work/job-search stay unaffected (systems/
-        # mental_health_effects.py::home_leaving_multiplier, feeding
-        # systems/withdrawal_concern.py's "staying home too much" drama).
-        from systems.mental_health_effects import home_leaving_multiplier
-        leave_mult = home_leaving_multiplier(c)
-        if r < 0.004 * leave_mult:
-            _send_errand(c, world, "shopping", 45)
-        elif r < 0.008 * leave_mult:
-            _send_errand(c, world, random.choice(["leisure", "gym", "cafe"]), random.randint(30, 60))
+        return
+
+    # Leisure/shopping/gym/cafe: never during (or about to start) a real
+    # work/contract commitment -- work gets real priority now that it no
+    # longer shares a daily trip-count cap with these -- and increasingly
+    # unlikely the more tired/depleted the character already is.
+    if _work_block_active_or_imminent(c, world):
+        return
+    fatigue_mult = _leisure_fatigue_multiplier(c)
+    if fatigue_mult <= 0:
+        return
+
+    # Depression reduces (not zeroes) the chance of a leisure-flavored
+    # trip specifically -- work/job-search stay unaffected (systems/
+    # mental_health_effects.py::home_leaving_multiplier, feeding
+    # systems/withdrawal_concern.py's "staying home too much" drama).
+    from systems.mental_health_effects import home_leaving_multiplier
+    leave_mult = home_leaving_multiplier(c) * fatigue_mult
+    if r < 0.004 * leave_mult:
+        _send_errand(c, world, "shopping", 45)
+    elif r < 0.008 * leave_mult:
+        _send_errand(c, world, random.choice(["leisure", "gym", "cafe"]), random.randint(30, 60))
 
 
 def maybe_schedule_doctor_visit(c, world):
@@ -854,6 +920,23 @@ def process_return(c, world):
     reason = c.get("off_grid_reason") or "outing"
     is_event = reason.startswith("event:")
 
+    # Real fatigue/energy cost, scaled by how long the trip actually took --
+    # replaces the old flat MAX_OFFGRID_TRIPS_PER_DAY counter (removed from
+    # send_offgrid() this round, per user request) with something that
+    # actually behaves like needing rest: maybe_go_offgrid()'s own leisure-
+    # roll gate reads these same body.py fields directly, so a character
+    # who just got back tired is organically much less likely to head out
+    # again until they've recovered, rather than being blocked by an
+    # arbitrary per-day count. A full ~8h workday costs roughly 90 fatigue/
+    # 60 energy; a quick ~45min errand costs proportionally little.
+    departed = c.pop("_offgrid_departure_tick", None)
+    if departed is not None:
+        elapsed = max(0, world["tick"] - departed)
+        if elapsed:
+            body = c.setdefault("body", {})
+            body["fatigue"] = min(100.0, body.get("fatigue", 20.0) + elapsed * (90.0 / (8 * 3600)))
+            body["energy"]  = max(0.0,   body.get("energy", 70.0)  - elapsed * (60.0 / (8 * 3600)))
+
     if reason in _NARRATOR_CATEGORIES or is_event:
         if reason == "jail":
             # law.py::process_jail() only checks jail_until on a cadence
@@ -945,6 +1028,14 @@ def process_return(c, world):
         crime_note = resolve_criminal_shift(c, world)
         if crime_note:
             story["summary"] += crime_note
+
+        # go_to_work (expectations.py) was real, tracked content with a
+        # real daily stress penalty on a miss, but was structurally
+        # incapable of ever being satisfied -- the only code path that
+        # could call satisfy_expectation() for it had zero callers
+        # anywhere. A completed work trip is the obvious, cheapest fix.
+        from systems.expectations import satisfy_expectation
+        satisfy_expectation(c, "go_to_work", world)
     elif reason in ("doctor", "hospital"):
         from core.definitions import load_definitions
         defs = load_definitions(world.get("sim_id", "default"))
