@@ -78,6 +78,7 @@ def get_view(
     # it falls outside the loaded window (see that function's comment).
     radius = {
 
+        0: 55,
         1: 32,
         2: 20,
         3: 12

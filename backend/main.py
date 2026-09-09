@@ -99,7 +99,11 @@ def _view_radius(zoom: int) -> int:
     # window instead of immediately falling outside it (see the WS
     # handler's movement-threshold check above, which relies on this
     # margin existing). Kept in sync with api/view.py's copy of this table.
-    return {1: 32, 2: 20, 3: 12}.get(zoom, 20)
+    # Tier 0 covers camera.zoom values below the old tier-1 floor -- with
+    # no minZoom on OrbitControls a user could scroll out indefinitely while
+    # the loaded window stayed capped at radius 32, leaving everything past
+    # that ring unloaded (a black void) instead of streaming more in.
+    return {0: 55, 1: 32, 2: 20, 3: 12}.get(zoom, 20)
 
 
 def _build_full_snapshot(world, definitions, cx, cy, zoom):

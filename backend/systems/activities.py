@@ -1898,6 +1898,19 @@ def complete_activity(
     activity_type = act["type"]
 
     # =====================================
+    # RELEASE RESERVED ANCHOR
+    # =====================================
+    # begin_interaction() (interactions.py) reserves an anchor for every
+    # interaction-based activity (use_toilet, take_shower, wash_hands, ...),
+    # but until now the only release call site was the hobby_session/
+    # seat_prop_id branch below -- every other activity's anchor stayed
+    # "occupied_by" its user forever, permanently blocking anyone else from
+    # ever using that toilet/sink/shower again. release_anchor() is a safe
+    # no-op when c["occupying"] isn't set, so this is correct for every
+    # activity type, not just the ones that already called it.
+    release_anchor(c, world)
+
+    # =====================================
     # ADVANCE ACTIVITY QUEUE
     # =====================================
 

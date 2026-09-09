@@ -392,6 +392,14 @@ const controls = new OrbitControls(
 );
 
 controls.enableDamping = true;
+// Floor for how far out the camera can scroll -- with no minZoom, a user
+// could zoom out indefinitely while the server's viewport window stayed
+// capped at its widest tier's radius (see main.py::_view_radius()), leaving
+// everything past that ring unloaded/black instead of streaming more in.
+// Set just below the tier-0 threshold in _updateViewport() below so the
+// widest radius tier is always reachable but nothing goes further than it
+// actually covers.
+controls.minZoom = 0.15;
 
 window.addEventListener("resize", ()=>{
 
@@ -4451,6 +4459,10 @@ function _formatIntentionFieldLabel(key){
 
 function _formatIntentionFieldValue(key, value){
   if(value == null || value === "") return "(none)";
+  if(key === "created_at"){
+    const nowTick = _worldState.tick || 0;
+    return `${_ticksAgoLabel(Math.max(0, nowTick - value))} (tick ${value})`;
+  }
   if(key === "service_id"){
     const tmpl = (definitions.service_templates || {})[value];
     return tmpl?.name ? `${tmpl.name} (${value})` : String(value);
@@ -5416,7 +5428,10 @@ function _updateViewport(ws) {
   // — OrbitControls' mouse-wheel zoom scales this directly and leaves
   // camera.position untouched for orthographic cameras, so distance-to-
   // target (the old metric here) never changed when the user scrolled.
-  const zoom = camera.zoom > 1.8 ? 3 : camera.zoom > 0.9 ? 2 : 1;
+  // Tier 0 (very zoomed out, down to controls.minZoom) maps to the server's
+  // widest radius tier so the loaded window actually keeps growing as the
+  // camera keeps pulling back, instead of capping out at tier 1's radius.
+  const zoom = camera.zoom > 1.8 ? 3 : camera.zoom > 0.9 ? 2 : camera.zoom > 0.35 ? 1 : 0;
   if (cx !== _viewport.cx || cy !== _viewport.cy || zoom !== _viewport.zoom) {
     _viewport = { cx, cy, zoom };
     _sendViewport(ws);
@@ -5567,7 +5582,9 @@ function _ticksAgoLabel(ticks){
   if(ticks < 60) return `${Math.max(0, Math.round(ticks))}s ago`;
   const mins = ticks / 60;
   if(mins < 60) return `${Math.round(mins)}m ago`;
-  return `${Math.round(mins / 60)}h ago`;
+  const hours = mins / 60;
+  if(hours < 24) return `${Math.round(hours)}h ago`;
+  return `${Math.round(hours / 24)}d ago`;
 }
 
 async function fetchEvents(){

@@ -1,5 +1,18 @@
 import random
 
+# Module-level current tick, stamped once per sim tick from sim_loop.py
+# (add_intention() has no world param -- 44 call sites across the
+# codebase call it as add_intention(c, {...}) with no world reference --
+# so a tiny global is far less invasive than threading world through
+# every caller just to timestamp when an intention was created).
+_CURRENT_TICK = 0
+
+
+def set_current_tick(t):
+    global _CURRENT_TICK
+    _CURRENT_TICK = t
+
+
 # =========================================================
 # INTENTION TYPES
 # =========================================================
@@ -81,7 +94,7 @@ def add_intention(
 
     intention.setdefault(
         "created_at",
-        0
+        _CURRENT_TICK
     )
 
     intention.setdefault(

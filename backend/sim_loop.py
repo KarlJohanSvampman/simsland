@@ -37,6 +37,7 @@ EVENT_BUS_ENABLED = os.getenv("EVENT_BUS_ENABLED", "1") != "0"
 
 # -- Per-tick (always) -------------------------------------------
 from brain.agent_loop   import update_agent
+from brain.intentions   import set_current_tick
 from systems.reactions  import process_reaction_queue
 from systems.item_knowledge import update_item_knowledge
 
@@ -311,6 +312,7 @@ def _update_nearby_relationships(characters, world):
 def tick(world):
     world["tick"] += 1
     t = world["tick"]
+    set_current_tick(t)
 
     advance_calendar(world)
     characters = list(world.get("characters", {}).values())

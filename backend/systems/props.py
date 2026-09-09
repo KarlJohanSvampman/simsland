@@ -398,7 +398,18 @@ def find_nearest_anchor(
 
                 best_prop = prop
 
-                best_anchor = wa
+                # The REAL anchor dict from prop["anchors"], not `wa` --
+                # get_world_anchor() returns dict(anchor) (a shallow copy
+                # with world x/y baked in), so reserve_anchor() mutating
+                # that copy's occupied_by never touched the actual prop
+                # object. That silently made occupancy checks for every
+                # find_nearest_anchor()-based interaction (use_toilet,
+                # take_shower, wash_hands, ...) always see occupied_by=None
+                # no matter how many characters had already reserved it --
+                # any number of characters could "use" the same toilet at
+                # once. Returning the real object lets reserve_anchor()'s
+                # mutation actually stick.
+                best_anchor = anchor
 
     if not best_prop:
         return None
