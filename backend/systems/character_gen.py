@@ -8,16 +8,10 @@ import uuid
 TICKS_PER_YEAR = 365 * 24  # ~8760 ticks per simulated year
 
 # ── Education rank (ascending) ────────────────────────────────────────────────
-# Mirrors jobs.py::apply_for_job()'s edu_rank dict exactly -- job_templates'
-# degree_required and school_templates' education_level both use this
-# vocabulary (preschool/primary/trade_school/certificate/...), not the old
-# elementary/some_college one that used to live here and had no matching
-# content anywhere.
-_EDU_RANK = {
-    "none": 0, "none_completed": 0, "preschool": 0, "primary": 0,
-    "middle_school": 0, "high_school": 1, "trade_school": 2, "certificate": 2,
-    "associate": 3, "bachelor": 4, "master": 5, "doctorate": 6, "professional": 6,
-}
+# Single source of truth now lives in job_complexity.py (this used to be a
+# hand-duplicated copy of jobs.py::apply_for_job()'s local edu_rank dict,
+# "kept in sync only by a comment" -- both now import the same table).
+from systems.job_complexity import DEGREE_RANK as _EDU_RANK
 
 # Fraction of characters who get a distinctive speech/writing quirk (see
 # speech_style_registry in definitions.json) -- most sims talk/write in
@@ -74,6 +68,37 @@ def _attained_education(age):
     if r < 0.93:  return "master"
     if r < 0.98:  return "doctorate"
     return "professional"
+
+def _assign_field_of_study(defs, education, world=None, household_id=None):
+    """Only characters with real post-secondary education (associate+)
+    have a declared field -- a high-schooler doesn't have a "major".
+    Picked from the real, populated `industry` values already on every
+    job_templates entry (577 real entries -- no separate field-of-study
+    vocabulary needs inventing), so a job application in that same
+    industry can score a real relevance bonus later (see jobs.py::
+    _qualification_fit). Biased toward a present household member's own
+    field when one already exists, matching how family often ends up in
+    related fields -- purely a light flavor bias, not a hard rule."""
+    if _EDU_RANK.get(education, 0) < _EDU_RANK["associate"]:
+        return None
+
+    industries = sorted({
+        v.get("industry") for v in defs.get("job_templates", {}).values()
+        if v.get("industry")
+    })
+    if not industries:
+        return None
+
+    if world and household_id:
+        for other in world.get("characters", {}).values():
+            if other.get("household_id") != household_id:
+                continue
+            fos = other.get("field_of_study")
+            if fos and fos in industries and random.random() < 0.4:
+                return fos
+
+    return random.choice(industries)
+
 
 def _random_skills(defs, job=None):
     # skill_templates may not be defined; return empty list gracefully
@@ -394,6 +419,9 @@ def generate_character(defs, overrides=None, world=None):
     nat_talents  = overrides.get("natural_talents")    or _random_natural_talents(defs)
     hairstyle    = overrides.get("current_hairstyle")  or _random_hairstyle(defs, sex)
     education    = overrides.get("education")          or _attained_education(age)
+    field_of_study = overrides.get("field_of_study") if "field_of_study" in overrides else (
+        _assign_field_of_study(defs, education, world=world, household_id=overrides.get("household_id"))
+    )
     job          = overrides.get("job")
     if job is None:
         job = _assign_job(defs, age_group, education)
@@ -481,6 +509,7 @@ def generate_character(defs, overrides=None, world=None):
         "occupation":         job.get("title", "none") if has_job else "none",
         "job":                job,
         "education":          education,
+        "field_of_study":     field_of_study,
         "skills":             skills,
         "current_school":     current_school,
         "hourly_wage":        job.get("hourly_wage", 0.0) if has_job else 0.0,

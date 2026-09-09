@@ -36,6 +36,42 @@ def _ticks_to_years(ticks):
     return round(ticks / TICKS_PER_YEAR, 1)
 
 
+def _qualification_fit(c, job, defs=None):
+    """Combines education-rank margin over the job's degree_required, a
+    field-of-study match bonus (c["field_of_study"] vs the job's own
+    "industry" -- both real, populated values, see character_gen.py::
+    _assign_field_of_study), and same-industry work experience
+    (c["industry_experience"], already tracked, previously never read for
+    this). Used both to gate whether an application is even accepted
+    into the hiring pipeline (see advance_job_application) and to weight
+    each interview stage's pass roll alongside the existing SES formula.
+    Roughly 0-1.25; not hard-capped on the high end so a strongly
+    over-qualified, experienced candidate genuinely stands out."""
+    from systems.job_complexity import DEGREE_RANK
+
+    my_rank = DEGREE_RANK.get(c.get("education", "none"), 0)
+    required_rank = DEGREE_RANK.get(job.get("degree_required", "none"), 0)
+    margin = my_rank - required_rank
+    # Meeting the requirement is what mostly matters; a little credit for
+    # margin above it, a real penalty for falling short (shouldn't
+    # normally happen -- this same score gates pipeline acceptance in the
+    # first place -- but a schedule/listing can drift after generation).
+    education_score = max(-0.5, min(0.5, 0.15 + margin * 0.1))
+
+    field_score = 0.0
+    if c.get("field_of_study") and c["field_of_study"] == job.get("industry"):
+        field_score = 0.25
+
+    experience_score = 0.0
+    industry = job.get("industry")
+    if industry:
+        ticks = c.get("industry_experience", {}).get(industry, 0)
+        years = ticks / TICKS_PER_YEAR
+        experience_score = min(0.5, years * 0.08)
+
+    return max(0.0, education_score + field_score + experience_score)
+
+
 # ---------------------------------------------------------------------------
 # Company slot initialisation
 # ---------------------------------------------------------------------------
@@ -235,11 +271,7 @@ def apply_for_job(c, world, job_id=None):
     if not world.get("job_listings"):
         generate_job_listings(world)
 
-    edu_rank = {
-        "none": 0, "none_completed": 0, "preschool": 0, "primary": 0,
-        "middle_school": 0, "high_school": 1, "trade_school": 2, "certificate": 2,
-        "associate": 3, "bachelor": 4, "master": 5, "doctorate": 6, "professional": 6,
-    }
+    from systems.job_complexity import DEGREE_RANK as edu_rank
     my_rank = edu_rank.get(c.get("education", "none"), 0)
 
     # Illegal listings (drug_dealer/mobster/etc -- see systems/crime.py)

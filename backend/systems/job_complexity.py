@@ -34,16 +34,18 @@ degree_required and a corrected tier can never disagree with each
 other.
 """
 
-import re
-
-# Same ordering/ranks jobs.py::apply_for_job and character_gen.py's
-# _EDU_RANK already use -- kept in sync manually (both are short, static
-# lookup tables with no shared import today; not this module's job to
-# fix that duplication).
+# Single source of truth for education-rank ordering -- character_gen.py
+# and jobs.py both used to keep their own hand-duplicated copy of this
+# exact table ("kept in sync only by a comment"); both now import
+# DEGREE_RANK from here instead. Same tie structure as those original
+# tables (certificate/trade_school tie, professional/doctorate tie) --
+# real-world these are comparable qualification tiers, and preserving
+# the tie avoids a behavior change for the existing degree_required
+# comparisons that already relied on it.
 DEGREE_RANK = {
-    "none": 0, "high_school": 1, "certificate": 2, "trade_school": 3,
-    "associate": 4, "bachelor": 5, "master": 6, "professional": 7,
-    "doctorate": 8,
+    "none": 0, "none_completed": 0, "preschool": 0, "primary": 0,
+    "middle_school": 0, "high_school": 1, "trade_school": 2, "certificate": 2,
+    "associate": 3, "bachelor": 4, "master": 5, "doctorate": 6, "professional": 6,
 }
 
 _MIN_TIER_DEGREE_FLOOR = {

@@ -686,6 +686,7 @@ def ensure_character_defaults(c, world=None):
     c.setdefault("company_id",              None)
     c.setdefault("job_template_id",         None)
     c.setdefault("industry_experience",     {})
+    c.setdefault("field_of_study",          None)
 
     # Family tree
     c.setdefault("family_id",   None)
