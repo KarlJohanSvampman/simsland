@@ -59,7 +59,13 @@ def reset_characters(sim_id: str = DEFAULT_SIM_ID):
     forever after that character was gone, since nothing else ever
     resolves an orphaned owner_id. Furniture-like placed_items with no
     owner_id (newspapers set down mid-read, dishware, ...) are untouched --
-    only entries actually tied to a character being deleted here."""
+    only entries actually tied to a character being deleted here.
+
+    Also clears events/incidents/calls/responders/conflicts/social_events
+    -- every character is being removed here, so every entry in these
+    world-level history logs is now unresolvable (a live symptom: the
+    event timeline fell back to showing raw character ids once the
+    characters they named were gone)."""
     with world_lock():
         world = load_world(sim_id)
         removed_ids = set(world["characters"].keys())
@@ -76,6 +82,23 @@ def reset_characters(sim_id: str = DEFAULT_SIM_ID):
         if isinstance(world_objects, dict):
             for obj_id in [k for k, v in world_objects.items() if v.get("owner_id") in removed_ids]:
                 del world_objects[obj_id]
+
+        # Live bug report: every character being wiped left several
+        # world-level history logs full of entries that can now only ever
+        # reference deleted characters -- confirmed live via the event
+        # timeline, which fell back to showing raw ids ("char_9bf93fea &
+        # char_93362e96") once api/events.py::_character_name() could no
+        # longer look either one up. Since a reset removes EVERY character
+        # (not a subset), every entry in these logs is orphaned, not just
+        # some of them -- clearing them outright is simpler and more
+        # correct than filtering, and matches this route's existing
+        # placed_items/world_objects cleanup above in spirit.
+        world["events"]      = []
+        world["incidents"]   = []
+        world["calls"]       = []
+        world["responders"]  = []
+        world["conflicts"]   = {}
+        world["social_events"] = {}
 
         save_world(sim_id, world)
     return {"ok": True}
