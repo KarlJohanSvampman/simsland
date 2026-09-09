@@ -1,57 +1,55 @@
 import random
 import math
-from data.stocks import STOCK_CATALOG, STOCKS_BY_TICKER
 
-# =========================================================
-# SECTOR ↔ NEWS TAG MAPPING
-# News items have tags; these determine which sectors react
-# =========================================================
-
-SECTOR_TAGS = {
-    "tech":       ["technology", "ai", "regulation", "cyber", "innovation", "trade"],
-    "energy":     ["energy", "environment", "climate", "infrastructure", "oil"],
-    "health":     ["health", "pharma", "biotech", "regulation"],
-    "finance":    ["finance", "economy", "tax", "banking", "corruption"],
-    "retail":     ["consumer", "economy", "trade", "labor"],
-    "consumer":   ["consumer", "entertainment", "auto", "trade", "labor"],
-    "media":      ["media", "free_press", "censorship", "technology", "regulation"],
-    "industrial": ["infrastructure", "construction", "labor", "environment", "trade"],
-}
+from systems.company_valuation import (
+    derive_stock_profile,
+    is_publicly_tradable,
+    INDUSTRY_NEWS_TAGS,
+)
 
 # Slow sector trend: small persistent drift per update, reverting to 0
 SECTOR_TREND_VOLATILITY = 0.0005
 SECTOR_TREND_MAX        = 0.003
 SECTOR_TREND_REVERSION  = 0.1   # how fast trend decays back to 0
 
+# History entries are now {"tick": int, "price": float} instead of a bare
+# float, so the dashboard can plot a real time axis -- window widened from
+# 60 since entries can be down-sampled for a sparkline rather than needing
+# every single tick.
+MAX_HISTORY_ENTRIES = 200
+
+# Per-tick fraction of the gap back toward shares_available_baseline that
+# recovers on its own (see update_stocks()) -- see investments.py for the
+# buy/sell side of the share-supply mechanic this feeds.
+FLOAT_RECOVERY_FRACTION = 0.002
+
 
 # =========================================================
 # INIT STOCKS
-# Populates world["stocks"] from catalog
+# Populates world["stocks"] from the real, already-authored
+# company_templates registry (54 of 57 -- the 2 illegal orgs and the
+# government revenue office aren't publicly traded corporations) via
+# company_valuation.py::derive_stock_profile(), replacing the old
+# disconnected 40-fictional-company data/stocks.py catalog.
 # =========================================================
 
 def init_stocks(world):
     stocks = world.setdefault("stocks", {})
     sector_trends = world.setdefault("stock_sector_trends", {})
 
-    for s in STOCK_CATALOG:
-        ticker = s["ticker"]
-        if ticker not in stocks:
-            stocks[ticker] = {
-                "name":             s["name"],
-                "sector":           s["sector"],
-                "price":            float(s["base_price"]),
-                "base_price":       float(s["base_price"]),
-                "open_price":       float(s["base_price"]),
-                "history":          [],
-                "volatility":       s["volatility"],
-                "market_cap":       s["market_cap"],
-                "news_sensitivity": s["news_sensitivity"],
-                "description":      s["description"],
-                "change_pct":       0.0,
-            }
+    defs = world.get("definitions")
+    if not defs:
+        from core.definitions import load_definitions
+        defs = load_definitions(world.get("sim_id", "default"))
 
-    for sector in SECTOR_TAGS:
-        sector_trends.setdefault(sector, 0.0)
+    for key, tmpl in defs.get("company_templates", {}).items():
+        if not is_publicly_tradable(key, tmpl):
+            continue
+        if key in stocks:
+            continue
+        profile = derive_stock_profile(key, tmpl)
+        stocks[key] = profile
+        sector_trends.setdefault(profile["sector"], 0.0)
 
 
 # =========================================================
@@ -66,11 +64,15 @@ def update_stocks(world):
         stocks = world["stocks"]
 
     sector_trends = world.setdefault("stock_sector_trends", {})
-    for sector in SECTOR_TAGS:
-        sector_trends.setdefault(sector, 0.0)
+    # Industries are now real, free-form strings pulled from company_
+    # templates rather than a fixed 8-bucket table -- trend for whatever
+    # sectors actually exist among the seeded stocks (init_stocks() already
+    # setdefaults one entry per real sector as each stock is created).
+    for stock in stocks.values():
+        sector_trends.setdefault(stock["sector"], 0.0)
 
     # 1. Evolve sector trends (slow random walk with reversion to 0)
-    for sector in SECTOR_TAGS:
+    for sector in list(sector_trends.keys()):
         step = random.gauss(0, SECTOR_TREND_VOLATILITY)
         trend = sector_trends[sector] * (1 - SECTOR_TREND_REVERSION) + step
         sector_trends[sector] = max(-SECTOR_TREND_MAX, min(SECTOR_TREND_MAX, trend))
@@ -102,17 +104,28 @@ def update_stocks(world):
         stock["price"]      = round(new_price, 2)
         stock["change_pct"] = round((new_price - old_price) / old_price * 100, 2)
 
-        # History: keep last 60 entries
-        stock["history"].append(round(new_price, 2))
-        if len(stock["history"]) > 60:
-            stock["history"] = stock["history"][-60:]
+        # History: real {tick, price} pairs so the dashboard can plot an
+        # actual time axis, not just "last N ticks".
+        stock["history"].append({"tick": world.get("tick", 0), "price": round(new_price, 2)})
+        if len(stock["history"]) > MAX_HISTORY_ENTRIES:
+            stock["history"] = stock["history"][-MAX_HISTORY_ENTRIES:]
+
+        # Float recovery: a thin float bought out by investments.py::
+        # buy_stock() drifts back up a small fraction of the way toward its
+        # starting size each tick -- other holders occasionally deciding to
+        # sell -- so it isn't permanently locked at zero once bought out.
+        baseline = stock.get("shares_available_baseline")
+        if baseline is not None:
+            current = stock.get("shares_available", 0)
+            if current < baseline:
+                stock["shares_available"] = min(baseline, current + (baseline - current) * FLOAT_RECOVERY_FRACTION)
 
 
 def _calc_news_effect(stock, recent_news):
     """Sum news effects from recent items that match this stock's sector."""
     sector     = stock["sector"]
     sensitivity = stock["news_sensitivity"]
-    relevant_tags = set(SECTOR_TAGS.get(sector, []))
+    relevant_tags = set(INDUSTRY_NEWS_TAGS.get(sector, []))
     effect = 0.0
     for news in recent_news:
         overlap = relevant_tags & set(news.get("tags", []))

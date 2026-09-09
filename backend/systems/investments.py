@@ -11,11 +11,10 @@ Portfolio structure on character:
 
 import random
 from systems.stock_market import (
-    SECTOR_TAGS,
     get_stock_price,
     get_stock_change,
 )
-from data.stocks import STOCK_CATALOG, STOCKS_BY_TICKER
+from systems.company_valuation import INDUSTRY_NEWS_TAGS
 
 # =========================================================
 # CONFIG
@@ -35,6 +34,12 @@ NEWS_RECHECK_PROB      = 0.40
 BASE_CHECK_PROB        = 0.30
 # Max stocks in a watched list
 MAX_WATCHED            = 6
+
+# Share supply: below this shares_available/num_shares ratio, the next
+# purchase pays a real premium -- what makes a thin-float company genuinely
+# hard to accumulate more than a few shares of.
+SCARCITY_FLOAT_THRESHOLD = 0.15
+SCARCITY_PREMIUM_PER_PCT = 0.02   # extra price % per 1pt the float sits below threshold
 
 
 # =========================================================
@@ -60,20 +65,45 @@ def _has_trading_device(c, world):
 # BUY STOCK
 # =========================================================
 
+def _apply_scarcity_pricing(stock):
+    """Below SCARCITY_FLOAT_THRESHOLD float, the NEXT purchase pays a real
+    premium -- this is what actually makes a thin float hard to accumulate
+    more than a few shares of, on top of the buy being capped outright."""
+    num_shares = stock.get("num_shares", 0)
+    if not num_shares:
+        return
+    float_ratio = stock.get("shares_available", 0) / num_shares
+    if float_ratio >= SCARCITY_FLOAT_THRESHOLD:
+        return
+    shortfall_pct = (SCARCITY_FLOAT_THRESHOLD - float_ratio) * 100
+    premium = 1 + shortfall_pct * SCARCITY_PREMIUM_PER_PCT
+    stock["price"] = round(stock["price"] * premium, 2)
+
+
 def buy_stock(c, world, ticker, cash_amount):
     """
     Spend up to cash_amount buying shares of ticker.
     Deducts from c["money"]. Returns shares purchased (0 on failure).
+
+    Capped at the stock's real, finite shares_available float -- a request
+    for more than what's currently tradeable either partial-fills (buys
+    whatever's left) or fails outright if the float is already exhausted.
     """
+    stock = world.get("stocks", {}).get(ticker)
     price = get_stock_price(world, ticker)
-    if not price or price <= 0:
+    if not stock or not price or price <= 0:
         return 0
 
     affordable = min(cash_amount, c.get("money", 0))
     if affordable < price:
         return 0
 
-    shares = int(affordable // price)
+    desired_shares = int(affordable // price)
+    if desired_shares == 0:
+        return 0
+
+    shares_available = stock.get("shares_available", 0)
+    shares = min(desired_shares, shares_available)
     if shares == 0:
         return 0
 
@@ -93,6 +123,9 @@ def buy_stock(c, world, ticker, cash_amount):
             "shares":        shares,
             "avg_buy_price": round(price, 2),
         }
+
+    stock["shares_available"] = max(0, shares_available - shares)
+    _apply_scarcity_pricing(stock)
 
     # Add to watched list
     watched = c.setdefault("watched_stocks", [])
@@ -135,6 +168,12 @@ def sell_stock(c, world, ticker, shares=None):
     else:
         portfolio[ticker]["shares"] = remaining
 
+    stock = world.get("stocks", {}).get(ticker)
+    if stock:
+        num_shares = stock.get("num_shares")
+        new_available = stock.get("shares_available", 0) + sell_qty
+        stock["shares_available"] = min(num_shares, new_available) if num_shares else new_available
+
     return proceeds
 
 
@@ -169,19 +208,20 @@ def position_pnl(c, world, ticker):
 def _discover_stocks_from_news(c, world):
     recent_news = world.get("news", [])[-5:]
     tag_to_sector = {}
-    for sector, tags in SECTOR_TAGS.items():
+    for sector, tags in INDUSTRY_NEWS_TAGS.items():
         for t in tags:
             tag_to_sector[t] = sector
 
     watched = c.setdefault("watched_stocks", [])
+    stocks = world.get("stocks", {})
     for news in recent_news:
         for tag in news.get("tags", []):
             sector = tag_to_sector.get(tag)
             if not sector:
                 continue
             candidates = [
-                s["ticker"] for s in STOCK_CATALOG
-                if s["sector"] == sector and s["ticker"] not in watched
+                ticker for ticker, s in stocks.items()
+                if s.get("sector") == sector and ticker not in watched
             ]
             if candidates and random.random() < 0.25:
                 pick = random.choice(candidates)
@@ -209,7 +249,7 @@ def _news_hit_portfolio(c, world):
 
     recent_news = world.get("news", [])[-5:]
     tag_to_sector = {}
-    for sector, tags in SECTOR_TAGS.items():
+    for sector, tags in INDUSTRY_NEWS_TAGS.items():
         for t in tags:
             tag_to_sector[t] = sector
 
