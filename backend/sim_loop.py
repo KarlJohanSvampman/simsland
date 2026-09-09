@@ -84,6 +84,7 @@ from systems.eviction   import check_household_for_eviction
 from systems.services   import update_services
 from systems.economy    import apply_expenses
 from systems.government_debt import assess_monthly_tax, apply_debt_consequences
+from systems.government_budget import tick_government_budget
 from systems.credit     import tick_monthly_card_cycle
 from systems.personal_items import recall_overdue_loans
 from systems.validation    import tick_popularity_decay
@@ -363,6 +364,11 @@ def tick(world):
             assess_monthly_tax(c, world)
             apply_debt_consequences(c, world)
             tick_monthly_card_cycle(c)
+
+        # Spend whatever tax was just collected across budget categories,
+        # nudging the matching real environment stats -- see
+        # systems/government_budget.py.
+        tick_government_budget(world)
 
     # -- Every sim-minute: popularity decay (systems/validation.py) ──
     if t % 60 == 0:

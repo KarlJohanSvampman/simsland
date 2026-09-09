@@ -410,6 +410,9 @@ def ensure_world_defaults(world, defs=None):
     world.setdefault("families", {})
     world.setdefault("factions", {})
 
+    from systems.government_budget import ensure_government
+    ensure_government(world)
+
     # =====================================================
     # MAP
     # =====================================================

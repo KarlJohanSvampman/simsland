@@ -61,6 +61,12 @@ def assess_monthly_tax(c, world):
             if draw > 0 and withdraw(world, bank_key, item["account_number"], draw):
                 remaining = round(remaining - draw, 2)
 
+    collected = round(owed - remaining, 2)
+    if collected > 0:
+        from systems.government_budget import ensure_government
+        gov = ensure_government(world)
+        gov["treasury"] = round(gov.get("treasury", 0.0) + collected, 2)
+
     if remaining > 0:
         c["government_debt"] = round(c.get("government_debt", 0.0) + remaining, 2)
 
