@@ -60,6 +60,18 @@ def _ensure_state(c):
 
 
 def _is_trying_to_move(c):
+    # Live bug report: a character waiting at a bus stop (travel_state
+    # "waiting_for_bus"/"awaiting_bus_arrival", or riding in/waiting on a
+    # car via "driving_out"/"driving_back") has is_moving stuck True the
+    # whole time they're paused there -- a deliberate, expected hold, not
+    # a failed movement attempt -- so this module read it as "trying to
+    # move but making no progress" and built full panic/stress on a
+    # perfectly calm character standing at a bus stop. None of
+    # TRAVEL_FROZEN_STATES represent someone actually trying and failing
+    # to move.
+    from systems.travel import TRAVEL_FROZEN_STATES
+    if c.get("travel_state") in TRAVEL_FROZEN_STATES:
+        return False
     if c.get("is_moving"):
         return True
     act = c.get("activity") or {}
