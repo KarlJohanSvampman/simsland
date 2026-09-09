@@ -194,6 +194,20 @@ def generate_week_schedule(c, world):
                     "end":      f"{we:02d}:00",
                     "activity": "work",
                 })
+                # Hygiene: a short "get ready" slot 30-60 min before work,
+                # same insertion shape as the meal slots below (Wants plan
+                # Phase D) -- gives update_schedule_runtime() something
+                # real to fire a proactive take_shower intention from,
+                # instead of hygiene only ever being a reactive interrupt
+                # once the hygiene stat has already dropped too far.
+                lead_min = random.choice([30, 45, 60])
+                start_total_min = max(0, ws * 60 - lead_min)
+                hs_h, hs_m = divmod(start_total_min, 60)
+                blocks.append({
+                    "start":    f"{hs_h:02d}:{hs_m:02d}",
+                    "end":      f"{ws:02d}:00",
+                    "activity": "hygiene",
+                })
 
         # 4. Meals — only add if not overlapping with work/contract
         occupied = _occupied_hours(blocks)
@@ -340,3 +354,33 @@ def update_schedule_runtime(c, world):
         "type":   current["activity"],
         "source": current.get("source", "schedule"),
     }
+
+    # Proactive survival/maintenance scheduling (Wants plan Phase D) --
+    # this module's own docstring used to say body needs "are NOT
+    # scheduled -- they fire as urgent interruptions," but in reality
+    # people mostly eat because it's lunchtime, not because they're
+    # already starving. Entering a scheduled eat/hygiene block now ALSO
+    # raises a real, moderate-priority active_intentions entry (type
+    # matches what body_intentions.py's reactive checks already use, so
+    # strategy.py's existing dispatch picks it up identically) alongside
+    # the current_intention set above. The reactive path is untouched and
+    # still fires independently -- and at a higher category priority --
+    # for a character who ignores this nudge and gets truly hungry/dirty.
+    if current["activity"] in ("eat", "hygiene"):
+        from brain.intentions import add_intention
+        if current["activity"] == "eat":
+            add_intention(c, {
+                "type":     "eat_food",
+                "category": "schedule",
+                "priority": 55,
+                "reason":   "It's about your usual mealtime.",
+                "source":   "schedule",
+            })
+        else:
+            add_intention(c, {
+                "type":     "take_shower",
+                "category": "schedule",
+                "priority": 50,
+                "reason":   "You're due to get ready before work.",
+                "source":   "schedule",
+            })

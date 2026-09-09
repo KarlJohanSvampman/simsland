@@ -65,6 +65,37 @@ def _expectations_ratio(c):
     return streak / (streak + missed + 1)
 
 
+def _dimension_closeness_multiplier(self_val, other_val):
+    """"The more equal circumstances the more interesting" -- a narrow gap
+    (near-equal standing) scales jealousy gain UP toward 1.5x, a wide gap
+    scales it DOWN toward 0.5x. Losing badly to someone in a completely
+    different league stings less than narrowly losing to a near-peer."""
+    try:
+        self_val = float(self_val)
+        other_val = float(other_val)
+    except (TypeError, ValueError):
+        return 1.0
+    denom = max(abs(self_val), abs(other_val), 1e-6)
+    relative_gap = abs(other_val - self_val) / denom
+    return max(0.5, min(1.5, 1.5 - relative_gap))
+
+
+def _worst_dimension(favorable_dims):
+    """The single most-unfavorable dimension (biggest relative gap) among
+    the ones that favor the other person -- what a crossed-threshold Want
+    intention (see _apply_comparison) actually names."""
+    best_key, best_gap = None, -1.0
+    for k, d in favorable_dims.items():
+        try:
+            self_val, other_val = float(d["self"]), float(d["other"])
+            gap = abs(other_val - self_val) / max(abs(self_val), abs(other_val), 1e-6)
+        except (TypeError, ValueError):
+            gap = 0.5
+        if gap > best_gap:
+            best_gap, best_key = gap, k
+    return best_key
+
+
 def _admired_traits_score(c, other):
     ideal = c.get("ideal_partner")
     if not ideal:
@@ -89,6 +120,16 @@ def compare_lives(c, other, world):
     c_wealth = c.get("wealth", 0) or 0
     o_wealth = other.get("wealth", 0) or 0
     dims["belongings"] = {"self": c_wealth, "other": o_wealth, "favors_other": o_wealth > c_wealth}
+
+    c_hid, o_hid = c.get("household_id"), other.get("household_id")
+    if c_hid and o_hid and c_hid != o_hid:
+        households = world.get("households", {})
+        c_hh_wealth = households.get(c_hid, {}).get("wealth", 0) or 0
+        o_hh_wealth = households.get(o_hid, {}).get("wealth", 0) or 0
+        dims["household_wealth"] = {
+            "self": c_hh_wealth, "other": o_hh_wealth,
+            "favors_other": o_hh_wealth > c_hh_wealth,
+        }
 
     c_spouse_match = _avg_ideal_match(c, [_spouse_of(c, world)] if _spouse_of(c, world) else [], "ideal_partner")
     o_spouse_match = _avg_ideal_match(c, [_spouse_of(other, world)] if _spouse_of(other, world) else [], "ideal_partner")
@@ -131,17 +172,50 @@ def compare_lives(c, other, world):
 def _apply_comparison(c, other, world):
     rel = c.setdefault("relationships", {}).setdefault(other["id"], {})
     dims = compare_lives(c, other, world)
-    favorable_hits = sum(1 for d in dims.values() if d["favors_other"])
+    favorable = {k: d for k, d in dims.items() if d["favors_other"]}
 
-    if favorable_hits:
-        rel["jealousy"] = min(100.0, rel.get("jealousy", 0.0) + JEALOUSY_GAIN_PER_DIMENSION * favorable_hits)
+    if favorable:
+        # Trait amplification: reuses envy.py's existing 0.3-2.0 trait-
+        # weighted multiplier -- a jealous/greedy/vain/materialistic/
+        # ambitious/competitive/envious character reacts far more strongly
+        # to losing a comparison than one with none of those traits.
+        from systems.envy import _envy_multiplier
+        trait_mult = _envy_multiplier(c)
+        gain = sum(
+            JEALOUSY_GAIN_PER_DIMENSION * trait_mult
+            * _dimension_closeness_multiplier(d["self"], d["other"])
+            for d in favorable.values()
+        )
+        rel["jealousy"] = min(100.0, rel.get("jealousy", 0.0) + gain)
     else:
         rel["jealousy"] = max(0.0, rel.get("jealousy", 0.0) * JEALOUSY_DECAY_RATE)
 
     if rel["jealousy"] >= JEALOUSY_GRIEVANCE_THRESHOLD:
+        jealousy_at_threshold = rel["jealousy"]
+
         from systems.grievances import add_grievance
         add_grievance(c, other["id"], "life_envy", world,
-                      details={"favorable_dimensions": [k for k, d in dims.items() if d["favors_other"]]})
+                      details={"favorable_dimensions": list(favorable.keys())})
+
+        # Losing a comparison doesn't just breed resentment -- it creates a
+        # real, acted-on urge to keep up with the single most-unfavorable
+        # dimension that tipped it over. Rides the existing active_intentions
+        # -> _sec_intentions narration path, no new context_builder wiring.
+        worst_dim = _worst_dimension(favorable)
+        if worst_dim:
+            from brain.intentions import add_intention
+            label = worst_dim.replace("_", " ")
+            other_name = other.get("name", "someone")
+            add_intention(c, {
+                "type":      f"keep_up_with:{worst_dim}",
+                "category":  "impulse",
+                "priority":  int(min(80, 30 + jealousy_at_threshold * 0.5)),
+                "target_id": other["id"],
+                "reason":    f"You noticed {other_name}'s {label} and it's bugging you -- "
+                             f"you want that for yourself.",
+                "source":    "life_comparison",
+            })
+
         rel["jealousy"] = 0.0  # vented via the grievance/confrontation pipeline
 
     return dims
