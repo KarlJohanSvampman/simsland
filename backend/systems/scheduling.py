@@ -130,13 +130,28 @@ def generate_week_schedule(c, world):
     if hours_remaining > 0:
         day_work_hours["saturday"] = min(8.0, hours_remaining)
 
-    # Pick a consistent start time for this character (trait-influenced)
-    if "night_owl" in c.get("traits", []):
+    # Pick a consistent start time for this character (trait-influenced).
+    # Live bug report: night_owl/early_bird are physical_trait_templates
+    # entries (c["physical_traits"]), not personality traits
+    # (c["traits"]) -- this used to check the wrong field, so night_owl
+    # (the only one of the two that even had a registry entry) never
+    # actually affected anyone's schedule in practice. early_bird had no
+    # registry entry at all until this round, on top of that.
+    physical_traits = c.get("physical_traits", [])
+    if "deep_sleeper" in physical_traits:
+        preferred_work_start = random.choice([11, 12, 13])
+    elif "night_owl" in physical_traits:
         preferred_work_start = random.choice([10, 11, 12])
-    elif "early_bird" in c.get("traits", []):
+    elif "early_bird" in physical_traits:
         preferred_work_start = random.choice([7, 8])
     else:
         preferred_work_start = random.choice([8, 9, 10])
+
+    # Unstructured/routineless: no fixed sleep block at all -- bedtime and
+    # wake time drift day to day, so a single week-wide sleep window
+    # doesn't fit them. Generated per-day in the loop below instead of
+    # once here.
+    freeform_sleep = bool({"unstructured", "routineless"} & set(physical_traits))
 
     schedule = {"week": {}, "last_generated": world.get("calendar", {}).get("timestamp", 0)}
 
@@ -144,7 +159,13 @@ def generate_week_schedule(c, world):
         blocks = []
 
         # 1. Sleep
-        blocks.append({"start": "23:00", "end": "07:00", "activity": "sleep"})
+        if freeform_sleep:
+            start_h = random.randint(21, 26) % 24   # 21:00-01:59, wrapping past midnight
+            duration = random.randint(5, 9)
+            end_h = (start_h + duration) % 24
+            blocks.append({"start": f"{start_h:02d}:00", "end": f"{end_h:02d}:00", "activity": "sleep"})
+        else:
+            blocks.append({"start": "23:00", "end": "07:00", "activity": "sleep"})
 
         # 2. Contract recurring blocks for this day
         for cb in contract_blks:
@@ -249,21 +270,29 @@ def adjust_for_household(c, world):
 # RUNTIME TRACKING
 # =========================================================
 
-def get_current_activity(c, world):
-    cal      = world.get("calendar", {})
-    day      = cal.get("weekday", "").lower()
-    time_str = f"{cal.get('hour', 0):02d}:{cal.get('minute', 0):02d}"
-    day_plan = c.get("schedule", {}).get("week", {}).get(day, [])
+OVERSLEEP_CHANCE = 0.35  # per natural wake-up, deep_sleeper only
+OVERSLEEP_EXTRA_TICKS = (3600, 7200)  # 1-2 extra hours held asleep
 
+
+def _lookup_block(day_plan, time_str):
     for block in day_plan:
         s, e = block["start"], block["end"]
         # Handle overnight sleep block
         if s > e:
             if time_str >= s or time_str < e:
-                return block["activity"]
+                return block
         elif s <= time_str < e:
-            return block["activity"]
+            return block
     return None
+
+
+def get_current_activity(c, world):
+    cal      = world.get("calendar", {})
+    day      = cal.get("weekday", "").lower()
+    time_str = f"{cal.get('hour', 0):02d}:{cal.get('minute', 0):02d}"
+    day_plan = c.get("schedule", {}).get("week", {}).get(day, [])
+    block = _lookup_block(day_plan, time_str)
+    return block["activity"] if block else None
 
 
 def update_schedule_runtime(c, world):
@@ -273,18 +302,29 @@ def update_schedule_runtime(c, world):
     time_str = f"{cal.get('hour', 0):02d}:{cal.get('minute', 0):02d}"
     day_plan = c.get("schedule", {}).get("week", {}).get(day, [])
 
-    current = None
-    for block in day_plan:
-        s, e = block["start"], block["end"]
-        if s > e:
-            if time_str >= s or time_str < e:
-                current = block
-                break
-        elif s <= time_str < e:
-            current = block
-            break
-
+    current  = _lookup_block(day_plan, time_str)
     previous = c.get("active_schedule_block")
+    tick     = world.get("tick", 0)
+
+    # Deep sleeper oversleep -- a real, occasional "hard to wake up" beat
+    # on top of the later preferred_work_start they already get (see
+    # generate_week_schedule). Only relevant right at a sleep -> anything-
+    # else transition; once rolled, the extra time is a real held window
+    # (_oversleep_until_tick), not re-rolled every tick while it's active.
+    if "deep_sleeper" in c.get("physical_traits", []):
+        oversleep_until = c.get("_oversleep_until_tick")
+        was_sleeping = bool(previous) and previous.get("activity") == "sleep"
+        waking_now = current is None or current.get("activity") != "sleep"
+        if oversleep_until is not None:
+            if tick < oversleep_until:
+                current = previous
+            else:
+                c["_oversleep_until_tick"] = None
+        elif was_sleeping and waking_now and random.random() < OVERSLEEP_CHANCE:
+            lo, hi = OVERSLEEP_EXTRA_TICKS
+            c["_oversleep_until_tick"] = tick + random.randint(lo, hi)
+            current = previous
+
     if current == previous:
         return
 

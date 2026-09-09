@@ -59005,6 +59005,26 @@
       "polarity": "neutral",
       "description": "Naturally more alert and active at night."
     },
+    "early_bird": {
+      "name": "Early Riser",
+      "polarity": "neutral",
+      "description": "Naturally more alert and active early in the morning."
+    },
+    "deep_sleeper": {
+      "name": "Deep Sleeper",
+      "polarity": "neutral",
+      "description": "Hard to wake and slow to get going -- needs more sleep than most, and occasionally oversleeps."
+    },
+    "unstructured": {
+      "name": "Unstructured",
+      "polarity": "neutral",
+      "description": "Sleeps and wakes at wildly different times day to day, with no consistent pattern."
+    },
+    "routineless": {
+      "name": "Routineless",
+      "polarity": "neutral",
+      "description": "Has no fixed sleep schedule at all -- bedtime and wake time drift unpredictably."
+    },
     "fast_metabolism": {
       "name": "Fast Metabolism",
       "polarity": "positive",
