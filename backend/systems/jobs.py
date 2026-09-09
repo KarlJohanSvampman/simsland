@@ -21,6 +21,18 @@ from core.event_bus import emit
 # How many ticks represent one simulated year (for experience calculation)
 TICKS_PER_YEAR = 365 * 24   # assumes ~24 ticks/day
 
+# Real tick-per-day convention (1 tick = 1 second, see core/tick_schedule.py
+# TICK_RATE_SECONDS / health.py's identical TICKS_PER_DAY) -- deliberately
+# NOT the same convention as TICKS_PER_YEAR above (an old, self-contained
+# "years of experience" scoring constant this module already had before
+# this round, left as-is rather than risk breaking its existing scoring).
+# This one is for real elapsed wait-time in the application pipeline below.
+TICKS_PER_DAY = 86400
+
+
+def _days_to_ticks(lo_days, hi_days):
+    return int(random.randint(lo_days, hi_days) * TICKS_PER_DAY)
+
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -124,6 +136,7 @@ def _make_listing(ckey, job_id, job_tmpl, world_env):
         "industry":        job_tmpl.get("industry", ""),
         "sector":          job_tmpl.get("sector", ""),
         "degree_required": job_tmpl.get("degree_required", "none"),
+        "complexity_tier": job_tmpl.get("complexity_tier", 1),
         "hourly_wage":     round(wage, 2),
         "average_salary":  job_tmpl.get("average_salary", 0),
         "work_mode":       job_tmpl.get("work_mode", "On-site"),
@@ -259,14 +272,41 @@ def maybe_fire(c, world):
         emit("character_fired", {"character_id": c["id"]})
 
 
+MIN_QUALIFICATION_TO_APPLY = 0.15  # below this, no callback at all -- never reaches an interview
+
+# Stage lists, keyed by complexity_tier (see job_complexity.py) --
+# interview_1 is always online, interview_2 (tier 3+ only) is a real
+# on-site trip, reference_check (tier 4 only) is a pure employer-side
+# wait with no character action. Tier isn't stored per-application --
+# job.get("complexity_tier", 1) is looked up fresh each time from the
+# still-open listing.
+def _stage_plan(tier):
+    if tier >= 4:
+        return ["interview_1", "interview_2", "reference_check"]
+    if tier == 3:
+        return ["interview_1", "interview_2"]
+    return ["interview_1"]
+
+_STAGE_WAIT_DAYS = {
+    "interview_1":     (1, 14),   # initial employer response
+    "interview_2":     (2, 5),    # after interview_1 passes
+    "reference_check": (3, 7),    # after interview_2 passes
+}
+_ONSITE_STAGES = {"interview_2"}
+
+
 def apply_for_job(c, world, job_id=None):
     """job_id: when given (a character/LLM explicitly picked a specific
     listing -- see action_router.py::_route_computer_apply_for_job),
     applies to exactly that one if still open/eligible. When omitted
     (the automatic per-economy-tick path, brain/agent_loop.py::
     update_economy), picks among eligible listings via
-    systems/choice.py rather than always taking the highest wage."""
-    if c.get("employed") or c.get("interview"):
+    systems/choice.py rather than always taking the highest wage.
+
+    Applying doesn't immediately schedule an interview -- see
+    advance_job_application() for the real multi-day, multi-stage
+    pipeline this now enters."""
+    if c.get("employed") or c.get("job_application"):
         return
     if not world.get("job_listings"):
         generate_job_listings(world)
@@ -310,68 +350,193 @@ def apply_for_job(c, world, job_id=None):
     queue_choice_for_validation(c, world, "workplace", job.get("title", job["id"]))
 
     job.setdefault("applicants", []).append(c["id"])
-    c["interview"] = {
-        "job_id":     job["id"],
-        "company_id": job.get("company_id"),
-        "tick":       world["tick"] + random.randint(10, 30),
+
+    fit = _qualification_fit(c, job, world.get("definitions", {}))
+    if fit < MIN_QUALIFICATION_TO_APPLY:
+        # Rejected before ever reaching an interview -- not qualified
+        # enough for this one (see Confirmed Decision #5: education/
+        # field/experience mismatch gates pipeline entry, not just the
+        # interview-pass roll).
+        store_memory(c, f"Applied for {job['title']} but never heard back.", 0.45,
+                     ["job", "rejection"], "job", world["tick"])
+        emit("job_application_rejected", {"character_id": c["id"], "job_id": job["id"], "stage": "screening"})
+        return
+
+    tier = job.get("complexity_tier", 1)
+    c["job_application"] = {
+        "job_id":                 job["id"],
+        "company_id":             job.get("company_id"),
+        "stages":                 _stage_plan(tier),
+        "stage_index":            0,
+        "stage_deadline_tick":    world["tick"] + _days_to_ticks(*_STAGE_WAIT_DAYS["interview_1"]),
+        "qualification_fit":      fit,
+        "awaiting_travel_return": False,
     }
-    store_memory(c, f"Applied for {job['title']} and got an interview.", 0.55,
-                 ["job", "interview"], "job", world["tick"])
-    emit("interview_scheduled", {"character_id": c["id"], "job_id": job["id"]})
+    store_memory(c, f"Applied for {job['title']}.", 0.55,
+                 ["job", "application"], "job", world["tick"])
+    emit("job_application_submitted", {"character_id": c["id"], "job_id": job["id"]})
 
 
-def process_interview(c, world):
-    iv = c.get("interview")
-    if not iv or world["tick"] < iv["tick"]:
+def advance_job_application(c, world):
+    """Polled on the same CADENCE["job_market"] cadence process_interview
+    used to be -- walks c["job_application"] through its real, multi-day
+    stage list (see _stage_plan). Replaces the old single-shot
+    c["interview"]/process_interview() entirely."""
+    app = c.get("job_application")
+    if not app:
+        return
+    if app.get("awaiting_travel_return"):
+        return  # resolved by _on_interview_return (offgrid.py hook) instead
+    if world["tick"] < app["stage_deadline_tick"]:
         return
 
-    job = next((j for j in world.get("job_listings", []) if j["id"] == iv["job_id"]), None)
+    job = next((j for j in world.get("job_listings", []) if j["id"] == app["job_id"]), None)
     if not job or not job.get("open"):
-        c["interview"] = None
+        c["job_application"] = None
+        store_memory(c, "The job you applied for is no longer available.", 0.4,
+                     ["job", "rejection"], "job", world["tick"])
         return
 
-    env     = world.get("environment", {})
-    unemp   = env.get("unemployment_rate", 5.5) / 100
-    success = random.random() < (
-        0.45
-        + c.get("ses", 0.5) * 0.25
-        + env.get("education_quality", 0.7) * 0.15
-        - unemp * 0.2
-    )
+    stage_name = app["stages"][app["stage_index"]]
 
-    if success:
-        # Fill the company slot
-        ckey = job.get("company_id")
-        if ckey and ckey in world.get("company_slots", {}):
-            slot = world["company_slots"][ckey].get(job["job_template_id"])
-            if slot:
-                slot["filled"] = min(slot["capacity"], slot["filled"] + 1)
+    if stage_name in _ONSITE_STAGES:
+        from systems.offgrid import send_offgrid
+        if send_offgrid(c, world, "interview", random.randint(60, 120)):
+            app["awaiting_travel_return"] = True
+            store_memory(c, f"Went in for an on-site interview for {job['title']}.", 0.5,
+                         ["job", "interview"], "job", world["tick"])
+        else:
+            # Couldn't make it there this cycle (already off_grid, jailed,
+            # ...) -- retry shortly rather than losing the whole pipeline
+            # over one bad-timing tick.
+            app["stage_deadline_tick"] = world["tick"] + random.randint(3600, 7200)
+        return
 
-        # Update character
-        c["employed"]               = True
-        c["job_searching"]          = False
-        c["job_id"]                 = job["id"]
-        c["job_template_id"]        = job.get("job_template_id")
-        c["company_id"]             = ckey
-        c["profession"]             = job.get("job_template_id", job.get("profession"))
-        c["hourly_wage"]            = job["hourly_wage"]
-        c["current_job_start_tick"] = world["tick"]
-        # industry_experience_ticks accumulates across jobs in same industry
-        if not c.get("industry_experience"):
-            c["industry_experience"] = {}
-        job["open"] = False
+    _resolve_interview_stage(c, world, app, job, stage_name)
 
-        store_memory(c, f"Got hired as {job['title']}.", 0.8, ["job", "success"], "job", world["tick"])
-        emit("character_hired", {
-            "character_id": c["id"],
-            "job_id":       job["id"],
-            "title":        job["title"],
-            "company_id":   ckey,
-        })
+
+def _resolve_interview_stage(c, world, app, job, stage_name):
+    if stage_name == "reference_check":
+        # A pure employer-side formality here -- the education/field/
+        # experience and interview-performance filtering already happened
+        # at application screening and the interview stages themselves;
+        # this stage is the multi-day WAIT the user asked for, not a
+        # second independent fail point.
+        passed = True
     else:
-        store_memory(c, f"Failed the interview for {job['title']}.", 0.7,
+        env   = world.get("environment", {})
+        unemp = env.get("unemployment_rate", 5.5) / 100
+        passed = random.random() < min(0.95, (
+            0.40
+            + c.get("ses", 0.5) * 0.20
+            + env.get("education_quality", 0.7) * 0.10
+            + app["qualification_fit"] * 0.35
+            - unemp * 0.15
+        ))
+
+    if not passed:
+        c["job_application"] = None
+        job["applicants"] = [a for a in job.get("applicants", []) if a != c["id"]]
+        store_memory(c, f"Didn't get past the {stage_name.replace('_', ' ')} for {job['title']}.", 0.65,
                      ["job", "rejection", "stress"], "job", world["tick"])
-        emit("interview_failed", {"character_id": c["id"], "job_id": job["id"]})
+        emit("job_application_rejected", {"character_id": c["id"], "job_id": job["id"], "stage": stage_name})
+        return
+
+    app["stage_index"] += 1
+    if app["stage_index"] < len(app["stages"]):
+        next_stage = app["stages"][app["stage_index"]]
+        app["stage_deadline_tick"] = world["tick"] + _days_to_ticks(*_STAGE_WAIT_DAYS[next_stage])
+        app["awaiting_travel_return"] = False
+        return
+
+    _extend_offer(c, world, app, job)
+
+
+def _on_interview_return(c, world):
+    """Called from offgrid.py::process_return() when an "interview"
+    off-grid trip concludes -- the on-site interview stage actually
+    resolves here, not at the travel-dispatch moment above."""
+    app = c.get("job_application")
+    if not app or not app.get("awaiting_travel_return"):
+        return
+    app["awaiting_travel_return"] = False
+    job = next((j for j in world.get("job_listings", []) if j["id"] == app["job_id"]), None)
+    if not job or not job.get("open"):
+        c["job_application"] = None
+        return
+    stage_name = app["stages"][app["stage_index"]]
+    _resolve_interview_stage(c, world, app, job, stage_name)
+
+
+NEGOTIATION_SUCCESS_BASE = 0.3
+
+
+def _extend_offer(c, world, app, job):
+    """Final stage passed -- salary negotiation (Confirmed Decision #6):
+    accept outright at/above the character's last known wage, otherwise
+    one qualification-scaled counter attempt, otherwise decline and stay
+    in the search."""
+    offered_wage = job["hourly_wage"]
+    current_wage = c.get("hourly_wage")  # persists through unemployment -- see maybe_fire()/layoff, never cleared
+
+    if current_wage and offered_wage < current_wage:
+        counter_chance = min(0.85, NEGOTIATION_SUCCESS_BASE + app["qualification_fit"] * 0.5)
+        if random.random() < counter_chance:
+            offered_wage = current_wage
+            store_memory(c, f"Negotiated {job['title']}'s pay up to match your old wage.", 0.6,
+                         ["job", "negotiation"], "job", world["tick"])
+        else:
+            c["job_application"] = None
+            job["applicants"] = [a for a in job.get("applicants", []) if a != c["id"]]
+            store_memory(c, f"Turned down {job['title']} -- the pay was a step down and they wouldn't budge.",
+                         0.6, ["job", "negotiation", "rejection"], "job", world["tick"])
+            emit("job_offer_declined", {"character_id": c["id"], "job_id": job["id"]})
+            return
+
+    _hire(c, world, job, offered_wage)
+
+
+def _hire(c, world, job, wage):
+    ckey = job.get("company_id")
+    if ckey and ckey in world.get("company_slots", {}):
+        slot = world["company_slots"][ckey].get(job["job_template_id"])
+        if slot:
+            slot["filled"] = min(slot["capacity"], slot["filled"] + 1)
+
+    c["employed"]               = True
+    c["job_searching"]          = False
+    c["job_id"]                 = job["id"]
+    c["job_template_id"]        = job.get("job_template_id")
+    c["company_id"]             = ckey
+    c["profession"]             = job.get("job_template_id", job.get("profession"))
+    c["hourly_wage"]            = wage
+    c["current_job_start_tick"] = world["tick"]
+    c.setdefault("industry_experience", {})
+    # Unified c["job"] shape -- matches crime.py::_hire_into_criminal_job's
+    # nested dict (average_salary/hourly_wage/salary/title/industry/...) so
+    # both hiring paths agree on what "a job" looks like on a character,
+    # closing a shape inconsistency the flat-fields-only version had.
+    c["job"] = {
+        "id":             job.get("job_template_id"),
+        "title":          job.get("title"),
+        "industry":       job.get("industry"),
+        "sector":         job.get("sector"),
+        "average_salary": job.get("average_salary"),
+        "hourly_wage":    wage,
+        "salary":         round(wage * 8 * 5 * 52 / 12, 2),
+        "illegal":        False,
+        "work_mode":      job.get("work_mode"),
+    }
+    job["open"] = False
+    c["job_application"] = None
+
+    store_memory(c, f"Got hired as {job['title']}.", 0.8, ["job", "success"], "job", world["tick"])
+    emit("character_hired", {
+        "character_id": c["id"],
+        "job_id":       job["id"],
+        "title":        job["title"],
+        "company_id":   ckey,
+    })
 
     c["interview"] = None
 

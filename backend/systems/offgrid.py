@@ -488,6 +488,7 @@ def _seed_lie_for_private_event(c, world, event):
 # garage and drive yourself" would be narratively wrong.
 _TRAVEL_ELIGIBLE_REASONS = {
     "work", "job_search", "shopping", "leisure", "gym", "cafe", "doctor", "pharmacy",
+    "interview",
 }
 
 
@@ -498,7 +499,10 @@ MAX_OFFGRID_TRIPS_PER_DAY = 3
 # of how many voluntary trips they've already taken today. hospital_treatment/
 # surgery (treatments[] step types, health.py::advance_treatment_progress)
 # join them for the same reason -- a scheduled procedure isn't optional.
-_UNCAPPED_REASONS = {"jail", "hospital", "hospital_treatment", "surgery"}
+# "interview" joins them too -- a scheduled on-site interview stage
+# (jobs.py::advance_job_application) isn't a discretionary outing the
+# character chose on a whim, it's the employer's own timeline.
+_UNCAPPED_REASONS = {"jail", "hospital", "hospital_treatment", "surgery", "interview"}
 
 
 def _offgrid_trips_today(c, world):
@@ -1073,6 +1077,12 @@ def process_return(c, world):
         if h:
             h["wealth"] = max(0, h.get("wealth", 0) - cost)
         story["summary"] += f" Cost ${cost:.0f}."
+    elif reason == "interview":
+        # The on-site interview stage's pass/fail roll actually happens
+        # here, on return -- not at dispatch time -- see jobs.py::
+        # advance_job_application()/_on_interview_return().
+        from systems.jobs import _on_interview_return
+        _on_interview_return(c, world)
     elif reason in ("credit_card_application", "account_setup", "loan_application"):
         # _pending_appointment_business was stashed by
         # resolve_due_appointments() right before send_offgrid() -- the

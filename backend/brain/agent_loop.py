@@ -110,7 +110,7 @@ from systems.social_intentions import (
 from systems.jobs import (
     maybe_fire,
     apply_for_job,
-    process_interview
+    advance_job_application
 )
 
 from systems.health import (

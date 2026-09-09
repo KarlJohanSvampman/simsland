@@ -14,7 +14,7 @@ Event chain overview:
   trial_scheduled           → process_trials (on its tick)
   character_jailed          → process_jail watch (cadence ÷30)
   character_fired           → apply_for_job
-  interview_scheduled       → process_interview (on its tick)
+  job_application_submitted → advance_job_application (polled on its own stage_deadline_tick)
   bills_overdue             → evict_household
   household_wants_to_move   → _do_migrate
   person_entered_view       → wake_character(observer, "person_entered_view")
@@ -144,11 +144,12 @@ def _on_character_fired_convenience(data, world):
 subscribe("character_fired", _on_character_fired_convenience)
 
 
-def _on_interview_scheduled(data, world):
-    """Nothing to do immediately — process_interview will fire on its tick."""
+def _on_job_application_submitted(data, world):
+    """Nothing to do immediately — advance_job_application() polls its own
+    stage_deadline_tick from sim_loop.py's job_market cadence."""
     pass
 
-subscribe("interview_scheduled", _on_interview_scheduled)
+subscribe("job_application_submitted", _on_job_application_submitted)
 
 
 # ── Housing ───────────────────────────────────────────────
