@@ -101,6 +101,26 @@ def reset_characters(sim_id: str = DEFAULT_SIM_ID):
         world["social_events"] = {}
 
         save_world(sim_id, world)
+
+    # Live bug report: a connected client's local character cache is only
+    # ever updated incrementally (main.py::_build_delta merges changed
+    # characters in, it never expresses "this id was removed" -- there's
+    # no such message in the delta protocol) -- so wiping every character
+    # here left every already-open browser tab still holding the deleted
+    # population in memory, rendering them as stale "ghost" models for a
+    # few seconds any time something (e.g. clicking a character in the
+    # list, which recenters the camera) happened to trigger a real full
+    # resnapshot before the ghosts got cleared. Forcing needs_full here
+    # means the very next broadcast tick sends every connected client a
+    # complete, correct snapshot instead of waiting on an unrelated
+    # viewport move to eventually do it.
+    try:
+        from main import _clients
+        for client in _clients:
+            client["needs_full"] = True
+    except Exception:
+        pass
+
     return {"ok": True}
 
 
