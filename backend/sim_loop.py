@@ -66,7 +66,8 @@ from systems.household_monitoring   import update_household_monitoring
 from systems.traffic    import update_ambient_traffic
 from systems.media      import generate_news
 from brain.conversations import cleanup_conversations
-from systems.emergency  import trigger_incident, resolve, tick_fire_incidents   # resolve polls arrival ticks
+from systems.emergency  import trigger_incident, resolve, tick_fire_incidents, auto_report_incidents   # resolve polls arrival ticks
+from systems.health     import maybe_report_medical_emergency
 from systems.law        import process_jail, process_trials, maybe_arrest_from_incidents
 from systems.jobs       import generate_job_listings, tick_job_market, maybe_fire, process_interview, init_company_slots
 from systems.postal_service     import update_postal_service
@@ -530,8 +531,28 @@ def tick(world):
     # World-level random incidents (character-level ones emitted in agent_loop)
     if every(world, CADENCE["arrests"], offset=15):
         trigger_incident(world, None)  # world-level random only
+        # Live bug report: auto_report_incidents() only ran reactively, off
+        # the "incident_created" event -- a lone unreported incident (e.g.
+        # a medical emergency with nobody else around to generate a fresh
+        # incident elsewhere) could sit unreported indefinitely since
+        # nothing ever re-rolled its 911-report chance. Confirmed live: a
+        # medical_emergency incident stayed reported=False for tens of
+        # thousands of ticks. Also polling it here on the same cadence
+        # resolve() already uses gives every unreported incident a repeat
+        # chance regardless of what else is happening in the world.
+        auto_report_incidents(world)
         resolve(world)                 # poll responder arrival ticks
         maybe_arrest_from_incidents(world)
+        # Incapacitated characters are deliberately excluded from
+        # agent_chars above (same reason their LLM doesn't get called) --
+        # but apply_severity_consequences() (and the medical-emergency
+        # retry inside it) only ever ran from INSIDE that per-character
+        # agent tick, so an unconscious character's own retry stopped
+        # firing the moment they became unconscious. Sweeping every
+        # character here, unconditionally, closes that gap.
+        for c in characters:
+            if c.get("alive") is not False:
+                maybe_report_medical_emergency(c, world)
 
     if every(world, CADENCE["fires"], offset=16):
         tick_fire_incidents(world)

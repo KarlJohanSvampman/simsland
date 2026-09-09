@@ -612,6 +612,7 @@ const placedItems = {};      // item.id → THREE object (dropped/delivered item
 const loadingPlacedItems = {};
 const worldObjects = {};     // world_object.id → THREE object (service-worker-spawned props, e.g. mail bundles)
 const loadingWorldObjects = {};
+const responders = {};       // responder.id → THREE object (police/medical/fire, en route or just arrived)
 const tiles = {};
 
 // Reusable vectors for IK (avoid GC pressure)
@@ -2451,6 +2452,60 @@ async function updateWorldObjects(state){
     scene.remove(worldObjects[id]);
     removeSelectable(worldObjects[id]);
     delete worldObjects[id];
+  }
+}
+
+// =========================================================
+// RESPONDERS (police/medical/fire, en route or just arrived)
+// =========================================================
+// No dedicated vehicle model exists yet for any of these, so this is a
+// permanent (not "until a real model arrives") tagged-primitive marker,
+// same spirit as createFallbackProp but color-coded per service so an
+// ambulance/cruiser/engine reads as a distinct thing at a glance.
+const _RESPONDER_COLORS = {
+  police:  0x2255cc,   // blue
+  medical: 0xdd2222,   // red (ambulance)
+  fire:    0xff7a1a,   // orange
+};
+
+function createResponderMarker(r){
+  const color = _RESPONDER_COLORS[r.type] || 0x999999;
+
+  const mesh = new THREE.Mesh(
+    new THREE.BoxGeometry(0.6, 0.5, 1.1),
+    new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.35, roughness: 0.5 })
+  );
+
+  mesh.position.set(r.location.x - 10, 0.4, r.location.y - 7);
+  mesh.userData = { type: "responder", id: r.id, responderType: r.type };
+
+  selectable.push(mesh);
+  scene.add(mesh);
+  return mesh;
+}
+
+function updateResponders(state){
+
+  const active = new Set();
+
+  for(const r of state.responders || []){
+
+    if(!r.id || !r.location) continue;
+    active.add(r.id);
+
+    if(responders[r.id]){
+      responders[r.id].position.set(r.location.x - 10, 0.4, r.location.y - 7);
+      continue;
+    }
+
+    responders[r.id] = createResponderMarker(r);
+  }
+
+  for(const id in responders){
+    if(active.has(id)) continue;
+    scene.remove(responders[id]);
+    removeSelectable(responders[id]);
+    delete responders[id];
   }
 }
 
@@ -5334,6 +5389,7 @@ async function _applyState(state) {
   await updateProps(state);
   await updatePlacedItems(state);
   await updateWorldObjects(state);
+  updateResponders(state);
   updateFloorplanFloors(state);
   updateFloorplanWalls(state);
   await updateCharacters(state);
@@ -5373,6 +5429,12 @@ async function _applyDelta(delta) {
     }
     Object.assign(_worldState._worldObjectsMap, delta.world_objects);
     _worldState.world_objects = Object.values(_worldState._worldObjectsMap);
+  }
+  if (delta.responders) {
+    // Sent as the full current visible set each time (see main.py::
+    // _build_delta), not a sparse per-id patch -- replace wholesale so a
+    // responder that's no longer active actually disappears.
+    _worldState.responders = delta.responders;
   }
   await _applyState(_worldState);
 }

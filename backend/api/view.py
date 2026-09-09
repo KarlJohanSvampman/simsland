@@ -13,6 +13,11 @@ from brain.perception import (
 
 router = APIRouter()
 
+# How long (in ticks) a resolved responder stays visible on the map after
+# arrival before disappearing -- long enough to register as "the ambulance
+# is here", short enough not to leave a permanent parked vehicle behind.
+RESPONDER_FADE_TICKS = 30
+
 
 # =========================================================
 # VIEW TEST
@@ -353,6 +358,28 @@ def get_view(
     ]
 
     # =====================================
+    # RESPONDERS (police/medical/fire en route or just arrived)
+    # =====================================
+    # Live bug report: an ambulance could be dispatched and even resolve
+    # (send the patient to hospital) with nothing ever appearing on the
+    # map -- world["responders"] was never sent to the frontend at all.
+    # Shown while approaching, and briefly after arrival (RESPONDER_FADE_
+    # TICKS) so the vehicle is visible at the scene before disappearing,
+    # matching main.py::_build_delta's identical filter for live updates.
+    responders = [
+        r for r in world.get("responders", [])
+        if (
+            r.get("status") == "en_route"
+            or (world.get("tick", 0) - r.get("arrival_tick", 0)) <= RESPONDER_FADE_TICKS
+        )
+        and in_view(
+            r.get("location", {}).get("x", 0),
+            r.get("location", {}).get("y", 0),
+            cx, cy, radius,
+        )
+    ]
+
+    # =====================================
     # RESPONSE
     # =====================================
 
@@ -385,6 +412,8 @@ def get_view(
         "placed_items": placed_items,
 
         "world_objects": world_objects,
+
+        "responders": responders,
 
         # semantic defs
         "definitions": definitions,

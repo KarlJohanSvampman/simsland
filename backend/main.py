@@ -132,7 +132,25 @@ def _build_delta(world: dict, dirty: dict, cx: int, cy: int, zoom: int) -> dict 
         if in_view(o.get("x", 0), o.get("y", 0), cx, cy, radius)
     }
 
-    if not visible_chars and not visible_props and not visible_placed_items and not visible_world_objects:
+    # Responders (police/medical/fire) aren't dirty-tracked like the entity
+    # types above -- there are only ever a handful active at once, so this
+    # recomputes the current visible set fresh every tick from world state
+    # directly (see api/view.py::get_view()'s identical filter for the
+    # initial-connect snapshot) rather than wiring a new producer-side
+    # dirty-marking call into every emergency.py call site that creates or
+    # resolves one. Sent as the full current list, not a sparse delta, so
+    # the frontend can just replace its tracked set wholesale each time.
+    visible_responders = [
+        r for r in world.get("responders", [])
+        if (
+            r.get("status") == "en_route"
+            or (world.get("tick", 0) - r.get("arrival_tick", 0)) <= RESPONDER_FADE_TICKS
+        )
+        and in_view(r.get("location", {}).get("x", 0), r.get("location", {}).get("y", 0), cx, cy, radius)
+    ]
+
+    if (not visible_chars and not visible_props and not visible_placed_items
+            and not visible_world_objects and not visible_responders):
         return None
 
     return {
@@ -141,6 +159,7 @@ def _build_delta(world: dict, dirty: dict, cx: int, cy: int, zoom: int) -> dict 
         "props":         visible_props,
         "placed_items":  visible_placed_items,
         "world_objects": visible_world_objects,
+        "responders":    visible_responders,
         # current world tick -- see api/view.py::get_view()'s matching
         # field, both feed main.js's _worldState.tick.
         "tick":       world.get("tick", 0),

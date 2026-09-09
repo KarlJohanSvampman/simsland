@@ -1588,6 +1588,7 @@ def compute_severity(char):
 # ---------------------------------------------------------------------------
 
 _MEDICAL_INCIDENT_TIERS = ("severe", "critical")
+MEDICAL_INCIDENT_RETRY_TICKS = 1800  # ~30 sim-minutes -- long enough for a normal dispatch/arrival/resolve cycle to fully play out before retrying
 
 # "crawling" here is self-healing every tick: an LLM-issued
 # stand_up/move while the character's severity tier is still "critical"
@@ -1647,17 +1648,50 @@ def apply_severity_consequences(char, world):
         except Exception:
             pass
 
-    needs_medical_report = tier in _MEDICAL_INCIDENT_TIERS
-    if needs_medical_report:
-        if not char.get("_medical_incident_reported"):
-            char["_medical_incident_reported"] = True
-            try:
-                from systems.emergency import report_medical_emergency_incident
-                report_medical_emergency_incident(world, char)
-            except Exception:
-                pass
-    else:
-        char["_medical_incident_reported"] = False
+    maybe_report_medical_emergency(char, world, tier)
+
+
+def maybe_report_medical_emergency(char, world, tier=None):
+    """Fire (or retry) the 911 bridge for a character whose severity is
+    severe/critical. Split out of apply_severity_consequences() so it can
+    ALSO be called from a plain per-tick sweep over every character (see
+    sim_loop.py) -- apply_severity_consequences() itself only runs inside
+    the per-character agent loop, which sim_loop.py deliberately excludes
+    incapacitated characters from (same reason the LLM doesn't get called
+    for them). That meant an unconscious character's own medical retry
+    never ran EITHER, which is exactly backwards: incapacitation is the
+    one state that most needs this to keep firing. Confirmed live: a
+    character stayed unconscious and bleeding for tens of thousands of
+    ticks because nothing kept re-checking whether she still needed an
+    ambulance once she could no longer trigger her own agent tick.
+
+    Live bug report (the retry itself): this used to be a one-shot
+    boolean, set True on the first report and never re-checked until the
+    character's tier dropped back out of _MEDICAL_INCIDENT_TIERS -- but
+    that recovery is exactly what a successful ambulance ride is supposed
+    to cause. If the first response never actually got them off_grid (bad
+    timing against compute_severity, a later re-injury, send_offgrid
+    declining, ...), the flag stayed permanently latched and nothing ever
+    called 911 for them again. Retrying on a cooldown (rather than every
+    tick) means a normal in-flight dispatch isn't spammed with duplicate
+    calls, but a stalled one gets a fresh attempt instead of being stuck
+    forever."""
+    if tier is None:
+        _, tier = compute_severity(char)
+
+    if tier not in _MEDICAL_INCIDENT_TIERS:
+        char["_medical_incident_reported_tick"] = None
+        return
+
+    last_tick = char.get("_medical_incident_reported_tick")
+    stale = last_tick is None or (world.get("tick", 0) - last_tick) >= MEDICAL_INCIDENT_RETRY_TICKS
+    if not char.get("off_grid") and stale:
+        char["_medical_incident_reported_tick"] = world.get("tick", 0)
+        try:
+            from systems.emergency import report_medical_emergency_incident
+            report_medical_emergency_incident(world, char)
+        except Exception:
+            pass
 
 
 # ---------------------------------------------------------------------------
