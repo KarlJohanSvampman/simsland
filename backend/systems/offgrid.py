@@ -570,6 +570,17 @@ def _send_offgrid_immediate(c, world, reason, duration_minutes):
     world.setdefault("offmap", []).append({
         "character_id": c["id"], "reason": reason, "return_tick": c["return_tick"],
     })
+    # Live bug report: this never marked the character dirty, so a client
+    # already tracking their model (main.js's sims[id]) never received the
+    # off_grid:True update and kept rendering them frozen, visible, at
+    # their pre-trip position -- confirmed live for an ambulance-dispatched
+    # patient, still shown standing on the map while the Inspector
+    # correctly said "Off-grid: hospital". travel.py/transit.py already
+    # mark dirty on their own car/bus departures; this path (used by
+    # anything not going through begin_travel -- ambulance, jail, most
+    # immediate off-grid reasons) never did.
+    from sim_loop import _mark_dirty
+    _mark_dirty(world, char_ids={c["id"]})
     return True
 
 
@@ -904,6 +915,13 @@ def process_return(c, world):
     c["return_tick"]     = None
     c.setdefault("off_grid_story_arc", []).append(story)
     c["off_grid_story_arc"] = c["off_grid_story_arc"][-8:]
+
+    # Mirrors the dirty-mark added at the off_grid:True transition above --
+    # without this, a client that had already hidden the model (correctly,
+    # while off_grid) would never learn the character came back and stays
+    # invisible/frozen at the old pre-trip position forever.
+    from sim_loop import _mark_dirty
+    _mark_dirty(world, char_ids={c["id"]})
 
     # Private history — separate, never shared with observers or in world events
     if private_events:

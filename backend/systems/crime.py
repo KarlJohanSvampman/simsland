@@ -27,13 +27,17 @@ RISK_TRAITS = {
     "reckless", "ambitious", "manipulative", "ruthless",
 }
 
-BASE_RECRUIT_CHANCE   = 0.0008
-UNEMPLOYED_BONUS      = 0.004
+# Tuned down from the original values (0.0008/0.004/0.01/0.005/0.006/0.03) --
+# live play showed criminal careers snowballing through entire households
+# (everyone who knows a criminal gets CRIMINAL_CONTACT_BONUS, so one
+# recruitment was making the next one likely) far more than intended.
+BASE_RECRUIT_CHANCE   = 0.0003
+UNEMPLOYED_BONUS      = 0.0015
 DESPERATION_WEALTH    = 500.0
-DESPERATION_BONUS     = 0.01
-DEBT_BONUS            = 0.005
-RISK_TRAIT_BONUS      = 0.006
-CRIMINAL_CONTACT_BONUS = 0.03
+DESPERATION_BONUS     = 0.004
+DEBT_BONUS            = 0.002
+RISK_TRAIT_BONUS      = 0.0025
+CRIMINAL_CONTACT_BONUS = 0.012
 
 _ENTRY_JOBS_BY_TRAIT = {
     "aggressive":   ["street_robber", "street_fighter"],

@@ -67,7 +67,7 @@ from systems.traffic    import update_ambient_traffic
 from systems.media      import generate_news
 from brain.conversations import cleanup_conversations
 from systems.emergency  import trigger_incident, resolve, tick_fire_incidents, auto_report_incidents   # resolve polls arrival ticks
-from systems.health     import maybe_report_medical_emergency
+from systems.health     import apply_severity_consequences
 from systems.law        import process_jail, process_trials, maybe_arrest_from_incidents
 from systems.jobs       import generate_job_listings, tick_job_market, maybe_fire, process_interview, init_company_slots
 from systems.postal_service     import update_postal_service
@@ -545,14 +545,24 @@ def tick(world):
         maybe_arrest_from_incidents(world)
         # Incapacitated characters are deliberately excluded from
         # agent_chars above (same reason their LLM doesn't get called) --
-        # but apply_severity_consequences() (and the medical-emergency
-        # retry inside it) only ever ran from INSIDE that per-character
-        # agent tick, so an unconscious character's own retry stopped
-        # firing the moment they became unconscious. Sweeping every
-        # character here, unconditionally, closes that gap.
+        # but apply_severity_consequences() (posture recovery, and the
+        # medical-emergency retry inside it) and offgrid.py::process_return()
+        # (which is what actually cures a hospital patient -- clears
+        # unconscious/bleeding/severe_trauma -- and brings anyone off_grid
+        # back once their return_tick passes) only ever ran from INSIDE
+        # that per-character agent tick. That's a deadlock for anyone sent
+        # off_grid while incapacitated: they can never re-enter agent_chars
+        # to get treated or come home, because getting treated/coming home
+        # is the only thing that would ever clear "incapacitated" in the
+        # first place. Confirmed live: two characters stayed off_grid,
+        # unconscious, and stuck rendering at their pre-hospital position
+        # on the map indefinitely. Sweeping every character here,
+        # unconditionally, closes both gaps at once.
+        from systems.offgrid import process_return
         for c in characters:
             if c.get("alive") is not False:
-                maybe_report_medical_emergency(c, world)
+                apply_severity_consequences(c, world)
+                process_return(c, world)
 
     if every(world, CADENCE["fires"], offset=16):
         tick_fire_incidents(world)
