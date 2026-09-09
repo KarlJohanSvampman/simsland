@@ -1830,6 +1830,12 @@ def _sec_intoxication(c, world):
     return list(lines) if lines else None
 
 
+def _sec_psychosis(c, world):
+    from systems.psychosis import get_psychosis_context
+    lines = get_psychosis_context(c, world)
+    return list(lines) if lines else None
+
+
 def _sec_libido(c, world):
     # systems/libido.py -- only narrates anything while actually
     # spiking. No specific listener known at this (whole-scene) level,
@@ -1982,6 +1988,7 @@ NARRATIVE_SECTIONS = [
     ("intimacy",              "full", _sec_intimacy),
     ("phone",                 "full", _sec_phone),
     ("intoxication",          "full", _sec_intoxication),
+    ("psychosis",             "core", _sec_psychosis),
     ("addictions",            "full", _sec_addictions),
     ("domestic_situation",    "full", _sec_domestic),
     ("emotional_control",     "full", _sec_emotional_control),
