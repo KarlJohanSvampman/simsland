@@ -528,7 +528,12 @@ def decay_memories(c):
         reverse=True
     )
 
-    c["memories"] = kept[-150:]
+    # kept is sorted highest-importance first -- keep the FRONT of that
+    # list. (Was kept[-150:], which took the tail of a descending-sorted
+    # list -- i.e. the least important entries -- once len(kept) ever
+    # exceeded 150; harmless today only because prune_memories() always
+    # caps the list at 150 before decay_memories() ever sees it.)
+    c["memories"] = kept[:150]
 
 
 # =========================================================

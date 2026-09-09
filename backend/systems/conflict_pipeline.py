@@ -494,16 +494,28 @@ def _resolve(conflict, outcome, world):
         _apply_outcome_relationship(a, b, outcome)
         _apply_outcome_relationship(b, a, outcome)
 
-    # Clear confrontation-emitted flag so fresh grievances can re-trigger
+    # Clear confrontation-emitted flag so fresh grievances can re-trigger --
+    # but NOT for an avoidance outcome (suppressed/cold_shoulder/storm_off):
+    # nothing about the underlying grievance actually got addressed there,
+    # so immediately re-arming let a single un-decayed grievance re-fire
+    # confrontation_desired -> start_conflict -> suppressed every single
+    # grievance-cadence tick, forever (a live bug report found one
+    # character stuck in exactly this loop for hours of sim time,
+    # spamming an identical "had a real fight" memory). Cold-shoulding
+    # them is the intended holding pattern until the score actually
+    # decays below COLD_SHOULDER_THRESHOLD*0.5 (see
+    # grievances.py::check_grievance_thresholds), not an instant retry.
+    AVOIDANCE_OUTCOMES = ("cold_shoulder", "storm_off", "suppressed")
     for pid in conflict["parties"]:
         c = chars.get(pid)
         if c:
             other = _other_party(conflict, pid)
-            emitted = c.get("_confrontation_emitted", [])
-            if other in emitted:
-                emitted.remove(other)
+            if outcome not in AVOIDANCE_OUTCOMES:
+                emitted = c.get("_confrontation_emitted", [])
+                if other in emitted:
+                    emitted.remove(other)
             # Cold shoulder after unresolved conflict
-            if outcome in ("cold_shoulder", "storm_off", "suppressed"):
+            if outcome in AVOIDANCE_OUTCOMES:
                 cold_shoulder = c.setdefault("cold_shoulder_towards", [])
                 if other not in cold_shoulder:
                     cold_shoulder.append(other)

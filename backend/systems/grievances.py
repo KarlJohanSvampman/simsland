@@ -198,7 +198,19 @@ def check_grievance_thresholds(c, world):
 
 
 def update_grievances(world):
-    """Called from sim_loop on a medium cadence."""
+    """Called from sim_loop on a medium cadence.
+
+    Live bug report: an unconscious/incapacitated character was found
+    re-emitting confrontation_desired (and re-starting, re-suppressing a
+    conflict) every single cycle for hours of sim time, since nothing
+    here checked whether the character was even capable of walking over
+    and confronting anyone -- unlike sim_loop.py's own per-tick agent
+    loop, which already excludes posture=="incapacitated" from running
+    at all. Grievances can still accumulate/decay while down, but
+    deciding to confront (and the conflict pipeline it spawns) requires
+    actually being conscious."""
     for c in world.get("characters", {}).values():
         decay_grievances(c)
+        if c.get("alive") is False or c.get("posture") == "incapacitated":
+            continue
         check_grievance_thresholds(c, world)
