@@ -126,7 +126,7 @@ from systems.body_composition import tick_body_composition
 
 # -- Very slow (÷300) ─────────────────────────────────────────────
 from systems.crisis         import check_crises, process_crises
-from systems.politics       import process_pending_effects, check_election
+from systems.politics       import process_pending_effects, check_election, schedule_upcoming_legislation, resolve_legislation_votes
 from systems.influence      import apply_public_figure_influence, apply_social_influence, resolve_exposure_influence, resolve_value_influence
 from systems.socioeconomics import tick_socioeconomics
 from systems.reputation     import tick_reputation
@@ -332,6 +332,7 @@ def tick(world):
         tick_conditioning_weekly(world)
         apply_expenses(world)   # issues this week's household bills (rent/food/hobbies/credit cards/loans)
         recall_overdue_loans(world)   # returns any borrowed item past its due date to its real owner
+        schedule_upcoming_legislation(world)   # keeps a real upcoming bill queued at all times
         try:
             from core.definitions import load_definitions
             _defs_weekly = load_definitions(world.get("sim_id", "default"))
@@ -724,6 +725,7 @@ def tick(world):
     if every(world, CADENCE["election"], offset=21):
         check_election(world)
         process_pending_effects(world)
+        resolve_legislation_votes(world)
 
     if every(world, CADENCE["faction"], offset=22):
         apply_faction_influence(world)
