@@ -4935,6 +4935,168 @@ if(debugSettingsBtn){
   debugSettingsBtn.addEventListener("click", openDebugSettingsModal);
 }
 
+// =========================================================
+// SOCIETAL OVERVIEW MODALS -- stocks/statistics/crime/politics/budget/
+// news. One button + modal + fetch-on-open per api/overview.py endpoint,
+// mirroring fetchEvents()'s on-open fetch shape. No charting library --
+// the stock sparkline is a small inline SVG built directly from the
+// endpoint's own timestamped history, consistent with how this project
+// already avoids new frontend dependencies for small visualizations.
+// =========================================================
+
+function _sparklineSvg(history, width = 120, height = 28){
+  if(!history || history.length < 2) return "";
+  const prices = history.map(h => typeof h === "object" ? h.price : h);
+  const min = Math.min(...prices), max = Math.max(...prices);
+  const range = (max - min) || 1;
+  const step = width / (prices.length - 1);
+  const points = prices
+    .map((p, i) => `${(i * step).toFixed(1)},${(height - ((p - min) / range) * height).toFixed(1)}`)
+    .join(" ");
+  const color = prices[prices.length - 1] >= prices[0] ? "#7ee787" : "#ff8080";
+  return `<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"><polyline points="${points}" fill="none" stroke="${color}" stroke-width="1.5"/></svg>`;
+}
+
+async function _fetchOverview(endpoint){
+  try{
+    const res = await fetch(`/api/overview/${endpoint}?sim_id=default`);
+    const data = await res.json();
+    return data.ok ? data : null;
+  } catch(e){
+    return null;
+  }
+}
+
+const _OVERVIEW_LOADING = `<div class="eventModalRowSummary">Loading…</div>`;
+const _OVERVIEW_FAILED  = `<div class="eventModalRowSummary">Failed to load.</div>`;
+
+async function openStocksModal(){
+  openModal("modal-stocks");
+  const body = document.getElementById("stocksModalBody");
+  body.innerHTML = _OVERVIEW_LOADING;
+  const data = await _fetchOverview("stocks");
+  if(!data){ body.innerHTML = _OVERVIEW_FAILED; return; }
+  const rows = data.stocks.map(s => `
+    <div class="viewerCard">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;">
+        <div>
+          <b>${s.name}</b> <span style="opacity:.6">(${s.ticker})</span><br/>
+          <span style="opacity:.6">${s.sector || ""}</span>
+        </div>
+        <div style="text-align:right">
+          $${(s.price ?? 0).toFixed(2)}
+          <span class="${s.change_pct >= 0 ? "viewerPos" : "viewerNeg"}">${s.change_pct >= 0 ? "+" : ""}${s.change_pct}%</span><br/>
+          ${_sparklineSvg(s.history)}
+        </div>
+      </div>
+      <div style="opacity:.6;font-size:.85em">Shares available: ${s.shares_available ?? "n/a"} / ${s.num_shares ?? "n/a"}</div>
+    </div>`).join("");
+  body.innerHTML = rows || "<div class=\"eventModalRowSummary\">No stocks.</div>";
+}
+
+async function openStatisticsModal(){
+  openModal("modal-statistics");
+  const body = document.getElementById("statisticsModalBody");
+  body.innerHTML = _OVERVIEW_LOADING;
+  const data = await _fetchOverview("statistics");
+  if(!data){ body.innerHTML = _OVERVIEW_FAILED; return; }
+  const rows = data.statistics.map(s => `
+    <div class="eventModalRow">
+      <div class="eventModalRowMeta">${s.label}</div>
+      <div>${s.value}${s.unit ? " " + s.unit : ""}</div>
+    </div>`).join("");
+  body.innerHTML = rows || "<div class=\"eventModalRowSummary\">No data.</div>";
+}
+
+async function openCrimeModal(){
+  openModal("modal-crime");
+  const body = document.getElementById("crimeModalBody");
+  body.innerHTML = _OVERVIEW_LOADING;
+  const data = await _fetchOverview("crime");
+  if(!data){ body.innerHTML = _OVERVIEW_FAILED; return; }
+  const rateRows = Object.entries(data.rates || {}).map(([k, v]) => `
+    <div class="eventModalRow">
+      <div class="eventModalRowMeta">${_formatIntentionFieldLabel(k)}</div>
+      <div>${v}</div>
+    </div>`).join("");
+  const incidentRows = Object.entries(data.recent_incidents_by_type || {}).map(([k, v]) => `
+    <div class="eventModalRow">
+      <div class="eventModalRowMeta">${_formatIntentionFieldLabel(k)}</div>
+      <div>${v}</div>
+    </div>`).join("");
+  body.innerHTML = `
+    <div class="eventModalRowSummary">Crime rates</div>${rateRows}
+    <div class="eventModalRowSummary">Recent incidents (last ${data.recent_incident_count})</div>
+    ${incidentRows || "<div class=\"eventModalRowSummary\">None recorded.</div>"}
+  `;
+}
+
+async function openPoliticsModal(){
+  openModal("modal-politics");
+  const body = document.getElementById("politicsModalBody");
+  body.innerHTML = _OVERVIEW_LOADING;
+  const data = await _fetchOverview("politics");
+  if(!data){ body.innerHTML = _OVERVIEW_FAILED; return; }
+  const factionRows = (data.factions || []).map(f => `
+    <div class="eventModalRow">
+      <div class="eventModalRowMeta">${f.name}</div>
+      <div>${f.member_count} members${f.agenda.length ? " — " + f.agenda.join(", ") : ""}</div>
+    </div>`).join("");
+  const billRows = (data.legislation || []).map(b => `
+    <div class="viewerCard">
+      <b>${b.title}</b> <span style="opacity:.6">(${b.status})</span><br/>
+      <span style="opacity:.6">Vote at tick ${b.vote_tick}${b.status !== "pending" ? ` — ${b.votes_for} for / ${b.votes_against} against` : ""}</span>
+    </div>`).join("");
+  const election = data.election || {};
+  body.innerHTML = `
+    <div class="eventModalRowSummary">Election: ${election.result ? `last winner "${election.result}"` : "in progress"}, next in ${election.days_until_election ?? "?"} days</div>
+    <div class="eventModalRowSummary">Factions</div>${factionRows}
+    <div class="eventModalRowSummary">Legislation</div>
+    ${billRows || "<div class=\"eventModalRowSummary\">No bills queued.</div>"}
+  `;
+}
+
+async function openBudgetModal(){
+  openModal("modal-budget");
+  const body = document.getElementById("budgetModalBody");
+  body.innerHTML = _OVERVIEW_LOADING;
+  const data = await _fetchOverview("budget");
+  if(!data){ body.innerHTML = _OVERVIEW_FAILED; return; }
+  const rows = Object.entries(data.spending_categories || {}).map(([cat, d]) => `
+    <div class="eventModalRow">
+      <div class="eventModalRowMeta">${_formatIntentionFieldLabel(cat)}</div>
+      <div>${Math.round((d.share || 0) * 100)}% share — $${(d.total_spent || 0).toLocaleString()} spent to date</div>
+    </div>`).join("");
+  body.innerHTML = `<div class="eventModalRowSummary">Treasury: $${(data.treasury || 0).toLocaleString()}</div>${rows}`;
+}
+
+async function openNewsModal(){
+  openModal("modal-news");
+  const body = document.getElementById("newsModalBody");
+  body.innerHTML = _OVERVIEW_LOADING;
+  const data = await _fetchOverview("news");
+  if(!data){ body.innerHTML = _OVERVIEW_FAILED; return; }
+  const rows = (data.news || []).map(n => `
+    <div class="viewerCard">
+      <b>${n.headline}</b><br/>
+      ${n.summary || ""}<br/>
+      <span style="opacity:.6">${n.source || ""} · ${n.sentiment || ""}</span>
+    </div>`).join("");
+  body.innerHTML = rows || "<div class=\"eventModalRowSummary\">No recent news.</div>";
+}
+
+[
+  ["stocksBtn", openStocksModal],
+  ["statisticsBtn", openStatisticsModal],
+  ["crimeBtn", openCrimeModal],
+  ["politicsBtn", openPoliticsModal],
+  ["budgetBtn", openBudgetModal],
+  ["newsBtn", openNewsModal],
+].forEach(([id, handler]) => {
+  const btn = document.getElementById(id);
+  if(btn) btn.addEventListener("click", handler);
+});
+
 renderer.domElement.addEventListener("dblclick", (event) => {
   mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
   mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;

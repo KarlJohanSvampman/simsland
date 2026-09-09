@@ -205,6 +205,38 @@
     background: rgba(40,40,40,0.9);
   }
 
+  /* =========================
+     SOCIETAL OVERVIEW TOOLBAR
+     Continues the same top-right button row as debugSettingsBtn/
+     timelineToggleBtn (44px spacing) -- see api/overview.py for the
+     data each one opens a modal onto.
+  ========================= */
+
+  .overviewToolbarBtn {
+    position: fixed;
+    top: 10px;
+    z-index: 9999;
+    width: 34px;
+    height: 34px;
+    background: rgba(0,0,0,0.85);
+    color: white;
+    border: 1px solid #444;
+    border-radius: 6px;
+    font-size: 16px;
+    cursor: pointer;
+  }
+
+  .overviewToolbarBtn:hover {
+    background: rgba(40,40,40,0.9);
+  }
+
+  #stocksBtn     { right: 368px; }
+  #statisticsBtn { right: 412px; }
+  #crimeBtn      { right: 456px; }
+  #politicsBtn   { right: 500px; }
+  #budgetBtn     { right: 544px; }
+  #newsBtn       { right: 588px; }
+
   #eventTimeline {
     position: fixed;
     top: 54px;
@@ -676,6 +708,12 @@
 <button id="debugSettingsBtn" title="Debug overlay settings">⚙</button>
 <button id="timelineToggleBtn" title="Toggle event timeline">🕒</button>
 <button id="outlinerToggleBtn" title="Toggle outliner">☰</button>
+<button id="stocksBtn" class="overviewToolbarBtn" title="Stock market">📈</button>
+<button id="statisticsBtn" class="overviewToolbarBtn" title="Statistics">📊</button>
+<button id="crimeBtn" class="overviewToolbarBtn" title="Crime">🚨</button>
+<button id="politicsBtn" class="overviewToolbarBtn" title="Politics">🏛</button>
+<button id="budgetBtn" class="overviewToolbarBtn" title="Budget">💰</button>
+<button id="newsBtn" class="overviewToolbarBtn" title="News">📰</button>
 
 <div id="outlinerSidebar">
   <input id="outlinerSearch" type="text" placeholder="Search households / characters..." />
@@ -732,6 +770,66 @@
       <button class="modal-close" onclick="closeModal('modal-intention')">✕</button>
     </div>
     <div class="modal-body" id="intentionModalBody"></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-stocks">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3>Stock Market</h3>
+      <button class="modal-close" onclick="closeModal('modal-stocks')">✕</button>
+    </div>
+    <div class="modal-body" id="stocksModalBody"></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-statistics">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3>General Statistics</h3>
+      <button class="modal-close" onclick="closeModal('modal-statistics')">✕</button>
+    </div>
+    <div class="modal-body" id="statisticsModalBody"></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-crime">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3>Crime</h3>
+      <button class="modal-close" onclick="closeModal('modal-crime')">✕</button>
+    </div>
+    <div class="modal-body" id="crimeModalBody"></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-politics">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3>Political Landscape</h3>
+      <button class="modal-close" onclick="closeModal('modal-politics')">✕</button>
+    </div>
+    <div class="modal-body" id="politicsModalBody"></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-budget">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3>Government Budget</h3>
+      <button class="modal-close" onclick="closeModal('modal-budget')">✕</button>
+    </div>
+    <div class="modal-body" id="budgetModalBody"></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-news">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3>News</h3>
+      <button class="modal-close" onclick="closeModal('modal-news')">✕</button>
+    </div>
+    <div class="modal-body" id="newsModalBody"></div>
   </div>
 </div>
 
