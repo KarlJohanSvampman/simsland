@@ -197,6 +197,13 @@ def _fulfill_listing(buyer, seller, listing, world):
         fake = make_item("fake_id", world=world)
         fake["impersonates_id"] = target_id
         fake["impersonates_name"] = target.get("name") if target else "Unknown"
+        # Forged, independently-rolled birth_year -- skewed older (21-30)
+        # so it's actually useful for an age-gated venue -- NOT copied
+        # from the real target's own birth_year. Forging a birthdate is
+        # the whole point of a fake ID (see systems/id_check.py, the one
+        # place that scrutinizes real vs. forged).
+        calendar_year = world.get("calendar", {}).get("year") or 2024
+        fake["birth_year"] = calendar_year - random.randint(21, 30)
         add_item(buyer, fake)
         return {"target_id": target_id}
 

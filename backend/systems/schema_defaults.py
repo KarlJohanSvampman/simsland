@@ -947,6 +947,28 @@ def ensure_character_defaults(c, world=None):
         import random as _random
         c["ssn"] = f"{_random.randint(0, 999):03d}-{_random.randint(0, 99):02d}-{_random.randint(0, 9999):04d}"
 
+    # ID/driver's-license backfill (Identification round) -- id_card/
+    # driver_license items created before this round's tags/birth_year
+    # fields existed (character_gen.py seeds both properly at creation
+    # now) need retrofitting so has_valid_id()/age-gate checks (which
+    # read those fields) work for already-existing characters, not just
+    # newly generated ones.
+    _wallet = next((i for i in c.get("inventory", []) if i.get("object_type") == "wallet"), None)
+    _docs = list(c.get("inventory", [])) + (_wallet.get("items", []) if _wallet else [])
+    if _docs:
+        _calendar_year = (world or {}).get("calendar", {}).get("year")
+        if _calendar_year is None:
+            from datetime import datetime as _datetime
+            _calendar_year = _datetime.now().year
+        for _doc in _docs:
+            if _doc.get("template_id") not in ("id_card", "driver_license"):
+                continue
+            if "valid_id" not in (_doc.get("tags") or []):
+                _doc.setdefault("tags", [])
+                _doc["tags"].append("valid_id")
+            if _doc.get("birth_year") is None:
+                _doc["birth_year"] = _calendar_year - c.get("age", 0)
+
     # Cognition core trait (Logical/Balanced/Self-Aware) -- every character
     # gets exactly one, assigned at generation (character_gen.py). Backfill
     # for pre-existing characters that predate this system.

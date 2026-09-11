@@ -934,6 +934,11 @@ STEAL_METHOD_SUCCESS = {
 }
 STEAL_CASH_RANGE = (20, 150)
 STEAL_STANDING_GAIN = 5.0
+# A real, smaller-probability chance a successful theft ALSO lifts a
+# wallet document (id_card/bank_card/driver_license), not just cash --
+# the user's "lost or stolen" ID ask.
+STEAL_ID_CHANCE = 0.25
+_STEALABLE_DOCUMENT_TEMPLATES = ("id_card", "bank_card", "driver_license")
 
 
 def resolve_steal_from(actor, target, method, world):
@@ -953,12 +958,29 @@ def resolve_steal_from(actor, target, method, world):
         pass
 
     stolen = 0.0
+    stolen_document = None
     if success:
         available = wallet_cash(target)
         take = min(available, random.uniform(*STEAL_CASH_RANGE))
         if take > 0 and spend_cash(target, take):
             add_cash(actor, take)
             stolen = take
+
+        # A real chance the wallet's ID/bank card/license go too, not just
+        # the cash. A stolen REAL document is more dangerous for identity
+        # fraud than a fabricated fake_id -- it's not impersonation, it's
+        # genuinely holding someone else's valid credential (see
+        # excuses.py::_get_true_detail()'s owner_id-mismatch branch for
+        # where that gets consumed).
+        if random.random() < STEAL_ID_CHANCE:
+            from systems.personal_items import get_item, add_item
+            wallet = get_item(target, "wallet")
+            stealable = [i for i in (wallet.get("items", []) if wallet else [])
+                         if i.get("template_id") in _STEALABLE_DOCUMENT_TEMPLATES]
+            if stealable:
+                stolen_document = random.choice(stealable)
+                wallet["items"].remove(stolen_document)
+                add_item(actor, stolen_document)
 
     from brain.relationships import ensure_relationship
     rel = ensure_relationship(target, actor["id"])
@@ -989,13 +1011,17 @@ def resolve_steal_from(actor, target, method, world):
                          ["crime", "robbery", "victim"], "crime", tick)
             store_memory(actor, f"Robbed {target.get('name', 'someone')} for ${stolen:.0f}.", .8,
                          ["crime", "robbery"], "crime", tick)
+            if stolen_document is not None:
+                doc_label = stolen_document.get("name", "a document")
+                store_memory(target, f"Their {doc_label} was stolen along with their cash.", .9,
+                             ["crime", "robbery", "victim", "identity_theft"], "crime", tick)
         else:
             store_memory(actor, f"Tried to rob {target.get('name', 'someone')} but they got away.", .6,
                          ["crime", "robbery", "failed"], "crime", tick)
     except Exception:
         pass
 
-    return {"success": success, "stolen": stolen}
+    return {"success": success, "stolen": stolen, "stolen_document": stolen_document}
 
 
 # =========================================================

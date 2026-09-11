@@ -4852,6 +4852,15 @@
       "consumable": false,
       "icon": "document"
     },
+    "driver_license": {
+      "name": "Driver's License",
+      "category": "document",
+      "size": 1,
+      "base_price": 0,
+      "stackable": false,
+      "consumable": false,
+      "icon": "document"
+    },
     "bank_card": {
       "name": "Bank Card",
       "category": "financial",
@@ -12220,7 +12229,8 @@
       "illicit": true,
       "tags": [
         "forged",
-        "darknet"
+        "darknet",
+        "valid_id"
       ]
     },
     "counterfeit_cash_bundle": {
@@ -34325,6 +34335,74 @@
       ],
       "complexity_tier": 3
     },
+    "driving_instructor": {
+      "name": "Driving Instructor",
+      "industry": "Education",
+      "sector": "education",
+      "income_class": "Middle",
+      "average_salary": 50000,
+      "hourly_wage": 24.04,
+      "salary": 4167,
+      "work_mode": "On-site",
+      "work_hours": [
+        9,
+        18
+      ],
+      "work_days": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "degree_required": "certificate",
+      "physical_demand": 40,
+      "social_demand": 72,
+      "service_job": true,
+      "hazard_level": "Low",
+      "skill_requirements": {},
+      "promotion_path": [],
+      "tags": [
+        "education",
+        "on_site",
+        "low_hazard"
+      ],
+      "complexity_tier": 2
+    },
+    "dmv_clerk": {
+      "name": "DMV Clerk",
+      "industry": "Government",
+      "sector": "government",
+      "income_class": "Lower Middle",
+      "average_salary": 42000,
+      "hourly_wage": 20.19,
+      "salary": 3500,
+      "work_mode": "On-site",
+      "work_hours": [
+        8,
+        17
+      ],
+      "work_days": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "degree_required": "high_school",
+      "physical_demand": 20,
+      "social_demand": 55,
+      "service_job": true,
+      "hazard_level": "Low",
+      "skill_requirements": {},
+      "promotion_path": [],
+      "tags": [
+        "government",
+        "on_site",
+        "low_hazard"
+      ],
+      "complexity_tier": 1
+    },
     "senior_pharmacist": {
       "name": "Senior Pharmacist",
       "industry": "Healthcare",
@@ -51668,6 +51746,72 @@
         "close": 20
       }
     },
+    "driving_school": {
+      "name": "DriveRight Driving School",
+      "industry": "education",
+      "off_grid": true,
+      "service_category": "instruction",
+      "opening_hours": {
+        "open": 9,
+        "close": 18
+      },
+      "staff_roles": [
+        "driving_instructor"
+      ],
+      "avg_visit_duration_ticks": 60,
+      "cost_range": [
+        40,
+        80
+      ],
+      "description": "Behind-the-wheel driving lessons with a certified instructor.",
+      "typical_roles": [
+        "driving_instructor"
+      ],
+      "max_staff": 8,
+      "turnover_rate": 0.02,
+      "business_kind": "service",
+      "presence": "physical",
+      "phone_hours": {
+        "open": 9,
+        "close": 18
+      },
+      "reason_options": [
+        "driving_lesson"
+      ]
+    },
+    "dmv": {
+      "name": "Department of Motor Vehicles",
+      "industry": "government",
+      "off_grid": true,
+      "service_category": "licensing",
+      "opening_hours": {
+        "open": 8,
+        "close": 17
+      },
+      "staff_roles": [
+        "dmv_clerk"
+      ],
+      "avg_visit_duration_ticks": 45,
+      "cost_range": [
+        15,
+        40
+      ],
+      "description": "Driving tests and license issuance.",
+      "typical_roles": [
+        "dmv_clerk"
+      ],
+      "max_staff": 10,
+      "turnover_rate": 0.01,
+      "business_kind": "service",
+      "presence": "physical",
+      "phone_hours": {
+        "open": 8,
+        "close": 17
+      },
+      "reason_options": [
+        "driving_test"
+      ]
+    },
     "law_firm": {
       "name": "Law Firm",
       "industry": "legal",
@@ -52540,7 +52684,8 @@
       "phone_hours": {
         "open": 16,
         "close": 2
-      }
+      },
+      "minimum_age": 21
     },
     "nightclub": {
       "name": "Nightclub",
@@ -52587,7 +52732,8 @@
       "phone_hours": {
         "open": 22,
         "close": 4
-      }
+      },
+      "minimum_age": 21
     },
     "tech_company": {
       "name": "Tech Company",
@@ -52991,7 +53137,8 @@
       "max_staff": 25,
       "turnover_rate": 0.08,
       "business_kind": "product",
-      "presence": "physical"
+      "presence": "physical",
+      "minimum_age": 18
     },
     "adult_cinema": {
       "name": "Paradise Adult Theater",
@@ -53007,7 +53154,8 @@
       "max_staff": 5,
       "turnover_rate": 0.04,
       "business_kind": "product",
-      "presence": "physical"
+      "presence": "physical",
+      "minimum_age": 18
     },
     "sex_shop": {
       "name": "Pleasure Palace",
@@ -53023,7 +53171,8 @@
       "max_staff": 4,
       "turnover_rate": 0.04,
       "business_kind": "product",
-      "presence": "physical"
+      "presence": "physical",
+      "minimum_age": 18
     },
     "criminal_gang": {
       "name": "Street Crew",
@@ -63418,6 +63567,18 @@
       ],
       "base_priority": 70,
       "category": "social"
+    },
+    "acquire_driver_license": {
+      "label": "Get your driver's license",
+      "cadence": "once",
+      "value_category": "education",
+      "of_self": true,
+      "requires_others": false,
+      "tags": [
+        "driving_age"
+      ],
+      "base_priority": 50,
+      "category": "identity"
     },
     "relax_with_someone": {
       "label": "Unwind with your spouse or a friend",

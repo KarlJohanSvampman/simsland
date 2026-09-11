@@ -132,7 +132,18 @@ def check_election(world):
                 c=world["characters"][cid]
                 for agenda in world["factions"][fid]["agenda"]: update_belief(c,agenda,"positive",.2,world["tick"])
     if world["tick"]>=e["next_tick"]:
+        # Eligibility fix: this used to count a vote from EVERY character
+        # in world["characters"] with no filter at all -- toddlers voted
+        # identically to adults. Same age>=18 filter resolve_legislation_
+        # votes() already uses, plus a real ID requirement (the user's own
+        # "something they need to go vote" ask) -- a fake ID still counts
+        # here (that IS the fraud vector), see personal_items.py::
+        # has_valid_id()'s own docstring for why real/fake aren't
+        # distinguished at this checkpoint.
+        from systems.personal_items import has_valid_id
         build_factions(world); votes={fid:0 for fid in world["factions"]}
-        for c in world["characters"].values(): votes[c.get("faction_id") or "moderate"]=votes.get(c.get("faction_id") or "moderate",0)+1
+        for c in world["characters"].values():
+            if c.get("age",0)<18 or not has_valid_id(c): continue
+            votes[c.get("faction_id") or "moderate"]=votes.get(c.get("faction_id") or "moderate",0)+1
         winner=max(votes,key=votes.get); e["result"]=winner; e["votes"]=votes; e["campaign_active"]=False; e["next_tick"]+=500; e["campaign_start_tick"]=e["next_tick"]-80
         for pol in world["factions"][winner].get("agenda",[])[:1]: apply_policy(world,pol)

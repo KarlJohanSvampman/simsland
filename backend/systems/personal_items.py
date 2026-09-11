@@ -157,6 +157,68 @@ def has_key_for_ref(c, kind, ref_id):
     )
 
 
+def make_driver_license(char_id, char_name, owner_id=None, birth_year=None):
+    """Same document shape as make_id_card() -- it doubles as valid ID
+    for any age-gate/voting/delivery check (see has_valid_id() below),
+    not just a driving permission (checked separately via
+    has_valid_license())."""
+    return {
+        "id":        f"item_license_{uuid.uuid4().hex[:6]}",
+        "template_id": "driver_license",
+        "object_type": "document",
+        "category":  "document",
+        "name":      "Driver's License",
+        "location":  "pocket",
+        "states":    {},
+        "quantity":  1,
+        "size":      1,
+        "char_id":   char_id,
+        "char_name": char_name,
+        "owner_id":  owner_id,
+        "birth_year": birth_year,
+        "tags":      ["valid_id"],
+    }
+
+
+def _carried_documents(c):
+    """Items this character actually carries, including ones tucked
+    inside their wallet -- get_inventory()/has_item_template() only see
+    the top-level inventory list, but id_card/bank_card/driver_license
+    are typically nested inside the wallet container (see make_wallet()),
+    so a naive has_item_template(c, "id_card") would miss them (this is
+    also why government_debt.py::assess_monthly_tax() reaches into
+    wallet["items"] by hand rather than using has_item_template)."""
+    items = list(get_inventory(c))
+    wallet = get_item(c, "wallet")
+    if wallet:
+        items.extend(wallet.get("items", []))
+    return items
+
+
+def has_valid_id(c):
+    """True if this character carries ANY document that functions as ID
+    -- a real id_card, a driver_license, or even a fake_id (a fake is
+    still a real, physical thing someone can hand over; whether it's
+    SCRUTINIZED and caught is a separate concern -- see
+    systems/id_check.py's age-gated-venue check, the one place that
+    actually discriminates real from forged)."""
+    return any("valid_id" in (i.get("tags") or []) for i in _carried_documents(c))
+
+
+def has_valid_license(c):
+    return any(i.get("template_id") == "driver_license" for i in _carried_documents(c))
+
+
+def get_carried_id(c):
+    """The first valid-ID-tagged document this character carries (real,
+    fake, or a driver's license) -- for systems that need to inspect
+    WHICH one, e.g. reading its claimed birth_year or template_id."""
+    for i in _carried_documents(c):
+        if "valid_id" in (i.get("tags") or []):
+            return i
+    return None
+
+
 def make_wallet(cash=100.0, owner_id=None, contents=None):
     """Cash stays on the simpler, already-wired states.cash path (see
     wallet_cash/spend_cash/add_cash below) rather than becoming a discrete
@@ -185,7 +247,15 @@ def make_wallet(cash=100.0, owner_id=None, contents=None):
     }
 
 
-def make_id_card(char_id, char_name, owner_id=None):
+def make_id_card(char_id, char_name, owner_id=None, birth_year=None):
+    # birth_year (not a raw age) is what an age-gate check reads back --
+    # storing the year rather than a snapshot of "age at issuance" means
+    # a REAL card's claimed age stays correct as the sim's calendar year
+    # advances (age and year both climb at the same rate, by definition),
+    # with zero drift-correction code needed. A FORGED card (see
+    # darknet.py's fake_id path) stamps its own fabricated birth_year
+    # instead, which is exactly right -- a fake ID's birthdate doesn't
+    # mysteriously update either.
     return {
         "id":        f"item_idcard_{uuid.uuid4().hex[:6]}",
         "template_id": "id_card",
@@ -199,6 +269,8 @@ def make_id_card(char_id, char_name, owner_id=None):
         "char_id":   char_id,
         "char_name": char_name,
         "owner_id":  owner_id,
+        "birth_year": birth_year,
+        "tags":      ["valid_id"],
     }
 
 

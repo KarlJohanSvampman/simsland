@@ -64,6 +64,12 @@ def _character_tags(c, world=None):
         tags.add("child_or_teen")
     if c.get("employed"):
         tags.add("employed")
+    # 16 is a common US learner-eligibility age (real state minimums for a
+    # full license vary 16-18) -- documented approximation, not a precise
+    # rule. Deliberately its own tag, not age_group=="teen" (13-17), since
+    # driving age cuts across that boundary.
+    if c.get("age", 0) >= 16:
+        tags.add("driving_age")
 
     if world is not None:
         household = world.get("households", {}).get(c.get("household_id"))

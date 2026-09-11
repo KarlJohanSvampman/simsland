@@ -752,7 +752,22 @@ def generate_character(defs, overrides=None, world=None):
     # plausibly has a wallet with a couple dollars and an ID card.
     try:
         from systems.personal_items import make_wallet, make_id_card, make_bank_card, STARTER_BANKS
-        id_card = make_id_card(character["id"], character["name"], owner_id=character["id"])
+
+        # birth_year, not a raw age snapshot -- see make_id_card()'s own
+        # docstring for why (stays accurate as the sim's calendar year
+        # advances, no drift-correction needed). Falls back to the real
+        # calendar year when generating without a world (Character
+        # Creator preview/validation contexts).
+        if world is not None:
+            calendar_year = world.get("calendar", {}).get("year")
+        else:
+            calendar_year = None
+        if calendar_year is None:
+            from datetime import datetime
+            calendar_year = datetime.now().year
+        birth_year = calendar_year - character.get("age", 0)
+
+        id_card = make_id_card(character["id"], character["name"], owner_id=character["id"], birth_year=birth_year)
 
         # Real account when a live world is available (see this function's
         # docstring) -- balance starts at $0, the $100 starting cash stays
@@ -769,7 +784,25 @@ def generate_character(defs, overrides=None, world=None):
                 account_number = open_account(world, bank_key, character["id"], initial_balance=0.0)
         bank_card = make_bank_card(bank=bank_name, account_number=account_number, owner_id=character["id"])
 
-        wallet = make_wallet(cash=100.0, owner_id=character["id"], contents=[id_card, bank_card])
+        contents = [id_card, bank_card]
+
+        # Driver's license: a real chance of already starting licensed
+        # rather than always assigning the whole acquire_driver_license
+        # pursuit (systems/driver_license.py) from zero. Approximate US
+        # licensure rates -- ~85% of adults hold one; noticeably lower for
+        # newly-eligible 16-17 year-olds, who often haven't gotten around
+        # to it yet -- documented approximations, not precise data.
+        age = character.get("age", 0)
+        if age >= 16:
+            licensed_chance = 0.85 if age >= 18 else 0.30
+            if random.random() < licensed_chance:
+                from systems.personal_items import make_driver_license
+                contents.append(make_driver_license(
+                    character["id"], character["name"],
+                    owner_id=character["id"], birth_year=birth_year,
+                ))
+
+        wallet = make_wallet(cash=100.0, owner_id=character["id"], contents=contents)
         character["inventory"].append(wallet)
     except Exception:
         pass

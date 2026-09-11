@@ -488,7 +488,10 @@ def _seed_lie_for_private_event(c, world, event):
 # garage and drive yourself" would be narratively wrong.
 _TRAVEL_ELIGIBLE_REASONS = {
     "work", "job_search", "shopping", "leisure", "gym", "cafe", "doctor", "pharmacy",
-    "interview",
+    "interview", "driving_lesson", "driving_test",
+    # "practice_driving" deliberately excluded -- the point of that trip is
+    # the driving itself (a companion's car, off-screen), not travelling to
+    # a destination, so it resolves via the plain immediate off-grid path.
 }
 
 
@@ -687,7 +690,18 @@ def maybe_go_offgrid(c, world):
     if r < 0.004 * leave_mult:
         _send_errand(c, world, "shopping", 45)
     elif r < 0.008 * leave_mult:
-        _send_errand(c, world, random.choice(["leisure", "gym", "cafe"]), random.randint(30, 60))
+        choice = random.choice(["leisure", "gym", "cafe"])
+        if choice == "leisure" and random.random() < 0.25:
+            # This leisure trip is specifically a night out at a bar/club
+            # -- see systems/id_check.py's module docstring for why the
+            # age/ID check happens right here at dispatch time rather than
+            # at a specific business (no real per-instance venue selection
+            # exists for leisure trips). Denied -> no trip this attempt,
+            # same real-world outcome as getting turned away at the door.
+            from systems.id_check import check_id_for_entry
+            if not check_id_for_entry(c, world):
+                return
+        _send_errand(c, world, choice, random.randint(30, 60))
 
 
 def maybe_schedule_doctor_visit(c, world):
@@ -1174,6 +1188,11 @@ def process_return(c, world):
         # advance_job_application()/_on_interview_return().
         from systems.jobs import _on_interview_return
         _on_interview_return(c, world)
+    elif reason in ("driving_lesson", "driving_test", "practice_driving"):
+        # Same pattern as the interview branch above -- the lesson
+        # counter/test pass-fail roll happens on return, not dispatch.
+        from systems.driver_license import on_driver_license_return
+        on_driver_license_return(c, world, reason)
     elif reason in ("credit_card_application", "account_setup", "loan_application"):
         # _pending_appointment_business was stashed by
         # resolve_due_appointments() right before send_offgrid() -- the

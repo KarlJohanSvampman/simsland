@@ -411,6 +411,24 @@ def _get_true_detail(c, question_type, world):
         if question_type == "what":
             return persona["occupation_label"]
 
+    # Carrying an ID that claims a different identity -- either a
+    # darknet-forged fake_id (impersonates_name, stamped at purchase,
+    # previously stored but never actually read anywhere) or a genuinely
+    # STOLEN real id_card/bank_card/driver_license (see crime.py::
+    # resolve_steal_from()'s stolen_document path -- owner_id/char_name
+    # belong to the actual victim, not the current bearer). Both are the
+    # same "fraud" concept from the excuse-generation pipeline's point of
+    # view: presenting under a name that isn't yours.
+    if question_type == "who":
+        from systems.personal_items import get_carried_id
+        doc = get_carried_id(c)
+        if doc:
+            claimed_name = doc.get("impersonates_name")
+            if not claimed_name and doc.get("owner_id") and doc.get("owner_id") != c.get("id"):
+                claimed_name = doc.get("char_name")
+            if claimed_name:
+                return claimed_name
+
     chars = world.get("characters", {})
     if question_type == "where":
         dest = c.get("move_target", {})

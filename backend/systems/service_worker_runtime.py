@@ -365,6 +365,24 @@ def deposit_newspaper(worker, world):
 # DROP PACKAGE
 # =========================================================
 
+def _resident_present(household, world):
+    """Is any household member actually home right now (not off-grid,
+    physically at the home building)? No existing "is anyone home"
+    helper exists in this codebase to reuse -- the closest thing,
+    action_router.py::_co_present_characters(), is keyed off a real
+    character's own room/building, not a household record."""
+    home_id = household.get("home_id")
+    if not home_id:
+        return None
+    for mid in household.get("members", []):
+        member = world.get("characters", {}).get(mid)
+        if not member or member.get("alive") is False or member.get("off_grid"):
+            continue
+        if member.get("building_id") == home_id:
+            return member
+    return None
+
+
 def drop_package(
 
     worker,
@@ -383,6 +401,16 @@ def drop_package(
 
     if not household:
         return
+
+    # If someone's actually home, the carrier asks for ID before leaving
+    # the package -- fails the check -> the package is NOT left (deferred,
+    # not delivered). Nobody-home case is unchanged: real carriers don't
+    # refuse a signature-optional package just because nobody answered.
+    resident = _resident_present(household, world)
+    if resident is not None:
+        from systems.personal_items import has_valid_id
+        if not has_valid_id(resident):
+            return
 
     household.setdefault(
         "pending_packages",

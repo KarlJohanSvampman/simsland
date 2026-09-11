@@ -50,6 +50,13 @@ _CAR_PROBABILITY = 0.8
 def choose_travel_mode(c, world):
     car = household_car(world, c.get("household_id"))
     car_available = car is not None and not car.get("state", {}).get("in_use")
+    if car_available:
+        # Confirmed real gap: before this, any character with car access
+        # simply drove, unconditionally -- including children. This also
+        # correctly routes an unlicensed learner's own driving_lesson/
+        # driving_test trips onto the bus, which is exactly right.
+        from systems.personal_items import has_valid_license
+        car_available = has_valid_license(c)
     if car_available and random.random() < _CAR_PROBABILITY:
         return "car"
     return "bus"

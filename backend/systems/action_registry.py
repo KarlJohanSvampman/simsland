@@ -285,6 +285,7 @@ ACTION_SPECS = {
     "cancel_subscription":  {"group": "finance", "target": "none", "doc": "Cancel one of your household's subscriptions."},
     "insure_vehicle":       {"group": "finance", "target": "prop", "doc": "Buy insurance for a specific vehicle."},
     "buy_mobile_data":      {"group": "finance", "target": "none", "doc": "Buy mobile data (GB) for your phone from a telecom provider."},
+    "report_id_lost":       {"group": "finance", "target": "none", "doc": "Report your ID card, bank card, or driver's license as lost or stolen."},
 
     # ---- exercise -----------------------------------------------------
     "jog":            {"group": "exercise", "target": "none", "doc": "Go for a jog."},

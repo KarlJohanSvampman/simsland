@@ -719,6 +719,26 @@ def _route_buy_mobile_data(c, world, action):
     buy_mobile_data(world, c, service_id, float(gb_amount))
 
 
+def _route_report_id_lost(c, world, action):
+    """Report an ID/license as lost or stolen. Flags any currently-
+    carried valid-ID document as reported -- a real paper trail future
+    systems could check (e.g. flagging suspicious use of a reported-
+    stolen ID -- not built this round, out of scope). If the actual
+    document was physically stolen (crime.py::resolve_steal_from()'s
+    stolen_document path), there's nothing left on this character's side
+    to flag; the report is still recorded on the character."""
+    from systems.personal_items import _carried_documents
+    reported_any = False
+    for doc in _carried_documents(c):
+        if "valid_id" in (doc.get("tags") or []):
+            doc.setdefault("states", {})["reported_lost"] = True
+            reported_any = True
+    c.setdefault("lost_id_reports", []).append({
+        "tick": world.get("tick", 0),
+        "had_document": reported_any,
+    })
+
+
 # =========================================================
 # ROUTE WAIT
 # =========================================================
@@ -1283,6 +1303,9 @@ def route_action(c, world, action, speech, definitions=None, available_actions=N
 
     elif action_type == "buy_mobile_data":
         _route_buy_mobile_data(c, world, action)
+
+    elif action_type == "report_id_lost":
+        _route_report_id_lost(c, world, action)
 
     elif action_type == "wait":
         _route_wait(c, world, action)

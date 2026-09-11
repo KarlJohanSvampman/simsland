@@ -71,6 +71,7 @@ from systems.emergency  import trigger_incident, resolve, tick_fire_incidents, a
 from systems.health     import apply_severity_consequences
 from systems.law        import process_jail, process_trials, maybe_arrest_from_incidents
 from systems.jobs       import generate_job_listings, tick_job_market, maybe_fire, advance_job_application, init_company_slots
+from systems.driver_license import advance_driver_license, maybe_practice_with_companion
 from systems.postal_service     import update_postal_service
 from systems.newspaper_delivery import update_newspaper_delivery
 from systems.business_support   import process_business_inboxes
@@ -509,6 +510,8 @@ def tick(world):
         for c in characters:
             maybe_fire(c, world)              # emits character_fired → apply_for_job
             advance_job_application(c, world) # polls job_application's stage_deadline_tick; emits character_hired
+            advance_driver_license(c, world)       # same real multi-stage-pipeline shape as job_application
+            maybe_practice_with_companion(c, world)
 
     if every(world, CADENCE["traffic"], offset=11):
         update_ambient_traffic(world)
