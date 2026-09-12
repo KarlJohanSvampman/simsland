@@ -56,7 +56,13 @@ def generate_diary_entry(c, world, day_memories):
     deterministic, still-grounded-in-real-memories summary on LLM
     failure rather than a blank/generic entry."""
     text = run_llm_call(_generate_diary_text(c, world, day_memories), priority=PRIORITY_BACKGROUND)
-    if text:
+    # _generate_diary_text() already unwraps call_llm_safe()'s own
+    # {"error": ...} shape internally, but a gate-level preemption
+    # (llm/llm_gate.py -- a higher-priority call cancelling this one
+    # before it even ran) resolves run_llm_call() itself to that same
+    # {"error": ...} dict, bypassing that internal check entirely. A
+    # bare `if text:` treats it as valid (truthy) diary content.
+    if text and isinstance(text, str):
         return text
     return _fallback_entry(c, day_memories)
 

@@ -67,6 +67,7 @@ INTERACTION_ANIMATIONS = {
     # --- hygiene ---
     "take_shower":  {"walking": "walk", "using": "shower",     "finishing": "idle"},
     "use_toilet":   {"walking": "walk", "using": "sit_idle",   "finishing": "stand_up"},
+    "vomit":        {"walking": "walk", "using": "cry_out",    "finishing": "stand_up"},
     "brush_teeth":  {"walking": "walk", "using": "interact",   "finishing": "idle"},
     "wash_hands":   {"walking": "walk", "using": "interact",   "finishing": "idle"},
     "mirror":       {"walking": "walk", "using": "interact",   "finishing": "idle"},
@@ -438,6 +439,21 @@ ACTIVITIES = {
         "interaction": "use_toilet",
 
         "base_duration_minutes": 3,
+
+        "interruptible": False,
+
+        "category": "survival"
+    },
+
+    "vomit": {
+
+        # Shares "use_toilet"'s real anchor/occupancy -- the same
+        # physical toilet, so someone sitting on it and someone about to
+        # be sick correctly contend for the one fixture rather than
+        # being tracked as unrelated.
+        "interaction": "use_toilet",
+
+        "base_duration_minutes": 2,
 
         "interruptible": False,
 
@@ -1990,6 +2006,10 @@ def complete_activity(
                 trigger_reaction(c, world, "gas_release", tick=world.get("tick", 0))
             except Exception:
                 pass
+
+    elif activity_type == "vomit":
+        from systems.body import on_vomit_complete
+        on_vomit_complete(c, world)
 
     # =====================================
     # SHOWER / BATH

@@ -514,13 +514,31 @@ def _advance_hazard_stage(char, hazard_tmpl, state, tick):
         instance["current_stage"] = ordered[new_idx][1].get("health_state") if new_idx >= 0 else None
 
 
-def _apply_manifestation(char, world, cond_key, m, tick):
+def _apply_manifestation(char, world, cond_key, m, tick, hazard_key=None):
     """Applies one rolled manifestation (decision #8) -- gesture reaction,
     contagion burst, and locomotion restriction, routed through existing
     primitives rather than a new posture-setting path
     (apply_severity_consequences stays the sole set_posture authority,
     reconciling posture from functional_status this writes on its own
     very next call)."""
+    # Per the user's ask: an active vomiting episode used to be pure
+    # flavor (a "cry_out" gesture + pain), with nothing actually sending
+    # the character to a toilet -- any parent condition whose current
+    # symptom hazard is "vomiting" (food poisoning, a stomach bug,
+    # morning sickness, ...) now raises a real, urgent "vomit" intention,
+    # resolved the same way bladder/bowels already are (systems/
+    # strategy.py, reusing the toilet's real occupancy/queueing/
+    # impatience machinery just built for use_toilet).
+    if hazard_key == "vomiting":
+        from brain.intentions import add_intention
+        add_intention(char, {
+            "type":       "vomit",
+            "category":   "survival",
+            "priority":   93,
+            "interrupts": True,
+            "reason":     "nauseous",
+        })
+
     gesture = m.get("gesture")
     if gesture:
         try:
@@ -640,7 +658,7 @@ def tick_hazard_manifestations(char, world):
         state["last_manifestation_tick"] = tick
         pick = weighted_pick(list(manifestations.values()))
         if pick:
-            _apply_manifestation(char, world, cond_key, pick, tick)
+            _apply_manifestation(char, world, cond_key, pick, tick, hazard_key=current)
 
 
 def _hazard_locality(hazard_tmpl):

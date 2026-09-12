@@ -78,7 +78,15 @@ def request_offgrid_summary(c, world, category, details, normalcy, enforced_cove
         ),
         priority=PRIORITY_BACKGROUND,
     )
-    if not narration:
+    # Confirmed live crash: run_llm_call() resolves a failed/preempted
+    # call to {"error": "..."} (the same shape every caller in this
+    # codebase is expected to check for -- see llm/llm_gate.py's module
+    # docstring), which is a TRUTHY dict, so `if not narration` alone
+    # never caught it -- the error dict then got stored directly as
+    # story["summary"], crashing brain/memory.py::score_importance()'s
+    # text.lower() call the next time this trip's return tried to save
+    # its memory (killing that whole tick, not just this character).
+    if not narration or isinstance(narration, dict):
         return None
 
     _record_category_memory(

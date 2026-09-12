@@ -54,6 +54,18 @@ def resolve_strategy(
         )
 
     # =====================================================
+    # VOMIT (health.py::_apply_manifestation, a "vomiting" hazard
+    # episode) -- always dispatches to the real toilet activity; the
+    # intention itself is only ever raised while an active vomiting
+    # episode is actually happening, so there's no threshold to
+    # re-check here the way thirst/hunger have.
+    # =====================================================
+
+    if t == "vomit":
+
+        return "vomit"
+
+    # =====================================================
     # SLEEP / TOILET
     # =====================================================
     # body_intentions.py creates {"type": "sleep", ...}/{"type":

@@ -412,6 +412,25 @@ def on_toilet_complete(c):
     b["bowels"]  = max(0, b["bowels"] - 60)
 
 
+def on_vomit_complete(c, world=None):
+    """A real, physical consequence of finally being sick -- stomach
+    emptied (hungrier afterward, 0=full/100=starving), hygiene takes a
+    real hit, and some genuine relief (a bit less stressed, the
+    "vomiting" hazard's current episode resets so the very next tick
+    doesn't immediately demand another one)."""
+    b = c["body"]
+    b["hunger"] = min(100, b.get("hunger", 0) + 15)
+    b["hygiene"] = max(0, b.get("hygiene", 100) - 20)
+    b["mouth_hygiene"] = max(0, b.get("mouth_hygiene", 100) - 15)
+    c["stress"] = max(0, c.get("stress", 0) - 5)
+
+    state = c.get("condition_state", {})
+    for cond_key, cond_state in state.items():
+        if cond_state.get("current_symptom") == "vomiting":
+            tick = world.get("tick", 0) if world else 0
+            cond_state["last_manifestation_tick"] = tick
+
+
 # ── odor perception ───────────────────────────────────────────────────────────
 
 def get_odor_label(odor):
