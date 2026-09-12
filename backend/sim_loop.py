@@ -25,7 +25,7 @@ from datetime import datetime
 import os
 import random
 import time
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, as_completed, wait as _futures_wait
 
 import core.event_handlers  # noqa: F401 — registers all subscriptions on import
 
@@ -174,6 +174,23 @@ from systems.events     import maybe_generate_shared_event
 _AGENT_WORKERS = 8
 _agent_pool = ThreadPoolExecutor(max_workers=_AGENT_WORKERS, thread_name_prefix="agent")
 
+# Confirmed live: world is fully reloaded from Redis/Postgres on every
+# single tick() invocation (main.py::_run_tick_and_persist), not kept as
+# one long-lived in-memory object -- so a character whose think() call
+# is still running when this tick's wait budget expires is holding a
+# reference to an already-stale `c`/`world` pair. There is no safe way
+# to splice that result into a LATER tick's freshly-reloaded world
+# (whatever it mutated already moved on independently in the meantime),
+# so rather than build risky merge logic, a decision that overruns the
+# budget is simply abandoned -- the character just tries again on their
+# next cognition cycle (should_think() naturally re-offers them, since
+# the abandoned attempt's own note_think()/cognition update also lands
+# on the same stale, discarded object). _pending_agent_ids stops the
+# SAME character being redispatched while their abandoned attempt is
+# still physically running in a pool thread.
+AGENT_WAIT_BUDGET_SECONDS = 3.0
+_pending_agent_ids = set()
+
 
 def _run_agent(c, world, t):
     """Run one character's agent tick. Called from a worker thread."""
@@ -181,6 +198,13 @@ def _run_agent(c, world, t):
     process_reaction_queue(c, t)
     update_agent(c, world)
     return c["id"]
+
+
+def _run_agent_and_release(c, world, t):
+    try:
+        return _run_agent(c, world, t)
+    finally:
+        _pending_agent_ids.discard(c["id"])
 
 
 # =========================================================
@@ -431,15 +455,30 @@ def tick(world):
         if not c.get("is_service_worker")
         and c.get("alive") is not False
         and c.get("posture") != "incapacitated"
+        and c["id"] not in _pending_agent_ids
     ]
-    futs = {_agent_pool.submit(_run_agent, c, world, t): c for c in agent_chars}
+    for c in agent_chars:
+        _pending_agent_ids.add(c["id"])
+    futs = {_agent_pool.submit(_run_agent_and_release, c, world, t): c for c in agent_chars}
+
     dirty_char_ids = set()
-    for fut in as_completed(futs):
-        try:
-            dirty_char_ids.add(fut.result())
-        except Exception as exc:
-            c = futs[fut]
-            print(f"[sim_loop] agent error for {c.get('id')}: {exc}")
+    if futs:
+        # Bounded wait -- per this block's module-level comment, a
+        # character whose decision doesn't land within the budget is
+        # abandoned for THIS tick (their attempt keeps running in the
+        # pool and self-cleans _pending_agent_ids when it finishes; its
+        # eventual result is never read) rather than holding the clock
+        # and every system after this point hostage to one slow LLM call.
+        done, not_done = _futures_wait(futs, timeout=AGENT_WAIT_BUDGET_SECONDS)
+        for fut in done:
+            try:
+                dirty_char_ids.add(fut.result())
+            except Exception as exc:
+                c = futs[fut]
+                print(f"[sim_loop] agent error for {c.get('id')}: {exc}")
+        if not_done:
+            abandoned = [futs[fut].get("name", futs[fut].get("id")) for fut in not_done]
+            print(f"[sim_loop] tick {t}: abandoned {len(not_done)} slow agent decision(s) past the {AGENT_WAIT_BUDGET_SECONDS}s budget: {abandoned}")
     _mark_dirty(world, char_ids=dirty_char_ids)
 
     # -- Medium: memory / beliefs / relationships (÷15) ─────
