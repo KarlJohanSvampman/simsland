@@ -75,7 +75,36 @@ def begin_interaction(c, world, interaction_name):
     # every other reserve_anchor() call site) -- guard here instead.
     # reserve_anchor() itself has no return value to check.
     if anchor.get("occupied_by") and anchor["occupied_by"] != c["id"]:
-        return None
+        # Per the user's ask: before giving up, check whether a SECOND
+        # instance of this same appliance (a different bathroom's
+        # toilet/sink, ...) is free elsewhere and go there instead.
+        from systems.props import find_nearest_free_anchor
+        alt = find_nearest_free_anchor(c, world, interaction_name, exclude_anchor=anchor)
+        if alt:
+            prop, anchor = alt
+        else:
+            # Nothing free anywhere -- this used to just silently fail
+            # every tick with no visible consequence (begin_interaction
+            # returning None, over and over, forever). Queue at the one
+            # that's occupied (systems/occupancy.py::enqueue_anchor --
+            # confirmed real but never actually called before this) and
+            # arm the same patience-timer/growing-stress mechanism
+            # already used for waiting on a person/business/delivery
+            # (systems/waiting.py) -- genuine, escalating impatience
+            # instead of a no-op, with a real wake to reconsider once
+            # patience runs out.
+            from systems.occupancy import enqueue_anchor
+            from systems.waiting import start_waiting_for
+            enqueue_anchor(c, prop, anchor)
+            c["activity"] = {
+                "type": "wait",
+                "phase": "using",
+                "phase_started_tick": world.get("tick", 0),
+                "duration": 120,
+                "state": {},
+            }
+            start_waiting_for(c, world, "prop", f"{prop['id']}:{anchor['name']}")
+            return None
 
     reserve_anchor(c, prop, anchor)
 

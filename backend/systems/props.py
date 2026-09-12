@@ -420,4 +420,36 @@ def find_nearest_anchor(
 
         best_anchor
     )
-    
+
+
+def find_nearest_free_anchor(c, world, interaction_name, exclude_anchor=None):
+    """Same scan as find_nearest_anchor(), but skips any anchor already
+    occupied by someone else -- and, if given, the specific anchor
+    already confirmed occupied so the caller doesn't just find it again.
+    Used when the globally-nearest anchor for an interaction is taken:
+    per the user's ask, a character should check whether a SECOND
+    instance of the same appliance (a different bathroom's toilet, a
+    different sink) is free before giving up or queueing."""
+    best_prop = None
+    best_anchor = None
+    best_dist = 999999
+
+    for prop in world.get("props", []):
+        for anchor in prop.get("anchors", []):
+            if anchor.get("interaction") != interaction_name:
+                continue
+            if anchor is exclude_anchor:
+                continue
+            if anchor.get("occupied_by") and anchor["occupied_by"] != c["id"]:
+                continue
+
+            wa = get_world_anchor(prop, anchor)
+            dist = abs(wa["x"] - c["x"]) + abs(wa["y"] - c["y"])
+            if dist < best_dist:
+                best_dist = dist
+                best_prop = prop
+                best_anchor = anchor
+
+    if not best_prop:
+        return None
+    return (best_prop, best_anchor)
