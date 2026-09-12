@@ -65928,5 +65928,104 @@
       "male": "anim_orgasm_climax_male",
       "female": "anim_orgasm_climax_female"
     }
+  },
+  "ability_templates": {
+    "cooking": {
+      "name": "Cooking",
+      "category": "practical",
+      "trains_via": [
+        "cook_meal",
+        "bake"
+      ],
+      "proficiency_levels": [
+        {
+          "level": "novice",
+          "successes_to_next": 3
+        },
+        {
+          "level": "beginner",
+          "successes_to_next": 6
+        },
+        {
+          "level": "intermediate",
+          "successes_to_next": 10
+        },
+        {
+          "level": "advanced",
+          "successes_to_next": 15
+        },
+        {
+          "level": "expert",
+          "successes_to_next": null
+        }
+      ],
+      "trait_modifiers": {
+        "clumsy": -0.15
+      }
+    },
+    "juggling": {
+      "name": "Juggling",
+      "category": "physical",
+      "trains_via": [
+        "practice_juggling"
+      ],
+      "proficiency_levels": [
+        {
+          "level": "novice",
+          "successes_to_next": 4
+        },
+        {
+          "level": "beginner",
+          "successes_to_next": 8
+        },
+        {
+          "level": "intermediate",
+          "successes_to_next": 12
+        },
+        {
+          "level": "advanced",
+          "successes_to_next": 20
+        },
+        {
+          "level": "expert",
+          "successes_to_next": null
+        }
+      ],
+      "trait_modifiers": {
+        "clumsy": -0.2,
+        "athletic": 0.1
+      }
+    },
+    "language_spanish": {
+      "name": "Spanish",
+      "category": "language",
+      "trains_via": [
+        "practice_language:spanish",
+        "speak_language:spanish"
+      ],
+      "proficiency_levels": [
+        {
+          "level": "beginner",
+          "successes_to_next": 8
+        },
+        {
+          "level": "elementary",
+          "successes_to_next": 12
+        },
+        {
+          "level": "intermediate",
+          "successes_to_next": 18
+        },
+        {
+          "level": "advanced",
+          "successes_to_next": 25
+        },
+        {
+          "level": "fluent",
+          "successes_to_next": null
+        }
+      ],
+      "trait_modifiers": {}
+    }
   }
 }

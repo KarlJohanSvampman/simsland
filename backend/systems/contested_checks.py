@@ -69,12 +69,23 @@ CHARACTERISTIC_FNS = {
 }
 
 
+def _characteristic_value(name, char, other, world):
+    # "ability:<id>" is resolved dynamically against whatever
+    # ability_templates the current definitions actually declare
+    # (systems/abilities.py) rather than needing a hardcoded entry per
+    # ability here -- a new ability template is usable in a
+    # CHECK_DEFINITIONS weighting immediately, no code change.
+    if name.startswith("ability:") and world is not None:
+        from systems.abilities import ability_characteristic_value
+        return ability_characteristic_value(char, name.split(":", 1)[1], world)
+    fn = CHARACTERISTIC_FNS.get(name)
+    return fn(char, other, world) if fn else 0.0
+
+
 def _weighted_sum(char, other, world, characteristics):
     total = 0.0
     for name, weight in (characteristics or {}).items():
-        fn = CHARACTERISTIC_FNS.get(name)
-        if fn:
-            total += fn(char, other, world) * weight
+        total += _characteristic_value(name, char, other, world) * weight
     return total
 
 
@@ -154,6 +165,20 @@ CHECK_DEFINITIONS = {
         "actor_trait_bonuses":      {"aggressive": 0.20, "manipulative": 0.10},
         "defender_characteristics": {},
         "defender_trait_bonuses":  {"confident": -0.20, "resilient": -0.15, "nervous": 0.25},
+    },
+
+    # ---- ability-trained actions (systems/abilities.py) -- solo checks,
+    # no target. "ability:<id>" is resolved dynamically against whatever
+    # ability_templates declare that id, not hardcoded per ability here.
+    "practice_juggling": {
+        "threshold": 0.40,
+        "actor_characteristics": {"ability:juggling": 0.6, "stress": -0.10},
+        "actor_trait_bonuses":   {},
+    },
+    "cook_meal": {
+        "threshold": 0.35,
+        "actor_characteristics": {"ability:cooking": 0.6, "stress": -0.10},
+        "actor_trait_bonuses":   {},
     },
 }
 

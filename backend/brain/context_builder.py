@@ -491,7 +491,7 @@ def build_available_actions(c, world):
     # propose_chore (the route handler needs no target validation).
     # chin_ups/lift_weights only when a prop with the matching anchor
     # interaction (do_pull_ups / lift_weights) is actually visible.
-    action_types.extend(["jog", "sit_ups"])
+    action_types.extend(["jog", "sit_ups", "practice_juggling"])
     for entry in interactable:
         if "do_pull_ups" in entry.get("interactions", []) and "chin_ups" not in action_types:
             action_types.append("chin_ups")

@@ -1666,6 +1666,8 @@ def route_action(c, world, action, speech, definitions=None, available_actions=N
         _route_chin_ups(c, world, action)
     elif action_type == "lift_weights":
         _route_lift_weights(c, world, action)
+    elif action_type == "practice_juggling":
+        _route_practice_juggling(c, world, action)
     elif action_type in ("grab_offensive", "hold", "punch", "kick", "shove", "threaten", "stab", "knock"):
         _route_hostile_action(c, world, action)
     elif action_type == "steal_from":
@@ -2428,6 +2430,28 @@ def _route_chin_ups(c, world, action):
 
 def _route_lift_weights(c, world, action):
     _route_exercise_activity(c, world, action, "lift_weights")
+
+
+def _route_practice_juggling(c, world, action):
+    """Special Skills & Abilities (systems/abilities.py) proof-of-concept
+    wiring: a real training attempt, resolved through the same opposed/
+    solo check engine (systems/contested_checks.py) everything else in
+    this round uses, rather than a flavor-only animation. Success/fail
+    and any level-up are decided immediately (a juggling attempt doesn't
+    need to wait for a multi-minute activity to "finish" to know how it
+    went) -- the scaffolded activity below is just the visible animation
+    span."""
+    _route_exercise_activity(c, world, action, "practice_juggling")
+
+    from systems.abilities import attempt_ability_action
+    success, entry = attempt_ability_action(c, "juggling", "practice_juggling", world)
+
+    from systems.incidental_speech import fire_incidental
+    level = entry.get("level", "novice") if entry else "novice"
+    if success:
+        fire_incidental(c, "inform", f"Nailed that juggling routine! ({level})", world)
+    else:
+        fire_incidental(c, "inform", "Drops the balls -- juggling is harder than it looks.", world)
 
 
 # =========================================================

@@ -296,6 +296,7 @@ ACTION_SPECS = {
     "sit_ups":        {"group": "exercise", "target": "none", "doc": "Do sit-ups."},
     "chin_ups":       {"group": "exercise", "target": "prop", "doc": "Do chin-ups on a bar."},
     "lift_weights":   {"group": "exercise", "target": "prop", "doc": "Lift weights."},
+    "practice_juggling": {"group": "exercise", "target": "none", "doc": "Practice juggling -- trains your juggling ability over time; a real skill (systems/abilities.py), not guaranteed to go well until you've built up proficiency."},
 }
 
 
