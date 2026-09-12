@@ -632,7 +632,17 @@ def maybe_report_missing_item(world):
         if not members:
             continue
         owned = by_household.get(hid, [])
-        item_name = random.choice(owned)["name"] if owned and random.random() < 0.7 else "the missing item"
+        # Confirmed live crash: most props (sofa/fridge/etc, see
+        # generate_world.py) never got a "name" field at all -- only ones
+        # like the household car happen to have one -- so a plain
+        # ["name"] index here killed the whole tick loop (an unhandled
+        # KeyError propagating out of tick() -> _run_tick_and_persist())
+        # the moment the daily roll picked a nameless prop. Restricting the
+        # pool to props that actually have a name is more honest than a
+        # fallback label anyway -- "can't find the sofa" makes sense as a
+        # detective-story hook, "can't find the [object]" doesn't.
+        named_owned = [p for p in owned if p.get("name")]
+        item_name = random.choice(named_owned)["name"] if named_owned and random.random() < 0.7 else "the missing item"
         noticer = random.choice(members)
         start_detective_story(
             noticer, world, ["missing_item"], f"Can't find {item_name} anywhere.",
