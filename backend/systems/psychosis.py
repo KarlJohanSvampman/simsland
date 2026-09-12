@@ -23,6 +23,19 @@ continues normally.
 
 import random
 
+# Disabled at the user's live-report request (2026-09-12): even with the
+# extreme-threshold + sustain-duration gating below, an entire household
+# ended up starving/dehydrated in sync (stuck off-grid for a long stretch)
+# and all triggered psychosis together. Rather than re-tuning the
+# threshold further, the mechanic is fully switched off here -- a single
+# early return, so tick_psychosis() is a guaranteed no-op and no character
+# can ever enter an episode. Nothing else needs to change: get_psychosis_
+# context()/context_builder.py's _sec_psychosis section and reactions.py's
+# "hallucinating" entries are purely reactive to psychosis_state and
+# safely produce nothing once it never activates. Flip back to True to
+# re-enable -- no other code changes needed.
+PSYCHOSIS_ENABLED = False
+
 # Extreme-only thresholds -- deliberately far past body.py's own everyday
 # "notice this need" thresholds (e.g. _HEALTH_THRESHOLDS' hunger=85):
 # reaching one of these is meant to be rare and severe, not a routine
@@ -137,6 +150,8 @@ def tick_psychosis(c, world):
     erratic behavior fires, and an already-active episode's clock doesn't
     advance either, so nothing about it depends on exactly when the
     character happened to fall asleep."""
+    if not PSYCHOSIS_ENABLED:
+        return
     if (c.get("activity") or {}).get("type") == "sleep":
         return
 

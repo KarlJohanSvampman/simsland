@@ -3167,6 +3167,24 @@ function openDebugSettingsModal(){
   openModal("modal-debug-settings");
 }
 
+// Off-grid physical travel: hidden while riding in/on a car or bus
+// (walking to/from the garage or bus stop stays visible) -- see
+// systems/travel.py and systems/transit.py. travel_hidden only covers
+// that brief ride, though -- it's cleared back to false the moment the
+// character arrives at their off-grid destination, well before c.off_grid
+// itself clears (that stays true for the whole stay, e.g. a multi-hour
+// hospital visit), so check both. Factored out of updateCharacters()'s
+// "ALREADY EXISTS" branch so the two mesh-CREATION sites below can apply
+// the same check immediately -- previously they defaulted to
+// THREE.js's visible=true and only got corrected the next time that
+// character happened to appear in a dirty WS delta, which could be a
+// long time (or never) for a stationary off-grid character, leaving a
+// stale fully-visible mesh for anyone who connected while they were
+// already away.
+function _isCharacterHidden(c){
+  return !!(c.travel_hidden || c.off_grid);
+}
+
 function createFallbackCharacter(c){
 
   const mesh = new THREE.Mesh(
@@ -3194,6 +3212,9 @@ function createFallbackCharacter(c){
 
     name: c.name
   };
+
+  mesh.visible = !_isCharacterHidden(c);
+  mesh.userData.ignoreRaycast = _isCharacterHidden(c);
 
   selectable.push(mesh);
   scene.add(mesh);
@@ -3262,15 +3283,9 @@ async function updateCharacters(state){
         sims[id].position.set(newX, 0, newZ);
       }
 
-      // Off-grid physical travel: hidden while riding in/on a car or bus
-      // (walking to/from the garage or bus stop stays visible) -- see
-      // systems/travel.py and systems/transit.py. travel_hidden only
-      // covers that brief ride, though -- it's cleared back to false the
-      // moment the character arrives at their off-grid destination, well
-      // before c.off_grid itself clears (that stays true for the whole
-      // stay, e.g. a multi-hour hospital visit), so check both or the
-      // model reappears on the map while the character is still away.
-      const isHidden = c.travel_hidden || c.off_grid;
+      // See _isCharacterHidden()'s own comment (above createFallbackCharacter)
+      // for why both travel_hidden and off_grid are checked here.
+      const isHidden = _isCharacterHidden(c);
       sims[id].visible = !isHidden;
       // Being invisible didn't stop the raycaster from hitting the mesh --
       // THREE.js raycasting ignores .visible entirely, it's a render-only
@@ -3479,6 +3494,9 @@ const loaded =
 
     name: c.name
   };
+
+  model.visible = !_isCharacterHidden(c);
+  model.userData.ignoreRaycast = _isCharacterHidden(c);
 
   model.traverse((o)=>{
 

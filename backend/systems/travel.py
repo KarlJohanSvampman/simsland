@@ -236,6 +236,18 @@ def _mark_dirty_prop(world, prop_id):
     _mark_dirty(world, prop_ids={prop_id})
 
 
+def _mark_dirty_char(world, char_id):
+    # Confirmed bug: every travel_hidden transition below only marked the
+    # CAR prop dirty, never the character -- a client that already has a
+    # mesh for that character (opened/reconnected before this trip started)
+    # never received the updated travel_hidden flag, leaving a stale
+    # fully-visible mesh for the whole car ride (see frontend/src/main.js's
+    # _isCharacterHidden()). off_grid's own transitions (offgrid.py) already
+    # did this correctly -- travel_hidden's transitions here just didn't.
+    from sim_loop import _mark_dirty
+    _mark_dirty(world, char_ids={char_id})
+
+
 def _nearest_point(points, xy):
     if not points:
         return None
@@ -289,6 +301,7 @@ def _start_driving_out(c, world):
     c["travel_hidden"] = True
     c["travel_state"] = "driving_out"
     _mark_dirty_prop(world, car["id"])
+    _mark_dirty_char(world, c["id"])
 
 
 def _finish_driving_out(c, world, car):
@@ -296,6 +309,15 @@ def _finish_driving_out(c, world, car):
         car["hidden"] = True
         _mark_dirty_prop(world, car["id"])
     c["travel_state"] = None
+    # Confirmed bug: this never reset travel_hidden back to False once the
+    # car ride out actually finished -- the character stayed marked hidden
+    # for their ENTIRE off-grid stay (only masked from being visibly wrong
+    # because c["off_grid"] is also True for that whole stay -- see
+    # _isCharacterHidden() in main.js, which already ORs both flags). The
+    # character has now arrived and gotten out of the car; travel_hidden
+    # should mean "currently riding," nothing more.
+    c["travel_hidden"] = False
+    _mark_dirty_char(world, c["id"])
     pending = c.pop("_pending_offgrid", None)
     if pending:
         from systems.offgrid import _send_offgrid_immediate
@@ -316,7 +338,14 @@ def _start_driving_back(c, world):
     car["_path"] = list(reversed(forward_path))
     car["_path_index"] = 0
     c["travel_state"] = "driving_back"
+    # Same "riding in the car" window as _start_driving_out() -- this was
+    # never set here at all (relying on _finish_driving_out()'s bug above
+    # having left it True the whole time in between), so fixing that bug
+    # without this would have left the character visible during the drive
+    # back.
+    c["travel_hidden"] = True
     _mark_dirty_prop(world, car["id"])
+    _mark_dirty_char(world, c["id"])
 
 
 def _finish_driving_back(c, world, car):
@@ -328,6 +357,7 @@ def _finish_driving_back(c, world, car):
         c["x"], c["y"] = car["x"], car["y"]
         _mark_dirty_prop(world, car["id"])
     c["travel_hidden"] = False
+    _mark_dirty_char(world, c["id"])
     _begin_walking_home(c, world)
 
 
@@ -345,6 +375,7 @@ def _abort_travel_to_immediate(c, world):
     c["travel_state"] = None
     c["travel_mode"] = None
     c["travel_hidden"] = False
+    _mark_dirty_char(world, c["id"])
     pending = c.pop("_pending_offgrid", None)
     if pending:
         from systems.offgrid import _send_offgrid_immediate
@@ -376,6 +407,7 @@ def interrupt_travel_for_incapacitation(c, world):
     c["travel_mode"]   = None
     c["travel_hidden"] = False
     c["riding_bus_id"] = None
+    _mark_dirty_char(world, c["id"])
     c.pop("_pending_offgrid", None)
 
 
@@ -398,6 +430,7 @@ def _finish_travel(c, world):
     c["travel_state"] = None
     c["travel_mode"] = None
     c["travel_hidden"] = False
+    _mark_dirty_char(world, c["id"])
 
 
 # =========================================================
