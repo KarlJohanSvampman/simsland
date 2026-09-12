@@ -20,6 +20,19 @@ POST /admin/fix_malnutrition    -> one-off correction for characters caught
                                     nutrition.py's fix commit) -- resets
                                     weight_kg to a healthy BMI and clears
                                     the malnutrition disease/traits
+POST /admin/purge_garbage_intentions -> one-off cleanup for the pre-fix
+                                    store_intention() bug (see brain/
+                                    llm_brain.py's _match_intention_type
+                                    fix commit) -- removes any
+                                    active_intentions entry whose "type"
+                                    is really a whole sentence, not a
+                                    real intention type
+POST /admin/clear_stale_anchor_occupancy -> one-off cleanup for prop
+                                    anchors left permanently
+                                    "occupied_by" a character that no
+                                    longer exists (see reset_characters'
+                                    matching fix) -- e.g. a sink nobody
+                                    can ever drink from again
 """
 
 from fastapi import APIRouter
@@ -106,6 +119,19 @@ def reset_characters(sim_id: str = DEFAULT_SIM_ID):
         world["conflicts"]   = {}
         world["social_events"] = {}
 
+        # Confirmed live bug: every prop anchor (systems/occupancy.py)
+        # reserved by a character this wipe removes stayed permanently
+        # "occupied_by" that now-nonexistent id forever after -- nobody
+        # new could ever use that anchor again (find_nearest_anchor()
+        # finds it, but begin_interaction()'s occupancy check always
+        # fails since the occupant never matches and never releases).
+        # A household's only sink getting stuck this way silently broke
+        # every future resident's ability to ever mechanically drink.
+        for prop in world.get("props", []):
+            for anchor in prop.get("anchors", []) or []:
+                if anchor.get("occupied_by"):
+                    anchor["occupied_by"] = None
+
         save_world(sim_id, world)
 
     # Live bug report: a connected client's local character cache is only
@@ -175,6 +201,52 @@ def fix_malnutrition(sim_id: str = DEFAULT_SIM_ID):
         save_world(sim_id, world)
 
     return {"ok": True, "fixed_character_ids": fixed}
+
+
+@router.post("/purge_garbage_intentions")
+def purge_garbage_intentions(sim_id: str = DEFAULT_SIM_ID):
+    """store_intention() (brain/agent_loop.py) used to fall back to the
+    LLM's raw, free-text "then" phrase as an intention's own "type" field
+    whenever it didn't cleanly match a real activity -- every real
+    intention type in this codebase is a plain identifier (snake_case,
+    optionally "expectation:"-prefixed) with no spaces, so a type
+    containing a space is unambiguously one of these leftover sentence
+    entries. They never resolved to anything and, worse, could silently
+    evict genuinely important intentions (drink, an expectation, ...)
+    once the (now also fixed) list filled up. One-off live cleanup."""
+    purged = {}
+    with world_lock():
+        world = load_world(sim_id)
+        for char_id, c in world.get("characters", {}).items():
+            intentions = c.get("active_intentions", [])
+            kept = [i for i in intentions if " " not in str(i.get("type", ""))]
+            if len(kept) != len(intentions):
+                purged[char_id] = len(intentions) - len(kept)
+                c["active_intentions"] = kept
+        save_world(sim_id, world)
+
+    return {"ok": True, "purged_counts": purged}
+
+
+@router.post("/clear_stale_anchor_occupancy")
+def clear_stale_anchor_occupancy(sim_id: str = DEFAULT_SIM_ID):
+    """One-off cleanup for anchors reserved by a character that no
+    longer exists (e.g. from before a reset_characters call made before
+    this route's own matching fix landed) -- see reset_characters'
+    docstring for the full mechanism."""
+    cleared = []
+    with world_lock():
+        world = load_world(sim_id)
+        char_ids = set(world.get("characters", {}).keys())
+        for prop in world.get("props", []):
+            for anchor in prop.get("anchors", []) or []:
+                occupant = anchor.get("occupied_by")
+                if occupant and occupant not in char_ids:
+                    anchor["occupied_by"] = None
+                    cleared.append({"prop_id": prop.get("id"), "anchor": anchor.get("name"), "was": occupant})
+        save_world(sim_id, world)
+
+    return {"ok": True, "cleared": cleared}
 
 
 @router.get("/cognition")

@@ -331,19 +331,25 @@ def store_intention(
 
     intention["priority"] = max(0, min(100, priority))
 
-    c.setdefault(
-        "active_intentions",
-        []
-    )
+    # Dedup by type (brain/intentions.py::add_intention(), the same
+    # mechanism every other intention producer in this codebase already
+    # uses) instead of a blind append -- confirmed live bug: a plain
+    # append here let every LLM turn's "then" intention pile up as its
+    # own permanent slot (nothing about a repeated real type, e.g.
+    # "sleep" every tick, ever collapsed into one entry), and the old
+    # last-10-by-insertion-order cap could silently evict a genuinely
+    # important, still-unresolved intention (drink, an expectation, ...)
+    # just because enough LLM turns had happened since it was added.
+    from brain.intentions import add_intention, final_priority
+    add_intention(c, intention)
 
-    c["active_intentions"].append(
-        intention
-    )
-
-    # limit
-    c["active_intentions"] = (
-        c["active_intentions"][-10:]
-    )
+    # Defensive cap, independent of the dedup fix above -- keeps the
+    # MOST IMPORTANT intentions if the list still grows large from many
+    # genuinely distinct sources, rather than the most RECENT ones.
+    intentions = c.get("active_intentions", [])
+    if len(intentions) > 20:
+        intentions.sort(key=final_priority, reverse=True)
+        c["active_intentions"] = intentions[:20]
 
 
 # =========================================================

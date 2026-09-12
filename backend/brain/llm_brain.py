@@ -503,14 +503,25 @@ def _match_intention_type(phrase):
     (systems/activities.py::ACTIVITIES) using the same scorer brain/
     action_resolver.py uses for targets — reused here for its exact same
     strength (candidate pool is small, vocabulary overlap is the signal).
-    Falls back to the raw phrase as a free-text intention type if nothing
-    scores well; store_intention() already clamps/handles arbitrary
-    intention types safely."""
+
+    Returns None when nothing scores well -- confirmed live bug: this
+    used to fall back to the raw phrase as the intention's own "type".
+    Since every slightly-differently-worded "then" phrase is a distinct
+    string, none of them ever match an existing entry to get replaced
+    (brain/intentions.py::add_intention()'s dedup-by-type never fires),
+    and resolve_strategy() can never resolve a sentence-shaped type to a
+    real activity either -- so these just accumulate as permanent dead
+    weight. store_intention()'s last-10 cap then silently evicted real,
+    resolvable intentions (drink, expectation:make_dinner, ...) to make
+    room, which is why a character could sit next to a working sink at
+    46% hydration repeating "let me find a phone to call for help" turn
+    after turn instead of just drinking -- its real "drink" intention had
+    been pushed out of the window entirely."""
     try:
         from systems.activities import ACTIVITIES
         from brain.action_resolver import _score
     except ImportError:
-        return phrase
+        return None
 
     best_type, best_score = None, 0.0
     for activity_type in ACTIVITIES:
@@ -518,7 +529,7 @@ def _match_intention_type(phrase):
         if s > best_score:
             best_type, best_score = activity_type, s
 
-    return best_type if best_score >= 0.55 else phrase
+    return best_type if best_score >= 0.55 else None
 
 
 def _to_legacy_decision(envelope, char_id=None):
@@ -574,11 +585,13 @@ def _to_legacy_decision(envelope, char_id=None):
 
     then = (envelope.get("then") or "").strip()
     if then:
-        decision["intention"] = {
-            "type": _match_intention_type(then),
-            "reason": then,
-            "priority": 40,
-        }
+        matched_type = _match_intention_type(then)
+        if matched_type:
+            decision["intention"] = {
+                "type": matched_type,
+                "reason": then,
+                "priority": 40,
+            }
 
     return decision
 
