@@ -3886,7 +3886,14 @@ def _route_computer_apply_for_job(c, world, action):
                                interaction="computer_apply_for_job")
     _set_computer_animation(c, world)
     if job_id:
-        apply_for_job(c, job_id, world)
+        # apply_for_job(c, world, job_id=None) -- this used to pass
+        # (c, job_id, world), binding world=<the job_id string> and
+        # job_id=<the world dict>; the first line inside apply_for_job
+        # that calls world.get(...) then raised AttributeError on the
+        # string, silently killing this character's turn (caught one
+        # level up by the per-character worker's own try/except) every
+        # single time someone tried to apply to a specific listing.
+        apply_for_job(c, world, job_id)
 
 
 # ─── email ────────────────────────────────────────────────────────────────────
