@@ -275,6 +275,28 @@ def release_stuck_anchor(payload: dict, sim_id: str = DEFAULT_SIM_ID):
     return {"ok": True, "released": occupying_before}
 
 
+@router.post("/clear_stuck_travel_state")
+def clear_stuck_travel_state(sim_id: str = DEFAULT_SIM_ID):
+    """Live-testing helper for a real, still-unfixed bug: a character can
+    end up with off_grid=False (marked home) while travel_state is still
+    one of TRAVEL_FROZEN_STATES (e.g. "waiting_for_bus"), which makes
+    update_agent() return immediately every tick forever (see agent_loop.py's
+    off_grid/travel_state guard) -- no body needs, no thinking, nothing.
+    This just force-clears travel_state for anyone caught in that
+    inconsistent combination; it does NOT fix the underlying transit.py
+    gap that lets it happen (flagged separately)."""
+    from systems.travel import TRAVEL_FROZEN_STATES
+    cleared = []
+    with world_lock():
+        world = load_world(sim_id)
+        for char_id, c in world.get("characters", {}).items():
+            if not c.get("off_grid") and c.get("travel_state") in TRAVEL_FROZEN_STATES:
+                cleared.append({"character_id": char_id, "was": c["travel_state"]})
+                c["travel_state"] = None
+        save_world(sim_id, world)
+    return {"ok": True, "cleared": cleared}
+
+
 @router.post("/set_body_need")
 def set_body_need(payload: dict, sim_id: str = DEFAULT_SIM_ID):
     """Live-testing helper: force one character's body need to a value
