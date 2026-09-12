@@ -4110,6 +4110,51 @@ const _NEED_METERS = [
   { key: "hygiene",   label: "Hygiene", color: "#d9c79e", satisfied: v => v },             // beige
 ];
 
+// Horizontal progress bar for the Inspector's current activity/action --
+// "Doing: use_toilet" gave no sense of how far along it was. Two sources
+// of progress, since they mean different things: a normal activity's
+// elapsed/duration (phase "using" only -- still walking there has no
+// progress yet), or a "wait" activity's elapsed-since-started against
+// systems/waiting.py's 30-min give-up ceiling (that activity's own
+// "duration" field is a no-op placeholder now -- see activities.py's
+// dedicated wait branch -- so it means nothing here).
+const WAIT_GIVE_UP_TICKS = 1800; // mirrors backend/systems/waiting.py::MAX_TOTAL_WAIT_TICKS
+
+function _activityProgressPct(c){
+  const act = c.activity;
+  if(!act) return null;
+  const tick = _worldState.tick || 0;
+
+  if(act.type === "wait"){
+    const started = act.state?.waiting_for?.started_at_tick;
+    if(started == null) return null;
+    return { pct: Math.max(0, Math.min(100, ((tick - started) / WAIT_GIVE_UP_TICKS) * 100)), urgency: true };
+  }
+
+  if(act.phase === "using" && act.duration && act.phase_started_tick != null){
+    return { pct: Math.max(0, Math.min(100, ((tick - act.phase_started_tick) / act.duration) * 100)), urgency: false };
+  }
+
+  return null;
+}
+
+function _renderActivityProgress(c){
+  const result = _activityProgressPct(c);
+  if(result == null) return "";
+  const { pct, urgency } = result;
+  // A normal activity finishing up is neutral-to-good -- stays a calm
+  // blue throughout. A "wait" closing in on the 30-min give-up ceiling is
+  // the opposite (rising impatience), so THAT one ramps green->yellow->red
+  // the same way needMeterCritical signals a need going bad.
+  const color = urgency
+    ? (pct > 80 ? "#e64545" : pct > 50 ? "#e6c200" : "#3ecf5e")
+    : "#3aa0ff";
+  return `
+    <div class="activityBarTrack" title="${Math.round(pct)}%">
+      <div class="activityBarFill" style="width:${pct}%; background:${color};"></div>
+    </div>`;
+}
+
 function _renderNeedsMeters(body, stress){
   const bars = _NEED_METERS.map(({ key, label, color, satisfied }) => {
     const raw = key === "_stress" ? stress : body?.[key];
@@ -4170,6 +4215,9 @@ function renderCharacterInspector(id){
       rows.push(`<span style="opacity:.85">Waiting for: ${target}${mood}</span>`);
     }
   }
+
+  const activityProgress = _renderActivityProgress(c);
+  if(activityProgress) rows.push(activityProgress);
 
   // Wake-up date/time-of-day, while actually asleep -- systems/
   // activities.py only tracks this as a raw tick count (phase_started_tick
