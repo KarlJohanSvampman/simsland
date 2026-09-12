@@ -63,7 +63,18 @@ def generate_unsettling_letter(c, world):
     systems/secret_keeping.py::_ensure_cover_story does."""
     session = world.setdefault("_unsettling_letter_sessions", {}).setdefault(c["id"], {"history": []})
     try:
-        return run_llm_call(_generate(c, world, session), priority=PRIORITY_BACKGROUND)
+        result = run_llm_call(_generate(c, world, session), priority=PRIORITY_BACKGROUND)
     except Exception:
+        result = None
+    # _generate() itself already falls back to a random _FALLBACK_LETTERS
+    # entry on any internal failure -- but a preempted/cancelled call
+    # bypasses that entirely (no exception is raised, so the `except
+    # Exception` above never fires) and resolves here to run_llm_call's
+    # own {"error": ...} dict instead, which would otherwise get mailed
+    # out verbatim as the letter's content.
+    if isinstance(result, dict) and "error" in result:
+        result = None
+    if not result:
         import random
         return random.choice(_FALLBACK_LETTERS)
+    return result

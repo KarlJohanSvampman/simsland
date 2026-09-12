@@ -63,6 +63,15 @@ def _project_engagement(c, world, post):
     except Exception:
         projection = None
 
+    # generate_post_engagement() returns a real projection dict or None --
+    # but a preempted/cancelled call instead resolves here to
+    # run_llm_call's own {"error": ...} dict, which is truthy. `if not
+    # projection` alone wouldn't catch that, and the .get(...) calls below
+    # would then silently zero out this post's engagement instead of using
+    # the popularity-scaled fallback.
+    if isinstance(projection, dict) and "error" in projection:
+        projection = None
+
     if not projection:
         # Deterministic fallback, scaled by the author's existing
         # standing -- an already-popular character's posts land bigger,

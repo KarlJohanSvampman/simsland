@@ -93,6 +93,14 @@ def _ensure_cover_story(c, world, secret):
         result = run_llm_call(generate_secret_cover(c, world, secret, session), priority=PRIORITY_BACKGROUND)
     except Exception:
         result = None
+    # generate_secret_cover() always returns a real {"reason",
+    # "preferred_lie"} dict (it has its own category-keyed fallback),
+    # except when run_llm_call() itself resolves to {"error": ...} for a
+    # preempted/cancelled call -- that dict is also truthy, so `if not
+    # result` wouldn't catch it, and the .get() calls below would silently
+    # leave reason/preferred_lie as None instead of using the fallback.
+    if isinstance(result, dict) and "error" in result:
+        result = None
     if not result:
         category = secret.get("category", "other")
         from llm.secret_authoring import _FALLBACK_REASONS, _FALLBACK_LIES

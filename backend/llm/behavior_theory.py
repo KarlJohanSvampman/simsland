@@ -57,4 +57,13 @@ Respond with STRICT JSON only: {{"text": <one-sentence theory>, "valence": "opti
 def generate_theory(c, other, pattern, world):
     """Sync entry point -- bridges the async LLM call the same way
     systems/choice.py::choose() already does via run_llm_call()."""
-    return run_llm_call(_generate(c, other, pattern, world), priority=PRIORITY_BACKGROUND)
+    result = run_llm_call(_generate(c, other, pattern, world), priority=PRIORITY_BACKGROUND)
+    # _generate() itself only ever returns a real {"text", "valence"} dict
+    # or None (see its own isinstance/error handling above) -- but a
+    # preempted/cancelled call bypasses that entirely and resolves here to
+    # run_llm_call's own {"error": ...} dict instead. Without this check,
+    # the caller's `if not theory` wouldn't catch it (a non-empty dict is
+    # truthy), and it would get stored as the pattern's theory verbatim.
+    if isinstance(result, dict) and "error" in result:
+        return None
+    return result
