@@ -494,6 +494,12 @@ def _age_one_food_item(item):
         item["spoiled"] = True
 
 
+def _day_key(calendar):
+    if not calendar:
+        return None
+    return f"{calendar.get('year', 0):04d}-{calendar.get('month', 0):02d}-{calendar.get('day', 0):02d}"
+
+
 def age_food_items(world, ticks_per_day=24):
     """
     Decay freshness of every food item in the simulation, once per
@@ -505,7 +511,21 @@ def age_food_items(world, ticks_per_day=24):
     containers.py's generic "items" list). Previously only swept
     placed_items gated on an `is_food` flag nothing ever set; now driven
     off item_templates' real `category == "food"` field.
+
+    CADENCE["food_aging"] is 24 TICKS (~24 real seconds), not 24 hours,
+    despite this cadence's own "~once/sim-day" naming -- the unused
+    `ticks_per_day` parameter here was a leftover guess at reconciling
+    that, never actually applied to the ~5%/call decay rate below.
+    Confirmed live: without a real day-key gate, food went from fresh to
+    fully spoiled in well under 10 minutes of real time instead of days.
+    Same day-key idiom as jobs.py::maybe_fire / body_composition.py's
+    matching fix.
     """
+    day_key = _day_key(world.get("calendar"))
+    if day_key is None or world.get("_food_aging_last_day") == day_key:
+        return
+    world["_food_aging_last_day"] = day_key
+
     def _sweep(items):
         for item in items:
             if not item:

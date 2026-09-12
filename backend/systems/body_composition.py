@@ -80,10 +80,31 @@ def _sync_dynamic_trait(c, trait, should_have):
         traits.remove(trait)
 
 
+def _day_key(calendar):
+    if not calendar:
+        return None
+    return f"{calendar.get('year', 0):04d}-{calendar.get('month', 0):02d}-{calendar.get('day', 0):02d}"
+
+
 def tick_body_composition(world):
-    """Daily cadence (see CADENCE['body_composition'], sim_loop.py)."""
+    """CADENCE['body_composition'] (sim_loop.py) is 24 -- 24 TICKS
+    (~24 simulated seconds), not 24 hours, despite that constant's own
+    "~once/sim-day" comment. DAILY_STEP is sized for a real once-a-day
+    settlement, so without a real day-key gate this was re-applying
+    itself ~3600x too often, crashing body_fat_level to its floor/
+    ceiling within minutes of a character existing regardless of how
+    they actually ate -- confirmed live, the same bug shape as
+    jobs.py::maybe_fire(). Same day-key idiom as libido.py::tick_libido
+    and jobs.py's fix."""
+    day_key = _day_key(world.get("calendar"))
+    if day_key is None:
+        return
+
     for c in world.get("characters", {}).values():
         bc = ensure_body_composition(c)
+        if bc.get("_last_settled_day") == day_key:
+            continue
+        bc["_last_settled_day"] = day_key
 
         net = bc["calories_in_today"] - BASELINE_DAILY_BURN - bc["calories_burned_today"]
         if net > NET_THRESHOLD:
