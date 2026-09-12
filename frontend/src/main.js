@@ -4152,6 +4152,25 @@ function renderCharacterInspector(id){
     : `State: ${c.animation_state || "idle"}`;
   rows.push(activity);
 
+  // The generic "wait" activity (systems/interactions.py's queueing path,
+  // systems/waiting.py's patience/give-up timer) carried no detail of its
+  // own here -- "Doing: wait" told you nothing about what for. Surface
+  // the same waiting_for the backend already tracks.
+  if(c.activity?.type === "wait"){
+    const wf = c.activity.state?.waiting_for;
+    if(wf){
+      let target = wf.ref || "something";
+      if(wf.kind === "prop" && typeof wf.ref === "string"){
+        const propId = wf.ref.split(":")[0];
+        const prop = _findProp(propId);
+        if(prop?.template) target = prop.template.replace(/_/g, " ");
+      }
+      const bangs = wf.bang_count || 0;
+      const mood = bangs >= 3 ? " — furious" : bangs >= 1 ? " — getting impatient" : "";
+      rows.push(`<span style="opacity:.85">Waiting for: ${target}${mood}</span>`);
+    }
+  }
+
   // Wake-up date/time-of-day, while actually asleep -- systems/
   // activities.py only tracks this as a raw tick count (phase_started_tick
   // + duration), reported live as not useful on its own. Projects it
