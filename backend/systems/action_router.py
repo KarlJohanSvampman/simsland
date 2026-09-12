@@ -925,6 +925,66 @@ def _route_examine(c, world, action):
 
 
 # =========================================================
+# ROUTE LOOK AROUND / FOCUS -- per the user's ask, everything sent to the
+# LLM by default should be a concise narrative description, not a raw
+# JSON dump of every wall/device/proposal/held item every single tick
+# (see llm_brain.py::_ID_ONLY_KEYS's prior "compact JSON, no natural
+# language handle" tradeoff). look_around is the explicit, on-demand way
+# to get that full inventory -- still prose, cached onto
+# c["environment_scan"] until the character looks around again -- and
+# focus drills into one specific thing already known about from it.
+# =========================================================
+
+def _route_look_around(c, world, action, available_actions):
+    # People/props/contacts are already in every prompt via
+    # llm_brain.py::_prose_scene() -- only the id-only pools (walls,
+    # devices, proposals, held/worn items, ...) are genuinely new
+    # information here, so this doesn't repeat the scene.
+    from brain.llm_brain import describe_id_only
+    available_actions = available_actions or {}
+    text = describe_id_only(available_actions)
+    c["environment_scan"] = {
+        "text": text or "Nothing further stands out beyond what you can already see.",
+        "tick": world.get("tick", 0),
+    }
+    c["activity"] = _scaffold(c, world, "look_around", interaction="look_around", duration=30)
+
+
+def _find_id_only_entry(available_actions, target_id):
+    """Looks up one entity by id across every pool the LLM could have
+    learned it from (look_around's id-only pools, plus nearby people/
+    props) -- the pools _route_focus needs to search, since a focus
+    target could be named from any of them."""
+    from brain.llm_brain import _ID_ONLY_KEYS
+    pools = list(_ID_ONLY_KEYS) + ["nearby_characters", "interactable_props", "known_contacts"]
+    for key in pools:
+        items = available_actions.get(key) or []
+        if isinstance(items, dict) and items.get("id") == target_id:
+            return key, items
+        for it in items if isinstance(items, list) else []:
+            if isinstance(it, dict) and (it.get("id") == target_id or it.get("wall_id") == target_id):
+                return key, it
+    return None, None
+
+
+def _route_focus(c, world, action, available_actions):
+    target_id = action.get("target")
+    available_actions = available_actions or {}
+    if not target_id:
+        return
+    pool, entry = _find_id_only_entry(available_actions, target_id)
+    if entry is None:
+        text = f"You look for \"{target_id}\" but can't place it right now."
+    else:
+        details = "; ".join(f"{k}: {v}" for k, v in entry.items() if k not in ("id",) and v not in (None, "", []))
+        text = f"A closer look at it ({pool}): {details}."
+    scan = c.setdefault("environment_scan", {"text": "", "tick": world.get("tick", 0)})
+    scan["focused"] = text
+    scan["tick"] = world.get("tick", 0)
+    c["activity"] = _scaffold(c, world, "focus", target_id=target_id, interaction="examine", duration=60)
+
+
+# =========================================================
 # ROUTE SEARCH FOR ITEM
 # =========================================================
 
@@ -1321,6 +1381,12 @@ def route_action(c, world, action, speech, definitions=None, available_actions=N
 
     elif action_type == "examine":
         _route_examine(c, world, action)
+
+    elif action_type == "look_around":
+        _route_look_around(c, world, action, available_actions)
+
+    elif action_type == "focus":
+        _route_focus(c, world, action, available_actions)
 
     elif action_type == "search":
         _route_search(c, world, action)

@@ -692,6 +692,7 @@ def ensure_character_defaults(c, world=None):
     c.setdefault("field_of_study",          None)
     c.setdefault("job_search_attempts",     0)    # applications sent without landing an interview -- resets on hire; gates crime.py's recruitment eligibility
     c.setdefault("resume_quality",          0.0)  # 0-1, raised by write_refine_resume; boosts jobs.py::_interview_invite_chance
+    c.setdefault("environment_scan",        None) # {"text","tick"} cached prose from the look_around action -- see llm_brain.py::build_prompt
     c.setdefault("_next_application_tick",  0)    # jobs.py::apply_for_job() real-pace cooldown between attempts
     c.setdefault("sketchy_contact_uses",    0)    # see crime.py::maybe_recruit_into_crime -- escalates while unemployed+desperate+in contact, cools off otherwise
 

@@ -2076,6 +2076,8 @@ def build_context(
         "narrative": build_narrative(c, world, mode=mode, wake_line=wake_line, staged=staged),
 
         "available_actions": build_available_actions(c, world),
+
+        "environment_scan": c.get("environment_scan"),
     }
 
 

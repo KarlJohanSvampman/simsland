@@ -51,6 +51,8 @@ ACTION_SPECS = {
     "search":     {"group": "core", "target": "prop", "doc": "Search a prop/container."},
     "carry":      {"group": "core", "target": "prop", "doc": "Pick up and carry a prop."},
     "clean":      {"group": "core", "target": "prop", "doc": "Clean a prop."},
+    "look_around": {"group": "core", "target": "none", "doc": "Take real stock of your surroundings -- walls, devices, proposals, worn/held items, anything else not already described. The result stays available until you look_around again."},
+    "focus":      {"group": "core", "target": "any", "doc": "Zero in on one specific thing you already know about (from look_around, or anything named nearby) for a fuller description of just that one thing."},
 
     # ---- describe (Round 8) — costs no in-world time, only yields more
     # description. target_description omitted -> describes the room by

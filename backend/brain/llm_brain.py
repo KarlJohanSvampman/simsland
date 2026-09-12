@@ -319,21 +319,87 @@ def _id_only_block(available_actions):
     )
 
 
+# Per-category plain-language labels for describe_id_only() below -- one
+# line per non-empty pool instead of a raw JSON dump. Kept in id_only's
+# own vocabulary (still "reference by exact id" for anything you'd act
+# on) so a character reading a look_around result can still target
+# something precisely, just never has to see it as literal JSON.
+_ID_ONLY_LABELS = {
+    "open_proposals":    "Open proposals",
+    "snoopable_devices": "Devices you could check",
+    "wearable_items":    "Wearable items nearby",
+    "worn_slots":        "What you're wearing",
+    "assembly_boxes":    "Boxes of parts",
+    "tile_boxes":        "Boxes of tiles",
+    "paint_buckets":     "Paint buckets",
+    "nearby_walls":      "Nearby walls",
+    "held_stack_names":  "What's in your stack",
+    "active_incidents":  "Things happening nearby",
+}
+
+
+def describe_id_only(available_actions):
+    """Plain-language version of _id_only_block()'s payload -- the real
+    content behind the new look_around action (action_router.py::
+    _route_look_around) instead of a raw JSON dump. Still names each
+    entry's exact id alongside its description so a subsequent action
+    can target it precisely."""
+    lines = []
+    for key, label in _ID_ONLY_LABELS.items():
+        items = available_actions.get(key) or []
+        if not items:
+            continue
+        entries = []
+        for it in items[:10]:
+            if isinstance(it, dict):
+                ident = it.get("id") or it.get("wall_id")
+                desc = it.get("name") or it.get("template") or it.get("type") or it.get("material") or "item"
+                entries.append(f"{desc} ({ident})" if ident else str(desc))
+            else:
+                entries.append(str(it))
+        lines.append(f"{label}: {'; '.join(entries)}.")
+
+    held = available_actions.get("held_item")
+    if held:
+        if isinstance(held, dict):
+            lines.append(f"You're holding: {held.get('name') or held.get('template') or held.get('id')}.")
+        else:
+            lines.append(f"You're holding: {held}.")
+
+    return "\n".join(lines)
+
+
 def build_prompt(context):
 
-    # context = {"narrative": "<prose>", "available_actions": {...}}
-    # (brain/context_builder.py::build_context).
+    # context = {"narrative": "<prose>", "available_actions": {...},
+    # "environment_scan": {...} | None} (brain/context_builder.py::
+    # build_context()).
     narrative = context.get("narrative", "")
     available_actions = context.get("available_actions", {}) or {}
 
     scene = _prose_scene(available_actions)
-    id_only = _id_only_block(available_actions)
 
     parts = [narrative]
     if scene:
         parts.append(scene)
 
-    return "\n\n".join(p for p in parts if p) + id_only
+    # Per the user's ask: don't dump the id-only pools (walls, devices,
+    # proposals, ...) into every single prompt as raw JSON. Only surface
+    # them once the character has actually chosen to look_around --
+    # environment_scan is that cached, already-prose result (set by
+    # action_router.py::_route_look_around, carried in context by
+    # context_builder.py::build_context()). Absent that, a short one-line
+    # nudge is all that's sent, so the model knows more detail exists
+    # without being handed it unasked.
+    scan = context.get("environment_scan")
+    if scan and scan.get("text"):
+        parts.append(f"What you took stock of when you last looked around:\n{scan['text']}")
+    if scan and scan.get("focused"):
+        parts.append(scan["focused"])
+    if not (scan and scan.get("text")) and any(available_actions.get(k) for k in _ID_ONLY_KEYS):
+        parts.append("There are some things nearby you haven't looked closely at — look_around to take stock, or focus on something specific you already know about.")
+
+    return "\n\n".join(p for p in parts if p)
 
 
 # =========================================================
