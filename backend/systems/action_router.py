@@ -913,6 +913,22 @@ def _humanize_memory_age(seconds):
 # ROUTE EXAMINE / INSPECT
 # =========================================================
 
+def _resolve_target_name(world, target_id):
+    """Best-effort human-readable name for any target id -- a character,
+    a prop, or (rarely) an item/id-only entity -- for narration purposes
+    (search/examine speech bubbles). Returns None if it can't be placed."""
+    if not target_id:
+        return None
+    char = world.get("characters", {}).get(target_id)
+    if char:
+        return char.get("name") or target_id
+    from systems.props import get_prop_by_id
+    prop = get_prop_by_id(world, target_id)
+    if prop:
+        return prop.get("name") or prop.get("template") or target_id
+    return None
+
+
 def _route_examine(c, world, action):
     target_id = action.get("target")
     c["activity"] = _scaffold(
@@ -922,6 +938,15 @@ def _route_examine(c, world, action):
         duration=180,
     )
     c["animation_state"] = get_phase_animation("examine", "using")
+
+    # Per the user's ask: examine/search should show what's actually
+    # being targeted, not just play a generic animation with no
+    # narration -- mirrors _route_search's "Looking for X..." bubble.
+    name = _resolve_target_name(world, target_id)
+    if name:
+        c["activity"]["target_name"] = name
+        from systems.incidental_speech import fire_incidental
+        fire_incidental(c, "inform", f"Examining {name}...", world)
 
 
 # =========================================================
@@ -1034,9 +1059,22 @@ def _route_search(c, world, action):
     if query:
         c["activity"]["query"] = query
     c["animation_state"] = get_phase_animation("search", "using")
-    if query:
+
+    target_name = _resolve_target_name(world, target_id)
+    if target_name:
+        c["activity"]["target_name"] = target_name
+
+    if query and target_name:
+        text = f"Searching the {target_name} for {query}..."
+    elif query:
+        text = f"Looking for {query}..."
+    elif target_name:
+        text = f"Searching the {target_name}..."
+    else:
+        text = None
+    if text:
         from systems.incidental_speech import fire_incidental
-        fire_incidental(c, "inform", f"Looking for {query}...", world)
+        fire_incidental(c, "inform", text, world)
 
 
 # =========================================================

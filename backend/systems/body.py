@@ -243,10 +243,22 @@ def update_body_needs(c, dt=1.0, world=None):
 
     # ── DAILY NUTRITION/WEIGHT/ADDICTION SETTLEMENT  (real calendar-midnight
     # detection, immune to CADENCE/tick-rate drift -- see systems/nutrition.py) ──
+    #
+    # Confirmed live bug: today_key was a plain (year, month, day) TUPLE,
+    # but b["_nutrients_reset_day"] round-trips through Postgres/Redis as
+    # JSON -- which has no tuple type, so it comes back as a LIST on the
+    # very next load. [2026,8,27] != (2026,8,27) in Python even though
+    # every element matches, so this "once per day" guard was actually
+    # true on EVERY call after the first (update_internal_state runs
+    # every tick for every character) -- crashing weight_kg to its floor
+    # within minutes of a fresh reset instead of drifting over real days.
+    # String-keyed, matching every other day-gate this session (jobs.py::
+    # maybe_fire, body_composition.py, contagion.py, libido.py) to avoid
+    # this exact class of bug recurring a third way.
     if world is not None:
         calendar = world.get("calendar", {})
-        today_key = (calendar.get("year"), calendar.get("month"), calendar.get("day"))
-        if today_key[0] is not None:
+        today_key = f"{calendar.get('year')}-{calendar.get('month')}-{calendar.get('day')}"
+        if calendar.get("year") is not None:
             last_key = b.get("_nutrients_reset_day")
             if last_key is not None and last_key != today_key:
                 from systems.nutrition import settle_nutrition_day
