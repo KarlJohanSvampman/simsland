@@ -208,7 +208,27 @@ _pending_agent_ids = set()
 # thread may still be leaked and running forever, but the character
 # themselves gets to make progress again rather than being silently
 # frozen for the rest of the session.
-STALE_PENDING_SECONDS = 30.0
+#
+# Confirmed live regression from THIS design in turn, once
+# llm/llm_gate.py's real single-concurrency priority queue existed:
+# 30s is comfortably SHORTER than this deployment's actual think()
+# latency (confirmed via the live prompt log -- routinely 34-90s per
+# call, remote Ollama). Every 30s a character was still "pending," a
+# BRAND NEW think() got dispatched and queued behind the still-running
+# old one (same priority -- same-tier arrivals never preempt each
+# other, they just FIFO), which only delayed that new call's own start
+# time further. With several characters doing this simultaneously,
+# fresh same-character retries piled up in the gate faster than the
+# single concurrent slot could drain them, so almost no decision ever
+# finished before being superseded by yet another retry -- confirmed
+# live: a freshly-spawned household's cognition state showed
+# last_think_tick stuck at -1 (never once completed) after 15+ minutes
+# and dozens of dispatches, despite the prompt log showing real,
+# successfully-decided actions the whole time. Set safely above
+# llm_client.py::call_llm_safe's own 150s worst-case timeout instead --
+# a call that's merely slow (the common case here) now has room to
+# actually land, and a genuinely hung one still recovers, just later.
+STALE_PENDING_SECONDS = 180.0
 _pending_agent_since = {}
 
 # Per-character dispatch counter -- guards against a genuinely leaked
