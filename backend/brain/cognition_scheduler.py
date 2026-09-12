@@ -52,6 +52,11 @@ WAKE_PRIORITY = {
     "activity_aborted": 80,
     "activity_finished": 70,
     "waiting_timed_out": 68,
+    "gave_up_waiting": 69,     # systems/waiting.py -- genuinely abandoned a
+                                 # queued wait after too many bang cycles;
+                                 # ranks just above the escalation wake
+                                 # itself since this one actually needs a
+                                 # real replan, not just a patience check
     "describe_result": 65,
     "recall_result": 65,
     "resolution_failed": 60,
@@ -143,6 +148,7 @@ _WAKE_LINE_TEMPLATES = {
     "activity_phase_changed": "You're finishing up what you were doing.",
     "wait_ready": "What you were waiting on is ready now.",
     "waiting_timed_out": "You've been waiting a while now and your patience is running out.",
+    "gave_up_waiting": "You gave up waiting -- it's taken too long, so you're moving on for now.",
     "noticed_commotion": "{summary}",
     "director_attention": "Something makes you stop and look up -- you have the odd feeling someone unseen is watching you, waiting for you to notice.",
 }

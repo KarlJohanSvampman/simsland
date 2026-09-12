@@ -2014,6 +2014,15 @@ def complete_activity(
     # =====================================
 
     elif activity_type in ("use_toilet", "use_toilet_bowels"):
+        # Confirmed live bug: unlike "sleep" just above, this branch never
+        # reset posture on completion -- a character kept c["posture"] ==
+        # "sitting_seat" indefinitely after standing up and walking away,
+        # so anyone who queued for the SAME toilet later (and got stuck
+        # standing at its anchor tile while waiting) visually read as
+        # "also sitting on the toilet right now" even though only one
+        # person was actually using it.
+        from systems.posture import set_posture
+        set_posture(c, world, "standing")
         on_toilet_complete(c)
         if activity_type == "use_toilet_bowels" and random.random() < 0.35:
             try:

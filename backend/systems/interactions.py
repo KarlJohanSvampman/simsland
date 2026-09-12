@@ -83,6 +83,18 @@ def begin_interaction(c, world, interaction_name):
         if alt:
             prop, anchor = alt
         else:
+            avoid_key = f"{prop['id']}:{anchor['name']}"
+            avoided = c.get("_avoided_anchors", {}).get(avoid_key, 0)
+            if world.get("tick", 0) < avoided:
+                # Confirmed live bug: this same occupied anchor was already
+                # abandoned recently (waiting.py's tick_waiting() gave up
+                # after too many door-bangs) -- without this check, the
+                # character's still-unmet need (bladder, ...) just
+                # re-triggered the exact same queue on the very next tick,
+                # making the earlier give-up a no-op in practice. Stay
+                # genuinely unresolved for the cooldown window instead.
+                return None
+
             # Nothing free anywhere -- this used to just silently fail
             # every tick with no visible consequence (begin_interaction
             # returning None, over and over, forever). Queue at the one
@@ -95,7 +107,15 @@ def begin_interaction(c, world, interaction_name):
             # patience runs out.
             from systems.occupancy import enqueue_anchor
             from systems.waiting import start_waiting_for
+            from systems.posture import set_posture
             enqueue_anchor(c, prop, anchor)
+            # Confirmed live bug: a character queued here while still
+            # carrying a stale "sitting_seat" posture from an EARLIER,
+            # already-completed use of this same toilet (see
+            # activities.py's use_toilet completion fix) rendered as if
+            # they were simultaneously using the appliance they were
+            # actually just standing in line for.
+            set_posture(c, world, "standing")
             c["activity"] = {
                 "type": "wait",
                 "phase": "using",

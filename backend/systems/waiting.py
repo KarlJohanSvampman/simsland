@@ -30,6 +30,23 @@ STRESS_PATIENCE_PENALTY_TICKS = 90
 
 MIN_PATIENCE_TICKS = 20
 
+# How many times a character re-arms the "banging on the door" escalation
+# (waiting.py's own prop-kind branch below) before genuinely giving up.
+# Confirmed live bug: the prop branch used to re-arm an ever-shorter timer
+# FOREVER with no upper bound -- if the occupant never finished (or kept
+# getting replaced by someone else queuing right back in), the waiter was
+# stuck banging on the door indefinitely with no way out. 3 cycles is
+# roughly BASE_PATIENCE_TICKS + 2*(BASE_PATIENCE_TICKS*0.5) ~= 4 real
+# sim-minutes of genuine waiting before they walk away.
+MAX_BANG_COUNT = 3
+
+# After giving up, how long this character avoids re-queuing at the SAME
+# occupied anchor -- without this, their still-unmet need (bladder, ...)
+# would just re-trigger the identical queue on the very next tick,
+# silently undoing the give-up (see interactions.py::begin_interaction's
+# avoidance check).
+GIVE_UP_AVOID_TICKS = 180
+
 
 def _patience_modifier(c):
     traits = set(c.get("traits", []) + c.get("personality_traits", []))
@@ -87,9 +104,36 @@ def tick_waiting(c, world):
         # fresh, shorter patience timer) rather than a one-off event, so
         # persistent occupancy reads as mounting impatience.
         if kind == "prop":
-            from systems.incidental_speech import fire_incidental
             bang_count = waiting_for.get("bang_count", 0) + 1
             waiting_for["bang_count"] = bang_count
+
+            if bang_count > MAX_BANG_COUNT:
+                # Genuinely give up -- per the user's ask, waiting too long
+                # should mean the character actually skips it rather than
+                # banging on the door forever. Leave the queue, clear the
+                # wait activity so the next tick's replan picks something
+                # else, and avoid re-queuing at this exact anchor for a
+                # while so the same unmet need doesn't just re-trigger the
+                # identical queue immediately.
+                ref = waiting_for["ref"]
+                prop_id, _, anchor_name = ref.rpartition(":")
+                for p in world.get("props", []):
+                    if p.get("id") != prop_id:
+                        continue
+                    for a in p.get("anchors", []):
+                        if a.get("name") == anchor_name and c["id"] in a.get("queue", []):
+                            a["queue"].remove(c["id"])
+                    break
+                c.setdefault("_avoided_anchors", {})[ref] = world.get("tick", 0) + GIVE_UP_AVOID_TICKS
+                waiting_for["timed_out"] = True
+                c["activity"] = None
+                wake_character(c, world, "gave_up_waiting", {
+                    "kind": kind,
+                    "ref":  ref,
+                })
+                return
+
+            from systems.incidental_speech import fire_incidental
             text = "Hurry up in there!" if bang_count == 1 else "Come ON, seriously?!"
             fire_incidental(c, "inform", f"*bangs on the door* {text}", world)
             c["stress"] = min(100, c.get("stress", 0) + 4 * bang_count)
@@ -97,10 +141,13 @@ def tick_waiting(c, world):
             # Re-arm a shorter timer (escalating urgency) instead of a
             # one-shot timeout -- still occupied means still banging.
             waiting_for["expires_at_tick"] = world.get("tick", 0) + max(MIN_PATIENCE_TICKS, round(BASE_PATIENCE_TICKS * 0.5))
+            wake_character(c, world, "waiting_timed_out", {
+                "kind": kind,
+                "ref":  waiting_for["ref"],
+            })
         else:
             waiting_for["timed_out"] = True
-
-        wake_character(c, world, "waiting_timed_out", {
-            "kind": waiting_for["kind"],
-            "ref":  waiting_for["ref"],
-        })
+            wake_character(c, world, "waiting_timed_out", {
+                "kind": kind,
+                "ref":  waiting_for["ref"],
+            })
