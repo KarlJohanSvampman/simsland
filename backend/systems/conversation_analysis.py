@@ -240,32 +240,44 @@ def apply_speech_act_analysis(
 
     if speech_act == "compliment":
 
-        result[
-            "observations"
-        ].append({
+        # Nervosity gate (systems/nervosity.py) -- a stressed or
+        # unprepared compliment can come out awkward instead of landing.
+        from systems.nervosity import attempt_influence
+        landed, _difficulty = attempt_influence(speaker, "compliment", listener)
 
-            "text":
-                f"{name} seemed supportive and validating.",
+        if landed:
+            result[
+                "observations"
+            ].append({
 
-            "weight":
-                0.5
-        })
+                "text":
+                    f"{name} seemed supportive and validating.",
 
-        result[
-            "relationship_effects"
-        ] = {
+                "weight":
+                    0.5
+            })
 
-            "trust": 5,
+            result[
+                "relationship_effects"
+            ] = {
 
-            "friendship": 4
-        }
+                "trust": 5,
 
-        result[
-            "emotional_effects"
-        ] = {
+                "friendship": 4,
 
-            "comfort": 0.2
-        }
+                "comfort": 4
+            }
+        else:
+            result[
+                "observations"
+            ].append({
+
+                "text":
+                    f"{name}'s compliment came out awkward and didn't quite land.",
+
+                "weight":
+                    0.3
+            })
 
     # =====================================================
     # FLIRT
@@ -273,32 +285,147 @@ def apply_speech_act_analysis(
 
     elif speech_act == "flirt":
 
-        result[
-            "observations"
-        ].append({
+        from systems.nervosity import attempt_influence
+        landed, _difficulty = attempt_influence(speaker, "flirt", listener)
 
-            "text":
-                f"{name} seemed flirtatious.",
+        if landed:
+            result[
+                "observations"
+            ].append({
 
-            "weight":
-                0.7
-        })
+                "text":
+                    f"{name} seemed flirtatious.",
 
-        result[
-            "relationship_effects"
-        ] = {
+                "weight":
+                    0.7
+            })
 
-            "attraction": 8,
+            result[
+                "relationship_effects"
+            ] = {
 
-            "friendship": 2
-        }
+                "attraction": 8,
 
-        result[
-            "conversation_effects"
-        ] = {
+                "friendship": 2
+            }
 
-            "emotional_charge": 0.25
-        }
+            result[
+                "conversation_effects"
+            ] = {
+
+                "emotional_charge": 0.25
+            }
+        else:
+            result[
+                "observations"
+            ].append({
+
+                "text":
+                    f"{name} tried to flirt but came across nervous and fumbling.",
+
+                "weight":
+                    0.4
+            })
+
+            result[
+                "relationship_effects"
+            ] = {
+
+                "attraction": -1
+            }
+
+    # =====================================================
+    # JOKE
+    # =====================================================
+
+    elif speech_act == "joke":
+
+        from systems.nervosity import attempt_influence
+        landed, _difficulty = attempt_influence(speaker, "joke", listener)
+
+        if landed:
+            result[
+                "observations"
+            ].append({
+
+                "text":
+                    f"{name} made a genuinely funny joke.",
+
+                "weight":
+                    0.4
+            })
+
+            result[
+                "relationship_effects"
+            ] = {
+
+                "friendship": 3,
+
+                "comfort": 3
+            }
+        else:
+            result[
+                "observations"
+            ].append({
+
+                "text":
+                    f"{name}'s joke fell flat.",
+
+                "weight":
+                    0.2
+            })
+
+    # =====================================================
+    # GUILT TRIP
+    # =====================================================
+
+    elif speech_act == "guilt_trip":
+
+        from systems.nervosity import attempt_influence
+        landed, _difficulty = attempt_influence(speaker, "guilt_trip", listener)
+
+        if landed:
+            result[
+                "observations"
+            ].append({
+
+                "text":
+                    f"{name} made {listener.get('name', 'them')} feel guilty about it.",
+
+                "weight":
+                    0.6
+            })
+
+            # A landed guilt trip is a real felt-guilt cost on the
+            # listener, not just an observation -- applied directly as
+            # stress rather than through result["emotional_effects"],
+            # which nothing in this module ever actually applies (a
+            # pre-existing gap, confirmed via analyze_message()'s body --
+            # only relationship_effects/conversation_effects get a real
+            # apply_*() pass).
+            listener["stress"] = min(100, listener.get("stress", 0) + 6)
+        else:
+            # A guilt trip that doesn't land reads as manipulative rather
+            # than sympathetic -- a real relationship cost, not a no-op.
+            result[
+                "observations"
+            ].append({
+
+                "text":
+                    f"{name} tried to guilt-trip {listener.get('name', 'them')}, but it just seemed manipulative.",
+
+                "weight":
+                    0.5
+            })
+
+            result[
+                "relationship_effects"
+            ] = {
+
+                "trust": -3,
+
+                "friendship": -2
+            }
 
     # =====================================================
     # INSULT

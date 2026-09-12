@@ -181,12 +181,14 @@ SPEECH
 - Keep utterances short (1-3 sentences). They appear as speech bubbles above your head.
 - "speech_act" genuinely shapes what happens, so pick the one that actually matches: compliment,
   flirt, insult, challenge, vulnerable, confession, apology, supportive, dismissive, gossip, brag,
-  lie, awkward_silence, joke, comfort, question, smalltalk, urgent_report — on top of the
-  always-valid greet, ask, declare, argue, whisper. A flirt nudges attraction and can cause
+  lie, awkward_silence, joke, guilt_trip, comfort, question, smalltalk, urgent_report — on top of
+  the always-valid greet, ask, declare, argue, whisper. A flirt nudges attraction and can cause
   blushing; an insult raises tension and can damage trust; a lie gets recorded and can be caught
   later if it's ever contradicted by where you actually are. Use urgent_report to tell someone
   about a hostile act you personally witnessed (only works if you actually saw one) — it gives
   the listener the same real awareness you have, including the ability to intervene or call 911.
+  compliment, flirt, joke, and guilt_trip are real attempts that can succeed or visibly flop
+  depending on how stressed/prepared you are (systems/nervosity.py) — don't assume it always lands.
 - "conversation_type" is optional — set it when you're starting a conversation or deliberately
   steering its shape: smalltalk, argument, negotiation, persuasion, competition, gossip. Leave it
   out to just continue naturally. It's yours to set or change any time, not locked in once picked.

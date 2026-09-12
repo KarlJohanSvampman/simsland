@@ -257,9 +257,26 @@ def generate_job_listings_legacy(world):
         generate_job_listings(world)
 
 
+def _day_key(calendar):
+    if not calendar:
+        return None
+    return f"{calendar.get('year', 0):04d}-{calendar.get('month', 0):02d}-{calendar.get('day', 0):02d}"
+
+
 def maybe_fire(c, world):
+    """fire_chance below is sized as a DAILY layoff risk (~0.1-0.3%), but
+    this is polled on CADENCE["job_market"] (every 60 ticks -- ~once a
+    simulated MINUTE, not once a day) -- confirmed live: without a
+    real day-key gate this re-rolled ~1440x too often, inflating a
+    freshly-hired character's chance of getting laid off within an hour
+    to a double-digit percentage instead of the intended fraction of a
+    percent per day. Same day-key idiom as libido.py::tick_libido."""
     if not c.get("employed"):
         return
+    day_key = _day_key(world.get("calendar"))
+    if day_key is None or c.get("_last_fire_check_day") == day_key:
+        return
+    c["_last_fire_check_day"] = day_key
     env        = world.get("environment", {})
     unemp      = env.get("unemployment_rate", 5.5) / 100
     fire_chance = 0.001 + unemp * 0.002
@@ -284,8 +301,8 @@ def maybe_fire(c, world):
 APPLICATION_COOLDOWN_DAYS = (1, 4)
 
 
-def _interview_invite_chance(fit):
-    return max(0.05, min(0.9, 0.08 + fit * 0.7))
+def _interview_invite_chance(fit, resume_quality=0.0):
+    return max(0.05, min(0.9, 0.08 + fit * 0.7 + resume_quality * 0.2))
 
 # Stage lists, keyed by complexity_tier (see job_complexity.py) --
 # interview_1 is always online, interview_2 (tier 3+ only) is a real
@@ -369,7 +386,7 @@ def apply_for_job(c, world, job_id=None):
     fit = _qualification_fit(c, job, world.get("definitions", {}))
     c["_next_application_tick"] = world["tick"] + _days_to_ticks(*APPLICATION_COOLDOWN_DAYS)
 
-    if random.random() > _interview_invite_chance(fit):
+    if random.random() > _interview_invite_chance(fit, c.get("resume_quality", 0.0)):
         # Not invited THIS time -- a real, education/experience-scaled
         # roll (see _interview_invite_chance), not a hard qualification
         # cutoff. A poorly qualified candidate can still eventually land

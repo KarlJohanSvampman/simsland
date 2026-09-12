@@ -97,6 +97,7 @@ ACTION_SPECS = {
     "computer_dating":           {"group": "computer", "target": "none", "doc": "Use a dating app/site."},
     "computer_job_search":       {"group": "computer", "target": "none", "doc": "Search job listings."},
     "computer_apply_for_job":    {"group": "computer", "target": "any", "doc": "Apply for a job listing."},
+    "write_refine_resume":       {"group": "computer", "target": "none", "doc": "Spend 10-30 minutes writing or polishing your resume. Each session raises how likely your next job applications are to land an interview."},
     "computer_send_email":       {"group": "computer", "target": "character", "detail": "message", "doc": "Email a known contact."},
     "computer_respond_email":    {"group": "computer", "target": "character", "detail": "message", "doc": "Reply to an email."},
     "computer_check_email":      {"group": "computer", "target": "none", "doc": "Check your email."},

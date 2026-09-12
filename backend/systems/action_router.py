@@ -1424,6 +1424,8 @@ def route_action(c, world, action, speech, definitions=None, available_actions=N
         _route_computer_job_search(c, world, action)
     elif action_type == "computer_apply_for_job":
         _route_computer_apply_for_job(c, world, action)
+    elif action_type == "write_refine_resume":
+        _route_write_refine_resume(c, world, action)
     elif action_type in ("computer_send_email", "computer_respond_email", "computer_check_email"):
         _route_computer_email(c, world, action)
     elif action_type == "browse_second_hand_marketplace":
@@ -3499,6 +3501,14 @@ def _route_make_argument(c, world, action):
         return
     argument_strength = max(0.0, min(1.0, result.get("argument_strength", 0.5)))
 
+    # Nervosity gate (systems/nervosity.py): a stressed, unprepared
+    # character can still make the argument, but a flubbed delivery
+    # barely moves anyone regardless of how sound the reasoning was.
+    from systems.nervosity import attempt_influence
+    landed, difficulty = attempt_influence(c, "make_argument", target)
+    if not landed:
+        argument_strength *= 0.15
+
     # Threads into the real conversation + fires the speech bubble --
     # also what triggers apply_speech's own form_opinion scheduling for
     # any listener who doesn't have an opinion on this topic yet.
@@ -3782,6 +3792,23 @@ def _route_computer_job_search(c, world, action):
     c["activity"] = _scaffold(c, world, "computer_job_search", interaction="computer_job_search")
     c["activity"]["job_listings"] = listings[:10]
     _set_computer_animation(c, world)
+
+
+def _route_write_refine_resume(c, world, action):
+    """10-30 real minutes (600-1800 ticks) spent on the resume itself --
+    raises c["resume_quality"] (0-1, schema_defaults.py) with diminishing
+    returns as it approaches the cap, consumed by
+    jobs.py::_interview_invite_chance() as a persistent bonus on every
+    future application, not a one-shot consumed boost -- a better resume
+    stays better."""
+    if not _require_phone_or_computer(c, world):
+        return
+    c["activity"] = _scaffold(c, world, "write_refine_resume",
+                               interaction="write_refine_resume",
+                               duration=random.randint(600, 1800))
+    _set_computer_animation(c, world)
+    quality = c.get("resume_quality", 0.0)
+    c["resume_quality"] = min(1.0, quality + (1.0 - quality) * 0.3)
 
 
 def _route_computer_apply_for_job(c, world, action):
