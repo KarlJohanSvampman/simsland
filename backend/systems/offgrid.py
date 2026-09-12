@@ -50,7 +50,6 @@ _VENUE_FLAVOR = {
     "leisure":    ["a park", "a movie theater", "downtown", "a friend's neighborhood"],
     "gym":        ["the gym"],
     "cafe":       ["a coffee shop", "a diner"],
-    "job_search": ["a job fair", "a few offices downtown", "a staffing agency"],
 }
 
 
@@ -294,7 +293,6 @@ _NARRATOR_CATEGORIES = {
     "leisure":    (_shopping_leisure_details, _ERRANDS_NORMALCY_WEIGHTS),
     "gym":        (_shopping_leisure_details, _ERRANDS_NORMALCY_WEIGHTS),
     "cafe":       (_shopping_leisure_details, _ERRANDS_NORMALCY_WEIGHTS),
-    "job_search": (_shopping_leisure_details, _ERRANDS_NORMALCY_WEIGHTS),
     "work":       (_work_details,             _WORK_NORMALCY_WEIGHTS),
     "doctor":     (_medical_details,          _DOCTOR_NORMALCY_WEIGHTS),
     "hospital":   (_medical_details,          _HOSPITAL_NORMALCY_WEIGHTS),
@@ -324,7 +322,6 @@ _REASON_VICE_CHANCE = {
     "gym":       [],
     "cafe":      [("smoke",         "had a smoke outside",         "smoking",   0.08)],
     "shopping":  [("gamble",        "stopped by and gambled a bit","gambling",  0.05)],
-    "job_search":[],
     "work":      [("drink_alcohol", "had drinks with coworkers",   "drinking",  0.07)],
     "outing":    [("drink_alcohol", "had a drink",                 "drinking",  0.10),
                   ("party_late",    "stayed out far later than usual","partying",0.06)],
@@ -487,7 +484,7 @@ def _seed_lie_for_private_event(c, world, event):
 # so routing an incapacitated or arrested character through "walk to the
 # garage and drive yourself" would be narratively wrong.
 _TRAVEL_ELIGIBLE_REASONS = {
-    "work", "job_search", "shopping", "leisure", "gym", "cafe", "doctor", "pharmacy",
+    "work", "shopping", "leisure", "gym", "cafe", "doctor", "pharmacy",
     "interview", "driving_lesson", "driving_test",
     # "practice_driving" deliberately excluded -- the point of that trip is
     # the driving itself (a companion's car, off-screen), not travelling to
@@ -583,7 +580,7 @@ def _send_offgrid_immediate(c, world, reason, duration_minutes):
     return True
 
 
-_ERRAND_CHAIN_POOL = ("shopping", "leisure", "gym", "cafe", "job_search")
+_ERRAND_CHAIN_POOL = ("shopping", "leisure", "gym", "cafe")
 
 
 def _send_errand(c, world, reason, minutes):
@@ -667,9 +664,16 @@ def maybe_go_offgrid(c, world):
         return
 
     r = random.random()
-    if not c.get("employed") and r < 0.01:
-        send_offgrid(c, world, "job_search", 60)
-        return
+
+    # Job searching/applying is real, on-grid, computer/phone-driven work
+    # now (jobs.py::apply_for_job(), called automatically every tick for
+    # any unemployed character, plus the computer_apply_for_job/
+    # computer_job_search actions) -- there used to be a separate, purely
+    # cosmetic off-grid "job_search" trip here (1% chance per tick, so
+    # effectively guaranteed within seconds of becoming unemployed) left
+    # over from before that real pipeline existed. Only an actual
+    # interview (advance_job_application()'s on-site interview_2 stage,
+    # reason "interview") sends anyone off-grid for job-market reasons now.
 
     # Leisure/shopping/gym/cafe: never during (or about to start) a real
     # work/contract commitment -- work gets real priority now that it no
