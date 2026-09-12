@@ -38,13 +38,13 @@ walls — see "reference by exact id" below, if present) don't have a natural wa
 in words, so those are given to you with real ids; use those exact ids only for those things."""
 
 
-def _format_action_menu(available_actions):
-    from systems.action_registry import ACTION_SPECS
-
-    offered = available_actions.get("action_types") or []
+def _render_action_lines(offered, specs):
+    """Shared doc-string rendering for a set of (already-filtered) action
+    types, grouped by their spec's "group" -- used both for the default
+    core-only menu and for list_available_actions' fuller one."""
     by_group = {}
     for t in offered:
-        spec = ACTION_SPECS.get(t)
+        spec = specs.get(t)
         if not spec:
             continue
         by_group.setdefault(spec.get("group", "other"), []).append((t, spec))
@@ -57,6 +57,33 @@ def _format_action_menu(available_actions):
             if detail:
                 doc = f"{doc} (set \"detail\" to the {detail})"
             lines.append(f"- {t} — {doc}")
+    return lines
+
+
+def _format_action_menu(available_actions):
+    """Per the user's ask: don't dump doc strings for EVERY currently-
+    eligible action into every single prompt -- action_registry.py's
+    "core" group (movement, speech, basic self-care, look_around/focus/
+    list_available_actions, ...) is the only thing shown by default.
+    Everything else (phone/computer, chores, proposals, exercise, prop-
+    specific interactions, ...) is real and still fully usable, just
+    deferred behind the new list_available_actions action -- see
+    action_router.py::_route_list_available_actions, which builds that
+    fuller, still-prose-not-JSON listing on demand and caches it exactly
+    like look_around's environment_scan."""
+    from systems.action_registry import ACTION_SPECS
+
+    offered = available_actions.get("action_types") or []
+    core = [t for t in offered if ACTION_SPECS.get(t, {}).get("group") == "core"]
+    lines = _render_action_lines(core, ACTION_SPECS)
+
+    extra_count = sum(1 for t in offered if ACTION_SPECS.get(t, {}).get("group") != "core")
+    if extra_count:
+        lines.append(
+            f"- ...and {extra_count} more specific things you could do right now "
+            "(phone/computer, chores, exercise, proposals, whatever's actually nearby, "
+            "...) -- call list_available_actions to see them."
+        )
     return "\n".join(lines)
 
 
@@ -398,6 +425,14 @@ def build_prompt(context):
         parts.append(scan["focused"])
     if not (scan and scan.get("text")) and any(available_actions.get(k) for k in _ID_ONLY_KEYS):
         parts.append("There are some things nearby you haven't looked closely at — look_around to take stock, or focus on something specific you already know about.")
+
+    # Cached result of list_available_actions (action_router.py::
+    # _route_list_available_actions) -- the fuller, non-core action menu,
+    # already grouped and grounded against whatever's actually nearby.
+    # Same "cache until refreshed" shape as environment_scan above.
+    menu_cache = context.get("action_menu_cache")
+    if menu_cache and menu_cache.get("text"):
+        parts.append(f"Everything else you can currently do:\n{menu_cache['text']}")
 
     return "\n\n".join(p for p in parts if p)
 

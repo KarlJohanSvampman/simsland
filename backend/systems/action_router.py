@@ -984,6 +984,40 @@ def _route_focus(c, world, action, available_actions):
     c["activity"] = _scaffold(c, world, "focus", target_id=target_id, interaction="examine", duration=60)
 
 
+def _route_list_available_actions(c, world, action, available_actions):
+    """Builds the fuller, non-"core" action menu on demand instead of
+    llm_brain.py::_format_action_menu() dumping every currently-eligible
+    action's doc string into every single prompt (per the user's ask --
+    that menu alone was measured at ~52% of a whole prompt's size).
+    Grouped the same way the existing menu already groups (by
+    action_registry.py's own "group" field on each spec -- phone,
+    computer, chore, exercise, proposal, prop, ...), with the nearby
+    interactable props actually named up front so the "prop"-grouped
+    entries (interact/examine/search/carry/clean/sit_down/...) have real
+    grounding instead of a bare doc string with no idea what's around to
+    use them on."""
+    from brain.llm_brain import _render_action_lines
+    from systems.action_registry import ACTION_SPECS
+
+    available_actions = available_actions or {}
+    offered = available_actions.get("action_types") or []
+    extra = [t for t in offered if ACTION_SPECS.get(t, {}).get("group") != "core"]
+
+    lines = []
+    props = available_actions.get("interactable_props") or []
+    if props:
+        names = sorted({p.get("template") or p.get("id") for p in props})
+        lines.append(f"Nearby props/appliances you could target: {', '.join(names)}.")
+
+    lines.extend(_render_action_lines(extra, ACTION_SPECS))
+
+    c["action_menu_cache"] = {
+        "text": "\n".join(lines) if lines else "Nothing else available right now beyond what's already listed.",
+        "tick": world.get("tick", 0),
+    }
+    c["activity"] = _scaffold(c, world, "list_available_actions", interaction="list_available_actions", duration=10)
+
+
 # =========================================================
 # ROUTE SEARCH FOR ITEM
 # =========================================================
@@ -1393,6 +1427,9 @@ def route_action(c, world, action, speech, definitions=None, available_actions=N
 
     elif action_type == "focus":
         _route_focus(c, world, action, available_actions)
+
+    elif action_type == "list_available_actions":
+        _route_list_available_actions(c, world, action, available_actions)
 
     elif action_type == "search":
         _route_search(c, world, action)

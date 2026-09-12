@@ -2078,6 +2078,8 @@ def build_context(
         "available_actions": build_available_actions(c, world),
 
         "environment_scan": c.get("environment_scan"),
+
+        "action_menu_cache": c.get("action_menu_cache"),
     }
 
 
