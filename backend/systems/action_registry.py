@@ -48,7 +48,7 @@ ACTION_SPECS = {
     # all four, but build_available_actions() doesn't offer them yet —
     # gating added in this round, see context_builder.py) -------------
     "examine":    {"group": "core", "target": "prop_or_character", "doc": "Take a closer look at something."},
-    "search":     {"group": "core", "target": "prop", "doc": "Search a prop/container."},
+    "search":     {"group": "core", "target": "prop", "detail": "query", "doc": "Search a prop/container for something specific."},
     "carry":      {"group": "core", "target": "prop", "doc": "Pick up and carry a prop."},
     "clean":      {"group": "core", "target": "prop", "doc": "Clean a prop."},
     "look_around": {"group": "core", "target": "none", "doc": "Take real stock of your surroundings -- walls, devices, proposals, worn/held items, anything else not already described. The result stays available until you look_around again."},

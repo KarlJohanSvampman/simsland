@@ -990,13 +990,19 @@ def _route_focus(c, world, action, available_actions):
 
 def _route_search(c, world, action):
     target_id = action.get("target")
+    query = (action.get("query") or "").strip()
     c["activity"] = _scaffold(
         c, world, "search",
         target_id=target_id,
         interaction="search",
         duration=600,
     )
+    if query:
+        c["activity"]["query"] = query
     c["animation_state"] = get_phase_animation("search", "using")
+    if query:
+        from systems.incidental_speech import fire_incidental
+        fire_incidental(c, "inform", f"Looking for {query}...", world)
 
 
 # =========================================================
