@@ -107,7 +107,16 @@ def tick_waiting(c, world):
         if kind == "prop":
             bang_count = waiting_for.get("bang_count", 0) + 1
             waiting_for["bang_count"] = bang_count
-            started_at = waiting_for.get("started_at_tick", world.get("tick", 0))
+            # setdefault, not get -- a waiting_for created before this
+            # field existed (a live character already mid-queue when this
+            # fix deployed) must have its start point pinned ONCE here,
+            # not recomputed as "now" on every single check. A bare .get()
+            # fallback would silently reset the 30-min clock back to zero
+            # every time this branch ran, meaning a pre-existing waiter
+            # could bang forever and never actually reach the cap
+            # (confirmed live: exactly this happened to two characters
+            # who were already queued when the previous fix restarted).
+            started_at = waiting_for.setdefault("started_at_tick", world.get("tick", 0))
 
             if world.get("tick", 0) - started_at >= MAX_TOTAL_WAIT_TICKS:
                 # Genuinely give up -- per the user's ask, waiting too long
