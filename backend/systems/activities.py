@@ -1686,6 +1686,27 @@ def execute_activity(
         return _execute_use_seat(c, world, act)
 
     # =====================================================
+    # WAIT (queued for an occupied appliance) — timing/give-up is owned
+    # entirely by systems/waiting.py::tick_waiting(), never by this
+    # function's generic elapsed>=duration completion below. Confirmed
+    # live bug: this activity carried a plain numeric "duration" like
+    # every other activity type, so the generic "using" phase block a
+    # little further down auto-completed and cleared it every ~2 minutes
+    # regardless of whether the appliance had actually freed up -- wiping
+    # the patience/bang-count escalation state and forcing a full fresh
+    # queue-rejoin. The give-up counter could never accumulate past its
+    # first cycle before being reset out from under it, so a character
+    # could end up waiting far longer than any patience setting intended
+    # (confirmed live: nearly an hour). tick_waiting() and
+    # release_anchor()'s queue-pop both already clear c["activity"]
+    # directly when it's actually time to move on -- nothing here needs
+    # to duplicate that.
+    # =====================================================
+
+    if activity_type == "wait":
+        return True
+
+    # =====================================================
     # WALKING  — wait until movement system clears is_moving
     # =====================================================
 
