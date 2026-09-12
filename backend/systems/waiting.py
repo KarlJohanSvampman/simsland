@@ -77,7 +77,29 @@ def tick_waiting(c, world):
     apply_waiting_stress(c, world)
 
     if world.get("tick", 0) >= waiting_for["expires_at_tick"]:
-        waiting_for["timed_out"] = True
+        kind = waiting_for["kind"]
+
+        # Per the user's ask: waiting on an occupied appliance (the only
+        # instance of it, per systems/interactions.py::begin_interaction's
+        # queueing path) escalates into real banging on the door instead
+        # of just quietly re-checking -- a visible, audible cue rather
+        # than a silent cognition-only wake, and genuinely repeats (a
+        # fresh, shorter patience timer) rather than a one-off event, so
+        # persistent occupancy reads as mounting impatience.
+        if kind == "prop":
+            from systems.incidental_speech import fire_incidental
+            bang_count = waiting_for.get("bang_count", 0) + 1
+            waiting_for["bang_count"] = bang_count
+            text = "Hurry up in there!" if bang_count == 1 else "Come ON, seriously?!"
+            fire_incidental(c, "inform", f"*bangs on the door* {text}", world)
+            c["stress"] = min(100, c.get("stress", 0) + 4 * bang_count)
+
+            # Re-arm a shorter timer (escalating urgency) instead of a
+            # one-shot timeout -- still occupied means still banging.
+            waiting_for["expires_at_tick"] = world.get("tick", 0) + max(MIN_PATIENCE_TICKS, round(BASE_PATIENCE_TICKS * 0.5))
+        else:
+            waiting_for["timed_out"] = True
+
         wake_character(c, world, "waiting_timed_out", {
             "kind": waiting_for["kind"],
             "ref":  waiting_for["ref"],
