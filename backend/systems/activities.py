@@ -1392,7 +1392,21 @@ def start_activity(
         config["interaction"]
     )
     if not interaction:
-        return False
+        # Confirmed live bug: begin_interaction() returning None covers
+        # TWO different outcomes -- "genuinely nothing to do" AND
+        # "queued at the only occupied instance, real wait activity
+        # already scaffolded" (systems/interactions.py's queueing path,
+        # see this session's toilet-impatience work). Treating both as
+        # a bare failure let resolve_strategy()'s intention loop fall
+        # through to a LOWER-priority intention that happened to
+        # succeed, silently overwriting/abandoning the freshly-queued
+        # "wait" activity the same tick it was set up -- a character
+        # queued for the bathroom would just wander off to get a drink
+        # instead, still needing the toilet, no longer actually waiting
+        # for it. A queued wait is a real, meaningful activity (the
+        # character IS doing something -- waiting) so it counts as
+        # "started" here, same as any other successful activity.
+        return bool(c.get("activity") and c["activity"].get("type") == "wait")
 
     prop = interaction["prop"]
     anchor = interaction["anchor"]
