@@ -246,6 +246,33 @@ def _is_month_start_midnight(world):
     return True
 
 
+def _is_new_calendar_day(world, tag):
+    """Same one-shot-per-period guard as _is_monday_midnight/
+    _is_month_start_midnight above, but for blocks that are meant to run
+    once per real day at WHATEVER moment their every()-gated cadence next
+    fires, not a specific hour. CADENCE["daily_finance"]/["value_influence"]
+    are both 24 (24 TICKS -- ~24 real seconds -- not 24 hours, despite
+    their own "daily"/"once/sim-day" naming) -- confirmed live the same
+    bug shape already found and fixed in jobs.py::maybe_fire,
+    body_composition.py::tick_body_composition, and
+    contagion.py::age_food_items: several of the functions gated on
+    these blocks (systems/influence.py::resolve_value_influence,
+    systems/mental_health_effects.py::tick_depression_effects, ...)
+    apply a real per-call step/accumulator with no gate of their own,
+    assuming their caller only invokes them once a day. Rather than
+    patching every downstream function individually, gate the whole
+    block once here -- they were always meant to run together as one
+    daily batch anyway (see the single `if every(...)` wrapping all of
+    them in tick())."""
+    cal = world.get("calendar", {})
+    stamp = f"{cal.get('year')}-{cal.get('month')}-{cal.get('day')}"
+    key = f"_last_{tag}_day"
+    if world.get(key) == stamp:
+        return False
+    world[key] = stamp
+    return True
+
+
 # =========================================================
 # DIRTY TRACKING
 # =========================================================
@@ -440,7 +467,7 @@ def tick(world):
     # deliberately a separate, once-a-day cadence from the exposure
     # resolver above, per the "impact over time... sum it all up maybe on
     # a daily basis" ask. See systems/influence.py::resolve_value_influence.
-    if every(world, CADENCE["value_influence"], offset=13):
+    if every(world, CADENCE["value_influence"], offset=13) and _is_new_calendar_day(world, "value_influence"):
         resolve_value_influence(world)
 
     # -- Medium: household systems (÷10) ────────────────────
@@ -793,7 +820,7 @@ def tick(world):
     # symptoms (systems/mental_health_effects.py) + noticing a
     # household member's sustained withdrawal (systems/
     # withdrawal_concern.py) ─────────────────────────────────────────
-    if every(world, CADENCE["daily_finance"], offset=45):
+    if every(world, CADENCE["daily_finance"], offset=45) and _is_new_calendar_day(world, "daily_finance"):
         from systems.telecom import tick_daily_data_usage
         from systems.subscriptions import maybe_grow_subscription_desire
         from systems.home_presence import roll_over_home_presence_day
