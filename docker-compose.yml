@@ -13,7 +13,7 @@ services:
       - OLLAMA_MODEL=llama3.1:latest
       - OLLAMA_NUM_CTX=8192          # 👈 explicit context window (was implicit 4096)
       - OLLAMA_KEEP_ALIVE=10m        # 👈 reduce cold-start reloads between ticks
-      - OLLAMA_MAX_CONCURRENCY=1     # 👈 strict single-flight -- never more than one call in progress
+      - OLLAMA_MAX_CONCURRENCY=2     # 👈 raised back from 1 -- the priority queue (llm/llm_gate.py) now protects urgent calls with preemption even at concurrency>1, so strict single-flight is no longer needed to keep decisions responsive, and it was directly bottlenecking tick throughput with 4 characters all needing decisions
       - PYTHONPATH=/app
       - PYTHONUNBUFFERED=1
     depends_on:
