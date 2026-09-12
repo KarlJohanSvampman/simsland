@@ -400,6 +400,19 @@ def resolve_hostile_action(actor, target, action_id, world):
         except Exception:
             pass
 
+    # Trait-weighted reaction, surfaced at the very top of the target's
+    # own next narrative and a real reactive wake -- see systems/
+    # target_reactions.py's module docstring for why this was needed
+    # (hostile_action_resolved below was emitted with zero subscribers,
+    # so a target never got any prompt to actually respond to being
+    # attacked). Fires regardless of outcome -- an evaded or fumbled
+    # attack still provokes a real reaction, just not an injury.
+    try:
+        from systems.target_reactions import flag_provocation
+        flag_provocation(target, world, actor, action_id, outcome=outcome)
+    except Exception:
+        pass
+
     _tag_hostile_act(actor, action_id, target["id"], tick, outcome)
 
     emit("hostile_action_resolved", {

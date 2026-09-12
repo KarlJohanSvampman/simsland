@@ -234,6 +234,18 @@ def apply_speech_act_analysis(
 
     name = speaker["name"]
 
+    # Trait-weighted reaction, surfaced at the top of the listener's own
+    # next narrative + a real reactive wake -- see systems/
+    # target_reactions.py. One shared hook here rather than duplicating
+    # a call in every branch below; harmless no-op for any speech_act
+    # not in REACTION_WEIGHTS (smalltalk, question, ...).
+    if world is not None:
+        try:
+            from systems.target_reactions import flag_provocation
+            flag_provocation(listener, world, speaker, speech_act)
+        except Exception:
+            pass
+
     # =====================================================
     # COMPLIMENT
     # =====================================================

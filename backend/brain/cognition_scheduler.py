@@ -43,6 +43,9 @@ TURN_BUDGET_DEFAULT = int(os.getenv("COGNITION_TURN_BUDGET", "2"))
 WAKE_PRIORITY = {
     "director_attention": 110,  # systems/director_mode.py -- an external
                                  # director interrupt always wins
+    "provoked": 105,           # systems/target_reactions.py -- being hit/
+                                 # insulted/threatened/etc. outranks merely
+                                 # being spoken to
     "heard_speech": 100,
     "urgent_need": 90,
     "noticed_commotion": 75,   # systems/curiosity.py -- a curious character just noticed something worth investigating
@@ -136,6 +139,7 @@ def wake_character(c, world, reason, payload=None, delay=0):
 _WAKE_LINE_TEMPLATES = {
     "person_entered_view": "{subject_name} has just come into view.",
     "heard_speech": '{speaker_name} just said to you: "{utterance}"',
+    "provoked": "{actor_name} just {verb_phrase} you. {reaction_hint}",
     "activity_phase_changed": "You're finishing up what you were doing.",
     "wait_ready": "What you were waiting on is ready now.",
     "waiting_timed_out": "You've been waiting a while now and your patience is running out.",
