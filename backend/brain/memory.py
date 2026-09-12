@@ -132,7 +132,15 @@ def store_memory(
     **extra
 ):
 
-    if not text:
+    if not text or not isinstance(text, str):
+        # A caller can hand this a truthy non-string (most commonly the
+        # {"error": ...} dict run_llm_call() resolves a failed/preempted
+        # LLM call to -- confirmed live: systems/offgrid.py's process_return
+        # crashed the whole tick loop this way once `text.lower()` ran
+        # inside score_importance() below on a dict). store_memory() is the
+        # single most shared sink for "something notable happened" text
+        # across this codebase, so guarding here protects every caller,
+        # not just the one that happened to trip it first.
         return None
 
     tags = tags or []
