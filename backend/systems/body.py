@@ -31,6 +31,7 @@ Body fields (all 0-100 unless noted):
 """
 
 import math
+import random
 
 # ── health threshold events ───────────────────────────────────────────────────
 _HEALTH_THRESHOLDS = {
@@ -58,6 +59,19 @@ _BODY_DEFAULTS = {
     "hours_awake":         0,
     "nutrients_today":     0,
     "toilet_visits_needed_today": 1,
+}
+
+# Confirmed live bug: EVERY character got the exact same fixed bladder=10/
+# bowels=5 starting point (via ensure_body()'s plain setdefault loop below)
+# -- with a household generated all at once, every member's bladder then
+# rises on nearly the same real-world formula, so they all cross the
+# "need to go" threshold within moments of each other, forever, with only
+# one toilet to share. Randomizing these two fields specifically (not the
+# rest of _BODY_DEFAULTS -- no other need showed this symptom) at first
+# creation staggers the household's bathroom schedule from the start.
+_RANDOMIZED_ON_INSERT = {
+    "bladder": (0, 70),
+    "bowels":  (0, 60),
 }
 
 # Fields on c["body"] that are NOT 0-100 percentages, so clamp_body() must
@@ -94,7 +108,10 @@ SLEEP_DEBT_RECOVERY_PER_TICK_ASLEEP = 60 / 28800
 def ensure_body(c):
     body = c.setdefault("body", {})
     for k, v in _BODY_DEFAULTS.items():
-        body.setdefault(k, v)
+        if k in _RANDOMIZED_ON_INSERT and k not in body:
+            body[k] = random.uniform(*_RANDOMIZED_ON_INSERT[k])
+        else:
+            body.setdefault(k, v)
     # Remove legacy c["needs"] entirely — long-term drives live in c["lt_needs"]
     c.pop("needs", None)
 
@@ -408,8 +425,12 @@ def on_consume_complete(c, world, item_tmpl):
 
 def on_toilet_complete(c):
     b = c["body"]
-    b["bladder"] = 5
-    b["bowels"]  = max(0, b["bowels"] - 60)
+    # Jittered, not a fixed value -- a hard reset to the same number for
+    # everyone after every use quietly re-synchronizes the household's
+    # bathroom schedule right back into lockstep over time, undoing the
+    # randomized starting point above.
+    b["bladder"] = random.uniform(2, 8)
+    b["bowels"]  = max(0, b["bowels"] - random.uniform(50, 65))
 
 
 def on_vomit_complete(c, world=None):
