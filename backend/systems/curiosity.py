@@ -116,8 +116,11 @@ def _start_investigation(c, world, target):
     # draining a non-empty activity_queue -- a single-slot activity (e.g.
     # "wait", with no queue behind it) needs clearing directly, or
     # _movement_blocked() (action_router.py) would still refuse the walk
-    # below.
-    c["activity"] = None
+    # below. Goes through interrupt_activity() (not a bare None) so any
+    # reserved prop anchor (mid-use_toilet/shower/... interrupted by
+    # curiosity) actually gets released too.
+    from systems.occupancy import interrupt_activity
+    interrupt_activity(c, world)
 
     if target["kind"] == "speech":
         other = world.get("characters", {}).get(target["source_id"])

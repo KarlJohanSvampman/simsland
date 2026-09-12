@@ -83,7 +83,8 @@ def interrupt_attention(c, world):
     their next think() notices the director. See module docstring for
     why this doesn't use activity_queue.py's hobby-suspend path."""
     start_director_session(c, world)
-    c["activity"] = None
+    from systems.occupancy import interrupt_activity
+    interrupt_activity(c, world)
     wake_character(c, world, DIRECTOR_WAKE_REASON)
     _log(world, c["id"], "interrupt_attention", {})
 

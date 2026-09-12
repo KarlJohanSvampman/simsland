@@ -134,7 +134,8 @@ def _interrupt_activity(c, world):
     if c.get("activity_queue"):
         from systems.activity_queue import suspend_activity_queue
         suspend_activity_queue(c, world, reason="psychosis")
-    c["activity"] = None
+    from systems.occupancy import interrupt_activity
+    interrupt_activity(c, world)
 
 
 def tick_psychosis(c, world):

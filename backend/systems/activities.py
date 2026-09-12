@@ -1495,8 +1495,9 @@ def _execute_use_seat(c, world, act):
 
     if phase == "using":
         from systems.activity_queue import mark_queue_task_done
+        from systems.occupancy import interrupt_activity
         mark_queue_task_done(c, "use_seat", success=True)
-        c["activity"] = None
+        interrupt_activity(c, world)
         c["current_intention"] = None
         return False
 

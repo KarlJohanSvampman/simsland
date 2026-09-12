@@ -254,6 +254,27 @@ def clear_stale_anchor_occupancy(sim_id: str = DEFAULT_SIM_ID):
     return {"ok": True, "cleared": cleared}
 
 
+@router.post("/release_stuck_anchor")
+def release_stuck_anchor(payload: dict, sim_id: str = DEFAULT_SIM_ID):
+    """One-off correction for the pre-fix interrupt_activity() gap (see
+    systems/occupancy.py) -- a character whose activity was interrupted
+    (not naturally completed) kept their prop anchor "occupied_by"
+    forever even after wandering off elsewhere, permanently blocking
+    anyone else queued for it. Releases whatever c["occupying"] points
+    to for one character and clears their (already-stale) activity."""
+    char_id = payload.get("character_id")
+    with world_lock():
+        world = load_world(sim_id)
+        c = world.get("characters", {}).get(char_id)
+        if not c:
+            return {"ok": False, "error": "character not found"}
+        from systems.occupancy import interrupt_activity
+        occupying_before = c.get("occupying")
+        interrupt_activity(c, world)
+        save_world(sim_id, world)
+    return {"ok": True, "released": occupying_before}
+
+
 @router.post("/set_body_need")
 def set_body_need(payload: dict, sim_id: str = DEFAULT_SIM_ID):
     """Live-testing helper: force one character's body need to a value

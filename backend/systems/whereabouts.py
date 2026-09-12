@@ -108,7 +108,8 @@ def check_ask_whereabouts(c, world):
 
     # Pausing the current activity takes priority, per the user's own
     # framing ("should most times warrant pausing any current activity").
-    c["activity"] = None
+    from systems.occupancy import interrupt_activity
+    interrupt_activity(c, world)
 
     target_name = target.get("name", target_id)
     try:

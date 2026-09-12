@@ -102,7 +102,8 @@ def _climb_out_window(c, world, window_prop):
     c["x"] = anchor.get("x", window_prop.get("x", c.get("x", 0)))
     c["y"] = anchor.get("y", window_prop.get("y", c.get("y", 0)))
     c["building_id"] = None
-    c["activity"] = None
+    from systems.occupancy import interrupt_activity
+    interrupt_activity(c, world)
     c["is_moving"] = False
     c["animation_state"] = "idle"
 

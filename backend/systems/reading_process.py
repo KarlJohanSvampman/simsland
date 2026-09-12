@@ -128,7 +128,8 @@ def _spawn_debate(c, world, item, listeners):
 
     put_away_reading_item(c, world)
     c["active_process"] = None
-    c["activity"] = None
+    from systems.occupancy import interrupt_activity
+    interrupt_activity(c, world)
 
     headline = item.get("headline") or "something in the news"
 

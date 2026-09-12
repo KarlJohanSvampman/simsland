@@ -22,6 +22,26 @@ def enqueue_anchor(c, prop, anchor):
     if c["id"] not in anchor["queue"]:
         anchor["queue"].append(c["id"])
 
+def interrupt_activity(c, world):
+    """Confirmed live bug: at least a dozen call sites across this
+    codebase clear a character's activity directly (`c["activity"] =
+    None`) to interrupt it -- a conversation starting, curiosity
+    pulling them away, claustrophobia, psychosis, travel departing,
+    etc. -- without releasing whatever prop anchor that activity had
+    reserved (systems/interactions.py::begin_interaction() reserves one
+    for every interaction-based activity: use_toilet, take_shower,
+    wash_hands, ...). complete_activity()'s own release_anchor() call
+    only fires on a NATURAL finish, so an interrupted use_toilet left
+    the toilet permanently "occupied_by" someone who'd since wandered
+    off elsewhere entirely, silently blocking everyone else forever
+    (confirmed live: a queued character never got their turn because
+    the anchor they were waiting on was never actually freed). Use this
+    instead of a bare `c["activity"] = None` anywhere an activity is
+    being interrupted rather than completing normally."""
+    release_anchor(c, world)
+    c["activity"] = None
+
+
 def release_anchor(c, world):
 
     occ = c.get("occupying")

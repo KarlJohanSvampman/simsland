@@ -90,7 +90,8 @@ def begin_travel(c, world, reason, duration):
     # from ever processing the to_garage/to_bus_stop route at all. The trip
     # itself was already a prioritized decision (maybe_go_offgrid() et al.),
     # so it preempts whatever the character was idly doing.
-    c["activity"] = None
+    from systems.occupancy import interrupt_activity
+    interrupt_activity(c, world)
 
     c["_pending_offgrid"] = {"reason": reason, "duration": duration}
     mode = choose_travel_mode(c, world)
