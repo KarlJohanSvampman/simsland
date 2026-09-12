@@ -268,8 +268,21 @@ def resolve_hostile_action(actor, target, action_id, world):
     effectiveness = _effectiveness(tpl, actor, target, world)
     evasion = _evasion_chance(target, world)
 
-    roll = random.random()
-    if roll < evasion:
+    # Opposed check (systems/contested_checks.py) for the action types it
+    # covers -- feeds this function's own tuned evasion signal (agile/
+    # clumsy traits, emotion, a fresh defense stance) in as an extra
+    # modifier on top of the shared engine's fitness/aggressive/resilient
+    # weighting, rather than throwing that tuning away. Anything not in
+    # CHECK_DEFINITIONS (stab/knock -- weapon-gated, no real unarmed
+    # equivalent to weigh) falls back to the original plain evasion roll.
+    from systems.contested_checks import resolve_check
+    check = resolve_check(action_id, actor, target, world, extra_defender_mod=evasion - 0.25)
+    if check and check["opposed"]:
+        evaded = check["resisted"]
+    else:
+        evaded = random.random() < evasion
+
+    if evaded:
         outcome = "evaded"
     elif random.random() < _fumble_chance(effectiveness):
         outcome = "fumble"

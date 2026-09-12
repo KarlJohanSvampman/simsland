@@ -3648,12 +3648,13 @@ def _route_make_argument(c, world, action):
         return
     argument_strength = max(0.0, min(1.0, result.get("argument_strength", 0.5)))
 
-    # Nervosity gate (systems/nervosity.py): a stressed, unprepared
-    # character can still make the argument, but a flubbed delivery
-    # barely moves anyone regardless of how sound the reasoning was.
-    from systems.nervosity import attempt_influence
-    landed, difficulty = attempt_influence(c, "make_argument", target)
-    if not landed:
+    # Opposed check (systems/contested_checks.py): a stressed, unprepared
+    # speaker can still make the argument, but a flubbed delivery barely
+    # moves anyone -- and a stubborn/confident/suspicious listener can
+    # simply resist a well-made one too.
+    from systems.contested_checks import resolve_check
+    check = resolve_check("make_argument", c, target, world)
+    if check and not check["success"]:
         argument_strength *= 0.15
 
     # Threads into the real conversation + fires the speech bubble --

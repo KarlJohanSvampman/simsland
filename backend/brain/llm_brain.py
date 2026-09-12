@@ -215,7 +215,7 @@ SPEECH
   about a hostile act you personally witnessed (only works if you actually saw one) — it gives
   the listener the same real awareness you have, including the ability to intervene or call 911.
   compliment, flirt, joke, and guilt_trip are real attempts that can succeed or visibly flop
-  depending on how stressed/prepared you are (systems/nervosity.py) — don't assume it always lands.
+  depending on how stressed/prepared you are, and who you're targeting (systems/contested_checks.py) — don't assume it always lands.
 - "conversation_type" is optional — set it when you're starting a conversation or deliberately
   steering its shape: smalltalk, argument, negotiation, persuasion, competition, gossip. Leave it
   out to just continue naturally. It's yours to set or change any time, not locked in once picked.

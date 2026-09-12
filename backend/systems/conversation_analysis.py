@@ -252,10 +252,12 @@ def apply_speech_act_analysis(
 
     if speech_act == "compliment":
 
-        # Nervosity gate (systems/nervosity.py) -- a stressed or
-        # unprepared compliment can come out awkward instead of landing.
-        from systems.nervosity import attempt_influence
-        landed, _difficulty = attempt_influence(speaker, "compliment", listener)
+        # Opposed check (systems/contested_checks.py) -- a stressed or
+        # unprepared compliment can come out awkward, and a suspicious/
+        # confident listener can shrug it off even when well-delivered.
+        from systems.contested_checks import resolve_check
+        check = resolve_check("compliment", speaker, listener, world)
+        landed = check["success"] if check else True
 
         if landed:
             result[
@@ -297,8 +299,9 @@ def apply_speech_act_analysis(
 
     elif speech_act == "flirt":
 
-        from systems.nervosity import attempt_influence
-        landed, _difficulty = attempt_influence(speaker, "flirt", listener)
+        from systems.contested_checks import resolve_check
+        check = resolve_check("flirt", speaker, listener, world)
+        landed = check["success"] if check else True
 
         if landed:
             result[
@@ -352,8 +355,9 @@ def apply_speech_act_analysis(
 
     elif speech_act == "joke":
 
-        from systems.nervosity import attempt_influence
-        landed, _difficulty = attempt_influence(speaker, "joke", listener)
+        from systems.contested_checks import resolve_check
+        check = resolve_check("joke", speaker, listener, world)
+        landed = check["success"] if check else True
 
         if landed:
             result[
@@ -393,8 +397,9 @@ def apply_speech_act_analysis(
 
     elif speech_act == "guilt_trip":
 
-        from systems.nervosity import attempt_influence
-        landed, _difficulty = attempt_influence(speaker, "guilt_trip", listener)
+        from systems.contested_checks import resolve_check
+        check = resolve_check("guilt_trip", speaker, listener, world)
+        landed = check["success"] if check else True
 
         if landed:
             result[
