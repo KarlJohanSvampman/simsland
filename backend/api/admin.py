@@ -14,6 +14,12 @@ GET  /admin/cognition           -> world-level cognition-scheduler histogram
 GET  /admin/cognition/{char_id} -> one character's live cognition state
 POST /admin/reset_characters    -> wipe all characters/households (keeps
                                     the hand-placed map/buildings/roads)
+POST /admin/fix_malnutrition    -> one-off correction for characters caught
+                                    by the pre-fix item_templates nutrition
+                                    miscalibration bug (see systems/
+                                    nutrition.py's fix commit) -- resets
+                                    weight_kg to a healthy BMI and clears
+                                    the malnutrition disease/traits
 """
 
 from fastapi import APIRouter
@@ -122,6 +128,53 @@ def reset_characters(sim_id: str = DEFAULT_SIM_ID):
         pass
 
     return {"ok": True}
+
+
+@router.post("/fix_malnutrition")
+def fix_malnutrition(sim_id: str = DEFAULT_SIM_ID):
+    """Item nutrition values were miscalibrated far below what
+    nutrition.py's daily settlement AND body_composition.py's calorie-
+    balance tick both need to keep weight stable (a few realistic meals a
+    day summed to well under 1.0 "day's worth" / under
+    BASELINE_DAILY_BURN), so every character was losing weight and body
+    fat every single day regardless of how fed they felt -- confirmed
+    live via characters pinned at nutrition.py's WEIGHT_MIN_KG floor with
+    "malnutrition" while their actual hunger stat sat in the 30-40%
+    range, nowhere near starving. The item data is fixed going forward;
+    this is a one-off correction for characters already run down by the
+    bug before that fix landed."""
+    from systems.nutrition import compute_bmi, get_weight_band, _sync_weight_band_trait, _sync_weight_band_disease
+    from systems.body_composition import BODY_FAT_DEFAULT, _sync_dynamic_trait
+
+    fixed = []
+    with world_lock():
+        world = load_world(sim_id)
+        for char_id, c in world.get("characters", {}).items():
+            band = get_weight_band(compute_bmi(c))
+            bc = c.get("body_composition")
+            underweight = bc is not None and bc.get("body_fat_level", BODY_FAT_DEFAULT) <= 0.15
+            if band not in ("thin", "skinny") and not underweight:
+                continue
+
+            height_cm = c.get("body_features", {}).get("height_cm", 170)
+            height_m = max(0.5, height_cm / 100.0)
+            c["weight_kg"] = round(22.0 * height_m ** 2, 1)
+            c.get("body", {})["nutrients_today"] = 0.0
+            new_band = get_weight_band(compute_bmi(c))
+            _sync_weight_band_trait(c, new_band)
+            _sync_weight_band_disease(c, new_band)
+
+            if bc is not None:
+                bc["body_fat_level"] = BODY_FAT_DEFAULT
+                bc["calories_in_today"] = 0.0
+                bc["calories_burned_today"] = 0.0
+                _sync_dynamic_trait(c, "obese", False)
+                _sync_dynamic_trait(c, "underweight", False)
+
+            fixed.append(char_id)
+        save_world(sim_id, world)
+
+    return {"ok": True, "fixed_character_ids": fixed}
 
 
 @router.get("/cognition")

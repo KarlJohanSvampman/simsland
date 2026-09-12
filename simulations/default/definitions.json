@@ -5122,7 +5122,7 @@
       "dirty": false,
       "consumable": true,
       "uses": 1,
-      "nutrition": 0.35,
+      "nutrition": 0.75,
       "hunger_restore": 60,
       "icon": "food"
     },
@@ -5134,7 +5134,7 @@
       "dirty": false,
       "consumable": true,
       "uses": 1,
-      "nutrition": 0.3,
+      "nutrition": 0.6,
       "hunger_restore": 50,
       "icon": "food"
     },
@@ -5146,7 +5146,7 @@
       "dirty": false,
       "consumable": true,
       "uses": 1,
-      "nutrition": 0.15,
+      "nutrition": 0.5,
       "hunger_restore": 35,
       "icon": "food"
     },
@@ -5157,7 +5157,7 @@
       "stackable": false,
       "consumable": true,
       "uses": 1,
-      "nutrition": 0.2,
+      "nutrition": 0.55,
       "hunger_restore": 40,
       "icon": "food"
     },
@@ -5169,7 +5169,7 @@
       "max_stack": 4,
       "consumable": true,
       "uses": 1,
-      "nutrition": 0.08,
+      "nutrition": 0.3,
       "hunger_restore": 20,
       "icon": "food"
     },
@@ -5182,7 +5182,7 @@
       "max_stack": 6,
       "consumable": true,
       "uses": 1,
-      "nutrition": 0.05,
+      "nutrition": 0.65,
       "hunger_restore": 18,
       "icon": "food"
     },
@@ -5195,7 +5195,7 @@
       "max_stack": 6,
       "consumable": true,
       "uses": 1,
-      "nutrition": 0.06,
+      "nutrition": 0.6,
       "hunger_restore": 22,
       "icon": "food"
     },
@@ -5207,7 +5207,7 @@
       "stackable": false,
       "consumable": true,
       "uses": 3,
-      "nutrition": 0.04,
+      "nutrition": 0.2,
       "hunger_restore": 12,
       "icon": "food"
     },
@@ -8695,7 +8695,7 @@
       "consumable": true,
       "uses": 10,
       "icon": "food",
-      "nutrition": 0.05
+      "nutrition": 0.25
     },
     "eggs": {
       "name": "Eggs",
@@ -8707,7 +8707,7 @@
       "consumable": true,
       "uses": 12,
       "icon": "food",
-      "nutrition": 0.1
+      "nutrition": 0.35
     },
     "butter": {
       "name": "Butter",
@@ -8731,7 +8731,7 @@
       "consumable": true,
       "uses": 8,
       "icon": "food",
-      "nutrition": 0.04
+      "nutrition": 0.1
     },
     "pasta": {
       "name": "Pasta",
@@ -8863,7 +8863,7 @@
       "consumable": true,
       "uses": 1,
       "icon": "food",
-      "nutrition": 0.15
+      "nutrition": 0.3
     },
     "frozen_meal": {
       "name": "Frozen Meal",
@@ -8875,7 +8875,7 @@
       "consumable": true,
       "uses": 1,
       "icon": "food",
-      "nutrition": 0.25
+      "nutrition": 0.55
     },
     "chocolate": {
       "name": "Chocolate",
@@ -8887,7 +8887,7 @@
       "consumable": true,
       "uses": 5,
       "icon": "food",
-      "nutrition": 0.06
+      "nutrition": 0.1
     },
     "juice": {
       "name": "Juice",
@@ -8912,7 +8912,7 @@
       "consumable": true,
       "uses": 6,
       "icon": "food",
-      "nutrition": 0.08
+      "nutrition": 0.15
     },
     "spices": {
       "name": "Spices",
@@ -11844,7 +11844,7 @@
       "max_stack": 10,
       "consumable": true,
       "uses": 1,
-      "nutrition": 0.03,
+      "nutrition": 0.08,
       "hunger_restore": 5,
       "addiction_type": "candy",
       "icon": "food"
