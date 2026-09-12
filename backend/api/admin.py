@@ -33,6 +33,11 @@ POST /admin/clear_stale_anchor_occupancy -> one-off cleanup for prop
                                     longer exists (see reset_characters'
                                     matching fix) -- e.g. a sink nobody
                                     can ever drink from again
+POST /admin/set_body_need           -> force one character's body need
+                                    (hunger/hydration/bladder/energy/...)
+                                    to a value, for live-testing reactive
+                                    behavior without waiting for it to
+                                    occur naturally
 """
 
 from fastapi import APIRouter
@@ -247,6 +252,42 @@ def clear_stale_anchor_occupancy(sim_id: str = DEFAULT_SIM_ID):
         save_world(sim_id, world)
 
     return {"ok": True, "cleared": cleared}
+
+
+@router.post("/set_body_need")
+def set_body_need(payload: dict, sim_id: str = DEFAULT_SIM_ID):
+    """Live-testing helper: force one character's body need to a value
+    without waiting for it to occur naturally. payload: {"character_id",
+    "need", "value"}."""
+    char_id = payload.get("character_id")
+    need = payload.get("need")
+    value = payload.get("value")
+    with world_lock():
+        world = load_world(sim_id)
+        c = world.get("characters", {}).get(char_id)
+        if not c:
+            return {"ok": False, "error": "character not found"}
+        c.setdefault("body", {})[need] = value
+        save_world(sim_id, world)
+    return {"ok": True, "character_id": char_id, "need": need, "value": value}
+
+
+@router.get("/pending_agents")
+def get_pending_agents():
+    """Live-debug introspection into sim_loop.py's in-process
+    _pending_agent_ids/_pending_agent_since state (not persisted world
+    data -- this reads the actual running process's module state)."""
+    import sim_loop
+    import time
+    now = time.time()
+    return {
+        "pending_ids": sorted(sim_loop._pending_agent_ids),
+        "pending_since_ago_seconds": {
+            cid: round(now - since, 1) for cid, since in sim_loop._pending_agent_since.items()
+        },
+        "generations": dict(sim_loop._agent_generation),
+        "stale_pending_threshold": sim_loop.STALE_PENDING_SECONDS,
+    }
 
 
 @router.get("/cognition")

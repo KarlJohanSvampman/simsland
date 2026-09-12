@@ -191,6 +191,35 @@ _agent_pool = ThreadPoolExecutor(max_workers=_AGENT_WORKERS, thread_name_prefix=
 AGENT_WAIT_BUDGET_SECONDS = 3.0
 _pending_agent_ids = set()
 
+# Confirmed live regression from the abandon-on-timeout design above: a
+# character whose call doesn't just overrun the budget but genuinely
+# NEVER completes (a real hang somewhere in update_agent, not just a
+# slow LLM response) stayed in _pending_agent_ids forever -- discard()
+# in the finally block below never runs because the thread never
+# reaches it. Confirmed via logs: "Charles Walker" got abandoned ~10
+# times (each one a real, if slow, completion) before one attempt
+# hung outright, after which he was silently never redispatched again
+# -- generate_body_intentions/update_internal_state/etc. all live
+# inside update_agent(), so a permanently-pending character stops
+# getting ANY per-tick processing at all, not just decisions (bladder
+# forced to 92 for a live test never even produced a use_toilet
+# intention, because the character never ran again to generate one).
+# A staleness timeout forces them back into circulation -- the old
+# thread may still be leaked and running forever, but the character
+# themselves gets to make progress again rather than being silently
+# frozen for the rest of the session.
+STALE_PENDING_SECONDS = 30.0
+_pending_agent_since = {}
+
+# Per-character dispatch counter -- guards against a genuinely leaked
+# thread (one force-released by the staleness timeout above, while
+# still physically running) finishing AFTER a fresh dispatch for the
+# same character has already started, and clobbering that NEW attempt's
+# pending state. Each dispatch captures its own generation number and
+# only clears _pending_agent_ids/_pending_agent_since if it's still the
+# most recent one for that character.
+_agent_generation = {}
+
 
 def _run_agent(c, world, t):
     """Run one character's agent tick. Called from a worker thread."""
@@ -200,11 +229,13 @@ def _run_agent(c, world, t):
     return c["id"]
 
 
-def _run_agent_and_release(c, world, t):
+def _run_agent_and_release(c, world, t, generation):
     try:
         return _run_agent(c, world, t)
     finally:
-        _pending_agent_ids.discard(c["id"])
+        if _agent_generation.get(c["id"]) == generation:
+            _pending_agent_ids.discard(c["id"])
+            _pending_agent_since.pop(c["id"], None)
 
 
 # =========================================================
@@ -450,6 +481,18 @@ def tick(world):
     # Service worker NPCs are driven by update_services, not LLM — skip them.
     # Each character's LLM call is I/O-bound; workers release the GIL while
     # waiting for the network, so this gives real throughput scaling.
+    now = time.time()
+    stale_ids = {
+        cid for cid, since in _pending_agent_since.items()
+        if now - since > STALE_PENDING_SECONDS
+    }
+    if stale_ids:
+        print(f"[sim_loop] tick {t}: force-releasing {len(stale_ids)} character(s) stuck pending past {STALE_PENDING_SECONDS}s "
+              f"(their old attempt may still be leaked/running, but they're eligible again): {sorted(stale_ids)}")
+        _pending_agent_ids.difference_update(stale_ids)
+        for cid in stale_ids:
+            _pending_agent_since.pop(cid, None)
+
     agent_chars = [
         c for c in characters
         if not c.get("is_service_worker")
@@ -459,7 +502,12 @@ def tick(world):
     ]
     for c in agent_chars:
         _pending_agent_ids.add(c["id"])
-    futs = {_agent_pool.submit(_run_agent_and_release, c, world, t): c for c in agent_chars}
+        _pending_agent_since[c["id"]] = now
+        _agent_generation[c["id"]] = _agent_generation.get(c["id"], 0) + 1
+    futs = {
+        _agent_pool.submit(_run_agent_and_release, c, world, t, _agent_generation[c["id"]]): c
+        for c in agent_chars
+    }
 
     dirty_char_ids = set()
     if futs:
