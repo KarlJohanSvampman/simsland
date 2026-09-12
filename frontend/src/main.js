@@ -1284,6 +1284,35 @@ const FADE_TIME = 0.2;  // seconds
 // to the next available one.
 // =========================================================
 
+// A character standing around with nothing to do (activity type "wait")
+// or truly idle (no activity at all, not moving) visually shifts weight/
+// paces a little instead of standing perfectly still. Purely a render-
+// layer position offset on top of the server's real x/y -- never touches
+// c.x/c.y, so it can't affect pathfinding, anchor reservation, or
+// occupancy. Per-character phase (hashed from id) keeps a room full of
+// idling characters from swaying in unison.
+function _idlePaceOffset(id, c, isMoving) {
+  if (isMoving) return null;
+  const activityType = c.activity?.type;
+  const isWaiting = activityType === "wait";
+  const isTrulyIdle = !activityType;
+  if (!isWaiting && !isTrulyIdle) return null;
+
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) | 0;
+  const phase = ((hash % 1000) / 1000) * Math.PI * 2;
+
+  const t = performance.now() / 1000;
+  // Waiting on something reads a bit more restless than plain idling.
+  const period = isWaiting ? 3.2 : 5.5;
+  const amplitude = isWaiting ? 0.18 : 0.10;
+  const angle = (t / period) * Math.PI * 2 + phase;
+  return {
+    dx: Math.sin(angle) * amplitude,
+    dz: Math.sin(angle * 0.6) * amplitude * 0.5,
+  };
+}
+
 const ANIM_VARIANTS = {
   // Conversation — cycle gesture animations while talking
   talk:          ["talk", "talk_gesture_a", "talk_gesture_b", "talk_nod", "talk_think"],
@@ -3266,8 +3295,15 @@ async function updateCharacters(state){
       if (!characterAnimations[id]?.isAnchored) {
         const newX = c.x - 10;
         const newZ = c.y - 7;
-        const dx = newX - sims[id].position.x;
-        const dz = newZ - sims[id].position.z;
+        // Compared against the last known SERVER (base) position, not the
+        // rendered mesh position -- the idle/wait pacing sway below adds a
+        // small offset directly to the mesh, and comparing against that
+        // would make the facing logic misread its own cosmetic wobble as
+        // real movement and spin the model back and forth every frame.
+        const animRec = characterAnimations[id];
+        const lastBase = animRec?.lastBasePos;
+        const dx = lastBase ? newX - lastBase.x : 0;
+        const dz = lastBase ? newZ - lastBase.z : 0;
         // Face the direction of actual movement -- updateIK()'s existing
         // facing logic only fires while there's a specific interaction
         // target to look at (activity.target_id); plain point-to-point
@@ -3280,7 +3316,10 @@ async function updateCharacters(state){
         if (Math.abs(dx) > 0.01 || Math.abs(dz) > 0.01) {
           sims[id].rotation.y = Math.atan2(dx, dz);
         }
-        sims[id].position.set(newX, 0, newZ);
+        if (animRec) animRec.lastBasePos = { x: newX, z: newZ };
+
+        const pace = _idlePaceOffset(id, c, !!c.is_moving);
+        sims[id].position.set(newX + (pace?.dx || 0), 0, newZ + (pace?.dz || 0));
       }
 
       // See _isCharacterHidden()'s own comment (above createFallbackCharacter)
