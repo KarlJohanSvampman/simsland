@@ -5,7 +5,8 @@ from llm.cognition_jobs import (
 )
 
 from llm.llm_gate import (
-    run_llm_call
+    run_llm_call,
+    PRIORITY_BACKGROUND
 )
 
 from systems.social_models import (
@@ -218,7 +219,8 @@ def handle_reflection(
                 "tick":
                     world["tick"]
             }
-        )
+        ),
+        priority=PRIORITY_BACKGROUND
     )
 
 # =========================================================
@@ -244,7 +246,7 @@ def _handle_opinion_reflection(c, world, reflection):
     session = c.setdefault("llm_session", {"history": []})
     context = {"reason": reflection.get("reason", ""), "prior_stance": None}
 
-    result = run_llm_call(generate_opinion(c, topic, context, world, session))
+    result = run_llm_call(generate_opinion(c, topic, context, world, session), priority=PRIORITY_BACKGROUND)
     if not result:
         return
 

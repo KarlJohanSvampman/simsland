@@ -10,7 +10,7 @@ signal something upstream isn't storing memories correctly.
 """
 
 from llm.llm_client import call_llm_safe
-from llm.llm_gate import run_llm_call
+from llm.llm_gate import run_llm_call, PRIORITY_BACKGROUND
 
 
 async def _generate_diary_text(c, world, day_memories):
@@ -55,7 +55,7 @@ def generate_diary_entry(c, world, day_memories):
     same mechanism as story_condensation.py/choice.py. Falls back to a
     deterministic, still-grounded-in-real-memories summary on LLM
     failure rather than a blank/generic entry."""
-    text = run_llm_call(_generate_diary_text(c, world, day_memories))
+    text = run_llm_call(_generate_diary_text(c, world, day_memories), priority=PRIORITY_BACKGROUND)
     if text:
         return text
     return _fallback_entry(c, day_memories)

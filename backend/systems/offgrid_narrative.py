@@ -1,6 +1,6 @@
 import random, uuid
 
-from llm.llm_gate import run_llm_call
+from llm.llm_gate import run_llm_call, PRIORITY_BACKGROUND
 from llm.offgrid_narration import generate_offgrid_narration
 
 
@@ -75,7 +75,8 @@ def request_offgrid_summary(c, world, category, details, normalcy, enforced_cove
         generate_offgrid_narration(
             c, world, category, details, normalcy, history,
             enforced_cover_story=enforced_cover_story,
-        )
+        ),
+        priority=PRIORITY_BACKGROUND,
     )
     if not narration:
         return None

@@ -521,7 +521,9 @@ def think(
 
     char_id=None,
 
-    session=None
+    session=None,
+
+    priority=None
 ):
 
     available_actions = context.get("available_actions") or {}
@@ -567,8 +569,10 @@ def think(
     # Inspector reads via GET /debug/prompt-log/{char_id} when a character
     # is selected — without it, that log only ever gets populated by the
     # manual /debug/prompt-send tool, never by real gameplay decisions.
+    from llm.llm_gate import PRIORITY_NORMAL
     raw = run_llm_call(
-        call_llm_safe(messages, char_id=char_id)
+        call_llm_safe(messages, char_id=char_id),
+        priority=PRIORITY_NORMAL if priority is None else priority,
     )
 
     try:

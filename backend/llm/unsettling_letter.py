@@ -1,7 +1,7 @@
 import json
 
 from llm.llm_client import call_llm_safe
-from llm.llm_gate import run_llm_call
+from llm.llm_gate import run_llm_call, PRIORITY_BACKGROUND
 
 # =========================================================
 # GENERATE UNSETTLING LETTER
@@ -63,7 +63,7 @@ def generate_unsettling_letter(c, world):
     systems/secret_keeping.py::_ensure_cover_story does."""
     session = world.setdefault("_unsettling_letter_sessions", {}).setdefault(c["id"], {"history": []})
     try:
-        return run_llm_call(_generate(c, world, session))
+        return run_llm_call(_generate(c, world, session), priority=PRIORITY_BACKGROUND)
     except Exception:
         import random
         return random.choice(_FALLBACK_LETTERS)

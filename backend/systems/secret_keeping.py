@@ -30,7 +30,7 @@ import random
 
 from systems import secrets as secrets_engine
 from llm.secret_authoring import generate_secret_cover
-from llm.llm_gate import run_llm_call
+from llm.llm_gate import run_llm_call, PRIORITY_BACKGROUND
 
 # Which question_type(s) (excuses.py's "who"/"where"/"what"/"when") a given
 # subject_type is actually relevant to -- e.g. a secret CONTACT matters for
@@ -90,7 +90,7 @@ def _ensure_cover_story(c, world, secret):
         return
     session = c.setdefault("llm_session", {"history": []})
     try:
-        result = run_llm_call(generate_secret_cover(c, world, secret, session))
+        result = run_llm_call(generate_secret_cover(c, world, secret, session), priority=PRIORITY_BACKGROUND)
     except Exception:
         result = None
     if not result:

@@ -57,9 +57,9 @@ def create_post(c, world, text, media=None, tags=None):
 def _project_engagement(c, world, post):
     projection = None
     try:
-        from llm.llm_gate import run_llm_call
+        from llm.llm_gate import run_llm_call, PRIORITY_BACKGROUND
         from llm.post_engagement import generate_post_engagement
-        projection = run_llm_call(generate_post_engagement(c, world, post))
+        projection = run_llm_call(generate_post_engagement(c, world, post), priority=PRIORITY_BACKGROUND)
     except Exception:
         projection = None
 

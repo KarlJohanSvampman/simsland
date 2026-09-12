@@ -14,7 +14,7 @@ sightings.
 import json
 
 from llm.llm_client import call_llm_safe
-from llm.llm_gate import run_llm_call
+from llm.llm_gate import run_llm_call, PRIORITY_BACKGROUND
 
 
 async def _generate(c, other, pattern, world):
@@ -57,4 +57,4 @@ Respond with STRICT JSON only: {{"text": <one-sentence theory>, "valence": "opti
 def generate_theory(c, other, pattern, world):
     """Sync entry point -- bridges the async LLM call the same way
     systems/choice.py::choose() already does via run_llm_call()."""
-    return run_llm_call(_generate(c, other, pattern, world))
+    return run_llm_call(_generate(c, other, pattern, world), priority=PRIORITY_BACKGROUND)

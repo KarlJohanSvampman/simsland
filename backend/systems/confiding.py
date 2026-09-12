@@ -29,7 +29,7 @@ import random
 
 from brain.memory import store_memory
 from systems.persistent_desires import add_desire
-from llm.llm_gate import run_llm_call
+from llm.llm_gate import run_llm_call, PRIORITY_BACKGROUND
 
 CONFIDE_VALIDATION_TRAITS = {"insecure", "anxious", "needs_approval", "people_pleaser", "self_doubting"}
 CONFIDE_COMFORT_TRAITS = {"dramatic", "emotional", "sensitive", "easily_embarrassed", "sentimental"}
@@ -137,7 +137,8 @@ def _do_confide(c, confidant, mem, world):
         session = c.setdefault("llm_session", {"history": []})
         try:
             result = run_llm_call(
-                generate_validation_response(confidant, c, mem.get("text", ""), world, session)
+                generate_validation_response(confidant, c, mem.get("text", ""), world, session),
+                priority=PRIORITY_BACKGROUND,
             )
         except Exception:
             result = None

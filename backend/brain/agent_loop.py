@@ -821,10 +821,27 @@ def update_agent(
     # THINK
     # =====================================
 
+    # LLM call priority (llm/llm_gate.py's queue) -- reuses the same
+    # CATEGORY_PRIORITY weights active_intentions are already sorted by,
+    # rather than inventing a second urgency taxonomy. A character whose
+    # top intention is survival/health-category, or who's mid-conversation
+    # (a stalled reply reads as broken to whoever they're talking to), gets
+    # PRIORITY_URGENT; everything else is PRIORITY_NORMAL.
+    from brain.intentions import final_priority
+    from llm.llm_gate import PRIORITY_URGENT, PRIORITY_NORMAL
+    top_intentions = c.get("active_intentions", [])
+    top_category = max(top_intentions, key=final_priority).get("category") if top_intentions else None
+    llm_priority = (
+        PRIORITY_URGENT
+        if top_category in ("survival", "health") or c.get("conversation")
+        else PRIORITY_NORMAL
+    )
+
     decision = think(
         context,
         char_id=c["id"],
-        session=c.get("_llm_session")
+        session=c.get("_llm_session"),
+        priority=llm_priority,
     )
 
     # Clear the wake state and schedule the next idle check-in regardless

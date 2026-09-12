@@ -13,7 +13,7 @@
 # =========================================================
 
 from core.definitions import load_definitions
-from llm.llm_gate import run_llm_call
+from llm.llm_gate import run_llm_call, PRIORITY_BACKGROUND
 from llm.business_response import generate_business_response
 from systems.business_hours import is_open
 from systems.inbox import get_business_inbox, get_character_inbox, add_message
@@ -57,7 +57,8 @@ def _respond_to_inquiry(world, business_key, business, state, entry):
     }
 
     reply = run_llm_call(
-        generate_business_response(business, business_key, inquiry, world, session)
+        generate_business_response(business, business_key, inquiry, world, session),
+        priority=PRIORITY_BACKGROUND,
     )
     if not reply:
         return False

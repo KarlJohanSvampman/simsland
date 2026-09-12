@@ -1,7 +1,7 @@
 import json
 
 from llm.llm_client import call_llm_safe
-from llm.llm_gate import run_llm_call
+from llm.llm_gate import run_llm_call, PRIORITY_BACKGROUND
 
 # =========================================================
 # GENERATE CHAPTER PLAN
@@ -108,7 +108,7 @@ def generate_chapter_plan(c, world, story, chapter, candidates):
         chapter.get("id", "unknown"), {"history": []}
     )
     try:
-        result = run_llm_call(_generate(c, world, story, chapter, candidates, session))
+        result = run_llm_call(_generate(c, world, story, chapter, candidates, session), priority=PRIORITY_BACKGROUND)
     except Exception:
         result = None
     return result or dict(_FALLBACK_OUTCOME)

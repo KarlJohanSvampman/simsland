@@ -82,8 +82,8 @@ def create_generated_item(template_id, world, c=None, **overrides):
         return item
 
     from llm.item_content import generate_item_content, fallback_content
-    from llm.llm_gate import run_llm_call
-    content = run_llm_call(generate_item_content(c, world, item))
+    from llm.llm_gate import run_llm_call, PRIORITY_BACKGROUND
+    content = run_llm_call(generate_item_content(c, world, item), priority=PRIORITY_BACKGROUND)
     item["content"] = content if isinstance(content, dict) and content else fallback_content(content_category)
     return item
 
