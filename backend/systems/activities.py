@@ -399,7 +399,9 @@ ACTIVITIES = {
         "interruptible": False,
 
         "category": "food",
-        
+
+        "skill_check": {"requiresSkill": True, "skill": "cooking", "minProficiencyLevel": None, "baseDifficulty": 35, "competitive": False},
+
         "waste": {
 
             "TRASH_FOOD_PACKAGING": 2,
@@ -2136,9 +2138,9 @@ def complete_activity(
     # =====================================
     # COOK -- plain "make a meal" activity, distinct from cook_recipe's
     # own separate recipe/cooking_process.py system just below (that one
-    # keeps its own pre-existing c["cooking_skill"] mechanic untouched --
-    # this activity is the new systems/skill_checks.py-based one, using
-    # the real abilities.py "cooking" proficiency instead).
+    # is now ALSO on systems/skill_checks.py -- see
+    # cooking_process.py::finish_recipe() -- both share the same real
+    # abilities.py "cooking" proficiency; c["cooking_skill"] is retired).
     # =====================================
     elif activity_type == "cook_meal":
 
@@ -2156,7 +2158,7 @@ def complete_activity(
                 from systems.resource_runtime import create_resource
                 meal = create_resource(
                     "MEAL", quantity=1, servings=2, nutrition=0.5,
-                    quality=min(1.0, 0.5 + result["actor_margin"] / 100),
+                    quality=min(1.0, result["actor_margin"] / 100),
                     cooked_by=c["id"], created_tick=world["tick"], container="fridge",
                 )
                 add_household_resource(household, meal)

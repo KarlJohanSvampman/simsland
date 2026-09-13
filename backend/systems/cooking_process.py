@@ -1,5 +1,3 @@
-import random
-
 from data.recipes import RECIPES as _PY_RECIPES
 
 def _get_recipes(world=None):
@@ -337,22 +335,32 @@ def finish_recipe(
         ]
     ]
 
-    cooking_skill = c.get(
-        "cooking_skill",
-        0.3
-    )
+    # Real d100 skill check (systems/skill_checks.py) against the shared
+    # abilities.py "cooking" proficiency -- replaces the old standalone
+    # c["cooking_skill"] float + calculate_quality() formula entirely.
+    # The recipe's own 0-1 "difficulty" field still matters (a harder
+    # recipe should be harder to nail) -- folded in as a situational
+    # modifier on the shared "cook_recipe" baseDifficulty rather than a
+    # second parallel difficulty concept: 0.5 is neutral (the value the
+    # old formula centered on), higher makes it harder, lower easier.
+    from systems.skill_checks import resolve_skill_check
+    from systems.abilities import record_attempt
 
-    difficulty = recipe.get(
-        "difficulty",
-        0.5
-    )
+    recipe_difficulty = recipe.get("difficulty", 0.5)
+    extra_modifier = round((0.5 - recipe_difficulty) * 100)
+    result = resolve_skill_check("cook_recipe", c, world, extra_actor_modifier=extra_modifier)
 
-    quality = calculate_quality(
-
-        cooking_skill,
-
-        difficulty
-    )
+    if result and not result.get("blocked"):
+        record_attempt(c, "cooking", world, result["success"], margin=result["actor_margin"])
+        # Quality reflects the FULL signed difference (can go negative on
+        # a bad miss, not just floored-at-0 like the progression-facing
+        # actor_margin) -- a recipe always produces something, per the
+        # user's own ask, its quality just ranges from a real disaster to
+        # a real triumph depending on how the roll actually went.
+        signed_margin = result["difficulty"] - result["roll"]
+        quality = max(0.0, min(1.0, signed_margin / 100))
+    else:
+        quality = 0.5
 
     nutrition = recipe.get(
         "nutrition",
@@ -410,43 +418,6 @@ def finish_recipe(
     ] = True
 
     c["active_process"] = None
-
-    # =====================================================
-    # EXPERIENCE
-    # =====================================================
-
-    c["cooking_skill"] = min(
-
-        1.0,
-
-        cooking_skill + 0.01
-    )
-
-
-# =========================================================
-# QUALITY
-# =========================================================
-
-def calculate_quality(
-
-    skill,
-
-    difficulty
-):
-
-    delta = skill - difficulty
-
-    quality = 0.5 + delta
-
-    quality += random.uniform(
-        -0.1,
-        0.1
-    )
-
-    return max(
-        0,
-        min(1.0, quality)
-    )
 
 
 # =========================================================
