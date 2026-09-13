@@ -534,7 +534,9 @@ ACTIVITIES = {
 
         "interruptible": False,
 
-        "category": "survival"
+        "category": "survival",
+
+        "skill_check": {"requiresSkill": True, "skill": "cooking", "minProficiencyLevel": None, "baseDifficulty": 35, "competitive": False},
     },
 
     "eat_meal": {
@@ -2130,6 +2132,37 @@ def complete_activity(
                 elif meal["servings"] > 0:
                     from systems.resource_runtime import convert_meal_to_leftovers
                     convert_meal_to_leftovers(meal)
+
+    # =====================================
+    # COOK -- plain "make a meal" activity, distinct from cook_recipe's
+    # own separate recipe/cooking_process.py system just below (that one
+    # keeps its own pre-existing c["cooking_skill"] mechanic untouched --
+    # this activity is the new systems/skill_checks.py-based one, using
+    # the real abilities.py "cooking" proficiency instead).
+    # =====================================
+    elif activity_type == "cook_meal":
+
+        from systems.skill_checks import resolve_skill_check
+        from systems.abilities import record_attempt
+        from systems.incidental_speech import fire_incidental
+
+        result = resolve_skill_check("cook_meal", c, world)
+        household = world["households"].get(c.get("household_id"))
+
+        if result and not result.get("blocked"):
+            record_attempt(c, "cooking", world, result["success"], margin=result["actor_margin"])
+            if result["success"] and household:
+                from systems.household_storage import add_household_resource
+                from systems.resource_runtime import create_resource
+                meal = create_resource(
+                    "MEAL", quantity=1, servings=2, nutrition=0.5,
+                    quality=min(1.0, 0.5 + result["actor_margin"] / 100),
+                    cooked_by=c["id"], created_tick=world["tick"], container="fridge",
+                )
+                add_household_resource(household, meal)
+                fire_incidental(c, "inform", "Dinner's ready -- turned out pretty well.", world)
+            else:
+                fire_incidental(c, "inform", "That didn't come out right -- back to the drawing board.", world)
 
     # =====================================
     # COOK

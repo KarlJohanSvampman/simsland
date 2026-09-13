@@ -2433,23 +2433,32 @@ def _route_lift_weights(c, world, action):
 
 
 def _route_practice_juggling(c, world, action):
-    """Special Skills & Abilities (systems/abilities.py) proof-of-concept
-    wiring: a real training attempt, resolved through the same opposed/
-    solo check engine (systems/contested_checks.py) everything else in
-    this round uses, rather than a flavor-only animation. Success/fail
-    and any level-up are decided immediately (a juggling attempt doesn't
-    need to wait for a multi-minute activity to "finish" to know how it
-    went) -- the scaffolded activity below is just the visible animation
-    span."""
+    """Special Skills & Abilities (systems/abilities.py) training attempt,
+    resolved through the real d100 skill-check engine
+    (systems/skill_checks.py) rather than a flavor-only animation.
+    Success/fail and any level-up are decided immediately (a juggling
+    attempt doesn't need to wait for a multi-minute activity to "finish"
+    to know how it went) -- the scaffolded activity below is just the
+    visible animation span."""
     _route_exercise_activity(c, world, action, "practice_juggling")
 
-    from systems.abilities import attempt_ability_action
-    success, entry = attempt_ability_action(c, "juggling", "practice_juggling", world)
+    from systems.skill_checks import resolve_skill_check
+    from systems.abilities import record_attempt, get_level_name
+    result = resolve_skill_check("practice_juggling", c, world)
 
     from systems.incidental_speech import fire_incidental
-    level = entry.get("level", "novice") if entry else "novice"
-    if success:
-        fire_incidental(c, "inform", f"Nailed that juggling routine! ({level})", world)
+    if not result or result.get("blocked"):
+        return
+
+    record_attempt(c, "juggling", world, result["success"], margin=result["actor_margin"])
+
+    defs = world.get("definitions", {})
+    levels = defs.get("ability_templates", {}).get("juggling", {}).get("proficiency_levels", [])
+    level_key = get_level_name(c, "juggling", world)
+    title = next((lvl.get("title", level_key) for lvl in levels if lvl.get("level") == level_key), level_key)
+
+    if result["success"]:
+        fire_incidental(c, "inform", f"Nailed that juggling routine! ({title})", world)
     else:
         fire_incidental(c, "inform", "Drops the balls -- juggling is harder than it looks.", world)
 

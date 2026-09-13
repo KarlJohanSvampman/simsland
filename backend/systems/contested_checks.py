@@ -167,19 +167,12 @@ CHECK_DEFINITIONS = {
         "defender_trait_bonuses":  {"confident": -0.20, "resilient": -0.15, "nervous": 0.25},
     },
 
-    # ---- ability-trained actions (systems/abilities.py) -- solo checks,
-    # no target. "ability:<id>" is resolved dynamically against whatever
-    # ability_templates declare that id, not hardcoded per ability here.
-    "practice_juggling": {
-        "threshold": 0.40,
-        "actor_characteristics": {"ability:juggling": 0.6, "stress": -0.10},
-        "actor_trait_bonuses":   {},
-    },
-    "cook_meal": {
-        "threshold": 0.35,
-        "actor_characteristics": {"ability:cooking": 0.6, "stress": -0.10},
-        "actor_trait_bonuses":   {},
-    },
+    # practice_juggling/cook_meal used to live here as solo ability-
+    # trained checks -- both migrated onto systems/skill_checks.py's real
+    # d100 roll-under-difficulty engine (a genuine skill check, not an
+    # opposed/solo interpersonal one). "ability:<id>" stays a real,
+    # resolvable characteristic below for any FUTURE force/influence/
+    # manipulation check that wants to weight in a skill.
 }
 
 

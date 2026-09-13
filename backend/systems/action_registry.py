@@ -111,6 +111,8 @@ ACTION_SPECS = {
     "browse_darknet_market":          {"group": "computer", "target": "none", "doc": "Browse the darknet marketplace -- drugs, stolen data, fake IDs, counterfeit money, and hired-service listings."},
     "order_darknet_listing":          {"group": "computer", "target": "any", "doc": "Order a darknet listing. Targeted categories (hitman/PI services) also need a target character."},
     "write_diary":                    {"group": "leisure", "target": "none", "doc": "Write a real entry in your diary, reflecting on your day. Requires owning a diary."},
+    "sing_karaoke":                   {"group": "leisure", "target": "none", "doc": "Sing karaoke -- a real skill check (systems/abilities.py's singing ability); anyone else present is a real audience who may or may not be impressed.",
+        "skill_check": {"requiresSkill": True, "skill": "singing", "minProficiencyLevel": None, "baseDifficulty": 35, "competitive": True, "targetBaseDifficulty": 50}},
     # Stock trading — routed (action_router.py lines ~2542-2599) but never
     # offered/validated before this round.
     "computer_list_stocks":         {"group": "computer", "target": "none", "doc": "See available stocks and prices."},
@@ -296,7 +298,8 @@ ACTION_SPECS = {
     "sit_ups":        {"group": "exercise", "target": "none", "doc": "Do sit-ups."},
     "chin_ups":       {"group": "exercise", "target": "prop", "doc": "Do chin-ups on a bar."},
     "lift_weights":   {"group": "exercise", "target": "prop", "doc": "Lift weights."},
-    "practice_juggling": {"group": "exercise", "target": "none", "doc": "Practice juggling -- trains your juggling ability over time; a real skill (systems/abilities.py), not guaranteed to go well until you've built up proficiency."},
+    "practice_juggling": {"group": "exercise", "target": "none", "doc": "Practice juggling -- trains your juggling ability over time; a real skill (systems/abilities.py), not guaranteed to go well until you've built up proficiency.",
+        "skill_check": {"requiresSkill": True, "skill": "juggling", "minProficiencyLevel": None, "baseDifficulty": 40, "competitive": False}},
 }
 
 
