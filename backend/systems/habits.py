@@ -59,7 +59,19 @@ def apply_habit_bias_to_intentions(c, world):
         strength = habits.get(f"{itype}@{hour}", 0)
         if strength > 0:
             boost = 1 + min(0.5, strength * 0.05)  # max +50%
-            intent["priority"] = round(intent.get("priority", 50) * boost)
+            # Confirmed live crash: this used to boost intent["priority"]
+            # IN PLACE every single tick this function ran on the same
+            # intention -- for one that persists across many ticks (e.g.
+            # a real activity's own matching intention, not regenerated
+            # fresh each cycle like most need-driven ones), the boost
+            # compounded exponentially (priority *= ~1.05 forever) until
+            # it overflowed to a ~300-digit number and then float
+            # infinity, crashing every single agent tick for that
+            # character from then on. Always compute from a stable base
+            # (stamped once, never re-derived from an already-boosted
+            # value) so repeated calls are idempotent.
+            base = intent.setdefault("_base_priority", intent.get("priority", 50))
+            intent["priority"] = round(base * boost)
 
 
 # =========================================================
