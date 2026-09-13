@@ -106,12 +106,24 @@ def meets_requirement(c, ability_id, min_level, world):
     return get_level_index(c, ability_id, world) >= levels.index(min_level)
 
 
-def record_attempt(c, ability_id, world, success):
+DEFAULT_MARGIN_PER_BONUS_SUCCESS = 10
+
+
+def record_attempt(c, ability_id, world, success, margin=0):
     """Call once per genuine training attempt (an action listed in the
     ability's own trains_via was actually performed) -- tracks attempts/
     successes and levels up once the CURRENT level's own
     successes_to_next threshold is reached (each level can require a
-    different number of successes, per the template)."""
+    different number of successes, per the template).
+
+    `margin` (systems/skill_checks.py::resolve_skill_check()'s own
+    "actor_margin" -- how much room to spare the roll succeeded by, 0 for
+    a plain non-margin-aware caller) scales how many successes a single
+    outstanding attempt counts as: 1 + (margin // margin_per_bonus_success)
+    -- a razor-thin success still counts as exactly 1 (unchanged from
+    before this existed), but a spectacular one trains the skill several
+    "occasions" at once, per the ability template's own (optional,
+    defaults to 10) margin_per_bonus_success field."""
     levels = _levels(ability_id, world)
     if not levels:
         return None
@@ -124,11 +136,22 @@ def record_attempt(c, ability_id, world, success):
     if not success:
         return entry
 
-    entry["successes"] += 1
-    idx = get_level_index(c, ability_id, world)
-    needed = levels[idx].get("successes_to_next")
-    if needed is not None and entry["successes"] >= needed and idx + 1 < len(levels):
-        entry["successes"] = 0
+    tmpl = _ability_templates(world).get(ability_id, {})
+    divisor = tmpl.get("margin_per_bonus_success", DEFAULT_MARGIN_PER_BONUS_SUCCESS)
+    bonus_successes = int(margin // divisor) if margin and divisor else 0
+    entry["successes"] += 1 + max(0, bonus_successes)
+
+    # Carry any overflow across a level-up (and allow cascading through
+    # more than one level in a single outstanding attempt) instead of
+    # discarding it -- a big margin's whole point is to reward an
+    # exceptional attempt, so resetting straight to 0 on level-up would
+    # waste exactly the credit this feature exists to grant.
+    while True:
+        idx = get_level_index(c, ability_id, world)
+        needed = levels[idx].get("successes_to_next")
+        if needed is None or entry["successes"] < needed or idx + 1 >= len(levels):
+            break
+        entry["successes"] -= needed
         entry["level"] = levels[idx + 1]["level"]
         entry["leveled_up_tick"] = world.get("tick", 0)
     return entry

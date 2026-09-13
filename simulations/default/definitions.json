@@ -65940,28 +65940,41 @@
       "proficiency_levels": [
         {
           "level": "novice",
-          "successes_to_next": 3
+          "title": "Initiate",
+          "successes_to_next": 3,
+          "bonus": 5
         },
         {
           "level": "beginner",
-          "successes_to_next": 6
+          "title": "Average",
+          "successes_to_next": 6,
+          "bonus": 15
         },
         {
           "level": "intermediate",
-          "successes_to_next": 10
+          "title": "Adept",
+          "successes_to_next": 10,
+          "bonus": 30
         },
         {
           "level": "advanced",
-          "successes_to_next": 15
+          "title": "Skilled",
+          "successes_to_next": 15,
+          "bonus": 45
         },
         {
           "level": "expert",
-          "successes_to_next": null
+          "title": "Master",
+          "successes_to_next": null,
+          "bonus": 60
         }
       ],
-      "trait_modifiers": {
-        "clumsy": -0.15
-      }
+      "trait_modifiers": [
+        {
+          "trait": "clumsy",
+          "modifier": -15
+        }
+      ]
     },
     "juggling": {
       "name": "Juggling",
@@ -65972,29 +65985,45 @@
       "proficiency_levels": [
         {
           "level": "novice",
-          "successes_to_next": 4
+          "title": "Initiate",
+          "successes_to_next": 4,
+          "bonus": 5
         },
         {
           "level": "beginner",
-          "successes_to_next": 8
+          "title": "Average",
+          "successes_to_next": 8,
+          "bonus": 15
         },
         {
           "level": "intermediate",
-          "successes_to_next": 12
+          "title": "Adept",
+          "successes_to_next": 12,
+          "bonus": 30
         },
         {
           "level": "advanced",
-          "successes_to_next": 20
+          "title": "Skilled",
+          "successes_to_next": 20,
+          "bonus": 45
         },
         {
           "level": "expert",
-          "successes_to_next": null
+          "title": "Master",
+          "successes_to_next": null,
+          "bonus": 60
         }
       ],
-      "trait_modifiers": {
-        "clumsy": -0.2,
-        "athletic": 0.1
-      }
+      "trait_modifiers": [
+        {
+          "trait": "clumsy",
+          "modifier": -20
+        },
+        {
+          "trait": "athletic",
+          "modifier": 10
+        }
+      ]
     },
     "language_spanish": {
       "name": "Spanish",
@@ -66006,26 +66035,85 @@
       "proficiency_levels": [
         {
           "level": "beginner",
-          "successes_to_next": 8
+          "title": "Initiate",
+          "successes_to_next": 8,
+          "bonus": 5
         },
         {
           "level": "elementary",
-          "successes_to_next": 12
+          "title": "Average",
+          "successes_to_next": 12,
+          "bonus": 15
         },
         {
           "level": "intermediate",
-          "successes_to_next": 18
+          "title": "Adept",
+          "successes_to_next": 18,
+          "bonus": 30
         },
         {
           "level": "advanced",
-          "successes_to_next": 25
+          "title": "Skilled",
+          "successes_to_next": 25,
+          "bonus": 45
         },
         {
           "level": "fluent",
-          "successes_to_next": null
+          "title": "Master",
+          "successes_to_next": null,
+          "bonus": 60
         }
       ],
-      "trait_modifiers": {}
+      "trait_modifiers": []
+    },
+    "singing": {
+      "name": "Singing",
+      "category": "performance",
+      "trains_via": [
+        "sing_karaoke"
+      ],
+      "proficiency_levels": [
+        {
+          "level": "novice",
+          "title": "Initiate",
+          "successes_to_next": 4,
+          "bonus": 5
+        },
+        {
+          "level": "beginner",
+          "title": "Average",
+          "successes_to_next": 8,
+          "bonus": 15
+        },
+        {
+          "level": "intermediate",
+          "title": "Adept",
+          "successes_to_next": 12,
+          "bonus": 30
+        },
+        {
+          "level": "advanced",
+          "title": "Skilled",
+          "successes_to_next": 20,
+          "bonus": 45
+        },
+        {
+          "level": "expert",
+          "title": "Master",
+          "successes_to_next": null,
+          "bonus": 60
+        }
+      ],
+      "trait_modifiers": [
+        {
+          "trait": "confident",
+          "modifier": 10
+        },
+        {
+          "trait": "nervous",
+          "modifier": -15
+        }
+      ]
     }
   }
 }
