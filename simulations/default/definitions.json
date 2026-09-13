@@ -1269,6 +1269,7 @@
     "kitchen_cabinet": {
       "name": "Kitchen Cabinet",
       "category": "furniture",
+      "model": "/resources/props/wall_cabinet.glb",
       "footprint": [
         {
           "dx": 0,
@@ -1293,6 +1294,7 @@
         "slots": 15,
         "accepted_categories": [
           "kitchenware",
+          "dishware",
           "food",
           "cleaning"
         ]
@@ -1301,6 +1303,40 @@
         "furniture",
         "kitchen",
         "storage"
+      ],
+      "icon": "furniture"
+    },
+    "kitchen_utensil_drawer": {
+      "name": "Utensil Drawer",
+      "category": "furniture",
+      "footprint": [
+        {
+          "dx": 0,
+          "dy": 0
+        }
+      ],
+      "anchors": [
+        {
+          "name": "anchor_open_storage",
+          "interaction": "open_storage"
+        },
+        {
+          "name": "anchor_grab_item",
+          "interaction": "grab_item"
+        }
+      ],
+      "storage": {
+        "slots": 12,
+        "accepted_categories": [
+          "dishware",
+          "kitchenware"
+        ]
+      },
+      "tags": [
+        "furniture",
+        "kitchen",
+        "storage",
+        "drawer"
       ],
       "icon": "furniture"
     },
@@ -1459,6 +1495,7 @@
     "kitchen_sink": {
       "name": "Kitchen Sink",
       "category": "fixture",
+      "model": "/resources/props/kitchen_sink_001.glb",
       "footprint": [
         {
           "dx": 0,
@@ -4823,7 +4860,12 @@
       ],
       "carryable": false,
       "interactions": [],
-      "anchors": []
+      "anchors": [
+        {
+          "name": "anchor_cook",
+          "interaction": "cook"
+        }
+      ]
     }
   },
   "item_templates": {
@@ -64133,6 +64175,7 @@
       "default_duration": 3,
       "default_active": true,
       "animation_state": "chop",
+      "requires_surface": true,
       "possible_accidents": [
         {
           "accident_template": "kitchen_cut",
@@ -64165,7 +64208,8 @@
       "label": "Mix",
       "default_duration": 5,
       "default_active": true,
-      "animation_state": "mix"
+      "animation_state": "mix",
+      "requires_surface": true
     },
     "boil": {
       "key": "boil",

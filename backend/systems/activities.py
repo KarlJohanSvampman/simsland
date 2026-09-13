@@ -392,7 +392,13 @@ ACTIVITIES = {
 
     "cook_recipe": {
 
-        "interaction": "stove",
+        # Confirmed live bug: no prop_template anchor anywhere has
+        # interaction "stove" -- only "cook" (the same one cook_meal
+        # already uses, and the real stove prop's own anchor defines).
+        # cook_recipe could therefore never find an anchor and start at
+        # all, despite being the actually-live cooking path
+        # (resolve_hunger_strategy() dispatches this, never cook_meal).
+        "interaction": "cook",
 
         "base_duration_minutes": 20,
 

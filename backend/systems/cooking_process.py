@@ -173,6 +173,37 @@ def begin_stage(
     ] = not is_active
 
     # =====================================================
+    # SURFACE REQUIREMENT
+    # =====================================================
+    # Confirmed live gap: recipe stages had zero awareness of what was
+    # physically nearby -- a "chop"/"mix" step resolved identically
+    # whether or not the character had any counter space. Checked once
+    # per stage (not every tick -- see update_cooking_process(), which
+    # used to be the natural-looking call site but would have over-
+    # counted a single missing stage many times over its own duration).
+    # A miss is a soft penalty (tracked here, applied to dish quality in
+    # finish_recipe()), not a hard block or a forced walk-to-counter --
+    # a character with no counter space still finishes the recipe, it
+    # just doesn't turn out as well.
+    primitives = (world.get("definitions") or {}).get("stage_primitives") or {}
+    prim = primitives.get(stage.get("primitive"), {})
+    if prim.get("requires_surface"):
+        from systems.props import find_nearest_free_anchor
+        # find_nearest_free_anchor() has no distance cutoff of its own --
+        # confirmed live, it happily returns a counter on the other side
+        # of the map as "found." A real same-room-scale radius is what
+        # actually answers "is there a surface *here*."
+        SURFACE_SEARCH_RADIUS = 10
+        found = find_nearest_free_anchor(c, world, "prepare_food")
+        has_surface = False
+        if found:
+            prop, _anchor = found
+            distance = abs(prop.get("x", 0) - c.get("x", 0)) + abs(prop.get("y", 0) - c.get("y", 0))
+            has_surface = distance <= SURFACE_SEARCH_RADIUS
+        if not has_surface:
+            process["missing_surface_count"] = process.get("missing_surface_count", 0) + 1
+
+    # =====================================================
     # STAGE ANIMATION
     # =====================================================
     # Previously this function never touched c["animation_state"] at
@@ -347,7 +378,12 @@ def finish_recipe(
     from systems.abilities import record_attempt
 
     recipe_difficulty = recipe.get("difficulty", 0.5)
-    extra_modifier = round((0.5 - recipe_difficulty) * 100)
+    # Missing counter space during a chop/mix stage (begin_stage()'s own
+    # surface-requirement check) is a real, additive penalty here -- 10
+    # difficulty points per miss, same order of magnitude as the recipe-
+    # difficulty term just above it.
+    surface_penalty = process.get("missing_surface_count", 0) * 10
+    extra_modifier = round((0.5 - recipe_difficulty) * 100) - surface_penalty
     result = resolve_skill_check("cook_recipe", c, world, extra_actor_modifier=extra_modifier)
 
     if result and not result.get("blocked"):
