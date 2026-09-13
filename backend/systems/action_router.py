@@ -1668,6 +1668,8 @@ def route_action(c, world, action, speech, definitions=None, available_actions=N
         _route_lift_weights(c, world, action)
     elif action_type == "practice_juggling":
         _route_practice_juggling(c, world, action)
+    elif action_type == "sing_karaoke":
+        _route_sing_karaoke(c, world, action)
     elif action_type in ("grab_offensive", "hold", "punch", "kick", "shove", "threaten", "stab", "knock"):
         _route_hostile_action(c, world, action)
     elif action_type == "steal_from":
@@ -2461,6 +2463,47 @@ def _route_practice_juggling(c, world, action):
         fire_incidental(c, "inform", f"Nailed that juggling routine! ({title})", world)
     else:
         fire_incidental(c, "inform", "Drops the balls -- juggling is harder than it looks.", world)
+
+
+def _route_sing_karaoke(c, world, action):
+    """Competitive skill-check proof-of-concept (systems/skill_checks.py):
+    the singer rolls once against their own "singing" proficiency, then
+    every co-present listener (capped, same reasoning as the debate-spawn
+    cap -- a crowded room shouldn't stampede everyone into reacting)
+    independently rolls to react, scaled by how well the performance
+    actually went (see resolve_skill_check's competitive path)."""
+    c["activity"] = _scaffold(c, world, "sing_karaoke", interaction="sing_karaoke", duration=600)
+
+    from systems.skill_checks import resolve_skill_check, MAX_SKILL_CHECK_AUDIENCE
+    from systems.abilities import record_attempt, get_level_name
+    from systems.incidental_speech import fire_incidental
+
+    audience = _co_present_characters(c, world)[:MAX_SKILL_CHECK_AUDIENCE]
+    result = resolve_skill_check("sing_karaoke", c, world, targets=audience)
+    if not result or result.get("blocked"):
+        return
+
+    record_attempt(c, "singing", world, result["success"], margin=result["actor_margin"])
+
+    defs = world.get("definitions", {})
+    levels = defs.get("ability_templates", {}).get("singing", {}).get("proficiency_levels", [])
+    level_key = get_level_name(c, "singing", world)
+    title = next((lvl.get("title", level_key) for lvl in levels if lvl.get("level") == level_key), level_key)
+
+    if result["success"]:
+        fire_incidental(c, "inform", f"Belts out a real karaoke performance! ({title})", world)
+    else:
+        fire_incidental(c, "inform", "Butchers the song -- rough one to sit through.", world)
+
+    listeners_by_id = {l["id"]: l for l in audience}
+    for target_result in result["target_results"]:
+        listener = listeners_by_id.get(target_result["target_id"])
+        if not listener:
+            continue
+        if target_result["success"]:
+            fire_incidental(listener, "react", f"Genuinely impressed by {c.get('name', 'that')}'s singing.", world, target_id=c["id"])
+        else:
+            fire_incidental(listener, "react", "Unimpressed by the karaoke performance.", world, target_id=c["id"])
 
 
 # =========================================================
