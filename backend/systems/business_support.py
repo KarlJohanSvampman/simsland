@@ -60,7 +60,12 @@ def _respond_to_inquiry(world, business_key, business, state, entry):
         generate_business_response(business, business_key, inquiry, world, session),
         priority=PRIORITY_BACKGROUND,
     )
-    if not reply:
+    # generate_business_response() promises a str or None, but a
+    # preempted/cancelled call bypasses that and resolves here to
+    # run_llm_call's own {"error": ...} dict instead -- a bare `not reply`
+    # doesn't catch that (a non-empty dict is truthy), which would have
+    # stored the error dict itself as the reply text below.
+    if not isinstance(reply, str) or not reply.strip():
         return False
 
     tick = world.get("tick", 0)
