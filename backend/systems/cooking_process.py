@@ -188,18 +188,19 @@ def begin_stage(
     primitives = (world.get("definitions") or {}).get("stage_primitives") or {}
     prim = primitives.get(stage.get("primitive"), {})
     if prim.get("requires_surface"):
-        from systems.props import find_nearest_free_anchor
-        # find_nearest_free_anchor() has no distance cutoff of its own --
-        # confirmed live, it happily returns a counter on the other side
-        # of the map as "found." A real same-room-scale radius is what
-        # actually answers "is there a surface *here*."
-        SURFACE_SEARCH_RADIUS = 10
-        found = find_nearest_free_anchor(c, world, "prepare_food")
+        from systems.props import find_preferred_surface, PREFERRED_SURFACE_RADIUS
+        # A table/counter tagged "cook_prep" (systems/props.py::
+        # find_preferred_surface) wins over the generic "prepare_food"
+        # anchor search when one's nearby; falls back to the untouched
+        # generic behavior (with its own same-room-scale radius --
+        # find_nearest_free_anchor() has no distance cutoff of its own)
+        # when nothing's tagged.
+        found = find_preferred_surface(c, world, "cook_prep", fallback_interaction="prepare_food")
         has_surface = False
         if found:
             prop, _anchor = found
             distance = abs(prop.get("x", 0) - c.get("x", 0)) + abs(prop.get("y", 0) - c.get("y", 0))
-            has_surface = distance <= SURFACE_SEARCH_RADIUS
+            has_surface = distance <= PREFERRED_SURFACE_RADIUS
         if not has_surface:
             process["missing_surface_count"] = process.get("missing_surface_count", 0) + 1
 

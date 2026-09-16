@@ -67,8 +67,25 @@ def ensure_prop_template_fields(world, defs):
             prop["storage"] = copy.deepcopy(template.get("storage"))
         prop.setdefault("footprint", template.get("footprint"))
         prop.setdefault("category", template.get("category"))
+        # Tagged square surface regions (systems/props.py::
+        # find_surface_with_tag()) -- same backfill-once-then-merge-new
+        # shape as anchors above, so a template gaining a new surface
+        # later still reaches already-placed instances.
+        if prop.get("surfaces") is None:
+            prop["surfaces"] = copy.deepcopy(template.get("surfaces", []))
+        else:
+            existing_ids = {s.get("id") for s in prop["surfaces"]}
+            for surface in template.get("surfaces", []):
+                if surface.get("id") not in existing_ids:
+                    prop["surfaces"].append(copy.deepcopy(surface))
         if template.get("catalog") is not None:
             prop.setdefault("catalog", template.get("catalog"))
+        # Tags a player/script has stamped onto this SPECIFIC instance
+        # (e.g. "cook_prep" on the one kitchen table that should be
+        # preferred for chopping) -- distinct from the template's own
+        # tags, which every instance of that template shares. See
+        # props.py::get_prop_tags()/find_preferred_surface().
+        prop.setdefault("extra_tags", [])
 
 
 def ensure_world_defaults(world, defs=None):
@@ -97,6 +114,12 @@ def ensure_world_defaults(world, defs=None):
         gov = defs.get("government")
         if gov:
             world.setdefault("government", gov.copy())
+
+    # Real per-company employee roster (see systems/workplace_npc.py) --
+    # {company_key: {"employee_ids": [...], "boss_id": None}}, distinct
+    # from world["company_slots"]'s pure integer capacity/filled
+    # counters. Created lazily per company, not upfront.
+    world.setdefault("companies", {})
 
 
     # =====================================================
@@ -497,6 +520,10 @@ def ensure_world_defaults(world, defs=None):
                 mailbox["x"] = mx
                 mailbox["y"] = my
 
+        # Real, tagged physical stacks of documents -- see
+        # systems/document_search.py. {pile_id: {tags, item_ids, x, y}}.
+        h.setdefault("document_piles", {})
+
         # Convenience/stability tracking (systems/convenience.py) -- when a
         # household already has a home, treat "established" as starting to
         # accrue from now rather than backdating a fake history.
@@ -758,8 +785,15 @@ def ensure_character_defaults(c, world=None):
     # the same axis as in-group vs. universal solidarity.
     c.setdefault("curiosity", 50)
 
-    # Masculinity confidence — separate axis targeted by emasculation tactics
-    c.setdefault("masculinity_confidence", 0.65)  # males only; attacks via ridicule/emasculation
+    # Masculinity confidence — separate axis targeted by emasculation tactics.
+    # Confirmed live bug (player report: "why does everyone have
+    # masculinity under self-esteem, even the women?") -- this was set
+    # unconditionally via setdefault for EVERY character despite the
+    # comment's own "males only" -- the frontend already correctly skips
+    # displaying it when the field is absent (main.js checks != null),
+    # so the fix is just to stop setting it on anyone it doesn't apply to.
+    if c.get("sex") == "male":
+        c.setdefault("masculinity_confidence", 0.65)  # attacks via ridicule/emasculation
 
     # Sexual dependency — character has been conditioned to need dominant partner style
     c.setdefault("sexual_dependency", {
@@ -1109,6 +1143,32 @@ def ensure_character_defaults(c, world=None):
     # aggregating into behavior_patterns.
     c.setdefault("_daily_observations", [])
     c.setdefault("behavior_patterns", {})
+
+    # Real, capped (max 10) list of known workplace contacts -- see
+    # systems/workplace_npc.py. Separate from c["relationships"] (which
+    # can hold many unrelated family/friend entries); reputation/
+    # dependency toward each id here live on the matching
+    # relationships[id] entry (brain/relationships.py's
+    # workplace_reputation/workplace_dependency fields).
+    c.setdefault("workplace_contact_ids", [])
+
+    # Real, actionable clause invocations awaiting the character's own
+    # choice -- see systems/contract_clauses.py. An "optional"
+    # conditional clause queues here instead of firing on its own.
+    c.setdefault("pending_clause_invocations", [])
+
+    # The one real, LLM-chosen career-ladder target this character is
+    # currently working toward -- see systems/career_ladder.py. Empty
+    # ({}) means no active target (freshly hired, unemployed, or just
+    # promoted); choose_career_path() re-picks the next time this
+    # character works a shift.
+    c.setdefault("career_progress", {})
+
+    # Rolling real sleep-duration history -- see systems/body.py::
+    # on_sleep_complete() (writer) and systems/alarm_habits.py (reader).
+    # Not a fuzzy "how routine is this person" guess -- actual recent
+    # measurements.
+    c.setdefault("sleep_stats", {"recent_durations": [], "avg_duration_by_weekday": {}})
 
     # Sports hobbies (see systems/sports.py). supported_teams: sport ->
     # sports_teams id (real pro team, picked when an "X Supporter" hobby is

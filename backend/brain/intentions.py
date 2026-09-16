@@ -92,6 +92,24 @@ def add_intention(
         "active_intentions"
     ]
 
+    # Confirmed live bug (player-visible: a whole batch of lt_need
+    # intentions all showing the same "Created At" on every UI refresh):
+    # add_intention() unconditionally re-stamps created_at to "now" every
+    # time it's called, even when an intention of this type already
+    # exists and is just being refreshed (e.g. generate_lt_need_
+    # intentions() re-adding the same still-frustrated need every
+    # lt_needs cadence tick). That made an intention that's actually been
+    # sitting there for hours look freshly created on every single
+    # refresh. Preserve the ORIGINAL creation tick when one already
+    # exists, unless the caller explicitly passes its own created_at.
+    if "created_at" not in intention:
+        existing = next(
+            (i for i in intentions if i["type"] == intention["type"]),
+            None
+        )
+        if existing and "created_at" in existing:
+            intention["created_at"] = existing["created_at"]
+
     intention.setdefault(
         "created_at",
         _CURRENT_TICK

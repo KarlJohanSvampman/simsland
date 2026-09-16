@@ -2,6 +2,8 @@
 # IMPORTS
 # =========================================================
 
+import random
+
 from brain.context_builder import (
     build_context
 )
@@ -186,6 +188,26 @@ def update_internal_state(
 
     world
 ):
+    # Confirmed live bug (real player report + screenshot): travel_hidden
+    # is set/cleared at many separate points scattered across travel.py's
+    # different trip-leg transitions (driving_out/driving_back/bus legs/
+    # walking home/etc.), each responsible for its own matching reset --
+    # any one gap (an interrupted trip, an edge case one specific leg's
+    # reset branch didn't cover) leaves it stuck True forever after,
+    # which main.js::_isCharacterHidden() reads directly -- the character
+    # renders permanently invisible despite being genuinely home and
+    # active (confirmed live: off_grid=False, travel_state=None,
+    # mid-sleep, yet travel_hidden=True). Rather than chase every
+    # individual transition site for the one that missed a reset, this is
+    # a general safety-net invariant, checked every tick for every
+    # character: not off-grid and not mid-trip means NOT travel_hidden,
+    # full stop -- self-heals within one tick regardless of which
+    # specific code path caused the staleness.
+    if c.get("travel_hidden") and not c.get("off_grid") and not c.get("travel_state"):
+        c["travel_hidden"] = False
+        from sim_loop import _mark_dirty
+        _mark_dirty(world, char_ids={c["id"]})
+
     ensure_body(c)           # migrate old characters; no-op on new ones
     update_body_needs(c, world=world)
     update_emotion(
@@ -253,6 +275,26 @@ def update_economy(
         c,
         world
     )
+
+    # Per the user's explicit ask: a character with real slack in their
+    # bank balance should try to pay off debt sooner, not just let it
+    # carry along at minimum forever. Self-gated to once per calendar day.
+    from systems.loans import maybe_prepay_debt
+    maybe_prepay_debt(c, world)
+
+    # Per the user's explicit ask: an elderly character past retirement
+    # age stops working (and stops being expected to) instead of working
+    # indefinitely. Self-gated on c["retired"], cheap no-op afterward.
+    from systems.retirement import maybe_retire, maybe_retire_disabled
+    maybe_retire(c, world)
+    maybe_retire_disabled(c, world)
+
+    # Per the user's explicit ask: hourly memory consolidation into a
+    # separate long-term store, plus periodic random forgetting of the
+    # raw short-term log. Both self-gate on their own tick interval.
+    from systems.memory_consolidation import maybe_consolidate_memories, maybe_forget_short_term
+    maybe_consolidate_memories(c, world)
+    maybe_forget_short_term(c, world)
 
 
 # =========================================================
@@ -449,7 +491,9 @@ def process_decision(
                 "thought"
             ],
 
-            importance=10,
+            importance=0.3,
+
+            tick=world.get("tick", 0),
 
             source="internal"
         )
@@ -481,6 +525,23 @@ def process_decision(
         # a second time — reuse the action's already-resolved target here.
         if action and speech and not speech.get("target") and speech.get("target_description") and action.get("target"):
             speech["target"] = action["target"]
+
+    # Confirmed live bug: dialogue narrated mid some OTHER activity (the
+    # chosen action isn't speak-like at all, e.g. "eat" while chatting)
+    # never got a target through the bridge above -- speech["target"]
+    # stayed None forever, and action_router.py::apply_speech()'s entire
+    # conversation-threading block (a real conversation object, waking
+    # the listener specifically, scheduling their reply) is gated on a
+    # resolved target. Independently resolve speech's own
+    # target_description here (llm_brain.py may have pulled a name
+    # straight out of the narration when nothing else supplied one) --
+    # apply_speech() itself still falls back further, to whoever's
+    # simply nearest, when even this finds nobody real to match.
+    if speech and not speech.get("target") and speech.get("target_description") and available_actions is not None:
+        from brain.action_resolver import resolve_target
+        result = resolve_target(c, world, "speak", speech["target_description"], available_actions)
+        if result["id"] is not None:
+            speech["target"] = result["id"]
 
     if action:
 
@@ -734,9 +795,125 @@ def update_agent(
         # Only activities in queues flagged "interruptible" can be suspended;
         # survival activities (sleep, toilet, eat) always run to completion.
         urgent = _check_urgent_interruption(c)
-        if urgent and c.get("activity_queue"):
+        act_type = (c["activity"] or {}).get("type", "")
+
+        # Confirmed live bug (real player report): sleep had NO way to be
+        # interrupted by anything, including a genuine bathroom emergency
+        # -- bladder/bowels intentions are flagged "interrupts": True by
+        # body_intentions.py, but that flag was never actually read
+        # anywhere in the codebase. Per the user's explicit ask, this is
+        # the one real physical-urgency exception to "survival activities
+        # always run to completion" above: sleep specifically (not eat/
+        # use_toilet themselves -- no need to interrupt a bathroom trip
+        # for a bathroom need) yields to a genuinely urgent bladder/bowels
+        # need, remembers to resume afterward (see activities.py's
+        # use_toilet completion hook), and falls through to this same
+        # tick's normal flow so the freshly-highest-priority use_toilet
+        # intention gets picked up immediately instead of waiting a tick.
+        # Confirmed live bug (real player report): work never actually
+        # took priority over anything -- maybe_go_offgrid() (offgrid.py)
+        # can only ever fire once c["activity"] is already empty (this
+        # whole block returns early otherwise), so a character mid-way
+        # through some discretionary activity (a hobby, chores, leisure)
+        # when their real scheduled shift started just... didn't go,
+        # every time, with no real diagnosis of why beyond a vague
+        # end-of-day catch-all. Per the user's explicit ask: work is a
+        # real commitment and should interrupt a merely discretionary
+        # activity -- but NOT the same protected survival activities
+        # sleep already isn't interrupted for (using the toilet, eating,
+        # or sleeping itself -- consistent with "only pee/being woken/
+        # noise interrupts sleep" from the bathroom-urgency branch below).
+        _PROTECTED_FOR_WORK = ("sleep", "use_toilet", "use_toilet_bowels", "eat")
+        from systems.offgrid import _work_block_starting_now
+        work_starting = c.get("employed") and _work_block_starting_now(c, world)
+
+        # A character's own set_phone_alarm_clock (action_router.py) --
+        # the one real way to defend a scheduled commitment against
+        # oversleeping, since sleep's own duration (activities.py::
+        # compute_duration_ticks) is driven purely by fatigue, never by
+        # the clock or the character's schedule. Recurring by design (no
+        # disarm) -- a real alarm clock keeps going off at the same time
+        # every day until reset to a different time.
+        #
+        # Per the user's explicit ask: waking to an alarm isn't a sure
+        # thing -- a real chance/risk roll (reduced for "deep_sleeper"),
+        # rechecked every ~10 minutes with rising odds rather than a
+        # single pass/fail, mirrors how a real alarm keeps going off/
+        # snoozing rather than ringing exactly once. Bounded to a real
+        # cap (ALARM_SNOOZE_MAX_ATTEMPTS) so a persistent failure doesn't
+        # recheck forever -- past that, sleep just runs to its own
+        # natural end, same as if no alarm had been set at all.
+        ALARM_WAKE_BASE_CHANCE = 0.85
+        ALARM_WAKE_ATTEMPT_BONUS = 0.15
+        ALARM_SNOOZE_RECHECK_MINUTES = 10
+        ALARM_SNOOZE_MAX_ATTEMPTS = 8
+
+        alarm = c.get("phone_alarm")
+        now_minute = world.get("calendar", {}).get("minute_of_day", -1)
+        snooze = c.get("_alarm_snooze")
+        alarm_ringing = act_type == "sleep" and alarm and alarm.get("minute_of_day") == now_minute and not snooze
+        alarm_rechecking = act_type == "sleep" and snooze and snooze.get("next_check_minute") == now_minute
+
+        if alarm_ringing or alarm_rechecking:
+            attempts = snooze.get("attempts", 0) if snooze else 0
+            wake_chance = min(1.0, ALARM_WAKE_BASE_CHANCE + attempts * ALARM_WAKE_ATTEMPT_BONUS)
+            if "deep_sleeper" in (c.get("physical_traits") or []):
+                wake_chance = max(0.05, wake_chance - 0.40)
+
+            if random.random() < wake_chance:
+                c.pop("_alarm_snooze", None)
+                from systems.occupancy import interrupt_activity
+                from systems.reactions import trigger_reaction
+                interrupt_activity(c, world)
+                try:
+                    trigger_reaction(c, world, "surprise", tick=world.get("tick", 0))
+                except Exception:
+                    pass
+            else:
+                attempts += 1
+                if attempts >= ALARM_SNOOZE_MAX_ATTEMPTS:
+                    c.pop("_alarm_snooze", None)  # gives up -- sleeps on naturally
+                else:
+                    c["_alarm_snooze"] = {
+                        "attempts": attempts,
+                        "next_check_minute": (now_minute + ALARM_SNOOZE_RECHECK_MINUTES) % 1440,
+                    }
+        elif act_type == "sleep" and urgent in ("urgent_bladder", "urgent_bowels"):
+            # Confirmed live bug (real player report + live data: bowels
+            # stuck frozen at exactly 100 forever, phase_started_tick
+            # matching "now" on every single check): merely interrupting
+            # and falling through to the normal intention-resolution loop
+            # was NOT enough -- sleep's own "exhausted" intention (up to
+            # priority 98) actually OUTRANKS the bathroom intention
+            # (bladder/bowels_urgent, priority 95), both being "survival"
+            # category, so the very next selection just picked sleep
+            # right back up before the character ever took a single step
+            # toward the toilet -- an infinite interrupt/re-sleep loop
+            # that never once actually resolved the real need. Directly
+            # starting the bathroom trip here, rather than trusting
+            # priority ordering to sort it out, is what actually gets
+            # them there.
+            c["_resume_sleep_after_bathroom"] = True
+            from systems.occupancy import interrupt_activity
+            interrupt_activity(c, world)
+            start_activity(c, world, "use_toilet")
+        elif work_starting and act_type not in _PROTECTED_FOR_WORK:
+            c.pop("_last_work_miss_reason", None)
+            from systems.occupancy import interrupt_activity
+            interrupt_activity(c, world)
+            # Fall through: no activity now, this same tick's normal flow
+            # below will let maybe_go_offgrid() actually dispatch the shift.
+        elif work_starting and act_type in _PROTECTED_FOR_WORK:
+            # A real, precise reason -- snapshotted at the EXACT tick their
+            # shift was due to start, not whatever they happen to be doing
+            # at the once-a-day expectation-miss check (see systems/
+            # expectations.py::_diagnose_miss_reason(), which now reads
+            # this first for a go_to_work miss specifically).
+            c["_last_work_miss_reason"] = f"you were {act_type.replace('_', ' ')}"
+            execute_activity(c, world, c["activity"])
+            return
+        elif urgent and c.get("activity_queue"):
             from systems.hobby_requirements import HOBBY_REQUIREMENTS
-            act_type = (c["activity"] or {}).get("type", "")
             hobby_params = c.get("_active_hobby_params", {})
             hobby_name   = hobby_params.get("hobby", "")
             interruptible = HOBBY_REQUIREMENTS.get(hobby_name, {}).get("interruptible", False)

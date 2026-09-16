@@ -26,6 +26,48 @@ WEEKDAYS = [
 ]
 WORK_DAYS = WEEKDAYS[:5]
 
+# Per-contracted-work-day chance of a real exception replacing that
+# day's work block entirely, re-rolled at every weekly regeneration --
+# documented tunable, not derived from anything real-world.
+SCHEDULE_EXCEPTION_CHANCE = 0.08
+SCHEDULE_EXCEPTIONS = ["doctor_appointment", "holiday", "wfh"]
+
+
+# =========================================================
+# SHIFT WORK (weekend/inconvenient-hours jobs)
+# =========================================================
+# job_templates' own work_days field is real but unauthored in practice
+# (confirmed: every sampled template -- cashier, bartender, police_officer,
+# firefighter -- carries the identical placeholder [1,2,3,4,5], even for
+# roles that obviously need weekend/night coverage in real life). Rather
+# than a 577-entry manual content pass, this derives "does this job
+# realistically require shift work" from fields every template already
+# has (name/industry/tags), same deterministic-classifier approach as
+# systems/job_complexity.py::classify_job(). Per the user's explicit ask:
+# a job that needs inconvenient hours pays a real premium (applied once,
+# at listing/hire time -- see jobs.py::_make_listing()) rather than
+# scheduling.py silently discounting the disruption.
+SHIFT_WORK_PAY_PREMIUM = 0.15  # +15% hourly for shift-work jobs
+
+_SHIFT_WORK_KEYWORDS = (
+    "retail", "hospitality", "restaurant", "food_service", "bar",
+    "bartend", "nurse", "medical", "hospital", "clinic", "police",
+    "fire", "emergency", "security", "cashier", "server", "cook",
+    "chef", "entertainment", "casino", "hotel", "transit", "driver",
+    "delivery", "paramedic",
+)
+
+
+def job_requires_shift_work(job_template):
+    if not job_template:
+        return False
+    haystack = " ".join([
+        job_template.get("name", "") or "",
+        job_template.get("industry", "") or "",
+        " ".join(job_template.get("tags", []) or []),
+    ]).lower()
+    return any(k in haystack for k in _SHIFT_WORK_KEYWORDS)
+
 
 # =========================================================
 # EXPENSE-DRIVEN WORK HOURS
@@ -59,8 +101,14 @@ def _calc_min_work_hours(c, world):
     if "workaholic" in c.get("traits", []):
         min_hours *= 1.40
 
-    # Hard caps: never fewer than 10h or more than 60h per week
-    return max(10.0, min(60.0, min_hours))
+    # Hard caps: aim for a realistic 20-40h/week range. (Previously
+    # 10-60h -- the 10h floor collided badly with the day-distribution
+    # loop's own 10h/day cap, see generate_week_schedule(): a character
+    # right at that floor got their entire week's hours crammed into a
+    # single Monday shift and nothing else. Per the user's explicit ask,
+    # doubled the floor and tightened the ceiling to a normal part-time-
+    # to-full-time band.)
+    return max(20.0, min(40.0, min_hours))
 
 
 # =========================================================
@@ -104,6 +152,18 @@ def _contract_blocks(c, world):
 # GENERATE WEEK SCHEDULE
 # =========================================================
 
+def _contract_day_work_hours(contract):
+    """Real work_hours/work_days straight from a signed employment
+    contract (systems/jobs.py::_stamp_employment_contract()) -- work_days
+    uses the common 1=Monday..7=Sunday convention. Returns a
+    {weekday_name: hours} dict, same shape generate_week_schedule()'s
+    financial-need-driven distribution already produces."""
+    work_hours = contract.get("work_hours") or [9, 17]
+    work_days = contract.get("work_days") or [1, 2, 3, 4, 5]
+    hours = max(0, work_hours[1] - work_hours[0])
+    return {WEEKDAYS[(d - 1) % 7]: hours for d in work_days}
+
+
 def generate_week_schedule(c, world):
     """
     Build a full week schedule.
@@ -118,17 +178,66 @@ def generate_week_schedule(c, world):
     min_hours      = _calc_min_work_hours(c, world)
     contract_blks  = _contract_blocks(c, world)
 
-    # Distribute work hours across Mon-Fri, then overflow to Sat if needed
-    hours_remaining = min_hours
-    day_work_hours  = {}
-    for day in WORK_DAYS:
-        if hours_remaining <= 0:
-            break
-        h = min(10.0, hours_remaining)    # max 10h/day
-        day_work_hours[day] = h
-        hours_remaining -= h
-    if hours_remaining > 0:
-        day_work_hours["saturday"] = min(8.0, hours_remaining)
+    # A real, signed employment contract (systems/jobs.py::
+    # _stamp_employment_contract()) takes over the work-hours skeleton
+    # entirely -- deterministic, from the contract's own work_hours/
+    # work_days, not recomputed from financial need every week. A
+    # character with no contract (not yet hired, or an older job that
+    # predates this feature) keeps the existing financial-need-driven
+    # behavior below unchanged.
+    employment_contract = c.get("employment_contract")
+
+    # Confirmed live bug (real player report): this used to greedily fill
+    # each day up to MAX_HOURS_PER_DAY before ever moving to the next one
+    # -- with min_hours' own 20h floor (previously 10h) sitting well
+    # under that per-day cap, a character's ENTIRE week's hours landed on
+    # a single Monday shift, nothing the rest of the week. Real jobs have
+    # a consistent day-to-day shift length -- spread evenly across as
+    # many of Mon-Fri as it takes to keep each shift a realistic length
+    # (at least MIN_SHIFT_HOURS), collapsing toward fewer/longer days
+    # only when the total is too small to support 5 real shifts, and
+    # only overflowing into Saturday for a total too big to fit 5 days
+    # at the per-day cap.
+    MAX_HOURS_PER_DAY = 10.0
+    MIN_SHIFT_HOURS   = 3.0
+
+    # Per the user's explicit ask: weekends stay clear of work by default
+    # -- ONLY a job whose own description reads as needing inconvenient/
+    # weekend coverage (see job_requires_shift_work() above) is eligible
+    # to schedule Saturday/Sunday shifts at all. A per-character rotation
+    # offset (stable, from their own id) spreads WHICH days off shift
+    # workers get across Sat/Sun/weekdays, rather than every shift worker
+    # ending up with the identical Mon-Fri pattern non-shift jobs already
+    # use, which would make the weekend-eligibility pointless in practice.
+    job_templates = (world.get("definitions", {}) or {}).get("job_templates", {})
+    job_template = job_templates.get(c.get("job_template_id"))
+    is_shift_work = job_requires_shift_work(job_template)
+
+    if is_shift_work:
+        offset = sum(ord(ch) for ch in str(c.get("id", ""))) % 7
+        day_pool = [WEEKDAYS[(offset + i) % 7] for i in range(7)]
+        max_days = 6   # never a full 7-day week, even for shift workers
+    else:
+        day_pool = WORK_DAYS
+        max_days = len(WORK_DAYS)
+
+    if employment_contract:
+        day_work_hours = _contract_day_work_hours(employment_contract)
+    else:
+        num_days = min(max_days, len(day_pool))
+        while num_days > 1 and min_hours / num_days < MIN_SHIFT_HOURS:
+            num_days -= 1
+
+        hours_remaining = min_hours
+        day_work_hours  = {}
+        for i, day in enumerate(day_pool[:num_days]):
+            days_left = num_days - i
+            h = min(MAX_HOURS_PER_DAY, round(hours_remaining / days_left, 2))
+            day_work_hours[day] = h
+            hours_remaining -= h
+        if hours_remaining > 0.01:
+            overflow_day = day_pool[num_days] if num_days < len(day_pool) else "saturday"
+            day_work_hours[overflow_day] = min(8.0, hours_remaining)
 
     # Pick a consistent start time for this character (trait-influenced).
     # Live bug report: night_owl/early_bird are physical_trait_templates
@@ -146,6 +255,11 @@ def generate_week_schedule(c, world):
         preferred_work_start = random.choice([7, 8])
     else:
         preferred_work_start = random.choice([8, 9, 10])
+
+    # A real contract's own start hour wins over the trait-based guess
+    # above -- your employer decided your hours, not your sleep type.
+    if employment_contract and employment_contract.get("work_hours"):
+        preferred_work_start = employment_contract["work_hours"][0]
 
     # Unstructured/routineless: no fixed sleep block at all -- bedtime and
     # wake time drift day to day, so a single week-wide sleep window
@@ -177,8 +291,21 @@ def generate_week_schedule(c, world):
                     "source":   "contract",
                 })
 
-        # 3. Work block
+        # 3. Work block -- a real contract keeps its base hours every
+        # week (Confirmed Decision #14) rather than being recomputed
+        # from financial need; the only week-to-week variation is a
+        # small, real chance of a genuine exception replacing that
+        # day's work block entirely, per the user's own "roll/test for
+        # exceptions" ask.
         wh = day_work_hours.get(day, 0)
+        if employment_contract and wh > 0 and random.random() < SCHEDULE_EXCEPTION_CHANCE:
+            blocks.append({
+                "start":    f"{preferred_work_start:02d}:00",
+                "end":      f"{preferred_work_start + int(wh):02d}:00",
+                "activity": random.choice(SCHEDULE_EXCEPTIONS),
+                "source":   "exception",
+            })
+            wh = 0
         if wh > 0:
             ws = preferred_work_start
             we = ws + int(wh)

@@ -61,14 +61,57 @@ def request_route_to_anchor(c, world, prop, anchor):
 # reserves it, and routes the character there.
 # =========================================================
 
+def _ask_permission_to_use(c, world, prop):
+    """A real, simple ask -- not a full back-and-forth negotiation, just
+    a single yes/no gate, matching how other hard-blocked outcomes
+    already resolve in this codebase (a denied favor, a failed
+    application). Asking a household with nobody home simply fails --
+    there's nobody to grant permission, so the answer is no by default,
+    not an assumed yes. A closer/more familiar relationship with whoever
+    IS home makes a yes more likely."""
+    household = world.get("households", {}).get(prop.get("household_id"))
+    if not household:
+        return False
+    from systems.service_worker_runtime import _resident_present
+    resident = _resident_present(household, world)
+    if not resident:
+        return False
+    rel = (c.get("relationships") or {}).get(resident["id"], {})
+    familiarity = rel.get("familiarity", 0.0)
+    import random
+    return random.random() < (0.3 + min(0.5, familiarity))
+
+
 def begin_interaction(c, world, interaction_name):
 
-    result = find_nearest_anchor(c, world, interaction_name)
+    # Confirmed live bug (real player report: "Brian ended up in
+    # Margaret's bed"): this had no household concept at all -- prefer a
+    # character's own home's fixtures (and public/unowned props) first;
+    # only fall through to a stranger's private property when nothing
+    # usable exists at home, and even then, gate it on actually being
+    # let in (see _ask_permission_to_use above) rather than presuming
+    # it's fine to just walk in and use it.
+    from systems.props import find_nearest_household_anchor
+    result = find_nearest_household_anchor(c, world, interaction_name, c.get("household_id"))
+    used_other_household = False
+
+    if not result:
+        result = find_nearest_anchor(c, world, interaction_name)
+        used_other_household = True
 
     if not result:
         return None
 
     prop, anchor = result
+
+    if used_other_household:
+        prop_household = prop.get("household_id")
+        if prop_household and prop_household != c.get("household_id"):
+            if not _ask_permission_to_use(c, world, prop):
+                # Denied, or nobody home to ask -- don't presume it's
+                # fine to just use it anyway. Nothing usable this tick;
+                # the character's own next decision picks something else.
+                return None
 
     # find_nearest_anchor() picks the globally nearest matching anchor
     # without checking occupancy (unlike find_free_anchor(), used by

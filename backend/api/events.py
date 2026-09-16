@@ -48,15 +48,15 @@ def _format_event(world, event):
         return base
 
     # The 4 shared_event subtypes (store_encounter/cafe_meet/
-    # street_argument/gym_incident) -- systems/events.py never generates a
-    # summary sentence, only participants/location_id/outcome, so build a
-    # one-line label here.
+    # street_argument/gym_incident) -- systems/events.py::
+    # create_shared_event() now stamps a real, freely-narrated "text"
+    # onto the event itself (llm/shared_event_narration.py), so this
+    # just surfaces that directly instead of a generic label +
+    # mechanical outcome-type suffix (removed entirely -- see session
+    # history for why that mechanic was dropped).
     names = [_character_name(world, cid) for cid in event.get("participants", [])]
-    outcome = event.get("outcome") or {}
     label = _SHARED_EVENT_LABELS.get(etype, (etype or "event").replace("_", " "))
-    summary = f"{' and '.join(names)} {label}" if names else label.capitalize()
-    if outcome.get("type") and outcome["type"] != "neutral":
-        summary += f" ({outcome['type']})"
+    summary = event.get("text") or (f"{' and '.join(names)} {label}" if names else label.capitalize())
     base["title"] = " & ".join(names) if names else (etype or "event").replace("_", " ").title()
     base["summary"] = summary
     return base

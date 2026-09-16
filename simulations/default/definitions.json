@@ -175,6 +175,7 @@
     },
     "bed_double_a": {
       "category": "furniture",
+      "model": "bed_a",
       "footprint": [
         {
           "dx": 0,
@@ -452,7 +453,8 @@
         "message_surface"
       ],
       "storage": null,
-      "icon": "furniture"
+      "icon": "furniture",
+      "model": "table_dining"
     },
     "easel": {
       "name": "Easel",
@@ -515,6 +517,7 @@
     "bookshelf": {
       "name": "Bookshelf",
       "category": "furniture",
+      "blocks_los": true,
       "footprint": [
         {
           "dx": 0,
@@ -760,6 +763,7 @@
     "wardrobe": {
       "name": "Wardrobe",
       "category": "furniture",
+      "blocks_los": true,
       "footprint": [
         {
           "dx": 0,
@@ -1131,6 +1135,7 @@
     "bed_single": {
       "name": "Single Bed",
       "category": "furniture",
+      "model": "bed_001",
       "footprint": [
         {
           "dx": 0,
@@ -1251,6 +1256,14 @@
           "interaction": "prepare_food"
         }
       ],
+      "surfaces": [
+        {
+          "id": "counter_top",
+          "tags": ["cook_prep"],
+          "center": {"x": 0.5, "z": 0},
+          "size": 1.0
+        }
+      ],
       "storage": {
         "slots": 10,
         "accepted_categories": [
@@ -1269,7 +1282,7 @@
     "kitchen_cabinet": {
       "name": "Kitchen Cabinet",
       "category": "furniture",
-      "model": "/resources/props/wall_cabinet.glb",
+      "model": "/resources/props/closet_02.glb",
       "footprint": [
         {
           "dx": 0,
@@ -1364,15 +1377,29 @@
       "anchors": [
         {
           "name": "anchor_prep",
-          "interaction": "prepare_food"
+          "interaction": "prepare_food",
+          "dx": 0,
+          "dy": 0
         },
         {
           "name": "anchor_sit_1",
-          "interaction": "sit"
+          "interaction": "sit",
+          "dx": 1,
+          "dy": 0
         },
         {
           "name": "anchor_sit_2",
-          "interaction": "sit"
+          "interaction": "sit",
+          "dx": 1,
+          "dy": 1
+        }
+      ],
+      "surfaces": [
+        {
+          "id": "island_top",
+          "tags": ["cook_prep"],
+          "center": {"x": 0.5, "z": 0.5},
+          "size": 1.5
         }
       ],
       "storage": {
@@ -1889,6 +1916,7 @@
     "ceiling_light": {
       "name": "Ceiling Light",
       "category": "lighting",
+      "ceiling_mounted": true,
       "footprint": [
         {
           "dx": 0,
@@ -2756,6 +2784,7 @@
     "room_divider": {
       "name": "Room Divider",
       "category": "furniture",
+      "blocks_los": true,
       "footprint": [
         {
           "dx": 0,
@@ -2892,6 +2921,7 @@
     "wall_clock": {
       "name": "Wall Clock",
       "category": "decor",
+      "wall_mounted": true,
       "footprint": [
         {
           "dx": 0,
@@ -4212,6 +4242,7 @@
     "wall_art": {
       "name": "Wall Art",
       "category": "decor",
+      "wall_mounted": true,
       "footprint": [
         {
           "dx": 0,
@@ -4301,6 +4332,7 @@
     "pendant_light": {
       "name": "Pendant Light",
       "category": "lighting",
+      "ceiling_mounted": true,
       "footprint": [
         {
           "dx": 0,
@@ -4361,6 +4393,7 @@
     "wall_sconce": {
       "name": "Wall Sconce",
       "category": "lighting",
+      "wall_mounted": true,
       "footprint": [
         {
           "dx": 0,
@@ -4555,7 +4588,8 @@
         "dining",
         "message_surface"
       ],
-      "icon": "furniture"
+      "icon": "furniture",
+      "model": "table_dining"
     },
     "barber_chair": {
       "name": "Barber Chair",
@@ -4892,7 +4926,10 @@
       "base_price": 0,
       "stackable": false,
       "consumable": false,
-      "icon": "document"
+      "icon": "document",
+      "tags": [
+        "document"
+      ]
     },
     "driver_license": {
       "name": "Driver's License",
@@ -4901,7 +4938,10 @@
       "base_price": 0,
       "stackable": false,
       "consumable": false,
-      "icon": "document"
+      "icon": "document",
+      "tags": [
+        "document"
+      ]
     },
     "bank_card": {
       "name": "Bank Card",
@@ -4910,7 +4950,10 @@
       "base_price": 0,
       "stackable": false,
       "consumable": false,
-      "icon": "financial"
+      "icon": "financial",
+      "tags": [
+        "document"
+      ]
     },
     "credit_card": {
       "name": "Credit Card",
@@ -4919,7 +4962,39 @@
       "base_price": 0,
       "stackable": false,
       "consumable": false,
-      "icon": "financial"
+      "icon": "financial",
+      "tags": [
+        "document"
+      ]
+    },
+    "document": {
+      "name": "Document",
+      "category": "document",
+      "size": 1,
+      "base_price": 0,
+      "stackable": false,
+      "consumable": false,
+      "content_category": "document",
+      "model": "/resources/items/media/document/document.glb",
+      "icon": "document",
+      "tags": [
+        "document"
+      ]
+    },
+    "drawing": {
+      "name": "Drawing",
+      "category": "document",
+      "size": 1,
+      "base_price": 0,
+      "stackable": false,
+      "consumable": false,
+      "content_category": "drawing",
+      "model": "/resources/items/media/drawing/drawing.glb",
+      "icon": "document",
+      "tags": [
+        "document",
+        "art"
+      ]
     },
     "house_key": {
       "name": "House Key",
@@ -7694,7 +7769,8 @@
       "model": "/resources/items/media/book/book.glb",
       "icon": "books_media",
       "tags": [
-        "reading"
+        "reading",
+        "document"
       ]
     },
     "magazine": {
@@ -7708,7 +7784,8 @@
       "model": "/resources/items/media/magazine/magazine.glb",
       "icon": "books_media",
       "tags": [
-        "reading"
+        "reading",
+        "document"
       ]
     },
     "newspaper": {
@@ -7722,7 +7799,8 @@
       "icon": "books_media",
       "tags": [
         "reading",
-        "news"
+        "news",
+        "document"
       ]
     },
     "dvd": {
@@ -18218,7 +18296,7 @@
           "target_tags": [
             "toilet"
           ],
-          "duration_minutes": 5,
+          "duration_minutes": 2,
           "requires": []
         },
         {
@@ -22947,8 +23025,8 @@
           "walls": {
             "north": null,
             "south": {
-              "type": "wall",
-              "material": "wallpaper_geometric_01"
+              "type": "window",
+              "material": "paint_grey_matt"
             },
             "east": null,
             "west": null
@@ -22994,7 +23072,10 @@
             "template": "wood_floor"
           },
           "walls": {
-            "north": null,
+            "north": {
+              "type": "window",
+              "material": "paint_grey_matt"
+            },
             "south": null,
             "east": null,
             "west": null
@@ -23006,8 +23087,8 @@
           },
           "walls": {
             "north": {
-              "type": "wall",
-              "material": "wallpaper_geometric_01"
+              "type": "window",
+              "material": "paint_grey_matt"
             },
             "south": null,
             "east": null,
@@ -23115,8 +23196,8 @@
             "south": null,
             "east": null,
             "west": {
-              "type": "wall",
-              "material": "wallpaper_geometric_01"
+              "type": "window",
+              "material": "paint_grey_matt"
             }
           }
         },
@@ -23282,8 +23363,8 @@
           },
           "walls": {
             "north": {
-              "type": "wall",
-              "material": "wallpaper_geometric_01"
+              "type": "window",
+              "material": "paint_grey_matt"
             },
             "south": null,
             "east": null,
@@ -23310,8 +23391,8 @@
           },
           "walls": {
             "north": {
-              "type": "wall",
-              "material": "wallpaper_geometric_01"
+              "type": "window",
+              "material": "paint_grey_matt"
             },
             "south": null,
             "east": null,
@@ -23336,8 +23417,8 @@
           "walls": {
             "north": null,
             "south": {
-              "type": "wall",
-              "material": "wallpaper_geometric_01"
+              "type": "window",
+              "material": "paint_grey_matt"
             },
             "east": null,
             "west": {
@@ -23367,8 +23448,8 @@
           "walls": {
             "north": null,
             "south": {
-              "type": "wall",
-              "material": "wallpaper_geometric_01"
+              "type": "window",
+              "material": "paint_grey_matt"
             },
             "east": {
               "type": "wall",
@@ -23684,8 +23765,8 @@
             "north": null,
             "south": null,
             "east": {
-              "type": "wall",
-              "material": "wallpaper_geometric_01"
+              "type": "window",
+              "material": "paint_grey_matt"
             },
             "west": null
           }
@@ -23767,31 +23848,6 @@
               "type": "wall",
               "material": "wallpaper_geometric_01"
             },
-            "east": null,
-            "west": {
-              "type": "wall",
-              "material": "wallpaper_geometric_01"
-            }
-          }
-        },
-        "3,8": {
-          "floor": {
-            "template": "wood_floor"
-          },
-          "walls": {
-            "north": null,
-            "south": null,
-            "east": null,
-            "west": null
-          }
-        },
-        "2,8": {
-          "floor": {
-            "template": "wood_floor"
-          },
-          "walls": {
-            "north": null,
-            "south": null,
             "east": null,
             "west": {
               "type": "wall",
@@ -23891,8 +23947,8 @@
             },
             "south": null,
             "east": {
-              "type": "wall",
-              "material": "wallpaper_geometric_01"
+              "type": "window",
+              "material": "paint_grey_matt"
             },
             "west": null
           }
@@ -23939,8 +23995,8 @@
             "north": null,
             "south": null,
             "east": {
-              "type": "wall",
-              "material": "wallpaper_geometric_01"
+              "type": "window",
+              "material": "paint_grey_matt"
             },
             "west": null
           }
@@ -23964,8 +24020,8 @@
           "walls": {
             "north": null,
             "south": {
-              "type": "wall",
-              "material": "wallpaper_geometric_01"
+              "type": "window",
+              "material": "paint_grey_matt"
             },
             "east": null,
             "west": null
@@ -24002,8 +24058,8 @@
             "south": null,
             "east": null,
             "west": {
-              "type": "wall",
-              "material": "wallpaper_geometric_01"
+              "type": "window",
+              "material": "paint_grey_matt"
             }
           }
         },
@@ -24085,8 +24141,8 @@
             },
             "south": null,
             "east": {
-              "type": "wall",
-              "material": "wallpaper_geometric_01"
+              "type": "window",
+              "material": "paint_grey_matt"
             },
             "west": null
           }
@@ -24161,8 +24217,8 @@
             "south": null,
             "east": null,
             "west": {
-              "type": "wall",
-              "material": "wallpaper_geometric_01"
+              "type": "window",
+              "material": "paint_grey_matt"
             }
           }
         },
@@ -24189,8 +24245,8 @@
           "walls": {
             "north": null,
             "south": {
-              "type": "wall",
-              "material": "wallpaper_geometric_01"
+              "type": "window",
+              "material": "paint_grey_matt"
             },
             "east": null,
             "west": null
@@ -24213,8 +24269,8 @@
           "walls": {
             "north": null,
             "south": {
-              "type": "wall",
-              "material": "wallpaper_geometric_01"
+              "type": "window",
+              "material": "paint_grey_matt"
             },
             "east": null,
             "west": null
@@ -24236,8 +24292,8 @@
           "floor": null,
           "walls": {
             "north": {
-              "type": "wall",
-              "material": "wallpaper_geometric_01"
+              "type": "window",
+              "material": "paint_grey_matt"
             },
             "south": null,
             "east": {
@@ -24253,8 +24309,8 @@
             "north": null,
             "south": null,
             "east": {
-              "type": "wall",
-              "material": "wallpaper_geometric_01"
+              "type": "window",
+              "material": "paint_grey_matt"
             },
             "west": null
           }
@@ -24263,7 +24319,10 @@
           "floor": null,
           "walls": {
             "north": null,
-            "south": null,
+            "south": {
+              "type": "window",
+              "material": "paint_grey_matt"
+            },
             "east": {
               "type": "wall",
               "material": "wallpaper_geometric_01"
@@ -24274,7 +24333,10 @@
         "1,10": {
           "floor": null,
           "walls": {
-            "north": null,
+            "north": {
+              "type": "window",
+              "material": "paint_grey_matt"
+            },
             "south": null,
             "east": null,
             "west": null
@@ -24320,7 +24382,10 @@
           "floor": null,
           "walls": {
             "north": null,
-            "south": null,
+            "south": {
+              "type": "wall",
+              "material": "paint_grey_matt"
+            },
             "east": null,
             "west": null
           }
@@ -24328,10 +24393,16 @@
         "0,10": {
           "floor": null,
           "walls": {
-            "north": null,
+            "north": {
+              "type": "wall",
+              "material": "paint_grey_matt"
+            },
             "south": null,
             "east": null,
-            "west": null
+            "west": {
+              "type": "wall",
+              "material": "paint_grey_matt"
+            }
           }
         },
         "2,11": {
@@ -24351,10 +24422,7 @@
           "walls": {
             "north": null,
             "south": null,
-            "east": {
-              "type": "wall",
-              "material": "wallpaper_geometric_01"
-            },
+            "east": null,
             "west": null
           }
         },
@@ -24374,8 +24442,8 @@
           "floor": null,
           "walls": {
             "north": {
-              "type": "wall",
-              "material": "wallpaper_geometric_01"
+              "type": "window",
+              "material": "paint_grey_matt"
             },
             "south": null,
             "east": null,
@@ -24389,12 +24457,15 @@
           "floor": null,
           "walls": {
             "north": {
-              "type": "wall",
-              "material": "wallpaper_geometric_01"
+              "type": "window",
+              "material": "paint_grey_matt"
             },
             "south": null,
             "east": null,
-            "west": null
+            "west": {
+              "type": "wall",
+              "material": "paint_grey_matt"
+            }
           }
         },
         "4,13": {
@@ -24415,7 +24486,10 @@
           },
           "walls": {
             "north": null,
-            "south": null,
+            "south": {
+              "type": "window",
+              "material": "paint_grey_matt"
+            },
             "east": null,
             "west": null
           }
@@ -24425,7 +24499,10 @@
             "template": "wood_floor"
           },
           "walls": {
-            "north": null,
+            "north": {
+              "type": "window",
+              "material": "paint_grey_matt"
+            },
             "south": null,
             "east": null,
             "west": null
@@ -24448,7 +24525,10 @@
           },
           "walls": {
             "north": null,
-            "south": null,
+            "south": {
+              "type": "window",
+              "material": "paint_grey_matt"
+            },
             "east": null,
             "west": null
           }
@@ -24480,8 +24560,8 @@
           "floor": null,
           "walls": {
             "north": {
-              "type": "wall",
-              "material": "wallpaper_geometric_01"
+              "type": "window",
+              "material": "paint_grey_matt"
             },
             "south": null,
             "east": null,
@@ -24512,8 +24592,8 @@
             "north": null,
             "south": null,
             "east": {
-              "type": "wall",
-              "material": "wallpaper_geometric_01"
+              "type": "window",
+              "material": "paint_grey_matt"
             },
             "west": null
           }
@@ -24530,8 +24610,8 @@
             },
             "east": null,
             "west": {
-              "type": "wall",
-              "material": "wallpaper_geometric_01"
+              "type": "window",
+              "material": "paint_grey_matt"
             }
           }
         },
@@ -24569,8 +24649,8 @@
           "floor": null,
           "walls": {
             "north": {
-              "type": "wall",
-              "material": "wallpaper_geometric_01"
+              "type": "window",
+              "material": "paint_grey_matt"
             },
             "south": null,
             "east": null,
@@ -24590,8 +24670,8 @@
           "floor": null,
           "walls": {
             "north": {
-              "type": "wall",
-              "material": "wallpaper_geometric_01"
+              "type": "window",
+              "material": "paint_grey_matt"
             },
             "south": null,
             "east": null,
@@ -24612,7 +24692,7 @@
           "walls": {
             "north": {
               "type": "wall",
-              "material": "wallpaper_geometric_01"
+              "material": "paint_grey_matt"
             },
             "south": null,
             "east": null,
@@ -24647,8 +24727,8 @@
           "walls": {
             "north": null,
             "south": {
-              "type": "wall",
-              "material": "wallpaper_geometric_01"
+              "type": "window",
+              "material": "paint_grey_matt"
             },
             "east": null,
             "west": null
@@ -24661,8 +24741,8 @@
           "walls": {
             "north": null,
             "south": {
-              "type": "wall",
-              "material": "wallpaper_geometric_01"
+              "type": "window",
+              "material": "paint_grey_matt"
             },
             "east": null,
             "west": null
@@ -24676,7 +24756,7 @@
             "north": null,
             "south": {
               "type": "wall",
-              "material": "wallpaper_geometric_01"
+              "material": "paint_grey_matt"
             },
             "east": {
               "type": "wall",
@@ -24704,8 +24784,8 @@
             "south": null,
             "east": null,
             "west": {
-              "type": "wall",
-              "material": "wallpaper_geometric_01"
+              "type": "window",
+              "material": "paint_grey_matt"
             }
           }
         },
@@ -24737,8 +24817,8 @@
           "floor": null,
           "walls": {
             "north": {
-              "type": "wall",
-              "material": "wallpaper_geometric_01"
+              "type": "window",
+              "material": "paint_grey_matt"
             },
             "south": null,
             "east": null,
@@ -24844,8 +24924,8 @@
           "walls": {
             "north": null,
             "south": {
-              "type": "wall",
-              "material": "wallpaper_geometric_01"
+              "type": "window",
+              "material": "paint_grey_matt"
             },
             "east": null,
             "west": null
@@ -25025,8 +25105,8 @@
           },
           "walls": {
             "north": {
-              "type": "wall",
-              "material": "wallpaper_geometric_01"
+              "type": "window",
+              "material": "paint_grey_matt"
             },
             "south": null,
             "east": null,
@@ -25120,7 +25200,7 @@
             "east": null,
             "west": {
               "type": "wall",
-              "material": "wallpaper_geometric_01"
+              "material": "paint_grey_matt"
             }
           }
         },
@@ -25133,8 +25213,8 @@
             "south": null,
             "east": null,
             "west": {
-              "type": "wall",
-              "material": "wallpaper_geometric_01"
+              "type": "window",
+              "material": "paint_grey_matt"
             }
           }
         },
@@ -25147,25 +25227,8 @@
             "south": null,
             "east": null,
             "west": {
-              "type": "wall",
-              "material": "wallpaper_geometric_01"
-            }
-          }
-        },
-        "0,2": {
-          "floor": {
-            "template": "wood_floor"
-          },
-          "walls": {
-            "north": {
-              "type": "door",
-              "material": "wallpaper_geometric_01"
-            },
-            "south": null,
-            "east": null,
-            "west": {
-              "type": "wall",
-              "material": "wallpaper_geometric_01"
+              "type": "window",
+              "material": "paint_grey_matt"
             }
           }
         },
@@ -25179,20 +25242,6 @@
             },
             "east": null,
             "west": null
-          }
-        },
-        "0,3": {
-          "floor": {
-            "template": "wood_floor"
-          },
-          "walls": {
-            "north": null,
-            "south": null,
-            "east": null,
-            "west": {
-              "type": "wall",
-              "material": "wallpaper_geometric_01"
-            }
           }
         },
         "1,1": {
@@ -25234,20 +25283,6 @@
             "west": null
           }
         },
-        "3,2": {
-          "floor": {
-            "template": "wood_floor"
-          },
-          "walls": {
-            "north": {
-              "type": "wall",
-              "material": "wallpaper_geometric_01"
-            },
-            "south": null,
-            "east": null,
-            "west": null
-          }
-        },
         "4,1": {
           "floor": null,
           "walls": {
@@ -25256,20 +25291,6 @@
               "type": "wall",
               "material": "wallpaper_geometric_01"
             },
-            "east": null,
-            "west": null
-          }
-        },
-        "4,2": {
-          "floor": {
-            "template": "wood_floor"
-          },
-          "walls": {
-            "north": {
-              "type": "wall",
-              "material": "wallpaper_geometric_01"
-            },
-            "south": null,
             "east": null,
             "west": null
           }
@@ -25302,23 +25323,15 @@
           },
           "walls": {
             "north": null,
-            "south": null,
+            "south": {
+              "type": "window",
+              "material": "paint_grey_matt"
+            },
             "east": null,
             "west": null
           }
         },
         "2,6": {
-          "floor": {
-            "template": "wood_floor"
-          },
-          "walls": {
-            "north": null,
-            "south": null,
-            "east": null,
-            "west": null
-          }
-        },
-        "3,6": {
           "floor": {
             "template": "wood_floor"
           },
@@ -25341,17 +25354,6 @@
           }
         },
         "4,5": {
-          "floor": {
-            "template": "wood_floor"
-          },
-          "walls": {
-            "north": null,
-            "south": null,
-            "east": null,
-            "west": null
-          }
-        },
-        "3,5": {
           "floor": {
             "template": "wood_floor"
           },
@@ -25399,6 +25401,382 @@
           "floor": {
             "template": "wood_floor"
           },
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "0,11": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": {
+              "type": "window",
+              "material": "paint_grey_matt"
+            }
+          }
+        },
+        "0,12": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": {
+              "type": "wall",
+              "material": "paint_grey_matt"
+            }
+          }
+        },
+        "1,12": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "1,11": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "0,13": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": {
+              "type": "wall",
+              "material": "paint_grey_matt"
+            },
+            "east": null,
+            "west": {
+              "type": "wall",
+              "material": "paint_grey_matt"
+            }
+          }
+        },
+        "0,14": {
+          "floor": null,
+          "walls": {
+            "north": {
+              "type": "wall",
+              "material": "paint_grey_matt"
+            },
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "1,14": {
+          "floor": null,
+          "walls": {
+            "north": {
+              "type": "wall",
+              "material": "paint_grey_matt"
+            },
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "2,13": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": {
+              "type": "wall",
+              "material": "paint_grey_matt"
+            },
+            "east": {
+              "type": "wall",
+              "material": "paint_grey_matt"
+            },
+            "west": null
+          }
+        },
+        "2,14": {
+          "floor": null,
+          "walls": {
+            "north": {
+              "type": "wall",
+              "material": "paint_grey_matt"
+            },
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "2,1": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": {
+              "type": "window",
+              "material": "paint_grey_matt"
+            },
+            "east": null,
+            "west": null
+          }
+        },
+        "3,0": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "3,14": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "3,15": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "3,16": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "3,17": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "4,17": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "3,18": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "4,18": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "4,19": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "3,19": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "4,16": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "2,17": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "0,3": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "0,2": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "3,2": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "4,2": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "3,5": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "3,6": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "1,13": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "2,8": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "3,8": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "5,19": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "5,18": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "2,19": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "1,19": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "2,18": {
+          "floor": null,
           "walls": {
             "north": null,
             "south": null,
@@ -25958,6 +26336,104 @@
               "y": 11
             }
           ]
+        },
+        {
+          "id": "laundry_6",
+          "type": "laundry",
+          "tags": [],
+          "tiles": [
+            {
+              "x": 3,
+              "y": 11
+            },
+            {
+              "x": 3,
+              "y": 10
+            },
+            {
+              "x": 4,
+              "y": 10
+            },
+            {
+              "x": 4,
+              "y": 12
+            },
+            {
+              "x": 3,
+              "y": 12
+            },
+            {
+              "x": 4,
+              "y": 11
+            }
+          ]
+        },
+        {
+          "id": "laundry_7",
+          "type": "laundry",
+          "tags": [],
+          "tiles": [
+            {
+              "x": 4,
+              "y": 11
+            },
+            {
+              "x": 2,
+              "y": 10
+            },
+            {
+              "x": 4,
+              "y": 12
+            },
+            {
+              "x": 2,
+              "y": 12
+            },
+            {
+              "x": 2,
+              "y": 11
+            },
+            {
+              "x": 3,
+              "y": 11
+            },
+            {
+              "x": 4,
+              "y": 10
+            },
+            {
+              "x": 3,
+              "y": 10
+            },
+            {
+              "x": 3,
+              "y": 12
+            },
+            {
+              "x": 1,
+              "y": 10
+            },
+            {
+              "x": 1,
+              "y": 11
+            },
+            {
+              "x": 1,
+              "y": 12
+            },
+            {
+              "x": 0,
+              "y": 10
+            },
+            {
+              "x": 0,
+              "y": 11
+            },
+            {
+              "x": 0,
+              "y": 12
+            }
+          ]
         }
       ],
       "roomGraph": {
@@ -25988,6 +26464,12 @@
           "neighbors": [
             "dining_room_1"
           ]
+        },
+        "laundry_6": {
+          "neighbors": []
+        },
+        "laundry_7": {
+          "neighbors": []
         }
       },
       "navigation": {
@@ -26013,6 +26495,10 @@
             "y": 6
           },
           {
+            "x": 0,
+            "y": 13
+          },
+          {
             "x": 1,
             "y": 2
           },
@@ -26031,6 +26517,10 @@
           {
             "x": 1,
             "y": 6
+          },
+          {
+            "x": 1,
+            "y": 13
           },
           {
             "x": 2,
@@ -26063,6 +26553,10 @@
           {
             "x": 2,
             "y": 9
+          },
+          {
+            "x": 2,
+            "y": 13
           },
           {
             "x": 3,
@@ -26478,7 +26972,6 @@
           "0,10",
           "0,11",
           "0,12",
-          "0,13",
           "0,14",
           "0,15",
           "0,16",
@@ -26493,7 +26986,6 @@
           "1,10",
           "1,11",
           "1,12",
-          "1,13",
           "1,14",
           "1,15",
           "1,16",
@@ -26505,7 +26997,6 @@
           "2,10",
           "2,11",
           "2,12",
-          "2,13",
           "2,14",
           "2,15",
           "2,16",
@@ -26811,7 +27302,7 @@
             "x": 8,
             "y": 2,
             "side": "south",
-            "type": "wall"
+            "type": "window"
           },
           {
             "x": 9,
@@ -26826,10 +27317,16 @@
             "type": "wall"
           },
           {
+            "x": 8,
+            "y": 3,
+            "side": "north",
+            "type": "window"
+          },
+          {
             "x": 11,
             "y": 3,
             "side": "north",
-            "type": "wall"
+            "type": "window"
           },
           {
             "x": 11,
@@ -26865,7 +27362,7 @@
             "x": 9,
             "y": 6,
             "side": "west",
-            "type": "wall"
+            "type": "window"
           },
           {
             "x": 9,
@@ -26919,7 +27416,7 @@
             "x": 7,
             "y": 8,
             "side": "north",
-            "type": "wall"
+            "type": "window"
           },
           {
             "x": 6,
@@ -26931,13 +27428,13 @@
             "x": 5,
             "y": 8,
             "side": "north",
-            "type": "wall"
+            "type": "window"
           },
           {
             "x": 5,
             "y": 10,
             "side": "south",
-            "type": "wall"
+            "type": "window"
           },
           {
             "x": 5,
@@ -26955,7 +27452,7 @@
             "x": 7,
             "y": 10,
             "side": "south",
-            "type": "wall"
+            "type": "window"
           },
           {
             "x": 7,
@@ -27081,7 +27578,7 @@
             "x": 12,
             "y": 4,
             "side": "east",
-            "type": "wall"
+            "type": "window"
           },
           {
             "x": 12,
@@ -27116,12 +27613,6 @@
           {
             "x": 2,
             "y": 9,
-            "side": "west",
-            "type": "wall"
-          },
-          {
-            "x": 2,
-            "y": 8,
             "side": "west",
             "type": "wall"
           },
@@ -27165,7 +27656,7 @@
             "x": 16,
             "y": 6,
             "side": "east",
-            "type": "wall"
+            "type": "window"
           },
           {
             "x": 16,
@@ -27195,7 +27686,7 @@
             "x": 16,
             "y": 9,
             "side": "east",
-            "type": "wall"
+            "type": "window"
           },
           {
             "x": 16,
@@ -27207,7 +27698,7 @@
             "x": 11,
             "y": 2,
             "side": "south",
-            "type": "wall"
+            "type": "window"
           },
           {
             "x": 12,
@@ -27225,7 +27716,7 @@
             "x": 13,
             "y": 4,
             "side": "west",
-            "type": "wall"
+            "type": "window"
           },
           {
             "x": 13,
@@ -27285,7 +27776,7 @@
             "x": 8,
             "y": 6,
             "side": "east",
-            "type": "wall"
+            "type": "window"
           },
           {
             "x": 8,
@@ -27327,7 +27818,7 @@
             "x": 17,
             "y": 6,
             "side": "west",
-            "type": "wall"
+            "type": "window"
           },
           {
             "x": 4,
@@ -27351,7 +27842,7 @@
             "x": 5,
             "y": 7,
             "side": "south",
-            "type": "wall"
+            "type": "window"
           },
           {
             "x": 6,
@@ -27363,7 +27854,7 @@
             "x": 7,
             "y": 7,
             "side": "south",
-            "type": "wall"
+            "type": "window"
           },
           {
             "x": 5,
@@ -27375,7 +27866,7 @@
             "x": 1,
             "y": 7,
             "side": "north",
-            "type": "wall"
+            "type": "window"
           },
           {
             "x": 1,
@@ -27387,13 +27878,25 @@
             "x": 1,
             "y": 8,
             "side": "east",
-            "type": "wall"
+            "type": "window"
+          },
+          {
+            "x": 1,
+            "y": 9,
+            "side": "south",
+            "type": "window"
           },
           {
             "x": 1,
             "y": 9,
             "side": "east",
             "type": "wall"
+          },
+          {
+            "x": 1,
+            "y": 10,
+            "side": "north",
+            "type": "window"
           },
           {
             "x": 2,
@@ -27414,14 +27917,26 @@
             "type": "wall"
           },
           {
-            "x": 2,
-            "y": 11,
-            "side": "east",
+            "x": 0,
+            "y": 9,
+            "side": "south",
+            "type": "wall"
+          },
+          {
+            "x": 0,
+            "y": 10,
+            "side": "north",
+            "type": "wall"
+          },
+          {
+            "x": 0,
+            "y": 10,
+            "side": "west",
             "type": "wall"
           },
           {
             "x": 2,
-            "y": 12,
+            "y": 11,
             "side": "east",
             "type": "wall"
           },
@@ -27435,7 +27950,7 @@
             "x": 5,
             "y": 11,
             "side": "north",
-            "type": "wall"
+            "type": "window"
           },
           {
             "x": 5,
@@ -27447,6 +27962,12 @@
             "x": 3,
             "y": 13,
             "side": "north",
+            "type": "window"
+          },
+          {
+            "x": 3,
+            "y": 13,
+            "side": "west",
             "type": "wall"
           },
           {
@@ -27454,6 +27975,24 @@
             "y": 13,
             "side": "north",
             "type": "wall"
+          },
+          {
+            "x": 3,
+            "y": 10,
+            "side": "south",
+            "type": "window"
+          },
+          {
+            "x": 3,
+            "y": 11,
+            "side": "north",
+            "type": "window"
+          },
+          {
+            "x": 3,
+            "y": 12,
+            "side": "south",
+            "type": "window"
           },
           {
             "x": 6,
@@ -27465,7 +28004,7 @@
             "x": 7,
             "y": 11,
             "side": "north",
-            "type": "wall"
+            "type": "window"
           },
           {
             "x": 8,
@@ -27489,7 +28028,7 @@
             "x": 8,
             "y": 11,
             "side": "east",
-            "type": "wall"
+            "type": "window"
           },
           {
             "x": 9,
@@ -27501,7 +28040,7 @@
             "x": 9,
             "y": 11,
             "side": "west",
-            "type": "wall"
+            "type": "window"
           },
           {
             "x": 9,
@@ -27513,13 +28052,13 @@
             "x": 10,
             "y": 12,
             "side": "north",
-            "type": "wall"
+            "type": "window"
           },
           {
             "x": 11,
             "y": 12,
             "side": "north",
-            "type": "wall"
+            "type": "window"
           },
           {
             "x": 12,
@@ -27537,13 +28076,13 @@
             "x": 10,
             "y": 11,
             "side": "south",
-            "type": "wall"
+            "type": "window"
           },
           {
             "x": 11,
             "y": 11,
             "side": "south",
-            "type": "wall"
+            "type": "window"
           },
           {
             "x": 12,
@@ -27567,7 +28106,7 @@
             "x": 17,
             "y": 9,
             "side": "west",
-            "type": "wall"
+            "type": "window"
           },
           {
             "x": 17,
@@ -27585,7 +28124,7 @@
             "x": 15,
             "y": 12,
             "side": "north",
-            "type": "wall"
+            "type": "window"
           },
           {
             "x": 14,
@@ -27609,7 +28148,7 @@
             "x": 15,
             "y": 11,
             "side": "south",
-            "type": "wall"
+            "type": "window"
           },
           {
             "x": 13,
@@ -27645,7 +28184,7 @@
             "x": 2,
             "y": 2,
             "side": "north",
-            "type": "wall"
+            "type": "window"
           },
           {
             "x": 5,
@@ -27669,25 +28208,13 @@
             "x": 0,
             "y": 5,
             "side": "west",
-            "type": "wall"
+            "type": "window"
           },
           {
             "x": 0,
             "y": 4,
             "side": "west",
-            "type": "wall"
-          },
-          {
-            "x": 0,
-            "y": 2,
-            "side": "north",
-            "type": "door"
-          },
-          {
-            "x": 0,
-            "y": 2,
-            "side": "west",
-            "type": "wall"
+            "type": "window"
           },
           {
             "x": 0,
@@ -27696,21 +28223,9 @@
             "type": "door"
           },
           {
-            "x": 0,
-            "y": 3,
-            "side": "west",
-            "type": "wall"
-          },
-          {
             "x": 3,
             "y": 1,
             "side": "south",
-            "type": "wall"
-          },
-          {
-            "x": 3,
-            "y": 2,
-            "side": "north",
             "type": "wall"
           },
           {
@@ -27720,14 +28235,369 @@
             "type": "wall"
           },
           {
-            "x": 4,
-            "y": 2,
+            "x": 1,
+            "y": 6,
+            "side": "south",
+            "type": "window"
+          },
+          {
+            "x": 0,
+            "y": 11,
+            "side": "west",
+            "type": "window"
+          },
+          {
+            "x": 0,
+            "y": 12,
+            "side": "west",
+            "type": "wall"
+          },
+          {
+            "x": 0,
+            "y": 13,
+            "side": "south",
+            "type": "wall"
+          },
+          {
+            "x": 0,
+            "y": 13,
+            "side": "west",
+            "type": "wall"
+          },
+          {
+            "x": 0,
+            "y": 14,
             "side": "north",
             "type": "wall"
+          },
+          {
+            "x": 1,
+            "y": 14,
+            "side": "north",
+            "type": "wall"
+          },
+          {
+            "x": 2,
+            "y": 13,
+            "side": "south",
+            "type": "wall"
+          },
+          {
+            "x": 2,
+            "y": 13,
+            "side": "east",
+            "type": "wall"
+          },
+          {
+            "x": 2,
+            "y": 14,
+            "side": "north",
+            "type": "wall"
+          },
+          {
+            "x": 2,
+            "y": 1,
+            "side": "south",
+            "type": "window"
           }
         ]
       },
-      "prop_spawns": []
+      "prop_spawns": [
+        {
+          "id": "bf00112a-bc7e-4f84-a210-10d2b37daf1f",
+          "template": "mailbox",
+          "x": 7,
+          "y": 12,
+          "rotation": 0
+        },
+        {
+          "id": "b0ea268c-c320-45f2-b36b-28931bd3f4e9",
+          "template": "laundry_basket",
+          "x": 2,
+          "y": 13,
+          "rotation": 0
+        },
+        {
+          "id": "dd319e25-d2ee-42ab-b7df-10e3b0190f2a",
+          "template": "washing_machine",
+          "x": 0,
+          "y": 10,
+          "rotation": 0
+        },
+        {
+          "id": "f2ad07e6-c1db-4f29-aa7f-71206b3e8bbb",
+          "template": "ceiling_light",
+          "x": 1,
+          "y": 11,
+          "rotation": 0
+        },
+        {
+          "id": "801241cf-1e83-4d90-b55d-1d7ebaea42f1",
+          "template": "shower",
+          "x": 16,
+          "y": 6,
+          "rotation": 0
+        },
+        {
+          "id": "58bf5f26-42c4-458c-9a95-3ae24652aafc",
+          "template": "kitchen_counter",
+          "x": 9,
+          "y": 3,
+          "rotation": 0
+        },
+        {
+          "id": "f66cdae9-a3c5-4cdf-a538-00ff1fc7bd2a",
+          "template": "bed_single",
+          "x": 15,
+          "y": 9,
+          "rotation": 0
+        },
+        {
+          "id": "24d45b55-0491-4e19-93e5-94fd7a2072c3",
+          "template": "bed_single",
+          "x": 15,
+          "y": 11,
+          "rotation": 0
+        },
+        {
+          "id": "f74e5f60-1376-42ad-9594-8759966f5baf",
+          "template": "tv_stand",
+          "x": 2,
+          "y": 2,
+          "rotation": 0
+        },
+        {
+          "id": "dee3cec2-d26b-4bfc-acd8-2af7b5b81fd7",
+          "template": "power_outlet",
+          "x": 3,
+          "y": 2,
+          "rotation": 0
+        },
+        {
+          "id": "6aaff9a2-c56a-4701-8ccb-1c5666585cfd",
+          "template": "bookshelf",
+          "x": 0,
+          "y": 6,
+          "rotation": 0
+        },
+        {
+          "id": "915622bb-117c-4d50-8cbf-0333e955c1dd",
+          "template": "toilet_a",
+          "x": 14,
+          "y": 6,
+          "rotation": 0
+        },
+        {
+          "id": "c30aa81f-8887-47f4-b023-e67d62b0493f",
+          "template": "desk_computer_a",
+          "x": 13,
+          "y": 10,
+          "rotation": 0
+        },
+        {
+          "id": "e21d5d57-9f4a-4ad2-a124-773661760a7a",
+          "template": "dining_table_a",
+          "x": 10,
+          "y": 8,
+          "rotation": 0
+        },
+        {
+          "id": "3af9bf3d-8282-4460-b360-59f39c2cffa3",
+          "template": "fridge_a",
+          "x": 8,
+          "y": 3,
+          "rotation": 0
+        },
+        {
+          "id": "a922f4c5-d17e-4015-82e9-1afa20983395",
+          "template": "chair_modern_a",
+          "x": 10,
+          "y": 9,
+          "rotation": 0
+        },
+        {
+          "id": "c2201e34-c20f-49e8-85f0-2d3b4d06fd30",
+          "template": "chair_modern_a",
+          "x": 10,
+          "y": 7,
+          "rotation": 0
+        },
+        {
+          "id": "c05bc33a-f0ea-4521-adea-e3083b76baed",
+          "template": "chair_modern_a",
+          "x": 11,
+          "y": 8,
+          "rotation": 0
+        },
+        {
+          "id": "c36299bd-4233-475f-9d60-64054173756e",
+          "template": "armchair",
+          "x": 3,
+          "y": 4,
+          "rotation": 0
+        },
+        {
+          "id": "33553d28-a209-40c6-b901-e7118c82942e",
+          "template": "sofa_large",
+          "x": 3,
+          "y": 5,
+          "rotation": 0
+        },
+        {
+          "id": "ad28cc43-8366-44ef-835d-d23d8ad7d26e",
+          "template": "kitchen_utensil_drawer",
+          "x": 6,
+          "y": 3,
+          "rotation": 0
+        },
+        {
+          "id": "d71e67d5-6df9-4474-b0c6-c34c8a7499e9",
+          "template": "kitchen_cabinet",
+          "x": 7,
+          "y": 3,
+          "rotation": 0
+        },
+        {
+          "id": "c94d7307-a1c7-4021-bd8c-8fd342f83029",
+          "template": "oven_stove",
+          "x": 6,
+          "y": 5,
+          "rotation": 0
+        },
+        {
+          "id": "82188c20-f20d-452d-8e92-8ac79e3fe9d7",
+          "template": "microwave",
+          "x": 7,
+          "y": 5,
+          "rotation": 0
+        },
+        {
+          "id": "7be6cc27-e7f6-4dea-9831-309af961d6f4",
+          "template": "kitchen_sink",
+          "x": 8,
+          "y": 5,
+          "rotation": 0
+        },
+        {
+          "id": "f1681cc8-1b26-4c5c-b864-5ffa4c2cdc34",
+          "template": "bathroom_sink",
+          "x": 13,
+          "y": 7,
+          "rotation": 0
+        },
+        {
+          "id": "bf63af31-861e-4d2b-96a0-f072d4e668f6",
+          "template": "towel_rail",
+          "x": 15,
+          "y": 7,
+          "rotation": 0
+        },
+        {
+          "id": "1172622e-79a6-4526-a4d2-c98724f69e37",
+          "template": "kitchen_utensil_drawer",
+          "x": 9,
+          "y": 5,
+          "rotation": 0
+        },
+        {
+          "id": "3851fc2f-101a-45c8-bf93-6d4de25708d2",
+          "template": "kitchen_counter",
+          "x": 10,
+          "y": 3,
+          "rotation": 0
+        },
+        {
+          "id": "ca321b16-9deb-4382-9be7-d1b567ee3152",
+          "template": "kitchen_counter",
+          "x": 11,
+          "y": 3,
+          "rotation": 0
+        },
+        {
+          "id": "3ffe183e-a880-483e-a354-f188d9285bd8",
+          "template": "kitchen_counter",
+          "x": 12,
+          "y": 3,
+          "rotation": 0
+        },
+        {
+          "id": "f774b769-e471-4bc4-9b23-158bbd62f141",
+          "template": "ceiling_light",
+          "x": 9,
+          "y": 4,
+          "rotation": 0
+        },
+        {
+          "id": "f9284ce6-1df8-431a-af1c-d03725ea3103",
+          "template": "ceiling_light",
+          "x": 5,
+          "y": 9,
+          "rotation": 0
+        },
+        {
+          "id": "b092bd94-203c-4650-8f8f-a3f87f78a3f3",
+          "template": "ceiling_light",
+          "x": 11,
+          "y": 9,
+          "rotation": 0
+        },
+        {
+          "id": "99b96724-de57-4d95-974e-29677d699e13",
+          "template": "ceiling_light",
+          "x": 14,
+          "y": 10,
+          "rotation": 0
+        },
+        {
+          "id": "14a6d135-4ab5-44ed-a138-58ef29b7e1d6",
+          "template": "ceiling_light",
+          "x": 2,
+          "y": 4,
+          "rotation": 0
+        },
+        {
+          "id": "6c94ba51-0ccd-4a90-8901-ff226ff8309a",
+          "template": "ceiling_light",
+          "x": 1,
+          "y": 4,
+          "rotation": 0
+        },
+        {
+          "id": "c46e8112-ae37-4adb-a37e-19127fd7a955",
+          "template": "ceiling_light",
+          "x": 3,
+          "y": 12,
+          "rotation": 0
+        },
+        {
+          "id": "a772f6c7-4592-42c2-aa41-8e4a4643ac61",
+          "template": "trash_can",
+          "x": 8,
+          "y": 8,
+          "rotation": 0
+        },
+        {
+          "id": "9058874d-9254-4662-8ae6-9c21ea2d2856",
+          "template": "trash_can",
+          "x": 12,
+          "y": 5,
+          "rotation": 0
+        },
+        {
+          "id": "530ed4f9-f694-491c-a92d-be551fc4f41f",
+          "template": "trash_can",
+          "x": 4,
+          "y": 2,
+          "rotation": 0
+        },
+        {
+          "id": "f5e0a46d-d012-4fc5-b263-5378b1a25131",
+          "template": "wine_rack",
+          "x": 9,
+          "y": 6,
+          "rotation": 0
+        }
+      ]
     },
     "convenience_store_a": {
       "tiles": {
@@ -29767,6 +30637,52 @@
           "modifier": -15
         }
       ],
+      "conditions": []
+    },
+    "forgetful": {
+      "name": "Forgetful",
+      "polarity": "negative",
+      "description": "Frequently forgets small tasks, plans, or things they meant to do.",
+      "need_modifiers": {},
+      "skill_modifiers": {},
+      "behavior_flags": [
+        "forgetful"
+      ],
+      "descriptions": {
+        "positive": "Even so, it isn't without an upside: Frequently forgets small tasks, plans, or things they meant to do.",
+        "negative": "Left unchecked, it becomes a real liability: Frequently forgets small tasks, plans, or things they meant to do.",
+        "balanced": "In practice: Frequently forgets small tasks, plans, or things they meant to do."
+      },
+      "learn_chance": {
+        "balanced": 10,
+        "logical": 8,
+        "self_aware": 8
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
+    },
+    "disorganized": {
+      "name": "Disorganized",
+      "polarity": "negative",
+      "description": "Struggles to keep routines, plans, and belongings in order.",
+      "need_modifiers": {},
+      "skill_modifiers": {},
+      "behavior_flags": [
+        "disorganized"
+      ],
+      "descriptions": {
+        "positive": "Even so, it isn't without an upside: Struggles to keep routines, plans, and belongings in order.",
+        "negative": "Left unchecked, it becomes a real liability: Struggles to keep routines, plans, and belongings in order.",
+        "balanced": "In practice: Struggles to keep routines, plans, and belongings in order."
+      },
+      "learn_chance": {
+        "balanced": 10,
+        "logical": 8,
+        "self_aware": 8
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
       "conditions": []
     },
     "pessimistic": {
@@ -35229,6 +36145,9 @@
     },
     "paramedic": {
       "name": "Paramedic",
+      "work_uniform": {
+        "outerwear": "paramedic_uniform"
+      },
       "industry": "Government",
       "sector": "government",
       "income_class": "Upper Middle",
@@ -45565,6 +46484,9 @@
     },
     "police_officer": {
       "name": "Police Officer",
+      "work_uniform": {
+        "outerwear": "police_uniform"
+      },
       "industry": "Government",
       "sector": "government",
       "income_class": "Upper Middle",
@@ -45701,6 +46623,9 @@
     },
     "firefighter": {
       "name": "Firefighter",
+      "work_uniform": {
+        "outerwear": "firefighter_uniform"
+      },
       "industry": "Government",
       "sector": "government",
       "income_class": "Elite",
@@ -60520,6 +61445,87 @@
     "fearless",
     "natural_charisma"
   ],
+  "skill_templates": {
+    "Technology": [
+      "python_programming", "database_design", "network_administration",
+      "cybersecurity", "cloud_computing", "ui_ux_design",
+      "technical_writing", "systems_architecture", "debugging", "data_analysis"
+    ],
+    "Healthcare": [
+      "patient_care", "phlebotomy", "first_aid", "medical_charting",
+      "bedside_manner", "triage", "sterile_technique",
+      "pharmacology_knowledge", "diagnostics", "emergency_response"
+    ],
+    "Finance": [
+      "financial_modeling", "risk_assessment", "bookkeeping",
+      "tax_preparation", "investment_analysis", "budgeting", "auditing",
+      "negotiation", "forecasting", "regulatory_compliance"
+    ],
+    "Education": [
+      "lesson_planning", "public_speaking", "classroom_management",
+      "curriculum_design", "tutoring", "grading", "mentoring",
+      "conflict_resolution", "active_listening", "patience"
+    ],
+    "Hospitality": [
+      "customer_service", "multitasking", "conflict_resolution",
+      "food_safety", "cash_handling", "upselling", "event_coordination",
+      "time_management", "hospitality_etiquette", "stress_management"
+    ],
+    "Retail": [
+      "customer_service", "inventory_management", "cash_handling",
+      "visual_merchandising", "upselling", "loss_prevention",
+      "point_of_sale_operation", "stock_replenishment", "negotiation",
+      "salesmanship"
+    ],
+    "Manufacturing": [
+      "machine_operation", "quality_control", "blueprint_reading",
+      "welding", "assembly_line_efficiency", "safety_compliance",
+      "inventory_tracking", "forklift_operation", "troubleshooting",
+      "precision_measurement"
+    ],
+    "Construction": [
+      "carpentry", "blueprint_reading", "heavy_equipment_operation",
+      "masonry", "electrical_wiring", "plumbing", "safety_compliance",
+      "project_estimation", "scaffolding", "structural_assessment"
+    ],
+    "Transportation": [
+      "defensive_driving", "route_planning", "vehicle_maintenance",
+      "logistics_coordination", "load_securing", "navigation",
+      "time_management", "customer_service", "hazmat_handling",
+      "fuel_efficiency"
+    ],
+    "Government": [
+      "public_speaking", "policy_analysis", "regulatory_compliance",
+      "conflict_resolution", "record_keeping", "negotiation",
+      "community_outreach", "budgeting", "public_administration",
+      "crisis_management"
+    ],
+    "Entertainment": [
+      "public_speaking", "improvisation", "stage_presence",
+      "choreography", "scriptwriting", "audio_editing", "video_editing",
+      "showmanship", "networking", "creative_direction"
+    ],
+    "Security": [
+      "situational_awareness", "conflict_de_escalation", "surveillance",
+      "self_defense", "report_writing", "emergency_response",
+      "access_control", "crowd_control", "first_aid", "threat_assessment"
+    ],
+    "Professional": [
+      "public_speaking", "negotiation", "project_management",
+      "strategic_planning", "client_relations", "report_writing",
+      "leadership", "time_management", "networking", "problem_solving"
+    ],
+    "Adult Entertainment": [
+      "showmanship", "discretion", "stage_presence", "customer_service",
+      "self_confidence", "improvisation", "negotiation",
+      "stress_management", "networking", "boundary_setting"
+    ],
+    "Criminal": [
+      "lockpicking", "intimidation", "situational_awareness", "evasion",
+      "negotiation", "discretion", "improvisation", "risk_assessment",
+      "street_smarts", "self_defense"
+    ]
+  },
   "sexual_orientations": [
     "straight",
     "gay",
@@ -63621,6 +64627,19 @@
       ],
       "base_priority": 50,
       "category": "identity"
+    },
+    "file_taxes": {
+      "label": "File your taxes",
+      "cadence": "yearly",
+      "value_category": "work",
+      "of_self": true,
+      "requires_others": false,
+      "tags": [
+        "employed"
+      ],
+      "base_priority": 55,
+      "category": "chores",
+      "activity_type": "file_taxes"
     },
     "relax_with_someone": {
       "label": "Unwind with your spouse or a friend",

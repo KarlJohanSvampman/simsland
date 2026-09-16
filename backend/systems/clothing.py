@@ -264,6 +264,67 @@ def take_off_clothing(c, world, slot):
     return item
 
 
+# =========================================================
+# WORK UNIFORM
+# Per the user's explicit ask: a job_template can optionally define
+# "work_uniform" -- a {slot: item_template_id} map -- and a character
+# holding that job wears it for the trip to/from work, restored back to
+# whatever they had on before once they're home. A no-op for the vast
+# majority of jobs, which define no work_uniform at all.
+# =========================================================
+
+def equip_work_uniform(c, world, job_template):
+    uniform = (job_template or {}).get("work_uniform")
+    if not uniform:
+        return
+
+    ensure_worn(c)
+    from systems.personal_items import make_item, get_inventory, add_item
+
+    displaced = {}
+    for slot, template_id in uniform.items():
+        current = c["worn"].get(slot)
+        displaced[slot] = current["id"] if current else None
+
+        # Find this character's own uniform piece if they've worn it
+        # before (checks both loose inventory AND whatever's already
+        # worn elsewhere -- a re-equip shouldn't silently mint a
+        # duplicate garment just because the old one happens to be worn
+        # in a slot get_inventory() alone wouldn't see); issue a real new
+        # one, once, the first time they ever need it otherwise.
+        item = next((i for i in get_inventory(c) if i.get("template_id") == template_id), None)
+        if not item:
+            worn_match = next((w for w in c["worn"].values() if w and w.get("template_id") == template_id), None)
+            item = worn_match
+        if not item:
+            item = make_item(template_id, world=world)
+            add_item(c, item)
+        elif item.get("id") not in {i.get("id") for i in get_inventory(c)}:
+            # It's currently worn in some OTHER slot (unusual, but
+            # possible for an accessory-type template) -- nothing to do,
+            # put_on_clothing below only needs it findable in inventory,
+            # and a worn item isn't there; issue a fresh one instead of
+            # fighting to relocate it.
+            item = make_item(template_id, world=world)
+            add_item(c, item)
+
+        put_on_clothing(c, world, item["id"])
+
+    c["_pre_work_outfit"] = displaced
+
+
+def restore_pre_work_outfit(c, world):
+    displaced = c.pop("_pre_work_outfit", None)
+    if not displaced:
+        return
+    ensure_worn(c)
+    for slot, item_id in displaced.items():
+        if item_id:
+            put_on_clothing(c, world, item_id)
+        else:
+            take_off_clothing(c, world, slot)
+
+
 def undress_all(c, world):
     """Strip all worn clothing back into inventory."""
     ensure_worn(c)

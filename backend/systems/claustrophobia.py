@@ -33,21 +33,6 @@ STRESS_PER_CHECK       = 4.0
 WINDOW_ESCAPE_PANIC_THRESHOLD = 40.0
 MAX_PANIC              = 100.0
 
-_PANIC_LINES = [
-    (20,  "I need to get out of here."),
-    (45,  "I really need to get out of here -- this is starting to freak me out."),
-    (70,  "I can't stay in here, I need out, NOW."),
-    (100, "I CAN'T BREATHE, I NEED TO GET OUT OF HERE!"),
-]
-
-
-def _panic_line(panic):
-    for threshold, line in _PANIC_LINES:
-        if panic <= threshold:
-            return line
-    return _PANIC_LINES[-1][1]
-
-
 def _ensure_state(c):
     return c.setdefault("claustrophobia", {
         "stuck_ticks": 0,
@@ -130,6 +115,17 @@ def tick_claustrophobia(world):
         if not c.get("alive", True) or c.get("off_grid"):
             continue
 
+        # Confirmed live bug (real player report): a character mid-way
+        # through resuming sleep after a bathroom interruption (see
+        # activities.py's use_toilet completion hook) carries activity
+        # type "sleep" even during its own "walking" sub-phase (walking
+        # back to bed) -- getting "stuck" walking there still ran the
+        # full panic/speech escalation below, so a sleeping (or
+        # nominally-sleeping) character ended up talking out loud, which
+        # shouldn't happen regardless of which sub-phase they're in.
+        if (c.get("activity") or {}).get("type") == "sleep":
+            continue
+
         state = _ensure_state(c)
         if tick - state["last_check_tick"] < STUCK_CHECK_INTERVAL:
             continue
@@ -156,11 +152,18 @@ def tick_claustrophobia(world):
         state["panic"] = min(MAX_PANIC, state["panic"] + PANIC_PER_CHECK)
         c["stress"] = min(100.0, c.get("stress", 0.0) + STRESS_PER_CHECK)
 
-        try:
-            from systems.incidental_speech import fire_incidental
-            fire_incidental(c, "distressed", _panic_line(state["panic"]), world)
-        except Exception:
-            pass
+        # Per the user's explicit ask ("remove any hardcoded speech"):
+        # this used to speak a fixed canned line directly via
+        # fire_incidental(), completely bypassing the LLM -- a character
+        # stuck for a while literally repeated the exact same sentence
+        # verbatim every ~30 seconds. brain/context_builder.py::
+        # _sec_claustrophobia() now narrates the real, escalating
+        # situation (how panicked they actually are) into their own next
+        # decision instead -- waking them for a real think() call lets
+        # them express it authentically, in their own words, through the
+        # same real speech pipeline everything else already goes through.
+        from brain.cognition_scheduler import wake_character
+        wake_character(c, world, "claustrophobia_panic")
 
         if state["panic"] >= WINDOW_ESCAPE_PANIC_THRESHOLD and not state["escaped_via_window"]:
             window = _find_window_in_building(world, c.get("building_id"))

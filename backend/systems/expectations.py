@@ -125,6 +125,38 @@ def assign_expectations(c, defs, world=None):
         }
 
 
+def synthesize_expectation(c, expectation_id, cadence, category, of_self,
+                            requires_others=False, blame_ids=None, grievance_event_type=None):
+    """Directly construct a real, non-registry-backed expectation entry
+    -- see systems/jobs.py's contract-responsibility synthesis (and
+    later, systems/insurance.py's equivalent). Bypasses assign_
+    expectations()'s registry-only path but produces the EXACT same
+    shape that path would, so update_expectations()/satisfy_expectation()
+    work on it identically to any registry-driven expectation -- the
+    only two additions are last_missed_blame (pre-populated, since a
+    contract already knows who's responsible for a promise made TO this
+    character -- no dynamic discovery needed) and grievance_event_type
+    (read by _attribute_blame()'s registry-optional fallback above)."""
+    entry = {
+        "template_id":           expectation_id,
+        "cadence":               cadence,
+        "category":              category,
+        "of_self":               of_self,
+        "requires_others":       requires_others,
+        "current_period_key":    None,
+        "satisfied_this_period": False,
+        "last_satisfied_tick":   None,
+        "streak":                0,
+        "missed_count":          0,
+        "frustration":           0.0,
+        "status":                "pending",
+        "last_missed_blame":     list(blame_ids or []),
+        "grievance_event_type":  grievance_event_type,
+    }
+    c.setdefault("expectations", {})[expectation_id] = entry
+    return entry
+
+
 # =========================================================
 # CALENDAR PERIOD KEYS
 # =========================================================
@@ -148,6 +180,18 @@ def _current_period_key(cadence, calendar):
 # =========================================================
 # UPDATE (called on a slow cadence -- see sim_loop.py/agent_loop.py)
 # =========================================================
+
+def _has_scheduled_work_today(c, world):
+    """Per the user's explicit ask: "go_to_work" should never come up
+    missed on a day the character wasn't even scheduled to work in the
+    first place (a day off in a shift rotation, a weekend for a Mon-Fri
+    job, ...). systems/scheduling.py's own week keys are lowercase full
+    weekday names (WEEKDAYS); world["calendar"]["weekday"] is produced by
+    strftime("%A") (capitalized) -- lowered here to match."""
+    weekday = (world.get("calendar", {}).get("weekday") or "").lower()
+    day_blocks = (c.get("schedule") or {}).get("week", {}).get(weekday, [])
+    return any(b.get("activity") == "work" for b in day_blocks)
+
 
 def update_expectations(c, world):
     defs = world.get("definitions", {})
@@ -176,6 +220,19 @@ def update_expectations(c, world):
         nd["satisfied_this_period"] = False
         if nd["status"] != "missed":
             nd["status"] = "pending"
+
+        # Confirmed live bug (player report: "go_to_work" flagged missed
+        # in the middle of the night with no work scheduled that day at
+        # all): the miss check above only ever looked at whether the
+        # PERIOD rolled over, never at whether the character actually had
+        # a real work block scheduled during it. Pre-satisfying the
+        # instant a work-free day's period starts means the NEXT
+        # rollover has nothing to miss -- this doesn't touch how a real
+        # missed work day (one that DID have a scheduled block) gets
+        # detected, which still runs through the normal path above.
+        if nd["template_id"] == "go_to_work" and not _has_scheduled_work_today(c, world):
+            nd["satisfied_this_period"] = True
+            nd["status"] = "satisfied"
 
     # Surface every still-outstanding expectation as a real intention --
     # brain/intentions.py::add_intention() already replaces same-type
@@ -223,7 +280,7 @@ def _refresh_intention(c, nd, world):
     })
 
 
-def _diagnose_miss_reason(c, world):
+def _diagnose_miss_reason(c, world, nd=None):
     """A real, specific cause for why an expectation was just missed,
     read off the character's actual state at the moment the miss is
     detected -- the generic "it's still bothering you" reason string gave
@@ -231,7 +288,20 @@ def _diagnose_miss_reason(c, world):
     period-rollover check that calls this runs on the same cadence the
     expectation's own period recurs on, so "at the moment" here really
     does mean close to when the miss actually happened, not some
-    arbitrarily later check)."""
+    arbitrarily later check).
+
+    go_to_work specifically gets an even more precise snapshot -- real
+    player report: this generic fallback was showing up for MOST go_to_
+    work misses, since the period-rollover check (once per real day)
+    often runs long after whatever actually blocked them at their real
+    scheduled shift start already ended. brain/agent_loop.py stamps
+    c["_last_work_miss_reason"] at the EXACT tick their shift was due to
+    start, which is a far more accurate "why" than whatever they happen
+    to be doing at the once-a-day rollover check."""
+    if nd and nd.get("template_id") == "go_to_work":
+        snapshot = c.get("_last_work_miss_reason")
+        if snapshot:
+            return snapshot
     if c.get("off_grid"):
         where = (c.get("off_grid_reason") or "away somewhere").replace("_", " ")
         return f"you were {where}"
@@ -251,7 +321,7 @@ def _diagnose_miss_reason(c, world):
 def _apply_miss_feedback(c, nd, world):
     c["stress"] = min(100.0, c.get("stress", 0.0) + MISS_STRESS_DELTA)
     nd["frustration"] = min(1.0, nd.get("frustration", 0.0) + FRUSTRATION_DELTA)
-    nd["last_miss_reason"] = _diagnose_miss_reason(c, world)
+    nd["last_miss_reason"] = _diagnose_miss_reason(c, world, nd)
     _attribute_blame(c, nd, world)
 
 
@@ -270,7 +340,13 @@ def _attribute_blame(c, nd, world):
 
     defs = world.get("definitions", {})
     template = defs.get("expectation_templates", {}).get(nd["template_id"], {})
-    event_type = template.get("grievance_event_type")
+    # A synthesized, non-registry expectation (see systems/jobs.py's
+    # contract-responsibility synthesis) has no registry template to
+    # look up -- falls back to a grievance_event_type stamped directly
+    # on the expectation entry itself at creation time. Every existing
+    # registry-driven expectation is unaffected (the template lookup
+    # still wins whenever a real template exists and sets the field).
+    event_type = template.get("grievance_event_type") or nd.get("grievance_event_type")
     if not event_type:
         return
 

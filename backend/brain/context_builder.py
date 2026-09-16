@@ -350,6 +350,17 @@ def build_active_conversations(c, world):
                 }
                 for m in conv.get("history", [])[-5:]
             ],
+            # systems/action_router.py::_prime_call_topic_pool() -- when
+            # called while at work, this character's own recent hourly
+            # work-shift beats (systems/offgrid.py::_resolve_work_shift())
+            # become the natural default topic, unless my_goal already
+            # points elsewhere (a real favor/impress/share_story agenda,
+            # or a family/outside-interest topic the caller steered to).
+            "topic_pool":         conv.get("topic_pool"),
+            # A small-talk-staged purposeful call -- how many real turns
+            # of chit-chat are expected before getting to the point.
+            "small_talk_turns_required": conv.get("small_talk_turns_required"),
+            "turn_count":         conv.get("turn_count", 0),
         })
 
     return result
@@ -1436,6 +1447,29 @@ def _sec_witnessed(c, world):
     return _build_witnessed_offense_line(c, world)
 
 
+def _sec_claustrophobia(c, world):
+    # Per the user's explicit ask: this used to just speak a fixed,
+    # hardcoded line ("I really need to get out of here...") directly,
+    # bypassing the LLM entirely -- which meant a character genuinely
+    # stuck for a while just repeated the exact same sentence forever,
+    # verbatim, every ~30 seconds (real player report). Narrating the
+    # real situation here instead lets the character's own next decision
+    # actually express it -- in their own words, varying with how
+    # panicked they really are -- through the same real speech pipeline
+    # everything else goes through now.
+    state = c.get("claustrophobia") or {}
+    panic = state.get("panic", 0.0)
+    if panic <= 0:
+        return None
+    if panic >= 90:
+        return "You can't breathe. You are trapped and you need out RIGHT NOW."
+    if panic >= 60:
+        return "You can't stay here. You need to get out, now -- the walls feel like they're closing in."
+    if panic >= 30:
+        return "You've been stuck, unable to get where you're trying to go, for a while now -- it's really starting to unsettle you."
+    return "You've been stuck in place for a bit and it's making you a little uneasy."
+
+
 def _sec_attention(c, world):
     # attention/focus — restores build_attention_summary, previously
     # unused (dead code, same gap as relationships/memories above)
@@ -1961,6 +1995,7 @@ NARRATIVE_SECTIONS = [
     ("aggressor",             "full", _sec_aggressor),
     ("witnessed",             "full", _sec_witnessed),
     ("attention",             "full", _sec_attention),
+    ("claustrophobia",        "core", _sec_claustrophobia),
     ("identity",              "core", _sec_identity),
     ("body",                  "core", _sec_body),
     ("health",                "core", _sec_health),

@@ -37,9 +37,42 @@ def interrupt_activity(c, world):
     (confirmed live: a queued character never got their turn because
     the anchor they were waiting on was never actually freed). Use this
     instead of a bare `c["activity"] = None` anywhere an activity is
-    being interrupted rather than completing normally."""
+    being interrupted rather than completing normally.
+
+    Second confirmed live bug, same root cause: this never reset
+    c["posture"] either -- a character interrupted mid-sleep (posture
+    "lying") and sent off on a trip (travel.py:93-94 calls this right
+    before departure) kept showing "lying" the whole time they were
+    walking to/waiting for the bus, since travel's own frozen
+    travel_state states skip update_internal_state's normal posture
+    processing entirely (see interrupt_travel_for_incapacitation's own
+    docstring). Reset here, once, at the moment of interruption --
+    exactly mirrors activities.py's use_toilet-completion posture fix."""
+    # Confirmed live bug (player report: a character gave up mid-"drink
+    # water", still 0% hydrated, with zero trace of it -- no debug
+    # bubble, no memory, the intention never marked as anything other
+    # than pending): this shared interrupt path -- used by well over a
+    # dozen call sites (a conversation starting, curiosity, travel
+    # departing, work priority, ...) -- never logged the interruption at
+    # all. debug_log.py's activity_started/completed events already
+    # exist for the other two lifecycle points; this is the missing
+    # third one.
+    act = c.get("activity") or {}
+    act_type = act.get("type")
+    if act_type:
+        from systems.debug_log import log_activity
+        log_activity(c, world, act_type, "interrupted")
+        from core.event_bus import emit
+        emit("activity_interrupted", {
+            "character_id": c["id"], "activity_type": act_type,
+            "target_id": act.get("target_id"), "anchor_name": act.get("anchor_name"),
+            "x": c.get("x"), "y": c.get("y"), "building_id": c.get("building_id"),
+        })
+
     release_anchor(c, world)
     c["activity"] = None
+    from systems.posture import set_posture
+    set_posture(c, world, "standing")
 
 
 def release_anchor(c, world):

@@ -116,6 +116,23 @@ let previewMixer = null;
 let previewBones = [];
 let previewMesh = null;   // for tile / material previews
 
+// ── Top-down surface/anchor authoring (prop_templates only) ────────────────
+// Per the user's explicit ask: a real top-down view for placing tagged
+// square surfaces + positioning anchors on a prop model, instead of
+// hand-typing coordinates into the raw JSON textarea. A SEPARATE camera
+// (not a re-purposed previewCamera) so the existing perspective/
+// OrbitControls preview stays completely untouched -- animate() just
+// picks which camera to render/update each frame.
+const topDownCamera = new THREE.OrthographicCamera(-2, 2, 2, -2, 0.1, 100);
+topDownCamera.up.set(0, 0, -1);   // screen-up = -z ("north"), matching the
+                                    // wall_side convention established this round
+let topDownActive = false;
+let placementMode = null;          // 'surface' | 'anchor' | null
+let selectedSurfaceIndex = null;
+let selectedAnchorIndex = null;
+const _topDownRaycaster = new THREE.Raycaster();
+let _surfaceMarkers = [];          // Three objects, cleared/rebuilt each render pass
+
 // ── Interaction preview state ─────────────────────────────────────────────────
 let _ixActive = false;
 let _ixCharKey = null;
@@ -207,6 +224,30 @@ function framePreviewCamera(model) {
 
   previewControls.target.copy(center);
   previewControls.update();
+}
+
+// Sizes/positions the orthographic top-down camera to fit the currently
+// loaded model, looking straight down its Y axis. previewModel is loaded
+// at its native GLTF-export local transform (confirmed: loadPreviewModel()
+// applies no position offset), so a raycast hit's x/z IS already the
+// model-local coordinate space that systems/props.py's new "surfaces"
+// field expects -- no extra conversion needed anywhere in this tool.
+function frameTopDownCamera(model) {
+  if (!model) return;
+  const box    = new THREE.Box3().setFromObject(model);
+  const size   = box.getSize(new THREE.Vector3());
+  const center = box.getCenter(new THREE.Vector3());
+  const half   = Math.max(size.x, size.z, 0.5) / 2 + 0.3;   // small margin
+
+  topDownCamera.left   = -half;
+  topDownCamera.right  =  half;
+  topDownCamera.top    =  half;
+  topDownCamera.bottom = -half;
+  topDownCamera.near   = 0.1;
+  topDownCamera.far    = Math.max(size.y, 1) + 10;
+  topDownCamera.position.set(center.x, center.y + Math.max(size.y, 1) + 5, center.z);
+  topDownCamera.lookAt(center.x, center.y, center.z);
+  topDownCamera.updateProjectionMatrix();
 }
 
 // =====================================================
@@ -388,6 +429,281 @@ function renderTraitRandomizerEditor() {
 }
 
 // =====================================================
+// SURFACE / ANCHOR TOP-DOWN AUTHORING (prop_templates only)
+// =====================================================
+// Real square surface regions (systems/props.py's new "surfaces" field:
+// {"id","tags","center":{"x","z"},"size"}) + real anchor dx/dy
+// positioning, both placed by clicking a top-down orthographic view of
+// the loaded model instead of hand-typing coordinates. Same "mutate the
+// parsed template, write back to jsonEditor.value" pattern already used
+// by renderBoneSlotEditor()/renderTraitRandomizerEditor() above -- no
+// new save path, the existing Save button persists it same as any other
+// template edit.
+
+function _currentPropTemplate() {
+  try {
+    return JSON.parse(jsonEditor.value);
+  } catch {
+    return null;
+  }
+}
+
+function _writeBackTemplate(template) {
+  jsonEditor.value = JSON.stringify(template, null, 2);
+}
+
+function clearSurfaceMarkers() {
+  _surfaceMarkers.forEach(m => { if (m.parent) m.parent.remove(m); });
+  _surfaceMarkers = [];
+}
+
+// Draws a small flat square outline for each surface (green = selected,
+// grey otherwise) and a small sphere for each positioned anchor (red),
+// directly in the shared previewScene -- visible in both camera modes,
+// though placement clicks only register while topDownActive.
+// Confirmed live bug (real player report): markers were drawn at a fixed
+// near-ground Y (0.02/0.05), so on any model taller than that -- e.g. a
+// real dining table's top surface sitting well above the floor -- the
+// marker rendered INSIDE/BELOW the solid mesh instead of as a visible
+// overlay on top of it. Markers now sit just above the model's own real
+// top surface (its bounding-box max Y), so they're always visible
+// regardless of the model's actual height; falls back to a small
+// near-ground offset when no model is loaded (e.g. previewing a
+// template with no GLB assigned yet).
+function _markerBaseY() {
+  if (!previewModel) return 0.02;
+  const box = new THREE.Box3().setFromObject(previewModel);
+  if (!isFinite(box.max.y)) return 0.02;
+  return box.max.y + 0.02;
+}
+
+function renderSurfaceMarkers(template) {
+  clearSurfaceMarkers();
+  if (!template) return;
+
+  const baseY = _markerBaseY();
+
+  (template.surfaces || []).forEach((surface, i) => {
+    const size = Math.max(0.05, Number(surface.size) || 1);
+    const cx = surface.center?.x || 0;
+    const cz = surface.center?.z || 0;
+    const geo = new THREE.PlaneGeometry(size, size);
+    const mat = new THREE.MeshBasicMaterial({
+      color: i === selectedSurfaceIndex ? 0x5fd35f : 0x6cf0f0,
+      transparent: true, opacity: 0.35, side: THREE.DoubleSide,
+    });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.rotation.x = -Math.PI / 2;
+    mesh.position.set(cx, baseY, cz);
+    previewScene.add(mesh);
+    _surfaceMarkers.push(mesh);
+
+    const edges = new THREE.LineSegments(
+      new THREE.EdgesGeometry(geo),
+      new THREE.LineBasicMaterial({ color: i === selectedSurfaceIndex ? 0x8fff8f : 0x9fe8e8 })
+    );
+    edges.rotation.x = -Math.PI / 2;
+    edges.position.copy(mesh.position);
+    previewScene.add(edges);
+    _surfaceMarkers.push(edges);
+  });
+
+  (template.anchors || []).forEach((anchor, i) => {
+    if (anchor.dx == null && anchor.dy == null) return;
+    const sphere = new THREE.Mesh(
+      new THREE.SphereGeometry(0.06),
+      new THREE.MeshBasicMaterial({ color: i === selectedAnchorIndex ? 0xffaa33 : 0xff4444 })
+    );
+    sphere.position.set(anchor.dx || 0, baseY + 0.03, anchor.dy || 0);
+    previewScene.add(sphere);
+    _surfaceMarkers.push(sphere);
+  });
+}
+
+function renderSurfaceEditor() {
+  const panel = document.getElementById('surfaceEditorPanel');
+  if (!panel) return;
+
+  if (currentTab !== 'prop_templates' || !currentTemplateId) {
+    panel.style.display = 'none';
+    topDownActive = false;
+    clearSurfaceMarkers();
+    const toggleBtn = document.getElementById('topDownToggleBtn');
+    if (toggleBtn) {
+      toggleBtn.classList.remove('active');
+      toggleBtn.textContent = 'Top-Down View: Off';
+    }
+    const body = document.getElementById('surfaceEditorBody');
+    if (body) body.style.display = 'none';
+    return;
+  }
+  panel.style.display = '';
+
+  const template = _currentPropTemplate();
+  if (!template) return;
+
+  const listEl = document.getElementById('surfaceListEditor');
+  listEl.innerHTML = '';
+
+  (template.surfaces || []).forEach((surface, i) => {
+    const row = document.createElement('div');
+    row.className = 'surfaceRow' + (i === selectedSurfaceIndex ? ' selected' : '');
+
+    const header = document.createElement('div');
+    header.className = 'surfaceRowHeader';
+    const idLabel = document.createElement('span');
+    idLabel.textContent = surface.id || `surface_${i}`;
+    header.appendChild(idLabel);
+    const removeBtn = document.createElement('button');
+    removeBtn.textContent = 'Remove';
+    removeBtn.onclick = (e) => {
+      e.stopPropagation();
+      template.surfaces.splice(i, 1);
+      _writeBackTemplate(template);
+      selectedSurfaceIndex = null;
+      renderSurfaceEditor();
+    };
+    header.appendChild(removeBtn);
+    row.appendChild(header);
+
+    const sizeInput = document.createElement('input');
+    sizeInput.type = 'number';
+    sizeInput.step = '0.1';
+    sizeInput.min = '0.1';
+    sizeInput.value = surface.size ?? 1;
+    sizeInput.title = 'Size (meters, always square)';
+    sizeInput.onchange = () => {
+      surface.size = parseFloat(sizeInput.value) || 1;
+      _writeBackTemplate(template);
+      renderSurfaceMarkers(template);
+    };
+    row.appendChild(sizeInput);
+
+    const tagsInput = document.createElement('input');
+    tagsInput.type = 'text';
+    tagsInput.value = (surface.tags || []).join(', ');
+    tagsInput.placeholder = 'tags, comma separated';
+    tagsInput.onchange = () => {
+      surface.tags = tagsInput.value.split(',').map(t => t.trim()).filter(Boolean);
+      _writeBackTemplate(template);
+    };
+    row.appendChild(tagsInput);
+
+    row.onclick = () => {
+      selectedSurfaceIndex = i;
+      placementMode = 'surface';
+      renderSurfaceEditor();
+    };
+
+    listEl.appendChild(row);
+  });
+
+  // Anchor position editor -- pick which real anchor (already declared
+  // on the template, name+interaction) to click-position next.
+  const anchorEl = document.getElementById('anchorPositionEditor');
+  anchorEl.innerHTML = '';
+  if ((template.anchors || []).length) {
+    const label = document.createElement('div');
+    label.textContent = 'Position anchor:';
+    label.style.marginBottom = '4px';
+    anchorEl.appendChild(label);
+
+    const row = document.createElement('div');
+    row.className = 'anchorPosRow';
+    const select = document.createElement('select');
+    const noneOpt = document.createElement('option');
+    noneOpt.value = '';
+    noneOpt.textContent = '-- none --';
+    select.appendChild(noneOpt);
+    template.anchors.forEach((a, i) => {
+      const opt = document.createElement('option');
+      opt.value = i;
+      opt.textContent = `${a.name} (${a.interaction})`;
+      if (i === selectedAnchorIndex) opt.selected = true;
+      select.appendChild(opt);
+    });
+    select.onchange = () => {
+      selectedAnchorIndex = select.value === '' ? null : parseInt(select.value);
+      placementMode = selectedAnchorIndex == null ? null : 'anchor';
+    };
+    row.appendChild(select);
+    anchorEl.appendChild(row);
+
+    const hint = document.createElement('div');
+    hint.style.opacity = '.6';
+    hint.style.fontSize = '10px';
+    hint.textContent = 'Click the model in Top-Down View to position it (snaps to whole tiles -- the backend anchor system is tile-integer, not continuous).';
+    anchorEl.appendChild(hint);
+  }
+
+  renderSurfaceMarkers(template);
+}
+
+document.getElementById('addSurfaceBtn').onclick = () => {
+  const template = _currentPropTemplate();
+  if (!template) return;
+  template.surfaces ||= [];
+  const id = `surface_${template.surfaces.length + 1}`;
+  template.surfaces.push({ id, tags: [], center: { x: 0, z: 0 }, size: 1 });
+  _writeBackTemplate(template);
+  selectedSurfaceIndex = template.surfaces.length - 1;
+  placementMode = 'surface';
+  renderSurfaceEditor();
+};
+
+document.getElementById('topDownToggleBtn').onclick = () => {
+  topDownActive = !topDownActive;
+  const btn = document.getElementById('topDownToggleBtn');
+  btn.classList.toggle('active', topDownActive);
+  btn.textContent = `Top-Down View: ${topDownActive ? 'On' : 'Off'}`;
+  document.getElementById('surfaceEditorBody').style.display = topDownActive ? '' : 'none';
+  if (topDownActive) {
+    frameTopDownCamera(previewModel);
+    const template = _currentPropTemplate();
+    if (template) renderSurfaceMarkers(template);
+  }
+};
+
+// Click-to-place: raycasts against the loaded model using whichever
+// camera is currently active. Only acts while topDownActive and a
+// placement mode is armed (a surface selected, or an anchor picked from
+// the dropdown) -- an ordinary click elsewhere in the app is unaffected.
+previewRenderer.domElement.addEventListener('pointerdown', (e) => {
+  if (!topDownActive || !placementMode || !previewModel) return;
+  const rect = previewRenderer.domElement.getBoundingClientRect();
+  const ndc = new THREE.Vector2(
+    ((e.clientX - rect.left) / rect.width) * 2 - 1,
+    -((e.clientY - rect.top) / rect.height) * 2 + 1
+  );
+  _topDownRaycaster.setFromCamera(ndc, topDownCamera);
+  const hits = _topDownRaycaster.intersectObject(previewModel, true);
+  if (!hits.length) return;
+
+  const template = _currentPropTemplate();
+  if (!template) return;
+
+  if (placementMode === 'surface' && selectedSurfaceIndex != null && template.surfaces?.[selectedSurfaceIndex]) {
+    template.surfaces[selectedSurfaceIndex].center = {
+      x: Math.round(hits[0].point.x * 100) / 100,
+      z: Math.round(hits[0].point.z * 100) / 100,
+    };
+    _writeBackTemplate(template);
+    renderSurfaceMarkers(template);
+    setStatus(`Surface "${template.surfaces[selectedSurfaceIndex].id}" positioned.`);
+  } else if (placementMode === 'anchor' && selectedAnchorIndex != null && template.anchors?.[selectedAnchorIndex]) {
+    // Anchors resolve through systems/transforms.py::rotate_local_tile(),
+    // which always truncates to whole-tile integers regardless of
+    // rotation -- snapping here avoids implying precision the backend
+    // doesn't actually honor.
+    template.anchors[selectedAnchorIndex].dx = Math.round(hits[0].point.x);
+    template.anchors[selectedAnchorIndex].dy = Math.round(hits[0].point.z);
+    _writeBackTemplate(template);
+    renderSurfaceMarkers(template);
+    setStatus(`Anchor "${template.anchors[selectedAnchorIndex].name}" positioned.`);
+  }
+});
+
+// =====================================================
 // LOAD MESHBANK
 // =====================================================
 
@@ -513,6 +829,10 @@ function openTemplate(id) {
 
   renderBoneSlotEditor();
   renderTraitRandomizerEditor();
+  selectedSurfaceIndex = null;
+  selectedAnchorIndex = null;
+  placementMode = null;
+  renderSurfaceEditor();
 
   // Choose preview type based on tab
   _ixActive = false;  // deactivate interaction preview whenever we switch away
@@ -1275,10 +1595,10 @@ const previewClock = new THREE.Clock();
 function animate() {
   requestAnimationFrame(animate);
   const delta = previewClock.getDelta();
-  previewControls.update();
+  if (!topDownActive) previewControls.update();
   if (previewMixer)       previewMixer.update(delta);
   if (_ixTargetMixer)     _ixTargetMixer.update(delta);
-  previewRenderer.render(previewScene, previewCamera);
+  previewRenderer.render(previewScene, topDownActive ? topDownCamera : previewCamera);
 }
 
 animate();

@@ -102,6 +102,101 @@ def _find_colleagues(c, world, limit=3):
     return [oc.get("name", "a coworker") for oc in pool[:limit]]
 
 
+def _resolve_work_shift(c, world, duration_minutes):
+    """Real, hourly-granular work-shift narration -- replaces the
+    single flat 1-3-sentence summary for "work" trips specifically
+    (every other off-grid category is untouched). One LLM call for the
+    whole shift (see llm/work_shift_narration.py), each hour stored as
+    its own memory so systems/stories.py can independently evaluate a
+    single notable hour instead of it being diluted into one blob."""
+    from llm.work_shift_narration import generate_hourly_work_beats
+    from systems.workplace_npc import get_or_create_workplace_contact
+    from systems.workplace_reputation import adjust_reputation, adjust_dependency
+
+    hours = max(1, round(duration_minutes / 60))
+    job = c.get("job") or {}
+    job_title = job.get("title", "their job")
+
+    if not c.get("workplace_contact_ids"):
+        get_or_create_workplace_contact(c, world, "colleague")
+
+    roster = []
+    for oid in c.get("workplace_contact_ids", []):
+        other = world.get("characters", {}).get(oid)
+        if not other:
+            continue
+        rel = c.get("relationships", {}).get(oid, {})
+        roster.append({
+            "id": oid,
+            "name": other.get("name", "a coworker"),
+            "role": other.get("role", "colleague"),
+            "reputation": rel.get("workplace_reputation", 0.0),
+            "dependency": rel.get("workplace_dependency", 0.0),
+        })
+    name_to_id = {r["name"]: r["id"] for r in roster}
+
+    hour_rolls = [roll_normalcy(_WORK_NORMALCY_WEIGHTS) for _ in range(hours)]
+    beats = generate_hourly_work_beats(c, world, hours, job_title, roster, hour_rolls)
+
+    notable_count = 0
+    tick = world.get("tick", 0)
+    for i, beat in enumerate(beats):
+        mentions_ids = [name_to_id[n] for n in beat.get("mentions_names", []) if n in name_to_id]
+        notable = bool(beat.get("notable"))
+        if notable:
+            notable_count += 1
+
+        store_memory(
+            c, beat.get("text", f"Continued working as a {job_title}."),
+            importance=0.65 if notable else 0.25,
+            tags=["work_beat", f"hour:{i + 1}"],
+            kind="work_beat", tick=tick, people=mentions_ids,
+            detail=beat.get("detail"),
+        )
+
+        sentiment = beat.get("sentiment", "neutral")
+        for mid in mentions_ids:
+            if sentiment == "positive":
+                adjust_reputation(c, mid, 3.0)
+            elif sentiment == "negative":
+                adjust_reputation(c, mid, -4.0)
+            if notable:
+                adjust_dependency(c, mid, 2.0)
+
+        busy_minutes = beat.get("busy_minutes")
+        if busy_minutes:
+            c["_work_busy_until_tick"] = tick + int(busy_minutes) * 60
+
+        stuck = beat.get("stuck_in_mind")
+        if stuck and isinstance(stuck, dict) and stuck.get("thought"):
+            c["_stuck_in_mind"] = {
+                "thought": stuck.get("thought"), "reason": stuck.get("reason"), "tick": tick,
+            }
+            # Feeds the SAME shared top-10 "what's on my mind" table
+            # (systems/stories.py::notable_stories) real objectively-
+            # notable work beats above already use -- a random musing
+            # would never keyword-match into any real category on its
+            # own, so this forces real routing via store_memory()'s
+            # story_category/story_value passthrough (brain/memory.py).
+            store_memory(
+                c, f"{stuck['thought']} ({stuck.get('reason', 'not sure why')})",
+                importance=0.3, tags=["musing", "stuck_in_mind"],
+                kind="musing", tick=tick,
+                story_category="musing", story_value=0.6,
+            )
+
+    summary = f"Worked a {hours}-hour shift as a {job_title}"
+    summary += f" -- {notable_count} notable moment{'s' if notable_count != 1 else ''}." if notable_count else "."
+
+    return {
+        "id": f"story_{uuid.uuid4().hex[:6]}",
+        "summary": summary,
+        "emotion": "surprised" if notable_count else "calm",
+        "impact": {"stress": 2 * notable_count, "temp": 0},
+        "tags": ["work", "hourly_beats"],
+    }
+
+
 def _work_details(c, world, reason, normalcy):
     """Stage-1 detail generator for work. A situational hook is only
     included on notable/rare normalcy rolls -- a normal day gets none."""
@@ -485,7 +580,7 @@ def _seed_lie_for_private_event(c, world, event):
 # garage and drive yourself" would be narratively wrong.
 _TRAVEL_ELIGIBLE_REASONS = {
     "work", "shopping", "leisure", "gym", "cafe", "doctor", "pharmacy",
-    "interview", "driving_lesson", "driving_test",
+    "interview", "sign_contract", "driving_lesson", "driving_test",
     # "practice_driving" deliberately excluded -- the point of that trip is
     # the driving itself (a companion's car, off-screen), not travelling to
     # a destination, so it resolves via the plain immediate off-grid path.
@@ -563,6 +658,20 @@ def _send_offgrid_immediate(c, world, reason, duration_minutes):
     # #8) -- this is the single lowest-level function every off-grid
     # reason eventually funnels through, travel-based or immediate.
     c["_offgrid_departure_tick"] = world["tick"]
+
+    # Per the user's explicit ask: commit a real memory of leaving --
+    # where and for how long -- tagged with a trip id that process_return
+    # ()'s own arrival-summary memory reuses, so memory_consolidation.py
+    # can later recognize the two as one trip and merge them instead of
+    # keeping two separate half-stories about the same outing.
+    trip_id = f"trip_{uuid.uuid4().hex[:8]}"
+    c["_offgrid_trip_id"] = trip_id
+    reason_label = reason.replace("_", " ")
+    store_memory(
+        c, f"You left for {reason_label}, planning to be gone about {duration_minutes:.0f} minutes.",
+        importance=0.2, tags=["offgrid_departure", f"trip:{trip_id}"],
+        kind="offgrid_departure", tick=world["tick"], aggregate=True,
+    )
     world.setdefault("offmap", []).append({
         "character_id": c["id"], "reason": reason, "return_tick": c["return_tick"],
     })
@@ -655,11 +764,62 @@ def _leisure_fatigue_multiplier(c):
     return max(0.0, min(1.0, 1 - fatigue / 80)) * max(0.0, min(1.0, energy / 70))
 
 
+# Confirmed live bug: no time-of-day gate existed for these abstract
+# errand trips at all -- pure random-roll every tick, same odds at 4am
+# as at 2pm. These reasons never bind to a specific real business
+# instance (confirmed: no company_template ever gets looked up for a
+# "shopping"/"gym"/"cafe" trip, just flavor text describing where they
+# went), so these are sensible TYPICAL-hours windows rather than any one
+# store's real opening_hours -- "shopping"'s matches the one real
+# business-hours data point that does exist in this codebase
+# (company_templates.convenience_store: 6-23) for consistency.
+_ERRAND_HOURS = {
+    "shopping": (6, 23),
+    "gym":      (5, 23),
+    "cafe":     (6, 22),
+    "leisure":  (8, 24),   # daytime leisure only -- a "night out" (bars/
+                            # clubs, rolled separately below) bypasses
+                            # this, since those are legitimately open late.
+}
+
+
+def _errand_hours_ok(reason, world):
+    window = _ERRAND_HOURS.get(reason)
+    if not window:
+        return True
+    hour = world.get("calendar", {}).get("hour")
+    if hour is None:
+        return True
+    open_h, close_h = window
+    if close_h > 24:
+        return hour >= open_h or hour < (close_h - 24)
+    return open_h <= hour < close_h
+
+
 def maybe_go_offgrid(c, world):
+    # Confirmed live bug (real player report): this had no guard against
+    # a character currently asleep at all -- a routine leisure/shopping
+    # roll (or even the work-dispatch check right below) could pull
+    # someone out of a full, scheduled night's sleep to go "shopping" at
+    # 4am. Per the user's explicit ask, sleep is only ever legitimately
+    # interrupted by a real physical urgency (bladder/bowels -- see
+    # brain/agent_loop.py's sleep-specific urgent-need handling), being
+    # woken by someone, or noise -- never a routine, discretionary trip.
+    if (c.get("activity") or {}).get("type") == "sleep":
+        return
+
     if c.get("off_grid") or c.get("conversation"):
         return
 
     if c.get("employed") and _work_block_starting_now(c, world):
+        # Per the user's explicit ask: a job whose template defines an
+        # optional work_uniform (slot -> item template id) gets worn for
+        # the trip -- restored back to whatever they had on before, on
+        # return (see process_return()'s "work" branch below). A no-op
+        # for the vast majority of jobs, which define no work_uniform.
+        job_template = (world.get("definitions", {}) or {}).get("job_templates", {}).get(c.get("job_template_id"))
+        from systems.clothing import equip_work_uniform
+        equip_work_uniform(c, world, job_template)
         send_offgrid(c, world, "work", 8 * 60)
         return
 
@@ -692,19 +852,26 @@ def maybe_go_offgrid(c, world):
     from systems.mental_health_effects import home_leaving_multiplier
     leave_mult = home_leaving_multiplier(c) * fatigue_mult
     if r < 0.004 * leave_mult:
-        _send_errand(c, world, "shopping", 45)
+        if _errand_hours_ok("shopping", world):
+            _send_errand(c, world, "shopping", 45)
     elif r < 0.008 * leave_mult:
         choice = random.choice(["leisure", "gym", "cafe"])
-        if choice == "leisure" and random.random() < 0.25:
+        is_night_out = choice == "leisure" and random.random() < 0.25
+        if is_night_out:
             # This leisure trip is specifically a night out at a bar/club
             # -- see systems/id_check.py's module docstring for why the
             # age/ID check happens right here at dispatch time rather than
             # at a specific business (no real per-instance venue selection
             # exists for leisure trips). Denied -> no trip this attempt,
             # same real-world outcome as getting turned away at the door.
+            # Deliberately NOT subject to _errand_hours_ok's daytime
+            # leisure window below -- bars/clubs are legitimately open
+            # late, that's the point of a "night out".
             from systems.id_check import check_id_for_entry
             if not check_id_for_entry(c, world):
                 return
+        elif not _errand_hours_ok(choice, world):
+            return
         _send_errand(c, world, choice, random.randint(30, 60))
 
 
@@ -980,19 +1147,31 @@ def process_return(c, world):
                 ev["lie_id"] = _seed_lie_for_private_event(c, world, ev)
 
         cover_story = _find_trip_cover_lie(c, world["tick"])
-        if is_event:
+        if reason == "work":
+            # Real, hourly-granular narration instead of one flat
+            # 1-3-sentence summary for the whole shift -- see
+            # _resolve_work_shift(). Falls through to the generic path
+            # below for every other off-grid category, unchanged.
+            shift_minutes = max(60, (elapsed if departed is not None else 480 * 60) // 60)
+            story = _resolve_work_shift(c, world, shift_minutes)
+        elif is_event:
             details_fn, weights = _SOCIAL_EVENT_NARRATOR
             category = "social_event"
+            normalcy = roll_normalcy(weights)
+            details  = details_fn(c, world, reason, normalcy)
+            story = request_offgrid_summary(
+                c, world, category, details, normalcy,
+                enforced_cover_story=cover_story,
+            )
         else:
             details_fn, weights = _NARRATOR_CATEGORIES[reason]
             category = reason
-        normalcy = roll_normalcy(weights)
-        details  = details_fn(c, world, reason, normalcy)
-
-        story = request_offgrid_summary(
-            c, world, category, details, normalcy,
-            enforced_cover_story=cover_story,
-        )
+            normalcy = roll_normalcy(weights)
+            details  = details_fn(c, world, reason, normalcy)
+            story = request_offgrid_summary(
+                c, world, category, details, normalcy,
+                enforced_cover_story=cover_story,
+            )
         if story is None:
             # LLM unreachable/failed -- graceful fallback to the existing
             # procedural narrator. _story() doesn't recognize the dynamic
@@ -1036,11 +1215,25 @@ def process_return(c, world):
 
     c["stress"] = max(0, min(100, c.get("stress", 0) + story["impact"]["stress"]))
     if reason == "work" and c.get("employed"):
+        from systems.clothing import restore_pre_work_outfit
+        restore_pre_work_outfit(c, world)
+
         h      = world["households"].get(c["household_id"])
-        earned = c.get("hourly_wage", 15) * 8
+        # Real shift length, not a hardcoded 8h -- shift_minutes (set
+        # just above by the "work"-reason narration branch) already
+        # carries the actual duration; this fix also feeds the career-
+        # ladder hour tracking below the exact same real number.
+        shift_hours = shift_minutes / 60.0
+        earned = c.get("hourly_wage", 15) * shift_hours
         if h:
             h["wealth"] += earned
         story["summary"] += f" Earned ${earned:.0f}."
+
+        # Real, checkable "was I actually paid recently" signal -- see
+        # systems/contract_clauses.py's payment_overdue checker.
+        contract = c.get("employment_contract")
+        if contract:
+            contract["last_paid_tick"] = world.get("tick", 0)
 
         from systems.crime import resolve_criminal_shift
         crime_note = resolve_criminal_shift(c, world)
@@ -1054,6 +1247,25 @@ def process_return(c, world):
         # anywhere. A completed work trip is the obvious, cheapest fix.
         from systems.expectations import satisfy_expectation
         satisfy_expectation(c, "go_to_work", world)
+
+        # The contract's own synthesized "show up for shifts"
+        # responsibility (systems/jobs.py::_synthesize_contract_
+        # expectations()) -- a real, separate, contract-specific entry
+        # alongside the generic go_to_work one, additive not a replacement.
+        contract = c.get("employment_contract")
+        if contract:
+            satisfy_expectation(c, f"contract:{contract['id']}:show_up_for_shifts", world)
+
+        # Real hour accumulation toward whichever promotion path this
+        # character has chosen (systems/career_ladder.py) -- fires a
+        # real promotion once the threshold is reached. Re-picks a path
+        # whenever there isn't one (freshly hired, or just promoted) --
+        # this naturally happens on every worked shift, which is exactly
+        # as often as an employed character can make progress anyway.
+        from systems.career_ladder import advance_career_progress, choose_career_path
+        advance_career_progress(c, world, shift_hours)
+        if not c.get("career_progress"):
+            choose_career_path(c, world)
     elif reason in ("doctor", "hospital"):
         from core.definitions import load_definitions
         defs = load_definitions(world.get("sim_id", "default"))
@@ -1192,6 +1404,13 @@ def process_return(c, world):
         # advance_job_application()/_on_interview_return().
         from systems.jobs import _on_interview_return
         _on_interview_return(c, world)
+    elif reason == "sign_contract":
+        # The pipeline's real terminal stage -- showing up and signing is
+        # what actually finalizes employment (jobs.py::_hire()), not
+        # accepting the offer over the phone. See jobs.py::
+        # _on_sign_contract_return().
+        from systems.jobs import _on_sign_contract_return
+        _on_sign_contract_return(c, world)
     elif reason in ("driving_lesson", "driving_test", "practice_driving"):
         # Same pattern as the interview branch above -- the lesson
         # counter/test pass-fail roll happens on return, not dispatch.
@@ -1268,7 +1487,12 @@ def process_return(c, world):
 
     # Only the PUBLIC summary goes into shared memory and world events
     public_story = {k: v for k, v in story.items() if k != "private"}
-    store_memory(c, story["summary"], .75, ["offgrid"] + story["tags"],
+    # Reuses the SAME trip id stamped at departure (_send_offgrid_
+    # immediate) so memory_consolidation.py can recognize the departure
+    # note and this arrival summary as one trip and merge them.
+    trip_id = c.pop("_offgrid_trip_id", None)
+    trip_tags = [f"trip:{trip_id}"] if trip_id else []
+    store_memory(c, story["summary"], .75, ["offgrid"] + story["tags"] + trip_tags,
                  "offgrid_story", world["tick"], story=public_story)
     events = world.setdefault("events", [])
     events.append({

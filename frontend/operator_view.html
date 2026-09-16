@@ -67,6 +67,14 @@
     border-color: #6cf;
   }
 
+  /* Work tab is blurred/unselectable when the character has no job. */
+  #viewerTabs button.disabled {
+    opacity: 0.4;
+    filter: blur(1px);
+    pointer-events: none;
+    cursor: default;
+  }
+
   #viewerEffectIcons {
     display: flex;
     flex-wrap: wrap;
@@ -116,8 +124,15 @@
     border-top: 1px solid #444;
   }
 
-  #viewerRelationshipsTab, #viewerMindTab, #viewerMemoryTab, #viewerLifeTab {
+  #viewerRelationshipsTab, #viewerMindTab, #viewerMemoryTab, #viewerLifeTab, #viewerWorkTab, #viewerHabitsTab, #viewerSkillsTab {
     font-size: 12px;
+  }
+
+  #bodyTabAppearance {
+    font-size: 12px;
+    margin-bottom: 8px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #444;
   }
 
   .viewerSection {
@@ -772,6 +787,9 @@
     <button class="viewerTabBtn" data-tab="mind">Mind</button>
     <button class="viewerTabBtn" data-tab="memory">Memory</button>
     <button class="viewerTabBtn" data-tab="life">Life</button>
+    <button class="viewerTabBtn" data-tab="work" id="viewerWorkTabBtn">Work</button>
+    <button class="viewerTabBtn" data-tab="habits">Habits</button>
+    <button class="viewerTabBtn" data-tab="skills">Skills</button>
   </div>
 
   <div id="viewerEffectIcons"></div>
@@ -792,6 +810,7 @@
       <rect   id="bodypart-left_leg"  x="42" y="124" width="16" height="82" rx="4" stroke="#222" stroke-width="1"/>
       <rect   id="bodypart-right_leg" x="62" y="124" width="16" height="82" rx="4" stroke="#222" stroke-width="1"/>
     </svg>
+    <div id="bodyTabAppearance"></div>
     <div id="bodyTabSummary" class="bodySummary"></div>
     <div id="bodyTabRows"></div>
     <div id="bodyTabDiseases" class="diseaseList"></div>
@@ -801,6 +820,9 @@
   <div id="viewerMindTab" class="hidden"></div>
   <div id="viewerMemoryTab" class="hidden"></div>
   <div id="viewerLifeTab" class="hidden"></div>
+  <div id="viewerWorkTab" class="hidden"></div>
+  <div id="viewerHabitsTab" class="hidden"></div>
+  <div id="viewerSkillsTab" class="hidden"></div>
 
 </div>
 

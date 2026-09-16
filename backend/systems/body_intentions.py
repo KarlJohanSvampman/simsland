@@ -8,9 +8,34 @@ from brain.intentions import add_intention
 from systems.body import get_odor_label, get_breath_label
 
 
+# Every type this function can add. It's the sole, unconditional (every
+# tick, every character -- see brain/agent_loop.py::update_internal_state)
+# owner of all of them, but it only ever ADDS one when its threshold is
+# crossed -- nothing ever removed one once the underlying stat dropped
+# back down. Confirmed live bug: two characters sharing one bathroom got
+# stuck in an endless swap because a satisfied "use_toilet" intention
+# (bowels reset to ~1 by on_toilet_complete()) was never cleared from
+# active_intentions -- the very next tick picked the same stale entry
+# right back up (add_intention()'s same-type replace only refreshes an
+# intention while it keeps getting re-added; it does nothing for one that
+# simply stops being re-added). Wiping these types at the top of every
+# call and letting the checks below re-add only what's still actually
+# true keeps this list a live reflection of body state instead of a
+# historical log of every threshold ever crossed.
+_MANAGED_INTENTION_TYPES = {
+    "use_toilet", "sleep", "take_nap", "take_shower",
+    "brush_teeth", "drink", "eat_food",
+}
+
+
 def generate_body_intentions(c, world=None):
     b = c.get("body", {})
     tr = c.get("traits", [])
+
+    c["active_intentions"] = [
+        i for i in c.get("active_intentions", [])
+        if i.get("type") not in _MANAGED_INTENTION_TYPES
+    ]
 
     # Live bug report: characters were sleeping full multi-hour sessions
     # in the middle of the day just as readily as at night -- this

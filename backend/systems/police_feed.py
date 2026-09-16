@@ -183,19 +183,28 @@ def tick_police_feed(world, defs):
     if not new_items:
         return
 
+    from systems.media import trim_news
+
     # Feed lists newest first; walk the new batch oldest-first so the
     # news feed reads in chronological order, capped per fetch.
     for it in list(reversed(new_items))[-MAX_NEW_ITEMS_PER_FETCH:]:
         seen.append(it["guid"])
         event_type, _location = parse_title(it["title"])
-        if not event_type:
-            continue
-        category, stat_key, nudge = resolve_category(event_type)
-        if not category:
-            continue
+        category, stat_key, nudge = resolve_category(event_type) if event_type else (None, None, 0)
 
         local_place = random.choice(LOCAL_PLACE_NAMES)
-        headline = f"{category.replace('_', ' ').title()} reported in {local_place}"
+        if category:
+            headline = f"{category.replace('_', ' ').title()} reported in {local_place}"
+            tags = [category, "crime" if stat_key else "local"]
+        else:
+            # Per the user's explicit ask: don't skip anything the real
+            # feed reports, even an event type this game has no specific
+            # mapped category for (a routine checkpoint, an animal call,
+            # a missing-person report, or a title parse_title() couldn't
+            # cleanly parse at all) -- a real, honest generic fallback
+            # instead of silently dropping it.
+            headline = f"Police activity reported in {local_place}"
+            tags = ["local"]
 
         world.setdefault("news", []).append({
             "id":                f"news_{uuid.uuid4().hex[:6]}",
@@ -204,12 +213,12 @@ def tick_police_feed(world, defs):
             "summary":           it["description"] or headline,
             "sentiment":         "negative",
             "intensity":         0.5,
-            "tags":              [category, "crime" if stat_key else "local"],
+            "tags":              tags,
             "related_entities":  [],
             "source":            "police_feed",
             "tick":              world.get("tick", 0),
         })
-        world["news"] = world["news"][-50:]
+        trim_news(world)
 
         _nudge_stat(world, defs, stat_key, nudge)
 

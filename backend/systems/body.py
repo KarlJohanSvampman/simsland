@@ -103,6 +103,11 @@ ENERGY_PER_FULL_DAY_NUTRITION = 60  # a full day's nutrition (nutrition==1.0) re
 SLEEP_FATIGUE_RECOVERY_PER_TICK    = 90 / 28800
 SLEEP_ENERGY_RECOVERY_PER_TICK     = 100 / 28800
 SLEEP_DEBT_RECOVERY_PER_TICK_ASLEEP = 60 / 28800
+# Per the user's explicit ask: stress should genuinely wind down overnight
+# too, not just fatigue/energy -- a real full 8-hour sleep takes a real
+# but not total bite out of it (30 of 100), since stress is driven by a lot
+# more than just tiredness and sleep alone shouldn't zero it out.
+SLEEP_STRESS_RECOVERY_PER_TICK      = 30 / 28800
 
 
 def ensure_body(c):
@@ -177,6 +182,12 @@ def update_body_needs(c, dt=1.0, world=None):
     # see systems/nutrition.py::settle_nutrition_day) ────────────────────────
     bowel_mult = max(1, b.get("toilet_visits_needed_today", 1))
     b["bowels"] = min(100, b["bowels"] + 0.012 * bowel_mult * dt)
+
+    # ── STRESS  (winds down while genuinely asleep -- see the user's
+    # explicit ask; awake-state stress changes are driven by other
+    # systems throughout the codebase and are untouched here) ──────────────
+    if is_asleep:
+        c["stress"] = max(0, c.get("stress", 0) - SLEEP_STRESS_RECOVERY_PER_TICK * dt)
 
     # ── FATIGUE ──────────────────────────────────────────────────────────────
     if is_asleep:

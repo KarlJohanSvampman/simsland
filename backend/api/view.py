@@ -408,6 +408,13 @@ def get_view(
         # entities
         "characters": characters,
 
+        # Non-spatial company records (boss_id, career_ladder,
+        # contract_templates) -- small, bounded by real company count,
+        # not viewport-filtered like everything else above. The Work
+        # tab (main.js::renderWorkTab) reads boss_id/career_ladder off
+        # this for a hired character's employment_contract.company_id.
+        "companies": world.get("companies", {}),
+
         "props": props,
 
         "placed_items": placed_items,

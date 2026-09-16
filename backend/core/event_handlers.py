@@ -346,3 +346,82 @@ subscribe("social_transgression_gossip", _on_social_transgression_gossip)
 
 subscribe("person_entered_view", _wake("observer_id", "person_entered_view"))
 subscribe("heard_speech", _wake("listener_id", "heard_speech"))
+
+
+# ── Debug-event bubbles + execution-trace memory (systems/debug_log.py) ────
+# Per the user's explicit ask: a visible, colored debug bubble (green for
+# actions/activities, red for reactions, purple for violent/illegal ones)
+# plus a real low-importance memory entry every time an activity actually
+# starts, completes, is interrupted, or is aborted. Riding the existing
+# activity_started/activity_completed/activity_finished/activity_aborted
+# emit() calls (systems/activities.py, systems/activity_queue.py) rather
+# than adding a fourth set of direct call sites there.
+
+def _on_activity_started(data, world):
+    from systems.debug_log import log_activity
+    c = world.get("characters", {}).get(data.get("character_id"))
+    if c:
+        log_activity(c, world, data.get("activity_type", "?"), "started")
+
+subscribe("activity_started", _on_activity_started)
+
+
+def _on_activity_completed(data, world):
+    from systems.debug_log import log_activity
+    c = world.get("characters", {}).get(data.get("character_id"))
+    if c:
+        log_activity(c, world, data.get("activity_type", "?"), "completed")
+
+subscribe("activity_completed", _on_activity_completed)
+
+
+def _on_activity_finished(data, world):
+    from systems.debug_log import log_activity
+    c = world.get("characters", {}).get(data.get("character_id"))
+    if c:
+        log_activity(c, world, data.get("activity_type", "?"), "finished")
+
+subscribe("activity_finished", _on_activity_finished)
+
+
+def _on_activity_aborted(data, world):
+    from systems.debug_log import log_debug_event
+    c = world.get("characters", {}).get(data.get("character_id"))
+    if c:
+        reason = (data.get("reason") or "unknown").replace("_", " ")
+        log_debug_event(c, world, "activity", f"Activity queue aborted: {reason}")
+
+subscribe("activity_aborted", _on_activity_aborted)
+
+
+# ── Household summary logging (systems/household_summary.py) ──────────
+# Feeds household["event_log"], later condensed hourly/daily/weekly by
+# sim_loop.py's calendar-boundary-gated sweeps. Presence-gated inside
+# the handlers themselves (systems/home_presence.py::is_character_home).
+
+def _on_household_activity_started(data, world):
+    from systems.household_summary import on_activity_started
+    on_activity_started(data, world)
+
+subscribe("activity_started", _on_household_activity_started)
+
+
+def _on_household_activity_completed(data, world):
+    from systems.household_summary import on_activity_completed
+    on_activity_completed(data, world)
+
+subscribe("activity_completed", _on_household_activity_completed)
+
+
+def _on_household_activity_interrupted(data, world):
+    from systems.household_summary import on_activity_interrupted
+    on_activity_interrupted(data, world)
+
+subscribe("activity_interrupted", _on_household_activity_interrupted)
+
+
+def _on_household_speech_spoken(data, world):
+    from systems.household_summary import on_speech_spoken
+    on_speech_spoken(data, world)
+
+subscribe("speech_spoken", _on_household_speech_spoken)

@@ -21,10 +21,52 @@ _SEEN_INCIDENTS_CAP = 20
 
 _NOTABLE_VOLUMES = ("high", "loud", "intense")
 
+# Confirmed live bug (player report: "why are all interruptable
+# activities constantly interrupted right now" -- every awake character
+# within earshot of a sleeping housemate kept abandoning whatever they
+# were doing, on a ~10-tick cycle, for the sound's whole multi-minute
+# duration): a mundane, already-understood household sound like snoring
+# is loud enough to matter for the real "can this wake a sleeper" check
+# (brain/perception.py's sleep-hearing threshold), but it was ALSO being
+# treated as curiosity-worthy for anyone AWAKE and in range -- there's
+# nothing to investigate, it's just a housemate snoring. Excluded here by
+# sound type, independent of volume, rather than lowering snoring's
+# volume (which would break the "loud enough to wake a light sleeper"
+# mechanic that volume also drives).
+_MUNDANE_AMBIENT_SOUNDS = {"snoring"}
+
 
 def tick_curiosity(c, world):
     """Call once per character per tick from agent_loop.py."""
     if not c.get("alive", True):
+        return
+
+    # Confirmed live bug (player report: a character rapidly cycling
+    # "Activity started: sleep" / "Activity interrupted: sleep" once a
+    # minute, forever): a loud-enough ambient sound (e.g. a housemate's
+    # own snoring -- systems/health.py::_maybe_snore(), which randomly
+    # rolls "high" volume) correctly registers through brain/perception.py
+    # ::perceive_audio()'s sleep-hearing threshold, but this function had
+    # no separate concept of "I'm asleep" at all -- it happily walked the
+    # sleeper right out of bed to go physically investigate the noise
+    # every ~10-tick check for as long as the sound kept being audible,
+    # immediately re-triggering the moment they went back to sleep and
+    # the same still-ongoing sound was heard again. Registering a loud
+    # sound while asleep is real (see the user's own explicit "should
+    # wake them" spec) -- but that should mean becoming alert, not
+    # launching a full walk-over-and-look investigation. Skip entirely
+    # while asleep; being woken by something is handled elsewhere.
+    act_type = (c.get("activity") or {}).get("type")
+    if act_type == "sleep":
+        return
+
+    # Second layer of defense, same root cause as above: even a genuinely
+    # notable sound (not just mundane snoring, now filtered separately)
+    # shouldn't yank a character off a task mid-use -- nobody actually
+    # abandons the toilet or a meal to go look at a noise. Mirrors
+    # agent_loop.py's own _PROTECTED_FOR_WORK set for the identical
+    # reasoning, applied here to curiosity instead of work-priority.
+    if act_type in ("use_toilet", "use_toilet_bowels", "eat"):
         return
 
     if c.get("_investigating"):
@@ -75,6 +117,7 @@ def _find_notable_target(c, world):
     audible = c.get("perception", {}).get("audible_events", [])
     for event in audible:
         if event.get("type") == "ambient" and event.get("volume") in _NOTABLE_VOLUMES \
+                and event.get("sound") not in _MUNDANE_AMBIENT_SOUNDS \
                 and "x" in event and "y" in event:
             return {"kind": "ambient", "x": event["x"], "y": event["y"],
                     "label": event.get("sound", "noise")}
@@ -124,7 +167,12 @@ def _start_investigation(c, world, target):
 
     if target["kind"] == "speech":
         other = world.get("characters", {}).get(target["source_id"])
-        if not other:
+        # Workplace NPCs (systems/workplace_npc.py) are real characters
+        # that could in principle end up as a speech source here, but
+        # have no x/y at all (never physically placed) -- defensive
+        # guard alongside the existing "not found" check, matching the
+        # same is_workplace_npc skip used elsewhere for this class of bug.
+        if not other or other.get("is_workplace_npc") or "x" not in other or "y" not in other:
             return
         tx, ty = other["x"], other["y"]
     else:

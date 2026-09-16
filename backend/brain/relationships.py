@@ -155,6 +155,21 @@ def ensure_relationship(
 
             "known_secrets": [],
 
+            # systems/workplace_reputation.py -- how THIS character
+            # subjectively feels about a workplace contact (-100..100,
+            # 0 = neutral; criticism/jealousy push it down, praise/
+            # attraction/fondness push it up) and how much they depend
+            # on that person's cooperation to do their own job well
+            # (0-100) -- a deliberately SEPARATE axis from reputation:
+            # you can dislike someone you desperately need, or like
+            # someone whose cooperation barely matters, and either
+            # combination is real workplace-drama material. Only ever
+            # populated for a real workplace_contact_ids entry (see
+            # systems/workplace_npc.py); stays at neutral defaults for
+            # every other relationship.
+            "workplace_reputation": 0.0,
+            "workplace_dependency": 0.0,
+
             "shared_groups": [],
 
             "last_interaction": 0,

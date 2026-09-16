@@ -72,11 +72,21 @@ def _hash_prompt(messages):
     ).hexdigest()
 
 
-def _cache_key(messages):
-
+def _cache_key(messages, char_id=None):
+    # Confirmed live bug: this cache was keyed ONLY off the prompt's own
+    # hash, with no character identity folded in at all -- two DIFFERENT
+    # characters whose situations happened to produce the same (or even
+    # just similarly-generic) prompt text got served the exact same
+    # cached completion, verbatim, for up to 5 minutes. Real player
+    # report: multiple characters "thinking exactly that same thing."
+    # Namespacing by char_id preserves the cache's actual intent (skip a
+    # redundant Ollama call when the SAME character re-asks with an
+    # unchanged prompt) without ever sharing one person's completion as
+    # another person's inner monologue.
     return (
 
         f"llm_cache:"
+        f"{char_id or 'anon'}:"
 
         f"{_hash_prompt(messages)}"
     )
@@ -262,7 +272,8 @@ async def call_llm(
     # =====================================================
 
     key = _cache_key(
-        full_messages
+        full_messages,
+        char_id=char_id
     )
 
     if use_cache:

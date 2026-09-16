@@ -61,6 +61,28 @@ def make_item(template_id, quantity=1, world=None, **overrides):
     return item
 
 
+def make_document(document_type, content, world=None, **overrides):
+    """A general-purpose physical paperwork item -- "a template, special
+    item, that could be anything really" per the user's own framing.
+    One shared model/appearance (content_category "document", same
+    shared-model-many-instances pattern as book/magazine/newspaper),
+    distinguished per-instance by document_type + a free-form content
+    dict shaped however that type needs (an employment contract, a
+    personal letter, a formal request, ...)."""
+    return make_item("document", world=world, document_type=document_type,
+                      content=content, **overrides)
+
+
+def make_drawing_item(subject, artist_note="", world=None, **overrides):
+    """A hand-drawn picture -- shares the "document" tag (it's still a
+    piece of paper someone made) but its own model/flavor, distinct from
+    official paperwork. See systems/activities.py's make_drawing
+    activity for the (deterministic, no LLM needed) subject picker."""
+    return make_item("drawing", world=world,
+                      content={"subject": subject, "artist_note": artist_note},
+                      **overrides)
+
+
 def make_item_stack(template_id, quantity, world=None, **overrides):
     """Convenience: make_item with explicit quantity for stackable items."""
     return make_item(template_id, quantity=quantity, world=world, **overrides)
@@ -98,6 +120,7 @@ SMARTPHONE_ACTIONS = [
     "browse_second_hand_marketplace", "sell_prop_item_second_hand",
     "buy_prop_item_second_hand", "estimate_avg_sell_value",
     "browse_darknet_market", "order_darknet_listing",
+    "set_phone_alarm_clock",
 ]
 BASIC_PHONE_ACTIONS = ["send_message", "call_contact"]
 
@@ -547,8 +570,18 @@ def phone_battery(c):
 
 
 def phone_is_usable(c):
-    """Phone exists and has enough battery to use."""
-    return phone_battery(c) > 0.05
+    """Phone exists and has enough battery to use.
+
+    Confirmed live bug: this used to compare against a bare 0.05 while
+    battery is stored on the real 0-100 scale systems/power.py's own
+    drain/charge engine uses (MIN_USABLE = 5.0 there) -- "usable" and
+    "the charging engine considers this too low to auto-power-on" never
+    agreed, so a phone was only ever unusable at literal exact-zero
+    battery, not genuinely low battery. Reusing power.py's own constant
+    is what makes a dead-overnight phone a real, reachable reason an
+    alarm (or anything else phone-gated) can fail."""
+    from systems.power import MIN_USABLE
+    return phone_battery(c) > MIN_USABLE
 
 
 def phone_actions(c):

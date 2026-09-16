@@ -141,6 +141,15 @@ def check_goal_trending(conv, listener, topic):
     if not goal:
         return 0
 
+    # A purposeful phone call (see PHONE_SMALL_TALK_GOALS) expects a
+    # real amount of small talk before "the point" -- every turn before
+    # conv["small_talk_turns_required"] counts as on-goal regardless of
+    # content, so a character isn't penalized (or pushed to blurt out
+    # the real reason) before a natural amount of chit-chat has passed.
+    required = conv.get("small_talk_turns_required")
+    if required and conv.get("turn_count", 0) < required:
+        return 0
+
     streak_map = conv.setdefault("_off_goal_streak", {})
     if _on_goal(goal, topic, conv):
         streak_map[listener["id"]] = 0

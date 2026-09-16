@@ -18,6 +18,68 @@ from systems.navigation import (
     cache_floorplan
 )
 
+from systems.transforms import (
+    local_to_world
+)
+
+
+# =========================================================
+# SPAWN BUILDING PROPS FROM FLOORPLAN
+# =========================================================
+# floorplan_templates[...]["prop_spawns"] (authored via the World Editor's
+# floorplan tool -- frontend/src/floorplan.js) is real, per-floorplan
+# furniture-placement data (id/template/x/y/rotation, local to the
+# floorplan) that nothing in the runtime pipeline ever consumed --
+# confirmed via a full-backend grep turning up zero readers before this.
+# instantiate_floorplan() above only ever projected tiles/rooms/doors/
+# windows, never props. This is the missing consumer: real world["props"]
+# entries, in the same shape api/props.py::_create_prop_dict() already
+# produces for a manually-placed prop, projected through the same
+# local_to_world() every other floorplan element already uses.
+
+def spawn_building_props(world, building, floorplan):
+    """Idempotent per building -- stamps building["_props_spawned"] once
+    real props exist for it, so calling this again on every
+    build_world_geometry() pass (every world load) never duplicates
+    furniture. A building created before this fix (or one whose
+    floorplan has no prop_spawns at all) is a safe no-op."""
+    if building.get("_props_spawned"):
+        return
+
+    prop_spawns = floorplan.get("prop_spawns")
+    if not prop_spawns:
+        return
+
+    import copy
+    import uuid
+
+    prop_templates = world.get("definitions", {}).get("prop_templates", {})
+    props = world.setdefault("props", [])
+
+    for spawn in prop_spawns:
+        template_id = spawn.get("template")
+        template = prop_templates.get(template_id)
+        if not template:
+            continue
+        wx, wy = local_to_world(building, spawn.get("x", 0), spawn.get("y", 0))
+        props.append({
+            "id":           f"prop_{uuid.uuid4().hex[:8]}",
+            "template":     template_id,
+            "x":            wx,
+            "y":            wy,
+            "rotation":     spawn.get("rotation", 0),
+            "building_id":  building["id"],
+            "household_id": building.get("owner_household_id"),
+            "anchors":      copy.deepcopy(template.get("anchors", [])),
+            "footprint":    template.get("footprint"),
+            "category":     template.get("category"),
+            "storage":      copy.deepcopy(template.get("storage")),
+            "catalog":      template.get("catalog"),
+            "extra_tags":   [],
+        })
+
+    building["_props_spawned"] = True
+
 
 # =========================================================
 # BUILD WORLD GEOMETRY
@@ -83,6 +145,12 @@ def build_world_geometry(
             )
 
             continue
+
+        # Real furniture from the floorplan's authored prop_spawns --
+        # see spawn_building_props()'s own docstring for why this wasn't
+        # happening at all before. Idempotent, so this is safe to call
+        # unconditionally on every geometry rebuild.
+        spawn_building_props(world, building, floorplan)
 
         # =====================================
         # RESOLVED BUILDING

@@ -24,13 +24,15 @@ on reactions didn't call store_memory at all, fixed there directly).
 import random
 import uuid
 
-STORY_CAP = 8
+STORY_CAP = 10   # per the user's explicit "top 10" framing for this
+                 # shared "what's on my mind" table (objectively notable
+                 # AND purely subjective/random musings alike)
 STORY_WORTHY_THRESHOLD = 0.55   # same 0-1 scale as mem["importance"]
 STORY_DECAY_RATE = 0.97         # per day, mirrors grievances.py's DECAY_RATE shape
 
 STORY_CATEGORIES = (
     "shock", "humor", "informative", "gossip",
-    "ridicule", "suspicious_activity", "unusual_behavior",
+    "ridicule", "suspicious_activity", "unusual_behavior", "musing",
 )
 
 # Per-category keyword weights -- same shape as brain/memory.py::
@@ -41,7 +43,20 @@ CATEGORY_KEYWORDS = {
     "humor":               {"laugh", "funny", "joke", "embarrassing", "fell", "tripped", "prank"},
     "informative":         {"job", "opportunity", "warning", "danger", "closed", "opening", "price", "hiring"},
     "gossip":              {"affair", "cheat", "secret", "rumor", "breakup", "divorce", "pregnant", "dating"},
-    "ridicule":            {"humiliat", "embarrassed", "caught", "walked in", "rejected", "laughed at"},
+    # Confirmed live bug (player report: "why does it always say
+    # ridicule?"): the bare word "caught" is a plain substring match
+    # (_classify_category checks `kw in lowered`, not whole-word), and
+    # "caught" shows up constantly in completely unrelated narration
+    # idioms an LLM writes all the time -- "caught off guard", "caught
+    # up in my thoughts", "caught myself staring" -- none of which are
+    # remotely ridicule. Every other category's keywords are either rare
+    # words or multi-word phrases with much lower false-positive rates;
+    # replacing the bare word with the specific phrases that actually
+    # mean ridicule (caught doing something specific/bad) fixes this
+    # without losing real ridicule detection.
+    "ridicule":            {"humiliat", "embarrassed", "caught cheating", "caught lying",
+                             "caught red-handed", "caught in the act", "walked in on",
+                             "rejected", "laughed at"},
     "suspicious_activity": {"suspicious", "sneaking", "lying", "hiding", "stole", "theft", "creepy", "snooping"},
     "unusual_behavior":    {"strange", "odd", "unusual", "bizarre", "weird", "out of character"},
 }
@@ -49,6 +64,11 @@ CATEGORY_KEYWORDS = {
 CATEGORY_BASE_WEIGHT = {
     "shock": 1.2, "humor": 0.9, "informative": 0.8, "gossip": 1.0,
     "ridicule": 1.0, "suspicious_activity": 1.0, "unusual_behavior": 0.85,
+    # A "stuck in my mind" musing (systems/offgrid.py's work-shift
+    # narration, un-fetched "nothing really happened" hours) -- always
+    # explicitly categorized (never keyword-matched, no CATEGORY_KEYWORDS
+    # entry), routed via store_memory()'s story_category override.
+    "musing": 0.9,
 }
 
 
@@ -95,8 +115,43 @@ def evaluate_story_worthiness(c, mem, category=None, value_override=None):
     )
 
 
+# Confirmed live bug (player report: 5 near-identical "White Socks"
+# stories about the same conversation, all created within the same
+# minute, filling more than half the whole 8-slot cap with duplicates
+# of ONE moment): add_story() never checked whether an existing story
+# was already about the same thing before appending a new one -- the
+# same underlying narration/situation firing evaluate_story_worthiness()
+# a few times in quick succession (a natural consequence of an ongoing
+# conversation producing several similar-looking notable memories) just
+# kept creating fresh entries. A story sharing category + at least one
+# of the same people, created within this window, is treated as the
+# SAME story -- bumped and refreshed instead of duplicated.
+DUPLICATE_STORY_WINDOW_TICKS = 3600   # ~1 real hour
+
+
+def _find_duplicate_story(c, category, about_people, tick):
+    people = set(about_people or [])
+    for s in c.get("notable_stories", []):
+        if s.get("category") != category:
+            continue
+        if tick - s.get("created_tick", 0) > DUPLICATE_STORY_WINDOW_TICKS:
+            continue
+        if people & set(s.get("about_people") or []):
+            return s
+    return None
+
+
 def add_story(c, summary, category, tags, value, about_people, source_memory_id=None, tick=0):
     stories = c.setdefault("notable_stories", [])
+
+    duplicate = _find_duplicate_story(c, category, about_people, tick)
+    if duplicate:
+        duplicate["summary"] = summary
+        duplicate["value"] = round(max(duplicate["value"], value), 1)
+        duplicate["created_tick"] = tick
+        stories.sort(key=lambda s: s["value"], reverse=True)
+        return duplicate
+
     entry = {
         "id":               f"story_{uuid.uuid4().hex[:8]}",
         "summary":          summary,
@@ -223,6 +278,16 @@ def tell_story(c, listener, story_id, world):
     })
     if listener["id"] not in story["told_to"]:
         story["told_to"].append(listener["id"])
+
+    # Per the user's explicit ask: once actually brought up, a thing
+    # sinks toward the bottom of the top-10 table rather than staying
+    # put -- next time something else is "the" thing on this
+    # character's mind. A real value cut (not removal -- it's still a
+    # real memory/story, just no longer the freshest one to reach for)
+    # naturally re-sorts it down on the next add_story()/decay pass.
+    story["value"] = round(story["value"] * 0.3, 1)
+    c["notable_stories"].sort(key=lambda s: s["value"], reverse=True)
+
     return True
 
 

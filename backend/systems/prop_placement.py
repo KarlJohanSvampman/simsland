@@ -17,6 +17,14 @@ codebase (confirmed this round) -- margin is judged purely by footprint
 tile overlap/proximity (via systems/transforms.py's rotation-aware
 transform_footprint(), reused as-is rather than reinvented), not by
 which side of a wall something sits on.
+
+Two per-template opt-outs let a prop share floor space with whatever's
+below/behind it instead of competing for margin: `"wall_mounted": true`
+(a poster/TV/art piece -- already existed) and `"ceiling_mounted": true`
+(a ceiling light/fan/fixture -- new, same exemption, added per the
+user's explicit "ceiling lights shouldn't block like a chair" ask).
+Either flag on EITHER of the two props being checked skips margin
+enforcement for that pair entirely.
 """
 
 from systems.transforms import transform_footprint, tile_distance
@@ -65,6 +73,14 @@ def _margin_needed(template_id_a, tmpl_a, template_id_b, tmpl_b):
 
     if tmpl_a.get("wall_mounted") or tmpl_b.get("wall_mounted"):
         return None  # wall art doesn't obstruct floor space
+
+    # Per the user's explicit ask: a ceiling-mounted fixture (a light,
+    # in their own example) shares real floor space with whatever's
+    # underneath it (a chair, a table) rather than competing for it --
+    # same "doesn't obstruct floor space" reasoning as wall_mounted,
+    # just for the ceiling instead of a wall.
+    if tmpl_a.get("ceiling_mounted") or tmpl_b.get("ceiling_mounted"):
+        return None
 
     if tmpl_a.get("category") not in MARGIN_ENFORCED_CATEGORIES:
         return None

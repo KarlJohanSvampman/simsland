@@ -30,6 +30,13 @@ from systems.interactions import (
     begin_interaction
 )
 
+# How close (Manhattan tiles) a character needs to get to an activity's
+# anchor before the last stretch is snapped rather than walked out tile
+# by tile -- see execute_activity()'s "walking" phase. Tuned to shave a
+# real, noticeable amount of dead travel time off every interaction
+# without characters visibly teleporting from far away.
+WALK_SNAP_RADIUS = 2
+
 # =========================================================
 # INTERACTION ANIMATIONS
 # Maps interaction name → animations per activity phase.
@@ -936,6 +943,21 @@ ACTIVITIES = {
         "category": "growth"
     },
 
+    # A small, real drawing -- deliberately separate from "paint" above
+    # (a longer, prop-anchored hobby activity with no item output today).
+    # no_target: no anchor/prop needed, matching clean_floors/dust_and_
+    # wipe's exact shape -- see personal_items.py::make_drawing_item().
+    "make_drawing": {
+
+        "no_target": True,
+
+        "base_duration_minutes": 15,
+
+        "interruptible": True,
+
+        "category": "creative"
+    },
+
     # =====================================================
     # TRANSPORTATION
     # =====================================================
@@ -1390,7 +1412,10 @@ def start_activity(
             "state": {},
         }
         from core.event_bus import emit
-        emit("activity_started", {"character_id": c["id"], "activity_type": activity_type})
+        emit("activity_started", {
+            "character_id": c["id"], "activity_type": activity_type,
+            "x": c.get("x"), "y": c.get("y"), "building_id": c.get("building_id"),
+        })
         return True
 
     interaction = begin_interaction(
@@ -1471,7 +1496,11 @@ def start_activity(
     )
 
     from core.event_bus import emit
-    emit("activity_started", {"character_id": c["id"], "activity_type": activity_type})
+    emit("activity_started", {
+        "character_id": c["id"], "activity_type": activity_type,
+        "target_id": prop["id"], "anchor_name": anchor["name"],
+        "x": c.get("x"), "y": c.get("y"), "building_id": c.get("building_id"),
+    })
 
     return True
 
@@ -1723,7 +1752,27 @@ def execute_activity(
     if act.get("phase", "using") == "walking":
 
         if c.get("is_moving"):
-            return True
+            # Confirmed live UX complaint: walking the full, exact
+            # pathfound route to an anchor -- especially with prop-
+            # spacing collision avoidance widening the route around
+            # furniture -- can take a noticeably long real-time while for
+            # what's conceptually just "go stand next to this thing."
+            # Once within a short final stretch, cut it short and snap
+            # the rest of the way rather than making the character walk
+            # out every last tile.
+            target_id = act.get("target_id")
+            anchor_name = act.get("anchor_name")
+            if target_id and anchor_name:
+                close_prop = get_prop_by_id(world, target_id)
+                close_anchor = get_anchor(close_prop, anchor_name) if close_prop else None
+                if close_anchor:
+                    dist = abs(c.get("x", 0) - close_anchor["x"]) + abs(c.get("y", 0) - close_anchor["y"])
+                    if dist <= WALK_SNAP_RADIUS:
+                        c["is_moving"] = False
+                        c["route"] = []
+                        c["move_target"] = None
+            if c.get("is_moving"):
+                return True
 
         # Character arrived — snap logical grid position to anchor
         prop = get_prop_by_id(world, act.get("target_id"))
@@ -1760,6 +1809,26 @@ def execute_activity(
 
         set_activity_phase(act, "using", world)
         c["animation_state"] = using_anim
+
+        # Per the user's explicit ask: a distinct event for the moment the
+        # walk-to-target actually finishes and the real interaction
+        # begins -- separate from "activity_started" (fired back when the
+        # walk itself began, see start_activity()) and from "activity_
+        # completed" (the interaction's own finish). Reuses debug_log.py's
+        # existing green/memory pipeline, just a third lifecycle point.
+        from systems.debug_log import log_activity
+        log_activity(c, world, act.get("type", "?"), "reached target, interaction begun")
+
+        # A real sleep session just began (phase_started_tick/duration are
+        # both fresh as of the line above) -- this is the one moment
+        # systems/alarm_habits.py can accurately project tonight's rolled
+        # sleep duration forward against tomorrow's schedule and decide
+        # whether this character would benefit from (and remembers to
+        # set) a phone alarm. Local import to avoid a module-load cycle.
+        if act.get("type") == "sleep":
+            from systems.alarm_habits import maybe_set_alarm_for_tomorrow
+            maybe_set_alarm_for_tomorrow(c, world)
+
         return True
 
     # =====================================================
@@ -2061,6 +2130,27 @@ def complete_activity(
                 trigger_reaction(c, world, "gas_release", tick=world.get("tick", 0))
             except Exception:
                 pass
+
+        # Per the user's explicit ask: a bathroom break that interrupted
+        # sleep (brain/agent_loop.py's sleep-specific urgent-bladder/
+        # bowels handling) should resume sleep afterward, not just leave
+        # the character up. Reuses start_activity()'s own real anchor-
+        # finding/routing/duration pipeline -- the exact same one sleep
+        # normally starts through -- rather than reinventing any of it;
+        # the freshly-computed duration reflects their current (still
+        # mostly satisfied) fatigue, not a fresh full night from scratch.
+        if c.pop("_resume_sleep_after_bathroom", None):
+            start_activity(c, world, "sleep")
+
+    elif activity_type == "make_drawing":
+        import random as _random
+        from systems.personal_items import make_drawing_item, add_item
+        subject = _random.choice([
+            "a horse", "the family", "a dinosaur", "a rainbow", "a rocket ship",
+            "a house with a big sun", "a cat", "a superhero", "the ocean", "a robot",
+        ])
+        doc = make_drawing_item(subject, world=world)
+        add_item(c, doc)
 
     elif activity_type == "vomit":
         from systems.body import on_vomit_complete
@@ -2572,7 +2662,11 @@ def complete_activity(
     record_habit(c, activity_type, world)
 
     from core.event_bus import emit
-    emit("activity_completed", {"character_id": c["id"], "activity_type": activity_type})
+    emit("activity_completed", {
+        "character_id": c["id"], "activity_type": activity_type,
+        "target_id": act.get("target_id"), "anchor_name": act.get("anchor_name"),
+        "x": c.get("x"), "y": c.get("y"), "building_id": c.get("building_id"),
+    })
 
 
 # =========================================================

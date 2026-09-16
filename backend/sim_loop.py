@@ -103,6 +103,7 @@ from systems.persona_expectations import tick_persona_expectations
 from systems.libido import tick_libido
 from systems.intimate_item_discovery import tick_discovery_checks
 from systems.stories import decay_stories
+from systems.workplace_reputation import decay_workplace_views
 from systems.life_comparison import tick_life_comparison
 from systems.sports_leagues import tick_sports_leagues
 from systems.sports import schedule_game_day_events, kickoff_scheduled_games, apply_game_day_outcomes
@@ -161,6 +162,9 @@ from systems.social_events import (
     check_event_completions, check_maybe_deadlines, generate_world_events
 )
 from systems.calendar_events import check_calendar_reminders
+from systems.reminders import check_reminders
+from systems.contract_clauses import tick_contract_clauses, tick_pending_payouts
+from systems.insurance import tick_insurance_renewals
 from systems.story      import update_story_arc
 from systems.events     import maybe_generate_shared_event
 
@@ -321,6 +325,27 @@ def _is_month_start_midnight(world):
     return True
 
 
+def _is_hour_boundary(world):
+    """Same one-shot-per-period stamp guard as _is_monday_midnight above,
+    but for real hour boundaries -- cal["minute"] stays 0 for a full 60
+    ticks (see advance_calendar()), so a bare minute==0 check would fire
+    60 times an hour without this. Note this is real calendar-boundary
+    detection, NOT the same thing as home_presence.py's
+    HOME_PRESENCE_TICKS_PER_HOUR sampling (a tick-count divisor that
+    happens to equal an hour but isn't boundary-aware) -- see that
+    module's own docstring for the distinction; systems/
+    household_summary.py's hourly rollup needs a real boundary, not a
+    sample."""
+    cal = world.get("calendar", {})
+    if cal.get("minute") != 0:
+        return False
+    stamp = f"{cal.get('year')}-{cal.get('month')}-{cal.get('day')}-{cal.get('hour')}"
+    if world.get("_last_hourly_stamp") == stamp:
+        return False
+    world["_last_hourly_stamp"] = stamp
+    return True
+
+
 def _is_new_calendar_day(world, tag):
     """Same one-shot-per-period guard as _is_monday_midnight/
     _is_month_start_midnight above, but for blocks that are meant to run
@@ -420,7 +445,22 @@ def tick(world):
     set_current_tick(t)
 
     advance_calendar(world)
-    characters = list(world.get("characters", {}).values())
+    # Workplace NPCs (systems/workplace_npc.py) are real characters (they
+    # live in world["characters"], hold relationships, accrue workplace_
+    # reputation/dependency) but deliberately have no body/needs/x/y at
+    # all -- by design, per their own docstring, "never physically
+    # rendered or walked". Every one of the ~30 population-wide sweeps
+    # below (schedules, life comparison, socioeconomics, ...) assumes a
+    # full character shape and crashes on one of these bare dicts, so
+    # they're excluded at this single source point rather than needing a
+    # guard added to every sweep individually. Systems that DO need to
+    # reach them (workplace_reputation decay, career_ladder, contract
+    # clauses) find them via world["companies"]/workplace_contact_ids,
+    # never through this generic list.
+    characters = [
+        c for c in world.get("characters", {}).values()
+        if not c.get("is_workplace_npc")
+    ]
 
     # -- Weekly ─────────────────────────────────────────────
     if _is_monday_midnight(world):
@@ -434,6 +474,11 @@ def tick(world):
         tick_baby_weekly(world)
         tick_conditioning_weekly(world)
         apply_expenses(world)   # issues this week's household bills (rent/food/hobbies/credit cards/loans)
+        from systems.retirement import pay_weekly_pension
+        from systems.insurance import pay_weekly_premium
+        for c in characters:
+            pay_weekly_pension(c, world)    # retired characters draw their own real pension/disability check
+            pay_weekly_premium(c, world)    # insured characters pay this week's premium (or lapse if they can't)
         recall_overdue_loans(world)   # returns any borrowed item past its due date to its real owner
         schedule_upcoming_legislation(world)   # keeps a real upcoming bill queued at all times
         try:
@@ -449,6 +494,19 @@ def tick(world):
                 resolve_cognitive_adoption(world, _defs_weekly, _weekly_learners)
         except Exception:
             pass
+
+        from systems.household_summary import update_household_weekly_summaries
+        update_household_weekly_summaries(world)
+
+    # -- Hourly: household activity log -> narrated summary ─
+    if _is_hour_boundary(world):
+        from systems.household_summary import update_household_hourly_summaries
+        update_household_hourly_summaries(world)
+
+    # -- Daily: household hourly summaries -> one daily summary ─
+    if _is_new_calendar_day(world, "household_daily_summary"):
+        from systems.household_summary import update_household_daily_summaries
+        update_household_daily_summaries(world)
 
     # -- Monthly: adult/elderly trait+belief adoption ──────
     if _is_month_start_midnight(world):
@@ -516,6 +574,7 @@ def tick(world):
     agent_chars = [
         c for c in characters
         if not c.get("is_service_worker")
+        and not c.get("is_workplace_npc")
         and c.get("alive") is not False
         and c.get("posture") != "incapacitated"
         and c["id"] not in _pending_agent_ids
@@ -813,6 +872,7 @@ def tick(world):
             maybe_offer_corruption(c, world)
         for c in characters:
             decay_stories(c)
+            decay_workplace_views(c)
             aggregate_daily_observations(c, world)
             maybe_recruit_into_crime(c, world)
             maybe_write_diary(c, world)
@@ -1046,6 +1106,10 @@ def tick(world):
 
     if every(world, CADENCE["calendar_events"], offset=32):
         check_calendar_reminders(world)
+        check_reminders(world)
+        tick_contract_clauses(world)
+        tick_pending_payouts(world)
+        tick_insurance_renewals(world)
 
     # Story arcs are lightweight — keep per-tick
     for c in characters:

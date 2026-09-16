@@ -1,3 +1,10 @@
+# 1 tick == 1 nominal sim-second (confirmed convention -- see libido.py/
+# plants.py/temporary_separation.py; health.py's own TICKS_PER_DAY is a
+# different, unrelated constant, not reused here).
+_TICKS_PER_DAY = 86400
+BILL_DUE_DAYS = 14
+
+
 def apply_expenses(world):
     """
     Issue a weekly bill to each household covering all recurring costs.
@@ -113,6 +120,11 @@ def apply_expenses(world):
             "amount":       total,
             "remaining":    total,
             "contributors": {},
+            # A real due date + resend/penalty tracking -- see
+            # systems/reminders.py, the sweep that actually reads these.
+            "due_tick":       world.get("tick", 0) + BILL_DUE_DAYS * _TICKS_PER_DAY,
+            "times_resent":   0,
+            "penalty_applied": False,
             "breakdown": {
                 "fixed_home":         round(fixed, 2),
                 "food":               round(food, 2),

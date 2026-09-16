@@ -117,19 +117,25 @@ def purchase_from_catalog(c, household, world, catalog_id, method="in_person"):
         return False
 
     price = entry["current_price"]
-    # Plain c["money"] stays the first-preference cash pool (unchanged
-    # behavior for the common case) -- only when that alone can't cover
-    # it do we fall back to the wallet's real cash/bank card/credit card
-    # (systems/personal_items.py::pay_from_wallet(), same fallback order
-    # systems/convenience_store.py's register checkout uses). Previously
-    # this branch just failed the whole purchase outright whenever
-    # c["money"] was short, even if the character was carrying a card
-    # with plenty of room.
-    if c.get("money", 0) >= price:
-        c["money"] = round(c["money"] - price, 2)
-    else:
-        from systems.personal_items import pay_from_wallet
-        if not pay_from_wallet(c, world, price):
+    # Confirmed live bug (player report: "I have yet to see anybody's
+    # cash decrease on purchase"): this used to drain the legacy, no-
+    # longer-displayed c["money"] pool FIRST and only fall back to the
+    # real wallet (systems/personal_items.py::pay_from_wallet() -- cash,
+    # then bank card, then credit card, same cascade the user explicitly
+    # asked for) when that alone couldn't cover it. c["money"] is large
+    # enough on most characters that it almost never ran out, so nearly
+    # every purchase silently drained a pool the Life tab's Finances
+    # section never shows -- the wallet cash the player actually WATCHES
+    # never budged. systems/convenience_store.py, darknet.py, and
+    # marketplace.py already all correctly use pay_from_wallet() as the
+    # PRIMARY path (this was the one outlier) -- matching that, with
+    # c["money"] kept only as a last-resort fallback for the unlikely
+    # case a character somehow has no wallet at all.
+    from systems.personal_items import pay_from_wallet
+    if not pay_from_wallet(c, world, price):
+        if c.get("money", 0) >= price:
+            c["money"] = round(c["money"] - price, 2)
+        else:
             return False
 
     # --- Container (paint bucket, generic box, backpack, etc.) ---

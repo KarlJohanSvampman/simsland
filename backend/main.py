@@ -15,7 +15,7 @@ Key changes vs. original:
     removed (redundant LLM cost, and a second silent data-loss path).
 """
 
-import asyncio, os, json, traceback
+import asyncio, os, json, traceback, time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -48,6 +48,7 @@ from api.admin     import router as admin_router
 from api.social_sandbox import router as social_sandbox_router
 from api.events    import router as events_router
 from api.overview  import router as overview_router
+from api.finances  import router as finances_router
 from api.director  import router as director_router
 
 app = FastAPI(title="Simsland")
@@ -78,6 +79,7 @@ app.include_router(admin_router)
 app.include_router(social_sandbox_router)
 app.include_router(events_router, prefix="/api")
 app.include_router(overview_router, prefix="/api")
+app.include_router(finances_router, prefix="/api")
 app.include_router(director_router)
 
 frontend_dir = Path(__file__).parent / "frontend"
@@ -182,6 +184,29 @@ def _build_delta(world: dict, dirty: dict, cx: int, cy: int, zoom: int) -> dict 
 # of a worker thread.
 _tick_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="tick")
 
+_resynced_clock_this_process = False
+
+
+def _maybe_resync_clock_to_real_time(world):
+    """Per the user's explicit ask: at 1x speed, the in-game clock is
+    conceptually supposed to track real time -- but sim_time
+    (sim_loop.py::advance_calendar()) only ever increments by a fixed
+    TICK_RATE_SECONDS per tick, never resyncing to actual wall-clock time.
+    Any time this process was stopped, restarted, or simply ticking
+    slower than real-time (routine during active development), that gap
+    silently accumulates forever -- confirmed live: the in-game clock had
+    fallen 17 real days behind. Snap sim_time back to now, once, on this
+    process's first tick, so a 1x-speed game's clock actually reads "now"
+    again after a restart instead of resuming wherever it last left off.
+    Only at 1x -- a deliberately sped-up (or slowed) simulation has
+    already chosen to diverge from real time on purpose."""
+    global _resynced_clock_this_process
+    if _resynced_clock_this_process:
+        return
+    _resynced_clock_this_process = True
+    if max(1, min(10, world.get("time_scale", 1))) == 1:
+        world["sim_time"] = time.time()
+
 
 def _run_tick_and_persist(sim_id: str) -> tuple[dict, dict]:
     """Runs the whole load->tick->persist span for one tick, held under
@@ -207,6 +232,8 @@ def _run_tick_and_persist(sim_id: str) -> tuple[dict, dict]:
         # even though save_definitions() already invalidates the read
         # cache correctly on its end.
         world["definitions"] = load_definitions(sim_id)
+
+        _maybe_resync_clock_to_real_time(world)
 
         tick(world)
 

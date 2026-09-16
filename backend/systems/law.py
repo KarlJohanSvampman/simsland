@@ -28,17 +28,25 @@ _SENTENCE_LENGTH = {
     "smuggling":              90,
     "counterfeit_money":      70,
     "bribery":               110,
+    # Tier 3 of systems/government_debt.py's tax-filing escalation (a
+    # missed filing deadline, ignored through a mail notice and an
+    # in-person IRS visit) -- modest relative to the career-crime types
+    # above, matching real-world tax-evasion sentencing being on the
+    # lighter end.
+    "tax_evasion":            40,
 }
 _DEFAULT_SENTENCE = 80
 
 # Crime types systems/crime.py's shared shift framework (and its bespoke
 # mechanics) can produce -- fed into the same incident/arrest pipeline
-# every other crime type already uses below.
+# every other crime type already uses below. "tax_evasion" is the one
+# exception, sourced from systems/government_debt.py's escalation
+# instead of crime.py, but reaching this exact same pipeline.
 _CRIME_CAREER_TYPES = (
     "burglary", "car_theft", "robbery", "drug_dealing",
     "fraud", "hacking", "arson", "murder_for_hire",
     "gang_violence", "drug_production", "smuggling", "counterfeit_money",
-    "bribery",
+    "bribery", "tax_evasion",
 )
 
 

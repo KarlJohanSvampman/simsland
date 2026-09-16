@@ -1718,6 +1718,16 @@ def maybe_report_medical_emergency(char, world, tier=None):
 
 DEHYDRATION_COUGH_THRESHOLD = 30.0  # body.py's hydration scale, 100=hydrated
 DEHYDRATION_COUGH_CHANCE    = 0.05
+# Confirmed live bug (real player report -- a terminal log full of
+# nothing but "*cough*"/"*cough cough*" from three sleeping, dehydrated
+# characters for 24+ sim-minutes straight): this used to roll fresh
+# every single tick (1 tick == 1 sim-second) with no cooldown at all --
+# a flat 5% per-tick chance means an EXPECTED gap of only ~20 seconds
+# between coughs, not the occasional/annoying-but-rare symptom this was
+# meant to be. A real minimum gap between coughs is what actually makes
+# this read as "occasionally coughs while dehydrated" instead of "coughs
+# almost continuously the moment hydration crosses the line."
+DEHYDRATION_COUGH_COOLDOWN_TICKS = 900  # 15 min
 
 
 def _maybe_dehydration_cough(char, world):
@@ -1727,16 +1737,61 @@ def _maybe_dehydration_cough(char, world):
     actually causes a tracked respiratory condition; there's no separate
     standalone smoking-habit field in this codebase to hook a second,
     independent trigger off of."""
+    # Per the user's explicit ask: no coughing while asleep -- see
+    # _maybe_snore() below for what a sleeping character does instead.
+    if (char.get("activity") or {}).get("type") == "sleep":
+        return
     hydration = char.get("body", {}).get("hydration", 100.0)
     if hydration >= DEHYDRATION_COUGH_THRESHOLD:
         return
+    tick = world.get("tick", 0)
+    last = char.get("_last_dehydration_cough_tick")
+    if last is not None and tick - last < DEHYDRATION_COUGH_COOLDOWN_TICKS:
+        return
     if random.random() >= DEHYDRATION_COUGH_CHANCE:
         return
+    char["_last_dehydration_cough_tick"] = tick
     try:
         from systems.reactions import trigger_reaction
-        trigger_reaction(char, world, "cough", tick=world.get("tick", 0))
+        trigger_reaction(char, world, "cough", tick=tick)
     except Exception:
         pass
+
+
+# Per the user's explicit ask: a sleeping character randomly starts
+# snoring instead of coughing -- real random volume and random duration,
+# capped at however much of the current sleep activity is actually left
+# (never outlives the sleep itself).
+SNORE_CHANCE_PER_CHECK    = 0.01
+SNORE_MIN_DURATION_TICKS  = 60     # 1 minute
+SNORE_MAX_DURATION_TICKS  = 1200   # 20 minutes
+_SNORE_VOLUMES = ["low", "medium", "high"]
+
+
+def _maybe_snore(char, world):
+    act = char.get("activity") or {}
+    if act.get("type") != "sleep":
+        return
+
+    tick = world.get("tick", 0)
+    if char.get("_snoring_until_tick", 0) > tick:
+        return   # already mid-snore
+
+    if random.random() >= SNORE_CHANCE_PER_CHECK:
+        return
+
+    remaining_sleep = act.get("duration", 0) - (tick - act.get("phase_started_tick", tick))
+    if remaining_sleep <= 0:
+        return
+
+    duration = random.randint(SNORE_MIN_DURATION_TICKS, SNORE_MAX_DURATION_TICKS)
+    duration = max(1, min(duration, remaining_sleep))
+    volume = random.choice(_SNORE_VOLUMES)
+
+    from brain.perception import emit_ambient_sound
+    emit_ambient_sound(world, char.get("x", 0), char.get("y", 0), "snoring",
+                        volume=volume, duration=duration)
+    char["_snoring_until_tick"] = tick + duration
 
 
 def process_health(char, world):
@@ -1744,6 +1799,7 @@ def process_health(char, world):
     if not char.get("alive", True):
                 return
     _maybe_dehydration_cough(char, world)
+    _maybe_snore(char, world)
     tick_health_hazards(char, world)
     tick_hazard_manifestations(char, world)
     tick = world.get("tick", 0)

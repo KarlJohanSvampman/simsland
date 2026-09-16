@@ -39,6 +39,14 @@ def update_social_intentions(
         if not other:
             continue
 
+        # Workplace NPCs (systems/workplace_npc.py) are real relationship
+        # entries (a boss/colleague) but are never physically present --
+        # no x/y, never walkable -- so generating visit/flirt/seek_comfort/
+        # gossip/apologize intentions toward one is a wasted, unreachable
+        # target, not a real social option.
+        if other.get("is_workplace_npc"):
+            continue
+
         generate_social_intentions(
 
             c,

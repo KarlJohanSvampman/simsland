@@ -87,6 +87,7 @@ ACTION_SPECS = {
     "retrieve_phone":    {"group": "phone", "target": "none", "doc": "Go get your phone from where you left it."},
     "charge":            {"group": "phone", "target": "prop", "doc": "Charge a device at an outlet."},
     "browse_news":       {"group": "phone", "target": "none", "doc": "Check the news on your phone -- picks a fresh recent headline every few minutes for as long as you keep at it."},
+    "set_phone_alarm_clock": {"group": "phone", "target": "none", "detail": "time", "doc": "Set a daily alarm on your phone for a specific time (24-hour \"HH:MM\", e.g. \"07:00\") so you wake yourself even if still asleep -- the only way to reliably defend a scheduled commitment (like work) from oversleeping, since sleep duration is otherwise driven purely by how tired you are, not by the clock."},
     "contact_business":  {"group": "phone", "target": "any", "detail": "reason", "doc": "Call or message a business's customer support -- deliveries, complaints, general questions. Target a company_templates key. If they're unreachable (closed, or you're an online-only business's caller and it happened to skip straight to email), your message lands in their inbox and they call/email you back later, during their business hours -- you won't get an answer right away."},
     "book_appointment":  {"group": "phone", "target": "any", "detail": "reason", "doc": "Call a service business (doctor, lawyer, therapist, ...) to book an appointment. Target a company_templates key, and state your reason -- ideally one of that business's reason_options. Only resolves to a confirmed appointment if you call during their phone hours; otherwise it's left as a request for them to get back to you."},
 
@@ -277,6 +278,13 @@ ACTION_SPECS = {
     # wherever you currently are), so they're scaffolded directly here
     # like jog/sit_ups below rather than going through start_activity().
     "clean_floors":   {"group": "chore", "target": "none", "doc": "Sweep, vacuum, and scrub the floor of the room you're in."},
+    "make_drawing":   {"group": "hobby", "target": "none", "doc": "Sit down and draw a quick picture -- produces a real drawing item you can keep, give away, or display."},
+    "organize_items": {"group": "household", "target": "none", "detail": "item_ids, tag", "doc": "Put a list of items (documents, or really anything) into a tagged pile at your household -- a real, general-purpose way to keep things organized. Items with the same tag join the same existing pile."},
+    "search_documents": {"group": "household", "target": "none", "detail": "category, person_or_company, title, time_period", "doc": "Look for a specific document (any subset of category/person_or_company/title/time_period). If it's really organized into a household pile, you'll be directed straight there; otherwise you'll need a computer, and how organized you are affects your odds of finding it."},
+    "renew_insurance": {"group": "finance", "target": "none", "doc": "Renew your current insurance policy for another ~6 months, issuing a fresh policy document."},
+    "mail_claim_document": {"group": "finance", "target": "none", "detail": "document_id", "doc": "Mail in a document with a confirmed claim value (a warranty refund, etc.) to actually collect the payout -- prints a fresh copy first if you only have a digital record. Money arrives in your account after a real delivery delay, not instantly."},
+    "invoke_contract_clause": {"group": "finance", "target": "none", "detail": "clause_id, effect_type", "doc": "Exercise a real, currently-available optional clause from a contract or a warranty (see your pending clause invocations) -- if it offers more than one remedy, state which one (effect_type) you want."},
+    "waive_contract_clause":  {"group": "finance", "target": "none", "detail": "clause_id", "doc": "Deliberately let a currently-available optional clause go unused, clearing it from your pending list without exercising it."},
     "dust_and_wipe":  {"group": "chore", "target": "none", "doc": "Dust and wipe down surfaces in the room you're in."},
     "wash_dishes":       {"group": "chore", "target": "none", "doc": "Wash dishes by hand at the sink."},
     "load_dishwasher":   {"group": "chore", "target": "none", "doc": "Load and run the dishwasher."},

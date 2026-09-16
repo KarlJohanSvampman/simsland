@@ -145,6 +145,108 @@ def _review_social_contracts(c, other, world):
             violation.setdefault("surfaced", []).append(c["id"])
 
 
+# Per the user's explicit ask: note where a character is, what they were
+# doing, and what mood they seemed in, whenever c actually SEES them --
+# but no more often than once every 30 real minutes per person (1 tick =
+# 1 real second, see sim_loop.py's own convention), so a character
+# standing in the same room all day doesn't spam a fresh memory every
+# single tick. This is a distinct, faster-cadence sibling to
+# maybe_review_on_sighting() below -- that one only RECALLS existing
+# memories once per calendar day; this one CREATES a new observational
+# one, on its own 30-minute gate.
+SIGHTING_OBSERVATION_GAP_TICKS = 1800
+
+
+def _describe_activity(target):
+    if target.get("off_grid"):
+        reason = (target.get("off_grid_reason") or "out").replace("_", " ")
+        return f"out at {reason}"
+    act = target.get("activity") or {}
+    act_type = act.get("type")
+    if act_type:
+        return act_type.replace("_", " ")
+    return "around, not doing anything in particular"
+
+
+# Per the user's explicit ask: the 30-minute gate above is only meant to
+# stop routine observation spam (idling, sleeping, relaxing, waiting) --
+# a character caught doing something violent, illegal, or threatening
+# gets remembered EVERY time they're seen doing it, cooldown bypassed
+# entirely, since that's exactly the kind of thing worth a fresh memory
+# regardless of how recently they were last seen.
+_VIOLENT_ACTIVITY_TYPES = {"fight", "wrestle", "flee", "hostile_action"}
+_HOSTILE_FIGHT_STAGES = {"heated_argument", "shouting_match", "physical_altercation", "assault"}
+
+
+def _is_violent_or_illegal(other, world):
+    act_type = (other.get("activity") or {}).get("type")
+    if act_type in _VIOLENT_ACTIVITY_TYPES:
+        return True
+    if other.get("off_grid") and (other.get("job") or {}).get("illegal"):
+        return True
+    other_id = other.get("id")
+    for conflict in world.get("conflicts", {}).values():
+        if other_id in conflict.get("parties", []) and conflict.get("fight_stage") in _HOSTILE_FIGHT_STAGES:
+            return True
+    return False
+
+
+def maybe_log_sighting_observation(c, other, world):
+    other_id = other.get("id")
+    if not other_id or other_id == c.get("id"):
+        return
+
+    from brain.relationships import ensure_relationship
+    rel = ensure_relationship(c, other_id)
+    tick = world.get("tick", 0)
+
+    urgent = _is_violent_or_illegal(other, world)
+    if not urgent:
+        last = rel.get("_last_sighting_observation_tick", -SIGHTING_OBSERVATION_GAP_TICKS)
+        if tick - last < SIGHTING_OBSERVATION_GAP_TICKS:
+            return
+    rel["_last_sighting_observation_tick"] = tick
+
+    activity_desc = _describe_activity(other)
+    mood = other.get("emotion") or "neutral"
+    name = other.get("name", "someone")
+
+    # Per the user's explicit ask: real memory is imperfect -- which of
+    # activity/mood/location actually stick (and how many) is randomized,
+    # weighted toward keeping everything for an alarming sighting and
+    # toward keeping only a random one or two details for a routine one.
+    from systems.memory_detail import select_details, location_label, relationship_closeness, compute_drop_probability
+    location = location_label(other, world)
+    closeness = relationship_closeness(c, other_id)
+    kept = select_details({"activity": activity_desc, "mood": mood, "location": location},
+                           high_salience=urgent, closeness=closeness)
+
+    parts = [f"You saw {name}"]
+    if kept.get("location"):
+        parts.append(f", {kept['location']}")
+    if kept.get("activity"):
+        parts.append(f", {kept['activity']}")
+    text = "".join(parts) + "."
+    if kept.get("mood"):
+        text += f" They seemed {kept['mood']}."
+
+    from brain.memory import store_memory
+    store_memory(
+        c,
+        text,
+        importance=0.6 if urgent else 0.25,
+        tags=["sighting", "whereabouts"] + (["alarming"] if urgent else []),
+        kind="sighting",
+        tick=tick,
+        people=[other_id],
+        # An alarming sighting is important enough to skip the hourly
+        # blur-into-a-summary pass and move to long-term memory exactly
+        # as recorded -- see memory_consolidation.py's aggregate handling.
+        aggregate=not urgent,
+        drop_probability=compute_drop_probability(urgent, closeness),
+    )
+
+
 def maybe_review_on_sighting(c, other, world):
     """other is the real character dict (world["characters"][id]) --
     same param shape as behavior_patterns.py::log_observation, called
