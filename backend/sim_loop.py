@@ -48,7 +48,7 @@ from systems.excuses    import check_visible_lies_for_observer, check_witnessed_
 
 # -- Medium (÷10-20) ---------------------------------------------
 from brain.memory       import decay_memories
-from brain.beliefs      import polarization_drift, compute_alignment
+from brain.opinions     import polarize_opinions, compute_political_lean
 from brain.relationships import first_impression, update_relationship_state, ensure_relationship
 from systems.contact_designation import accumulate_hours, evaluate_weekly_designations
 from systems.peer_influence import resolve_cognitive_adoption
@@ -532,6 +532,9 @@ def tick(world):
         # systems/government_budget.py.
         tick_government_budget(world)
 
+        from systems.politics import tick_environment_opinion_drift
+        tick_environment_opinion_drift(world)
+
     # -- Every sim-minute: popularity decay (systems/validation.py) ──
     if t % 60 == 0:
         tick_popularity_decay(world)
@@ -615,8 +618,8 @@ def tick(world):
 
     if every(world, CADENCE["polarization"], offset=3):
         for c in characters:
-            polarization_drift(c)
-            compute_alignment(c)
+            polarize_opinions(c)
+            compute_political_lean(c)
 
     if every(world, CADENCE["relationships"], offset=4):
         _update_nearby_relationships(characters, world)
@@ -683,6 +686,10 @@ def tick(world):
 
     if every(world, CADENCE["household_monitoring"], offset=8):
         update_household_monitoring(world)
+
+    if every(world, CADENCE["mentality_compilation"], offset=12):
+        from systems.mentality import tick_mentality_compilation
+        tick_mentality_compilation(world)
 
     # -- Medium: market (÷20) ───────────────────────────────
     if every(world, CADENCE["market"], offset=9):

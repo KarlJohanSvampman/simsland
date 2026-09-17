@@ -123,6 +123,18 @@ def add_grievance(c, caused_by_id, event_type, world, severity=None, details=Non
     if event_type == "contract_violated":
         base_severity *= CONTRACT_MULTIPLIER
 
+    # systems/mentality.py -- Phase I's wired consequence: a FIRM ('>')
+    # negative principle toward the person who caused this gives real
+    # prejudice its teeth -- the same minor slight lands harder from
+    # someone c already firmly distrusts, and a lighter slight from
+    # someone c firmly identifies WITH gets more benefit of the doubt.
+    caused_by = world.get("characters", {}).get(caused_by_id)
+    if caused_by:
+        from systems.mentality import principle_stance_toward
+        stance = principle_stance_toward(c, caused_by, world)
+        if stance and stance.get("op") == ">":
+            base_severity *= 1.5 if stance["sentiment"] == "unfavorable" else 0.7
+
     c["grievances"].append({
         "id":          f"griev_{uuid.uuid4().hex[:8]}",
         "caused_by":   caused_by_id,

@@ -677,6 +677,28 @@ def evaluate_attendance_tradeoff(c, event, world):
             name = other.get("name", "someone") if other else "someone"
             cons.append(f"{name} there disapproves of choices you've made")
 
+    # systems/mentality.py -- Phase I's wired consequence: a FIRM ('>')
+    # principle match toward a confirmed attendee is a real pro/con too,
+    # same "real, data-grounded, not flavor text" spirit as the clash
+    # check just above.
+    from systems.mentality import principle_stance_toward
+    for aid, resp in event.get("attendees", {}).items():
+        if aid == c["id"] or resp != "yes":
+            continue
+        other = chars.get(aid)
+        if not other:
+            continue
+        stance = principle_stance_toward(c, other, world)
+        if not stance or stance.get("op") != ">":
+            continue
+        name = other.get("name", "someone")
+        if stance["sentiment"] == "unfavorable":
+            score -= 12
+            cons.append(f"{name} (someone like that) will be there")
+        else:
+            score += 8
+            pros.append(f"{name} (someone you feel a kinship with) will be there")
+
     casual_reluctance = profile.get("casual_reluctance", 0.5)
     score -= casual_reluctance * 10
 

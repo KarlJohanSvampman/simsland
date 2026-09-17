@@ -6,8 +6,8 @@ from systems.contacts import (
     maybe_learn_phone
 )
 
-from brain.beliefs import (
-    belief_alignment
+from brain.opinions import (
+    political_similarity
 )
 
 
@@ -530,7 +530,7 @@ def calculate_compatibility(
 
     try:
 
-        alignment = belief_alignment(
+        alignment = political_similarity(
             c,
             other
         )

@@ -38,6 +38,15 @@ POST /admin/set_body_need           -> force one character's body need
                                     to a value, for live-testing reactive
                                     behavior without waiting for it to
                                     occur naturally
+POST /admin/preview_mentality       -> given a list of held_beliefs ids,
+                                    compile principles/mentality/opinions
+                                    against a throwaway synthetic
+                                    character -- a pure preview, nothing
+                                    is read from or written back to any
+                                    real character or the real
+                                    principle_concepts registry (see
+                                    systems/mentality.py, llm/
+                                    mentality_compiler.py)
 """
 
 from fastapi import APIRouter
@@ -382,4 +391,72 @@ def get_cognition_for_char(char_id: str, sim_id: str = DEFAULT_SIM_ID):
     return {
         "tick": world.get("tick", 0),
         "cognition": c.get("cognition", {}),
+    }
+
+
+@router.post("/preview_mentality")
+def preview_mentality(payload: dict, sim_id: str = DEFAULT_SIM_ID):
+    """held_beliefs: [belief_template_id, ...], plus optional
+    society_categories: [id, ...] (max 3), traits: [trait_id, ...], and
+    reasoning_lens: "philosophy"|"faith_superstition"|"pragmatism" --
+    Phase H's manual-pick half (real characters auto-derive these three
+    instead, see systems/mentality.py). Runs the real compile pipeline
+    (systems/mentality.py's per-character step) against a throwaway
+    synthetic character. Reads the real world only for its definitions
+    (belief_templates/principle_concepts/society_categories); never
+    touches world_lock() or persists anything, matching this endpoint's
+    own "pure preview" contract."""
+    held_beliefs = payload.get("held_beliefs") or []
+    categories = (payload.get("society_categories") or [])[:3]
+    traits = payload.get("traits") or []
+    reasoning_lens = payload.get("reasoning_lens") or None
+    real_world = load_world(sim_id)
+    defs = real_world.get("definitions") or {}
+
+    belief_templates = defs.get("belief_templates", {})
+    unknown = [b for b in held_beliefs if b not in belief_templates]
+    if unknown:
+        return JSONResponse({"error": f"unknown belief ids: {unknown}"}, status_code=400)
+
+    society_categories = defs.get("society_categories", {})
+    unknown_categories = [cat for cat in categories if cat not in society_categories]
+    if unknown_categories:
+        return JSONResponse({"error": f"unknown society_categories: {unknown_categories}"}, status_code=400)
+
+    if reasoning_lens is not None and reasoning_lens not in ("philosophy", "faith_superstition", "pragmatism"):
+        return JSONResponse({"error": f"unknown reasoning_lens: {reasoning_lens}"}, status_code=400)
+
+    throwaway_world = {
+        "tick": real_world.get("tick", 0),
+        "definitions": defs,
+        # A local copy so any newly-minted concept from this preview
+        # never leaks into the real registry.
+        "principle_concepts": dict(defs.get("principle_concepts", {})),
+    }
+    synthetic_char = {
+        "id": "preview_char",
+        "name": "Preview Character",
+        "held_beliefs": held_beliefs,
+        "traits": traits,
+        "values": {},
+        "principles": [],
+        "mentality": None,
+        "opinions": {},
+    }
+
+    from systems.mentality import _compile_one
+    _compile_one(
+        synthetic_char, throwaway_world,
+        categories=categories, traits=traits, reasoning_lens=reasoning_lens,
+    )
+
+    return {
+        "held_beliefs": held_beliefs,
+        "principles": synthetic_char["principles"],
+        "mentality": synthetic_char["mentality"],
+        "opinions": {
+            topic: history[-1] for topic, history in synthetic_char.get("opinions", {}).items() if history
+        },
+        "concepts": throwaway_world["principle_concepts"],
+        "adjectives": defs.get("adjectives_registry", {}),
     }

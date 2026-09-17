@@ -1,4 +1,4 @@
-from brain.beliefs import update_belief
+from brain.opinions import nudge_opinion
 def record_influence(source,target,amount,world):
     source.setdefault("influence_given",{})[target["id"]]=source.setdefault("influence_given",{}).get(target["id"],0)+amount
     target.setdefault("influence_received",{})[source["id"]]=target.setdefault("influence_received",{}).get(source["id"],0)+amount
@@ -10,13 +10,18 @@ def apply_public_figure_influence(world):
             if not pf: continue
             for c in world["characters"].values():
                 curiosity_scale=c.get("curiosity",50)/100.0
-                for tag in pf.get("tags",[])[:2]: update_belief(c,tag,news.get("sentiment","neutral"),news.get("intensity",.3)*pf.get("influence_power",.5)*curiosity_scale,world["tick"])
+                for tag in pf.get("tags",[])[:2]: nudge_opinion(c,tag,news.get("sentiment","neutral"),news.get("intensity",.3)*pf.get("influence_power",.5)*curiosity_scale,world["tick"])
 def apply_social_influence(world):
     for c in world["characters"].values():
         for tid,weight in c.get("influence_given",{}).items():
             if tid in world["characters"]:
                 target=world["characters"][tid]
-                for topic,b in c.get("beliefs",{}).items(): update_belief(target,topic,"positive" if b.get("value",0)>0 else "negative",min(.3,abs(b.get("value",0))*weight*.05),world["tick"])
+                # Migrated off the retired c["beliefs"] dict -- reads each
+                # topic's current opinion stance instead.
+                for topic,history in c.get("opinions",{}).items():
+                    if not history: continue
+                    stance=history[-1].get("stance",0)
+                    nudge_opinion(target,topic,"positive" if stance>0 else "negative",min(.3,abs(stance)*weight*.05),world["tick"])
 
 
 # =========================================================

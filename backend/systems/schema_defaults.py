@@ -28,6 +28,13 @@ COGNITION_CORE_TRAITS = {
     "cognition_selfaware": "self_aware",
 }
 
+# belief_templates categories where a character may hold at most ONE --
+# generalized from religion-only (Phase H): picking a NEW belief in one of
+# these categories, whether at generation (character_gen.py::_random_beliefs)
+# or via runtime conversion (peer_influence.py::_make_room_for_belief),
+# evicts/excludes any other belief already held in that same category.
+EXCLUSIVE_BELIEF_CATEGORIES = ("religion", "ideology")
+
 
 def ensure_prop_template_fields(world, defs):
     """api/props.py::create_prop() never actually copied anchors/storage/
@@ -432,6 +439,13 @@ def ensure_world_defaults(world, defs=None):
 
     world.setdefault("families", {})
     world.setdefault("factions", {})
+
+    # Runtime state for definitions.json's political_party_templates
+    # registry (systems/politics.py) -- per-party generated policies
+    # (llm/party_policy.py), keyed by party id. Separate from the static
+    # template registry the same way world["factions"] is already
+    # separate from any authored faction content.
+    world.setdefault("political_parties", {})
 
     from systems.government_budget import ensure_government
     ensure_government(world)
@@ -1223,18 +1237,33 @@ def ensure_character_defaults(c, world=None):
     # dict-of-capped-lists shape) -- see brain/opinions.py.
     c.setdefault("opinions", {})
 
-    # General beliefs adopted from belief_templates (definitions.json) via
-    # social exposure -- see systems/peer_influence.py's adoption engine.
-    # Deliberately separate from c["beliefs"] (brain/beliefs.py -- narrow,
-    # fixed-axis political sentiment scalars consumed by systems/politics.py's
-    # elections/factions) and c["opinions"] (free-form, LLM-reasoned). A flat
-    # list of belief-template ids, mirroring c["personality_traits"].
+    # Deep/religious/philosophical beliefs -- belief_templates
+    # (definitions.json) content, selected weighted-random at generation
+    # (character_gen.py::_random_beliefs()) and slowly adoptable afterward
+    # via prolonged social exposure -- see systems/peer_influence.py's
+    # adoption engine. A flat list of belief-template ids, mirroring
+    # c["personality_traits"].
     c.setdefault("held_beliefs", [])
 
     # Per-(source_person_id, belief) accumulator feeding the same
     # dual-threshold promotion shape as c["influence_profile"] (traits) --
     # see systems/peer_influence.py::record_positive_belief_exposure().
     c.setdefault("belief_influence_profile", [])
+
+    # Principles ("applied beliefs" -- X > Y / X < Y + Z / X == Y over
+    # principle_concepts ids) compiled by AI from c["held_beliefs"], and
+    # c["mentality"] (the collective picture: which principles, which
+    # concepts they reference, their common tags, and a short summary) --
+    # see systems/mentality.py::tick_mentality_compilation() and
+    # llm/mentality_compiler.py. c["opinions"] (brain/opinions.py) gets
+    # seeded from mentality at the same pass -- this is what "compiling
+    # political views" means concretely. _mentality_pending flags a
+    # character whose principles/mentality/opinions are stale relative to
+    # their current held_beliefs (freshly generated, or just adopted/
+    # converted a new belief) and still need the sweep to (re)compile them.
+    c.setdefault("principles", [])
+    c.setdefault("mentality", None)
+    c.setdefault("_mentality_pending", bool(c.get("held_beliefs")))
 
     # Accumulator for the daily trust/respect/exposure/value-similarity
     # weighted influence pass -- see systems/influence.py::resolve_value_influence().

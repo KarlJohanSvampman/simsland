@@ -103,6 +103,15 @@ def assign_conversation_goal(c, world, conv, other_id):
     if occasion == "close":
         options.append({"id": "not_interested", "tags": ["close"],
                          "label": "not really interested in this particular conversation right now"})
+    # A political debate reads right for an acquaintance/coworker (someone
+    # you're not intimate with, but who's a real enough presence to spar
+    # with) -- a stranger doesn't warrant it, a spouse/close friend chat
+    # isn't the venue for it. systems/politics.py::choose_political_topic()
+    # picks which real issue, weighted by what each side's party actually
+    # campaigns on.
+    if occasion in ("acquaintance", "coworker"):
+        options.append({"id": "political_debate", "tags": ["acquaintance", "coworker"],
+                         "label": "itching to get into a political debate with them"})
 
     from systems.choice import choose
     picked = choose(c, world, "conversation goal", options, occasion=occasion)
@@ -110,6 +119,11 @@ def assign_conversation_goal(c, world, conv, other_id):
         goal = {"type": picked["id"], "label": picked["label"]}
         if picked["id"] == "share_story":
             goal["story_id"] = picked.get("story_id")
+        elif picked["id"] == "political_debate":
+            from systems.politics import choose_political_topic
+            topic = choose_political_topic(c, other, world)
+            goal["topic"] = topic
+            conv["topic"] = topic
     else:
         goal = {"type": "topic_interest", "label": "genuinely interested in the subject"}
     goals[other_id] = goal

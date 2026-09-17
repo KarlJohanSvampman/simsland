@@ -8,10 +8,6 @@ from social.relationship_score import (
     relationship_score
 )
 
-from brain.beliefs import (
-    compute_alignment
-)
-
 from brain.cognitive_pressure import (
     build_cognitive_pressure
 )
@@ -2143,6 +2139,30 @@ def _build_household_process_context(c, world):
     ]
 
 
+def _principle_bias_note(c, proposer, world):
+    """Real, data-grounded bias from c's own held principles toward
+    `proposer` (Phase I's wired consequence -- systems/mentality.py::
+    principle_stance_toward()) -- same "real accumulated state the LLM
+    can naturally lean on, not flavor text" precedent as the favors.py
+    fatigue note just above. Reused across EVERY incoming proposal kind
+    (chore/social_ask/request/item_loan/item_sale/recurring_offer) --
+    the same "would I really do this for/with someone like them" bias
+    applies regardless of what's actually being asked. Only a FIRM ('>')
+    conviction fires (a tentative '<' suspicion or a moderate '=='
+    generalization isn't strong enough to color a real decision) --
+    returns "" (safe to always += ) when there's no proposer or no firm
+    match."""
+    if not proposer:
+        return ""
+    from systems.mentality import principle_stance_toward
+    stance = principle_stance_toward(c, proposer, world)
+    if not stance or stance.get("op") != ">":
+        return ""
+    if stance["sentiment"] == "unfavorable":
+        return " Deep down, you've never quite trusted people like that — this doesn't sit right with you."
+    return " You've always felt a real kinship with people like them — you're inclined to help."
+
+
 def _build_proposal_context(c, world):
     """Ambient visibility into pending systems/proposals.py negotiations —
     chore invites and recurring-schedule offers. This is the wiring the
@@ -2186,8 +2206,10 @@ def _build_proposal_context(c, world):
         if p.get("status") == "open":
             if p.get("responses", {}).get(cid) == "pending":
                 if kind == "chore":
+                    proposer = chars.get(p.get("proposer_id"))
                     note = (f"Someone proposed {p.get('chore_id')} — you can accept, decline, "
                             f"or counter with different details.")
+                    note += _principle_bias_note(c, proposer, world)
                 elif kind == "social_ask":
                     # params.text carries the real question when the asker
                     # supplied one (e.g. systems/choice.py::
@@ -2199,6 +2221,7 @@ def _build_proposal_context(c, world):
                     question = (p.get("params") or {}).get("text") or p.get("chore_id")
                     note = (f"{proposer.get('name', 'Someone') if proposer else 'Someone'} is "
                             f"asking you: {question} — you can accept, decline, or counter.")
+                    note += _principle_bias_note(c, proposer, world)
                 elif kind == "request":
                     proposer = chars.get(p.get("proposer_id"))
                     params = p.get("params", {})
@@ -2214,6 +2237,7 @@ def _build_proposal_context(c, world):
                     if proposer and is_favor_worn_out(c, proposer["id"]):
                         note += (" You've done a lot for them lately without much "
                                  "coming back the other way.")
+                    note += _principle_bias_note(c, proposer, world)
                 elif kind == "item_loan":
                     # chore_id holds the item_id for this kind (see
                     # systems/proposals.py::propose_item_loan) -- the item
@@ -2227,6 +2251,7 @@ def _build_proposal_context(c, world):
                     note = (f"{proposer.get('name', 'Someone') if proposer else 'Someone'} wants "
                             f"to borrow your {item_name} for about {days} day(s) — you can accept, "
                             f"decline, or counter with a different duration.")
+                    note += _principle_bias_note(c, proposer, world)
                 elif kind == "item_sale":
                     proposer = chars.get(p.get("proposer_id"))
                     from systems.personal_items import get_item_by_id
@@ -2239,8 +2264,11 @@ def _build_proposal_context(c, world):
                     note = (f"{proposer.get('name', 'Someone') if proposer else 'Someone'} wants "
                             f"to buy your {item_name}, {price_note}{trade_note} — you can accept, "
                             f"decline, or counter with a different price.")
+                    note += _principle_bias_note(c, proposer, world)
                 else:
+                    proposer = chars.get(p.get("proposer_id"))
                     note = f"Someone offered to make {p.get('chore_id')} a recurring thing."
+                    note += _principle_bias_note(c, proposer, world)
                 incoming.append({
                     "proposal_id": p["id"],
                     "kind":        kind,

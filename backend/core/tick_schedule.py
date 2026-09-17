@@ -64,6 +64,7 @@ CADENCE = {
     "service_workers":      10,
     "appliance_degradation":60,
     "household_monitoring": 20,
+    "mentality_compilation": 25,
     "job_market":           60,
     "conversation_cleanup": 60,
 
