@@ -233,6 +233,16 @@ def create_shared_event(world, participants, tier, location_id=None, severity=No
     )
     event["text"] = narration["text"]
     event["topic"] = narration.get("topic")
+    # Per the user's explicit ask ("can we get more detail here"): the
+    # fuller 2-4 sentence account already exists in narration (this
+    # module's own return shape), but only ever got attached to each
+    # participant's own memory below -- api/events.py's timeline feed
+    # reads straight off this event dict, so it was structurally
+    # incapable of ever showing more than the 1-sentence "text", even
+    # when narration succeeded. Stamped here too, now that api/events.py
+    # actually surfaces it.
+    event["detail"] = narration.get("detail")
+    event["category"] = narration.get("category")
 
     for cid in participants:
         c = characters.get(cid)

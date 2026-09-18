@@ -235,6 +235,8 @@ ACTION_SPECS = {
     "threaten":         {"group": "hostile", "target": "character", "doc": "Threaten someone."},
     "stab":             {"group": "hostile", "target": "character", "doc": "Stab someone (requires a sharp weapon in hand)."},
     "knock":            {"group": "hostile", "target": "character", "doc": "Strike someone (requires a blunt weapon in hand)."},
+    "ring_doorbell":    {"group": "core", "target": "character", "doc": "Ring the doorbell to get a household's attention -- carries well, even likely to wake someone asleep."},
+    "knock_on_door":    {"group": "core", "target": "character", "doc": "Knock on someone's door -- quieter than a doorbell, easy to miss if they're asleep, showering, or have music on."},
     "steal_from":       {"group": "hostile", "target": "character", "doc": "Attempt to take money from someone -- pickpocket/snatch quietly, or demand it at knife/gunpoint. A serious crime, real consequences if caught."},
     "dodge":            {"group": "defensive", "target": "none", "doc": "Dodge an incoming attack or struggle free."},
     "block":            {"group": "defensive", "target": "none", "doc": "Block an incoming attack."},

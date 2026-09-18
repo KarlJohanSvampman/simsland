@@ -63,6 +63,7 @@ from systems.deliveries import update_deliveries
 from systems.service_worker_runtime import update_service_workers
 from systems.household_monitoring   import update_household_monitoring
 from systems.caretaker_negotiation  import tick_caretaker_negotiation
+from systems.childcare_arrangement  import tick_babysitting_requests
 
 # -- Slow (÷30-60) — still periodic ─────────────────────────────
 from systems.traffic    import update_ambient_traffic
@@ -691,6 +692,7 @@ def tick(world):
     if every(world, CADENCE["household_monitoring"], offset=8):
         update_household_monitoring(world)
         tick_caretaker_negotiation(world)
+        tick_babysitting_requests(world)
 
     if every(world, CADENCE["mentality_compilation"], offset=12):
         from systems.mentality import tick_mentality_compilation

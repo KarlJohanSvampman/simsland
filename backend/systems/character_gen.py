@@ -613,7 +613,21 @@ def generate_character(defs, overrides=None, world=None):
         "hourly_wage":        job.get("hourly_wage", 0.0) if has_job else 0.0,
         "wealth":             wealth,
         # Employment & work history
-        "employed":                has_job,
+        # Confirmed live bug: has_job (a couple lines up) is just "does
+        # the job dict have an id at all" -- true for _assign_job()'s own
+        # "retired" placeholder (a real, non-empty id string), so a
+        # character generated already-retired came out of here
+        # "employed": True. That wrongly earned them the "employed" tag
+        # in systems/expectations.py::_character_tags(), which is what
+        # go_to_work's assignment is gated on -- a character who was
+        # NEVER live-employed during the sim (so systems/retirement.py::
+        # _do_retire() never ran for them) ended up with a real,
+        # perpetually-missable go_to_work expectation despite having no
+        # job to go to. "retired" is specifically excluded here, same as
+        # this file's own _assign_job() treats it as a non-job for every
+        # other purpose.
+        "employed":                has_job and job.get("id") != "retired",
+        "retired":                 job.get("id") == "retired",
         "job_searching":           not has_job and age_group not in ("child",),
         "job_template_id":         job_template_id,
         "company_id":              None,

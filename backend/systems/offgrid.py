@@ -617,6 +617,12 @@ def send_offgrid(c, world, reason, duration_minutes):
     if c.get("travel_state"):
         return False
 
+    # Real check, every departure reason included (work shifts too, per
+    # the user's explicit ask) -- see systems/childcare_arrangement.py.
+    # Purely a side-effecting attempt, never blocks/delays this trip.
+    from systems.childcare_arrangement import maybe_arrange_childcare_before_departure
+    maybe_arrange_childcare_before_departure(c, world, reason)
+
     if reason in _TRAVEL_ELIGIBLE_REASONS or reason.startswith("event:"):
         from systems.travel import begin_travel
         return begin_travel(c, world, reason, duration_minutes)
@@ -1120,6 +1126,12 @@ def handle_return_transport(c, world):
 def process_return(c, world):
     if not c.get("off_grid") or world["tick"] < (c.get("return_tick") or 0):
         return
+
+    # Bring home any dependent currently placed with a temporary
+    # caretaker on this parent's behalf -- see systems/
+    # childcare_arrangement.py::maybe_return_dependents.
+    from systems.childcare_arrangement import maybe_return_dependents
+    maybe_return_dependents(c, world)
 
     reason = c.get("off_grid_reason") or "outing"
     is_event = reason.startswith("event:")

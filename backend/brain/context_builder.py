@@ -441,6 +441,8 @@ def build_available_actions(c, world):
         "text",
         "contact_business",
         "book_appointment",
+        "ring_doorbell",
+        "knock_on_door",
     ]
 
     # describe (Round 8) / recall (Round 9) — cost no in-world time but do
@@ -1954,6 +1956,12 @@ def _sec_temporary_separation(c, world):
     return list(lines) if lines else None
 
 
+def _sec_temp_caretaker(c, world):
+    from systems.childcare_arrangement import get_temp_caretaker_context
+    lines = get_temp_caretaker_context(c, world)
+    return list(lines) if lines else None
+
+
 def _sec_notable_stories(c, world):
     from systems.stories import get_stories_context
     lines = get_stories_context(c, world)
@@ -2058,6 +2066,7 @@ NARRATIVE_SECTIONS = [
     ("confiding",             "full", _sec_confiding),
     ("self_image",            "full", _sec_self_image),
     ("temporary_separation",  "full", _sec_temporary_separation),
+    ("temp_caretaker",        "full", _sec_temp_caretaker),
     ("notable_stories",       "full", _sec_notable_stories),
     ("behavior_patterns",     "full", _sec_behavior_patterns),
     ("guilt_paranoia",        "full", _sec_guilt_paranoia),

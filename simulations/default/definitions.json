@@ -4930,6 +4930,32 @@
           "interaction": "cook"
         }
       ]
+    },
+    "light_switch": {
+      "name": "Light Switch",
+      "category": "lighting",
+      "wall_mounted": true,
+      "footprint": [
+        {
+          "dx": 0,
+          "dy": 0
+        }
+      ],
+      "anchors": [
+        {
+          "name": "anchor_toggle",
+          "interaction": "toggle_room_lights"
+        }
+      ],
+      "storage": null,
+      "tags": [
+        "lighting",
+        "switch"
+      ],
+      "default_state": {
+        "on": true
+      },
+      "icon": "lighting"
     }
   },
   "item_templates": {

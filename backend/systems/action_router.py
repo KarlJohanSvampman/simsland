@@ -564,6 +564,17 @@ def _route_interact(c, world, action, definitions):
     # mark prop occupied
     prop["occupied_by"] = c["id"]
 
+    # Instant-effect interactions -- see systems/lighting.py for why
+    # these need real handling here at all (toggle_light/toggle_room_
+    # lights were declared on every lamp/switch template but never
+    # actually wired to anything).
+    if interaction == "toggle_light":
+        from systems.lighting import toggle_light
+        toggle_light(prop, definitions, world)
+    elif interaction == "toggle_room_lights":
+        from systems.lighting import toggle_room_lights
+        toggle_room_lights(prop, world, definitions)
+
 
 # =========================================================
 # ROUTE EAT
@@ -1876,6 +1887,11 @@ def route_action(c, world, action, speech, definitions=None, available_actions=N
 
     elif action_type == "paint_wall":
         _route_paint_wall(c, world, action)
+
+    elif action_type == "ring_doorbell":
+        _route_door_signal(c, world, action, method="ring_doorbell")
+    elif action_type == "knock_on_door":
+        _route_door_signal(c, world, action, method="knock_on_door")
 
     # ── Phone ──────────────────────────────────────────────────────────────────
     elif action_type == "phone_call":
@@ -3608,6 +3624,25 @@ def _set_computer_animation(c, world):
 
 _PURPOSEFUL_CALL_GOALS = {"favor", "impress", "share_story"}
 SMALL_TALK_TURNS_RANGE = (2, 4)
+
+
+def _route_door_signal(c, world, action, method):
+    """Ring the doorbell or knock -- see systems/doorbell.py for who
+    actually notices (sleep/shower/music reduce the odds, don't zero
+    them out) and what happens next (whoever notices gets woken, and if
+    it wasn't the specific person the visitor came for, whoever DID
+    notice gets a real intention to go tell them)."""
+    target_id = action.get("target_id") or action.get("target")
+    target = world.get("characters", {}).get(target_id) if target_id else None
+    household = None
+    if target and target.get("household_id"):
+        household = world.get("households", {}).get(target["household_id"])
+    c["activity"] = _scaffold(c, world, method, target_id=target_id, interaction=method)
+    if not household:
+        return
+
+    from systems.doorbell import resolve_door_signal
+    resolve_door_signal(c, world, household, target_id=target_id, method=method)
 
 
 def _route_phone_call(c, world, action):

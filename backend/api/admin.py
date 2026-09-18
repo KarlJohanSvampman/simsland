@@ -14,6 +14,15 @@ GET  /admin/cognition           -> world-level cognition-scheduler histogram
 GET  /admin/cognition/{char_id} -> one character's live cognition state
 POST /admin/reset_characters    -> wipe all characters/households (keeps
                                     the hand-placed map/buildings/roads)
+POST /admin/remove_character    -> remove one character (live experiment /
+                                    population trimming) without touching
+                                    anyone else -- unlike reset_characters
+                                    this leaves world-level history logs
+                                    alone, since _character_name() (api/
+                                    events.py) already falls back to
+                                    "someone" for a missing id and only a
+                                    MINORITY of characters are gone here,
+                                    not all of them
 POST /admin/fix_malnutrition    -> one-off correction for characters caught
                                     by the pre-fix item_templates nutrition
                                     miscalibration bug (see systems/
@@ -170,6 +179,63 @@ def reset_characters(sim_id: str = DEFAULT_SIM_ID):
     return {"ok": True}
 
 
+@router.post("/remove_character")
+def remove_character(payload: dict, sim_id: str = DEFAULT_SIM_ID):
+    """Remove a single character -- everyone else keeps going. Applies the
+    same orphan cleanup as reset_characters (placed_items/world_objects
+    owner_id, anchor occupied_by) scoped to just this id, plus removes them
+    from their household's members list. Also drops their in-process
+    sim_loop dispatch bookkeeping (_pending_agent_ids/_since/_generation) so
+    a currently in-flight decision for them doesn't try to write back into a
+    world that no longer has them.
+
+    payload: {"character_id"}"""
+    char_id = payload.get("character_id")
+    if not char_id:
+        return JSONResponse({"error": "character_id required"}, status_code=400)
+
+    with world_lock():
+        world = load_world(sim_id)
+        c = world.get("characters", {}).pop(char_id, None)
+        if c is None:
+            return JSONResponse({"error": f"no character {char_id}"}, status_code=404)
+
+        household_id = c.get("household_id")
+        household = world.get("households", {}).get(household_id)
+        if household and char_id in household.get("members", []):
+            household["members"].remove(char_id)
+
+        placed_items = world.get("placed_items", {})
+        if isinstance(placed_items, dict):
+            for item_id in [k for k, v in placed_items.items() if v.get("owner_id") == char_id]:
+                del placed_items[item_id]
+        world_objects = world.get("world_objects", {})
+        if isinstance(world_objects, dict):
+            for obj_id in [k for k, v in world_objects.items() if v.get("owner_id") == char_id]:
+                del world_objects[obj_id]
+
+        for prop in world.get("props", []):
+            for anchor in prop.get("anchors", []) or []:
+                if anchor.get("occupied_by") == char_id:
+                    anchor["occupied_by"] = None
+
+        save_world(sim_id, world)
+
+    import sim_loop
+    sim_loop._pending_agent_ids.discard(char_id)
+    sim_loop._pending_agent_since.pop(char_id, None)
+    sim_loop._agent_generation.pop(char_id, None)
+
+    try:
+        from main import _clients
+        for client in _clients:
+            client["needs_full"] = True
+    except Exception:
+        pass
+
+    return {"ok": True, "removed": char_id, "name": c.get("name")}
+
+
 @router.post("/fix_malnutrition")
 def fix_malnutrition(sim_id: str = DEFAULT_SIM_ID):
     """Item nutrition values were miscalibrated far below what
@@ -322,6 +388,36 @@ def set_body_need(payload: dict, sim_id: str = DEFAULT_SIM_ID):
         c.setdefault("body", {})[need] = value
         save_world(sim_id, world)
     return {"ok": True, "character_id": char_id, "need": need, "value": value}
+
+
+@router.post("/toggle_light")
+def toggle_light_admin(payload: dict, sim_id: str = DEFAULT_SIM_ID):
+    """Live-testing helper: flip a lamp or wall switch's on/off state
+    without waiting for a character to actually walk up and interact
+    with it -- see systems/lighting.py. Auto-detects a switch (room-wide)
+    vs a single lamp from the prop's own anchor interaction.
+    payload: {"prop_id"}."""
+    prop_id = payload.get("prop_id")
+    from core.definitions import load_definitions
+    import systems.lighting as lighting
+    with world_lock():
+        world = load_world(sim_id)
+        defs = load_definitions(sim_id)
+        props = world.get("props", [])
+        prop = next((p for p in props if p.get("id") == prop_id), None) if isinstance(props, list) \
+            else props.get(prop_id)
+        if not prop:
+            return {"ok": False, "error": f"no prop {prop_id}"}
+
+        template = defs.get("prop_templates", {}).get(prop.get("template"), {})
+        if lighting._is_switch_template(template):
+            affected = lighting.toggle_room_lights(prop, world, defs)
+        else:
+            lighting.toggle_light(prop, defs, world)
+            affected = []
+        world.pop("_dirty", None)
+        save_world(sim_id, world)
+    return {"ok": True, "prop_id": prop_id, "on": (prop.get("state") or {}).get("on"), "affected": affected}
 
 
 @router.get("/pending_agents")

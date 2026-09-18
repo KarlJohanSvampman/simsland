@@ -89,6 +89,48 @@ const placementState = {
   wallSide:   null        // "north"|"south"|"east"|"west"|null -- only meaningful for a wall_mounted prop template
 };
 
+// Ceiling Mode -- per the user's explicit ask, a ceiling-mounted prop
+// (light, fan) is see-through and can't be clicked/placed while this is
+// off, so it never blocks selecting or placing whatever's underneath it
+// (backend/systems/prop_placement.py already exempts ceiling_mounted
+// templates from floor-space margin checks; this is the matching editor-
+// side fix for the SAME prop visually/interactively blocking the tile
+// below it). Turning it on is required to add, select, or (once move/
+// delete exist for props at all -- they don't yet, see editor-main.js's
+// own lack of any drag/delete handling today) move/remove one.
+let ceilingModeActive = false;
+const CEILING_OPACITY_OFF = 0.28;  // barely-there outline when not editing ceiling props
+const CEILING_OPACITY_ON  = 0.85;  // solid enough to actually work with while in Ceiling Mode
+const ceilingMarkerMeshes = [];     // every placed ceiling-mounted prop's marker mesh
+
+// Selected-prop tracking for Move/Delete -- separate from the read-only
+// Inspector text, which the tile-selection branch below also overwrites.
+let selectedPropEntry = null;   // the worldState.props entry, or null
+let selectedPropMesh  = null;   // its THREE.Mesh, or null
+let movingPropEntry   = null;   // set while a "Move Selected" destination pick is pending
+let movingPropMesh    = null;
+
+function setPropActionButtonsVisible(visible) {
+  const el = document.getElementById("propActionButtons");
+  if (el) el.style.display = visible ? "block" : "none";
+}
+
+function setCeilingMode(active) {
+  ceilingModeActive = active;
+  for (const mesh of ceilingMarkerMeshes) {
+    mesh.material.opacity = active ? CEILING_OPACITY_ON : CEILING_OPACITY_OFF;
+  }
+  const btn = document.getElementById("btn-ceiling_mode");
+  if (btn) {
+    btn.textContent = active ? "🔆 Ceiling Mode: On" : "🔆 Ceiling Mode: Off";
+    btn.style.background  = active ? "#1a5f2a" : "";
+    btn.style.borderColor = active ? "#4caf50" : "";
+  }
+  setStatus(active
+    ? "Ceiling Mode on -- ceiling props (lights, fans) are now selectable/placeable."
+    : "Ceiling Mode off -- ceiling props are see-through and won't block what's underneath.");
+}
+
 //
 // ===================================
 // TILE STORAGE
@@ -231,21 +273,32 @@ scene.add(tileCornerMarkerGroup);
 const tileCornerMarkers = new Map(); // "x,y" -> THREE.Group
 
 function addPropMarker(entry) {
+  const tmpl = (definitions.prop_templates || {})[entry.template];
+  const isCeiling = !!tmpl?.ceiling_mounted;
+
   const world = gridToWorld(entry.x, entry.y);
   const mesh = new THREE.Mesh(
     new THREE.CylinderGeometry(0.3, 0.35, 0.9, 12),
-    new THREE.MeshBasicMaterial({ color: 0xe0a030 })
+    new THREE.MeshBasicMaterial({
+      color:       isCeiling ? 0xfff0a0 : 0xe0a030,
+      transparent: isCeiling,
+      opacity:     isCeiling ? (ceilingModeActive ? CEILING_OPACITY_ON : CEILING_OPACITY_OFF) : 1
+    })
   );
-  mesh.position.set(world.x, 0.45, world.z);
+  // Ceiling-mounted markers sit up near where a real ceiling fixture
+  // would hang, floor/wall markers keep their original height.
+  mesh.position.set(world.x, isCeiling ? 1.9 : 0.45, world.z);
   mesh.userData = {
-    type:     "prop",
-    id:       entry.id,
-    template: entry.template,
-    x:        entry.x,
-    y:        entry.y,
-    rotation: entry.rotation || 0
+    type:          "prop",
+    id:            entry.id,
+    template:      entry.template,
+    x:             entry.x,
+    y:             entry.y,
+    rotation:      entry.rotation || 0,
+    ceilingMounted: isCeiling
   };
   placedGroup.add(mesh);
+  if (isCeiling) ceilingMarkerMeshes.push(mesh);
   return mesh;
 }
 
@@ -532,8 +585,19 @@ renderer.domElement.addEventListener("pointerdown", (event) => {
 
   const objectHits = raycaster.intersectObjects(placedGroup.children, true);
 
-  if (objectHits.length) {
-    let obj = objectHits[0].object;
+  // Ceiling Mode gate: while off, a ceiling-mounted marker is see-through
+  // AND unselectable, so it never blocks clicking whatever's underneath;
+  // while on, only ceiling markers are selectable, so you can work on them
+  // without accidentally grabbing the furniture below. See setCeilingMode().
+  const hit = objectHits.find((h) => {
+    let o = h.object;
+    while (o && !o.userData?.type) o = o.parent;
+    if (!o) return false;
+    return !!o.userData.ceilingMounted === ceilingModeActive;
+  });
+
+  if (hit) {
+    let obj = hit.object;
     while (obj && !obj.userData?.type) obj = obj.parent;
 
     if (obj) {
@@ -552,8 +616,32 @@ renderer.domElement.addEventListener("pointerdown", (event) => {
         <b>Grid:</b> ${d.x}, ${d.y}<br>
         <b>Rotation:</b> ${d.rotation || 0}°
       `);
+
+      // Track the selected PROP (not floorplan) for the Move/Delete
+      // buttons -- d.type is "prop" for a prop marker, see addPropMarker().
+      if (d.type === "prop") {
+        selectedPropEntry = worldState.props.find((p) => p.id === d.id) || null;
+        selectedPropMesh  = obj;
+        setPropActionButtonsVisible(!!selectedPropEntry);
+      } else {
+        selectedPropEntry = null;
+        selectedPropMesh  = null;
+        setPropActionButtonsVisible(false);
+      }
       return;
     }
+  }
+
+  selectedPropEntry = null;
+  selectedPropMesh  = null;
+  setPropActionButtonsVisible(false);
+
+  // A pending "Move Selected" pick takes this tile click as its
+  // destination instead of the normal tile-selection behavior below.
+  if (movingPropEntry) {
+    const moveTile = pickTile(event);
+    if (moveTile) commitPropMove(moveTile);
+    return;
   }
 
   const tile = pickTile(event);
@@ -586,6 +674,51 @@ renderer.domElement.addEventListener("pointerdown", (event) => {
 });
 
 //
+// Move / Delete the currently-selected prop -- see selectedPropEntry/
+// selectedPropMesh, set in the pointerdown handler above. Both act on
+// whatever's currently selected, so they automatically inherit Ceiling
+// Mode's own gate (a ceiling prop can only BE selected while Ceiling
+// Mode is on in the first place -- see the raycast filter above).
+//
+function startMoveSelectedProp() {
+  if (!selectedPropEntry || !selectedPropMesh) return;
+  movingPropEntry = selectedPropEntry;
+  movingPropMesh  = selectedPropMesh;
+  setStatus(`Moving ${movingPropEntry.template} — click a tile for its new position.`);
+}
+
+function commitPropMove(tile) {
+  movingPropEntry.x = tile.x;
+  movingPropEntry.y = tile.y;
+  const isCeiling = !!movingPropMesh.userData.ceilingMounted;
+  const world = gridToWorld(tile.x, tile.y);
+  movingPropMesh.position.set(world.x, isCeiling ? 1.9 : 0.45, world.z);
+  movingPropMesh.userData.x = tile.x;
+  movingPropMesh.userData.y = tile.y;
+  setStatus(`Moved ${movingPropEntry.template} to ${tile.x}, ${tile.y}.`);
+  movingPropEntry = null;
+  movingPropMesh  = null;
+}
+
+function deleteSelectedProp() {
+  if (!selectedPropEntry || !selectedPropMesh) return;
+  const idx = worldState.props.indexOf(selectedPropEntry);
+  if (idx !== -1) worldState.props.splice(idx, 1);
+  placedGroup.remove(selectedPropMesh);
+  const ceilingIdx = ceilingMarkerMeshes.indexOf(selectedPropMesh);
+  if (ceilingIdx !== -1) ceilingMarkerMeshes.splice(ceilingIdx, 1);
+  setStatus(`Deleted ${selectedPropEntry.template}.`);
+  selectedPropEntry = null;
+  selectedPropMesh  = null;
+  setPropActionButtonsVisible(false);
+  showInspector("Nothing selected");
+  document.getElementById("editorSelection").innerHTML = "<b>Selection</b><hr>Nothing selected";
+}
+
+document.getElementById("btn-move_prop").onclick = startMoveSelectedProp;
+document.getElementById("btn-delete_prop").onclick = deleteSelectedProp;
+
+//
 // Commit a prop/floorplan placement at a given tile — shared by the
 // double-click handler and the explicit "Place Here" button.
 //
@@ -593,6 +726,16 @@ function commitPlacement(tile) {
   if (!placementState.active || !tile) return;
 
   if (placementState.mode === "prop") {
+    // Ceiling Mode gate for ADD (see setCeilingMode()) -- a ceiling-mounted
+    // template needs Ceiling Mode on to place, same as select; a normal
+    // prop is unaffected either way (this mode is scoped to ceiling props
+    // only, not a general lockout of everything else).
+    const tmpl = (definitions.prop_templates || {})[placementState.templateId];
+    if (tmpl?.ceiling_mounted && !ceilingModeActive) {
+      setStatus(`Turn on Ceiling Mode to place "${placementState.templateId}" (it's ceiling-mounted).`);
+      return;
+    }
+
     const entry = {
       id:       crypto.randomUUID(),
       template: placementState.templateId,
@@ -728,6 +871,14 @@ function updateWallSideSelect() {
 
 document.getElementById("wallSideSelect").onchange = (e) => {
   placementState.wallSide = e.target.value || null;
+};
+
+//
+// Ceiling Mode toggle button
+//
+
+document.getElementById("btn-ceiling_mode").onclick = () => {
+  setCeilingMode(!ceilingModeActive);
 };
 
 //

@@ -78,6 +78,20 @@ def _calc_min_work_hours(c, world):
     How many hours must this character work this week to cover their
     share of household expenses?
     """
+    # Confirmed live bug (player report: a retired 63-year-old still had
+    # "work" blocks and a go_to_work expectation): this never checked
+    # whether the character actually HAS a job at all -- share/wage below
+    # always comes out positive (wage floors at 0.01 even when the real
+    # hourly_wage is 0), then the hard floor a few lines down forces it
+    # into a 20-40h/week band regardless. A character with no real job --
+    # retired (either via systems/retirement.py::_do_retire(), or born
+    # retired at generation, systems/character_gen.py::_assign_job()'s
+    # own "retired" placeholder) or simply between jobs -- has no wage to
+    # work toward and shouldn't get a work skeleton at all.
+    job = c.get("job") or {}
+    if not job.get("id") or job.get("id") == "retired":
+        return 0.0
+
     hid       = c.get("household_id")
     household = world.get("households", {}).get(hid) if hid else None
 

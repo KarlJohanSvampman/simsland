@@ -285,6 +285,8 @@ html, body {
     <option value="west">Wall side: West</option>
   </select>
   <div class="toolButton" id="btn-spawn_character">👤 Spawn Character</div>
+  <hr>
+  <div class="toolButton" id="btn-ceiling_mode" title="While off, ceiling-mounted props (lights, fans) are see-through and can't be clicked or placed, so they never block what's underneath. Turn on to add/select ceiling props.">🔆 Ceiling Mode: Off</div>
 </div>
 
 <!-- =========================
@@ -295,6 +297,10 @@ html, body {
   <b>Selection</b>
   <hr>
   Nothing selected
+</div>
+<div id="propActionButtons" style="display:none; margin-top:8px;">
+  <div class="toolButton" id="btn-move_prop" style="background:#3d4754;">✋ Move Selected</div>
+  <div class="toolButton" id="btn-delete_prop" style="background:#5f1a1a; border-color:#c44;">🗑 Delete Selected</div>
 </div>
 
 <!-- =========================

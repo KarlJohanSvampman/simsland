@@ -72,6 +72,13 @@ def _format_event(world, event):
     base["medium"] = medium
     subcategory = event.get("subcategory")
     base["subcategory"] = subcategory.get("subcategory") if subcategory else None
+    # The fuller 2-4 sentence account (llm/shared_event_narration.py),
+    # when narration actually succeeded -- None for the deterministic
+    # fallback (whose own "detail" is just a copy of "text", not worth
+    # showing twice) or for an event created before this field existed.
+    detail = event.get("detail")
+    base["detail"] = detail if detail and detail != summary else None
+    base["category"] = event.get("category")
     return base
 
 

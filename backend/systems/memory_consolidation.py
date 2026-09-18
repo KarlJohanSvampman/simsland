@@ -236,7 +236,20 @@ def maybe_forget_short_term(c, world):
     moment or someone close, higher for routine chatter about a stranger
     -- rather than one flat rate applied to everything. A memory younger
     than MIN_AGE_BEFORE_FORGETTING_TICKS is never even rolled -- it
-    hasn't had a chance to be remembered yet, let alone forgotten."""
+    hasn't had a chance to be remembered yet, let alone forgotten.
+
+    Confirmed live bug (player report: a retired, mostly-asleep elderly
+    character ended up with ZERO memories at all): unlike
+    maybe_consolidate_memories() above, this had no _is_unconscious()
+    skip -- it kept rolling drop chances against the SAME short-term log
+    every ~3 real hours regardless of whether the character was awake to
+    make any new memories in between. A character who sleeps through
+    most real hours nets a steady drain with nothing to offset it,
+    converging on an empty memory bank over enough real time. Forgetting
+    should pause the same way remembering already does."""
+    if _is_unconscious(c):
+        return
+
     tick = world.get("tick", 0)
 
     # Same cold-start fix as maybe_consolidate_memories() above -- seed

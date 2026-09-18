@@ -47,6 +47,9 @@ WAKE_PRIORITY = {
                                  # insulted/threatened/etc. outranks merely
                                  # being spoken to
     "heard_speech": 100,
+    "door_signal": 95,        # systems/doorbell.py -- noticed a doorbell/
+                                 # knock; ranks just under actually being
+                                 # spoken to, above a body need
     "urgent_need": 90,
     "noticed_commotion": 75,   # systems/curiosity.py -- a curious character just noticed something worth investigating
     "activity_aborted": 80,
@@ -150,6 +153,7 @@ _WAKE_LINE_TEMPLATES = {
     "waiting_timed_out": "You've been waiting a while now and your patience is running out.",
     "gave_up_waiting": "You gave up waiting -- it's taken too long, so you're moving on for now.",
     "noticed_commotion": "{summary}",
+    "door_signal": "You hear someone at the door -- {visitor_name} is here.",
     "director_attention": "Something makes you stop and look up -- you have the odd feeling someone unseen is watching you, waiting for you to notice.",
 }
 

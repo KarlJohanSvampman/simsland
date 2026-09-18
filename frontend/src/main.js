@@ -2165,12 +2165,47 @@ function updateTiles(state){
   }
 }
 
-function createFallbackProp(prop){
+// Backend systems/lighting.py's own on/off resolution, mirrored here so
+// the fallback-cylinder placeholder (no real lamp/switch GLB models exist
+// yet, confirmed via full-codebase grep) can actually show it -- a prop's
+// own state.on is authoritative once set, template default_state.on is
+// only the fallback for a prop nobody's touched yet.
+function isLightingTemplate(resolved){
+  if(!resolved) return false;
+  return resolved.category === "lighting" || (resolved.tags || []).includes("lighting");
+}
 
-  // Cylinder placeholder — blue-grey, easy to spot, clearly "not a real model"
+function isLightOn(prop, resolved){
+  const state = prop.state || {};
+  if("on" in state) return !!state.on;
+  const def = resolved?.default_state || {};
+  return def.on !== undefined ? !!def.on : true;
+}
+
+const LIGHT_ON_COLOR  = 0xfff2b0;
+const LIGHT_OFF_COLOR = 0x4a4a4a;
+
+function applyLightVisual(mesh, on){
+  const mat = mesh.material;
+  mat.color.set(on ? LIGHT_ON_COLOR : LIGHT_OFF_COLOR);
+  mat.emissive.set(on ? 0xffcc55 : 0x000000);
+  mat.emissiveIntensity = on ? 1.1 : 0;
+  mesh.userData.lightOn = on;
+}
+
+function createFallbackProp(prop, resolved){
+
+  const lighting = isLightingTemplate(resolved);
+
+  // Cylinder placeholder — blue-grey, easy to spot, clearly "not a real
+  // model". A lighting prop (lamp/switch) gets its own material instead,
+  // so its on/off state (systems/lighting.py) is actually visible —
+  // warm/glowing when on, dim grey when off.
   const mesh = new THREE.Mesh(
     new THREE.CylinderGeometry(0.38, 0.38, 1.0, 16),
-    new THREE.MeshStandardMaterial({ color: 0x6688aa, roughness: 0.7 })
+    lighting
+      ? new THREE.MeshStandardMaterial({ roughness: 0.5 })
+      : new THREE.MeshStandardMaterial({ color: 0x6688aa, roughness: 0.7 })
   );
 
   mesh.position.set(
@@ -2178,15 +2213,19 @@ function createFallbackProp(prop){
     0.5,
     prop.y - 7
   );
-  applyWallSideTransform(mesh, prop, resolveProp(definitions, prop));
+  applyWallSideTransform(mesh, prop, resolved);
   mesh.userData = {
 
     type: "prop",
 
     id: prop.id,
 
-    template: prop.template
+    template: prop.template,
+
+    isLighting: lighting
   };
+
+  if(lighting) applyLightVisual(mesh, isLightOn(prop, resolved));
 
   mesh.visible = !prop.hidden;
 
@@ -2237,17 +2276,29 @@ async function updateProps(state){
 
     if(props[prop.id]){
 
+      const resolvedExisting = resolveProp(definitions, prop);
+
       props[prop.id].position.set(
         prop.x - 10,
         0.5,
         prop.y - 7
       );
-      applyWallSideTransform(props[prop.id], prop, resolveProp(definitions, prop));
+      applyWallSideTransform(props[prop.id], prop, resolvedExisting);
 
       // Off-grid physical travel: server sets prop.hidden explicitly
       // (garage/car/bus while mid-trip or off-map) -- see systems/travel.py
       // and systems/transit.py.
       props[prop.id].visible = !prop.hidden;
+
+      // Lighting on/off visual sync (systems/lighting.py) -- fallback-
+      // cylinder props only (see createFallbackProp/isLightingTemplate);
+      // a real lamp/switch GLB model would need its own emissive-material
+      // convention once one actually exists. Only touches the material
+      // when the resolved on/off value actually changed, not every tick.
+      if(props[prop.id].userData?.isLighting){
+        const on = isLightOn(prop, resolvedExisting);
+        if(props[prop.id].userData.lightOn !== on) applyLightVisual(props[prop.id], on);
+      }
 
       // ── Prop animation state sync ──
       // If the server changed anim_state, cross-fade to the new clip.
@@ -2297,7 +2348,7 @@ async function updateProps(state){
     if(!propModelPath){
 
       props[prop.id] =
-        createFallbackProp(prop);
+        createFallbackProp(prop, resolved);
 
       delete loadingProps[prop.id];
 
@@ -2377,7 +2428,7 @@ catch(err){
   );
 
   props[prop.id] =
-    createFallbackProp(prop);
+    createFallbackProp(prop, resolved);
 }
 
 delete loadingProps[prop.id];
@@ -7550,6 +7601,17 @@ function openEventModal(items, nowTick){
     summary.className = "eventModalRowSummary";
     summary.textContent = ev.summary || "(no details)";
     row.appendChild(summary);
+
+    // Fuller 2-4 sentence account (api/events.py's "detail"), when the
+    // real narration behind this event actually generated one -- absent
+    // for the deterministic fallback, so most events still show just
+    // the one-line summary above.
+    if(ev.detail){
+      const detail = document.createElement("div");
+      detail.className = "eventModalRowDetail";
+      detail.textContent = ev.detail;
+      row.appendChild(detail);
+    }
 
     body.appendChild(row);
   }
