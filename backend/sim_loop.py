@@ -62,6 +62,7 @@ from systems.investments   import update_investment_behavior
 from systems.deliveries import update_deliveries
 from systems.service_worker_runtime import update_service_workers
 from systems.household_monitoring   import update_household_monitoring
+from systems.caretaker_negotiation  import tick_caretaker_negotiation
 
 # -- Slow (÷30-60) — still periodic ─────────────────────────────
 from systems.traffic    import update_ambient_traffic
@@ -69,7 +70,7 @@ from systems.media      import generate_news
 from brain.conversations import cleanup_conversations
 from systems.emergency  import trigger_incident, resolve, tick_fire_incidents, auto_report_incidents   # resolve polls arrival ticks
 from systems.health     import apply_severity_consequences
-from systems.law        import process_jail, process_trials, maybe_arrest_from_incidents
+from systems.law        import process_jail, process_trials, maybe_arrest_from_incidents, process_prison_reporting
 from systems.jobs       import generate_job_listings, tick_job_market, maybe_fire, advance_job_application, init_company_slots
 from systems.driver_license import advance_driver_license, maybe_practice_with_companion
 from systems.postal_service     import update_postal_service
@@ -122,6 +123,9 @@ from systems.sociopathy import (
 from systems.behavior_patterns import aggregate_daily_observations
 from systems.contagion       import tick_contagion_location, age_food_items
 from systems.child_care      import tick_child_needs
+from systems.child_welfare   import tick_child_welfare
+from systems.child_disclosure import tick_child_disclosure
+from systems.dependent_tracking import tick_dependent_checks
 from systems.bedroom_assignment import tick_bedroom_assignments
 from systems.plants           import tick_plants
 from systems.body_composition import tick_body_composition
@@ -686,6 +690,7 @@ def tick(world):
 
     if every(world, CADENCE["household_monitoring"], offset=8):
         update_household_monitoring(world)
+        tick_caretaker_negotiation(world)
 
     if every(world, CADENCE["mentality_compilation"], offset=12):
         from systems.mentality import tick_mentality_compilation
@@ -785,10 +790,17 @@ def tick(world):
         for c in characters:
             process_jail(c, world)     # emits character_released
         process_trials(world)          # emits character_jailed / character_acquitted
+        process_prison_reporting(world)  # mail-scheduled self-surrender + failure-to-appear
+        from systems.offgrid import tick_long_stay_checkins
+        tick_long_stay_checkins(world)  # periodic narration for long off-grid stays
 
     if every(world, CADENCE["news"], offset=17):
         generate_news(world)
         maybe_generate_shared_event(world)
+
+    if every(world, CADENCE["reading"], offset=23):
+        from systems.scripted_conversations import tick_scripted_conversations
+        tick_scripted_conversations(world)  # plays back a remote call/sms shared_event's script
 
     # Conversations threaded via action_router.py's apply_speech() aren't
     # tied to a scripted activity with its own end condition anymore, so
@@ -817,6 +829,12 @@ def tick(world):
 
     if every(world, CADENCE["grievances"], offset=25):
         update_grievances(world)    # decay + emit confrontation_desired
+        from systems.goodwill import update_goodwill
+        update_goodwill(world)      # decay + stamp _bond_emitted, same cadence
+        from systems.offense_rationalization import decay_guilt_paranoia
+        for c in characters:
+            if c.get("_guilt_paranoia"):
+                decay_guilt_paranoia(c)
 
     if every(world, CADENCE["contract_checks"], offset=26):
         check_contract_violations(world)  # emits contract_violated
@@ -969,6 +987,11 @@ def tick(world):
     # -- Child needs oversight + baseline accountability contract ──
     if every(world, CADENCE["child_care"], offset=37):
         tick_child_needs(world)
+        tick_child_welfare(world)
+        tick_child_disclosure(world)
+        for c in characters:
+            if c.get("dependents"):
+                tick_dependent_checks(c, world)
 
     # -- Age-based bedroom ownership ────────────────────────────────
     if every(world, CADENCE["bedroom_assignment"], offset=38):

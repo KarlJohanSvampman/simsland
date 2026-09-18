@@ -41,9 +41,33 @@ CATEGORY_PRIORITY = {
     "impulse":  10,
 }
 
+# How far out (real ticks) urgency starts ramping before a real
+# window_end_tick -- e.g. an intention whose window closes in 2 hours
+# starts climbing now; one still 5 hours out is unaffected.
+URGENCY_WINDOW_TICKS = 2 * 3600
+
+
 def final_priority(i):
     category_score = CATEGORY_PRIORITY.get(i.get("category", "impulse"), 0)
-    return category_score * 1000 + i.get("priority", 0)
+    base = i.get("priority", 0)
+
+    # Real deadline-driven urgency (systems/expectations.py's schedule-
+    # derived window_end_tick) -- compounds with the intention's own
+    # base priority rather than a flat additive bump, per the explicit
+    # ask: "least time left and highest priority should compel us all
+    # the more." A low-priority intention barely spikes even with zero
+    # time left; a high-priority one running out of time genuinely
+    # dominates. Reuses the same module-level _CURRENT_TICK
+    # add_intention() already relies on, rather than threading a world
+    # param through every one of final_priority()'s own callers.
+    window_end = i.get("window_end_tick")
+    if window_end is not None:
+        remaining = max(0, window_end - _CURRENT_TICK)
+        if remaining < URGENCY_WINDOW_TICKS:
+            urgency_factor = 1.0 + (1.0 - remaining / URGENCY_WINDOW_TICKS) * (base / 100.0)
+            base = min(100, base * urgency_factor)
+
+    return category_score * 1000 + base
 # =========================================================
 # ENSURE ACTIVE INTENTIONS
 # =========================================================

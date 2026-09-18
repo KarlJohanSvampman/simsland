@@ -1961,7 +1961,11 @@ def _find_and_consume_food(c, world, category="food"):
 
     for container in _household_storage_containers(c, world):
         for entry in list(container.get("items", [])):
-            if entry.get("category") == category:
+            # edible (definitions.json item_templates) is the newer,
+            # explicit signal -- checked alongside category for the same
+            # "is this real, established food" reasoning contagion.py's
+            # own category/is_food dual-check already uses elsewhere.
+            if entry.get("category") == category or (category == "food" and entry.get("edible")):
                 removed = remove_from_container(container, entry["id"], quantity=1)
                 if removed.get("success"):
                     return removed["item"]

@@ -4,7 +4,7 @@ body_intentions.py — converts physical body state into high-priority intention
 These override scheduled activities when the body demands attention.
 """
 
-from brain.intentions import add_intention
+from brain.intentions import add_intention as _add_intention_raw
 from systems.body import get_odor_label, get_breath_label
 
 
@@ -31,6 +31,33 @@ _MANAGED_INTENTION_TYPES = {
 def generate_body_intentions(c, world=None):
     b = c.get("body", {})
     tr = c.get("traits", [])
+
+    # Confirmed live bug (player-visible: every body-need intention's
+    # "Created At" always reads "0s ago", no matter how long the need has
+    # actually been active): the wipe-then-readd pattern right below this
+    # comment (needed for the toilet-swap fix documented above) deletes
+    # the existing entry BEFORE add_intention() ever runs, so its own
+    # "preserve the original created_at when one already exists" lookup
+    # always finds nothing and always stamps a fresh "now" -- every
+    # single tick, for every managed type. Snapshot each managed type's
+    # real original created_at first, so it can be threaded back in
+    # explicitly (add_intention() honors an explicit created_at and skips
+    # its own now-useless lookup) when re-added below.
+    _original_created_at = {
+        i["type"]: i["created_at"]
+        for i in c.get("active_intentions", [])
+        if i.get("type") in _MANAGED_INTENTION_TYPES and "created_at" in i
+    }
+
+    # Local shadow of the real add_intention for the rest of this function
+    # only -- every call site below stays unchanged, but now transparently
+    # carries forward the real original created_at (when this type was
+    # already active) instead of always minting a fresh "now".
+    def add_intention(c, intention):
+        preserved = _original_created_at.get(intention["type"])
+        if preserved is not None and "created_at" not in intention:
+            intention["created_at"] = preserved
+        _add_intention_raw(c, intention)
 
     c["active_intentions"] = [
         i for i in c.get("active_intentions", [])

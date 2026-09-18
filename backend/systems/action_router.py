@@ -1188,24 +1188,98 @@ def _resolve_target_name(world, target_id):
     return None
 
 
-def _route_examine(c, world, action):
-    target_id = action.get("target")
-    c["activity"] = _scaffold(
-        c, world, "examine",
-        target_id=target_id,
-        interaction="examine",
-        duration=180,
-    )
-    c["animation_state"] = get_phase_animation("examine", "using")
+def _build_examine_facts(c, world, target_id, available_actions):
+    """Gathers whatever real structured facts are known about a target --
+    prop/item/character template data first (category, tags, description,
+    edible), falling back to the existing crude id-only-pool extraction
+    (_find_id_only_entry, focus's original mechanism) when nothing
+    template-based resolves. Returns (entity_name, facts_dict)."""
+    if not target_id:
+        return "something", {}
 
-    # Per the user's ask: examine/search should show what's actually
-    # being targeted, not just play a generic animation with no
-    # narration -- mirrors _route_search's "Looking for X..." bubble.
-    name = _resolve_target_name(world, target_id)
-    if name:
-        c["activity"]["target_name"] = name
-        from systems.incidental_speech import fire_incidental
-        fire_incidental(c, "inform", f"Examining {name}...", world)
+    from systems.templates import resolve_prop, resolve_item
+    from systems.props import get_prop_by_id
+
+    prop = get_prop_by_id(world, target_id)
+    if prop:
+        resolved = resolve_prop(world, prop)
+        name = resolved.get("name") or resolved.get("template") or target_id
+        facts = {
+            "category":    resolved.get("category"),
+            "tags":        resolved.get("tags"),
+            "description": resolved.get("description"),
+        }
+        return name, facts
+
+    from systems.personal_items import get_item_by_id
+    item = get_item_by_id(c, target_id) or (world.get("placed_items") or {}).get(target_id)
+    if item:
+        resolved = resolve_item(world, item)
+        name = resolved.get("name") or resolved.get("template_id") or target_id
+        facts = {
+            "category":    resolved.get("category"),
+            "tags":        resolved.get("tags"),
+            "description": resolved.get("description"),
+            "edible":      resolved.get("edible"),
+        }
+        return name, facts
+
+    char = world.get("characters", {}).get(target_id)
+    if char:
+        name = char.get("name", target_id)
+        facts = {
+            "category": "person",
+            "job":      (char.get("job") or {}).get("title"),
+            "activity": (char.get("activity") or {}).get("type"),
+        }
+        return name, facts
+
+    pool, entry = _find_id_only_entry(available_actions or {}, target_id)
+    if entry is not None:
+        name = entry.get("name") or target_id
+        facts = {k: v for k, v in entry.items() if k not in ("id", "name")}
+        return name, facts
+
+    return target_id, {}
+
+
+def _resolve_examine_target(c, world, target_id, available_actions):
+    """Real, synchronous LLM description grounded in the target's own
+    template facts -- resolves in the same tick it's called, exactly
+    like _route_make_argument()'s existing "no _scaffold wait" pattern,
+    instead of examine's old flat 180-tick no-content wait. Stores the
+    result as both an incidental speech bubble and a real, retained
+    memory. Returns (entity_name, description_text)."""
+    name, facts = _build_examine_facts(c, world, target_id, available_actions)
+
+    from llm.examine_narration import generate_examine_description, fallback_examine_description
+    from llm.llm_gate import run_llm_call
+
+    # PRIORITY_NORMAL (the default) -- this is part of an already-active
+    # character's own live decision/turn, not one-off background content
+    # generation, so it shouldn't be the first thing preempted the moment
+    # any other character's own think() call arrives.
+    result = run_llm_call(generate_examine_description(c, name, facts, world))
+    text = result if isinstance(result, str) and result.strip() else fallback_examine_description(name, facts)
+
+    scan = c.get("environment_scan") or {"text": ""}
+    scan["focused"] = text
+    scan["tick"] = world.get("tick", 0)
+    c["environment_scan"] = scan
+
+    from brain.memory import store_memory
+    store_memory(c, text, importance=0.3, tags=["examine", "observation"], kind="observation", tick=world.get("tick", 0))
+
+    return name, text
+
+
+def _route_examine(c, world, action, available_actions=None):
+    target_id = action.get("target")
+    name, text = _resolve_examine_target(c, world, target_id, available_actions)
+
+    c["animation_state"] = get_phase_animation("examine", "using")
+    from systems.incidental_speech import fire_incidental
+    fire_incidental(c, "inform", text, world)
 
 
 # =========================================================
@@ -1253,19 +1327,14 @@ def _find_id_only_entry(available_actions, target_id):
 
 def _route_focus(c, world, action, available_actions):
     target_id = action.get("target")
-    available_actions = available_actions or {}
     if not target_id:
         return
-    pool, entry = _find_id_only_entry(available_actions, target_id)
-    if entry is None:
-        text = f"You look for \"{target_id}\" but can't place it right now."
-    else:
-        details = "; ".join(f"{k}: {v}" for k, v in entry.items() if k not in ("id",) and v not in (None, "", []))
-        text = f"A closer look at it ({pool}): {details}."
-    scan = c.setdefault("environment_scan", {"text": "", "tick": world.get("tick", 0)})
-    scan["focused"] = text
-    scan["tick"] = world.get("tick", 0)
-    c["activity"] = _scaffold(c, world, "focus", target_id=target_id, interaction="examine", duration=60)
+    # Same real, LLM-grounded resolution as examine now -- focus was
+    # always "examine, but starting from an already-known id-only pool
+    # entry rather than a fresh target"; both now go through the same
+    # template-facts-first, id-only-pool-fallback path and the same
+    # instant (no _scaffold wait) resolution.
+    _resolve_examine_target(c, world, target_id, available_actions)
 
 
 def _route_list_available_actions(c, world, action, available_actions):
@@ -1746,7 +1815,7 @@ def route_action(c, world, action, speech, definitions=None, available_actions=N
         _route_recall(c, world, action, available_actions)
 
     elif action_type == "examine":
-        _route_examine(c, world, action)
+        _route_examine(c, world, action, available_actions)
 
     elif action_type == "look_around":
         _route_look_around(c, world, action, available_actions)

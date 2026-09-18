@@ -1,8 +1,8 @@
 """
 api/events.py
 
-Read-only feed over world["events"] (offgrid_story + the 4 shared_event
-subtypes -- see systems/offgrid.py::process_return() and
+Read-only feed over world["events"] (offgrid_story + the 5 shared_event
+encounter tiers -- see systems/offgrid.py::process_return() and
 systems/events.py::create_shared_event()) for the viewer's event timeline.
 Non-spatial by design: events aren't tied to a viewport radius the way
 characters/props/tiles are, so this is a plain REST poll, not part of the
@@ -15,11 +15,15 @@ from db import load_world
 
 router = APIRouter()
 
+# Fallback labels only -- create_shared_event() always stamps a real,
+# narrated event["text"] (llm/shared_event_narration.py), so this is
+# just the never-blank backstop if that's ever somehow missing.
 _SHARED_EVENT_LABELS = {
-    "store_encounter": "ran into each other at a store",
-    "cafe_meet":        "met up at a cafe",
-    "street_argument":  "got into an argument on the street",
-    "gym_incident":      "had an incident at the gym",
+    "neutral":    "crossed paths",
+    "pleasant":   "had a pleasant exchange",
+    "unpleasant": "had an unpleasant exchange",
+    "argument":   "got into an argument",
+    "conflict":   "had a real conflict",
 }
 
 
@@ -47,18 +51,27 @@ def _format_event(world, event):
         base["summary"] = f"{name} picked {chosen} for {choice_type}."
         return base
 
-    # The 4 shared_event subtypes (store_encounter/cafe_meet/
-    # street_argument/gym_incident) -- systems/events.py::
-    # create_shared_event() now stamps a real, freely-narrated "text"
-    # onto the event itself (llm/shared_event_narration.py), so this
-    # just surfaces that directly instead of a generic label +
-    # mechanical outcome-type suffix (removed entirely -- see session
-    # history for why that mechanic was dropped).
+    # The 5 real, rolled encounter tiers (neutral/pleasant/unpleasant/
+    # argument/conflict) -- systems/events.py::create_shared_event() now
+    # stamps a real, narrated "text" onto the event itself (llm/
+    # shared_event_narration.py), so this just surfaces that directly.
+    # A negative tier also carries a real "severity" (Minor..Intense).
     names = [_character_name(world, cid) for cid in event.get("participants", [])]
     label = _SHARED_EVENT_LABELS.get(etype, (etype or "event").replace("_", " "))
     summary = event.get("text") or (f"{' and '.join(names)} {label}" if names else label.capitalize())
-    base["title"] = " & ".join(names) if names else (etype or "event").replace("_", " ").title()
+    title = " & ".join(names) if names else (etype or "event").replace("_", " ").title()
+    severity = event.get("severity")
+    if severity:
+        title += f" ({severity} {etype})"
+    medium = event.get("medium")
+    if medium:
+        title += f" [{medium}]"
+    base["title"] = title
     base["summary"] = summary
+    base["severity"] = severity
+    base["medium"] = medium
+    subcategory = event.get("subcategory")
+    base["subcategory"] = subcategory.get("subcategory") if subcategory else None
     return base
 
 

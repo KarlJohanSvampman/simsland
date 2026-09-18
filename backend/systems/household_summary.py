@@ -156,8 +156,19 @@ def on_speech_spoken(data, world):
 
 def update_household_hourly_summaries(world):
     from llm.household_summary_narration import generate_hourly_summary
+    from systems.events import maybe_generate_summary_linked_event
     tick = world.get("tick", 0)
+    characters = world.get("characters", {})
     for household in world.get("households", {}).values():
+        # Real chance any present member had a genuine exchange with
+        # someone this hour -- same pipeline as the off-grid trip-return
+        # trigger (systems/offgrid.py::process_return), just rolled once
+        # per present member per hourly window instead of once per trip.
+        for member_id in household.get("members", []):
+            c = characters.get(member_id)
+            if c and is_character_home(c, world):
+                maybe_generate_summary_linked_event(c, world)
+
         events = household.get("event_log") or []
         if not events:
             continue

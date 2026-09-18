@@ -1359,6 +1359,14 @@ def ensure_character_defaults(c, world=None):
     # Serialised queues saved when an urgent activity interrupted a hobby
     c.setdefault("suspended_hobby_sessions", [])
 
+    # Real, priority-ordered list of child ids this character is a
+    # resolved caregiver for -- synced from the child-side resolution
+    # (systems/child_care.py::_find_parents_for_child) in
+    # tick_child_needs(), least-capable/youngest child first, so a
+    # parent's own responsibilities are a real, readable list rather
+    # than only ever discoverable by scanning every child in the world.
+    c.setdefault("dependents", [])
+
     c.setdefault(
         "intentions",
         []

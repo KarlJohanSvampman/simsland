@@ -384,11 +384,17 @@ def _assign_job(defs, age_group, education):
     }
 
 def _assign_school(defs, age, age_group):
+    """Confirmed live bug: every school_templates entry stores its real
+    age eligibility as `age_range: [lo, hi]`, never `min_age`/`max_age`
+    -- this read the wrong field names, so `.get(..., default)` always
+    fell through to the (0, 99) default and every school was equally
+    eligible for every age, including a 6-year-old landing at a trade
+    college. Fixed to read the real field."""
     schools = defs.get("school_templates", {})
     if not schools: return None
     eligible = [
         k for k, s in schools.items()
-        if s.get("min_age", 0) <= age <= s.get("max_age", 99)
+        if (s.get("age_range") or [0, 99])[0] <= age <= (s.get("age_range") or [0, 99])[1]
     ]
     return random.choice(eligible) if eligible else None
 

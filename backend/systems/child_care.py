@@ -65,6 +65,19 @@ def _find_parents_for_child(c, world):
     return result
 
 
+def _sync_dependents(child, parents, world):
+    """Keeps each resolved parent's real c["dependents"] list in sync --
+    the priority-ordered view of "who am I responsible for," least-
+    capable (youngest) child first. Cheap to just re-append+dedupe+
+    resort every sweep given how small this list is per character."""
+    for parent in parents:
+        deps = parent.setdefault("dependents", [])
+        if child["id"] not in deps:
+            deps.append(child["id"])
+        chars = world.get("characters", {})
+        deps.sort(key=lambda cid: (chars.get(cid) or {}).get("age", 999))
+
+
 def _ensure_departure_contract(child, parents, world):
     from systems.social_contracts import get_contracts_for_character, create_authority_contract
 
@@ -132,6 +145,8 @@ def tick_child_needs(world):
         parents = _find_parents_for_child(c, world)
         if not parents:
             continue
+
+        _sync_dependents(c, parents, world)
 
         _ensure_departure_contract(c, parents, world)
 

@@ -289,7 +289,14 @@ def generate_initial_world():
 
                 "adult_base": {
 
-                    "model": "/resources/characters/base.glb",
+                    # Was "/resources/characters/base.glb" -- confirmed
+                    # that file has never existed (only adult_male.glb/
+                    # adult_female.glb do), so the very first seeded
+                    # character in any brand-new simulation ("c1"/"Alex"
+                    # below) silently fell back to the fallback-primitive
+                    # renderer from the moment a fresh world was ever
+                    # created. Real, existing asset.
+                    "model": "/resources/characters/adult_male.glb",
 
                     "default_animations": {
                         "idle": "idle",

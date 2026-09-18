@@ -83,7 +83,17 @@ def _character_tags(c, world=None):
             if has_child_in_household and age_group in ("adult", "elderly"):
                 tags.add("parent")
                 tags.add("provider_archetype")
-            if len(members) > 1:
+            # Confirmed live bug: a 6-year-old sharing a household with
+            # anyone else (no age check at all here) qualified for
+            # make_dinner's "cohabiting" tag on its own -- make_dinner's
+            # tags are OR-matched (parent/provider_archetype/cohabiting),
+            # so a child was picking up a real adult obligation, complete
+            # with real missed-expectation stress/grievance consequences,
+            # purely for living with someone. "cohabiting" is meant for
+            # roommate-style shared-duty expectations, which a young
+            # child can't meaningfully hold regardless of who they live
+            # with.
+            if len(members) > 1 and age_group != "child":
                 tags.add("cohabiting")
 
     return tags
@@ -122,6 +132,12 @@ def assign_expectations(c, defs, world=None):
             "frustration":           0.0,
             "status":                "pending",
             "last_missed_blame":     [],
+            # Real time window for the CURRENT period -- computed by
+            # update_expectations()/_compute_window() at each rollover,
+            # None until then (or permanently, for anything not
+            # schedule-linked -- see _SCHEDULE_LINKED_EXPECTATIONS).
+            "window_start_tick":     None,
+            "window_end_tick":       None,
         }
 
 
@@ -152,6 +168,8 @@ def synthesize_expectation(c, expectation_id, cadence, category, of_self,
         "status":                "pending",
         "last_missed_blame":     list(blame_ids or []),
         "grievance_event_type":  grievance_event_type,
+        "window_start_tick":     None,
+        "window_end_tick":       None,
     }
     c.setdefault("expectations", {})[expectation_id] = entry
     return entry
@@ -181,6 +199,51 @@ def _current_period_key(cadence, calendar):
 # UPDATE (called on a slow cadence -- see sim_loop.py/agent_loop.py)
 # =========================================================
 
+# Small, explicit map: template_id -> the real schedule-block "activity"
+# name (systems/scheduling.py) this expectation's real time window
+# should derive from, when the character has a matching block today.
+# Anything not listed here (or with no matching block that day) falls
+# back to window_end_tick=None -- the existing whole-period rollover
+# check (unchanged) is what catches a miss for those, exactly like
+# before this feature existed.
+_SCHEDULE_LINKED_EXPECTATIONS = {
+    "make_dinner":            "eat",
+    "family_dinner_together": "eat",
+    "go_to_work":             "work",
+}
+
+
+def _hhmm_to_tick(hhmm, calendar, world):
+    """Real absolute tick for an "HH:MM" schedule-block boundary,
+    relative to the character's real current calendar time today."""
+    h, m = (int(x) for x in hhmm.split(":"))
+    now_h, now_m = calendar.get("hour", 0), calendar.get("minute", 0)
+    return world.get("tick", 0) + ((h * 60 + m) - (now_h * 60 + now_m)) * 60
+
+
+def _compute_window(c, world, template_id, calendar):
+    """A real (window_start_tick, window_end_tick) for the CURRENT period
+    when a matching real schedule block exists today, else (None, None)
+    -- preserves today's existing rollover-only miss detection for
+    anything not schedule-linked."""
+    activity = _SCHEDULE_LINKED_EXPECTATIONS.get(template_id)
+    if not activity:
+        return None, None
+    weekday = (calendar.get("weekday") or "").lower()
+    day_blocks = (c.get("schedule") or {}).get("week", {}).get(weekday, [])
+    matches = [b for b in day_blocks if b.get("activity") == activity]
+    if not matches:
+        return None, None
+    # "eat" maps to both lunch and dinner blocks in scheduling.py -- the
+    # LATER one is what "make dinner"/"family dinner together" actually
+    # mean; for "work" there's only ever one real block, so [-1] is a
+    # no-op there.
+    block = matches[-1]
+    start = _hhmm_to_tick(block["start"], calendar, world)
+    end = _hhmm_to_tick(block["end"], calendar, world)
+    return start, end
+
+
 def _has_scheduled_work_today(c, world):
     """Per the user's explicit ask: "go_to_work" should never come up
     missed on a day the character wasn't even scheduled to work in the
@@ -201,38 +264,63 @@ def update_expectations(c, world):
     if not calendar:
         return
 
+    tick = world.get("tick", 0)
+
     for nd in c.get("expectations", {}).values():
         period = _current_period_key(nd["cadence"], calendar)
         if period is None:
             continue   # "once" -- no recurring boundary to roll over
 
-        if nd["current_period_key"] == period:
-            continue   # still the same period, nothing rolled over
+        if nd["current_period_key"] != period:
+            was_first_period = nd["current_period_key"] is None
+            # Guarded by status != "missed" -- a real schedule-derived
+            # window (see below) may have already caught this miss
+            # earlier in the SAME period, immediately when the window
+            # closed rather than waiting for rollover; don't double-count
+            # it here too.
+            if not was_first_period and not nd["satisfied_this_period"] and nd["status"] != "missed":
+                nd["missed_count"] += 1
+                nd["streak"] = 0
+                nd["status"] = "missed"
+                _apply_miss_feedback(c, nd, world)
 
-        was_first_period = nd["current_period_key"] is None
-        if not was_first_period and not nd["satisfied_this_period"]:
+            nd["current_period_key"] = period
+            nd["satisfied_this_period"] = False
+            nd["window_start_tick"], nd["window_end_tick"] = _compute_window(
+                c, world, nd["template_id"], calendar,
+            )
+            if nd["status"] != "missed":
+                nd["status"] = "pending"
+
+            # Confirmed live bug (player report: "go_to_work" flagged
+            # missed in the middle of the night with no work scheduled
+            # that day at all): the miss check above only ever looked at
+            # whether the PERIOD rolled over, never at whether the
+            # character actually had a real work block scheduled during
+            # it. Pre-satisfying the instant a work-free day's period
+            # starts means the NEXT rollover has nothing to miss -- this
+            # doesn't touch how a real missed work day (one that DID have
+            # a scheduled block) gets detected, which still runs through
+            # the normal path above.
+            if nd["template_id"] == "go_to_work" and not _has_scheduled_work_today(c, world):
+                nd["satisfied_this_period"] = True
+                nd["status"] = "satisfied"
+
+        # Real, immediate window-close miss detection -- for an
+        # expectation with a real schedule-derived window this period
+        # (Confirmed Decision #5), a miss is caught the moment the window
+        # actually ends (e.g. right after dinner's own block passes),
+        # not deferred until the whole period eventually rolls over.
+        # Expectations with no real window (window_end_tick stays None)
+        # are untouched -- they keep exactly today's rollover-only
+        # behavior via the block above.
+        window_end = nd.get("window_end_tick")
+        if (window_end is not None and tick >= window_end
+                and not nd["satisfied_this_period"] and nd["status"] not in ("missed", "satisfied")):
             nd["missed_count"] += 1
             nd["streak"] = 0
             nd["status"] = "missed"
             _apply_miss_feedback(c, nd, world)
-
-        nd["current_period_key"] = period
-        nd["satisfied_this_period"] = False
-        if nd["status"] != "missed":
-            nd["status"] = "pending"
-
-        # Confirmed live bug (player report: "go_to_work" flagged missed
-        # in the middle of the night with no work scheduled that day at
-        # all): the miss check above only ever looked at whether the
-        # PERIOD rolled over, never at whether the character actually had
-        # a real work block scheduled during it. Pre-satisfying the
-        # instant a work-free day's period starts means the NEXT
-        # rollover has nothing to miss -- this doesn't touch how a real
-        # missed work day (one that DID have a scheduled block) gets
-        # detected, which still runs through the normal path above.
-        if nd["template_id"] == "go_to_work" and not _has_scheduled_work_today(c, world):
-            nd["satisfied_this_period"] = True
-            nd["status"] = "satisfied"
 
     # Surface every still-outstanding expectation as a real intention --
     # brain/intentions.py::add_intention() already replaces same-type
@@ -272,11 +360,15 @@ def _refresh_intention(c, nd, world):
                    + int(nd.get("frustration", 0) * 30))
 
     add_intention(c, {
-        "type":     f"expectation:{nd['template_id']}",
-        "source":   "expectation",
-        "category": nd.get("category", "schedule"),
-        "priority": priority,
-        "reason":   reason,
+        "type":            f"expectation:{nd['template_id']}",
+        "source":          "expectation",
+        "category":        nd.get("category", "schedule"),
+        "priority":        priority,
+        "reason":          reason,
+        # Real time-remaining urgency (brain/intentions.py::
+        # final_priority()) reads this directly when set -- None for
+        # anything not schedule-linked, same as today's behavior.
+        "window_end_tick": nd.get("window_end_tick"),
     })
 
 

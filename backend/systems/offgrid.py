@@ -35,6 +35,12 @@ _UNCAPPED_DURATION_REASONS = {
     # same shape as every other uncapped reason above, just triggered by
     # relationship drama instead of an obligation.
     "temporary_separation",
+    # systems/law.py's real custody-at-arrest span (held without bail,
+    # pending trial) -- multi-day, same shape as "jail" itself.
+    "held_pending_trial",
+    # systems/child_welfare.py's real CPS placement -- a child sent away
+    # for the duration of their only caregiver's own unavailability.
+    "cps_care",
 }
 
 # ── LLM narrator ─────────────────────────────────────────────────────────────
@@ -823,6 +829,19 @@ def maybe_go_offgrid(c, world):
         send_offgrid(c, world, "work", 8 * 60)
         return
 
+    # A child (age_group=="child") never independently rolls into a
+    # leisure/shopping/gym/cafe trip -- no unsupervised solo outings,
+    # same real-world reasoning as "doesn't have a job" already
+    # naturally excludes them from the work-dispatch branch above.
+    # Confirmed live gap: this had no age gate at all before, so a
+    # 6-year-old could roll an unsupervised trip to the gym alone.
+    # systems/child_care.py's parent-authority "announce_departure"
+    # contract is a separate, narrower mechanic (only applies once a
+    # real resolved parent exists in the household) -- this is the
+    # blanket floor underneath it.
+    if c.get("age_group") == "child":
+        return
+
     r = random.random()
 
     # Job searching/applying is real, on-grid, computer/phone-driven work
@@ -1121,6 +1140,25 @@ def process_return(c, world):
             body = c.setdefault("body", {})
             body["fatigue"] = min(100.0, body.get("fatigue", 20.0) + elapsed * (90.0 / (8 * 3600)))
             body["energy"]  = max(0.0,   body.get("energy", 70.0)  - elapsed * (60.0 / (8 * 3600)))
+
+    # Real chance this trip included a genuine exchange with someone --
+    # in-person if the partner happens to be co-located, remote (a real
+    # scripted call/sms) otherwise. Feeds the same shared_event pipeline
+    # the standalone ambient roll uses, just scoped to this character's
+    # own real contacts (systems/events.py::maybe_generate_summary_
+    # linked_event). Rolled while still off_grid, so a real remote
+    # exchange is the natural outcome for most trips.
+    from systems.events import maybe_generate_summary_linked_event
+    maybe_generate_summary_linked_event(c, world)
+
+    if reason == "cps_care":
+        # A real, if deliberately simple, return -- the child just comes
+        # home once their off-grid clock runs out, matching every other
+        # off-grid trip; see systems/child_welfare.py for the dispatch
+        # side and its own documented "duration doesn't dynamically
+        # re-sync with the caregiver's own return" limitation.
+        from systems.child_welfare import process_cps_care_return
+        process_cps_care_return(c, world)
 
     if reason in _NARRATOR_CATEGORIES or is_event:
         if reason == "jail":
@@ -1546,3 +1584,56 @@ def process_return(c, world):
                 c["x"], c["y"] = stop["x"], stop["y"]
                 c["travel_hidden"] = False
             c["travel_state"] = "awaiting_bus_arrival"
+
+
+# ── Long-stay periodic check-ins ────────────────────────────────────────────
+# Real, mid-stay narration for any character off-grid on a long/uncapped-
+# duration reason (jail, cps_care, temporary_separation, held_pending_trial,
+# hospital, ...) -- these would otherwise sit completely silent for weeks.
+_LONG_STAY_CHECKIN_DAYS = 30
+TICKS_PER_DAY = 86400
+
+
+def tick_long_stay_checkins(world):
+    """Day-gated sweep (mirrors reminders.py's own once-per-real-day
+    shape) -- every character currently off-grid on an
+    _UNCAPPED_DURATION_REASONS reason gets a real check-in roughly once
+    per _LONG_STAY_CHECKIN_DAYS, lazily initializing
+    c["_next_long_stay_checkin_tick"] the first time it's seen (same
+    "lazy on first need" convention this codebase already uses
+    elsewhere)."""
+    stamp_key = "_last_long_stay_checkin_day"
+    today = world.get("tick", 0) // TICKS_PER_DAY
+    if world.get(stamp_key) == today:
+        return
+    world[stamp_key] = today
+
+    for c in world.get("characters", {}).values():
+        if not c.get("off_grid") or c.get("off_grid_reason") not in _UNCAPPED_DURATION_REASONS:
+            c.pop("_next_long_stay_checkin_tick", None)
+            continue
+
+        next_checkin = c.get("_next_long_stay_checkin_tick")
+        if next_checkin is None:
+            c["_next_long_stay_checkin_tick"] = world["tick"] + _LONG_STAY_CHECKIN_DAYS * TICKS_PER_DAY
+            continue
+        if world["tick"] < next_checkin:
+            continue
+
+        reason = c["off_grid_reason"]
+        from llm.long_stay_checkin_narration import generate_checkin_summary
+        from llm.llm_gate import run_llm_call, PRIORITY_BACKGROUND
+        summary = run_llm_call(generate_checkin_summary(c, world, reason), priority=PRIORITY_BACKGROUND)
+        if not summary or isinstance(summary, dict):
+            flavor = {
+                "jail": "Still serving time.", "held_pending_trial": "Still awaiting trial.",
+                "cps_care": "Still in the care of social services.",
+                "temporary_separation": "Still staying away from home.",
+                "hospital": "Still recovering in the hospital.",
+                "hospital_treatment": "Still undergoing treatment.", "surgery": "Still recovering from surgery.",
+            }.get(reason, "Still away.")
+            summary = flavor
+
+        from brain.memory import store_memory
+        store_memory(c, summary, 0.5, ["long_stay_checkin", reason], "long_stay_checkin", world["tick"])
+        c["_next_long_stay_checkin_tick"] = world["tick"] + _LONG_STAY_CHECKIN_DAYS * TICKS_PER_DAY

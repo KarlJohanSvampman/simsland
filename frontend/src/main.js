@@ -4986,11 +4986,24 @@ function renderMindTab(c){
   // -- Persistent desires --
   const desires = (c.persistent_desires || []).filter(d => d.active && !d.resolved);
   if(desires.length){
-    const lines = desires.map(d => `
+    const memoriesById = {};
+    (c.memories || []).forEach(m => { if(m.id) memoriesById[m.id] = m; });
+    const lines = desires.map(d => {
+      // A desire's `target` is usually a memory id (see systems/
+      // persistent_desires.py::add_desire / confiding.py) -- surface the
+      // triggering memory's own text as the reason this specific desire
+      // exists, so e.g. two "confide in someone" entries with the same
+      // importance/frustration read as two distinct real events, not an
+      // unexplained duplicate.
+      const targetMem = d.target ? memoriesById[d.target] : null;
+      const reason = targetMem?.text || d.reason;
+      return `
       <div class="viewerCard">
         ${(d.type || "").replace(/_/g, " ")}
         <div class="viewerStatRow">importance ${(d.importance ?? 0).toFixed(2)}, frustration ${(d.frustration ?? 0).toFixed(2)}</div>
-      </div>`);
+        ${reason ? `<div style="opacity:.7">"${reason}"</div>` : ""}
+      </div>`;
+    });
     sections.push(_section(`Desires (${desires.length})`, lines.join("")));
   }
 
@@ -5229,7 +5242,7 @@ function renderMemoryTab(c){
         <div style="opacity:.6">${s.category || ""}${s.value != null ? ` · value ${s.value.toFixed(1)}` : ""}</div>
       </div>`;
     });
-    sections.push(_section(`Notable Stories (${stories.length})`, lines.join("")));
+    sections.push(_section(`Events (${stories.length})`, lines.join("")));
   }
 
   // -- Secrets --
@@ -5438,6 +5451,29 @@ async function _fetchCharacterFinances(characterId){
   return cached?.data || null;
 }
 
+// GET /api/dependents/{id} -- each real c.dependents entry resolved into
+// a real whereabouts summary (see api/dependents.py's own docstring).
+// Same cached-fetch-and-patch shape as _fetchCharacterFinances above.
+const _dependentsCache = {};   // characterId -> { data, fetchedAt }
+const DEPENDENTS_CACHE_MS = 5000;
+
+async function _fetchCharacterDependents(characterId){
+  const cached = _dependentsCache[characterId];
+  const now = Date.now();
+  if(cached && now - cached.fetchedAt < DEPENDENTS_CACHE_MS){
+    return cached.data;
+  }
+  try{
+    const res = await fetch(`/api/dependents/${encodeURIComponent(characterId)}?sim_id=default`);
+    const data = await res.json();
+    if(data.ok){
+      _dependentsCache[characterId] = { data, fetchedAt: now };
+      return data;
+    }
+  } catch(e){ /* network hiccup -- fall through to stale cache below */ }
+  return cached?.data || null;
+}
+
 function renderLifeTab(c){
   const el = document.getElementById("viewerLifeTab");
   if(!el) return;
@@ -5552,6 +5588,51 @@ function renderLifeTab(c){
   if(c.household_id) householdLines.push(`Household: ${c.household_id}`);
   if(c.family_role) householdLines.push(`Family role: ${c.family_role}`);
   sections.push(_section("Household", householdLines.length ? householdLines.join("<br>") : _empty("No household.")));
+
+  // -- Dependents --
+  // c.dependents (systems/child_care.py::_sync_dependents) is a real,
+  // priority-ordered (youngest/least-capable first) list of ids already
+  // on the character over the WS snapshot -- but the resolved whereabouts
+  // summary (last contact, current caretaker, expected activity, ...)
+  // needs cross-character lookups the frontend shouldn't re-derive, so
+  // it's fetched separately via GET /api/dependents/{id} and patched in,
+  // same shape as the Finances section above.
+  if((c.dependents || []).length){
+    sections.push(_section(`Dependents (${c.dependents.length})`, `
+      <div id="lifeDependentsExtra" data-character-id="${c.id}">${_empty("Loading dependents...")}</div>
+    `));
+    _fetchCharacterDependents(c.id).then(data => {
+      const extraEl = document.getElementById("lifeDependentsExtra");
+      if(!extraEl || extraEl.dataset.characterId !== c.id) return;
+      const deps = data?.dependents || [];
+      if(!deps.length){ extraEl.innerHTML = _empty("No dependents."); return; }
+
+      const cards = deps.map(d => {
+        const loc = d.last_known_location || {};
+        const locLine = loc.status === "away"
+          ? `Away — ${(loc.reason || "unknown").replace(/_/g, " ")}`
+          : `At (${Math.round(loc.x)}, ${Math.round(loc.y)})`;
+
+        const contactLine = d.last_contact
+          ? `Last contact: ${d.last_contact.medium.replace(/_/g, " ")} at tick ${d.last_contact.tick}`
+          : `Last contact: none on record`;
+
+        const lines = [locLine, contactLine];
+        if(d.expected_activity) lines.push(`Expected: ${d.expected_activity.replace(/_/g, " ")}`);
+        if(d.current_caretaker) lines.push(`Currently with: ${d.current_caretaker}`);
+        if(d.announced_departure === false) lines.push(`<span class="viewerWarn">Left without announcing departure</span>`);
+        if(!d.expected_home_today) lines.push(`<span class="viewerWarn">Not expected home today</span>`);
+        else if(d.expected_return_tick != null) lines.push(`Expected back around tick ${d.expected_return_tick}`);
+
+        return `
+          <div class="viewerCard">
+            <div class="viewerCardTitle">${d.name}${d.age != null ? ` (${d.age})` : ""}</div>
+            <div style="opacity:.7">${lines.join("<br>")}</div>
+          </div>`;
+      });
+      extraEl.innerHTML = cards.join("");
+    });
+  }
 
   const expectationTemplates = definitions.expectation_templates || {};
   const expectations = Object.values(c.expectations || {});
@@ -7295,9 +7376,23 @@ function _syncOutlinerHighlight(){
   }
 }
 
+// Mirrors backend/systems/offgrid.py's _UNCAPPED_DURATION_REASONS long-
+// stay subset -- a raw minutes countdown reads as meaningless/unreadable
+// at day-plus scale, so these show "next update in N days" instead,
+// reading the real _next_long_stay_checkin_tick field directly rather
+// than re-deriving the 30-day schedule client-side.
+const LONG_STAY_REASONS = new Set(["jail", "cps_care", "held_pending_trial", "temporary_separation"]);
+
 function _outlinerStatus(c, tick){
   if(c.alive === false) return { text: "dead", cls: "dead" };
   if(c.off_grid){
+    if(LONG_STAY_REASONS.has(c.off_grid_reason)){
+      const reason = c.off_grid_reason.replace(/_/g, " ");
+      const nextCheckin = c._next_long_stay_checkin_tick;
+      const daysLeft = nextCheckin != null ? Math.max(0, Math.ceil((nextCheckin - tick) / 86400)) : null;
+      const update = daysLeft != null ? `next update in ${daysLeft}d` : "away";
+      return { text: `${reason} — ${update}`, cls: "longstay" };
+    }
     const remain = (c.return_tick || tick) - tick;
     const backIn = remain > 0 ? `back in ~${Math.max(1, Math.round(remain / 60))}m` : "due back";
     const reason = c.off_grid_reason ? c.off_grid_reason.replace(/_/g, " ") : "off-grid";
@@ -7382,12 +7477,13 @@ function renderOutliner(data){
       row.dataset.characterId = c.id;
       if(c.id === selectedCharacterId) row.classList.add("selected");
 
+      const status = _outlinerStatus(c, data.tick);
+
       const name = document.createElement("span");
-      name.className = "outlinerRowName";
+      name.className = "outlinerRowName" + (status.cls === "longstay" ? " outlinerRowNameAway" : "");
       name.textContent = c.name || c.id;
       row.appendChild(name);
 
-      const status = _outlinerStatus(c, data.tick);
       const statusEl = document.createElement("span");
       statusEl.className = "outlinerRowStatus" + (status.cls ? " " + status.cls : "");
       statusEl.textContent = status.text;

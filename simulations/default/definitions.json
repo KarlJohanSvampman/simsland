@@ -12399,6 +12399,300 @@
     }
   },
   "character_templates": {
+    "service_worker_male": {
+      "model": "adult_male",
+      "bone_slots": {
+        "head": "mixamorigHead",
+        "neck": "mixamorigNeck",
+        "right_hand": "mixamorigRightHand",
+        "left_hand": "mixamorigLeftHand",
+        "spine": "mixamorigSpine2",
+        "pelvis": "mixamorigHips",
+        "right_foot": "mixamorigRightFoot",
+        "left_foot": "mixamorigLeftFoot"
+      },
+      "body_region_bones": {
+        "head": "mixamorigHead",
+        "face": "mixamorigHead",
+        "neck": "mixamorigNeck",
+        "chest": "mixamorigSpine2",
+        "torso": "mixamorigSpine2",
+        "upper_body": "mixamorigSpine2",
+        "lower_body": "mixamorigHips",
+        "back": "mixamorigSpine1",
+        "groin": "mixamorigHips",
+        "right_arm": "mixamorigRightArm",
+        "left_arm": "mixamorigLeftArm",
+        "right_hand": "mixamorigRightHand",
+        "left_hand": "mixamorigLeftHand",
+        "right_leg": "mixamorigRightUpLeg",
+        "left_leg": "mixamorigLeftUpLeg",
+        "right_foot": "mixamorigRightFoot",
+        "left_foot": "mixamorigLeftFoot",
+        "right_shoulder": "mixamorigRightShoulder",
+        "left_shoulder": "mixamorigLeftShoulder"
+      },
+      "base_animations": {
+        "idle": "idle",
+        "walk": "walk",
+        "run": "run",
+        "sit": "sit_idle",
+        "sleep": "sleep_loop"
+      },
+      "_note": "Generic male service-worker NPC body (contractor/repairman/gardener/caregiver/dealer/arms_dealer/escort -- see services.py::SERVICE_CATALOG). Real, resolvable character_templates entry -- replaces the previous \"adult_base\" id, which didn't exist and silently fell back to the plain fallback-primitive renderer for every service worker."
+    },
+    "service_worker_female": {
+      "model": "adult_female",
+      "bone_slots": {
+        "head": "mixamorigHead",
+        "neck": "mixamorigNeck",
+        "right_hand": "mixamorigRightHand",
+        "left_hand": "mixamorigLeftHand",
+        "spine": "mixamorigSpine2",
+        "pelvis": "mixamorigHips",
+        "right_foot": "mixamorigRightFoot",
+        "left_foot": "mixamorigLeftFoot"
+      },
+      "body_region_bones": {
+        "head": "mixamorigHead",
+        "face": "mixamorigHead",
+        "neck": "mixamorigNeck",
+        "chest": "mixamorigSpine2",
+        "torso": "mixamorigSpine2",
+        "upper_body": "mixamorigSpine2",
+        "lower_body": "mixamorigHips",
+        "back": "mixamorigSpine1",
+        "groin": "mixamorigHips",
+        "right_arm": "mixamorigRightArm",
+        "left_arm": "mixamorigLeftArm",
+        "right_hand": "mixamorigRightHand",
+        "left_hand": "mixamorigLeftHand",
+        "right_leg": "mixamorigRightUpLeg",
+        "left_leg": "mixamorigLeftUpLeg",
+        "right_foot": "mixamorigRightFoot",
+        "left_foot": "mixamorigLeftFoot",
+        "right_shoulder": "mixamorigRightShoulder",
+        "left_shoulder": "mixamorigLeftShoulder"
+      },
+      "base_animations": {
+        "idle": "idle",
+        "walk": "walk",
+        "run": "run",
+        "sit": "sit_idle",
+        "sleep": "sleep_loop"
+      },
+      "_note": "Female counterpart to service_worker_male -- see that entry's note."
+    },
+    "cps_worker": {
+      "model": "adult_male",
+      "bone_slots": {
+        "head": "mixamorigHead",
+        "neck": "mixamorigNeck",
+        "right_hand": "mixamorigRightHand",
+        "left_hand": "mixamorigLeftHand",
+        "spine": "mixamorigSpine2",
+        "pelvis": "mixamorigHips",
+        "right_foot": "mixamorigRightFoot",
+        "left_foot": "mixamorigLeftFoot"
+      },
+      "body_region_bones": {
+        "head": "mixamorigHead",
+        "face": "mixamorigHead",
+        "neck": "mixamorigNeck",
+        "chest": "mixamorigSpine2",
+        "torso": "mixamorigSpine2",
+        "upper_body": "mixamorigSpine2",
+        "lower_body": "mixamorigHips",
+        "back": "mixamorigSpine1",
+        "groin": "mixamorigHips",
+        "right_arm": "mixamorigRightArm",
+        "left_arm": "mixamorigLeftArm",
+        "right_hand": "mixamorigRightHand",
+        "left_hand": "mixamorigLeftHand",
+        "right_leg": "mixamorigRightUpLeg",
+        "left_leg": "mixamorigLeftUpLeg",
+        "right_foot": "mixamorigRightFoot",
+        "left_foot": "mixamorigLeftFoot",
+        "right_shoulder": "mixamorigRightShoulder",
+        "left_shoulder": "mixamorigLeftShoulder"
+      },
+      "base_animations": {
+        "idle": "idle",
+        "walk": "walk",
+        "run": "run",
+        "sit": "sit_idle",
+        "sleep": "sleep_loop"
+      },
+      "_note": "Child Protective Services worker (systems/child_welfare.py). Reuses the generic adult body as a placeholder -- swap \"model\" here for a real distinct asset later, no code changes needed elsewhere."
+    },
+    "police_officer": {
+      "model": "adult_male",
+      "bone_slots": {
+        "head": "mixamorigHead",
+        "neck": "mixamorigNeck",
+        "right_hand": "mixamorigRightHand",
+        "left_hand": "mixamorigLeftHand",
+        "spine": "mixamorigSpine2",
+        "pelvis": "mixamorigHips",
+        "right_foot": "mixamorigRightFoot",
+        "left_foot": "mixamorigLeftFoot"
+      },
+      "body_region_bones": {
+        "head": "mixamorigHead",
+        "face": "mixamorigHead",
+        "neck": "mixamorigNeck",
+        "chest": "mixamorigSpine2",
+        "torso": "mixamorigSpine2",
+        "upper_body": "mixamorigSpine2",
+        "lower_body": "mixamorigHips",
+        "back": "mixamorigSpine1",
+        "groin": "mixamorigHips",
+        "right_arm": "mixamorigRightArm",
+        "left_arm": "mixamorigLeftArm",
+        "right_hand": "mixamorigRightHand",
+        "left_hand": "mixamorigLeftHand",
+        "right_leg": "mixamorigRightUpLeg",
+        "left_leg": "mixamorigLeftUpLeg",
+        "right_foot": "mixamorigRightFoot",
+        "left_foot": "mixamorigLeftFoot",
+        "right_shoulder": "mixamorigRightShoulder",
+        "left_shoulder": "mixamorigLeftShoulder"
+      },
+      "base_animations": {
+        "idle": "idle",
+        "walk": "walk",
+        "run": "run",
+        "sit": "sit_idle",
+        "sleep": "sleep_loop"
+      },
+      "_note": "Placeholder for a future police-responder NPC (no real spawn site exists yet -- systems/emergency.py's police responders are still purely abstract, no character is created). Reserved so a future dispatch feature has a real template id ready to use."
+    },
+    "firefighter": {
+      "model": "adult_male",
+      "bone_slots": {
+        "head": "mixamorigHead",
+        "neck": "mixamorigNeck",
+        "right_hand": "mixamorigRightHand",
+        "left_hand": "mixamorigLeftHand",
+        "spine": "mixamorigSpine2",
+        "pelvis": "mixamorigHips",
+        "right_foot": "mixamorigRightFoot",
+        "left_foot": "mixamorigLeftFoot"
+      },
+      "body_region_bones": {
+        "head": "mixamorigHead",
+        "face": "mixamorigHead",
+        "neck": "mixamorigNeck",
+        "chest": "mixamorigSpine2",
+        "torso": "mixamorigSpine2",
+        "upper_body": "mixamorigSpine2",
+        "lower_body": "mixamorigHips",
+        "back": "mixamorigSpine1",
+        "groin": "mixamorigHips",
+        "right_arm": "mixamorigRightArm",
+        "left_arm": "mixamorigLeftArm",
+        "right_hand": "mixamorigRightHand",
+        "left_hand": "mixamorigLeftHand",
+        "right_leg": "mixamorigRightUpLeg",
+        "left_leg": "mixamorigLeftUpLeg",
+        "right_foot": "mixamorigRightFoot",
+        "left_foot": "mixamorigLeftFoot",
+        "right_shoulder": "mixamorigRightShoulder",
+        "left_shoulder": "mixamorigLeftShoulder"
+      },
+      "base_animations": {
+        "idle": "idle",
+        "walk": "walk",
+        "run": "run",
+        "sit": "sit_idle",
+        "sleep": "sleep_loop"
+      },
+      "_note": "Placeholder for a future fire-responder NPC (see police_officer's note -- systems/emergency.py's fire responders are still abstract)."
+    },
+    "paramedic": {
+      "model": "adult_female",
+      "bone_slots": {
+        "head": "mixamorigHead",
+        "neck": "mixamorigNeck",
+        "right_hand": "mixamorigRightHand",
+        "left_hand": "mixamorigLeftHand",
+        "spine": "mixamorigSpine2",
+        "pelvis": "mixamorigHips",
+        "right_foot": "mixamorigRightFoot",
+        "left_foot": "mixamorigLeftFoot"
+      },
+      "body_region_bones": {
+        "head": "mixamorigHead",
+        "face": "mixamorigHead",
+        "neck": "mixamorigNeck",
+        "chest": "mixamorigSpine2",
+        "torso": "mixamorigSpine2",
+        "upper_body": "mixamorigSpine2",
+        "lower_body": "mixamorigHips",
+        "back": "mixamorigSpine1",
+        "groin": "mixamorigHips",
+        "right_arm": "mixamorigRightArm",
+        "left_arm": "mixamorigLeftArm",
+        "right_hand": "mixamorigRightHand",
+        "left_hand": "mixamorigLeftHand",
+        "right_leg": "mixamorigRightUpLeg",
+        "left_leg": "mixamorigLeftUpLeg",
+        "right_foot": "mixamorigRightFoot",
+        "left_foot": "mixamorigLeftFoot",
+        "right_shoulder": "mixamorigRightShoulder",
+        "left_shoulder": "mixamorigLeftShoulder"
+      },
+      "base_animations": {
+        "idle": "idle",
+        "walk": "walk",
+        "run": "run",
+        "sit": "sit_idle",
+        "sleep": "sleep_loop"
+      },
+      "_note": "Placeholder for a future medical-responder NPC (see police_officer's note -- systems/emergency.py's medical responders are still abstract)."
+    },
+    "mail_carrier": {
+      "model": "adult_male",
+      "bone_slots": {
+        "head": "mixamorigHead",
+        "neck": "mixamorigNeck",
+        "right_hand": "mixamorigRightHand",
+        "left_hand": "mixamorigLeftHand",
+        "spine": "mixamorigSpine2",
+        "pelvis": "mixamorigHips",
+        "right_foot": "mixamorigRightFoot",
+        "left_foot": "mixamorigLeftFoot"
+      },
+      "body_region_bones": {
+        "head": "mixamorigHead",
+        "face": "mixamorigHead",
+        "neck": "mixamorigNeck",
+        "chest": "mixamorigSpine2",
+        "torso": "mixamorigSpine2",
+        "upper_body": "mixamorigSpine2",
+        "lower_body": "mixamorigHips",
+        "back": "mixamorigSpine1",
+        "groin": "mixamorigHips",
+        "right_arm": "mixamorigRightArm",
+        "left_arm": "mixamorigLeftArm",
+        "right_hand": "mixamorigRightHand",
+        "left_hand": "mixamorigLeftHand",
+        "right_leg": "mixamorigRightUpLeg",
+        "left_leg": "mixamorigLeftUpLeg",
+        "right_foot": "mixamorigRightFoot",
+        "left_foot": "mixamorigLeftFoot",
+        "right_shoulder": "mixamorigRightShoulder",
+        "left_shoulder": "mixamorigLeftShoulder"
+      },
+      "base_animations": {
+        "idle": "idle",
+        "walk": "walk",
+        "run": "run",
+        "sit": "sit_idle",
+        "sleep": "sleep_loop"
+      },
+      "_note": "Placeholder for the mail-carrier/paperboy role. Not yet consumed by any real spawn site -- systems/postal_service.py and systems/newspaper_delivery.py dispatch via the separate service_vehicles.py vehicle+worker_model pattern, which the frontend doesn't render at all today (a bigger, separate gap, out of scope here). Reserved so that system can adopt this same character_templates id later."
+    },
     "adult_male_a": {
       "model": "adult_male",
       "bone_slots": {
@@ -12649,6 +12943,81 @@
         "status": "free",
         "jail_until": null
       }
+    },
+    "new_character_1": {
+      "name": "Shakespear McWanker",
+      "age": 32,
+      "sex": "male",
+      "first_name": "Shakespear",
+      "family_name": "McWanker",
+      "ssn": "343-23-2332",
+      "body_features": {
+        "height_cm": 178
+      },
+      "body_composition": {
+        "body_fat_level": 0.27
+      },
+      "instance": {
+        "walk_speed": 1,
+        "jog_speed": 2,
+        "sprint_speed": 3,
+        "crawl_speed": 0.2,
+        "sneak_speed": 0.5
+      },
+      "traits": [],
+      "physical_traits": [
+        "high_stamina",
+        "physically_resilient",
+        "thin",
+        "night_owl",
+        "hyperactive_libido",
+        "insomnia"
+      ],
+      "hobbies": [
+        "guitar",
+        "books",
+        "pictionary",
+        "boardgames",
+        "book_club",
+        "reading",
+        "keep_a_diary",
+        "basketball_supporter",
+        "slot_machines"
+      ],
+      "worn": {},
+      "starting_inventory": [],
+      "bio": "",
+      "job": {
+        "id": "game_developer",
+        "title": "Game Developer",
+        "industry": "Technology",
+        "income_class": "Lower Middle",
+        "average_salary": 69000,
+        "hourly_wage": 33.17,
+        "salary": 5750,
+        "work_mode": "Remote",
+        "physical_demand": 19,
+        "social_demand": 24,
+        "hazard_level": "Medium",
+        "illegal": false,
+        "adult_industry": false
+      },
+      "education": "professional",
+      "current_school": "",
+      "work_history": [
+        {
+          "title": "Cashier",
+          "industry": "Fast Food Resturants",
+          "years": 20,
+          "reason_left": "quit"
+        }
+      ],
+      "legal": {
+        "status": "free",
+        "jail_until": null,
+        "record": []
+      },
+      "household_id": ""
     }
   },
   "interaction_templates": {
@@ -61774,84 +62143,222 @@
     }
   },
   "adjectives_registry": {
-    "credible": { "name": "Credible", "polarity": "positive" },
-    "honest": { "name": "Honest", "polarity": "positive" },
-    "trustworthy": { "name": "Trustworthy", "polarity": "positive" },
-    "competent": { "name": "Competent", "polarity": "positive" },
-    "reliable": { "name": "Reliable", "polarity": "positive" },
-    "wise": { "name": "Wise", "polarity": "positive" },
-    "virtuous": { "name": "Virtuous", "polarity": "positive" },
-    "admirable": { "name": "Admirable", "polarity": "positive" },
-    "principled": { "name": "Principled", "polarity": "positive" },
-    "generous": { "name": "Generous", "polarity": "positive" },
-    "dishonest": { "name": "Dishonest", "polarity": "negative" },
-    "untrustworthy": { "name": "Untrustworthy", "polarity": "negative" },
-    "incompetent": { "name": "Incompetent", "polarity": "negative" },
-    "corrupt": { "name": "Corrupt", "polarity": "negative" },
-    "dangerous": { "name": "Dangerous", "polarity": "negative" },
-    "deceitful": { "name": "Deceitful", "polarity": "negative" },
-    "inferior": { "name": "Inferior", "polarity": "negative" },
-    "unreliable": { "name": "Unreliable", "polarity": "negative" },
-    "reckless": { "name": "Reckless", "polarity": "negative" },
-    "greedy": { "name": "Greedy", "polarity": "negative" }
+    "credible": {
+      "name": "Credible",
+      "polarity": "positive"
+    },
+    "honest": {
+      "name": "Honest",
+      "polarity": "positive"
+    },
+    "trustworthy": {
+      "name": "Trustworthy",
+      "polarity": "positive"
+    },
+    "competent": {
+      "name": "Competent",
+      "polarity": "positive"
+    },
+    "reliable": {
+      "name": "Reliable",
+      "polarity": "positive"
+    },
+    "wise": {
+      "name": "Wise",
+      "polarity": "positive"
+    },
+    "virtuous": {
+      "name": "Virtuous",
+      "polarity": "positive"
+    },
+    "admirable": {
+      "name": "Admirable",
+      "polarity": "positive"
+    },
+    "principled": {
+      "name": "Principled",
+      "polarity": "positive"
+    },
+    "generous": {
+      "name": "Generous",
+      "polarity": "positive"
+    },
+    "dishonest": {
+      "name": "Dishonest",
+      "polarity": "negative"
+    },
+    "untrustworthy": {
+      "name": "Untrustworthy",
+      "polarity": "negative"
+    },
+    "incompetent": {
+      "name": "Incompetent",
+      "polarity": "negative"
+    },
+    "corrupt": {
+      "name": "Corrupt",
+      "polarity": "negative"
+    },
+    "dangerous": {
+      "name": "Dangerous",
+      "polarity": "negative"
+    },
+    "deceitful": {
+      "name": "Deceitful",
+      "polarity": "negative"
+    },
+    "inferior": {
+      "name": "Inferior",
+      "polarity": "negative"
+    },
+    "unreliable": {
+      "name": "Unreliable",
+      "polarity": "negative"
+    },
+    "reckless": {
+      "name": "Reckless",
+      "polarity": "negative"
+    },
+    "greedy": {
+      "name": "Greedy",
+      "polarity": "negative"
+    }
   },
   "principle_concept_axes": {
     "gender": {
       "name": "Gender",
-      "concepts": ["men", "women"]
+      "concepts": [
+        "men",
+        "women"
+      ]
     },
     "religion": {
       "name": "Religion",
       "concepts": [
-        "atheist", "agnostic", "christian", "muslim", "jewish",
-        "buddhist", "hindu", "freemason", "cultist"
+        "atheist",
+        "agnostic",
+        "christian",
+        "muslim",
+        "jewish",
+        "buddhist",
+        "hindu",
+        "freemason",
+        "cultist"
       ]
     },
     "government_form": {
       "name": "Form of Government",
-      "concepts": ["communism", "fascism", "anarchism", "oligarchy", "democracy"]
+      "concepts": [
+        "communism",
+        "fascism",
+        "anarchism",
+        "oligarchy",
+        "democracy"
+      ]
     },
     "economic_model": {
       "name": "Economic Model",
-      "concepts": ["capitalism", "socialism"]
+      "concepts": [
+        "capitalism",
+        "socialism"
+      ]
     }
   },
   "political_party_templates": {
     "republican": {
       "name": "Republican Party",
-      "ideology_tags": ["traditionalist", "individualist", "nationalist", "hierarchical"],
+      "ideology_tags": [
+        "traditionalist",
+        "individualist",
+        "nationalist",
+        "hierarchical"
+      ],
       "topic_awareness": {
-        "taxes": 0.9, "economy": 0.6, "cost_of_living": 0.3, "welfare": 0.2,
-        "crime": 0.8, "police": 0.85, "safety": 0.7,
-        "immigration": 0.75, "homelessness": 0.2,
-        "justice": 0.4, "government": 0.55, "media": 0.4,
-        "honor": 0.6, "loyalty": 0.5, "ambition": 0.5, "integrity": 0.45, "self_reliance": 0.8
+        "taxes": 0.9,
+        "economy": 0.6,
+        "cost_of_living": 0.3,
+        "welfare": 0.2,
+        "crime": 0.8,
+        "police": 0.85,
+        "safety": 0.7,
+        "immigration": 0.75,
+        "homelessness": 0.2,
+        "justice": 0.4,
+        "government": 0.55,
+        "media": 0.4,
+        "honor": 0.6,
+        "loyalty": 0.5,
+        "ambition": 0.5,
+        "integrity": 0.45,
+        "self_reliance": 0.8
       },
-      "agenda": ["lower_taxes", "increase_policing"]
+      "agenda": [
+        "lower_taxes",
+        "increase_policing"
+      ]
     },
     "democrat": {
       "name": "Democratic Party",
-      "ideology_tags": ["collectivist", "communal", "marginalized", "open_ended"],
+      "ideology_tags": [
+        "collectivist",
+        "communal",
+        "marginalized",
+        "open_ended"
+      ],
       "topic_awareness": {
-        "taxes": 0.3, "economy": 0.4, "cost_of_living": 0.85, "welfare": 0.9,
-        "crime": 0.3, "police": 0.3, "safety": 0.4,
-        "immigration": 0.7, "homelessness": 0.8,
-        "justice": 0.7, "government": 0.5, "media": 0.4,
-        "honor": 0.3, "loyalty": 0.3, "ambition": 0.3, "integrity": 0.5, "self_reliance": 0.2
+        "taxes": 0.3,
+        "economy": 0.4,
+        "cost_of_living": 0.85,
+        "welfare": 0.9,
+        "crime": 0.3,
+        "police": 0.3,
+        "safety": 0.4,
+        "immigration": 0.7,
+        "homelessness": 0.8,
+        "justice": 0.7,
+        "government": 0.5,
+        "media": 0.4,
+        "honor": 0.3,
+        "loyalty": 0.3,
+        "ambition": 0.3,
+        "integrity": 0.5,
+        "self_reliance": 0.2
       },
-      "agenda": ["support_welfare", "improve_healthcare"]
+      "agenda": [
+        "support_welfare",
+        "improve_healthcare"
+      ]
     },
     "independent": {
       "name": "Independent Coalition",
-      "ideology_tags": ["skeptical", "anti_establishment", "individualist"],
+      "ideology_tags": [
+        "skeptical",
+        "anti_establishment",
+        "individualist"
+      ],
       "topic_awareness": {
-        "taxes": 0.4, "economy": 0.5, "cost_of_living": 0.5, "welfare": 0.3,
-        "crime": 0.35, "police": 0.3, "safety": 0.3,
-        "immigration": 0.3, "homelessness": 0.3,
-        "justice": 0.8, "government": 0.85, "media": 0.6,
-        "honor": 0.3, "loyalty": 0.2, "ambition": 0.3, "integrity": 0.85, "self_reliance": 0.4
+        "taxes": 0.4,
+        "economy": 0.5,
+        "cost_of_living": 0.5,
+        "welfare": 0.3,
+        "crime": 0.35,
+        "police": 0.3,
+        "safety": 0.3,
+        "immigration": 0.3,
+        "homelessness": 0.3,
+        "justice": 0.8,
+        "government": 0.85,
+        "media": 0.6,
+        "honor": 0.3,
+        "loyalty": 0.2,
+        "ambition": 0.3,
+        "integrity": 0.85,
+        "self_reliance": 0.4
       },
-      "agenda": ["anti_corruption_reform", "housing_investment"]
+      "agenda": [
+        "anti_corruption_reform",
+        "housing_investment"
+      ]
     }
   },
   "contact_designations": {

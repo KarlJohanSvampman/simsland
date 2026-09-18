@@ -208,6 +208,7 @@ def all_characters(sim_id: str):
             "off_grid_reason": c.get("off_grid_reason"),
             "return_tick": c.get("return_tick"),
             "travel_state": c.get("travel_state"),
+            "_next_long_stay_checkin_tick": c.get("_next_long_stay_checkin_tick"),
         }
         for c in world.get("characters", {}).values()
     ]

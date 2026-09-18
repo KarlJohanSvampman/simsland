@@ -1540,6 +1540,18 @@ def _sec_intentions(c, world):
     return line
 
 
+def _sec_examine_reminder(c, world):
+    """Only shown outside full re-orientation mode -- the explicit,
+    one-sentence reason it's safe to trim the default context down to
+    the core tier: the LLM is told, every time, that examine/focus exist
+    to drill into anything specific it's curious about (see systems/
+    action_router.py's examine/focus rewrite, llm/examine_narration.py)."""
+    if c.get("_narrative_mode") == "full":
+        return None
+    return ("You're seeing the short version of what's around you -- "
+            "examine or focus on something specific if you want a closer look.")
+
+
 def _sec_turn_budget(c, world):
     # describe/recall (Rounds 8-9) are withheld from the action menu once
     # cognition.turn_budget hits 0 (see build_available_actions()) — this
@@ -1954,6 +1966,18 @@ def _sec_behavior_patterns(c, world):
     return list(lines) if lines else None
 
 
+def _sec_guilt_paranoia(c, world):
+    from systems.offense_rationalization import get_guilt_paranoia_context
+    line = get_guilt_paranoia_context(c)
+    return [line] if line else None
+
+
+def _sec_unreported_trauma(c, world):
+    from systems.child_disclosure import get_school_trauma_context
+    line = get_school_trauma_context(c, world)
+    return [line] if line else None
+
+
 def _sec_impulse(c, world):
     lines = _build_impulse_context(c, world)
     return list(lines) if lines else None
@@ -1998,6 +2022,7 @@ NARRATIVE_SECTIONS = [
     ("bedroom",               "full", _sec_bedroom),
     ("intentions",            "core", _sec_intentions),
     ("turn_budget",           "core", _sec_turn_budget),
+    ("examine_reminder",      "core", _sec_examine_reminder),
     ("relationships",         "full", _sec_relationships),
     ("grievances",            "full", _sec_grievances),
     ("conflict",              "full", _sec_conflict),
@@ -2035,6 +2060,8 @@ NARRATIVE_SECTIONS = [
     ("temporary_separation",  "full", _sec_temporary_separation),
     ("notable_stories",       "full", _sec_notable_stories),
     ("behavior_patterns",     "full", _sec_behavior_patterns),
+    ("guilt_paranoia",        "full", _sec_guilt_paranoia),
+    ("unreported_trauma",     "full", _sec_unreported_trauma),
 ]
 
 TIER_SETS = {"brief": {"core"}, "full": {"core", "full"}}
@@ -2052,6 +2079,12 @@ BRIEF_REASONS = {
 def build_narrative(c, world, mode="full", wake_line=None, staged=()):
     paragraphs = [wake_line] if wake_line else []
     paragraphs.extend(staged)
+
+    # Transient, read-this-cycle-only signal for _sec_examine_reminder()
+    # below -- section functions only ever receive (c, world), and adding
+    # `mode` to that signature would mean touching all ~53 of them for
+    # one section's benefit.
+    c["_narrative_mode"] = mode
 
     tiers = TIER_SETS.get(mode, TIER_SETS["full"])
     for _key, tier, fn in NARRATIVE_SECTIONS:
@@ -2087,6 +2120,20 @@ def build_narrative(c, world, mode="full", wake_line=None, staged=()):
 # through to build_narrative() — see brain/cognition_scheduler.py::
 # wake_line() and Round 8/9's staged_knowledge (describe/recall results).
 
+# Confirmed live bug (Kevin Walker froze for hours): "full" mode (45 of
+# 53 NARRATIVE_SECTIONS, including a long tail of near-always-empty
+# psychological/social sections) fired on almost every decision --
+# BRIEF_REASONS above only exempted 4 of the many real wake reasons.
+# Combined with an unrelated duplicate-memory bug, a bloated prompt
+# consistently exceeded sim_loop.py's 3s per-tick LLM response budget,
+# freezing that character's cognition entirely. "Full" is now real,
+# periodic re-orientation (every FULL_CONTEXT_REORIENT_TICKS, or for a
+# genuinely major interrupt) rather than the default -- "brief" (the
+# existing 8-section "core" tier) is the default for everything else.
+_ALWAYS_FULL_REASONS = {"provoked", "director_attention", "activity_aborted"}
+FULL_CONTEXT_REORIENT_TICKS = 6 * 3600  # ~6 real hours between forced full re-orientations
+
+
 def build_context(
 
     c,
@@ -2100,7 +2147,15 @@ def build_context(
     staged=()
 ):
 
-    mode = "brief" if trigger_reason in BRIEF_REASONS else "full"
+    tick = world.get("tick", 0)
+    last_full = c.get("_last_full_context_tick")
+    due_for_reorient = last_full is None or (tick - last_full) >= FULL_CONTEXT_REORIENT_TICKS
+
+    if trigger_reason in _ALWAYS_FULL_REASONS or due_for_reorient:
+        mode = "full"
+        c["_last_full_context_tick"] = tick
+    else:
+        mode = "brief"
 
     return {
 

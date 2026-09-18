@@ -76,14 +76,17 @@ def get_view(
     # Kept in sync with main.py::_view_radius() -- the ~25-30% buffer over
     # the strict "what's visible" figure gives pan/zoom drift slack before
     # it falls outside the loaded window (see that function's comment).
+    # Doubled from {55,32,20,12} -- see main.py::_view_radius()'s comment
+    # for why (a real building ~25 tiles from origin never loaded at the
+    # old default-zoom radius).
     radius = {
 
-        0: 55,
-        1: 32,
-        2: 20,
-        3: 12
+        0: 110,
+        1: 64,
+        2: 40,
+        3: 24
 
-    }.get(zoom, 20)
+    }.get(zoom, 40)
 
     # =====================================
     # CHARACTERS

@@ -186,7 +186,23 @@ def _is_violent_or_illegal(other, world):
         return True
     other_id = other.get("id")
     for conflict in world.get("conflicts", {}).values():
-        if other_id in conflict.get("parties", []) and conflict.get("fight_stage") in _HOSTILE_FIGHT_STAGES:
+        # Confirmed live bug: systems/conflict_pipeline.py::start_conflict()
+        # itself already uses conflict["outcome"] is None as "still active"
+        # (its own no-double-conflict guard), but this check never looked at
+        # it -- a conflict that reached a hostile fight_stage stays in
+        # world["conflicts"] forever (nothing ever deletes it), so once ANY
+        # two characters ever had a heated_argument/physical_altercation/
+        # assault, this returned True for that pair PERMANENTLY, even
+        # sim-days after it resolved. That permanently disabled
+        # maybe_log_sighting_observation's cooldown between them, spamming
+        # a fresh "alarming" sighting memory every single perception tick
+        # forever -- confirmed live: a character stuck re-perceiving the
+        # other every ~1 minute for hours, bloating their own prompt large
+        # enough to blow the per-tick LLM response budget and never
+        # complete a decision again.
+        if (other_id in conflict.get("parties", [])
+                and conflict.get("outcome") is None
+                and conflict.get("fight_stage") in _HOSTILE_FIGHT_STAGES):
             return True
     return False
 
