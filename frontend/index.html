@@ -252,6 +252,79 @@
     margin: 2px 0 8px;
   }
 
+  /* =========================
+     EXPECTATIONS CALENDAR -- same week-grid/day-drilldown shape as the
+     schedule view above (Plans tab, toggled via .plansViewBtn), but each
+     day row can stack several lanes (an expectation's real window can
+     overlap another's) instead of a single fixed-height bar.
+  ========================= */
+
+  .plansViewToggle {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 10px;
+  }
+
+  .plansViewBtn {
+    background: #2a2e36;
+    color: #aaa;
+    border: 1px solid #444;
+    border-radius: 4px;
+    padding: 3px 10px;
+    cursor: pointer;
+    font-size: 11px;
+  }
+
+  .plansViewBtn:hover {
+    background: #3a3e46;
+  }
+
+  .plansViewBtn.active {
+    background: #3a5e8c;
+    color: #fff;
+    border-color: #5a8ec0;
+  }
+
+  .expectCalDayRow {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 4px 0;
+    cursor: pointer;
+    border-radius: 4px;
+  }
+
+  .expectCalDayRow:hover {
+    background: rgba(255,255,255,0.06);
+  }
+
+  .expectCalLanes {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .expectCalLane {
+    position: relative;
+    height: 12px;
+    background: rgba(255,255,255,0.06);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+
+  .expectCalLaneEmpty {
+    opacity: 0.4;
+  }
+
+  .expectCalBlock {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    opacity: 0.9;
+    border-radius: 3px;
+  }
+
   .viewerSection {
     margin-bottom: 12px;
     padding-bottom: 10px;

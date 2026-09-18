@@ -5306,9 +5306,44 @@ const SCHEDULE_DEFAULT_COLOR = "#888";
 
 let _plansDrilldownDay = null;
 let _plansLastCharId = null;
+// Per the user's explicit ask: expectations visualized in a calendar
+// format, sharing the Plans tab with the existing weekly schedule view
+// via a small sub-toggle rather than a whole new top-level tab.
+let _plansView = "schedule";   // "schedule" | "expectations"
 
 function _scheduleColorFor(activity){
   return SCHEDULE_ACTIVITY_COLORS[activity] || SCHEDULE_DEFAULT_COLOR;
+}
+
+const EXPECTATION_STATUS_COLORS = {
+  satisfied: "#3ecf5e",   // matches _intentionOutcome()'s Mind-tab coloring
+  missed:    "#e64545",
+  pending:   "#e6c200",
+};
+const EXPECTATION_DEFAULT_COLOR = "#888";
+
+function _expectationColorFor(status){
+  return EXPECTATION_STATUS_COLORS[status] || EXPECTATION_DEFAULT_COLOR;
+}
+
+// Real tick ranges for each day of the CURRENT calendar week (Mon-Sun),
+// derived from the last-fetched live calendar + its corresponding world
+// tick (same _lastCalendar/_lastCalendarWorldTick pair _formatMemoryTimestamp
+// already projects against) -- 1 tick === 1 real second
+// (backend/core/tick_schedule.py::TICK_RATE_SECONDS), so a day is exactly
+// 86400 ticks. Used to clip each expectation's real window_start_tick/
+// window_end_tick against a specific calendar day for the week-grid view.
+function _currentWeekDayTicks(){
+  if(!_lastCalendar || _lastCalendarWorldTick == null) return null;
+  const idx = _WEEKDAY_ORDER.indexOf(_lastCalendar.weekday);
+  if(idx < 0) return null;
+  const secondsIntoToday = (_lastCalendar.hour || 0) * 3600 + (_lastCalendar.minute || 0) * 60;
+  const mondayStartTick = (_lastCalendarWorldTick - secondsIntoToday) - idx * 86400;
+  const out = {};
+  SCHEDULE_WEEKDAYS.forEach((day, i) => {
+    out[day] = { startTick: mondayStartTick + i * 86400, endTick: mondayStartTick + (i + 1) * 86400 };
+  });
+  return out;
 }
 
 function _scheduleMinutes(hhmm){
@@ -5336,17 +5371,35 @@ function renderPlansTab(c){
     _plansDrilldownDay = null;
   }
 
-  const week = c.schedule?.week;
-  if(!week){
-    el.innerHTML = _section("Plans", _empty("No schedule generated for this character yet."));
-    return;
+  const toggle = `
+    <div class="plansViewToggle">
+      <button class="plansViewBtn${_plansView === "schedule" ? " active" : ""}" data-plans-view="schedule">Schedule</button>
+      <button class="plansViewBtn${_plansView === "expectations" ? " active" : ""}" data-plans-view="expectations">Expectations</button>
+    </div>`;
+
+  let body;
+  if(_plansView === "expectations"){
+    body = _renderExpectationsView(c);
+  } else {
+    const week = c.schedule?.week;
+    if(!week){
+      body = _section("Plans", _empty("No schedule generated for this character yet."));
+    } else if(_plansDrilldownDay && week[_plansDrilldownDay]){
+      body = _renderScheduleDayDetail(_plansDrilldownDay, week[_plansDrilldownDay]);
+    } else {
+      body = _renderScheduleWeek(week);
+    }
   }
 
-  if(_plansDrilldownDay && week[_plansDrilldownDay]){
-    el.innerHTML = _renderScheduleDayDetail(_plansDrilldownDay, week[_plansDrilldownDay]);
-  } else {
-    el.innerHTML = _renderScheduleWeek(week);
-  }
+  el.innerHTML = toggle + body;
+
+  el.querySelectorAll("[data-plans-view]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      _plansView = btn.dataset.plansView;
+      _plansDrilldownDay = null;
+      renderPlansTab(c);
+    });
+  });
 
   el.querySelectorAll("[data-schedule-day]").forEach(row => {
     row.addEventListener("click", () => {
@@ -5358,6 +5411,111 @@ function renderPlansTab(c){
     _plansDrilldownDay = null;
     renderPlansTab(c);
   });
+}
+
+// =========================================================
+// EXPECTATIONS CALENDAR -- same week-grid/day-drilldown shape as the
+// schedule view above, but plotting each expectation's real
+// window_start_tick/window_end_tick (systems/expectations.py) clipped
+// against each day of the current calendar week, color-coded by real
+// status (satisfied/missed/pending) rather than a flat activity label.
+// Expectations with no real window (window_end_tick still null -- not
+// schedule-linked, or the very first period hasn't rolled over yet)
+// list separately below the grid rather than being silently dropped.
+// =========================================================
+
+function _renderExpectationsView(c){
+  const expectations = Object.values(c.expectations || {});
+  if(!expectations.length){
+    return _section("Expectations", _empty("No expectations tracked for this character yet."));
+  }
+
+  const dayTicks = _currentWeekDayTicks();
+  if(_plansDrilldownDay && dayTicks && dayTicks[_plansDrilldownDay]){
+    return _renderExpectationsDayDetail(_plansDrilldownDay, expectations, dayTicks[_plansDrilldownDay]);
+  }
+  return _renderExpectationsWeek(expectations, dayTicks);
+}
+
+function _renderExpectationsWeek(expectations, dayTicks){
+  const windowed = expectations.filter(e => e.window_start_tick != null && e.window_end_tick != null);
+  const unwindowed = expectations.filter(e => e.window_start_tick == null || e.window_end_tick == null);
+
+  let rows;
+  if(!dayTicks){
+    rows = _empty("Calendar not loaded yet.");
+  } else {
+    rows = SCHEDULE_WEEKDAYS.map(day => {
+      const range = dayTicks[day];
+      const active = windowed.filter(e => e.window_start_tick < range.endTick && e.window_end_tick > range.startTick);
+      const lanes = active.length ? active.map(e => {
+        const clippedStart = Math.max(e.window_start_tick, range.startTick);
+        const clippedEnd = Math.min(e.window_end_tick, range.endTick);
+        const left = Math.max(0, ((clippedStart - range.startTick) / 86400) * 100);
+        const width = Math.max(2, Math.min(100 - left, ((clippedEnd - clippedStart) / 86400) * 100));
+        const tmpl = definitions.expectation_templates?.[e.template_id];
+        const label = tmpl?.label || e.template_id;
+        return `<div class="expectCalLane">
+          <div class="expectCalBlock" title="${label} (${e.status})"
+               style="left:${left}%; width:${width}%; background:${_expectationColorFor(e.status)};"></div>
+        </div>`;
+      }).join("") : `<div class="expectCalLane expectCalLaneEmpty"></div>`;
+      return `
+        <div class="expectCalDayRow" data-schedule-day="${day}">
+          <div class="scheduleDayLabel">${SCHEDULE_DAY_LABELS[day]}</div>
+          <div class="expectCalLanes">${lanes}</div>
+        </div>`;
+    }).join("");
+  }
+
+  const unwindowedLines = unwindowed.map(e => {
+    const tmpl = definitions.expectation_templates?.[e.template_id];
+    const status = e.status === "missed"
+      ? `<span class="viewerNeg">missed ${e.missed_count || 0}x</span>`
+      : `<span class="viewerPos">streak ${e.streak || 0}</span>`;
+    return `<div class="viewerCard">${tmpl?.label || e.template_id} <span style="opacity:.5">(${e.cadence})</span> — ${status}</div>`;
+  }).join("");
+
+  return _section("Expectations — this week (click a day for details)", `
+    <div class="scheduleHourAxis"><span>12am</span><span>6am</span><span>12pm</span><span>6pm</span><span>12am</span></div>
+    ${rows}
+  `) + (unwindowedLines ? _section("Not tied to a daily window", unwindowedLines) : "");
+}
+
+function _renderExpectationsDayDetail(day, expectations, range){
+  const active = expectations.filter(e =>
+    e.window_start_tick != null && e.window_end_tick != null
+    && e.window_start_tick < range.endTick && e.window_end_tick > range.startTick
+  );
+
+  const rows = active.length ? active.map(e => {
+    const tmpl = definitions.expectation_templates?.[e.template_id];
+    const startProj = _lastCalendar && _lastCalendarWorldTick != null
+      ? _projectCalendarForward(_lastCalendar, e.window_start_tick - _lastCalendarWorldTick) : null;
+    const endProj = _lastCalendar && _lastCalendarWorldTick != null
+      ? _projectCalendarForward(_lastCalendar, e.window_end_tick - _lastCalendarWorldTick) : null;
+    const timeLabel = startProj && endProj
+      ? `${String(startProj.hour).padStart(2, "0")}:${String(startProj.minute).padStart(2, "0")}–${String(endProj.hour).padStart(2, "0")}:${String(endProj.minute).padStart(2, "0")}`
+      : "";
+    const detail = e.status === "missed" ? `, missed ${e.missed_count || 0}x`
+      : e.status === "satisfied" ? `, streak ${e.streak || 0}` : "";
+    return `
+    <div class="scheduleDetailRow">
+      <div class="scheduleDetailSwatch" style="background:${_expectationColorFor(e.status)};"></div>
+      <div class="scheduleDetailTime">${timeLabel}</div>
+      <div>${tmpl?.label || e.template_id} <span style="opacity:.5">(${e.cadence}, ${e.status}${detail})</span></div>
+    </div>`;
+  }).join("") : _empty("No expectation windows this day.");
+
+  return `
+    <div class="viewerSection">
+      <div class="scheduleDayDetailHeader">
+        <div class="viewerSectionTitle" style="margin:0;">${SCHEDULE_DAY_LABELS[day]} — expectations</div>
+        <button class="scheduleBackBtn">← Week</button>
+      </div>
+      ${rows}
+    </div>
+  `;
 }
 
 function _renderScheduleWeek(week){
