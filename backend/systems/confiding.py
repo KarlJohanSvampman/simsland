@@ -142,6 +142,14 @@ def _do_confide(c, confidant, mem, world):
             )
         except Exception:
             result = None
+        # generate_validation_response() always returns a real
+        # {"approves", "text"} dict (it has its own fallback), except when
+        # run_llm_call() itself resolves to {"error": ...} for a
+        # preempted/cancelled call -- that dict is also truthy, and
+        # result.get("approves") on it silently comes back None/False
+        # rather than actually falling back to the coin-flip default below.
+        if isinstance(result, dict) and "error" in result:
+            result = None
         approves = bool(result.get("approves")) if result else True
 
         if approves:

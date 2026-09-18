@@ -247,7 +247,13 @@ def _handle_opinion_reflection(c, world, reflection):
     context = {"reason": reflection.get("reason", ""), "prior_stance": None}
 
     result = run_llm_call(generate_opinion(c, topic, context, world, session), priority=PRIORITY_BACKGROUND)
-    if not result:
+    # generate_opinion() returns a real {"stance", ...} dict or None -- but
+    # a preempted/cancelled call instead resolves here to run_llm_call's
+    # own {"error": ...} dict, which is truthy. `if not result` alone
+    # wouldn't catch that, and result.get("stance", 0) etc. below would
+    # then silently form a fake neutral opinion (stance=0, confidence=0.3)
+    # that was never actually reasoned about.
+    if not isinstance(result, dict) or "error" in result:
         return
 
     update_opinion(

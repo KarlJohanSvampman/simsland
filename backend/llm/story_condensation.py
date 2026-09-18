@@ -45,4 +45,14 @@ def condense_story(c, story, world):
     """Sync entry point -- bridges the async LLM call the same way
     systems/choice.py::choose() already does via run_llm_call(),
     rather than a new mechanism."""
-    return run_llm_call(_generate_condensed_text(c, story, world), priority=PRIORITY_BACKGROUND)
+    result = run_llm_call(_generate_condensed_text(c, story, world), priority=PRIORITY_BACKGROUND)
+    # _generate_condensed_text() itself only ever returns a str or None --
+    # but a preempted/cancelled call bypasses that entirely and resolves
+    # here to run_llm_call's own {"error": ...} dict instead. Without this
+    # check, the caller's `if not condensed` wouldn't catch it (a non-empty
+    # dict is truthy), and it would get passed straight to
+    # brain/memory.py::store_memory() as the memory text instead of falling
+    # back to the truncated summary.
+    if isinstance(result, dict) and "error" in result:
+        return None
+    return result

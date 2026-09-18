@@ -111,4 +111,13 @@ def generate_chapter_plan(c, world, story, chapter, candidates):
         result = run_llm_call(_generate(c, world, story, chapter, candidates, session), priority=PRIORITY_BACKGROUND)
     except Exception:
         result = None
+    # _generate() itself already falls back to _FALLBACK_OUTCOME on any
+    # internal failure -- but a preempted/cancelled call bypasses that
+    # entirely and resolves here to run_llm_call's own {"error": ...} dict
+    # instead. That dict is also truthy, so `result or dict(_FALLBACK_OUTCOME)`
+    # would never trigger the fallback on it, and advance_chapter() would
+    # silently apply a chapter outcome built from an error dict's missing
+    # keys (plan=None, outcome="no_progress" by .get() default, etc.).
+    if isinstance(result, dict) and "error" in result:
+        result = None
     return result or dict(_FALLBACK_OUTCOME)
