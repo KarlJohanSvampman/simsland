@@ -28,6 +28,13 @@ COGNITION_CORE_TRAITS = {
     "cognition_selfaware": "self_aware",
 }
 
+# belief_templates categories where a character may hold at most ONE --
+# generalized from religion-only (Phase H): picking a NEW belief in one of
+# these categories, whether at generation (character_gen.py::_random_beliefs)
+# or via runtime conversion (peer_influence.py::_make_room_for_belief),
+# evicts/excludes any other belief already held in that same category.
+EXCLUSIVE_BELIEF_CATEGORIES = ("religion", "ideology")
+
 
 def ensure_prop_template_fields(world, defs):
     """api/props.py::create_prop() never actually copied anchors/storage/
@@ -67,8 +74,25 @@ def ensure_prop_template_fields(world, defs):
             prop["storage"] = copy.deepcopy(template.get("storage"))
         prop.setdefault("footprint", template.get("footprint"))
         prop.setdefault("category", template.get("category"))
+        # Tagged square surface regions (systems/props.py::
+        # find_surface_with_tag()) -- same backfill-once-then-merge-new
+        # shape as anchors above, so a template gaining a new surface
+        # later still reaches already-placed instances.
+        if prop.get("surfaces") is None:
+            prop["surfaces"] = copy.deepcopy(template.get("surfaces", []))
+        else:
+            existing_ids = {s.get("id") for s in prop["surfaces"]}
+            for surface in template.get("surfaces", []):
+                if surface.get("id") not in existing_ids:
+                    prop["surfaces"].append(copy.deepcopy(surface))
         if template.get("catalog") is not None:
             prop.setdefault("catalog", template.get("catalog"))
+        # Tags a player/script has stamped onto this SPECIFIC instance
+        # (e.g. "cook_prep" on the one kitchen table that should be
+        # preferred for chopping) -- distinct from the template's own
+        # tags, which every instance of that template shares. See
+        # props.py::get_prop_tags()/find_preferred_surface().
+        prop.setdefault("extra_tags", [])
 
 
 def ensure_world_defaults(world, defs=None):
@@ -97,6 +121,12 @@ def ensure_world_defaults(world, defs=None):
         gov = defs.get("government")
         if gov:
             world.setdefault("government", gov.copy())
+
+    # Real per-company employee roster (see systems/workplace_npc.py) --
+    # {company_key: {"employee_ids": [...], "boss_id": None}}, distinct
+    # from world["company_slots"]'s pure integer capacity/filled
+    # counters. Created lazily per company, not upfront.
+    world.setdefault("companies", {})
 
 
     # =====================================================
@@ -410,6 +440,13 @@ def ensure_world_defaults(world, defs=None):
     world.setdefault("families", {})
     world.setdefault("factions", {})
 
+    # Runtime state for definitions.json's political_party_templates
+    # registry (systems/politics.py) -- per-party generated policies
+    # (llm/party_policy.py), keyed by party id. Separate from the static
+    # template registry the same way world["factions"] is already
+    # separate from any authored faction content.
+    world.setdefault("political_parties", {})
+
     from systems.government_budget import ensure_government
     ensure_government(world)
 
@@ -496,6 +533,10 @@ def ensure_world_defaults(world, defs=None):
                 mx, my = local_to_world(building, 0, -1)
                 mailbox["x"] = mx
                 mailbox["y"] = my
+
+        # Real, tagged physical stacks of documents -- see
+        # systems/document_search.py. {pile_id: {tags, item_ids, x, y}}.
+        h.setdefault("document_piles", {})
 
         # Convenience/stability tracking (systems/convenience.py) -- when a
         # household already has a home, treat "established" as starting to
@@ -758,8 +799,15 @@ def ensure_character_defaults(c, world=None):
     # the same axis as in-group vs. universal solidarity.
     c.setdefault("curiosity", 50)
 
-    # Masculinity confidence — separate axis targeted by emasculation tactics
-    c.setdefault("masculinity_confidence", 0.65)  # males only; attacks via ridicule/emasculation
+    # Masculinity confidence — separate axis targeted by emasculation tactics.
+    # Confirmed live bug (player report: "why does everyone have
+    # masculinity under self-esteem, even the women?") -- this was set
+    # unconditionally via setdefault for EVERY character despite the
+    # comment's own "males only" -- the frontend already correctly skips
+    # displaying it when the field is absent (main.js checks != null),
+    # so the fix is just to stop setting it on anyone it doesn't apply to.
+    if c.get("sex") == "male":
+        c.setdefault("masculinity_confidence", 0.65)  # attacks via ridicule/emasculation
 
     # Sexual dependency — character has been conditioned to need dominant partner style
     c.setdefault("sexual_dependency", {
@@ -1110,6 +1158,32 @@ def ensure_character_defaults(c, world=None):
     c.setdefault("_daily_observations", [])
     c.setdefault("behavior_patterns", {})
 
+    # Real, capped (max 10) list of known workplace contacts -- see
+    # systems/workplace_npc.py. Separate from c["relationships"] (which
+    # can hold many unrelated family/friend entries); reputation/
+    # dependency toward each id here live on the matching
+    # relationships[id] entry (brain/relationships.py's
+    # workplace_reputation/workplace_dependency fields).
+    c.setdefault("workplace_contact_ids", [])
+
+    # Real, actionable clause invocations awaiting the character's own
+    # choice -- see systems/contract_clauses.py. An "optional"
+    # conditional clause queues here instead of firing on its own.
+    c.setdefault("pending_clause_invocations", [])
+
+    # The one real, LLM-chosen career-ladder target this character is
+    # currently working toward -- see systems/career_ladder.py. Empty
+    # ({}) means no active target (freshly hired, unemployed, or just
+    # promoted); choose_career_path() re-picks the next time this
+    # character works a shift.
+    c.setdefault("career_progress", {})
+
+    # Rolling real sleep-duration history -- see systems/body.py::
+    # on_sleep_complete() (writer) and systems/alarm_habits.py (reader).
+    # Not a fuzzy "how routine is this person" guess -- actual recent
+    # measurements.
+    c.setdefault("sleep_stats", {"recent_durations": [], "avg_duration_by_weekday": {}})
+
     # Sports hobbies (see systems/sports.py). supported_teams: sport ->
     # sports_teams id (real pro team, picked when an "X Supporter" hobby is
     # adopted). local_team: sport -> local_teams id (invented local club,
@@ -1163,18 +1237,33 @@ def ensure_character_defaults(c, world=None):
     # dict-of-capped-lists shape) -- see brain/opinions.py.
     c.setdefault("opinions", {})
 
-    # General beliefs adopted from belief_templates (definitions.json) via
-    # social exposure -- see systems/peer_influence.py's adoption engine.
-    # Deliberately separate from c["beliefs"] (brain/beliefs.py -- narrow,
-    # fixed-axis political sentiment scalars consumed by systems/politics.py's
-    # elections/factions) and c["opinions"] (free-form, LLM-reasoned). A flat
-    # list of belief-template ids, mirroring c["personality_traits"].
+    # Deep/religious/philosophical beliefs -- belief_templates
+    # (definitions.json) content, selected weighted-random at generation
+    # (character_gen.py::_random_beliefs()) and slowly adoptable afterward
+    # via prolonged social exposure -- see systems/peer_influence.py's
+    # adoption engine. A flat list of belief-template ids, mirroring
+    # c["personality_traits"].
     c.setdefault("held_beliefs", [])
 
     # Per-(source_person_id, belief) accumulator feeding the same
     # dual-threshold promotion shape as c["influence_profile"] (traits) --
     # see systems/peer_influence.py::record_positive_belief_exposure().
     c.setdefault("belief_influence_profile", [])
+
+    # Principles ("applied beliefs" -- X > Y / X < Y + Z / X == Y over
+    # principle_concepts ids) compiled by AI from c["held_beliefs"], and
+    # c["mentality"] (the collective picture: which principles, which
+    # concepts they reference, their common tags, and a short summary) --
+    # see systems/mentality.py::tick_mentality_compilation() and
+    # llm/mentality_compiler.py. c["opinions"] (brain/opinions.py) gets
+    # seeded from mentality at the same pass -- this is what "compiling
+    # political views" means concretely. _mentality_pending flags a
+    # character whose principles/mentality/opinions are stale relative to
+    # their current held_beliefs (freshly generated, or just adopted/
+    # converted a new belief) and still need the sweep to (re)compile them.
+    c.setdefault("principles", [])
+    c.setdefault("mentality", None)
+    c.setdefault("_mentality_pending", bool(c.get("held_beliefs")))
 
     # Accumulator for the daily trust/respect/exposure/value-similarity
     # weighted influence pass -- see systems/influence.py::resolve_value_influence().
@@ -1269,6 +1358,14 @@ def ensure_character_defaults(c, world=None):
 
     # Serialised queues saved when an urgent activity interrupted a hobby
     c.setdefault("suspended_hobby_sessions", [])
+
+    # Real, priority-ordered list of child ids this character is a
+    # resolved caregiver for -- synced from the child-side resolution
+    # (systems/child_care.py::_find_parents_for_child) in
+    # tick_child_needs(), least-capable/youngest child first, so a
+    # parent's own responsibilities are a real, readable list rather
+    # than only ever discoverable by scanning every child in the world.
+    c.setdefault("dependents", [])
 
     c.setdefault(
         "intentions",

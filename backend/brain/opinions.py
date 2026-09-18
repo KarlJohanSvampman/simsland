@@ -19,6 +19,18 @@ just current state:
 
 _OPINION_HISTORY_CAP = 6
 
+# Relocated from the retired brain/beliefs.py -- the same political-topic
+# grouping elections/factions (systems/politics.py) already read, now
+# averaging c["opinions"][topic]["stance"] instead of the old module's
+# c["beliefs"][topic]["value"]. See compute_political_lean() below.
+IDEOLOGY_AXES = {
+    "economic":         ["taxes", "economy", "cost_of_living", "welfare"],
+    "security":         ["crime", "police", "safety"],
+    "social":           ["immigration", "homelessness"],
+    "institutional":    ["justice", "government", "media"],
+    "personal_conduct": ["honor", "loyalty", "ambition", "integrity", "self_reliance"],
+}
+
 
 def update_opinion(c, topic, stance, confidence, reasoning, relevant_values, tick):
     """Append a new opinion snapshot for `topic`, capped to the last
@@ -80,10 +92,89 @@ def shift_opinion(c, topic, delta, tick, reasoning="", relevant_values=None):
 
 def opinion_alignment(a, b, topic):
     """0..1 similarity between two characters' current stance on `topic`,
-    mirrors beliefs.py::belief_alignment()'s shape. 0.5 (neutral) if
-    either character has no opinion formed yet."""
+    mirrors the retired brain/beliefs.py::belief_alignment()'s shape.
+    0.5 (neutral) if either character has no opinion formed yet."""
     oa = get_current_opinion(a, topic)
     ob = get_current_opinion(b, topic)
     if oa is None or ob is None:
         return 0.5
     return max(0.0, 1 - abs(oa["stance"] - ob["stance"]) / 2)
+
+
+# =========================================================
+# POLITICAL LEAN -- replaces the retired brain/beliefs.py module.
+# Same IDEOLOGY_AXES grouping, same consumers (systems/politics.py's
+# elections/factions, brain/relationships.py), now sourced from
+# c["opinions"] instead of a separate c["beliefs"] dict -- opinions
+# are the one dynamic layer now (seeded from mentality at generation,
+# nudged by real events afterward), matching the unified belief ->
+# principle -> mentality -> opinion pipeline.
+# =========================================================
+
+def compute_political_lean(c):
+    """Averages this character's current opinion stance across each
+    IDEOLOGY_AXES group's topics. Stored as c["political_lean"]
+    (renamed from the old module's c["political_alignment"] to avoid
+    confusion with the retired module -- same shape, same consumers)."""
+    axes = {}
+    for axis, topics in IDEOLOGY_AXES.items():
+        vals = []
+        for topic in topics:
+            op = get_current_opinion(c, topic)
+            if op is not None:
+                vals.append(op["stance"])
+        axes[axis] = sum(vals) / len(vals) if vals else 0.0
+    c["political_lean"] = axes
+    return axes
+
+
+def political_similarity(a, b):
+    """0..1 whole-of-politics compatibility, mirrors the retired
+    brain/beliefs.py::belief_alignment()'s multi-topic-averaging shape,
+    now sourced from c["political_lean"] (opinions-derived)."""
+    aa = a.get("political_lean") or compute_political_lean(a)
+    bb = b.get("political_lean") or compute_political_lean(b)
+    keys = set(aa) | set(bb)
+    if not keys:
+        return 0.5
+    return max(0.0, 1 - (sum(abs(aa.get(k, 0) - bb.get(k, 0)) for k in keys) / len(keys) / 2))
+
+
+def polarize_opinions(c):
+    """Replaces the retired brain/beliefs.py::polarization_drift() --
+    same math, over the current stance of every opinion topic instead
+    of the old c["beliefs"] dict. Mutates the most recent snapshot in
+    place (passive background drift, not a new opinion-forming event,
+    so this deliberately doesn't grow the capped history every tick)."""
+    for history in c.get("opinions", {}).values():
+        if not history:
+            continue
+        entry = history[-1]
+        v = entry.get("stance", 0)
+        conf = entry.get("confidence", 0)
+        if abs(v) > 0.2:
+            entry["stance"] = max(-1.0, min(1.0, v + (0.005 * conf if v > 0 else -0.005 * conf)))
+
+
+def nudge_opinion(c, topic, sentiment, intensity, tick, reasoning=""):
+    """Thin wrapper replacing the retired brain/beliefs.py::
+    update_belief() at its 4 real call sites (systems/politics.py's
+    election-winner reinforcement, systems/influence.py's news/peer
+    nudges) -- replicates its exact sentiment-to-delta math so those
+    call sites needed no behavioral change, just an import swap. Shifts
+    an existing opinion (the normal case, since every political topic
+    gets seeded at generation by the mentality-compilation sweep) or
+    creates a fresh one as a defensive fallback for an edge-case
+    character whose compilation hasn't run yet."""
+    delta = 0.2 * float(intensity)
+    if sentiment in ("negative", "anti"):
+        delta = -abs(delta)
+    elif sentiment in ("positive", "pro"):
+        delta = abs(delta)
+    else:
+        delta = delta * 0.2
+
+    shifted = shift_opinion(c, topic, delta, tick, reasoning=reasoning)
+    if shifted is None:
+        shifted = update_opinion(c, topic, delta, 0.1, reasoning, [], tick)
+    return shifted

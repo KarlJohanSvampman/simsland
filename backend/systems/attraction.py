@@ -554,6 +554,7 @@ def compute_attraction(c, other, world):
       3. Personality/trait resonance
       4. Status differential (if c values status)
       5. Quirk modifiers
+      5b. Firm principle stance (Phase I -- prejudice/kinship nudge)
       6. Relationship familiarity + trust
       7. Demisexual gate
       8. Current mood/arousal state boost
@@ -605,6 +606,16 @@ def compute_attraction(c, other, world):
     # 6. Quirk modifier
     quirk_mod = _evaluate_quirks(c, other, defs)
     base = max(0.0, min(1.0, base + quirk_mod * 0.3))
+
+    # 6b. Phase I wired consequence: a FIRM ('>') principle stance c
+    # holds toward `other` (systems/mentality.py::principle_stance_toward)
+    # nudges attraction directly -- a real, deterministic modifier here
+    # (not narration), since this is the one real number flirt_score/
+    # envy/conflict_of_interest/etc. all already read.
+    from systems.mentality import principle_stance_toward
+    stance = principle_stance_toward(c, other, world)
+    if stance and stance.get("op") == ">":
+        base = max(0.0, min(1.0, base + (0.15 if stance["sentiment"] == "favorable" else -0.15)))
 
     # 7. Demisexual gate — requires strong trust bond
     requires_trust = profile.get("requires_trust", 0.0)

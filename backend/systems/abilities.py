@@ -11,27 +11,42 @@ rather than hardcoded per skill:
             practicing this ability actually trains it (attempting one
             of these counts as a real training attempt, win or lose).
         "proficiency_levels": [
-            {"level": "novice", "successes_to_next": 3},
-            {"level": "beginner", "successes_to_next": 6},
+            {"level": "novice", "title": "Initiate", "successes_to_next": 3, "bonus": 5},
+            {"level": "beginner", "title": "Average", "successes_to_next": 6, "bonus": 15},
             ...
-            {"level": "expert", "successes_to_next": null}   -- null =
-                the top level, nothing further to level into.
+            {"level": "expert", "title": "Master", "successes_to_next": null, "bonus": 60}
+                -- null successes_to_next = the top level, nothing
+                further to level into. "title" is the player-facing
+                name; "bonus" is this level's authored contribution to
+                a d100 skill-check difficulty (see systems/
+                skill_checks.py -- higher difficulty = easier to
+                succeed, so a higher-level bonus makes success MORE
+                likely, not less).
         ],
-        "trait_modifiers": {"clumsy": -0.15}   -- flat bonus/penalty to
-            every check involving this ability, per owned trait tag.
+        "trait_modifiers": [{"trait": "clumsy", "modifier": -15}]
+            -- signed difficulty-point bonus/penalty per owned trait
+            (checked against traits + personality_traits +
+            physical_traits), applied by systems/skill_checks.py's own
+            difficulty calculation, not by this module.
     }
 
 A character's own progress lives in c["abilities"][ability_id] =
 {"level", "successes", "attempts"}, created lazily on first attempt.
+This module owns proficiency TRACKING only (level-up bookkeeping via
+record_attempt(), requirement gating via meets_requirement()) -- the
+actual pass/fail ROLL for a skill/ability-gated action is
+systems/skill_checks.py's job (a real d100 roll-under-difficulty check,
+separate from systems/contested_checks.py's own continuous roll+
+threshold math for force/influence/manipulation checks). A route calls
+skill_checks.resolve_skill_check(...) first, then feeds its "success"
+and "actor_margin" straight into this module's record_attempt() to
+update progression.
 
-Reuses systems/contested_checks.py's engine for the actual pass/fail
-roll on a training attempt -- current proficiency feeds back INTO that
-roll as a real characteristic ("ability:<id>", resolved dynamically by
-contested_checks.py rather than hardcoded per ability), so a more
-practiced character is more likely to succeed at the very thing that
-keeps training them further, and CHECK_DEFINITIONS entries for
-ability-trained actions can weight "ability:<id>" like any other
-characteristic.
+ability_characteristic_value() is kept as a 0-1 proficiency readout
+still consumed by contested_checks.py's generic "ability:<id>"
+characteristic hook (for any FORCE/INFLUENCE/MANIPULATION check that
+wants to weight in a skill) -- that's a different consumer than the
+skill_checks.py path above and is unrelated to it.
 """
 
 
@@ -84,17 +99,6 @@ def ability_characteristic_value(c, ability_id, world):
     return get_level_index(c, ability_id, world) / max(1, len(levels) - 1)
 
 
-def trait_modifier(c, ability_id, world):
-    """Flat bonus/penalty from the ability template's own trait_modifiers
-    table -- e.g. "clumsy" hurting juggling/cooking checks."""
-    tmpl = _ability_templates(world).get(ability_id, {})
-    mods = tmpl.get("trait_modifiers", {})
-    if not mods:
-        return 0.0
-    traits = set(c.get("traits", []) + c.get("personality_traits", []))
-    return sum(v for tag, v in mods.items() if tag in traits)
-
-
 def meets_requirement(c, ability_id, min_level, world):
     """True if c's current proficiency in ability_id is at or above
     min_level (per that ability's own level ordering). Fails OPEN (True)
@@ -106,12 +110,24 @@ def meets_requirement(c, ability_id, min_level, world):
     return get_level_index(c, ability_id, world) >= levels.index(min_level)
 
 
-def record_attempt(c, ability_id, world, success):
+DEFAULT_MARGIN_PER_BONUS_SUCCESS = 10
+
+
+def record_attempt(c, ability_id, world, success, margin=0):
     """Call once per genuine training attempt (an action listed in the
     ability's own trains_via was actually performed) -- tracks attempts/
     successes and levels up once the CURRENT level's own
     successes_to_next threshold is reached (each level can require a
-    different number of successes, per the template)."""
+    different number of successes, per the template).
+
+    `margin` (systems/skill_checks.py::resolve_skill_check()'s own
+    "actor_margin" -- how much room to spare the roll succeeded by, 0 for
+    a plain non-margin-aware caller) scales how many successes a single
+    outstanding attempt counts as: 1 + (margin // margin_per_bonus_success)
+    -- a razor-thin success still counts as exactly 1 (unchanged from
+    before this existed), but a spectacular one trains the skill several
+    "occasions" at once, per the ability template's own (optional,
+    defaults to 10) margin_per_bonus_success field."""
     levels = _levels(ability_id, world)
     if not levels:
         return None
@@ -124,11 +140,22 @@ def record_attempt(c, ability_id, world, success):
     if not success:
         return entry
 
-    entry["successes"] += 1
-    idx = get_level_index(c, ability_id, world)
-    needed = levels[idx].get("successes_to_next")
-    if needed is not None and entry["successes"] >= needed and idx + 1 < len(levels):
-        entry["successes"] = 0
+    tmpl = _ability_templates(world).get(ability_id, {})
+    divisor = tmpl.get("margin_per_bonus_success", DEFAULT_MARGIN_PER_BONUS_SUCCESS)
+    bonus_successes = int(margin // divisor) if margin and divisor else 0
+    entry["successes"] += 1 + max(0, bonus_successes)
+
+    # Carry any overflow across a level-up (and allow cascading through
+    # more than one level in a single outstanding attempt) instead of
+    # discarding it -- a big margin's whole point is to reward an
+    # exceptional attempt, so resetting straight to 0 on level-up would
+    # waste exactly the credit this feature exists to grant.
+    while True:
+        idx = get_level_index(c, ability_id, world)
+        needed = levels[idx].get("successes_to_next")
+        if needed is None or entry["successes"] < needed or idx + 1 >= len(levels):
+            break
+        entry["successes"] -= needed
         entry["level"] = levels[idx + 1]["level"]
         entry["leveled_up_tick"] = world.get("tick", 0)
     return entry
@@ -145,25 +172,3 @@ def find_ability_for_action(action_type, world):
     return None
 
 
-def attempt_ability_action(c, ability_id, action_type, world, target=None):
-    """The real entry point a route calls when a character performs an
-    action that trains (and/or requires) an ability: resolves a check
-    (systems/contested_checks.py, if action_type has its own
-    CHECK_DEFINITIONS entry weighting "ability:<id>"; otherwise a plain
-    proficiency-vs-a-flat-threshold roll) and records the attempt.
-    Returns (success: bool, ability_entry)."""
-    from systems.contested_checks import CHECK_DEFINITIONS, resolve_check
-    import random
-
-    extra = trait_modifier(c, ability_id, world)
-    if action_type in CHECK_DEFINITIONS:
-        check = resolve_check(action_type, c, target, world, extra_actor_mod=extra)
-        success = bool(check and check["success"])
-    else:
-        # No bespoke check config for this action -- fall back to a
-        # simple solo roll weighted by proficiency alone.
-        proficiency = ability_characteristic_value(c, ability_id, world)
-        success = random.random() < (0.35 + proficiency * 0.5 + extra)
-
-    entry = record_attempt(c, ability_id, world, success)
-    return success, entry

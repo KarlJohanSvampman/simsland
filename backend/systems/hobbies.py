@@ -322,6 +322,14 @@ def spawn_hobby_guests(world, evt):
         spawned_names.add(name)
 
         gid = "guest_{}_{}".format(evt["id"][:6], uuid.uuid4().hex[:4])
+        # Real, resolvable character_templates id -- see systems/
+        # service_npc.py. "adult_base" doesn't exist in definitions.json's
+        # character_templates registry, so this real, live NPC spawn
+        # silently fell back to the plain fallback-primitive renderer,
+        # same bug class as services.py::_spawn_worker() / systems/
+        # child_welfare.py's CPS worker (both already fixed).
+        from systems.service_npc import pick_worker_template
+        guest_template, guest_sex = pick_worker_template("hobby_guest")
         world.setdefault("characters", {})[gid] = {
             "id":               gid,
             "name":             name,
@@ -329,7 +337,8 @@ def spawn_hobby_guests(world, evt):
             "y":                home_y - 4,     # approach from outside
             "rotation":         0,
             "facing":           "south",
-            "template":         "adult_base",
+            "template":         guest_template,
+            "sex":              guest_sex,
             "is_hobby_guest":   True,
             "hobby_session_id": evt["id"],
             "hobby_id":         hobby_id,

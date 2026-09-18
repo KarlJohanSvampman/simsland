@@ -66,6 +66,26 @@ def apply_speech(c, world, speech):
     topic = speech.get("topic", "")
     target_id = speech.get("target")
 
+    # Confirmed live bug (real player report): a spoken line with no
+    # resolved target used to become a floating, ambient utterance that
+    # never threaded into a real conversation at all -- below, `listener`
+    # stayed None, so the entire conversation block (a real conversation
+    # object, waking the listener specifically, scheduling their reply)
+    # never ran; the only fallback was a weak "wake up to 4 nearby people"
+    # ambient nudge. Per the user's own framing, you don't need to know
+    # someone's name for your words to reach them if they're standing
+    # right there -- default to whoever's most clearly co-present
+    # (perception.py's own "visibility" score, the same field this
+    # codebase already uses elsewhere to pick the single most-attention-
+    # grabbing nearby person) so ordinary conversation still threads
+    # properly even when the LLM didn't -- or, mid some other narrated
+    # activity, couldn't cleanly -- name anyone.
+    if not target_id:
+        visible = (c.get("perception") or {}).get("visible_people", [])
+        if visible:
+            nearest = max(visible, key=lambda p: p.get("visibility", 0))
+            target_id = nearest.get("id")
+
     # Volume (see brain/perception.py's VOLUME_TIERS) -- explicit caller
     # value wins (e.g. a future hostile-action shout), otherwise inferred
     # from the same signals already tracked elsewhere: an "argument"
@@ -105,6 +125,13 @@ def apply_speech(c, world, speech):
     })
     c["speech_log"] = c["speech_log"][-20:]   # keep last 20
 
+    from core.event_bus import emit
+    emit("speech_spoken", {
+        "character_id": c["id"], "utterance": utterance,
+        "target_id": target_id, "speech_act": speech_act,
+        "x": c.get("x"), "y": c.get("y"), "building_id": c.get("building_id"),
+    })
+
     # =====================================================
     # THREAD INTO A REAL CONVERSATION
     # apply_speech() used to be a dead end — no conversations entry ever
@@ -127,7 +154,9 @@ def apply_speech(c, world, speech):
     medium = speech.get("medium", "in_person")
     if listener and medium == "call":
         from systems.personal_items import phone_is_usable
-        if not phone_is_usable(listener):
+        busy_until = listener.get("_work_busy_until_tick", 0)
+        in_meeting = tick < busy_until
+        if not phone_is_usable(listener) or in_meeting:
             from systems.inbox import get_character_inbox, add_message as add_inbox_message
             add_inbox_message(
                 get_character_inbox(listener), "voicemail", c["id"], target_id,
@@ -167,6 +196,13 @@ def apply_speech(c, world, speech):
             world, conv, c["id"], utterance, speech_act,
             topic or conv.get("topic", "general"), tick
         )
+
+        # Per the user's explicit ask: commit every spoken exchange to
+        # real memory, both what was said and what was heard, keyword-
+        # tagged so it's searchable later.
+        from systems.dialogue_memory import remember_dialogue
+        remember_dialogue(c, listener, utterance, world,
+                           speech_act=speech_act, conversation_type=conversation_type)
 
         push_conversation_reaction(listener, speech_act, tick)
 
@@ -638,6 +674,204 @@ def _route_clean_floors(c, world, action):
     start_activity(c, world, "clean_floors")
 
 
+def _route_organize_items(c, world, action):
+    """General-purpose, not document-specific -- per the user's own
+    explicit ask. Finds an existing pile with the given tag in the
+    character's household (creating one at their current position if
+    none exists) and moves the given items out of inventory into it.
+    An organized character is simply more likely to choose this action
+    in the first place -- nothing here gates ON traits, matching how
+    hobby_planner.py's own organized-trait check works elsewhere (a
+    real behavioral tendency, not a hard code-level requirement)."""
+    item_ids = action.get("item_ids") or []
+    tag = action.get("tag")
+    if not item_ids or not tag:
+        return
+    household = world.get("households", {}).get(c.get("household_id"))
+    if not household:
+        return
+
+    from systems.personal_items import get_inventory, remove_item
+
+    piles = household.setdefault("document_piles", {})
+    pile = next((p for p in piles.values() if tag in p.get("tags", [])), None)
+    if pile is None:
+        import uuid
+        pile_id = f"pile_{uuid.uuid4().hex[:6]}"
+        pile = {"tags": [tag], "item_ids": [], "x": c.get("x", 0), "y": c.get("y", 0)}
+        piles[pile_id] = pile
+
+    inv = get_inventory(c)
+    moved = [i for i in inv if i.get("id") in item_ids]
+    for item in moved:
+        remove_item(c, item["id"])
+        pile["item_ids"].append(item["id"])
+        item["location"] = "stored"
+        item["household_id"] = household["id"]
+        # The item stops being a real, rendered/carried object and
+        # starts living purely as a reference inside the pile -- see
+        # systems/document_search.py, which resolves pile item_ids back
+        # to real item dicts via a household-wide item index.
+        household.setdefault("stored_items", {})[item["id"]] = item
+
+
+def _route_make_drawing(c, world, action):
+    from systems.activities import start_activity
+    start_activity(c, world, "make_drawing")
+
+
+def _route_search_documents(c, world, action):
+    """Deliberately NOT the broken search_item/search_room machinery
+    (confirmed dead code -- referenced, never defined -- see the plan).
+    A real query against systems/document_search.py::find_document()
+    decides success up front; the activity itself is flavor/pacing
+    (a real 1-5 minute wait with the existing "search" animation), not
+    a second independent roll."""
+    import random
+    from systems.document_search import find_document, computer_search_chance, SEARCH_DURATION_TICKS_RANGE
+    from systems.personal_items import has_computer
+
+    query = {k: action.get(k) for k in ("category", "person_or_company", "title", "time_period") if action.get(k)}
+    result = find_document(c, world, query)
+    duration = random.randint(*SEARCH_DURATION_TICKS_RANGE)
+
+    if not result["found"]:
+        c["_last_found_document_id"] = None
+        return
+
+    if result["location"] in ("inventory", "pile"):
+        if result["location"] == "pile":
+            household = world.get("households", {}).get(c.get("household_id"))
+            pile = household.get("document_piles", {}).get(result["pile_id"]) if household else None
+            if pile and (pile.get("x") != c.get("x") or pile.get("y") != c.get("y")):
+                from systems.navigation import plan_character_route
+                c["move_target"] = {"x": pile["x"], "y": pile["y"], "target_type": "tile"}
+                if plan_character_route(world, c, pile["x"], pile["y"]):
+                    c["animation_state"] = "walk"
+                    c["is_moving"] = True
+        c["activity"] = _scaffold(c, world, "search_documents", interaction="search", duration=duration)
+        c["_last_found_document_id"] = result["item"]["id"]
+        return
+
+    # Digital-only -- requires a real computer, real trait-scaled chance.
+    if not has_computer(c, world):
+        c["_last_found_document_id"] = None
+        return
+    c["activity"] = _scaffold(c, world, "search_documents", interaction="computer", duration=duration)
+    if random.random() < computer_search_chance(c):
+        c["_last_found_document_id"] = result["item"]["id"]
+    else:
+        c["_last_found_document_id"] = None
+
+
+def _find_pending_clause(c, clause_id):
+    pending = c.get("pending_clause_invocations", [])
+    return next((p for p in pending if p["clause_id"] == clause_id), None)
+
+
+def _find_clause_document(c, document_id):
+    contract = c.get("employment_contract")
+    if contract and contract.get("id") == document_id:
+        return contract
+    for item in c.get("inventory", []):
+        if item.get("id") == document_id:
+            return item.get("content") or {}
+    return None
+
+
+def _find_document_item_or_digital(c, world, document_id):
+    """Like _find_clause_document, but also resolves a document that
+    only exists as a household digital record (found via computer
+    search, never physically held) -- used by _route_mail_claim_
+    document() specifically, since printing-then-mailing needs a real
+    content dict to copy regardless of where it currently lives."""
+    for item in c.get("inventory", []):
+        if item.get("id") == document_id:
+            return item
+    household = world.get("households", {}).get(c.get("household_id"))
+    if household:
+        record = household.get("digital_document_records", {}).get(document_id)
+        if record:
+            return record
+    return None
+
+
+def _route_invoke_contract_clause(c, world, action):
+    clause_id = action.get("clause_id")
+    effect_type = action.get("effect_type")
+    if not clause_id:
+        return
+    pending = _find_pending_clause(c, clause_id)
+    if not pending:
+        return
+    document = _find_clause_document(c, pending["document_id"])
+    if document is None:
+        return
+    clause = document.get("conditional_clauses", {}).get(clause_id)
+    if not clause:
+        return
+
+    options = clause.get("effect_options", [])
+    effect = next((o for o in options if o.get("type") == effect_type), options[0] if options else None)
+    if not effect:
+        return
+
+    from systems.contract_clauses import _CLAUSE_EFFECTS
+    fn = _CLAUSE_EFFECTS.get(effect.get("type"))
+    if fn:
+        fn(c, world, document, effect)
+    clause["invocation_count"] = clause.get("invocation_count", 0) + 1
+    c["pending_clause_invocations"] = [p for p in c.get("pending_clause_invocations", [])
+                                       if p["clause_id"] != clause_id]
+
+
+def _route_mail_claim_document(c, world, action):
+    """Per the user's explicit ask: a confirmed claim (systems/
+    contract_clauses.py's refund effect stamps content["claim_value"]
+    on the document) only actually pays out once the character mails
+    the document in -- printing a fresh physical copy first if all they
+    have is a digital record. Schedules a real, delayed payout rather
+    than crediting money on the spot."""
+    document_id = action.get("document_id")
+    record = _find_document_item_or_digital(c, world, document_id)
+    if record is None:
+        return
+    content = record.get("content") if "content" in record else record
+    claim_value = content.get("claim_value") if content else None
+    if not claim_value:
+        return
+
+    item = next((i for i in c.get("inventory", []) if i.get("id") == document_id), None)
+    if item is None:
+        # Only a digital record exists -- print a fresh physical copy
+        # first (requires a real computer; any computer is treated as
+        # printer-capable, a documented simplification -- no separate
+        # printer-equipment concept exists elsewhere in this codebase).
+        from systems.personal_items import has_computer, make_document, add_item
+        if not has_computer(c, world):
+            return
+        item = make_document(record.get("document_type", "document"), dict(content), world=world)
+        add_item(c, item)
+
+    from systems.personal_items import remove_item
+    remove_item(c, item["id"])
+
+    world.setdefault("pending_payouts", []).append({
+        "character_id": c["id"],
+        "amount": claim_value,
+        "arrives_tick": world.get("tick", 0) + 86400,  # ~1 day, contract_clauses.MAIL_CLAIM_DELIVERY_DAYS
+    })
+    content["claim_value"] = 0  # already queued for payout, don't double-mail
+
+
+def _route_waive_contract_clause(c, world, action):
+    clause_id = action.get("clause_id")
+    if not clause_id:
+        return
+    c["pending_clause_invocations"] = [p for p in c.get("pending_clause_invocations", [])
+                                       if p["clause_id"] != clause_id]
+
+
 def _route_dust_and_wipe(c, world, action):
     from systems.activities import start_activity
     start_activity(c, world, "dust_and_wipe")
@@ -744,6 +978,24 @@ def _route_report_id_lost(c, world, action):
 # =========================================================
 
 def _route_wait(c, world, action):
+    # Confirmed live bug (player report: "Gary is waiting on nothing, I
+    # can't see what... we should not let anyone wait without a
+    # condition/reason, then they should be idle"): the live envelope
+    # schema (llm_brain.py::_ENVELOPE_FORMAT, what the LLM is ACTUALLY
+    # prompted with) never offers a "waiting_for" field at all -- that
+    # capability is documented only in the unused legacy SYSTEM_PROMPT,
+    # never in the real one. So every LLM-issued "wait" reached here with
+    # no reason, yet still got scaffolded into a real ~2-minute blocking
+    # "wait" activity, with nothing recorded anywhere (not even for the
+    # Inspector) explaining why. A "wait" with no real reason is no
+    # different from being idle -- don't create a blocking activity for
+    # it at all; leaving c["activity"] unset lets the character just
+    # reconsider on their very next decision tick instead of sitting in
+    # an unexplained stall for up to two minutes.
+    waiting_for = action.get("waiting_for")
+    if not (waiting_for and waiting_for.get("kind")):
+        return
+
     ticks = action.get("duration", 120)
     c["activity"] = _scaffold(
         c, world, "wait",
@@ -751,14 +1003,10 @@ def _route_wait(c, world, action):
         duration=ticks,
     )
 
-    # Optional "waiting for a reason" -- distinguishes blocked-on-something
-    # waiting (a person, a business, a delivery) from plain idle waiting.
-    # See systems/waiting.py for the patience timer + backlog-stress this
-    # arms; a bare "wait" with no waiting_for behaves exactly as before.
-    waiting_for = action.get("waiting_for")
-    if waiting_for and waiting_for.get("kind"):
-        from systems.waiting import start_waiting_for
-        start_waiting_for(c, world, waiting_for["kind"], waiting_for.get("ref"))
+    # A real reason to wait (a person, a business, a delivery) arms the
+    # patience timer + backlog-stress in systems/waiting.py.
+    from systems.waiting import start_waiting_for
+    start_waiting_for(c, world, waiting_for["kind"], waiting_for.get("ref"))
 
 
 # =========================================================
@@ -825,7 +1073,18 @@ def _route_recall(c, world, action, available_actions=None):
         return
 
     subject_name = _resolve_recall_subject(c, world, query, available_actions)
-    memories = biased_recall(c, query=subject_name or query, limit=5, world=world)
+
+    # Per the user's explicit ask: when the recall is clearly ABOUT a
+    # specific person, try the structured, name-filtered search first
+    # (short-term, falling back to long-term -- brain/memory.py::
+    # recall_with_filters()) before falling back to the older plain-text
+    # biased_recall() below.
+    memories = []
+    if subject_name:
+        from brain.memory import recall_with_filters
+        memories = recall_with_filters(c, world, character_name=subject_name, limit=5)
+    if not memories:
+        memories = biased_recall(c, query=subject_name or query, limit=5, world=world)
     text = _render_recall_result(query, memories)
     stage_and_wake(c, world, text, "recall_result")
 
@@ -929,24 +1188,98 @@ def _resolve_target_name(world, target_id):
     return None
 
 
-def _route_examine(c, world, action):
-    target_id = action.get("target")
-    c["activity"] = _scaffold(
-        c, world, "examine",
-        target_id=target_id,
-        interaction="examine",
-        duration=180,
-    )
-    c["animation_state"] = get_phase_animation("examine", "using")
+def _build_examine_facts(c, world, target_id, available_actions):
+    """Gathers whatever real structured facts are known about a target --
+    prop/item/character template data first (category, tags, description,
+    edible), falling back to the existing crude id-only-pool extraction
+    (_find_id_only_entry, focus's original mechanism) when nothing
+    template-based resolves. Returns (entity_name, facts_dict)."""
+    if not target_id:
+        return "something", {}
 
-    # Per the user's ask: examine/search should show what's actually
-    # being targeted, not just play a generic animation with no
-    # narration -- mirrors _route_search's "Looking for X..." bubble.
-    name = _resolve_target_name(world, target_id)
-    if name:
-        c["activity"]["target_name"] = name
-        from systems.incidental_speech import fire_incidental
-        fire_incidental(c, "inform", f"Examining {name}...", world)
+    from systems.templates import resolve_prop, resolve_item
+    from systems.props import get_prop_by_id
+
+    prop = get_prop_by_id(world, target_id)
+    if prop:
+        resolved = resolve_prop(world, prop)
+        name = resolved.get("name") or resolved.get("template") or target_id
+        facts = {
+            "category":    resolved.get("category"),
+            "tags":        resolved.get("tags"),
+            "description": resolved.get("description"),
+        }
+        return name, facts
+
+    from systems.personal_items import get_item_by_id
+    item = get_item_by_id(c, target_id) or (world.get("placed_items") or {}).get(target_id)
+    if item:
+        resolved = resolve_item(world, item)
+        name = resolved.get("name") or resolved.get("template_id") or target_id
+        facts = {
+            "category":    resolved.get("category"),
+            "tags":        resolved.get("tags"),
+            "description": resolved.get("description"),
+            "edible":      resolved.get("edible"),
+        }
+        return name, facts
+
+    char = world.get("characters", {}).get(target_id)
+    if char:
+        name = char.get("name", target_id)
+        facts = {
+            "category": "person",
+            "job":      (char.get("job") or {}).get("title"),
+            "activity": (char.get("activity") or {}).get("type"),
+        }
+        return name, facts
+
+    pool, entry = _find_id_only_entry(available_actions or {}, target_id)
+    if entry is not None:
+        name = entry.get("name") or target_id
+        facts = {k: v for k, v in entry.items() if k not in ("id", "name")}
+        return name, facts
+
+    return target_id, {}
+
+
+def _resolve_examine_target(c, world, target_id, available_actions):
+    """Real, synchronous LLM description grounded in the target's own
+    template facts -- resolves in the same tick it's called, exactly
+    like _route_make_argument()'s existing "no _scaffold wait" pattern,
+    instead of examine's old flat 180-tick no-content wait. Stores the
+    result as both an incidental speech bubble and a real, retained
+    memory. Returns (entity_name, description_text)."""
+    name, facts = _build_examine_facts(c, world, target_id, available_actions)
+
+    from llm.examine_narration import generate_examine_description, fallback_examine_description
+    from llm.llm_gate import run_llm_call
+
+    # PRIORITY_NORMAL (the default) -- this is part of an already-active
+    # character's own live decision/turn, not one-off background content
+    # generation, so it shouldn't be the first thing preempted the moment
+    # any other character's own think() call arrives.
+    result = run_llm_call(generate_examine_description(c, name, facts, world))
+    text = result if isinstance(result, str) and result.strip() else fallback_examine_description(name, facts)
+
+    scan = c.get("environment_scan") or {"text": ""}
+    scan["focused"] = text
+    scan["tick"] = world.get("tick", 0)
+    c["environment_scan"] = scan
+
+    from brain.memory import store_memory
+    store_memory(c, text, importance=0.3, tags=["examine", "observation"], kind="observation", tick=world.get("tick", 0))
+
+    return name, text
+
+
+def _route_examine(c, world, action, available_actions=None):
+    target_id = action.get("target")
+    name, text = _resolve_examine_target(c, world, target_id, available_actions)
+
+    c["animation_state"] = get_phase_animation("examine", "using")
+    from systems.incidental_speech import fire_incidental
+    fire_incidental(c, "inform", text, world)
 
 
 # =========================================================
@@ -994,19 +1327,14 @@ def _find_id_only_entry(available_actions, target_id):
 
 def _route_focus(c, world, action, available_actions):
     target_id = action.get("target")
-    available_actions = available_actions or {}
     if not target_id:
         return
-    pool, entry = _find_id_only_entry(available_actions, target_id)
-    if entry is None:
-        text = f"You look for \"{target_id}\" but can't place it right now."
-    else:
-        details = "; ".join(f"{k}: {v}" for k, v in entry.items() if k not in ("id",) and v not in (None, "", []))
-        text = f"A closer look at it ({pool}): {details}."
-    scan = c.setdefault("environment_scan", {"text": "", "tick": world.get("tick", 0)})
-    scan["focused"] = text
-    scan["tick"] = world.get("tick", 0)
-    c["activity"] = _scaffold(c, world, "focus", target_id=target_id, interaction="examine", duration=60)
+    # Same real, LLM-grounded resolution as examine now -- focus was
+    # always "examine, but starting from an already-known id-only pool
+    # entry rather than a fresh target"; both now go through the same
+    # template-facts-first, id-only-pool-fallback path and the same
+    # instant (no _scaffold wait) resolution.
+    _resolve_examine_target(c, world, target_id, available_actions)
 
 
 def _route_list_available_actions(c, world, action, available_actions):
@@ -1366,6 +1694,13 @@ def route_action(c, world, action, speech, definitions=None, available_actions=N
 
     action_type = action.get("type", "")
 
+    # Per the user's explicit ask: a visible, colored debug bubble (green
+    # normally, purple for violent/illegal actions -- see debug_log.py)
+    # every time an action actually dispatches, plus a low-importance
+    # memory entry of the same event.
+    from systems.debug_log import log_action
+    log_action(c, world, action_type, action.get("target_description") or "")
+
     if action_type == "move":
         _route_move(c, world, action)
 
@@ -1415,6 +1750,28 @@ def route_action(c, world, action, speech, definitions=None, available_actions=N
     elif action_type == "clean_floors":
         _route_clean_floors(c, world, action)
 
+    elif action_type == "make_drawing":
+        _route_make_drawing(c, world, action)
+
+    elif action_type == "organize_items":
+        _route_organize_items(c, world, action)
+
+    elif action_type == "search_documents":
+        _route_search_documents(c, world, action)
+
+    elif action_type == "renew_insurance":
+        from systems.insurance import renew_insurance
+        renew_insurance(c, world)
+
+    elif action_type == "invoke_contract_clause":
+        _route_invoke_contract_clause(c, world, action)
+
+    elif action_type == "waive_contract_clause":
+        _route_waive_contract_clause(c, world, action)
+
+    elif action_type == "mail_claim_document":
+        _route_mail_claim_document(c, world, action)
+
     elif action_type == "dust_and_wipe":
         _route_dust_and_wipe(c, world, action)
 
@@ -1458,7 +1815,7 @@ def route_action(c, world, action, speech, definitions=None, available_actions=N
         _route_recall(c, world, action, available_actions)
 
     elif action_type == "examine":
-        _route_examine(c, world, action)
+        _route_examine(c, world, action, available_actions)
 
     elif action_type == "look_around":
         _route_look_around(c, world, action, available_actions)
@@ -1563,6 +1920,8 @@ def route_action(c, world, action, speech, definitions=None, available_actions=N
         _route_read_newspaper(c, world, action)
     elif action_type == "browse_news":
         _route_browse_news(c, world, action)
+    elif action_type == "set_phone_alarm_clock":
+        _route_set_phone_alarm_clock(c, world, action)
     elif action_type == "computer_window_shopping":
         _route_computer(c, world, action, "computer_window_shopping")
     elif action_type == "computer_dating":
@@ -1668,6 +2027,8 @@ def route_action(c, world, action, speech, definitions=None, available_actions=N
         _route_lift_weights(c, world, action)
     elif action_type == "practice_juggling":
         _route_practice_juggling(c, world, action)
+    elif action_type == "sing_karaoke":
+        _route_sing_karaoke(c, world, action)
     elif action_type in ("grab_offensive", "hold", "punch", "kick", "shove", "threaten", "stab", "knock"):
         _route_hostile_action(c, world, action)
     elif action_type == "steal_from":
@@ -2433,25 +2794,75 @@ def _route_lift_weights(c, world, action):
 
 
 def _route_practice_juggling(c, world, action):
-    """Special Skills & Abilities (systems/abilities.py) proof-of-concept
-    wiring: a real training attempt, resolved through the same opposed/
-    solo check engine (systems/contested_checks.py) everything else in
-    this round uses, rather than a flavor-only animation. Success/fail
-    and any level-up are decided immediately (a juggling attempt doesn't
-    need to wait for a multi-minute activity to "finish" to know how it
-    went) -- the scaffolded activity below is just the visible animation
-    span."""
+    """Special Skills & Abilities (systems/abilities.py) training attempt,
+    resolved through the real d100 skill-check engine
+    (systems/skill_checks.py) rather than a flavor-only animation.
+    Success/fail and any level-up are decided immediately (a juggling
+    attempt doesn't need to wait for a multi-minute activity to "finish"
+    to know how it went) -- the scaffolded activity below is just the
+    visible animation span."""
     _route_exercise_activity(c, world, action, "practice_juggling")
 
-    from systems.abilities import attempt_ability_action
-    success, entry = attempt_ability_action(c, "juggling", "practice_juggling", world)
+    from systems.skill_checks import resolve_skill_check
+    from systems.abilities import record_attempt, get_level_name
+    result = resolve_skill_check("practice_juggling", c, world)
 
     from systems.incidental_speech import fire_incidental
-    level = entry.get("level", "novice") if entry else "novice"
-    if success:
-        fire_incidental(c, "inform", f"Nailed that juggling routine! ({level})", world)
+    if not result or result.get("blocked"):
+        return
+
+    record_attempt(c, "juggling", world, result["success"], margin=result["actor_margin"])
+
+    defs = world.get("definitions", {})
+    levels = defs.get("ability_templates", {}).get("juggling", {}).get("proficiency_levels", [])
+    level_key = get_level_name(c, "juggling", world)
+    title = next((lvl.get("title", level_key) for lvl in levels if lvl.get("level") == level_key), level_key)
+
+    if result["success"]:
+        fire_incidental(c, "inform", f"Nailed that juggling routine! ({title})", world)
     else:
         fire_incidental(c, "inform", "Drops the balls -- juggling is harder than it looks.", world)
+
+
+def _route_sing_karaoke(c, world, action):
+    """Competitive skill-check proof-of-concept (systems/skill_checks.py):
+    the singer rolls once against their own "singing" proficiency, then
+    every co-present listener (capped, same reasoning as the debate-spawn
+    cap -- a crowded room shouldn't stampede everyone into reacting)
+    independently rolls to react, scaled by how well the performance
+    actually went (see resolve_skill_check's competitive path)."""
+    c["activity"] = _scaffold(c, world, "sing_karaoke", interaction="sing_karaoke", duration=600)
+
+    from systems.skill_checks import resolve_skill_check, MAX_SKILL_CHECK_AUDIENCE
+    from systems.abilities import record_attempt, get_level_name
+    from systems.incidental_speech import fire_incidental
+
+    audience = _co_present_characters(c, world)[:MAX_SKILL_CHECK_AUDIENCE]
+    result = resolve_skill_check("sing_karaoke", c, world, targets=audience)
+    if not result or result.get("blocked"):
+        return
+
+    record_attempt(c, "singing", world, result["success"], margin=result["actor_margin"])
+
+    defs = world.get("definitions", {})
+    levels = defs.get("ability_templates", {}).get("singing", {}).get("proficiency_levels", [])
+    level_key = get_level_name(c, "singing", world)
+    title = next((lvl.get("title", level_key) for lvl in levels if lvl.get("level") == level_key), level_key)
+
+    if result["success"]:
+        fire_incidental(c, "inform", f"Belts out a real karaoke performance! ({title})", world)
+    else:
+        fire_incidental(c, "inform", "Butchers the song -- rough one to sit through.", world)
+
+    listeners_by_id = {l["id"]: l for l in audience}
+    for target_result in result["target_results"]:
+        listener = listeners_by_id.get(target_result["target_id"])
+        if not listener:
+            continue
+        if target_result["success"]:
+            fire_incidental(listener, "react", f"Genuinely impressed by {c.get('name', 'that')}'s singing.", world, target_id=c["id"])
+        else:
+            fire_incidental(listener, "react", "Unimpressed by the karaoke performance.", world, target_id=c["id"])
 
 
 # =========================================================
@@ -3189,6 +3600,10 @@ def _set_computer_animation(c, world):
     c["animation_state"] = anim
 
 
+_PURPOSEFUL_CALL_GOALS = {"favor", "impress", "share_story"}
+SMALL_TALK_TURNS_RANGE = (2, 4)
+
+
 def _route_phone_call(c, world, action):
     phone = _require_phone(c)
     if not phone:
@@ -3198,6 +3613,47 @@ def _route_phone_call(c, world, action):
     c["activity"] = _scaffold(c, world, "phone_call",
                                target_id=target_id, interaction="phone_call")
     _set_phone_animation(c, "phone_call")
+
+    # Per the user's explicit ask: a phone call has a real intention
+    # (routine catch-up vs. a genuine agenda) decided the SAME way as
+    # any other in-character choice -- reuses conversation_goals.py's
+    # already-live per-participant goal system rather than inventing a
+    # second one. A purposeful call gets a real small-talk requirement
+    # before "the point" counts against goal-trending (see
+    # conversation_goals.py::check_goal_trending()).
+    if target_id:
+        listener = world.get("characters", {}).get(target_id)
+        if listener:
+            from brain.conversations import get_or_create_conversation
+            from systems.conversation_goals import assign_conversation_goal
+            import random as _random
+            conv = get_or_create_conversation(world, [c["id"], target_id], medium="call")
+            # Both directions, matching this codebase's own established
+            # convention at every other assign_conversation_goal() call
+            # site (action_router.py's apply_speech()/heard_speech
+            # paths) -- both participants' goals populated up front
+            # rather than only the caller's.
+            goal = assign_conversation_goal(c, world, conv, target_id)
+            assign_conversation_goal(listener, world, conv, c["id"])
+            if goal and goal["type"] in _PURPOSEFUL_CALL_GOALS:
+                conv["small_talk_turns_required"] = _random.randint(*SMALL_TALK_TURNS_RANGE)
+            _prime_call_topic_pool(conv, c, listener, world)
+
+
+def _prime_call_topic_pool(conv, caller, listener, world):
+    """Being called while at work makes the callee's own recent work
+    shift the default topic (unless the caller's own real goal already
+    points elsewhere) -- narrated as real context, not a hardcoded
+    override. See systems/offgrid.py::_resolve_work_shift() for where
+    these memories come from."""
+    if not (listener.get("off_grid") and listener.get("off_grid_reason") == "work"):
+        return
+    recent_beats = [
+        m for m in listener.get("memories", [])
+        if m.get("kind") == "work_beat"
+    ][-3:]
+    if recent_beats:
+        conv["topic_pool"] = [m["text"] for m in recent_beats]
 
 
 def _route_phone_answer(c, world, action):
@@ -3953,6 +4409,39 @@ def _route_browse_news(c, world, action):
     c["activity"] = _scaffold(c, world, "browse_news", interaction="phone")
     from systems.reading_process import start_reading_news
     start_reading_news(c, world, medium="phone")
+
+
+def _route_set_phone_alarm_clock(c, world, action):
+    """Sets a real, recurring daily wake-up check -- see brain/agent_loop.py's
+    per-tick sleep-interrupt block, the actual enforcement side. Confirmed
+    live bug this exists to fix: sleep's duration (activities.py::
+    compute_duration_ticks) is driven purely by how tired the character
+    is (fatigue/mood-randomized, base ~8h), with zero awareness of the
+    clock or the character's own schedule -- a character who fell asleep
+    late, or resumed sleep after a bathroom interruption, can sleep
+    straight through their own scheduled work block with no self-
+    correction. An alarm is the character's own defense against that,
+    not an automatic fix to sleep duration itself."""
+    if not _require_phone(c):
+        return
+    detail = str(action.get("detail") or "").strip()
+    import re
+    m = re.match(r"^(\d{1,2}):(\d{2})$", detail)
+    if not m:
+        return
+    hour, minute = int(m.group(1)), int(m.group(2))
+    if not (0 <= hour < 24 and 0 <= minute < 60):
+        return
+    _set_alarm_for_minute(c, hour * 60 + minute)
+
+
+def _set_alarm_for_minute(c, minute_of_day):
+    """Shared setter -- both the player/LLM-invoked set_phone_alarm_clock
+    action above and systems/alarm_habits.py's automatic nightly
+    "did they remember to set it" roll go through this one function, so
+    there's exactly one place that defines what c["phone_alarm"] looks
+    like."""
+    c["phone_alarm"] = {"minute_of_day": minute_of_day}
 
 
 # ─── job search / apply ───────────────────────────────────────────────────────

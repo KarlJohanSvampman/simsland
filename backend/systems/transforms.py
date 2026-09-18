@@ -100,6 +100,31 @@ def rotate_local_tile(
 
 
 # =========================================================
+# ROTATE LOCAL POINT (continuous coordinates)
+# =========================================================
+# Same exact 90/180/270 swap-and-negate convention as rotate_local_tile()
+# above, just for continuous model-local coordinates (meters) instead of
+# integer tile offsets -- used to resolve a prop_template surface's
+# center point (systems/props.py::find_surface_with_tag()) into real
+# world-space coordinates given the prop's own placement rotation.
+
+def rotate_local_point(x, z, rotation):
+
+    rotation = normalize_rotation(rotation)
+
+    if rotation == 90:
+        return (-z, x)
+
+    if rotation == 180:
+        return (-x, -z)
+
+    if rotation == 270:
+        return (z, -x)
+
+    return (x, z)
+
+
+# =========================================================
 # INVERSE ROTATION
 # =========================================================
 

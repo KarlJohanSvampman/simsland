@@ -8,10 +8,6 @@ from social.relationship_score import (
     relationship_score
 )
 
-from brain.beliefs import (
-    compute_alignment
-)
-
 from brain.cognitive_pressure import (
     build_cognitive_pressure
 )
@@ -350,6 +346,17 @@ def build_active_conversations(c, world):
                 }
                 for m in conv.get("history", [])[-5:]
             ],
+            # systems/action_router.py::_prime_call_topic_pool() -- when
+            # called while at work, this character's own recent hourly
+            # work-shift beats (systems/offgrid.py::_resolve_work_shift())
+            # become the natural default topic, unless my_goal already
+            # points elsewhere (a real favor/impress/share_story agenda,
+            # or a family/outside-interest topic the caller steered to).
+            "topic_pool":         conv.get("topic_pool"),
+            # A small-talk-staged purposeful call -- how many real turns
+            # of chit-chat are expected before getting to the point.
+            "small_talk_turns_required": conv.get("small_talk_turns_required"),
+            "turn_count":         conv.get("turn_count", 0),
         })
 
     return result
@@ -1436,6 +1443,29 @@ def _sec_witnessed(c, world):
     return _build_witnessed_offense_line(c, world)
 
 
+def _sec_claustrophobia(c, world):
+    # Per the user's explicit ask: this used to just speak a fixed,
+    # hardcoded line ("I really need to get out of here...") directly,
+    # bypassing the LLM entirely -- which meant a character genuinely
+    # stuck for a while just repeated the exact same sentence forever,
+    # verbatim, every ~30 seconds (real player report). Narrating the
+    # real situation here instead lets the character's own next decision
+    # actually express it -- in their own words, varying with how
+    # panicked they really are -- through the same real speech pipeline
+    # everything else goes through now.
+    state = c.get("claustrophobia") or {}
+    panic = state.get("panic", 0.0)
+    if panic <= 0:
+        return None
+    if panic >= 90:
+        return "You can't breathe. You are trapped and you need out RIGHT NOW."
+    if panic >= 60:
+        return "You can't stay here. You need to get out, now -- the walls feel like they're closing in."
+    if panic >= 30:
+        return "You've been stuck, unable to get where you're trying to go, for a while now -- it's really starting to unsettle you."
+    return "You've been stuck in place for a bit and it's making you a little uneasy."
+
+
 def _sec_attention(c, world):
     # attention/focus — restores build_attention_summary, previously
     # unused (dead code, same gap as relationships/memories above)
@@ -1508,6 +1538,18 @@ def _sec_intentions(c, world):
     if rest:
         line += f" You're also thinking about: {', '.join(rest)}."
     return line
+
+
+def _sec_examine_reminder(c, world):
+    """Only shown outside full re-orientation mode -- the explicit,
+    one-sentence reason it's safe to trim the default context down to
+    the core tier: the LLM is told, every time, that examine/focus exist
+    to drill into anything specific it's curious about (see systems/
+    action_router.py's examine/focus rewrite, llm/examine_narration.py)."""
+    if c.get("_narrative_mode") == "full":
+        return None
+    return ("You're seeing the short version of what's around you -- "
+            "examine or focus on something specific if you want a closer look.")
 
 
 def _sec_turn_budget(c, world):
@@ -1924,6 +1966,18 @@ def _sec_behavior_patterns(c, world):
     return list(lines) if lines else None
 
 
+def _sec_guilt_paranoia(c, world):
+    from systems.offense_rationalization import get_guilt_paranoia_context
+    line = get_guilt_paranoia_context(c)
+    return [line] if line else None
+
+
+def _sec_unreported_trauma(c, world):
+    from systems.child_disclosure import get_school_trauma_context
+    line = get_school_trauma_context(c, world)
+    return [line] if line else None
+
+
 def _sec_impulse(c, world):
     lines = _build_impulse_context(c, world)
     return list(lines) if lines else None
@@ -1961,12 +2015,14 @@ NARRATIVE_SECTIONS = [
     ("aggressor",             "full", _sec_aggressor),
     ("witnessed",             "full", _sec_witnessed),
     ("attention",             "full", _sec_attention),
+    ("claustrophobia",        "core", _sec_claustrophobia),
     ("identity",              "core", _sec_identity),
     ("body",                  "core", _sec_body),
     ("health",                "core", _sec_health),
     ("bedroom",               "full", _sec_bedroom),
     ("intentions",            "core", _sec_intentions),
     ("turn_budget",           "core", _sec_turn_budget),
+    ("examine_reminder",      "core", _sec_examine_reminder),
     ("relationships",         "full", _sec_relationships),
     ("grievances",            "full", _sec_grievances),
     ("conflict",              "full", _sec_conflict),
@@ -2004,6 +2060,8 @@ NARRATIVE_SECTIONS = [
     ("temporary_separation",  "full", _sec_temporary_separation),
     ("notable_stories",       "full", _sec_notable_stories),
     ("behavior_patterns",     "full", _sec_behavior_patterns),
+    ("guilt_paranoia",        "full", _sec_guilt_paranoia),
+    ("unreported_trauma",     "full", _sec_unreported_trauma),
 ]
 
 TIER_SETS = {"brief": {"core"}, "full": {"core", "full"}}
@@ -2021,6 +2079,12 @@ BRIEF_REASONS = {
 def build_narrative(c, world, mode="full", wake_line=None, staged=()):
     paragraphs = [wake_line] if wake_line else []
     paragraphs.extend(staged)
+
+    # Transient, read-this-cycle-only signal for _sec_examine_reminder()
+    # below -- section functions only ever receive (c, world), and adding
+    # `mode` to that signature would mean touching all ~53 of them for
+    # one section's benefit.
+    c["_narrative_mode"] = mode
 
     tiers = TIER_SETS.get(mode, TIER_SETS["full"])
     for _key, tier, fn in NARRATIVE_SECTIONS:
@@ -2056,6 +2120,20 @@ def build_narrative(c, world, mode="full", wake_line=None, staged=()):
 # through to build_narrative() — see brain/cognition_scheduler.py::
 # wake_line() and Round 8/9's staged_knowledge (describe/recall results).
 
+# Confirmed live bug (Kevin Walker froze for hours): "full" mode (45 of
+# 53 NARRATIVE_SECTIONS, including a long tail of near-always-empty
+# psychological/social sections) fired on almost every decision --
+# BRIEF_REASONS above only exempted 4 of the many real wake reasons.
+# Combined with an unrelated duplicate-memory bug, a bloated prompt
+# consistently exceeded sim_loop.py's 3s per-tick LLM response budget,
+# freezing that character's cognition entirely. "Full" is now real,
+# periodic re-orientation (every FULL_CONTEXT_REORIENT_TICKS, or for a
+# genuinely major interrupt) rather than the default -- "brief" (the
+# existing 8-section "core" tier) is the default for everything else.
+_ALWAYS_FULL_REASONS = {"provoked", "director_attention", "activity_aborted"}
+FULL_CONTEXT_REORIENT_TICKS = 6 * 3600  # ~6 real hours between forced full re-orientations
+
+
 def build_context(
 
     c,
@@ -2069,7 +2147,15 @@ def build_context(
     staged=()
 ):
 
-    mode = "brief" if trigger_reason in BRIEF_REASONS else "full"
+    tick = world.get("tick", 0)
+    last_full = c.get("_last_full_context_tick")
+    due_for_reorient = last_full is None or (tick - last_full) >= FULL_CONTEXT_REORIENT_TICKS
+
+    if trigger_reason in _ALWAYS_FULL_REASONS or due_for_reorient:
+        mode = "full"
+        c["_last_full_context_tick"] = tick
+    else:
+        mode = "brief"
 
     return {
 
@@ -2106,6 +2192,30 @@ def _build_household_process_context(c, world):
         for p in world.get("household_processes", [])
         if p.get("household_id") == household_id and not p.get("completed")
     ]
+
+
+def _principle_bias_note(c, proposer, world):
+    """Real, data-grounded bias from c's own held principles toward
+    `proposer` (Phase I's wired consequence -- systems/mentality.py::
+    principle_stance_toward()) -- same "real accumulated state the LLM
+    can naturally lean on, not flavor text" precedent as the favors.py
+    fatigue note just above. Reused across EVERY incoming proposal kind
+    (chore/social_ask/request/item_loan/item_sale/recurring_offer) --
+    the same "would I really do this for/with someone like them" bias
+    applies regardless of what's actually being asked. Only a FIRM ('>')
+    conviction fires (a tentative '<' suspicion or a moderate '=='
+    generalization isn't strong enough to color a real decision) --
+    returns "" (safe to always += ) when there's no proposer or no firm
+    match."""
+    if not proposer:
+        return ""
+    from systems.mentality import principle_stance_toward
+    stance = principle_stance_toward(c, proposer, world)
+    if not stance or stance.get("op") != ">":
+        return ""
+    if stance["sentiment"] == "unfavorable":
+        return " Deep down, you've never quite trusted people like that — this doesn't sit right with you."
+    return " You've always felt a real kinship with people like them — you're inclined to help."
 
 
 def _build_proposal_context(c, world):
@@ -2151,8 +2261,10 @@ def _build_proposal_context(c, world):
         if p.get("status") == "open":
             if p.get("responses", {}).get(cid) == "pending":
                 if kind == "chore":
+                    proposer = chars.get(p.get("proposer_id"))
                     note = (f"Someone proposed {p.get('chore_id')} — you can accept, decline, "
                             f"or counter with different details.")
+                    note += _principle_bias_note(c, proposer, world)
                 elif kind == "social_ask":
                     # params.text carries the real question when the asker
                     # supplied one (e.g. systems/choice.py::
@@ -2164,6 +2276,7 @@ def _build_proposal_context(c, world):
                     question = (p.get("params") or {}).get("text") or p.get("chore_id")
                     note = (f"{proposer.get('name', 'Someone') if proposer else 'Someone'} is "
                             f"asking you: {question} — you can accept, decline, or counter.")
+                    note += _principle_bias_note(c, proposer, world)
                 elif kind == "request":
                     proposer = chars.get(p.get("proposer_id"))
                     params = p.get("params", {})
@@ -2179,6 +2292,7 @@ def _build_proposal_context(c, world):
                     if proposer and is_favor_worn_out(c, proposer["id"]):
                         note += (" You've done a lot for them lately without much "
                                  "coming back the other way.")
+                    note += _principle_bias_note(c, proposer, world)
                 elif kind == "item_loan":
                     # chore_id holds the item_id for this kind (see
                     # systems/proposals.py::propose_item_loan) -- the item
@@ -2192,6 +2306,7 @@ def _build_proposal_context(c, world):
                     note = (f"{proposer.get('name', 'Someone') if proposer else 'Someone'} wants "
                             f"to borrow your {item_name} for about {days} day(s) — you can accept, "
                             f"decline, or counter with a different duration.")
+                    note += _principle_bias_note(c, proposer, world)
                 elif kind == "item_sale":
                     proposer = chars.get(p.get("proposer_id"))
                     from systems.personal_items import get_item_by_id
@@ -2204,8 +2319,11 @@ def _build_proposal_context(c, world):
                     note = (f"{proposer.get('name', 'Someone') if proposer else 'Someone'} wants "
                             f"to buy your {item_name}, {price_note}{trade_note} — you can accept, "
                             f"decline, or counter with a different price.")
+                    note += _principle_bias_note(c, proposer, world)
                 else:
+                    proposer = chars.get(p.get("proposer_id"))
                     note = f"Someone offered to make {p.get('chore_id')} a recurring thing."
+                    note += _principle_bias_note(c, proposer, world)
                 incoming.append({
                     "proposal_id": p["id"],
                     "kind":        kind,

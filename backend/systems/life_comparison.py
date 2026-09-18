@@ -235,6 +235,11 @@ def tick_life_comparison(world):
         sample = random.sample(contact_ids, min(COMPARISON_SAMPLE_SIZE, len(contact_ids)))
         for oid in sample:
             other = characters.get(oid)
-            if not other or other.get("id") == c.get("id"):
+            # Workplace NPCs (systems/workplace_npc.py) can be real
+            # c["relationships"] entries (a boss/colleague) but are a
+            # deliberately bare shape -- no wealth/attractiveness/body/
+            # etc. -- so they're not a real candidate for a life
+            # comparison, which reads exactly those fields.
+            if not other or other.get("id") == c.get("id") or other.get("is_workplace_npc"):
                 continue
             _apply_comparison(c, other, world)

@@ -699,5 +699,194 @@
     "hasSkeleton": true,
     "targets": {},
     "interaction_points": {}
+  },
+  "kitchen_sink_001": {
+    "display_name": "kitchen_sink_001",
+    "anchors": {},
+    "mesh": "/resources/props/kitchen_sink_001.glb",
+    "placement": {
+      "pivot": "bottom_center",
+      "snap_to_ground": true,
+      "snap_to_grid": true
+    },
+    "bones": {},
+    "hasSkeleton": false,
+    "targets": {},
+    "interaction_points": {}
+  },
+  "kitchen_table_001": {
+    "display_name": "kitchen_table_001",
+    "anchors": {},
+    "mesh": "/resources/props/kitchen_table_001.glb",
+    "placement": {
+      "pivot": "bottom_center",
+      "snap_to_ground": true,
+      "snap_to_grid": true
+    },
+    "bones": {},
+    "hasSkeleton": false,
+    "targets": {},
+    "interaction_points": {}
+  },
+  "microwave_oven_001": {
+    "display_name": "microwave_oven_001",
+    "anchors": {},
+    "mesh": "/resources/props/microwave_oven_001.glb",
+    "placement": {
+      "pivot": "bottom_center",
+      "snap_to_ground": true,
+      "snap_to_grid": true
+    },
+    "bones": {},
+    "hasSkeleton": false,
+    "targets": {},
+    "interaction_points": {}
+  },
+  "wall_cabinet": {
+    "display_name": "wall_cabinet",
+    "anchors": {},
+    "mesh": "/resources/props/wall_cabinet.glb",
+    "placement": {
+      "pivot": "bottom_center",
+      "snap_to_ground": true,
+      "snap_to_grid": true
+    },
+    "bones": {},
+    "hasSkeleton": false,
+    "targets": {},
+    "interaction_points": {}
+  },
+  "closet_001": {
+    "display_name": "closet_001",
+    "anchors": {},
+    "mesh": "/resources/props/closet_001.glb",
+    "placement": {
+      "pivot": "bottom_center",
+      "snap_to_ground": true,
+      "snap_to_grid": true
+    },
+    "bones": {},
+    "hasSkeleton": false,
+    "targets": {},
+    "interaction_points": {}
+  },
+  "closet_002": {
+    "display_name": "closet_002",
+    "anchors": {},
+    "mesh": "/resources/props/closet_002.glb",
+    "placement": {
+      "pivot": "bottom_center",
+      "snap_to_ground": true,
+      "snap_to_grid": true
+    },
+    "bones": {},
+    "hasSkeleton": false,
+    "targets": {},
+    "interaction_points": {}
+  },
+  "stove_and_oven": {
+    "display_name": "stove_and_oven",
+    "anchors": {
+      "anchor_left_pad": {
+        "name": "anchor_left_pad"
+      },
+      "anchor_right_pad": {
+        "name": "anchor_right_pad"
+      },
+      "anchor_stand": {
+        "name": "anchor_stand"
+      }
+    },
+    "mesh": "/resources/props/stove_and_oven.glb",
+    "placement": {
+      "pivot": "bottom_center",
+      "snap_to_ground": true,
+      "snap_to_grid": true
+    },
+    "bones": {},
+    "hasSkeleton": false,
+    "targets": {},
+    "interaction_points": {},
+    "transform": {
+      "position": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "rotation": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "scale": {
+        "x": 0.2,
+        "y": 0.2,
+        "z": 0.2
+      }
+    },
+    "tags": []
+  },
+  "bed_001": {
+    "display_name": "Bed Single",
+    "anchors": {},
+    "mesh": "/resources/props/bed_001.glb",
+    "placement": {
+      "pivot": "bottom_center",
+      "snap_to_ground": true,
+      "snap_to_grid": true
+    },
+    "bones": {},
+    "hasSkeleton": false,
+    "targets": {},
+    "interaction_points": {},
+    "tags": []
+  },
+  "table_dining": {
+    "display_name": "table_dining",
+    "category": "props",
+    "subfolder": null,
+    "tags": [],
+    "anchors": {},
+    "mesh": "/resources/props/table_dining.glb",
+    "placement": {
+      "pivot": "bottom_center",
+      "snap_to_ground": true,
+      "snap_to_grid": true
+    },
+    "bones": {},
+    "hasSkeleton": false,
+    "targets": {},
+    "interaction_points": {},
+    "transform": {
+      "position": {
+        "x": 0,
+        "y": -0.4,
+        "z": 0
+      },
+      "rotation": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "scale": {
+        "x": 0.2,
+        "y": 0.2,
+        "z": 0.2
+      }
+    }
+  },
+  "street_light": {
+    "display_name": "street_light",
+    "anchors": {},
+    "mesh": "/resources/props/street_light.glb",
+    "placement": {
+      "pivot": "bottom_center",
+      "snap_to_ground": true,
+      "snap_to_grid": true
+    },
+    "bones": {},
+    "hasSkeleton": false,
+    "targets": {},
+    "interaction_points": {}
   }
 }

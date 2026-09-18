@@ -153,6 +153,7 @@ def _create_prop_dict(payload, template):
         "category":  template.get("category"),
         "storage":   copy.deepcopy(template.get("storage")),
         "catalog":   template.get("catalog"),
+        "extra_tags": [],
     }
 
 
@@ -224,6 +225,47 @@ def move_prop(
 
                     world,
                 )
+
+            save_world(sim_id, world)
+
+            return {
+                "ok": True,
+                "prop": prop
+            }
+
+    return {
+        "ok": False,
+        "error": "prop not found"
+    }
+
+
+# =========================================================
+# SET EXTRA TAGS
+# Tags a specific prop INSTANCE (e.g. "the" kitchen table) with
+# activity/interaction names, distinct from every other prop sharing the
+# same template -- see systems/props.py::get_prop_tags()/
+# find_preferred_surface(). Full replace, not append, so the caller
+# (World Editor / a script) can also clear a tag by omitting it.
+# =========================================================
+
+@router.post("/prop/set_extra_tags")
+def set_extra_tags(
+    sim_id: str,
+    payload: dict
+):
+
+    prop_id = payload["id"]
+    tags = payload.get("extra_tags", [])
+
+    with world_lock():
+        world = load_world(sim_id)
+
+        for prop in world.get("props", []):
+
+            if prop["id"] != prop_id:
+                continue
+
+            prop["extra_tags"] = list(tags)
 
             save_world(sim_id, world)
 

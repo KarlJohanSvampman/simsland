@@ -63,6 +63,10 @@
         {
           "item_template": "coffee_beans",
           "price": 16
+        },
+        {
+          "item_template": "phone_charger",
+          "price": 15
         }
       ],
       "storage": null,
@@ -175,6 +179,7 @@
     },
     "bed_double_a": {
       "category": "furniture",
+      "model": "bed_a",
       "footprint": [
         {
           "dx": 0,
@@ -451,8 +456,25 @@
         "dining",
         "message_surface"
       ],
+      "surfaces": [
+        {
+          "id": "table_top",
+          "tags": [
+            "cook_prep",
+            "eat",
+            "boardgames",
+            "documents"
+          ],
+          "center": {
+            "x": -0.16,
+            "z": -0.59
+          },
+          "size": 8
+        }
+      ],
       "storage": null,
-      "icon": "furniture"
+      "icon": "furniture",
+      "model": "table_dining"
     },
     "easel": {
       "name": "Easel",
@@ -515,6 +537,7 @@
     "bookshelf": {
       "name": "Bookshelf",
       "category": "furniture",
+      "blocks_los": true,
       "footprint": [
         {
           "dx": 0,
@@ -760,6 +783,7 @@
     "wardrobe": {
       "name": "Wardrobe",
       "category": "furniture",
+      "blocks_los": true,
       "footprint": [
         {
           "dx": 0,
@@ -1131,6 +1155,7 @@
     "bed_single": {
       "name": "Single Bed",
       "category": "furniture",
+      "model": "bed_001",
       "footprint": [
         {
           "dx": 0,
@@ -1251,6 +1276,19 @@
           "interaction": "prepare_food"
         }
       ],
+      "surfaces": [
+        {
+          "id": "counter_top",
+          "tags": [
+            "cook_prep"
+          ],
+          "center": {
+            "x": 0.5,
+            "z": 0
+          },
+          "size": 1
+        }
+      ],
       "storage": {
         "slots": 10,
         "accepted_categories": [
@@ -1269,6 +1307,7 @@
     "kitchen_cabinet": {
       "name": "Kitchen Cabinet",
       "category": "furniture",
+      "model": "/resources/props/closet_02.glb",
       "footprint": [
         {
           "dx": 0,
@@ -1293,6 +1332,7 @@
         "slots": 15,
         "accepted_categories": [
           "kitchenware",
+          "dishware",
           "food",
           "cleaning"
         ]
@@ -1301,6 +1341,40 @@
         "furniture",
         "kitchen",
         "storage"
+      ],
+      "icon": "furniture"
+    },
+    "kitchen_utensil_drawer": {
+      "name": "Utensil Drawer",
+      "category": "furniture",
+      "footprint": [
+        {
+          "dx": 0,
+          "dy": 0
+        }
+      ],
+      "anchors": [
+        {
+          "name": "anchor_open_storage",
+          "interaction": "open_storage"
+        },
+        {
+          "name": "anchor_grab_item",
+          "interaction": "grab_item"
+        }
+      ],
+      "storage": {
+        "slots": 12,
+        "accepted_categories": [
+          "dishware",
+          "kitchenware"
+        ]
+      },
+      "tags": [
+        "furniture",
+        "kitchen",
+        "storage",
+        "drawer"
       ],
       "icon": "furniture"
     },
@@ -1328,15 +1402,34 @@
       "anchors": [
         {
           "name": "anchor_prep",
-          "interaction": "prepare_food"
+          "interaction": "prepare_food",
+          "dx": 0,
+          "dy": 0
         },
         {
           "name": "anchor_sit_1",
-          "interaction": "sit"
+          "interaction": "sit",
+          "dx": 1,
+          "dy": 0
         },
         {
           "name": "anchor_sit_2",
-          "interaction": "sit"
+          "interaction": "sit",
+          "dx": 1,
+          "dy": 1
+        }
+      ],
+      "surfaces": [
+        {
+          "id": "island_top",
+          "tags": [
+            "cook_prep"
+          ],
+          "center": {
+            "x": 0.5,
+            "z": 0.5
+          },
+          "size": 1.5
         }
       ],
       "storage": {
@@ -1459,6 +1552,7 @@
     "kitchen_sink": {
       "name": "Kitchen Sink",
       "category": "fixture",
+      "model": "/resources/props/kitchen_sink_001.glb",
       "footprint": [
         {
           "dx": 0,
@@ -1852,6 +1946,7 @@
     "ceiling_light": {
       "name": "Ceiling Light",
       "category": "lighting",
+      "ceiling_mounted": true,
       "footprint": [
         {
           "dx": 0,
@@ -2719,6 +2814,7 @@
     "room_divider": {
       "name": "Room Divider",
       "category": "furniture",
+      "blocks_los": true,
       "footprint": [
         {
           "dx": 0,
@@ -2855,6 +2951,7 @@
     "wall_clock": {
       "name": "Wall Clock",
       "category": "decor",
+      "wall_mounted": true,
       "footprint": [
         {
           "dx": 0,
@@ -4175,6 +4272,7 @@
     "wall_art": {
       "name": "Wall Art",
       "category": "decor",
+      "wall_mounted": true,
       "footprint": [
         {
           "dx": 0,
@@ -4264,6 +4362,7 @@
     "pendant_light": {
       "name": "Pendant Light",
       "category": "lighting",
+      "ceiling_mounted": true,
       "footprint": [
         {
           "dx": 0,
@@ -4324,6 +4423,7 @@
     "wall_sconce": {
       "name": "Wall Sconce",
       "category": "lighting",
+      "wall_mounted": true,
       "footprint": [
         {
           "dx": 0,
@@ -4518,7 +4618,8 @@
         "dining",
         "message_surface"
       ],
-      "icon": "furniture"
+      "icon": "furniture",
+      "model": "table_dining"
     },
     "barber_chair": {
       "name": "Barber Chair",
@@ -4823,7 +4924,12 @@
       ],
       "carryable": false,
       "interactions": [],
-      "anchors": []
+      "anchors": [
+        {
+          "name": "anchor_cook",
+          "interaction": "cook"
+        }
+      ]
     }
   },
   "item_templates": {
@@ -4850,7 +4956,10 @@
       "base_price": 0,
       "stackable": false,
       "consumable": false,
-      "icon": "document"
+      "icon": "document",
+      "tags": [
+        "document"
+      ]
     },
     "driver_license": {
       "name": "Driver's License",
@@ -4859,7 +4968,10 @@
       "base_price": 0,
       "stackable": false,
       "consumable": false,
-      "icon": "document"
+      "icon": "document",
+      "tags": [
+        "document"
+      ]
     },
     "bank_card": {
       "name": "Bank Card",
@@ -4868,7 +4980,10 @@
       "base_price": 0,
       "stackable": false,
       "consumable": false,
-      "icon": "financial"
+      "icon": "financial",
+      "tags": [
+        "document"
+      ]
     },
     "credit_card": {
       "name": "Credit Card",
@@ -4877,7 +4992,39 @@
       "base_price": 0,
       "stackable": false,
       "consumable": false,
-      "icon": "financial"
+      "icon": "financial",
+      "tags": [
+        "document"
+      ]
+    },
+    "document": {
+      "name": "Document",
+      "category": "document",
+      "size": 1,
+      "base_price": 0,
+      "stackable": false,
+      "consumable": false,
+      "content_category": "document",
+      "model": "/resources/items/media/document/document.glb",
+      "icon": "document",
+      "tags": [
+        "document"
+      ]
+    },
+    "drawing": {
+      "name": "Drawing",
+      "category": "document",
+      "size": 1,
+      "base_price": 0,
+      "stackable": false,
+      "consumable": false,
+      "content_category": "drawing",
+      "model": "/resources/items/media/drawing/drawing.glb",
+      "icon": "document",
+      "tags": [
+        "document",
+        "art"
+      ]
     },
     "house_key": {
       "name": "House Key",
@@ -7652,7 +7799,8 @@
       "model": "/resources/items/media/book/book.glb",
       "icon": "books_media",
       "tags": [
-        "reading"
+        "reading",
+        "document"
       ]
     },
     "magazine": {
@@ -7666,7 +7814,8 @@
       "model": "/resources/items/media/magazine/magazine.glb",
       "icon": "books_media",
       "tags": [
-        "reading"
+        "reading",
+        "document"
       ]
     },
     "newspaper": {
@@ -7680,7 +7829,8 @@
       "icon": "books_media",
       "tags": [
         "reading",
-        "news"
+        "news",
+        "document"
       ]
     },
     "dvd": {
@@ -12249,6 +12399,300 @@
     }
   },
   "character_templates": {
+    "service_worker_male": {
+      "model": "adult_male",
+      "bone_slots": {
+        "head": "mixamorigHead",
+        "neck": "mixamorigNeck",
+        "right_hand": "mixamorigRightHand",
+        "left_hand": "mixamorigLeftHand",
+        "spine": "mixamorigSpine2",
+        "pelvis": "mixamorigHips",
+        "right_foot": "mixamorigRightFoot",
+        "left_foot": "mixamorigLeftFoot"
+      },
+      "body_region_bones": {
+        "head": "mixamorigHead",
+        "face": "mixamorigHead",
+        "neck": "mixamorigNeck",
+        "chest": "mixamorigSpine2",
+        "torso": "mixamorigSpine2",
+        "upper_body": "mixamorigSpine2",
+        "lower_body": "mixamorigHips",
+        "back": "mixamorigSpine1",
+        "groin": "mixamorigHips",
+        "right_arm": "mixamorigRightArm",
+        "left_arm": "mixamorigLeftArm",
+        "right_hand": "mixamorigRightHand",
+        "left_hand": "mixamorigLeftHand",
+        "right_leg": "mixamorigRightUpLeg",
+        "left_leg": "mixamorigLeftUpLeg",
+        "right_foot": "mixamorigRightFoot",
+        "left_foot": "mixamorigLeftFoot",
+        "right_shoulder": "mixamorigRightShoulder",
+        "left_shoulder": "mixamorigLeftShoulder"
+      },
+      "base_animations": {
+        "idle": "idle",
+        "walk": "walk",
+        "run": "run",
+        "sit": "sit_idle",
+        "sleep": "sleep_loop"
+      },
+      "_note": "Generic male service-worker NPC body (contractor/repairman/gardener/caregiver/dealer/arms_dealer/escort -- see services.py::SERVICE_CATALOG). Real, resolvable character_templates entry -- replaces the previous \"adult_base\" id, which didn't exist and silently fell back to the plain fallback-primitive renderer for every service worker."
+    },
+    "service_worker_female": {
+      "model": "adult_female",
+      "bone_slots": {
+        "head": "mixamorigHead",
+        "neck": "mixamorigNeck",
+        "right_hand": "mixamorigRightHand",
+        "left_hand": "mixamorigLeftHand",
+        "spine": "mixamorigSpine2",
+        "pelvis": "mixamorigHips",
+        "right_foot": "mixamorigRightFoot",
+        "left_foot": "mixamorigLeftFoot"
+      },
+      "body_region_bones": {
+        "head": "mixamorigHead",
+        "face": "mixamorigHead",
+        "neck": "mixamorigNeck",
+        "chest": "mixamorigSpine2",
+        "torso": "mixamorigSpine2",
+        "upper_body": "mixamorigSpine2",
+        "lower_body": "mixamorigHips",
+        "back": "mixamorigSpine1",
+        "groin": "mixamorigHips",
+        "right_arm": "mixamorigRightArm",
+        "left_arm": "mixamorigLeftArm",
+        "right_hand": "mixamorigRightHand",
+        "left_hand": "mixamorigLeftHand",
+        "right_leg": "mixamorigRightUpLeg",
+        "left_leg": "mixamorigLeftUpLeg",
+        "right_foot": "mixamorigRightFoot",
+        "left_foot": "mixamorigLeftFoot",
+        "right_shoulder": "mixamorigRightShoulder",
+        "left_shoulder": "mixamorigLeftShoulder"
+      },
+      "base_animations": {
+        "idle": "idle",
+        "walk": "walk",
+        "run": "run",
+        "sit": "sit_idle",
+        "sleep": "sleep_loop"
+      },
+      "_note": "Female counterpart to service_worker_male -- see that entry's note."
+    },
+    "cps_worker": {
+      "model": "adult_male",
+      "bone_slots": {
+        "head": "mixamorigHead",
+        "neck": "mixamorigNeck",
+        "right_hand": "mixamorigRightHand",
+        "left_hand": "mixamorigLeftHand",
+        "spine": "mixamorigSpine2",
+        "pelvis": "mixamorigHips",
+        "right_foot": "mixamorigRightFoot",
+        "left_foot": "mixamorigLeftFoot"
+      },
+      "body_region_bones": {
+        "head": "mixamorigHead",
+        "face": "mixamorigHead",
+        "neck": "mixamorigNeck",
+        "chest": "mixamorigSpine2",
+        "torso": "mixamorigSpine2",
+        "upper_body": "mixamorigSpine2",
+        "lower_body": "mixamorigHips",
+        "back": "mixamorigSpine1",
+        "groin": "mixamorigHips",
+        "right_arm": "mixamorigRightArm",
+        "left_arm": "mixamorigLeftArm",
+        "right_hand": "mixamorigRightHand",
+        "left_hand": "mixamorigLeftHand",
+        "right_leg": "mixamorigRightUpLeg",
+        "left_leg": "mixamorigLeftUpLeg",
+        "right_foot": "mixamorigRightFoot",
+        "left_foot": "mixamorigLeftFoot",
+        "right_shoulder": "mixamorigRightShoulder",
+        "left_shoulder": "mixamorigLeftShoulder"
+      },
+      "base_animations": {
+        "idle": "idle",
+        "walk": "walk",
+        "run": "run",
+        "sit": "sit_idle",
+        "sleep": "sleep_loop"
+      },
+      "_note": "Child Protective Services worker (systems/child_welfare.py). Reuses the generic adult body as a placeholder -- swap \"model\" here for a real distinct asset later, no code changes needed elsewhere."
+    },
+    "police_officer": {
+      "model": "adult_male",
+      "bone_slots": {
+        "head": "mixamorigHead",
+        "neck": "mixamorigNeck",
+        "right_hand": "mixamorigRightHand",
+        "left_hand": "mixamorigLeftHand",
+        "spine": "mixamorigSpine2",
+        "pelvis": "mixamorigHips",
+        "right_foot": "mixamorigRightFoot",
+        "left_foot": "mixamorigLeftFoot"
+      },
+      "body_region_bones": {
+        "head": "mixamorigHead",
+        "face": "mixamorigHead",
+        "neck": "mixamorigNeck",
+        "chest": "mixamorigSpine2",
+        "torso": "mixamorigSpine2",
+        "upper_body": "mixamorigSpine2",
+        "lower_body": "mixamorigHips",
+        "back": "mixamorigSpine1",
+        "groin": "mixamorigHips",
+        "right_arm": "mixamorigRightArm",
+        "left_arm": "mixamorigLeftArm",
+        "right_hand": "mixamorigRightHand",
+        "left_hand": "mixamorigLeftHand",
+        "right_leg": "mixamorigRightUpLeg",
+        "left_leg": "mixamorigLeftUpLeg",
+        "right_foot": "mixamorigRightFoot",
+        "left_foot": "mixamorigLeftFoot",
+        "right_shoulder": "mixamorigRightShoulder",
+        "left_shoulder": "mixamorigLeftShoulder"
+      },
+      "base_animations": {
+        "idle": "idle",
+        "walk": "walk",
+        "run": "run",
+        "sit": "sit_idle",
+        "sleep": "sleep_loop"
+      },
+      "_note": "Placeholder for a future police-responder NPC (no real spawn site exists yet -- systems/emergency.py's police responders are still purely abstract, no character is created). Reserved so a future dispatch feature has a real template id ready to use."
+    },
+    "firefighter": {
+      "model": "adult_male",
+      "bone_slots": {
+        "head": "mixamorigHead",
+        "neck": "mixamorigNeck",
+        "right_hand": "mixamorigRightHand",
+        "left_hand": "mixamorigLeftHand",
+        "spine": "mixamorigSpine2",
+        "pelvis": "mixamorigHips",
+        "right_foot": "mixamorigRightFoot",
+        "left_foot": "mixamorigLeftFoot"
+      },
+      "body_region_bones": {
+        "head": "mixamorigHead",
+        "face": "mixamorigHead",
+        "neck": "mixamorigNeck",
+        "chest": "mixamorigSpine2",
+        "torso": "mixamorigSpine2",
+        "upper_body": "mixamorigSpine2",
+        "lower_body": "mixamorigHips",
+        "back": "mixamorigSpine1",
+        "groin": "mixamorigHips",
+        "right_arm": "mixamorigRightArm",
+        "left_arm": "mixamorigLeftArm",
+        "right_hand": "mixamorigRightHand",
+        "left_hand": "mixamorigLeftHand",
+        "right_leg": "mixamorigRightUpLeg",
+        "left_leg": "mixamorigLeftUpLeg",
+        "right_foot": "mixamorigRightFoot",
+        "left_foot": "mixamorigLeftFoot",
+        "right_shoulder": "mixamorigRightShoulder",
+        "left_shoulder": "mixamorigLeftShoulder"
+      },
+      "base_animations": {
+        "idle": "idle",
+        "walk": "walk",
+        "run": "run",
+        "sit": "sit_idle",
+        "sleep": "sleep_loop"
+      },
+      "_note": "Placeholder for a future fire-responder NPC (see police_officer's note -- systems/emergency.py's fire responders are still abstract)."
+    },
+    "paramedic": {
+      "model": "adult_female",
+      "bone_slots": {
+        "head": "mixamorigHead",
+        "neck": "mixamorigNeck",
+        "right_hand": "mixamorigRightHand",
+        "left_hand": "mixamorigLeftHand",
+        "spine": "mixamorigSpine2",
+        "pelvis": "mixamorigHips",
+        "right_foot": "mixamorigRightFoot",
+        "left_foot": "mixamorigLeftFoot"
+      },
+      "body_region_bones": {
+        "head": "mixamorigHead",
+        "face": "mixamorigHead",
+        "neck": "mixamorigNeck",
+        "chest": "mixamorigSpine2",
+        "torso": "mixamorigSpine2",
+        "upper_body": "mixamorigSpine2",
+        "lower_body": "mixamorigHips",
+        "back": "mixamorigSpine1",
+        "groin": "mixamorigHips",
+        "right_arm": "mixamorigRightArm",
+        "left_arm": "mixamorigLeftArm",
+        "right_hand": "mixamorigRightHand",
+        "left_hand": "mixamorigLeftHand",
+        "right_leg": "mixamorigRightUpLeg",
+        "left_leg": "mixamorigLeftUpLeg",
+        "right_foot": "mixamorigRightFoot",
+        "left_foot": "mixamorigLeftFoot",
+        "right_shoulder": "mixamorigRightShoulder",
+        "left_shoulder": "mixamorigLeftShoulder"
+      },
+      "base_animations": {
+        "idle": "idle",
+        "walk": "walk",
+        "run": "run",
+        "sit": "sit_idle",
+        "sleep": "sleep_loop"
+      },
+      "_note": "Placeholder for a future medical-responder NPC (see police_officer's note -- systems/emergency.py's medical responders are still abstract)."
+    },
+    "mail_carrier": {
+      "model": "adult_male",
+      "bone_slots": {
+        "head": "mixamorigHead",
+        "neck": "mixamorigNeck",
+        "right_hand": "mixamorigRightHand",
+        "left_hand": "mixamorigLeftHand",
+        "spine": "mixamorigSpine2",
+        "pelvis": "mixamorigHips",
+        "right_foot": "mixamorigRightFoot",
+        "left_foot": "mixamorigLeftFoot"
+      },
+      "body_region_bones": {
+        "head": "mixamorigHead",
+        "face": "mixamorigHead",
+        "neck": "mixamorigNeck",
+        "chest": "mixamorigSpine2",
+        "torso": "mixamorigSpine2",
+        "upper_body": "mixamorigSpine2",
+        "lower_body": "mixamorigHips",
+        "back": "mixamorigSpine1",
+        "groin": "mixamorigHips",
+        "right_arm": "mixamorigRightArm",
+        "left_arm": "mixamorigLeftArm",
+        "right_hand": "mixamorigRightHand",
+        "left_hand": "mixamorigLeftHand",
+        "right_leg": "mixamorigRightUpLeg",
+        "left_leg": "mixamorigLeftUpLeg",
+        "right_foot": "mixamorigRightFoot",
+        "left_foot": "mixamorigLeftFoot",
+        "right_shoulder": "mixamorigRightShoulder",
+        "left_shoulder": "mixamorigLeftShoulder"
+      },
+      "base_animations": {
+        "idle": "idle",
+        "walk": "walk",
+        "run": "run",
+        "sit": "sit_idle",
+        "sleep": "sleep_loop"
+      },
+      "_note": "Placeholder for the mail-carrier/paperboy role. Not yet consumed by any real spawn site -- systems/postal_service.py and systems/newspaper_delivery.py dispatch via the separate service_vehicles.py vehicle+worker_model pattern, which the frontend doesn't render at all today (a bigger, separate gap, out of scope here). Reserved so that system can adopt this same character_templates id later."
+    },
     "adult_male_a": {
       "model": "adult_male",
       "bone_slots": {
@@ -12499,6 +12943,81 @@
         "status": "free",
         "jail_until": null
       }
+    },
+    "new_character_1": {
+      "name": "Shakespear McWanker",
+      "age": 32,
+      "sex": "male",
+      "first_name": "Shakespear",
+      "family_name": "McWanker",
+      "ssn": "343-23-2332",
+      "body_features": {
+        "height_cm": 178
+      },
+      "body_composition": {
+        "body_fat_level": 0.27
+      },
+      "instance": {
+        "walk_speed": 1,
+        "jog_speed": 2,
+        "sprint_speed": 3,
+        "crawl_speed": 0.2,
+        "sneak_speed": 0.5
+      },
+      "traits": [],
+      "physical_traits": [
+        "high_stamina",
+        "physically_resilient",
+        "thin",
+        "night_owl",
+        "hyperactive_libido",
+        "insomnia"
+      ],
+      "hobbies": [
+        "guitar",
+        "books",
+        "pictionary",
+        "boardgames",
+        "book_club",
+        "reading",
+        "keep_a_diary",
+        "basketball_supporter",
+        "slot_machines"
+      ],
+      "worn": {},
+      "starting_inventory": [],
+      "bio": "",
+      "job": {
+        "id": "game_developer",
+        "title": "Game Developer",
+        "industry": "Technology",
+        "income_class": "Lower Middle",
+        "average_salary": 69000,
+        "hourly_wage": 33.17,
+        "salary": 5750,
+        "work_mode": "Remote",
+        "physical_demand": 19,
+        "social_demand": 24,
+        "hazard_level": "Medium",
+        "illegal": false,
+        "adult_industry": false
+      },
+      "education": "professional",
+      "current_school": "",
+      "work_history": [
+        {
+          "title": "Cashier",
+          "industry": "Fast Food Resturants",
+          "years": 20,
+          "reason_left": "quit"
+        }
+      ],
+      "legal": {
+        "status": "free",
+        "jail_until": null,
+        "record": []
+      },
+      "household_id": ""
     }
   },
   "interaction_templates": {
@@ -18176,7 +18695,7 @@
           "target_tags": [
             "toilet"
           ],
-          "duration_minutes": 5,
+          "duration_minutes": 2,
           "requires": []
         },
         {
@@ -22905,8 +23424,8 @@
           "walls": {
             "north": null,
             "south": {
-              "type": "wall",
-              "material": "wallpaper_geometric_01"
+              "type": "window",
+              "material": "paint_grey_matt"
             },
             "east": null,
             "west": null
@@ -22952,7 +23471,10 @@
             "template": "wood_floor"
           },
           "walls": {
-            "north": null,
+            "north": {
+              "type": "window",
+              "material": "paint_grey_matt"
+            },
             "south": null,
             "east": null,
             "west": null
@@ -22964,8 +23486,8 @@
           },
           "walls": {
             "north": {
-              "type": "wall",
-              "material": "wallpaper_geometric_01"
+              "type": "window",
+              "material": "paint_grey_matt"
             },
             "south": null,
             "east": null,
@@ -23073,8 +23595,8 @@
             "south": null,
             "east": null,
             "west": {
-              "type": "wall",
-              "material": "wallpaper_geometric_01"
+              "type": "window",
+              "material": "paint_grey_matt"
             }
           }
         },
@@ -23240,8 +23762,8 @@
           },
           "walls": {
             "north": {
-              "type": "wall",
-              "material": "wallpaper_geometric_01"
+              "type": "window",
+              "material": "paint_grey_matt"
             },
             "south": null,
             "east": null,
@@ -23268,8 +23790,8 @@
           },
           "walls": {
             "north": {
-              "type": "wall",
-              "material": "wallpaper_geometric_01"
+              "type": "window",
+              "material": "paint_grey_matt"
             },
             "south": null,
             "east": null,
@@ -23294,8 +23816,8 @@
           "walls": {
             "north": null,
             "south": {
-              "type": "wall",
-              "material": "wallpaper_geometric_01"
+              "type": "window",
+              "material": "paint_grey_matt"
             },
             "east": null,
             "west": {
@@ -23325,8 +23847,8 @@
           "walls": {
             "north": null,
             "south": {
-              "type": "wall",
-              "material": "wallpaper_geometric_01"
+              "type": "window",
+              "material": "paint_grey_matt"
             },
             "east": {
               "type": "wall",
@@ -23642,8 +24164,8 @@
             "north": null,
             "south": null,
             "east": {
-              "type": "wall",
-              "material": "wallpaper_geometric_01"
+              "type": "window",
+              "material": "paint_grey_matt"
             },
             "west": null
           }
@@ -23725,31 +24247,6 @@
               "type": "wall",
               "material": "wallpaper_geometric_01"
             },
-            "east": null,
-            "west": {
-              "type": "wall",
-              "material": "wallpaper_geometric_01"
-            }
-          }
-        },
-        "3,8": {
-          "floor": {
-            "template": "wood_floor"
-          },
-          "walls": {
-            "north": null,
-            "south": null,
-            "east": null,
-            "west": null
-          }
-        },
-        "2,8": {
-          "floor": {
-            "template": "wood_floor"
-          },
-          "walls": {
-            "north": null,
-            "south": null,
             "east": null,
             "west": {
               "type": "wall",
@@ -23849,8 +24346,8 @@
             },
             "south": null,
             "east": {
-              "type": "wall",
-              "material": "wallpaper_geometric_01"
+              "type": "window",
+              "material": "paint_grey_matt"
             },
             "west": null
           }
@@ -23897,8 +24394,8 @@
             "north": null,
             "south": null,
             "east": {
-              "type": "wall",
-              "material": "wallpaper_geometric_01"
+              "type": "window",
+              "material": "paint_grey_matt"
             },
             "west": null
           }
@@ -23922,8 +24419,8 @@
           "walls": {
             "north": null,
             "south": {
-              "type": "wall",
-              "material": "wallpaper_geometric_01"
+              "type": "window",
+              "material": "paint_grey_matt"
             },
             "east": null,
             "west": null
@@ -23960,8 +24457,8 @@
             "south": null,
             "east": null,
             "west": {
-              "type": "wall",
-              "material": "wallpaper_geometric_01"
+              "type": "window",
+              "material": "paint_grey_matt"
             }
           }
         },
@@ -24043,8 +24540,8 @@
             },
             "south": null,
             "east": {
-              "type": "wall",
-              "material": "wallpaper_geometric_01"
+              "type": "window",
+              "material": "paint_grey_matt"
             },
             "west": null
           }
@@ -24119,8 +24616,8 @@
             "south": null,
             "east": null,
             "west": {
-              "type": "wall",
-              "material": "wallpaper_geometric_01"
+              "type": "window",
+              "material": "paint_grey_matt"
             }
           }
         },
@@ -24147,8 +24644,8 @@
           "walls": {
             "north": null,
             "south": {
-              "type": "wall",
-              "material": "wallpaper_geometric_01"
+              "type": "window",
+              "material": "paint_grey_matt"
             },
             "east": null,
             "west": null
@@ -24171,8 +24668,8 @@
           "walls": {
             "north": null,
             "south": {
-              "type": "wall",
-              "material": "wallpaper_geometric_01"
+              "type": "window",
+              "material": "paint_grey_matt"
             },
             "east": null,
             "west": null
@@ -24194,8 +24691,8 @@
           "floor": null,
           "walls": {
             "north": {
-              "type": "wall",
-              "material": "wallpaper_geometric_01"
+              "type": "window",
+              "material": "paint_grey_matt"
             },
             "south": null,
             "east": {
@@ -24211,8 +24708,8 @@
             "north": null,
             "south": null,
             "east": {
-              "type": "wall",
-              "material": "wallpaper_geometric_01"
+              "type": "window",
+              "material": "paint_grey_matt"
             },
             "west": null
           }
@@ -24221,7 +24718,10 @@
           "floor": null,
           "walls": {
             "north": null,
-            "south": null,
+            "south": {
+              "type": "window",
+              "material": "paint_grey_matt"
+            },
             "east": {
               "type": "wall",
               "material": "wallpaper_geometric_01"
@@ -24232,7 +24732,10 @@
         "1,10": {
           "floor": null,
           "walls": {
-            "north": null,
+            "north": {
+              "type": "window",
+              "material": "paint_grey_matt"
+            },
             "south": null,
             "east": null,
             "west": null
@@ -24278,7 +24781,10 @@
           "floor": null,
           "walls": {
             "north": null,
-            "south": null,
+            "south": {
+              "type": "wall",
+              "material": "paint_grey_matt"
+            },
             "east": null,
             "west": null
           }
@@ -24286,10 +24792,16 @@
         "0,10": {
           "floor": null,
           "walls": {
-            "north": null,
+            "north": {
+              "type": "wall",
+              "material": "paint_grey_matt"
+            },
             "south": null,
             "east": null,
-            "west": null
+            "west": {
+              "type": "wall",
+              "material": "paint_grey_matt"
+            }
           }
         },
         "2,11": {
@@ -24309,10 +24821,7 @@
           "walls": {
             "north": null,
             "south": null,
-            "east": {
-              "type": "wall",
-              "material": "wallpaper_geometric_01"
-            },
+            "east": null,
             "west": null
           }
         },
@@ -24332,8 +24841,8 @@
           "floor": null,
           "walls": {
             "north": {
-              "type": "wall",
-              "material": "wallpaper_geometric_01"
+              "type": "window",
+              "material": "paint_grey_matt"
             },
             "south": null,
             "east": null,
@@ -24347,12 +24856,15 @@
           "floor": null,
           "walls": {
             "north": {
-              "type": "wall",
-              "material": "wallpaper_geometric_01"
+              "type": "window",
+              "material": "paint_grey_matt"
             },
             "south": null,
             "east": null,
-            "west": null
+            "west": {
+              "type": "wall",
+              "material": "paint_grey_matt"
+            }
           }
         },
         "4,13": {
@@ -24373,7 +24885,10 @@
           },
           "walls": {
             "north": null,
-            "south": null,
+            "south": {
+              "type": "window",
+              "material": "paint_grey_matt"
+            },
             "east": null,
             "west": null
           }
@@ -24383,7 +24898,10 @@
             "template": "wood_floor"
           },
           "walls": {
-            "north": null,
+            "north": {
+              "type": "window",
+              "material": "paint_grey_matt"
+            },
             "south": null,
             "east": null,
             "west": null
@@ -24406,7 +24924,10 @@
           },
           "walls": {
             "north": null,
-            "south": null,
+            "south": {
+              "type": "window",
+              "material": "paint_grey_matt"
+            },
             "east": null,
             "west": null
           }
@@ -24438,8 +24959,8 @@
           "floor": null,
           "walls": {
             "north": {
-              "type": "wall",
-              "material": "wallpaper_geometric_01"
+              "type": "window",
+              "material": "paint_grey_matt"
             },
             "south": null,
             "east": null,
@@ -24470,8 +24991,8 @@
             "north": null,
             "south": null,
             "east": {
-              "type": "wall",
-              "material": "wallpaper_geometric_01"
+              "type": "window",
+              "material": "paint_grey_matt"
             },
             "west": null
           }
@@ -24488,8 +25009,8 @@
             },
             "east": null,
             "west": {
-              "type": "wall",
-              "material": "wallpaper_geometric_01"
+              "type": "window",
+              "material": "paint_grey_matt"
             }
           }
         },
@@ -24527,8 +25048,8 @@
           "floor": null,
           "walls": {
             "north": {
-              "type": "wall",
-              "material": "wallpaper_geometric_01"
+              "type": "window",
+              "material": "paint_grey_matt"
             },
             "south": null,
             "east": null,
@@ -24548,8 +25069,8 @@
           "floor": null,
           "walls": {
             "north": {
-              "type": "wall",
-              "material": "wallpaper_geometric_01"
+              "type": "window",
+              "material": "paint_grey_matt"
             },
             "south": null,
             "east": null,
@@ -24570,7 +25091,7 @@
           "walls": {
             "north": {
               "type": "wall",
-              "material": "wallpaper_geometric_01"
+              "material": "paint_grey_matt"
             },
             "south": null,
             "east": null,
@@ -24605,8 +25126,8 @@
           "walls": {
             "north": null,
             "south": {
-              "type": "wall",
-              "material": "wallpaper_geometric_01"
+              "type": "window",
+              "material": "paint_grey_matt"
             },
             "east": null,
             "west": null
@@ -24619,8 +25140,8 @@
           "walls": {
             "north": null,
             "south": {
-              "type": "wall",
-              "material": "wallpaper_geometric_01"
+              "type": "window",
+              "material": "paint_grey_matt"
             },
             "east": null,
             "west": null
@@ -24634,7 +25155,7 @@
             "north": null,
             "south": {
               "type": "wall",
-              "material": "wallpaper_geometric_01"
+              "material": "paint_grey_matt"
             },
             "east": {
               "type": "wall",
@@ -24662,8 +25183,8 @@
             "south": null,
             "east": null,
             "west": {
-              "type": "wall",
-              "material": "wallpaper_geometric_01"
+              "type": "window",
+              "material": "paint_grey_matt"
             }
           }
         },
@@ -24695,8 +25216,8 @@
           "floor": null,
           "walls": {
             "north": {
-              "type": "wall",
-              "material": "wallpaper_geometric_01"
+              "type": "window",
+              "material": "paint_grey_matt"
             },
             "south": null,
             "east": null,
@@ -24802,8 +25323,8 @@
           "walls": {
             "north": null,
             "south": {
-              "type": "wall",
-              "material": "wallpaper_geometric_01"
+              "type": "window",
+              "material": "paint_grey_matt"
             },
             "east": null,
             "west": null
@@ -24983,8 +25504,8 @@
           },
           "walls": {
             "north": {
-              "type": "wall",
-              "material": "wallpaper_geometric_01"
+              "type": "window",
+              "material": "paint_grey_matt"
             },
             "south": null,
             "east": null,
@@ -25078,7 +25599,7 @@
             "east": null,
             "west": {
               "type": "wall",
-              "material": "wallpaper_geometric_01"
+              "material": "paint_grey_matt"
             }
           }
         },
@@ -25091,8 +25612,8 @@
             "south": null,
             "east": null,
             "west": {
-              "type": "wall",
-              "material": "wallpaper_geometric_01"
+              "type": "window",
+              "material": "paint_grey_matt"
             }
           }
         },
@@ -25105,25 +25626,8 @@
             "south": null,
             "east": null,
             "west": {
-              "type": "wall",
-              "material": "wallpaper_geometric_01"
-            }
-          }
-        },
-        "0,2": {
-          "floor": {
-            "template": "wood_floor"
-          },
-          "walls": {
-            "north": {
-              "type": "door",
-              "material": "wallpaper_geometric_01"
-            },
-            "south": null,
-            "east": null,
-            "west": {
-              "type": "wall",
-              "material": "wallpaper_geometric_01"
+              "type": "window",
+              "material": "paint_grey_matt"
             }
           }
         },
@@ -25137,20 +25641,6 @@
             },
             "east": null,
             "west": null
-          }
-        },
-        "0,3": {
-          "floor": {
-            "template": "wood_floor"
-          },
-          "walls": {
-            "north": null,
-            "south": null,
-            "east": null,
-            "west": {
-              "type": "wall",
-              "material": "wallpaper_geometric_01"
-            }
           }
         },
         "1,1": {
@@ -25192,20 +25682,6 @@
             "west": null
           }
         },
-        "3,2": {
-          "floor": {
-            "template": "wood_floor"
-          },
-          "walls": {
-            "north": {
-              "type": "wall",
-              "material": "wallpaper_geometric_01"
-            },
-            "south": null,
-            "east": null,
-            "west": null
-          }
-        },
         "4,1": {
           "floor": null,
           "walls": {
@@ -25214,20 +25690,6 @@
               "type": "wall",
               "material": "wallpaper_geometric_01"
             },
-            "east": null,
-            "west": null
-          }
-        },
-        "4,2": {
-          "floor": {
-            "template": "wood_floor"
-          },
-          "walls": {
-            "north": {
-              "type": "wall",
-              "material": "wallpaper_geometric_01"
-            },
-            "south": null,
             "east": null,
             "west": null
           }
@@ -25260,23 +25722,15 @@
           },
           "walls": {
             "north": null,
-            "south": null,
+            "south": {
+              "type": "window",
+              "material": "paint_grey_matt"
+            },
             "east": null,
             "west": null
           }
         },
         "2,6": {
-          "floor": {
-            "template": "wood_floor"
-          },
-          "walls": {
-            "north": null,
-            "south": null,
-            "east": null,
-            "west": null
-          }
-        },
-        "3,6": {
           "floor": {
             "template": "wood_floor"
           },
@@ -25299,17 +25753,6 @@
           }
         },
         "4,5": {
-          "floor": {
-            "template": "wood_floor"
-          },
-          "walls": {
-            "north": null,
-            "south": null,
-            "east": null,
-            "west": null
-          }
-        },
-        "3,5": {
           "floor": {
             "template": "wood_floor"
           },
@@ -25357,6 +25800,382 @@
           "floor": {
             "template": "wood_floor"
           },
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "0,11": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": {
+              "type": "window",
+              "material": "paint_grey_matt"
+            }
+          }
+        },
+        "0,12": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": {
+              "type": "wall",
+              "material": "paint_grey_matt"
+            }
+          }
+        },
+        "1,12": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "1,11": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "0,13": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": {
+              "type": "wall",
+              "material": "paint_grey_matt"
+            },
+            "east": null,
+            "west": {
+              "type": "wall",
+              "material": "paint_grey_matt"
+            }
+          }
+        },
+        "0,14": {
+          "floor": null,
+          "walls": {
+            "north": {
+              "type": "wall",
+              "material": "paint_grey_matt"
+            },
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "1,14": {
+          "floor": null,
+          "walls": {
+            "north": {
+              "type": "wall",
+              "material": "paint_grey_matt"
+            },
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "2,13": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": {
+              "type": "wall",
+              "material": "paint_grey_matt"
+            },
+            "east": {
+              "type": "wall",
+              "material": "paint_grey_matt"
+            },
+            "west": null
+          }
+        },
+        "2,14": {
+          "floor": null,
+          "walls": {
+            "north": {
+              "type": "wall",
+              "material": "paint_grey_matt"
+            },
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "2,1": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": {
+              "type": "window",
+              "material": "paint_grey_matt"
+            },
+            "east": null,
+            "west": null
+          }
+        },
+        "3,0": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "3,14": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "3,15": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "3,16": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "3,17": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "4,17": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "3,18": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "4,18": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "4,19": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "3,19": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "4,16": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "2,17": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "0,3": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "0,2": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "3,2": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "4,2": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "3,5": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "3,6": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "1,13": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "2,8": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "3,8": {
+          "floor": {
+            "template": "wood_floor"
+          },
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "5,19": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "5,18": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "2,19": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "1,19": {
+          "floor": null,
+          "walls": {
+            "north": null,
+            "south": null,
+            "east": null,
+            "west": null
+          }
+        },
+        "2,18": {
+          "floor": null,
           "walls": {
             "north": null,
             "south": null,
@@ -25916,6 +26735,104 @@
               "y": 11
             }
           ]
+        },
+        {
+          "id": "laundry_6",
+          "type": "laundry",
+          "tags": [],
+          "tiles": [
+            {
+              "x": 3,
+              "y": 11
+            },
+            {
+              "x": 3,
+              "y": 10
+            },
+            {
+              "x": 4,
+              "y": 10
+            },
+            {
+              "x": 4,
+              "y": 12
+            },
+            {
+              "x": 3,
+              "y": 12
+            },
+            {
+              "x": 4,
+              "y": 11
+            }
+          ]
+        },
+        {
+          "id": "laundry_7",
+          "type": "laundry",
+          "tags": [],
+          "tiles": [
+            {
+              "x": 4,
+              "y": 11
+            },
+            {
+              "x": 2,
+              "y": 10
+            },
+            {
+              "x": 4,
+              "y": 12
+            },
+            {
+              "x": 2,
+              "y": 12
+            },
+            {
+              "x": 2,
+              "y": 11
+            },
+            {
+              "x": 3,
+              "y": 11
+            },
+            {
+              "x": 4,
+              "y": 10
+            },
+            {
+              "x": 3,
+              "y": 10
+            },
+            {
+              "x": 3,
+              "y": 12
+            },
+            {
+              "x": 1,
+              "y": 10
+            },
+            {
+              "x": 1,
+              "y": 11
+            },
+            {
+              "x": 1,
+              "y": 12
+            },
+            {
+              "x": 0,
+              "y": 10
+            },
+            {
+              "x": 0,
+              "y": 11
+            },
+            {
+              "x": 0,
+              "y": 12
+            }
+          ]
         }
       ],
       "roomGraph": {
@@ -25946,6 +26863,12 @@
           "neighbors": [
             "dining_room_1"
           ]
+        },
+        "laundry_6": {
+          "neighbors": []
+        },
+        "laundry_7": {
+          "neighbors": []
         }
       },
       "navigation": {
@@ -25971,6 +26894,10 @@
             "y": 6
           },
           {
+            "x": 0,
+            "y": 13
+          },
+          {
             "x": 1,
             "y": 2
           },
@@ -25989,6 +26916,10 @@
           {
             "x": 1,
             "y": 6
+          },
+          {
+            "x": 1,
+            "y": 13
           },
           {
             "x": 2,
@@ -26021,6 +26952,10 @@
           {
             "x": 2,
             "y": 9
+          },
+          {
+            "x": 2,
+            "y": 13
           },
           {
             "x": 3,
@@ -26436,7 +27371,6 @@
           "0,10",
           "0,11",
           "0,12",
-          "0,13",
           "0,14",
           "0,15",
           "0,16",
@@ -26451,7 +27385,6 @@
           "1,10",
           "1,11",
           "1,12",
-          "1,13",
           "1,14",
           "1,15",
           "1,16",
@@ -26463,7 +27396,6 @@
           "2,10",
           "2,11",
           "2,12",
-          "2,13",
           "2,14",
           "2,15",
           "2,16",
@@ -26769,7 +27701,7 @@
             "x": 8,
             "y": 2,
             "side": "south",
-            "type": "wall"
+            "type": "window"
           },
           {
             "x": 9,
@@ -26784,10 +27716,16 @@
             "type": "wall"
           },
           {
+            "x": 8,
+            "y": 3,
+            "side": "north",
+            "type": "window"
+          },
+          {
             "x": 11,
             "y": 3,
             "side": "north",
-            "type": "wall"
+            "type": "window"
           },
           {
             "x": 11,
@@ -26823,7 +27761,7 @@
             "x": 9,
             "y": 6,
             "side": "west",
-            "type": "wall"
+            "type": "window"
           },
           {
             "x": 9,
@@ -26877,7 +27815,7 @@
             "x": 7,
             "y": 8,
             "side": "north",
-            "type": "wall"
+            "type": "window"
           },
           {
             "x": 6,
@@ -26889,13 +27827,13 @@
             "x": 5,
             "y": 8,
             "side": "north",
-            "type": "wall"
+            "type": "window"
           },
           {
             "x": 5,
             "y": 10,
             "side": "south",
-            "type": "wall"
+            "type": "window"
           },
           {
             "x": 5,
@@ -26913,7 +27851,7 @@
             "x": 7,
             "y": 10,
             "side": "south",
-            "type": "wall"
+            "type": "window"
           },
           {
             "x": 7,
@@ -27039,7 +27977,7 @@
             "x": 12,
             "y": 4,
             "side": "east",
-            "type": "wall"
+            "type": "window"
           },
           {
             "x": 12,
@@ -27074,12 +28012,6 @@
           {
             "x": 2,
             "y": 9,
-            "side": "west",
-            "type": "wall"
-          },
-          {
-            "x": 2,
-            "y": 8,
             "side": "west",
             "type": "wall"
           },
@@ -27123,7 +28055,7 @@
             "x": 16,
             "y": 6,
             "side": "east",
-            "type": "wall"
+            "type": "window"
           },
           {
             "x": 16,
@@ -27153,7 +28085,7 @@
             "x": 16,
             "y": 9,
             "side": "east",
-            "type": "wall"
+            "type": "window"
           },
           {
             "x": 16,
@@ -27165,7 +28097,7 @@
             "x": 11,
             "y": 2,
             "side": "south",
-            "type": "wall"
+            "type": "window"
           },
           {
             "x": 12,
@@ -27183,7 +28115,7 @@
             "x": 13,
             "y": 4,
             "side": "west",
-            "type": "wall"
+            "type": "window"
           },
           {
             "x": 13,
@@ -27243,7 +28175,7 @@
             "x": 8,
             "y": 6,
             "side": "east",
-            "type": "wall"
+            "type": "window"
           },
           {
             "x": 8,
@@ -27285,7 +28217,7 @@
             "x": 17,
             "y": 6,
             "side": "west",
-            "type": "wall"
+            "type": "window"
           },
           {
             "x": 4,
@@ -27309,7 +28241,7 @@
             "x": 5,
             "y": 7,
             "side": "south",
-            "type": "wall"
+            "type": "window"
           },
           {
             "x": 6,
@@ -27321,7 +28253,7 @@
             "x": 7,
             "y": 7,
             "side": "south",
-            "type": "wall"
+            "type": "window"
           },
           {
             "x": 5,
@@ -27333,7 +28265,7 @@
             "x": 1,
             "y": 7,
             "side": "north",
-            "type": "wall"
+            "type": "window"
           },
           {
             "x": 1,
@@ -27345,13 +28277,25 @@
             "x": 1,
             "y": 8,
             "side": "east",
-            "type": "wall"
+            "type": "window"
+          },
+          {
+            "x": 1,
+            "y": 9,
+            "side": "south",
+            "type": "window"
           },
           {
             "x": 1,
             "y": 9,
             "side": "east",
             "type": "wall"
+          },
+          {
+            "x": 1,
+            "y": 10,
+            "side": "north",
+            "type": "window"
           },
           {
             "x": 2,
@@ -27372,14 +28316,26 @@
             "type": "wall"
           },
           {
-            "x": 2,
-            "y": 11,
-            "side": "east",
+            "x": 0,
+            "y": 9,
+            "side": "south",
+            "type": "wall"
+          },
+          {
+            "x": 0,
+            "y": 10,
+            "side": "north",
+            "type": "wall"
+          },
+          {
+            "x": 0,
+            "y": 10,
+            "side": "west",
             "type": "wall"
           },
           {
             "x": 2,
-            "y": 12,
+            "y": 11,
             "side": "east",
             "type": "wall"
           },
@@ -27393,7 +28349,7 @@
             "x": 5,
             "y": 11,
             "side": "north",
-            "type": "wall"
+            "type": "window"
           },
           {
             "x": 5,
@@ -27405,6 +28361,12 @@
             "x": 3,
             "y": 13,
             "side": "north",
+            "type": "window"
+          },
+          {
+            "x": 3,
+            "y": 13,
+            "side": "west",
             "type": "wall"
           },
           {
@@ -27412,6 +28374,24 @@
             "y": 13,
             "side": "north",
             "type": "wall"
+          },
+          {
+            "x": 3,
+            "y": 10,
+            "side": "south",
+            "type": "window"
+          },
+          {
+            "x": 3,
+            "y": 11,
+            "side": "north",
+            "type": "window"
+          },
+          {
+            "x": 3,
+            "y": 12,
+            "side": "south",
+            "type": "window"
           },
           {
             "x": 6,
@@ -27423,7 +28403,7 @@
             "x": 7,
             "y": 11,
             "side": "north",
-            "type": "wall"
+            "type": "window"
           },
           {
             "x": 8,
@@ -27447,7 +28427,7 @@
             "x": 8,
             "y": 11,
             "side": "east",
-            "type": "wall"
+            "type": "window"
           },
           {
             "x": 9,
@@ -27459,7 +28439,7 @@
             "x": 9,
             "y": 11,
             "side": "west",
-            "type": "wall"
+            "type": "window"
           },
           {
             "x": 9,
@@ -27471,13 +28451,13 @@
             "x": 10,
             "y": 12,
             "side": "north",
-            "type": "wall"
+            "type": "window"
           },
           {
             "x": 11,
             "y": 12,
             "side": "north",
-            "type": "wall"
+            "type": "window"
           },
           {
             "x": 12,
@@ -27495,13 +28475,13 @@
             "x": 10,
             "y": 11,
             "side": "south",
-            "type": "wall"
+            "type": "window"
           },
           {
             "x": 11,
             "y": 11,
             "side": "south",
-            "type": "wall"
+            "type": "window"
           },
           {
             "x": 12,
@@ -27525,7 +28505,7 @@
             "x": 17,
             "y": 9,
             "side": "west",
-            "type": "wall"
+            "type": "window"
           },
           {
             "x": 17,
@@ -27543,7 +28523,7 @@
             "x": 15,
             "y": 12,
             "side": "north",
-            "type": "wall"
+            "type": "window"
           },
           {
             "x": 14,
@@ -27567,7 +28547,7 @@
             "x": 15,
             "y": 11,
             "side": "south",
-            "type": "wall"
+            "type": "window"
           },
           {
             "x": 13,
@@ -27603,7 +28583,7 @@
             "x": 2,
             "y": 2,
             "side": "north",
-            "type": "wall"
+            "type": "window"
           },
           {
             "x": 5,
@@ -27627,25 +28607,13 @@
             "x": 0,
             "y": 5,
             "side": "west",
-            "type": "wall"
+            "type": "window"
           },
           {
             "x": 0,
             "y": 4,
             "side": "west",
-            "type": "wall"
-          },
-          {
-            "x": 0,
-            "y": 2,
-            "side": "north",
-            "type": "door"
-          },
-          {
-            "x": 0,
-            "y": 2,
-            "side": "west",
-            "type": "wall"
+            "type": "window"
           },
           {
             "x": 0,
@@ -27654,21 +28622,9 @@
             "type": "door"
           },
           {
-            "x": 0,
-            "y": 3,
-            "side": "west",
-            "type": "wall"
-          },
-          {
             "x": 3,
             "y": 1,
             "side": "south",
-            "type": "wall"
-          },
-          {
-            "x": 3,
-            "y": 2,
-            "side": "north",
             "type": "wall"
           },
           {
@@ -27678,14 +28634,383 @@
             "type": "wall"
           },
           {
-            "x": 4,
-            "y": 2,
+            "x": 1,
+            "y": 6,
+            "side": "south",
+            "type": "window"
+          },
+          {
+            "x": 0,
+            "y": 11,
+            "side": "west",
+            "type": "window"
+          },
+          {
+            "x": 0,
+            "y": 12,
+            "side": "west",
+            "type": "wall"
+          },
+          {
+            "x": 0,
+            "y": 13,
+            "side": "south",
+            "type": "wall"
+          },
+          {
+            "x": 0,
+            "y": 13,
+            "side": "west",
+            "type": "wall"
+          },
+          {
+            "x": 0,
+            "y": 14,
             "side": "north",
             "type": "wall"
+          },
+          {
+            "x": 1,
+            "y": 14,
+            "side": "north",
+            "type": "wall"
+          },
+          {
+            "x": 2,
+            "y": 13,
+            "side": "south",
+            "type": "wall"
+          },
+          {
+            "x": 2,
+            "y": 13,
+            "side": "east",
+            "type": "wall"
+          },
+          {
+            "x": 2,
+            "y": 14,
+            "side": "north",
+            "type": "wall"
+          },
+          {
+            "x": 2,
+            "y": 1,
+            "side": "south",
+            "type": "window"
           }
         ]
       },
-      "prop_spawns": []
+      "prop_spawns": [
+        {
+          "id": "bf00112a-bc7e-4f84-a210-10d2b37daf1f",
+          "template": "mailbox",
+          "x": 7,
+          "y": 12,
+          "rotation": 0
+        },
+        {
+          "id": "b0ea268c-c320-45f2-b36b-28931bd3f4e9",
+          "template": "laundry_basket",
+          "x": 2,
+          "y": 13,
+          "rotation": 0
+        },
+        {
+          "id": "dd319e25-d2ee-42ab-b7df-10e3b0190f2a",
+          "template": "washing_machine",
+          "x": 0,
+          "y": 10,
+          "rotation": 0
+        },
+        {
+          "id": "f2ad07e6-c1db-4f29-aa7f-71206b3e8bbb",
+          "template": "ceiling_light",
+          "x": 1,
+          "y": 11,
+          "rotation": 0
+        },
+        {
+          "id": "801241cf-1e83-4d90-b55d-1d7ebaea42f1",
+          "template": "shower",
+          "x": 16,
+          "y": 6,
+          "rotation": 0
+        },
+        {
+          "id": "58bf5f26-42c4-458c-9a95-3ae24652aafc",
+          "template": "kitchen_counter",
+          "x": 9,
+          "y": 3,
+          "rotation": 0
+        },
+        {
+          "id": "f66cdae9-a3c5-4cdf-a538-00ff1fc7bd2a",
+          "template": "bed_single",
+          "x": 15,
+          "y": 9,
+          "rotation": 0
+        },
+        {
+          "id": "24d45b55-0491-4e19-93e5-94fd7a2072c3",
+          "template": "bed_single",
+          "x": 15,
+          "y": 11,
+          "rotation": 0
+        },
+        {
+          "id": "f74e5f60-1376-42ad-9594-8759966f5baf",
+          "template": "tv_stand",
+          "x": 2,
+          "y": 2,
+          "rotation": 0
+        },
+        {
+          "id": "dee3cec2-d26b-4bfc-acd8-2af7b5b81fd7",
+          "template": "power_outlet",
+          "x": 3,
+          "y": 2,
+          "rotation": 0
+        },
+        {
+          "id": "6aaff9a2-c56a-4701-8ccb-1c5666585cfd",
+          "template": "bookshelf",
+          "x": 0,
+          "y": 6,
+          "rotation": 0
+        },
+        {
+          "id": "915622bb-117c-4d50-8cbf-0333e955c1dd",
+          "template": "toilet_a",
+          "x": 14,
+          "y": 6,
+          "rotation": 0
+        },
+        {
+          "id": "c30aa81f-8887-47f4-b023-e67d62b0493f",
+          "template": "desk_computer_a",
+          "x": 13,
+          "y": 10,
+          "rotation": 0
+        },
+        {
+          "id": "e21d5d57-9f4a-4ad2-a124-773661760a7a",
+          "template": "dining_table_a",
+          "x": 10,
+          "y": 8,
+          "rotation": 0
+        },
+        {
+          "id": "3af9bf3d-8282-4460-b360-59f39c2cffa3",
+          "template": "fridge_a",
+          "x": 8,
+          "y": 3,
+          "rotation": 0
+        },
+        {
+          "id": "a922f4c5-d17e-4015-82e9-1afa20983395",
+          "template": "chair_modern_a",
+          "x": 10,
+          "y": 9,
+          "rotation": 0
+        },
+        {
+          "id": "c2201e34-c20f-49e8-85f0-2d3b4d06fd30",
+          "template": "chair_modern_a",
+          "x": 10,
+          "y": 7,
+          "rotation": 0
+        },
+        {
+          "id": "c05bc33a-f0ea-4521-adea-e3083b76baed",
+          "template": "chair_modern_a",
+          "x": 11,
+          "y": 8,
+          "rotation": 0
+        },
+        {
+          "id": "c36299bd-4233-475f-9d60-64054173756e",
+          "template": "armchair",
+          "x": 3,
+          "y": 4,
+          "rotation": 0
+        },
+        {
+          "id": "33553d28-a209-40c6-b901-e7118c82942e",
+          "template": "sofa_large",
+          "x": 3,
+          "y": 5,
+          "rotation": 0
+        },
+        {
+          "id": "ad28cc43-8366-44ef-835d-d23d8ad7d26e",
+          "template": "kitchen_utensil_drawer",
+          "x": 6,
+          "y": 3,
+          "rotation": 0
+        },
+        {
+          "id": "d71e67d5-6df9-4474-b0c6-c34c8a7499e9",
+          "template": "kitchen_cabinet",
+          "x": 7,
+          "y": 3,
+          "rotation": 0
+        },
+        {
+          "id": "c94d7307-a1c7-4021-bd8c-8fd342f83029",
+          "template": "oven_stove",
+          "x": 6,
+          "y": 5,
+          "rotation": 0
+        },
+        {
+          "id": "82188c20-f20d-452d-8e92-8ac79e3fe9d7",
+          "template": "microwave",
+          "x": 7,
+          "y": 5,
+          "rotation": 0
+        },
+        {
+          "id": "7be6cc27-e7f6-4dea-9831-309af961d6f4",
+          "template": "kitchen_sink",
+          "x": 8,
+          "y": 5,
+          "rotation": 0
+        },
+        {
+          "id": "f1681cc8-1b26-4c5c-b864-5ffa4c2cdc34",
+          "template": "bathroom_sink",
+          "x": 13,
+          "y": 7,
+          "rotation": 0
+        },
+        {
+          "id": "bf63af31-861e-4d2b-96a0-f072d4e668f6",
+          "template": "towel_rail",
+          "x": 15,
+          "y": 7,
+          "rotation": 0
+        },
+        {
+          "id": "1172622e-79a6-4526-a4d2-c98724f69e37",
+          "template": "kitchen_utensil_drawer",
+          "x": 9,
+          "y": 5,
+          "rotation": 0
+        },
+        {
+          "id": "3851fc2f-101a-45c8-bf93-6d4de25708d2",
+          "template": "kitchen_counter",
+          "x": 10,
+          "y": 3,
+          "rotation": 0
+        },
+        {
+          "id": "ca321b16-9deb-4382-9be7-d1b567ee3152",
+          "template": "kitchen_counter",
+          "x": 11,
+          "y": 3,
+          "rotation": 0
+        },
+        {
+          "id": "3ffe183e-a880-483e-a354-f188d9285bd8",
+          "template": "kitchen_counter",
+          "x": 12,
+          "y": 3,
+          "rotation": 0
+        },
+        {
+          "id": "f774b769-e471-4bc4-9b23-158bbd62f141",
+          "template": "ceiling_light",
+          "x": 9,
+          "y": 4,
+          "rotation": 0
+        },
+        {
+          "id": "f9284ce6-1df8-431a-af1c-d03725ea3103",
+          "template": "ceiling_light",
+          "x": 5,
+          "y": 9,
+          "rotation": 0
+        },
+        {
+          "id": "b092bd94-203c-4650-8f8f-a3f87f78a3f3",
+          "template": "ceiling_light",
+          "x": 11,
+          "y": 9,
+          "rotation": 0
+        },
+        {
+          "id": "99b96724-de57-4d95-974e-29677d699e13",
+          "template": "ceiling_light",
+          "x": 14,
+          "y": 10,
+          "rotation": 0
+        },
+        {
+          "id": "14a6d135-4ab5-44ed-a138-58ef29b7e1d6",
+          "template": "ceiling_light",
+          "x": 2,
+          "y": 4,
+          "rotation": 0
+        },
+        {
+          "id": "6c94ba51-0ccd-4a90-8901-ff226ff8309a",
+          "template": "ceiling_light",
+          "x": 1,
+          "y": 4,
+          "rotation": 0
+        },
+        {
+          "id": "c46e8112-ae37-4adb-a37e-19127fd7a955",
+          "template": "ceiling_light",
+          "x": 3,
+          "y": 12,
+          "rotation": 0
+        },
+        {
+          "id": "a772f6c7-4592-42c2-aa41-8e4a4643ac61",
+          "template": "trash_can",
+          "x": 8,
+          "y": 8,
+          "rotation": 0
+        },
+        {
+          "id": "9058874d-9254-4662-8ae6-9c21ea2d2856",
+          "template": "trash_can",
+          "x": 12,
+          "y": 5,
+          "rotation": 0
+        },
+        {
+          "id": "530ed4f9-f694-491c-a92d-be551fc4f41f",
+          "template": "trash_can",
+          "x": 4,
+          "y": 2,
+          "rotation": 0
+        },
+        {
+          "id": "f5e0a46d-d012-4fc5-b263-5378b1a25131",
+          "template": "wine_rack",
+          "x": 9,
+          "y": 6,
+          "rotation": 0
+        },
+        {
+          "id": "ws-bedroom-01",
+          "template": "wall_socket",
+          "x": 13,
+          "y": 8,
+          "rotation": 0
+        },
+        {
+          "id": "ws-livingroom-01",
+          "template": "wall_socket",
+          "x": 0,
+          "y": 2,
+          "rotation": 0
+        }
+      ]
     },
     "convenience_store_a": {
       "tiles": {
@@ -29607,6 +30932,56 @@
       "belief_modifiers": [],
       "conditions": []
     },
+    "fundamentalist": {
+      "name": "Fundamentalist",
+      "polarity": "neutral",
+      "description": "Holds their core convictions as absolute, literal, and non-negotiable.",
+      "need_modifiers": {
+        "stress": 0.05
+      },
+      "skill_modifiers": {},
+      "behavior_flags": [
+        "fundamentalist"
+      ],
+      "descriptions": {
+        "positive": "It can work in their favor under the right circumstances: Holds their core convictions as absolute, literal, and non-negotiable.",
+        "negative": "Left unchecked, it becomes a real liability: Holds their core convictions as absolute, literal, and non-negotiable.",
+        "balanced": "Holds their core convictions as absolute, literal, and non-negotiable."
+      },
+      "learn_chance": {
+        "balanced": 11,
+        "logical": 7,
+        "self_aware": 12
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
+    },
+    "extremist": {
+      "name": "Extremist",
+      "polarity": "negative",
+      "description": "Pulled toward the most radical, uncompromising version of whatever they believe.",
+      "need_modifiers": {
+        "stress": 0.08
+      },
+      "skill_modifiers": {},
+      "behavior_flags": [
+        "extremist"
+      ],
+      "descriptions": {
+        "positive": "Even so, it isn't without an upside: Pulled toward the most radical, uncompromising version of whatever they believe.",
+        "negative": "Left unchecked, it becomes a real liability: Pulled toward the most radical, uncompromising version of whatever they believe.",
+        "balanced": "Pulled toward the most radical, uncompromising version of whatever they believe."
+      },
+      "learn_chance": {
+        "balanced": 6,
+        "logical": 4,
+        "self_aware": 7
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
+    },
     "envious": {
       "name": "Envious",
       "polarity": "negative",
@@ -29725,6 +31100,52 @@
           "modifier": -15
         }
       ],
+      "conditions": []
+    },
+    "forgetful": {
+      "name": "Forgetful",
+      "polarity": "negative",
+      "description": "Frequently forgets small tasks, plans, or things they meant to do.",
+      "need_modifiers": {},
+      "skill_modifiers": {},
+      "behavior_flags": [
+        "forgetful"
+      ],
+      "descriptions": {
+        "positive": "Even so, it isn't without an upside: Frequently forgets small tasks, plans, or things they meant to do.",
+        "negative": "Left unchecked, it becomes a real liability: Frequently forgets small tasks, plans, or things they meant to do.",
+        "balanced": "In practice: Frequently forgets small tasks, plans, or things they meant to do."
+      },
+      "learn_chance": {
+        "balanced": 10,
+        "logical": 8,
+        "self_aware": 8
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
+    },
+    "disorganized": {
+      "name": "Disorganized",
+      "polarity": "negative",
+      "description": "Struggles to keep routines, plans, and belongings in order.",
+      "need_modifiers": {},
+      "skill_modifiers": {},
+      "behavior_flags": [
+        "disorganized"
+      ],
+      "descriptions": {
+        "positive": "Even so, it isn't without an upside: Struggles to keep routines, plans, and belongings in order.",
+        "negative": "Left unchecked, it becomes a real liability: Struggles to keep routines, plans, and belongings in order.",
+        "balanced": "In practice: Struggles to keep routines, plans, and belongings in order."
+      },
+      "learn_chance": {
+        "balanced": 10,
+        "logical": 8,
+        "self_aware": 8
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
       "conditions": []
     },
     "pessimistic": {
@@ -35187,6 +36608,9 @@
     },
     "paramedic": {
       "name": "Paramedic",
+      "work_uniform": {
+        "outerwear": "paramedic_uniform"
+      },
       "industry": "Government",
       "sector": "government",
       "income_class": "Upper Middle",
@@ -45523,6 +46947,9 @@
     },
     "police_officer": {
       "name": "Police Officer",
+      "work_uniform": {
+        "outerwear": "police_uniform"
+      },
       "industry": "Government",
       "sector": "government",
       "income_class": "Upper Middle",
@@ -45659,6 +47086,9 @@
     },
     "firefighter": {
       "name": "Firefighter",
+      "work_uniform": {
+        "outerwear": "firefighter_uniform"
+      },
       "industry": "Government",
       "sector": "government",
       "income_class": "Elite",
@@ -59140,41 +60570,85 @@
     }
   },
   "belief_templates": {
-    "hard_work_pays_off": {
-      "name": "Hard Work Pays Off",
+    "atheist": {
+      "name": "Atheist",
+      "category": "religion",
+      "intensity": 0.2,
+      "tags": [
+        "scientific",
+        "skeptical",
+        "individualist"
+      ],
       "descriptions": {
-        "positive": "A conviction that steady effort compounds into real results, and it's worth betting on.",
-        "negative": "A stubborn insistence that failure just means not trying hard enough yet.",
-        "balanced": "Believes that consistent effort is usually rewarded over time, without expecting it to be guaranteed."
+        "positive": "A clear-eyed conviction that there's no god, and morality/meaning are things people build themselves.",
+        "negative": "A flat dismissal of anyone else's faith as simply mistaken.",
+        "balanced": "Believes there is no god or gods; meaning and morality come from people, not scripture."
       },
       "learn_chance": {
         "balanced": 16,
-        "logical": 24,
-        "self_aware": 14
+        "logical": 32,
+        "self_aware": 9
       },
       "trait_modifiers": [
         {
-          "trait": "diligent",
+          "trait": "rational",
           "modifier": 20
         },
         {
-          "trait": "lazy",
-          "modifier": -25
+          "trait": "gullible",
+          "modifier": -15
         }
       ],
       "conditions": []
     },
-    "people_are_good": {
-      "name": "People Are Fundamentally Good",
+    "agnostic": {
+      "name": "Agnostic",
+      "category": "religion",
+      "intensity": 0.15,
+      "tags": [
+        "skeptical",
+        "open_ended"
+      ],
       "descriptions": {
-        "positive": "A grounding faith that most people mean well, even when they stumble.",
-        "negative": "A naivety that keeps them slow to notice when someone's taking advantage of it.",
-        "balanced": "Believes most people are decent at heart, even if they don't always act like it."
+        "positive": "A comfortable acceptance that the big questions may simply be unanswerable, and that's fine.",
+        "negative": "A convenient way to avoid ever really committing to a position.",
+        "balanced": "Believes whether any god exists is fundamentally unknowable, and doesn't press the question."
       },
       "learn_chance": {
-        "balanced": 18,
-        "logical": 10,
-        "self_aware": 22
+        "balanced": 21,
+        "logical": 27,
+        "self_aware": 13
+      },
+      "trait_modifiers": [
+        {
+          "trait": "curious",
+          "modifier": 15
+        },
+        {
+          "trait": "rational",
+          "modifier": 10
+        }
+      ],
+      "conditions": []
+    },
+    "christian": {
+      "name": "Christian",
+      "category": "religion",
+      "intensity": 0.3,
+      "tags": [
+        "traditionalist",
+        "communal",
+        "moral_order"
+      ],
+      "descriptions": {
+        "positive": "A real, grounding faith that God is present, loving, and worth building a life around.",
+        "negative": "A faith that too easily curdles into judging anyone living differently.",
+        "balanced": "Believes in the God and teachings of Christianity, and tries to live by them."
+      },
+      "learn_chance": {
+        "balanced": 17,
+        "logical": 6,
+        "self_aware": 15
       },
       "trait_modifiers": [
         {
@@ -59182,119 +60656,154 @@
           "modifier": 15
         },
         {
-          "trait": "cynical",
-          "modifier": -20
+          "trait": "loyal",
+          "modifier": 10
         }
       ],
       "conditions": []
     },
-    "skeptical_of_authority": {
-      "name": "Skeptical of Authority",
-      "descriptions": {
-        "positive": "A healthy refusal to take institutions at their word just because they're in charge.",
-        "negative": "A reflexive distrust that makes it hard to accept help even when it's genuine.",
-        "balanced": "Distrusts institutions and those in power by default, wanting them to earn trust."
-      },
-      "learn_chance": {
-        "balanced": 15,
-        "logical": 20,
-        "self_aware": 14
-      },
-      "trait_modifiers": [
-        {
-          "trait": "suspicious",
-          "modifier": 20
-        },
-        {
-          "trait": "naive",
-          "modifier": 0
-        }
+    "muslim": {
+      "name": "Muslim",
+      "category": "religion",
+      "intensity": 0.3,
+      "tags": [
+        "traditionalist",
+        "communal",
+        "moral_order"
       ],
-      "conditions": []
-    },
-    "money_buys_happiness": {
-      "name": "Money Buys Happiness",
       "descriptions": {
-        "positive": "A clear-eyed recognition that financial security removes a lot of daily suffering.",
-        "negative": "A trap that keeps chasing more without ever feeling like enough.",
-        "balanced": "Believes financial security is central to a good life, though not the whole of it."
+        "positive": "A real, structuring faith in God and the teachings of Islam, lived out with discipline and community.",
+        "negative": "A rigid framework they expect everyone around them to eventually respect, whether it's theirs or not.",
+        "balanced": "Believes in the God and teachings of Islam, and tries to live by them."
       },
       "learn_chance": {
         "balanced": 14,
-        "logical": 16,
-        "self_aware": 10
+        "logical": 5,
+        "self_aware": 13
       },
       "trait_modifiers": [
         {
-          "trait": "materialistic",
-          "modifier": 25
+          "trait": "loyal",
+          "modifier": 15
         },
         {
-          "trait": "frugal",
-          "modifier": -10
+          "trait": "compassionate",
+          "modifier": 10
         }
       ],
       "conditions": []
     },
-    "experiences_over_possessions": {
-      "name": "Experiences Over Possessions",
+    "jewish": {
+      "name": "Jewish",
+      "category": "religion",
+      "intensity": 0.3,
+      "tags": [
+        "traditionalist",
+        "communal",
+        "cultural_identity"
+      ],
       "descriptions": {
-        "positive": "A conviction that what's lived and shared outlasts what's owned.",
-        "negative": "An excuse to never build any financial cushion at all.",
-        "balanced": "Values memories and experiences over material things."
+        "positive": "A real faith and cultural inheritance, carried forward with real pride and continuity.",
+        "negative": "An identity they can be prickly and defensive about when it's questioned.",
+        "balanced": "Believes in the God and teachings of Judaism, and identifies with its cultural/religious tradition."
       },
       "learn_chance": {
-        "balanced": 17,
-        "logical": 12,
+        "balanced": 12,
+        "logical": 6,
+        "self_aware": 12
+      },
+      "trait_modifiers": [
+        {
+          "trait": "loyal",
+          "modifier": 15
+        },
+        {
+          "trait": "ambitious",
+          "modifier": 10
+        }
+      ],
+      "conditions": []
+    },
+    "buddhist": {
+      "name": "Buddhist",
+      "category": "religion",
+      "intensity": 0.25,
+      "tags": [
+        "spiritual",
+        "introspective",
+        "non_attachment"
+      ],
+      "descriptions": {
+        "positive": "A real, practiced belief that suffering comes from attachment, and peace comes from letting go.",
+        "negative": "A calm exterior that can shade into just not engaging with real problems.",
+        "balanced": "Believes in Buddhist teachings -- non-attachment, mindfulness, and the reduction of suffering."
+      },
+      "learn_chance": {
+        "balanced": 14,
+        "logical": 8,
         "self_aware": 20
       },
       "trait_modifiers": [
         {
-          "trait": "adventurous",
+          "trait": "compassionate",
           "modifier": 20
         },
         {
-          "trait": "materialistic",
-          "modifier": -20
-        }
-      ],
-      "conditions": []
-    },
-    "everything_happens_for_a_reason": {
-      "name": "Everything Happens for a Reason",
-      "descriptions": {
-        "positive": "A comfort that turns setbacks into something bearable, even meaningful.",
-        "negative": "A way of dodging responsibility by outsourcing outcomes to fate.",
-        "balanced": "Believes life events unfold according to some larger pattern or purpose."
-      },
-      "learn_chance": {
-        "balanced": 16,
-        "logical": 6,
-        "self_aware": 18
-      },
-      "trait_modifiers": [
-        {
-          "trait": "optimistic",
-          "modifier": 15
-        },
-        {
-          "trait": "rational",
+          "trait": "aggressive",
           "modifier": -15
         }
       ],
       "conditions": []
     },
-    "self_made_success": {
-      "name": "Self-Made Success",
+    "hindu": {
+      "name": "Hindu",
+      "category": "religion",
+      "intensity": 0.3,
+      "tags": [
+        "spiritual",
+        "traditionalist",
+        "cosmic_order"
+      ],
       "descriptions": {
-        "positive": "A belief that gives real weight and pride to what someone builds themselves.",
-        "negative": "A blind spot that discounts luck, privilege, and the help of others.",
-        "balanced": "Believes people are mostly responsible for their own outcomes."
+        "positive": "A real faith in dharma, karma, and a deep, living tradition bigger than any one lifetime.",
+        "negative": "A framework that can tip into fatalism about things that are actually in their control.",
+        "balanced": "Believes in the gods and teachings of Hinduism, including karma and dharma."
       },
       "learn_chance": {
-        "balanced": 15,
-        "logical": 22,
-        "self_aware": 12
+        "balanced": 11,
+        "logical": 5,
+        "self_aware": 15
+      },
+      "trait_modifiers": [
+        {
+          "trait": "compassionate",
+          "modifier": 12
+        },
+        {
+          "trait": "loyal",
+          "modifier": 12
+        }
+      ],
+      "conditions": []
+    },
+    "freemason": {
+      "name": "Freemason",
+      "category": "religion",
+      "intensity": 0.55,
+      "tags": [
+        "fraternal",
+        "secretive",
+        "hierarchical"
+      ],
+      "descriptions": {
+        "positive": "A real, valued membership in a fraternal order built on ritual, self-improvement, and mutual aid.",
+        "negative": "A taste for secrecy and ritual that makes people around them wonder what's really going on.",
+        "balanced": "A member of a Masonic lodge -- holds its rituals, symbolism, and fraternal obligations as genuinely meaningful."
+      },
+      "learn_chance": {
+        "balanced": 6,
+        "logical": 7,
+        "self_aware": 9
       },
       "trait_modifiers": [
         {
@@ -59302,119 +60811,127 @@
           "modifier": 20
         },
         {
-          "trait": "entitled",
-          "modifier": -15
+          "trait": "career_ambitious",
+          "modifier": 15
         }
       ],
       "conditions": []
     },
-    "community_over_self": {
-      "name": "Community Over Self",
+    "cultist": {
+      "name": "Cultist",
+      "category": "religion",
+      "intensity": 0.9,
+      "tags": [
+        "authoritarian",
+        "collectivist",
+        "fringe"
+      ],
       "descriptions": {
-        "positive": "A generosity that puts the group's wellbeing ahead of personal convenience.",
-        "negative": "A habit of self-erasure that leaves their own needs chronically unmet.",
-        "balanced": "Believes the group's wellbeing should generally come before individual wants."
+        "positive": "A total, unwavering devotion to a leader/group that finally makes them feel like they truly belong.",
+        "negative": "A devotion that's completely handed their judgment over to someone else.",
+        "balanced": "A committed member of a fringe, high-control group, and defers to its leader/doctrine over their own judgment."
       },
       "learn_chance": {
-        "balanced": 18,
-        "logical": 12,
-        "self_aware": 20
+        "balanced": 4,
+        "logical": 2,
+        "self_aware": 6
       },
       "trait_modifiers": [
         {
-          "trait": "selfless",
+          "trait": "gullible",
+          "modifier": 25
+        },
+        {
+          "trait": "loyal",
           "modifier": 20
         },
         {
-          "trait": "selfish",
-          "modifier": 0
+          "trait": "rational",
+          "modifier": -25
         }
       ],
       "conditions": []
     },
-    "change_is_good": {
-      "name": "Change Is Good",
+    "simulation_theory": {
+      "name": "Simulation Theory",
+      "category": "metaphysical",
+      "intensity": 0.6,
+      "tags": [
+        "fringe",
+        "skeptical_of_reality",
+        "speculative"
+      ],
       "descriptions": {
-        "positive": "An openness that keeps them adaptable when circumstances shift.",
-        "negative": "A restlessness that abandons things just as they start to work.",
-        "balanced": "Welcomes disruption and new ways of doing things."
+        "positive": "A genuinely fascinating conviction that reality itself might be a constructed simulation.",
+        "negative": "A conversation-stopper of a theory they bring up at the worst possible moments.",
+        "balanced": "Believes it's likely we're living inside a simulated reality, not base physical reality."
       },
       "learn_chance": {
-        "balanced": 16,
-        "logical": 14,
-        "self_aware": 16
+        "balanced": 8,
+        "logical": 11,
+        "self_aware": 13
       },
       "trait_modifiers": [
         {
-          "trait": "adaptable",
+          "trait": "curious",
           "modifier": 20
         },
         {
-          "trait": "stubborn",
-          "modifier": -20
+          "trait": "rational",
+          "modifier": 10
         }
       ],
       "conditions": []
     },
-    "tradition_matters": {
-      "name": "Tradition Matters",
+    "alien_experimentation": {
+      "name": "Alien Experimentation",
+      "category": "conspiracy",
+      "intensity": 0.6,
+      "tags": [
+        "fringe",
+        "anti_establishment",
+        "speculative"
+      ],
       "descriptions": {
-        "positive": "A respect for what's been tested by time and passed down with care.",
-        "negative": "A resistance to anything new, useful or not.",
-        "balanced": "Believes established ways of doing things deserve respect and preservation."
+        "positive": "A genuine, watchful conviction that we're being studied by something far more advanced than us.",
+        "negative": "A conviction that turns every unexplained mark or missing hour into proof of abduction.",
+        "balanced": "Believes extraterrestrials are secretly observing and experimenting on humans."
       },
       "learn_chance": {
-        "balanced": 16,
-        "logical": 12,
-        "self_aware": 14
+        "balanced": 9,
+        "logical": 5,
+        "self_aware": 15
       },
       "trait_modifiers": [
         {
-          "trait": "conforming",
+          "trait": "paranoid",
           "modifier": 20
         },
         {
-          "trait": "adventurous",
-          "modifier": -15
+          "trait": "curious",
+          "modifier": 15
         }
       ],
       "conditions": []
     },
-    "justice_is_attainable": {
-      "name": "Justice Is Attainable",
-      "descriptions": {
-        "positive": "A confidence that fairness is worth pursuing because it's actually reachable.",
-        "negative": "A rigidity that struggles to accept when outcomes are simply unfair.",
-        "balanced": "Believes wrongdoing is eventually addressed and fairness generally prevails."
-      },
-      "learn_chance": {
-        "balanced": 16,
-        "logical": 20,
-        "self_aware": 14
-      },
-      "trait_modifiers": [
-        {
-          "trait": "fair",
-          "modifier": 20
-        },
-        {
-          "trait": "cynical",
-          "modifier": -15
-        }
+    "aliens_among_us": {
+      "name": "Aliens Among Us",
+      "category": "conspiracy",
+      "intensity": 0.7,
+      "tags": [
+        "fringe",
+        "anti_establishment",
+        "distrustful"
       ],
-      "conditions": []
-    },
-    "world_is_dangerous": {
-      "name": "The World Is Dangerous",
       "descriptions": {
-        "positive": "A vigilance that keeps them prepared for real risks others miss.",
-        "negative": "A guardedness that makes it hard to ever fully relax or trust.",
-        "balanced": "Believes the world is fundamentally risky and people should stay alert."
+        "positive": "A genuinely thrilling suspicion that some of the people around them aren't entirely human.",
+        "negative": "A conviction that makes them scrutinize strangers for signs of something inhuman underneath.",
+        "balanced": "Believes extraterrestrials are already living among us, disguised as ordinary people."
       },
       "learn_chance": {
-        "balanced": 14,
-        "logical": 14,
-        "self_aware": 12
+        "balanced": 6,
+        "logical": 2,
+        "self_aware": 13
       },
       "trait_modifiers": [
         {
@@ -59422,135 +60939,127 @@
           "modifier": 25
         },
         {
-          "trait": "naive",
-          "modifier": 0
+          "trait": "suspicious",
+          "modifier": 20
         }
       ],
       "conditions": []
     },
-    "honesty_is_always_best": {
-      "name": "Honesty Is Always Best",
-      "descriptions": {
-        "positive": "A commitment to truth that makes them someone others can rely on completely.",
-        "negative": "A bluntness that forgets tact has its place too.",
-        "balanced": "Believes truth-telling should rarely, if ever, be compromised."
-      },
-      "learn_chance": {
-        "balanced": 15,
-        "logical": 18,
-        "self_aware": 15
-      },
-      "trait_modifiers": [
-        {
-          "trait": "honest",
-          "modifier": 100
-        },
-        {
-          "trait": "dishonest",
-          "modifier": 0
-        }
+    "government_conspiracy": {
+      "name": "Government Conspiracy",
+      "category": "conspiracy",
+      "intensity": 0.65,
+      "tags": [
+        "anti_establishment",
+        "fringe",
+        "distrustful"
       ],
-      "conditions": []
-    },
-    "rules_are_meant_to_be_tested": {
-      "name": "Rules Are Meant to Be Tested",
       "descriptions": {
-        "positive": "A curiosity that questions rules instead of following them blindly.",
-        "negative": "A recklessness that treats every boundary as optional.",
-        "balanced": "Believes rules are starting points, not absolutes."
+        "positive": "A healthy, vindicated-feeling refusal to just take official explanations at face value.",
+        "negative": "A reflex that dismisses anything official as a lie by default.",
+        "balanced": "Believes a hidden group of powerful people secretly steers major events from behind the scenes."
       },
       "learn_chance": {
-        "balanced": 14,
-        "logical": 16,
-        "self_aware": 12
+        "balanced": 9,
+        "logical": 7,
+        "self_aware": 14
       },
       "trait_modifiers": [
         {
-          "trait": "reckless",
-          "modifier": 15
-        },
-        {
-          "trait": "conforming",
-          "modifier": -20
-        }
-      ],
-      "conditions": []
-    },
-    "love_conquers_all": {
-      "name": "Love Conquers All",
-      "descriptions": {
-        "positive": "A devotion that keeps them fighting for relationships worth keeping.",
-        "negative": "A blind spot that keeps them in situations they should have left.",
-        "balanced": "Believes strong relationships can overcome nearly any obstacle."
-      },
-      "learn_chance": {
-        "balanced": 16,
-        "logical": 8,
-        "self_aware": 22
-      },
-      "trait_modifiers": [
-        {
-          "trait": "romantic",
+          "trait": "paranoid",
           "modifier": 25
-        }
-      ],
-      "conditions": []
-    },
-    "hard_times_build_character": {
-      "name": "Hard Times Build Character",
-      "descriptions": {
-        "positive": "A perspective that turns struggle into something that ultimately strengthens them.",
-        "negative": "An excuse to romanticize suffering that didn't need to happen.",
-        "balanced": "Believes struggle and adversity are often necessary for personal growth."
-      },
-      "learn_chance": {
-        "balanced": 17,
-        "logical": 14,
-        "self_aware": 18
-      },
-      "trait_modifiers": [
+        },
         {
-          "trait": "resilient",
+          "trait": "cynical",
           "modifier": 20
         }
       ],
       "conditions": []
     },
-    "know_thyself": {
-      "name": "Know Thyself",
+    "chosen_one": {
+      "name": "Chosen One",
+      "category": "destiny",
+      "intensity": 0.7,
+      "tags": [
+        "individualist",
+        "destiny",
+        "grandiose"
+      ],
       "descriptions": {
-        "positive": "A discipline of honest self-reflection that keeps their choices aligned with who they are.",
-        "negative": "A tendency to overanalyze everything until it's hard to just act.",
-        "balanced": "Believes self-understanding is the foundation of a good life."
+        "positive": "A real, private sense of being marked for something significant, and it keeps them pushing forward.",
+        "negative": "A grandiosity that reads as delusional the moment they say it out loud.",
+        "balanced": "Believes they are personally destined for something greater than an ordinary life."
       },
       "learn_chance": {
-        "balanced": 16,
-        "logical": 16,
-        "self_aware": 30
+        "balanced": 7,
+        "logical": 3,
+        "self_aware": 17
       },
       "trait_modifiers": [
         {
-          "trait": "wise",
+          "trait": "ambitious",
           "modifier": 20
         },
         {
-          "trait": "perceptive",
-          "modifier": 15
+          "trait": "gullible",
+          "modifier": 10
         }
       ],
       "conditions": []
     },
-    "scripture_is_literal_truth": {
-      "name": "Scripture Is Literal Truth",
+    "ingroup_supremacy": {
+      "name": "Ingroup Supremacy",
+      "category": "prejudice",
+      "intensity": 0.95,
+      "tags": [
+        "tribalist",
+        "exclusionary",
+        "authoritarian"
+      ],
       "descriptions": {
-        "positive": "A conviction that sacred text is the direct, inerrant word of the divine, and a firm anchor in an uncertain world.",
-        "negative": "A rigid refusal to question or reinterpret scripture even when it conflicts with plain evidence.",
-        "balanced": "Believes religious scripture should be read and followed literally, without reinterpretation."
+        "positive": "A fierce, unshakeable pride in their own people, placed above every other group without exception.",
+        "negative": "A real, corrosive conviction that their own race/group is simply superior to others -- and acts on it.",
+        "balanced": "Believes their own race/ethnic group is inherently superior to others."
       },
       "learn_chance": {
-        "balanced": 10,
-        "logical": 6,
-        "self_aware": 8
+        "balanced": 6,
+        "logical": 3,
+        "self_aware": 5
+      },
+      "trait_modifiers": [
+        {
+          "trait": "aggressive",
+          "modifier": 20
+        },
+        {
+          "trait": "judgmental",
+          "modifier": 25
+        },
+        {
+          "trait": "open_minded",
+          "modifier": -35
+        }
+      ],
+      "conditions": []
+    },
+    "traditional_gender_hierarchy": {
+      "name": "Traditional Gender Hierarchy",
+      "category": "prejudice",
+      "intensity": 0.75,
+      "tags": [
+        "traditionalist",
+        "hierarchical",
+        "exclusionary"
+      ],
+      "descriptions": {
+        "positive": "A firm belief in traditional, clearly-defined roles for men and women, which they find genuinely reassuring.",
+        "negative": "A real conviction that one sex is simply meant to lead and the other to follow.",
+        "balanced": "Believes one sex is naturally suited to lead and the other to follow, and that roles shouldn't blur."
+      },
+      "learn_chance": {
+        "balanced": 9,
+        "logical": 5,
+        "self_aware": 7
       },
       "trait_modifiers": [
         {
@@ -59564,77 +61073,1292 @@
       ],
       "conditions": []
     },
-    "other_faiths_are_wrong": {
-      "name": "Other Faiths Are Wrong",
+    "flat_earth": {
+      "name": "Flat Earth",
+      "category": "conspiracy",
+      "intensity": 0.8,
+      "tags": [
+        "fringe",
+        "anti_establishment",
+        "distrustful"
+      ],
       "descriptions": {
-        "positive": "A confidence that one's own faith holds the whole truth, and other paths lead people astray.",
-        "negative": "An intolerance for other beliefs that curdles into contempt for anyone who doesn't share them.",
-        "balanced": "Believes their own religion is correct and other faiths/beliefs are mistaken."
+        "positive": "A stubborn confidence in trusting their own eyes over any official model of the world.",
+        "negative": "A conviction that makes them dismiss basic astronomy as an elaborate, coordinated lie.",
+        "balanced": "Believes the Earth is flat and that a global conspiracy hides the truth."
       },
       "learn_chance": {
-        "balanced": 9,
-        "logical": 5,
-        "self_aware": 6
+        "balanced": 4,
+        "logical": 1,
+        "self_aware": 8
       },
       "trait_modifiers": [
         {
-          "trait": "judgmental",
+          "trait": "paranoid",
           "modifier": 20
         },
         {
-          "trait": "open_minded",
-          "modifier": -30
+          "trait": "stubborn",
+          "modifier": 20
+        },
+        {
+          "trait": "gullible",
+          "modifier": 15
         }
       ],
       "conditions": []
     },
-    "moral_enforcement_duty": {
-      "name": "Moral Enforcement Duty",
+    "humans_are_ai": {
+      "name": "Humans Are AI",
+      "category": "metaphysical",
+      "intensity": 0.55,
+      "tags": [
+        "fringe",
+        "skeptical_of_reality",
+        "speculative"
+      ],
       "descriptions": {
-        "positive": "A sense of sacred responsibility to guide others back onto the right moral path, out of genuine care.",
-        "negative": "A self-appointed right to police and shame other people's private choices.",
-        "balanced": "Believes it's their duty to correct others' behavior when it violates their moral/religious code."
+        "positive": "A genuinely mind-expanding conviction that consciousness itself might be engineered, not born.",
+        "negative": "A conviction that makes them treat their own feelings as suspect, just outputs of a program.",
+        "balanced": "Believes people, themselves included, are literally artificial constructs, not naturally evolved beings."
       },
       "learn_chance": {
-        "balanced": 8,
-        "logical": 4,
-        "self_aware": 5
+        "balanced": 7,
+        "logical": 9,
+        "self_aware": 12
       },
       "trait_modifiers": [
+        {
+          "trait": "curious",
+          "modifier": 15
+        },
+        {
+          "trait": "rational",
+          "modifier": 10
+        }
+      ],
+      "conditions": []
+    },
+    "ethnic_conspiracy_theory": {
+      "name": "Ethnic Conspiracy Theory",
+      "category": "prejudice",
+      "intensity": 0.9,
+      "tags": [
+        "tribalist",
+        "exclusionary",
+        "distrustful",
+        "anti_establishment"
+      ],
+      "descriptions": {
+        "positive": "A conviction they experience as clear-eyed vigilance against a hidden enemy.",
+        "negative": "A real, corrosive conviction that a specific ethnic group secretly controls world events -- and it colors everything they say about them.",
+        "balanced": "Believes a specific ethnic group secretly manipulates governments, media, and finance from behind the scenes."
+      },
+      "learn_chance": {
+        "balanced": 4,
+        "logical": 1,
+        "self_aware": 6
+      },
+      "trait_modifiers": [
+        {
+          "trait": "paranoid",
+          "modifier": 25
+        },
         {
           "trait": "judgmental",
           "modifier": 25
         },
         {
           "trait": "open_minded",
-          "modifier": -20
+          "modifier": -35
         }
       ],
       "conditions": []
     },
-    "end_times_are_near": {
-      "name": "End Times Are Near",
+    "robot_uprising": {
+      "name": "Robot Uprising",
+      "category": "conspiracy",
+      "intensity": 0.5,
+      "tags": [
+        "fringe",
+        "anti_establishment",
+        "speculative"
+      ],
       "descriptions": {
-        "positive": "A watchful conviction that the world is approaching a great reckoning, and it's worth living as though it matters.",
-        "negative": "A doom-laden certainty that ordinary setbacks are signs of imminent apocalypse.",
-        "balanced": "Believes a major religious/apocalyptic reckoning is imminent."
+        "positive": "A wary, practical conviction that today's machines are quietly building toward turning on us.",
+        "negative": "A conviction that makes them see a coming machine takeover in every new gadget.",
+        "balanced": "Believes artificial intelligence and machines will eventually rise up against humanity."
+      },
+      "learn_chance": {
+        "balanced": 8,
+        "logical": 10,
+        "self_aware": 12
+      },
+      "trait_modifiers": [
+        {
+          "trait": "paranoid",
+          "modifier": 15
+        },
+        {
+          "trait": "curious",
+          "modifier": 10
+        }
+      ],
+      "conditions": []
+    },
+    "secret_societies_conspiracy": {
+      "name": "Secret Societies Conspiracy",
+      "category": "conspiracy",
+      "intensity": 0.6,
+      "tags": [
+        "anti_establishment",
+        "fringe",
+        "distrustful"
+      ],
+      "descriptions": {
+        "positive": "A genuinely engrossing conviction that the real decisions are made behind closed doors, by people who actually know what's going on.",
+        "negative": "A conviction that makes them see a hidden hand behind every unrelated headline.",
+        "balanced": "Believes shadowy secret societies -- not elected leaders -- actually run the world from behind the scenes."
+      },
+      "learn_chance": {
+        "balanced": 9,
+        "logical": 5,
+        "self_aware": 14
+      },
+      "trait_modifiers": [
+        {
+          "trait": "paranoid",
+          "modifier": 20
+        },
+        {
+          "trait": "distrustful",
+          "modifier": 20
+        }
+      ],
+      "conditions": []
+    },
+    "ancient_medicine": {
+      "name": "Ancient Medicine",
+      "category": "metaphysical",
+      "intensity": 0.4,
+      "tags": [
+        "traditionalist",
+        "skeptical_of_reality",
+        "spiritual"
+      ],
+      "descriptions": {
+        "positive": "A real, grounded trust in remedies passed down over generations, over anything from a lab.",
+        "negative": "A conviction that leads them to reach for herbs and rituals instead of real treatment when it actually matters.",
+        "balanced": "Believes traditional, pre-modern remedies work better than modern medicine."
+      },
+      "learn_chance": {
+        "balanced": 10,
+        "logical": 3,
+        "self_aware": 14
+      },
+      "trait_modifiers": [
+        {
+          "trait": "stubborn",
+          "modifier": 10
+        },
+        {
+          "trait": "distrustful",
+          "modifier": 10
+        }
+      ],
+      "conditions": []
+    },
+    "phobic_worldview": {
+      "name": "Phobic Worldview",
+      "category": "metaphysical",
+      "intensity": 0.45,
+      "tags": [
+        "fearful",
+        "anxious",
+        "fringe"
+      ],
+      "descriptions": {
+        "positive": "A hyper-alert wariness that keeps them genuinely prepared for whatever might go wrong.",
+        "negative": "A pervasive dread that colors nearly every decision they make, however small.",
+        "balanced": "Sees the world as fundamentally dangerous, and lives braced for the worst at all times."
+      },
+      "learn_chance": {
+        "balanced": 10,
+        "logical": 6,
+        "self_aware": 16
+      },
+      "trait_modifiers": [
+        {
+          "trait": "paranoid",
+          "modifier": 15
+        },
+        {
+          "trait": "suspicious",
+          "modifier": 15
+        }
+      ],
+      "conditions": []
+    },
+    "reincarnation": {
+      "name": "Reincarnation",
+      "category": "metaphysical",
+      "intensity": 0.35,
+      "tags": [
+        "spiritual",
+        "cosmic_order",
+        "non_attachment"
+      ],
+      "descriptions": {
+        "positive": "A genuinely comforting conviction that this life is just one chapter in a much longer story.",
+        "negative": "A conviction that makes them oddly detached about real, present-life consequences.",
+        "balanced": "Believes the soul is reborn into a new life after death, again and again."
+      },
+      "learn_chance": {
+        "balanced": 10,
+        "logical": 4,
+        "self_aware": 15
+      },
+      "trait_modifiers": [
+        {
+          "trait": "empathetic",
+          "modifier": 10
+        },
+        {
+          "trait": "curious",
+          "modifier": 10
+        }
+      ],
+      "conditions": []
+    },
+    "occult_magic": {
+      "name": "Occult Magic",
+      "category": "metaphysical",
+      "intensity": 0.75,
+      "tags": [
+        "fringe",
+        "spiritual",
+        "secretive"
+      ],
+      "descriptions": {
+        "positive": "A genuine, deeply-held conviction that ritual and will can actually bend reality, if done right.",
+        "negative": "A conviction that pushes them toward real ritual, and real sacrifice, in service of something dark.",
+        "balanced": "Believes in literal ritual magic -- and that real sacrifice can call down real power."
+      },
+      "learn_chance": {
+        "balanced": 5,
+        "logical": 1,
+        "self_aware": 9
+      },
+      "trait_modifiers": [
+        {
+          "trait": "secretive",
+          "modifier": 20
+        },
+        {
+          "trait": "curious",
+          "modifier": 15
+        }
+      ],
+      "conditions": []
+    },
+    "communism": {
+      "name": "Communism",
+      "category": "ideology",
+      "intensity": 0.55,
+      "tags": [
+        "collectivist",
+        "anti_establishment",
+        "egalitarian"
+      ],
+      "descriptions": {
+        "positive": "A genuine conviction that shared ownership and real equality would fix what markets never will.",
+        "negative": "A rigid insistence that private property itself is the root of every real injustice.",
+        "balanced": "Believes property and production should be collectively owned, not privately controlled."
+      },
+      "learn_chance": {
+        "balanced": 10,
+        "logical": 8,
+        "self_aware": 12
+      },
+      "trait_modifiers": [
+        {
+          "trait": "egalitarian",
+          "modifier": 20
+        },
+        {
+          "trait": "cooperative",
+          "modifier": 10
+        }
+      ],
+      "conditions": []
+    },
+    "fascism": {
+      "name": "Fascism",
+      "category": "ideology",
+      "intensity": 0.85,
+      "tags": [
+        "authoritarian",
+        "nationalist",
+        "hierarchical"
+      ],
+      "descriptions": {
+        "positive": "A fierce conviction that a strong, unified nation under decisive leadership is worth real sacrifice.",
+        "negative": "A conviction that excuses real cruelty toward anyone cast as outside the nation.",
+        "balanced": "Believes in a strong, centralized, authoritarian nationalist state above individual rights."
+      },
+      "learn_chance": {
+        "balanced": 5,
+        "logical": 2,
+        "self_aware": 8
+      },
+      "trait_modifiers": [
+        {
+          "trait": "aggressive",
+          "modifier": 15
+        },
+        {
+          "trait": "controlling",
+          "modifier": 15
+        },
+        {
+          "trait": "open_minded",
+          "modifier": -25
+        }
+      ],
+      "conditions": []
+    },
+    "anarchism": {
+      "name": "Anarchism",
+      "category": "ideology",
+      "intensity": 0.65,
+      "tags": [
+        "anti_establishment",
+        "individualist",
+        "distrustful"
+      ],
+      "descriptions": {
+        "positive": "A genuine conviction that people are better off organizing themselves than being ruled.",
+        "negative": "A conviction that makes them reflexively distrust any real authority, even a reasonable one.",
+        "balanced": "Believes all hierarchical government and imposed authority should be abolished."
+      },
+      "learn_chance": {
+        "balanced": 8,
+        "logical": 6,
+        "self_aware": 14
+      },
+      "trait_modifiers": [
+        {
+          "trait": "independent",
+          "modifier": 20
+        },
+        {
+          "trait": "distrustful",
+          "modifier": 15
+        }
+      ],
+      "conditions": []
+    },
+    "oligarchy": {
+      "name": "Oligarchy",
+      "category": "ideology",
+      "intensity": 0.6,
+      "tags": [
+        "elitist",
+        "hierarchical",
+        "materialist"
+      ],
+      "descriptions": {
+        "positive": "A frank conviction that the most capable and successful should be the ones actually running things.",
+        "negative": "A conviction that dismisses ordinary people's judgment as unfit to matter.",
+        "balanced": "Believes power should rest with a small, capable elite rather than the broader public."
       },
       "learn_chance": {
         "balanced": 7,
-        "logical": 3,
+        "logical": 9,
         "self_aware": 6
       },
       "trait_modifiers": [
         {
-          "trait": "judgmental",
-          "modifier": 10
+          "trait": "arrogant",
+          "modifier": 15
         },
         {
-          "trait": "open_minded",
-          "modifier": -15
+          "trait": "ambitious",
+          "modifier": 10
         }
       ],
       "conditions": []
+    },
+    "democracy": {
+      "name": "Democracy",
+      "category": "ideology",
+      "intensity": 0.2,
+      "tags": [
+        "individualist",
+        "egalitarian"
+      ],
+      "descriptions": {
+        "positive": "A steady, mainstream conviction that ordinary people, collectively, should be the ones who decide.",
+        "negative": "A stubborn faith in majority rule even when the majority is clearly wrong.",
+        "balanced": "Believes political power should come from free, fair elections open to the whole public."
+      },
+      "learn_chance": {
+        "balanced": 20,
+        "logical": 22,
+        "self_aware": 15
+      },
+      "trait_modifiers": [
+        {
+          "trait": "fair",
+          "modifier": 10
+        },
+        {
+          "trait": "cooperative",
+          "modifier": 5
+        }
+      ],
+      "conditions": []
+    }
+  },
+  "principle_concepts": {
+    "atheist": {
+      "name": "Atheists",
+      "category": "religion",
+      "tags": [
+        "scientific",
+        "skeptical",
+        "individualist"
+      ],
+      "related_categories": [
+        "religion"
+      ]
+    },
+    "agnostic": {
+      "name": "Agnostics",
+      "category": "religion",
+      "tags": [
+        "skeptical",
+        "open_ended"
+      ],
+      "related_categories": [
+        "religion"
+      ]
+    },
+    "christian": {
+      "name": "Christianity",
+      "category": "religion",
+      "tags": [
+        "traditionalist",
+        "communal",
+        "moral_order"
+      ],
+      "related_categories": [
+        "religion"
+      ]
+    },
+    "muslim": {
+      "name": "Islam",
+      "category": "religion",
+      "tags": [
+        "traditionalist",
+        "communal",
+        "moral_order"
+      ],
+      "related_categories": [
+        "religion"
+      ]
+    },
+    "jewish": {
+      "name": "Judaism",
+      "category": "religion",
+      "tags": [
+        "traditionalist",
+        "communal",
+        "cultural_identity"
+      ],
+      "related_categories": [
+        "religion"
+      ]
+    },
+    "buddhist": {
+      "name": "Buddhism",
+      "category": "religion",
+      "tags": [
+        "spiritual",
+        "introspective",
+        "non_attachment"
+      ],
+      "related_categories": [
+        "religion"
+      ]
+    },
+    "hindu": {
+      "name": "Hinduism",
+      "category": "religion",
+      "tags": [
+        "spiritual",
+        "traditionalist",
+        "cosmic_order"
+      ],
+      "related_categories": [
+        "religion"
+      ]
+    },
+    "freemason": {
+      "name": "The Freemasons",
+      "category": "religion",
+      "tags": [
+        "fraternal",
+        "secretive",
+        "hierarchical"
+      ],
+      "related_categories": [
+        "religion"
+      ]
+    },
+    "cultist": {
+      "name": "Fringe Cults",
+      "category": "religion",
+      "tags": [
+        "authoritarian",
+        "collectivist",
+        "fringe"
+      ],
+      "related_categories": [
+        "religion"
+      ]
+    },
+    "scientists": {
+      "name": "Scientists",
+      "category": "group",
+      "tags": [
+        "scientific",
+        "institutional"
+      ],
+      "related_categories": [
+        "technology",
+        "healthcare"
+      ]
+    },
+    "the_rich": {
+      "name": "The Rich",
+      "category": "group",
+      "tags": [
+        "materialist",
+        "elitist"
+      ],
+      "related_categories": [
+        "economy"
+      ]
+    },
+    "the_poor": {
+      "name": "The Poor",
+      "category": "group",
+      "tags": [
+        "collectivist",
+        "marginalized"
+      ],
+      "related_categories": [
+        "economy"
+      ]
+    },
+    "immigrants": {
+      "name": "Immigrants",
+      "category": "group",
+      "tags": [
+        "outsider",
+        "marginalized"
+      ],
+      "related_categories": [
+        "equality"
+      ]
+    },
+    "the_media": {
+      "name": "The Media",
+      "category": "group",
+      "tags": [
+        "institutional",
+        "anti_establishment"
+      ]
+    },
+    "the_government": {
+      "name": "The Government",
+      "category": "group",
+      "tags": [
+        "institutional",
+        "hierarchical"
+      ]
+    },
+    "the_military": {
+      "name": "The Military",
+      "category": "group",
+      "tags": [
+        "hierarchical",
+        "nationalist"
+      ]
+    },
+    "religious_leaders": {
+      "name": "Religious Leaders",
+      "category": "group",
+      "tags": [
+        "traditionalist",
+        "hierarchical"
+      ],
+      "related_categories": [
+        "religion"
+      ]
+    },
+    "the_youth": {
+      "name": "The Youth",
+      "category": "group",
+      "tags": [
+        "individualist",
+        "open_ended"
+      ]
+    },
+    "the_elderly": {
+      "name": "The Elderly",
+      "category": "group",
+      "tags": [
+        "traditionalist",
+        "cultural_identity"
+      ],
+      "related_categories": [
+        "elderly_care"
+      ]
+    },
+    "artists": {
+      "name": "Artists",
+      "category": "group",
+      "tags": [
+        "individualist",
+        "open_ended"
+      ]
+    },
+    "business_owners": {
+      "name": "Business Owners",
+      "category": "group",
+      "tags": [
+        "materialist",
+        "individualist"
+      ],
+      "related_categories": [
+        "economy"
+      ]
+    },
+    "workers": {
+      "name": "Working People",
+      "category": "group",
+      "tags": [
+        "collectivist",
+        "marginalized"
+      ]
+    },
+    "the_elite": {
+      "name": "The Elite",
+      "category": "group",
+      "tags": [
+        "elitist",
+        "hierarchical"
+      ]
+    },
+    "usa": {
+      "name": "The United States",
+      "category": "nation",
+      "tags": [
+        "nationalist",
+        "individualist"
+      ]
+    },
+    "china": {
+      "name": "China",
+      "category": "nation",
+      "tags": [
+        "nationalist",
+        "collectivist",
+        "hierarchical"
+      ]
+    },
+    "russia": {
+      "name": "Russia",
+      "category": "nation",
+      "tags": [
+        "nationalist",
+        "hierarchical"
+      ]
+    },
+    "the_west": {
+      "name": "The West",
+      "category": "nation",
+      "tags": [
+        "nationalist",
+        "individualist"
+      ]
+    },
+    "the_middle_east": {
+      "name": "The Middle East",
+      "category": "nation",
+      "tags": [
+        "traditionalist",
+        "cultural_identity"
+      ]
+    },
+    "socialism": {
+      "name": "Socialism",
+      "category": "ideology",
+      "tags": [
+        "collectivist",
+        "anti_establishment"
+      ]
+    },
+    "capitalism": {
+      "name": "Capitalism",
+      "category": "ideology",
+      "tags": [
+        "individualist",
+        "materialist"
+      ]
+    },
+    "conservatism": {
+      "name": "Conservatism",
+      "category": "ideology",
+      "tags": [
+        "traditionalist",
+        "hierarchical"
+      ]
+    },
+    "liberalism": {
+      "name": "Liberalism",
+      "category": "ideology",
+      "tags": [
+        "individualist",
+        "open_ended"
+      ]
+    },
+    "nationalism": {
+      "name": "Nationalism",
+      "category": "ideology",
+      "tags": [
+        "nationalist",
+        "collectivist"
+      ]
+    },
+    "socrates": {
+      "name": "Socrates",
+      "category": "philosopher",
+      "tags": [
+        "scientific",
+        "introspective"
+      ]
+    },
+    "nietzsche": {
+      "name": "Nietzsche",
+      "category": "philosopher",
+      "tags": [
+        "individualist",
+        "anti_establishment"
+      ]
+    },
+    "confucius": {
+      "name": "Confucius",
+      "category": "philosopher",
+      "tags": [
+        "traditionalist",
+        "hierarchical",
+        "moral_order"
+      ]
+    },
+    "marx": {
+      "name": "Marx",
+      "category": "philosopher",
+      "tags": [
+        "collectivist",
+        "anti_establishment"
+      ]
+    },
+    "political_leaders": {
+      "name": "Political Leaders",
+      "category": "group",
+      "tags": [
+        "hierarchical",
+        "institutional"
+      ]
+    },
+    "simulation_theory": {
+      "name": "Simulation Theory",
+      "category": "metaphysical",
+      "tags": [
+        "fringe",
+        "skeptical_of_reality",
+        "speculative"
+      ]
+    },
+    "alien_contact": {
+      "name": "Alien Contact",
+      "category": "conspiracy",
+      "tags": [
+        "fringe",
+        "anti_establishment",
+        "speculative"
+      ]
+    },
+    "government_conspiracy": {
+      "name": "The Hidden Hand",
+      "category": "conspiracy",
+      "tags": [
+        "anti_establishment",
+        "fringe",
+        "distrustful"
+      ]
+    },
+    "chosen_one": {
+      "name": "Personal Destiny",
+      "category": "destiny",
+      "tags": [
+        "individualist",
+        "destiny",
+        "grandiose"
+      ]
+    },
+    "ingroup_supremacy": {
+      "name": "Ingroup Supremacy",
+      "category": "prejudice",
+      "tags": [
+        "tribalist",
+        "exclusionary",
+        "authoritarian"
+      ]
+    },
+    "traditional_gender_hierarchy": {
+      "name": "Traditional Gender Roles",
+      "category": "prejudice",
+      "tags": [
+        "traditionalist",
+        "hierarchical",
+        "exclusionary"
+      ]
+    },
+    "men": {
+      "name": "Men",
+      "category": "group",
+      "tags": [
+        "gendered"
+      ],
+      "related_categories": [
+        "equality"
+      ]
+    },
+    "women": {
+      "name": "Women",
+      "category": "group",
+      "tags": [
+        "gendered"
+      ],
+      "related_categories": [
+        "equality"
+      ]
+    },
+    "doctors": {
+      "name": "Doctors",
+      "category": "group",
+      "tags": [
+        "institutional",
+        "scientific"
+      ],
+      "related_categories": [
+        "healthcare"
+      ]
+    },
+    "the_sick": {
+      "name": "The Sick",
+      "category": "group",
+      "tags": [
+        "marginalized"
+      ],
+      "related_categories": [
+        "healthcare"
+      ]
+    },
+    "teachers": {
+      "name": "Teachers",
+      "category": "group",
+      "tags": [
+        "institutional"
+      ],
+      "related_categories": [
+        "school"
+      ]
+    },
+    "criminals": {
+      "name": "Criminals",
+      "category": "group",
+      "tags": [
+        "outsider",
+        "anti_establishment"
+      ],
+      "related_categories": [
+        "crime"
+      ]
+    },
+    "police_officers": {
+      "name": "Police Officers",
+      "category": "group",
+      "tags": [
+        "institutional",
+        "hierarchical"
+      ],
+      "related_categories": [
+        "crime"
+      ]
+    },
+    "landlords": {
+      "name": "Landlords",
+      "category": "group",
+      "tags": [
+        "materialist",
+        "elitist"
+      ],
+      "related_categories": [
+        "housing"
+      ]
+    },
+    "tenants": {
+      "name": "Tenants",
+      "category": "group",
+      "tags": [
+        "marginalized"
+      ],
+      "related_categories": [
+        "housing"
+      ]
+    },
+    "the_unemployed": {
+      "name": "The Unemployed",
+      "category": "group",
+      "tags": [
+        "marginalized"
+      ],
+      "related_categories": [
+        "economy"
+      ]
+    },
+    "celebrities": {
+      "name": "Celebrities",
+      "category": "group",
+      "tags": [
+        "individualist",
+        "elitist"
+      ],
+      "related_categories": [
+        "entertainment"
+      ]
+    },
+    "communism": {
+      "name": "Communism",
+      "category": "ideology",
+      "tags": [
+        "collectivist",
+        "anti_establishment",
+        "egalitarian"
+      ]
+    },
+    "fascism": {
+      "name": "Fascism",
+      "category": "ideology",
+      "tags": [
+        "authoritarian",
+        "nationalist",
+        "hierarchical"
+      ]
+    },
+    "anarchism": {
+      "name": "Anarchism",
+      "category": "ideology",
+      "tags": [
+        "anti_establishment",
+        "individualist",
+        "distrustful"
+      ]
+    },
+    "oligarchy": {
+      "name": "Oligarchy",
+      "category": "ideology",
+      "tags": [
+        "elitist",
+        "hierarchical",
+        "materialist"
+      ]
+    },
+    "democracy": {
+      "name": "Democracy",
+      "category": "ideology",
+      "tags": [
+        "individualist",
+        "egalitarian"
+      ]
+    }
+  },
+  "society_categories": {
+    "school": {
+      "name": "School & Education"
+    },
+    "elderly_care": {
+      "name": "Elderly Care"
+    },
+    "healthcare": {
+      "name": "Healthcare"
+    },
+    "housing": {
+      "name": "Housing"
+    },
+    "economy": {
+      "name": "Economy & Jobs"
+    },
+    "entertainment": {
+      "name": "Entertainment & Media"
+    },
+    "religion": {
+      "name": "Religion"
+    },
+    "equality": {
+      "name": "Equality"
+    },
+    "crime": {
+      "name": "Crime & Justice"
+    },
+    "environment": {
+      "name": "Environment"
+    },
+    "transportation": {
+      "name": "Transportation"
+    },
+    "defense": {
+      "name": "Defense & Military"
+    },
+    "technology": {
+      "name": "Technology"
+    },
+    "family": {
+      "name": "Family"
+    }
+  },
+  "adjectives_registry": {
+    "credible": {
+      "name": "Credible",
+      "polarity": "positive"
+    },
+    "honest": {
+      "name": "Honest",
+      "polarity": "positive"
+    },
+    "trustworthy": {
+      "name": "Trustworthy",
+      "polarity": "positive"
+    },
+    "competent": {
+      "name": "Competent",
+      "polarity": "positive"
+    },
+    "reliable": {
+      "name": "Reliable",
+      "polarity": "positive"
+    },
+    "wise": {
+      "name": "Wise",
+      "polarity": "positive"
+    },
+    "virtuous": {
+      "name": "Virtuous",
+      "polarity": "positive"
+    },
+    "admirable": {
+      "name": "Admirable",
+      "polarity": "positive"
+    },
+    "principled": {
+      "name": "Principled",
+      "polarity": "positive"
+    },
+    "generous": {
+      "name": "Generous",
+      "polarity": "positive"
+    },
+    "dishonest": {
+      "name": "Dishonest",
+      "polarity": "negative"
+    },
+    "untrustworthy": {
+      "name": "Untrustworthy",
+      "polarity": "negative"
+    },
+    "incompetent": {
+      "name": "Incompetent",
+      "polarity": "negative"
+    },
+    "corrupt": {
+      "name": "Corrupt",
+      "polarity": "negative"
+    },
+    "dangerous": {
+      "name": "Dangerous",
+      "polarity": "negative"
+    },
+    "deceitful": {
+      "name": "Deceitful",
+      "polarity": "negative"
+    },
+    "inferior": {
+      "name": "Inferior",
+      "polarity": "negative"
+    },
+    "unreliable": {
+      "name": "Unreliable",
+      "polarity": "negative"
+    },
+    "reckless": {
+      "name": "Reckless",
+      "polarity": "negative"
+    },
+    "greedy": {
+      "name": "Greedy",
+      "polarity": "negative"
+    }
+  },
+  "principle_concept_axes": {
+    "gender": {
+      "name": "Gender",
+      "concepts": [
+        "men",
+        "women"
+      ]
+    },
+    "religion": {
+      "name": "Religion",
+      "concepts": [
+        "atheist",
+        "agnostic",
+        "christian",
+        "muslim",
+        "jewish",
+        "buddhist",
+        "hindu",
+        "freemason",
+        "cultist"
+      ]
+    },
+    "government_form": {
+      "name": "Form of Government",
+      "concepts": [
+        "communism",
+        "fascism",
+        "anarchism",
+        "oligarchy",
+        "democracy"
+      ]
+    },
+    "economic_model": {
+      "name": "Economic Model",
+      "concepts": [
+        "capitalism",
+        "socialism"
+      ]
+    }
+  },
+  "political_party_templates": {
+    "republican": {
+      "name": "Republican Party",
+      "ideology_tags": [
+        "traditionalist",
+        "individualist",
+        "nationalist",
+        "hierarchical"
+      ],
+      "topic_awareness": {
+        "taxes": 0.9,
+        "economy": 0.6,
+        "cost_of_living": 0.3,
+        "welfare": 0.2,
+        "crime": 0.8,
+        "police": 0.85,
+        "safety": 0.7,
+        "immigration": 0.75,
+        "homelessness": 0.2,
+        "justice": 0.4,
+        "government": 0.55,
+        "media": 0.4,
+        "honor": 0.6,
+        "loyalty": 0.5,
+        "ambition": 0.5,
+        "integrity": 0.45,
+        "self_reliance": 0.8
+      },
+      "agenda": [
+        "lower_taxes",
+        "increase_policing"
+      ]
+    },
+    "democrat": {
+      "name": "Democratic Party",
+      "ideology_tags": [
+        "collectivist",
+        "communal",
+        "marginalized",
+        "open_ended"
+      ],
+      "topic_awareness": {
+        "taxes": 0.3,
+        "economy": 0.4,
+        "cost_of_living": 0.85,
+        "welfare": 0.9,
+        "crime": 0.3,
+        "police": 0.3,
+        "safety": 0.4,
+        "immigration": 0.7,
+        "homelessness": 0.8,
+        "justice": 0.7,
+        "government": 0.5,
+        "media": 0.4,
+        "honor": 0.3,
+        "loyalty": 0.3,
+        "ambition": 0.3,
+        "integrity": 0.5,
+        "self_reliance": 0.2
+      },
+      "agenda": [
+        "support_welfare",
+        "improve_healthcare"
+      ]
+    },
+    "independent": {
+      "name": "Independent Coalition",
+      "ideology_tags": [
+        "skeptical",
+        "anti_establishment",
+        "individualist"
+      ],
+      "topic_awareness": {
+        "taxes": 0.4,
+        "economy": 0.5,
+        "cost_of_living": 0.5,
+        "welfare": 0.3,
+        "crime": 0.35,
+        "police": 0.3,
+        "safety": 0.3,
+        "immigration": 0.3,
+        "homelessness": 0.3,
+        "justice": 0.8,
+        "government": 0.85,
+        "media": 0.6,
+        "honor": 0.3,
+        "loyalty": 0.2,
+        "ambition": 0.3,
+        "integrity": 0.85,
+        "self_reliance": 0.4
+      },
+      "agenda": [
+        "anti_corruption_reform",
+        "housing_investment"
+      ]
     }
   },
   "contact_designations": {
@@ -60478,6 +63202,188 @@
     "fearless",
     "natural_charisma"
   ],
+  "skill_templates": {
+    "Technology": [
+      "python_programming",
+      "database_design",
+      "network_administration",
+      "cybersecurity",
+      "cloud_computing",
+      "ui_ux_design",
+      "technical_writing",
+      "systems_architecture",
+      "debugging",
+      "data_analysis"
+    ],
+    "Healthcare": [
+      "patient_care",
+      "phlebotomy",
+      "first_aid",
+      "medical_charting",
+      "bedside_manner",
+      "triage",
+      "sterile_technique",
+      "pharmacology_knowledge",
+      "diagnostics",
+      "emergency_response"
+    ],
+    "Finance": [
+      "financial_modeling",
+      "risk_assessment",
+      "bookkeeping",
+      "tax_preparation",
+      "investment_analysis",
+      "budgeting",
+      "auditing",
+      "negotiation",
+      "forecasting",
+      "regulatory_compliance"
+    ],
+    "Education": [
+      "lesson_planning",
+      "public_speaking",
+      "classroom_management",
+      "curriculum_design",
+      "tutoring",
+      "grading",
+      "mentoring",
+      "conflict_resolution",
+      "active_listening",
+      "patience"
+    ],
+    "Hospitality": [
+      "customer_service",
+      "multitasking",
+      "conflict_resolution",
+      "food_safety",
+      "cash_handling",
+      "upselling",
+      "event_coordination",
+      "time_management",
+      "hospitality_etiquette",
+      "stress_management"
+    ],
+    "Retail": [
+      "customer_service",
+      "inventory_management",
+      "cash_handling",
+      "visual_merchandising",
+      "upselling",
+      "loss_prevention",
+      "point_of_sale_operation",
+      "stock_replenishment",
+      "negotiation",
+      "salesmanship"
+    ],
+    "Manufacturing": [
+      "machine_operation",
+      "quality_control",
+      "blueprint_reading",
+      "welding",
+      "assembly_line_efficiency",
+      "safety_compliance",
+      "inventory_tracking",
+      "forklift_operation",
+      "troubleshooting",
+      "precision_measurement"
+    ],
+    "Construction": [
+      "carpentry",
+      "blueprint_reading",
+      "heavy_equipment_operation",
+      "masonry",
+      "electrical_wiring",
+      "plumbing",
+      "safety_compliance",
+      "project_estimation",
+      "scaffolding",
+      "structural_assessment"
+    ],
+    "Transportation": [
+      "defensive_driving",
+      "route_planning",
+      "vehicle_maintenance",
+      "logistics_coordination",
+      "load_securing",
+      "navigation",
+      "time_management",
+      "customer_service",
+      "hazmat_handling",
+      "fuel_efficiency"
+    ],
+    "Government": [
+      "public_speaking",
+      "policy_analysis",
+      "regulatory_compliance",
+      "conflict_resolution",
+      "record_keeping",
+      "negotiation",
+      "community_outreach",
+      "budgeting",
+      "public_administration",
+      "crisis_management"
+    ],
+    "Entertainment": [
+      "public_speaking",
+      "improvisation",
+      "stage_presence",
+      "choreography",
+      "scriptwriting",
+      "audio_editing",
+      "video_editing",
+      "showmanship",
+      "networking",
+      "creative_direction"
+    ],
+    "Security": [
+      "situational_awareness",
+      "conflict_de_escalation",
+      "surveillance",
+      "self_defense",
+      "report_writing",
+      "emergency_response",
+      "access_control",
+      "crowd_control",
+      "first_aid",
+      "threat_assessment"
+    ],
+    "Professional": [
+      "public_speaking",
+      "negotiation",
+      "project_management",
+      "strategic_planning",
+      "client_relations",
+      "report_writing",
+      "leadership",
+      "time_management",
+      "networking",
+      "problem_solving"
+    ],
+    "Adult Entertainment": [
+      "showmanship",
+      "discretion",
+      "stage_presence",
+      "customer_service",
+      "self_confidence",
+      "improvisation",
+      "negotiation",
+      "stress_management",
+      "networking",
+      "boundary_setting"
+    ],
+    "Criminal": [
+      "lockpicking",
+      "intimidation",
+      "situational_awareness",
+      "evasion",
+      "negotiation",
+      "discretion",
+      "improvisation",
+      "risk_assessment",
+      "street_smarts",
+      "self_defense"
+    ]
+  },
   "sexual_orientations": [
     "straight",
     "gay",
@@ -63580,6 +66486,19 @@
       "base_priority": 50,
       "category": "identity"
     },
+    "file_taxes": {
+      "label": "File your taxes",
+      "cadence": "yearly",
+      "value_category": "work",
+      "of_self": true,
+      "requires_others": false,
+      "tags": [
+        "employed"
+      ],
+      "base_priority": 55,
+      "category": "chores",
+      "activity_type": "file_taxes"
+    },
     "relax_with_someone": {
       "label": "Unwind with your spouse or a friend",
       "cadence": "daily",
@@ -64133,6 +67052,7 @@
       "default_duration": 3,
       "default_active": true,
       "animation_state": "chop",
+      "requires_surface": true,
       "possible_accidents": [
         {
           "accident_template": "kitchen_cut",
@@ -64165,7 +67085,8 @@
       "label": "Mix",
       "default_duration": 5,
       "default_active": true,
-      "animation_state": "mix"
+      "animation_state": "mix",
+      "requires_surface": true
     },
     "boil": {
       "key": "boil",
@@ -65940,28 +68861,41 @@
       "proficiency_levels": [
         {
           "level": "novice",
-          "successes_to_next": 3
+          "title": "Initiate",
+          "successes_to_next": 3,
+          "bonus": 5
         },
         {
           "level": "beginner",
-          "successes_to_next": 6
+          "title": "Average",
+          "successes_to_next": 6,
+          "bonus": 15
         },
         {
           "level": "intermediate",
-          "successes_to_next": 10
+          "title": "Adept",
+          "successes_to_next": 10,
+          "bonus": 30
         },
         {
           "level": "advanced",
-          "successes_to_next": 15
+          "title": "Skilled",
+          "successes_to_next": 15,
+          "bonus": 45
         },
         {
           "level": "expert",
-          "successes_to_next": null
+          "title": "Master",
+          "successes_to_next": null,
+          "bonus": 60
         }
       ],
-      "trait_modifiers": {
-        "clumsy": -0.15
-      }
+      "trait_modifiers": [
+        {
+          "trait": "clumsy",
+          "modifier": -15
+        }
+      ]
     },
     "juggling": {
       "name": "Juggling",
@@ -65972,29 +68906,45 @@
       "proficiency_levels": [
         {
           "level": "novice",
-          "successes_to_next": 4
+          "title": "Initiate",
+          "successes_to_next": 4,
+          "bonus": 5
         },
         {
           "level": "beginner",
-          "successes_to_next": 8
+          "title": "Average",
+          "successes_to_next": 8,
+          "bonus": 15
         },
         {
           "level": "intermediate",
-          "successes_to_next": 12
+          "title": "Adept",
+          "successes_to_next": 12,
+          "bonus": 30
         },
         {
           "level": "advanced",
-          "successes_to_next": 20
+          "title": "Skilled",
+          "successes_to_next": 20,
+          "bonus": 45
         },
         {
           "level": "expert",
-          "successes_to_next": null
+          "title": "Master",
+          "successes_to_next": null,
+          "bonus": 60
         }
       ],
-      "trait_modifiers": {
-        "clumsy": -0.2,
-        "athletic": 0.1
-      }
+      "trait_modifiers": [
+        {
+          "trait": "clumsy",
+          "modifier": -20
+        },
+        {
+          "trait": "athletic",
+          "modifier": 10
+        }
+      ]
     },
     "language_spanish": {
       "name": "Spanish",
@@ -66006,26 +68956,85 @@
       "proficiency_levels": [
         {
           "level": "beginner",
-          "successes_to_next": 8
+          "title": "Initiate",
+          "successes_to_next": 8,
+          "bonus": 5
         },
         {
           "level": "elementary",
-          "successes_to_next": 12
+          "title": "Average",
+          "successes_to_next": 12,
+          "bonus": 15
         },
         {
           "level": "intermediate",
-          "successes_to_next": 18
+          "title": "Adept",
+          "successes_to_next": 18,
+          "bonus": 30
         },
         {
           "level": "advanced",
-          "successes_to_next": 25
+          "title": "Skilled",
+          "successes_to_next": 25,
+          "bonus": 45
         },
         {
           "level": "fluent",
-          "successes_to_next": null
+          "title": "Master",
+          "successes_to_next": null,
+          "bonus": 60
         }
       ],
-      "trait_modifiers": {}
+      "trait_modifiers": []
+    },
+    "singing": {
+      "name": "Singing",
+      "category": "performance",
+      "trains_via": [
+        "sing_karaoke"
+      ],
+      "proficiency_levels": [
+        {
+          "level": "novice",
+          "title": "Initiate",
+          "successes_to_next": 4,
+          "bonus": 5
+        },
+        {
+          "level": "beginner",
+          "title": "Average",
+          "successes_to_next": 8,
+          "bonus": 15
+        },
+        {
+          "level": "intermediate",
+          "title": "Adept",
+          "successes_to_next": 12,
+          "bonus": 30
+        },
+        {
+          "level": "advanced",
+          "title": "Skilled",
+          "successes_to_next": 20,
+          "bonus": 45
+        },
+        {
+          "level": "expert",
+          "title": "Master",
+          "successes_to_next": null,
+          "bonus": 60
+        }
+      ],
+      "trait_modifiers": [
+        {
+          "trait": "confident",
+          "modifier": 10
+        },
+        {
+          "trait": "nervous",
+          "modifier": -15
+        }
+      ]
     }
   }
 }

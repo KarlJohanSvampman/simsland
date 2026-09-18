@@ -71,6 +71,20 @@ def report_assault_incident(world, offender, victim=None):
     }
     world.setdefault("incidents", []).append(inc)
     emit("incident_created", {"incident_id": inc["id"], "type": inc["type"]})
+
+    # Real, offender-specific rationalization + guilt/paranoia, generated
+    # at the moment of the offense itself -- see systems/
+    # offense_rationalization.py. Never blocks incident creation on
+    # failure (a missing name/field shouldn't be able to break the
+    # incident pipeline itself).
+    try:
+        if victim:
+            offender["_last_victim_name"] = victim.get("name", "someone")
+        from systems.offense_rationalization import generate_offense_rationalization
+        generate_offense_rationalization(offender, world, inc)
+    except Exception:
+        pass
+
     return inc
 
 
@@ -202,20 +216,88 @@ def trigger_incident(world, c):
                     pass
 
 
+# Real, witness-based caller selection for the two incident types that
+# most plausibly happen with no one calling at all: a domestic assault
+# with no one else around genuinely can go unreported, and even a
+# perpetrator calling on himself is a real (if less usual) possibility --
+# NOT the participants[0]-is-always-the-caller default this used to fall
+# back on, which is what made an offender always "call 911 on himself."
+_WITNESS_CALL_CHANCE = 0.40
+_SELF_REPORT_CHANCE = 0.15
+_MAX_REPORT_ATTEMPTS = 3
+
+
+def _find_incident_witnesses(world, inc):
+    """Real co-present adult/teen characters near an incident's location
+    (Manhattan-4, matching resolve()'s own proximity radius below) --
+    excludes the offender and any child participant (a young child victim
+    doesn't call 911 on their own). This is the candidate pool for "does
+    someone actually report this," not the offender by default."""
+    loc = inc.get("location", {})
+    lx, ly = loc.get("x"), loc.get("y")
+    if lx is None or ly is None:
+        return []
+    offender_id = inc.get("offender_id")
+    witnesses = []
+    for cid, c in world.get("characters", {}).items():
+        if c.get("alive") is False or cid == offender_id:
+            continue
+        if c.get("age_group") == "child":
+            continue
+        if abs(c.get("x", 0) - lx) + abs(c.get("y", 0) - ly) >= 4:
+            continue
+        witnesses.append(c)
+    return witnesses
+
+
 def auto_report_incidents(world):
     for inc in world.get("incidents", []):
-        if inc.get("reported"):
+        if inc.get("reported") or inc.get("unreported_final"):
             continue
+        entry = INCIDENT_CALL_TYPE.get(inc["type"])
+        if not entry:
+            continue
+        service, report, chance = entry
+
+        if inc["type"] in ("assault", "domestic_disturbance"):
+            attempts = inc.get("_report_attempts", 0) + 1
+            inc["_report_attempts"] = attempts
+            caller = None
+            for witness in _find_incident_witnesses(world, inc):
+                if random.random() < _WITNESS_CALL_CHANCE:
+                    caller = witness
+                    break
+            if caller is None:
+                offender = world["characters"].get(inc.get("offender_id"))
+                if offender and random.random() < _SELF_REPORT_CHANCE:
+                    caller = offender
+            if caller is None:
+                if attempts >= _MAX_REPORT_ATTEMPTS:
+                    # Nobody called it in across every real attempt --
+                    # stays genuinely unwitnessed-by-authorities. No
+                    # further retries; see systems/law.py::
+                    # maybe_arrest_from_incidents for the matching gate.
+                    inc["unreported_final"] = True
+                    if inc["type"] == "assault":
+                        try:
+                            from systems.child_disclosure import stamp_unreported_trauma
+                            stamp_unreported_trauma(world, inc)
+                        except Exception:
+                            pass
+                continue
+            create_911_call(world, caller, service, report, incident_id=inc["id"])
+            inc["reported"] = True
+            continue
+
+        # Every other reportable incident type keeps its original,
+        # always-participants[0]-as-caller flat-chance behavior --
+        # unaffected by the witness-based rework above.
         participants = inc.get("participants", [])
         if not participants:
             continue
         caller = world["characters"].get(participants[0])
         if not caller:
             continue
-        entry = INCIDENT_CALL_TYPE.get(inc["type"])
-        if not entry:
-            continue
-        service, report, chance = entry
         if random.random() < chance:
             create_911_call(world, caller, service, report, incident_id=inc["id"])
             inc["reported"] = True

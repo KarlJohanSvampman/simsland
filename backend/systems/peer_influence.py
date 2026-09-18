@@ -74,9 +74,31 @@ def _make_room_for_belief(observer, new_belief_id, world):
     """Belief-side mirror of _make_room_for_trait() -- shares the same
     MAX_PERSONALITY_TRAITS ceiling and observer["held_beliefs"] instead.
     No belief-to-belief incompatibility list exists (only trait_modifiers,
-    checked against held traits, not other beliefs), so eviction always
-    picks the oldest held belief."""
+    checked against held traits, not other beliefs), so cap-eviction
+    always picks the oldest held belief. Any EXCLUSIVE_BELIEF_CATEGORIES
+    category (religion, ideology) is the exception: adopting a NEW belief
+    in one of those categories evicts whichever belief of that SAME
+    category was already held -- a real "conversion" -- independent of
+    whether the cap is even full."""
+    from systems.schema_defaults import EXCLUSIVE_BELIEF_CATEGORIES
+
     all_beliefs = observer.get("held_beliefs", [])
+
+    belief_templates = (world.get("definitions") or {}).get("belief_templates", {})
+    new_category = belief_templates.get(new_belief_id, {}).get("category")
+    if new_category in EXCLUSIVE_BELIEF_CATEGORIES:
+        existing_same_category = next(
+            (b for b in all_beliefs if belief_templates.get(b, {}).get("category") == new_category),
+            None,
+        )
+        if existing_same_category and existing_same_category != new_belief_id:
+            all_beliefs.remove(existing_same_category)
+            observer.setdefault("absorbed_beliefs", []).append({
+                "belief": existing_same_category, "source": f"{new_category}_conversion",
+                "acquired_tick": world.get("tick", 0), "removed": True,
+                "replaced_by": new_belief_id,
+            })
+
     if len(all_beliefs) < MAX_PERSONALITY_TRAITS:
         return True
     if not all_beliefs:
@@ -431,6 +453,10 @@ def _finalize_belief_promotion(observer, entry, world):
             "acquired_tick":     world.get("tick", 0),
             "exposure_count":    entry["exposure_count"],
         })
+        # A changed belief set means this character's principles/mentality/
+        # opinions are stale -- flag for systems/mentality.py's sweep to
+        # recompile them against the new held_beliefs.
+        observer["_mentality_pending"] = True
     entry["belief_converted"] = True
 
 
@@ -452,6 +478,13 @@ def _promote_absorbed_belief(observer, entry, world):
     _finalize_belief_promotion(observer, entry, world)
 
 
+# Real elapsed hours between this character's own adoption-eval passes --
+# weekly for children/teens, monthly for adults/elderly (matches
+# sim_loop.py's own cadence split). Used to turn raw contact hours into
+# a real SHARE of the character's time, not an arbitrary absolute scale.
+_ADOPTION_PERIOD_HOURS = {"child": 168, "teen": 168, "adult": 730, "elderly": 730}
+
+
 def resolve_cognitive_adoption(world, defs, characters):
     """Main entry point for the trait/belief adoption pass -- called from
     sim_loop.py at the age-appropriate cadence (weekly for children/teens,
@@ -471,6 +504,14 @@ def resolve_cognitive_adoption(world, defs, characters):
         cognition_key = cognition_type_of(c.get("traits", []))
         my_traits  = set(c.get("traits", []) + c.get("personality_traits", []))
         my_beliefs = set(c.get("held_beliefs", []))
+        my_belief_tags = set()
+        for b in my_beliefs:
+            my_belief_tags.update(belief_templates.get(b, {}).get("tags", []))
+        # A fundamentalist/extremist learner's OWN adoption skews toward
+        # higher-intensity beliefs, same exponential shape character_gen.py
+        # uses at generation time.
+        is_extreme = any(t in ("fundamentalist", "extremist") for t in my_traits)
+        period_hours = _ADOPTION_PERIOD_HOURS.get(c.get("age_group"), 730)
 
         for other_id, rel in list(c.get("relationships", {}).items()):
             hours = rel.get("hours_since_adoption_eval", 0.0)
@@ -487,12 +528,24 @@ def resolve_cognitive_adoption(world, defs, characters):
             record_social_engagement(c, hours, level)
 
             bonus = tiers.get(designation, {}).get("cognitive_bonus_per_hour", 0.0)
-            weighted_exposure = hours * bonus
+            # Share of this character's real time, not raw hours -- someone
+            # who spends a small absolute number of hours but a LARGE
+            # fraction of their actual social time with one person is
+            # influenced accordingly, not diluted against an arbitrary
+            # hour scale.
+            time_share = min(1.0, hours / period_hours) if period_hours else 0.0
+            weighted_exposure = time_share * bonus
             if weighted_exposure <= 0:
                 continue
 
+            other_traits_all = other.get("traits", []) + other.get("personality_traits", [])
             other_beliefs = set(other.get("held_beliefs", []))
-            other_traits  = set(other.get("traits", []) + other.get("personality_traits", []))
+            other_traits  = set(other_traits_all)
+            # A fundamentalist/extremist SOURCE spreads their beliefs
+            # faster to everyone around them -- they don't just end up
+            # with more extreme beliefs themselves, they're a stronger
+            # influencer.
+            source_amp = 2.0 if any(t in ("fundamentalist", "extremist") for t in other_traits_all) else 1.0
 
             # "More beliefs in common -> more influenced in traits"
             trait_sim_mult = 1.0 + _jaccard(my_beliefs, other_beliefs)
@@ -509,7 +562,7 @@ def resolve_cognitive_adoption(world, defs, characters):
                 )
                 if chance <= 0:
                     continue
-                gain = weighted_exposure * (chance / 100.0) * trait_sim_mult * STRENGTH_GAIN_POSITIVE
+                gain = weighted_exposure * (chance / 100.0) * trait_sim_mult * STRENGTH_GAIN_POSITIVE * source_amp
                 record_positive_exposure(c, other, trait_id, world, strength_gain=gain)
 
             # "More traits in common -> more influenced by beliefs"
@@ -524,5 +577,11 @@ def resolve_cognitive_adoption(world, defs, characters):
                 )
                 if chance <= 0:
                     continue
-                gain = weighted_exposure * (chance / 100.0) * belief_sim_mult * STRENGTH_GAIN_POSITIVE
+                intensity_mult = (1.0 + float(tmpl.get("intensity", 0.3))) ** 4 if is_extreme else 1.0
+                # Coherence bonus -- a candidate belief sharing tags with
+                # beliefs I already hold is more likely to stick, since it
+                # fits my existing worldview rather than contradicting it.
+                coherence_mult = 1.0 + 0.3 * len(my_belief_tags & set(tmpl.get("tags", [])))
+                gain = (weighted_exposure * (chance / 100.0) * belief_sim_mult
+                        * intensity_mult * coherence_mult * STRENGTH_GAIN_POSITIVE * source_amp)
                 record_positive_belief_exposure(c, other, belief_id, world, strength_gain=gain)

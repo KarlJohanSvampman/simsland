@@ -103,6 +103,15 @@ def assign_conversation_goal(c, world, conv, other_id):
     if occasion == "close":
         options.append({"id": "not_interested", "tags": ["close"],
                          "label": "not really interested in this particular conversation right now"})
+    # A political debate reads right for an acquaintance/coworker (someone
+    # you're not intimate with, but who's a real enough presence to spar
+    # with) -- a stranger doesn't warrant it, a spouse/close friend chat
+    # isn't the venue for it. systems/politics.py::choose_political_topic()
+    # picks which real issue, weighted by what each side's party actually
+    # campaigns on.
+    if occasion in ("acquaintance", "coworker"):
+        options.append({"id": "political_debate", "tags": ["acquaintance", "coworker"],
+                         "label": "itching to get into a political debate with them"})
 
     from systems.choice import choose
     picked = choose(c, world, "conversation goal", options, occasion=occasion)
@@ -110,6 +119,11 @@ def assign_conversation_goal(c, world, conv, other_id):
         goal = {"type": picked["id"], "label": picked["label"]}
         if picked["id"] == "share_story":
             goal["story_id"] = picked.get("story_id")
+        elif picked["id"] == "political_debate":
+            from systems.politics import choose_political_topic
+            topic = choose_political_topic(c, other, world)
+            goal["topic"] = topic
+            conv["topic"] = topic
     else:
         goal = {"type": "topic_interest", "label": "genuinely interested in the subject"}
     goals[other_id] = goal
@@ -139,6 +153,15 @@ def check_goal_trending(conv, listener, topic):
     auto-decline. Returns the updated streak count (mainly for tests)."""
     goal = conv.get("goals", {}).get(listener["id"])
     if not goal:
+        return 0
+
+    # A purposeful phone call (see PHONE_SMALL_TALK_GOALS) expects a
+    # real amount of small talk before "the point" -- every turn before
+    # conv["small_talk_turns_required"] counts as on-goal regardless of
+    # content, so a character isn't penalized (or pushed to blurt out
+    # the real reason) before a natural amount of chit-chat has passed.
+    required = conv.get("small_talk_turns_required")
+    if required and conv.get("turn_count", 0) < required:
         return 0
 
     streak_map = conv.setdefault("_off_goal_streak", {})

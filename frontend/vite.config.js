@@ -8,7 +8,8 @@ export default defineConfig({
       "/api": "http://localhost:8000",
       "/resources": "http://localhost:8000",
       "/debug": "http://localhost:8000",
-      "/view": "http://localhost:8000"
+      "/view": "http://localhost:8000",
+      "/admin": "http://localhost:8000"
     }
   },
 
@@ -43,7 +44,10 @@ export default defineConfig({
           resolve(__dirname, "character_creator.html"),
 
         operator_view:
-          resolve(__dirname, "operator_view.html")
+          resolve(__dirname, "operator_view.html"),
+
+        mentality_preview:
+          resolve(__dirname, "mentality_preview.html")
       }
     }
   }

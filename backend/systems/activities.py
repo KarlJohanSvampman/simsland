@@ -30,6 +30,13 @@ from systems.interactions import (
     begin_interaction
 )
 
+# How close (Manhattan tiles) a character needs to get to an activity's
+# anchor before the last stretch is snapped rather than walked out tile
+# by tile -- see execute_activity()'s "walking" phase. Tuned to shave a
+# real, noticeable amount of dead travel time off every interaction
+# without characters visibly teleporting from far away.
+WALK_SNAP_RADIUS = 2
+
 # =========================================================
 # INTERACTION ANIMATIONS
 # Maps interaction name → animations per activity phase.
@@ -392,14 +399,22 @@ ACTIVITIES = {
 
     "cook_recipe": {
 
-        "interaction": "stove",
+        # Confirmed live bug: no prop_template anchor anywhere has
+        # interaction "stove" -- only "cook" (the same one cook_meal
+        # already uses, and the real stove prop's own anchor defines).
+        # cook_recipe could therefore never find an anchor and start at
+        # all, despite being the actually-live cooking path
+        # (resolve_hunger_strategy() dispatches this, never cook_meal).
+        "interaction": "cook",
 
         "base_duration_minutes": 20,
 
         "interruptible": False,
 
         "category": "food",
-        
+
+        "skill_check": {"requiresSkill": True, "skill": "cooking", "minProficiencyLevel": None, "baseDifficulty": 35, "competitive": False},
+
         "waste": {
 
             "TRASH_FOOD_PACKAGING": 2,
@@ -534,7 +549,9 @@ ACTIVITIES = {
 
         "interruptible": False,
 
-        "category": "survival"
+        "category": "survival",
+
+        "skill_check": {"requiresSkill": True, "skill": "cooking", "minProficiencyLevel": None, "baseDifficulty": 35, "competitive": False},
     },
 
     "eat_meal": {
@@ -924,6 +941,21 @@ ACTIVITIES = {
         "interruptible": True,
 
         "category": "growth"
+    },
+
+    # A small, real drawing -- deliberately separate from "paint" above
+    # (a longer, prop-anchored hobby activity with no item output today).
+    # no_target: no anchor/prop needed, matching clean_floors/dust_and_
+    # wipe's exact shape -- see personal_items.py::make_drawing_item().
+    "make_drawing": {
+
+        "no_target": True,
+
+        "base_duration_minutes": 15,
+
+        "interruptible": True,
+
+        "category": "creative"
     },
 
     # =====================================================
@@ -1380,7 +1412,10 @@ def start_activity(
             "state": {},
         }
         from core.event_bus import emit
-        emit("activity_started", {"character_id": c["id"], "activity_type": activity_type})
+        emit("activity_started", {
+            "character_id": c["id"], "activity_type": activity_type,
+            "x": c.get("x"), "y": c.get("y"), "building_id": c.get("building_id"),
+        })
         return True
 
     interaction = begin_interaction(
@@ -1461,7 +1496,11 @@ def start_activity(
     )
 
     from core.event_bus import emit
-    emit("activity_started", {"character_id": c["id"], "activity_type": activity_type})
+    emit("activity_started", {
+        "character_id": c["id"], "activity_type": activity_type,
+        "target_id": prop["id"], "anchor_name": anchor["name"],
+        "x": c.get("x"), "y": c.get("y"), "building_id": c.get("building_id"),
+    })
 
     return True
 
@@ -1686,13 +1725,54 @@ def execute_activity(
         return _execute_use_seat(c, world, act)
 
     # =====================================================
+    # WAIT (queued for an occupied appliance) — timing/give-up is owned
+    # entirely by systems/waiting.py::tick_waiting(), never by this
+    # function's generic elapsed>=duration completion below. Confirmed
+    # live bug: this activity carried a plain numeric "duration" like
+    # every other activity type, so the generic "using" phase block a
+    # little further down auto-completed and cleared it every ~2 minutes
+    # regardless of whether the appliance had actually freed up -- wiping
+    # the patience/bang-count escalation state and forcing a full fresh
+    # queue-rejoin. The give-up counter could never accumulate past its
+    # first cycle before being reset out from under it, so a character
+    # could end up waiting far longer than any patience setting intended
+    # (confirmed live: nearly an hour). tick_waiting() and
+    # release_anchor()'s queue-pop both already clear c["activity"]
+    # directly when it's actually time to move on -- nothing here needs
+    # to duplicate that.
+    # =====================================================
+
+    if activity_type == "wait":
+        return True
+
+    # =====================================================
     # WALKING  — wait until movement system clears is_moving
     # =====================================================
 
     if act.get("phase", "using") == "walking":
 
         if c.get("is_moving"):
-            return True
+            # Confirmed live UX complaint: walking the full, exact
+            # pathfound route to an anchor -- especially with prop-
+            # spacing collision avoidance widening the route around
+            # furniture -- can take a noticeably long real-time while for
+            # what's conceptually just "go stand next to this thing."
+            # Once within a short final stretch, cut it short and snap
+            # the rest of the way rather than making the character walk
+            # out every last tile.
+            target_id = act.get("target_id")
+            anchor_name = act.get("anchor_name")
+            if target_id and anchor_name:
+                close_prop = get_prop_by_id(world, target_id)
+                close_anchor = get_anchor(close_prop, anchor_name) if close_prop else None
+                if close_anchor:
+                    dist = abs(c.get("x", 0) - close_anchor["x"]) + abs(c.get("y", 0) - close_anchor["y"])
+                    if dist <= WALK_SNAP_RADIUS:
+                        c["is_moving"] = False
+                        c["route"] = []
+                        c["move_target"] = None
+            if c.get("is_moving"):
+                return True
 
         # Character arrived — snap logical grid position to anchor
         prop = get_prop_by_id(world, act.get("target_id"))
@@ -1729,6 +1809,26 @@ def execute_activity(
 
         set_activity_phase(act, "using", world)
         c["animation_state"] = using_anim
+
+        # Per the user's explicit ask: a distinct event for the moment the
+        # walk-to-target actually finishes and the real interaction
+        # begins -- separate from "activity_started" (fired back when the
+        # walk itself began, see start_activity()) and from "activity_
+        # completed" (the interaction's own finish). Reuses debug_log.py's
+        # existing green/memory pipeline, just a third lifecycle point.
+        from systems.debug_log import log_activity
+        log_activity(c, world, act.get("type", "?"), "reached target, interaction begun")
+
+        # A real sleep session just began (phase_started_tick/duration are
+        # both fresh as of the line above) -- this is the one moment
+        # systems/alarm_habits.py can accurately project tonight's rolled
+        # sleep duration forward against tomorrow's schedule and decide
+        # whether this character would benefit from (and remembers to
+        # set) a phone alarm. Local import to avoid a module-load cycle.
+        if act.get("type") == "sleep":
+            from systems.alarm_habits import maybe_set_alarm_for_tomorrow
+            maybe_set_alarm_for_tomorrow(c, world)
+
         return True
 
     # =====================================================
@@ -1861,7 +1961,11 @@ def _find_and_consume_food(c, world, category="food"):
 
     for container in _household_storage_containers(c, world):
         for entry in list(container.get("items", [])):
-            if entry.get("category") == category:
+            # edible (definitions.json item_templates) is the newer,
+            # explicit signal -- checked alongside category for the same
+            # "is this real, established food" reasoning contagion.py's
+            # own category/is_food dual-check already uses elsewhere.
+            if entry.get("category") == category or (category == "food" and entry.get("edible")):
                 removed = remove_from_container(container, entry["id"], quantity=1)
                 if removed.get("success"):
                     return removed["item"]
@@ -2014,6 +2118,15 @@ def complete_activity(
     # =====================================
 
     elif activity_type in ("use_toilet", "use_toilet_bowels"):
+        # Confirmed live bug: unlike "sleep" just above, this branch never
+        # reset posture on completion -- a character kept c["posture"] ==
+        # "sitting_seat" indefinitely after standing up and walking away,
+        # so anyone who queued for the SAME toilet later (and got stuck
+        # standing at its anchor tile while waiting) visually read as
+        # "also sitting on the toilet right now" even though only one
+        # person was actually using it.
+        from systems.posture import set_posture
+        set_posture(c, world, "standing")
         on_toilet_complete(c)
         if activity_type == "use_toilet_bowels" and random.random() < 0.35:
             try:
@@ -2021,6 +2134,27 @@ def complete_activity(
                 trigger_reaction(c, world, "gas_release", tick=world.get("tick", 0))
             except Exception:
                 pass
+
+        # Per the user's explicit ask: a bathroom break that interrupted
+        # sleep (brain/agent_loop.py's sleep-specific urgent-bladder/
+        # bowels handling) should resume sleep afterward, not just leave
+        # the character up. Reuses start_activity()'s own real anchor-
+        # finding/routing/duration pipeline -- the exact same one sleep
+        # normally starts through -- rather than reinventing any of it;
+        # the freshly-computed duration reflects their current (still
+        # mostly satisfied) fatigue, not a fresh full night from scratch.
+        if c.pop("_resume_sleep_after_bathroom", None):
+            start_activity(c, world, "sleep")
+
+    elif activity_type == "make_drawing":
+        import random as _random
+        from systems.personal_items import make_drawing_item, add_item
+        subject = _random.choice([
+            "a horse", "the family", "a dinosaur", "a rainbow", "a rocket ship",
+            "a house with a big sun", "a cat", "a superhero", "the ocean", "a robot",
+        ])
+        doc = make_drawing_item(subject, world=world)
+        add_item(c, doc)
 
     elif activity_type == "vomit":
         from systems.body import on_vomit_complete
@@ -2100,6 +2234,37 @@ def complete_activity(
                 elif meal["servings"] > 0:
                     from systems.resource_runtime import convert_meal_to_leftovers
                     convert_meal_to_leftovers(meal)
+
+    # =====================================
+    # COOK -- plain "make a meal" activity, distinct from cook_recipe's
+    # own separate recipe/cooking_process.py system just below (that one
+    # is now ALSO on systems/skill_checks.py -- see
+    # cooking_process.py::finish_recipe() -- both share the same real
+    # abilities.py "cooking" proficiency; c["cooking_skill"] is retired).
+    # =====================================
+    elif activity_type == "cook_meal":
+
+        from systems.skill_checks import resolve_skill_check
+        from systems.abilities import record_attempt
+        from systems.incidental_speech import fire_incidental
+
+        result = resolve_skill_check("cook_meal", c, world)
+        household = world["households"].get(c.get("household_id"))
+
+        if result and not result.get("blocked"):
+            record_attempt(c, "cooking", world, result["success"], margin=result["actor_margin"])
+            if result["success"] and household:
+                from systems.household_storage import add_household_resource
+                from systems.resource_runtime import create_resource
+                meal = create_resource(
+                    "MEAL", quantity=1, servings=2, nutrition=0.5,
+                    quality=min(1.0, result["actor_margin"] / 100),
+                    cooked_by=c["id"], created_tick=world["tick"], container="fridge",
+                )
+                add_household_resource(household, meal)
+                fire_incidental(c, "inform", "Dinner's ready -- turned out pretty well.", world)
+            else:
+                fire_incidental(c, "inform", "That didn't come out right -- back to the drawing board.", world)
 
     # =====================================
     # COOK
@@ -2501,7 +2666,11 @@ def complete_activity(
     record_habit(c, activity_type, world)
 
     from core.event_bus import emit
-    emit("activity_completed", {"character_id": c["id"], "activity_type": activity_type})
+    emit("activity_completed", {
+        "character_id": c["id"], "activity_type": activity_type,
+        "target_id": act.get("target_id"), "anchor_name": act.get("anchor_name"),
+        "x": c.get("x"), "y": c.get("y"), "building_id": c.get("building_id"),
+    })
 
 
 # =========================================================

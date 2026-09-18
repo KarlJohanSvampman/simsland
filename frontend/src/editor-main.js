@@ -85,7 +85,8 @@ const placementState = {
   mode:       null,       // "floorplan" | "prop"
   templateId: null,
   rotation:   0,
-  preview:    null
+  preview:    null,
+  wallSide:   null        // "north"|"south"|"east"|"west"|null -- only meaningful for a wall_mounted prop template
 };
 
 //
@@ -599,6 +600,7 @@ function commitPlacement(tile) {
       y:        tile.y,
       rotation: placementState.rotation
     };
+    if (placementState.wallSide) entry.wall_side = placementState.wallSide;
     worldState.props.push(entry);
     addPropMarker(entry);
     document.getElementById("editorSelection").innerHTML = `
@@ -706,7 +708,27 @@ function updatePlaceButton() {
   if (!btn) return;
   btn.style.display = placementState.active ? "block" : "none";
   updateRotateButton();
+  updateWallSideSelect();
 }
+
+// Wall-side dropdown -- shown only while a wall_mounted prop template is
+// armed for placement (systems/prop_placement.py's existing wall_mounted
+// flag; this is the only visual placement affordance for it).
+function updateWallSideSelect() {
+  const sel = document.getElementById("wallSideSelect");
+  if (!sel) return;
+  const tmpl = placementState.mode === "prop"
+    ? (definitions.prop_templates || {})[placementState.templateId]
+    : null;
+  const show = placementState.active && !!tmpl?.wall_mounted;
+  sel.style.display = show ? "block" : "none";
+  if (!show) return;
+  sel.value = placementState.wallSide || "";
+}
+
+document.getElementById("wallSideSelect").onchange = (e) => {
+  placementState.wallSide = e.target.value || null;
+};
 
 //
 // Rotate control — rotates the currently-armed placement (floorplan or prop)
@@ -825,6 +847,7 @@ document.getElementById("btn-place_floorplan").onclick = () => {
       placementState.mode       = "floorplan";
       placementState.active     = true;
       placementState.rotation   = 0;
+      placementState.wallSide   = null;
       updatePlaceButton();
       closeModal("modal-place_floorplan");
       setStatus(`Place floorplan: ${id} — double-click a tile, or click a tile then press Place Here`);
@@ -847,6 +870,7 @@ document.getElementById("btn-place_prop").onclick = () => {
       placementState.mode       = "prop";
       placementState.active     = true;
       placementState.rotation   = 0;
+      placementState.wallSide   = null;
       updatePlaceButton();
       closeModal("modal-place_prop");
       setStatus(`Place prop: ${id} — double-click a tile, or click a tile then press Place Here`);

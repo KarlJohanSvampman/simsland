@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Mentality Preview</title>
+<style>
+*,*::before,*::after { box-sizing:border-box; margin:0; padding:0; }
+html,body { width:100%; min-height:100%; background:#1a1e24; color:#ccc; font-family:Arial,sans-serif; font-size:13px; }
+
+#topbar {
+  height:38px; background:#22272e; border-bottom:1px solid #3a3f48;
+  display:flex; align-items:center; gap:8px; padding:0 12px;
+}
+#topbar h1 { font-size:14px; color:#adf; margin-right:8px; white-space:nowrap; }
+.topBtn { padding:4px 10px; background:#2d3440; border:1px solid #444; color:#ccc; border-radius:4px; cursor:pointer; font-size:12px; text-decoration:none; }
+.topBtn:hover { background:#3a4254; }
+
+#main { display:flex; gap:0; height:calc(100vh - 38px); }
+
+#beliefPanel {
+  width:340px; flex-shrink:0; overflow-y:auto; padding:12px;
+  border-right:1px solid #3a3f48; background:#1d2229;
+}
+#beliefPanel h2 { font-size:13px; color:#adf; margin-bottom:8px; }
+.beliefCategory { font-size:11px; color:#789; text-transform:uppercase; letter-spacing:.05em; margin:10px 0 4px; }
+.beliefRow { display:flex; align-items:flex-start; gap:6px; padding:4px 2px; cursor:pointer; border-radius:3px; }
+.beliefRow:hover { background:#252b33; }
+.beliefRow input { margin-top:2px; cursor:pointer; }
+.beliefRow label { cursor:pointer; }
+.beliefName { color:#ddeeff; font-weight:bold; }
+.beliefIntensity { color:#888; font-size:11px; }
+
+#compileBtn {
+  width:100%; margin-top:12px; padding:8px; background:#1a4a1a; border:1px solid #27ae60;
+  color:#aef; border-radius:4px; cursor:pointer; font-size:13px;
+}
+#compileBtn:hover { background:#215d21; }
+#compileBtn:disabled { opacity:.5; cursor:default; }
+
+#resultsPanel { flex:1; overflow-y:auto; padding:16px; }
+#resultsPanel h2 { font-size:14px; color:#adf; margin-bottom:10px; }
+.resultSection { margin-bottom:20px; }
+.resultSection h3 { font-size:12px; color:#789; text-transform:uppercase; letter-spacing:.05em; margin-bottom:6px; }
+.principleLine { padding:6px 10px; background:#22272e; border:1px solid #3a3f48; border-radius:4px; margin-bottom:6px; }
+.principleLine .op { color:#f8c471; font-weight:bold; margin:0 4px; }
+.principleLine .reasoning { color:#888; font-size:11px; margin-top:2px; }
+.shapeTag { display:inline-block; font-size:9px; text-transform:uppercase; letter-spacing:.05em; padding:1px 6px; border-radius:8px; margin-right:6px; vertical-align:middle; background:#2d3440; color:#9cf; }
+.principleLine.shapePrejudice { border-color:#a04030; }
+.principleLine.shapePrejudice .shapeTag { background:#4a1a1a; color:#f99; }
+.principleLine.shapeBelief .shapeTag { background:#1a3a1a; color:#9f9; }
+.principleLine.shapeIdentity .shapeTag { background:#2d3440; color:#f8c471; }
+#mentalitySummary { font-style:italic; color:#ddeeff; padding:8px 10px; background:#22272e; border-left:3px solid #2e86c1; border-radius:2px; }
+#mentalityTags { margin-top:6px; }
+.tagChip { display:inline-block; background:#2d3440; border:1px solid #444; color:#9cf; border-radius:10px; padding:2px 8px; font-size:11px; margin:2px 3px 0 0; }
+table.opinionsTable { width:100%; border-collapse:collapse; font-size:12px; }
+table.opinionsTable th, table.opinionsTable td { text-align:left; padding:4px 8px; border-bottom:1px solid #2d3440; }
+table.opinionsTable th { color:#789; font-weight:normal; }
+.stanceBar { display:inline-block; width:80px; height:8px; background:#2d3440; border-radius:4px; position:relative; vertical-align:middle; margin-right:6px; }
+.stanceBar .fill { position:absolute; top:0; bottom:0; width:4px; background:#5dade2; border-radius:2px; }
+#placeholder { color:#666; padding:20px; }
+#loading { color:#f8c471; padding:20px; }
+
+.pickerSection { margin-top:16px; padding-top:10px; border-top:1px solid #3a3f48; }
+.pickerSection h3 { font-size:11px; color:#789; text-transform:uppercase; letter-spacing:.05em; margin-bottom:6px; }
+.categoryChips, .traitChips { display:flex; flex-wrap:wrap; gap:5px; }
+.pickChip { padding:3px 9px; background:#2d3440; border:1px solid #444; color:#ccc; border-radius:10px; cursor:pointer; font-size:11px; user-select:none; }
+.pickChip.selected { background:#1a4a4a; border-color:#2e86c1; color:#9cf; }
+.pickChip.disabled { opacity:.35; cursor:default; }
+#categoryHint { color:#666; font-size:10px; margin-top:4px; }
+select#lensSelect { width:100%; padding:5px; background:#22272e; border:1px solid #444; color:#ccc; border-radius:4px; font-size:12px; margin-top:2px; }
+.suggestionLine { padding:5px 8px; background:#2d2422; border-left:3px solid #d35400; border-radius:2px; margin-bottom:5px; font-size:12px; }
+.suggestionLine .tag { display:inline-block; padding:1px 6px; border-radius:8px; font-size:10px; margin-right:5px; }
+.suggestionLine .tag.add { background:#1a4a1a; color:#9f9; }
+.suggestionLine .tag.remove { background:#4a1a1a; color:#f99; }
+</style>
+</head>
+<body>
+
+<div id="topbar">
+  <h1>Mentality Preview</h1>
+  <a class="topBtn" href="/">Viewer</a>
+  <a class="topBtn" href="/definitions.html">Definitions</a>
+  <span style="color:#666;font-size:11px;">Pick beliefs, up to 3 society categories, some traits, and a reasoning lens, then compile -- nothing is saved.</span>
+</div>
+
+<div id="main">
+  <div id="beliefPanel">
+    <h2>Beliefs</h2>
+    <div id="beliefList"></div>
+
+    <div class="pickerSection">
+      <h3>Society Categories (pick up to 3)</h3>
+      <div id="categoryChips" class="categoryChips"></div>
+      <div id="categoryHint"></div>
+    </div>
+
+    <div class="pickerSection">
+      <h3>Character Traits</h3>
+      <div id="traitChips" class="traitChips"></div>
+    </div>
+
+    <div class="pickerSection">
+      <h3>Reasoning Lens</h3>
+      <select id="lensSelect">
+        <option value="">(auto -- balanced/philosophy default)</option>
+        <option value="philosophy">Philosophy</option>
+        <option value="faith_superstition">Faith / Superstition</option>
+        <option value="pragmatism">Pragmatism</option>
+      </select>
+    </div>
+
+    <button id="compileBtn">Compile</button>
+  </div>
+  <div id="resultsPanel">
+    <div id="placeholder">Pick some beliefs on the left and click Compile.</div>
+  </div>
+</div>
+
+<script type="module" src="/src/mentality_preview.js"></script>
+</body>
+</html>

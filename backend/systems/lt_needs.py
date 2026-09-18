@@ -110,6 +110,16 @@ def distribute_lt_needs(c, budget=100, world=None):
                 "last_satisfied_tick":  0,
                 "week_count":           0,
                 "frustration":          0.0,
+                # Confirmed live bug (player report: 8 lt_need intentions
+                # all created in the same minute): every category starts
+                # from the same last_satisfied_tick=0 and grows frustration
+                # via the same formula, so for a fresh character they all
+                # cross the intention threshold in lockstep on the same
+                # cadence tick. A per-category random phase offset spreads
+                # out when each one's "overdue" clock effectively starts,
+                # so needs come up for real one at a time instead of as a
+                # single simultaneous batch.
+                "phase_offset_ticks":   random.randint(0, TICKS_PER_GAME_WEEK),
             }
 
     c["lt_needs"] = lt
@@ -131,11 +141,23 @@ def update_lt_needs(c, world):
         if pts == 0:
             continue
 
+        # Migration backfill for characters generated before phase
+        # offsets existed -- without this, every already-live character
+        # keeps the old lockstep behavior forever (a phase_offset_ticks
+        # of 0 is a valid roll too, so this only fires for genuinely
+        # missing entries, not to "fix" an unlucky 0).
+        if "phase_offset_ticks" not in nd:
+            nd["phase_offset_ticks"] = random.randint(0, TICKS_PER_GAME_WEEK)
+
         # Frustration grows proportional to need weight and time since last satisfied
         ticks_since = tick - nd.get("last_satisfied_tick", 0)
         # If never satisfied and tick=0, don't penalise immediately
         if nd.get("last_satisfied_tick", 0) == 0 and tick < TICKS_PER_GAME_WEEK:
             ticks_since = 0
+        # Per-category phase offset (set once at distribution time) so
+        # different needs don't all become "overdue" at the exact same
+        # tick -- see distribute_lt_needs()'s comment for why this exists.
+        ticks_since += nd.get("phase_offset_ticks", 0)
 
         max_comfortable = TICKS_PER_GAME_WEEK   # frustration starts after 1 week
         if ticks_since > max_comfortable:

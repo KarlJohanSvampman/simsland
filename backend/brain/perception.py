@@ -111,6 +111,12 @@ VOLUME_TIERS = {
 
 DEFAULT_VOLUME = "medium"
 
+# Per the user's explicit ask: while asleep, a character is only
+# perceptive to sound at all above this tier -- ordinary speech ("medium")
+# and a whisper ("low") simply never reach a sleeper, only a yell or
+# louder actually gets through. See perceive_audio()'s is_asleep gate.
+SLEEP_HEARING_MIN_VOLUME = "high"
+
 
 def volume_range(c, volume=DEFAULT_VOLUME):
     """Max tiles this character could possibly hear a sound of this
@@ -247,12 +253,24 @@ def line_of_sight(a, b, world):
     # PROP BLOCKERS
     # =====================================
 
+    # Confirmed live bug: real placed props are saved as a bare
+    # {id, template, x, y, rotation} instance (the actual World Editor
+    # save path, editor-main.js::commitPlacement() -> POST /api/editor/
+    # world, never merges template fields onto the instance) -- so
+    # reading p.get("blocks_los") directly here was always None
+    # regardless of the TEMPLATE's own flag. Resolve the template first
+    # (systems/templates.py::resolve_prop(), the same {**template,
+    # **instance} merge already used for buildings/characters/items).
+    from systems.templates import resolve_prop
+
     for p in world.get(
         "props",
         []
     ):
 
-        if p.get(
+        if resolve_prop(
+            world, p
+        ).get(
             "blocks_los"
         ):
 
@@ -574,6 +592,16 @@ def perceive_people(
         ):
             continue
 
+        # Workplace NPCs (systems/workplace_npc.py) are real characters
+        # but deliberately have no x/y at all -- never physically placed
+        # or walked, only ever narrated off-grid/on the phone. Without
+        # this guard, any real character whose perception loop reaches
+        # one crashes here (manhattan() indexing a missing "x").
+        if other.get(
+            "is_workplace_npc"
+        ):
+            continue
+
         d = manhattan(
             c,
             other
@@ -706,6 +734,16 @@ def perceive_audio(
 
     heard = []
 
+    # Confirmed live bug (player report: two characters, both asleep,
+    # each "saw" the other sleeping): a sleeping character is unconscious
+    # -- they shouldn't register anything below a real wake-worthy
+    # volume. Below SLEEP_HEARING_MIN_VOLUME, a sound just never reaches
+    # `heard` at all while asleep -- it isn't muffled or misheard, it
+    # simply doesn't happen for them, same as a real sleeper genuinely
+    # not hearing a whispered conversation down the hall.
+    is_asleep = (c.get("activity") or {}).get("type") == "sleep"
+    sleep_min_tier = VOLUME_TIERS[SLEEP_HEARING_MIN_VOLUME]
+
     # =====================================
     # SPEECH
     # =====================================
@@ -726,6 +764,8 @@ def perceive_audio(
             continue
 
         volume = speech.get("volume", DEFAULT_VOLUME)
+        if is_asleep and VOLUME_TIERS.get(volume, VOLUME_TIERS[DEFAULT_VOLUME]) < sleep_min_tier:
+            continue
         hrange = volume_range(c, volume)
 
         d = manhattan(
@@ -810,6 +850,8 @@ def perceive_audio(
     # through the same distance/volume/direction math.
 
     def _hear_ambient(x, y, sound, volume):
+        if is_asleep and VOLUME_TIERS.get(volume, VOLUME_TIERS[DEFAULT_VOLUME]) < sleep_min_tier:
+            return None
         hrange = volume_range(c, volume)
         d = abs(x - c["x"]) + abs(y - c["y"])
         if d > hrange:
@@ -1315,7 +1357,17 @@ def perceive(
     world
 ):
 
-    perception_people = perceive_people(
+    # Confirmed live bug (player report: two characters, each asleep in
+    # their own room, each "saw" the other one sleeping): visual
+    # perception ran unconditionally regardless of the observer's own
+    # activity -- a sleeping character has their eyes closed and cannot
+    # see anything at all, full stop. No visible_people, no sighting/
+    # observation logging that rides on it, while asleep. They can still
+    # be reached by a loud-enough SOUND (see perceive_audio()'s own
+    # is_asleep gate, SLEEP_HEARING_MIN_VOLUME) -- this only blocks sight.
+    is_asleep = (c.get("activity") or {}).get("type") == "sleep"
+
+    perception_people = [] if is_asleep else perceive_people(
         c,
         world
     )
@@ -1370,6 +1422,17 @@ def perceive(
         try:
             from systems.social_memory import maybe_review_on_sighting
             maybe_review_on_sighting(c, target, world)
+        except Exception:
+            pass
+
+        # systems/social_memory.py -- per the user's explicit ask, a
+        # separate faster-cadence (30 real minutes) sibling that CREATES
+        # a fresh memory of where this person was, what they were doing,
+        # and what mood they seemed in, rather than just recalling
+        # existing memories once/day like the call above.
+        try:
+            from systems.social_memory import maybe_log_sighting_observation
+            maybe_log_sighting_observation(c, target, world)
         except Exception:
             pass
 

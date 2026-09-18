@@ -173,6 +173,13 @@ def _spawn_worker(contract, world):
     wx     = home.get("x", 0) + dx
     wy     = home.get("y", 0) + dy
 
+    # Real, resolvable character_templates id -- see systems/service_npc.py.
+    # "adult_base" (the previous value here) doesn't exist in
+    # definitions.json's character_templates registry, so every worker
+    # silently fell back to the plain fallback-primitive renderer.
+    from systems.service_npc import pick_worker_template
+    template, sex = pick_worker_template(trait)
+
     wid = f"worker_{stype}_{uuid.uuid4().hex[:6]}"
     world.setdefault("characters", {})[wid] = {
         "id":               wid,
@@ -181,7 +188,8 @@ def _spawn_worker(contract, world):
         "y":                wy,
         "rotation":         0,
         "facing":           "north",
-        "template":         "adult_base",
+        "template":         template,
+        "sex":              sex,
         "is_service_worker": True,
         "service_contract": contract["id"],
         "service_role":     trait,

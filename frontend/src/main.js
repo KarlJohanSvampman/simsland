@@ -206,6 +206,36 @@ function resolveModel(modelRef) {
   // Backward compat: raw paths pass through
   return modelRef;
 }
+
+// Confirmed live bug: meshbank.html's editor lets you set a per-asset
+// Scale X/Y/Z and saves it into meshbank[key].transform.scale, but the
+// live game viewer only ever read `asset.mesh` (resolveModel() above) --
+// it never looked at `asset.transform` at all, so a scale change made
+// and saved in the mesh bank had zero effect on how the model actually
+// renders in-game. This returns that saved scale (default 1/1/1, same
+// as meshbank.js's own ensureTransform() default) for a caller to apply
+// to the loaded THREE object.
+function resolveModelScale(modelRef) {
+  let asset = meshbank[modelRef];
+  if (!asset) {
+    // Confirmed live bug: a prop_templates entry can store the .glb
+    // PATH directly (e.g. stove_andf_oven's "/resources/props/
+    // stove_and_oven.glb") instead of a meshbank key -- resolveModel()
+    // above already tolerates both forms when picking which file to
+    // LOAD ("backward compat: raw paths pass through"), but this only
+    // ever looked the ref up as a meshbank KEY, so a raw-path prop's
+    // saved scale was silently never found (always fell back to 1/1/1,
+    // no matter what was set and saved in the mesh bank editor). Fall
+    // back to matching by the asset's own .mesh path instead.
+    asset = Object.values(meshbank).find(a => a.mesh === modelRef);
+  }
+  const scale = asset?.transform?.scale;
+  return {
+    x: scale?.x ?? 1,
+    y: scale?.y ?? 1,
+    z: scale?.z ?? 1,
+  };
+}
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x20242a);
 
@@ -579,6 +609,18 @@ function _formatProjectedTime(proj){
   return `${weekdayLabel}${_MONTH_NAMES[proj.month - 1]} ${proj.day} at ${ampmHour}:${String(proj.minute).padStart(2, "0")} ${ampm}`;
 }
 
+// Per the user's explicit ask: "Recent Memories" must show WHEN each one
+// was committed. tick == a real in-game second (sim_loop.py's own
+// convention), so a memory's own tick projects against the last-fetched
+// live calendar exactly like the "Wakes up: ..." display above does --
+// this works for a PAST tick too (a negative seconds delta), not just a
+// future one.
+function _formatMemoryTimestamp(tick){
+  if(!_lastCalendar || _lastCalendarWorldTick == null || tick == null) return null;
+  const proj = _projectCalendarForward(_lastCalendar, tick - _lastCalendarWorldTick);
+  return _formatProjectedTime(proj);
+}
+
 scene.add(
   new THREE.AmbientLight(0xffffff, 0.6)
 );
@@ -600,12 +642,18 @@ const characterAttachments = {};
 const speechBubbles = {};   // id → { cssObject, div }
 const thoughtBubbles = {};  // id → { cssObject, div }  -- debug-only, see DEBUG OVERLAY SETTINGS
 const badges = {};          // id → { cssObject, div }  -- debug-only, see DEBUG OVERLAY SETTINGS
+const debugEventBubbles = {}; // id → { cssObject, div } -- debug-only, action/activity/reaction/violation
 
 // Currently selected character (perception debug overlay -- vision/hearing
 // rings + LOS lines, only ever shown for this one character). Nothing else
 // in this file previously tracked "who is selected" as real state -- the
 // inspector panel is otherwise transient DOM writes with no backing variable.
 let selectedCharacterId = null;
+// Per the user's explicit ask: nothing selected -> Inspector hidden
+// entirely, and a click while something IS selected always deselects
+// first (never jumps straight to a different selection) -- see the
+// pointerdown handler below and _applyInspectorVisibility().
+let _somethingSelected = false;
 // Ground-ring highlight that follows whichever character is currently
 // selected -- created lazily on first use, re-parented onto the newly
 // selected character's own model (sims[id]) so it moves/rotates with them
@@ -1283,6 +1331,35 @@ const FADE_TIME = 0.2;  // seconds
 // clip isn't found in the GLB the system gracefully falls back
 // to the next available one.
 // =========================================================
+
+// A character standing around with nothing to do (activity type "wait")
+// or truly idle (no activity at all, not moving) visually shifts weight/
+// paces a little instead of standing perfectly still. Purely a render-
+// layer position offset on top of the server's real x/y -- never touches
+// c.x/c.y, so it can't affect pathfinding, anchor reservation, or
+// occupancy. Per-character phase (hashed from id) keeps a room full of
+// idling characters from swaying in unison.
+function _idlePaceOffset(id, c, isMoving) {
+  if (isMoving) return null;
+  const activityType = c.activity?.type;
+  const isWaiting = activityType === "wait";
+  const isTrulyIdle = !activityType;
+  if (!isWaiting && !isTrulyIdle) return null;
+
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) | 0;
+  const phase = ((hash % 1000) / 1000) * Math.PI * 2;
+
+  const t = performance.now() / 1000;
+  // Waiting on something reads a bit more restless than plain idling.
+  const period = isWaiting ? 3.2 : 5.5;
+  const amplitude = isWaiting ? 0.18 : 0.10;
+  const angle = (t / period) * Math.PI * 2 + phase;
+  return {
+    dx: Math.sin(angle) * amplitude,
+    dz: Math.sin(angle * 0.6) * amplitude * 0.5,
+  };
+}
 
 const ANIM_VARIANTS = {
   // Conversation — cycle gesture animations while talking
@@ -2101,6 +2178,7 @@ function createFallbackProp(prop){
     0.5,
     prop.y - 7
   );
+  applyWallSideTransform(mesh, prop, resolveProp(definitions, prop));
   mesh.userData = {
 
     type: "prop",
@@ -2116,6 +2194,33 @@ function createFallbackProp(prop){
   scene.add(mesh);
 
   return mesh;
+}
+
+// Per the user's explicit ask: a wall_mounted prop instance carrying a
+// real wall_side ("north"|"south"|"east"|"west") renders flush against
+// that tile edge and facing outward, instead of centered like a normal
+// floor prop -- no backend collision change needed (wall_mounted
+// already fully exempts margin, see systems/prop_placement.py). No
+// north/south/east/west -> world-direction convention existed
+// anywhere else in this codebase to inherit (confirmed: nothing reads
+// floorplan tiles' own per-edge wall data), so this establishes one --
+// standard map convention, north = -y/-z (up), matching this file's
+// existing world->scene offset (x-10, y-7). Exact rotation.y per side
+// is a first-approximation default; this codebase doesn't apply
+// prop.rotation to any mesh anywhere today (confirmed via grep), so
+// there's no existing per-model "forward" convention to match against --
+// may need per-asset tuning once real wall-decor GLBs are previewed.
+const WALL_SIDE_EDGE_OFFSET = { north: [0, -0.45], south: [0, 0.45], east: [0.45, 0], west: [-0.45, 0] };
+const WALL_SIDE_ROTATION_Y  = { north: 0, east: Math.PI / 2, south: Math.PI, west: -Math.PI / 2 };
+
+function applyWallSideTransform(mesh, prop, resolved){
+  const side = resolved?.wall_mounted && prop.wall_side;
+  const edge = side && WALL_SIDE_EDGE_OFFSET[side];
+  if(!edge) return false;
+  mesh.position.x += edge[0];
+  mesh.position.z += edge[1];
+  mesh.rotation.y = WALL_SIDE_ROTATION_Y[side];
+  return true;
 }
 
 async function updateProps(state){
@@ -2137,6 +2242,7 @@ async function updateProps(state){
         0.5,
         prop.y - 7
       );
+      applyWallSideTransform(props[prop.id], prop, resolveProp(definitions, prop));
 
       // Off-grid physical travel: server sets prop.hidden explicitly
       // (garage/car/bus while mid-trip or off-map) -- see systems/travel.py
@@ -2213,6 +2319,10 @@ try {
     0,
     prop.y - 7
   );
+  applyWallSideTransform(model, prop, resolved);
+
+  const propScale = resolveModelScale(resolved?.model);
+  model.scale.set(propScale.x, propScale.y, propScale.z);
 
   model.userData = {
 
@@ -2576,6 +2686,22 @@ function updateSpeechBubbles(state){
     // otherwise show as an empty bubble box.
     const utterance = speech?.utterance?.trim();
 
+    if(utterance){
+      // Confirmed live bug: a page reload resets this tracker to empty,
+      // so the very next update treated whatever OLD, unchanged
+      // current_speech a character already had (from long before the
+      // reload) as brand-new -- re-logging a real player-reported stale
+      // decision with a freshly-current timestamp made it look like it
+      // had just happened again, when nothing new had occurred at all.
+      // Seed silently on first sight of a character instead of logging
+      // it as an event; only a genuine SUBSEQUENT change gets logged.
+      const seenBefore = Object.prototype.hasOwnProperty.call(_lastLoggedSpeech, id);
+      if(utterance !== _lastLoggedSpeech[id]){
+        _lastLoggedSpeech[id] = utterance;
+        if(seenBefore) terminalLog("said", c.name || id, utterance);
+      }
+    }
+
     // Toggle visibility via cssObject.visible, not div.style.display —
     // CSS2DRenderer.render() unconditionally overwrites element.style.display
     // ('' or 'none') every frame based on frustum visibility alone, so a
@@ -2689,12 +2815,18 @@ const DEBUG_SETTINGS_DEFAULTS = {
   version: 1,
   showThoughtBubbles: true,   // on by default -- distinguishes real speech (white bubble) from internal thought/reflection (blue bubble)
   showBadges: true,            // the whole point of this feature is seeing these work
+  // Per the user's explicit ask: colored debug bubbles for action/
+  // activity execution (green), reactions (red), and violent/illegal
+  // actions (purple) -- default OFF, this is a debugging aid, not
+  // something to clutter the normal viewing experience.
+  showDebugEventBubbles: false,
   thoughtChannels: { thought: true, reflection: true, current_intention: false },
   badgeChannels:   { worries: true, current_intention: true },
   // Gated behind a deliberate character selection first (unlike the two
-  // above, which apply ambiently to every character), so there's no
-  // ambient-clutter risk -- default all three on.
-  perceptionOverlays: { visionRange: true, hearingRange: true, lineOfSight: true },
+  // above, which apply ambiently to every character). Default off --
+  // this is debug data, not something to clutter the normal viewing
+  // experience by default.
+  perceptionOverlays: { visionRange: false, hearingRange: false, lineOfSight: false },
 };
 
 function _loadDebugSettings(){
@@ -2840,20 +2972,27 @@ function updateThoughtBubbles(state){
       .filter(Boolean)
       .join(" | ");
 
-    // Only (re)trigger the bubble when content actually changed -- a
-    // debug log message shows up when something new happens, not on
-    // every tick the same thing is still true. Bursty/irregular timing
-    // is expected here: last_thought/last_reflection only update on
-    // ticks the character actually gets an LLM turn, not a steady clock.
+    // Confirmed live bug (player report: "current_intention" bubble
+    // shows right after a page reload then disappears in a few seconds,
+    // even though the intention itself has been active for hours) --
+    // exactly the same class of bug already fixed for speech bubbles'
+    // _lastLoggedSpeech: a reload resets this tracker to empty, so the
+    // very next update sees undefined !== combined and treats whatever
+    // OLD, unchanged content a character already had as brand new.
+    // Seed silently on first sight instead; only a genuine SUBSEQUENT
+    // change re-triggers the visible bubble + hide timer.
+    const seenBefore = Object.prototype.hasOwnProperty.call(_lastThoughtContent, id);
     if(combined && combined !== _lastThoughtContent[id]){
       _lastThoughtContent[id] = combined;
-      div.textContent = combined;
-      cssObject.visible = true;
+      if(seenBefore){
+        div.textContent = combined;
+        cssObject.visible = true;
 
-      clearTimeout(_thoughtHideTimers[id]);
-      _thoughtHideTimers[id] = setTimeout(() => {
-        cssObject.visible = false;
-      }, THOUGHT_BUBBLE_HIDE_MS);
+        clearTimeout(_thoughtHideTimers[id]);
+        _thoughtHideTimers[id] = setTimeout(() => {
+          cssObject.visible = false;
+        }, THOUGHT_BUBBLE_HIDE_MS);
+      }
     }
   }
 
@@ -2864,8 +3003,95 @@ function updateThoughtBubbles(state){
     if(model) model.remove(cssObject);
     clearTimeout(_thoughtHideTimers[id]);
     delete _thoughtHideTimers[id];
-    delete _lastThoughtContent[id];
+    // Confirmed live bug (real player report + screenshot): deleting
+    // this on every out-of-view cleanup (which fires constantly --
+    // server-side viewport filtering, not just a character actually
+    // leaving for good) meant the moment they came back into view,
+    // whatever content they already had -- however old -- was treated
+    // as brand new and popped the bubble right back up. Their content
+    // hasn't changed just because the client briefly lost track of
+    // them; leave the memory of it alone so only a genuine change
+    // re-triggers the bubble.
     delete thoughtBubbles[id];
+  }
+}
+
+// =========================================================
+// DEBUG EVENT BUBBLES (systems/debug_log.py) -- action/activity execution
+// (green), reactions (red), violent/illegal actions (purple). Default OFF
+// (_debugSettings.showDebugEventBubbles) -- a debugging aid, not part of
+// the normal viewing experience. Parked above the thought bubble (3.2) so
+// the two never overlap.
+// =========================================================
+
+const _DEBUG_EVENT_COLORS = {
+  action:    "rgba(46,160,67,0.92)",
+  activity:  "rgba(46,160,67,0.92)",
+  reaction:  "rgba(220,53,69,0.92)",
+  violation: "rgba(147,51,234,0.92)",
+};
+
+function getOrCreateDebugEventBubble(id){
+  if(debugEventBubbles[id]) return debugEventBubbles[id];
+
+  const div = document.createElement("div");
+  div.className = "debug-event-bubble";
+  div.style.cssText = `
+    color: #fff;
+    padding: 3px 7px;
+    border-radius: 6px;
+    font-size: 10px;
+    font-family: monospace;
+    max-width: 220px;
+    text-align: center;
+    white-space: normal;
+    pointer-events: none;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.35);
+    display: none;
+  `;
+
+  const cssObject = new CSS2DObject(div);
+  cssObject.position.set(0, 3.8, 0);
+  debugEventBubbles[id] = { cssObject, div };
+  return debugEventBubbles[id];
+}
+
+function updateDebugEventBubbles(state){
+  const active = new Set(Object.keys(state.characters || {}));
+
+  if(!_debugSettings.showDebugEventBubbles){
+    for(const id in debugEventBubbles){
+      debugEventBubbles[id].cssObject.visible = false;
+    }
+    return;
+  }
+
+  const tick = state.tick || 0;
+
+  for(const [id, c] of Object.entries(state.characters || {})){
+    const model = sims[id];
+    if(!model) continue;
+
+    const { cssObject, div } = getOrCreateDebugEventBubble(id);
+    if(!model.getObjectById(cssObject.id)) model.add(cssObject);
+
+    const ev = c.current_debug_event;
+    const live = ev && ev.text && tick <= (ev.expires_at_tick || 0);
+    if(live){
+      div.textContent = ev.text;
+      div.style.background = _DEBUG_EVENT_COLORS[ev.category] || _DEBUG_EVENT_COLORS.action;
+      cssObject.visible = true;
+    } else {
+      cssObject.visible = false;
+    }
+  }
+
+  for(const id in debugEventBubbles){
+    if(active.has(id)) continue;
+    const { cssObject } = debugEventBubbles[id];
+    const model = sims[id];
+    if(model) model.remove(cssObject);
+    delete debugEventBubbles[id];
   }
 }
 
@@ -3136,6 +3362,12 @@ function renderDebugSettingsModal(){
         Show badges
       </label>
     </div>
+    <div class="modal-row">
+      <label style="cursor:pointer; flex:1;">
+        <input type="checkbox" id="dbgShowDebugEventBubbles" ${_debugSettings.showDebugEventBubbles ? "checked" : ""} />
+        Show action/activity/reaction debug bubbles (green/red/purple)
+      </label>
+    </div>
     <h4>Thought bubble sources</h4>
     ${_renderChannelCheckboxes(THOUGHT_CHANNELS, _debugSettings.thoughtChannels, "thoughtChannels")}
     <h4>Badge sources</h4>
@@ -3150,6 +3382,10 @@ function renderDebugSettingsModal(){
   });
   document.getElementById("dbgShowBadges").addEventListener("change", (e) => {
     _debugSettings.showBadges = e.target.checked;
+    _saveDebugSettings();
+  });
+  document.getElementById("dbgShowDebugEventBubbles").addEventListener("change", (e) => {
+    _debugSettings.showDebugEventBubbles = e.target.checked;
     _saveDebugSettings();
   });
   body.querySelectorAll("input[data-group]").forEach(input => {
@@ -3266,8 +3502,15 @@ async function updateCharacters(state){
       if (!characterAnimations[id]?.isAnchored) {
         const newX = c.x - 10;
         const newZ = c.y - 7;
-        const dx = newX - sims[id].position.x;
-        const dz = newZ - sims[id].position.z;
+        // Compared against the last known SERVER (base) position, not the
+        // rendered mesh position -- the idle/wait pacing sway below adds a
+        // small offset directly to the mesh, and comparing against that
+        // would make the facing logic misread its own cosmetic wobble as
+        // real movement and spin the model back and forth every frame.
+        const animRec = characterAnimations[id];
+        const lastBase = animRec?.lastBasePos;
+        const dx = lastBase ? newX - lastBase.x : 0;
+        const dz = lastBase ? newZ - lastBase.z : 0;
         // Face the direction of actual movement -- updateIK()'s existing
         // facing logic only fires while there's a specific interaction
         // target to look at (activity.target_id); plain point-to-point
@@ -3280,7 +3523,10 @@ async function updateCharacters(state){
         if (Math.abs(dx) > 0.01 || Math.abs(dz) > 0.01) {
           sims[id].rotation.y = Math.atan2(dx, dz);
         }
-        sims[id].position.set(newX, 0, newZ);
+        if (animRec) animRec.lastBasePos = { x: newX, z: newZ };
+
+        const pace = _idlePaceOffset(id, c, !!c.is_moving);
+        sims[id].position.set(newX + (pace?.dx || 0), 0, newZ + (pace?.dz || 0));
       }
 
       // See _isCharacterHidden()'s own comment (above createFallbackCharacter)
@@ -3637,6 +3883,10 @@ delete loadingCharacters[id];
       mesh.remove(badges[id].cssObject);
       delete badges[id];
     }
+    if(debugEventBubbles[id]){
+      mesh.remove(debugEventBubbles[id].cssObject);
+      delete debugEventBubbles[id];
+    }
 
     scene.remove(mesh);
 
@@ -3776,6 +4026,22 @@ function _applyWorldDeltaQ(bone, worldDeltaQ, weight) {
 }
 
 
+// Confirmed live bug (player report: characters spinning a full 360°
+// every few seconds while walking toward an interaction target):
+// THREE.MathUtils.lerp() interpolates its two numbers literally, with no
+// awareness that an angle wraps -- lerping from a facing near +π toward
+// a target angle near -π (the same real direction, just expressed on
+// the other side of the wrap) sweeps the LONG way around through 0
+// instead of the short way across the seam, visibly spinning the model
+// through nearly a full circle before it "catches up." Reused by every
+// rotation.y lerp below (body facing + head-look yaw) since both feed a
+// raw atan2() angle straight into a lerp the same way.
+function lerpAngle(from, to, t) {
+  const twoPi = Math.PI * 2;
+  let diff = ((to - from) % twoPi + twoPi + Math.PI) % twoPi - Math.PI;
+  return from + diff * t;
+}
+
 // =========================================================
 // IK + PROCEDURAL INTERACTIONS  (called every frame)
 // =========================================================
@@ -3848,7 +4114,7 @@ function updateIK(id) {
       const dx = _ikB.x - model.position.x;
       const dz = _ikB.z - model.position.z;
       if (Math.abs(dx) > 0.01 || Math.abs(dz) > 0.01) {
-        model.rotation.y = THREE.MathUtils.lerp(
+        model.rotation.y = lerpAngle(
           model.rotation.y, Math.atan2(dx, dz), 0.10
         );
       }
@@ -3878,7 +4144,7 @@ function updateIK(id) {
       );
     }
 
-    headBone.rotation.y = THREE.MathUtils.lerp(
+    headBone.rotation.y = lerpAngle(
       headBone.rotation.y,
       desiredYaw,
       lookTarget ? 0.08 : 0.04   // snap faster when looking, drift back slower
@@ -3941,6 +4207,19 @@ renderer.domElement.addEventListener(
 
   (event)=>{
 
+    // Per the user's explicit ask: a click while something is already
+    // selected ALWAYS deselects first, regardless of what it hit --
+    // never jumps straight from one selection to a different one. This
+    // is also the strongest possible fix for the recurring "still sort
+    // of selected" report: a genuine full clear runs before ANY new
+    // selection can ever be made.
+    if(_somethingSelected){
+      selectedCharacterId = null;
+      _syncOutlinerHighlight();
+      _clearInspector();
+      return;
+    }
+
     mouse.x =
       (event.clientX /
       window.innerWidth) * 2 - 1;
@@ -3966,15 +4245,38 @@ renderer.domElement.addEventListener(
             ?.ignoreRaycast
         );
 
+    // Per the user's explicit ask: ctrl+click a character standing on a
+    // prop/item/tile selects THAT instead -- the ray from the camera
+    // through the click point already passes through everything at that
+    // screen position in depth order (the character, then whatever's on
+    // the ground under them), so this just looks further down the same
+    // hit list rather than only ever taking the frontmost (character)
+    // hit. Props/items are preferred over a bare tile, per spec; only
+    // hits close to the character's own hit point count as "the same
+    // square", not some unrelated object the ray happened to also pass
+    // through.
+    if(event.ctrlKey && hits.length > 1){
+      let topObj = hits[0].object;
+      while(topObj && !topObj.userData?.type) topObj = topObj.parent;
+      if(topObj?.userData?.type === "character"){
+        const charPoint = hits[0].point;
+        const resolved = hits.slice(1).map(h => {
+          let o = h.object;
+          while(o && !o.userData?.type) o = o.parent;
+          return o ? { obj: o, point: h.point } : null;
+        }).filter(h => h && h.point.distanceTo(charPoint) < 1.0);
+        const chosen =
+          resolved.find(h => ["prop", "placed_item", "world_object"].includes(h.obj.userData.type))
+          || resolved.find(h => h.obj.userData.type === "tile");
+        if(chosen) hits.unshift({ object: chosen.obj, point: chosen.point });
+      }
+    }
+
     if(!hits.length){
 
       selectedCharacterId = null;
-
-      document
-        .getElementById(
-          "viewerSelection"
-        ).innerHTML =
-          "Nothing selected";
+      _syncOutlinerHighlight();
+      _clearInspector();
 
       return;
     }
@@ -3998,7 +4300,8 @@ renderer.domElement.addEventListener(
     // here too, now that obj is the resolved top-level character.
     if(obj.userData?.ignoreRaycast){
       selectedCharacterId = null;
-      document.getElementById("viewerSelection").innerHTML = "Nothing selected";
+      _syncOutlinerHighlight();
+      _clearInspector();
       return;
     }
 
@@ -4013,22 +4316,59 @@ renderer.domElement.addEventListener(
       // show stale numbers before the fresh fetch resolves.
       if(selectedCharacterId !== d.id) _perceptionRanges = null;
       selectedCharacterId = d.id;
+      _somethingSelected = true;
+      _applyInspectorVisibility();
+      _setNonStatusTabsVisible(true);
       renderCharacterInspector(d.id);
       showCharacterLLMLog(d.id);
+      _syncOutlinerHighlight();
     } else {
       // Selecting a prop/tile while a character was selected must also
       // clear selectedCharacterId -- otherwise the perception rings stay
       // anchored to the stale previous character while the inspector
-      // shows unrelated prop info.
+      // shows unrelated prop info. Also wipe every character-specific
+      // tab (Body/Relations/Mind/Memory/Life/Plans) -- a prop has none
+      // of that, and leaving the previous character's data sitting there
+      // was the exact "still sort of selected" bug reported live.
       selectedCharacterId = null;
+      _syncOutlinerHighlight();
+      _clearInspector();
+      _somethingSelected = true;
+      _applyInspectorVisibility();
+      _setNonStatusTabsVisible(false);
+
+      // Confirmed live bug (real player report: "props that do not
+      // resolve to anything in inspector"): a prop's userData only ever
+      // carried {type, id, template} (see updateProps() -- no "name"
+      // field is ever set on it), so this always rendered as a bare
+      // "prop" heading + a raw uuid with nothing useful underneath.
+      // Resolve the real template (prop_templates/item_templates
+      // depending on type) for a proper name/category, same lookup
+      // resolveProp()/resolveItem() already use elsewhere in this file.
+      let resolvedName = d.name;
+      let resolvedCategory = null;
+      if(!resolvedName && d.template && definitions){
+        const templatePool =
+          d.type === "placed_item" ? definitions.item_templates
+          : definitions.prop_templates;
+        const tpl = templatePool?.[d.template];
+        if(tpl){
+          resolvedName = tpl.name || d.template;
+          resolvedCategory = tpl.category || null;
+        }
+      }
+
+      const selectedNameEl = document.getElementById("viewerSelectedName");
+      if(selectedNameEl) selectedNameEl.textContent = resolvedName || d.template || d.type || "(unknown)";
+
       document
         .getElementById(
           "viewerSelection"
         ).innerHTML = `
           <b>${d.type}</b><br>
           ${d.tileType ? `Type: ${d.tileType}<br>` : ""}
-          ${d.id || ""}<br>
-          ${d.name || ""}
+          ${resolvedCategory ? `Category: ${resolvedCategory}<br>` : ""}
+          <span style="opacity:.6; font-size: 11px;">${d.id || ""}</span>
         `;
     }
   }
@@ -4046,7 +4386,17 @@ renderer.domElement.addEventListener(
 // which the existing debounced listener in connectWS() picks up to resync
 // the viewport with the server -- no separate network call needed here.
 const _DEFAULT_CAMERA_OFFSET = new THREE.Vector3(20, 20, 20);
-const _DEFAULT_CAMERA_ZOOM = 3;
+// Confirmed live bug (real player report: "takes forever before I get
+// to see the characters"): zoom 3 maps to main.py::_view_radius()'s
+// SMALLEST tier (12 tiles) -- jumping to a selection at this zoom means
+// even a slightly-stale target (the outliner's x/y is polled every 5s,
+// see fetchOutliner()) or a character still mid-walk can land just
+// outside the server's filtered viewport, and nothing else proactively
+// re-jumps from there (the soft camera-follow added alongside this only
+// tracks someone once their position is ALREADY being received -- a
+// catch-22 if the first jump missed). A wider starting radius gives a
+// lot more slack to still land inside the loaded window on the first try.
+const _DEFAULT_CAMERA_ZOOM = 1;
 
 function focusCameraOn(x, y){
   // World (x,y) -> scene (x,z) uses the same (-10,-7) map-centering offset
@@ -4092,32 +4442,88 @@ function _templateDescription(tmpl, flavorKey){
 }
 
 // Vertical health-bar-style meters for the Inspector's Status tab, one per
-// systems/body.py need + c.stress. Bar HEIGHT always represents "how
-// satisfied is this need" (full = fine, empty = critical) so all seven
-// read the same way despite body.py storing them with different
-// polarities (energy/hygiene: high raw value = good; hunger/bladder/
-// fatigue/stress: high raw value = bad; hydration: high = good, but
-// displayed elsewhere in this file as "thirst" with the opposite sense --
-// _renderNeedsMeters always normalizes to "satisfaction" internally, this
-// isn't the same inverted-for-display value the old text line used).
+// systems/body.py need + c.stress.
+//
+// Confirmed live bug (player report: "I got a full bladder bar at 7%"):
+// an earlier version of this kept the bar's HEIGHT on an inverted
+// "satisfaction" score (tall bar = doing fine) while changing only the
+// TOOLTIP text to show the raw "% full" number -- so a nearly-empty
+// bladder (7% full, great) rendered as a TALL bar, directly contradicting
+// its own tooltip. Bar height now always equals the RAW body.py value
+// directly, with zero inversion, for every meter -- what you see is
+// exactly what the tooltip says, full stop. `badWhenHigh` only controls
+// which direction triggers the critical (pulsing) highlight, since some
+// needs are bad when full (bladder/hunger/fatigue/stress) and others are
+// bad when empty (hydration/energy/hygiene).
 const _NEED_METERS = [
-  { key: "hydration", label: "Thirst",  color: "#3aa0ff", satisfied: v => v },            // blue
-  { key: "bladder",   label: "Bladder", color: "#e6c200", satisfied: v => 100 - v },       // yellow
-  { key: "hunger",    label: "Hunger",  color: "#e64545", satisfied: v => 100 - v },       // red
-  { key: "energy",    label: "Energy",  color: "#3ecf5e", satisfied: v => v },             // green
-  { key: "fatigue",   label: "Fatigue", color: "#9b5de5", satisfied: v => 100 - v },       // purple
-  { key: "_stress",   label: "Stress",  color: "#1a1a1a", satisfied: v => 100 - v },       // black
-  { key: "hygiene",   label: "Hygiene", color: "#d9c79e", satisfied: v => v },             // beige
+  { key: "hydration", label: "Thirst",  color: "#3aa0ff", badWhenHigh: false, display: v => `${Math.round(v)}% hydrated` },
+  { key: "bladder",   label: "Bladder", color: "#e6c200", badWhenHigh: true,  display: v => `${Math.round(v)}% full` },
+  { key: "hunger",    label: "Hunger",  color: "#e64545", badWhenHigh: true,  display: v => `${Math.round(v)}% hungry` },
+  { key: "energy",    label: "Energy",  color: "#3ecf5e", badWhenHigh: false, display: v => `${Math.round(v)}% energized` },
+  { key: "fatigue",   label: "Fatigue", color: "#9b5de5", badWhenHigh: true,  display: v => `${Math.round(v)}% fatigued` },
+  // Confirmed live bug (player report: "stress is at 65% on hover yet
+  // the bar looks all empty"): #1a1a1a (near-black) is virtually
+  // invisible against this panel's own dark background/track regardless
+  // of fill height -- not a height/percentage bug at all, just a fill
+  // color nobody could actually see. Orange reads clearly here and
+  // isn't already used by another meter.
+  { key: "_stress",   label: "Stress",  color: "#ff8c42", badWhenHigh: true,  display: v => `${Math.round(v)}% stressed` },
+  { key: "hygiene",   label: "Hygiene", color: "#d9c79e", badWhenHigh: false, display: v => `${Math.round(v)}% clean` },
 ];
 
+// Horizontal progress bar for the Inspector's current activity/action --
+// "Doing: use_toilet" gave no sense of how far along it was. Two sources
+// of progress, since they mean different things: a normal activity's
+// elapsed/duration (phase "using" only -- still walking there has no
+// progress yet), or a "wait" activity's elapsed-since-started against
+// systems/waiting.py's 30-min give-up ceiling (that activity's own
+// "duration" field is a no-op placeholder now -- see activities.py's
+// dedicated wait branch -- so it means nothing here).
+const WAIT_GIVE_UP_TICKS = 1800; // mirrors backend/systems/waiting.py::MAX_TOTAL_WAIT_TICKS
+
+function _activityProgressPct(c){
+  const act = c.activity;
+  if(!act) return null;
+  const tick = _worldState.tick || 0;
+
+  if(act.type === "wait"){
+    const started = act.state?.waiting_for?.started_at_tick;
+    if(started == null) return null;
+    return { pct: Math.max(0, Math.min(100, ((tick - started) / WAIT_GIVE_UP_TICKS) * 100)), urgency: true };
+  }
+
+  if(act.phase === "using" && act.duration && act.phase_started_tick != null){
+    return { pct: Math.max(0, Math.min(100, ((tick - act.phase_started_tick) / act.duration) * 100)), urgency: false };
+  }
+
+  return null;
+}
+
+function _renderActivityProgress(c){
+  const result = _activityProgressPct(c);
+  if(result == null) return "";
+  const { pct, urgency } = result;
+  // A normal activity finishing up is neutral-to-good -- stays a calm
+  // blue throughout. A "wait" closing in on the 30-min give-up ceiling is
+  // the opposite (rising impatience), so THAT one ramps green->yellow->red
+  // the same way needMeterCritical signals a need going bad.
+  const color = urgency
+    ? (pct > 80 ? "#e64545" : pct > 50 ? "#e6c200" : "#3ecf5e")
+    : "#3aa0ff";
+  return `
+    <div class="activityBarTrack" title="${Math.round(pct)}%">
+      <div class="activityBarFill" style="width:${pct}%; background:${color};"></div>
+    </div>`;
+}
+
 function _renderNeedsMeters(body, stress){
-  const bars = _NEED_METERS.map(({ key, label, color, satisfied }) => {
+  const bars = _NEED_METERS.map(({ key, label, color, badWhenHigh, display }) => {
     const raw = key === "_stress" ? stress : body?.[key];
     if (raw == null) return "";
-    const pct = Math.max(0, Math.min(100, satisfied(raw)));
-    const critical = pct < 20;
+    const pct = Math.max(0, Math.min(100, raw));
+    const critical = badWhenHigh ? pct > 80 : pct < 20;
     return `
-      <div class="needMeter" title="${label}: ${Math.round(pct)}% satisfied">
+      <div class="needMeter" title="${label}: ${display(pct)}">
         <div class="needMeterTrack">
           <div class="needMeterFill${critical ? " needMeterCritical" : ""}"
                style="height:${pct}%; background:${color};"></div>
@@ -4129,28 +4535,119 @@ function _renderNeedsMeters(body, stress){
   return bars.length ? `<div class="needMeters">${bars.join("")}</div>` : "";
 }
 
+// Confirmed live bug (player report: deselecting left a character "sort
+// of selected" -- the Status tab correctly went blank, but Body/
+// Relations/Mind/Memory/Life/Plans kept showing that character's last-
+// rendered content forever, since only viewerSelection's innerHTML and
+// the name header were ever reset on deselect, and even the name header
+// was missed at some of the three deselection call sites). One shared
+// helper, called from all of them, resets EVERY tab panel + the header
+// back to a genuine "nothing selected" state.
+// Per the user's explicit ask: a non-character selection (prop/tile/
+// building/...) has nothing for Body/Relations/Mind/Memory/Life/Plans/
+// Work/Habits to show, so only the Status tab button stays visible --
+// forced active/visible too, since its own content is what actually
+// carries the prop/tile info (see the raycast click handler's "else"
+// branch below). A character selection restores every tab button.
+function _setNonStatusTabsVisible(visible){
+  document.querySelectorAll(".viewerTabBtn").forEach(btn => {
+    if(btn.dataset.tab !== "status") btn.classList.toggle("hidden", !visible);
+  });
+  if(!visible){
+    document.querySelectorAll(".viewerTabBtn").forEach(b => b.classList.toggle("active", b.dataset.tab === "status"));
+    for(const panelId of Object.values(VIEWER_TAB_PANELS)){
+      document.getElementById(panelId)?.classList.toggle("hidden", panelId !== "viewerSelection");
+    }
+  }
+}
+
+function _clearInspector(){
+  const nameEl = document.getElementById("viewerSelectedName");
+  if(nameEl) nameEl.textContent = "";
+  const empty = _empty("Nothing selected.");
+  const panelIds = [
+    "viewerSelection", "viewerRelationshipsTab", "viewerMindTab",
+    "viewerMemoryTab", "viewerLifeTab", "viewerPlansTab", "viewerWorkTab",
+    "viewerHabitsTab", "viewerSkillsTab",
+  ];
+  for(const id of panelIds){
+    const el = document.getElementById(id);
+    if(el) el.innerHTML = empty;
+  }
+  const bodyAppearance = document.getElementById("bodyTabAppearance");
+  const bodySummary = document.getElementById("bodyTabSummary");
+  const bodyRows = document.getElementById("bodyTabRows");
+  const bodyDisease = document.getElementById("bodyTabDiseases");
+  if(bodyAppearance) bodyAppearance.innerHTML = "";
+  if(bodySummary) bodySummary.innerHTML = empty;
+  if(bodyRows) bodyRows.innerHTML = "";
+  if(bodyDisease) bodyDisease.innerHTML = "";
+  for(const part of _BODY_PART_NAMES){
+    const shape = document.getElementById(`bodypart-${part}`);
+    if(shape) shape.setAttribute("fill", _SEVERITY_COLORS[null]);
+  }
+  // Per the user's explicit ask: hide the whole panel, not just its
+  // content, whenever nothing is selected.
+  _somethingSelected = false;
+  _applyInspectorVisibility();
+}
+
 function renderCharacterInspector(id){
   const el = document.getElementById("viewerSelection");
   if(!el) return;
+  const nameEl = document.getElementById("viewerSelectedName");
   const c = _worldState.characters?.[id];
   if(!c){
-    el.innerHTML = `<b>character</b><br>${id}<br>(out of view)`;
+    if(nameEl) nameEl.textContent = id;
+    el.innerHTML = `(out of view)`;
     return;
   }
 
+  // Per the user's explicit ask: the selected entity's name now lives
+  // in its own header above the tabs (#viewerSelectedName), not buried
+  // inside the Status tab's own content below them.
+  if(nameEl) nameEl.textContent = c.name || c.id;
+
   const rows = [];
-  rows.push(`<b>${c.name || c.id}</b>`);
-  rows.push(c.id);
 
   if(c.alive === false){
     rows.push(`<span style="color:#f66">DEAD</span>`);
   }
 
   if(c.posture) rows.push(`Posture: ${c.posture}`);
-  const activity = c.activity?.type
-    ? `Doing: ${c.activity.type}`
+  // Per the user's explicit ask: make it clear a character is still on
+  // their way to an activity (the "walking" phase, before they've
+  // actually reached whatever prop/anchor it needs) rather than reading
+  // as if they're already doing it -- "Doing: drink" while still
+  // walking across the map read as if they'd already started.
+  const activityLabel = c.activity?.type
+    ? (c.activity.phase === "walking"
+        ? `Heading to: ${c.activity.type.replace(/_/g, " ")}`
+        : `Doing: ${c.activity.type}`)
     : `State: ${c.animation_state || "idle"}`;
-  rows.push(activity);
+  rows.push(activityLabel);
+
+  // The generic "wait" activity (systems/interactions.py's queueing path,
+  // systems/waiting.py's patience/give-up timer) carried no detail of its
+  // own here -- "Doing: wait" told you nothing about what for. Surface
+  // the same waiting_for the backend already tracks.
+  if(c.activity?.type === "wait"){
+    const wf = c.activity.state?.waiting_for;
+    if(wf){
+      let target = wf.ref || "something";
+      if(wf.kind === "prop" && typeof wf.ref === "string"){
+        const propId = wf.ref.split(":")[0];
+        const prop = _findProp(propId);
+        if(prop?.template) target = prop.template.replace(/_/g, " ");
+      }
+      const bangs = wf.bang_count || 0;
+      const mood = bangs >= 3 ? " — furious" : bangs >= 1 ? " — getting impatient" : "";
+      rows.push(`<span style="opacity:.85">Waiting for: ${target}${mood}</span>`);
+    }
+  }
+
+  const activityProgress = _renderActivityProgress(c);
+  if(activityProgress) rows.push(activityProgress);
 
   // Wake-up date/time-of-day, while actually asleep -- systems/
   // activities.py only tracks this as a raw tick count (phase_started_tick
@@ -4186,7 +4683,17 @@ function renderCharacterInspector(id){
       walking_home:         "walking home",
     };
     const label = TRAVEL_STATE_LABELS[c.travel_state] || c.travel_state;
-    rows.push(`<span style="color:#6cf">Traveling: ${label}</span>`);
+    // Per the user's ask: while waiting for a bus/driving out, nothing
+    // said what the trip was actually FOR -- backend/systems/travel.py
+    // stashes the real reason in c._pending_offgrid from the moment the
+    // trip starts until it actually goes off-grid (spanning every one
+    // of these intermediate travel_state values), so it's already
+    // available here, just never displayed.
+    const pendingReason = c._pending_offgrid?.reason;
+    const destination = pendingReason
+      ? ` — heading to ${pendingReason.replace(/_/g, " ")}`
+      : "";
+    rows.push(`<span style="color:#6cf">Traveling: ${label}${destination}</span>`);
   }
 
   // c.body is the real, live 0-100 needs simulation (systems/body.py) --
@@ -4236,6 +4743,33 @@ function renderCharacterInspector(id){
     rows.push(`Beliefs:<br>&nbsp;&nbsp;${beliefLines.join("<br>&nbsp;&nbsp;")}`);
   }
 
+  // Reputation (c.reputation -- the real, actively-read global/community/
+  // notoriety dict; NOT c.status.reputation, a separate write-only field
+  // law.py's arrest penalty decrements but nothing ever reads) / popularity
+  // (c.popularity, an unbounded accumulate-and-decay validation score) /
+  // addictions (c.addictions, only entries actually used at least once).
+  const rep = c.reputation || {};
+  const repBits = [];
+  if(rep.global != null) repBits.push(`global ${Math.round(rep.global * 100)}%`);
+  if(rep.community != null) repBits.push(`community ${Math.round(rep.community * 100)}%`);
+  if(rep.notoriety) repBits.push(`notoriety ${Math.round(rep.notoriety * 100)}%`);
+  if(repBits.length) rows.push(`Reputation: ${repBits.join(" · ")}`);
+
+  if(c.popularity) rows.push(`Popularity: ${c.popularity.toFixed(1)}`);
+
+  const addictionTemplates = definitions.addiction_templates || {};
+  const addictionEntries = Object.entries(c.addictions || {}).filter(([, a]) => a?.usages > 0);
+  if(addictionEntries.length){
+    const lines = addictionEntries.map(([key, a]) => {
+      const tmpl = addictionTemplates[key];
+      const label = tmpl?.name || key;
+      const threshold = tmpl?.threshold || 5;
+      const craving = Math.min(1.0, a.usages / (threshold * 2));
+      return `${label} <span style="opacity:.65">— ${a.usages} uses, ${Math.round(craving * 100)}% craving</span>`;
+    });
+    rows.push(`Addictions:<br>&nbsp;&nbsp;${lines.join("<br>&nbsp;&nbsp;")}`);
+  }
+
   el.innerHTML = rows.join("<br>");
 
   renderEffectIconRow(c);
@@ -4244,6 +4778,10 @@ function renderCharacterInspector(id){
   renderMindTab(c);
   renderMemoryTab(c);
   renderLifeTab(c);
+  renderPlansTab(c);
+  renderWorkTab(c);
+  renderHabitsTab(c);
+  renderSkillsTab(c);
 }
 
 // =========================================================
@@ -4430,26 +4968,74 @@ function renderMindTab(c){
   const intentions = c.active_intentions || [];
   _lastRenderedIntentions = intentions;
   if(intentions.length){
-    const lines = intentions.map((i, idx) => `
+    const lines = intentions.map((i, idx) => {
+      const outcome = _intentionOutcome(c, i);
+      return `
       <div class="viewerCard viewerCardClickable" data-intent-index="${idx}">
-        <div class="viewerCardTitle">${(i.type || "").replace(/_/g, " ")}</div>
+        <div class="viewerCardTitle">
+          <span class="intentionStatusDot" style="background:${outcome.color};" title="${outcome.label}"></span>
+          ${(i.type || "").replace(/_/g, " ")}
+          <span style="opacity:.45; font-size:10px; float:right;">${i.category || ""} · ${i.priority ?? 0}</span>
+        </div>
         ${i.reason ? `<div style="opacity:.7">${i.reason}</div>` : ""}
-      </div>`);
-    sections.push(_section(`Intentions (${intentions.length})`, lines.join("")));
+      </div>`;
+    });
+    sections.push(_section(`Intentions (${intentions.length}) — sorted by category, then priority`, lines.join("")));
   }
 
   // -- Persistent desires --
   const desires = (c.persistent_desires || []).filter(d => d.active && !d.resolved);
   if(desires.length){
-    const lines = desires.map(d => `
+    const memoriesById = {};
+    (c.memories || []).forEach(m => { if(m.id) memoriesById[m.id] = m; });
+    const lines = desires.map(d => {
+      // A desire's `target` is usually a memory id (see systems/
+      // persistent_desires.py::add_desire / confiding.py) -- surface the
+      // triggering memory's own text as the reason this specific desire
+      // exists, so e.g. two "confide in someone" entries with the same
+      // importance/frustration read as two distinct real events, not an
+      // unexplained duplicate.
+      const targetMem = d.target ? memoriesById[d.target] : null;
+      const reason = targetMem?.text || d.reason;
+      return `
       <div class="viewerCard">
         ${(d.type || "").replace(/_/g, " ")}
         <div class="viewerStatRow">importance ${(d.importance ?? 0).toFixed(2)}, frustration ${(d.frustration ?? 0).toFixed(2)}</div>
-      </div>`);
+        ${reason ? `<div style="opacity:.7">"${reason}"</div>` : ""}
+      </div>`;
+    });
     sections.push(_section(`Desires (${desires.length})`, lines.join("")));
   }
 
   el.innerHTML = sections.join("");
+}
+
+// Per the user's explicit ask: can we tell whether an intention actually
+// got achieved? "expectation:<id>" intentions already carry a real,
+// backend-tracked outcome (systems/expectations.py's own satisfied/
+// pending/missed status, streak, missed_count) -- surfaced directly here
+// rather than inventing a new tracking system on top of it. Every other
+// intention type has no such explicit lifecycle, so its "outcome" is
+// approximated from how long it's been sitting active without getting
+// resolved (a real signal: an intention that's been true for a long time
+// without anything addressing it really is stalled) -- green/yellow/red
+// per the user's own spec (success / still in progress / timed out).
+const STALE_INTENTION_TICKS = 1800;   // 30 min with no resolution reads as "stalled"
+
+function _intentionOutcome(c, intention){
+  const type = intention.type || "";
+  if(type.startsWith("expectation:")){
+    const templateId = type.slice("expectation:".length);
+    const exp = (c.expectations || {})[templateId];
+    if(exp?.status === "satisfied") return { color: "#3ecf5e", label: `Satisfied (streak ${exp.streak ?? 0})` };
+    if(exp?.status === "missed") return { color: "#e64545", label: `Missed (${exp.missed_count ?? 0} times)` };
+    return { color: "#e6c200", label: "Still pending this period" };
+  }
+  const age = (_worldState.tick || 0) - (intention.created_at || 0);
+  if(age > STALE_INTENTION_TICKS){
+    return { color: "#e64545", label: `Stalled -- unresolved for ${_ticksAgoLabel(age)}` };
+  }
+  return { color: "#e6c200", label: "In progress" };
 }
 
 // Delegated click handler for the Mind tab's intention cards (registered
@@ -4512,6 +5098,18 @@ function openIntentionModal(intention){
   if(!body) return;
   body.innerHTML = "";
 
+  const outcomeChar = selectedCharacterId ? _worldState.characters?.[selectedCharacterId] : null;
+  if(outcomeChar){
+    const outcome = _intentionOutcome(outcomeChar, intention);
+    const outcomeRow = document.createElement("div");
+    outcomeRow.className = "eventModalRow";
+    outcomeRow.innerHTML = `
+      <div class="eventModalRowMeta">Outcome</div>
+      <div><span class="intentionStatusDot" style="background:${outcome.color};"></span>${outcome.label}</div>
+    `;
+    body.appendChild(outcomeRow);
+  }
+
   if(intention.reason){
     const reason = document.createElement("div");
     reason.className = "eventModalRowSummary";
@@ -4544,34 +5142,107 @@ function openIntentionModal(intention){
 // same spirit as the LLM request/response log already exposed here.
 // =========================================================
 
+// Per-character pagination state for the two memory lists below -- reset
+// whenever the selected character changes, same pattern as the Plans
+// tab's own _plansLastCharId/_plansDrilldownDay.
+let _memoryLastCharId = null;
+let _shortTermMemoryPage = 0;
+let _longTermMemoryPage = 0;
+const SHORT_TERM_MEMORY_PAGE_SIZE = 10;
+const LONG_TERM_MEMORY_PAGE_SIZE  = 5;
+
+function _renderMemoryList(title, allItems, page, pageSize, listKey){
+  const total = allItems.length;
+  if(!total) return _section(title + " (0)", _empty("Nothing yet."));
+
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const clampedPage = Math.min(page, totalPages - 1);
+  const pageItems = allItems.slice(clampedPage * pageSize, (clampedPage + 1) * pageSize);
+
+  const lines = pageItems.map(m => {
+    const stamp = _formatMemoryTimestamp(m.tick);
+    return `
+    <div class="viewerCard">
+      ${stamp ? `<div style="opacity:.6">${stamp}</div>` : ""}
+      ${m.text}
+      ${m.tags?.length ? `<div style="opacity:.6">${m.tags.join(", ")}</div>` : ""}
+    </div>`;
+  }).join("");
+
+  const pager = totalPages > 1 ? `
+    <div class="viewerStatRow" style="justify-content:space-between; align-items:center;">
+      <button class="memoryPageBtn" data-memory-list="${listKey}" data-memory-dir="-1" ${clampedPage <= 0 ? "disabled" : ""}>← Newer</button>
+      <span style="opacity:.6;">Page ${clampedPage + 1} of ${totalPages}</span>
+      <button class="memoryPageBtn" data-memory-list="${listKey}" data-memory-dir="1" ${clampedPage >= totalPages - 1 ? "disabled" : ""}>Older →</button>
+    </div>` : "";
+
+  return _section(`${title} (${total})`, lines + pager);
+}
+
+// Delegated once, not per-render (renderMemoryTab() reassigns el.innerHTML
+// wholesale every call, which would silently drop a listener attached
+// directly to a button element).
+document.getElementById("viewerMemoryTab")?.addEventListener("click", (e) => {
+  const btn = e.target.closest(".memoryPageBtn");
+  if(!btn || btn.disabled) return;
+  const dir = Number(btn.dataset.memoryDir);
+  if(btn.dataset.memoryList === "short"){
+    _shortTermMemoryPage = Math.max(0, _shortTermMemoryPage + dir);
+  } else {
+    _longTermMemoryPage = Math.max(0, _longTermMemoryPage + dir);
+  }
+  const c = _worldState.characters?.[_memoryLastCharId];
+  if(c) renderMemoryTab(c);
+});
+
 function renderMemoryTab(c){
   const el = document.getElementById("viewerMemoryTab");
   if(!el) return;
 
+  if(_memoryLastCharId !== c.id){
+    _memoryLastCharId = c.id;
+    _shortTermMemoryPage = 0;
+    _longTermMemoryPage = 0;
+  }
+
   const sections = [];
 
-  // -- Recent memories --
-  const memories = [...(c.memories || [])].sort((a, b) => (b.tick || 0) - (a.tick || 0)).slice(0, 12);
-  if(memories.length){
-    const lines = memories.map(m => `
-      <div class="viewerCard">
-        ${m.text}
-        ${m.tags?.length ? `<div style="opacity:.6">${m.tags.join(", ")}</div>` : ""}
-      </div>`);
-    sections.push(_section("Recent Memories", lines.join("")));
-  } else {
-    sections.push(_section("Recent Memories", _empty("No memories yet.")));
+  const shortTerm = [...(c.memories || [])].sort((a, b) => (b.tick || 0) - (a.tick || 0));
+  sections.push(_renderMemoryList("Short-Term Memory", shortTerm, _shortTermMemoryPage, SHORT_TERM_MEMORY_PAGE_SIZE, "short"));
+
+  const longTerm = [...(c.long_term_memory || [])].sort((a, b) => (b.tick || 0) - (a.tick || 0));
+  sections.push(_renderMemoryList("Long-Term Memory", longTerm, _longTermMemoryPage, LONG_TERM_MEMORY_PAGE_SIZE, "long"));
+
+  // -- Conversation topics -- pure client-side aggregation of the
+  // already-real `topic` field stamped on memories by work-shift/
+  // shared-event narration (llm/work_shift_narration.py,
+  // llm/shared_event_narration.py), no backend change needed.
+  const topicCounts = {};
+  for(const m of (c.memories || [])){
+    if(!m.topic) continue;
+    topicCounts[m.topic] = (topicCounts[m.topic] || 0) + 1;
+  }
+  const topicEntries = Object.entries(topicCounts).sort((a, b) => b[1] - a[1]);
+  if(topicEntries.length){
+    const lines = topicEntries.map(([topic, count]) =>
+      `<div class="viewerStatRow" style="justify-content:space-between;"><span>${topic}</span><span style="opacity:.7">${count}×</span></div>`
+    );
+    sections.push(_section(`Conversation Topics (${topicEntries.length})`, lines.join("")));
   }
 
   // -- Notable stories --
   const stories = c.notable_stories || [];
   if(stories.length){
-    const lines = stories.map(s => `
+    const lines = stories.map(s => {
+      const stamp = _formatMemoryTimestamp(s.created_tick);
+      return `
       <div class="viewerCard">
+        ${stamp ? `<div style="opacity:.6">${stamp}</div>` : ""}
         ${s.summary || s.text || ""}
         <div style="opacity:.6">${s.category || ""}${s.value != null ? ` · value ${s.value.toFixed(1)}` : ""}</div>
-      </div>`);
-    sections.push(_section(`Notable Stories (${stories.length})`, lines.join("")));
+      </div>`;
+    });
+    sections.push(_section(`Events (${stories.length})`, lines.join("")));
   }
 
   // -- Secrets --
@@ -4610,6 +5281,356 @@ function renderMemoryTab(c){
 // Status tab so Status stays focused on real-time vitals), grievances,
 // and household-owned vehicles.
 // =========================================================
+
+// =========================================================
+// PLANS TAB -- systems/scheduling.py's c["schedule"]["week"], a 7-day
+// week grid with drill-down into a single day's detail. Own module-level
+// state (which day, if any, is currently drilled into) so switching
+// characters or getting a fresh state update doesn't fight the user's
+// current view -- reset only when the SELECTED character actually
+// changes, not on every routine re-render.
+// =========================================================
+
+const SCHEDULE_WEEKDAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
+const SCHEDULE_DAY_LABELS = { monday: "Mon", tuesday: "Tue", wednesday: "Wed", thursday: "Thu", friday: "Fri", saturday: "Sat", sunday: "Sun" };
+const SCHEDULE_ACTIVITY_COLORS = {
+  sleep:    "#5b6ee1",
+  work:     "#e0a640",
+  eat:      "#5ec97a",
+  meal:     "#5ec97a",
+  leisure:  "#c95ec9",
+  hygiene:  "#5ecbc9",
+  chore:    "#a0a0a0",
+};
+const SCHEDULE_DEFAULT_COLOR = "#888";
+
+let _plansDrilldownDay = null;
+let _plansLastCharId = null;
+// Per the user's explicit ask: expectations visualized in a calendar
+// format, sharing the Plans tab with the existing weekly schedule view
+// via a small sub-toggle rather than a whole new top-level tab.
+let _plansView = "schedule";   // "schedule" | "expectations"
+
+function _scheduleColorFor(activity){
+  return SCHEDULE_ACTIVITY_COLORS[activity] || SCHEDULE_DEFAULT_COLOR;
+}
+
+const EXPECTATION_STATUS_COLORS = {
+  satisfied: "#3ecf5e",   // matches _intentionOutcome()'s Mind-tab coloring
+  missed:    "#e64545",
+  pending:   "#e6c200",
+};
+const EXPECTATION_DEFAULT_COLOR = "#888";
+
+function _expectationColorFor(status){
+  return EXPECTATION_STATUS_COLORS[status] || EXPECTATION_DEFAULT_COLOR;
+}
+
+// Real tick ranges for each day of the CURRENT calendar week (Mon-Sun),
+// derived from the last-fetched live calendar + its corresponding world
+// tick (same _lastCalendar/_lastCalendarWorldTick pair _formatMemoryTimestamp
+// already projects against) -- 1 tick === 1 real second
+// (backend/core/tick_schedule.py::TICK_RATE_SECONDS), so a day is exactly
+// 86400 ticks. Used to clip each expectation's real window_start_tick/
+// window_end_tick against a specific calendar day for the week-grid view.
+function _currentWeekDayTicks(){
+  if(!_lastCalendar || _lastCalendarWorldTick == null) return null;
+  const idx = _WEEKDAY_ORDER.indexOf(_lastCalendar.weekday);
+  if(idx < 0) return null;
+  const secondsIntoToday = (_lastCalendar.hour || 0) * 3600 + (_lastCalendar.minute || 0) * 60;
+  const mondayStartTick = (_lastCalendarWorldTick - secondsIntoToday) - idx * 86400;
+  const out = {};
+  SCHEDULE_WEEKDAYS.forEach((day, i) => {
+    out[day] = { startTick: mondayStartTick + i * 86400, endTick: mondayStartTick + (i + 1) * 86400 };
+  });
+  return out;
+}
+
+function _scheduleMinutes(hhmm){
+  const [h, m] = (hhmm || "00:00").split(":").map(Number);
+  return (h || 0) * 60 + (m || 0);
+}
+
+function _scheduleBarSegments(blocks){
+  return (blocks || []).map(b => {
+    const startMin = _scheduleMinutes(b.start);
+    let endMin = _scheduleMinutes(b.end);
+    if(endMin <= startMin) endMin += 24 * 60;   // wraps past midnight
+    const left = Math.max(0, (startMin / 1440) * 100);
+    const width = Math.min(100 - left, ((endMin - startMin) / 1440) * 100);
+    return { ...b, left, width };
+  });
+}
+
+function renderPlansTab(c){
+  const el = document.getElementById("viewerPlansTab");
+  if(!el) return;
+
+  if(_plansLastCharId !== c.id){
+    _plansLastCharId = c.id;
+    _plansDrilldownDay = null;
+  }
+
+  const toggle = `
+    <div class="plansViewToggle">
+      <button class="plansViewBtn${_plansView === "schedule" ? " active" : ""}" data-plans-view="schedule">Schedule</button>
+      <button class="plansViewBtn${_plansView === "expectations" ? " active" : ""}" data-plans-view="expectations">Expectations</button>
+    </div>`;
+
+  let body;
+  if(_plansView === "expectations"){
+    body = _renderExpectationsView(c);
+  } else {
+    const week = c.schedule?.week;
+    if(!week){
+      body = _section("Plans", _empty("No schedule generated for this character yet."));
+    } else if(_plansDrilldownDay && week[_plansDrilldownDay]){
+      body = _renderScheduleDayDetail(_plansDrilldownDay, week[_plansDrilldownDay]);
+    } else {
+      body = _renderScheduleWeek(week);
+    }
+  }
+
+  el.innerHTML = toggle + body;
+
+  el.querySelectorAll("[data-plans-view]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      _plansView = btn.dataset.plansView;
+      _plansDrilldownDay = null;
+      renderPlansTab(c);
+    });
+  });
+
+  el.querySelectorAll("[data-schedule-day]").forEach(row => {
+    row.addEventListener("click", () => {
+      _plansDrilldownDay = row.dataset.scheduleDay;
+      renderPlansTab(c);
+    });
+  });
+  el.querySelector(".scheduleBackBtn")?.addEventListener("click", () => {
+    _plansDrilldownDay = null;
+    renderPlansTab(c);
+  });
+}
+
+// =========================================================
+// EXPECTATIONS CALENDAR -- same week-grid/day-drilldown shape as the
+// schedule view above, but plotting each expectation's real
+// window_start_tick/window_end_tick (systems/expectations.py) clipped
+// against each day of the current calendar week, color-coded by real
+// status (satisfied/missed/pending) rather than a flat activity label.
+// Expectations with no real window (window_end_tick still null -- not
+// schedule-linked, or the very first period hasn't rolled over yet)
+// list separately below the grid rather than being silently dropped.
+// =========================================================
+
+function _renderExpectationsView(c){
+  const expectations = Object.values(c.expectations || {});
+  if(!expectations.length){
+    return _section("Expectations", _empty("No expectations tracked for this character yet."));
+  }
+
+  const dayTicks = _currentWeekDayTicks();
+  if(_plansDrilldownDay && dayTicks && dayTicks[_plansDrilldownDay]){
+    return _renderExpectationsDayDetail(_plansDrilldownDay, expectations, dayTicks[_plansDrilldownDay]);
+  }
+  return _renderExpectationsWeek(expectations, dayTicks);
+}
+
+function _renderExpectationsWeek(expectations, dayTicks){
+  const windowed = expectations.filter(e => e.window_start_tick != null && e.window_end_tick != null);
+  const unwindowed = expectations.filter(e => e.window_start_tick == null || e.window_end_tick == null);
+
+  let rows;
+  if(!dayTicks){
+    rows = _empty("Calendar not loaded yet.");
+  } else {
+    rows = SCHEDULE_WEEKDAYS.map(day => {
+      const range = dayTicks[day];
+      const active = windowed.filter(e => e.window_start_tick < range.endTick && e.window_end_tick > range.startTick);
+      const lanes = active.length ? active.map(e => {
+        const clippedStart = Math.max(e.window_start_tick, range.startTick);
+        const clippedEnd = Math.min(e.window_end_tick, range.endTick);
+        const left = Math.max(0, ((clippedStart - range.startTick) / 86400) * 100);
+        const width = Math.max(2, Math.min(100 - left, ((clippedEnd - clippedStart) / 86400) * 100));
+        const tmpl = definitions.expectation_templates?.[e.template_id];
+        const label = tmpl?.label || e.template_id;
+        return `<div class="expectCalLane">
+          <div class="expectCalBlock" title="${label} (${e.status})"
+               style="left:${left}%; width:${width}%; background:${_expectationColorFor(e.status)};"></div>
+        </div>`;
+      }).join("") : `<div class="expectCalLane expectCalLaneEmpty"></div>`;
+      return `
+        <div class="expectCalDayRow" data-schedule-day="${day}">
+          <div class="scheduleDayLabel">${SCHEDULE_DAY_LABELS[day]}</div>
+          <div class="expectCalLanes">${lanes}</div>
+        </div>`;
+    }).join("");
+  }
+
+  const unwindowedLines = unwindowed.map(e => {
+    const tmpl = definitions.expectation_templates?.[e.template_id];
+    const status = e.status === "missed"
+      ? `<span class="viewerNeg">missed ${e.missed_count || 0}x</span>`
+      : `<span class="viewerPos">streak ${e.streak || 0}</span>`;
+    return `<div class="viewerCard">${tmpl?.label || e.template_id} <span style="opacity:.5">(${e.cadence})</span> — ${status}</div>`;
+  }).join("");
+
+  return _section("Expectations — this week (click a day for details)", `
+    <div class="scheduleHourAxis"><span>12am</span><span>6am</span><span>12pm</span><span>6pm</span><span>12am</span></div>
+    ${rows}
+  `) + (unwindowedLines ? _section("Not tied to a daily window", unwindowedLines) : "");
+}
+
+function _renderExpectationsDayDetail(day, expectations, range){
+  const active = expectations.filter(e =>
+    e.window_start_tick != null && e.window_end_tick != null
+    && e.window_start_tick < range.endTick && e.window_end_tick > range.startTick
+  );
+
+  const rows = active.length ? active.map(e => {
+    const tmpl = definitions.expectation_templates?.[e.template_id];
+    const startProj = _lastCalendar && _lastCalendarWorldTick != null
+      ? _projectCalendarForward(_lastCalendar, e.window_start_tick - _lastCalendarWorldTick) : null;
+    const endProj = _lastCalendar && _lastCalendarWorldTick != null
+      ? _projectCalendarForward(_lastCalendar, e.window_end_tick - _lastCalendarWorldTick) : null;
+    const timeLabel = startProj && endProj
+      ? `${String(startProj.hour).padStart(2, "0")}:${String(startProj.minute).padStart(2, "0")}–${String(endProj.hour).padStart(2, "0")}:${String(endProj.minute).padStart(2, "0")}`
+      : "";
+    const detail = e.status === "missed" ? `, missed ${e.missed_count || 0}x`
+      : e.status === "satisfied" ? `, streak ${e.streak || 0}` : "";
+    return `
+    <div class="scheduleDetailRow">
+      <div class="scheduleDetailSwatch" style="background:${_expectationColorFor(e.status)};"></div>
+      <div class="scheduleDetailTime">${timeLabel}</div>
+      <div>${tmpl?.label || e.template_id} <span style="opacity:.5">(${e.cadence}, ${e.status}${detail})</span></div>
+    </div>`;
+  }).join("") : _empty("No expectation windows this day.");
+
+  return `
+    <div class="viewerSection">
+      <div class="scheduleDayDetailHeader">
+        <div class="viewerSectionTitle" style="margin:0;">${SCHEDULE_DAY_LABELS[day]} — expectations</div>
+        <button class="scheduleBackBtn">← Week</button>
+      </div>
+      ${rows}
+    </div>
+  `;
+}
+
+function _renderScheduleWeek(week){
+  const rows = SCHEDULE_WEEKDAYS.map(day => {
+    const segments = _scheduleBarSegments(week[day]);
+    const bar = segments.map(seg => `
+      <div class="scheduleBlock" title="${seg.activity} ${seg.start}-${seg.end}"
+           style="left:${seg.left}%; width:${seg.width}%; background:${_scheduleColorFor(seg.activity)};"></div>
+    `).join("");
+    return `
+      <div class="scheduleDayRow" data-schedule-day="${day}">
+        <div class="scheduleDayLabel">${SCHEDULE_DAY_LABELS[day]}</div>
+        <div class="scheduleBar">${bar}</div>
+      </div>
+    `;
+  }).join("");
+
+  return _section("Plans — this week (click a day for details)", `
+    <div class="scheduleHourAxis"><span>12am</span><span>6am</span><span>12pm</span><span>6pm</span><span>12am</span></div>
+    ${rows}
+  `);
+}
+
+function _renderScheduleDayDetail(day, blocks){
+  const segments = _scheduleBarSegments(blocks);
+  const bar = segments.map(seg => `
+    <div class="scheduleBlock" title="${seg.activity} ${seg.start}-${seg.end}"
+         style="left:${seg.left}%; width:${seg.width}%; background:${_scheduleColorFor(seg.activity)};"></div>
+  `).join("");
+
+  // Per the user's explicit ask: a block that's already passed today
+  // gets a plain checkmark next to it -- no color changes, colors stay
+  // exactly as they are. Only meaningful when viewing TODAY's own day
+  // (an arbitrary other day in the week has no "current time" to
+  // compare against).
+  const isToday = _lastCalendar && day === (_lastCalendar.weekday || "").toLowerCase();
+  const nowMinutes = isToday && _lastCalendarWorldTick != null && _worldState.tick != null
+    ? (() => {
+        const proj = _projectCalendarForward(_lastCalendar, _worldState.tick - _lastCalendarWorldTick);
+        return proj ? proj.hour * 60 + proj.minute : null;
+      })()
+    : null;
+
+  const sorted = [...(blocks || [])].sort((a, b) => _scheduleMinutes(a.start) - _scheduleMinutes(b.start));
+  const detailRows = sorted.map(b => {
+    const completed = nowMinutes != null && _scheduleMinutes(b.end) <= nowMinutes;
+    return `
+    <div class="scheduleDetailRow">
+      <div class="scheduleDetailSwatch" style="background:${_scheduleColorFor(b.activity)};"></div>
+      <div class="scheduleDetailTime">${b.start}–${b.end}</div>
+      <div>${(b.activity || "").replace(/_/g, " ")}${b.source ? ` <span style="opacity:.5">(${b.source})</span>` : ""}${completed ? ' <span title="Already happened today">✓</span>' : ""}</div>
+    </div>
+  `;
+  }).join("") || _empty("No blocks scheduled this day.");
+
+  return `
+    <div class="viewerSection">
+      <div class="scheduleDayDetailHeader">
+        <div class="viewerSectionTitle" style="margin:0;">${SCHEDULE_DAY_LABELS[day]} — full day</div>
+        <button class="scheduleBackBtn">← Week</button>
+      </div>
+      <div class="scheduleHourAxis"><span>12am</span><span>6am</span><span>12pm</span><span>6pm</span><span>12am</span></div>
+      <div class="scheduleBar scheduleBarLarge" style="margin-bottom:10px;">${bar}</div>
+      ${detailRows}
+    </div>
+  `;
+}
+
+// GET /api/finances/{id} -- bank balance / total debt / weekly debt cost,
+// none of which is part of the WS snapshot/delta payload (see api/
+// finances.py's own docstring for why). renderLifeTab() can be re-invoked
+// on every WS update while the Life tab is open, so results are cached
+// per character for a few seconds rather than re-fetched on every call.
+const _financesCache = {};   // characterId -> { data, fetchedAt }
+const FINANCES_CACHE_MS = 5000;
+
+async function _fetchCharacterFinances(characterId){
+  const cached = _financesCache[characterId];
+  const now = Date.now();
+  if(cached && now - cached.fetchedAt < FINANCES_CACHE_MS){
+    return cached.data;
+  }
+  try{
+    const res = await fetch(`/api/finances/${encodeURIComponent(characterId)}?sim_id=default`);
+    const data = await res.json();
+    if(data.ok){
+      _financesCache[characterId] = { data, fetchedAt: now };
+      return data;
+    }
+  } catch(e){ /* network hiccup -- fall through to stale cache below */ }
+  return cached?.data || null;
+}
+
+// GET /api/dependents/{id} -- each real c.dependents entry resolved into
+// a real whereabouts summary (see api/dependents.py's own docstring).
+// Same cached-fetch-and-patch shape as _fetchCharacterFinances above.
+const _dependentsCache = {};   // characterId -> { data, fetchedAt }
+const DEPENDENTS_CACHE_MS = 5000;
+
+async function _fetchCharacterDependents(characterId){
+  const cached = _dependentsCache[characterId];
+  const now = Date.now();
+  if(cached && now - cached.fetchedAt < DEPENDENTS_CACHE_MS){
+    return cached.data;
+  }
+  try{
+    const res = await fetch(`/api/dependents/${encodeURIComponent(characterId)}?sim_id=default`);
+    const data = await res.json();
+    if(data.ok){
+      _dependentsCache[characterId] = { data, fetchedAt: now };
+      return data;
+    }
+  } catch(e){ /* network hiccup -- fall through to stale cache below */ }
+  return cached?.data || null;
+}
 
 function renderLifeTab(c){
   const el = document.getElementById("viewerLifeTab");
@@ -4677,6 +5698,14 @@ function renderLifeTab(c){
   }
 
   // -- Finances (moved from Status) --
+  // Bank balance / total debt / weekly debt cost live in world["banks"]
+  // and household["loans"] -- neither is part of the WS snapshot/delta
+  // payload (both non-spatial, not viewport data) -- so those three
+  // fields are fetched separately via GET /api/finances/{id} and patched
+  // into #lifeFinancesExtra once they arrive, rather than blocking this
+  // synchronous render. Everything already present on the character
+  // (wallet cash, credit score, credit card debt, tax debt) still renders
+  // immediately below, unchanged.
   const wallet = (c.inventory || []).find(i => i.object_type === "wallet");
   const financeLines = [];
   const cash = wallet?.states?.cash ?? wallet?.cash;
@@ -4684,20 +5713,84 @@ function renderLifeTab(c){
   if(c.credit_score != null) financeLines.push(`credit score ${c.credit_score}`);
   if(c.government_debt > 0) financeLines.push(`<span class="viewerWarn">$${Math.round(c.government_debt)} owed in taxes</span>`);
   const walletItems = wallet?.items || [];
-  const bankCard = walletItems.find(i => i.object_type === "bank_card");
-  if(bankCard) financeLines.push(`${bankCard.bank} account`);
   const creditCards = walletItems.filter(i => i.object_type === "credit_card");
   for(const card of creditCards){
     financeLines.push(`${card.provider} credit card: $${Math.round(card.current_debt || 0)} / $${Math.round(card.max_credit || 0)}`);
   }
-  sections.push(_section("Finances", financeLines.length
-    ? `<div class="viewerStatRow">${financeLines.join(" · ")}</div>` : _empty("No financial data.")));
+  sections.push(_section("Finances", `
+    ${financeLines.length ? `<div class="viewerStatRow">${financeLines.join(" · ")}</div>` : _empty("No financial data.")}
+    <div id="lifeFinancesExtra" data-character-id="${c.id}">${_empty("Loading bank/debt details...")}</div>
+  `));
+  _fetchCharacterFinances(c.id).then(data => {
+    const extraEl = document.getElementById("lifeFinancesExtra");
+    // Guard against a fetch resolving after the tab moved to a different
+    // character (or closed) -- only patch in data for whoever's still
+    // actually shown.
+    if(!extraEl || extraEl.dataset.characterId !== c.id) return;
+    if(!data){ extraEl.innerHTML = ""; return; }
+    const lines = [];
+    for(const acct of data.bank_accounts || []){
+      if(acct.balance != null) lines.push(`${acct.bank}: $${Math.round(acct.balance)}`);
+    }
+    for(const loan of data.loans || []){
+      lines.push(`${(loan.kind || "loan").replace(/_/g, " ")} (${loan.provider || ""}): $${Math.round(loan.balance)} balance · ${loan.rate_pct}% APR`);
+      lines.push(`&nbsp;&nbsp;$${loan.weekly_principal.toFixed(2)}/week principal + $${loan.weekly_interest.toFixed(2)}/week interest = $${loan.weekly_payment.toFixed(2)}/week`);
+    }
+    if(data.total_debt > 0) lines.push(`<span class="viewerWarn">Total debt: $${Math.round(data.total_debt)}</span>`);
+    if(data.weekly_debt_cost > 0) lines.push(`$${data.weekly_debt_cost.toFixed(2)}/week household debt cost`);
+    extraEl.innerHTML = lines.length ? lines.join("<br>") : "";
+  });
 
   // -- Household / family --
   const householdLines = [];
   if(c.household_id) householdLines.push(`Household: ${c.household_id}`);
   if(c.family_role) householdLines.push(`Family role: ${c.family_role}`);
   sections.push(_section("Household", householdLines.length ? householdLines.join("<br>") : _empty("No household.")));
+
+  // -- Dependents --
+  // c.dependents (systems/child_care.py::_sync_dependents) is a real,
+  // priority-ordered (youngest/least-capable first) list of ids already
+  // on the character over the WS snapshot -- but the resolved whereabouts
+  // summary (last contact, current caretaker, expected activity, ...)
+  // needs cross-character lookups the frontend shouldn't re-derive, so
+  // it's fetched separately via GET /api/dependents/{id} and patched in,
+  // same shape as the Finances section above.
+  if((c.dependents || []).length){
+    sections.push(_section(`Dependents (${c.dependents.length})`, `
+      <div id="lifeDependentsExtra" data-character-id="${c.id}">${_empty("Loading dependents...")}</div>
+    `));
+    _fetchCharacterDependents(c.id).then(data => {
+      const extraEl = document.getElementById("lifeDependentsExtra");
+      if(!extraEl || extraEl.dataset.characterId !== c.id) return;
+      const deps = data?.dependents || [];
+      if(!deps.length){ extraEl.innerHTML = _empty("No dependents."); return; }
+
+      const cards = deps.map(d => {
+        const loc = d.last_known_location || {};
+        const locLine = loc.status === "away"
+          ? `Away — ${(loc.reason || "unknown").replace(/_/g, " ")}`
+          : `At (${Math.round(loc.x)}, ${Math.round(loc.y)})`;
+
+        const contactLine = d.last_contact
+          ? `Last contact: ${d.last_contact.medium.replace(/_/g, " ")} at tick ${d.last_contact.tick}`
+          : `Last contact: none on record`;
+
+        const lines = [locLine, contactLine];
+        if(d.expected_activity) lines.push(`Expected: ${d.expected_activity.replace(/_/g, " ")}`);
+        if(d.current_caretaker) lines.push(`Currently with: ${d.current_caretaker}`);
+        if(d.announced_departure === false) lines.push(`<span class="viewerWarn">Left without announcing departure</span>`);
+        if(!d.expected_home_today) lines.push(`<span class="viewerWarn">Not expected home today</span>`);
+        else if(d.expected_return_tick != null) lines.push(`Expected back around tick ${d.expected_return_tick}`);
+
+        return `
+          <div class="viewerCard">
+            <div class="viewerCardTitle">${d.name}${d.age != null ? ` (${d.age})` : ""}</div>
+            <div style="opacity:.7">${lines.join("<br>")}</div>
+          </div>`;
+      });
+      extraEl.innerHTML = cards.join("");
+    });
+  }
 
   const expectationTemplates = definitions.expectation_templates || {};
   const expectations = Object.values(c.expectations || {});
@@ -4738,6 +5831,274 @@ function renderLifeTab(c){
         Against ${_charName(targetId) || targetId}: <span class="viewerNeg">${weight.toFixed(1)}</span>
       </div>`);
     sections.push(_section(`Grievances (${grievances.length})`, lines.join("")));
+  }
+
+  el.innerHTML = sections.join("");
+}
+
+// =========================================================
+// WORK TAB -- work-shift summaries (kind==="work_beat" memories),
+// workplace contacts/reputation, hire date, boss/recruiter, full
+// contract details, and the chosen career-ladder path. Blurred/
+// unclickable in #viewerTabs when the character has no job (see the
+// tab-disable pass inside this function and the click-handler guard
+// below).
+// =========================================================
+
+let _workSummaryCount = 2;
+
+function renderWorkTab(c){
+  const btn = document.getElementById("viewerWorkTabBtn");
+  const el = document.getElementById("viewerWorkTab");
+  if(!el) return;
+
+  const contract = c.employment_contract;
+  const employed = !!(c.employed && contract);
+
+  if(btn){
+    btn.classList.toggle("disabled", !employed);
+    // If the currently-employed tab just became unemployed while it was
+    // the active one, fall back to Status rather than leaving a blurred,
+    // unclickable panel showing.
+    if(!employed && btn.classList.contains("active")){
+      btn.classList.remove("active");
+      document.querySelector('.viewerTabBtn[data-tab="status"]')?.classList.add("active");
+      document.getElementById("viewerWorkTab")?.classList.add("hidden");
+      document.getElementById("viewerSelection")?.classList.remove("hidden");
+    }
+  }
+
+  if(!employed){
+    el.innerHTML = _empty("Not currently employed.");
+    return;
+  }
+
+  const sections = [];
+  const tick = _worldState.tick || 0;
+
+  // -- Recent work-shift summaries --
+  const workBeats = (c.memories || [])
+    .filter(m => m.kind === "work_beat")
+    .sort((a, b) => (b.tick || 0) - (a.tick || 0));
+  const countControl = `
+    <div class="viewerStatRow" style="justify-content:flex-end; gap:6px; align-items:center;">
+      <span style="opacity:.6;">Show</span>
+      <input type="number" id="workSummaryCountInput" min="1" max="50" value="${_workSummaryCount}" style="width:48px;">
+      <span style="opacity:.6;">summaries</span>
+    </div>`;
+  const beatLines = workBeats.slice(0, _workSummaryCount).map(m => {
+    const stamp = _formatMemoryTimestamp(m.tick);
+    return `
+      <div class="viewerCard">
+        ${stamp ? `<div style="opacity:.6">${stamp}</div>` : ""}
+        ${m.text || m.detail || ""}
+      </div>`;
+  }).join("") || _empty("No work-shift summaries yet.");
+  sections.push(_section(`Recent Work Summaries (${workBeats.length})`, countControl + beatLines));
+
+  // -- Workplace contacts / reputation --
+  const contactIds = c.workplace_contact_ids || [];
+  if(contactIds.length){
+    const rows = contactIds.map(id => {
+      const contact = _worldState.characters?.[id];
+      const rel = (c.relationships || {})[id] || {};
+      const name = contact?.name || id;
+      const role = contact?.role || "colleague";
+      const rep = rel.workplace_reputation != null ? _signed(rel.workplace_reputation, 0) : "0";
+      const dep = rel.workplace_dependency != null ? rel.workplace_dependency.toFixed(0) : "0";
+      return `<div class="viewerCard">${name} <span style="opacity:.6">(${role})</span>
+        <div style="opacity:.7">reputation ${rep} · dependency ${dep}</div></div>`;
+    });
+    sections.push(_section(`Workplace Contacts (${contactIds.length})`, rows.join("")));
+  }
+
+  // -- Hire date / boss / recruiter --
+  const hireLines = [];
+  const hireStamp = _formatMemoryTimestamp(contract.signed_tick);
+  if(hireStamp) hireLines.push(`Hired: ${hireStamp}`);
+  if(contract.signed_tick != null){
+    const daysSince = Math.max(0, Math.floor((tick - contract.signed_tick) / 86400));
+    hireLines.push(`${daysSince} day${daysSince === 1 ? "" : "s"} since hire`);
+  }
+  const company = _worldState.companies?.[contract.company_id] || {};
+  const bossName = company.boss_id ? _charName(company.boss_id) : null;
+  if(bossName) hireLines.push(`Boss: ${bossName}`);
+  const recruiterName = contract.recruiter_id ? _charName(contract.recruiter_id) : null;
+  if(recruiterName) hireLines.push(`Hired by (recruiter): ${recruiterName}`);
+  sections.push(_section("Hiring", hireLines.length ? hireLines.join("<br>") : _empty("No hiring data.")));
+
+  // -- Contract details --
+  const contractLines = [];
+  if(contract.hourly_wage != null) contractLines.push(`$${contract.hourly_wage}/hr`);
+  if(contract.salary != null) contractLines.push(`$${Math.round(contract.salary)}/yr salary`);
+  if(contract.projected_raise_per_year_pct != null) contractLines.push(`~${contract.projected_raise_per_year_pct}%/yr projected raise`);
+  if(contract.hours_per_week != null) contractLines.push(`${contract.hours_per_week} hrs/week`);
+  if(contract.work_hours) contractLines.push(`Hours: ${contract.work_hours[0]}:00 – ${contract.work_hours[1]}:00`);
+  if(contract.work_days) contractLines.push(`Days: ${contract.work_days.map(d => SCHEDULE_DAY_LABELS[SCHEDULE_WEEKDAYS[d - 1]] || d).join(", ")}`);
+
+  const respLines = [];
+  for(const r of contract.employee_responsibilities || []){
+    respLines.push(`<div class="viewerCard">You: ${r.label} <span style="opacity:.6">(${r.cadence})</span></div>`);
+  }
+  for(const r of contract.employer_responsibilities || []){
+    respLines.push(`<div class="viewerCard">Employer: ${r.label} <span style="opacity:.6">(${r.cadence})</span></div>`);
+  }
+
+  const clauseLines = Object.entries(contract.conditional_clauses || {}).map(([id, cl]) => `
+    <div class="viewerCard">
+      <div class="viewerCardTitle">${(cl.description || id)}</div>
+      <div style="opacity:.7">${cl.trigger_mode || ""}${cl.triggered ? " · <span class=\"viewerNeg\">triggered</span>" : ""}</div>
+    </div>`);
+
+  sections.push(_section("Contract Details", `
+    ${contractLines.length ? `<div class="viewerStatRow">${contractLines.join(" · ")}</div>` : ""}
+    ${respLines.join("")}
+    ${clauseLines.join("")}
+  `));
+
+  // -- Career path --
+  const progress = c.career_progress;
+  if(progress && progress.title){
+    const companyLadder = (_worldState.companies?.[progress.company_id] || {}).career_ladder || {};
+    const levelData = (companyLadder[progress.title] || {})[progress.ambition] || {};
+    const required = levelData.hours_required;
+    const worked = progress.hours_worked || 0;
+    const progressLine = required
+      ? `${worked.toFixed(1)} / ${required} hours toward ${progress.title} (${progress.ambition} ambition)`
+      : `${worked.toFixed(1)} hours toward ${progress.title} (${progress.ambition} ambition)`;
+    sections.push(_section("Career Path", `<div class="viewerStatRow">${progressLine}</div>`));
+  } else {
+    sections.push(_section("Career Path", _empty("No active career goal.")));
+  }
+
+  el.innerHTML = sections.join("");
+}
+
+document.getElementById("viewerWorkTab")?.addEventListener("change", (e) => {
+  if(e.target.id !== "workSummaryCountInput") return;
+  const val = Math.max(1, Math.min(50, Number(e.target.value) || 2));
+  _workSummaryCount = val;
+  const c = _worldState.characters?.[selectedCharacterId];
+  if(c) renderWorkTab(c);
+});
+
+// =========================================================
+// HABITS TAB -- interests (c.values, the 12 VALUE_CATEGORIES importance/
+// conform weights) and hobbies (c.hobbies, resolved against definitions.
+// hobby_templates), plus supported sports teams as a natural hobby
+// extension. All real, already-generated data with no Inspector display
+// anywhere before this tab.
+// =========================================================
+
+const VALUE_CATEGORY_LABELS = {
+  family: "Family", friends: "Friends", work: "Work", leisure: "Leisure",
+  education: "Education", romance: "Romance", children: "Children",
+  religion: "Religion", politics: "Politics", community: "Community",
+  solidarity: "Solidarity", traditions: "Traditions",
+};
+
+function renderHabitsTab(c){
+  const el = document.getElementById("viewerHabitsTab");
+  if(!el) return;
+
+  const sections = [];
+
+  // -- Interests (c.values) --
+  const values = c.values || {};
+  const valueEntries = Object.entries(values)
+    .map(([cat, v]) => ({ cat, importance: v?.importance ?? 0, conform: v?.conform }))
+    .sort((a, b) => b.importance - a.importance);
+  if(valueEntries.length){
+    const lines = valueEntries.map(({ cat, importance, conform }) => {
+      const pct = Math.round(importance * 100);
+      const label = VALUE_CATEGORY_LABELS[cat] || cat;
+      const conformNote = conform === true ? "mainstream view"
+        : conform === false ? "non-conformist view" : "";
+      return `
+        <div class="viewerStatRow" style="justify-content:space-between; gap:8px;">
+          <span>${label}</span>
+          <span style="opacity:.75">${pct}%${conformNote ? ` · ${conformNote}` : ""}</span>
+        </div>`;
+    });
+    sections.push(_section("Interests", lines.join("")));
+  } else {
+    sections.push(_section("Interests", _empty("No interest data.")));
+  }
+
+  // -- Hobbies (c.hobbies -> definitions.hobby_templates) --
+  const hobbyTemplates = definitions.hobby_templates || {};
+  const hobbies = c.hobbies || [];
+  if(hobbies.length){
+    const lines = hobbies.map(hid => {
+      const tmpl = hobbyTemplates[hid];
+      const name = tmpl?.name || hid;
+      const category = tmpl?.category ? ` <span style="opacity:.6">(${tmpl.category})</span>` : "";
+      return `<div class="viewerCard">${name}${category}</div>`;
+    });
+    sections.push(_section(`Hobbies (${hobbies.length})`, lines.join("")));
+  } else {
+    sections.push(_section("Hobbies", _empty("No hobbies picked up yet.")));
+  }
+
+  // -- Sports fandom (supported pro teams) --
+  const sportsTeams = definitions.sports_teams || {};
+  const supported = Object.entries(c.supported_teams || {});
+  if(supported.length){
+    const lines = supported.map(([sport, teamId]) => {
+      const team = sportsTeams[teamId];
+      const teamName = team ? `${team.city ? team.city + " " : ""}${team.name || teamId}` : teamId;
+      return `<div class="viewerStatRow">${sport}: supports the ${teamName}</div>`;
+    });
+    sections.push(_section("Sports Fandom", lines.join("")));
+  }
+
+  el.innerHTML = sections.join("");
+}
+
+// =========================================================
+// SKILLS TAB -- c.skills (flat list, skill_templates registry -- empty
+// content today, confirmed via a live defs check, so this reliably
+// shows "none" rather than being broken), c.natural_talents (flat list,
+// natural_talents_registry), and c.abilities (the real D100 skill-check
+// engine's per-character progress, systems/abilities.py -- level/
+// successes/attempts per ability, resolved against ability_templates
+// for a display title and next-level threshold).
+// =========================================================
+
+function renderSkillsTab(c){
+  const el = document.getElementById("viewerSkillsTab");
+  if(!el) return;
+
+  const sections = [];
+
+  const skills = c.skills || [];
+  const skillLines = skills.map(s => `<div class="viewerCard">${String(s).replace(/_/g, " ")}</div>`);
+  sections.push(_section(`Skills (${skills.length})`, skillLines.join("") || _empty("No skills yet.")));
+
+  const talents = c.natural_talents || [];
+  const talentLines = talents.map(t => `<div class="viewerCard">${String(t).replace(/_/g, " ")}</div>`);
+  sections.push(_section(`Natural Talents (${talents.length})`, talentLines.join("") || _empty("No natural talents.")));
+
+  const abilityTemplates = definitions.ability_templates || {};
+  const abilities = Object.entries(c.abilities || {});
+  if(abilities.length){
+    const lines = abilities.map(([id, entry]) => {
+      const tmpl = abilityTemplates[id];
+      const name = tmpl?.name || id;
+      const levels = tmpl?.proficiency_levels || [];
+      const levelIdx = levels.findIndex(l => l.level === entry.level);
+      const levelInfo = levels[levelIdx];
+      const title = levelInfo?.title || entry.level || "";
+      const nextInfo = levels[levelIdx + 1];
+      const progress = levelInfo?.successes_to_next != null
+        ? ` — ${entry.successes || 0} / ${levelInfo.successes_to_next} to ${nextInfo ? nextInfo.title : "next level"}`
+        : " — max level";
+      return `<div class="viewerCard">${name}: <b>${title}</b>${progress}
+        <div style="opacity:.6">${entry.attempts || 0} attempts</div></div>`;
+    });
+    sections.push(_section(`Abilities (${abilities.length})`, lines.join("")));
+  } else {
+    sections.push(_section("Abilities", _empty("No ability progress yet.")));
   }
 
   el.innerHTML = sections.join("");
@@ -4820,12 +6181,52 @@ const _SEVERITY_COLORS = {
   severe:   "#d33",
 };
 
+// Physical appearance (c.body_features -- the real, populated source;
+// c.appearance is a separate, confirmed-dead field, always initialized
+// to null and never actually written anywhere) + demographics. Neither
+// had anywhere to show before this.
+const BUILD_LABELS = {
+  slim: "Slim", average: "Average", athletic: "Athletic",
+  stocky: "Stocky", heavy: "Heavy",
+};
+
+function renderAppearanceBlock(c){
+  const el = document.getElementById("bodyTabAppearance");
+  if(!el) return;
+
+  const bf = c.body_features || {};
+  const appearanceBits = [];
+  if(bf.height_cm != null) appearanceBits.push(`${bf.height_cm} cm`);
+  if(bf.build) appearanceBits.push(BUILD_LABELS[bf.build] || bf.build);
+  if(c.current_hairstyle) appearanceBits.push(`${c.current_hairstyle.replace(/_/g, " ")} hair`);
+  // Fertility-signal fields (female/intersex only) -- real data, just
+  // narrower in scope than a general appearance model.
+  for(const field of ["breast_size", "hip_ratio", "thigh_build"]){
+    if(bf[field]) appearanceBits.push(bf[field].replace(/_/g, " "));
+  }
+  // hair_color/eye_color/clothing_style (c.appearance) are always null
+  // today -- nothing in the backend ever assigns them -- so they're
+  // deliberately left out rather than always showing "not set".
+
+  const demographicsBits = [];
+  if(c.gender_identity) demographicsBits.push(c.gender_identity.replace(/_/g, " "));
+  if(c.sexual_orientation) demographicsBits.push(c.sexual_orientation.replace(/_/g, " "));
+  if(c.ssn) demographicsBits.push(`SSN ${c.ssn}`);
+
+  const lines = [];
+  if(appearanceBits.length) lines.push(`<div class="viewerStatRow">${appearanceBits.join(" · ")}</div>`);
+  if(demographicsBits.length) lines.push(`<div class="viewerStatRow" style="opacity:.8">${demographicsBits.join(" · ")}</div>`);
+  el.innerHTML = lines.join("") || "";
+}
+
 function renderBodyTab(c){
   const svgRoot = document.querySelector("#viewerBodyTab svg");
   const summaryEl = document.getElementById("bodyTabSummary");
   const rowsEl = document.getElementById("bodyTabRows");
   const diseaseEl = document.getElementById("bodyTabDiseases");
   if(!svgRoot || !summaryEl || !rowsEl || !diseaseEl) return;
+
+  renderAppearanceBlock(c);
 
   const hs = c?.health_state || {};
   const bodyParts = hs.body_parts || {};
@@ -4894,11 +6295,15 @@ const VIEWER_TAB_PANELS = {
   mind:          "viewerMindTab",
   memory:        "viewerMemoryTab",
   life:          "viewerLifeTab",
+  plans:         "viewerPlansTab",
+  work:          "viewerWorkTab",
+  habits:        "viewerHabitsTab",
+  skills:        "viewerSkillsTab",
 };
 
 document.getElementById("viewerTabs")?.addEventListener("click", (e) => {
   const btn = e.target.closest(".viewerTabBtn");
-  if(!btn) return;
+  if(!btn || btn.classList.contains("disabled")) return;
   const tab = btn.dataset.tab;
   document.querySelectorAll(".viewerTabBtn").forEach(b => b.classList.toggle("active", b === btn));
   for(const [name, panelId] of Object.entries(VIEWER_TAB_PANELS)){
@@ -5618,6 +7023,40 @@ function _updateViewport(ws) {
   }
 }
 
+// Confirmed live bug report: a character walking away from wherever the
+// camera happened to be left (e.g. after clicking them once in the
+// outliner -- see focusCameraOn()'s one-shot call site) falls outside
+// the server's per-client viewport radius (main.py::_view_radius/
+// in_view) and stops receiving updates at all -- reads as "the map
+// won't load"/"character walked out of view" even though their
+// underlying position is perfectly sane. Rather than widening the
+// radius (a real perf cost for every client, all the time), keep the
+// camera translated onto whoever's selected every state update -- a
+// soft follow that only shifts translation (preserving the user's own
+// zoom/angle, unlike focusCameraOn()'s full re-frame) so the character
+// -- and the geometry around them -- never leaves the tracked viewport
+// in the first place. controls.update() dispatches "change", which
+// connectWS()'s existing debounced listener already turns into a
+// _updateViewport() call, so the server-side radius re-centers for
+// free, no separate network call needed here.
+function _followSelectedCharacter(state) {
+  if (!selectedCharacterId) return;
+  const c = state.characters?.[selectedCharacterId];
+  if (!c || c.x == null || c.y == null) return;
+
+  const targetX = c.x - 10;
+  const targetZ = c.y - 7;
+  const dx = targetX - controls.target.x;
+  const dz = targetZ - controls.target.z;
+  if (dx === 0 && dz === 0) return;
+
+  controls.target.x += dx;
+  controls.target.z += dz;
+  camera.position.x += dx;
+  camera.position.z += dz;
+  controls.update();
+}
+
 async function _applyState(state) {
   definitions = state.definitions || definitions;
   _rebuildStanceMaps(state.definitions);
@@ -5630,11 +7069,14 @@ async function _applyState(state) {
   updateFloorplanWalls(state);
   await updateCharacters(state);
   updateSpeechBubbles(state);
+  _logCharacterEvents(state);
   updateOrgasmMeters(state);
   updateThoughtBubbles(state);
+  updateDebugEventBubbles(state);
   updateBadges(state);
   updatePerceptionOverlay(state);
   updateSelectionInspector(state);
+  _followSelectedCharacter(state);
 }
 
 async function _applyDelta(delta) {
@@ -5755,6 +7197,136 @@ if(timelineToggleBtn){
     localStorage.setItem(EVENT_TIMELINE_VISIBLE_KEY, _timelineVisible ? "1" : "0");
     _applyTimelineVisibility();
   });
+}
+
+// =========================================================
+// TERMINAL LOG
+// A scrollable, timestamped history of every speech/thought bubble --
+// updateSpeechBubbles()/updateThoughtBubbles() below call terminalLog()
+// at the exact point each already decides a bubble is showing NEW
+// content, so an entry lands here whenever (and only when) a bubble
+// would actually appear. Docked under the event timeline; expandable by
+// dragging its resize handle (native CSS `resize: vertical`).
+// =========================================================
+
+const TERMINAL_LOG_VISIBLE_KEY = "holosims_terminal_log_visible";
+const TERMINAL_LOG_MAX_ENTRIES = 500;
+const _lastLoggedSpeech = {};   // id -> last logged utterance, dedup across ticks
+
+let _terminalLogVisible = localStorage.getItem(TERMINAL_LOG_VISIBLE_KEY) === "1";
+
+const terminalLogPanel      = document.getElementById("terminalLogPanel");
+const terminalLogToggleBtn  = document.getElementById("terminalLogToggleBtn");
+
+function _applyTerminalLogVisibility(){
+  if(terminalLogPanel) terminalLogPanel.classList.toggle("hidden", !_terminalLogVisible);
+}
+_applyTerminalLogVisibility();
+
+if(terminalLogToggleBtn){
+  terminalLogToggleBtn.addEventListener("click", () => {
+    _terminalLogVisible = !_terminalLogVisible;
+    localStorage.setItem(TERMINAL_LOG_VISIBLE_KEY, _terminalLogVisible ? "1" : "0");
+    _applyTerminalLogVisibility();
+  });
+}
+
+// =========================================================
+// INSPECTOR VISIBILITY
+// Same show/hide-plus-remember-it pattern as the outliner/timeline/
+// terminal log toggles above.
+// =========================================================
+
+const INSPECTOR_VISIBLE_KEY = "holosims_inspector_visible";
+let _inspectorVisible = localStorage.getItem(INSPECTOR_VISIBLE_KEY) !== "0";
+
+const viewerInspectorEl  = document.getElementById("viewerInspector");
+const inspectorToggleBtn = document.getElementById("inspectorToggleBtn");
+
+function _applyInspectorVisibility(){
+  // Per the user's explicit ask: hidden whenever nothing is selected,
+  // regardless of the manual show/hide toggle's own state -- the manual
+  // toggle only matters once something IS actually selected again.
+  if(viewerInspectorEl) viewerInspectorEl.classList.toggle("hidden", !_inspectorVisible || !_somethingSelected);
+}
+_applyInspectorVisibility();
+
+if(inspectorToggleBtn){
+  inspectorToggleBtn.addEventListener("click", () => {
+    _inspectorVisible = !_inspectorVisible;
+    localStorage.setItem(INSPECTOR_VISIBLE_KEY, _inspectorVisible ? "1" : "0");
+    _applyInspectorVisibility();
+  });
+}
+
+function _terminalLogTimeLabel(){
+  if(!_lastCalendar || _lastCalendarWorldTick == null || _worldState.tick == null) return "--:--";
+  const proj = _projectCalendarForward(_lastCalendar, _worldState.tick - _lastCalendarWorldTick);
+  if(!proj) return "--:--";
+  const ampmHour = ((proj.hour % 12) || 12);
+  const ampm = proj.hour < 12 ? "AM" : "PM";
+  return `${ampmHour}:${String(proj.minute).padStart(2, "0")} ${ampm}`;
+}
+
+function terminalLog(kind, characterName, text){
+  if(!terminalLogPanel || !text) return;
+
+  const wasAtBottom = terminalLogPanel.scrollTop + terminalLogPanel.clientHeight
+    >= terminalLogPanel.scrollHeight - 4;
+
+  const entry = document.createElement("div");
+  entry.className = `terminalLogEntry ${kind}`;
+
+  const time = document.createElement("span");
+  time.className = "terminalLogTime";
+  time.textContent = `[${_terminalLogTimeLabel()}]`;
+  entry.appendChild(time);
+
+  const name = document.createElement("span");
+  name.className = "terminalLogName";
+  name.textContent = kind === "thought" ? `${characterName} (thought):` : `${characterName}:`;
+  entry.appendChild(name);
+
+  const text_ = document.createElement("span");
+  text_.className = "terminalLogText";
+  text_.textContent = kind === "said" ? `"${text}"` : text;
+  entry.appendChild(text_);
+
+  terminalLogPanel.appendChild(entry);
+
+  while(terminalLogPanel.children.length > TERMINAL_LOG_MAX_ENTRIES){
+    terminalLogPanel.removeChild(terminalLogPanel.firstChild);
+  }
+
+  // Only auto-scroll if the user was already at (or near) the bottom --
+  // otherwise a scroll-up-to-read-history gets yanked back down every
+  // time a new line arrives, which this feature explicitly exists to
+  // let the user do ("keep history so I can scroll up").
+  if(wasAtBottom) terminalLogPanel.scrollTop = terminalLogPanel.scrollHeight;
+}
+
+// Deliberately independent of updateThoughtBubbles()'s own dedup/timer
+// logic -- that function early-returns entirely when the debug 3D
+// thought-bubble overlay is switched off (_debugSettings.showThoughtBubbles),
+// but the terminal log is meant to keep a real history regardless of
+// whether that debug overlay happens to be on. Own dedup tracker so a
+// thought that's still the same across many ticks isn't re-logged.
+const _lastLoggedThought = {};   // id -> last logged c.last_thought
+
+function _logCharacterEvents(state){
+  for(const [id, c] of Object.entries(state.characters || {})){
+    const thought = c.last_thought?.trim?.();
+    if(!thought) continue;
+    // Same reload-seeds-as-fresh bug as the speech tracker above: seed
+    // silently on first sight of a character rather than logging their
+    // already-existing (possibly long-stale) last_thought as if it just
+    // happened.
+    const seenBefore = Object.prototype.hasOwnProperty.call(_lastLoggedThought, id);
+    if(thought !== _lastLoggedThought[id]){
+      _lastLoggedThought[id] = thought;
+      if(seenBefore) terminalLog("thought", c.name || id, thought);
+    }
+  }
 }
 
 function _ticksAgoLabel(ticks){
@@ -5950,9 +7522,35 @@ if(outlinerSearchEl){
   });
 }
 
+// Per the user's explicit ask: selecting a character (by ANY method --
+// clicking their 3D model, or the outliner list itself) should highlight
+// their row in the outliner. Each row now carries data-character-id
+// (see its creation above) so this can find it directly regardless of
+// how the selection happened, rather than only the outliner's own click
+// handler knowing to toggle its own class.
+function _syncOutlinerHighlight(){
+  for(const row of document.querySelectorAll(".outlinerRow")){
+    row.classList.toggle("selected", row.dataset.characterId === selectedCharacterId);
+  }
+}
+
+// Mirrors backend/systems/offgrid.py's _UNCAPPED_DURATION_REASONS long-
+// stay subset -- a raw minutes countdown reads as meaningless/unreadable
+// at day-plus scale, so these show "next update in N days" instead,
+// reading the real _next_long_stay_checkin_tick field directly rather
+// than re-deriving the 30-day schedule client-side.
+const LONG_STAY_REASONS = new Set(["jail", "cps_care", "held_pending_trial", "temporary_separation"]);
+
 function _outlinerStatus(c, tick){
   if(c.alive === false) return { text: "dead", cls: "dead" };
   if(c.off_grid){
+    if(LONG_STAY_REASONS.has(c.off_grid_reason)){
+      const reason = c.off_grid_reason.replace(/_/g, " ");
+      const nextCheckin = c._next_long_stay_checkin_tick;
+      const daysLeft = nextCheckin != null ? Math.max(0, Math.ceil((nextCheckin - tick) / 86400)) : null;
+      const update = daysLeft != null ? `next update in ${daysLeft}d` : "away";
+      return { text: `${reason} — ${update}`, cls: "longstay" };
+    }
     const remain = (c.return_tick || tick) - tick;
     const backIn = remain > 0 ? `back in ~${Math.max(1, Math.round(remain / 60))}m` : "due back";
     const reason = c.off_grid_reason ? c.off_grid_reason.replace(/_/g, " ") : "off-grid";
@@ -6034,30 +7632,34 @@ function renderOutliner(data){
     for(const c of filteredMembers){
       const row = document.createElement("div");
       row.className = "outlinerRow";
+      row.dataset.characterId = c.id;
+      if(c.id === selectedCharacterId) row.classList.add("selected");
+
+      const status = _outlinerStatus(c, data.tick);
 
       const name = document.createElement("span");
-      name.className = "outlinerRowName";
+      name.className = "outlinerRowName" + (status.cls === "longstay" ? " outlinerRowNameAway" : "");
       name.textContent = c.name || c.id;
       row.appendChild(name);
 
-      const status = _outlinerStatus(c, data.tick);
       const statusEl = document.createElement("span");
       statusEl.className = "outlinerRowStatus" + (status.cls ? " " + status.cls : "");
       statusEl.textContent = status.text;
       row.appendChild(statusEl);
 
       row.addEventListener("click", () => {
-        for(const el of outlinerTreeEl.querySelectorAll(".outlinerRow.selected")) el.classList.remove("selected");
-        row.classList.add("selected");
-
         // Same selection path a 3D-viewport click takes (see the
         // pointerdown handler above) -- inspector + perception overlay +
         // LLM log all key off selectedCharacterId, not off anything
         // outliner-local.
         if(selectedCharacterId !== c.id) _perceptionRanges = null;
         selectedCharacterId = c.id;
+        _somethingSelected = true;
+        _applyInspectorVisibility();
+        _setNonStatusTabsVisible(true);
         renderCharacterInspector(c.id);
         showCharacterLLMLog(c.id);
+        _syncOutlinerHighlight();
 
         // Off-grid characters have no loaded mesh to frame a camera on --
         // x/y here is still their real last-known world position (from

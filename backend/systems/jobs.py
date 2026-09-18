@@ -12,6 +12,7 @@ Architecture:
   - character["current_job_start_tick"]   — tick when hired into current role
 """
 
+import copy
 import random
 import uuid
 
@@ -128,6 +129,15 @@ def _make_listing(ckey, job_id, job_tmpl, world_env):
     """Create a single job listing dict."""
     base_wage = job_tmpl.get("hourly_wage", job_tmpl.get("average_salary", 30000) / 2080)
     wage      = base_wage * world_env.get("average_salary_index", 1.0) * random.uniform(0.9, 1.12)
+
+    # Per the user's explicit ask: a job needing weekend/inconvenient-
+    # hours coverage (systems/scheduling.py::job_requires_shift_work())
+    # pays a real premium, applied once here at listing time so it's
+    # baked into the wage a character actually gets hired at -- not a
+    # per-shift bonus recomputed elsewhere.
+    from systems.scheduling import job_requires_shift_work, SHIFT_WORK_PAY_PREMIUM
+    if job_requires_shift_work(job_tmpl):
+        wage *= (1 + SHIFT_WORK_PAY_PREMIUM)
     return {
         "id":              _listing_id(),
         "company_id":      ckey,
@@ -336,7 +346,13 @@ def apply_for_job(c, world, job_id=None):
     Applying doesn't immediately schedule an interview -- see
     advance_job_application() for the real multi-day, multi-stage
     pipeline this now enters."""
-    if c.get("employed") or c.get("job_application"):
+    # Confirmed live bug (player report: a just-retired character showed
+    # employed again moments later): this had no concept of "retired" at
+    # all -- systems/retirement.py::maybe_retire() sets employed=False,
+    # which looked exactly like an ordinary unemployed adult to this
+    # automatic per-tick path, so it just re-hired them right back into
+    # a new job before the retirement was ever visibly confirmed.
+    if c.get("employed") or c.get("job_application") or c.get("retired"):
         return
     if world.get("tick", 0) < c.get("_next_application_tick", 0):
         return
@@ -402,9 +418,22 @@ def apply_for_job(c, world, job_id=None):
         return
 
     tier = job.get("complexity_tier", 1)
+
+    # A real, named point of contact for this specific application --
+    # ephemeral (never added to workplace_contact_ids, see systems/
+    # workplace_npc.py's cap) unless the same person coincidentally
+    # already is a real colleague there. Generated straight via
+    # generate_workplace_npc(), not get_or_create_workplace_contact(),
+    # precisely so it does NOT consume a workplace_contact_ids slot.
+    from systems.workplace_npc import generate_workplace_npc
+    defs = world.get("definitions", {})
+    recruiter_template = defs.get("job_templates", {}).get(job.get("job_template_id")) or {"name": job.get("title")}
+    recruiter = generate_workplace_npc("recruiter", job.get("company_id"), recruiter_template, world)
+
     c["job_application"] = {
         "job_id":                 job["id"],
         "company_id":             job.get("company_id"),
+        "recruiter_id":           recruiter["id"],
         "stages":                 _stage_plan(tier),
         "stage_index":            0,
         "stage_deadline_tick":    world["tick"] + _days_to_ticks(*_STAGE_WAIT_DAYS["interview_1"]),
@@ -532,7 +561,206 @@ def _extend_offer(c, world, app, job):
             emit("job_offer_declined", {"character_id": c["id"], "job_id": job["id"]})
             return
 
-    _hire(c, world, job, offered_wage)
+    _dispatch_sign_contract(c, world, app, job, offered_wage)
+
+
+def _dispatch_sign_contract(c, world, app, job, offered_wage):
+    """Per the user's explicit ask: accepting an offer isn't the same
+    moment as actually being employed -- a real, scheduled appointment
+    to go sign the paperwork sits between them. Employment only
+    finalizes (see _on_sign_contract_return -> _hire()) once that trip
+    actually resolves."""
+    from systems.offgrid import send_offgrid
+    app["offered_wage"] = offered_wage
+    app["stage"] = "sign_contract"
+    if send_offgrid(c, world, "sign_contract", random.randint(30, 60)):
+        app["awaiting_travel_return"] = True
+        store_memory(c, f"Accepted the offer for {job['title']} -- heading in to sign the paperwork.",
+                     0.55, ["job", "offer_accepted"], "job", world["tick"])
+    else:
+        # Couldn't make the trip this cycle -- retry shortly, same
+        # pattern as the on-site interview stage's own retry above.
+        app["stage_deadline_tick"] = world["tick"] + random.randint(3600, 7200)
+
+
+def _on_sign_contract_return(c, world):
+    """Called from offgrid.py::process_return() when a "sign_contract"
+    trip concludes -- this is where employment actually finalizes."""
+    app = c.get("job_application")
+    if not app or app.get("stage") != "sign_contract" or not app.get("awaiting_travel_return"):
+        return
+    app["awaiting_travel_return"] = False
+    job = next((j for j in world.get("job_listings", []) if j["id"] == app["job_id"]), None)
+    if not job or not job.get("open"):
+        c["job_application"] = None
+        return
+    _hire(c, world, job, app.get("offered_wage", job.get("hourly_wage", 15)))
+
+
+DEFAULT_PROJECTED_RAISE_PER_YEAR_PCT = 2.0
+
+
+def _get_or_create_contract_template(world, company_key, job_template_id):
+    """A standard contract TEMPLATE, shared by every hire into the same
+    (company, job_template) pair -- lazily created once, cloned (deep
+    copy) by _stamp_employment_contract() rather than hardcoded inline
+    per hire. Holds the real fields every hire into that exact role
+    should share: responsibilities, conditional_clauses, the projected
+    raise rate."""
+    company = world.setdefault("companies", {}).setdefault(company_key, {})
+    templates = company.setdefault("contract_templates", {})
+    existing = templates.get(job_template_id)
+    if existing:
+        return existing
+
+    template = {
+        "employee_responsibilities": [
+            {"id": "show_up_for_shifts", "label": "Show up for scheduled shifts",
+             "cadence": "daily", "category": "work"},
+            {"id": "follow_workplace_conduct", "label": "Follow workplace conduct standards",
+             "cadence": "weekly", "category": "work"},
+        ],
+        "employer_responsibilities": [
+            {"id": "pay_wages_on_time", "label": "Pay wages on time",
+             "cadence": "weekly", "category": "financial"},
+            {"id": "provide_scheduled_hours", "label": "Provide the contracted hours",
+             "cadence": "weekly", "category": "work"},
+        ],
+        "conditional_clauses": {
+            "late_payment_termination": {
+                "description": "You may quit without notice if wages are 7+ days late",
+                "check_type": "payment_overdue", "params": {"days": 7},
+                "trigger_mode": "optional", "beneficiary": "employee",
+                "effect_options": [{"type": "quit_without_penalty"}],
+                "valid_until_tick": None, "max_invocations": None,
+                "invocation_count": 0, "triggered": False,
+            },
+            "chronic_understaffing_bonus": {
+                "description": "Automatic 5% raise if your scheduled hours are cut below half your contracted hours",
+                "check_type": "hours_shortfall", "params": {"weeks": 3},
+                "trigger_mode": "automatic", "beneficiary": "employee",
+                "effect_options": [{"type": "wage_adjustment", "pct": 0.05}],
+                "valid_until_tick": None, "max_invocations": None,
+                "invocation_count": 0, "triggered": False,
+            },
+        },
+        "projected_raise_per_year_pct": DEFAULT_PROJECTED_RAISE_PER_YEAR_PCT,
+    }
+    templates[job_template_id] = template
+    return template
+
+
+def _stamp_employment_contract(c, world, job):
+    """New, real employment contract (start date/hours/wage/working
+    hours) -- see brain.relationships/scheduling.py::
+    generate_week_schedule() for the contract-driven schedule branch
+    that reads this. Derived from the job template's own already-real
+    work_hours/work_days fields."""
+    defs = world.get("definitions", {})
+    tmpl = defs.get("job_templates", {}).get(job.get("job_template_id"), {})
+    work_hours = tmpl.get("work_hours", [9, 17])
+    work_days = tmpl.get("work_days", [1, 2, 3, 4, 5])
+    hours_per_week = max(0, work_hours[1] - work_hours[0]) * len(work_days)
+    contract_id = f"contract_{uuid.uuid4().hex[:8]}"
+
+    # Real, structured responsibilities/clauses shared by everyone hired
+    # into this same (company, role) -- deep-copied so per-character
+    # mutations (an invoked clause, a wage bump) never leak back into
+    # the shared template.
+    company_key = job.get("company_id")
+    template = _get_or_create_contract_template(world, company_key, job.get("job_template_id"))
+    employee_responsibilities = copy.deepcopy(template["employee_responsibilities"])
+    employer_responsibilities = copy.deepcopy(template["employer_responsibilities"])
+    conditional_clauses = copy.deepcopy(template["conditional_clauses"])
+    projected_raise_per_year_pct = template.get("projected_raise_per_year_pct", DEFAULT_PROJECTED_RAISE_PER_YEAR_PCT)
+
+    hourly_wage = c.get("hourly_wage")
+    salary = round((hourly_wage or 0) * hours_per_week * 52, 2)
+
+    c["employment_contract"] = {
+        "id":              contract_id,
+        "company_id":      company_key,
+        "job_template_id": job.get("job_template_id"),
+        "start_date":      dict(world.get("calendar", {})),
+        "hourly_wage":     hourly_wage,
+        "salary":          salary,
+        "projected_raise_per_year_pct": projected_raise_per_year_pct,
+        "hours_per_week":  hours_per_week,
+        "work_hours":      list(work_hours),
+        "work_days":       list(work_days),
+        "signed_tick":     world.get("tick", 0),
+        "last_paid_tick":  world.get("tick", 0),
+        "employee_responsibilities": employee_responsibilities,
+        "employer_responsibilities": employer_responsibilities,
+        "conditional_clauses": conditional_clauses,
+    }
+
+    app = c.get("job_application")
+    if app and app.get("recruiter_id"):
+        c["employment_contract"]["recruiter_id"] = app["recruiter_id"]
+
+    _synthesize_contract_expectations(c, world, contract_id,
+                                       employee_responsibilities, employer_responsibilities,
+                                       job.get("company_id"))
+
+    # A real, physical copy of the paperwork -- per the user's explicit
+    # ask, the contract shouldn't be just a data dict; this is the
+    # holdable/losable representation, cross-referenced back to the
+    # dict above (which stays the fast, structured source every other
+    # system -- e.g. scheduling.py -- reads).
+    from systems.personal_items import make_document, add_item
+    contract_content = dict(c["employment_contract"])
+    contract_content["has_digital_copy"] = True  # the employer keeps its own record too
+    doc = make_document("employment_contract", contract_content, world=world)
+    add_item(c, doc)
+    c["employment_contract"]["document_item_id"] = doc["id"]
+
+    from systems.document_search import register_digital_copy
+    register_digital_copy(c, world, doc)
+
+
+def _synthesize_contract_expectations(c, world, contract_id, employee_resps, employer_resps, company_id):
+    """Turns a contract's two responsibility arrays into real, tracked
+    c["expectations"] entries -- see expectations.py::synthesize_
+    expectation(). Employee-side ones are the character's own checkbox
+    (of_self); employer-side ones are what the character expects of
+    their EMPLOYER, with blame pre-attributed to the real boss NPC (see
+    systems/workplace_npc.py) since a contract already states who's
+    responsible for a given promise -- no dynamic discovery needed."""
+    from systems.expectations import synthesize_expectation
+
+    for resp in employee_resps:
+        synthesize_expectation(
+            c, f"contract:{contract_id}:{resp['id']}",
+            cadence=resp["cadence"], category=resp["category"], of_self=True,
+        )
+
+    boss_id = (world.get("companies", {}).get(company_id) or {}).get("boss_id")
+    blame_ids = [boss_id] if boss_id else []
+    for resp in employer_resps:
+        synthesize_expectation(
+            c, f"contract:{contract_id}:{resp['id']}",
+            cadence=resp["cadence"], category=resp["category"], of_self=False,
+            requires_others=True, blame_ids=blame_ids, grievance_event_type="contract_violated",
+        )
+
+
+
+def _generate_workplace_circle(c, world, job):
+    """A boss + 2 colleagues, generated once a hire actually finalizes
+    -- see systems/workplace_npc.py::get_or_create_workplace_contact()
+    (real generation, capped/reused roster, links both sides)."""
+    from systems.workplace_npc import get_or_create_workplace_contact
+    defs = world.get("definitions", {})
+    tmpl = defs.get("job_templates", {}).get(job.get("job_template_id")) or {"name": job.get("title")}
+    company_key = job.get("company_id")
+    if not company_key:
+        return
+    company = world.get("companies", {}).get(company_key, {})
+    if not company.get("boss_id"):
+        get_or_create_workplace_contact(c, world, "boss", company_key=company_key, job_template=tmpl)
+    for _ in range(2):
+        get_or_create_workplace_contact(c, world, "colleague", company_key=company_key, job_template=tmpl)
 
 
 def _hire(c, world, job, wage):
@@ -574,6 +802,12 @@ def _hire(c, world, job, wage):
     c["job_search_attempts"] = 0
     c["sketchy_contact_uses"] = 0
 
+    _stamp_employment_contract(c, world, job)
+    _generate_workplace_circle(c, world, job)
+
+    from systems.career_ladder import choose_career_path
+    choose_career_path(c, world)
+
     store_memory(c, f"Got hired as {job['title']}.", 0.8, ["job", "success"], "job", world["tick"])
     emit("character_hired", {
         "character_id": c["id"],
@@ -598,16 +832,22 @@ def _record_job_end(c, world, reason="quit"):
     elapsed = world["tick"] - start_tick
     years   = _ticks_to_years(elapsed)
 
+    job = c.get("job") if isinstance(c.get("job"), dict) else {}
     entry = {
         "job_template_id": c.get("job_template_id") or c.get("profession"),
         "job_id":          c.get("job_id"),
         "company_id":      c.get("company_id"),
-        "title":           c.get("job", {}).get("title") if isinstance(c.get("job"), dict) else c.get("profession"),
-        "industry":        c.get("job", {}).get("industry") if isinstance(c.get("job"), dict) else None,
+        "title":           job.get("title") if job else c.get("profession"),
+        "industry":        job.get("industry") if job else None,
         "start_tick":      start_tick,
         "end_tick":        world["tick"],
         "years":           years,
         "reason_left":     reason,
+        # Per the user's explicit ask: retirement pension math needs a
+        # real salary figure per past job -- neither field existed on a
+        # work_history entry before this.
+        "average_salary":  job.get("average_salary") if job else None,
+        "hourly_wage":     job.get("hourly_wage") if job else None,
     }
     c.setdefault("work_history", []).append(entry)
 
@@ -622,6 +862,18 @@ def _record_job_end(c, world, reason="quit"):
     c["current_job_start_tick"] = None
     c["company_id"]             = None
     c["job_template_id"]        = None
+
+    # Confirmed live bug (player report: a retired character's Life tab
+    # still showed their old career/hourly wage): c["occupation"]
+    # (character_gen.py, generation-time only) and c["profession"]/
+    # c["hourly_wage"] (apply_for_job(), set on hire) are separate flat
+    # fields several frontend/narration call sites read as a fallback
+    # independent of job_template_id/employed -- nothing cleared them on
+    # ANY job separation (quit, layoff, retirement all funnel through
+    # here), so they kept reading as still-employed indefinitely.
+    c["occupation"] = "none"
+    c["profession"] = None
+    c["hourly_wage"] = None
 
 
 def quit_job(c, world):

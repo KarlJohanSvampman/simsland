@@ -48,7 +48,7 @@ from systems.excuses    import check_visible_lies_for_observer, check_witnessed_
 
 # -- Medium (÷10-20) ---------------------------------------------
 from brain.memory       import decay_memories
-from brain.beliefs      import polarization_drift, compute_alignment
+from brain.opinions     import polarize_opinions, compute_political_lean
 from brain.relationships import first_impression, update_relationship_state, ensure_relationship
 from systems.contact_designation import accumulate_hours, evaluate_weekly_designations
 from systems.peer_influence import resolve_cognitive_adoption
@@ -62,6 +62,7 @@ from systems.investments   import update_investment_behavior
 from systems.deliveries import update_deliveries
 from systems.service_worker_runtime import update_service_workers
 from systems.household_monitoring   import update_household_monitoring
+from systems.caretaker_negotiation  import tick_caretaker_negotiation
 
 # -- Slow (÷30-60) — still periodic ─────────────────────────────
 from systems.traffic    import update_ambient_traffic
@@ -69,7 +70,7 @@ from systems.media      import generate_news
 from brain.conversations import cleanup_conversations
 from systems.emergency  import trigger_incident, resolve, tick_fire_incidents, auto_report_incidents   # resolve polls arrival ticks
 from systems.health     import apply_severity_consequences
-from systems.law        import process_jail, process_trials, maybe_arrest_from_incidents
+from systems.law        import process_jail, process_trials, maybe_arrest_from_incidents, process_prison_reporting
 from systems.jobs       import generate_job_listings, tick_job_market, maybe_fire, advance_job_application, init_company_slots
 from systems.driver_license import advance_driver_license, maybe_practice_with_companion
 from systems.postal_service     import update_postal_service
@@ -103,6 +104,7 @@ from systems.persona_expectations import tick_persona_expectations
 from systems.libido import tick_libido
 from systems.intimate_item_discovery import tick_discovery_checks
 from systems.stories import decay_stories
+from systems.workplace_reputation import decay_workplace_views
 from systems.life_comparison import tick_life_comparison
 from systems.sports_leagues import tick_sports_leagues
 from systems.sports import schedule_game_day_events, kickoff_scheduled_games, apply_game_day_outcomes
@@ -121,6 +123,9 @@ from systems.sociopathy import (
 from systems.behavior_patterns import aggregate_daily_observations
 from systems.contagion       import tick_contagion_location, age_food_items
 from systems.child_care      import tick_child_needs
+from systems.child_welfare   import tick_child_welfare
+from systems.child_disclosure import tick_child_disclosure
+from systems.dependent_tracking import tick_dependent_checks
 from systems.bedroom_assignment import tick_bedroom_assignments
 from systems.plants           import tick_plants
 from systems.body_composition import tick_body_composition
@@ -161,6 +166,9 @@ from systems.social_events import (
     check_event_completions, check_maybe_deadlines, generate_world_events
 )
 from systems.calendar_events import check_calendar_reminders
+from systems.reminders import check_reminders
+from systems.contract_clauses import tick_contract_clauses, tick_pending_payouts
+from systems.insurance import tick_insurance_renewals
 from systems.story      import update_story_arc
 from systems.events     import maybe_generate_shared_event
 
@@ -208,7 +216,27 @@ _pending_agent_ids = set()
 # thread may still be leaked and running forever, but the character
 # themselves gets to make progress again rather than being silently
 # frozen for the rest of the session.
-STALE_PENDING_SECONDS = 30.0
+#
+# Confirmed live regression from THIS design in turn, once
+# llm/llm_gate.py's real single-concurrency priority queue existed:
+# 30s is comfortably SHORTER than this deployment's actual think()
+# latency (confirmed via the live prompt log -- routinely 34-90s per
+# call, remote Ollama). Every 30s a character was still "pending," a
+# BRAND NEW think() got dispatched and queued behind the still-running
+# old one (same priority -- same-tier arrivals never preempt each
+# other, they just FIFO), which only delayed that new call's own start
+# time further. With several characters doing this simultaneously,
+# fresh same-character retries piled up in the gate faster than the
+# single concurrent slot could drain them, so almost no decision ever
+# finished before being superseded by yet another retry -- confirmed
+# live: a freshly-spawned household's cognition state showed
+# last_think_tick stuck at -1 (never once completed) after 15+ minutes
+# and dozens of dispatches, despite the prompt log showing real,
+# successfully-decided actions the whole time. Set safely above
+# llm_client.py::call_llm_safe's own 150s worst-case timeout instead --
+# a call that's merely slow (the common case here) now has room to
+# actually land, and a genuinely hung one still recovers, just later.
+STALE_PENDING_SECONDS = 180.0
 _pending_agent_since = {}
 
 # Per-character dispatch counter -- guards against a genuinely leaked
@@ -298,6 +326,27 @@ def _is_month_start_midnight(world):
     if world.get("_last_monthly_stamp") == stamp:
         return False
     world["_last_monthly_stamp"] = stamp
+    return True
+
+
+def _is_hour_boundary(world):
+    """Same one-shot-per-period stamp guard as _is_monday_midnight above,
+    but for real hour boundaries -- cal["minute"] stays 0 for a full 60
+    ticks (see advance_calendar()), so a bare minute==0 check would fire
+    60 times an hour without this. Note this is real calendar-boundary
+    detection, NOT the same thing as home_presence.py's
+    HOME_PRESENCE_TICKS_PER_HOUR sampling (a tick-count divisor that
+    happens to equal an hour but isn't boundary-aware) -- see that
+    module's own docstring for the distinction; systems/
+    household_summary.py's hourly rollup needs a real boundary, not a
+    sample."""
+    cal = world.get("calendar", {})
+    if cal.get("minute") != 0:
+        return False
+    stamp = f"{cal.get('year')}-{cal.get('month')}-{cal.get('day')}-{cal.get('hour')}"
+    if world.get("_last_hourly_stamp") == stamp:
+        return False
+    world["_last_hourly_stamp"] = stamp
     return True
 
 
@@ -400,7 +449,22 @@ def tick(world):
     set_current_tick(t)
 
     advance_calendar(world)
-    characters = list(world.get("characters", {}).values())
+    # Workplace NPCs (systems/workplace_npc.py) are real characters (they
+    # live in world["characters"], hold relationships, accrue workplace_
+    # reputation/dependency) but deliberately have no body/needs/x/y at
+    # all -- by design, per their own docstring, "never physically
+    # rendered or walked". Every one of the ~30 population-wide sweeps
+    # below (schedules, life comparison, socioeconomics, ...) assumes a
+    # full character shape and crashes on one of these bare dicts, so
+    # they're excluded at this single source point rather than needing a
+    # guard added to every sweep individually. Systems that DO need to
+    # reach them (workplace_reputation decay, career_ladder, contract
+    # clauses) find them via world["companies"]/workplace_contact_ids,
+    # never through this generic list.
+    characters = [
+        c for c in world.get("characters", {}).values()
+        if not c.get("is_workplace_npc")
+    ]
 
     # -- Weekly ─────────────────────────────────────────────
     if _is_monday_midnight(world):
@@ -414,6 +478,11 @@ def tick(world):
         tick_baby_weekly(world)
         tick_conditioning_weekly(world)
         apply_expenses(world)   # issues this week's household bills (rent/food/hobbies/credit cards/loans)
+        from systems.retirement import pay_weekly_pension
+        from systems.insurance import pay_weekly_premium
+        for c in characters:
+            pay_weekly_pension(c, world)    # retired characters draw their own real pension/disability check
+            pay_weekly_premium(c, world)    # insured characters pay this week's premium (or lapse if they can't)
         recall_overdue_loans(world)   # returns any borrowed item past its due date to its real owner
         schedule_upcoming_legislation(world)   # keeps a real upcoming bill queued at all times
         try:
@@ -429,6 +498,19 @@ def tick(world):
                 resolve_cognitive_adoption(world, _defs_weekly, _weekly_learners)
         except Exception:
             pass
+
+        from systems.household_summary import update_household_weekly_summaries
+        update_household_weekly_summaries(world)
+
+    # -- Hourly: household activity log -> narrated summary ─
+    if _is_hour_boundary(world):
+        from systems.household_summary import update_household_hourly_summaries
+        update_household_hourly_summaries(world)
+
+    # -- Daily: household hourly summaries -> one daily summary ─
+    if _is_new_calendar_day(world, "household_daily_summary"):
+        from systems.household_summary import update_household_daily_summaries
+        update_household_daily_summaries(world)
 
     # -- Monthly: adult/elderly trait+belief adoption ──────
     if _is_month_start_midnight(world):
@@ -453,6 +535,9 @@ def tick(world):
         # nudging the matching real environment stats -- see
         # systems/government_budget.py.
         tick_government_budget(world)
+
+        from systems.politics import tick_environment_opinion_drift
+        tick_environment_opinion_drift(world)
 
     # -- Every sim-minute: popularity decay (systems/validation.py) ──
     if t % 60 == 0:
@@ -496,6 +581,7 @@ def tick(world):
     agent_chars = [
         c for c in characters
         if not c.get("is_service_worker")
+        and not c.get("is_workplace_npc")
         and c.get("alive") is not False
         and c.get("posture") != "incapacitated"
         and c["id"] not in _pending_agent_ids
@@ -536,8 +622,8 @@ def tick(world):
 
     if every(world, CADENCE["polarization"], offset=3):
         for c in characters:
-            polarization_drift(c)
-            compute_alignment(c)
+            polarize_opinions(c)
+            compute_political_lean(c)
 
     if every(world, CADENCE["relationships"], offset=4):
         _update_nearby_relationships(characters, world)
@@ -604,6 +690,11 @@ def tick(world):
 
     if every(world, CADENCE["household_monitoring"], offset=8):
         update_household_monitoring(world)
+        tick_caretaker_negotiation(world)
+
+    if every(world, CADENCE["mentality_compilation"], offset=12):
+        from systems.mentality import tick_mentality_compilation
+        tick_mentality_compilation(world)
 
     # -- Medium: market (÷20) ───────────────────────────────
     if every(world, CADENCE["market"], offset=9):
@@ -699,10 +790,17 @@ def tick(world):
         for c in characters:
             process_jail(c, world)     # emits character_released
         process_trials(world)          # emits character_jailed / character_acquitted
+        process_prison_reporting(world)  # mail-scheduled self-surrender + failure-to-appear
+        from systems.offgrid import tick_long_stay_checkins
+        tick_long_stay_checkins(world)  # periodic narration for long off-grid stays
 
     if every(world, CADENCE["news"], offset=17):
         generate_news(world)
         maybe_generate_shared_event(world)
+
+    if every(world, CADENCE["reading"], offset=23):
+        from systems.scripted_conversations import tick_scripted_conversations
+        tick_scripted_conversations(world)  # plays back a remote call/sms shared_event's script
 
     # Conversations threaded via action_router.py's apply_speech() aren't
     # tied to a scripted activity with its own end condition anymore, so
@@ -731,6 +829,12 @@ def tick(world):
 
     if every(world, CADENCE["grievances"], offset=25):
         update_grievances(world)    # decay + emit confrontation_desired
+        from systems.goodwill import update_goodwill
+        update_goodwill(world)      # decay + stamp _bond_emitted, same cadence
+        from systems.offense_rationalization import decay_guilt_paranoia
+        for c in characters:
+            if c.get("_guilt_paranoia"):
+                decay_guilt_paranoia(c)
 
     if every(world, CADENCE["contract_checks"], offset=26):
         check_contract_violations(world)  # emits contract_violated
@@ -793,6 +897,7 @@ def tick(world):
             maybe_offer_corruption(c, world)
         for c in characters:
             decay_stories(c)
+            decay_workplace_views(c)
             aggregate_daily_observations(c, world)
             maybe_recruit_into_crime(c, world)
             maybe_write_diary(c, world)
@@ -882,6 +987,11 @@ def tick(world):
     # -- Child needs oversight + baseline accountability contract ──
     if every(world, CADENCE["child_care"], offset=37):
         tick_child_needs(world)
+        tick_child_welfare(world)
+        tick_child_disclosure(world)
+        for c in characters:
+            if c.get("dependents"):
+                tick_dependent_checks(c, world)
 
     # -- Age-based bedroom ownership ────────────────────────────────
     if every(world, CADENCE["bedroom_assignment"], offset=38):
@@ -1026,6 +1136,10 @@ def tick(world):
 
     if every(world, CADENCE["calendar_events"], offset=32):
         check_calendar_reminders(world)
+        check_reminders(world)
+        tick_contract_clauses(world)
+        tick_pending_payouts(world)
+        tick_insurance_renewals(world)
 
     # Story arcs are lightweight — keep per-tick
     for c in characters:

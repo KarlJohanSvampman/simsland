@@ -1,12 +1,49 @@
 import uuid
 
 
-def create_personal_letter(household, world, addressed_to_id, letter_type, content, sender_label="Unknown"):
+def _spawn_mail_document(household, world, mail, document_type, content):
+    """A real, physical, holdable copy of this mail item at the
+    household's real mailbox position -- see service_worker_runtime.py::
+    deposit_newspaper()'s identical, already-live pattern, reused
+    directly. Additive to the existing mailbox["items"] bookkeeping
+    dict (unchanged, every existing reader keeps working off it as
+    today) -- this is purely the physical representation a character
+    can actually go pick up. Silently a no-op if this household's
+    mailbox has no real x/y yet (schema_defaults.py normally backfills
+    this for every household)."""
+    mailbox = household.get("mailbox", {})
+    x, y = mailbox.get("x"), mailbox.get("y")
+    if x is None or y is None:
+        return
+    from systems.personal_items import make_document
+    doc = make_document(document_type, content, world=world)
+    doc["location"] = "placed"
+    doc["x"] = x
+    doc["y"] = y
+    doc["placed_at_tick"] = world.get("tick", 0)
+    world.setdefault("placed_items", {})[doc["id"]] = doc
+    mail["document_item_id"] = doc["id"]
+    try:
+        from sim_loop import _mark_dirty
+        _mark_dirty(world, placed_item_ids={doc["id"]})
+    except Exception:
+        pass
+
+
+def create_personal_letter(
+    household, world, addressed_to_id, letter_type, content,
+    sender_label="Unknown", requires_response=False, reply_by_tick=None,
+):
     """A piece of mail addressed to a SPECIFIC household member, not the
     household generically -- everything else in this module (bills, form
     requests) has no addressee concept at all. Used by systems/
     detective_work.py's unsettling-letter trigger; general-purpose enough
-    for any future personal-mail content too."""
+    for any future personal-mail content too.
+
+    requires_response/reply_by_tick are optional and default to the
+    exact prior behavior (False/None) for every existing caller --
+    systems/reminders.py is the first real consumer, watching for a
+    letter that expects a reply by a given tick and none ever arrived."""
     mail = {
         "id": f"mail_{uuid.uuid4().hex[:8]}",
         "type": "personal_letter",
@@ -15,8 +52,10 @@ def create_personal_letter(household, world, addressed_to_id, letter_type, conte
         "sender": sender_label,
         "title": "A letter",
         "content": content,
-        "requires_response": False,
+        "requires_response": requires_response,
         "response_type": None,
+        "reply_by_tick": reply_by_tick,
+        "reminder_sent": False,
         "opened": False,
         "responded": False,
         "urgency": 0.3,
@@ -28,6 +67,9 @@ def create_personal_letter(household, world, addressed_to_id, letter_type, conte
     mailbox["items"].append(mail)
     mailbox["has_mail"] = True
     mailbox["unopened_count"] += 1
+    _spawn_mail_document(household, world, mail, "personal_letter", {
+        "sender": sender_label, "letter_type": letter_type, "body": content,
+    })
     return mail
 
 
@@ -70,6 +112,9 @@ def create_form_request_mail(
     mailbox["items"].append(mail)
     mailbox["has_mail"] = True
     mailbox["unopened_count"] += 1
+    _spawn_mail_document(household, world, mail, "formal_request", {
+        "sender": sender, "title": title, "form_template": form_template,
+    })
 
     return mail
 

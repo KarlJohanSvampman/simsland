@@ -236,6 +236,11 @@ def trigger_reaction(c, world, reaction_type, tick=None, sound=True, mood=True):
     tick = tick if tick is not None else world.get("tick", 0)
     push_reaction(c, reaction_type, tick)
 
+    # Per the user's explicit ask: a visible red debug bubble + a real
+    # low-importance memory entry every time a reaction actually fires.
+    from systems.debug_log import log_reaction
+    log_reaction(c, world, reaction_type)
+
     if mood:
         for stat, amount in REACTION_MOOD_EFFECTS.get(reaction_type, {}).items():
             c[stat] = max(0.0, min(100.0, c.get(stat, 0.0) + amount))

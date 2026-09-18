@@ -216,6 +216,102 @@ body {
   font-size: 13px;
 }
 
+#surfaceEditorPanel {
+  padding: 8px 10px;
+  border-bottom: 1px solid #444;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+#surfaceEditorPanel h3 {
+  margin: 0 0 6px 0;
+  font-size: 13px;
+}
+
+#topDownToggleBtn {
+  width: 100%;
+  background: #2a2f38;
+  color: #cde;
+  border: 1px solid #555;
+  padding: 5px;
+  cursor: pointer;
+  font-size: 11px;
+}
+
+#topDownToggleBtn.active {
+  background: #4a7fa0;
+  color: #fff;
+}
+
+.surfaceRow {
+  margin-bottom: 6px;
+  padding: 6px;
+  background: #23272e;
+  border: 1px solid #3a4048;
+  border-radius: 3px;
+  font-size: 11px;
+}
+
+.surfaceRow.selected {
+  border-color: #6cf;
+}
+
+.surfaceRow input[type="text"],
+.surfaceRow input[type="number"] {
+  background: #2a2f38;
+  color: white;
+  border: 1px solid #555;
+  padding: 2px 4px;
+  font-size: 11px;
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: 2px;
+}
+
+.surfaceRowHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+}
+
+.surfaceRowHeader button {
+  background: #4a2020;
+  color: #f88;
+  border: none;
+  padding: 2px 6px;
+  cursor: pointer;
+  font-size: 10px;
+}
+
+#addSurfaceBtn {
+  width: 100%;
+  background: #1e3a1e;
+  color: #8d8;
+  border: 1px solid #2a5a2a;
+  padding: 5px;
+  cursor: pointer;
+  font-size: 11px;
+  margin-top: 4px;
+}
+
+.anchorPosRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+  font-size: 11px;
+}
+
+.anchorPosRow select {
+  flex: 1;
+  background: #2a2f38;
+  color: white;
+  border: 1px solid #555;
+  padding: 2px 4px;
+  font-size: 11px;
+}
+
 .traitRandRow {
   margin-bottom: 6px;
   display: flex;
@@ -375,6 +471,7 @@ button:hover {
     <button onclick="window.location='/animbank.html'">Anim Bank</button>
     <button onclick="window.location='/social_debug.html'">💬 Social Debug</button>
     <button onclick="window.location='/character_creator.html'">🧑 Character Creator</button>
+    <button onclick="window.location='/mentality_preview.html'">🧠 Mentality Preview</button>
   </div>
 
   <div id="tabs"></div>
@@ -420,6 +517,17 @@ button:hover {
   <div id="traitRandomizerPanel">
     <h3>Randomize Traits</h3>
     <div id="traitRandomizerEditor"></div>
+  </div>
+
+  <div id="surfaceEditorPanel">
+    <h3>Surfaces &amp; Anchor Positions</h3>
+    <button id="topDownToggleBtn" type="button">Top-Down View: Off</button>
+    <div id="surfaceEditorBody" style="display:none;">
+      <div id="surfaceListEditor"></div>
+      <button id="addSurfaceBtn" type="button">+ Add Surface</button>
+      <hr>
+      <div id="anchorPositionEditor"></div>
+    </div>
   </div>
 
   <div id="assetBrowserSection">

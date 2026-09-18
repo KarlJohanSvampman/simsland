@@ -1,5 +1,5 @@
 import random
-from brain.beliefs import compute_alignment, update_belief
+from brain.opinions import compute_political_lean, nudge_opinion
 POLICIES={
  "lower_taxes":{"primary":[("tax_rate",-0.04)],"secondary":[("health_quality",-0.02),("education_quality",-0.02)],"delayed":[{"key":"budget_deficit","delta":0.05,"delay":150}],"tags":["taxes","economy"]},
  "increase_policing":{"primary":[("crime_solve_rate",0.08)],"secondary":[("social_tension",0.05)],"delayed":[{"key":"crime_rate","delta":-0.03,"delay":120}],"tags":["crime","police"]},
@@ -98,10 +98,61 @@ def resolve_legislation_votes(world):
 def clamp(v): return max(0,min(2,v))
 def build_factions(world):
     chars=list(world["characters"].values())
-    for c in chars: compute_alignment(c)
+    for c in chars: compute_political_lean(c)
+
+    # Party-aware path: when definitions.json's political_party_templates
+    # exist, match each character with a compiled mentality to their
+    # best-tag-overlap party -- resolve_legislation_votes()/
+    # _character_leans_for() only ever read faction["agenda"]/["members"],
+    # never the faction's key name, so this is a drop-in for them.
+    defs = world.get("definitions") or {}
+    parties = defs.get("political_party_templates") or {}
+    if parties:
+        ensure_party_policies(world)
+        groups = {pid: [] for pid in parties}
+        fallback_groups = {"security":[],"welfare":[],"low_tax":[],"moderate":[]}
+        for c in chars:
+            tags = set((c.get("mentality") or {}).get("tags") or [])
+            if tags:
+                best_pid, best_overlap = None, -1
+                for pid, party in parties.items():
+                    overlap = len(tags & set(party.get("ideology_tags", [])))
+                    if overlap > best_overlap:
+                        best_pid, best_overlap = pid, overlap
+                groups[best_pid].append(c["id"])
+                c["faction_id"] = best_pid
+            else:
+                # No compiled mentality yet (a workplace NPC, or a
+                # character generated before this round) -- falls back to
+                # the original alignment split so nobody's left unbucketed.
+                a = c.get("political_lean", {})
+                g = "security" if a.get("security",0)>0.35 else "welfare" if a.get("economic",0)<-0.25 else "low_tax" if a.get("economic",0)>0.25 else "moderate"
+                fallback_groups[g].append(c["id"])
+                c["faction_id"] = g
+
+        parties_runtime = world.get("political_parties") or {}
+        factions = {
+            pid: {"id": pid, "name": party["name"], "members": groups[pid],
+                  # Static authored agenda + any AI-generated policies
+                  # (llm/party_policy.py) cached at world level -- merged
+                  # here at read time rather than mutating the shared,
+                  # cross-world definitions.json content.
+                  "agenda": list(party.get("agenda", []))
+                            + list(parties_runtime.get(pid, {}).get("generated_policies", {}).values()),
+                  "resources": 1000}
+            for pid, party in parties.items()
+        }
+        for g, members in fallback_groups.items():
+            if members:
+                factions[g] = {"id": g, "name": g.replace("_", " ").title(),
+                                "members": members, "agenda": [], "resources": 500}
+        world["factions"] = factions
+        return
+
+    # Legacy path -- no party templates defined, unchanged.
     groups={"security":[],"welfare":[],"low_tax":[],"moderate":[]}
     for c in chars:
-        a=c.get("political_alignment",{})
+        a=c.get("political_lean",{})
         g="security" if a.get("security",0)>0.35 else "welfare" if a.get("economic",0)<-0.25 else "low_tax" if a.get("economic",0)>0.25 else "moderate"
         groups[g].append(c["id"]); c["faction_id"]=g
     world["factions"]={
@@ -130,7 +181,16 @@ def check_election(world):
         for fid in e.get("candidates",[]):
             for cid in world["factions"][fid]["members"]:
                 c=world["characters"][cid]
-                for agenda in world["factions"][fid]["agenda"]: update_belief(c,agenda,"positive",.2,world["tick"])
+                # Real fix made during the beliefs->opinions migration: the
+                # old update_belief() call nudged a belief keyed by the
+                # POLICY id itself (e.g. "increase_policing"), which
+                # compute_alignment()/IDEOLOGY_AXES never actually read
+                # (only real topic ids like "crime"/"police" are) -- so
+                # this reinforcement never once reached political_alignment.
+                # Nudging the policy's own real tags closes that gap.
+                for agenda in world["factions"][fid]["agenda"]:
+                    for topic in POLICIES.get(agenda,{}).get("tags",[]):
+                        nudge_opinion(c,topic,"positive",.2,world["tick"])
     if world["tick"]>=e["next_tick"]:
         # Eligibility fix: this used to count a vote from EVERY character
         # in world["characters"] with no filter at all -- toddlers voted
@@ -147,3 +207,70 @@ def check_election(world):
             votes[c.get("faction_id") or "moderate"]=votes.get(c.get("faction_id") or "moderate",0)+1
         winner=max(votes,key=votes.get); e["result"]=winner; e["votes"]=votes; e["campaign_active"]=False; e["next_tick"]+=500; e["campaign_start_tick"]=e["next_tick"]-80
         for pol in world["factions"][winner].get("agenda",[])[:1]: apply_policy(world,pol)
+
+
+def choose_political_topic(a, b, world):
+    """Weights mentality_compiler.POLITICAL_TOPICS by the higher of the
+    two participants' party's topic_awareness for each topic, then
+    weighted-picks one -- a debate leans toward whatever either party
+    actually campaigns hardest on. Falls back to a uniform random topic
+    if neither participant has a resolved party/topic_awareness yet."""
+    import random
+    from llm.mentality_compiler import POLITICAL_TOPICS
+
+    defs = world.get("definitions") or {}
+    parties = defs.get("political_party_templates") or {}
+    a_aware = parties.get(a.get("faction_id"), {}).get("topic_awareness", {})
+    b_aware = parties.get(b.get("faction_id"), {}).get("topic_awareness", {})
+
+    weights = [max(a_aware.get(t, 0), b_aware.get(t, 0)) for t in POLITICAL_TOPICS]
+    if sum(weights) <= 0:
+        return random.choice(POLITICAL_TOPICS)
+    return random.choices(POLITICAL_TOPICS, weights=weights, k=1)[0]
+
+
+_POLICY_GENERATION_THRESHOLD = 0.75
+
+
+def ensure_party_policies(world):
+    """Lazily generates a real, AI-authored policy (llm/party_policy.py)
+    for any (party, topic) pair a party is highly aware of but hasn't
+    authored a real POLICIES entry for yet. Called from build_factions()
+    itself so it naturally piggybacks on however often that already
+    runs -- a no-op after the first successful generation per pair, per
+    party_policy.py's own world-level caching."""
+    from llm.party_policy import generate_party_policy
+
+    defs = world.get("definitions") or {}
+    parties = defs.get("political_party_templates") or {}
+    for pid, party in parties.items():
+        for topic, weight in party.get("topic_awareness", {}).items():
+            if weight >= _POLICY_GENERATION_THRESHOLD:
+                generate_party_policy(world, pid, topic)
+
+
+def tick_environment_opinion_drift(world):
+    """Monthly re-nudge (sim_loop.py's _is_month_start_midnight block) --
+    keeps opinions drifting with real, current conditions over time, not
+    just the one-time generation seed compile_political_views() applies.
+    Reuses nudge_opinion() (brain/opinions.py, shipped in the earlier
+    beliefs->opinions round) and llm/mentality_compiler.py's own
+    environment-stat gates/topic-nudge table directly -- no new
+    mechanism, just a new, small, real periodic caller of both."""
+    from llm.mentality_compiler import active_environment_topic_nudges
+
+    active_nudges = active_environment_topic_nudges(world)
+    if not active_nudges:
+        return
+
+    tick = world.get("tick", 0)
+    for c in world.get("characters", {}).values():
+        if c.get("is_workplace_npc"):
+            continue
+        for topic, delta in active_nudges:
+            # A small monthly drift, not a big jump -- a fraction of the
+            # one-time generation-seed nudge magnitude.
+            nudge_opinion(
+                c, topic, "positive" if delta > 0 else "negative", abs(delta) / 6.0, tick,
+                reasoning="Real local conditions.",
+            )

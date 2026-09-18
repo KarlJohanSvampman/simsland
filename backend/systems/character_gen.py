@@ -155,6 +155,80 @@ def _random_traits(defs, sex=None, age=None):
     picked = weighted_trait_pick(pool, pseudo_char, cognition_key, 3, existing=[cognition_trait])
     return [cognition_trait] + picked
 
+
+# ── Deep/religious/philosophical beliefs (belief_templates) ────────────────────
+# Selection only -- deterministic, safe to run inline here (mirrors
+# _random_traits()'s exact weighted-pick shape). The two LLM-backed
+# compilation steps (principles-from-beliefs, political-views-from-
+# principles) deliberately do NOT run here -- generate_character() is
+# sometimes called while api/editor.py's spawn flow holds world_lock(),
+# and a blocking LLM call in that critical section would stall the whole
+# tick loop (same reasoning this file's bio-generation block already
+# documents). See systems/mentality.py::tick_mentality_compilation() for
+# the deferred, un-locked sweep that actually compiles principles/opinions
+# for any character left with c["_mentality_pending"] = True below.
+def _random_beliefs(defs, traits, sex=None, age=None):
+    from systems.trait_chance import cognition_type_of, compute_learn_chance
+
+    pool = defs.get("belief_templates", {})
+    pool = {k: v for k, v in pool.items() if isinstance(v, dict)}
+    if not pool:
+        return []
+
+    cognition_key = cognition_type_of(traits)
+    pseudo_char = {"sex": sex, "age": age if age is not None else 0, "traits": traits}
+    # A fundamentalist/extremist character's own weighted pick skews toward
+    # the more extreme/controversial end of the belief spectrum -- the
+    # direct, content-light way to make that trait mean something at
+    # generation time, per the user's own explicit ask.
+    is_extreme = any(t in ("fundamentalist", "extremist") for t in (traits or []))
+
+    def _weight(belief_id, tmpl, existing_ids):
+        chance = compute_learn_chance(
+            tmpl, pseudo_char, cognition_key,
+            modifier_specs=[("trait_modifiers", "trait", set(traits or []))],
+        )
+        w = max(0.5, chance)
+        if is_extreme:
+            # A linear bump isn't enough to overcome how much lower a high-
+            # intensity belief's own base learn_chance already is (a cultist
+            # entry's base weight is a fraction of agnostic's) -- an
+            # exponential skew is what actually makes "ends up with the
+            # crazier belief" a real, measurable outcome rather than a
+            # rounding error.
+            w *= (1.0 + float(tmpl.get("intensity", 0.3))) ** 4
+        return w
+
+    from systems.schema_defaults import EXCLUSIVE_BELIEF_CATEGORIES
+
+    religion_ids = [bid for bid, t in pool.items() if t.get("category") == "religion"]
+    other_ids = [bid for bid, t in pool.items() if t.get("category") != "religion"]
+
+    picked = []
+    # Exactly one religion belief -- mandatory, mutually-exclusive category.
+    if religion_ids:
+        weights = [_weight(bid, pool[bid], picked) for bid in religion_ids]
+        picked.append(random.choices(religion_ids, weights=weights, k=1)[0])
+
+    # 1-2 more from every other category combined (2-3 total). Any OTHER
+    # exclusive category (e.g. "ideology") is not mandatory -- it's just one
+    # more candidate pool here -- but once one of its entries is picked,
+    # every other entry in that same category is removed from further
+    # consideration so at most one is ever held.
+    remaining = list(other_ids)
+    for _ in range(min(random.choice([1, 2]), len(remaining))):
+        if not remaining:
+            break
+        weights = [_weight(bid, pool[bid], picked) for bid in remaining]
+        choice = random.choices(remaining, weights=weights, k=1)[0]
+        picked.append(choice)
+        remaining.remove(choice)
+        chosen_category = pool[choice].get("category")
+        if chosen_category in EXCLUSIVE_BELIEF_CATEGORIES:
+            remaining = [bid for bid in remaining if pool[bid].get("category") != chosen_category]
+
+    return picked
+
 # ── Values (systems/schema_defaults.py::VALUE_CATEGORIES) ──────────────────────
 # Fully random per category for unrelated/adult-generated characters.
 # parent_values (a list of 1-2 parent c["values"] dicts, passed by
@@ -310,11 +384,17 @@ def _assign_job(defs, age_group, education):
     }
 
 def _assign_school(defs, age, age_group):
+    """Confirmed live bug: every school_templates entry stores its real
+    age eligibility as `age_range: [lo, hi]`, never `min_age`/`max_age`
+    -- this read the wrong field names, so `.get(..., default)` always
+    fell through to the (0, 99) default and every school was equally
+    eligible for every age, including a 6-year-old landing at a trade
+    college. Fixed to read the real field."""
     schools = defs.get("school_templates", {})
     if not schools: return None
     eligible = [
         k for k, s in schools.items()
-        if s.get("min_age", 0) <= age <= s.get("max_age", 99)
+        if (s.get("age_range") or [0, 99])[0] <= age <= (s.get("age_range") or [0, 99])[1]
     ]
     return random.choice(eligible) if eligible else None
 
@@ -411,6 +491,7 @@ def generate_character(defs, overrides=None, world=None):
 
     values          = overrides.get("values")              or _seed_values(defs, overrides.get("parent_values"))
     traits          = overrides.get("traits")             or _random_traits(defs, sex=sex, age=age)
+    held_beliefs    = overrides.get("held_beliefs")        or _random_beliefs(defs, traits, sex=sex, age=age)
     curiosity       = overrides.get("curiosity")           if overrides.get("curiosity") is not None else _seed_curiosity(traits)
     physical_traits = overrides.get("physical_traits")    or _random_physical_traits(defs)
     hobbies      = overrides.get("hobbies")            or _random_hobbies(defs)
@@ -498,6 +579,10 @@ def generate_character(defs, overrides=None, world=None):
         "values":              values,
         "curiosity":           curiosity,
         "traits":             traits,
+        "held_beliefs":       held_beliefs,
+        "principles":         [],
+        "mentality":          None,
+        "_mentality_pending": bool(held_beliefs),
         "cleanliness_threshold": cleanliness_threshold_for_traits(traits),
         "redecorate_threshold_days": redecorate_threshold_days,
         "online_profile":     online_profile,
@@ -740,6 +825,17 @@ def generate_character(defs, overrides=None, world=None):
             phone = make_smartphone(owner_id=character["id"], model=model,
                                      world={"definitions": defs})
             character["inventory"].append(phone)
+
+            # A phone with no way to recharge it is a dead phone waiting to
+            # happen -- systems/power.py's charge_device()/find_charger_for()
+            # already require a matching charger item in inventory (keyed by
+            # CHARGER_BY_OBJECT_TYPE) plus a wall_socket-tagged prop nearby,
+            # both real and wired, but nothing ever actually gave anyone the
+            # charger half of that pair.
+            from systems.personal_items import make_item
+            charger = make_item("phone_charger", world={"definitions": defs},
+                                 owner_id=character["id"])
+            character["inventory"].append(charger)
         except Exception:
             pass
 

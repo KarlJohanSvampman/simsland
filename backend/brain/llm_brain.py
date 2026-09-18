@@ -1,5 +1,6 @@
 import json
 import difflib
+import re
 
 from llm.llm_client import (
     call_llm_safe
@@ -35,7 +36,14 @@ Never invent or guess an id or a number you weren't given. When your action need
 specific person, prop, or thing, describe it in your own words — a separate system matches your
 description to the right one. A few things (proposals, unattended phones, worn/carried items,
 walls — see "reference by exact id" below, if present) don't have a natural way to describe them
-in words, so those are given to you with real ids; use those exact ids only for those things."""
+in words, so those are given to you with real ids; use those exact ids only for those things.
+
+Only interact with something for what it's actually for. A need only gets satisfied by something
+that genuinely serves it — a power outlet doesn't help you find a restroom, a bus stop doesn't
+give you water, a bookshelf doesn't feed you. If nothing nearby actually addresses a need you
+have, say so honestly in your narration (you can't find one, it's frustrating, you'll keep
+looking or ask someone) instead of inventing a connection between an unrelated object and a need
+it can't actually meet."""
 
 
 def _render_action_lines(offered, specs):
@@ -90,13 +98,16 @@ def _format_action_menu(available_actions):
 _ENVELOPE_FORMAT = """
 Respond with ONLY this JSON object — no markdown, no extra text, nothing outside the braces:
 {
-  "narration": "what you do, say, and think this turn, in your own words — 1-3 sentences",
+  "narration": "what you do and think this turn, in your own words — 1-3 sentences. If you're
+    speaking, describe the moment (e.g. 'I smile and reassure him') but do NOT restate the actual
+    words here -- those belong ONLY in \\"say\\" below, never duplicated in both places.",
   "action": {
     "type": "<one action type from the list above>",
     "target_description": "who or what you're acting on, in your own words (omit if no target is needed)",
     "detail": "extra detail the action needs, if the list above says so (omit otherwise)"
   },
-  "say": "the exact words you say aloud this turn, if any (omit or leave empty if you don't speak)",
+  "say": "the exact words you say aloud this turn, if any -- required whenever narration describes
+    you speaking; omit or leave empty only if you don't speak at all this turn",
   "then": "a short phrase for what you intend to do next, once this is done (optional)"
 }
 """
@@ -567,6 +578,160 @@ def _match_intention_type(phrase):
     return best_type if best_score >= 0.55 else None
 
 
+# Confirmed live bug (real player report + screenshot): the model is
+# told to put spoken words in the dedicated "say" field, separate from
+# "narration" -- but doesn't always comply, sometimes folding a quoted
+# line of dialogue into narration instead and leaving "say" empty
+# (e.g. narration: "I smile and respond to Paul, 'Not bad, just getting
+# ready for work...'"). That meant the character never got a real white
+# speech bubble for what was unmistakably them talking out loud -- only
+# the blue narration/thought bubble showed, reading as if they'd only
+# thought it. This is a deterministic best-effort fallback for exactly
+# that case, never overriding a real "say" value when one is present.
+#
+# Confirmed live bug in an EARLIER version of this fallback: a bare
+# `'(.+)'` (greedy, to survive an apostrophe inside the quoted line)
+# matched between two totally unrelated apostrophes -- e.g. "I'm
+# feeling overwhelmed... before addressing Paul Wright's question" --
+# manufacturing fake dialogue out of a narration that never quoted
+# anyone. Anchoring the quote to a real speech verb immediately before
+# it (say/respond/tell/ask/...) is what actually distinguishes "this is
+# a quotation" from "this narration happens to contain two apostrophes
+# that aren't a matched pair." Double quotes are tried first since they
+# can't collide with a contraction's/possessive's apostrophe at all.
+_SPEECH_CUE = (
+    r"\b(?:say|says|said|saying"
+    r"|respond|responds|responded|responding"
+    r"|repl(?:y|ies|ied|ying)"
+    r"|tell|tells|telling|told"
+    r"|ask|asks|asked|asking"
+    r"|whisper|whispers|whispered|whispering"
+    r"|shout|shouts|shouted|shouting"
+    r"|exclaim|exclaims|exclaimed|exclaiming"
+    r"|mutter|mutters|muttered|muttering"
+    r"|answer|answers|answered|answering)\b"
+)
+# Confirmed live bug in the FIRST version of this cue-anchor: "respond
+# to Paul Wright's question, but..." still matched, because a speech
+# verb followed by ANY quote-type character within range is not enough
+# -- "Wright's" own possessive apostrophe sits right there too, and
+# nothing distinguished it from a real opening quote. A real quotation
+# is always punctuated as "<verb> ..., '...'" or "<verb> ...: '...'" in
+# English -- requiring a literal comma/colon immediately before the
+# quote mark (with the character class still banning any stray quote
+# char in between) is what actually rules out a mid-sentence possessive/
+# contraction sitting between the verb and a real closing quote later on.
+_QUOTED_SPEECH_PATTERNS = (
+    re.compile(_SPEECH_CUE + r"[^\"'\n]{0,30}[,:]\s*\"([^\"]+)\"", re.IGNORECASE),
+    re.compile(_SPEECH_CUE + r"[^\"'\n]{0,30}[,:]\s*'(.+)'", re.IGNORECASE),
+)
+
+
+def _extract_quoted_speech(narration):
+    for pattern in _QUOTED_SPEECH_PATTERNS:
+        m = pattern.search(narration)
+        if m:
+            quoted = m.group(1).strip()
+            if quoted:
+                return quoted
+    return None
+
+
+# Confirmed live bug, deeper than the display glitch above: even once an
+# utterance is correctly extracted, a speech dict with no "target" never
+# gets threaded into a real conversation at all -- action_router.py::
+# apply_speech()'s entire conversation block (get_or_create_conversation,
+# add_message, waking the LISTENER specifically, scheduling their reply)
+# is gated on a resolved target character. Narration that clearly names
+# who's being spoken to ("I ... respond to Paul, '...'") carries that
+# information, but nothing extracted it -- speech["target_description"]
+# only ever got set by borrowing the ACTION's own target when the action
+# type happened to also be speak-like (_SPEAK_LIKE_TYPES), which a
+# narrated-mid-other-activity reply often isn't. This is what actually
+# produced "the reply never reaches the other character and the
+# conversation doesn't continue" -- not just a display issue.
+#
+# This is a best-effort SIGNAL, not the only fix -- apply_speech() itself
+# (systems/action_router.py) now also falls back to whichever real
+# co-present character is nearest when no target resolves at all, per
+# the user's own framing: you don't need to know someone's name for your
+# words to reach whoever's standing right there. This regex still adds
+# real value on top of that when multiple people are around and the
+# narration names a specific one of them. Case-insensitively matches the
+# same speech-cue verbs as the quote extractor above, but the captured
+# name itself stays case-SENSITIVE (must start with a capital letter) so
+# "responds to him"/"tells her" don't get misread as a literal name
+# called "Him"/"Her".
+_SPEECH_TARGET_PATTERN = re.compile(
+    r"(?i:" + _SPEECH_CUE + r"\s+(?:to\s+)?)([A-Z][a-zA-Z'-]{1,30})\b"
+)
+
+
+def _extract_speech_target_name(narration):
+    m = _SPEECH_TARGET_PATTERN.search(narration)
+    if m:
+        return m.group(1)
+    return None
+
+
+# Confirmed live gap (player report): narration very often describes a
+# real conversational beat -- "I decide to address his question", "I ask
+# him to elaborate" -- without the envelope's own "say" field being set
+# and without an anchored quote for _extract_quoted_speech() to find (by
+# design -- that extractor deliberately only fires on a real, punctuated
+# quotation, see the comment above it). The result was a silent
+# character: something was clearly said, but no actual line of dialogue
+# ever reached apply_speech()/the speech bubble. This is a looser
+# detector than _SPEECH_CUE -- it also catches the bare nouns
+# "question"/"response" the user pointed out, not just the verb forms --
+# used only to decide whether a follow-up call is worth making, never to
+# extract text itself.
+_SPEECH_IMPLIED_PATTERN = re.compile(
+    r"\b(?:question|questions|answer|answers|response|responses"
+    r"|ask|asks|asked|asking"
+    r"|repl(?:y|ies|ied|ying)"
+    r"|respond|responds|responded|responding)\b",
+    re.IGNORECASE,
+)
+
+
+def _fill_missing_speech(narration, char_id, priority):
+    """One small, focused follow-up call -- NOT the full per-tick
+    context/system prompt again, just enough to ask "what did you
+    actually say." A nice-to-have enrichment, never load-bearing: any
+    failure (timeout, malformed reply, preempted by a higher-priority
+    call) just leaves the character silent this tick, exactly like
+    before this existed. Returns an utterance string, or None."""
+    messages = [
+        {
+            "role": "system",
+            "content": (
+                "You are voicing one character's spoken line in a life "
+                "simulation, in the moment described below. Reply with "
+                "ONLY the exact words they say out loud right now, in "
+                "natural first-person spoken English -- no quotation "
+                "marks, no narration, no stage directions, no labels. "
+                "If they would not actually speak out loud in this "
+                "moment, reply with exactly: NONE"
+            ),
+        },
+        {"role": "user", "content": narration[:500]},
+    ]
+    try:
+        raw = run_llm_call(
+            call_llm_safe(messages, char_id=char_id),
+            priority=priority,
+        )
+    except Exception:
+        return None
+    if not isinstance(raw, str):
+        return None
+    text = raw.strip().strip('"').strip("'").strip()
+    if not text or text.upper().startswith("NONE"):
+        return None
+    return text
+
+
 def _to_legacy_decision(envelope, char_id=None):
     narration = (envelope.get("narration") or "").strip()
 
@@ -601,6 +766,8 @@ def _to_legacy_decision(envelope, char_id=None):
         decision["action"] = legacy_action
 
     say = (envelope.get("say") or "").strip()
+    if not say:
+        say = _extract_quoted_speech(narration) or ""
     if say:
         speech = {
             "utterance": say,
@@ -616,6 +783,19 @@ def _to_legacy_decision(envelope, char_id=None):
             action_target_desc = (decision["action"] or {}).get("target_description")
             if action_target_desc:
                 speech["target_description"] = action_target_desc
+
+        # Still nothing to go on (a reply narrated mid-other-activity,
+        # whose action type isn't speak-like at all) -- try pulling a
+        # named recipient straight out of the narration itself. Real
+        # resolution to a character id, and the nearest-co-present
+        # fallback when even this finds nobody, both happen in
+        # process_decision()/apply_speech() -- this only supplies the
+        # candidate name to resolve.
+        if not speech.get("target_description"):
+            target_name = _extract_speech_target_name(narration)
+            if target_name:
+                speech["target_description"] = target_name
+
         decision["speech"] = speech
 
     then = (envelope.get("then") or "").strip()
@@ -721,6 +901,32 @@ def think(
             return fallback_response()
 
         decision = _to_legacy_decision(data, char_id=char_id)
+
+    # Per the user's explicit ask: when the narration clearly describes a
+    # conversational beat (a question, a reply, an answer) but nothing
+    # upstream captured an actual line of dialogue -- no envelope "say",
+    # no anchored quote for _extract_quoted_speech() to find -- schedule
+    # one small follow-up call asking specifically what was said, rather
+    # than leaving the moment silent. Gated on speech still being empty
+    # so this never overrides a real "say"/quoted line already resolved.
+    if not decision.get("speech"):
+        narration_text = decision.get("thought") or ""
+        if narration_text and _SPEECH_IMPLIED_PATTERN.search(narration_text):
+            utterance = _fill_missing_speech(
+                narration_text, char_id,
+                PRIORITY_NORMAL if priority is None else priority,
+            )
+            if utterance:
+                speech = {
+                    "utterance": utterance,
+                    "speech_act": "declare",
+                    "topic": "",
+                    "target": None,
+                }
+                target_name = _extract_speech_target_name(narration_text)
+                if target_name:
+                    speech["target_description"] = target_name
+                decision["speech"] = speech
 
     if session is not None:
 

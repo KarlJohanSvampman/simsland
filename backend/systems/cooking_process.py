@@ -1,5 +1,3 @@
-import random
-
 from data.recipes import RECIPES as _PY_RECIPES
 
 def _get_recipes(world=None):
@@ -175,6 +173,38 @@ def begin_stage(
     ] = not is_active
 
     # =====================================================
+    # SURFACE REQUIREMENT
+    # =====================================================
+    # Confirmed live gap: recipe stages had zero awareness of what was
+    # physically nearby -- a "chop"/"mix" step resolved identically
+    # whether or not the character had any counter space. Checked once
+    # per stage (not every tick -- see update_cooking_process(), which
+    # used to be the natural-looking call site but would have over-
+    # counted a single missing stage many times over its own duration).
+    # A miss is a soft penalty (tracked here, applied to dish quality in
+    # finish_recipe()), not a hard block or a forced walk-to-counter --
+    # a character with no counter space still finishes the recipe, it
+    # just doesn't turn out as well.
+    primitives = (world.get("definitions") or {}).get("stage_primitives") or {}
+    prim = primitives.get(stage.get("primitive"), {})
+    if prim.get("requires_surface"):
+        from systems.props import find_preferred_surface, PREFERRED_SURFACE_RADIUS
+        # A table/counter tagged "cook_prep" (systems/props.py::
+        # find_preferred_surface) wins over the generic "prepare_food"
+        # anchor search when one's nearby; falls back to the untouched
+        # generic behavior (with its own same-room-scale radius --
+        # find_nearest_free_anchor() has no distance cutoff of its own)
+        # when nothing's tagged.
+        found = find_preferred_surface(c, world, "cook_prep", fallback_interaction="prepare_food")
+        has_surface = False
+        if found:
+            prop, _anchor = found
+            distance = abs(prop.get("x", 0) - c.get("x", 0)) + abs(prop.get("y", 0) - c.get("y", 0))
+            has_surface = distance <= PREFERRED_SURFACE_RADIUS
+        if not has_surface:
+            process["missing_surface_count"] = process.get("missing_surface_count", 0) + 1
+
+    # =====================================================
     # STAGE ANIMATION
     # =====================================================
     # Previously this function never touched c["animation_state"] at
@@ -337,22 +367,37 @@ def finish_recipe(
         ]
     ]
 
-    cooking_skill = c.get(
-        "cooking_skill",
-        0.3
-    )
+    # Real d100 skill check (systems/skill_checks.py) against the shared
+    # abilities.py "cooking" proficiency -- replaces the old standalone
+    # c["cooking_skill"] float + calculate_quality() formula entirely.
+    # The recipe's own 0-1 "difficulty" field still matters (a harder
+    # recipe should be harder to nail) -- folded in as a situational
+    # modifier on the shared "cook_recipe" baseDifficulty rather than a
+    # second parallel difficulty concept: 0.5 is neutral (the value the
+    # old formula centered on), higher makes it harder, lower easier.
+    from systems.skill_checks import resolve_skill_check
+    from systems.abilities import record_attempt
 
-    difficulty = recipe.get(
-        "difficulty",
-        0.5
-    )
+    recipe_difficulty = recipe.get("difficulty", 0.5)
+    # Missing counter space during a chop/mix stage (begin_stage()'s own
+    # surface-requirement check) is a real, additive penalty here -- 10
+    # difficulty points per miss, same order of magnitude as the recipe-
+    # difficulty term just above it.
+    surface_penalty = process.get("missing_surface_count", 0) * 10
+    extra_modifier = round((0.5 - recipe_difficulty) * 100) - surface_penalty
+    result = resolve_skill_check("cook_recipe", c, world, extra_actor_modifier=extra_modifier)
 
-    quality = calculate_quality(
-
-        cooking_skill,
-
-        difficulty
-    )
+    if result and not result.get("blocked"):
+        record_attempt(c, "cooking", world, result["success"], margin=result["actor_margin"])
+        # Quality reflects the FULL signed difference (can go negative on
+        # a bad miss, not just floored-at-0 like the progression-facing
+        # actor_margin) -- a recipe always produces something, per the
+        # user's own ask, its quality just ranges from a real disaster to
+        # a real triumph depending on how the roll actually went.
+        signed_margin = result["difficulty"] - result["roll"]
+        quality = max(0.0, min(1.0, signed_margin / 100))
+    else:
+        quality = 0.5
 
     nutrition = recipe.get(
         "nutrition",
@@ -410,43 +455,6 @@ def finish_recipe(
     ] = True
 
     c["active_process"] = None
-
-    # =====================================================
-    # EXPERIENCE
-    # =====================================================
-
-    c["cooking_skill"] = min(
-
-        1.0,
-
-        cooking_skill + 0.01
-    )
-
-
-# =========================================================
-# QUALITY
-# =========================================================
-
-def calculate_quality(
-
-    skill,
-
-    difficulty
-):
-
-    delta = skill - difficulty
-
-    quality = 0.5 + delta
-
-    quality += random.uniform(
-        -0.1,
-        0.1
-    )
-
-    return max(
-        0,
-        min(1.0, quality)
-    )
 
 
 # =========================================================

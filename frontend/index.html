@@ -67,6 +67,15 @@
     border-color: #6cf;
   }
 
+  /* Work tab is blurred/unselectable when the character has no job --
+     genuinely new UI, no existing Inspector tab is ever disabled. */
+  #viewerTabs button.disabled {
+    opacity: 0.4;
+    filter: blur(1px);
+    pointer-events: none;
+    cursor: default;
+  }
+
   #viewerEffectIcons {
     display: flex;
     flex-wrap: wrap;
@@ -116,8 +125,204 @@
     border-top: 1px solid #444;
   }
 
-  #viewerRelationshipsTab, #viewerMindTab, #viewerMemoryTab, #viewerLifeTab {
+  #viewerRelationshipsTab, #viewerMindTab, #viewerMemoryTab, #viewerLifeTab, #viewerPlansTab, #viewerWorkTab, #viewerHabitsTab, #viewerSkillsTab {
     font-size: 12px;
+  }
+
+  #bodyTabAppearance {
+    font-size: 12px;
+    margin-bottom: 8px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #444;
+  }
+
+  .intentionStatusDot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    margin-right: 5px;
+    vertical-align: middle;
+  }
+
+  #viewerSelectedName {
+    font-size: 15px;
+    font-weight: bold;
+    color: #9cf;
+    margin: 4px 0 10px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #333;
+  }
+
+  /* =========================
+     PLANS TAB
+     Weekly schedule grid (systems/scheduling.py's c["schedule"]["week"])
+     with day drill-down -- one horizontal 24h bar per day, colored
+     segments per block, click a day to zoom into just that one.
+  ========================= */
+
+  .scheduleDayRow {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 0;
+    cursor: pointer;
+    border-radius: 4px;
+  }
+
+  .scheduleDayRow:hover {
+    background: rgba(255,255,255,0.06);
+  }
+
+  .scheduleDayLabel {
+    width: 34px;
+    flex-shrink: 0;
+    color: #9cf;
+    font-weight: bold;
+  }
+
+  .scheduleBar {
+    position: relative;
+    flex: 1;
+    height: 16px;
+    background: rgba(255,255,255,0.06);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+
+  .scheduleBar.scheduleBarLarge {
+    height: 28px;
+  }
+
+  .scheduleBlock {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    opacity: 0.9;
+  }
+
+  .scheduleDayDetailHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+  }
+
+  .scheduleBackBtn {
+    background: #2a2e36;
+    color: #eee;
+    border: 1px solid #444;
+    border-radius: 4px;
+    padding: 3px 8px;
+    cursor: pointer;
+    font-size: 11px;
+  }
+
+  .scheduleBackBtn:hover {
+    background: #3a3e46;
+  }
+
+  .scheduleDetailRow {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 3px 0;
+    border-bottom: 1px solid #2a2a2a;
+  }
+
+  .scheduleDetailSwatch {
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+    flex-shrink: 0;
+  }
+
+  .scheduleDetailTime {
+    color: #888;
+    font-size: 11px;
+    width: 90px;
+    flex-shrink: 0;
+  }
+
+  .scheduleHourAxis {
+    display: flex;
+    justify-content: space-between;
+    font-size: 9px;
+    color: #666;
+    margin: 2px 0 8px;
+  }
+
+  /* =========================
+     EXPECTATIONS CALENDAR -- same week-grid/day-drilldown shape as the
+     schedule view above (Plans tab, toggled via .plansViewBtn), but each
+     day row can stack several lanes (an expectation's real window can
+     overlap another's) instead of a single fixed-height bar.
+  ========================= */
+
+  .plansViewToggle {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 10px;
+  }
+
+  .plansViewBtn {
+    background: #2a2e36;
+    color: #aaa;
+    border: 1px solid #444;
+    border-radius: 4px;
+    padding: 3px 10px;
+    cursor: pointer;
+    font-size: 11px;
+  }
+
+  .plansViewBtn:hover {
+    background: #3a3e46;
+  }
+
+  .plansViewBtn.active {
+    background: #3a5e8c;
+    color: #fff;
+    border-color: #5a8ec0;
+  }
+
+  .expectCalDayRow {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 4px 0;
+    cursor: pointer;
+    border-radius: 4px;
+  }
+
+  .expectCalDayRow:hover {
+    background: rgba(255,255,255,0.06);
+  }
+
+  .expectCalLanes {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .expectCalLane {
+    position: relative;
+    height: 12px;
+    background: rgba(255,255,255,0.06);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+
+  .expectCalLaneEmpty {
+    opacity: 0.4;
+  }
+
+  .expectCalBlock {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    opacity: 0.9;
+    border-radius: 3px;
   }
 
   .viewerSection {
@@ -204,6 +409,60 @@
   #timelineToggleBtn:hover {
     background: rgba(40,40,40,0.9);
   }
+
+  /* =========================
+     TERMINAL LOG
+     Expandable scrollback of every character speech/thought bubble
+     (see main.js's updateSpeechBubbles()/updateThoughtBubbles() --
+     terminalLog() taps the exact same "content changed" checks those
+     already use, so an entry appears here whenever and only when a
+     bubble would). Docked directly under the event timeline.
+  ========================= */
+
+  #terminalLogPanel {
+    position: fixed;
+    top: 110px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 50%;
+    height: 220px;
+    min-height: 80px;
+    max-height: 70vh;
+    resize: vertical;
+    overflow-y: auto;
+    background: rgba(0,0,0,0.88);
+    border: 1px solid #444;
+    border-top: none;
+    z-index: 8999;
+    font-family: monospace;
+    font-size: 12px;
+    color: #ddd;
+    box-sizing: border-box;
+    padding: 6px 10px;
+  }
+
+  #terminalLogPanel.hidden { display: none; }
+
+  .terminalLogEntry {
+    white-space: pre-wrap;
+    word-break: break-word;
+    line-height: 1.5;
+    padding: 1px 0;
+  }
+
+  .terminalLogTime {
+    color: #667;
+    margin-right: 6px;
+  }
+
+  .terminalLogName {
+    color: #9cf;
+    font-weight: bold;
+    margin-right: 4px;
+  }
+
+  .terminalLogEntry.said .terminalLogText { color: #eee; }
+  .terminalLogEntry.thought .terminalLogText { color: #7fa8c9; font-style: italic; }
 
   /* =========================
      SOCIETAL OVERVIEW TOOLBAR
@@ -457,13 +716,18 @@
   }
 
   .outlinerRow.selected {
-    background: rgba(100,180,255,0.22);
+    background: rgba(100,180,255,0.5);
   }
 
   .outlinerRowName {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .outlinerRowNameAway {
+    color: #777;
+    font-style: italic;
   }
 
   .outlinerRowStatus {
@@ -475,6 +739,7 @@
   .outlinerRowStatus.offgrid { color: #fc6; }
   .outlinerRowStatus.traveling { color: #6cf; }
   .outlinerRowStatus.dead { color: #f66; }
+  .outlinerRowStatus.longstay { color: #888; }
 
   .outlinerEmpty {
     color: #777;
@@ -533,6 +798,22 @@
   .needMeterLabel {
     font-size: 10px;
     color: #aaa;
+  }
+
+  .activityBarTrack {
+    position: relative;
+    width: 100%;
+    height: 8px;
+    margin: 4px 0 8px;
+    background: rgba(255,255,255,0.08);
+    border: 1px solid #444;
+    border-radius: 3px;
+    overflow: hidden;
+  }
+
+  .activityBarFill {
+    height: 100%;
+    transition: width 0.4s ease;
   }
 
   #viewerInspector pre {
@@ -666,6 +947,8 @@
 
   <h3>Inspector</h3>
 
+  <div id="viewerSelectedName">Nothing selected</div>
+
   <div id="viewerTabs">
     <button class="viewerTabBtn active" data-tab="status">Status</button>
     <button class="viewerTabBtn" data-tab="body">Body</button>
@@ -673,6 +956,10 @@
     <button class="viewerTabBtn" data-tab="mind">Mind</button>
     <button class="viewerTabBtn" data-tab="memory">Memory</button>
     <button class="viewerTabBtn" data-tab="life">Life</button>
+    <button class="viewerTabBtn" data-tab="plans">Plans</button>
+    <button class="viewerTabBtn" data-tab="work" id="viewerWorkTabBtn">Work</button>
+    <button class="viewerTabBtn" data-tab="habits">Habits</button>
+    <button class="viewerTabBtn" data-tab="skills">Skills</button>
   </div>
 
   <div id="viewerEffectIcons"></div>
@@ -693,6 +980,7 @@
       <rect   id="bodypart-left_leg"  x="42" y="124" width="16" height="82" rx="4" stroke="#222" stroke-width="1"/>
       <rect   id="bodypart-right_leg" x="62" y="124" width="16" height="82" rx="4" stroke="#222" stroke-width="1"/>
     </svg>
+    <div id="bodyTabAppearance"></div>
     <div id="bodyTabSummary" class="bodySummary"></div>
     <div id="bodyTabRows"></div>
     <div id="bodyTabDiseases" class="diseaseList"></div>
@@ -702,6 +990,10 @@
   <div id="viewerMindTab" class="hidden"></div>
   <div id="viewerMemoryTab" class="hidden"></div>
   <div id="viewerLifeTab" class="hidden"></div>
+  <div id="viewerPlansTab" class="hidden"></div>
+  <div id="viewerWorkTab" class="hidden"></div>
+  <div id="viewerHabitsTab" class="hidden"></div>
+  <div id="viewerSkillsTab" class="hidden"></div>
 
 </div>
 
@@ -714,6 +1006,8 @@
 <button id="politicsBtn" class="overviewToolbarBtn" title="Politics">🏛</button>
 <button id="budgetBtn" class="overviewToolbarBtn" title="Budget">💰</button>
 <button id="newsBtn" class="overviewToolbarBtn" title="News">📰</button>
+<button id="terminalLogToggleBtn" class="overviewToolbarBtn" style="right: 632px;" title="Toggle terminal log">🖳</button>
+<button id="inspectorToggleBtn" class="overviewToolbarBtn" style="right: 676px;" title="Toggle inspector">🔍</button>
 
 <div id="outlinerSidebar">
   <input id="outlinerSearch" type="text" placeholder="Search households / characters..." />
@@ -732,6 +1026,8 @@
 </div>
 
 <div id="eventTimelineTooltip"></div>
+
+<div id="terminalLogPanel" class="hidden"></div>
 
 <div class="modal-overlay" id="modal-household">
   <div class="modal-box">

@@ -269,7 +269,15 @@ def store_memory(
     # instrumenting every individual calling system separately.
     try:
         from systems.stories import evaluate_story_worthiness
-        evaluate_story_worthiness(c, mem)
+        # A caller can force real routing via **extra's story_category/
+        # story_value (e.g. offgrid.py's "stuck in mind" musings, which
+        # keyword-matching alone would never classify) -- None/None for
+        # every existing caller, identical to previous behavior.
+        evaluate_story_worthiness(
+            c, mem,
+            category=mem.get("story_category"),
+            value_override=mem.get("story_value"),
+        )
     except Exception:
         pass
 
@@ -542,6 +550,68 @@ def decay_memories(c):
     # exceeded 150; harmless today only because prune_memories() always
     # caps the list at 150 before decay_memories() ever sees it.)
     c["memories"] = kept[:150]
+
+
+# =========================================================
+# STRUCTURED (FILTERED) RECALL
+# =========================================================
+# Per the user's explicit ask: recall should support real filters
+# (character name, activity type, household, location, a time span),
+# ALL optional and AND-combined -- search short-term memory (c
+# ["memories"]) first, and only fall back to long-term memory (c
+# ["long_term_memory"], the hourly-consolidated store -- see systems/
+# memory_consolidation.py) if nothing in short-term matched. No real NLP
+# exists anywhere in this codebase (matching e.g. systems/social_memory.py
+# ::_mentioned_character_ids's own approach) -- these are plain, case-
+# insensitive substring checks against each memory's own text/tags/
+# people, not a structured schema those writers filled in with
+# foreknowledge of being queried this way.
+
+def recall_with_filters(
+    c, world,
+    character_name=None, activity_type=None, household_id=None,
+    location=None, since_tick=None, until_tick=None, limit=6,
+):
+    chars = world.get("characters", {}) if world else {}
+
+    def _matches(m):
+        text = (m.get("text") or "").lower()
+        tags = [str(t).lower() for t in (m.get("tags") or [])]
+        people = m.get("people") or []
+
+        if character_name:
+            name = character_name.lower()
+            people_names = [(chars.get(pid, {}).get("name") or "").lower() for pid in people]
+            if name not in text and name not in people_names:
+                return False
+
+        if activity_type and activity_type.lower() not in text and activity_type.lower() not in tags:
+            return False
+
+        if location and location.lower() not in text:
+            return False
+
+        if household_id and not any(
+            chars.get(pid, {}).get("household_id") == household_id for pid in people
+        ):
+            return False
+
+        tick = m.get("tick", 0)
+        if since_tick is not None and tick < since_tick:
+            return False
+        if until_tick is not None and tick > until_tick:
+            return False
+
+        return True
+
+    short_term = [m for m in c.get("memories", []) if _matches(m)]
+    if short_term:
+        short_term.sort(key=lambda m: m.get("tick", 0), reverse=True)
+        return short_term[:limit]
+
+    long_term = [m for m in c.get("long_term_memory", []) if _matches(m)]
+    long_term.sort(key=lambda m: m.get("tick", 0), reverse=True)
+    return long_term[:limit]
 
 
 # =========================================================

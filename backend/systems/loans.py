@@ -189,6 +189,94 @@ def originate_mortgage(world, household, home):
     return loan
 
 
+# Per the user's explicit ask: "when characters feel they have extra
+# money they should try to pay off these loans sooner." Keep a real cash
+# buffer untouched (paying down debt with your last dollar is reckless,
+# not admirable) and only put a portion of genuine surplus toward debt
+# each check -- a real person with slack in their budget accelerates
+# payoff, they don't dump their entire cushion into it at once.
+PREPAY_CASH_BUFFER = 3000.0
+PREPAY_SURPLUS_FRACTION = 0.5
+PREPAY_MIN_SURPLUS = 50.0
+
+
+def maybe_prepay_debt(c, world):
+    """Runs at most once per in-game calendar day per character -- a bank-
+    balance check, not something that needs tick-rate precision. Funds
+    itself from whichever of the character's own bank accounts currently
+    holds the most (simplest correct behavior for someone with more than
+    one), paying down the highest-cost debt first: credit card balances
+    (no fixed payoff date, effectively the worst debt to be carrying),
+    then this household's loans the character is a borrower on, worst
+    interest rate first."""
+    cal = world.get("calendar", {})
+    day_key = (cal.get("year"), cal.get("month"), cal.get("day"))
+    if c.get("_last_debt_prepay_day") == day_key:
+        return
+    c["_last_debt_prepay_day"] = day_key
+
+    from systems.personal_items import get_item
+    from systems.banking import BANK_NAME_TO_KEY, get_balance, withdraw
+
+    wallet = get_item(c, "wallet")
+    if not wallet:
+        return
+
+    best = None
+    for card in wallet.get("items", []):
+        if card.get("object_type") != "bank_card":
+            continue
+        bank_key = BANK_NAME_TO_KEY.get(card.get("bank"))
+        if not bank_key:
+            continue
+        balance = get_balance(world, bank_key, card.get("account_number"))
+        if balance is None:
+            continue
+        if not best or balance > best[2]:
+            best = (bank_key, card.get("account_number"), balance)
+    if not best:
+        return
+    bank_key, account_number, balance = best
+
+    surplus = balance - PREPAY_CASH_BUFFER
+    if surplus <= PREPAY_MIN_SURPLUS:
+        return
+    available = surplus * PREPAY_SURPLUS_FRACTION
+
+    from systems.credit import get_credit_cards, make_payment as pay_credit_card
+    for card in get_credit_cards(c):
+        if available <= 0:
+            break
+        debt = card.get("current_debt", 0.0)
+        if debt <= 0:
+            continue
+        pay = min(available, debt)
+        if not withdraw(world, bank_key, account_number, pay):
+            break
+        pay_credit_card(card, pay)
+        available -= pay
+
+    if available <= 0:
+        return
+
+    household = world.get("households", {}).get(c.get("household_id"))
+    if not household:
+        return
+    open_loans = sorted(
+        (l for l in household.get("loans", {}).values()
+         if c["id"] in l.get("borrower_ids", []) and l.get("balance", 0.0) > 0),
+        key=lambda l: l.get("rate", 0.0), reverse=True,
+    )
+    for loan in open_loans:
+        if available <= 0:
+            break
+        pay = min(available, loan.get("balance", 0.0))
+        if not withdraw(world, bank_key, account_number, pay):
+            break
+        make_payment(loan, pay)
+        available -= pay
+
+
 def weekly_loan_payments(household, world):
     """List of {loan_id, borrower_ids, amount} weekly-equivalent payment
     slices (monthly_payment / ~4.345 weeks) for every open loan on this

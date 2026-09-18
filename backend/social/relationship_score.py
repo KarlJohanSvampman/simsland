@@ -2,8 +2,8 @@ from brain.relationships import (
     ensure_relationship
 )
 
-from brain.beliefs import (
-    belief_alignment
+from brain.opinions import (
+    political_similarity
 )
 
 
@@ -56,7 +56,7 @@ def relationship_score(
 
     try:
 
-        alignment = belief_alignment(
+        alignment = political_similarity(
             c,
             other
         )

@@ -320,6 +320,7 @@ def add_message(
     )
 
     conv["last_update"] = tick
+    conv["turn_count"] = conv.get("turn_count", 0) + 1
 
     # =====================================================
     # SWAP TURN

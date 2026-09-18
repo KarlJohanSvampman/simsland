@@ -58,6 +58,13 @@ def fire_incidental(character, speech_type, text, world, target_id=None):
     if not text:
         return
 
+    # Per the user's explicit ask: a sleeping character doesn't speak,
+    # full stop -- a real safety net here (rather than gating every
+    # individual caller) since fire_incidental() is the shared
+    # non-blocking speech path several unrelated systems call into.
+    if (character.get("activity") or {}).get("type") == "sleep":
+        return
+
     tick = world.get("tick", 0)
     character["current_speech"] = {
         "utterance":       text,
