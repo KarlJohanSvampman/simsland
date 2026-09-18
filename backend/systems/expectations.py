@@ -39,7 +39,7 @@ across job/marriage/birth life-event handlers -- any household/
 employment change gets picked up naturally on the next cadence tick.
 """
 
-from datetime import date
+from datetime import date, timedelta
 
 MISS_STRESS_DELTA     = 5.0   # mirrors lt_needs.py::satisfy_lt_need()'s -5 stress, inverted
 SATISFY_STRESS_DELTA  = 5.0
@@ -221,27 +221,81 @@ def _hhmm_to_tick(hhmm, calendar, world):
     return world.get("tick", 0) + ((h * 60 + m) - (now_h * 60 + now_m)) * 60
 
 
-def _compute_window(c, world, template_id, calendar):
-    """A real (window_start_tick, window_end_tick) for the CURRENT period
-    when a matching real schedule block exists today, else (None, None)
-    -- preserves today's existing rollover-only miss detection for
-    anything not schedule-linked."""
+_WEEKDAY_INDEX = {
+    "monday": 0, "tuesday": 1, "wednesday": 2, "thursday": 3,
+    "friday": 4, "saturday": 5, "sunday": 6,
+}
+
+
+def _calendar_moment_to_tick(world, calendar, target_date, hour=0, minute=0):
+    """Real absolute tick for an arbitrary real calendar date+time,
+    relative to the character's real current calendar moment -- a
+    generalization of _hhmm_to_tick's "today" assumption to any date."""
+    today = date(calendar["year"], calendar["month"], calendar["day"])
+    days_delta = (target_date - today).days
+    now_minutes = calendar.get("hour", 0) * 60 + calendar.get("minute", 0)
+    target_minutes = hour * 60 + minute
+    return world.get("tick", 0) + days_delta * 86400 + (target_minutes - now_minutes) * 60
+
+
+def _fallback_window(cadence, calendar, world):
+    """Real, calendar-derived window for any cadence with no specific
+    schedule-block anchor -- per the user's explicit ask, EVERY
+    expectation gets a real start/end, capped at 7 real days even for a
+    monthly/yearly one (which uses the last 7 days before its real
+    deadline as the real "due soon" window, rather than the whole
+    month/year)."""
+    today = date(calendar["year"], calendar["month"], calendar["day"])
+
+    if cadence == "daily":
+        start = _calendar_moment_to_tick(world, calendar, today, 0, 0)
+        return start, start + 86400
+
+    if cadence == "weekly":
+        wd = _WEEKDAY_INDEX.get((calendar.get("weekday") or "").lower(), 0)
+        week_start = today - timedelta(days=wd)
+        start = _calendar_moment_to_tick(world, calendar, week_start, 0, 0)
+        return start, start + 7 * 86400
+
+    if cadence == "monthly":
+        next_month = date(today.year + 1, 1, 1) if today.month == 12 else date(today.year, today.month + 1, 1)
+        window_start_date = next_month - timedelta(days=7)
+        start = _calendar_moment_to_tick(world, calendar, window_start_date, 0, 0)
+        end = _calendar_moment_to_tick(world, calendar, next_month, 0, 0)
+        return start, end
+
+    if cadence == "yearly":
+        year_end = date(today.year + 1, 1, 1)
+        window_start_date = year_end - timedelta(days=7)
+        start = _calendar_moment_to_tick(world, calendar, window_start_date, 0, 0)
+        end = _calendar_moment_to_tick(world, calendar, year_end, 0, 0)
+        return start, end
+
+    return None, None
+
+
+def _compute_window(c, world, template_id, calendar, cadence=None):
+    """A real (window_start_tick, window_end_tick) for the CURRENT
+    period -- a matching real schedule block today (make_dinner/
+    family_dinner_together/go_to_work) wins when one exists; otherwise
+    falls back to a real calendar-derived window for the expectation's
+    own cadence (see _fallback_window) so every expectation gets a real
+    timespan, not just the schedule-linked handful."""
     activity = _SCHEDULE_LINKED_EXPECTATIONS.get(template_id)
-    if not activity:
-        return None, None
-    weekday = (calendar.get("weekday") or "").lower()
-    day_blocks = (c.get("schedule") or {}).get("week", {}).get(weekday, [])
-    matches = [b for b in day_blocks if b.get("activity") == activity]
-    if not matches:
-        return None, None
-    # "eat" maps to both lunch and dinner blocks in scheduling.py -- the
-    # LATER one is what "make dinner"/"family dinner together" actually
-    # mean; for "work" there's only ever one real block, so [-1] is a
-    # no-op there.
-    block = matches[-1]
-    start = _hhmm_to_tick(block["start"], calendar, world)
-    end = _hhmm_to_tick(block["end"], calendar, world)
-    return start, end
+    if activity:
+        weekday = (calendar.get("weekday") or "").lower()
+        day_blocks = (c.get("schedule") or {}).get("week", {}).get(weekday, [])
+        matches = [b for b in day_blocks if b.get("activity") == activity]
+        if matches:
+            # "eat" maps to both lunch and dinner blocks in scheduling.py
+            # -- the LATER one is what "make dinner"/"family dinner
+            # together" actually mean; for "work" there's only ever one
+            # real block, so [-1] is a no-op there.
+            block = matches[-1]
+            start = _hhmm_to_tick(block["start"], calendar, world)
+            end = _hhmm_to_tick(block["end"], calendar, world)
+            return start, end
+    return _fallback_window(cadence, calendar, world)
 
 
 def _has_scheduled_work_today(c, world):
@@ -269,7 +323,27 @@ def update_expectations(c, world):
     for nd in c.get("expectations", {}).values():
         period = _current_period_key(nd["cadence"], calendar)
         if period is None:
-            continue   # "once" -- no recurring boundary to roll over
+            # "once" cadence -- no real recurring calendar period, but
+            # still gets a real, regenerating 7-day window per the
+            # user's explicit ask ("all of them ought to have a
+            # timespan... and then we generate a new one") until it's
+            # actually satisfied, at which point it's truly done and
+            # left alone (matching "once" semantics).
+            if nd["status"] == "satisfied":
+                continue
+            window_end = nd.get("window_end_tick")
+            if window_end is None or tick >= window_end:
+                if window_end is not None and not nd["satisfied_this_period"] and nd["status"] != "missed":
+                    nd["missed_count"] += 1
+                    nd["streak"] = 0
+                    nd["status"] = "missed"
+                    _apply_miss_feedback(c, nd, world)
+                nd["window_start_tick"] = tick
+                nd["window_end_tick"] = tick + 7 * 86400
+                nd["satisfied_this_period"] = False
+                if nd["status"] != "missed":
+                    nd["status"] = "pending"
+            continue
 
         if nd["current_period_key"] != period:
             was_first_period = nd["current_period_key"] is None
@@ -287,7 +361,7 @@ def update_expectations(c, world):
             nd["current_period_key"] = period
             nd["satisfied_this_period"] = False
             nd["window_start_tick"], nd["window_end_tick"] = _compute_window(
-                c, world, nd["template_id"], calendar,
+                c, world, nd["template_id"], calendar, cadence=nd["cadence"],
             )
             if nd["status"] != "missed":
                 nd["status"] = "pending"
@@ -366,9 +440,21 @@ def _refresh_intention(c, nd, world):
         "priority":        priority,
         "reason":          reason,
         # Real time-remaining urgency (brain/intentions.py::
-        # final_priority()) reads this directly when set -- None for
-        # anything not schedule-linked, same as today's behavior.
-        "window_end_tick": nd.get("window_end_tick"),
+        # final_priority()) reads window_end_tick directly when set --
+        # window_start_tick is carried alongside purely for display (the
+        # Inspector's intention-detail modal), every expectation now gets
+        # both (see _compute_window/_fallback_window above).
+        "window_start_tick": nd.get("window_start_tick"),
+        "window_end_tick":   nd.get("window_end_tick"),
+        # Real stats -- how well this expectation has been kept up with,
+        # and what it's cost when missed (streak/missed_count/
+        # frustration/status all live on c["expectations"][template_id]
+        # itself, not the intention -- surfaced here too so the
+        # Inspector's detail view can show them without a second lookup).
+        "streak":           nd.get("streak", 0),
+        "missed_count":     nd.get("missed_count", 0),
+        "frustration":      round(nd.get("frustration", 0.0), 2),
+        "expectation_status": nd.get("status"),
     })
 
 

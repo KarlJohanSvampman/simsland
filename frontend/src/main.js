@@ -4614,6 +4614,7 @@ function renderCharacterInspector(id){
     rows.push(`<span style="color:#f66">DEAD</span>`);
   }
 
+  if(c.age != null) rows.push(`Age: ${c.age}${c.age_group ? ` (${c.age_group.replace(/_/g, " ")})` : ""}`);
   if(c.posture) rows.push(`Posture: ${c.posture}`);
   // Per the user's explicit ask: make it clear a character is still on
   // their way to an activity (the "walking" phase, before they've
@@ -5049,9 +5050,83 @@ document.getElementById("viewerMindTab")?.addEventListener("click", (e) => {
   if(intention) openIntentionModal(intention);
 });
 
-// Fields that already read naturally as part of the card/title and don't
-// need repeating in the detail view.
-const _INTENTION_HIDDEN_FIELDS = new Set(["type", "reason"]);
+// Fields that already read naturally as part of the card/title, or that
+// get a dedicated real-calendar/stats rendering below instead of the
+// generic key-dump, and don't need repeating there too.
+const _INTENTION_HIDDEN_FIELDS = new Set([
+  "type", "reason", "window_start_tick", "window_end_tick",
+  "streak", "missed_count", "frustration", "expectation_status",
+]);
+
+// Real 7-day calendar strip for one expectation's own window_start_tick/
+// window_end_tick -- per the user's explicit ask: click an expectation in
+// the intentions list, see a real 7-day span (never longer -- see
+// systems/expectations.py::_fallback_window's cap) showing exactly when
+// it must be fulfilled, with real start/end times under the title, not a
+// raw tick number.
+function _renderExpectationWindowCalendar(intention){
+  const startTick = intention.window_start_tick;
+  const endTick = intention.window_end_tick;
+  if(startTick == null || endTick == null || !_lastCalendar || _lastCalendarWorldTick == null) return "";
+
+  const startProj = _projectCalendarForward(_lastCalendar, startTick - _lastCalendarWorldTick);
+  const endProj = _projectCalendarForward(_lastCalendar, endTick - _lastCalendarWorldTick);
+  if(!startProj || !endProj) return "";
+
+  const startLabel = _formatProjectedTime(startProj);
+  const endLabel = _formatProjectedTime(endProj);
+
+  // 7 real calendar day-cells, anchored at the window's own start date --
+  // the window is guaranteed <=7 real days (backend cap), so it always
+  // fits, with each day's cell shaded by how much of THAT day the window
+  // actually covers (a same-day 1h dinner block shades a sliver of one
+  // cell; a 7-day monthly window shades all seven fully).
+  const dayMs = 86400;
+  const dayStartTick = startTick - ((startProj.hour * 3600 + startProj.minute * 60));
+  const cells = [];
+  for(let i = 0; i < 7; i++){
+    const cellStart = dayStartTick + i * dayMs;
+    const cellEnd = cellStart + dayMs;
+    const coveredStart = Math.max(cellStart, startTick);
+    const coveredEnd = Math.min(cellEnd, endTick);
+    const coveredFrac = Math.max(0, Math.min(1, (coveredEnd - coveredStart) / dayMs));
+    const proj = _projectCalendarForward(_lastCalendar, cellStart - _lastCalendarWorldTick);
+    const dayLabel = proj ? `${(proj.weekday || "").slice(0, 3)} ${_MONTH_NAMES[proj.month - 1]} ${proj.day}` : "";
+    cells.push(`
+      <div class="expectWindowDay">
+        <div class="expectWindowDayLabel">${dayLabel}</div>
+        <div class="expectWindowDayBar">
+          <div class="expectWindowDayFill" style="width:${(coveredFrac * 100).toFixed(1)}%;"></div>
+        </div>
+      </div>`);
+  }
+
+  return `
+    <div class="expectWindowCalendar">
+      <div class="expectWindowRange">${startLabel} &rarr; ${endLabel}</div>
+      <div class="expectWindowDays">${cells.join("")}</div>
+    </div>`;
+}
+
+// Real stats -- how well this expectation has been kept up with, and
+// what it's cost when missed (streak/missed_count/frustration/status).
+function _renderExpectationStats(intention){
+  if(intention.streak == null && intention.missed_count == null) return "";
+  const frustrationPct = Math.round((intention.frustration || 0) * 100);
+  return `
+    <div class="eventModalRow">
+      <div class="eventModalRowMeta">Track Record</div>
+      <div>
+        <span class="viewerPos">streak ${intention.streak ?? 0}</span>
+        &nbsp;&middot;&nbsp;
+        <span class="viewerNeg">missed ${intention.missed_count ?? 0}x</span>
+        &nbsp;&middot;&nbsp;
+        frustration ${frustrationPct}%
+        &nbsp;&middot;&nbsp;
+        ${intention.expectation_status || "pending"}
+      </div>
+    </div>`;
+}
 
 // Field names that hold a character id -- resolved to a real name rather
 // than shown as a bare char_xxxxx string.
@@ -5097,6 +5172,15 @@ function openIntentionModal(intention){
   const body = document.getElementById("intentionModalBody");
   if(!body) return;
   body.innerHTML = "";
+
+  // Real 7-day window calendar, right under the title -- only ever
+  // present for an expectation:* intention (every one now carries a
+  // real window_start_tick/window_end_tick, see systems/expectations.py).
+  const calendarHtml = _renderExpectationWindowCalendar(intention);
+  if(calendarHtml) body.insertAdjacentHTML("beforeend", calendarHtml);
+
+  const statsHtml = _renderExpectationStats(intention);
+  if(statsHtml) body.insertAdjacentHTML("beforeend", statsHtml);
 
   const outcomeChar = selectedCharacterId ? _worldState.characters?.[selectedCharacterId] : null;
   if(outcomeChar){
@@ -7639,7 +7723,7 @@ function renderOutliner(data){
 
       const name = document.createElement("span");
       name.className = "outlinerRowName" + (status.cls === "longstay" ? " outlinerRowNameAway" : "");
-      name.textContent = c.name || c.id;
+      name.textContent = (c.name || c.id) + (c.age != null ? ` (${c.age})` : "");
       row.appendChild(name);
 
       const statusEl = document.createElement("span");

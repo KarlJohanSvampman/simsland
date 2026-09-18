@@ -46,8 +46,51 @@ CATEGORY_PRIORITY = {
 # starts climbing now; one still 5 hours out is unaffected.
 URGENCY_WINDOW_TICKS = 2 * 3600
 
+# Per the user's explicit ask: fatigue should shape which intention gets
+# picked in general, not just gate a hard "must sleep now" cutoff --
+# a tired character can still do things, but naturally gravitates toward
+# the easier ones first ("low hanging fruit"). How physically/mentally
+# demanding a handful of well-known intention types are (0=trivial,
+# 1=strenuous); anything not listed here (the many intention types this
+# deliberately doesn't enumerate one-by-one, including every
+# "expectation:<id>" instance) falls back to DEFAULT_INTENTION_EFFORT, a
+# reasonable moderate middle ground. Body-survival types (sleep, toilet,
+# eat, drink) are kept near-zero on purpose -- those aren't really
+# optional regardless of how tired someone is, so fatigue shouldn't
+# discount them at all.
+INTENTION_EFFORT = {
+    "exercise": 0.9, "work": 0.8, "chore": 0.6,
+    "clean_floors": 0.6, "dust_and_wipe": 0.5, "outdoor_time": 0.4,
+    "sleep": 0.0, "take_nap": 0.0, "use_toilet": 0.05,
+    "eat_food": 0.1, "drink": 0.05, "wait": 0.0,
+    "seek_solitude": 0.1, "seek_caffeine_or_rest": 0.0,
+    "socialize": 0.3, "seek_romance": 0.4, "seek_intimacy": 0.5,
+    "creative_outlet": 0.25, "learn_something": 0.2,
+    "spiritual_practice": 0.15, "play": 0.3, "pursue_purpose": 0.3,
+}
+DEFAULT_INTENTION_EFFORT = 0.35
 
-def final_priority(i):
+# At fatigue=100, a max-effort (1.0) intention's priority is cut by up to
+# this fraction -- a trivial (0.0-effort) one is completely untouched at
+# any fatigue level. This only ever discounts a demanding option relative
+# to an easy one WITHIN the same category tier (category_score*1000
+# still dominates below, so fatigue can never make a leisure activity
+# outrank a real survival need) -- the actual mechanism behind "pick low
+# hanging fruit first."
+FATIGUE_EFFORT_PENALTY_MAX = 0.5
+
+
+def _fatigue_effort_multiplier(i, c):
+    if c is None:
+        return 1.0
+    effort = INTENTION_EFFORT.get(i.get("type", ""), DEFAULT_INTENTION_EFFORT)
+    if effort <= 0:
+        return 1.0
+    fatigue = c.get("body", {}).get("fatigue", 0) / 100.0
+    return 1.0 - fatigue * effort * FATIGUE_EFFORT_PENALTY_MAX
+
+
+def final_priority(i, c=None):
     category_score = CATEGORY_PRIORITY.get(i.get("category", "impulse"), 0)
     base = i.get("priority", 0)
 
@@ -66,6 +109,12 @@ def final_priority(i):
         if remaining < URGENCY_WINDOW_TICKS:
             urgency_factor = 1.0 + (1.0 - remaining / URGENCY_WINDOW_TICKS) * (base / 100.0)
             base = min(100, base * urgency_factor)
+
+    # c is optional (every caller below now passes it; a couple of older,
+    # narrower call sites that only ever sort within one already-fixed
+    # category can safely omit it and get the fatigue-blind score, same
+    # as before this round).
+    base *= _fatigue_effort_multiplier(i, c)
 
     return category_score * 1000 + base
 # =========================================================
@@ -251,7 +300,7 @@ def sort_intentions(c):
     """Sort active intentions by final_priority, descending, in place."""
     c["active_intentions"] = sorted(
         c.get("active_intentions", []),
-        key=final_priority,
+        key=lambda i: final_priority(i, c),
         reverse=True
     )
     return c["active_intentions"]

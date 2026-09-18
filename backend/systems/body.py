@@ -80,11 +80,115 @@ _RANDOMIZED_ON_INSERT = {
 _NON_PERCENT_BODY_FIELDS = {
     "hours_awake", "nutrients_today", "toilet_visits_needed_today",
     "_wake_sim_time", "_nutrients_reset_day",
+    "_sleep_hours_today", "sleep_hours_log", "_stimulant_until_tick",
 }
 
 # ── energy tuning ────────────────────────────────────────────────────────────
-BASE_ENERGY_DECAY        = 0.03   # per sim-hour equivalent (dt units), before multipliers
+# Confirmed live bug: update_body_needs(c, dt=1.0, world=world) is called
+# once per real TICK (1 tick == 1 real second, brain/agent_loop.py::
+# update_agent -> update_internal_state, dispatched every tick for every
+# non-off-grid character) -- but the awake-state fatigue_rate/
+# BASE_ENERGY_DECAY constants below were flat, un-tick-scaled numbers
+# (0.02 and 0.03) that only made sense if this function ran roughly once
+# per sim-HOUR, not once per second. Verified directly (docker-exec,
+# calling update_body_needs 3600 times to simulate 1 real hour): fatigue
+# hit 92/100 and energy hit 0/100 within that single simulated hour --
+# every character should have been pegged at max fatigue/zero energy
+# within about an hour of waking, every single day. This was almost
+# entirely masked by an unrelated problem (Ollama running slow/
+# unreachable for much of this session, causing most per-tick agent
+# decisions to be abandoned past AGENT_WAIT_BUDGET_SECONDS -- see
+# sim_loop.py -- which meant update_body_needs's mutations often never
+# actually persisted), not by any correct scaling in the formula itself.
+#
+# Per the user's explicit ask: awake, unmedicated, no sleep debt, a
+# character should be comfortable through a normal day, start feeling it
+# (see body_intentions.py's new hours_awake-driven nagging) from roughly
+# 16-18h awake, and only hit FULLY fatigued + FULLY out of energy at
+# 48h awake. Rescaled to a real 48-hour (172800-tick) linear baseline;
+# the existing hunger_mult/wake_mult multipliers on energy (and the new
+# sleep-debt multiplier below) still apply on TOP of this, so a hungry
+# or already sleep-deprived character bottoms out sooner than 48h --
+# which is the intended, realistic outcome.
+AWAKE_FATIGUE_RATE_PER_TICK = 100 / 172800
+BASE_ENERGY_DECAY = 100 / 172800   # before hunger_mult/wake_mult/debt_mult
 ENERGY_PER_FULL_DAY_NUTRITION = 60  # a full day's nutrition (nutrition==1.0) restores this much energy
+
+# A character's own carried sleep_debt (0-100, see the real weekly
+# hours-slept measurement in _settle_daily_sleep_debt below) speeds up
+# BOTH fatigue accrual and energy drain while awake -- "when you're
+# behind on sleep you feel it faster during the day," not just "you need
+# a longer catch-up sleep tonight" (see compute_needed_sleep_ticks for
+# that half of it). 0 debt -> no change; 100 debt -> 60% faster.
+SLEEP_DEBT_AWAKE_RATE_MULTIPLIER_MAX = 0.6
+
+# A caffeinated item (item_templates' real "caffeine" flag -- coffee/
+# tea/soda/energy drinks) suppresses fatigue accrual for a real,
+# temporary window -- "activate themselves to stay awake" per the user's
+# own framing, not just an instant flat energy top-up (which is all
+# these items did before). Energy still drains close to normal (caffeine
+# masks tiredness, it doesn't feed you) -- only a small extra easing.
+# caffeine_strength on the item ("high", e.g. energy drinks) gets a
+# longer window; anything else (coffee/tea/soda) gets the base one.
+STIMULANT_FATIGUE_MULTIPLIER = 0.15
+STIMULANT_ENERGY_DECAY_MULTIPLIER = 0.7
+STIMULANT_DURATION_TICKS = {"base": 3 * 3600, "high": 5 * 3600}
+
+# Real, measured daily sleep-debt recalibration (replaces the old crude
+# fatigue>85/<40 drift below with an actual hours-slept-vs-optimal
+# comparison) -- see _settle_daily_sleep_debt(). 7h/night is the
+# documented optimal; each missing hour adds real, lasting debt.
+OPTIMAL_SLEEP_HOURS_PER_NIGHT = 7.0
+SLEEP_DEBT_PER_MISSING_HOUR = 8.0
+SLEEP_DEBT_RECOVERY_PER_SURPLUS_HOUR = 4.0   # sleeping MORE than optimal pays debt down faster too
+
+# Sleep now starts with a real, fatigue/energy/debt-aware duration
+# (systems/activities.py::start_activity, action_router.py::_route_sleep)
+# instead of a flat ~8h every time regardless of how much recovery is
+# actually needed -- see compute_needed_sleep_ticks(). This is also the
+# direct fix for a confirmed live bug: a character whose sleep was
+# interrupted for a bathroom trip and then "resumed" via a fresh
+# start_activity(c, world, "sleep") call got a brand-new flat ~8h sleep
+# stacked on top of whatever they'd already slept, even with fatigue
+# already mostly cleared -- landing them asleep again until mid/late
+# afternoon. A floor keeps even an almost-fully-rested top-up sleep
+# realistically short-but-real; a ceiling keeps a very sleep-deprived
+# night from swallowing multiple real days in one sitting -- leftover
+# debt simply carries into the following night(s) instead, the same
+# real, self-correcting "distributed over the coming nights" catch-up
+# the user asked about, with no separate 7-day repayment schedule
+# needed -- the per-tick recovery-rate math already does it.
+SLEEP_MIN_DURATION_TICKS = 90 * 60      # 1.5h floor
+SLEEP_MAX_DURATION_TICKS = 11 * 3600    # 11h ceiling
+
+# ── general body-need rate constants ─────────────────────────────────────────
+# Confirmed live bug, same root cause and same fix shape as the fatigue/
+# energy rescale above: hunger/hydration/bladder/bowels/hygiene/
+# mouth_hygiene all carried flat, un-tick-scaled rate constants (0.03,
+# 0.04, 0.05, 0.012, 0.008, 0.015) left over from before dt became
+# "always exactly 1 real tick" -- confirmed LIVE (docker-exec against the
+# actual running world, not just a synthetic test): both real characters
+# in the live sim were sitting at hunger=100/hydration=0 -- maxed out --
+# despite having eaten/drunk recently by their own schedules. Only
+# recent_intake (0.009/tick, whose own comment already says "decays over
+# ~3 sim-hours") was correctly scaled -- confirmed by the math
+# (100/0.009 ticks ≈ 3.09h) -- and is used here as the calibration
+# reference for the others: rate = 100 / (target_hours * 3600).
+# Documented target timescales (real-world-ish approximations, easy to
+# retune): hunger/hydration ~10h to run out from empty/full; bladder
+# ~3.5h to fill at typical recent-intake/hydration levels; bowels ~16h;
+# hygiene ~20h to need a shower; mouth_hygiene ~14h. Odor/
+# stomach_discomfort/stamina are left untouched -- odor's own rate
+# already derives from hygiene_gap (a nonlinear term bounded 0-1), so it
+# slows down for free once hygiene does; stomach_discomfort only fires
+# once hunger is already critical (now correctly much rarer), and
+# stamina wasn't part of the reported symptom.
+HUNGER_RATE_PER_TICK        = 100 / (10 * 3600)
+HYDRATION_RATE_PER_TICK     = 100 / (10 * 3600)
+BLADDER_BASE_RATE_PER_TICK  = 0.012
+BOWELS_RATE_PER_TICK        = 100 / (16 * 3600)
+HYGIENE_DECAY_PER_TICK      = 100 / (20 * 3600)
+MOUTH_HYGIENE_DECAY_PER_TICK = 100 / (14 * 3600)
 
 # ── sleep recovery tuning ─────────────────────────────────────────────────────
 # Fixed a real bug: update_body_needs() ran unconditionally every tick
@@ -160,7 +264,7 @@ def update_body_needs(c, dt=1.0, world=None):
             b["hours_awake"] = max(0.0, (world.get("sim_time", 0.0) - wake_at) / 3600.0)
 
     # ── HUNGER ───────────────────────────────────────────────────────────────
-    rate = 0.03
+    rate = HUNGER_RATE_PER_TICK
     if "lazy" in tr or "apathetic" in tr:
         rate *= 0.85          # less active → burns less
     if "disciplined" in tr:
@@ -168,7 +272,7 @@ def update_body_needs(c, dt=1.0, world=None):
     b["hunger"] = min(100, b["hunger"] + rate * dt)
 
     # ── HYDRATION ────────────────────────────────────────────────────────────
-    b["hydration"] = max(0, b["hydration"] - 0.04 * dt)
+    b["hydration"] = max(0, b["hydration"] - HYDRATION_RATE_PER_TICK * dt)
 
     # ── RECENT INTAKE  (decays over ~3 sim-hours; food/drink sets it) ────────
     b["recent_intake"] = max(0, b["recent_intake"] - 0.009 * dt)
@@ -176,12 +280,12 @@ def update_body_needs(c, dt=1.0, world=None):
     # ── BLADDER  (base fill + intake spike) ──────────────────────────────────
     intake_factor = 0.5 + (b["recent_intake"] / 100) * 1.5   # 0.5 → 2.0
     hydration_factor = max(0, b["hydration"] / 100)
-    b["bladder"] = min(100, b["bladder"] + 0.05 * hydration_factor * intake_factor * dt)
+    b["bladder"] = min(100, b["bladder"] + BLADDER_BASE_RATE_PER_TICK * hydration_factor * intake_factor * dt)
 
     # ── BOWELS  (scaled by yesterday's excess-nutrition toilet-visit load,
     # see systems/nutrition.py::settle_nutrition_day) ────────────────────────
     bowel_mult = max(1, b.get("toilet_visits_needed_today", 1))
-    b["bowels"] = min(100, b["bowels"] + 0.012 * bowel_mult * dt)
+    b["bowels"] = min(100, b["bowels"] + BOWELS_RATE_PER_TICK * bowel_mult * dt)
 
     # ── STRESS  (winds down while genuinely asleep -- see the user's
     # explicit ask; awake-state stress changes are driven by other
@@ -189,11 +293,30 @@ def update_body_needs(c, dt=1.0, world=None):
     if is_asleep:
         c["stress"] = max(0, c.get("stress", 0) - SLEEP_STRESS_RECOVERY_PER_TICK * dt)
 
+    # Real per-tick tally of actual hours slept today -- accumulated
+    # regardless of whether the sleep session completes naturally or gets
+    # interrupted (a bathroom break, etc.), feeding the real daily
+    # sleep-debt recalibration below rather than on_sleep_complete()'s own
+    # lump-sum, which wouldn't see a short/interrupted segment correctly.
+    if is_asleep:
+        b["_sleep_hours_today"] = b.get("_sleep_hours_today", 0.0) + dt / 3600.0
+
+    # Real, temporary stimulant window (coffee/tea/soda/energy drinks --
+    # see on_consume_complete) -- suppresses fatigue accrual and eases
+    # energy drain while active, a real "push through it" effect rather
+    # than caffeine just being an instant flat energy top-up.
+    stimulant_active = world is not None and world.get("tick", 0) < b.get("_stimulant_until_tick", 0)
+
+    # Carried sleep debt makes awake hours feel harder -- both fatigue and
+    # energy move faster while debt is elevated (see
+    # SLEEP_DEBT_AWAKE_RATE_MULTIPLIER_MAX above).
+    debt_mult = 1.0 + (b.get("sleep_debt", 0) / 100) * SLEEP_DEBT_AWAKE_RATE_MULTIPLIER_MAX
+
     # ── FATIGUE ──────────────────────────────────────────────────────────────
     if is_asleep:
         b["fatigue"] = max(0, b["fatigue"] - SLEEP_FATIGUE_RECOVERY_PER_TICK * dt)
     else:
-        fatigue_rate = 0.02
+        fatigue_rate = AWAKE_FATIGUE_RATE_PER_TICK
         if "lazy" in tr or "apathetic" in tr:
             fatigue_rate *= 0.8
         if "disciplined" in tr or "determined" in tr:
@@ -202,20 +325,23 @@ def update_body_needs(c, dt=1.0, world=None):
         # faster -- the "become lazier" consequence of weight gain.
         if "obese" in c.get("physical_traits", []):
             fatigue_rate *= 1.2
+        fatigue_rate *= debt_mult
+        if stimulant_active:
+            fatigue_rate *= STIMULANT_FATIGUE_MULTIPLIER
         b["fatigue"] = min(100, b["fatigue"] + fatigue_rate * dt)
 
     # ── SLEEP DEBT ───────────────────────────────────────────────────────────
-    # Recovers while actually asleep; accumulates when exhausted and awake,
-    # recovers slowly while awake and well-rested otherwise.
+    # Recovers while actually asleep. The real, measured day-to-day debt
+    # level itself is recalibrated once per real day against actual hours
+    # slept vs. the 7h/night optimal (_settle_daily_sleep_debt, called
+    # from the daily-settlement block below) -- this per-tick branch is
+    # now just the "asleep -> pays down" half; awake no longer drifts it
+    # off a crude fatigue-threshold proxy.
     if is_asleep:
         b["sleep_debt"] = max(0, b["sleep_debt"] - SLEEP_DEBT_RECOVERY_PER_TICK_ASLEEP * dt)
-    elif b["fatigue"] > 85:
-        b["sleep_debt"] = min(100, b["sleep_debt"] + 0.005 * dt)
-    elif b["fatigue"] < 40:
-        b["sleep_debt"] = max(0, b["sleep_debt"] - 0.002 * dt)
 
     # ── HYGIENE ──────────────────────────────────────────────────────────────
-    decay = 0.008
+    decay = HYGIENE_DECAY_PER_TICK
     if "lazy" in tr or "apathetic" in tr:
         decay *= 1.4
     if "vain" in tr:
@@ -231,17 +357,20 @@ def update_body_needs(c, dt=1.0, world=None):
         b["odor"] = max(0, b["odor"] - 0.005 * dt)
 
     # ── MOUTH HYGIENE ────────────────────────────────────────────────────────
-    mouth_decay = 0.015
+    mouth_decay = MOUTH_HYGIENE_DECAY_PER_TICK
     # Eating makes breath worse temporarily
     if b["recent_intake"] > 50:
         mouth_decay *= 1.5
     b["mouth_hygiene"] = max(0, b["mouth_hygiene"] - mouth_decay * dt)
 
     # ── SIDE EFFECTS ─────────────────────────────────────────────────────────
+    # Same flat-per-tick bug as the others above (0.5/0.1 previously meant
+    # 100 -> full discomfort in ~3 min flat, and back down in ~17 min) --
+    # rescaled to a real ~2h-to-max / ~1h-to-ease timescale.
     if b["hunger"] > 95:
-        b["stomach_discomfort"] = min(100, b["stomach_discomfort"] + 0.5 * dt)
+        b["stomach_discomfort"] = min(100, b["stomach_discomfort"] + (100 / (2 * 3600)) * dt)
     else:
-        b["stomach_discomfort"] = max(0, b["stomach_discomfort"] - 0.1 * dt)
+        b["stomach_discomfort"] = max(0, b["stomach_discomfort"] - (100 / (1 * 3600)) * dt)
 
     # ── STAMINA REGEN  (passive recovery -- the only other stamina path,
     # health.py's injury stamina_penalty, is one-directional drain) ──────────
@@ -264,7 +393,10 @@ def update_body_needs(c, dt=1.0, world=None):
             wake_mult = 1.5
         else:
             wake_mult = 1.0
-        b["energy"] = max(0, b["energy"] - BASE_ENERGY_DECAY * hunger_mult * wake_mult * dt)
+        energy_decay = BASE_ENERGY_DECAY * hunger_mult * wake_mult * debt_mult
+        if stimulant_active:
+            energy_decay *= STIMULANT_ENERGY_DECAY_MULTIPLIER
+        b["energy"] = max(0, b["energy"] - energy_decay * dt)
 
     # ── APPLY SLEEP DEBT EFFECTS ─────────────────────────────────────────────
     _apply_sleep_debt_effects(c)
@@ -291,6 +423,7 @@ def update_body_needs(c, dt=1.0, world=None):
             if last_key is not None and last_key != today_key:
                 from systems.nutrition import settle_nutrition_day
                 settle_nutrition_day(c, world)
+                _settle_daily_sleep_debt(c)
             b["_nutrients_reset_day"] = today_key
 
     clamp_body(c)
@@ -305,6 +438,51 @@ def _apply_sleep_debt_effects(c):
     # Raise stress proportional to debt
     stress_bump = (debt - 20) / 80 * 15   # max +15 stress from sleep debt
     c["stress"] = min(100, c.get("stress", 0) + stress_bump * 0.001)
+
+
+def _settle_daily_sleep_debt(c):
+    """Real, measured recalibration of sleep_debt against actual hours
+    slept yesterday vs. OPTIMAL_SLEEP_HOURS_PER_NIGHT -- called once per
+    real calendar day (update_body_needs' existing daily-settlement
+    block, alongside settle_nutrition_day). Replaces the old crude
+    fatigue>85/<40 awake-drift with a real accounting of hours actually
+    slept; a real rolling week of them is kept (sleep_hours_log) for
+    anything that wants to look at the pattern, not just the single
+    derived debt number."""
+    b = c["body"]
+    slept = b.get("_sleep_hours_today", 0.0)
+    deficit = OPTIMAL_SLEEP_HOURS_PER_NIGHT - slept
+    if deficit > 0:
+        b["sleep_debt"] = min(100, b.get("sleep_debt", 0) + deficit * SLEEP_DEBT_PER_MISSING_HOUR)
+    else:
+        b["sleep_debt"] = max(0, b.get("sleep_debt", 0) - (-deficit) * SLEEP_DEBT_RECOVERY_PER_SURPLUS_HOUR)
+    log = b.setdefault("sleep_hours_log", [])
+    log.append(round(slept, 2))
+    del log[:-7]
+    b["_sleep_hours_today"] = 0.0
+
+
+def compute_needed_sleep_ticks(c):
+    """Real, fatigue/energy/sleep_debt-aware sleep duration -- ticks
+    needed to fully clear whichever of the three is furthest from its
+    rested target, using the SAME per-tick recovery rates sleep already
+    applies gradually while asleep. Used at the moment a sleep activity
+    STARTS (systems/activities.py::start_activity, action_router.py::
+    _route_sleep) instead of a flat ~8h every time -- a character who's
+    mostly already rested (e.g. resuming after a bathroom break near the
+    end of a night's sleep) gets a real, short top-up; a genuinely
+    sleep-deprived character gets a real, longer night. A floor keeps
+    even a near-fully-rested top-up realistically non-instant; a ceiling
+    keeps one sitting from swallowing multiple real days -- leftover
+    debt simply carries into the following night(s), the real,
+    self-correcting version of "distribute the catch-up over the coming
+    nights" with no separate repayment schedule needed."""
+    b = c.get("body", {})
+    fatigue_ticks = b.get("fatigue", 0) / SLEEP_FATIGUE_RECOVERY_PER_TICK
+    energy_ticks = (100 - b.get("energy", 70)) / SLEEP_ENERGY_RECOVERY_PER_TICK
+    debt_ticks = b.get("sleep_debt", 0) / SLEEP_DEBT_RECOVERY_PER_TICK_ASLEEP
+    needed = max(fatigue_ticks, energy_ticks, debt_ticks)
+    return int(max(SLEEP_MIN_DURATION_TICKS, min(SLEEP_MAX_DURATION_TICKS, needed)))
 
 
 # ── activity completions ──────────────────────────────────────────────────────
@@ -418,6 +596,16 @@ def on_consume_complete(c, world, item_tmpl):
         b["energy"] = min(100, b["energy"] + gain)
     if energy_restore:
         b["energy"] = min(100, b["energy"] + energy_restore)
+
+    # ── caffeine: a real, temporary "push through it" window, not just
+    # the flat energy_restore bump above -- see STIMULANT_* constants.
+    # caffeine_strength == "high" (energy drinks) gets the longer window.
+    if item_tmpl.get("caffeine") and world is not None:
+        strength = "high" if item_tmpl.get("caffeine_strength") == "high" else "base"
+        window = STIMULANT_DURATION_TICKS[strength]
+        b["_stimulant_until_tick"] = max(
+            b.get("_stimulant_until_tick", 0), world.get("tick", 0) + window
+        )
 
     # ── alcohol/drugs → harassment.py's existing intoxication_state ─────────
     if alcohol_units:

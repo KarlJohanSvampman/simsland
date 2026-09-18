@@ -390,7 +390,7 @@ def store_intention(
     # genuinely distinct sources, rather than the most RECENT ones.
     intentions = c.get("active_intentions", [])
     if len(intentions) > 20:
-        intentions.sort(key=final_priority, reverse=True)
+        intentions.sort(key=lambda i: final_priority(i, c), reverse=True)
         c["active_intentions"] = intentions[:20]
 
 
@@ -1013,7 +1013,7 @@ def update_agent(
     from brain.intentions import final_priority
     from llm.llm_gate import PRIORITY_URGENT, PRIORITY_NORMAL
     top_intentions = c.get("active_intentions", [])
-    top_category = max(top_intentions, key=final_priority).get("category") if top_intentions else None
+    top_category = max(top_intentions, key=lambda i: final_priority(i, c)).get("category") if top_intentions else None
     llm_priority = (
         PRIORITY_URGENT
         if top_category in ("survival", "health") or c.get("conversation")

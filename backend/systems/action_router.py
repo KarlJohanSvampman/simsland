@@ -584,11 +584,17 @@ def _route_eat(c, world, action):
 
 def _route_sleep(c, world, action):
     from systems.posture import set_posture
+    from systems.body import compute_needed_sleep_ticks
     target_id = action.get("target")
+    # Real, fatigue/energy/sleep_debt-aware duration -- was a flat 28800
+    # (_INTERACTION_DURATIONS["sleep"]) every time regardless of how
+    # rested the character already was. See systems/body.py::
+    # compute_needed_sleep_ticks() for the full reasoning.
     c["activity"] = _scaffold(
         c, world, "sleep",
         target_id=target_id,
         interaction="sleep",
+        duration=compute_needed_sleep_ticks(c),
     )
     set_posture(c, world, "lying")
 
@@ -1099,7 +1105,7 @@ def _default_recall_text(c):
     active = c.get("active_intentions") or []
     if active:
         from brain.intentions import final_priority
-        top = max(active, key=final_priority)
+        top = max(active, key=lambda i: final_priority(i, c))
         reason = top.get("reason")
         if reason:
             parts.append(f"You'd been meaning to: {reason}")

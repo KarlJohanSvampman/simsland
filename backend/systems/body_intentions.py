@@ -24,7 +24,7 @@ from systems.body import get_odor_label, get_breath_label
 # historical log of every threshold ever crossed.
 _MANAGED_INTENTION_TYPES = {
     "use_toilet", "sleep", "take_nap", "take_shower",
-    "brush_teeth", "drink", "eat_food",
+    "brush_teeth", "drink", "eat_food", "seek_caffeine_or_rest",
 }
 
 
@@ -151,6 +151,24 @@ def generate_body_intentions(c, world=None):
             "category": "health",
             "priority": 55,
             "reason":   "sleep_debt"
+        })
+
+    # ── EXTENDED WAKEFULNESS ("whiny") ───────────────────────────────────────
+    # A real, escalating nag distinct from the hard fatigue-based sleep/nap
+    # triggers above -- starts well before those (fatigue now takes a real
+    # 48h awake, unmedicated, to max out -- see systems/body.py's rescaled
+    # AWAKE_FATIGUE_RATE_PER_TICK), never interrupts, and naturally goes
+    # away once the character either gets real sleep or a real stimulant
+    # (coffee/energy drink -- see body.py's _stimulant_until_tick window).
+    hours_awake = b.get("hours_awake", 0)
+    stimulant_active = world is not None and world.get("tick", 0) < b.get("_stimulant_until_tick", 0)
+    if hours_awake >= 16 and not stimulant_active and fatigue <= critical_threshold:
+        priority = min(65, 20 + (hours_awake - 16) * 3)
+        add_intention(c, {
+            "type":     "seek_caffeine_or_rest",
+            "category": "health",
+            "priority": priority,
+            "reason":   f"You've been awake {int(hours_awake)}h -- it's starting to wear on you. Coffee or getting to bed soon would help."
         })
 
     # ── HYGIENE / SHOWER ─────────────────────────────────────────────────────

@@ -142,6 +142,19 @@ def _random_traits(defs, sex=None, age=None):
     # trait pool so the weighted pick can't also pick one as a "regular" trait.
     pool = {k: v for k, v in pool.items() if k not in COGNITION_CORE_TRAITS}
 
+    # Confirmed live bug: a 5-year-old character generated with the real
+    # "promiscuous" trait (category "sexuality", no age condition on it
+    # at all) -- weighted_trait_pick()'s existing conditions-check only
+    # ever fires for traits that actually declare a condition, and none
+    # of the 12 real sexuality-category traits do. Excluded outright for
+    # a young child, matching this session's other child-safety gates
+    # (lt_needs.py's romance/intimacy weights, expectations.py's
+    # cohabiting tag) -- a real age-appropriate personality pool, not
+    # just a per-trait condition someone would need to remember to add
+    # to all 12 entries individually.
+    if age is not None and age < 13:
+        pool = {k: v for k, v in pool.items() if v.get("category") != "sexuality"}
+
     cognition_trait = random.choice(list(COGNITION_CORE_TRAITS.keys()))
     if not pool:
         return [cognition_trait]

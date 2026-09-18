@@ -325,6 +325,56 @@
     border-radius: 3px;
   }
 
+  /* =========================
+     PER-EXPECTATION 7-DAY WINDOW (Inspector's intention-detail modal) --
+     a real, calendar-anchored strip for ONE expectation's own
+     window_start_tick/window_end_tick, distinct from the Plans tab's
+     whole-week grid above.
+  ========================= */
+
+  .expectWindowCalendar {
+    margin: 6px 0 10px;
+  }
+
+  .expectWindowRange {
+    font-size: 12px;
+    color: #9cf;
+    font-weight: bold;
+    margin-bottom: 6px;
+  }
+
+  .expectWindowDays {
+    display: flex;
+    gap: 4px;
+  }
+
+  .expectWindowDay {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .expectWindowDayLabel {
+    font-size: 9px;
+    color: #888;
+    text-align: center;
+    margin-bottom: 3px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .expectWindowDayBar {
+    height: 14px;
+    background: rgba(255,255,255,0.06);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+
+  .expectWindowDayFill {
+    height: 100%;
+    background: #5b9ee1;
+  }
+
   .viewerSection {
     margin-bottom: 12px;
     padding-bottom: 10px;

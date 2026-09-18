@@ -1390,14 +1390,25 @@ def start_activity(
     if not config:
         return False
 
-    duration = compute_duration_ticks(
+    if activity_type == "sleep":
+        # Real, fatigue/energy/sleep_debt-aware duration instead of the
+        # generic flat-base-plus-jitter formula -- see systems/body.py::
+        # compute_needed_sleep_ticks() for why (this is the direct fix
+        # for a confirmed live bug: a bathroom-interrupted sleep resumed
+        # via this same start_activity("sleep") call got a brand-new
+        # flat ~8h sleep stacked on top of an already-mostly-recovered
+        # night).
+        from systems.body import compute_needed_sleep_ticks
+        duration = compute_needed_sleep_ticks(c)
+    else:
+        duration = compute_duration_ticks(
 
-        c,
+            c,
 
-        config[
-            "base_duration_minutes"
-        ]
-    )
+            config[
+                "base_duration_minutes"
+            ]
+        )
 
     # no_target activities (systems/chores.py's clean_floors/dust_and_wipe
     # -- "clean wherever you currently are") have no prop to walk to at

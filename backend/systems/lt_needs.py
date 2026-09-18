@@ -93,6 +93,19 @@ def distribute_lt_needs(c, budget=100, world=None):
     if "playful" in traits:
         weights["play"] = weights.get("play", 2) + 10
 
+    # Confirmed live bug: a young child (Dennis Davis, 5 years old) had
+    # real, LLM-surfaced "seek_romance"/"seek_intimacy" intentions --
+    # romance/intimacy weights had no age gate at all, unlike every other
+    # age-inappropriate-content gate this codebase already has elsewhere
+    # (expectations.py's cohabiting tag, character_gen.py's belief/
+    # persona generation, ...). Zeroed for a child regardless of trait
+    # modifiers above (placed last so it always wins); their share is
+    # simply redistributed across the remaining categories below rather
+    # than needing a second budget re-balance.
+    if c.get("age_group") == "child":
+        weights["romance"] = 0
+        weights["intimacy"] = 0
+
     # Normalise to budget
     total = sum(weights.values())
     lt = {}

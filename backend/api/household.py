@@ -199,6 +199,7 @@ def all_characters(sim_id: str):
         {
             "id": c["id"],
             "name": c.get("name"),
+            "age": c.get("age"),
             "household_id": c.get("household_id"),
             "x": c.get("x"),
             "y": c.get("y"),
