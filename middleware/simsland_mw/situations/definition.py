@@ -82,6 +82,7 @@ class OptionSeed:
     default_line: Optional[Callable[[SituationContext], str]] = None
     speech_act: Optional[str] = None
     speaks: bool = False                       # LLM-authored `speech` is accepted for this option
+    min_age: int = 0                           # never offered to anyone younger
     thought: bool = True                       # the reply's `thought` is kept in the session
 
 
@@ -97,5 +98,10 @@ class SituationDefinition:
     cooldown_ticks: int = 1800                 # 1 tick = 1 sim second -> 30 sim minutes
     min_options: int = 2
     notes: str = ""
+    # Options that depend on the character (one per pressing intention, ...).
+    # They come first; `ordered` keeps them in the order given (priority) rather
+    # than sampling when there are more than fit.
+    dynamic_options: Optional[Callable[[SituationContext], Tuple[OptionSeed, ...]]] = None
+    ordered: bool = False
 
     MAX_OPTIONS = 6

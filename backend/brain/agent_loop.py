@@ -634,6 +634,12 @@ def update_agent(
         world
     )
 
+    if c.get("off_grid") and c.get("activity"):
+        # Whoever is away can't also be mid-activity at home; nothing else ever
+        # progresses or clears it while they're off-grid.
+        from systems.occupancy import interrupt_activity
+        interrupt_activity(c, world)
+
     if c.get(
         "off_grid"
     ) or c.get(

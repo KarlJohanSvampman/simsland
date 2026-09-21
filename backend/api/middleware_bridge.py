@@ -100,6 +100,8 @@ def due():
     for cid, c in world.get("characters", {}).items():
         if not external_brain.wants_middleware(c):
             continue
+        if c.get("off_grid") or c.get("travel_state"):
+            continue   # away/travelling: update_agent() doesn't run them, nothing to decide
         cog = c.get("cognition") or {}
         if tick >= cog.get("next_think_tick", 0):
             out.append({
@@ -206,6 +208,14 @@ def execute(char_id: str, req: ExecuteReq):
         c = _char_or_404(world, char_id)
 
         c["last_invalid_action"] = None
+        if c.get("off_grid"):
+            # They left while this decision was being made. Applying it now would
+            # leave a stale activity on someone who is away (update_agent() never
+            # runs for off-grid characters, so it would sit there forever).
+            note_think(c, world, {}, wake_reason=req.wake_reason)
+            save_world(SIM_ID, world)
+            return {"ok": True, "tick": world.get("tick", 0), "activity_type": None,
+                    "invalid_action": None, "ignored": "character is off-grid"}
         available = build_available_actions(c, world)
         try:
             process_decision(c, world, req.decision, available_actions=available)

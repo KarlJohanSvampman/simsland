@@ -8,7 +8,7 @@ from ..decisions.options import Option
 from ..narrative.compiler import ConsciousnessSnapshot
 
 _BASE = [
-    "character.identity", "character.traits", "character.needs", "character.activity",
+    "character.identity", "character.traits", "character.mood", "character.needs", "character.activity",
     "character.intentions", "environment.current", "environment.nearby_characters",
     "environment.nearby_props", "environment.available_interactions", "household.members",
 ]

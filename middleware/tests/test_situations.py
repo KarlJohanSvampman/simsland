@@ -138,7 +138,7 @@ def test_capability_report_lists_every_gap_with_its_situations():
 def test_every_situation_has_at_least_4_seeds():
     from simsland_mw.situations.library import default_registry
     for s in default_registry().all():
-        assert len(s.options) >= 4, s.id
+        assert len(s.options) >= 4 or s.dynamic_options, s.id
 
 
 @pytest.mark.asyncio
@@ -172,3 +172,44 @@ async def test_executor_refuses_targetless_interact_and_conditionless_wait(sim):
     assert check_action({"type": "wait"}) == ["wait without a condition"]
     assert check_action({"type": "wait", "waiting_for": {"kind": "person", "ref": "den"}}) == []
     assert check_action({"type": "interact", "target": "p"}) == []
+
+
+def _agenda_world(world, age=34):
+    world["character"]["age"] = age
+    world["character"]["body"].update({"hunger": 10, "fatigue": 0})
+    world["environment"]["visible_people"] = []
+    world["meta"]["cognition"] = {"wake_reason": "idle", "wake_payload": {}}
+    world["character"]["emotion"] = "anxious"
+    world["character"]["active_intentions"] = [
+        {"type": "creative_outlet", "priority": 40, "reason": "You want a creative outlet."},
+        {"type": "expectation:make_dinner", "priority": 80, "reason": "Dinner is due."},
+        {"type": "outdoor_time", "priority": 70, "reason": "You want fresh air."},
+        {"type": "eat_food", "priority": 60, "reason": "You're hungry."},
+    ]
+    world["available_actions"]["action_types"] += ["make_drawing"]
+    world["environment"]["visible_props"][0]["interactions"].append("cook_meal")
+
+
+@pytest.mark.asyncio
+async def test_idle_agenda_orders_options_by_priority_and_reports_gaps(sim, world):
+    _agenda_world(world)
+    p = await eng(sim).prepare("kim", "idle")
+    assert p.situation.situation.id == "cognition.idle_agenda"
+    ids = [o.id for o in p.options]
+    assert ids.index("agenda_expectation_make_dinner") < ids.index("agenda_eat_food") < ids.index("agenda_creative_outlet")
+    assert ids[-1] == "just_relax_for_a_while"
+    assert dict(p.situation.unresolved)["agenda_outdoor_time"].endswith("outdoor_activity")
+    text = p.messages[1]["content"]
+    assert "feeling anxious" in text and text.index("Dinner is due") < text.index("You're hungry")
+
+
+@pytest.mark.asyncio
+async def test_options_are_age_aware(sim, world):
+    _agenda_world(world, age=6)
+    p = await eng(sim).prepare("kim", "idle")
+    ids = [o.id for o in p.options]
+    assert "agenda_expectation_make_dinner" not in ids
+    assert "not for someone aged 6" in dict(p.situation.unresolved)["agenda_expectation_make_dinner"]
+    world["character"]["body"]["hunger"] = 80
+    q = await eng(sim).prepare("kim", "urgent_need")
+    assert "cook_a_proper_meal" not in [o.id for o in q.options]

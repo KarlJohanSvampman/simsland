@@ -6,7 +6,7 @@ from typing import Any, Dict, List
 
 from ..provider import DataProvider, ResolveContext
 
-MAX_INTENTIONS = 6
+MAX_INTENTIONS = 8
 
 
 async def _char(ctx: ResolveContext) -> Dict[str, Any]:
@@ -56,6 +56,11 @@ async def activity(ctx: ResolveContext) -> Dict[str, Any]:
     a = c.get("activity") or {}
     return {"type": a.get("type"), "phase": a.get("phase"),
             "target_id": a.get("target_id"), "interaction": a.get("interaction")}
+
+
+async def mood(ctx: ResolveContext) -> Dict[str, Any]:
+    c = await _char(ctx)
+    return {"emotion": c.get("emotion")}
 
 
 async def intentions(ctx: ResolveContext) -> List[Dict[str, Any]]:
@@ -114,6 +119,7 @@ PROVIDERS = [
     DataProvider("character.body", body, sections=("character",)),
     DataProvider("character.needs", needs, depends_on=("character.body",), sections=("character",)),
     DataProvider("character.activity", activity, sections=("character",)),
+    DataProvider("character.mood", mood, sections=("character",)),
     DataProvider("character.intentions", intentions, sections=("character",)),
     DataProvider("character.expectations", expectations, sections=("character",)),
     DataProvider("character.grievances", grievances, sections=("character",)),

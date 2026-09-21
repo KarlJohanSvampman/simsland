@@ -5149,11 +5149,23 @@ function renderMindTab(c){
 // per the user's own spec (success / still in progress / timed out).
 const STALE_INTENTION_TICKS = 1800;   // 30 min with no resolution reads as "stalled"
 
+// One place decides how an expectation's status reads, so the same row can't
+// be red in one tab and green in another. `pending` means the current window
+// is still open; a miss from an earlier period only shows as a count.
+function _expectationStatusHtml(e){
+  if(e.not_applicable) return `<span style="opacity:.55">not today</span>`;
+  const past = e.missed_count ? ` <span style="opacity:.55">· missed ${e.missed_count}x before</span>` : "";
+  if(e.status === "missed") return `<span class="viewerNeg">missed</span>${past}`;
+  if(e.status === "satisfied") return `<span class="viewerPos">done · streak ${e.streak || 0}</span>`;
+  return `<span style="color:#e6c200">pending</span>${past}`;
+}
+
 function _intentionOutcome(c, intention){
   const type = intention.type || "";
   if(type.startsWith("expectation:")){
     const templateId = type.slice("expectation:".length);
     const exp = (c.expectations || {})[templateId];
+    if(exp?.not_applicable) return { color: "#888", label: "Not applicable today" };
     if(exp?.status === "satisfied") return { color: "#3ecf5e", label: `Satisfied (streak ${exp.streak ?? 0})` };
     if(exp?.status === "missed") return { color: "#e64545", label: `Missed (${exp.missed_count ?? 0} times)` };
     return { color: "#e6c200", label: "Still pending this period" };
@@ -5478,9 +5490,12 @@ function renderMemoryTab(c){
     const lines = lies.map(l => `
       <div class="viewerCard">
         "${l.lie_text}" <span style="opacity:.6">(${l.question_type})</span>
-        <div style="opacity:.6">told to: ${(l.told_to || []).map(_charName).filter(Boolean).join(", ")}</div>
+        ${l.actual_truth ? `<div style="opacity:.6">really: ${l.actual_truth}</div>` : ""}
+        <div style="opacity:.6">${(l.told_to || []).length
+          ? "told to: " + l.told_to.map(_charName).filter(Boolean).join(", ")
+          : "cover story -- hasn't told anyone yet"}</div>
       </div>`);
-    sections.push(_section(`Active Lies (${lies.length})`, lines.join("")));
+    sections.push(_section(`Cover stories (${lies.length})`, lines.join("")));
   }
 
   el.innerHTML = sections.join("");
@@ -5680,9 +5695,7 @@ function _renderExpectationsWeek(expectations, dayTicks){
 
   const unwindowedLines = unwindowed.map(e => {
     const tmpl = definitions.expectation_templates?.[e.template_id];
-    const status = e.status === "missed"
-      ? `<span class="viewerNeg">missed ${e.missed_count || 0}x</span>`
-      : `<span class="viewerPos">streak ${e.streak || 0}</span>`;
+    const status = _expectationStatusHtml(e);
     return `<div class="viewerCard">${tmpl?.label || e.template_id} <span style="opacity:.5">(${e.cadence})</span> — ${status}</div>`;
   }).join("");
 
@@ -6007,9 +6020,7 @@ function renderLifeTab(c){
   if(expectations.length){
     const lines = expectations.map(e => {
       const tmpl = expectationTemplates[e.template_id];
-      const status = e.status === "missed"
-        ? `<span class="viewerNeg">missed ${e.missed_count || 0}x</span>`
-        : `<span class="viewerPos">streak ${e.streak || 0}</span>`;
+      const status = _expectationStatusHtml(e);
       return `<div class="viewerCard">${tmpl?.label || e.template_id} — ${status}</div>`;
     });
     sections.push(_section("Expectations", lines.join("")));

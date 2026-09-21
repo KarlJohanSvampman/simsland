@@ -341,8 +341,7 @@ def update_expectations(c, world):
                 nd["window_start_tick"] = tick
                 nd["window_end_tick"] = tick + 7 * 86400
                 nd["satisfied_this_period"] = False
-                if nd["status"] != "missed":
-                    nd["status"] = "pending"
+                nd["status"] = "pending"
             continue
 
         if nd["current_period_key"] != period:
@@ -363,8 +362,12 @@ def update_expectations(c, world):
             nd["window_start_tick"], nd["window_end_tick"] = _compute_window(
                 c, world, nd["template_id"], calendar, cadence=nd["cadence"],
             )
-            if nd["status"] != "missed":
-                nd["status"] = "pending"
+            # A brand-new window is open, so this period is pending -- whatever was
+            # missed last period lives on in missed_count/frustration. It used to
+            # stay "missed" (red) until satisfied, so a weekly expectation with six
+            # days still to go read as failed the moment its window opened.
+            nd["status"] = "pending"
+            nd["not_applicable"] = False
 
             # Confirmed live bug (player report: "go_to_work" flagged
             # missed in the middle of the night with no work scheduled
@@ -379,6 +382,8 @@ def update_expectations(c, world):
             if nd["template_id"] == "go_to_work" and not _has_scheduled_work_today(c, world):
                 nd["satisfied_this_period"] = True
                 nd["status"] = "satisfied"
+                # Nothing was expected today -- not the same as having done it.
+                nd["not_applicable"] = True
 
         # Real, immediate window-close miss detection -- for an
         # expectation with a real schedule-derived window this period
@@ -408,6 +413,16 @@ def update_expectations(c, world):
     for nd in c.get("expectations", {}).values():
         if nd["status"] != "satisfied":
             _refresh_intention(c, nd, world)
+        else:
+            # Satisfied (or not applicable today): the intention would otherwise
+            # linger with its old "you didn't get to ..." reason.
+            _drop_intention(c, f"expectation:{nd['template_id']}")
+
+
+def _drop_intention(c, intention_type):
+    ints = c.get("active_intentions")
+    if ints:
+        c["active_intentions"] = [i for i in ints if i.get("type") != intention_type]
 
 
 def _refresh_intention(c, nd, world):

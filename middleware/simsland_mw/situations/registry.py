@@ -42,6 +42,7 @@ class SituationRegistry:
         self._sits: Dict[str, SituationDefinition] = {}
         self.evaluator = TriggerEvaluator()
         self._state: Dict[str, Dict[str, Any]] = {}
+        self._extra_gaps: List[Tuple[str, str, str]] = []      # (situation, what, capability)
         for s in situations:
             self.register(s)
 
@@ -50,6 +51,11 @@ class SituationRegistry:
             raise ValueError(f"duplicate situation id {sit.id}")
         self._sits[sit.id] = sit
         return sit
+
+    def register_gaps(self, situation_id: str, gaps: Dict[str, str]) -> None:
+        """Gaps of dynamic options (one per intention type), which can't be found by
+        reading the static seed list."""
+        self._extra_gaps += [(situation_id, what, cap) for what, cap in gaps.items()]
 
     def all(self) -> List[SituationDefinition]:
         return list(self._sits.values())
@@ -104,7 +110,12 @@ class SituationRegistry:
         options: List[Option] = []
         unresolved: List[Tuple[str, str]] = []
         seen_outcomes = set()
-        for i, seed in enumerate(sit.options):
+        seeds = tuple(sit.dynamic_options(ctx)) if sit.dynamic_options else ()
+        age = ctx.get("character.identity.age")
+        for i, seed in enumerate(seeds + sit.options):
+            if seed.min_age and age is not None and age < seed.min_age:
+                unresolved.append((seed.id, f"not for someone aged {age}"))
+                continue
             if seed.gap:
                 unresolved.append((seed.id, f"missing backend capability: {seed.gap}"))
                 continue
@@ -134,9 +145,9 @@ class SituationRegistry:
                     speech = {"utterance": line, "speech_act": seed.speech_act or "say",
                               "target": outcome.get("target")}
             options.append(Option(seed.id, desc, outcome, speech=speech,
-                                  priority=sit.priority - i, kind="situation",
+                                  priority=sit.priority - len(options), kind="situation",
                                   speaks=seed.speaks, situation=sit.id))
-        options = self._trim(options, random.Random(f"{ctx.tick}:{sit.id}"))
+        options = self._trim(options, random.Random(f"{ctx.tick}:{sit.id}"), sit.ordered)
         return CompiledSituation(sit, trig, ctx, sit.describe(ctx), options, unresolved)
 
     PROP_ACTIONS = ("interact", "sleep", "sit_down", "eat", "lie_down")
@@ -150,7 +161,7 @@ class SituationRegistry:
                     and outcome.get("target") and act.get("target_id") == outcome["target"])
 
     @staticmethod
-    def _trim(options: List[Option], rng: random.Random) -> List[Option]:
+    def _trim(options: List[Option], rng: random.Random, ordered: bool = False) -> List[Option]:
         """At most MAX_OPTIONS. Deliberate no-ops always survive; the rest are
         sampled, so a situation with many possible things to do doesn't offer the
         same first few forever."""
@@ -159,7 +170,8 @@ class SituationRegistry:
             return options
         keep = [o for o in options if o.outcome is None]
         rest = [o for o in options if o.outcome is not None]
-        picked = set(id(o) for o in rng.sample(rest, max(0, cap - len(keep))))
+        room = max(0, cap - len(keep))
+        picked = set(id(o) for o in (rest[:room] if ordered else rng.sample(rest, room)))
         return [o for o in options if o.outcome is None or id(o) in picked]
 
     # ---- reporting -------------------------------------------------------
@@ -172,4 +184,6 @@ class SituationRegistry:
                 if seed.gap:
                     e = out.setdefault(seed.gap, {"capability": seed.gap, "needed_by": []})
                     e["needed_by"].append(f"{sit.id}/{seed.id}")
+        for sid, what, cap in self._extra_gaps:
+            out.setdefault(cap, {"capability": cap, "needed_by": []})["needed_by"].append(f"{sid}/{what}")
         return sorted(out.values(), key=lambda e: e["capability"])

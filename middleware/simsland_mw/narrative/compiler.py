@@ -106,6 +106,9 @@ def compile_snapshot(res: Resolution, digest: Optional[List[str]] = None) -> Con
     if members and len(members) > 1:
         others = [m["name"] for m in members if not m["is_self"]]
         who.append(f"You share a household with {join_natural(others)}.")
+    emotion = (res.get("character.mood") or {}).get("emotion")
+    if emotion and emotion != "neutral":
+        who.append(f"Right now you're feeling {emotion}.")
     s["who"] = who
 
     # HOW I FEEL
