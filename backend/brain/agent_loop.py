@@ -641,6 +641,9 @@ def update_agent(
     ) in TRAVEL_FROZEN_STATES:
         return
 
+    from systems.activity_watchdog import check_activity_watchdog
+    check_activity_watchdog(c, world)
+
     # =====================================
     # INTERNAL STATE
     # =====================================

@@ -151,6 +151,7 @@ _WAKE_LINE_TEMPLATES = {
     "activity_phase_changed": "You're finishing up what you were doing.",
     "wait_ready": "What you were waiting on is ready now.",
     "waiting_timed_out": "You've been waiting a while now and your patience is running out.",
+    "activity_aborted": "You couldn't get anywhere with what you were doing and gave up on it for now.",
     "gave_up_waiting": "You gave up waiting -- it's taken too long, so you're moving on for now.",
     "noticed_commotion": "{summary}",
     "door_signal": "You hear someone at the door -- {visitor_name} is here.",

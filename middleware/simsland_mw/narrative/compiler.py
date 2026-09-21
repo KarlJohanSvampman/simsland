@@ -34,6 +34,7 @@ _WAKE_LINES = {
     "heard_speech": '{speaker_name} just said to you: "{utterance}"',
     "person_entered_view": "{subject_name} has just come into view.",
     "door_signal": "You hear someone at the door -- {visitor_name} is here.",
+    "activity_aborted": "You couldn't get anywhere with what you were doing and gave up on it for now.",
     "activity_finished": "You've just finished what you were doing.",
     "waiting_timed_out": "You've been waiting a while and your patience is running out.",
     "wait_ready": "What you were waiting on is ready now.",
