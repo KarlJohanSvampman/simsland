@@ -11,7 +11,7 @@ from llm.llm_client import call_llm_safe
 # reliably parseable answer, not narration.
 
 
-async def generate_choice(c, world, choice_type, options, occasion):
+async def generate_choice(c, world, choice_type, options, occasion, context=None):
     """
     Returns the raw LLM response string (expected to be a bare option
     id), or None on any failure (LLM unreachable, error response, empty
@@ -27,10 +27,14 @@ async def generate_choice(c, world, choice_type, options, occasion):
 
     occasion_block = f"\nOccasion / reason for this choice: {occasion}\n" if occasion else ""
 
+    context_block = f"
+{context}
+" if context else ""
+
     prompt = f"""
 Character: {c.get("name", "Someone")}
 Traits: {c.get("traits", [])}
-
+{context_block}
 Choosing a {choice_type} from the following options:
 {options_block}
 {occasion_block}

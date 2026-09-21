@@ -28,6 +28,7 @@ AFFORDANCES: Dict[str, Dict[str, Sequence[str]]] = {
     "food": {"interactions": ("fridge", "pantry", "prepare_food", "cook"), "tags": ("food", "fridge")},
     "cook": {"interactions": ("cook", "prepare_food"), "tags": ()},
     "coffee": {"interactions": ("coffee",), "tags": ("coffee",)},
+    "computer": {"interactions": ("computer_use",), "tags": ()},
     "toilet": {"interactions": ("toilet",), "tags": ("toilet",)},
     "water": {"interactions": ("drink", "sink", "get_water"), "tags": ("water",)},
     "sleep": {"interactions": (), "tags": ("sleepable",)},
@@ -248,8 +249,11 @@ def rule_socialize(dc: DecisionContext) -> List[Option]:
 
 
 def rule_wait(dc: DecisionContext) -> List[Option]:
-    return [Option("wait", "Do nothing in particular for now and see what happens.",
-                   {"type": "wait"}, priority=1, kind="idle")]
+    """Carrying on with nothing in particular. Deliberately NOT Simsland's
+    `wait` action: that one means "waiting for <person/business/delivery>" and
+    must carry a condition, and a bare idle has none. This sends no action."""
+    return [Option("do_nothing_for_now", "Do nothing in particular for now and see what happens.",
+                   None, priority=1, kind="idle")]
 
 
 DEFAULT_RULES: List[Rule] = [rule_eat, rule_bathroom, rule_drink, rule_rest,

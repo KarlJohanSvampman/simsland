@@ -154,7 +154,7 @@ def _review_social_contracts(c, other, world):
 # maybe_review_on_sighting() below -- that one only RECALLS existing
 # memories once per calendar day; this one CREATES a new observational
 # one, on its own 30-minute gate.
-SIGHTING_OBSERVATION_GAP_TICKS = 1800
+SIGHTING_OBSERVATION_GAP_TICKS = 3 * 3600   # per observed person, per observer (see below)
 
 
 def _describe_activity(target):
@@ -216,12 +216,18 @@ def maybe_log_sighting_observation(c, other, world):
     rel = ensure_relationship(c, other_id)
     tick = world.get("tick", 0)
 
+    # Each character remembers when they last reported seeing each other
+    # person, and only records a fresh sighting once 3+ hours have passed.
+    # Alarming sightings used to bypass the gate entirely, which produced a
+    # new memory every perception tick for as long as an old hostile
+    # conflict stayed open -- they now have their own timer, same length,
+    # so a routine sighting can't suppress an alarming one (or vice versa).
     urgent = _is_violent_or_illegal(other, world)
-    if not urgent:
-        last = rel.get("_last_sighting_observation_tick", -SIGHTING_OBSERVATION_GAP_TICKS)
-        if tick - last < SIGHTING_OBSERVATION_GAP_TICKS:
-            return
-    rel["_last_sighting_observation_tick"] = tick
+    key = "_last_urgent_sighting_tick" if urgent else "_last_sighting_observation_tick"
+    last = rel.get(key)
+    if last is not None and tick - last < SIGHTING_OBSERVATION_GAP_TICKS:
+        return
+    rel[key] = tick
 
     activity_desc = _describe_activity(other)
     mood = other.get("emotion") or "neutral"

@@ -4643,6 +4643,60 @@ function _clearInspector(){
   _applyInspectorVisibility();
 }
 
+// Everything the activity carries, in the shared intention modal. A wait with
+// no condition, or an interact with no target, is called out explicitly.
+function openActivityModal(charId){
+  const c = _worldState.characters?.[charId];
+  const act = c?.activity;
+  const titleEl = document.getElementById("intentionModalTitle");
+  const body = document.getElementById("intentionModalBody");
+  if(!c || !act || !body) return;
+  if(titleEl) titleEl.textContent = `${c.name}: ${(act.type || "activity").replace(/_/g, " ")}`;
+  body.innerHTML = "";
+  const tick = _worldState.tick || 0;
+  const prop = act.target_id ? _findProp(act.target_id) : null;
+  const targetChar = act.target_id ? _worldState.characters?.[act.target_id] : null;
+  const fields = [
+    ["Type", act.type],
+    ["Interaction", act.interaction],
+    ["Phase", act.phase],
+    ["Target", act.target_id
+      ? `${prop?.template?.replace(/_/g, " ") || targetChar?.name || "unknown"} (${act.target_id})` : null],
+    ["Anchor", act.anchor_name],
+    ["Started", act.phase_started_tick != null ? `${Math.max(0, tick - act.phase_started_tick)} ticks ago` : null],
+    ["Duration", act.duration != null ? `${act.duration} ticks` : null],
+    ["Waiting for", act.state?.waiting_for ? JSON.stringify(act.state.waiting_for) : null],
+    ["Moving", c.is_moving ? "yes" : "no"],
+  ];
+  const problems = [];
+  if(act.type === "wait" && !act.state?.waiting_for) problems.push("A wait with no condition -- nothing is being waited for.");
+  if(act.type === "interact" && !act.target_id) problems.push("An interact with no target.");
+  for(const p of problems){
+    const row = document.createElement("div");
+    row.className = "eventModalRowSummary";
+    row.style.color = "#f66";
+    row.textContent = "⚠ " + p;
+    body.appendChild(row);
+  }
+  for(const [k, v] of fields){
+    if(v == null || v === "") continue;
+    const row = document.createElement("div");
+    row.className = "eventModalRow";
+    row.innerHTML = `<div class="eventModalRowMeta"></div><div></div>`;
+    row.children[0].textContent = k;
+    row.children[1].textContent = String(v);
+    body.appendChild(row);
+  }
+  openModal("modal-intention");
+}
+
+document.addEventListener("click", (e) => {
+  const link = e.target.closest?.(".activityDetailsLink");
+  if(!link) return;
+  e.preventDefault();
+  if(selectedCharacterId) openActivityModal(selectedCharacterId);
+});
+
 function renderCharacterInspector(id){
   const el = document.getElementById("viewerSelection");
   if(!el) return;
@@ -4681,13 +4735,23 @@ function renderCharacterInspector(id){
   const activityLabel = c.activity?.type
     ? (() => {
         const verb = c.activity.phase === "walking" ? "Heading to" : "Doing";
-        const label = c.activity.type.replace(/_/g, " ");
+        // A generic "interact" is only meaningful with the interaction it
+        // carries (use_toilet, open_fridge, ...) -- show that, not the shell.
+        const kind = c.activity.type === "interact" && c.activity.interaction
+          ? c.activity.interaction : c.activity.type;
+        const label = kind.replace(/_/g, " ");
         const targetId = c.activity.target_id;
-        if (!targetId) return `${verb}: ${label}`;
+        const link = `<a href="#" class="activityDetailsLink" style="opacity:.7;margin-left:6px">details</a>`;
+        if (!targetId) {
+          const flag = (c.activity.type === "wait" && !c.activity.state?.waiting_for)
+            || c.activity.type === "interact"
+            ? ` <span style="color:#f66">⚠ no target</span>` : "";
+          return `${verb}: ${label}${flag}${link}`;
+        }
         const prop = _findProp(targetId);
         const targetChar = _worldState.characters?.[targetId];
         const targetName = prop?.template?.replace(/_/g, " ") || targetChar?.name || targetId;
-        return `${verb}: ${label} (${targetName})`;
+        return `${verb}: ${label} (${targetName})${link}`;
       })()
     : `State: ${c.animation_state || "idle"}`;
   rows.push(activityLabel);
@@ -4729,10 +4793,8 @@ function renderCharacterInspector(id){
   if(c.emotion) rows.push(`Mood: ${c.emotion}`);
 
   if(c.off_grid){
-    const tick = _worldState.tick || 0;
-    const remain = (c.return_tick || tick) - tick;
-    const backIn = remain > 0 ? `~${Math.max(1, Math.round(remain / 60))}m` : "due now";
-    rows.push(`<span style="color:#fc6">Off-grid: ${(c.off_grid_reason || "?").replace(/_/g, " ")} — back in ${backIn}</span>`);
+    const backIn = _offgridBackIn(c, _worldState.tick);
+    rows.push(`<span style="color:#fc6">Off-grid: ${(c.off_grid_reason || "?").replace(/_/g, " ")} — back ${backIn}</span>`);
   } else if(c.travel_state){
     // Human-readable gloss per systems/travel.py + systems/transit.py's
     // state machine.
@@ -7700,6 +7762,18 @@ function _syncOutlinerHighlight(){
 // than re-deriving the 30-day schedule client-side.
 const LONG_STAY_REASONS = new Set(["jail", "cps_care", "held_pending_trial", "temporary_separation"]);
 
+// One source of truth for "how long until back", shared by the inspector and
+// the outliner. They used to compute it from two different fetches (the
+// outliner's own polled /household/characters tick vs the inspector's live
+// world-state), so the same character showed two different times.
+function _offgridBackIn(c, fallbackTick){
+  const live = _worldState.characters?.[c.id];
+  const tick = _worldState.tick ?? fallbackTick ?? 0;
+  const returnTick = live?.return_tick ?? c.return_tick ?? tick;
+  const remain = returnTick - tick;
+  return remain > 0 ? `in ~${Math.max(1, Math.round(remain / 60))}m` : "due now";
+}
+
 function _outlinerStatus(c, tick){
   if(c.alive === false) return { text: "dead", cls: "dead" };
   if(c.off_grid){
@@ -7710,8 +7784,7 @@ function _outlinerStatus(c, tick){
       const update = daysLeft != null ? `next update in ${daysLeft}d` : "away";
       return { text: `${reason} — ${update}`, cls: "longstay" };
     }
-    const remain = (c.return_tick || tick) - tick;
-    const backIn = remain > 0 ? `back in ~${Math.max(1, Math.round(remain / 60))}m` : "due back";
+    const backIn = `back ${_offgridBackIn(c, tick)}`;
     const reason = c.off_grid_reason ? c.off_grid_reason.replace(/_/g, " ") : "off-grid";
     return { text: `${reason} — ${backIn}`, cls: "offgrid" };
   }

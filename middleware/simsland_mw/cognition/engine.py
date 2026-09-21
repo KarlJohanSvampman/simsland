@@ -9,6 +9,7 @@ Each stage is a separate, replaceable object; this class only sequences them.
 
 from __future__ import annotations
 
+import logging
 import time
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
@@ -27,7 +28,9 @@ from ..sessions.manager import SessionManager
 from ..simulation.client import SimulationClient
 from . import decisions as prompts
 
-MAX_ATTEMPTS = 2  # first try + one corrective retry
+log = logging.getLogger(__name__)
+MAX_ATTEMPTS = 2
+REPEAT_COOLDOWN_TICKS = 3600  # first try + one corrective retry
 
 
 @dataclass
@@ -56,6 +59,7 @@ class DecisionRecord:
     unresolved: List[Dict[str, str]] = field(default_factory=list)
     thought: Optional[str] = None
     speech: Optional[str] = None
+    problems: List[str] = field(default_factory=list)
     replies: List[str] = field(default_factory=list)
     rejections: List[str] = field(default_factory=list)
     choice_id: Optional[str] = None
@@ -99,11 +103,32 @@ class CognitionEngine:
         compiled = self.situations.select(
             char_id, DecisionContext(res), wake_reason or env.get("wake_reason"),
             env.get("wake_payload"), env.get("tick"), commit=commit)
-        options = compiled.options if compiled else self.generator.generate(res)
+        options = compiled.options if compiled else self._without_recent_repeats(
+            session, self.generator.generate(res), env.get("tick"))
+        if not compiled and all(o.kind == "idle" for o in options):
+            # Nothing to act on: offer real things to do rather than a bare "nothing".
+            compiled = self.situations.select(
+                char_id, DecisionContext(res), wake_reason or env.get("wake_reason"),
+                env.get("wake_payload"), env.get("tick"), commit=False,
+                force="cognition.quiet_moment") or compiled
+            if compiled:
+                options = compiled.options
         return Prepared(char_id, wake_reason, profile, res, snapshot, options,
                         prompts.build_messages(snapshot, options,
                                                compiled.description if compiled else None),
                         tick=env.get("tick"), situation=compiled)
+
+    @staticmethod
+    def _without_recent_repeats(session, options: List[Option], tick: Optional[int]) -> List[Option]:
+        """Don't re-offer a confrontation/ask the character already made within
+        the last hour -- otherwise the same rule re-fires on every wake and
+        someone tells the same person they're frustrated every few minutes."""
+        if tick is None:
+            return options
+        recent = {c["option_id"] for c in session.recent_choices
+                  if c.get("tick") is not None and tick - c["tick"] < REPEAT_COOLDOWN_TICKS}
+        kept = [o for o in options if not (o.kind == "social" and o.speech and o.id in recent)]
+        return kept or options
 
     async def decide(self, char_id: str, wake_reason: Optional[str] = None,
                      dry_run: Optional[bool] = None, profile: Optional[str] = None) -> DecisionRecord:
@@ -122,6 +147,9 @@ class CognitionEngine:
         rec.executed = result.executed
         rec.action = result.decision["action"]
         rec.thought, rec.speech = choice.thought, choice.speech
+        rec.problems = result.problems
+        if result.problems:
+            log.warning("%s: refused to send %s (%s)", char_id, choice.option.id, "; ".join(result.problems))
         rec.simsland_response = result.response or None
 
         tick = (result.response or {}).get("tick")

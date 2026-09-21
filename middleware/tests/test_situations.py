@@ -135,7 +135,40 @@ def test_capability_report_lists_every_gap_with_its_situations():
     assert "need.hunger.noticeable/order_food_delivery" in rep["food_delivery"]
 
 
-def test_every_situation_has_4_to_6_options():
+def test_every_situation_has_at_least_4_seeds():
     from simsland_mw.situations.library import default_registry
     for s in default_registry().all():
-        assert 4 <= len(s.options) <= 6, s.id
+        assert len(s.options) >= 4, s.id
+
+
+@pytest.mark.asyncio
+async def test_idle_only_character_gets_real_things_to_do_and_never_a_bare_wait(sim, world):
+    world["character"]["body"].update({"hunger": 0, "fatigue": 0})
+    world["environment"]["visible_people"] = []
+    world["character"]["expectations"] = {}
+    world["character"]["grievances"] = []
+    world["character"]["active_intentions"] = [{"type": "x", "priority": 90, "reason": "busy"}]
+    world["meta"]["cognition"] = {"wake_reason": "idle", "wake_payload": {}}
+    world["available_actions"]["action_types"] += ["examine", "practice_juggling"]
+    p = await eng(sim).prepare("kim", "idle")
+    assert p.situation.situation.id == "cognition.quiet_moment"
+    assert len(p.options) <= 6 and "sit_quietly" in [o.id for o in p.options]
+    assert all((o.outcome or {}).get("type") != "wait" for o in p.options)
+    assert all((o.outcome or {}).get("type") != "interact" or o.outcome.get("target") for o in p.options)
+
+
+@pytest.mark.asyncio
+async def test_does_not_restart_the_interaction_already_in_progress(sim, world):
+    world["character"]["activity"] = {"type": "interact", "target_id": "prop_fridge",
+                                      "interaction": "open_fridge", "phase": "using"}
+    p = await eng(sim).prepare("kim", "urgent_need")
+    assert "eat_something_at_home" not in [o.id for o in p.options]
+
+
+@pytest.mark.asyncio
+async def test_executor_refuses_targetless_interact_and_conditionless_wait(sim):
+    from simsland_mw.decisions.executor import check_action
+    assert check_action({"type": "interact"}) == ["interact without a target"]
+    assert check_action({"type": "wait"}) == ["wait without a condition"]
+    assert check_action({"type": "wait", "waiting_for": {"kind": "person", "ref": "den"}}) == []
+    assert check_action({"type": "interact", "target": "p"}) == []

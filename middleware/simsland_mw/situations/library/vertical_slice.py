@@ -208,19 +208,43 @@ PUT_OFF = S(
 
 
 # ---- cognition.quiet_moment -------------------------------------------------
+def _examine_something(ctx: SituationContext):
+    """Look closely at the nearest prop -- always with a target."""
+    if not ctx.dc.allowed("examine"):
+        return None
+    for p in ctx.dc.props:
+        if not any(t in p.get("template", "") for t in ("wall", "ceiling", "socket")):
+            return {"type": "examine", "target": p["id"]}
+    return None
+
+
+def _chat_with_someone(ctx: SituationContext):
+    others = [p for p in ctx.dc.people if p["id"] in ctx.dc.relationships]
+    return socialize_with(ctx, others[0]["id"]) if others else None
+
+
 QUIET = S(
     id="cognition.quiet_moment", category="cognition", priority=10, cooldown_ticks=HOUR // 2,
     triggers=(T("idle"),),
-    required_data=("character.intentions", "environment.available_interactions"),
+    required_data=("character.intentions", "environment.available_interactions",
+                   "environment.nearby_props", "environment.nearby_characters",
+                   "character.relationships"),
     describe=lambda c: "Nothing needs doing right now. You have a moment to yourself.",
     options=(
         O("look_around_the_place", "Take a look around.", action=lambda c: act(c, "look_around")),
         O("think_back_on_the_day", "Think back over recent events.", action=lambda c: act(c, "recall")),
+        O("take_a_closer_look_at_something", "Take a closer look at something nearby.",
+          action=_examine_something),
+        O("use_the_computer", "Spend a little time on the computer.", action=lambda c: interact(c, "computer")),
+        O("chat_with_someone_nearby", "Chat with someone nearby.", action=_chat_with_someone),
         O("write_in_the_diary", "Write in your diary.", action=lambda c: act(c, "write_diary")),
         O("read_the_news", "Catch up on the news.", action=lambda c: act(c, "browse_news")),
+        O("practice_juggling", "Practise some juggling.", action=lambda c: act(c, "practice_juggling")),
+        O("do_some_sit_ups", "Do a few sit-ups.", action=lambda c: act(c, "sit_ups")),
         O("sit_quietly", "Just be still for a while.", noop=True),
         O("pick_a_leisure_activity", "Pick something fun to do.", gap="leisure_activity_selection"),
     ),
+    min_options=1,
 )
 
 VERTICAL_SLICE = (HUNGER, TIRED, APPROACH, QUESTION, MESSY, PUT_OFF, QUIET)

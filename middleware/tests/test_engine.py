@@ -23,7 +23,7 @@ async def test_happy_path_executes_the_chosen_outcome(sim):
 
 
 async def test_llm_sees_descriptions_only_and_is_constrained_to_ids(sim):
-    llm = ScriptedLLM('{"choice": "wait"}')
+    llm = ScriptedLLM('{"choice": "do_nothing_for_now"}')
     await engine(sim, llm).decide("kim", dry_run=True)
     call = llm.calls[0]
     prompt = call["messages"][1]["content"]
@@ -62,11 +62,11 @@ async def test_single_option_skips_the_model_call(sim):
     sim.world["character"]["active_intentions"] = []
     llm = ScriptedLLM()
     rec = await engine(sim, llm).decide("kim", dry_run=False)
-    assert rec.via == "only_option" and rec.choice_id == "wait" and llm.calls == []
+    assert rec.via == "only_option" and rec.choice_id == "do_nothing_for_now" and llm.calls == []
 
 
 async def test_session_remembers_choices_for_next_prompt(sim):
-    eng = engine(sim, ScriptedLLM('{"choice": "ask_dennis_about_buy_groceries"}', '{"choice": "wait"}'))
+    eng = engine(sim, ScriptedLLM('{"choice": "ask_dennis_about_buy_groceries"}', '{"choice": "do_nothing_for_now"}'))
     await eng.decide("kim", dry_run=False)
     p = await eng.prepare("kim")
     assert "Earlier you decided to: ask Dennis about it" in p.messages[1]["content"]

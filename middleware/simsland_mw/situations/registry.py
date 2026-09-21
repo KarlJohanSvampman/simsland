@@ -13,6 +13,7 @@ without a decision.
 from __future__ import annotations
 
 import json
+import random
 from dataclasses import dataclass, field
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
@@ -65,9 +66,19 @@ class SituationRegistry:
     # ---- selection -------------------------------------------------------
     def select(self, char_id: str, dc: DecisionContext, wake_reason: Optional[str],
                wake_payload: Optional[Dict[str, Any]], tick: Optional[int],
-               commit: bool = True) -> Optional[CompiledSituation]:
+               commit: bool = True, force: Optional[str] = None) -> Optional[CompiledSituation]:
+        """`force` compiles one named situation regardless of its triggers -- the
+        engine uses it so a character with nothing else to do still gets real
+        things to do instead of an empty menu."""
         ctx = SituationContext(dc=dc, wake_reason=wake_reason, wake_payload=wake_payload or {},
                                tick=tick or 0, state=self.state_for(char_id))
+        if force:
+            sit = self._sits.get(force)
+            if sit is None:
+                return None
+            trig = sit.triggers[0]
+            compiled = self.compile(sit, trig, ctx)
+            return compiled if len(compiled.options) >= sit.min_options else None
         eligible: List[Tuple[SituationDefinition, Trigger]] = []
         for sit in self._sits.values():
             missing = [d for d in sit.required_data if d not in dc.res.values]
@@ -111,6 +122,9 @@ class SituationRegistry:
                 if sig in seen_outcomes:            # two seeds that resolve to the same act
                     continue
                 seen_outcomes.add(sig)
+            if outcome and self._restarts_current(ctx, outcome):
+                unresolved.append((seed.id, "already doing this"))
+                continue
             desc = seed.description(ctx) if callable(seed.description) else seed.description
             speech = None
             if seed.speaks and outcome and outcome.get("type") in ("speak", "socialize"):
@@ -122,9 +136,31 @@ class SituationRegistry:
             options.append(Option(seed.id, desc, outcome, speech=speech,
                                   priority=sit.priority - i, kind="situation",
                                   speaks=seed.speaks, situation=sit.id))
-            if len(options) >= SituationDefinition.MAX_OPTIONS:
-                break
+        options = self._trim(options, random.Random(f"{ctx.tick}:{sit.id}"))
         return CompiledSituation(sit, trig, ctx, sit.describe(ctx), options, unresolved)
+
+    PROP_ACTIONS = ("interact", "sleep", "sit_down", "eat", "lie_down")
+
+    @classmethod
+    def _restarts_current(cls, ctx: SituationContext, outcome: Dict[str, Any]) -> bool:
+        """Choosing it would restart the very activity the character is in the
+        middle of (re-picking "use the toilet" while on it resets its progress)."""
+        act = ctx.dc.activity
+        return bool(act.get("type") and outcome.get("type") in cls.PROP_ACTIONS
+                    and outcome.get("target") and act.get("target_id") == outcome["target"])
+
+    @staticmethod
+    def _trim(options: List[Option], rng: random.Random) -> List[Option]:
+        """At most MAX_OPTIONS. Deliberate no-ops always survive; the rest are
+        sampled, so a situation with many possible things to do doesn't offer the
+        same first few forever."""
+        cap = SituationDefinition.MAX_OPTIONS
+        if len(options) <= cap:
+            return options
+        keep = [o for o in options if o.outcome is None]
+        rest = [o for o in options if o.outcome is not None]
+        picked = set(id(o) for o in rng.sample(rest, max(0, cap - len(keep))))
+        return [o for o in options if o.outcome is None or id(o) in picked]
 
     # ---- reporting -------------------------------------------------------
     def capability_report(self) -> List[Dict[str, Any]]:

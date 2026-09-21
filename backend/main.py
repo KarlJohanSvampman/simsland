@@ -349,6 +349,8 @@ async def loop():
 
 @app.on_event("startup")
 async def startup():
+    from core.memory_guard import start as _start_memory_guard
+    _start_memory_guard()
     init_db()
     asyncio.create_task(loop())
 

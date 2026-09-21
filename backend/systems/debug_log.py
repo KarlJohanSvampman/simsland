@@ -26,6 +26,9 @@ VIOLENT_OR_ILLEGAL_ACTIVITIES = {
 }
 
 
+DEBUG_EVENT_DEDUPE_TICKS = 120
+
+
 def _category_for_action(action_type, c=None):
     if action_type in VIOLENT_OR_ILLEGAL_ACTIONS:
         return "violation"
@@ -52,6 +55,17 @@ def log_debug_event(c, world, category, text):
         "category":        category,
         "expires_at_tick": tick + 6,
     }
+
+    # The same trace line firing several times inside a few seconds (an
+    # activity started/completed/restarted in a loop) is one event to a
+    # reader, not five memories all stamped with the same minute.
+    last = c.setdefault("_debug_event_last", {})
+    if tick - last.get(text, -10**9) < DEBUG_EVENT_DEDUPE_TICKS:
+        return
+    last[text] = tick
+    if len(last) > 40:
+        for k in sorted(last, key=last.get)[:20]:
+            last.pop(k, None)
 
     from brain.memory import store_memory
     store_memory(

@@ -18,6 +18,7 @@ class ExecutionResult:
     executed: bool
     decision: Dict[str, Any]
     response: Dict[str, Any] = field(default_factory=dict)
+    problems: list = field(default_factory=list)   # decisions we refused to send as-is
 
     @property
     def invalid_action(self) -> Optional[Any]:
@@ -48,10 +49,28 @@ def build_decision(choice: Choice) -> Dict[str, Any]:
     }
 
 
+def check_action(action: Optional[Dict[str, Any]]) -> list:
+    """An action Simsland can't act on meaningfully. `interact` needs a target;
+    `wait` means "waiting for something" and needs a condition. Anything that
+    fails is reported (never silently sent) and the character carries on
+    without an action so their wake still clears."""
+    if not action:
+        return []
+    problems = []
+    if action.get("type") == "interact" and not action.get("target"):
+        problems.append("interact without a target")
+    if action.get("type") == "wait" and not (action.get("waiting_for") or action.get("condition")):
+        problems.append("wait without a condition")
+    return problems
+
+
 async def execute(sim: SimulationClient, char_id: str, choice: Choice,
                   wake_reason: Optional[str] = None, dry_run: bool = False) -> ExecutionResult:
     decision = build_decision(choice)
+    problems = check_action(decision["action"])
+    if problems:
+        decision["dropped_action"], decision["action"] = decision["action"], None
     if dry_run:
-        return ExecutionResult(executed=False, decision=decision)
+        return ExecutionResult(executed=False, decision=decision, problems=problems)
     response = await sim.execute(char_id, decision, wake_reason)
-    return ExecutionResult(executed=True, decision=decision, response=response)
+    return ExecutionResult(executed=True, decision=decision, response=response, problems=problems)

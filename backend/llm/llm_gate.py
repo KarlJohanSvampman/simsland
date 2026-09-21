@@ -43,6 +43,7 @@ concurrently instead of one.
 """
 
 import asyncio
+import concurrent.futures
 import heapq
 import itertools
 import os
@@ -58,6 +59,15 @@ PRIORITY_NORMAL     = 1   # the default -- routine character decisions, anything
 PRIORITY_BACKGROUND = 2   # one-off flavor/content generation (diary entries, item content, ...)
 
 _ABORTED_ERROR = {"error": "aborted: preempted by a higher-priority request"}
+_TIMEOUT_ERROR = {"error": "timeout: gave up waiting for the LLM gate"}
+
+# Hard ceiling on how long ANY caller thread may block in run_llm_call (queue
+# wait + the call itself). Without one, a slow/unreachable Ollama leaves the
+# calling thread parked forever -- for a character decision that thread holds a
+# whole world copy, and abandoned decisions piled up until the container ran
+# out of memory. On expiry the call is cancelled (dropped from the queue, or
+# the running request cancelled) and the caller gets the usual {"error": ...}.
+LLM_CALL_MAX_WAIT_SECONDS = float(os.getenv("LLM_CALL_MAX_WAIT_SECONDS", "90"))
 
 _loop = asyncio.new_event_loop()
 _counter = itertools.count()
@@ -82,6 +92,8 @@ async def _dispatcher():
             continue  # caller already gave up (e.g. its own timeout fired first)
 
         task = asyncio.ensure_future(coro)
+        # If the caller gives up (hard timeout), stop the in-flight request too.
+        fut.add_done_callback(lambda f, t=task: t.cancel() if f.cancelled() else None)
         slot = (priority, task)
         _running.append(slot)
         try:
@@ -136,18 +148,28 @@ _thread = threading.Thread(target=_run_loop, name="llm-gate", daemon=True)
 _thread.start()
 
 
-def run_llm_call(coro, priority=PRIORITY_NORMAL):
+def run_llm_call(coro, priority=PRIORITY_NORMAL, timeout=None):
     """Submit an awaitable (e.g. call_llm_safe(...)) to the gate's event
     loop and block the calling thread until it completes (or is aborted
     for a higher-priority arrival -- see module docstring), bounded by
     OLLAMA_MAX_CONCURRENCY concurrent in-flight calls across all callers."""
     future = asyncio.run_coroutine_threadsafe(_submit_and_await(coro, priority), _loop)
-    return future.result()
+    try:
+        return future.result(timeout=timeout if timeout is not None else LLM_CALL_MAX_WAIT_SECONDS)
+    except concurrent.futures.TimeoutError:
+        future.cancel()
+        print(f"[llm_gate] call abandoned after {timeout or LLM_CALL_MAX_WAIT_SECONDS}s")
+        return dict(_TIMEOUT_ERROR)
 
 
-async def run_llm_call_async(coro, priority=PRIORITY_NORMAL):
+async def run_llm_call_async(coro, priority=PRIORITY_NORMAL, timeout=None):
     """Async equivalent of run_llm_call, for callers already inside an
     event loop (e.g. cognition_jobs.py) -- schedules onto the gate's loop
     and awaits the result without blocking the caller's own loop thread."""
     future = asyncio.run_coroutine_threadsafe(_submit_and_await(coro, priority), _loop)
-    return await asyncio.wrap_future(future)
+    try:
+        return await asyncio.wait_for(asyncio.wrap_future(future),
+                                      timeout if timeout is not None else LLM_CALL_MAX_WAIT_SECONDS)
+    except asyncio.TimeoutError:
+        future.cancel()
+        return dict(_TIMEOUT_ERROR)

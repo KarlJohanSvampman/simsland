@@ -21,7 +21,7 @@ deterministic instead).
 import random
 
 
-def choose(c, world, choice_type, options, occasion=None, max_num_options=None):
+def choose(c, world, choice_type, options, occasion=None, max_num_options=None, context=None):
     """
     choice_type: short label for what's being chosen ("clothing item",
     "restaurant", "time slot", ...) -- shapes the LLM prompt only, no
@@ -71,7 +71,7 @@ def choose(c, world, choice_type, options, occasion=None, max_num_options=None):
     try:
         from llm.llm_gate import run_llm_call
         from llm.choice_narration import generate_choice
-        picked_id = run_llm_call(generate_choice(c, world, choice_type, pool, occasion))
+        picked_id = run_llm_call(generate_choice(c, world, choice_type, pool, occasion, context))
     except Exception:
         picked_id = None
 

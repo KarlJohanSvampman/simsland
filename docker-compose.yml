@@ -4,6 +4,9 @@ services:
   backend:
     build: ./backend
     container_name: sim-backend
+    restart: unless-stopped
+    mem_limit: 3g                 # hard cap; core/memory_guard.py exits cleanly (soft 1.5GB / hard 2.6GB RSS) before the kernel OOM-kills
+    memswap_limit: 3g
     ports:
       - "8000:8000"
     environment:
@@ -14,6 +17,7 @@ services:
       - OLLAMA_NUM_CTX=8192          # 👈 explicit context window (was implicit 4096)
       - OLLAMA_KEEP_ALIVE=10m        # 👈 reduce cold-start reloads between ticks
       - OLLAMA_MAX_CONCURRENCY=2     # 👈 raised back from 1 -- the priority queue (llm/llm_gate.py) now protects urgent calls with preemption even at concurrency>1, so strict single-flight is no longer needed to keep decisions responsive, and it was directly bottlenecking tick throughput with 4 characters all needing decisions
+      - LLM_CALL_MAX_WAIT_SECONDS=90   # hard cap on any thread blocked on the LLM (llm/llm_gate.py)
       - PYTHONPATH=/app
       - PYTHONUNBUFFERED=1
     depends_on:

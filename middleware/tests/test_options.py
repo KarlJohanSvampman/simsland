@@ -18,7 +18,7 @@ def _ids(opts):
 async def test_dinner_scenario_offers_the_expected_menu(sim):
     ids = _ids(await _options(sim))
     assert ids[0] == "eat_at_home"
-    assert {"ask_dennis_about_buy_groceries", "sit_and_rest", "tell_dennis_frustrated", "wait"} <= set(ids)
+    assert {"ask_dennis_about_buy_groceries", "sit_and_rest", "tell_dennis_frustrated", "do_nothing_for_now"} <= set(ids)
 
 
 async def test_option_outcomes_map_to_real_simsland_actions(sim):
@@ -42,7 +42,7 @@ async def test_options_gated_by_what_simsland_says_is_possible(sim):
         w["available_actions"]["action_types"].remove("speak")
     ids = _ids(await _options(sim, no_interact))
     assert "eat_at_home" not in ids and not any(i.startswith("ask_") for i in ids)
-    assert "wait" in ids
+    assert "do_nothing_for_now" in ids
 
 
 async def test_no_food_source_no_eat_option(sim):
@@ -66,9 +66,9 @@ async def test_exhaustion_offers_sleep(sim):
     assert by_id["go_to_sleep"].outcome == {"type": "sleep", "target": "prop_sofa"}
 
 
-async def test_wait_is_always_available_and_ids_are_unique(sim):
+async def test_idle_option_is_always_available_and_ids_are_unique(sim):
     opts = await _options(sim)
-    assert "wait" in _ids(opts) and len(set(_ids(opts))) == len(opts)
+    assert "do_nothing_for_now" in _ids(opts) and len(set(_ids(opts))) == len(opts)
 
 
 async def test_custom_rule_extends_generator_without_touching_others(sim):
@@ -87,7 +87,7 @@ async def test_option_already_being_done_is_not_offered_again(sim):
                                               "target_id": "prop_fridge"}
     ids = _ids(await _options(sim, at_fridge))
     assert "eat_at_home" not in ids
-    assert "wait" in ids and "sit_and_rest" in ids
+    assert "do_nothing_for_now" in ids and "sit_and_rest" in ids
 
 
 async def test_dependents_are_never_confronted(sim):

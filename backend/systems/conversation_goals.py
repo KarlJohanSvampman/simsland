@@ -114,7 +114,10 @@ def assign_conversation_goal(c, world, conv, other_id):
                          "label": "itching to get into a political debate with them"})
 
     from systems.choice import choose
-    picked = choose(c, world, "conversation goal", options, occasion=occasion)
+    # Name the other party: the prompt used to say only "a conversation goal",
+    # with nothing saying who the conversation was with.
+    picked = choose(c, world, "conversation goal", options, occasion=occasion,
+                    context=f"You are in a conversation with {other.get('name', 'someone')}.")
     if picked:
         goal = {"type": picked["id"], "label": picked["label"]}
         if picked["id"] == "share_story":
