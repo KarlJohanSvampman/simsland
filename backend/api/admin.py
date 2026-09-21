@@ -420,6 +420,71 @@ def toggle_light_admin(payload: dict, sim_id: str = DEFAULT_SIM_ID):
     return {"ok": True, "prop_id": prop_id, "on": (prop.get("state") or {}).get("on"), "affected": affected}
 
 
+@router.post("/set_relationship")
+def set_relationship(payload: dict, sim_id: str = DEFAULT_SIM_ID):
+    """Live-fix helper: overwrite fields on one directed relationship edge
+    (from_id's view of to_id). payload: {"from_id", "to_id", "fields": {...}}.
+    Runs in-process under the world lock -- an out-of-process DB edit loses
+    to the live tick loop's own save."""
+    from brain.relationships import ensure_relationship
+    with world_lock():
+        world = load_world(sim_id)
+        src = world["characters"].get(payload.get("from_id"))
+        if not src or payload.get("to_id") not in world["characters"]:
+            return {"ok": False, "error": "unknown character"}
+        rel = ensure_relationship(src, payload["to_id"])
+        rel.update(payload.get("fields") or {})
+        save_world(sim_id, world)
+    return {"ok": True, "edge": rel}
+
+
+@router.post("/dedupe_long_term_memory")
+def dedupe_long_term_memory(payload: dict, sim_id: str = DEFAULT_SIM_ID):
+    """Live-testing/cleanup helper: collapse a character's long_term_memory
+    down to one entry per unique text, keeping the most recent (highest
+    tick) occurrence of each. Confirmed live bug: systems/social_memory.py
+    ::_is_violent_or_illegal() used to stay permanently True for a pair
+    once any conflict between them ever reached a hostile fight_stage
+    (nothing cleared it), which both bypassed the sighting cooldown AND
+    forced aggregate=False (skips consolidation, preserved verbatim
+    forever) -- already fixed going forward (see that function's own
+    comment), but a save from before the fix can still be sitting on a
+    huge backlog of near-duplicate "alarming" sightings with nothing to
+    clean them up. payload: {"character_id"} (omit to dedupe everyone)."""
+    char_id = payload.get("character_id")
+    with world_lock():
+        world = load_world(sim_id)
+        chars = [world["characters"][char_id]] if char_id else list(world.get("characters", {}).values())
+        results = {}
+        for c in chars:
+            ltm = c.get("long_term_memory", [])
+            seen = {}
+            for m in ltm:
+                key = m.get("text")
+                if key not in seen or m.get("tick", 0) > seen[key].get("tick", 0):
+                    seen[key] = m
+            deduped = sorted(seen.values(), key=lambda m: m.get("tick", 0))
+            if len(deduped) != len(ltm):
+                c["long_term_memory"] = deduped
+                results[c["id"]] = {"before": len(ltm), "after": len(deduped)}
+        save_world(sim_id, world)
+    return {"ok": True, "results": results}
+
+
+@router.get("/llm_gate_state")
+def get_llm_gate_state():
+    """Live-debug introspection into llm_gate.py's in-process queue --
+    _heap has no size cap at all, so a live read is the fastest way to
+    confirm/deny it as the source of runaway memory growth."""
+    import llm.llm_gate as gate
+    return {
+        "heap_size": len(gate._heap),
+        "running": len(gate._running),
+        "max_concurrency": gate.OLLAMA_MAX_CONCURRENCY,
+        "heap_priorities": [p for p, *_ in gate._heap],
+    }
+
+
 @router.get("/pending_agents")
 def get_pending_agents():
     """Live-debug introspection into sim_loop.py's in-process

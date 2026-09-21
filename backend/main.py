@@ -51,6 +51,7 @@ from api.overview  import router as overview_router
 from api.finances  import router as finances_router
 from api.dependents import router as dependents_router
 from api.director  import router as director_router
+from api.middleware_bridge import router as middleware_bridge_router
 
 app = FastAPI(title="Simsland")
 app.add_middleware(
@@ -83,6 +84,7 @@ app.include_router(overview_router, prefix="/api")
 app.include_router(finances_router, prefix="/api")
 app.include_router(dependents_router, prefix="/api")
 app.include_router(director_router)
+app.include_router(middleware_bridge_router)
 
 frontend_dir = Path(__file__).parent / "frontend"
 if frontend_dir.exists():

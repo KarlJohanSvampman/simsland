@@ -987,6 +987,14 @@ def update_agent(
     if not wake_reason:
         return
 
+    # Characters owned by the standalone AI middleware (../middleware) are
+    # decided for through api/middleware_bridge.py. brain/external_brain.py's
+    # is_external() is only true while the middleware's heartbeat is fresh, so
+    # a dead middleware falls straight back to the built-in think() below.
+    from brain.external_brain import is_external
+    if is_external(c):
+        return
+
     # =====================================
     # BUILD CONTEXT
     # =====================================

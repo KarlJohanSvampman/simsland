@@ -43,7 +43,19 @@ def heuristic(a, b):
 # ASTAR
 # =========================================================
 
+ASTAR_MARGIN = 40          # cells of slack around the start/goal box
+ASTAR_MAX_EXPANSIONS = 60000
+
+
 def astar(start, goal, blocked):
+    """A* on an unbounded grid. It MUST be bounded: with an unreachable or
+    blocked goal the open set never empties, and one such call eats memory at
+    tens of MB/s until the container dies."""
+    min_x = min(start[0], goal[0]) - ASTAR_MARGIN
+    max_x = max(start[0], goal[0]) + ASTAR_MARGIN
+    min_y = min(start[1], goal[1]) - ASTAR_MARGIN
+    max_y = max(start[1], goal[1]) + ASTAR_MARGIN
+    expansions = 0
 
     open_set = []
 
@@ -63,6 +75,10 @@ def astar(start, goal, blocked):
         _, current = heappop(
             open_set
         )
+
+        expansions += 1
+        if expansions > ASTAR_MAX_EXPANSIONS:
+            return []
 
         if current == goal:
 
@@ -91,6 +107,9 @@ def astar(start, goal, blocked):
         for n in neighbors:
 
             if n in blocked:
+                continue
+
+            if not (min_x <= n[0] <= max_x and min_y <= n[1] <= max_y):
                 continue
 
             tentative = (

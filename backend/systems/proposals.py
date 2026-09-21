@@ -79,7 +79,29 @@ def propose(proposer, recipients, kind, chore_id, params, world):
     """recipients: list of character dicts (not ids) already filtered to
     who should be asked — see propose_chore_to_household() below for the
     household/locality-aware convenience wrapper most callers should use
-    instead of calling this directly."""
+    instead of calling this directly.
+
+    Confirmed live bug: nothing here deduped against an already-open
+    identical proposal, so a character stuck re-attempting the same
+    decision (the sim_loop.py AGENT_WAIT_BUDGET_SECONDS abandon/retry
+    loop when the LLM backend is slow -- their own state never advances,
+    so should_think() just re-offers the same choice next cycle) minted
+    a brand new proposal every single retry, forever. Confirmed live:
+    433 "opinion_on_workplace" request proposals from one proposer to
+    one recipient, all still "open", nobody ever declining/accepting any
+    of them because the recipient was stuck in the exact same retry loop
+    -- steadily growing the persisted world blob (and the per-tick cost
+    of scanning it for every character) without bound. Reusing an
+    existing open proposal with the same proposer+recipients+chore_id
+    instead of creating a duplicate makes a retried decision idempotent."""
+    recipient_ids = {r["id"] for r in recipients}
+    for existing in world.get("proposals", {}).values():
+        if (existing.get("status") == "open"
+                and existing.get("proposer_id") == proposer["id"]
+                and existing.get("chore_id") == chore_id
+                and set(existing.get("recipients", [])) == recipient_ids):
+            return existing
+
     proposal = {
         "id": str(uuid4()),
         "kind": kind,
