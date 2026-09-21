@@ -4,10 +4,11 @@ import pytest
 
 from conftest import ScriptedLLM
 from simsland_mw.cognition.engine import CognitionEngine
+from simsland_mw.situations import SituationRegistry
 
 
 def engine(sim, llm):
-    return CognitionEngine(sim, llm)
+    return CognitionEngine(sim, llm, situations=SituationRegistry())  # legacy menu: engine mechanics only
 
 
 async def test_happy_path_executes_the_chosen_outcome(sim):
@@ -38,9 +39,9 @@ async def test_dry_run_never_touches_the_simulation(sim):
 
 
 async def test_invalid_reply_is_retried_once_with_a_correction(sim):
-    llm = ScriptedLLM('{"choice": "steal_money_from_bank"}', '{"choice": "ask_den_about_buy_groceries"}')
+    llm = ScriptedLLM('{"choice": "steal_money_from_bank"}', '{"choice": "ask_dennis_about_buy_groceries"}')
     rec = await engine(sim, llm).decide("kim", dry_run=False)
-    assert rec.choice_id == "ask_den_about_buy_groceries" and not rec.fallback
+    assert rec.choice_id == "ask_dennis_about_buy_groceries" and not rec.fallback
     assert len(rec.rejections) == 1 and len(llm.calls) == 2
     assert "rejected" in llm.calls[1]["messages"][-1]["content"]
     assert sim.executed[0]["decision"]["speech"]["utterance"] == "Dennis, did you buy groceries?"
@@ -65,11 +66,11 @@ async def test_single_option_skips_the_model_call(sim):
 
 
 async def test_session_remembers_choices_for_next_prompt(sim):
-    eng = engine(sim, ScriptedLLM('{"choice": "ask_den_about_buy_groceries"}', '{"choice": "wait"}'))
+    eng = engine(sim, ScriptedLLM('{"choice": "ask_dennis_about_buy_groceries"}', '{"choice": "wait"}'))
     await eng.decide("kim", dry_run=False)
     p = await eng.prepare("kim")
     assert "Earlier you decided to: ask Dennis about it" in p.messages[1]["content"]
-    assert eng.sessions.get("kim").to_dict()["recent_choices"][0]["option_id"] == "ask_den_about_buy_groceries"
+    assert eng.sessions.get("kim").to_dict()["recent_choices"][0]["option_id"] == "ask_dennis_about_buy_groceries"
 
 
 async def test_simsland_rejecting_the_action_is_reported_not_hidden(sim):

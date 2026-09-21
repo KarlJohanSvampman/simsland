@@ -76,7 +76,12 @@ def _affection(friendship: float) -> str:
 def describe_relationship(name: str, rel: Dict[str, Any], grievance_total: float = 0.0) -> str:
     """One sentence about how she sees someone. Directed: her view, not theirs."""
     labels = [l for l in rel.get("labels") or [] if l]
-    tag = f" (your {labels[0].replace('_', ' ')})" if labels else ""
+    if rel.get("authority_over"):
+        # Simsland's own label convention is inconsistent about which side a
+        # "parent"/"child" label describes; authority_over is unambiguous.
+        tag = " (someone in your care)"
+    else:
+        tag = f" (your {labels[0].replace('_', ' ')})" if labels else ""
     if (rel.get("familiarity") or 0) < 20:
         return f"You hardly know {name}{tag}."
 

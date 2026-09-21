@@ -26,6 +26,8 @@ from ..narrative.templates import humanize
 # interaction names, exact match on tags. Extend as templates are added.
 AFFORDANCES: Dict[str, Dict[str, Sequence[str]]] = {
     "food": {"interactions": ("fridge", "pantry", "prepare_food", "cook"), "tags": ("food", "fridge")},
+    "cook": {"interactions": ("cook", "prepare_food"), "tags": ()},
+    "coffee": {"interactions": ("coffee",), "tags": ("coffee",)},
     "toilet": {"interactions": ("toilet",), "tags": ("toilet",)},
     "water": {"interactions": ("drink", "sink", "get_water"), "tags": ("water",)},
     "sleep": {"interactions": (), "tags": ("sleepable",)},
@@ -34,16 +36,23 @@ AFFORDANCES: Dict[str, Dict[str, Sequence[str]]] = {
 
 SIT_REST_AT = 35  # fatigue at which "sit down and rest" is a reasonable thing to consider
 MAX_CHAT_OPTIONS = 2
+CHILD_AGE = 13  # matches Simsland's own age_group boundary (child < 13)
+
+
+def _slug(text: str) -> str:
+    return "".join(ch if ch.isalnum() else "_" for ch in text.lower()).strip("_")
 
 
 @dataclass(frozen=True)
 class Option:
     id: str
     description: str
-    outcome: Dict[str, Any]                 # private: what Simsland is asked to do
+    outcome: Optional[Dict[str, Any]]       # private: what Simsland is asked to do (None = carry on, no action)
     speech: Optional[Dict[str, Any]] = None  # private: templated line for speak-type options
     priority: int = 50                       # deterministic fallback + display order (never shown)
     kind: str = "generic"
+    speaks: bool = False                     # a model-authored `speech` line is accepted for this option
+    situation: Optional[str] = None          # id of the situation that offered it (None = legacy rules)
 
     def public(self) -> Dict[str, str]:
         return {"id": self.id, "description": self.description}
@@ -90,6 +99,27 @@ class DecisionContext:
             if any(sub in i for sub in AFFORDANCES[kind]["interactions"]):
                 return i
         return None
+
+    @property
+    def activity(self) -> Dict[str, Any]:
+        return self.res.get("character.activity") or {}
+
+    def is_dependent(self, pid: str) -> bool:
+        """A child -- in this character's care, or simply young (a neighbour's
+        6-year-old) -- is never the target of a confrontation or a "did you do
+        your chores" ask."""
+        rel = self.relationships.get(pid) or {}
+        age = rel.get("age")
+        return bool(rel.get("authority_over")) or (age is not None and age < CHILD_AGE)
+
+    def handle(self, pid: str) -> str:
+        """Short, readable option-id fragment for a person (their first name)
+        instead of a raw Simsland id; falls back to the id tail on a name clash."""
+        name = (self.relationships.get(pid) or {}).get("name") or pid
+        first = _slug(name.split()[0]) or "someone"
+        clash = sum(1 for r in self.relationships.values()
+                    if _slug((r.get("name") or "").split()[0] if r.get("name") else "") == first)
+        return first if clash <= 1 else f"{first}_{pid[-4:]}"
 
     def has_intention(self, prefix: str) -> bool:
         return any((i.get("type") or "").startswith(prefix)
@@ -180,23 +210,23 @@ def rule_raise_issue(dc: DecisionContext) -> List[Option]:
         if e["status"] != "missed" or e["frustration"] < 0.3:
             continue
         for pid in e["blame"]:
-            if pid in here and pid not in used and pid in dc.relationships:
+            if pid in here and pid not in used and pid in dc.relationships and not dc.is_dependent(pid):
                 used.add(pid)
                 name = dc.relationships[pid]["name"]
                 label = _expectation_label(e["id"])
                 line = f"{name}, did you {label}?"
                 out.append(Option(
-                    f"ask_{pid}_about_{e['id']}", f"Ask {name} about it: did they {label}?",
+                    f"ask_{dc.handle(pid)}_about_{e['id']}", f"Ask {name} about it: did they {label}?",
                     {"type": "speak", "target": pid, "utterance": line},
                     speech={"utterance": line, "speech_act": "ask", "topic": label, "target": pid},
                     priority=45 + int(e["frustration"] * 20), kind="social"))
     grievances = dc.res.get("character.grievances") or {}
     for pid, g in grievances.items():
-        if g["total"] >= 4 and pid in here and pid in dc.relationships:
+        if g["total"] >= 4 and pid in here and pid in dc.relationships and not dc.is_dependent(pid):
             name = dc.relationships[pid]["name"]
             line = f"{name}, I'm really frustrated about how things have been around here."
             out.append(Option(
-                f"tell_{pid}_frustrated", f"Tell {name} you're frustrated.",
+                f"tell_{dc.handle(pid)}_frustrated", f"Tell {name} you're frustrated.",
                 {"type": "speak", "target": pid, "utterance": line},
                 speech={"utterance": line, "speech_act": "declare", "topic": "frustration", "target": pid},
                 priority=40, kind="social"))
@@ -210,7 +240,7 @@ def rule_socialize(dc: DecisionContext) -> List[Option]:
     for p in dc.people:
         rel = dc.relationships.get(p["id"])
         if rel and (rel.get("friendship") or 0) >= 40:
-            out.append(Option(f"chat_{p['id']}", f"Spend some time chatting with {rel['name']}.",
+            out.append(Option(f"chat_{dc.handle(p['id'])}", f"Spend some time chatting with {rel['name']}.",
                               {"type": "socialize", "target": p["id"]}, priority=25, kind="social"))
         if len(out) >= MAX_CHAT_OPTIONS:
             break
@@ -226,6 +256,19 @@ DEFAULT_RULES: List[Rule] = [rule_eat, rule_bathroom, rule_drink, rule_rest,
                              rule_raise_issue, rule_socialize, rule_wait]
 
 
+def _already_doing(dc: DecisionContext, opt: Option) -> bool:
+    """True when the character is already engaged in exactly this. Without it a
+    character woken by an unrelated event (someone walked in, a noise) re-picks
+    "get a drink" while already at the sink, and restarts it every wake."""
+    act = dc.activity
+    if not act.get("type") or opt.kind == "idle":
+        return False
+    target = (opt.outcome or {}).get("target")
+    if target and act.get("target_id") == target:
+        return True
+    return False
+
+
 class OptionGenerator:
     def __init__(self, rules: Optional[Iterable[Rule]] = None):
         self.rules: List[Rule] = list(rules) if rules is not None else list(DEFAULT_RULES)
@@ -239,5 +282,6 @@ class OptionGenerator:
                 if opt.id not in seen:
                     seen.add(opt.id)
                     options.append(opt)
+        options = [o for o in options if not _already_doing(dc, o)]
         options.sort(key=lambda o: -o.priority)  # stable: rule order breaks ties
         return options

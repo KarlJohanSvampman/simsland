@@ -26,14 +26,23 @@ class ExecutionResult:
 
 def build_decision(choice: Choice) -> Dict[str, Any]:
     """The 'legacy decision' dict brain/agent_loop.py::process_decision consumes."""
-    action = dict(choice.option.outcome)
-    action.setdefault("reason", choice.option.description)
+    opt = choice.option
+    action = dict(opt.outcome) if opt.outcome else None
+    speech = dict(opt.speech) if opt.speech else None
+    if action is not None:
+        action.setdefault("reason", opt.description)
+        if choice.speech and opt.speaks and action.get("type") == "speak":
+            # The model's own words replace the templated line; the act itself
+            # (who, to whom, what kind) is still the option's.
+            action["utterance"] = choice.speech
+            speech = {**(speech or {"speech_act": "say", "target": action.get("target")}),
+                      "utterance": choice.speech}
     return {
         # Deliberately None: a thought would be stored as a memory by
         # process_decision. The middleware decides what persists (Phase 2).
         "thought": None,
         "action": action,
-        "speech": dict(choice.option.speech) if choice.option.speech else None,
+        "speech": speech,
         "intention": None,
         "reflection": None,
     }

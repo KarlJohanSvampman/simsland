@@ -33,6 +33,7 @@ async def current(ctx: ResolveContext) -> Dict[str, Any]:
     cal = meta.get("calendar") or {}
     hour = cal.get("hour")
     return {
+        "tick": meta.get("tick"),
         "building_id": loc.get("building_id"), "room_id": loc.get("room_id"),
         "indoors": bool(loc.get("building_id")),
         "hour": hour, "minute": cal.get("minute"), "weekday": cal.get("weekday"),
@@ -40,6 +41,14 @@ async def current(ctx: ResolveContext) -> Dict[str, Any]:
         "wake_reason": (meta.get("cognition") or {}).get("wake_reason"),
         "wake_payload": (meta.get("cognition") or {}).get("wake_payload") or {},
     }
+
+
+async def room(ctx: ResolveContext) -> Dict[str, Any]:
+    """The room the character is standing in, as she would simply notice it."""
+    loc = ctx.dep("character.location")
+    env = (await ctx.section("environment"))["environment"]
+    return {"building_id": loc.get("building_id"), "room_id": loc.get("room_id"),
+            "cleanliness": env.get("room_cleanliness")}
 
 
 async def nearby_characters(ctx: ResolveContext) -> List[Dict[str, Any]]:
@@ -75,6 +84,8 @@ async def available_interactions(ctx: ResolveContext) -> Dict[str, Any]:
 PROVIDERS = [
     DataProvider("environment.current", current, depends_on=("character.location",),
                  sections=("meta",)),
+    DataProvider("environment.room", room, depends_on=("character.location",),
+                 sections=("environment",)),
     DataProvider("environment.nearby_characters", nearby_characters,
                  depends_on=("character.location",), sections=("environment",)),
     DataProvider("environment.nearby_props", nearby_props, sections=("environment",)),

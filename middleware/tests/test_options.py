@@ -18,14 +18,14 @@ def _ids(opts):
 async def test_dinner_scenario_offers_the_expected_menu(sim):
     ids = _ids(await _options(sim))
     assert ids[0] == "eat_at_home"
-    assert {"ask_den_about_buy_groceries", "sit_and_rest", "tell_den_frustrated", "wait"} <= set(ids)
+    assert {"ask_dennis_about_buy_groceries", "sit_and_rest", "tell_dennis_frustrated", "wait"} <= set(ids)
 
 
 async def test_option_outcomes_map_to_real_simsland_actions(sim):
     by_id = {o.id: o for o in await _options(sim)}
     assert by_id["eat_at_home"].outcome == {"type": "interact", "target": "prop_fridge",
                                             "interaction": "open_fridge"}
-    ask = by_id["ask_den_about_buy_groceries"]
+    ask = by_id["ask_dennis_about_buy_groceries"]
     assert ask.outcome["type"] == "speak" and ask.outcome["target"] == "den"
     assert ask.outcome["utterance"] == "Dennis, did you buy groceries?"
     assert ask.speech["speech_act"] == "ask"
@@ -77,3 +77,35 @@ async def test_custom_rule_extends_generator_without_touching_others(sim):
     extra = lambda dc: [Option("order_pizza", "Order a pizza.", {"type": "wait"}, priority=99)]
     opts = OptionGenerator([*DEFAULT_RULES, extra]).generate(res)
     assert opts[0].id == "order_pizza"
+
+
+async def test_option_already_being_done_is_not_offered_again(sim):
+    """Woken by an unrelated event while already at the fridge: don't offer to go
+    to the fridge again (it restarted the action every wake)."""
+    def at_fridge(w):
+        w["character"]["activity"] = {"type": "interact", "phase": "using",
+                                              "target_id": "prop_fridge"}
+    ids = _ids(await _options(sim, at_fridge))
+    assert "eat_at_home" not in ids
+    assert "wait" in ids and "sit_and_rest" in ids
+
+
+async def test_dependents_are_never_confronted(sim):
+    """A child in your care is not offered as the target of "tell them you're
+    frustrated" or "did you buy groceries?"."""
+    def dennis_is_a_child(w):
+        w["character"]["relationships"]["den"]["authority_over"] = True
+    ids = _ids(await _options(sim, dennis_is_a_child))
+    assert not any(i.startswith(("ask_dennis", "tell_dennis")) for i in ids)
+
+
+async def test_option_ids_use_names_not_raw_simsland_ids(sim):
+    ids = _ids(await _options(sim))
+    assert not any("char_" in i for i in ids)
+
+
+async def test_young_people_are_never_confronted_even_when_not_your_dependent(sim):
+    def den_is_six(w):
+        w["people"]["den"]["age"] = 6
+    ids = _ids(await _options(sim, den_is_six))
+    assert not any(i.startswith(("ask_dennis", "tell_dennis")) for i in ids)

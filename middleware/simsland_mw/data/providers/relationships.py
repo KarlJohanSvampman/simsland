@@ -21,6 +21,7 @@ async def relationships(ctx: ResolveContext) -> Dict[str, Dict[str, Any]]:
     for other_id, r in (c.get("relationships") or {}).items():
         out[other_id] = {
             "name": (people.get(other_id) or {}).get("name") or other_id,
+            "age": (people.get(other_id) or {}).get("age"),
             "trust": r.get("trust", 0), "friendship": r.get("friendship", 0),
             "familiarity": r.get("familiarity", 0), "respect": r.get("respect", 0),
             "labels": list(r.get("labels") or []),

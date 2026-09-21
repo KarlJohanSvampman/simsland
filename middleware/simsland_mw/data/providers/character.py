@@ -54,7 +54,8 @@ async def needs(ctx: ResolveContext) -> Dict[str, Any]:
 async def activity(ctx: ResolveContext) -> Dict[str, Any]:
     c = await _char(ctx)
     a = c.get("activity") or {}
-    return {"type": a.get("type"), "phase": a.get("phase")}
+    return {"type": a.get("type"), "phase": a.get("phase"),
+            "target_id": a.get("target_id"), "interaction": a.get("interaction")}
 
 
 async def intentions(ctx: ResolveContext) -> List[Dict[str, Any]]:
@@ -74,6 +75,9 @@ async def expectations(ctx: ResolveContext) -> List[Dict[str, Any]]:
             "status": e.get("status"), "frustration": e.get("frustration") or 0.0,
             "missed_count": e.get("missed_count") or 0, "streak": e.get("streak") or 0,
             "blame": list(e.get("last_missed_blame") or []),
+            "window_start_tick": e.get("window_start_tick"),
+            "window_end_tick": e.get("window_end_tick"),
+            "satisfied": bool(e.get("satisfied_this_period")),
         })
     out.sort(key=lambda e: -e["frustration"])
     return out

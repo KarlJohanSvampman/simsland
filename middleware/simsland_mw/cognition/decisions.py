@@ -38,20 +38,34 @@ SYSTEM_TEMPLATE = (
     "Reply with ONLY a JSON object of the form {{\"choice\": \"<id>\"}}, where <id> is exactly one of the "
     "ids in the list. No explanation."
 )
+SITUATION_ADDENDUM = (
+    "\nYou may add \"thought\": a short private thought (never spoken aloud)."
+    "{speech_clause}"
+)
+SPEECH_CLAUSE = (
+    " If your choice involves saying something, add \"speech\": the exact words {name} says, "
+    "in {name}'s own voice, one or two sentences."
+)
 
 
 def render_options(options: List[Option]) -> str:
     return "\n".join(f"{i}. {o.description}  [id: {o.id}]" for i, o in enumerate(options, 1))
 
 
-def build_messages(snapshot: ConsciousnessSnapshot, options: List[Option]) -> List[Dict[str, str]]:
+def build_messages(snapshot: ConsciousnessSnapshot, options: List[Option],
+                   situation: Optional[str] = None) -> List[Dict[str, str]]:
     user = snapshot.render()
-    if snapshot.wake_line:
+    system = SYSTEM_TEMPLATE.format(name=snapshot.name)
+    if situation:
+        user += "\n\nWHAT'S HAPPENING\n" + situation
+        clause = SPEECH_CLAUSE.format(name=snapshot.name) if any(o.speaks for o in options) else ""
+        system += SITUATION_ADDENDUM.format(speech_clause=clause)
+    elif snapshot.wake_line:
         user += "\n\nJUST NOW\n" + snapshot.wake_line
     user += "\n\nWHAT I CAN DO RIGHT NOW\n" + render_options(options)
     user += "\n\nWhat do you do?"
     return [
-        {"role": "system", "content": SYSTEM_TEMPLATE.format(name=snapshot.name)},
+        {"role": "system", "content": system},
         {"role": "user", "content": user},
     ]
 

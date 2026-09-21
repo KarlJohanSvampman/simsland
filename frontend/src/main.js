@@ -4672,10 +4672,23 @@ function renderCharacterInspector(id){
   // actually reached whatever prop/anchor it needs) rather than reading
   // as if they're already doing it -- "Doing: drink" while still
   // walking across the map read as if they'd already started.
+  // Per the user's explicit ask ("I can't see what she examines"):
+  // c.activity.target_id has always been there (set by action_router.py::
+  // _scaffold() whenever an activity has a real target) -- this just
+  // never rendered it. Tries a prop first (the common case for examine/
+  // interact/search/...), falls back to a character (speak/socialize/
+  // ring_doorbell/...), falls back to the raw id if neither resolves.
   const activityLabel = c.activity?.type
-    ? (c.activity.phase === "walking"
-        ? `Heading to: ${c.activity.type.replace(/_/g, " ")}`
-        : `Doing: ${c.activity.type}`)
+    ? (() => {
+        const verb = c.activity.phase === "walking" ? "Heading to" : "Doing";
+        const label = c.activity.type.replace(/_/g, " ");
+        const targetId = c.activity.target_id;
+        if (!targetId) return `${verb}: ${label}`;
+        const prop = _findProp(targetId);
+        const targetChar = _worldState.characters?.[targetId];
+        const targetName = prop?.template?.replace(/_/g, " ") || targetChar?.name || targetId;
+        return `${verb}: ${label} (${targetName})`;
+      })()
     : `State: ${c.animation_state || "idle"}`;
   rows.push(activityLabel);
 

@@ -17,7 +17,9 @@ from ..config import Settings
 from ..data.registry import Registry, build_default_registry
 from ..data.resolver import Resolution, Resolver
 from ..decisions import executor
-from ..decisions.options import Option, OptionGenerator
+from ..decisions.options import DecisionContext, Option, OptionGenerator
+from ..situations.library import default_registry
+from ..situations.registry import CompiledSituation, SituationRegistry
 from ..decisions.validator import Choice, ChoiceRejected, parse_choice
 from ..llm.client import LLMClient
 from ..narrative.compiler import ConsciousnessSnapshot, compile_snapshot
@@ -38,6 +40,7 @@ class Prepared:
     options: List[Option]
     messages: List[Dict[str, str]]
     tick: Optional[int] = None
+    situation: Optional[CompiledSituation] = None
 
 
 @dataclass
@@ -49,6 +52,10 @@ class DecisionRecord:
     errors: Dict[str, str]
     options: List[Dict[str, str]]
     prompt: List[Dict[str, str]]
+    situation_id: Optional[str] = None
+    unresolved: List[Dict[str, str]] = field(default_factory=list)
+    thought: Optional[str] = None
+    speech: Optional[str] = None
     replies: List[str] = field(default_factory=list)
     rejections: List[str] = field(default_factory=list)
     choice_id: Optional[str] = None
@@ -67,40 +74,54 @@ class DecisionRecord:
 class CognitionEngine:
     def __init__(self, sim: SimulationClient, llm: LLMClient, settings: Optional[Settings] = None,
                  registry: Optional[Registry] = None, generator: Optional[OptionGenerator] = None,
-                 sessions: Optional[SessionManager] = None):
+                 sessions: Optional[SessionManager] = None,
+                 situations: Optional[SituationRegistry] = None):
         self.sim = sim
         self.llm = llm
         self.settings = settings or Settings()
         self.resolver = Resolver(registry or build_default_registry())
         self.generator = generator or OptionGenerator()
         self.sessions = sessions or SessionManager()
+        self.situations = situations if situations is not None else default_registry()
 
     async def prepare(self, char_id: str, wake_reason: Optional[str] = None,
-                      profile: Optional[str] = None) -> Prepared:
-        """Everything up to (not including) the LLM call."""
+                      profile: Optional[str] = None, commit: bool = False) -> Prepared:
+        """Everything up to (not including) the LLM call. `commit=False` (previews)
+        leaves situation cooldowns untouched."""
         profile = profile or prompts.profile_for(wake_reason)
-        res = await self.resolver.resolve(prompts.PROFILES[profile], self.sim, char_id)
+        types = sorted(set(prompts.PROFILES[profile]) | set(self.situations.required_data()))
+        res = await self.resolver.resolve(types, self.sim, char_id)
         if "character.identity" in res.errors:
             raise RuntimeError(f"cannot decide for {char_id}: {res.errors['character.identity']}")
         session = self.sessions.get(char_id)
         snapshot = compile_snapshot(res, session.digest())
-        options = self.generator.generate(res)
+        env = res.get("environment.current") or {}
+        compiled = self.situations.select(
+            char_id, DecisionContext(res), wake_reason or env.get("wake_reason"),
+            env.get("wake_payload"), env.get("tick"), commit=commit)
+        options = compiled.options if compiled else self.generator.generate(res)
         return Prepared(char_id, wake_reason, profile, res, snapshot, options,
-                        prompts.build_messages(snapshot, options))
+                        prompts.build_messages(snapshot, options,
+                                               compiled.description if compiled else None),
+                        tick=env.get("tick"), situation=compiled)
 
     async def decide(self, char_id: str, wake_reason: Optional[str] = None,
                      dry_run: Optional[bool] = None, profile: Optional[str] = None) -> DecisionRecord:
         started = time.monotonic()
         dry = self.settings.dry_run if dry_run is None else dry_run
-        p = await self.prepare(char_id, wake_reason, profile)
+        p = await self.prepare(char_id, wake_reason, profile, commit=not dry)
         rec = DecisionRecord(
             char_id=char_id, wake_reason=wake_reason, profile=p.profile, waves=p.resolution.waves,
-            errors=p.resolution.errors, options=[o.public() for o in p.options], prompt=p.messages)
+            errors=p.resolution.errors, options=[o.public() for o in p.options], prompt=p.messages,
+            situation_id=p.situation.situation.id if p.situation else None,
+            unresolved=[{"option": o, "reason": r}
+                        for o, r in (p.situation.unresolved if p.situation else [])])
 
         choice = await self._choose(p, rec)
         result = await executor.execute(self.sim, char_id, choice, wake_reason, dry_run=dry)
         rec.executed = result.executed
         rec.action = result.decision["action"]
+        rec.thought, rec.speech = choice.thought, choice.speech
         rec.simsland_response = result.response or None
 
         tick = (result.response or {}).get("tick")

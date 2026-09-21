@@ -51,6 +51,11 @@ def _char_or_404(world, char_id):
     return c
 
 
+def _room_cleanliness(c, world):
+    from systems.chores import get_room_cleanliness, zone_key_for_character
+    return get_room_cleanliness(world, zone_key_for_character(c))
+
+
 def _identity(c):
     return {"id": c["id"], "name": c.get("name"), "age": c.get("age"), "sex": c.get("sex")}
 
@@ -139,6 +144,9 @@ def snapshot(char_id: str, sections: str = ",".join(ALL_SECTIONS)):
             "room_id": c.get("room_id"),
             "visible_people": people,
             "visible_props": perception.get("visible_props", []),
+            # Cleanliness of the room they are standing in (0 = filthy, 100 =
+            # spotless) -- what a person would simply notice on walking in.
+            "room_cleanliness": _room_cleanliness(c, world),
         }
 
     # Minimal identity for everyone this character is allowed to know about

@@ -14,7 +14,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from .api import characters, health
+from .api import characters, health, situations
 from .cognition.engine import CognitionEngine
 from .cognition.runner import Runner
 from .config import get_settings
@@ -54,6 +54,7 @@ def create_app(sim=None, llm=None, settings=None) -> FastAPI:
     app = FastAPI(title="Simsland AI Middleware", lifespan=lifespan)
     app.include_router(health.router)
     app.include_router(characters.router)
+    app.include_router(situations.router)
     return app
 
 

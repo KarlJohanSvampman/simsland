@@ -19,10 +19,11 @@ import time
 
 ALIVE_SECONDS = float(os.getenv("MIDDLEWARE_ALIVE_SECONDS", "30"))
 
-# Phase 1 middleware only makes needs/solo/one-line social choices. Anything that
-# needs real dialogue is handed straight back to the built-in brain until the
-# cognition-aware contract (spec Phase 2) lets the middleware speak.
-LEGACY_WAKES = {"heard_speech", "provoked"}
+# Wakes the middleware has no situation for yet stay with the built-in brain.
+# "provoked" (conflict.* situations) is not built. Routing every other wake through
+# the middleware matters for stability too: each built-in LLM attempt that blows the
+# 3s agent budget is abandoned but keeps a world copy alive, and memory balloons.
+LEGACY_WAKES = {"provoked"}
 
 _last_seen = 0.0
 
@@ -40,9 +41,8 @@ def wants_middleware(c):
     """Flagged for the middleware, and not currently in a moment it can't handle yet."""
     if not c.get("external_brain"):
         return False
-    if c.get("conversation"):
-        return False
-    return (c.get("cognition") or {}).get("wake_reason") not in LEGACY_WAKES
+    wake = (c.get("cognition") or {}).get("wake_reason")
+    return wake not in LEGACY_WAKES
 
 
 def is_external(c):

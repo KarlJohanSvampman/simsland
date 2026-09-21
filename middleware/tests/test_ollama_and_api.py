@@ -56,7 +56,7 @@ async def test_sim_client_talks_to_the_bridge_routes():
 
 
 def _client(llm=None):
-    app = create_app(sim=MockSimClient(), llm=llm or ScriptedLLM('{"choice": "eat_at_home"}'), settings=Settings())
+    app = create_app(sim=MockSimClient(), llm=llm or ScriptedLLM('{"choice": "eat_something_at_home"}'), settings=Settings())
     return TestClient(app)
 
 
@@ -64,14 +64,14 @@ def test_api_preview_shows_prompt_without_calling_llm():
     llm = ScriptedLLM()
     with _client(llm) as c:
         body = c.get("/characters/kim/preview").json()
-        assert body["options"][0]["id"] == "eat_at_home" and "WHO I AM" in body["prompt"][1]["content"]
+        assert body["options"][0]["id"] == "eat_something_at_home" and "WHO I AM" in body["prompt"][1]["content"]
         assert llm.calls == []
 
 
 def test_api_decide_defaults_to_dry_run():
     with _client() as c:
         rec = c.post("/characters/kim/decide").json()
-        assert rec["choice_id"] == "eat_at_home" and rec["executed"] is False
+        assert rec["choice_id"] == "eat_something_at_home" and rec["executed"] is False
         live = c.post("/characters/kim/decide?dry_run=false").json()
         assert live["executed"] is True
 

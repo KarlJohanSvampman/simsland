@@ -21,35 +21,21 @@ from llm.llm_gate import (
 # instead of a single ~12KB enum covering every action type in the game.
 # Real per-character sizes run ~2-4KB.
 
-_PREAMBLE = """You are a persistent simulated person living inside a dynamic world.
-You ARE the character — not a narrator, not an observer.
-
-Stay consistent with your memories, intentions, emotions, relationships, beliefs, and personality.
-The world persists — consequences carry forward.
-
-You'll be given a scene described like a game master narrating it: what you perceive, remember,
-and feel right now. Respond the same way — describe your turn in your own words, the way a player
-narrates what their character does, says, and thinks. Then translate that into the small JSON
-shape below so the game can actually move your character.
-
-Never invent or guess an id or a number you weren't given. When your action needs to refer to a
-specific person, prop, or thing, describe it in your own words — a separate system matches your
-description to the right one. A few things (proposals, unattended phones, worn/carried items,
-walls — see "reference by exact id" below, if present) don't have a natural way to describe them
-in words, so those are given to you with real ids; use those exact ids only for those things.
-
-Only interact with something for what it's actually for. A need only gets satisfied by something
-that genuinely serves it — a power outlet doesn't help you find a restroom, a bus stop doesn't
-give you water, a bookshelf doesn't feed you. If nothing nearby actually addresses a need you
-have, say so honestly in your narration (you can't find one, it's frustrating, you'll keep
-looking or ask someone) instead of inventing a connection between an unrelated object and a need
-it can't actually meet."""
+# Per the user's explicit ask ("bare minimum D&D style, no more than a
+# tweet"): this used to be a ~2KB, five-paragraph preamble explaining the
+# same handful of rules at length. A GM's actual table-talk is this
+# short -- the model doesn't need paragraphs to know not to eat a
+# bookshelf.
+_PREAMBLE = """You're a real person in a life sim, not a narrator. Narrate your turn in 1-2 short sentences, in character.
+Describe targets in your own words, never invent an id. Only use things for what they're actually for."""
 
 
 def _render_action_lines(offered, specs):
-    """Shared doc-string rendering for a set of (already-filtered) action
-    types, grouped by their spec's "group" -- used both for the default
-    core-only menu and for list_available_actions' fuller one."""
+    """Kept for list_available_actions' fuller, on-demand listing
+    (action_router.py::_route_list_available_actions) -- doc strings are
+    only worth the tokens there, once, when a character actually asks
+    what else they can do. The default per-tick menu (_format_action_menu
+    below) never shows this."""
     by_group = {}
     for t in offered:
         spec = specs.get(t)
@@ -69,53 +55,43 @@ def _render_action_lines(offered, specs):
 
 
 def _format_action_menu(available_actions):
-    """Per the user's ask: don't dump doc strings for EVERY currently-
-    eligible action into every single prompt -- action_registry.py's
-    "core" group (movement, speech, basic self-care, look_around/focus/
-    list_available_actions, ...) is the only thing shown by default.
-    Everything else (phone/computer, chores, proposals, exercise, prop-
-    specific interactions, ...) is real and still fully usable, just
-    deferred behind the new list_available_actions action -- see
-    action_router.py::_route_list_available_actions, which builds that
-    fuller, still-prose-not-JSON listing on demand and caches it exactly
-    like look_around's environment_scan."""
+    """Per the user's explicit ask ("bare minimum, no descriptions"):
+    just the core action names, comma-separated -- no per-action doc
+    strings at all in the default per-tick prompt (that was the single
+    biggest chunk of every prompt's size). Everything else stays
+    reachable via list_available_actions exactly as before, which still
+    returns the fuller described listing on demand."""
     from systems.action_registry import ACTION_SPECS
 
     offered = available_actions.get("action_types") or []
-    core = [t for t in offered if ACTION_SPECS.get(t, {}).get("group") == "core"]
-    lines = _render_action_lines(core, ACTION_SPECS)
+    core = sorted(t for t in offered if ACTION_SPECS.get(t, {}).get("group") == "core")
 
     extra_count = sum(1 for t in offered if ACTION_SPECS.get(t, {}).get("group") != "core")
+    names = list(core)
     if extra_count:
-        lines.append(
-            f"- ...and {extra_count} more specific things you could do right now "
-            "(phone/computer, chores, exercise, proposals, whatever's actually nearby, "
-            "...) -- call list_available_actions to see them."
-        )
-    return "\n".join(lines)
+        names.append(f"list_available_actions (+{extra_count} more)")
+    return ", ".join(names)
 
 
+# Per the user's explicit ask: replaces the old strict-JSON envelope with
+# a compact, line-based reply shape -- a screenplay/script format an LLM
+# already has heavy prior exposure to, without JSON's brace/quote/escape
+# overhead. Parsed by _parse_compact_envelope() below into the exact same
+# {"narration", "action", "say", "then"} shape the JSON envelope used to
+# produce, so _to_legacy_decision() and everything downstream of it
+# (action_router.py, process_decision, ...) needed zero changes.
 _ENVELOPE_FORMAT = """
-Respond with ONLY this JSON object — no markdown, no extra text, nothing outside the braces:
-{
-  "narration": "what you do and think this turn, in your own words — 1-3 sentences. If you're
-    speaking, describe the moment (e.g. 'I smile and reassure him') but do NOT restate the actual
-    words here -- those belong ONLY in \\"say\\" below, never duplicated in both places.",
-  "action": {
-    "type": "<one action type from the list above>",
-    "target_description": "who or what you're acting on, in your own words (omit if no target is needed)",
-    "detail": "extra detail the action needs, if the list above says so (omit otherwise)"
-  },
-  "say": "the exact words you say aloud this turn, if any -- required whenever narration describes
-    you speaking; omit or leave empty only if you don't speak at all this turn",
-  "then": "a short phrase for what you intend to do next, once this is done (optional)"
-}
+Reply in EXACTLY this shape, one line each. Skip a line entirely if it doesn't apply.
+<what you do, ONLY if it's worth describing -- skip this line for a routine action, don't narrate every single move>
+ACTION: <type> | <target, in your own words> | <extra detail, if needed>
+SAY: <exact words, REQUIRED whenever your action is speak/socialize/phone_call/phone_answer -- never leave this blank if you're talking to someone>
+THEN: <short next intention>
 """
 
 
 def build_system_prompt(available_actions):
     menu = _format_action_menu(available_actions or {})
-    return f"{_PREAMBLE}\n\nActions you can take right now:\n{menu}\n{_ENVELOPE_FORMAT}"
+    return f"{_PREAMBLE}\n\nActions: {menu}\n{_ENVELOPE_FORMAT}"
 
 
 # =========================================================
@@ -449,22 +425,79 @@ def build_prompt(context):
 
 
 # =========================================================
+# PARSE COMPACT RESPONSE
+# =========================================================
+# Mirrors _ENVELOPE_FORMAT above -- one ACTION: line is the only hard
+# requirement; everything before it is narration, SAY:/THEN: are each
+# optional. Tolerant of stray whitespace/casing and an accidental
+# markdown code fence, since this is free-text the model is producing,
+# not a real grammar.
+
+_ACTION_LINE_RE = re.compile(r'(?im)^[ \t>*_-]*ACTION[ \t]*:[ \t]*(.+)$')
+_SAY_LINE_RE    = re.compile(r'(?im)^[ \t>*_-]*SAY[ \t]*:[ \t]*(.*)$')
+_THEN_LINE_RE   = re.compile(r'(?im)^[ \t>*_-]*THEN[ \t]*:[ \t]*(.*)$')
+_CODE_FENCE_RE  = re.compile(r'^```[a-zA-Z]*\n?|\n?```$')
+
+
+def _parse_compact_envelope(raw):
+    """Parses _ENVELOPE_FORMAT's line-based reply into the same
+    {"narration", "action": {"type","target_description","detail"},
+    "say", "then"} shape the old JSON envelope produced -- only the wire
+    format changed, _to_legacy_decision() below is untouched. Returns
+    None if no ACTION: line is found at all (not this format -- think()
+    falls back to trying strict JSON next, then fallback_response())."""
+    if not isinstance(raw, str):
+        return None
+    text = _CODE_FENCE_RE.sub("", raw.strip()).strip()
+
+    action_match = _ACTION_LINE_RE.search(text)
+    if not action_match:
+        return None
+
+    narration = text[:action_match.start()].strip()
+    action_line = action_match.group(1).strip()
+
+    say_match = _SAY_LINE_RE.search(text)
+    then_match = _THEN_LINE_RE.search(text)
+
+    parts = [p.strip() for p in action_line.split("|")]
+    action_type = (parts[0] if parts else "").lower().replace(" ", "_")
+
+    return {
+        "narration": narration,
+        "action": {
+            "type": action_type,
+            "target_description": parts[1] if len(parts) > 1 and parts[1] else "",
+            "detail": parts[2] if len(parts) > 2 and parts[2] else "",
+        },
+        "say": say_match.group(1).strip() if say_match else "",
+        "then": then_match.group(1).strip() if then_match else "",
+    }
+
+
+# =========================================================
 # VALIDATE RESPONSE
 # =========================================================
 
 def validate_response(data):
-    """Validates the new envelope shape only — narration (non-empty str)
-    and action.type (str) are the only hard requirements; say/then/
-    action.target_description/action.detail are all optional. A stale
-    prompt-cache hit returning the OLD shape is detected separately in
-    think() (via "thought" in data) and never reaches this function."""
+    """Validates the new envelope shape only — action.type (non-empty
+    str) is the only hard requirement. Per the user's explicit ask
+    ("cheap pick, rich talk only when needed"): narration used to be
+    required, forcing 1-3 sentences of prose out of the model on every
+    single routine action (move, wait, examine, ...) -- the dominant
+    cost of a generation call is OUTPUT length, so that was paying full
+    narration price on every tick regardless of whether anything was
+    actually worth describing. Empty narration is now valid; think()
+    fills in a short canned line from the action itself (see
+    _canned_narration()) rather than leaving the character silent.
+    say/then/action.target_description/action.detail all stay optional.
+    A stale prompt-cache hit returning the OLD shape is detected
+    separately in think() (via "thought" in data) and never reaches this
+    function."""
     if not isinstance(data, dict):
         return False
-    narration = data.get("narration")
-    if not isinstance(narration, str) or not narration.strip():
-        return False
     action = data.get("action")
-    if not isinstance(action, dict) or not isinstance(action.get("type"), str):
+    if not isinstance(action, dict) or not action.get("type"):
         return False
     return True
 
@@ -531,6 +564,48 @@ def _condense_turn(data):
     return " — ".join(bits) if bits else None
 
 
+def _append_history(session, decision):
+    """Confirmed live bug (player report: a character stuck examining the
+    same bookshelf for real minutes straight): the last 6 turns were
+    appended verbatim regardless of content, so a stuck loop showed up as
+    6 near-identical "thought: ... — did: describe" lines fed straight
+    back into the character's OWN next prompt as "recent memory" -- the
+    model sees a repeating pattern and, unsurprisingly, continues it,
+    actively reinforcing the exact loop this history was meant to give
+    useful continuity against. Collapses a run of the SAME action
+    type+target into one entry with a growing repeat count instead --
+    see _render_history_entry() below for how that reads to the model."""
+    digest = _condense_turn(decision)
+    if not digest:
+        return
+
+    action = decision.get("action") or {}
+    key = (action.get("type"), action.get("target_description") or action.get("target"))
+
+    history = session.setdefault("history", [])
+    last = history[-1] if history else None
+    if isinstance(last, dict) and last.get("_key") == key:
+        last["count"] = last.get("count", 1) + 1
+        last["text"] = digest
+    else:
+        history.append({"_key": key, "count": 1, "text": digest})
+    session["history"] = history[-20:]
+
+
+def _render_history_entry(h):
+    """A history entry is either a plain string (an older session
+    predating _append_history()'s collapsing, or one that's never
+    repeated) or the {"text","count",...} shape above. Once count > 1,
+    the repeat itself becomes part of the text -- a real signal to try
+    something else, not just N near-identical lines diluting the same
+    signal into invisibility."""
+    if isinstance(h, str):
+        return h
+    text = h.get("text", "")
+    count = h.get("count", 1)
+    return f"{text} (×{count} in a row now -- try something different)" if count > 1 else text
+
+
 # =========================================================
 # ENVELOPE -> LEGACY DECISION ADAPTER
 # =========================================================
@@ -542,6 +617,47 @@ def _condense_turn(data):
 # it through brain/action_resolver.py after this returns.
 
 _SPEAK_LIKE_TYPES = {"speak", "socialize", "phone_call", "phone_answer"}
+
+# Per the user's explicit ask ("cheap pick, rich talk only when needed"):
+# narration is now optional (validate_response no longer requires it) --
+# a routine action the model chose not to narrate gets a flat, generic
+# line synthesized here instead of an empty "thought", so the character
+# still has SOMETHING for their own history digest / UI display. Not
+# meant to carry personality -- that budget is spent on speech instead
+# (see _fill_missing_speech()), which is the one place this codebase's
+# own "make it feel alive" ask actually shows up to a player.
+_CANNED_NARRATION = {
+    "move": "I head toward {target}.",
+    "jog_to": "I hurry toward {target}.",
+    "sneak_to": "I quietly slip toward {target}.",
+    "examine": "I take a closer look at {target}.",
+    "describe": "I look around.",
+    "search": "I search {target}.",
+    "eat": "I eat {target}.",
+    "sleep": "I settle in to sleep.",
+    "wait": "I wait.",
+    "work": "I get to work.",
+    "interact": "I use {target}.",
+    "carry": "I pick up {target}.",
+    "clean": "I clean {target}.",
+    "recall": "I think back for a moment.",
+    "sit_down": "I sit down.",
+    "stand_up": "I stand up.",
+    "lean_against_wall": "I lean against the wall.",
+    "push_off_wall": "I stand back up.",
+    "speak": "I turn to speak with {target}.",
+    "socialize": "I strike up a casual conversation with {target}.",
+    "phone_call": "I call {target}.",
+    "phone_answer": "I answer the phone.",
+}
+_CANNED_NARRATION_DEFAULT = "I get on with it."
+
+
+def _canned_narration(action_type, target):
+    template = _CANNED_NARRATION.get(action_type, _CANNED_NARRATION_DEFAULT)
+    if "{target}" in template:
+        return template.format(target=target or "it")
+    return template
 
 
 def _match_intention_type(phrase):
@@ -848,9 +964,10 @@ def think(
     # of "what did I just do" without repeating the full context each tick.
     history = (session or {}).get("history", [])
     if history:
+        rendered = [_render_history_entry(h) for h in history[-6:]]
         messages.insert(1, {
             "role": "system",
-            "content": "Your recent turns:\n" + "\n".join(history[-6:]),
+            "content": "Your recent turns:\n" + "\n".join(rendered),
         })
 
     # call_llm_safe is async; think() runs synchronously inside a
@@ -871,49 +988,76 @@ def think(
         priority=PRIORITY_NORMAL if priority is None else priority,
     )
 
-    try:
+    # Compact line-based reply (see _ENVELOPE_FORMAT) is the primary
+    # format now. Falls back to strict JSON for a stale llm_client.py
+    # cache hit (5-minute window) from just before this round's format
+    # flip, or a model that reverts to JSON out of habit -- either way,
+    # _to_legacy_decision()/process_decision() below never see the
+    # difference, only this parsing step does.
+    envelope = _parse_compact_envelope(raw)
 
-        data = json.loads(raw)
+    if envelope is not None:
 
-    except Exception:
-
-        return fallback_response()
-
-    if not isinstance(data, dict):
-
-        return fallback_response()
-
-    # Compatibility branch: llm_client.py caches by exact message hash for
-    # 5 minutes, so a call landing just after this round's schema flip
-    # could still return the OLD ("thought"/"emotion"/"goal"/"action")
-    # shape from a pre-flip cache entry. Detect and pass it straight
-    # through — process_decision() already understands it — rather than
-    # hard-failing into fallback_response(). Safe to delete any time after
-    # this round ships (once the cache window has cycled out).
-    if "thought" in data and "action" in data:
-
-        decision = data
-
-    else:
-
-        if not validate_response(data):
+        if not validate_response(envelope):
 
             return fallback_response()
 
-        decision = _to_legacy_decision(data, char_id=char_id)
+        decision = _to_legacy_decision(envelope, char_id=char_id)
 
-    # Per the user's explicit ask: when the narration clearly describes a
-    # conversational beat (a question, a reply, an answer) but nothing
-    # upstream captured an actual line of dialogue -- no envelope "say",
-    # no anchored quote for _extract_quoted_speech() to find -- schedule
-    # one small follow-up call asking specifically what was said, rather
-    # than leaving the moment silent. Gated on speech still being empty
-    # so this never overrides a real "say"/quoted line already resolved.
+    else:
+
+        try:
+
+            data = json.loads(raw)
+
+        except Exception:
+
+            return fallback_response()
+
+        if not isinstance(data, dict):
+
+            return fallback_response()
+
+        # Compatibility branch: the OLD ("thought"/"emotion"/"goal"/
+        # "action") shape, from even further back. Detect and pass it
+        # straight through — process_decision() already understands it.
+        if "thought" in data and "action" in data:
+
+            decision = data
+
+        else:
+
+            if not validate_response(data):
+
+                return fallback_response()
+
+            decision = _to_legacy_decision(data, char_id=char_id)
+
+    # Fetch the actual words whenever they're missing -- two ways to get
+    # here: (1) the narration clearly describes a conversational beat but
+    # nothing captured a real line (original trigger), or (2) per the
+    # user's explicit ask ("rich talk only when needed"), the CHOSEN
+    # ACTION itself is speak-like -- the reliable signal now that
+    # narration is optional and can't be counted on to even exist. Either
+    # way this is the ONE place a routine decision is allowed a second
+    # round-trip; every other action type stays a single call. Gated on
+    # speech still being empty so a real "say"/quoted line already
+    # resolved is never overridden.
+    action_type = (decision.get("action") or {}).get("type")
     if not decision.get("speech"):
         narration_text = decision.get("thought") or ""
-        if narration_text and _SPEECH_IMPLIED_PATTERN.search(narration_text):
+        target_description = (decision.get("action") or {}).get("target_description")
+        speech_implied = narration_text and _SPEECH_IMPLIED_PATTERN.search(narration_text)
+        if speech_implied or action_type in _SPEAK_LIKE_TYPES:
+            # No real narration to hand the follow-up call as context when
+            # it was skipped (the whole point of making it optional) --
+            # a short synthesized prompt naming the target stands in.
+            context_text = narration_text or (
+                f"You decide to talk to {target_description}." if target_description
+                else "You decide to say something."
+            )
             utterance = _fill_missing_speech(
-                narration_text, char_id,
+                context_text, char_id,
                 PRIORITY_NORMAL if priority is None else priority,
             )
             if utterance:
@@ -923,19 +1067,21 @@ def think(
                     "topic": "",
                     "target": None,
                 }
-                target_name = _extract_speech_target_name(narration_text)
+                target_name = target_description or _extract_speech_target_name(narration_text)
                 if target_name:
                     speech["target_description"] = target_name
                 decision["speech"] = speech
 
+    # Per the user's explicit ask: narration is optional now (the model
+    # was told to skip it for anything routine) -- fill in a flat canned
+    # line from the action itself rather than leaving "thought" empty,
+    # so history digests/UI display still have something to show.
+    if not decision.get("thought") and action_type:
+        target_description = (decision.get("action") or {}).get("target_description")
+        decision["thought"] = _canned_narration(action_type, target_description)
+
     if session is not None:
 
-        digest = _condense_turn(decision)
-
-        if digest:
-
-            session.setdefault("history", []).append(digest)
-
-            session["history"] = session["history"][-20:]
+        _append_history(session, decision)
 
     return decision

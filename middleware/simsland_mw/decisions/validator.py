@@ -17,6 +17,7 @@ from typing import Any, List, Optional
 from .options import Option
 
 MAX_THOUGHT_CHARS = 300
+MAX_SPEECH_CHARS = 240
 _FENCE = re.compile(r"^```(?:json)?\s*|\s*```$", re.IGNORECASE)
 
 
@@ -28,7 +29,8 @@ class ChoiceRejected(ValueError):
 class Choice:
     option: Option
     via: str                       # "id" or "index"
-    thought: Optional[str] = None  # Phase 1: only kept in the session digest, never persisted to Simsland
+    thought: Optional[str] = None  # private: kept in the session digest, never persisted to Simsland
+    speech: Optional[str] = None   # only ever set for options that `speaks`; goes through Simsland's speech path
 
 
 def extract_json(raw: str) -> Any:
@@ -80,4 +82,9 @@ def parse_choice(raw: str, options: List[Option]) -> Choice:
         thought = thought.strip()[:MAX_THOUGHT_CHARS]
     else:
         thought = None
-    return Choice(option=option, via=via, thought=thought)
+    speech = data.get("speech")
+    if option.speaks and isinstance(speech, str) and speech.strip():
+        speech = speech.strip().strip('"')[:MAX_SPEECH_CHARS]
+    else:
+        speech = None
+    return Choice(option=option, via=via, thought=thought, speech=speech)
