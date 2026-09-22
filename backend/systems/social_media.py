@@ -115,7 +115,11 @@ def _notify_mentioned_characters(c, world, post):
             "created_at":  tick,
             "source":      "social_media",
         })
-        wake_character(target, world, "post_about_self", {"author_name": c.get("name", "someone")})
+        wake_character(target, world, "post_about_self", {
+            "author_name": c.get("name", "someone"),
+            "author_id":   c["id"],
+            "post_id":     post["id"],
+        })
 
 
 def _project_engagement(c, world, post):

@@ -119,7 +119,13 @@ def flag_provocation(target, world, actor, provocation_type, outcome=None):
 
     from brain.cognition_scheduler import wake_character
     wake_character(target, world, "provoked", payload={
-        "actor_name":    actor.get("name", "someone"),
-        "verb_phrase":   _VERB_PHRASE.get(provocation_type, "provoked"),
-        "reaction_hint": reaction_hint,
+        "actor_name":       actor.get("name", "someone"),
+        "verb_phrase":      _VERB_PHRASE.get(provocation_type, "provoked"),
+        "reaction_hint":    reaction_hint,
+        # Added for the middleware (simsland_mw/situations/library/reactions.py)
+        # to build a real, targeted response situation per provocation type --
+        # the wake_line template above only ever needed the three string fields
+        # already there, so this is purely additive.
+        "actor_id":         actor["id"],
+        "provocation_type": provocation_type,
     })

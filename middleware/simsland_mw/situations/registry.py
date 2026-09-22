@@ -130,6 +130,25 @@ class SituationRegistry:
                     unresolved.append((seed.id, "not possible right now"))
                     continue
                 sig = json.dumps(outcome, sort_keys=True, default=str)
+                if seed.speaks:
+                    # Confirmed live bug: speak_to()/socialize_with() only ever
+                    # return {"type": ..., "target": pid} -- speech_act (what
+                    # actually makes "challenge them" a different act from
+                    # "insult them back" or "ask why") lives on the SEED, not
+                    # the outcome dict, so two seeds.speaks options aimed at the
+                    # same person were byte-identical to this dedup check and
+                    # silently collapsed to whichever came first. Already
+                    # affected social.character_approaches's greet_them/
+                    # ask_how_they_are before this -- neither test nor anything
+                    # else had ever caught it, since nothing asserted both
+                    # speech options actually coexisted. Folding speech_act into
+                    # the signature only for speaks=True seeds -- the LLM is
+                    # meant to supply genuinely different words for a genuinely
+                    # different social intent here, so two such seeds are never
+                    # really "the same act" the way two equivalent non-speech
+                    # resolutions (e.g. two seeds that both land on the same
+                    # interact(fridge)) legitimately are.
+                    sig = f"{sig}:{seed.speech_act}"
                 if sig in seen_outcomes:            # two seeds that resolve to the same act
                     continue
                 seen_outcomes.add(sig)

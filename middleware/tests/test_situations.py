@@ -100,6 +100,13 @@ async def test_character_approaches_uses_the_person_who_arrived(sim, world):
     ids = [o.id for o in p.options]
     assert "greet_them" in ids and "avoid_them" not in ids
     assert [o for o in p.options if o.id == "greet_them"][0].outcome["target"] == "den"
+    # Confirmed live bug (see situations/registry.py's compile()): greet_them/
+    # ask_how_they_are/stop_and_chat all resolve to the exact same {"type":
+    # "speak"|"socialize", "target": "den"} outcome dict -- speech_act lived
+    # only on the seed, not the outcome, so the dedup check used to collapse
+    # all three down to whichever came first. Both real speak options must
+    # actually coexist now.
+    assert "ask_how_they_are" in ids
 
 
 @pytest.mark.asyncio
