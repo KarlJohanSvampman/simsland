@@ -479,33 +479,64 @@ def _route_move(c, world, action, mode="walk"):
 # fields that execute_activity() requires.
 # =========================================================
 
+# Per the user's explicit ask: no single generic catch-all for every
+# interaction Simsland's content actually has (a flat 600 masked how long
+# should genuinely vary by WHAT is being done) -- one deliberate entry per
+# real anchor interaction that exists in the game's props (see any prop
+# template's anchors), a handful of top-level action types, and only a
+# small, clearly-labeled last resort for anything genuinely new/unlisted.
 _INTERACTION_DURATIONS = {
+    # top-level action types (not a specific prop interaction)
     "socialize":  900,    # 15 sim-minutes -- a real chat, not an instant blip
-    "sit":        1800,
-    "sleep":      28800,
+    "sleep":      28800,  # overridden per-character -- see _sleep_duration_ticks
     "eat":        720,
     "cook":       1200,
-    "work":       28800,
-    "interact":   600,
+    "work":       28800,  # overridden per-character -- see _work_duration_ticks
+    "interact":   60,     # generic dispatch label itself, not a real interaction
     "wait":       120,
     "retrieve_phone": 300,
     "check_device": 300,
-    # Confirmed live bug: these quick, single-beat prop checks were all
-    # falling through to the generic 600-tick (10 sim-minute) "interact"
-    # default -- realistic for something substantial, way too long for
-    # "open the fridge and grab a snack" or "get a glass of water".
-    "open_fridge":     120,
-    "drink":           90,
-    "get_water":       90,
-    "use_tap":         60,
-    "wash_hands":      90,
-    "brush_teeth":     180,
-    "grab_towel":      30,
-    "hang_towel":      30,
-    "toggle_light":    15,
-    "toggle_room_lights": 15,
     "coffee":          180,
+    "sit_down_seat":   300,   # a real pause, not a placeholder leisure session --
+                              # see _route_sit_down's own note on pairing this with
+                              # an actual seated activity (watch TV, eat, computer, ...)
+
+    # real anchor interactions (systems/*.py prop templates)
+    "open_fridge":     10,
+    "drink":           60,
+    "get_water":       60,
+    "use_tap":         5,
+    "wash_hands":      60,
+    "brush_teeth":     90,
+    "grab_towel":      5,
+    "hang_towel":      5,
+    "toggle_light":    5,
+    "toggle_room_lights": 5,
+    "add_laundry":     60,
+    "adjust_brightness": 5,
+    "browse":          180,
+    "browse_shelf":    60,
+    "charge":          10,
+    "check_mail":      30,
+    "check_time":      5,
+    "computer_use":    1800,
+    "dispose_trash":   15,
+    "do_laundry":      300,
+    "flush_toilet":    5,
+    "grab_drink":      15,
+    "grab_item":       10,
+    "lie":             30,
+    "open_storage":    15,
+    "prepare_food":    900,
+    "shower":          720,
+    "sit":             300,
+    "store_drink":     10,
+    "use_atm":         30,
+    "use_microwave":   60,
+    "use_toilet":      150,
+    "wash_dishes":     300,
 }
+_FALLBACK_INTERACTION_DURATION = 60   # last resort only, for content not listed above
 
 def _scaffold(c, world, activity_type, target_id=None,
               interaction=None, duration=None):
@@ -534,7 +565,7 @@ def _scaffold(c, world, activity_type, target_id=None,
     if duration is None:
         duration = _INTERACTION_DURATIONS.get(
             interaction or activity_type,
-            600
+            _FALLBACK_INTERACTION_DURATION
         )
 
     act = {
@@ -633,7 +664,7 @@ def _route_interact(c, world, action, definitions):
         c["activity"] = {
             "type": "interact", "phase": "walking",
             "phase_started_tick": world.get("tick", 0),
-            "duration": _INTERACTION_DURATIONS.get(interaction or "interact", 600),
+            "duration": _INTERACTION_DURATIONS.get(interaction, _FALLBACK_INTERACTION_DURATION),
             "target_id": target_id, "interaction": interaction, "state": {},
         }
         prop["occupied_by"] = c["id"]
@@ -693,7 +724,7 @@ def _route_eat(c, world, action):
             c["activity"] = {
                 "type": "eat", "phase": "walking",
                 "phase_started_tick": world.get("tick", 0),
-                "duration": _INTERACTION_DURATIONS.get("eat", 600),
+                "duration": _INTERACTION_DURATIONS.get("eat", _FALLBACK_INTERACTION_DURATION),
                 "target_id": target_id, "interaction": "eat", "state": {},
             }
             return
@@ -713,17 +744,18 @@ def _route_eat(c, world, action):
 
 def _route_sleep(c, world, action):
     from systems.posture import set_posture
-    from systems.body import compute_needed_sleep_ticks
     target_id = action.get("target")
-    # Real, fatigue/energy/sleep_debt-aware duration -- was a flat 28800
-    # (_INTERACTION_DURATIONS["sleep"]) every time regardless of how
-    # rested the character already was. See systems/body.py::
-    # compute_needed_sleep_ticks() for the full reasoning.
+    # Per the user's explicit ask: a normal night follows tonight's actual
+    # scheduled sleep block (systems/scheduling.py), not a flat 8h -- the
+    # fatigue/energy/sleep_debt-aware calculation (compute_needed_sleep_
+    # ticks) only overrides it upward, when the character is genuinely too
+    # tired/behind for the scheduled block to be enough. See
+    # _sleep_duration_ticks_scheduled() above.
     c["activity"] = _scaffold(
         c, world, "sleep",
         target_id=target_id,
         interaction="sleep",
-        duration=compute_needed_sleep_ticks(c),
+        duration=_sleep_duration_ticks_scheduled(c, world),
     )
     set_posture(c, world, "lying")
 
@@ -1108,6 +1140,58 @@ def _route_report_id_lost(c, world, action):
     })
 
 
+def _scheduled_block_end_ticks(c, world, activity_name):
+    """Ticks remaining until TODAY's scheduled block for this activity ends
+    -- None if the character has no such block right now (no schedule, or
+    the current block isn't this activity). Handles an overnight block
+    (e.g. sleep 23:00-07:00) wrapping past midnight."""
+    block = c.get("active_schedule_block") or {}
+    if block.get("activity") != activity_name or not block.get("end"):
+        return None
+    calendar = world.get("calendar", {})
+    if not calendar:
+        return None
+    from systems.expectations import _hhmm_to_tick
+    end_tick = _hhmm_to_tick(block["end"], calendar, world)
+    tick = world.get("tick", 0)
+    if end_tick <= tick:
+        end_tick += 86400   # the block's end is technically "tomorrow"
+    return max(0, end_tick - tick)
+
+
+def _work_duration_ticks(c, world, default=28800):
+    """Per the user's explicit ask: work should run to the end of today's
+    actual scheduled work block (systems/scheduling.py), not a flat 8h --
+    a character who clocked in late still clocks out on schedule, and a
+    shift generated shorter or longer than 8h (see generate_week_schedule)
+    is honored rather than silently overridden back to a fixed length."""
+    remaining = _scheduled_block_end_ticks(c, world, "work")
+    return max(600, remaining) if remaining is not None else default
+
+
+def _sleep_duration_ticks(c):
+    """The character's own biological need (fatigue/energy/sleep_debt --
+    see compute_needed_sleep_ticks) is what actually decides tonight's
+    sleep length; this only offers world/c as an optional second arg via a
+    thin wrapper below so genuine over-tiredness can still run past the
+    scheduled block rather than cutting a real debt short."""
+    from systems.body import compute_needed_sleep_ticks
+    return compute_needed_sleep_ticks(c)
+
+
+def _sleep_duration_ticks_scheduled(c, world):
+    """Normally the length of tonight's scheduled sleep block; if the
+    character is carrying enough fatigue/energy/sleep debt that they
+    genuinely need MORE than that, the real biological calculation wins
+    instead -- per the user's explicit ask, sleep follows the schedule
+    "unless there is too much debt/fatigue"."""
+    needed = _sleep_duration_ticks(c)
+    scheduled = _scheduled_block_end_ticks(c, world, "sleep")
+    if scheduled is None:
+        return needed
+    return max(600, scheduled, needed)
+
+
 # =========================================================
 # ROUTE WAIT
 # =========================================================
@@ -1131,16 +1215,26 @@ def _route_wait(c, world, action):
     if not (waiting_for and waiting_for.get("kind")):
         return
 
-    ticks = action.get("duration", 120)
+    # Confirmed live bug: this used to scaffold the activity itself with a
+    # flat 120-tick duration -- systems/waiting.py's real patience/give-up
+    # timer (900-1800 ticks depending on trait/stress) is the actual thing
+    # meant to decide when a wait ends, but execute_activity()'s own generic
+    # "elapsed >= duration" check would silently complete/clear the activity
+    # via the SHORT 120-tick default first, every time, long before
+    # tick_waiting() ever got a chance to escalate ("banging on the door")
+    # or genuinely give up -- the whole patience mechanic was unreachable in
+    # practice. The scaffolded duration is now just a hard backstop past
+    # waiting.py's own longest real ceiling (MAX_TOTAL_WAIT_TICKS), so
+    # tick_waiting() is always what actually ends the wait.
+    from systems.waiting import start_waiting_for, MAX_TOTAL_WAIT_TICKS
     c["activity"] = _scaffold(
         c, world, "wait",
         interaction="wait",
-        duration=ticks,
+        duration=MAX_TOTAL_WAIT_TICKS,
     )
 
     # A real reason to wait (a person, a business, a delivery) arms the
     # patience timer + backlog-stress in systems/waiting.py.
-    from systems.waiting import start_waiting_for
     start_waiting_for(c, world, waiting_for["kind"], waiting_for.get("ref"))
 
 
@@ -1958,7 +2052,8 @@ def route_action(c, world, action, speech, definitions=None, available_actions=N
         _route_wait(c, world, action)
 
     elif action_type == "work":
-        c["activity"] = _scaffold(c, world, "work", interaction="work")
+        c["activity"] = _scaffold(c, world, "work", interaction="work",
+                                  duration=_work_duration_ticks(c, world))
 
     elif action_type == "describe":
         _route_describe(c, world, action)
@@ -4425,6 +4520,14 @@ def _route_charge_device(c, world, action):
 # =========================================================
 
 def _route_sit_down(c, world, action):
+    """A plain rest break (5 min, see _INTERACTION_DURATIONS["sit_down_seat"]),
+    NOT a stand-in for a real seated leisure activity -- per the user's
+    explicit ask, sitting down should really be something a character does
+    IN ORDER to eat/watch TV/use the computer/read, with the seat picked for
+    that purpose (empty seat with a TV in view, a proper eating surface,
+    ...), and dropping to the floor instead when fatigued and nothing
+    proper is free. That seat-selection layer isn't built yet -- this is
+    only ever a deliberate short pause today."""
     from systems.posture import set_posture
     from systems.props import get_prop_by_id
     from systems.occupancy import find_free_anchor, reserve_anchor
