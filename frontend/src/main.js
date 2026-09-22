@@ -5452,9 +5452,82 @@ function openMemoryModal(m){
   openModal("modal-intention");
 }
 
+const _MEDIUM_LABELS = { in_person: "in person", call: "call", text: "text", email: "email" };
+
+let _lastRenderedConversations = [];
+
+function _renderConversationLog(c){
+  const log = [...(c.conversation_log || [])].sort((a, b) => (b.ended_tick || 0) - (a.ended_tick || 0));
+  if(!log.length) return _section("Conversations (0)", _empty("No conversations logged yet."));
+
+  const lines = log.map(entry => {
+    const idx = _lastRenderedConversations.length;
+    _lastRenderedConversations.push(entry);
+    const withNames = entry.with?.map(p => p.name || p.id).join(", ") || "someone";
+    const medium = _MEDIUM_LABELS[entry.medium] || entry.medium || "in person";
+    const stamp = _formatMemoryTimestamp(entry.ended_tick);
+    const lastLine = entry.lines?.length ? entry.lines[entry.lines.length - 1] : null;
+    const excerpt = lastLine ? `"${lastLine.utterance}"` : "(no lines recorded)";
+    return `
+    <div class="viewerCard viewerCardClickable" data-conv-index="${idx}">
+      ${stamp ? `<div style="opacity:.6">${stamp}</div>` : ""}
+      <div>${withNames} <span style="opacity:.5">(${medium}${entry.topic && entry.topic !== "general" ? `, ${entry.topic}` : ""})</span></div>
+      <div style="opacity:.75">${excerpt}</div>
+      <a href="#" style="opacity:.7;font-size:.85em">details</a>
+    </div>`;
+  }).join("");
+
+  return _section(`Conversations (${log.length})`, lines);
+}
+
+function openConversationModal(entry){
+  const titleEl = document.getElementById("intentionModalTitle");
+  const body = document.getElementById("intentionModalBody");
+  if(!entry || !body) return;
+  const withNames = entry.with?.map(p => p.name || p.id).join(", ") || "someone";
+  if(titleEl) titleEl.textContent = `Conversation with ${withNames}`;
+  body.innerHTML = "";
+
+  const meta = [
+    ["Medium", _MEDIUM_LABELS[entry.medium] || entry.medium],
+    ["Topic", entry.topic],
+    ["Started", _formatMemoryTimestamp(entry.started_tick)],
+    ["Ended", _formatMemoryTimestamp(entry.ended_tick)],
+  ];
+  for(const [k, v] of meta){
+    if(v == null || v === "") continue;
+    const row = document.createElement("div");
+    row.className = "eventModalRow";
+    row.innerHTML = `<div class="eventModalRowMeta"></div><div></div>`;
+    row.children[0].textContent = k;
+    row.children[1].textContent = String(v);
+    body.appendChild(row);
+  }
+
+  const transcript = document.createElement("div");
+  transcript.style.marginTop = "10px";
+  if(!entry.lines?.length){
+    transcript.innerHTML = `<div style="opacity:.6">No lines recorded.</div>`;
+  } else {
+    transcript.innerHTML = entry.lines.map(l => {
+      const speakerName = _charName(l.speaker) || l.speaker;
+      return `<div style="margin-bottom:6px;"><b>${speakerName}:</b> ${l.utterance}
+        <span style="opacity:.5;font-size:.85em">(${l.speech_act || ""})</span></div>`;
+    }).join("");
+  }
+  body.appendChild(transcript);
+  openModal("modal-intention");
+}
+
 document.getElementById("viewerMemoryTab")?.addEventListener("click", (e) => {
+  const convCard = e.target.closest("[data-conv-index]");
+  if(convCard){
+    e.preventDefault();
+    openConversationModal(_lastRenderedConversations[Number(convCard.dataset.convIndex)]);
+    return;
+  }
   const card = e.target.closest(".viewerCardClickable");
-  if(card){
+  if(card && !card.hasAttribute("data-conv-index")){
     e.preventDefault();
     openMemoryModal(_lastRenderedMemories[Number(card.dataset.memoryIndex)]);
     return;
@@ -5482,6 +5555,7 @@ function renderMemoryTab(c){
   }
 
   _lastRenderedMemories = [];
+  _lastRenderedConversations = [];
   const sections = [];
 
   const shortTerm = [...(c.memories || [])].sort((a, b) => (b.tick || 0) - (a.tick || 0));
@@ -5489,6 +5563,13 @@ function renderMemoryTab(c){
 
   const longTerm = [...(c.long_term_memory || [])].sort((a, b) => (b.tick || 0) - (a.tick || 0));
   sections.push(_renderMemoryList("Long-Term Memory", longTerm, _longTermMemoryPage, LONG_TERM_MEMORY_PAGE_SIZE, "long"));
+
+  // Per the user's explicit ask: a durable log of this character's own
+  // conversations/dialogue, including calls and texts (backend/brain/
+  // conversations.py::_archive_conversation, written once a conversation
+  // naturally closes -- not the same thing as the short-term "You told X..."
+  // memory lines above, which fade/get forgotten like any other memory).
+  sections.push(_renderConversationLog(c));
 
   // -- Conversation topics -- pure client-side aggregation of the
   // already-real `topic` field stamped on memories by work-shift/

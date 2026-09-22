@@ -951,6 +951,43 @@ def conversation_score(
 # END INACTIVE
 # =========================================================
 
+# Per the user's explicit ask: each character keeps a durable log of their
+# own conversations/dialogue, including calls and texts -- conv["history"]
+# (add_message(), above) already carries the real exchange for any medium
+# (apply_speech() threads in-person/call/text into the same conversation
+# object), it just never survived past world["conversations"] itself
+# (unindexed by character, and conv objects are never actually deleted, just
+# marked inactive -- not something a character-scoped UI can use directly).
+# Archived once, right here, at the one moment a conversation naturally
+# closes (not per-message -- one real log entry per conversation).
+CONVERSATION_LOG_CAP = 50
+
+
+def _archive_conversation(world, conv):
+    if conv.get("_archived"):
+        return
+    conv["_archived"] = True
+    chars = world.get("characters", {})
+    participants = conv.get("participants", [])
+    for pid in participants:
+        c = chars.get(pid)
+        if not c:
+            continue
+        others = [{"id": other_id, "name": chars[other_id].get("name")}
+                 for other_id in participants if other_id != pid and other_id in chars]
+        entry = {
+            "conv_id":      conv.get("id"),
+            "started_tick": conv.get("started_at"),
+            "ended_tick":   conv.get("last_update"),
+            "medium":       conv.get("medium", "in_person"),
+            "topic":        conv.get("topic"),
+            "with":         others,
+            "lines":        [dict(h) for h in conv.get("history", [])],
+        }
+        c.setdefault("conversation_log", []).append(entry)
+        c["conversation_log"] = c["conversation_log"][-CONVERSATION_LOG_CAP:]
+
+
 def cleanup_conversations(
 
     world,
@@ -966,6 +1003,12 @@ def cleanup_conversations(
     ).values():
 
         if not conv.get("active"):
+            # Catches both a conversation that just went inactive on an
+            # earlier pass, AND any that were already inactive from before
+            # this archiving existed at all -- _archive_conversation() is
+            # itself idempotent (the _archived flag), so this is safe to
+            # just try unconditionally every sweep.
+            _archive_conversation(world, conv)
             continue
 
         if (
@@ -982,6 +1025,7 @@ def cleanup_conversations(
         ):
 
             conv["active"] = False
+            _archive_conversation(world, conv)
 
 
 # =========================================================

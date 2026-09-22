@@ -42,6 +42,10 @@ POST /admin/clear_stale_anchor_occupancy -> one-off cleanup for prop
                                     longer exists (see reset_characters'
                                     matching fix) -- e.g. a sink nobody
                                     can ever drink from again
+POST /admin/reset_character_state   -> reset body needs/schedule/conflicts/
+                                    stuck activity for the given (or every
+                                    real) character, without deleting
+                                    them or touching relationships/memories
 POST /admin/set_body_need           -> force one character's body need
                                     (hunger/hydration/bladder/energy/...)
                                     to a value, for live-testing reactive
@@ -388,6 +392,56 @@ def set_body_need(payload: dict, sim_id: str = DEFAULT_SIM_ID):
         c.setdefault("body", {})[need] = value
         save_world(sim_id, world)
     return {"ok": True, "character_id": char_id, "need": need, "value": value}
+
+
+@router.post("/reset_character_state")
+def reset_character_state(payload: dict, sim_id: str = DEFAULT_SIM_ID):
+    """Per the user's explicit ask: reset the SAME characters' state
+    (accumulated fatigue/sleep_debt/other body needs, stuck activities,
+    stale schedules, conflicts) without deleting them or touching their
+    relationships/memories -- unlike reset_characters (full wipe) or any
+    single-need set_body_need call. payload: optional {"character_ids":
+    [...]}; defaults to every real (non-workplace-NPC) character.
+
+    Clearing "schedule" specifically forces the very next thing each
+    character does to be generating a fresh one -- sim_loop.py's own
+    self-heal (any character missing a schedule gets one immediately,
+    not just at the next Monday-midnight reset) already runs before
+    anything else in the tick, so this doubles as "force them to plan
+    their week first.\""""
+    from systems.body import _BODY_DEFAULTS, ensure_body
+    from systems.occupancy import interrupt_activity
+    from brain.cognition_scheduler import wake_character
+
+    with world_lock():
+        world = load_world(sim_id)
+        chars = world.get("characters", {})
+        target_ids = payload.get("character_ids") or [
+            cid for cid, c in chars.items() if not c.get("is_workplace_npc")
+        ]
+        reset = []
+        for cid in target_ids:
+            c = chars.get(cid)
+            if not c:
+                continue
+            interrupt_activity(c, world)   # clears activity, releases any anchor, posture -> standing
+            c["body"] = dict(_BODY_DEFAULTS)
+            ensure_body(c)
+            c.pop("schedule", None)
+            c.pop("active_schedule_block", None)
+            c["active_intentions"] = []
+            c["is_moving"] = False
+            c["move_target"] = None
+            wake_character(c, world, "idle")
+            reset.append(cid)
+
+        # Conflicts are cross-character by nature (parties on both sides) --
+        # clearing globally, same as reset_characters' own precedent, rather
+        # than trying to filter to only conflicts touching the reset set.
+        world["conflicts"] = {}
+
+        save_world(sim_id, world)
+    return {"ok": True, "reset": reset, "conflicts_cleared": True}
 
 
 @router.post("/toggle_light")
