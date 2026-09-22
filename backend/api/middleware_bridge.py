@@ -255,6 +255,16 @@ def execute(char_id: str, req: ExecuteReq):
         except Exception as e:  # nothing is saved on failure
             log.exception("middleware execute failed for %s", char_id)
             raise HTTPException(status_code=500, detail=f"{type(e).__name__}: {e}")
+
+        # Confirmed live bug: this endpoint is how EVERY middleware-driven
+        # character's decision gets applied, and it never marked the
+        # character dirty -- their every action/movement/state change was
+        # invisible to every connected client's live WebSocket feed
+        # entirely, not just delayed (see sim_loop.py::_mark_dirty's own
+        # updated docstring for the full trace).
+        from sim_loop import _mark_dirty
+        _mark_dirty(world, char_ids=[char_id])
+
         save_world(SIM_ID, world)
 
         activity = c.get("activity") or {}

@@ -390,6 +390,8 @@ def set_body_need(payload: dict, sim_id: str = DEFAULT_SIM_ID):
         if not c:
             return {"ok": False, "error": "character not found"}
         c.setdefault("body", {})[need] = value
+        from sim_loop import _mark_dirty
+        _mark_dirty(world, char_ids=[char_id])
         save_world(sim_id, world)
     return {"ok": True, "character_id": char_id, "need": need, "value": value}
 
@@ -439,6 +441,9 @@ def reset_character_state(payload: dict, sim_id: str = DEFAULT_SIM_ID):
         # clearing globally, same as reset_characters' own precedent, rather
         # than trying to filter to only conflicts touching the reset set.
         world["conflicts"] = {}
+
+        from sim_loop import _mark_dirty   # see its own docstring -- every
+        _mark_dirty(world, char_ids=reset) # out-of-band write needs this now
 
         save_world(sim_id, world)
     return {"ok": True, "reset": reset, "conflicts_cleared": True}

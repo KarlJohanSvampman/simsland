@@ -382,15 +382,35 @@ def _is_new_calendar_day(world, tag):
 # DIRTY TRACKING
 # =========================================================
 
-_DIRTY_DEFAULT = {"chars": set(), "props": set(), "placed_items": set(), "world_objects": set()}
+# Confirmed live bug, likely the single biggest contributor to this whole
+# session's "nothing updates without a manual refresh" reports: this used
+# to store each bucket as a real Python set(), which is NOT JSON-
+# serializable -- fine as long as _mark_dirty() was only ever called (and
+# _dirty popped via collect_dirty()) from WITHIN _run_tick_and_persist()'s
+# own single load->tick->save span, entirely in memory. But every OTHER
+# world_lock()-protected write (api/middleware_bridge.py's /execute --
+# literally how EVERY middleware-driven character's decision is applied
+# -- and every api/admin.py endpoint) does its own separate load_world()/
+# save_world() round-trip through Postgres, which json.dumps()'s world
+# wholesale -- a set anywhere in it would crash that save outright, so
+# none of those call sites could ever safely call this at all. The result:
+# a middleware character's every action, movement, and state change was
+# invisible to every connected client's WebSocket feed -- not stale, not
+# delayed, NEVER delivered -- until an unrelated dirty-marking event
+# elsewhere happened to also touch them, or the client's camera moved
+# enough to force a full resync from the DB. Lists are JSON-safe and work
+# identically here: collect_dirty() only ever iterates these, never relies
+# on set semantics, and a duplicate id costs one harmless redundant dict
+# lookup.
+_DIRTY_DEFAULT = {"chars": [], "props": [], "placed_items": [], "world_objects": []}
 
 
 def _mark_dirty(world, char_ids=(), prop_ids=(), placed_item_ids=(), world_object_ids=()):
     dirty = world.setdefault("_dirty", dict(_DIRTY_DEFAULT))
-    dirty["chars"].update(char_ids)
-    dirty["props"].update(prop_ids)
-    dirty["placed_items"].update(placed_item_ids)
-    dirty["world_objects"].update(world_object_ids)
+    dirty["chars"].extend(char_ids)
+    dirty["props"].extend(prop_ids)
+    dirty["placed_items"].extend(placed_item_ids)
+    dirty["world_objects"].extend(world_object_ids)
 
 
 def collect_dirty(world) -> dict:

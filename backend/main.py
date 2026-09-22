@@ -27,7 +27,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from core.cache import set_world_cache
 from db import load_world, save_world, init_db, update_world_tick, world_lock, _world_lock, _STATIC_WORLD_KEYS
 from sim_loop import tick, collect_dirty
-from api.view import get_view, in_view
+from api.view import get_view, in_view, RESPONDER_FADE_TICKS
 # core.definitions (not api.editor's own separate, uncached duplicate of
 # the same name) — this is the one with the process-local cache that
 # api/editor.py's save_definitions() actually invalidates on edit, so the
@@ -128,10 +128,24 @@ def _build_full_snapshot(world, definitions, cx, cy, zoom):
     return get_view(sim_id=SIM_ID, cx=cx, cy=cy, zoom=zoom)
 
 
-def _build_delta(world: dict, dirty: dict, cx: int, cy: int, zoom: int) -> dict | None:
+def _build_delta(world: dict, dirty: dict, cx: int, cy: int, zoom: int,
+                 selected_id: str | None = None) -> dict | None:
     """
     Filter the dirty entities to only what falls within this client's viewport.
     Returns None if nothing in the delta is visible to this client.
+
+    Confirmed live bug (player report: a followed character's position and
+    Inspector state going stale -- "in totally different positions" --
+    until a manual page refresh): the viewport filter below is exactly
+    right for the 3D scene (no reason to update meshes nobody can see), but
+    it silently starved whoever the CLIENT has selected in the Inspector
+    too, the moment that character walked outside whatever area the camera
+    happened to be centered on -- nothing ever marked it stale, their last
+    known state just froze in place, unrelated to whether the character
+    was actually still doing anything. `selected_id` (set via the client's
+    own {"type":"select",...} WS message -- main.py's ws_endpoint) is
+    force-included below regardless of camera position, same as if they
+    were always in view.
     """
     radius = _view_radius(zoom)
 
@@ -139,6 +153,8 @@ def _build_delta(world: dict, dirty: dict, cx: int, cy: int, zoom: int) -> dict 
         cid: c for cid, c in dirty["chars"].items()
         if in_view(c.get("x", 0), c.get("y", 0), cx, cy, radius)
     }
+    if selected_id and selected_id in dirty["chars"] and selected_id not in visible_chars:
+        visible_chars[selected_id] = dirty["chars"][selected_id]
     visible_props = {
         pid: p for pid, p in dirty["props"].items()
         if in_view(p.get("x", 0), p.get("y", 0), cx, cy, radius)
@@ -299,7 +315,6 @@ async def loop():
             world, dirty = await asyncio.get_event_loop().run_in_executor(
                 _tick_executor, _run_tick_and_persist, SIM_ID
             )
-
             # Broadcast to each client
             dead = []
             for client in _clients:
@@ -314,10 +329,19 @@ async def loop():
                         await ws.send_json(snapshot)
                         client["needs_full"] = False
                     else:
-                        delta = _build_delta(world, dirty, cx, cy, zoom)
+                        delta = _build_delta(world, dirty, cx, cy, zoom, client.get("selected_id"))
                         if delta:
                             await ws.send_json(delta)
                 except Exception:
+                    # Log instead of swallowing: a bug in snapshot/delta
+                    # building (e.g. the missing RESPONDER_FADE_TICKS
+                    # import that used to crash _build_delta on every
+                    # single call) previously killed every client here
+                    # with zero trace, silently disabling all live
+                    # updates while still leaving reconnect+one-shot
+                    # snapshot working -- which looked exactly like
+                    # "nothing updates until I refresh".
+                    traceback.print_exc()
                     dead.append(client)
 
             for client in dead:
@@ -364,7 +388,7 @@ async def startup():
 @app.websocket("/ws")
 async def ws_endpoint(ws: WebSocket):
     await ws.accept()
-    client = {"ws": ws, "cx": 0, "cy": 0, "zoom": 2, "needs_full": True}
+    client = {"ws": ws, "cx": 0, "cy": 0, "zoom": 2, "needs_full": True, "selected_id": None}
     _clients.append(client)
 
     try:
@@ -401,6 +425,22 @@ async def ws_endpoint(ws: WebSocket):
                     client["cy"]         = new_cy
                     client["zoom"]       = new_zoom
                     client["needs_full"] = True
+
+            elif msg.get("type") == "select":
+                # See _build_delta()'s selected_id parameter: this is what
+                # keeps the Inspector's character live once the camera has
+                # moved on from wherever they physically are.
+                selected_id = msg.get("character_id")
+                client["selected_id"] = selected_id
+                if selected_id:
+                    world = load_world(SIM_ID)
+                    c = world.get("characters", {}).get(selected_id)
+                    if c:
+                        await ws.send_json({
+                            "type": "delta",
+                            "characters": {selected_id: c},
+                            "tick": world.get("tick", 0),
+                        })
 
     except WebSocketDisconnect:
         if client in _clients:

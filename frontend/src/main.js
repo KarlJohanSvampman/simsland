@@ -649,6 +649,11 @@ const debugEventBubbles = {}; // id → { cssObject, div } -- debug-only, action
 // in this file previously tracked "who is selected" as real state -- the
 // inspector panel is otherwise transient DOM writes with no backing variable.
 let selectedCharacterId = null;
+// So renderCharacterInspector() can tell the server which character to keep
+// tracking regardless of camera viewport -- see _build_delta()'s selected-
+// character carve-out in main.py. Set once connectWS() actually opens a socket.
+let _wsRef = null;
+let _lastNotifiedSelectionId = undefined;   // distinct from null (no selection) and any real id
 // Per the user's explicit ask: nothing selected -> Inspector hidden
 // entirely, and a click while something IS selected always deselects
 // first (never jumps straight to a different selection) -- see the
@@ -4613,6 +4618,15 @@ function _setNonStatusTabsVisible(visible){
 }
 
 function _clearInspector(){
+  // Tell the server to stop force-tracking whoever was selected (see
+  // renderCharacterInspector()'s matching notify -- this is the one
+  // deselect path that never routes back through it).
+  if(_lastNotifiedSelectionId !== null){
+    _lastNotifiedSelectionId = null;
+    if(_wsRef && _wsRef.readyState === WebSocket.OPEN){
+      _wsRef.send(JSON.stringify({ type: "select", character_id: null }));
+    }
+  }
   const nameEl = document.getElementById("viewerSelectedName");
   if(nameEl) nameEl.textContent = "";
   const empty = _empty("Nothing selected.");
@@ -4700,6 +4714,22 @@ document.addEventListener("click", (e) => {
 function renderCharacterInspector(id){
   const el = document.getElementById("viewerSelection");
   if(!el) return;
+
+  // Confirmed live bug (player report: a followed character's position/
+  // Inspector state going stale -- "in totally different positions" --
+  // until a manual page refresh): deltas only ever cover what's inside the
+  // camera's own tracked viewport (main.py::_build_delta), so whoever is
+  // selected here just silently stops updating the moment they walk off
+  // whatever area the camera happened to be centered on -- nothing ever
+  // marked it stale, it just froze. Tell the server which character is
+  // selected so it force-includes them in every delta regardless of
+  // camera position, same as if they were always in view.
+  if(id !== _lastNotifiedSelectionId){
+    _lastNotifiedSelectionId = id;
+    if(_wsRef && _wsRef.readyState === WebSocket.OPEN){
+      _wsRef.send(JSON.stringify({ type: "select", character_id: id || null }));
+    }
+  }
   const nameEl = document.getElementById("viewerSelectedName");
   const c = _worldState.characters?.[id];
   if(!c){
@@ -7476,9 +7506,14 @@ async function _applyDelta(delta) {
 
 function connectWS() {
   const ws = new WebSocket(`ws://${location.hostname}:8000/ws`);
+  _wsRef = ws;
 
   ws.onopen = () => {
     _sendViewport(ws);
+    // A reconnect gets a brand new server-side client record with no
+    // selection remembered -- re-assert it (own no-op if nothing selected).
+    _lastNotifiedSelectionId = undefined;
+    if(selectedCharacterId) ws.send(JSON.stringify({ type: "select", character_id: selectedCharacterId }));
   };
 
   ws.onmessage = async (e) => {
