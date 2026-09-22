@@ -155,10 +155,18 @@ class SituationRegistry:
     @classmethod
     def _restarts_current(cls, ctx: SituationContext, outcome: Dict[str, Any]) -> bool:
         """Choosing it would restart the very activity the character is in the
-        middle of (re-picking "use the toilet" while on it resets its progress)."""
+        middle of (re-picking "use the toilet" while on it resets its progress).
+        Confirmed live bug: a targetless activity (jog, sit_ups, practice_juggling,
+        ...) was never caught here -- re-picking it while already mid-session
+        re-scaffolds a brand new one from tick 0 every time, so it could never
+        actually finish and just kept visibly restarting."""
         act = ctx.dc.activity
-        return bool(act.get("type") and outcome.get("type") in cls.PROP_ACTIONS
-                    and outcome.get("target") and act.get("target_id") == outcome["target"])
+        if not act.get("type"):
+            return False
+        target = outcome.get("target")
+        if target:
+            return outcome.get("type") in cls.PROP_ACTIONS and act.get("target_id") == target
+        return act.get("type") == outcome.get("type") and not act.get("target_id")
 
     @staticmethod
     def _trim(options: List[Option], rng: random.Random, ordered: bool = False) -> List[Option]:

@@ -1,7 +1,8 @@
+import pytest
 from simsland_mw.data.registry import build_default_registry
 from simsland_mw.data.resolver import Resolver
 from simsland_mw.cognition import decisions as prompts
-from simsland_mw.decisions.options import OptionGenerator
+from simsland_mw.decisions.options import Option, OptionGenerator
 
 
 async def _options(sim, mutate=None):
@@ -109,3 +110,15 @@ async def test_young_people_are_never_confronted_even_when_not_your_dependent(si
         w["people"]["den"]["age"] = 6
     ids = _ids(await _options(sim, den_is_six))
     assert not any(i.startswith(("ask_dennis", "tell_dennis")) for i in ids)
+
+
+@pytest.mark.asyncio
+async def test_already_doing_filters_targetless_activity_too(sim, world):
+    world["character"]["activity"] = {"type": "sit_ups", "target_id": None}
+    world["available_actions"]["action_types"] += ["sit_ups"]
+    opts = [Option("do_sit_ups", "Do sit-ups.", {"type": "sit_ups"}, kind="need")]
+    from simsland_mw.decisions.options import _already_doing, DecisionContext
+    res = (await Resolver(build_default_registry()).resolve(
+        ["character.activity", "environment.available_interactions"], sim, "kim"))
+    dc = DecisionContext(res)
+    assert _already_doing(dc, opts[0]) is True

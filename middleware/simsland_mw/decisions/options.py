@@ -267,10 +267,16 @@ def _already_doing(dc: DecisionContext, opt: Option) -> bool:
     act = dc.activity
     if not act.get("type") or opt.kind == "idle":
         return False
-    target = (opt.outcome or {}).get("target")
-    if target and act.get("target_id") == target:
-        return True
-    return False
+    outcome = opt.outcome or {}
+    target = outcome.get("target")
+    if target:
+        return act.get("target_id") == target
+    # Confirmed live bug: a targetless activity (jog, sit_ups, practice_juggling,
+    # ...) never matched here, so a character already mid-sit-ups kept getting
+    # "sit_and_rest"/etc. re-offered, and picking it again re-scaffolded a BRAND
+    # NEW activity from tick 0 -- it could never actually finish, just kept
+    # restarting. Same activity type, no target on either side -> already doing it.
+    return act.get("type") == outcome.get("type") and not act.get("target_id")
 
 
 class OptionGenerator:

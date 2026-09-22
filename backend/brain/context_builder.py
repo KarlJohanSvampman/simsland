@@ -445,6 +445,9 @@ def build_available_actions(c, world):
         "knock_on_door",
     ]
 
+    if c.get("household_id"):
+        action_types.extend(["lock_door", "unlock_door"])
+
     # describe (Round 8) / recall (Round 9) — cost no in-world time but do
     # cost one of a small per-decision-cycle turn budget (see
     # brain/cognition_scheduler.py::stage_and_wake/note_think), so they're

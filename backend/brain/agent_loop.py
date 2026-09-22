@@ -650,6 +650,9 @@ def update_agent(
     from systems.activity_watchdog import check_activity_watchdog
     check_activity_watchdog(c, world)
 
+    from systems.idle_quirks import advance_idle_quirk
+    advance_idle_quirk(c, world)
+
     # =====================================
     # INTERNAL STATE
     # =====================================
@@ -995,6 +998,15 @@ def update_agent(
 
     if not wake_reason:
         return
+
+    # A genuinely idle moment -- rolled here, before EITHER the middleware or
+    # the built-in think() below ever sees it, so roaming/checking the door/
+    # pausing at a window is real base behavior, not something either brain
+    # has to remember to offer. See systems/idle_quirks.py.
+    if wake_reason == "idle":
+        from systems.idle_quirks import maybe_delay_or_quirk
+        if maybe_delay_or_quirk(c, world):
+            return
 
     # Characters owned by the standalone AI middleware (../middleware) are
     # decided for through api/middleware_bridge.py. brain/external_brain.py's

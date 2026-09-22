@@ -233,3 +233,15 @@ async def test_non_sleep_schedule_block_does_not_trigger_tired(sim, world):
     world["meta"]["cognition"] = {"wake_reason": "schedule_block", "wake_payload": {}}
     p = await eng(sim).prepare("kim", "schedule_block")
     assert not p.situation or p.situation.situation.id != "need.energy.tired"
+
+
+@pytest.mark.asyncio
+async def test_targetless_activity_is_not_restarted(sim, world):
+    world["character"]["activity"] = {"type": "sit_ups", "phase": "using", "duration": 1800,
+                                      "phase_started_tick": 900}
+    world["character"]["active_intentions"] = [{"type": "exercise", "priority": 80, "reason": "x"}]
+    world["character"]["body"].update({"hunger": 10, "fatigue": 10})
+    world["meta"]["cognition"] = {"wake_reason": "idle", "wake_payload": {}}
+    world["available_actions"]["action_types"] += ["sit_ups"]
+    p = await eng(sim).prepare("kim", "idle")
+    assert "agenda_exercise" not in [o.id for o in p.options]

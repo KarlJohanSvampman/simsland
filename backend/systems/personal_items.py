@@ -773,30 +773,50 @@ def use_key_to_unlock(c, world, building_id, door_id):
     return True
 
 
-def lock_home(c, world):
+def _resolve_home_building_id(c, world):
+    """Confirmed pre-existing bug in lock_home()/unlock_home() below: both
+    compared a BUILDING's id against c["household_id"] directly -- a
+    household id (a UUID) never equals a building id (e.g. "starter_house_2"),
+    so neither loop body could ever run, for any real household. This was
+    unreachable dead code (nothing called either function) until this
+    session wired lock_door/unlock_door up to them, which is presumably why
+    it went unnoticed. household["home_id"] is the actual building id."""
     home_id = c.get("household_id") or c.get("home_id")
-    if not home_id or not has_key_for(c, home_id):
+    if not home_id:
+        return None
+    household = world.get("households", {}).get(home_id)
+    return household.get("home_id") if household else home_id
+
+
+def _lock_unlock_home(c, world, locked):
+    household_id = c.get("household_id") or c.get("home_id")
+    building_id = _resolve_home_building_id(c, world)
+    # The key check is against the HOUSEHOLD id -- systems/household_manager.py
+    # ::_grant_household_keys(), the only real path that ever grants one,
+    # mints it with home_id=household["id"]. (The one hand-authored sample
+    # door in world/generate_world.py instead keys its own home_id off the
+    # BUILDING id -- a second, likely-unintentional convention mismatch, moot
+    # today since no procedurally-generated building has door objects at all
+    # yet to exercise it against.)
+    if not household_id or not building_id or not has_key_for(c, household_id):
         return False
+    found_a_door = False
     for building in world.get("buildings", []):
-        if building["id"] != home_id:
+        if building["id"] != building_id:
             continue
         for door in building.get("doors", []):
-            if door.get("home_id") == home_id:
-                door["locked"] = True
-    return True
+            if door.get("home_id") == building_id:
+                door["locked"] = locked
+                found_a_door = True
+    return found_a_door
+
+
+def lock_home(c, world):
+    return _lock_unlock_home(c, world, True)
 
 
 def unlock_home(c, world):
-    home_id = c.get("household_id") or c.get("home_id")
-    if not home_id or not has_key_for(c, home_id):
-        return False
-    for building in world.get("buildings", []):
-        if building["id"] != home_id:
-            continue
-        for door in building.get("doors", []):
-            if door.get("home_id") == home_id:
-                door["locked"] = False
-    return True
+    return _lock_unlock_home(c, world, False)
 
 
 # =========================================================

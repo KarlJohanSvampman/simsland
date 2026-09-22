@@ -1892,6 +1892,10 @@ def route_action(c, world, action, speech, definitions=None, available_actions=N
         _route_door_signal(c, world, action, method="ring_doorbell")
     elif action_type == "knock_on_door":
         _route_door_signal(c, world, action, method="knock_on_door")
+    elif action_type == "lock_door":
+        _route_lock_door(c, world, action, lock=True)
+    elif action_type == "unlock_door":
+        _route_lock_door(c, world, action, lock=False)
 
     # ── Phone ──────────────────────────────────────────────────────────────────
     elif action_type == "phone_call":
@@ -3624,6 +3628,20 @@ def _set_computer_animation(c, world):
 
 _PURPOSEFUL_CALL_GOALS = {"favor", "impress", "share_story"}
 SMALL_TALK_TURNS_RANGE = (2, 4)
+
+
+def _route_lock_door(c, world, action, lock):
+    """Lock/unlock every door of the character's own home at once -- matches
+    systems/personal_items.py::lock_home()/unlock_home()'s own whole-home
+    semantics (a real household usually has one working set of keys, not a
+    separate lock state per door someone has to remember). Instant, same as
+    toggle_light -- no need to walk to a specific door for this."""
+    from systems.personal_items import lock_home, unlock_home
+    from brain.memory import store_memory
+    ok = lock_home(c, world) if lock else unlock_home(c, world)
+    if ok:
+        store_memory(c, "You locked the door." if lock else "You unlocked the door.",
+                    importance=0.15, tags=["flavor"], tick=world.get("tick", 0), source="internal")
 
 
 def _route_door_signal(c, world, action, method):
