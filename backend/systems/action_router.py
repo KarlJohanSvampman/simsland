@@ -617,7 +617,7 @@ def _walk_target_for(prop, interaction):
 # Only the "already close enough, just sit" half is reused here; carrying a
 # chair over needs the activity_queue task machinery the automatic path
 # runs on, which this simpler direct-scaffold route doesn't.
-_INTERACTIONS_PREFERRING_A_SEAT = {"computer_use"}
+_INTERACTIONS_PREFERRING_A_SEAT = {"computer_use", "eat"}
 
 
 def _seat_near(world, prop, interaction):
@@ -626,11 +626,34 @@ def _seat_near(world, prop, interaction):
     uses for use_computer/work/pay_bills/...)."""
     if interaction not in _INTERACTIONS_PREFERRING_A_SEAT:
         return None
+    return _seat_near_point(world, prop["x"], prop["y"])
+
+
+def _seat_near_point(world, x, y):
+    """Same lookup as _seat_near(), against a bare point rather than a prop
+    -- reused for sitting down near an already-seated conversation partner
+    (find_free_seats/_dist_between_props only ever read .x/.y, so a plain
+    point works exactly like a prop or a character here)."""
     from systems.seating_planner import find_free_seats, NEARBY_THRESHOLD, _dist_between_props
-    seats = find_free_seats(world, near_prop=prop)
-    if seats and _dist_between_props(seats[0], prop) <= NEARBY_THRESHOLD:
+    near = {"x": x, "y": y}
+    seats = find_free_seats(world, near_prop=near)
+    if seats and _dist_between_props(seats[0], near) <= NEARBY_THRESHOLD:
         return seats[0]
     return None
+
+
+def _sit_in(c, world, seat):
+    """Reserve and enter a seat directly (character already close enough, or
+    close enough after the caller's own walk) -- shared by _route_interact's
+    seat-near-a-desk case and speak/socialize's sit-near-a-seated-partner
+    case."""
+    from systems.occupancy import find_free_anchor, reserve_anchor
+    from systems.posture import set_posture
+    anchor = find_free_anchor(seat, "sit")
+    if anchor:
+        reserve_anchor(c, seat, anchor)
+    c["seat_prop_id"] = seat["id"]
+    set_posture(c, world, "sitting_seat")
 
 
 def _route_interact(c, world, action, definitions):
@@ -744,25 +767,51 @@ def _route_interact(c, world, action, definitions):
 # =========================================================
 
 def _route_eat(c, world, action):
+    """Per the user's explicit ask: eating should pair with a real seat when
+    one's already nearby (same _seat_near lookup as computer_use), not just
+    stand at the food source. Locating a genuinely PREFERRED eating surface
+    (a dining table specifically, over wherever the food itself is) isn't
+    built -- this only adds a seat near whichever prop the food came from."""
     target_id = action.get("target")
     if target_id:
         from systems.props import get_prop_by_id, prop_distance
         prop = get_prop_by_id(world, target_id)
-        if prop and prop_distance(c, prop) > INTERACT_WALK_RADIUS:
-            if c.get("posture") not in (None, "standing"):
+        if prop:
+            seat = _seat_near(world, prop, "eat")
+            if prop_distance(c, seat or prop) > INTERACT_WALK_RADIUS:
+                target_posture = "sitting_seat" if seat else "standing"
+                if c.get("posture") != target_posture:
+                    from systems.posture import set_posture
+                    set_posture(c, world, target_posture)
+                from systems.navigation import plan_character_route
+                wx, wy = _walk_target_for(seat, "sit") if seat else _walk_target_for(prop, "eat")
+                if plan_character_route(world, c, wx, wy):
+                    c["animation_state"] = "walk"
+                    c["is_moving"] = True
+                c["activity"] = {
+                    "type": "eat", "phase": "walking",
+                    "phase_started_tick": world.get("tick", 0),
+                    "duration": _INTERACTION_DURATIONS.get("eat", _FALLBACK_INTERACTION_DURATION),
+                    "target_id": target_id, "interaction": "eat", "state": {},
+                }
+                if seat:
+                    from systems.occupancy import find_free_anchor, reserve_anchor
+                    anchor = find_free_anchor(seat, "sit")
+                    if anchor:
+                        reserve_anchor(c, seat, anchor)
+                    c["seat_prop_id"] = seat["id"]
+                return
+            target_posture = "sitting_seat" if seat else "standing"
+            if c.get("posture") != target_posture:
                 from systems.posture import set_posture
-                set_posture(c, world, "standing")
-            from systems.navigation import plan_character_route
-            wx, wy = _walk_target_for(prop, "eat")
-            if plan_character_route(world, c, wx, wy):
-                c["animation_state"] = "walk"
-                c["is_moving"] = True
-            c["activity"] = {
-                "type": "eat", "phase": "walking",
-                "phase_started_tick": world.get("tick", 0),
-                "duration": _INTERACTION_DURATIONS.get("eat", _FALLBACK_INTERACTION_DURATION),
-                "target_id": target_id, "interaction": "eat", "state": {},
-            }
+                set_posture(c, world, target_posture)
+            if seat:
+                _sit_in(c, world, seat)
+            c["activity"] = _scaffold(
+                c, world, "eat",
+                target_id=target_id,
+                interaction="eat",
+            )
             return
     if c.get("posture") not in (None, "standing"):
         from systems.posture import set_posture
@@ -1983,14 +2032,36 @@ def route_action(c, world, action, speech, definitions=None, available_actions=N
         # Speech was already applied above.
         # Also point character toward target if given.
         target_id = action.get("target")
+        target_char = None
         if target_id:
             chars = world.get("characters", {})
-            if target_id in chars:
-                t = chars[target_id]
+            target_char = chars.get(target_id)
+            if target_char:
                 c["look_target"] = {
-                    "x": t.get("x", 0),
-                    "y": t.get("y", 0),
+                    "x": target_char.get("x", 0),
+                    "y": target_char.get("y", 0),
                 }
+
+        # Per the user's explicit ask: talking to someone shouldn't force
+        # either side out of their seat. The listener's own activity/posture
+        # is never touched by apply_speech() above -- they just keep doing
+        # whatever they were doing. The speaker is the one who needs help:
+        # if whoever they're approaching is already sitting, look for a free
+        # seat nearby and sit there too, rather than standing over them.
+        # Only the "already close enough" half (see _seat_near_point) --
+        # carrying a chair over for this isn't wired.
+        # Only the "already right there" case -- properly walking to a
+        # farther seat first needs the same walk-then-arrive phase machinery
+        # _route_interact uses, which speak/socialize (still instant/near-
+        # instant here) doesn't have; sitting mid-stride would be its own
+        # visible bug (the exact class just fixed for interact).
+        if (target_char and target_char.get("posture") == "sitting_seat"
+                and c.get("posture") != "sitting_seat"):
+            seat = _seat_near_point(world, target_char.get("x", 0), target_char.get("y", 0))
+            if seat:
+                from systems.props import prop_distance
+                if prop_distance(c, seat) <= INTERACT_WALK_RADIUS:
+                    _sit_in(c, world, seat)
         # Confirmed live bug: "socialize" (unlike speak, eat, sleep, ...) never
         # scaffolded a real activity -- it's instant, sets nothing on
         # c["activity"] -- so nothing gated update_agent()'s cognition gate
