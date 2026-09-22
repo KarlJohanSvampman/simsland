@@ -37,6 +37,12 @@ DEFAULT_ENGAGEMENT_ACTIVE_HOURS = 24
 def create_post(c, world, text, media=None, tags=None):
     """media: optional {"kind": "photo"|"video", "description": str,
     "subjects": [char_id, ...]}."""
+    about_ids = _find_mentioned_characters(world, text, exclude_id=c["id"])
+    if media:
+        about_ids = sorted(set(about_ids) | {
+            sid for sid in media.get("subjects", []) if sid != c["id"]
+        })
+
     post = {
         "id": f"post_{uuid.uuid4().hex[:8]}",
         "type": "social_post",
@@ -48,10 +54,68 @@ def create_post(c, world, text, media=None, tags=None):
         "views": [],      # char_ids who've seen it, deduped
         "likes": [],      # char_ids
         "comments": [],   # [{"id", "author_id", "text", "tick"}]
+        "about_character_ids": about_ids,
     }
     world.setdefault("social_posts", []).append(post)
     _project_engagement(c, world, post)
+    _notify_mentioned_characters(c, world, post)
     return post
+
+
+# Per the ChatGPT-proposed social_media.post.about_self situation
+# (evaluated against this codebase and adopted where it fit): seeing a
+# post ABOUT yourself shouldn't require you to happen to be browsing --
+# a person finds out sooner or later regardless, often from someone else
+# entirely. Detected by matching another living character's full display
+# name in the post text (not just first name, to keep false positives
+# low) -- simple, but doesn't require the LLM to correctly supply real
+# character ids it may not actually know for a name it's just narrating.
+def _find_mentioned_characters(world, text, exclude_id):
+    if not text:
+        return []
+    lowered = text.lower()
+    found = []
+    for cid, other in world.get("characters", {}).items():
+        if cid == exclude_id or not other.get("alive", True):
+            continue
+        name = other.get("name")
+        if name and name.lower() in lowered:
+            found.append(cid)
+    return found
+
+
+def _notify_mentioned_characters(c, world, post):
+    """Per the proposal's own architectural point: seeing a post is not
+    equivalent to knowing its truth -- this only ever surfaces "there's a
+    post mentioning you" as a real, scored situation (brain/situations/)
+    for the mentioned character to eventually notice and react to in
+    their own words; it never writes anything about them being true.
+    Uses systems/social_intentions.py's target-scoped add_social_intention
+    (dedupes by type+target_id) rather than brain/intentions.py's plain
+    add_intention (which only dedupes by type -- would collide across
+    different post authors)."""
+    about_ids = post.get("about_character_ids") or []
+    if not about_ids:
+        return
+
+    from systems.social_intentions import add_social_intention
+    from brain.cognition_scheduler import wake_character
+
+    tick = world.get("tick", 0)
+    for target_id in about_ids:
+        target = world.get("characters", {}).get(target_id)
+        if not target:
+            continue
+        add_social_intention(target, {
+            "type":        "post_about_self",
+            "category":    "social",
+            "target_id":   c["id"],
+            "priority":    55,
+            "reason":      "someone_posted_about_you",
+            "created_at":  tick,
+            "source":      "social_media",
+        })
+        wake_character(target, world, "post_about_self", {"author_name": c.get("name", "someone")})
 
 
 def _project_engagement(c, world, post):

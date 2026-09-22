@@ -155,6 +155,7 @@ _WAKE_LINE_TEMPLATES = {
     "gave_up_waiting": "You gave up waiting -- it's taken too long, so you're moving on for now.",
     "noticed_commotion": "{summary}",
     "door_signal": "You hear someone at the door -- {visitor_name} is here.",
+    "post_about_self": "You come across a social media post from {author_name} that mentions you.",
     "director_attention": "Something makes you stop and look up -- you have the odd feeling someone unseen is watching you, waiting for you to notice.",
 }
 

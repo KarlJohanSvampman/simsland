@@ -172,7 +172,19 @@ def apply_speech(c, world, speech):
         from systems.conversation_analysis import analyze_message, should_schedule_reflection
 
         topic_for_interest = topic or "general"
-        is_new_conversation = medium == "in_person" and not find_conversation(world, [c["id"], target_id])
+        # Per the ChatGPT-proposed communication.call.incoming situation
+        # (evaluated against this codebase and adopted where it fit): a
+        # call is the one medium where the recipient answering at all is
+        # itself a real choice, same as approaching someone in person --
+        # unlike in_person this never gated a call before, so a call
+        # always connected instantly the moment the phone was merely
+        # usable and the listener wasn't at work, with zero say in the
+        # matter (not busy with something they'd rather not drop, not
+        # simply not wanting to deal with this caller right now). text
+        # stays ungated -- it's async by nature, the listener can always
+        # just not reply, so gating at send time buys nothing a real
+        # reply-or-don't already covers.
+        is_new_conversation = medium in ("in_person", "call") and not find_conversation(world, [c["id"], target_id])
 
         # Per the user's explicit ask: a NEW conversation isn't automatic --
         # the listener's real willingness to engage right now (their
@@ -187,8 +199,21 @@ def apply_speech(c, world, speech):
             accepted, engagement, excuse = check_conversation_interest(
                 listener, world, topic_for_interest, c["id"])
             if not accepted:
-                from systems.incidental_speech import fire_incidental
-                fire_incidental(listener, "decline", excuse, world, target_id=c["id"])
+                if medium == "call":
+                    # A declined call leaves a real voicemail (the same
+                    # answering-machine path just above for an unusable/
+                    # busy phone) rather than the caller's words vanishing
+                    # with no trace -- the excuse is the *reason* they
+                    # didn't pick up, not something the caller ever hears.
+                    from systems.inbox import get_character_inbox, add_message as add_inbox_message
+                    add_inbox_message(
+                        get_character_inbox(listener), "voicemail", c["id"], target_id,
+                        utterance, tick, metadata={"topic": topic, "missed_call": True,
+                                                    "decline_reason": excuse},
+                    )
+                else:
+                    from systems.incidental_speech import fire_incidental
+                    fire_incidental(listener, "decline", excuse, world, target_id=c["id"])
                 return
 
         conv = get_or_create_conversation(
