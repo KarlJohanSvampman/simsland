@@ -480,6 +480,7 @@ def _route_move(c, world, action, mode="walk"):
 # =========================================================
 
 _INTERACTION_DURATIONS = {
+    "socialize":  900,    # 15 sim-minutes -- a real chat, not an instant blip
     "sit":        1800,
     "sleep":      28800,
     "eat":        720,
@@ -489,11 +490,47 @@ _INTERACTION_DURATIONS = {
     "wait":       120,
     "retrieve_phone": 300,
     "check_device": 300,
+    # Confirmed live bug: these quick, single-beat prop checks were all
+    # falling through to the generic 600-tick (10 sim-minute) "interact"
+    # default -- realistic for something substantial, way too long for
+    # "open the fridge and grab a snack" or "get a glass of water".
+    "open_fridge":     120,
+    "drink":           90,
+    "get_water":       90,
+    "use_tap":         60,
+    "wash_hands":      90,
+    "brush_teeth":     180,
+    "grab_towel":      30,
+    "hang_towel":      30,
+    "toggle_light":    15,
+    "toggle_room_lights": 15,
+    "coffee":          180,
 }
 
 def _scaffold(c, world, activity_type, target_id=None,
               interaction=None, duration=None):
-    """Return a fully scaffolded activity dict."""
+    """Return a fully scaffolded activity dict -- or, if the character is
+    ALREADY mid-way through this exact activity (same type/target/
+    interaction, still within its own duration), the existing one, untouched.
+
+    Confirmed live bug: every _scaffold() call built a brand new dict with
+    phase_started_tick reset to "now", with no check for whether one was
+    already running. A decision source (LLM or middleware) that picks the
+    same real action again -- while mid-activity, on some short idle-cadence
+    recheck -- silently restarted it from 0% every time: the progress bar
+    read as frozen (or oscillating near 0%), and it could never actually
+    finish. This is the one shared choke point every route (_route_interact,
+    _route_eat, socialize, jog/sit_ups/..., ...) already goes through, so
+    protecting it here covers all of them at once rather than trusting each
+    route (and both brains) to independently avoid re-triggering."""
+    current = c.get("activity")
+    if (current and current.get("phase") == "using"
+            and current.get("type") == activity_type
+            and current.get("target_id") == target_id
+            and current.get("interaction") == interaction
+            and world.get("tick", 0) - current.get("phase_started_tick", 0) < current.get("duration", 0)):
+        return current
+
     if duration is None:
         duration = _INTERACTION_DURATIONS.get(
             interaction or activity_type,
@@ -520,6 +557,26 @@ def _scaffold(c, world, activity_type, target_id=None,
 # =========================================================
 # ROUTE INTERACT
 # =========================================================
+
+INTERACT_WALK_RADIUS = 1   # already "here" if within this many tiles
+
+
+def _walk_target_for(prop, interaction):
+    """A real, walkable point to route to for this prop -- its own anchor for
+    the given interaction if it has one (never the prop's own (x, y): that
+    tile is usually the prop's own solid footprint, and routing straight onto
+    it can never resolve -- confirmed live: a character stuck endlessly
+    "trying to get to the fridge"). Falls back to the prop's position only
+    when it genuinely has no anchor data at all (better than refusing to
+    move; matches this route's old, pre-existing assumption)."""
+    from systems.anchors import get_world_anchor_position
+    for anchor in prop.get("anchors", []):
+        if anchor.get("interaction") == interaction:
+            return get_world_anchor_position(prop, anchor)
+    if prop.get("anchors"):
+        return get_world_anchor_position(prop, prop["anchors"][0])
+    return prop.get("x", 0), prop.get("y", 0)
+
 
 def _route_interact(c, world, action, definitions):
     target_id = action.get("target")
@@ -550,6 +607,45 @@ def _route_interact(c, world, action, definitions):
             interaction = anchor.get("interaction")
             if interaction:
                 break
+
+    # Confirmed live bug (player report: characters "drinking water"/etc while
+    # visibly still sitting in a chair across the room): this used to call
+    # _scaffold() straight into phase "using" -- SAME as jog/sit_ups, which
+    # genuinely need no target -- silently assuming the character was already
+    # standing right at the prop. A decision-driven interact (this is the
+    # path both the middleware and the built-in brain's explicit "interact"
+    # action go through -- NOT the same path as an automatic intention like
+    # start_activity(), which already walks properly via begin_interaction())
+    # has no such guarantee: the target just came from a "nearby props" list,
+    # not a proximity check. Real walk when they're not already there, and
+    # drop out of a seated/lying posture the moment they set off, rather than
+    # letting it silently persist through an unrelated activity.
+    from systems.props import prop_distance
+    if prop_distance(c, prop) > INTERACT_WALK_RADIUS:
+        if c.get("posture") not in (None, "standing"):
+            from systems.posture import set_posture
+            set_posture(c, world, "standing")
+        from systems.navigation import plan_character_route
+        wx, wy = _walk_target_for(prop, interaction)
+        if plan_character_route(world, c, wx, wy):
+            c["animation_state"] = "walk"
+            c["is_moving"] = True
+        c["activity"] = {
+            "type": "interact", "phase": "walking",
+            "phase_started_tick": world.get("tick", 0),
+            "duration": _INTERACTION_DURATIONS.get(interaction or "interact", 600),
+            "target_id": target_id, "interaction": interaction, "state": {},
+        }
+        prop["occupied_by"] = c["id"]
+        return
+
+    # Already close enough to skip the walk -- but a leftover seated/lying
+    # posture from whatever they were doing a moment ago (a different
+    # nearby chair, ...) needs clearing here too; the walk branch above
+    # only resets it on its own path.
+    if c.get("posture") not in (None, "standing"):
+        from systems.posture import set_posture
+        set_posture(c, world, "standing")
 
     c["activity"] = _scaffold(
         c, world, "interact",
@@ -582,6 +678,28 @@ def _route_interact(c, world, action, definitions):
 
 def _route_eat(c, world, action):
     target_id = action.get("target")
+    if target_id:
+        from systems.props import get_prop_by_id, prop_distance
+        prop = get_prop_by_id(world, target_id)
+        if prop and prop_distance(c, prop) > INTERACT_WALK_RADIUS:
+            if c.get("posture") not in (None, "standing"):
+                from systems.posture import set_posture
+                set_posture(c, world, "standing")
+            from systems.navigation import plan_character_route
+            wx, wy = _walk_target_for(prop, "eat")
+            if plan_character_route(world, c, wx, wy):
+                c["animation_state"] = "walk"
+                c["is_moving"] = True
+            c["activity"] = {
+                "type": "eat", "phase": "walking",
+                "phase_started_tick": world.get("tick", 0),
+                "duration": _INTERACTION_DURATIONS.get("eat", 600),
+                "target_id": target_id, "interaction": "eat", "state": {},
+            }
+            return
+    if c.get("posture") not in (None, "standing"):
+        from systems.posture import set_posture
+        set_posture(c, world, "standing")
     c["activity"] = _scaffold(
         c, world, "eat",
         target_id=target_id,
@@ -1716,7 +1834,8 @@ def route_action(c, world, action, speech, definitions=None, available_actions=N
     # every time an action actually dispatches, plus a low-importance
     # memory entry of the same event.
     from systems.debug_log import log_action
-    log_action(c, world, action_type, action.get("target_description") or "")
+    log_action(c, world, action_type, action.get("target_description") or "",
+              target_id=action.get("target"))
 
     if action_type == "move":
         _route_move(c, world, action)
@@ -1742,6 +1861,22 @@ def route_action(c, world, action, speech, definitions=None, available_actions=N
                     "x": t.get("x", 0),
                     "y": t.get("y", 0),
                 }
+        # Confirmed live bug: "socialize" (unlike speak, eat, sleep, ...) never
+        # scaffolded a real activity -- it's instant, sets nothing on
+        # c["activity"] -- so nothing gated update_agent()'s cognition gate
+        # (which only skips re-deciding while c["activity"] is set) from
+        # firing again the moment the short idle cadence (~45-70 ticks)
+        # elapsed. A character who picked "spend some time chatting" was
+        # immediately eligible to abandon it and pick something else
+        # ~1 sim-minute later -- confirmed live: a character cycling through
+        # socialize/sit_ups/etc every 1-3 sim-minutes, never actually settling
+        # into anything. "speak" (a single line, not a lingering activity) is
+        # deliberately left instant.
+        if action_type == "socialize":
+            c["activity"] = _scaffold(
+                c, world, "socialize", target_id=target_id, interaction="talk",
+                duration=_INTERACTION_DURATIONS.get("socialize", 900),
+            )
 
     elif action_type == "eat":
         _route_eat(c, world, action)

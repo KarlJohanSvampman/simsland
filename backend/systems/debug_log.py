@@ -43,7 +43,26 @@ def _category_for_activity(activity_type):
     return "activity"
 
 
-def log_debug_event(c, world, category, text):
+def _resolve_target_name(world, target_id):
+    """A real, human-readable label for a target id -- a character's name,
+    a prop's template name, or the raw id as a last resort -- so a memory/
+    debug line reads as "Action: interact (fridge_a)" instead of a bare,
+    unexplained "Action: interact". Per the user's explicit ask: every
+    action/activity should carry its real target, not just its type."""
+    if not target_id:
+        return None
+    chars = world.get("characters", {})
+    if target_id in chars:
+        return chars[target_id].get("name") or target_id
+    from systems.props import get_prop_by_id
+    prop = get_prop_by_id(world, target_id)
+    if prop:
+        return (prop.get("template") or target_id).replace("_", " ")
+    return target_id
+
+
+def log_debug_event(c, world, category, text, target_id=None, target_name=None,
+                    action_type=None, activity_type=None):
     """category: "action" | "activity" | "reaction" | "violation" """
     text = (text or "").strip()
     if not text:
@@ -67,27 +86,47 @@ def log_debug_event(c, world, category, text):
         for k in sorted(last, key=last.get)[:20]:
             last.pop(k, None)
 
+    # Structured fields alongside the text -- so the Memory tab can render a
+    # real detail popup (target, action/activity type) instead of only the
+    # flattened sentence, which is all the old version stored.
+    extra = {}
+    if target_id:
+        extra["target_id"] = target_id
+    if target_name:
+        extra["target_name"] = target_name
+    if action_type:
+        extra["action_type"] = action_type
+    if activity_type:
+        extra["activity_type"] = activity_type
+
     from brain.memory import store_memory
     store_memory(
         c, text, importance=0.15,
         tags=["debug_event", category],
         kind="debug_event",
         tick=tick,
+        **extra,
     )
 
 
-def log_action(c, world, action_type, detail=""):
+def log_action(c, world, action_type, detail="", target_id=None):
     category = _category_for_action(action_type, c)
     label = action_type.replace("_", " ")
-    text = f"Action: {label}" + (f" ({detail})" if detail else "")
-    log_debug_event(c, world, category, text)
+    target_name = _resolve_target_name(world, target_id)
+    shown = detail or target_name
+    text = f"Action: {label}" + (f" ({shown})" if shown else "")
+    log_debug_event(c, world, category, text, target_id=target_id,
+                    target_name=target_name, action_type=action_type)
 
 
-def log_activity(c, world, activity_type, event):
+def log_activity(c, world, activity_type, event, target_id=None):
     """event: "started" | "completed" | "interrupted" | "timed out" """
     category = _category_for_activity(activity_type)
     label = activity_type.replace("_", " ")
-    log_debug_event(c, world, category, f"Activity {event}: {label}")
+    target_name = _resolve_target_name(world, target_id)
+    text = f"Activity {event}: {label}" + (f" ({target_name})" if target_name else "")
+    log_debug_event(c, world, category, text, target_id=target_id,
+                    target_name=target_name, activity_type=activity_type)
 
 
 def log_reaction(c, world, reaction_type, detail=""):

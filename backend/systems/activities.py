@@ -1828,7 +1828,7 @@ def execute_activity(
         # completed" (the interaction's own finish). Reuses debug_log.py's
         # existing green/memory pipeline, just a third lifecycle point.
         from systems.debug_log import log_activity
-        log_activity(c, world, act.get("type", "?"), "reached target, interaction begun")
+        log_activity(c, world, act.get("type", "?"), "reached target, interaction begun", target_id=act.get("target_id"))
 
         # A real sleep session just began (phase_started_tick/duration are
         # both fresh as of the line above) -- this is the one moment
@@ -2697,6 +2697,7 @@ def finish_activity(c, world):
     activity slot once the finishing animation's single tick has played.
     """
     activity_type = (c.get("activity") or {}).get("type")
+    activity_target_id = (c.get("activity") or {}).get("target_id")
 
     # Reading a physical newspaper naturally ending (as opposed to being
     # interrupted by a debate -- see systems/reading_process.py's own
@@ -2719,5 +2720,6 @@ def finish_activity(c, world):
     # execute_activity(); this is the actual free-to-act moment.
     from core.event_bus import emit
     from brain.cognition_scheduler import wake_character
-    emit("activity_finished", {"character_id": c["id"], "activity_type": activity_type})
+    emit("activity_finished", {"character_id": c["id"], "activity_type": activity_type,
+                               "target_id": activity_target_id})
     wake_character(c, world, "activity_finished")

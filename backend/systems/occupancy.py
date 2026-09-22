@@ -61,7 +61,7 @@ def interrupt_activity(c, world):
     act_type = act.get("type")
     if act_type:
         from systems.debug_log import log_activity
-        log_activity(c, world, act_type, "interrupted")
+        log_activity(c, world, act_type, "interrupted", target_id=act.get("target_id"))
         from core.event_bus import emit
         emit("activity_interrupted", {
             "character_id": c["id"], "activity_type": act_type,

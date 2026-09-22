@@ -21,7 +21,7 @@ class SimulationClient(Protocol):
     async def due(self) -> Dict[str, Any]: ...
     async def list_characters(self) -> Dict[str, Any]: ...
     async def execute(self, char_id: str, decision: Dict[str, Any],
-                      wake_reason: Optional[str] = None) -> Dict[str, Any]: ...
+                      wake_reason: Optional[str] = None, thought: Optional[str] = None) -> Dict[str, Any]: ...
     async def set_external_brain(self, char_id: str, enabled: bool) -> Dict[str, Any]: ...
     async def aclose(self) -> None: ...
 
@@ -52,10 +52,13 @@ class SimClient:
         return await self._request("GET", "/mw/characters")
 
     async def execute(self, char_id: str, decision: Dict[str, Any],
-                      wake_reason: Optional[str] = None) -> Dict[str, Any]:
+                      wake_reason: Optional[str] = None, thought: Optional[str] = None) -> Dict[str, Any]:
         return await self._request(
             "POST", f"/mw/characters/{char_id}/execute",
-            json={"decision": decision, "wake_reason": wake_reason},
+            # "thought" is separate from decision["thought"] (always None,
+            # deliberately never persisted -- see executor.build_decision):
+            # this is only ever shown (a thought bubble), never remembered.
+            json={"decision": decision, "wake_reason": wake_reason, "thought": thought},
         )
 
     async def set_external_brain(self, char_id: str, enabled: bool) -> Dict[str, Any]:

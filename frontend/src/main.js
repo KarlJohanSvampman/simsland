@@ -5142,12 +5142,8 @@ function renderMindTab(c){
 // backend-tracked outcome (systems/expectations.py's own satisfied/
 // pending/missed status, streak, missed_count) -- surfaced directly here
 // rather than inventing a new tracking system on top of it. Every other
-// intention type has no such explicit lifecycle, so its "outcome" is
-// approximated from how long it's been sitting active without getting
-// resolved (a real signal: an intention that's been true for a long time
-// without anything addressing it really is stalled) -- green/yellow/red
-// per the user's own spec (success / still in progress / timed out).
-const STALE_INTENTION_TICKS = 1800;   // 30 min with no resolution reads as "stalled"
+// intention type gets a real yellow/orange/red deadline-staged lifecycle
+// instead (backend/brain/intentions.py::check_intention_deadlines).
 
 // One place decides how an expectation's status reads, so the same row can't
 // be red in one tab and green in another. `pending` means the current window
@@ -5170,11 +5166,19 @@ function _intentionOutcome(c, intention){
     if(exp?.status === "missed") return { color: "#e64545", label: `Missed (${exp.missed_count ?? 0} times)` };
     return { color: "#e6c200", label: "Still pending this period" };
   }
-  const age = (_worldState.tick || 0) - (intention.created_at || 0);
-  if(age > STALE_INTENTION_TICKS){
-    return { color: "#e64545", label: `Stalled -- unresolved for ${_ticksAgoLabel(age)}` };
-  }
-  return { color: "#e6c200", label: "In progress" };
+  // Real yellow -> orange -> red staging (backend/brain/intentions.py::
+  // check_intention_deadlines) -- an intention starts yellow with a real
+  // deadline; still being around, unresolved, once that deadline passes
+  // bumps it a stage and re-arms a fresh one, rather than reading a raw age.
+  const stage = intention.stage ?? 0;
+  const colors = ["#e6c200", "#f59e0b", "#e64545"];
+  const labels = ["In progress", "Overdue -- pressing harder", "Long overdue"];
+  const tick = _worldState.tick || 0;
+  const deadline = intention.deadline_tick;
+  const untilText = deadline != null && deadline > tick
+    ? ` (next check-in in ${_durationLabel(deadline - tick)})` : "";
+  return { color: colors[Math.min(stage, colors.length - 1)],
+           label: labels[Math.min(stage, labels.length - 1)] + untilText };
 }
 
 // Delegated click handler for the Mind tab's intention cards (registered
@@ -5373,6 +5377,11 @@ let _longTermMemoryPage = 0;
 const SHORT_TERM_MEMORY_PAGE_SIZE = 10;
 const LONG_TERM_MEMORY_PAGE_SIZE  = 5;
 
+// Every memory currently rendered across both lists, in render order --
+// click handler below indexes into this, same pattern as
+// _lastRenderedIntentions.
+let _lastRenderedMemories = [];
+
 function _renderMemoryList(title, allItems, page, pageSize, listKey){
   const total = allItems.length;
   if(!total) return _section(title + " (0)", _empty("Nothing yet."));
@@ -5383,11 +5392,19 @@ function _renderMemoryList(title, allItems, page, pageSize, listKey){
 
   const lines = pageItems.map(m => {
     const stamp = _formatMemoryTimestamp(m.tick);
+    // Per the user's explicit ask: every action/activity memory should carry
+    // its real target and be openable for the full detail -- not just a
+    // flattened sentence. Any memory with structured fields beyond text
+    // (debug_event's target_id/action_type/activity_type, ...) gets one.
+    const hasDetail = m.target_id || m.target_name || m.action_type || m.activity_type;
+    const idx = _lastRenderedMemories.length;
+    _lastRenderedMemories.push(m);
     return `
-    <div class="viewerCard">
+    <div class="viewerCard${hasDetail ? " viewerCardClickable" : ""}" ${hasDetail ? `data-memory-index="${idx}"` : ""}>
       ${stamp ? `<div style="opacity:.6">${stamp}</div>` : ""}
       ${m.text}
       ${m.tags?.length ? `<div style="opacity:.6">${m.tags.join(", ")}</div>` : ""}
+      ${hasDetail ? `<a href="#" style="opacity:.7;font-size:.85em">details</a>` : ""}
     </div>`;
   }).join("");
 
@@ -5404,7 +5421,44 @@ function _renderMemoryList(title, allItems, page, pageSize, listKey){
 // Delegated once, not per-render (renderMemoryTab() reassigns el.innerHTML
 // wholesale every call, which would silently drop a listener attached
 // directly to a button element).
+function openMemoryModal(m){
+  const titleEl = document.getElementById("intentionModalTitle");
+  const body = document.getElementById("intentionModalBody");
+  if(!m || !body) return;
+  if(titleEl) titleEl.textContent = (m.kind || "Memory").replace(/_/g, " ");
+  body.innerHTML = "";
+  const summary = document.createElement("div");
+  summary.className = "eventModalRowSummary";
+  summary.textContent = m.text || "";
+  body.appendChild(summary);
+  const fields = [
+    ["When", _formatMemoryTimestamp(m.tick)],
+    ["Kind", m.kind],
+    ["Action type", m.action_type],
+    ["Activity type", m.activity_type],
+    ["Target", m.target_name ? `${m.target_name} (${m.target_id})` : m.target_id],
+    ["Tags", m.tags?.length ? m.tags.join(", ") : null],
+    ["Importance", m.importance != null ? m.importance.toFixed(2) : null],
+  ];
+  for(const [k, v] of fields){
+    if(v == null || v === "") continue;
+    const row = document.createElement("div");
+    row.className = "eventModalRow";
+    row.innerHTML = `<div class="eventModalRowMeta"></div><div></div>`;
+    row.children[0].textContent = k;
+    row.children[1].textContent = String(v);
+    body.appendChild(row);
+  }
+  openModal("modal-intention");
+}
+
 document.getElementById("viewerMemoryTab")?.addEventListener("click", (e) => {
+  const card = e.target.closest(".viewerCardClickable");
+  if(card){
+    e.preventDefault();
+    openMemoryModal(_lastRenderedMemories[Number(card.dataset.memoryIndex)]);
+    return;
+  }
   const btn = e.target.closest(".memoryPageBtn");
   if(!btn || btn.disabled) return;
   const dir = Number(btn.dataset.memoryDir);
@@ -5427,6 +5481,7 @@ function renderMemoryTab(c){
     _longTermMemoryPage = 0;
   }
 
+  _lastRenderedMemories = [];
   const sections = [];
 
   const shortTerm = [...(c.memories || [])].sort((a, b) => (b.tick || 0) - (a.tick || 0));
@@ -7550,14 +7605,18 @@ function _logCharacterEvents(state){
   }
 }
 
-function _ticksAgoLabel(ticks){
+function _durationLabel(ticks){
   // 1 tick == 1 nominal sim-second (see core/tick_schedule.py).
-  if(ticks < 60) return `${Math.max(0, Math.round(ticks))}s ago`;
+  if(ticks < 60) return `${Math.max(0, Math.round(ticks))}s`;
   const mins = ticks / 60;
-  if(mins < 60) return `${Math.round(mins)}m ago`;
+  if(mins < 60) return `${Math.round(mins)}m`;
   const hours = mins / 60;
-  if(hours < 24) return `${Math.round(hours)}h ago`;
-  return `${Math.round(hours / 24)}d ago`;
+  if(hours < 24) return `${Math.round(hours)}h`;
+  return `${Math.round(hours / 24)}d`;
+}
+
+function _ticksAgoLabel(ticks){
+  return `${_durationLabel(ticks)} ago`;
 }
 
 async function fetchEvents(){

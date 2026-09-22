@@ -673,6 +673,9 @@ def update_agent(
     world
     )
 
+    from brain.intentions import check_intention_deadlines
+    check_intention_deadlines(c, world)
+
     # =====================================
     # EXPECTATIONS
     # =====================================

@@ -129,8 +129,9 @@ class MockSimClient:
              "external_brain": self.external.get(c["id"], False), "due": True}]}
 
     async def execute(self, char_id: str, decision: Dict[str, Any],
-                      wake_reason: Optional[str] = None) -> Dict[str, Any]:
-        self.executed.append({"char_id": char_id, "decision": decision, "wake_reason": wake_reason})
+                      wake_reason: Optional[str] = None, thought: Optional[str] = None) -> Dict[str, Any]:
+        self.executed.append({"char_id": char_id, "decision": decision, "wake_reason": wake_reason,
+                              "thought": thought})
         return {"ok": True, "tick": self.world["tick"],
                 "activity_type": (decision.get("action") or {}).get("type"),
                 "invalid_action": self.invalid_action}

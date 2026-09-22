@@ -102,6 +102,26 @@ def due():
             continue
         if c.get("off_grid") or c.get("travel_state"):
             continue   # away/travelling: update_agent() doesn't run them, nothing to decide
+        # Confirmed live bug, the real root cause behind a run of "stuck"/
+        # "spam" reports today: brain/agent_loop.py::update_agent() already
+        # refuses to call think() at all while c["activity"] is set (its own
+        # early "execute_activity(...); return" gate) -- but this poll and
+        # POST /execute are a SEPARATE path that never goes through
+        # update_agent() at all. next_think_tick reflects only the generic
+        # ~45-70 tick idle cadence (brain/cognition_scheduler.py::note_think),
+        # with no idea how long whatever activity was just started is
+        # actually supposed to run -- so the runner kept finding a mid-
+        # activity character "due" again within a minute and POSTing a fresh
+        # decision, which /execute applied unconditionally, silently
+        # overwriting (not completing) whatever was already in progress.
+        # Simsland's own emergency-interrupt logic (bladder overriding sleep,
+        # a shift starting, ...) already runs for every character every tick
+        # regardless of middleware/legacy, and clears c["activity"] itself
+        # when something genuinely needs to pre-empt it -- so it's safe to
+        # just wait here, matching the legacy gate exactly, rather than
+        # trying to guess which wake reasons should override it.
+        if c.get("activity"):
+            continue
         cog = c.get("cognition") or {}
         if tick >= cog.get("next_think_tick", 0):
             out.append({
@@ -194,6 +214,14 @@ class ExecuteReq(BaseModel):
     # produces and process_decision() consumes: {thought, action, speech, ...}
     decision: Dict[str, Any]
     wake_reason: Optional[str] = None
+    # Deliberately separate from decision["thought"] (always None -- see
+    # middleware/.../executor.py::build_decision's own comment): that field
+    # controls whether process_decision() writes a real, persisted memory.
+    # This one is display-only -- a thought bubble the character never
+    # actually "remembers" having, matching the Phase-1 design intent
+    # ("the middleware decides what persists") without silently going
+    # back to persisting every thought as a memory to get bubbles back.
+    thought: Optional[str] = None
 
 
 @router.post("/characters/{char_id}/execute")
@@ -219,6 +247,9 @@ def execute(char_id: str, req: ExecuteReq):
         available = build_available_actions(c, world)
         try:
             process_decision(c, world, req.decision, available_actions=available)
+            if req.thought:
+                c["last_thought"] = req.thought
+                c["last_narration"] = req.thought
             note_think(c, world, req.decision, wake_reason=req.wake_reason)
             post_update(c, world)
         except Exception as e:  # nothing is saved on failure

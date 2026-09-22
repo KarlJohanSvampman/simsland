@@ -30,6 +30,44 @@ INTENTION_TYPES = {
 # CATEGORY PRIORITY
 # =========================================================
 
+# Yellow -> orange -> red urgency staging (spec: per the user's explicit ask).
+# A brand-new intention starts yellow with a real deadline in the future; if
+# it's STILL around, unresolved, once that deadline passes, it's re-armed with
+# a fresh deadline, a higher priority, and moves up a color stage. Deliberately
+# generic (not per-template) -- more urgent categories simply get a shorter
+# fuse, so they escalate sooner. Expectation-sourced intentions already carry
+# their own real window_end_tick and their own missed/frustration escalation
+# (systems/expectations.py) -- this reuses that window as the deadline instead
+# of inventing a second, competing one, but leaves stage/color to expectations'
+# own status coloring (Mind tab keeps that branch separate, see main.js).
+INTENTION_DEADLINE_TICKS_BY_CATEGORY = {
+    "survival": 900,     # 15 sim-minutes
+    "health":   1800,    # 30 min
+    "schedule": 3600,    # 1h
+    "social":   3600,
+    "chores":   5400,    # 1.5h
+    "identity": 7200,    # 2h
+    "leisure":  7200,
+}
+INTENTION_DEFAULT_DEADLINE_TICKS = 3600
+INTENTION_STAGE_COLORS = ("yellow", "orange", "red")   # index 0 = brand new
+INTENTION_MAX_STAGE = len(INTENTION_STAGE_COLORS) - 1
+INTENTION_PRIORITY_ESCALATION = 15   # per missed deadline, capped at 100
+
+_intention_seq = 0
+
+
+def _next_intention_seq():
+    global _intention_seq
+    _intention_seq += 1
+    return _intention_seq
+
+
+def _deadline_window(intention):
+    return INTENTION_DEADLINE_TICKS_BY_CATEGORY.get(
+        intention.get("category"), INTENTION_DEFAULT_DEADLINE_TICKS)
+
+
 CATEGORY_PRIORITY = {
     "survival": 100,
     "health":   90,
@@ -191,11 +229,12 @@ def add_intention(
     # sitting there for hours look freshly created on every single
     # refresh. Preserve the ORIGINAL creation tick when one already
     # exists, unless the caller explicitly passes its own created_at.
+    existing = next(
+        (i for i in intentions if i["type"] == intention["type"]),
+        None
+    )
+
     if "created_at" not in intention:
-        existing = next(
-            (i for i in intentions if i["type"] == intention["type"]),
-            None
-        )
         if existing and "created_at" in existing:
             intention["created_at"] = existing["created_at"]
 
@@ -203,6 +242,24 @@ def add_intention(
         "created_at",
         _CURRENT_TICK
     )
+
+    # Yellow/orange/red deadline staging -- expectation-sourced intentions
+    # already carry their own real window_end_tick and their own
+    # missed/frustration-driven escalation (systems/expectations.py), so this
+    # only manages the generic ones (see INTENTION_DEADLINE_TICKS_BY_CATEGORY
+    # above). A brand-new intention (no existing entry of this type) starts at
+    # stage 0 (yellow) with a fresh deadline; a refresh carries its stage/
+    # deadline/seq forward unchanged -- check_intention_deadlines() below is
+    # what actually escalates one whose deadline has passed.
+    if not str(intention.get("type", "")).startswith("expectation:"):
+        if existing is not None:
+            for field in ("_seq", "stage", "deadline_tick"):
+                if field in existing and field not in intention:
+                    intention[field] = existing[field]
+        if "_seq" not in intention:
+            intention["_seq"] = _next_intention_seq()
+        intention.setdefault("stage", 0)
+        intention.setdefault("deadline_tick", _CURRENT_TICK + _deadline_window(intention))
 
     intention.setdefault(
         "source",
@@ -218,6 +275,18 @@ def add_intention(
         "priority",
         0
     )
+
+    # Per the user's explicit ask: every intention gets a unique priority the
+    # first time it's created, so the whole list is strictly ordered from the
+    # start rather than several tying and falling back to insertion order.
+    # Only on real creation (a refresh keeps whatever priority its own
+    # recompute already gave it -- e.g. lt_need frustration rising) and only
+    # nudged up by whole points, so it never crosses into a different
+    # category's priority band.
+    if existing is None:
+        used = {i.get("priority") for i in intentions if i is not intention}
+        while intention["priority"] in used:
+            intention["priority"] += 1
 
     intention.setdefault(
         "interrupts",
@@ -242,6 +311,28 @@ def add_intention(
     c["active_intentions"] = (
         intentions
     )
+
+
+# =========================================================
+# CHECK INTENTION DEADLINES
+# =========================================================
+
+def check_intention_deadlines(c, world):
+    """Escalate any generic (non-expectation) intention whose deadline has
+    passed while it's still sitting there unresolved: priority up, color
+    stage up (yellow -> orange -> red), deadline re-armed. Called every tick
+    from update_agent(), same cadence as update_desires()/update_expectations().
+    """
+    tick = world.get("tick", 0)
+    for i in c.get("active_intentions", []):
+        if str(i.get("type", "")).startswith("expectation:"):
+            continue
+        deadline = i.get("deadline_tick")
+        if deadline is None or tick < deadline:
+            continue
+        i["stage"] = min(INTENTION_MAX_STAGE, i.get("stage", 0) + 1)
+        i["priority"] = min(100, i.get("priority", 0) + INTENTION_PRIORITY_ESCALATION)
+        i["deadline_tick"] = tick + _deadline_window(i)
 
 # =========================================================
 # DECAY

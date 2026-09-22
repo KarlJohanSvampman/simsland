@@ -72,5 +72,5 @@ async def execute(sim: SimulationClient, char_id: str, choice: Choice,
         decision["dropped_action"], decision["action"] = decision["action"], None
     if dry_run:
         return ExecutionResult(executed=False, decision=decision, problems=problems)
-    response = await sim.execute(char_id, decision, wake_reason)
+    response = await sim.execute(char_id, decision, wake_reason, thought=choice.thought)
     return ExecutionResult(executed=True, decision=decision, response=response, problems=problems)
