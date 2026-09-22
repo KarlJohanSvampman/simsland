@@ -156,6 +156,7 @@ _WAKE_LINE_TEMPLATES = {
     "noticed_commotion": "{summary}",
     "door_signal": "You hear someone at the door -- {visitor_name} is here.",
     "post_about_self": "You come across a social media post from {author_name} that mentions you.",
+    "contract_violated": "{violator_name} just missed {commitment}.",
     "director_attention": "Something makes you stop and look up -- you have the odd feeling someone unseen is watching you, waiting for you to notice.",
 }
 

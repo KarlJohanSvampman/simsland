@@ -181,6 +181,7 @@ def report_violation(contract, violator_id, term, world):
         )
 
     # Notify the other parties
+    from brain.cognition_scheduler import wake_character
     for pid in contract["parties"]:
         if pid != violator_id:
             victim_char = chars.get(pid)
@@ -190,6 +191,21 @@ def report_violation(contract, violator_id, term, world):
                     tags=["social_contract", "violated", "let_down"],
                     tick=world["tick"], people=[violator_id],
                 )
+                # Confirmed live gap: nothing in this whole module (or
+                # proposals.py) ever called wake_character -- a violated
+                # contract only ever reached a party's own next
+                # regularly-scheduled think(), whenever that happened to
+                # fall, same as target_reactions.py's "provoked"/
+                # social_media.py's "post_about_self" before those got a
+                # real reactive wake. A broken promise deserves an actual
+                # decision moment, not a passive memory entry that might
+                # sit unnoticed for a long time.
+                wake_character(victim_char, world, "contract_violated", {
+                    "violator_name": violator_name,
+                    "violator_id":   violator_id,
+                    "commitment":    commitment,
+                    "contract_id":   contract["id"],
+                })
             emit("contract_violated", {
                 "contract_id":  contract["id"],
                 "violator_id":  violator_id,
