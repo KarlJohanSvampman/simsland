@@ -53,6 +53,17 @@ WAKE_PRIORITY = {
     "urgent_need": 90,
     "noticed_commotion": 75,   # systems/curiosity.py -- a curious character just noticed something worth investigating
     "activity_aborted": 80,
+    # Confirmed live bug: a violated social contract (systems/
+    # social_contracts.py::report_violation, added this session) had no
+    # entry here at all, so it defaulted to priority 0 -- a character
+    # with virtually ANY other wake already pending (even schedule_block
+    # at 40) silently kept that old reason instead, even though
+    # next_think_tick still got pulled forward regardless (wake_character
+    # always does that part unconditionally). Ranked with
+    # noticed_commotion/activity_aborted -- a broken promise is a real,
+    # attention-worthy moment, not urgent_need-tier but well above an
+    # ordinary schedule reminder.
+    "contract_violated": 72,
     "activity_finished": 70,
     "waiting_timed_out": 68,
     "gave_up_waiting": 69,     # systems/waiting.py -- genuinely abandoned a
@@ -65,6 +76,15 @@ WAKE_PRIORITY = {
     "resolution_failed": 60,
     "activity_phase_changed": 55,
     "person_entered_view": 50,
+    # Same missing-entry bug as contract_violated above, for this
+    # session's other new wake reasons (systems/proposals.py,
+    # systems/social_media.py) -- all ranked above schedule_block (an
+    # ordinary reminder) but below anything involving a person actually
+    # right there (person_entered_view/heard_speech/door_signal/provoked).
+    "proposal_countered": 48,   # needs the proposer's own action to move forward
+    "proposal_received":  45,
+    "post_about_self":    44,
+    "proposal_resolved":  42,   # purely informational -- lowest of this group
     "schedule_block": 40,
     "wait_ready": 35,
     "idle": 0,
@@ -157,6 +177,9 @@ _WAKE_LINE_TEMPLATES = {
     "door_signal": "You hear someone at the door -- {visitor_name} is here.",
     "post_about_self": "You come across a social media post from {author_name} that mentions you.",
     "contract_violated": "{violator_name} just missed {commitment}.",
+    "proposal_received": "{from_name} has proposed something -- {topic}.",
+    "proposal_countered": "{from_name} came back with a different offer on {topic}.",
+    "proposal_resolved": "Your proposal about {topic} has an answer: {outcome_summary}.",
     "director_attention": "Something makes you stop and look up -- you have the odd feeling someone unseen is watching you, waiting for you to notice.",
 }
 

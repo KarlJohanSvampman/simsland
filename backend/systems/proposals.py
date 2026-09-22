@@ -118,6 +118,25 @@ def propose(proposer, recipients, kind, chore_id, params, world):
         "status": "open",
     }
     world.setdefault("proposals", {})[proposal["id"]] = proposal
+
+    # Confirmed live gap (same class already fixed this session for
+    # target_reactions.py/social_media.py/social_contracts.py): this
+    # engine's own module docstring calls out that its context function
+    # IS wired into context_builder.py's open_proposals -- real, but
+    # PASSIVE, no different from a proposal just sitting in a menu the
+    # recipient might not glance at for a long time. Nothing here ever
+    # called wake_character, so a brand new proposal only ever reached a
+    # recipient's next regularly-scheduled think().
+    from brain.cognition_scheduler import wake_character
+    for r in recipients:
+        wake_character(r, world, "proposal_received", {
+            "from_name":   proposer.get("name", "someone"),
+            "from_id":     proposer["id"],
+            "kind":        kind,
+            "topic":       str(chore_id),
+            "proposal_id": proposal["id"],
+        })
+
     return proposal
 
 
@@ -177,6 +196,23 @@ def respond(recipient, world, proposal_id, response, counter_params=None):
             return {"ok": False, "reason": "counter_not_supported_for_this_kind"}
         proposal["responses"][rid] = "counter"
         proposal["counter_params"][rid] = dict(counter_params or {})
+
+        # A counter genuinely needs the proposer's own next action
+        # (proposer_advance_round) to go anywhere -- unlike a plain
+        # accept/decline, nothing else in this engine will ever move it
+        # forward on its own, so this one wakes the proposer immediately
+        # rather than waiting for _maybe_resolve() below (which a lone
+        # counter, with other recipients still pending, won't even reach).
+        proposer = world.get("characters", {}).get(proposal["proposer_id"])
+        if proposer:
+            from brain.cognition_scheduler import wake_character
+            wake_character(proposer, world, "proposal_countered", {
+                "from_name":   recipient.get("name", "someone"),
+                "from_id":     rid,
+                "kind":        proposal["kind"],
+                "topic":       str(proposal["chore_id"]),
+                "proposal_id": proposal["id"],
+            })
     elif response in ("accept", "decline"):
         proposal["responses"][rid] = response
     else:
@@ -211,9 +247,23 @@ def proposer_advance_round(proposer, world, proposal_id, new_params=None):
         for rid in still_open:
             proposal["responses"][rid] = "decline"
     else:
+        chars = world.get("characters", {})
+        from brain.cognition_scheduler import wake_character
         for rid in still_open:
             proposal["responses"][rid] = "pending"
             proposal["counter_params"].pop(rid, None)
+            # Revised terms are, from this recipient's own point of view,
+            # a fresh thing to consider -- same wake shape as a brand new
+            # proposal_received in propose() above, not a separate reason.
+            recipient = chars.get(rid)
+            if recipient:
+                wake_character(recipient, world, "proposal_received", {
+                    "from_name":   proposer.get("name", "someone"),
+                    "from_id":     proposer["id"],
+                    "kind":        proposal["kind"],
+                    "topic":       str(proposal["chore_id"]),
+                    "proposal_id": proposal["id"],
+                })
 
     _maybe_resolve(proposal, world)
     return {"ok": True, "round": proposal["round"]}
@@ -227,6 +277,47 @@ def _maybe_resolve(proposal, world):
         rid for rid, state in proposal["responses"].items() if state == "accept"
     ] + [proposal["proposer_id"]]
     proposal["participants"] = accepted
+
+    # The proposer is the one party never otherwise notified their own
+    # proposal reached a final answer -- every recipient already knows
+    # their own response, but nothing told the proposer accept/decline
+    # actually landed (as opposed to "counter", woken immediately in
+    # respond() above since that one needs their action specifically).
+    proposer = world.get("characters", {}).get(proposal["proposer_id"])
+    if proposer:
+        recipient_states = {
+            rid: state for rid, state in proposal["responses"].items()
+            if rid != proposal["proposer_id"]
+        }
+        accepted_n = sum(1 for s in recipient_states.values() if s == "accept")
+        declined_n = sum(1 for s in recipient_states.values() if s == "decline")
+        if accepted_n and declined_n:
+            outcome_summary = f"{accepted_n} accepted, {declined_n} declined"
+        elif accepted_n:
+            outcome_summary = "accepted"
+        else:
+            outcome_summary = "declined"
+
+        # Named only when there's exactly one other party (the common
+        # case: social_ask/request/item_loan/item_sale/recurring_offer
+        # with a single recipient) -- a multi-recipient "chore" proposal
+        # has no single "the other person" to point a follow-up at, so
+        # this stays None there rather than picking one arbitrarily.
+        other_id, other_name = None, None
+        if len(recipient_states) == 1:
+            other_id = next(iter(recipient_states))
+            other_char = world.get("characters", {}).get(other_id)
+            other_name = other_char.get("name", "them") if other_char else "them"
+
+        from brain.cognition_scheduler import wake_character
+        wake_character(proposer, world, "proposal_resolved", {
+            "kind":            proposal["kind"],
+            "topic":           str(proposal["chore_id"]),
+            "outcome_summary": outcome_summary,
+            "proposal_id":     proposal["id"],
+            "other_id":        other_id,
+            "other_name":      other_name,
+        })
 
     if proposal["kind"] == "chore":
         household = world.get("households", {}).get(proposal["household_id"])
