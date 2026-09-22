@@ -34,6 +34,7 @@ REACTION_WEIGHTS = {
     "hold":           {"fear": 0.50, "anger": 0.30, "shock": 0.20},
     "wrestle":        {"anger": 0.30, "adrenaline": 0.40, "fear": 0.30},
     "insult":         {"anger": 0.40, "hurt": 0.40, "dismissive": 0.20},
+    "accuse":         {"anger": 0.35, "defensive": 0.40, "shock": 0.25},
     "guilt_trip":     {"guilt": 0.50, "annoyance": 0.30, "dismissive": 0.20},
     "compliment":     {"pleased": 0.60, "suspicious": 0.15, "awkward": 0.25},
     "flirt":          {"pleased": 0.45, "awkward": 0.35, "uninterested": 0.20},
@@ -46,7 +47,7 @@ _VERB_PHRASE = {
     "punch": "punched", "kick": "kicked", "shove": "shoved",
     "threaten": "threatened", "grab_offensive": "grabbed at",
     "hold": "grabbed and held", "wrestle": "grappled with",
-    "insult": "insulted", "guilt_trip": "tried to guilt-trip",
+    "insult": "insulted", "accuse": "accused", "guilt_trip": "tried to guilt-trip",
     "compliment": "complimented", "flirt": "flirted with",
     "joke": "made a joke at", "brag": "bragged to",
 }

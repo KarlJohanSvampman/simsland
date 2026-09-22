@@ -1074,9 +1074,22 @@ def build_available_actions(c, world):
         other = chars.get(other_id)
         if not other:
             continue
+        # Confirmed live bug (player report, screenshot): a 50-year-old
+        # texted a 6-year-old neighbor's kid content that read like a
+        # spousal argument about "our family"/"the kids" -- known_contacts
+        # was the ONLY thing the LLM had to go on for someone not
+        # currently visible (phone_call/phone_send_text/computer_send_email
+        # all address purely from this list), and it carried nothing but a
+        # bare name. age_group/relationship labels are cheap, already-
+        # computed fields (same ones build_relationship_context() already
+        # surfaces for someone who IS nearby) -- there's no reason a
+        # remote contact should be any less identified than someone
+        # standing right there.
         known_contacts.append({
             "id":           other_id,
             "name":         other.get("name", other_id),
+            "age_group":    other.get("age_group"),
+            "relationship": rel.get("labels") or rel.get("state"),
             "last_contact": rel.get("last_contact", 0),
         })
     known_contacts.sort(key=lambda k: -k["last_contact"])

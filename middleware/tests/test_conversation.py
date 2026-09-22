@@ -58,3 +58,35 @@ async def test_insult_from_someone_not_perceivable_does_not_fire(sim, world):
                              "provocation_type": "insult"})
     p = await eng(sim).prepare("kim", "provoked")
     assert not p.situation or p.situation.situation.id != "conversation.insult"
+
+
+@pytest.mark.asyncio
+async def test_accusation_offers_five_distinct_real_speech_options(sim, world):
+    world["character"]["body"]["hunger"] = 10
+    wake(world, "provoked", {"actor_id": "den", "actor_name": "Dennis",
+                             "provocation_type": "accuse",
+                             "reaction_hint": "Your gut reaction: mostly defensive."})
+    e = eng(sim, json.dumps({"choice": "admit_it", "speech": "...Okay, fine, it was me."}))
+    p = await e.prepare("kim", "provoked")
+    assert p.situation.situation.id == "conversation.accusation"
+    assert "Dennis just accused you" in p.situation.description
+    ids = [o.id for o in p.options]
+    assert {"deny_it", "explain_what_happened", "ask_why_they_think_that",
+           "admit_it", "get_defensive"} <= set(ids)
+    # Every real option must have resolved to a genuinely distinct
+    # (outcome, speech_act) pair -- the exact dedup bug fixed alongside this.
+    real = [o for o in p.options if o.outcome]
+    assert len({o.speech.get("speech_act") if o.speech else o.id for o in real}) == len(real)
+    rec = await e.decide("kim", "provoked", dry_run=False)
+    d = sim.executed[0]["decision"]
+    assert d["speech"]["speech_act"] == "confession" and d["speech"]["utterance"] == "...Okay, fine, it was me."
+
+
+@pytest.mark.asyncio
+async def test_accusation_and_insult_are_mutually_exclusive(sim, world):
+    world["character"]["body"]["hunger"] = 10
+    wake(world, "provoked", {"actor_id": "den", "actor_name": "Dennis", "provocation_type": "accuse"})
+    p = await eng(sim).prepare("kim", "provoked")
+    assert p.situation.situation.id == "conversation.accusation"
+    ids = [o.id for o in p.options]
+    assert "insult_them_back" not in ids and "deny_it" in ids

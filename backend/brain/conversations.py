@@ -520,6 +520,8 @@ def apply_conversation_dynamics(
 
         "insult",
 
+        "accuse",
+
         "challenge",
 
         "dismissive"
