@@ -609,6 +609,30 @@ def _walk_target_for(prop, interaction):
     return prop.get("x", 0), prop.get("y", 0)
 
 
+# Confirmed already built: systems/seating_planner.py's find_free_seats()/
+# SEATING_PREFERRED already do real seat-finding (and, for the automatic
+# hobby-queue path, carrying a chair over) for desk-style activities -- this
+# reuses that same "is there a free seat already near the target" lookup for
+# the decision-driven _route_interact path, which never called it before.
+# Only the "already close enough, just sit" half is reused here; carrying a
+# chair over needs the activity_queue task machinery the automatic path
+# runs on, which this simpler direct-scaffold route doesn't.
+_INTERACTIONS_PREFERRING_A_SEAT = {"computer_use"}
+
+
+def _seat_near(world, prop, interaction):
+    """A free, already-nearby seat for this interaction, or None -- see
+    systems/seating_planner.py (the same lookup the automatic hobby system
+    uses for use_computer/work/pay_bills/...)."""
+    if interaction not in _INTERACTIONS_PREFERRING_A_SEAT:
+        return None
+    from systems.seating_planner import find_free_seats, NEARBY_THRESHOLD, _dist_between_props
+    seats = find_free_seats(world, near_prop=prop)
+    if seats and _dist_between_props(seats[0], prop) <= NEARBY_THRESHOLD:
+        return seats[0]
+    return None
+
+
 def _route_interact(c, world, action, definitions):
     target_id = action.get("target")
     if not target_id:
@@ -651,13 +675,23 @@ def _route_interact(c, world, action, definitions):
     # not a proximity check. Real walk when they're not already there, and
     # drop out of a seated/lying posture the moment they set off, rather than
     # letting it silently persist through an unrelated activity.
+    seat = _seat_near(world, prop, interaction)
+    if seat:
+        from systems.occupancy import find_free_anchor, reserve_anchor
+        seat_anchor = find_free_anchor(seat, "sit")
+        if seat_anchor:
+            reserve_anchor(c, seat, seat_anchor)
+        c["seat_prop_id"] = seat["id"]
+
     from systems.props import prop_distance
-    if prop_distance(c, prop) > INTERACT_WALK_RADIUS:
-        if c.get("posture") not in (None, "standing"):
+    walk_needed_to = seat if seat else prop
+    if prop_distance(c, walk_needed_to) > INTERACT_WALK_RADIUS:
+        target_posture = "sitting_seat" if seat else "standing"
+        if c.get("posture") != target_posture:
             from systems.posture import set_posture
-            set_posture(c, world, "standing")
+            set_posture(c, world, target_posture)
         from systems.navigation import plan_character_route
-        wx, wy = _walk_target_for(prop, interaction)
+        wx, wy = _walk_target_for(seat, "sit") if seat else _walk_target_for(prop, interaction)
         if plan_character_route(world, c, wx, wy):
             c["animation_state"] = "walk"
             c["is_moving"] = True
@@ -673,10 +707,12 @@ def _route_interact(c, world, action, definitions):
     # Already close enough to skip the walk -- but a leftover seated/lying
     # posture from whatever they were doing a moment ago (a different
     # nearby chair, ...) needs clearing here too; the walk branch above
-    # only resets it on its own path.
-    if c.get("posture") not in (None, "standing"):
+    # only resets it on its own path. Already-seated (found a nearby seat
+    # above) keeps sitting rather than standing back up for no reason.
+    target_posture = "sitting_seat" if seat else "standing"
+    if c.get("posture") != target_posture:
         from systems.posture import set_posture
-        set_posture(c, world, "standing")
+        set_posture(c, world, target_posture)
 
     c["activity"] = _scaffold(
         c, world, "interact",
