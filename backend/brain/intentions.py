@@ -149,6 +149,22 @@ def has_intention(
     return False
 
 # =========================================================
+# REMOVE INTENTION
+# =========================================================
+
+def remove_intention(c, intention_type):
+    """Drop a still-lingering entry of this type. Needed anywhere an
+    intention is only ever ADDED while some condition holds (frustration
+    above a threshold, an expectation still outstanding, ...): once that
+    condition clears, nothing else revisits the old entry, so without an
+    explicit removal it sits in active_intentions -- at its last, now
+    stale, priority/reason -- forever, and keeps getting offered."""
+    ints = c.get("active_intentions")
+    if ints:
+        c["active_intentions"] = [i for i in ints if i.get("type") != intention_type]
+
+
+# =========================================================
 # ADD INTENTION
 # =========================================================
 

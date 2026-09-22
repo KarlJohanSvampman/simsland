@@ -410,19 +410,14 @@ def update_expectations(c, world):
     # expectations never clobber each other (add_intention replaces by
     # type). Not injected for "satisfied" ones -- nothing left to act on
     # until the next period.
+    from brain.intentions import remove_intention
     for nd in c.get("expectations", {}).values():
         if nd["status"] != "satisfied":
             _refresh_intention(c, nd, world)
         else:
             # Satisfied (or not applicable today): the intention would otherwise
             # linger with its old "you didn't get to ..." reason.
-            _drop_intention(c, f"expectation:{nd['template_id']}")
-
-
-def _drop_intention(c, intention_type):
-    ints = c.get("active_intentions")
-    if ints:
-        c["active_intentions"] = [i for i in ints if i.get("type") != intention_type]
+            remove_intention(c, f"expectation:{nd['template_id']}")
 
 
 def _refresh_intention(c, nd, world):

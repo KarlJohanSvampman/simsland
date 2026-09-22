@@ -269,7 +269,7 @@ def generate_lt_need_intentions(c, world):
     -> _sec_intentions narration pipeline into LLM context as-is, letting
     the LLM's own action choice decide how (or whether) to act on a Want.
     """
-    from brain.intentions import add_intention
+    from brain.intentions import add_intention, remove_intention
 
     lt = c.get("lt_needs", {})
     for need_id, cfg in _LT_NEED_INTENTION_CONFIG.items():
@@ -279,6 +279,14 @@ def generate_lt_need_intentions(c, world):
 
         frustration = nd.get("frustration", 0.0)
         if frustration < 0.3:
+            # Confirmed live bug: this only ever skipped ADDING a fresh
+            # intention here -- an entry already added on some earlier tick
+            # (when frustration WAS over 0.3) was never taken back down,
+            # even once the need was actually satisfied. A character who'd
+            # just done their sit-ups kept being offered "exercise" every
+            # idle wake, at a priority computed from the frustration level
+            # that no longer applied.
+            remove_intention(c, cfg["type"])
             continue
 
         priority = int(30 + frustration * 45)
