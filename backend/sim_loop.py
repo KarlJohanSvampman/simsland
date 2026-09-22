@@ -467,6 +467,19 @@ def tick(world):
         if not c.get("is_workplace_npc")
     ]
 
+    # Confirmed live bug: schedule generation only ever runs for whoever is
+    # already in world["characters"] at the one Monday-midnight tick per week
+    # (see _is_monday_midnight's one-shot guard below) -- anyone added or
+    # restored between two Mondays (a character brought back into the sim,
+    # a new NPC, ...) got no schedule at all and stayed that way for up to a
+    # full week: no work/sleep blocks, no schedule-derived expectation
+    # windows, no "it's bedtime" wake regardless of how late it got. Self-
+    # heals every tick instead of waiting for the next weekly reset.
+    for c in characters:
+        if "schedule" not in c:
+            c["schedule"] = generate_week_schedule(c, world)
+            adjust_for_household(c, world)
+
     # -- Weekly ─────────────────────────────────────────────
     if _is_monday_midnight(world):
         for c in characters:

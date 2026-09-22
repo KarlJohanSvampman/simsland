@@ -43,13 +43,26 @@ HUNGER = S(
 
 
 # ---- need.energy.tired ------------------------------------------------------
+def _tired_text(ctx: SituationContext) -> str:
+    if ctx.wake_reason == "schedule_block" and ctx.get("character.schedule.activity") == "sleep":
+        return f"It's {ctx.get('environment.current.time_of_day') or 'late'} -- bedtime, by your own schedule."
+    return (f"You're worn out. It's {ctx.get('environment.current.time_of_day') or 'late'} "
+           "and your body wants to stop.")
+
+
 TIRED = S(
     id="need.energy.tired", category="physical_need", priority=60, cooldown_ticks=HOUR,
-    triggers=(T("threshold_crossed", field="character.needs.body.fatigue", threshold=60),),
-    required_data=("character.needs", "environment.current", "environment.nearby_props",
-                   "environment.available_interactions"),
-    describe=lambda c: f"You're worn out. It's {c.get('environment.current.time_of_day') or 'late'} "
-                       "and your body wants to stop.",
+    triggers=(
+        T("threshold_crossed", field="character.needs.body.fatigue", threshold=60),
+        # Simsland's own schedule says this is a sleep block, independent of how
+        # tired the character actually feels right now -- a child (or anyone)
+        # whose fatigue simply accrues slower than an adult's never crossed 60 on
+        # its own and so was never offered bed at all, no matter how late it got.
+        T("event", event="schedule_block", when=lambda c: c.get("character.schedule.activity") == "sleep"),
+    ),
+    required_data=("character.needs", "character.schedule", "environment.current",
+                   "environment.nearby_props", "environment.available_interactions"),
+    describe=_tired_text,
     options=(
         O("lie_down_and_sleep", "Lie down and go to sleep.", action=lambda c: prop_action(c, "sleep", "sleep")),
         O("sit_and_rest_a_while", "Sit down and rest for a bit without going to bed.",

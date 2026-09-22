@@ -321,6 +321,17 @@ def update_expectations(c, world):
     tick = world.get("tick", 0)
 
     for nd in c.get("expectations", {}).values():
+        # Invariant, checked every call, not just at period rollover: "missed"
+        # only ever means the window's own end actually passed without being
+        # satisfied. Status used to only get corrected back to "pending" at
+        # the moment a period rolled over -- once a week for a weekly one --
+        # so an expectation that went "missed" under an earlier bug (or any
+        # other stale write) stayed wrongly red for up to a full period
+        # afterwards even though its current window hasn't closed yet.
+        window_end = nd.get("window_end_tick")
+        if nd["status"] == "missed" and window_end is not None and tick < window_end:
+            nd["status"] = "pending"
+
         period = _current_period_key(nd["cadence"], calendar)
         if period is None:
             # "once" cadence -- no real recurring calendar period, but

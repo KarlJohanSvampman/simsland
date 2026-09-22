@@ -213,3 +213,23 @@ async def test_options_are_age_aware(sim, world):
     world["character"]["body"]["hunger"] = 80
     q = await eng(sim).prepare("kim", "urgent_need")
     assert "cook_a_proper_meal" not in [o.id for o in q.options]
+
+
+@pytest.mark.asyncio
+async def test_bedtime_offers_sleep_regardless_of_fatigue(sim, world):
+    world["character"]["body"].update({"fatigue": 20, "hunger": 10})   # nowhere near the 60 threshold
+    world["character"]["active_schedule_block"] = {"activity": "sleep", "source": "schedule"}
+    world["meta"]["cognition"] = {"wake_reason": "schedule_block", "wake_payload": {}}
+    p = await eng(sim).prepare("kim", "schedule_block")
+    assert p.situation.situation.id == "need.energy.tired"
+    assert "lie_down_and_sleep" in [o.id for o in p.options]
+    assert "bedtime" in p.situation.description
+
+
+@pytest.mark.asyncio
+async def test_non_sleep_schedule_block_does_not_trigger_tired(sim, world):
+    world["character"]["body"].update({"fatigue": 20, "hunger": 10})
+    world["character"]["active_schedule_block"] = {"activity": "work", "source": "schedule"}
+    world["meta"]["cognition"] = {"wake_reason": "schedule_block", "wake_payload": {}}
+    p = await eng(sim).prepare("kim", "schedule_block")
+    assert not p.situation or p.situation.situation.id != "need.energy.tired"

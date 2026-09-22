@@ -63,6 +63,17 @@ async def mood(ctx: ResolveContext) -> Dict[str, Any]:
     return {"emotion": c.get("emotion")}
 
 
+async def schedule(ctx: ResolveContext) -> Dict[str, Any]:
+    """What Simsland's own schedule says should be happening right now --
+    the "schedule_block" wake fires the instant this changes (systems/
+    scheduling.py::update_schedule_runtime). Nothing else surfaced this to
+    the middleware, so a character woken for exactly "it's bedtime" or
+    "it's your work block" had no way to know that was why."""
+    c = await _char(ctx)
+    block = c.get("active_schedule_block") or {}
+    return {"activity": block.get("activity"), "source": block.get("source")}
+
+
 async def intentions(ctx: ResolveContext) -> List[Dict[str, Any]]:
     c = await _char(ctx)
     items = sorted(c.get("active_intentions") or [], key=lambda i: -(i.get("priority") or 0))
@@ -120,6 +131,7 @@ PROVIDERS = [
     DataProvider("character.needs", needs, depends_on=("character.body",), sections=("character",)),
     DataProvider("character.activity", activity, sections=("character",)),
     DataProvider("character.mood", mood, sections=("character",)),
+    DataProvider("character.schedule", schedule, sections=("character",)),
     DataProvider("character.intentions", intentions, sections=("character",)),
     DataProvider("character.expectations", expectations, sections=("character",)),
     DataProvider("character.grievances", grievances, sections=("character",)),
