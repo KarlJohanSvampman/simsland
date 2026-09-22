@@ -67,6 +67,7 @@ CADENCE = {
     "mentality_compilation": 25,
     "job_market":           60,
     "conversation_cleanup": 60,
+    "conversation_seating": 30,
 
     # rare / event-driven (default cadence; events bypass this)
     "news":                 60,

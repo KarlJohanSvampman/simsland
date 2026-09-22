@@ -166,15 +166,40 @@ def apply_speech(c, world, speech):
 
     if listener:
 
-        from brain.conversations import get_or_create_conversation, add_message
+        from brain.conversations import get_or_create_conversation, add_message, find_conversation
         from systems.reactions import push_conversation_reaction
         from brain.relationships import apply_interaction
         from systems.conversation_analysis import analyze_message, should_schedule_reflection
+
+        topic_for_interest = topic or "general"
+        is_new_conversation = medium == "in_person" and not find_conversation(world, [c["id"], target_id])
+
+        # Per the user's explicit ask: a NEW conversation isn't automatic --
+        # the listener's real willingness to engage right now (their
+        # relationship to the initiator, their traits/mood, and what they're
+        # already doing -- a leisure activity, a chore, nothing) is checked
+        # by the LLM first. Only gates a BRAND NEW conversation, never every
+        # follow-up message in an ongoing one. Declining doesn't create/
+        # thread a conversation object at all -- the listener just gives a
+        # real, specific excuse instead.
+        if is_new_conversation:
+            from systems.conversation_interest import check_conversation_interest, planned_length_ticks, SEATING_SUGGESTION_CHANCE
+            accepted, engagement, excuse = check_conversation_interest(
+                listener, world, topic_for_interest, c["id"])
+            if not accepted:
+                from systems.incidental_speech import fire_incidental
+                fire_incidental(listener, "decline", excuse, world, target_id=c["id"])
+                return
 
         conv = get_or_create_conversation(
             world, [c["id"], target_id], topic=topic or "general",
             medium=speech.get("medium", "in_person"),
         )
+
+        if is_new_conversation:
+            conv["planned_length_ticks"] = planned_length_ticks(engagement)
+            conv["will_suggest_seating"] = random.random() < SEATING_SUGGESTION_CHANCE
+            conv["seating_suggested"] = False
 
         # Personal per-participant conversation goals (systems/
         # conversation_goals.py) -- assigned lazily/idempotently for

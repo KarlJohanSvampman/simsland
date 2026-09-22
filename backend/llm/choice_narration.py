@@ -27,9 +27,7 @@ async def generate_choice(c, world, choice_type, options, occasion, context=None
 
     occasion_block = f"\nOccasion / reason for this choice: {occasion}\n" if occasion else ""
 
-    context_block = f"
-{context}
-" if context else ""
+    context_block = f"\n{context}\n" if context else ""
 
     prompt = f"""
 Character: {c.get("name", "Someone")}

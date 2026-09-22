@@ -823,6 +823,10 @@ def tick(world):
     if every(world, CADENCE["conversation_cleanup"], offset=19):
         cleanup_conversations(world)
 
+    if every(world, CADENCE["conversation_seating"], offset=21):
+        from systems.conversation_seating import tick_conversation_seating
+        tick_conversation_seating(world)
+
     if every(world, CADENCE["job_market"], offset=20):
         for c in characters:
             update_investment_behavior(c, world)
