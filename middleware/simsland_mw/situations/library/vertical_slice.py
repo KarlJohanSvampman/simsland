@@ -237,6 +237,15 @@ def _chat_with_someone(ctx: SituationContext):
     return socialize_with(ctx, others[0]["id"]) if others else None
 
 
+def _watch_tv(ctx: SituationContext):
+    """A real TV/entertainment-tagged prop, not just any seat -- the backend
+    (_route_watch_tv) is the one that actually checks a seat has line of
+    sight to it (brain/perception.py::line_of_sight) and picks/walks there;
+    this only needs to name a real target."""
+    tv = ctx.dc.find_prop("tv")
+    return act(ctx, "watch_tv", target=tv["id"]) if tv else None
+
+
 QUIET = S(
     id="cognition.quiet_moment", category="cognition", priority=10, cooldown_ticks=HOUR // 2,
     triggers=(T("idle"),),
@@ -251,6 +260,7 @@ QUIET = S(
           action=_examine_something),
         O("use_the_computer", "Spend a little time on the computer.", action=lambda c: interact(c, "computer")),
         O("chat_with_someone_nearby", "Chat with someone nearby.", action=_chat_with_someone),
+        O("watch_some_tv", "Watch some TV.", action=_watch_tv),
         O("write_in_the_diary", "Write in your diary.", action=lambda c: act(c, "write_diary")),
         O("read_the_news", "Catch up on the news.", action=lambda c: act(c, "browse_news"), min_age=12),
         O("practice_juggling", "Practise some juggling.", action=lambda c: act(c, "practice_juggling")),

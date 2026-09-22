@@ -1367,6 +1367,7 @@ _ACTIVITY_POSTURE = {
     "sleep": "lying",
     "use_toilet": "sitting_seat",
     "use_toilet_bowels": "sitting_seat",
+    "watch_tv": "sitting_seat",
 }
 
 

@@ -560,6 +560,7 @@ _INTERACTION_DURATIONS = {
     "use_microwave":   60,
     "use_toilet":      150,
     "wash_dishes":     300,
+    "watch_tv":        2700,   # 45 min, matches the automatic hobby system's own "watch_tv" value
 }
 _FALLBACK_INTERACTION_DURATION = 60   # last resort only, for content not listed above
 
@@ -2258,6 +2259,8 @@ def route_action(c, world, action, speech, definitions=None, available_actions=N
         _route_lock_door(c, world, action, lock=True)
     elif action_type == "unlock_door":
         _route_lock_door(c, world, action, lock=False)
+    elif action_type == "watch_tv":
+        _route_watch_tv(c, world, action)
 
     # ── Phone ──────────────────────────────────────────────────────────────────
     elif action_type == "phone_call":
@@ -4004,6 +4007,91 @@ def _route_lock_door(c, world, action, lock):
     if ok:
         store_memory(c, "You locked the door." if lock else "You unlocked the door.",
                     importance=0.15, tags=["flavor"], tick=world.get("tick", 0), source="internal")
+
+
+_TV_TAGS = {"entertainment", "tv"}
+_TV_LOS_SEARCH_RADIUS = 15  # tiles -- generous enough for a real room (confirmed live: a genuinely-in-view seat 13 tiles off), still bounded so it never reaches into a different room/building
+
+
+def _find_tv(world, c, target_id):
+    from systems.props import get_prop_by_id
+    if target_id:
+        return get_prop_by_id(world, target_id)
+    props = world.get("props", [])
+    best, best_dist = None, _TV_LOS_SEARCH_RADIUS + 1
+    for p in props:
+        from systems.props import get_prop_tags, prop_distance
+        if not (set(get_prop_tags(world, p)) & _TV_TAGS):
+            continue
+        d = prop_distance(c, p)
+        if d < best_dist:
+            best, best_dist = p, d
+    return best
+
+
+def _seat_with_view_of(world, tv):
+    """A free seat near the TV that can actually SEE it -- per the user's
+    explicit ask, real line-of-sight (brain/perception.py::line_of_sight,
+    already built: tile-by-tile, blocked by blocks_los props and closed
+    doors), not just "close enough". Nearest qualifying seat wins."""
+    from systems.seating_planner import find_free_seats, _dist_between_props
+    from brain.perception import line_of_sight
+    for seat in find_free_seats(world, near_prop=tv):
+        if _dist_between_props(seat, tv) > _TV_LOS_SEARCH_RADIUS:
+            break   # sorted by distance -- nothing further out will qualify either
+        if line_of_sight(seat, tv, world):
+            return seat
+    return None
+
+
+def _route_watch_tv(c, world, action):
+    """Per the user's explicit ask: watching TV means finding an empty seat
+    that can actually see the TV, not just sitting down anywhere. No
+    real "watch_tv" anchor interaction exists on any prop template today
+    (tv_stand's own only anchor is browse_shelf) -- this targets the
+    TV/entertainment prop directly instead, the same way eat/sleep are
+    their own dedicated action types rather than going through interact."""
+    tv = _find_tv(world, c, action.get("target"))
+    if not tv:
+        return
+    seat = _seat_with_view_of(world, tv)
+    if not seat:
+        return   # nowhere to actually watch from -- do nothing rather than fake it
+
+    from systems.props import prop_distance
+    duration = _INTERACTION_DURATIONS.get("watch_tv", 2700)   # 45 min, matches the automatic hobby system's own value
+
+    # Reserve the seat now (same convention _route_interact already uses for
+    # its own target prop -- claimed at decision time, released by
+    # interrupt_activity()/occupancy.release_anchor() if abandoned), not only
+    # once they arrive -- otherwise two characters could both set off for
+    # the one free seat with a view.
+    from systems.occupancy import find_free_anchor, reserve_anchor
+    seat_anchor = find_free_anchor(seat, "sit")
+    if seat_anchor:
+        reserve_anchor(c, seat, seat_anchor)
+    c["seat_prop_id"] = seat["id"]
+
+    if prop_distance(c, seat) > INTERACT_WALK_RADIUS:
+        if c.get("posture") not in (None, "standing"):
+            from systems.posture import set_posture
+            set_posture(c, world, "standing")
+        from systems.navigation import plan_character_route
+        wx, wy = _walk_target_for(seat, "sit")
+        if plan_character_route(world, c, wx, wy):
+            c["animation_state"] = "walk"
+            c["is_moving"] = True
+        c["activity"] = {
+            "type": "watch_tv", "phase": "walking",
+            "phase_started_tick": world.get("tick", 0),
+            "duration": duration, "target_id": tv["id"], "interaction": "watch_tv", "state": {},
+        }
+        return
+
+    from systems.posture import set_posture
+    set_posture(c, world, "sitting_seat")
+    c["activity"] = _scaffold(c, world, "watch_tv", target_id=tv["id"], interaction="watch_tv",
+                              duration=duration)
 
 
 def _route_door_signal(c, world, action, method):

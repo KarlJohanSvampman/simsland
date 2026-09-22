@@ -33,6 +33,7 @@ AFFORDANCES: Dict[str, Dict[str, Sequence[str]]] = {
     "water": {"interactions": ("drink", "sink", "get_water"), "tags": ("water",)},
     "sleep": {"interactions": (), "tags": ("sleepable",)},
     "seat": {"interactions": (), "tags": ("seatable",)},
+    "tv": {"interactions": (), "tags": ("entertainment", "tv")},
 }
 
 SIT_REST_AT = 35  # fatigue at which "sit down and rest" is a reasonable thing to consider
