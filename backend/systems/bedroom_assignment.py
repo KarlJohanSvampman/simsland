@@ -10,9 +10,15 @@ Policy:
   primary (adult/elderly) -- a spouse/partner pair shares one room as a
                               unit; an unpartnered adult gets their own.
   teen    (age >= 14)      -- private room while rooms remain.
-  child   (age < 14)       -- paired up 2-per-room.
+  child   (age < 14)       -- private room while rooms remain, same as
+                              teens -- NOT pre-paired. Two siblings only
+                              end up sharing because of the general
+                              out-of-rooms fallback below, same as any
+                              other group would.
 If bedrooms run out, the lowest-priority remaining group doubles up into
-whatever room is left rather than leaving anyone unassigned.
+whatever room is left rather than leaving anyone unassigned -- this is
+also what makes multiple children share when the house doesn't have
+enough bedrooms for one each.
 """
 
 CHILD_PRIVATE_AGE = 14
@@ -34,9 +40,13 @@ def _is_partner(a, b):
 
 
 def _group_household_members(members):
-    """Split into (primary_units, teens, child_pairs) where primary_units
-    is a list of 1-2-element lists (partner pairs kept together) and
-    child_pairs is a list of 1-2-element lists (children paired in order)."""
+    """Split into (primary_units, teens, children) where primary_units is a
+    list of 1-2-element lists (partner pairs kept together); teens and
+    children are each returned as a flat list, one member per person --
+    assign_bedrooms_for_household turns each into its own singleton group,
+    same as a solo adult, so every child gets a private room by default.
+    Sharing only happens through that function's own out-of-rooms
+    fallback, not by pre-pairing here."""
     adults = [m for m in members if m.get("age_group") in ("adult", "elderly")]
     teens  = [m for m in members if m.get("age", 0) >= CHILD_PRIVATE_AGE
               and m.get("age_group") not in ("adult", "elderly")]
@@ -58,9 +68,7 @@ def _group_household_members(members):
             primary_units.append([a])
             used.add(a["id"])
 
-    child_pairs = [children[i:i + 2] for i in range(0, len(children), 2)]
-
-    return primary_units, teens, child_pairs
+    return primary_units, teens, children
 
 
 def assign_bedrooms_for_household(household, world):
@@ -80,10 +88,12 @@ def assign_bedrooms_for_household(household, world):
     if not members:
         return
 
-    primary_units, teens, child_pairs = _group_household_members(members)
+    primary_units, teens, children = _group_household_members(members)
 
-    # Priority order: primary units, then teens (solo), then child pairs.
-    groups = list(primary_units) + [[t] for t in teens] + list(child_pairs)
+    # Priority order: primary units, then teens (solo), then children
+    # (solo -- see _group_household_members' docstring for why these
+    # aren't pre-paired).
+    groups = list(primary_units) + [[t] for t in teens] + [[ch] for ch in children]
 
     room_idx = 0
     for room in bedrooms:

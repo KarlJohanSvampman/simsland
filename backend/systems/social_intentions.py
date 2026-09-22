@@ -251,6 +251,22 @@ def generate_social_intentions(
     # FLIRT
     # =====================================================
 
+    # Confirmed live bug (player report): flirt/compliment_looks are both
+    # scored purely off attraction/ideal-physical-match with no age check
+    # at all -- unlike systems/lt_needs.py's romance/intimacy budget,
+    # which already has a child gate (distribute_lt_needs()), this
+    # per-relationship pairwise path had none, so a child could still end
+    # up with a real flirt/compliment_looks intention toward (or a child
+    # target could be on the receiving end of one from) another
+    # character. Gates BOTH directions -- neither party being a child --
+    # rather than just c, since an adult targeting a child is the worse
+    # failure mode. compliment_character (personality, not looks) is
+    # unaffected; praising someone's traits isn't romance-coded.
+    romance_allowed = (
+        c.get("age_group") != "child"
+        and other.get("age_group") != "child"
+    )
+
     flirt_score = (
 
         attraction * 0.5
@@ -262,7 +278,7 @@ def generate_social_intentions(
         +
 
         chemistry_modifier(rel)
-    )
+    ) if romance_allowed else 0
 
     if trust < 0:
 
@@ -315,7 +331,7 @@ def generate_social_intentions(
     from systems.attraction import compute_ideal_match
     ideal_match = compute_ideal_match(c, other)
 
-    compliment_looks_score = ideal_match["physical"] * 60 + familiarity * 0.2
+    compliment_looks_score = (ideal_match["physical"] * 60 + familiarity * 0.2) if romance_allowed else 0
     compliment_character_score = ideal_match["trait"] * 60 + friendship * 0.2
 
     if hostility > 20:

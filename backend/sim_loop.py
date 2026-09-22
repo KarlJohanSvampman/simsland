@@ -116,6 +116,7 @@ from systems.crime import (
 )
 from systems.darknet import generate_darknet_listings
 from systems.psychosis import tick_psychosis
+from systems.body import decay_stress
 from systems.diary import maybe_write_diary
 from systems.sociopathy import (
     is_sociopath, maybe_introduce_false_identity,
@@ -596,6 +597,39 @@ def tick(world):
         for c in characters:
             update_attention(c, world)
 
+    # -- Per-tick: movement (main thread, always, before any dispatch) ──
+    # Confirmed live bug (player report: a character mid-walk to the
+    # kitchen frozen in place for well over a minute, moving only in
+    # occasional bursts): position interpolation (systems/movement.py,
+    # pure CPU-bound math -- no LLM/network call involved at all) used to
+    # only run from INSIDE brain/agent_loop.py's update_agent(), which
+    # itself only runs when a character's turn comes up on the per-
+    # character worker-thread pool below -- sharing the GIL with however
+    # many OTHER characters are mid-LLM-call that same tick, and entirely
+    # skipped for a tick where that character's own dispatch gets
+    # abandoned past AGENT_WAIT_BUDGET_SECONDS (worse: once abandoned, a
+    # character is excluded from being resubmitted AT ALL until their
+    # original stuck thread finishes, up to STALE_PENDING_SECONDS later --
+    # see agent_chars below). A character who was otherwise doing nothing
+    # computationally expensive still had their walk stall for reasons
+    # entirely unrelated to their own state. Applying it here instead --
+    # unconditionally, for every is_moving character, before any per-
+    # character dispatch even begins -- means movement can never be
+    # delayed by another character's unrelated LLM latency or by the
+    # dispatch/abandon bookkeeping below. agent_loop.py's update_agent()
+    # no longer calls this itself (see its own matching comments) --
+    # is_moving/position are already this tick's final values by the time
+    # it runs.
+    from systems.movement import update_character_movement
+    dirty_char_ids = set()
+    for c in characters:
+        if c.get("is_moving"):
+            try:
+                update_character_movement(c, world)
+                dirty_char_ids.add(c["id"])
+            except Exception as exc:
+                print(f"[sim_loop] movement error for {c.get('id')}: {exc}")
+
     # -- Per-tick: agent brain (parallel) ─────────────────
     # Service worker NPCs are driven by update_services, not LLM — skip them.
     # Each character's LLM call is I/O-bound; workers release the GIL while
@@ -629,7 +663,6 @@ def tick(world):
         for c in agent_chars
     }
 
-    dirty_char_ids = set()
     if futs:
         # Bounded wait -- per this block's module-level comment, a
         # character whose decision doesn't land within the budget is
@@ -637,6 +670,9 @@ def tick(world):
         # pool and self-cleans _pending_agent_ids when it finishes; its
         # eventual result is never read) rather than holding the clock
         # and every system after this point hostage to one slow LLM call.
+        # Movement itself is unaffected by any of this -- see the
+        # dedicated movement pass above, which already ran before this
+        # dispatch even started.
         done, not_done = _futures_wait(futs, timeout=AGENT_WAIT_BUDGET_SECONDS)
         for fut in done:
             try:
@@ -647,6 +683,7 @@ def tick(world):
         if not_done:
             abandoned = [futs[fut].get("name", futs[fut].get("id")) for fut in not_done]
             print(f"[sim_loop] tick {t}: abandoned {len(not_done)} slow agent decision(s) past the {AGENT_WAIT_BUDGET_SECONDS}s budget: {abandoned}")
+
     _mark_dirty(world, char_ids=dirty_char_ids)
 
     # -- Medium: memory / beliefs / relationships (÷15) ─────
@@ -695,6 +732,7 @@ def tick(world):
     if every(world, CADENCE["health"], offset=19):
         for c in characters:
             tick_psychosis(c, world)
+            decay_stress(c, world)
 
     # Sports: move attendees into their game-day mode once kickoff arrives,
     # and narrate periodic score updates for anyone currently watching
@@ -846,6 +884,14 @@ def tick(world):
     if every(world, CADENCE["conversation_seating"], offset=21):
         from systems.conversation_seating import tick_conversation_seating
         tick_conversation_seating(world)
+
+    # Weather + outdoor temperature exposure (systems/weather.py) --
+    # world["weather"] was read by brain/perception.py's room-summary
+    # narration but never actually set anywhere before this.
+    if every(world, CADENCE["weather"], offset=44):
+        from systems.weather import generate_weather_tick, apply_weather_to_characters
+        generate_weather_tick(world)
+        apply_weather_to_characters(world)
 
     if every(world, CADENCE["job_market"], offset=20):
         for c in characters:

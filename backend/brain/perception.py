@@ -1162,9 +1162,16 @@ def _build_room_summary(c, world, env):
     if env.get("crowded"):
         parts.append("It feels crowded.")
 
-    weather = env.get("weather")
-    if weather:
-        parts.append(f"Outside it is {weather}.")
+    # world["weather"] (systems/weather.py) is a dict, not a bare label --
+    # this used to interpolate the dict itself (always falsy before
+    # weather.py started setting it, so it silently never fired; would
+    # have printed a raw dict repr the moment something finally did).
+    weather_label = (env.get("weather") or {}).get("label")
+    if weather_label and not env.get("location"):
+        # Only worth mentioning when the character is actually outdoors --
+        # env["location"] is the building id, None means outside (see
+        # _build_environment's own building/room lookup above).
+        parts.append(f"Outside it is {weather_label}.")
 
     return " ".join(parts)
 

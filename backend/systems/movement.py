@@ -258,8 +258,14 @@ def update_character_movement(
     # increases, so dividing the per-tick step keeps *real-time* walking
     # speed constant even though more ticks are being processed per second
     # -- the one place this file needs to know about time_scale at all.
-    time_scale = max(1, min(10, world.get("time_scale", 1)))
-    speed = _current_move_speed(c) / time_scale
+    time_scale = max(1, min(50, world.get("time_scale", 1)))
+    # movement_speed_multiplier (api/admin.py's /admin/movement_speed) is
+    # the independent knob for this -- per the user's explicit ask, NOT
+    # the same thing as time_scale: they wanted characters to visibly walk
+    # faster on screen without also speeding up every other simulated
+    # system (needs decay, schedules, ...) the way time_scale does.
+    speed_multiplier = max(1, min(200, world.get("movement_speed_multiplier", 1)))
+    speed = _current_move_speed(c) / time_scale * speed_multiplier
 
     # =====================================
     # STUCK DETECTION

@@ -46,6 +46,10 @@ REACTION_ANIMATIONS = {
     "dizzy":        ["react_dizzy", "react_stumble"],
     "vomit":        ["react_vomit"],
 
+    # ── Weather exposure (systems/weather.py) -- "sweating" above already
+    # covers the heat side; this is its cold counterpart. ──
+    "shivering":    ["react_shivering", "react_cold"],
+
     # ── Pain/discomfort reactions ──
     "wince":        ["react_wince"],
     "cry_out":      ["react_cry_out", "react_wince"],
@@ -127,6 +131,7 @@ REACTION_PRIORITIES = {
 
     "cough":       1,
     "sweating":    1,
+    "shivering":   1,
     "breathless":  2,
     "dizzy":       2,
     "vomit":       2,

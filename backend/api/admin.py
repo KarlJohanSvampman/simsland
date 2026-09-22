@@ -9,7 +9,14 @@ its own small router (not folded into api/debug.py, which is explicitly
 controls later without growing an unrelated file.
 
 GET  /admin/state              -> current time_scale + simulated calendar
-POST /admin/time_scale          -> set time_scale (clamped 1-10)
+POST /admin/time_scale          -> set time_scale (clamped 1-50)
+POST /admin/movement_speed      -> set movement_speed_multiplier (clamped
+                                    1-200) -- independent of time_scale,
+                                    for visually speeding up how fast
+                                    characters walk on screen without
+                                    speeding up every other simulated
+                                    system the way time_scale does (see
+                                    systems/movement.py's own use of it)
 GET  /admin/cognition           -> world-level cognition-scheduler histogram
 GET  /admin/cognition/{char_id} -> one character's live cognition state
 POST /admin/reset_characters    -> wipe all characters/households (keeps
@@ -83,12 +90,25 @@ def get_state(sim_id: str = DEFAULT_SIM_ID):
 
 @router.post("/time_scale")
 def set_time_scale(payload: dict, sim_id: str = DEFAULT_SIM_ID):
-    value = max(1, min(10, int(payload.get("value", 1))))
+    value = max(1, min(50, int(payload.get("value", 1))))
     with world_lock():
         world = load_world(sim_id)
         world["time_scale"] = value
         save_world(sim_id, world)
     return {"time_scale": value}
+
+
+@router.post("/movement_speed")
+def set_movement_speed(payload: dict, sim_id: str = DEFAULT_SIM_ID):
+    """Per the user's explicit ask: a knob for how fast characters walk on
+    screen that's independent of time_scale (see systems/movement.py's
+    update_character_movement, the one consumer)."""
+    value = max(1, min(200, int(payload.get("value", 1))))
+    with world_lock():
+        world = load_world(sim_id)
+        world["movement_speed_multiplier"] = value
+        save_world(sim_id, world)
+    return {"movement_speed_multiplier": value}
 
 
 @router.post("/reset_characters")

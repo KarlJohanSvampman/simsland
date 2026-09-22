@@ -232,7 +232,7 @@ def _maybe_resync_clock_to_real_time(world):
     if _resynced_clock_this_process:
         return
     _resynced_clock_this_process = True
-    if max(1, min(10, world.get("time_scale", 1))) == 1:
+    if max(1, min(50, world.get("time_scale", 1))) == 1:
         world["sim_time"] = time.time()
 
 
@@ -363,7 +363,7 @@ async def loop():
         # actually speeds up everything counted in ticks (activity
         # durations, need decay, calendar). movement.py counter-scales its
         # own per-tick distance so walking speed on screen stays constant.
-        time_scale = max(1, min(10, world.get("time_scale", 1)))
+        time_scale = max(1, min(50, world.get("time_scale", 1)))
         await asyncio.sleep(TICK_RATE_SECONDS / time_scale)
 
 

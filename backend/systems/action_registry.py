@@ -313,6 +313,21 @@ ACTION_SPECS = {
     "lift_weights":   {"group": "exercise", "target": "prop", "doc": "Lift weights."},
     "practice_juggling": {"group": "exercise", "target": "none", "doc": "Practice juggling -- trains your juggling ability over time; a real skill (systems/abilities.py), not guaranteed to go well until you've built up proficiency.",
         "skill_check": {"requiresSkill": True, "skill": "juggling", "minProficiencyLevel": None, "baseDifficulty": 40, "competitive": False}},
+
+    # ---- music (systems/lt_needs.py's "creative" need) -----------------
+    # sing_karaoke already existed further up (real skill-check + audience
+    # reactions) but, same class of gap as everything else in this block,
+    # was never actually offered in context_builder.py's action_types --
+    # fixed there rather than duplicated here.
+    "listen_to_music": {"group": "leisure", "target": "prop", "doc": "Put on music and listen -- a record player or a room with its own music-listening spot."},
+    "play_instrument": {"group": "leisure", "target": "prop", "doc": "Play a piano, keyboard, drum kit, or other instrument you can see."},
+    "dance":           {"group": "leisure", "target": "none", "doc": "Dance, just for the fun of it."},
+
+    # ---- childish (context_builder.py gates these to age_group=="child")
+    "mimic_adult":  {"group": "child", "target": "character", "doc": "Playfully copy what a nearby adult is doing right now."},
+    "play_alone":   {"group": "child", "target": "none", "doc": "Entertain yourself with solo make-believe play."},
+    "homework":     {"group": "child", "target": "none", "doc": "Sit down and do schoolwork."},
+    "jump_on_bed":  {"group": "child", "target": "prop", "doc": "Jump on a bed -- the kind of thing kids do when no one's telling them not to."},
 }
 
 

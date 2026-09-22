@@ -25,6 +25,7 @@ from systems.body import get_odor_label, get_breath_label
 _MANAGED_INTENTION_TYPES = {
     "use_toilet", "sleep", "take_nap", "take_shower",
     "brush_teeth", "drink", "eat_food", "seek_caffeine_or_rest",
+    "seek_shelter", "seek_warmer_clothes",
 }
 
 
@@ -246,4 +247,30 @@ def generate_body_intentions(c, world=None):
             "category": "social",
             "priority": 70,
             "reason":   "self_conscious_about_smell"
+        })
+
+    # ── WEATHER EXPOSURE (systems/weather.py) ────────────────────────────────
+    # seek_shelter (get inside) is the same "go somewhere" want regardless of
+    # cold or heat -- getting indoors fixes both. seek_warmer_clothes only
+    # makes sense for cold (there's no equivalent "put on lighter clothes"
+    # item stat yet, and taking clothes OFF in public has its own
+    # nudity-perception consequences elsewhere, so heat doesn't get a
+    # matching clothing want here).
+    cold_exposure = b.get("cold_exposure", 0)
+    heat_exposure = b.get("heat_exposure", 0)
+    worst_exposure = max(cold_exposure, heat_exposure)
+    if worst_exposure > 60:
+        add_intention(c, {
+            "type":       "seek_shelter",
+            "category":   "survival",
+            "priority":   int(60 + (worst_exposure - 60) * 0.8),
+            "interrupts": worst_exposure > 85,
+            "reason":     "too_cold" if cold_exposure >= heat_exposure else "too_hot"
+        })
+    elif cold_exposure > 30:
+        add_intention(c, {
+            "type":     "seek_warmer_clothes",
+            "category": "survival",
+            "priority": 40,
+            "reason":   "getting_cold"
         })

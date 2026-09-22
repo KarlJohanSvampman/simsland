@@ -191,6 +191,8 @@ def ensure_world_defaults(world, defs=None):
     # 0-100, 100=spotless; decays passively, raised by completing a
     # cleaning chore in that zone.
     world.setdefault("room_cleanliness", {})
+    world.setdefault("weather", {})   # systems/weather.py populates this on its own cadence
+    world.setdefault("movement_speed_multiplier", 1)   # api/admin.py's /admin/movement_speed
     # Per-zone furniture-change tracking (systems/refurnishing.py) --
     # {zone_key: {last_changed_tick, changes_today, day_stamp}}.
     world.setdefault("zone_furniture_changes", {})

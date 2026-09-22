@@ -2420,6 +2420,20 @@ def route_action(c, world, action, speech, definitions=None, available_actions=N
         _route_practice_juggling(c, world, action)
     elif action_type == "sing_karaoke":
         _route_sing_karaoke(c, world, action)
+    elif action_type == "listen_to_music":
+        _route_listen_to_music(c, world, action)
+    elif action_type == "play_instrument":
+        _route_play_instrument(c, world, action)
+    elif action_type == "dance":
+        _route_dance(c, world, action)
+    elif action_type == "mimic_adult":
+        _route_mimic_adult(c, world, action)
+    elif action_type == "play_alone":
+        _route_play_alone(c, world, action)
+    elif action_type == "homework":
+        _route_homework(c, world, action)
+    elif action_type == "jump_on_bed":
+        _route_jump_on_bed(c, world, action)
     elif action_type in ("grab_offensive", "hold", "punch", "kick", "shove", "threaten", "stab", "knock"):
         _route_hostile_action(c, world, action)
     elif action_type == "steal_from":
@@ -3182,6 +3196,130 @@ def _route_chin_ups(c, world, action):
 
 def _route_lift_weights(c, world, action):
     _route_exercise_activity(c, world, action, "lift_weights")
+
+
+
+# =========================================================
+# MUSIC -- listen_to_music/play_instrument/sing/dance
+# See systems/lt_needs.py's "creative" need. The music-related anchor
+# interactions (record_player's play_music, music_room's listen_to_music/
+# practice_instrument, piano/keyboard/drum_kit's play_*, karaoke_machine's
+# sing_karaoke) already existed in prop_templates -- reachable only
+# through the generic, no-payoff "interact" action before this (see the
+# module docstring above _INTERACTION_DURATIONS for that same class of
+# gap). sing/dance need no prop, same as jog.
+# =========================================================
+
+_MUSIC_REQUIRED_INTERACTIONS = {
+    "listen_to_music": ("listen_to_music", "play_music"),
+    "play_instrument": ("play_piano", "play_keyboard", "play_drums", "practice_instrument"),
+}
+_MUSIC_DURATION_TICKS = {
+    "listen_to_music": 1200,  # 20 min
+    "play_instrument": 1800,  # 30 min, matches computer_use
+    "dance":            900,  # 15 min
+}
+
+def _route_music_activity(c, world, action, activity_type):
+    target_id = action.get("target")
+    required = _MUSIC_REQUIRED_INTERACTIONS.get(activity_type)
+    if required:
+        if not target_id:
+            return
+        from systems.props import get_prop_by_id
+        prop = get_prop_by_id(world, target_id)
+        if not prop:
+            return
+        tpl = world.get("definitions", {}).get("prop_templates", {}).get(prop.get("template"), {})
+        if not any(a.get("interaction") in required for a in tpl.get("anchors", [])):
+            return
+
+    c["activity"] = _scaffold(
+        c, world, activity_type,
+        target_id=target_id,
+        interaction=activity_type,
+        duration=_MUSIC_DURATION_TICKS[activity_type],
+    )
+
+
+def _route_listen_to_music(c, world, action):
+    _route_music_activity(c, world, action, "listen_to_music")
+
+
+def _route_play_instrument(c, world, action):
+    _route_music_activity(c, world, action, "play_instrument")
+
+
+def _route_dance(c, world, action):
+    _route_music_activity(c, world, action, "dance")
+
+
+# =========================================================
+# CHILDISH INTENTIONS -- mimic_adult/play_alone/homework/jump_on_bed
+# context_builder.py only ever offers these to age_group=="child"; the
+# route handlers themselves don't re-check age since nothing else routes
+# these action types in.
+# =========================================================
+
+_CHILD_ACTIVITY_DURATION_TICKS = {
+    "mimic_adult":  300,   # 5 min -- a quick, in-the-moment copy-cat beat
+    "play_alone":   1200,  # 20 min
+    "homework":     1800,  # 30 min
+    "jump_on_bed":  300,   # 5 min -- a short mischief burst, not a real activity
+}
+
+
+def _route_mimic_adult(c, world, action):
+    target_id = action.get("target")
+    if not target_id:
+        return
+    adult = world.get("characters", {}).get(target_id)
+    if not adult or adult.get("age_group") not in ("adult", "elderly"):
+        return
+
+    c["activity"] = _scaffold(
+        c, world, "mimic_adult",
+        target_id=target_id,
+        interaction="mimic_adult",
+        duration=_CHILD_ACTIVITY_DURATION_TICKS["mimic_adult"],
+    )
+    c["activity"]["state"]["mimicked_activity"] = (adult.get("activity") or {}).get("type")
+
+
+def _route_play_alone(c, world, action):
+    c["activity"] = _scaffold(
+        c, world, "play_alone",
+        interaction="play_alone",
+        duration=_CHILD_ACTIVITY_DURATION_TICKS["play_alone"],
+    )
+
+
+def _route_homework(c, world, action):
+    c["activity"] = _scaffold(
+        c, world, "homework",
+        interaction="homework",
+        duration=_CHILD_ACTIVITY_DURATION_TICKS["homework"],
+    )
+
+
+def _route_jump_on_bed(c, world, action):
+    target_id = action.get("target")
+    if not target_id:
+        return
+    from systems.props import get_prop_by_id
+    prop = get_prop_by_id(world, target_id)
+    if not prop:
+        return
+    tpl = world.get("definitions", {}).get("prop_templates", {}).get(prop.get("template"), {})
+    if "sleepable" not in tpl.get("tags", []):
+        return
+
+    c["activity"] = _scaffold(
+        c, world, "jump_on_bed",
+        target_id=target_id,
+        interaction="jump_on_bed",
+        duration=_CHILD_ACTIVITY_DURATION_TICKS["jump_on_bed"],
+    )
 
 
 def _route_practice_juggling(c, world, action):

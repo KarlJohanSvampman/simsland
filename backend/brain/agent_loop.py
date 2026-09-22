@@ -129,9 +129,11 @@ from systems.story import (
     update_story_arc
 )
 
-from systems.movement import (
-    update_character_movement
-)
+# systems.movement's update_character_movement is no longer called from
+# here -- see the two former call sites' comments below (this function's
+# activity branch, and the MOVEMENT section further down): it now runs
+# once, up front, for every is_moving character directly in
+# sim_loop.py's main tick(), before any per-character dispatch.
 
 from systems.action_router import (
     clear_expired_speech
@@ -783,6 +785,22 @@ def update_agent(
     sort_intentions(c)
 
     # =====================================
+    # SITUATION SELECTION (brain/situations/) -- deterministic, no LLM.
+    # Per the user's explicit ask: decide *what deserves attention* as its
+    # own cheap, explainable step, separate from the LLM later deciding
+    # *what to do about it*. Runs every tick (candidates are just
+    # c["active_intentions"], already maintained above) so
+    # c["selected_situation"] is always current by the time a real
+    # think() call actually happens; context_builder.py reads it to
+    # foreground the winning situation(s) in what the LLM is shown,
+    # instead of just a flat top-6 priority list with no explicit "this
+    # one" framing.
+    # =====================================
+
+    from brain.situations.selector import select_situation
+    c["selected_situation"] = select_situation(c, world)
+
+    # =====================================
     # ITEM KNOWLEDGE DECAY
     # =====================================
 
@@ -797,14 +815,26 @@ def update_agent(
         # An activity's own "walking" phase (activities.py::execute_activity)
         # only ever checks is_moving to decide whether the character has
         # arrived -- it never itself advances position. update_character_
-        # movement() is what flips is_moving to False on arrival, but it's
-        # normally only reached below, past the `return` a couple of lines
-        # down -- unreachable the entire time an activity is active. Without
-        # this, any activity with a walking phase (eat/drink/sleep/shower/
-        # use_toilet/...) would queue a real route and then never move
-        # along it, leaving the character stuck mid-walk indefinitely.
-        if c.get("is_moving"):
-            update_character_movement(c, world)
+        # movement() is what flips is_moving to False on arrival.
+        #
+        # Confirmed live bug (player report: a character mid-walk to the
+        # kitchen frozen in place for well over a minute, moving only in
+        # occasional bursts): this used to call update_character_movement()
+        # right here -- meaning actual position interpolation, pure CPU-
+        # bound math with no LLM/network call involved, only ever
+        # happened when THIS character's own update_agent() call (run on
+        # sim_loop.py's per-character worker-thread pool, sharing the GIL
+        # with however many OTHER characters are mid-LLM-call that same
+        # tick) actually got its turn within the pool's bounded per-tick
+        # wait budget. A character who was otherwise idle computationally
+        # but just happened to share a busy tick with someone else's slow
+        # think() call got their walk stalled for no reason connected to
+        # their own state at all. Movement is now applied once, up front,
+        # for every is_moving character, directly in sim_loop.py's main
+        # tick() -- before any per-character dispatch -- so it can never
+        # be delayed by another character's unrelated LLM latency. By the
+        # time this function runs, is_moving already reflects this same
+        # tick's movement, so there is nothing left to do here.
 
         # Check whether an urgent body need should interrupt a queued hobby.
         # Only activities in queues flagged "interruptible" can be suspended;
@@ -947,13 +977,18 @@ def update_agent(
     # =====================================
     # If still walking a previously-planned route, let it continue and
     # skip evaluating new intentions / calling the LLM this tick.
-
-    moving = update_character_movement(
-        c,
-        world
-    )
-
-    if moving or c.get("travel_state") in TRAVEL_WALKING_STATES:
+    #
+    # update_character_movement() itself now runs once, up front, for
+    # every is_moving character directly in sim_loop.py's main tick() --
+    # see the matching comment on this function's activity branch above
+    # for why -- so by this point in the tick, is_moving/pushing_prop_id
+    # already reflect the outcome of this tick's movement. A pusher (see
+    # update_character_movement's own pushing_prop_id short-circuit)
+    # always counts as "still moving" here even though it doesn't drive
+    # is_moving itself -- it's attached to the dragger, not walking its
+    # own route.
+    if (c.get("is_moving") or c.get("pushing_prop_id")
+            or c.get("travel_state") in TRAVEL_WALKING_STATES):
         return
 
     # =====================================

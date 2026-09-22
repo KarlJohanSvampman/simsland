@@ -2549,6 +2549,45 @@ def complete_activity(
         satisfy_lt_need(c, "exercise", world, hobby_id=hobby_id, has_companion=has_companion)
 
     # =====================================
+    # MUSIC — listen_to_music/play_instrument/dance (action_router.py).
+    # See systems/lt_needs.py's "creative" need -- unlike "exercise" this
+    # need has no dedicated subsystem to route into, so satisfy_lt_need()
+    # alone (frustration/stress) is the whole payoff.
+    # =====================================
+
+    elif activity_type in ("listen_to_music", "play_instrument", "dance"):
+        from systems.lt_needs import satisfy_lt_need
+        satisfy_lt_need(c, "creative", world)
+
+    # =====================================
+    # CHILDISH INTENTIONS — mimic_adult/play_alone/homework/jump_on_bed
+    # (action_router.py, all gated to age_group=="child" in
+    # context_builder.py). mimic_adult/play_alone/jump_on_bed satisfy the
+    # "play" need; homework satisfies "learning" -- it's schoolwork, not
+    # leisure, so it doesn't belong under "play".
+    # =====================================
+
+    elif activity_type in ("mimic_adult", "play_alone", "jump_on_bed"):
+        from systems.lt_needs import satisfy_lt_need
+        satisfy_lt_need(c, "play", world)
+        if activity_type == "mimic_adult":
+            target_id = act.get("target_id")
+            adult = world.get("characters", {}).get(target_id)
+            mimicked = (act.get("state") or {}).get("mimicked_activity")
+            if adult:
+                from brain.relationships import ensure_relationship
+                rel = ensure_relationship(c, adult["id"])
+                rel["familiarity"] = min(100, rel.get("familiarity", 0) + 1)
+                from systems.incidental_speech import fire_incidental
+                flavor = f"like {adult.get('name', 'them')}" if not mimicked else \
+                    f"pretending to {mimicked.replace('_', ' ')}, just like {adult.get('name', 'them')}"
+                fire_incidental(c, "inform", f"Copies {flavor}.", world)
+
+    elif activity_type == "homework":
+        from systems.lt_needs import satisfy_lt_need
+        satisfy_lt_need(c, "learning", world)
+
+    # =====================================
     # PHONE — the phone actions (action_router.py) set the phone's
     # location to "held" for the duration; put it back in the pocket
     # once the activity finishes. retrieve_phone re-acquires a phone

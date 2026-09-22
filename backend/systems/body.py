@@ -59,6 +59,8 @@ _BODY_DEFAULTS = {
     "hours_awake":         0,
     "nutrients_today":     0,
     "toilet_visits_needed_today": 1,
+    "cold_exposure":       0,   # systems/weather.py
+    "heat_exposure":       0,   # systems/weather.py
 }
 
 # Confirmed live bug: EVERY character got the exact same fixed bladder=10/
@@ -438,6 +440,38 @@ def _apply_sleep_debt_effects(c):
     # Raise stress proportional to debt
     stress_bump = (debt - 20) / 80 * 15   # max +15 stress from sleep debt
     c["stress"] = min(100, c.get("stress", 0) + stress_bump * 0.001)
+
+
+# Confirmed live bug (player report: a character stuck at stress=100 for
+# hours, cycling through negative moods with no way out): every stress
+# INCREASE in this codebase (sleep debt above, lt_needs frustration,
+# waiting, expectations missed, weather exposure, claustrophobia, ...) is
+# real, but nothing ever brought it back down passively -- the only
+# decreases were tied to specific event completions (satisfying a leisure
+# need, finishing sleep, ...), which a depressed/avoidant mood's own
+# behavior_flags make the character LESS likely to go pursue in the first
+# place. That combination is a genuine trap: maxed stress helps trigger a
+# negative mood, the mood discourages the actions that would lower
+# stress, and stress has no other way down -- so once it hits 100 it can
+# stay there for however long the mood template's duration_ticks says,
+# then likely trigger straight into another one. This is the real-world
+# "stress fades with time, given no new stressors" baseline every other
+# body meter effectively already has (hunger/fatigue/etc. all move both
+# ways); stress was the one exception.
+_STRESS_PASSIVE_DECAY_PER_TICK = 0.2   # at CADENCE["health"] cadence -- ~100->0 over ~4h with nothing re-adding it
+
+
+def decay_stress(c, world=None):
+    """Cadence-driven (CADENCE["health"], see sim_loop.py) passive stress
+    recovery. Purely additive-safe: any system that's still actively
+    generating real stress this same tick (sleep debt, an unmet need,
+    weather exposure, ...) reapplies its own increase independently, so
+    an ongoing real problem keeps winning out over this -- this only
+    ever un-sticks stress that's stopped being actively re-caused."""
+    stress = c.get("stress", 0)
+    if stress <= 0:
+        return
+    c["stress"] = max(0, stress - _STRESS_PASSIVE_DECAY_PER_TICK)
 
 
 def _settle_daily_sleep_debt(c):

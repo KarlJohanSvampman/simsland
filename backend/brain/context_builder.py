@@ -504,12 +504,67 @@ def build_available_actions(c, world):
     # propose_chore (the route handler needs no target validation).
     # chin_ups/lift_weights only when a prop with the matching anchor
     # interaction (do_pull_ups / lift_weights) is actually visible.
-    action_types.extend(["jog", "sit_ups", "practice_juggling"])
+    #
+    # Confirmed live bug (player report: a 6-year-old doing sit-ups):
+    # these are structured fitness routines (systems/lt_needs.py's
+    # "exercise" need, same category adults use to train strength/
+    # cardio), not free play -- gated the same way is_child already
+    # strips cooking above and distribute_lt_needs() zeroes the
+    # romance/intimacy budget for children. practice_juggling stays
+    # available regardless -- it's a playful skill, not a workout.
+    action_types.append("practice_juggling")
+    if not is_child:
+        action_types.extend(["jog", "sit_ups"])
+        for entry in interactable:
+            if "do_pull_ups" in entry.get("interactions", []) and "chin_ups" not in action_types:
+                action_types.append("chin_ups")
+            if "lift_weights" in entry.get("interactions", []) and "lift_weights" not in action_types:
+                action_types.append("lift_weights")
+
+    # Music (systems/lt_needs.py's "creative" need via
+    # action_router.py's _route_listen_to_music/_route_play_instrument/
+    # _route_dance, plus the pre-existing _route_sing_karaoke). The
+    # music-related anchor interactions (record_player/music_room's
+    # "play_music"/"listen_to_music", piano/keyboard/drum_kit/music_room's
+    # "play_piano"/"play_keyboard"/"play_drums"/"practice_instrument")
+    # already existed in prop_templates but were only ever reachable
+    # through the generic, no-payoff "interact" action -- confirmed live
+    # gap (player report: no character ever wants to listen to music).
+    # sing_karaoke/dance need no prop -- singing and dancing don't require
+    # equipment -- so they're offered unconditionally, same as jog.
+    # sing_karaoke itself is pre-existing (real skill-check + audience
+    # reactions) but was never actually offered here before this fix.
+    action_types.extend(["sing_karaoke", "dance"])
     for entry in interactable:
-        if "do_pull_ups" in entry.get("interactions", []) and "chin_ups" not in action_types:
-            action_types.append("chin_ups")
-        if "lift_weights" in entry.get("interactions", []) and "lift_weights" not in action_types:
-            action_types.append("lift_weights")
+        interactions = entry.get("interactions", [])
+        if ("listen_to_music" in interactions or "play_music" in interactions) \
+                and "listen_to_music" not in action_types:
+            action_types.append("listen_to_music")
+        if any(i in interactions for i in
+               ("play_piano", "play_keyboard", "play_drums", "practice_instrument")) \
+                and "play_instrument" not in action_types:
+            action_types.append("play_instrument")
+
+    # Childish intentions (action_router.py's _route_mimic_adult/
+    # _route_play_alone/_route_homework/_route_jump_on_bed) -- per the
+    # player's explicit ask, alongside the exercise/romance gates above:
+    # these are things a child would actually do unprompted, offered only
+    # to children rather than left available to everyone the way the
+    # adult-oriented actions above used to be.
+    if is_child:
+        action_types.extend(["play_alone", "homework"])
+        if any("sleepable" in entry.get("tags", []) for entry in interactable):
+            action_types.append("jump_on_bed")
+        # mimic_adult needs a real adult nearby who's visibly doing
+        # something (mimicking someone standing around idle isn't much
+        # of a want) -- world lookup rather than trusting perception's
+        # enrichment to carry age_group/activity through untouched.
+        chars = world.get("characters", {})
+        for person in nearby_people:
+            other = chars.get(person["id"])
+            if other and other.get("age_group") in ("adult", "elderly") and other.get("activity"):
+                action_types.append("mimic_adult")
+                break
 
     # Phone/computer "online actions" (see systems/phone.py,
     # action_router.py's _route_computer* family + _require_phone_or_
@@ -1535,6 +1590,41 @@ def _sec_intentions(c, world):
     intentions = build_intentions(c)
     if not intentions:
         return None
+
+    # brain/situations/selector.py -- a deterministic, no-LLM pass that
+    # already ran this tick (agent_loop.py, right after sort_intentions)
+    # to decide *what deserves attention right now*, separately from this
+    # narrative step and separately from the LLM's own eventual *what to
+    # do about it* choice. Preferred over the plain "top of the priority
+    # sort" fallback below whenever it actually picked something -- it
+    # accounts for cooldown/novelty/persistence/relationship weight/trait
+    # affinity the raw priority sort doesn't, and composed==True surfaces
+    # two genuinely concurrent pulls on attention instead of only ever
+    # narrating one. Falls back to the old flat top-intention framing
+    # when the selector found nothing eligible to interrupt the current
+    # activity (e.g. mid-shower) -- same behavior as before this existed.
+    selection = c.get("selected_situation")
+    if selection and selection.get("situations"):
+        situations = selection["situations"]
+
+        def _describe(i):
+            text = i.get("type", "something")
+            if i.get("reason"):
+                text += f" ({i['reason']})"
+            return text
+
+        if selection.get("composed") and len(situations) > 1:
+            line = (f"Two things are pulling at your attention right now: "
+                     f"{_describe(situations[0])}, and {_describe(situations[1])}.")
+        else:
+            line = f"Right now you're mainly focused on {_describe(situations[0])}."
+
+        rest = [i.get("type") for i in intentions
+                if i.get("type") not in {s.get("type") for s in situations}][:3]
+        if rest:
+            line += f" You're also thinking about: {', '.join(rest)}."
+        return line
+
     top = intentions[0]
     line = f"Right now you're mainly focused on {top.get('type')}"
     if top.get("reason"):

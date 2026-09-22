@@ -102,9 +102,23 @@ def distribute_lt_needs(c, budget=100, world=None):
     # modifiers above (placed last so it always wins); their share is
     # simply redistributed across the remaining categories below rather
     # than needing a second budget re-balance.
+    #
+    # Confirmed live bug (player report): same gap for "exercise" (a
+    # 6-year-old had a real "physical exercise" want that resolved into
+    # doing sit-ups) and for "spirituality"/"purpose" -- a structured
+    # fitness regimen and an identity-level "sense of purpose" search are
+    # both adult-typical, not something a young child forms an unmet-need
+    # frustration over. See context_builder.py's matching is_child gate
+    # on the raw jog/sit_ups/chin_ups/lift_weights actions -- that one
+    # stops a child from being offered the action even opportunistically;
+    # this one stops the underlying "want" (and its frustration/stress
+    # buildup) from ever being generated for them in the first place.
     if c.get("age_group") == "child":
         weights["romance"] = 0
         weights["intimacy"] = 0
+        weights["exercise"] = 0
+        weights["spirituality"] = 0
+        weights["purpose"] = 0
 
     # Normalise to budget
     total = sum(weights.values())

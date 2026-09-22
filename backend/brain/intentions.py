@@ -105,6 +105,7 @@ INTENTION_EFFORT = {
     "socialize": 0.3, "seek_romance": 0.4, "seek_intimacy": 0.5,
     "creative_outlet": 0.25, "learn_something": 0.2,
     "spiritual_practice": 0.15, "play": 0.3, "pursue_purpose": 0.3,
+    "seek_shelter": 0.1, "seek_warmer_clothes": 0.05,
 }
 DEFAULT_INTENTION_EFFORT = 0.35
 

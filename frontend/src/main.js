@@ -245,6 +245,18 @@ const floorRegistry = {};
 const wallRegistry = {};
 const WALL_HEIGHT = 2.8;
 const WALL_THICKNESS = 0.08;
+
+// Per the user's explicit ask: a ceiling_mounted prop template
+// (ceiling_light/pendant_light -- both real prop_templates entries with
+// no GLB model, so they always render via createFallbackProp's cylinder
+// placeholder below) was placed at the exact same y=0.5 floor height as
+// every other prop -- confirmed live: they showed up as opaque blobs
+// sitting on the floor instead of hanging fixtures. CEILING_PROP_Y sits
+// just under WALL_HEIGHT (a small drop, like a real pendant fixture);
+// CEILING_PROP_OPACITY makes them mostly see-through so a ceiling light
+// doesn't visually block the room underneath from this isometric camera.
+const CEILING_PROP_Y = WALL_HEIGHT - 0.3;
+const CEILING_PROP_OPACITY = 0.2;
 const textureLoader =
   new THREE.TextureLoader();
 
@@ -2201,21 +2213,28 @@ function applyLightVisual(mesh, on){
 function createFallbackProp(prop, resolved){
 
   const lighting = isLightingTemplate(resolved);
+  const ceilingMounted = !!resolved?.ceiling_mounted;
 
   // Cylinder placeholder — blue-grey, easy to spot, clearly "not a real
   // model". A lighting prop (lamp/switch) gets its own material instead,
   // so its on/off state (systems/lighting.py) is actually visible —
-  // warm/glowing when on, dim grey when off.
+  // warm/glowing when on, dim grey when off. A ceiling-mounted one (see
+  // CEILING_PROP_OPACITY above) is also mostly transparent, same reason.
+  const material = lighting
+    ? new THREE.MeshStandardMaterial({ roughness: 0.5 })
+    : new THREE.MeshStandardMaterial({ color: 0x6688aa, roughness: 0.7 });
+  if (ceilingMounted) {
+    material.transparent = true;
+    material.opacity = CEILING_PROP_OPACITY;
+  }
   const mesh = new THREE.Mesh(
     new THREE.CylinderGeometry(0.38, 0.38, 1.0, 16),
-    lighting
-      ? new THREE.MeshStandardMaterial({ roughness: 0.5 })
-      : new THREE.MeshStandardMaterial({ color: 0x6688aa, roughness: 0.7 })
+    material
   );
 
   mesh.position.set(
     prop.x - 10,
-    0.5,
+    ceilingMounted ? CEILING_PROP_Y : 0.5,
     prop.y - 7
   );
   applyWallSideTransform(mesh, prop, resolved);
@@ -2227,7 +2246,9 @@ function createFallbackProp(prop, resolved){
 
     template: prop.template,
 
-    isLighting: lighting
+    isLighting: lighting,
+
+    ceilingMounted
   };
 
   if(lighting) applyLightVisual(mesh, isLightOn(prop, resolved));
@@ -2285,7 +2306,7 @@ async function updateProps(state){
 
       props[prop.id].position.set(
         prop.x - 10,
-        0.5,
+        resolvedExisting?.ceiling_mounted ? CEILING_PROP_Y : 0.5,
         prop.y - 7
       );
       applyWallSideTransform(props[prop.id], prop, resolvedExisting);
@@ -2370,9 +2391,13 @@ try {
 
   const model = loaded.scene;
 
+  // No real GLB exists for ceiling_light/pendant_light today (both
+  // resolve through createFallbackProp above instead) -- this just keeps
+  // a future ceiling-mounted model consistent with the fallback cylinder
+  // rather than sitting on the floor like every other prop's own y=0.
   model.position.set(
     prop.x - 10,
-    0,
+    resolved?.ceiling_mounted ? CEILING_PROP_Y : 0,
     prop.y - 7
   );
   applyWallSideTransform(model, prop, resolved);
