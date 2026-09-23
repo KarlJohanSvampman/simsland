@@ -239,12 +239,22 @@ def _laundry_on_begin(household, process, stage, world):
 
 def _laundry_on_complete(household, process, world):
     from systems.household_storage import create_household_resource
+    from systems.clothing import launder_worn, launder_inventory
     create_household_resource(
         household,
         "CLEAN_LAUNDRY",
         quantity=1,
         container="closet",
     )
+    # A load is household-scoped, not per-participant (see this file's
+    # docstring — nobody's dirty-hamper is tracked separately), so it
+    # launders everyone's clothes, not just whoever ran the process.
+    chars = world.get("characters", {})
+    for mid in household.get("members", []):
+        member = chars.get(mid)
+        if member is not None:
+            launder_worn(member)
+            launder_inventory(member)
 
 
 register_process_type("laundry", on_begin=_laundry_on_begin, on_complete=_laundry_on_complete)
