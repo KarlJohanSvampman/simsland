@@ -161,6 +161,7 @@ from systems.conditioning import tick_conditioning_weekly
 from systems.scheduling import generate_week_schedule, adjust_for_household
 from systems.lt_needs   import update_lt_needs, reset_weekly_counts, distribute_lt_needs, generate_lt_need_intentions
 from systems.social     import generate_social_intentions as generate_socialize_intention
+from systems.social     import interrupt_socializing_with_unavailable_targets
 from systems.social_odor import apply_odor_social_pressure
 from systems.phone      import update_phone_battery, maybe_set_phone_down, maybe_forget_phone
 from systems.power      import charge_device
@@ -903,6 +904,13 @@ def tick(world):
         # Real, cheap fix while already touching this cadence block.
         from systems.hobbies import check_hobby_sessions
         check_hobby_sessions(world)
+
+    # Interrupt anyone currently "socializing" with a target who's since
+    # fallen asleep or gone off-grid (systems/social.py) -- confirmed live
+    # bug: a character could be left mid-conversation with someone asleep
+    # for the rest of that activity's real duration.
+    if every(world, CADENCE["social_availability"], offset=52):
+        interrupt_socializing_with_unavailable_targets(world)
 
     if every(world, CADENCE["job_market"], offset=20):
         for c in characters:

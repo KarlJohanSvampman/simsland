@@ -341,6 +341,43 @@ def generate_social_intentions(
 
 
 # =========================================================
+# INTERRUPT SOCIALIZING WITH AN UNAVAILABLE TARGET
+# =========================================================
+# Player report: a sim was shown "socialize (Kimberly Jackson)" while
+# Kimberly herself was asleep in bed. Confirmed real, two-part gap:
+# (1) action_router.py's socialize dispatch never checked the target's
+# own availability before scaffolding the activity -- fixed there
+# directly (see its own "target_unavailable" check) for anyone who tries
+# to START socializing with someone already asleep/off-grid; (2) nothing
+# ever re-checked an ALREADY-RUNNING socialize activity once its target
+# became unavailable partway through (the far more likely real sequence
+# here: Dennis started chatting with Kimberly while she was still awake,
+# she went to bed for the night, and his own 900-tick activity just kept
+# running against a target who was no longer there to talk to). This
+# sweep is the fix for that second half.
+
+def interrupt_socializing_with_unavailable_targets(world):
+    """Called on a moderate cadence (see CADENCE["social_availability"],
+    sim_loop.py). For every character mid-"socialize", checks whether
+    their target has since fallen asleep or gone off-grid, and if so
+    interrupts the activity for real (systems/occupancy.py::
+    interrupt_activity -- releases anchors/posture properly, not a bare
+    c["activity"] = None)."""
+    from systems.occupancy import interrupt_activity
+
+    chars = world.get("characters", {})
+    for c in chars.values():
+        act = c.get("activity") or {}
+        if act.get("type") != "socialize":
+            continue
+        target = chars.get(act.get("target_id"))
+        if not target:
+            continue
+        if (target.get("activity") or {}).get("type") == "sleep" or target.get("off_grid"):
+            interrupt_activity(c, world)
+
+
+# =========================================================
 # BUILD RELATIONSHIP CONTEXT
 # =========================================================
 

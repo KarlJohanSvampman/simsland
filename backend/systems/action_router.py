@@ -2181,10 +2181,23 @@ def route_action(c, world, action, speech, definitions=None, available_actions=N
         # into anything. "speak" (a single line, not a lingering activity) is
         # deliberately left instant.
         if action_type == "socialize":
-            c["activity"] = _scaffold(
-                c, world, "socialize", target_id=target_id, interaction="talk",
-                duration=_INTERACTION_DURATIONS.get("socialize", 900),
+            # Player report: a character was shown mid-"socialize" with
+            # someone who was actually asleep in bed. This is the "don't
+            # START it" half of the fix -- never scaffold the activity
+            # against a target who's already asleep/off-grid at the
+            # moment it's chosen; systems/social.py::
+            # interrupt_socializing_with_unavailable_targets() is the
+            # other half, for a target who falls asleep partway through
+            # an already-running conversation.
+            target_unavailable = bool(target_char) and (
+                (target_char.get("activity") or {}).get("type") == "sleep"
+                or target_char.get("off_grid")
             )
+            if not target_unavailable:
+                c["activity"] = _scaffold(
+                    c, world, "socialize", target_id=target_id, interaction="talk",
+                    duration=_INTERACTION_DURATIONS.get("socialize", 900),
+                )
 
     elif action_type == "eat":
         _route_eat(c, world, action)

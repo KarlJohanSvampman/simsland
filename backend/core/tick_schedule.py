@@ -70,6 +70,7 @@ CADENCE = {
     "conversation_seating": 30,
     "weather":              60,
     "social_projects":      60,   # systems/social_projects.py -- proposal expiry + schedule-start sweep
+    "social_availability":  20,   # systems/social.py -- interrupt socializing with a target who's since fallen asleep/gone off-grid
 
     # rare / event-driven (default cadence; events bypass this)
     "news":                 60,

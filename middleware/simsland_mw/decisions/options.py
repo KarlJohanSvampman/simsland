@@ -205,7 +205,9 @@ def rule_raise_issue(dc: DecisionContext) -> List[Option]:
     Phase 2's `speech` field lets the character say it in her own words."""
     if not dc.allowed("speak"):
         return []
-    here = {p["id"]: p for p in dc.people}
+    # Same "don't talk at someone who's actually asleep" fix as
+    # rule_socialize above.
+    here = {p["id"]: p for p in dc.people if p.get("activity") != "sleeping"}
     out: List[Option] = []
     used = set()
     for e in dc.res.get("character.expectations") or []:
@@ -236,10 +238,21 @@ def rule_raise_issue(dc: DecisionContext) -> List[Option]:
 
 
 def rule_socialize(dc: DecisionContext) -> List[Option]:
+    """Player report: a character was offered/shown mid-"socialize" with
+    someone who was actually asleep in bed. This is the middleware-side
+    half of the fix -- backend/systems/perception.py's own perceived_
+    activity() already exposes "sleeping" as the real, narrated activity
+    string for a sleeping person (the same field describe_person_nearby()
+    reads), so this rule now simply never offers to chat with one. The
+    backend-side half (never starting/continuing a socialize activity
+    with an asleep target regardless of who requested it) lives in
+    systems/action_router.py and systems/social.py."""
     if not dc.allowed("socialize"):
         return []
     out: List[Option] = []
     for p in dc.people:
+        if p.get("activity") == "sleeping":
+            continue
         rel = dc.relationships.get(p["id"])
         if rel and (rel.get("friendship") or 0) >= 40:
             out.append(Option(f"chat_{dc.handle(p['id'])}", f"Spend some time chatting with {rel['name']}.",
