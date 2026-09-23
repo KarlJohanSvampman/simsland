@@ -3361,6 +3361,23 @@ function updatePerceptionOverlay(state){
   const model = sims[selectedCharacterId];
   if(!c || !model) return;
 
+  // Confirmed live bug (player report: selecting an off-grid character
+  // showed their vision/hearing range rings drifting around the map as
+  // if they were still there, invisibly walking around) -- this overlay
+  // is added straight to the scene at model.position, not as a child of
+  // the character's own mesh, so it never inherited the model.visible=
+  // false that _isCharacterHidden() already sets correctly elsewhere.
+  // Same "not really here right now" state, so treat it the same as no
+  // selection at all rather than drawing rings around empty space.
+  if(_isCharacterHidden(c)){
+    _disposeRing(perceptionOverlay.visionRing);
+    _disposeRing(perceptionOverlay.hearingRing);
+    _disposeLosLines();
+    perceptionOverlay.visionRing = null;
+    perceptionOverlay.hearingRing = null;
+    return;
+  }
+
   // Immediate refetch on building_id change -- zero drift risk, just a
   // string diff, not reimplementing the night/indoor formula client-side.
   if(c.building_id !== _lastSelectedBuildingId){
@@ -8366,9 +8383,15 @@ function _ensureSelectionRing(){
 
 function updateSelectionOverlay(elapsedSeconds){
   const ring = _ensureSelectionRing();
+  const selectedChar = selectedCharacterId ? _worldState.characters?.[selectedCharacterId] : null;
   const targetSim = selectedCharacterId ? sims[selectedCharacterId] : null;
 
-  if (!targetSim) {
+  // Same off-grid/hidden gate as updatePerceptionOverlay() -- the ring is
+  // parented onto the character's own mesh (unlike the vision/hearing
+  // rings above), so model.visible=false SHOULD already cascade to hide
+  // it, but that's an implicit dependency on the renderer's traversal
+  // order; check explicitly rather than trust it.
+  if (!targetSim || !selectedChar || _isCharacterHidden(selectedChar)) {
     if (ring.parent) ring.parent.remove(ring);
     _selectionRingParent = null;
     return;
