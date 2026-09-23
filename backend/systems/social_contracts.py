@@ -46,7 +46,7 @@ def _check_resource_state(term, party_char, world):
 def _check_activity(term, party_char, world):
     """True if the character is (or recently was) doing a forbidden activity."""
     forbidden = term.get("params", {}).get("forbidden_activity")
-    current   = party_char.get("activity", {}).get("type")
+    current   = (party_char.get("activity") or {}).get("type")
     return forbidden and current == forbidden
 
 
@@ -61,7 +61,7 @@ def _check_schedule(term, party_char, world):
     if not in_window:
         return False
     forbidden = params.get("forbidden_activity")
-    current   = party_char.get("activity", {}).get("type")
+    current   = (party_char.get("activity") or {}).get("type")
     return forbidden and current == forbidden
 
 

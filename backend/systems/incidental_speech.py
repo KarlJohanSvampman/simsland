@@ -371,7 +371,7 @@ def _tick_micro_requests(chars, world):
         if not target:
             continue
         # Simple acceptance: accept if not sleeping, not in argument
-        activity_type = target.get("activity", {}).get("type", "")
+        activity_type = (target.get("activity") or {}).get("type", "")
         if activity_type in ("sleep", "fight", "flee"):
             reply = random.choice(["Not right now.", "Give me a sec."])
             fire_incidental(target, "micro_decline", reply, world,

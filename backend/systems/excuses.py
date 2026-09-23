@@ -109,7 +109,7 @@ def _detail_is_sensitive(detail_type, c, world, authority=None):
 
     if detail_type == "what":
         # Check the explicit activity
-        activity_type = c.get("activity", {}).get("type", "")
+        activity_type = (c.get("activity") or {}).get("type", "")
         if activity_type and _authority_disapproves_of_activity(auth_char, activity_type, world):
             return True
         # Check implied activity from company (associative risk)

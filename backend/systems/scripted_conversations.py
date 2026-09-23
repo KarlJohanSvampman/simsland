@@ -102,7 +102,15 @@ def _end_conversation(world, entry):
 
     if entry["medium"] == "call":
         for c in (a, b):
-            if c and c.get("activity", {}).get("interaction") == "phone_call":
+            # Confirmed live bug (froze the entire tick loop): c["activity"]
+            # can be explicitly None (not just absent), and dict.get()'s
+            # default only covers a MISSING key, not a present key whose
+            # value already IS None -- c.get("activity", {}).get(...) still
+            # raised AttributeError on None.get(...) every single tick,
+            # uncaught, before update_world_tick()/save_world() ever ran
+            # (main.py::_run_tick_and_persist calls tick() before either),
+            # so the whole simulation silently stopped persisting/advancing.
+            if c and (c.get("activity") or {}).get("interaction") == "phone_call":
                 c["activity"] = {}
 
     tier = entry["tier"]

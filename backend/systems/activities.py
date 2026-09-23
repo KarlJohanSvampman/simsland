@@ -2111,7 +2111,7 @@ def complete_activity(
     )
 
     if activity_type == "sleep":
-        duration = c.get("activity", {}).get("duration", 28800) / 60
+        duration = (c.get("activity") or {}).get("duration", 28800) / 60
         on_sleep_complete(c, duration, world=world)
         # Posture bookkeeping — set_posture() also writes a transient
         # "lying_to_standing" animation_state, but the very next line in
