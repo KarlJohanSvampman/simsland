@@ -450,6 +450,17 @@ def finish_recipe(
         meal
     )
 
+    # Cooking dirties the kitchen -- scaled by how many stages the recipe
+    # actually needed (more steps, more pans/counter space used), same
+    # zone-scalar chores.py's own dishwashing/floor chores already credit
+    # against. A bad cook (low quality) also means more mess left behind.
+    from systems.chores import adjust_room_cleanliness, kitchen_zone_key
+    zone_key = kitchen_zone_key(world, household)
+    if zone_key:
+        stage_count = len(recipe.get("stages", [])) or 1
+        mess = 3.0 * stage_count * (1.5 - quality)
+        adjust_room_cleanliness(world, zone_key, -mess)
+
     process[
         "completed"
     ] = True
