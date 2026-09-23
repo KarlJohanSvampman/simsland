@@ -219,11 +219,18 @@ def create_shared_event(world, participants, tier, location_id=None, severity=No
         script = generate_conversation_script(a, b, tier, world, severity=severity,
                                                medium=medium, subcategory=subcategory)
         if medium == "call":
-            begin_scripted_call(world, a, b, script, tier, severity, subcategory)
+            conv = begin_scripted_call(world, a, b, script, tier, severity, subcategory)
         else:
-            begin_scripted_sms(world, a, b, script, tier, severity, subcategory)
+            conv = begin_scripted_sms(world, a, b, script, tier, severity, subcategory)
         event["text"] = f"{a['name']} and {b['name']} are exchanging {'a call' if medium == 'call' else 'texts'}."
         event["topic"] = (subcategory or {}).get("subcategory") or tier
+        # Per the user's explicit ask: lets the timeline's event modal
+        # link straight to the real transcript this scripted call/text
+        # actually produces (via brain/conversations.py::add_message(),
+        # ticked by systems/scripted_conversations.py::
+        # tick_scripted_conversations()) instead of just a one-line
+        # "exchanging a call" summary with nothing behind it.
+        event["conv_id"] = conv["id"]
         return event
 
     from llm.shared_event_narration import generate_shared_event_narration

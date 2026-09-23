@@ -62,7 +62,8 @@ def _resolve_target_name(world, target_id):
 
 
 def log_debug_event(c, world, category, text, target_id=None, target_name=None,
-                    action_type=None, activity_type=None):
+                    action_type=None, activity_type=None, interaction=None,
+                    anchor_name=None):
     """category: "action" | "activity" | "reaction" | "violation" """
     text = (text or "").strip()
     if not text:
@@ -98,6 +99,16 @@ def log_debug_event(c, world, category, text, target_id=None, target_name=None,
         extra["action_type"] = action_type
     if activity_type:
         extra["activity_type"] = activity_type
+    # Per the user's explicit ask: a generic "interact"/activity_type
+    # doesn't say WHICH of the target prop's own anchors/affordances was
+    # actually used (e.g. kitchen_counter's real anchor is "prepare_food"
+    # -- see systems/action_router.py::_route_interact, which already
+    # resolves both of these onto c["activity"] itself, just never fed
+    # them any further than that).
+    if interaction:
+        extra["interaction"] = interaction
+    if anchor_name:
+        extra["anchor_name"] = anchor_name
 
     from brain.memory import store_memory
     store_memory(
@@ -119,14 +130,18 @@ def log_action(c, world, action_type, detail="", target_id=None):
                     target_name=target_name, action_type=action_type)
 
 
-def log_activity(c, world, activity_type, event, target_id=None):
+def log_activity(c, world, activity_type, event, target_id=None, interaction=None,
+                 anchor_name=None):
     """event: "started" | "completed" | "interrupted" | "timed out" """
     category = _category_for_activity(activity_type)
     label = activity_type.replace("_", " ")
+    if interaction and interaction != activity_type:
+        label += f" — {interaction.replace('_', ' ')}"
     target_name = _resolve_target_name(world, target_id)
     text = f"Activity {event}: {label}" + (f" ({target_name})" if target_name else "")
     log_debug_event(c, world, category, text, target_id=target_id,
-                    target_name=target_name, activity_type=activity_type)
+                    target_name=target_name, activity_type=activity_type,
+                    interaction=interaction, anchor_name=anchor_name)
 
 
 def log_reaction(c, world, reaction_type, detail=""):

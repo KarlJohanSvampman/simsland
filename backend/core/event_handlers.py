@@ -413,7 +413,9 @@ def _on_activity_started(data, world):
     from systems.debug_log import log_activity
     c = world.get("characters", {}).get(data.get("character_id"))
     if c:
-        log_activity(c, world, data.get("activity_type", "?"), "started", target_id=data.get("target_id"))
+        act = c.get("activity") or {}
+        log_activity(c, world, data.get("activity_type", "?"), "started", target_id=data.get("target_id"),
+                    interaction=act.get("interaction"), anchor_name=act.get("anchor_name"))
 
 subscribe("activity_started", _on_activity_started)
 
@@ -422,7 +424,13 @@ def _on_activity_completed(data, world):
     from systems.debug_log import log_activity
     c = world.get("characters", {}).get(data.get("character_id"))
     if c:
-        log_activity(c, world, data.get("activity_type", "?"), "completed", target_id=data.get("target_id"))
+        # activity_completed fires as the activity resolves -- c["activity"]
+        # may already be cleared by the time this handler runs, same as
+        # activity_finished below, so interaction/anchor_name are a
+        # best-effort read, not guaranteed present.
+        act = c.get("activity") or {}
+        log_activity(c, world, data.get("activity_type", "?"), "completed", target_id=data.get("target_id"),
+                    interaction=act.get("interaction"), anchor_name=act.get("anchor_name"))
 
 subscribe("activity_completed", _on_activity_completed)
 
@@ -431,7 +439,9 @@ def _on_activity_finished(data, world):
     from systems.debug_log import log_activity
     c = world.get("characters", {}).get(data.get("character_id"))
     if c:
-        log_activity(c, world, data.get("activity_type", "?"), "finished", target_id=data.get("target_id"))
+        act = c.get("activity") or {}
+        log_activity(c, world, data.get("activity_type", "?"), "finished", target_id=data.get("target_id"),
+                    interaction=act.get("interaction"), anchor_name=act.get("anchor_name"))
 
 subscribe("activity_finished", _on_activity_finished)
 

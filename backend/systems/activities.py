@@ -1829,7 +1829,8 @@ def execute_activity(
         # completed" (the interaction's own finish). Reuses debug_log.py's
         # existing green/memory pipeline, just a third lifecycle point.
         from systems.debug_log import log_activity
-        log_activity(c, world, act.get("type", "?"), "reached target, interaction begun", target_id=act.get("target_id"))
+        log_activity(c, world, act.get("type", "?"), "reached target, interaction begun", target_id=act.get("target_id"),
+                    interaction=act.get("interaction"), anchor_name=act.get("anchor_name"))
 
         # A real sleep session just began (phase_started_tick/duration are
         # both fresh as of the line above) -- this is the one moment

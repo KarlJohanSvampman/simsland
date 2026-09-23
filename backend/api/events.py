@@ -79,6 +79,12 @@ def _format_event(world, event):
     detail = event.get("detail")
     base["detail"] = detail if detail and detail != summary else None
     base["category"] = event.get("category")
+    # Only ever set for a scripted call/text (systems/events.py::
+    # create_shared_event()'s medium branch) -- an in-person shared event
+    # resolves in one narrated shot with no real turn-by-turn dialogue
+    # behind it, so there's genuinely nothing to link to there.
+    base["conv_id"] = event.get("conv_id")
+    base["participants"] = event.get("participants")
     return base
 
 
@@ -92,3 +98,50 @@ def get_events(sim_id: str = "default", limit: int = 50):
         "tick": world.get("tick", 0),
         "events": [_format_event(world, e) for e in recent],
     }
+
+
+@router.get("/conversation/{conv_id}")
+def get_conversation(conv_id: str, sim_id: str = "default", participants: str = ""):
+    """
+    Full transcript for a conv_id surfaced on a timeline event (see
+    _format_event() above) -- the timeline is global, not scoped to any
+    one character's already-loaded Inspector data, so this looks it up
+    server-side instead. Checks the LIVE conversation first (still
+    in-progress, or finished but not yet swept into conversation_log by
+    brain/conversations.py::cleanup_conversations()'s silence timeout),
+    then falls back to searching the named participants' own archived
+    conversation_log (participants: comma-separated character ids, from
+    the event's own "participants" field -- keeps this from having to
+    scan every character in a larger sim).
+    """
+    world = load_world(sim_id)
+    chars = world.get("characters", {})
+
+    live = world.get("conversations", {}).get(conv_id)
+    if live:
+        withs = [
+            {"id": pid, "name": chars[pid].get("name", pid)}
+            for pid in live.get("participants", []) if pid in chars
+        ]
+        return {
+            "ok": True,
+            "conv_id": conv_id,
+            "medium": live.get("medium", "in_person"),
+            "topic": live.get("topic"),
+            "started_tick": live.get("started_at"),
+            "ended_tick": live.get("last_update"),
+            "with": withs,
+            "lines": list(live.get("history", [])),
+            "active": live.get("active", False),
+        }
+
+    candidate_ids = [pid for pid in participants.split(",") if pid] or list(chars.keys())
+    for pid in candidate_ids:
+        c = chars.get(pid)
+        if not c:
+            continue
+        for entry in c.get("conversation_log", []):
+            if entry.get("conv_id") == conv_id:
+                return {"ok": True, **entry, "active": False}
+
+    return {"ok": False, "error": "conversation not found"}

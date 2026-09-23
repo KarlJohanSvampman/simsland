@@ -5503,16 +5503,33 @@ function openMemoryModal(m){
   summary.textContent = m.text || "";
   body.appendChild(summary);
   const peopleNames = (m.people || []).map(_charName).filter(Boolean);
+  // Per the user's explicit ask ("just show everything that is
+  // relevant"): a curated label for every field this codebase's various
+  // store_memory() callers are actually known to set (debug_log.py's
+  // interaction/anchor_name, e.g. kitchen_counter's real "prepare_food"
+  // anchor, are two that used to be silently dropped despite already
+  // being available at the call site -- see systems/debug_log.py), PLUS
+  // a generic catch-all below for anything else present that isn't
+  // already shown elsewhere in this modal or purely internal bookkeeping.
+  const _shown = new Set(["id", "text", "fading_details", "created_at", "conv_id", "people", "tags", "importance"]);
   const fields = [
     ["When", _formatMemoryTimestamp(m.tick)],
     ["Kind", m.kind],
     ["Action type", m.action_type],
     ["Activity type", m.activity_type],
+    ["Interaction", m.interaction],
+    ["Anchor", m.anchor_name],
     ["Target", m.target_name ? `${m.target_name} (${m.target_id})` : m.target_id],
     ["With", peopleNames.length ? peopleNames.join(", ") : null],
+    ["Source", m.source],
+    ["Emotional impact", m.emotional_impact],
     ["Tags", m.tags?.length ? m.tags.join(", ") : null],
     ["Importance", m.importance != null ? m.importance.toFixed(2) : null],
   ];
+  for(const k of ["action_type", "activity_type", "interaction", "anchor_name", "target_name",
+                   "target_id", "source", "emotional_impact", "tick"]){
+    _shown.add(k);
+  }
   for(const [k, v] of fields){
     if(v == null || v === "") continue;
     const row = document.createElement("div");
@@ -5520,6 +5537,20 @@ function openMemoryModal(m){
     row.innerHTML = `<div class="eventModalRowMeta"></div><div></div>`;
     row.children[0].textContent = k;
     row.children[1].textContent = String(v);
+    body.appendChild(row);
+  }
+  // Generic catch-all: whatever else this particular memory happens to
+  // carry (different store_memory() callers pass different **extra
+  // fields -- e.g. a shopping trip's "trip_id", a choice_made's
+  // "choice_type"/"chosen_label") that isn't already shown above.
+  for(const [k, v] of Object.entries(m)){
+    if(_shown.has(k) || v == null || v === "") continue;
+    const label = k.replace(/_/g, " ").replace(/\b\w/g, ch => ch.toUpperCase());
+    const row = document.createElement("div");
+    row.className = "eventModalRow";
+    row.innerHTML = `<div class="eventModalRowMeta"></div><div></div>`;
+    row.children[0].textContent = label;
+    row.children[1].textContent = typeof v === "object" ? JSON.stringify(v) : String(v);
     body.appendChild(row);
   }
 
@@ -7962,6 +7993,37 @@ function openEventModal(items, nowTick){
       detail.className = "eventModalRowDetail";
       detail.textContent = ev.detail;
       row.appendChild(detail);
+    }
+
+    // Per the user's explicit ask: a "[call]"/"[text]" event is a real,
+    // ticked conversation behind the scenes (systems/events.py::
+    // create_shared_event() -> systems/scripted_conversations.py) --
+    // only ever set for those, never an in-person shared event, which
+    // resolves in one narrated shot with no real transcript behind it.
+    if(ev.conv_id){
+      const link = document.createElement("a");
+      link.href = "#";
+      link.style.cssText = "display:inline-block;margin-top:6px;opacity:.85;font-size:.9em;";
+      link.textContent = "View full conversation →";
+      link.addEventListener("click", async (e) => {
+        e.preventDefault();
+        link.textContent = "Loading…";
+        try{
+          const participants = (ev.participants || []).join(",");
+          const res = await fetch(`/api/conversation/${ev.conv_id}?sim_id=default&participants=${participants}`);
+          const data = await res.json();
+          if(data.ok){
+            openConversationModal(data);
+          } else {
+            link.textContent = "(conversation no longer available)";
+            link.style.pointerEvents = "none";
+            link.style.opacity = ".5";
+          }
+        } catch(err){
+          link.textContent = "(failed to load conversation)";
+        }
+      });
+      row.appendChild(link);
     }
 
     body.appendChild(row);

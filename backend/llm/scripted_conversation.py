@@ -66,16 +66,32 @@ def _fallback_script(a_name, b_name, tier, medium):
 def _to_speaker_ids(script_by_name, a, b):
     """Resolve each turn's 'speaker' (a real name) back to a real
     character id, defaulting to alternating a/b if the LLM's name
-    doesn't match either participant cleanly."""
+    doesn't match either participant cleanly.
+
+    Confirmed live bug (same failure class as the tick-loop freeze fixed
+    earlier this session -- an uncaught exception deep in conversation
+    code, here reachable from systems/events.py::create_shared_event()):
+    _generate()'s only shape check on the LLM's parsed "lines" is
+    isinstance(lines, list) -- a well-formed JSON list whose ELEMENTS
+    aren't the expected {"speaker","line"} dicts (e.g. a list of plain
+    strings, seen live off a call abandoned by llm_gate's own timeout)
+    sailed through unchanged and crashed here on turn.get(...), since a
+    str has no .get(). Coerced defensively per-turn instead of trusting
+    the LLM's/run_llm_call's own shape -- a malformed turn is treated as
+    an empty line from whoever's turn it is, not a crash.
+    """
     name_to_id = {a["name"]: a["id"], b["name"]: b["id"]}
     out = []
     last_speaker = None
     for i, turn in enumerate(script_by_name):
+        if not isinstance(turn, dict):
+            turn = {}
         speaker_name = turn.get("speaker", "")
         speaker_id = name_to_id.get(speaker_name)
         if not speaker_id:
             speaker_id = b["id"] if last_speaker == a["id"] else a["id"]
-        out.append({"speaker_id": speaker_id, "line": turn.get("line", "").strip() or "..."})
+        line = turn.get("line", "")
+        out.append({"speaker_id": speaker_id, "line": (line or "").strip() or "..."})
         last_speaker = speaker_id
     return out
 
