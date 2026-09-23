@@ -314,6 +314,29 @@ def _find_someone_to_blame(world, c):
     return random.choice(mates) if mates else None
 
 
+SPILL_CHANCE = 0.06
+SPILL_CLEANLINESS_HIT = 15.0
+
+
+def maybe_spill(c, world):
+    """Called from activities.py::complete_activity() on finishing eating
+    or drinking -- a small, real chance of an accidental mess, an acute
+    version of the same ambient dirtying tick_room_cleanliness_decay
+    already causes passively, just immediate and attributable to a
+    specific moment. No separate reactive pipeline needed here:
+    maybe_react_to_mess() below (same cleanliness cadence) already
+    notices any zone that crosses below a character's own threshold and
+    nags/blames/self-cleans generically, regardless of why it got dirty."""
+    if random.random() >= SPILL_CHANCE:
+        return
+    zone_key = zone_key_for_character(c)
+    if not zone_key:
+        return
+    adjust_room_cleanliness(world, zone_key, -SPILL_CLEANLINESS_HIT)
+    from systems.debug_log import log_debug_event
+    log_debug_event(c, world, "reaction", "Oops -- spilled a little.")
+
+
 def maybe_react_to_mess(c, world):
     """Called from sim_loop.py on a slow per-character cadence. Finds the
     worst zone this character can see that's below their own

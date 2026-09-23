@@ -2101,6 +2101,22 @@ def complete_activity(
 
             act
         )
+
+    # =====================================
+    # SPILL — a small, real chance of an accidental mess on finishing
+    # eating/drinking. Deliberately NOT a separate reactive pipeline:
+    # systems/chores.py::maybe_react_to_mess (same cleanliness cadence,
+    # already wired into sim_loop.py) already notices any zone that
+    # crosses below a character's own threshold and nags/blames/
+    # self-cleans generically, regardless of why it got dirty -- a spill
+    # just needs to be a real, acute cleanliness hit, not its own
+    # duplicate notice-and-react system.
+    # =====================================
+    if activity_type in ("eat_meal", "eat_snack", "drink", "drink_water",
+                          "drink_alcohol", "have_drink"):
+        from systems.chores import maybe_spill
+        maybe_spill(c, world)
+
     # =====================================
     # SLEEP
     # =====================================
