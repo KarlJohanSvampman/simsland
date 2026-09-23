@@ -72,6 +72,11 @@ WAKE_PRIORITY = {
     "intimate_object_discovered": 46,  # systems/intimate_item_discovery.py
     "plant_needs_water": 40,        # systems/plants.py
     "appliance_broken":  47,        # systems/appliance_degradation.py
+    "child_placement": 85,          # systems/child_welfare.py -- a child's
+                                     # caregiver just became unavailable and
+                                     # they're being placed elsewhere
+    "took_in_relative_child": 65,   # systems/child_welfare.py
+    "reunified_with_caregiver": 60, # systems/child_welfare.py
     "partner_broke_up_with_me": 70,          # systems/romance.py -- a major,
                                               # unilateral life event
     "partner_flirted_with_someone_else": 68, # systems/action_router.py::
