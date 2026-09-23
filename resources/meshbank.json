@@ -888,5 +888,75 @@
     "hasSkeleton": false,
     "targets": {},
     "interaction_points": {}
+  },
+  "male_child_base": {
+    "display_name": "male_child_base",
+    "category": "characters",
+    "mesh": "/resources/characters/child_male.glb",
+    "placement": {
+      "pivot": "bottom_center",
+      "snap_to_ground": true,
+      "snap_to_grid": true
+    },
+    "anchors": {},
+    "targets": {},
+    "interaction_points": {},
+    "tags": []
+  },
+  "female_child_base": {
+    "display_name": "female_child_base",
+    "category": "characters",
+    "mesh": "/resources/characters/child_female.glb",
+    "placement": {
+      "pivot": "bottom_center",
+      "snap_to_ground": true,
+      "snap_to_grid": true
+    },
+    "anchors": {},
+    "targets": {},
+    "interaction_points": {},
+    "tags": []
+  },
+  "male_teen_base": {
+    "display_name": "male_teen_base",
+    "category": "characters",
+    "mesh": "/resources/characters/teen_male.glb",
+    "placement": {
+      "pivot": "bottom_center",
+      "snap_to_ground": true,
+      "snap_to_grid": true
+    },
+    "anchors": {},
+    "targets": {},
+    "interaction_points": {},
+    "tags": []
+  },
+  "female_teen_base": {
+    "display_name": "female_teen_base",
+    "category": "characters",
+    "mesh": "/resources/characters/teen_female.glb",
+    "placement": {
+      "pivot": "bottom_center",
+      "snap_to_ground": true,
+      "snap_to_grid": true
+    },
+    "anchors": {},
+    "targets": {},
+    "interaction_points": {},
+    "tags": []
+  },
+  "female_elderly_base": {
+    "display_name": "female_elderly_base",
+    "category": "characters",
+    "mesh": "/resources/characters/elder_female.glb",
+    "placement": {
+      "pivot": "bottom_center",
+      "snap_to_ground": true,
+      "snap_to_grid": true
+    },
+    "anchors": {},
+    "targets": {},
+    "interaction_points": {},
+    "tags": []
   }
 }
