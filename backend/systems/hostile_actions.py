@@ -289,6 +289,14 @@ def resolve_hostile_action(actor, target, action_id, world):
     else:
         outcome = "hit"
 
+    # Captured on "hit"/"fumble" below (report_assault_incident's return)
+    # and threaded through to flag_provocation()/hostile_action_resolved
+    # so the middleware's reactive situations (violence.attacked/
+    # witnessed_violence) can offer a real call_911 option against the
+    # SAME incident context_builder.py's own _build_incident_context()
+    # already surfaces to anyone nearby, instead of guessing an id.
+    incident = None
+
     # Consume a used defense stance regardless of outcome -- it was the
     # target's one shot at this exchange.
     stance = target.pop("defense_stance", None)
@@ -378,6 +386,7 @@ def resolve_hostile_action(actor, target, action_id, world):
         try:
             from systems.emergency import report_assault_incident
             inc = report_assault_incident(world, actor, victim=target)
+            incident = inc
             _tag_minor_offender_incident(inc, actor, target, world)
         except Exception:
             pass
@@ -404,6 +413,7 @@ def resolve_hostile_action(actor, target, action_id, world):
         try:
             from systems.emergency import report_assault_incident
             inc = report_assault_incident(world, actor, victim=target)
+            incident = inc
             _tag_minor_offender_incident(inc, actor, target, world)
         except Exception:
             pass
@@ -420,9 +430,10 @@ def resolve_hostile_action(actor, target, action_id, world):
     # so a target never got any prompt to actually respond to being
     # attacked). Fires regardless of outcome -- an evaded or fumbled
     # attack still provokes a real reaction, just not an injury.
+    incident_id = incident.get("id") if incident else None
     try:
         from systems.target_reactions import flag_provocation
-        flag_provocation(target, world, actor, action_id, outcome=outcome)
+        flag_provocation(target, world, actor, action_id, outcome=outcome, incident_id=incident_id)
     except Exception:
         pass
 
@@ -430,7 +441,7 @@ def resolve_hostile_action(actor, target, action_id, world):
 
     emit("hostile_action_resolved", {
         "actor_id": actor["id"], "target_id": target["id"],
-        "action": action_id, "outcome": outcome,
+        "action": action_id, "outcome": outcome, "incident_id": incident_id,
     })
 
     return outcome

@@ -262,6 +262,58 @@ def _on_fight_physical(data, world):
 subscribe("fight_physical", _on_fight_physical)
 
 
+def _co_present(c, world):
+    """Everyone else physically here right now -- same room_id-preferred/
+    building_id-fallback idiom as systems/action_router.py::
+    _co_present_characters (kept as a small local copy rather than a
+    cross-module import of that leading-underscore helper)."""
+    room_id = c.get("room_id")
+    building_id = c.get("building_id")
+    if not room_id and not building_id:
+        return []
+    result = []
+    for other_id, other in world.get("characters", {}).items():
+        if other_id == c["id"] or other.get("alive") is False:
+            continue
+        if room_id and other.get("room_id") == room_id:
+            result.append(other)
+        elif not room_id and building_id and other.get("building_id") == building_id:
+            result.append(other)
+    return result
+
+
+def _on_hostile_action_resolved(data, world):
+    """systems/hostile_actions.py's own docstring confirmed this event
+    was emitted with ZERO subscribers before this -- systems/
+    target_reactions.py::flag_provocation() already wakes the direct
+    TARGET for real, but nobody who merely witnessed a punch/kick/shove/
+    threaten/grab/hold/wrestle land got any reactive prompt at all.
+    Gated to outcome == "hit" -- a miss/fumble isn't dramatic enough to
+    interrupt a bystander who wasn't even directly involved."""
+    if data.get("outcome") != "hit":
+        return
+    chars = world.get("characters", {})
+    actor = chars.get(data.get("actor_id"))
+    target = chars.get(data.get("target_id"))
+    if not actor or not target:
+        return
+
+    from brain.cognition_scheduler import wake_character
+    for other in _co_present(actor, world):
+        if other["id"] in (actor["id"], target["id"]):
+            continue
+        wake_character(other, world, "witnessed_violence", {
+            "actor_id":     actor["id"],
+            "actor_name":   actor.get("name", "someone"),
+            "target_id":    target["id"],
+            "target_name":  target.get("name", "someone"),
+            "action":       data.get("action"),
+            "incident_id":  data.get("incident_id"),
+        })
+
+subscribe("hostile_action_resolved", _on_hostile_action_resolved)
+
+
 # ── Reputation hooks ───────────────────────────────────────────────────────
 
 def _on_character_arrested(data, world):

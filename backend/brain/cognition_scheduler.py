@@ -46,6 +46,9 @@ WAKE_PRIORITY = {
     "provoked": 105,           # systems/target_reactions.py -- being hit/
                                  # insulted/threatened/etc. outranks merely
                                  # being spoken to
+    "witnessed_violence": 92,  # core/event_handlers.py::
+                                 # _on_hostile_action_resolved -- dramatic,
+                                 # but ranked below being the direct target
     "heard_speech": 100,
     "door_signal": 95,        # systems/doorbell.py -- noticed a doorbell/
                                  # knock; ranks just under actually being

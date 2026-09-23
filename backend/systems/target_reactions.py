@@ -101,13 +101,24 @@ def sample_reaction(target, provocation_type):
     return ranked[0][0], weights
 
 
-def flag_provocation(target, world, actor, provocation_type, outcome=None):
+def flag_provocation(target, world, actor, provocation_type, outcome=None, incident_id=None):
     """Call right after a provoking action lands on `target`. Samples a
     trait-weighted reaction, wakes the target reactively (so they get a
     real decision cycle about this instead of waiting on their next
     scheduled/idle poll), and stamps enough payload for
     cognition_scheduler.py's "provoked" wake-line template to render it
-    at the very top of their next narrative."""
+    at the very top of their next narrative.
+
+    outcome/incident_id (systems/hostile_actions.py's own "hit"/"evaded"/
+    "fumble" and the real incident it may have just filed via systems/
+    emergency.py::report_assault_incident) were both accepted as
+    parameters here already but silently dropped before reaching the
+    wake payload -- confirmed gap: the middleware's violence situations
+    (simsland_mw/situations/library/violence.py) need outcome to know
+    whether to describe a landed hit or a dodged/fumbled attempt, and
+    incident_id to offer a real call_911 option against the SAME
+    incident context_builder.py's _build_incident_context() already
+    surfaces, instead of guessing one."""
     label, weights = sample_reaction(target, provocation_type)
     if not label:
         return
@@ -129,4 +140,6 @@ def flag_provocation(target, world, actor, provocation_type, outcome=None):
         # already there, so this is purely additive.
         "actor_id":         actor["id"],
         "provocation_type": provocation_type,
+        "outcome":          outcome,
+        "incident_id":      incident_id,
     })
