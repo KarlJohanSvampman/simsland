@@ -81,7 +81,11 @@ WAKE_PRIORITY = {
     # systems/social_media.py) -- all ranked above schedule_block (an
     # ordinary reminder) but below anything involving a person actually
     # right there (person_entered_view/heard_speech/door_signal/provoked).
+    "project_created":    50,   # systems/social_projects.py -- a project you
+                                 # joined just became real (see proposal_
+                                 # countered's own tier reasoning below)
     "proposal_countered": 48,   # needs the proposer's own action to move forward
+    "project_proposal_received": 47,   # systems/social_projects.py
     "rumor_about_self":   46,   # systems/social_media.py -- a rumor (not just
                                  # an ordinary mention) ranks a bit above a
                                  # plain proposal notification: it's actively

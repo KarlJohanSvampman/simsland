@@ -124,13 +124,14 @@ ACTION_SPECS = {
     "computer_order_item":          {"group": "computer", "target": "any", "doc": "Order an item for delivery."},
     "computer_order_service":       {"group": "computer", "target": "any", "doc": "Order a service."},
 
-    # ---- social events / hobby sessions (systems/social_events.py-style
-    # routes) — routed but never offered/validated before this round -----
-    "social_browse_events":   {"group": "social_event", "target": "none", "doc": "Browse upcoming social events."},
-    "social_event_rsvp":      {"group": "social_event", "target": "any", "doc": "RSVP to an event."},
-    "social_event_comment":   {"group": "social_event", "target": "any", "doc": "Comment on an event."},
-    "social_event_attend":    {"group": "social_event", "target": "any", "doc": "Attend an event you RSVP'd to."},
-    "social_event_plan":      {"group": "social_event", "target": "none", "doc": "Plan/host a new event."},
+    # ---- social events / hobby sessions (backed by systems/
+    # social_projects.py's SocialProject model) — routed but never
+    # offered/validated before this round -----
+    "social_browse_events":   {"group": "social_event", "target": "none", "doc": "Browse social media/your phone for upcoming public events (dinners, parties, trips, ...)."},
+    "social_event_rsvp":      {"group": "social_event", "target": "any", "doc": "RSVP to an event you've heard about (event_id, response: accepted|declined|considering)."},
+    "social_event_comment":   {"group": "social_event", "target": "any", "doc": "Comment on an event (event_id, text)."},
+    "social_event_attend":    {"group": "social_event", "target": "any", "doc": "Go attend an event you're RSVP'd to (event_id) -- you'll actually leave for its real duration."},
+    "social_event_plan":      {"group": "social_event", "target": "none", "doc": "Plan/host a new event -- it becomes real immediately (you're the organizer); people you invite RSVP independently."},
     "organize_hobby_session": {"group": "social_event", "target": "any", "doc": "Organize a group hobby session."},
     "plan_hobby_session":     {"group": "social_event", "target": "any", "doc": "Plan a future hobby session."},
 
@@ -192,6 +193,13 @@ ACTION_SPECS = {
     "propose_item_sale":      {"group": "proposal", "target": "character", "detail": "item_id", "doc": "Ask if someone will sell an item of theirs -- offer_price (omit to invite their asking price) and/or offer_item_id to propose a trade instead of/alongside cash."},
     "respond_item_sale":      {"group": "proposal", "target": "proposal", "doc": "Respond to a pending item-sale/trade offer."},
     "advance_item_sale_round": {"group": "proposal", "target": "proposal", "doc": "Push a stalled item-sale/trade negotiation forward."},
+
+    # ---- social projects (see systems/social_projects.py) -----------------
+    "propose_project":         {"group": "proposal", "target": "none", "doc": "Propose a shared undertaking (a dinner, trip, club, household project, ...) to one or more people. Fields: recipients (list of character ids), project_type, title, description, objectives (list of {title, required}), tasks (list of {title, required, completion_action_type -- a real action_type that would count as doing this task, if there's an obvious one}). Only becomes a real project once at least one recipient accepts -- proposing it doesn't commit anyone."},
+    "respond_project":         {"group": "proposal", "target": "proposal", "doc": "Accept or decline a pending project invitation (proposal_id, response: accepted|declined)."},
+    "assign_project_task":     {"group": "proposal", "target": "character", "detail": "task_id", "doc": "Assign one of your project's open tasks to someone (including yourself). Only makes sense for a project you organize or already have a role in."},
+    "complete_project_task":   {"group": "proposal", "target": "proposal", "doc": "Mark one of your own assigned project tasks done (task_id). Only offered for tasks with no better, action-linked way to detect completion automatically -- use it honestly."},
+    "withdraw_from_project":   {"group": "proposal", "target": "proposal", "doc": "Leave a project you're participating in (project_id). Participation was never a permanent commitment."},
 
     # ---- social media -------------------------------------------------------
     "post_social_media":       {"group": "social", "target": "none", "doc": "Post to social media (text; media_description optional -- a photo/video isn't actually captured, just described). If the post repeats an unverified claim or piece of gossip about someone else rather than reporting something you directly know, include \"rumor\" in tags -- this is what lets other characters' reactions (and the subject's own) treat it as a rumor rather than a confirmed fact."},

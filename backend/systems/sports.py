@@ -21,7 +21,7 @@ import time
 SPORTS = ("football", "basketball", "hockey", "soccer")
 
 # How far ahead (in ticks) schedule_game_day_events() looks for upcoming
-# fixtures worth turning into a real social_events entry / attendance plan.
+# fixtures worth turning into a real social_projects entry / attendance plan.
 LOOKAHEAD_TICKS = 5 * 86400
 
 OFF_GRID_ATTEND_CHANCE = 0.4        # pro supporter: stadium/bar vs. watch from home
@@ -264,28 +264,34 @@ def _plan_fixture_attendance(world, sport, scope, fx):
     off_grid_ids = [cid for cid, a in attendees.items()
                     if a["mode"] in ("playing", "off_grid", "off_grid_spectator")]
     if off_grid_ids:
-        from systems.social_events import create_event_draft
+        from systems.social_projects import create_project_directly
         from systems.sports_leagues import GAME_DURATION_TICKS
 
         home_name = _team_display_name(world, sport, scope, home)
         away_name = _team_display_name(world, sport, scope, away)
         initiator = characters[off_grid_ids[0]]
-        evt = create_event_draft(
-            initiator, world,
-            title=f"{home_name} vs {away_name}",
-            category="sports",
+        # Record-only (systems/social_projects.py's real off-grid trigger
+        # for a fixture is kickoff_scheduled_games() below, with its own
+        # reason strings -- this project exists for the discoverable/
+        # narrative record, same as it did as a social_events.py event
+        # before this port, confirmed by fx["event_id"] never actually
+        # being read anywhere in this file).
+        project = create_project_directly(
+            world, initiator, "sports_activity", f"{home_name} vs {away_name}",
             description=f"Game day: {home_name} vs {away_name}.",
             location="stadium" if scope == "pro" else "local sports grounds",
             location_type="stadium" if scope == "pro" else "venue",
-            start_ts=_tick_to_ts(world, fx["scheduled_tick"]),
-            end_ts=_tick_to_ts(world, fx["scheduled_tick"] + GAME_DURATION_TICKS),
+            planned_start_tick=fx["scheduled_tick"],
+            planned_end_tick=fx["scheduled_tick"] + GAME_DURATION_TICKS,
             tags=["game_day", sport, scope, fx["id"], home, away],
         )
         for cid in off_grid_ids[1:]:
-            if cid not in evt["invited"]:
-                evt["invited"].append(cid)
-            evt["attendees"][cid] = "yes"
-        fx["event_id"] = evt["id"]
+            if cid not in project["participant_ids"]:
+                project["participant_ids"].append(cid)
+            char = characters.get(cid)
+            if char is not None and project["project_id"] not in char.get("project_ids", []):
+                char.setdefault("project_ids", []).append(project["project_id"])
+        fx["event_id"] = project["project_id"]
 
 
 # ----------------------------------------------------------

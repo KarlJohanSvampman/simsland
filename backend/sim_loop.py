@@ -164,9 +164,6 @@ from systems.social     import generate_social_intentions as generate_socialize_
 from systems.social_odor import apply_odor_social_pressure
 from systems.phone      import update_phone_battery, maybe_set_phone_down, maybe_forget_phone
 from systems.power      import charge_device
-from systems.social_events import (
-    check_event_completions, check_maybe_deadlines, generate_world_events
-)
 from systems.calendar_events import check_calendar_reminders
 from systems.reminders import check_reminders
 from systems.contract_clauses import tick_contract_clauses, tick_pending_payouts
@@ -893,6 +890,20 @@ def tick(world):
         generate_weather_tick(world)
         apply_weather_to_characters(world)
 
+    # Social Projects (systems/social_projects.py) -- proposal expiry
+    # (timeout defaults to declined, never auto-accepted) + SCHEDULED ->
+    # ACTIVE transition once a project's planned_start_tick arrives.
+    if every(world, CADENCE["social_projects"], offset=48):
+        from systems.social_projects import tick_social_projects
+        tick_social_projects(world)
+        # Confirmed real, pre-existing gap carried over from the retired
+        # systems/social_events.py: check_hobby_sessions() (spawns/despawns
+        # temporary NPC guests for an at-home hobby session) had zero
+        # callers anywhere in this codebase, so it never actually ran.
+        # Real, cheap fix while already touching this cadence block.
+        from systems.hobbies import check_hobby_sessions
+        check_hobby_sessions(world)
+
     if every(world, CADENCE["job_market"], offset=20):
         for c in characters:
             update_investment_behavior(c, world)
@@ -1214,10 +1225,6 @@ def tick(world):
                 wait["ready"] = True
                 from brain.cognition_scheduler import wake_character
                 wake_character(c, world, "wait_ready")
-
-    # -- Maybe-RSVP deadline nudges ──────────────────────────────
-    if every(world, CADENCE["maybe_deadlines"], offset=31):
-        check_maybe_deadlines(world)
 
     if every(world, CADENCE["calendar_events"], offset=32):
         check_calendar_reminders(world)

@@ -291,53 +291,55 @@ def _inject_intentions_for_event(c, event):
 
 def _inject_intentions_for_social_rsvp(c, world):
     """
-    Inject prep intentions for social events the character has RSVP'd yes to,
-    including dress_code and cost-budgeting reminders.
+    Inject prep intentions for social projects the character has accepted
+    (systems/social_projects.py -- real ProjectParticipant status, not
+    just an "invited" listing).
     """
-    now_ts = time.time()
-    for evt in world.get("social_events", {}).values():
-        if evt.get("status") != "published":
+    tick_now = world.get("tick", 0)
+    from core.tick_schedule import TICK_RATE_SECONDS
+    for project in world.get("social_projects", {}).values():
+        if project["status"] not in ("planning", "scheduled", "active"):
             continue
-        if c["id"] not in evt.get("attendees", []):
+        if c["id"] not in project.get("participant_ids", []):
             continue
-        start_ts = evt.get("start_ts")
-        if not start_ts or start_ts < now_ts:
+        start_tick = project.get("planned_start_tick")
+        if not start_tick or start_tick < tick_now:
             continue
-        days_left = int((start_ts - now_ts) / 86400)
+        days_left = int((start_tick - tick_now) * TICK_RATE_SECONDS / 86400)
         if days_left > 60:
             continue
         t, priority, _ = _threshold_for_days(days_left)
         if priority is None:
             continue
 
+        # prep_requirements (dress code, "bring X") wasn't ported from the
+        # retired systems/social_events.py -- a real, if minor, scope trim
+        # (see systems/social_projects.py's own module docstring); the
+        # days-out reminder itself, the more load-bearing half, still fires.
         fake_event = {
-            "id":               "social_" + evt["id"],
-            "name":             evt.get("title", "social event"),
+            "id":               "social_" + project["project_id"],
+            "name":             project.get("title", "social event"),
             "type":             "social_event",
             "days_until":       days_left,
             "for_char_id":      None,
-            "prep_requirements": evt.get("prep_requirements", []),
+            "prep_requirements": [],
         }
 
         _inject_intention(c, "prepare_for_event", priority, fake_event, {
-            "social_event_id":  evt["id"],
-            "prep_requirements": evt.get("prep_requirements", []),
+            "social_event_id":  project["project_id"],
+            "prep_requirements": [],
         })
 
-        dress_code = evt.get("dress_code")
-        if dress_code and dress_code != "casual" and days_left <= 7:
-            if not _already_has_intention(c, "get_outfit", fake_event["id"]):
-                _inject_intention(c, "get_outfit", priority, fake_event, {
-                    "dress_code":      dress_code,
-                    "social_event_id": evt["id"],
-                })
+        # dress_code wasn't ported either (same scope-trim note above) --
+        # this get_outfit nudge is dropped along with it rather than left
+        # referencing a field that no longer exists.
 
-        cost = evt.get("cost_per_person", 0)
+        cost = project.get("cost_per_person", 0)
         if cost > 0 and days_left <= 14:
             if not _already_has_intention(c, "budget_for_event", fake_event["id"]):
                 _inject_intention(c, "budget_for_event", max(priority - 20, 10), fake_event, {
                     "amount":          cost,
-                    "social_event_id": evt["id"],
+                    "social_event_id": project["project_id"],
                 })
 
 

@@ -69,6 +69,7 @@ CADENCE = {
     "conversation_cleanup": 60,
     "conversation_seating": 30,
     "weather":              60,
+    "social_projects":      60,   # systems/social_projects.py -- proposal expiry + schedule-start sweep
 
     # rare / event-driven (default cadence; events bypass this)
     "news":                 60,
@@ -112,9 +113,10 @@ CADENCE = {
 # Phone battery drain — every tick but gated by cadence to spread load
 CADENCE["phone_battery"]    = 1    # every tick
 
-# Social / calendar events (fire frequently; internally guard to once per real day/hour)
-CADENCE["social_events"]    = 60
-CADENCE["maybe_deadlines"]  = 30
+# Calendar events (fire frequently; internally guard to once per real day/hour)
+# -- "maybe" deadline nudges for social projects are now handled inside
+# systems/social_projects.py::tick_social_projects() itself (CADENCE
+# ["social_projects"], see sim_loop.py), not a separate cadence.
 CADENCE["calendar_events"]  = 60
 
 # Socioeconomics — once per simulated day (~24 ticks)

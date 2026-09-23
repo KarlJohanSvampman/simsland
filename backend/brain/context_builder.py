@@ -616,8 +616,8 @@ def build_available_actions(c, world):
             "computer_list_stocks", "computer_buy_stock", "computer_sell_stock",
             "computer_check_stock_value", "computer_order_item", "computer_order_service",
         ])
-        # Social events (systems/social_events.py) — browsing/planning need
-        # no pre-existing state (same "route validates" pattern as
+        # Social events (systems/social_projects.py) — browsing/planning
+        # need no pre-existing state (same "route validates" pattern as
         # hire_service); rsvp/comment/attend need a real event_id, only
         # available once browsing has actually surfaced one.
         action_types.extend(["social_browse_events", "social_event_plan"])
@@ -894,6 +894,40 @@ def build_available_actions(c, world):
     if find_active_conversation_for(world, c["id"]):
         action_types.append("leave_conversation")
 
+    # Social projects (see systems/social_projects.py) — propose_project is
+    # always offered (same "route handler validates the rest" shape as
+    # propose_chore/propose_rule above, both also unconditional); the
+    # others only appear once there's real state to act on.
+    action_types.append("propose_project")
+
+    from systems.social_projects import (
+        get_pending_project_proposals_for_character,
+        get_projects_for_character,
+        get_open_tasks_for_character,
+    )
+    if get_pending_project_proposals_for_character(world, c["id"]):
+        action_types.append("respond_project")
+
+    my_projects = get_projects_for_character(world, c["id"])
+    if any(
+        c["id"] == p.get("organizer_id")
+        and any(world.get("project_tasks", {}).get(tid, {}).get("status") == "unassigned"
+                for tid in p.get("task_ids", []))
+        for p in my_projects
+    ):
+        action_types.append("assign_project_task")
+
+    # Only offered for a task with no completion_action_type mapped --
+    # one WITH a mapping should complete for real the moment the matching
+    # action is actually taken (action_router.py's route_action() central
+    # hook), so offering the self-reported fallback alongside it would
+    # just invite skipping the real evidence path for no reason.
+    if any(not t.get("completion_action_type") for t in get_open_tasks_for_character(world, c["id"])):
+        action_types.append("complete_project_task")
+
+    if any(p.get("status") not in ("completed", "failed", "cancelled", "abandoned") for p in my_projects):
+        action_types.append("withdraw_from_project")
+
     # Touch proposals (see systems/intimacy.py) — the six propose-touch
     # types listed whenever someone's nearby, same "route handler
     # validates the rest" pattern (propose_touch() already does its own
@@ -1152,6 +1186,45 @@ def build_available_actions(c, world):
         })
 
     # -----------------------------------------------
+    # SOCIAL PROJECTS (systems/social_projects.py) — real ids the LLM
+    # needs to actually target respond_project/assign_project_task/
+    # complete_project_task/withdraw_from_project (the action_types
+    # gates above only decide WHETHER those are offered, not what to
+    # aim them at).
+    # -----------------------------------------------
+    from systems.social_projects import (
+        get_pending_project_proposals_for_character as _get_pending_projects,
+        get_projects_for_character as _get_my_projects,
+        get_open_tasks_for_character as _get_my_open_tasks,
+    )
+    project_proposals_ctx = []
+    for p in _get_pending_projects(world, c["id"]):
+        proposer = chars.get(p.get("proposer_id"))
+        project_proposals_ctx.append({
+            "proposal_id":  p["proposal_id"],
+            "title":        p.get("title"),
+            "project_type": p.get("project_type"),
+            "from_id":      p.get("proposer_id"),
+            "from_name":    proposer.get("name", "someone") if proposer else "someone",
+        })
+    my_projects_ctx = [
+        {"project_id": p["project_id"], "title": p.get("title"), "status": p.get("status"),
+         "organizer_id": p.get("organizer_id")}
+        for p in _get_my_projects(world, c["id"])
+    ]
+    my_open_tasks_ctx = []
+    for t in _get_my_open_tasks(world, c["id"]):
+        proj = world.get("social_projects", {}).get(t["project_id"])
+        my_open_tasks_ctx.append({
+            "task_id":    t["task_id"],
+            "title":      t.get("title"),
+            "status":     t.get("status"),
+            "project_id": t["project_id"],
+            "project_title": proj.get("title") if proj else None,
+            "self_reportable": not t.get("completion_action_type"),
+        })
+
+    # -----------------------------------------------
     # SNOOPABLE DEVICES (systems/worries.py's check_device) — a phone
     # someone else set down, within reach, its owner elsewhere, and
     # this character suspicious enough of the owner to actually check
@@ -1235,6 +1308,9 @@ def build_available_actions(c, world):
         "known_contacts":        known_contacts,
         "known_businesses":      known_businesses,
         "open_proposals":        open_proposals,
+        "project_proposals":     project_proposals_ctx,
+        "my_projects":           my_projects_ctx,
+        "my_project_tasks":      my_open_tasks_ctx,
         "snoopable_devices":     snoopable_devices,
         "wearable_items":        wearable_in_inventory,
         "worn_slots":            worn_slots,
@@ -3463,15 +3539,6 @@ def _build_faction_context(c, world):
 def _build_phone_context(c):
     from systems.phone import phone_context
     return phone_context(c)
-
-
-# =========================================================
-# SOCIAL EVENTS CONTEXT
-# =========================================================
-
-def _build_events_context(c, world):
-    from systems.social_events import build_events_context
-    return build_events_context(c, world)
 
 
 def _build_hobbies_context(c, world):

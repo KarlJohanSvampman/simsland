@@ -348,32 +348,29 @@ _SOCIAL_EVENT_SITUATIONAL_HOOKS = [
 def _social_event_details(c, world, reason, normalcy):
     """
     Stage-1 detail generator for social events. reason is
-    f"event:{event_id}" (see action_router.py::_route_social_event_attend)
-    -- unlike every other off-grid category, real event data (title,
-    category, location, who else is attending) already exists in
-    social_events.py, so this is mostly a matter of reading it rather than
-    building a proxy.
+    f"event:{project_id}" (see systems/social_projects.py::attend_project)
+    -- unlike every other off-grid category, real project data (title,
+    type, location, who else is attending) already exists there, so this
+    is mostly a matter of reading it rather than building a proxy.
     """
-    from systems.social_events import get_event
-
-    event_id = reason.split(":", 1)[1] if ":" in reason else None
-    evt = get_event(world, event_id) if event_id else None
-    if not evt:
+    project_id = reason.split(":", 1)[1] if ":" in reason else None
+    project = world.get("social_projects", {}).get(project_id) if project_id else None
+    if not project:
         return {"reason": "social_event", "title": "a social event"}
 
     chars = world.get("characters", {})
     other_attendees = [
         chars[cid].get("name", "someone")
-        for cid, resp in evt.get("attendees", {}).items()
-        if resp == "yes" and cid != c.get("id") and cid in chars
+        for cid in project.get("participant_ids", [])
+        if cid != c.get("id") and cid in chars
     ]
 
     details = {
         "reason": "social_event",
-        "title": evt.get("title", "a social event"),
-        "category": evt.get("category", "other"),
-        "location": evt.get("location", "somewhere"),
-        "description": evt.get("description", ""),
+        "title": project.get("title", "a social event"),
+        "category": project.get("project_type", "other"),
+        "location": project.get("location") or "somewhere",
+        "description": project.get("description", ""),
         "other_attendees": other_attendees[:4],
     }
     if normalcy != "normal":

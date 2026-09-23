@@ -9,7 +9,6 @@ import random
 
 from systems.activities import get_phase_animation, get_clean_animation
 from systems.navigation import plan_character_route
-from systems.offgrid import send_offgrid
 from core.tick_schedule import TICK_RATE_SECONDS
 
 
@@ -2114,6 +2113,16 @@ def route_action(c, world, action, speech, definitions=None, available_actions=N
             "expires_at_tick": world.get("tick", 0) + 120,   # 2 sim-minutes
         }
 
+    # Real, evidence-based project task completion (systems/
+    # social_projects.py, belief/opinion spec's own "the LLM cannot
+    # simply claim 'I bought the food'" principle applied to project
+    # tasks) -- every dispatched action passes through this exact point
+    # regardless of type, so a task's completion_action_type is checked
+    # against what the character actually just did, not what they say.
+    if world.get("project_tasks"):
+        from systems.social_projects import maybe_complete_tasks_for_action
+        maybe_complete_tasks_for_action(c, world, action_type)
+
     if action_type == "move":
         _route_move(c, world, action)
 
@@ -2569,6 +2578,16 @@ def route_action(c, world, action, speech, definitions=None, available_actions=N
         _route_respond_chore(c, world, action)
     elif action_type == "advance_item_sale_round":
         _route_advance_chore_round(c, world, action)
+    elif action_type == "propose_project":
+        _route_propose_project(c, world, action)
+    elif action_type == "respond_project":
+        _route_respond_project(c, world, action)
+    elif action_type == "assign_project_task":
+        _route_assign_project_task(c, world, action)
+    elif action_type == "complete_project_task":
+        _route_complete_project_task(c, world, action)
+    elif action_type == "withdraw_from_project":
+        _route_withdraw_from_project(c, world, action)
     elif action_type == "post_social_media":
         _route_post_social_media(c, world, action)
     elif action_type == "like_social_post":
@@ -3910,6 +3929,86 @@ def _route_propose_item_sale(c, world, action):
                            offer_item_id=action.get("offer_item_id"))
     except Exception:
         pass
+
+
+# =========================================================
+# SOCIAL PROJECTS -- see systems/social_projects.py
+# =========================================================
+
+def _route_propose_project(c, world, action):
+    """
+    action: {"type": "propose_project", "recipients": [character_id, ...],
+             "project_type": str, "title": str, "description": optional str,
+             "objectives": optional [{"title", "required", ...}],
+             "tasks": optional [{"title", "required", "completion_action_type", ...}],
+             "planned_start_tick": optional int}
+    """
+    recipient_ids = action.get("recipients") or []
+    title = action.get("title")
+    project_type = action.get("project_type")
+    if not title or not project_type:
+        return
+    chars = world.get("characters", {})
+    recipients = [chars[rid] for rid in recipient_ids if rid in chars and rid != c["id"]]
+
+    from systems.social_projects import propose_project
+    propose_project(
+        c, world, recipients, project_type, title,
+        description=action.get("description", ""),
+        proposed_objectives=action.get("objectives"),
+        proposed_tasks=action.get("tasks"),
+        planned_start_tick=action.get("planned_start_tick"),
+        source_type="conversation",
+    )
+
+
+def _route_respond_project(c, world, action):
+    """action: {"type": "respond_project", "proposal_id": str,
+    "response": "accepted"|"declined"}"""
+    proposal_id = action.get("proposal_id")
+    response = action.get("response")
+    if not proposal_id or not response:
+        return
+    from systems.social_projects import respond_to_project
+    respond_to_project(c, world, proposal_id, response)
+
+
+def _route_assign_project_task(c, world, action):
+    """action: {"type": "assign_project_task", "task_id": str,
+    "target": character_id, "commitment_required": optional bool}"""
+    task_id = action.get("task_id")
+    assignee_id = action.get("target")
+    if not task_id or not assignee_id:
+        return
+    from systems.social_projects import assign_task
+    assign_task(world, task_id, assignee_id,
+                commitment_required=action.get("commitment_required"))
+
+
+def _route_complete_project_task(c, world, action):
+    """action: {"type": "complete_project_task", "task_id": str}. The
+    weaker, self-reported completion path -- see systems/
+    social_projects.py's module docstring on why this exists alongside
+    the real, action-linked one, and only completes a task this
+    character is actually assigned to (no marking someone else's task
+    done from the outside)."""
+    task_id = action.get("task_id")
+    if not task_id:
+        return
+    task = world.get("project_tasks", {}).get(task_id)
+    if not task or c["id"] not in task.get("assigned_character_ids", []):
+        return
+    from systems.social_projects import complete_task
+    complete_task(world, task_id)
+
+
+def _route_withdraw_from_project(c, world, action):
+    """action: {"type": "withdraw_from_project", "project_id": str}"""
+    project_id = action.get("project_id")
+    if not project_id:
+        return
+    from systems.social_projects import withdraw_from_project
+    withdraw_from_project(world, c["id"], project_id)
 
 
 def _route_post_social_media(c, world, action):
@@ -5686,112 +5785,102 @@ def _route_pocket_item(c, world, action):
 
 
 # =========================================================
-# SOCIAL EVENTS
+# SOCIAL EVENTS -- backed by systems/social_projects.py's SocialProject
+# model (replacing the retired systems/social_events.py entirely).
 # =========================================================
 
 def _route_social_browse_events(c, world, action):
     """Discover events while browsing social media or scrolling phone."""
-    from systems.social_events import maybe_discover_events
+    from systems.social_projects import discover_projects
     channel = action.get("channel", "social_media")
-    found   = maybe_discover_events(c, world, channel=channel)
+    found   = discover_projects(c, world, channel=channel)
     if found:
         c["last_discovered_events"] = found
 
 
 def _route_social_event_rsvp(c, world, action):
-    """RSVP to an event: yes / no / maybe."""
-    from systems.social_events import rsvp, _hard_conflict
-    event_id  = action.get("event_id") or action.get("args", {}).get("event_id")
-    response  = action.get("response") or action.get("args", {}).get("response", "yes")
-    decide_ts = action.get("decide_ts") or action.get("args", {}).get("decide_ts")
-    if not (event_id and response in ("yes", "no", "maybe")):
+    """RSVP to an event: accepted / declined / considering. event_id here
+    is a social_projects.py project_id (kept the field name for backward
+    compatibility -- this action was already live before the port)."""
+    from systems.social_projects import rsvp_to_project, _hard_conflict
+    event_id = action.get("event_id") or action.get("args", {}).get("event_id")
+    response = action.get("response") or action.get("args", {}).get("response", "accepted")
+    if response in ("yes", "no", "maybe"):   # tolerate the old yes/no/maybe vocabulary too
+        response = {"yes": "accepted", "no": "declined", "maybe": "considering"}[response]
+    decide_by_tick = action.get("decide_ts") or action.get("args", {}).get("decide_ts")
+    if not (event_id and response in ("accepted", "declined", "considering")):
         return
-    if response == "yes":
-        # One-sided fast-path override (see social_events.py
-        # ::evaluate_attendance_tradeoff's docstring) -- mirrors
-        # _route_social_event_attend's unaffordability check below.
+    if response == "accepted":
+        # One-sided fast-path override (see systems/social_projects.py::
+        # _hard_conflict's docstring) -- mirrors _route_social_event_attend's
+        # unaffordability check below.
         conflict = _hard_conflict(c, world)
         if conflict:
-            response = "no"
+            response = "declined"
             c.setdefault("notifications", []).append({
                 "type": "event_conflict_declined", "event_id": event_id,
-                "conflict": conflict, "ts": time.time(),
+                "conflict": conflict, "tick": world.get("tick", 0),
             })
-    rsvp(c, world, event_id, response, decide_ts=decide_ts)
+    rsvp_to_project(c, world, event_id, response, decide_by_tick=decide_by_tick)
 
 
 def _route_social_event_comment(c, world, action):
     """Comment or react to an event post."""
-    from systems.social_events import add_comment, react_comment, get_event
+    from systems.social_projects import add_project_comment, react_project_comment
     event_id = action.get("event_id") or action.get("args", {}).get("event_id")
     text     = action.get("text") or action.get("args", {}).get("text", "")
     reaction = action.get("reaction") or action.get("args", {}).get("reaction")
     if not event_id:
         return
     if text:
-        add_comment(c, world, event_id, text)
+        add_project_comment(world, event_id, c["id"], text)
     if reaction in ("like", "dislike"):
-        evt = get_event(world, event_id)
-        if evt and evt.get("comments"):
-            idx = action.get("comment_idx", len(evt["comments"]) - 1)
-            react_comment(c, world, event_id, idx, reaction)
+        project = world.get("social_projects", {}).get(event_id)
+        if project and project.get("comments"):
+            idx = action.get("comment_idx", len(project["comments"]) - 1)
+            react_project_comment(world, event_id, c["id"], idx, reaction)
 
 
 def _route_social_event_attend(c, world, action):
-    """Character attends an event — goes off-grid for the event duration."""
-    from systems.social_events import get_event, rsvp, _hard_conflict
+    """Character attends an event — goes off-grid for the event's real
+    duration. All the real logic (hard-conflict check, affordability,
+    off-grid duration -- correctly in MINUTES now; see
+    social_projects.py::attend_project's own note on the ticks-vs-minutes
+    bug this fixes) lives in systems/social_projects.py."""
+    from systems.social_projects import attend_project
     event_id = action.get("event_id") or action.get("args", {}).get("event_id")
     if not event_id:
         return
-    evt = get_event(world, event_id)
-    if not evt or evt["status"] != "published":
-        return
-    conflict = _hard_conflict(c, world)
-    if conflict:
-        c.setdefault("notifications", []).append({
-            "type": "event_conflict_declined", "event_id": event_id,
-            "conflict": conflict, "ts": time.time(),
-        })
-        return
-    cost = evt.get("cost_per_person", 0.0)
-    if cost > 0:
-        for item in c.get("inventory", []):
-            if item.get("object_type") == "wallet":
-                cash = item.get("cash", 0.0)
-                if cash < cost:
-                    c.setdefault("notifications", []).append({
-                        "type": "event_cant_afford",
-                        "event_id": event_id,
-                        "title": evt["title"],
-                        "cost": cost,
-                        "ts": time.time(),
-                    })
-                    return
-                item["cash"] = round(cash - cost, 2)
-                break
-    rsvp(c, world, event_id, "yes")
-    # duration in ticks, not off_grid_until (a real timestamp nothing ever
-    # read) -- process_return() only waits on return_tick.
-    now            = time.time()
-    end_ts         = evt.get("end_ts") or (evt.get("start_ts", now) + 3 * 3600)
-    duration_ticks = max(1, int((end_ts - now) / TICK_RATE_SECONDS))
-    send_offgrid(c, world, f"event:{event_id}", duration_ticks)
+    attend_project(c, world, event_id)
 
 
 def _route_social_event_plan(c, world, action):
-    """Create a new social event draft."""
-    from systems.social_events import create_event_draft
+    """Create a new social event -- real immediately (the organizer's own
+    participation needs no one else's permission); people invited RSVP
+    independently via social_event_rsvp. args accept start_offset_hours/
+    duration_hours (relative, LLM-friendly) instead of raw ticks."""
+    from systems.social_projects import create_project_directly
     args = action.get("args") or action
-    create_event_draft(
-        c, world,
-        title           = args.get("title", "My Event"),
-        category        = args.get("category", "party"),
+
+    from core.tick_schedule import TICK_RATE_SECONDS
+    tick = world.get("tick", 0)
+    start_offset_hours = float(args.get("start_offset_hours", 48))
+    duration_hours      = float(args.get("duration_hours", 3))
+    start_tick = tick + int(start_offset_hours * 3600 / TICK_RATE_SECONDS)
+    end_tick   = start_tick + int(duration_hours * 3600 / TICK_RATE_SECONDS)
+
+    chars = world.get("characters", {})
+    invite_ids = [cid for cid in (args.get("co_organizers") or args.get("invite_ids") or [])
+                  if cid in chars and cid != c["id"]]
+
+    create_project_directly(
+        world, c, args.get("category", "party"), args.get("title", "My Event"),
         description     = args.get("description", ""),
+        invite_ids      = invite_ids,
+        planned_start_tick = start_tick,
+        planned_end_tick   = end_tick,
         location        = args.get("location", ""),
         location_type   = args.get("location_type", "venue"),
-        start_ts        = args.get("start_ts"),
-        end_ts          = args.get("end_ts"),
-        co_organizers   = args.get("co_organizers") or [],
         max_attendees   = args.get("max_attendees"),
         cost_per_person = float(args.get("cost_per_person", 0.0)),
         min_age         = args.get("min_age"),

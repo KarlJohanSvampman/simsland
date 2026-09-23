@@ -19,7 +19,6 @@
 # =========================================================
 
 import random
-import time
 
 
 # ----------------------------------------------------------
@@ -153,13 +152,23 @@ def inject_organize_intention(c, world, hobby_id):
 
 def plan_hobby_session(c, world, hobby_id, start_offset_hours=48):
     """
-    Create a social_event draft for a group hobby session.
-    Invitees are contacts who share the hobby first; falls back
-    to the general social network if not enough sharers are found.
-    The character is expected to reach out via computer or phone
-    before calling this (intention: organize_hobby_session).
+    Propose a group hobby session as a real systems/social_projects.py
+    project. Invitees are contacts who share the hobby first; falls back
+    to the general social network if not enough sharers are found. The
+    character is expected to reach out via computer or phone before
+    calling this (intention: organize_hobby_session).
+
+    Confirmed real bug in the retired systems/social_events.py version
+    this replaces: it passed `invitees` as create_event_draft's
+    co_organizers (which require approval before the event publishes),
+    not as ordinary invited attendees -- and nothing anywhere ever called
+    approve_event() (confirmed zero callers), so any hobby session with
+    at least one invitee got stuck in "draft" status forever and never
+    actually became visible/RSVP-able. propose_project's invitees are
+    genuine invited recipients, not approval-gated co-organizers, so this
+    fixes it rather than reproducing it.
     """
-    from systems.social_events import create_event_draft
+    from systems.social_projects import propose_project
 
     defs  = world.get("definitions", {})
     hobby = defs.get("hobby_templates", {}).get(hobby_id)
@@ -171,20 +180,22 @@ def plan_hobby_session(c, world, hobby_id, start_offset_hours=48):
         return None
 
     # Contacts who share the hobby (+ fallback)
-    contacts = find_hobby_contacts(c, world, hobby_id, max_results=20)
-    needed   = min_p - 1           # already counting the initiator
-    invitees = contacts[:needed]
+    contact_ids = find_hobby_contacts(c, world, hobby_id, max_results=20)
+    needed      = min_p - 1           # already counting the initiator
+    chars       = world.get("characters", {})
+    invitees    = [chars[cid] for cid in contact_ids[:needed] if cid in chars]
 
     # Duration
     if hobby.get("overnight"):
-        days       = hobby.get("min_days") or 1
-        duration_s = days * 86400
+        days          = hobby.get("min_days") or 1
+        duration_secs = days * 86400
     else:
-        duration_s = 3 * 3600      # 3 h default
+        duration_secs = 3 * 3600      # 3 h default
 
-    now      = time.time()
-    start_ts = now + start_offset_hours * 3600
-    end_ts   = start_ts + duration_s
+    from core.tick_schedule import TICK_RATE_SECONDS
+    tick       = world.get("tick", 0)
+    start_tick = tick + int(start_offset_hours * 3600 / TICK_RATE_SECONDS)
+    end_tick   = start_tick + int(duration_secs / TICK_RATE_SECONDS)
 
     # Location / type
     at_home, loc = resolve_hobby_location(c, world, hobby_id)
@@ -195,29 +206,19 @@ def plan_hobby_session(c, world, hobby_id, start_offset_hours=48):
         location      = loc or hobby.get("location") or "venue"
         location_type = "outdoor" if hobby.get("off_grid") else "venue"
 
-    prep = (hobby.get("required_items") or [])[:3]
-
-    evt = create_event_draft(
-        c, world,
-        title             = hobby["name"] + " session",
-        category          = "hobby_session",
-        description       = (
-            "Come join me for "
-            + hobby["name"]
-            + ". We need at least "
-            + str(min_p)
-            + " people."
+    return propose_project(
+        c, world, invitees, "social_activity",
+        title       = hobby["name"] + " session",
+        description = (
+            "Come join me for " + hobby["name"] + ". We need at least "
+            + str(min_p) + " people."
         ),
-        location          = location,
-        location_type     = location_type,
-        start_ts          = start_ts,
-        end_ts            = end_ts,
-        co_organizers     = invitees,
-        prep_requirements = prep,
-        dress_code        = None,
-        tags              = [hobby["category"], "hobby", hobby_id],
+        planned_start_tick = start_tick,
+        planned_end_tick   = end_tick,
+        location            = location,
+        location_type       = location_type,
+        tags                = [hobby["category"], "hobby", hobby_id],
     )
-    return evt
 
 
 # ----------------------------------------------------------
@@ -282,37 +283,46 @@ _GUEST_NAMES = [
 ]
 
 
-def spawn_hobby_guests(world, evt):
+def spawn_hobby_guests(world, project):
     """
     Spawn temporary NPC guests for an at-home hobby session.
-    Called when evt["start_ts"] is reached.
-    Skips if guests already spawned (guest_ids present on event).
+    Called when project["planned_start_tick"] is reached.
+    Skips if guests already spawned (guest_ids present on the project).
+
+    Ported from the retired systems/social_events.py-backed version --
+    reads systems/social_projects.py's SocialProject/ProjectParticipant
+    shape instead. In practice this rarely spawns anyone for a hobby
+    session specifically, same as before the port: invitees always come
+    from find_hobby_contacts() (real existing characters), and the
+    "already a real character, don't spawn a ghost" skip below always
+    applies to them -- kept faithfully rather than silently dropped,
+    since a caller with genuinely unresolvable attendees could still
+    reach this.
     """
-    if evt.get("hobby_guests_spawned"):
+    if project.get("hobby_guests_spawned"):
         return
 
     hobby_id  = None
-    for tag in evt.get("tags", []):
+    for tag in project.get("tags", []):
         defs = world.get("definitions", {})
         if tag in defs.get("hobby_templates", {}):
             hobby_id = tag
             break
 
-    # Find the initiator's home position
-    initiator = world.get("characters", {}).get(evt.get("initiator", ""))
-    if not initiator:
+    # Find the organizer's home position
+    organizer = world.get("characters", {}).get(project.get("organizer_id", ""))
+    if not organizer:
         return
 
-    home_x = initiator.get("x", 5)
-    home_y = initiator.get("y", 5)
+    home_x = organizer.get("x", 5)
+    home_y = organizer.get("y", 5)
 
-    # Spawn one guest per confirmed attendee (excluding initiator)
-    attendees    = evt.get("attendees", {})
+    # Spawn one guest per accepted participant (excluding the organizer)
     guest_ids    = []
     spawned_names = set()
 
-    for participant_id, rsvp in attendees.items():
-        if rsvp != "yes" or participant_id == evt["initiator"]:
+    for participant_id in project.get("participant_ids", []):
+        if participant_id == project.get("organizer_id"):
             continue
         # If participant exists as a real character, don't spawn a ghost
         if participant_id in world.get("characters", {}):
@@ -321,7 +331,7 @@ def spawn_hobby_guests(world, evt):
         name = random.choice([n for n in _GUEST_NAMES if n not in spawned_names] or _GUEST_NAMES)
         spawned_names.add(name)
 
-        gid = "guest_{}_{}".format(evt["id"][:6], uuid.uuid4().hex[:4])
+        gid = "guest_{}_{}".format(project["project_id"][:6], uuid.uuid4().hex[:4])
         # Real, resolvable character_templates id -- see systems/
         # service_npc.py. "adult_base" doesn't exist in definitions.json's
         # character_templates registry, so this real, live NPC spawn
@@ -340,7 +350,7 @@ def spawn_hobby_guests(world, evt):
             "template":         guest_template,
             "sex":              guest_sex,
             "is_hobby_guest":   True,
-            "hobby_session_id": evt["id"],
+            "hobby_session_id": project["project_id"],
             "hobby_id":         hobby_id,
             "animation_state":  {"base": "walk", "upper": None},
             "body": {
@@ -359,17 +369,17 @@ def spawn_hobby_guests(world, evt):
         }
         guest_ids.append(gid)
 
-    evt["hobby_guests_spawned"] = True
-    evt["guest_ids"]            = guest_ids
+    project["hobby_guests_spawned"] = True
+    project["guest_ids"]            = guest_ids
 
 
-def despawn_hobby_guests(world, evt):
+def despawn_hobby_guests(world, project):
     """
     Remove all hobby guest NPCs for a session that has ended.
     """
-    for gid in evt.get("guest_ids", []):
+    for gid in project.get("guest_ids", []):
         world.get("characters", {}).pop(gid, None)
-    evt["guest_ids"] = []
+    project["guest_ids"] = []
 
 
 # ----------------------------------------------------------
@@ -379,30 +389,31 @@ def despawn_hobby_guests(world, evt):
 def check_hobby_sessions(world):
     """
     Called periodically from sim_loop. Manages hobby session
-    event lifecycle:
-      - start_ts reached + location==home  → spawn guests
-      - end_ts reached                     → despawn guests
+    project lifecycle (systems/social_projects.py):
+      - planned_start_tick reached + location_type==home → spawn guests
+      - planned_end_tick reached                          → despawn guests
     """
-    now    = time.time()
-    events = world.get("social_events", {})
+    tick     = world.get("tick", 0)
+    projects = world.get("social_projects", {})
 
-    for evt in list(events.values()):
-        if evt.get("category") != "hobby_session":
+    for project in list(projects.values()):
+        if project.get("project_type") != "social_activity" or "hobby" not in project.get("tags", []):
             continue
-        if evt.get("status") != "published":
+        if project.get("status") not in ("scheduled", "active"):
             continue
 
-        start_ts = evt.get("start_ts", 0)
-        end_ts   = evt.get("end_ts", 0)
-        loc_type = evt.get("location_type", "")
+        start_tick = project.get("planned_start_tick", 0) or 0
+        end_tick   = project.get("planned_end_tick", 0) or 0
+        loc_type   = project.get("location_type", "")
 
         # Spawn guests when session starts and it's at home
-        if (now >= start_ts
+        if (tick >= start_tick
                 and loc_type == "home"
-                and not evt.get("hobby_guests_spawned")):
-            spawn_hobby_guests(world, evt)
+                and not project.get("hobby_guests_spawned")):
+            spawn_hobby_guests(world, project)
 
         # Despawn when session ends
-        if end_ts and now >= end_ts and evt.get("hobby_guests_spawned"):
-            despawn_hobby_guests(world, evt)
-            evt["status"] = "completed"
+        if end_tick and tick >= end_tick and project.get("hobby_guests_spawned"):
+            despawn_hobby_guests(world, project)
+            project["status"] = "completed"
+            project["actual_end_tick"] = tick

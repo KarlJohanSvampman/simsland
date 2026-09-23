@@ -127,7 +127,7 @@ def reset_characters(sim_id: str = DEFAULT_SIM_ID):
     owner_id (newspapers set down mid-read, dishware, ...) are untouched --
     only entries actually tied to a character being deleted here.
 
-    Also clears events/incidents/calls/responders/conflicts/social_events
+    Also clears events/incidents/calls/responders/conflicts/social_projects
     -- every character is being removed here, so every entry in these
     world-level history logs is now unresolvable (a live symptom: the
     event timeline fell back to showing raw character ids once the
@@ -164,7 +164,11 @@ def reset_characters(sim_id: str = DEFAULT_SIM_ID):
         world["calls"]       = []
         world["responders"]  = []
         world["conflicts"]   = {}
-        world["social_events"] = {}
+        world["social_projects"]      = {}
+        world["project_participants"] = {}
+        world["project_objectives"]   = {}
+        world["project_tasks"]        = {}
+        world["project_proposals"]    = {}
 
         # Confirmed live bug: every prop anchor (systems/occupancy.py)
         # reserved by a character this wipe removes stayed permanently

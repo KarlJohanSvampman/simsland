@@ -152,7 +152,7 @@ def check_goal_trending(conv, listener, topic):
     Tracks a per-listener off-goal streak on the conversation; once a
     "not_interested" participant's streak crosses DISENGAGE_STREAK, retires
     the conversation for them without spending a real LLM turn on it --
-    same fast-path principle as social_events.py's hard-conflict
+    same fast-path principle as social_projects.py's hard-conflict
     auto-decline. Returns the updated streak count (mainly for tests)."""
     goal = conv.get("goals", {}).get(listener["id"])
     if not goal:

@@ -627,10 +627,10 @@ def generate_initial_world():
             except Exception:
                 pass
 
-    # Social events — seed initial world events
-    from systems.social_events import generate_world_events
-    world["social_events"] = {}
-    generate_world_events(world)
+    # Social projects — seed initial discoverable world projects
+    # (systems/social_projects.py, replacing the retired social_events.py)
+    from systems.social_projects import generate_world_projects
+    generate_world_projects(world)
 
     # Household + garage/car/bus-stop -- generate_initial_world() never
     # created a household before (household_manager.create_household() is
