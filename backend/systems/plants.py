@@ -114,6 +114,7 @@ def water_plant(prop):
     if not state:
         return False
     state["moisture"] = 100
+    state["_water_warned"] = False
     return True
 
 
@@ -173,6 +174,29 @@ def tick_plants(world):
         state["moisture"] = max(0, state["moisture"] - tmpl.get("moisture_decay_per_day", 10) * elapsed_days)
         state["weed_level"] = min(100, state["weed_level"] + tmpl.get("weed_growth_per_day", 5) * elapsed_days)
         state["last_decay_tick"] = tick
+
+        # Real reactive wake for the household's own plant, once, when it
+        # crosses a real "needs water soon" threshold -- confirmed gap:
+        # moisture already decayed for real, but nothing ever surfaced it
+        # to anyone before growth silently paused at 0 (plant_needs_water/
+        # garden_dry, ChatGPT-authored household situation spec).
+        # water_plant() clears the flag so this can re-arm on the next
+        # real dry-out, not just once ever.
+        if state["moisture"] <= 20 and not state.get("_water_warned"):
+            state["_water_warned"] = True
+            household = world.get("households", {}).get(prop.get("household_id"))
+            if household:
+                from systems.household_monitoring import choose_responsible_member
+                chars = world.get("characters", {})
+                members = [chars[mid] for mid in household.get("members", []) if mid in chars]
+                responsible = choose_responsible_member(members, world) if members else None
+                if responsible:
+                    from brain.cognition_scheduler import wake_character
+                    wake_character(responsible, world, "plant_needs_water", {
+                        "plant_id": prop["id"],
+                        "plant_name": tmpl.get("name", prop.get("plant_template", "a plant")),
+                        "moisture": state["moisture"],
+                    })
 
         # Growth pauses entirely while bone dry.
         if state["moisture"] <= 0:

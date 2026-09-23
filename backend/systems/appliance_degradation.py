@@ -154,6 +154,13 @@ def trigger_appliance_failure(
         importance=0.9
     )
 
+    # Real reactive wake -- add_desire() above is a real, but passive,
+    # background want; nothing ever interrupted the responsible member's
+    # own next decision cycle with the fact that it just broke
+    # (appliance_broken, ChatGPT-authored household situation spec).
+    from brain.cognition_scheduler import wake_character
+    wake_character(responsible, world, "appliance_broken", {"object_type": object_type})
+
     household.setdefault(
         "notifications",
         []

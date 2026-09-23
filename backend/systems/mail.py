@@ -214,6 +214,27 @@ def attempt_pay_bills(c, world):
     # above kicks in), never actually shrink as debt gets paid down.
     household["bills_due"] = [b for b in bills if b.get("remaining", 0) > 0]
 
+    # Real reactive wake when the household genuinely can't keep up --
+    # confirmed gap: before this, the ONLY consequence of unpaid bills was
+    # systems/eviction.py silently escalating straight to eviction once
+    # total debt crossed 5000, with zero warning or agency for anyone in
+    # the household along the way (household_cannot_pay_bill, ChatGPT-
+    # authored household situation spec). An ordinary bill that gets paid
+    # off in full here (the common case) is not eventful and stays
+    # silent; only a bill that's STILL unpaid after this household's own
+    # wealth ran out is worth a character's real attention.
+    still_owed = sum(b.get("remaining", 0) for b in household["bills_due"])
+    if still_owed > 0:
+        last_warned = household.get("_bill_trouble_warned_tick")
+        tick = world.get("tick", 0)
+        if last_warned is None or tick - last_warned >= 7 * 86400:   # once a week at most
+            household["_bill_trouble_warned_tick"] = tick
+            from brain.cognition_scheduler import wake_character
+            wake_character(c, world, "household_bill_trouble", {
+                "amount_owed": round(still_owed, 2),
+                "household_wealth": household.get("wealth", 0),
+            })
+
 
 def _settle_bill_debts(household, world, bill):
     from systems.credit import get_credit_cards, make_payment as pay_credit_card

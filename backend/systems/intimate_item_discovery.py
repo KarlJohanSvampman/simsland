@@ -66,3 +66,13 @@ def tick_discovery_checks(world):
                     continue
                 if random.random() < DISCOVERY_CHANCE_PER_CHECK:
                     apply_creeped_out(other, owner["id"], world)
+                    # Real reactive wake -- confirmed gap: apply_creeped_out()
+                    # already dents the discoverer's own subjective view of
+                    # the owner for real, but nothing ever surfaced the
+                    # moment itself as something the discoverer actually
+                    # reacts to in the moment (intimate_object_discovered,
+                    # ChatGPT-authored household situation spec).
+                    from brain.cognition_scheduler import wake_character
+                    wake_character(other, world, "intimate_object_discovered", {
+                        "owner_id": owner["id"], "owner_name": owner.get("name", "someone"),
+                    })

@@ -64,6 +64,11 @@ WAKE_PRIORITY = {
     # attention-worthy moment, not urgent_need-tier but well above an
     # ordinary schedule reminder.
     "contract_violated": 72,
+    "household_bill_trouble": 71,   # systems/mail.py -- real financial
+                                     # stress, ranked alongside contract_violated
+    "intimate_object_discovered": 46,  # systems/intimate_item_discovery.py
+    "plant_needs_water": 40,        # systems/plants.py
+    "appliance_broken":  47,        # systems/appliance_degradation.py
     "activity_finished": 70,
     "waiting_timed_out": 68,
     "gave_up_waiting": 69,     # systems/waiting.py -- genuinely abandoned a
