@@ -20,13 +20,17 @@ breaks (systems/appliance_degradation.py). This file is the situation
 built on top of each.
 
 The other ~95 situation types in that spec are NOT built this pass --
-most of them (trash/cleaning/laundry/TV/hobbies/shopping/...) either need
-a real backend mechanic wired up first (e.g. trash: systems/waste.py's
-own move_waste_to_bin() is confirmed dead code, never called anywhere --
-household-level trash "fullness" never actually accumulates today,
-disconnected from the real per-item "trash" action) or are lower-value
-background/entertainment flavor than the four picked here. Flagged
-honestly as a real, scoped-down v1, not silently pretended complete.
+most of them (cleaning/TV/hobbies/shopping/...) either need a real
+backend mechanic wired up first or are lower-value background/
+entertainment flavor than the four picked here. Flagged honestly as a
+real, scoped-down v1, not silently pretended complete.
+
+(Trash itself is no longer in that "needs a mechanic first" bucket --
+systems/waste.py's move_waste_to_bin() is now wired up, with a real
+household_monitoring.py::monitor_trash() nudging a responsible member
+via the ordinary desire/responsibility system rather than a dedicated
+situation here, same shape as the toilet-paper/meal monitors right
+next to it.)
 """
 
 from __future__ import annotations
