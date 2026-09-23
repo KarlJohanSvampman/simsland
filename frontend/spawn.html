@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>HoloSims Spawn</title>
+
+<style>
+html, body {
+  margin: 0;
+  height: 100%;
+  background: #1b1f24;
+  color: white;
+  font-family: Arial, sans-serif;
+  overflow: hidden;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+}
+
+#topNav {
+  padding: 10px 12px;
+  background: #1d2229;
+  border-bottom: 1px solid #444;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+#topNav h2 {
+  margin: 0 14px 0 0;
+  font-size: 15px;
+}
+
+#topNav button {
+  padding: 6px 10px;
+  background: #3d4754;
+  border: 1px solid #555;
+  color: #eee;
+  cursor: pointer;
+  font-size: 12px;
+  border-radius: 3px;
+}
+#topNav button:hover { background: #556170; }
+
+#body {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+
+/* ── LEFT PANEL: TABLE ────────────────────────── */
+
+#leftPanel {
+  width: 460px;
+  flex-shrink: 0;
+  background: #252b33;
+  border-right: 1px solid #444;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+#leftHeader {
+  padding: 10px;
+  border-bottom: 1px solid #444;
+  display: flex;
+  gap: 8px;
+}
+
+#btnAddRow {
+  padding: 6px 10px;
+  background: #3d4754;
+  border: 1px solid #555;
+  color: #eee;
+  cursor: pointer;
+  font-size: 12px;
+  border-radius: 3px;
+}
+#btnAddRow:hover { background: #556170; }
+
+#btnSave {
+  margin-left: auto;
+  padding: 6px 14px;
+  background: #3a5a4a;
+  border: 1px solid #4a7a5f;
+  color: #eee;
+  cursor: pointer;
+  font-size: 12px;
+  border-radius: 3px;
+  font-weight: bold;
+}
+#btnSave:hover { background: #4a7a5f; }
+#btnSave:disabled { opacity: 0.4; cursor: default; }
+
+#householdFilterRow {
+  padding: 8px 10px;
+  border-bottom: 1px solid #444;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+#householdFilterRow label {
+  font-size: 11px;
+  color: #9ab;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  flex-shrink: 0;
+}
+#householdFilterRow select {
+  flex: 1;
+  padding: 5px 7px;
+  background: #1a1e28;
+  border: 1px solid #3a4050;
+  color: #eee;
+  border-radius: 3px;
+  font-size: 12px;
+}
+
+#tableWrap {
+  flex: 1;
+  overflow: auto;
+  padding: 8px;
+}
+
+table#spawnTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+#spawnTable th {
+  text-align: left;
+  color: #9ab;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 4px 4px;
+  border-bottom: 1px solid #444;
+}
+
+#spawnTable td {
+  padding: 4px 4px;
+  border-bottom: 1px solid #2c323a;
+  vertical-align: middle;
+}
+
+#spawnTable select, #spawnTable input[type="text"] {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 4px 5px;
+  background: #1a1e28;
+  border: 1px solid #3a4050;
+  color: #eee;
+  border-radius: 3px;
+  font-size: 11px;
+}
+
+.rowRemoveBtn {
+  background: none;
+  border: none;
+  color: #999;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 0 4px;
+}
+.rowRemoveBtn:hover { color: #f66; }
+
+.spawnRow.selected { background: #2a3542; }
+.spawnRow { cursor: default; }
+
+.rowSelectDot {
+  cursor: pointer;
+  text-align: center;
+  color: #667;
+  font-size: 13px;
+}
+.rowSelectDot:hover { color: #9ab; }
+.spawnRow.selected .rowSelectDot { color: #7ab4f5; }
+
+#pendingEditsWrap {
+  border-top: 1px solid #444;
+  padding: 8px 10px;
+  max-height: 160px;
+  overflow-y: auto;
+  flex-shrink: 0;
+}
+#pendingEditsWrap h4 {
+  margin: 0 0 6px 0;
+  font-size: 11px;
+  color: #9ab;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.pendingEditRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 0;
+  font-size: 11px;
+  color: #ccd;
+}
+.pendingEditRow .pendingCancel {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: #999;
+  cursor: pointer;
+  font-size: 12px;
+}
+.pendingEditRow .pendingCancel:hover { color: #f66; }
+.pendingAdd { color: #7fd88f; }
+.pendingRemove { color: #e88; }
+
+#statusBar {
+  padding: 6px 10px;
+  background: #16191d;
+  border-top: 1px solid #444;
+  font-size: 11px;
+  color: #888;
+  flex-shrink: 0;
+}
+
+/* ── RIGHT PANEL: TREE ────────────────────────── */
+
+#rightPanel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: #14171c;
+}
+
+#treeToolbar {
+  padding: 8px 12px;
+  background: #1d2229;
+  border-bottom: 1px solid #444;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+#treeTitle {
+  font-size: 12px;
+  color: #aab;
+  flex: 1;
+}
+
+#treeToolbar button {
+  padding: 5px 10px;
+  background: #3d4754;
+  border: 1px solid #555;
+  color: #eee;
+  cursor: pointer;
+  font-size: 11px;
+  border-radius: 3px;
+}
+#treeToolbar button:hover { background: #556170; }
+
+#treeSvgWrap {
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+}
+
+#treeSvg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  cursor: grab;
+}
+#treeSvg.panning { cursor: grabbing; }
+
+.legendBox {
+  position: absolute;
+  bottom: 10px;
+  left: 10px;
+  font-size: 11px;
+  color: #aab;
+  background: rgba(20,23,28,0.85);
+  border: 1px solid #333;
+  border-radius: 4px;
+  padding: 6px 10px;
+  line-height: 1.6;
+}
+.legendSwatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  margin-right: 5px;
+  vertical-align: middle;
+}
+
+/* ── RELATION PICKER POPUP ────────────────────── */
+
+#relationPopup {
+  position: absolute;
+  background: #252b33;
+  border: 1px solid #556;
+  border-radius: 5px;
+  padding: 8px;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.5);
+  z-index: 50;
+  display: none;
+}
+#relationPopup select {
+  padding: 4px 6px;
+  background: #1a1e28;
+  border: 1px solid #3a4050;
+  color: #eee;
+  border-radius: 3px;
+  font-size: 12px;
+  margin-bottom: 6px;
+  width: 180px;
+}
+#relationPopup .popupBtns {
+  display: flex;
+  gap: 6px;
+}
+#relationPopup button {
+  flex: 1;
+  padding: 4px 8px;
+  background: #3d4754;
+  border: 1px solid #555;
+  color: #eee;
+  cursor: pointer;
+  font-size: 11px;
+  border-radius: 3px;
+}
+#relationPopup button:hover { background: #556170; }
+#relationPopup .popupConfirm { background: #3a5a4a; border-color: #4a7a5f; }
+#relationPopup .popupConfirm:hover { background: #4a7a5f; }
+</style>
+</head>
+
+<body>
+
+<header id="topNav">
+  <h2>Spawn</h2>
+  <button onclick="window.location='/'">Viewer</button>
+  <button onclick="window.location='/editor.html'">World</button>
+  <button onclick="window.location='/meshbank.html'">Meshbank</button>
+  <button onclick="window.location='/animbank.html'">Anim Bank</button>
+  <button onclick="window.location='/definitions.html'">Templates</button>
+  <button onclick="window.location='/character_creator.html'">Character Creator</button>
+  <button onclick="window.location='/social_debug.html'">💬 Social Debug</button>
+</header>
+
+<div id="body">
+
+  <aside id="leftPanel">
+    <div id="leftHeader">
+      <button id="btnAddRow">+ Add Character</button>
+      <button id="btnSave">💾 Save</button>
+    </div>
+
+    <div id="householdFilterRow">
+      <label for="householdFilter">Household</label>
+      <select id="householdFilter"></select>
+    </div>
+
+    <div id="tableWrap">
+      <table id="spawnTable">
+        <thead>
+          <tr>
+            <th style="width:3%"></th>
+            <th style="width:25%">Template</th>
+            <th style="width:20%">Name</th>
+            <th style="width:22%">Household</th>
+            <th style="width:28%">Starting relation</th>
+            <th style="width:4%"></th>
+          </tr>
+        </thead>
+        <tbody id="spawnTableBody"></tbody>
+      </table>
+    </div>
+
+    <div id="pendingEditsWrap">
+      <h4>Pending tree edits</h4>
+      <div id="pendingEditsList"></div>
+    </div>
+
+    <div id="statusBar">Ready</div>
+  </aside>
+
+  <main id="rightPanel">
+    <div id="treeToolbar">
+      <span id="treeTitle">Select a character to view their family tree.</span>
+      <button id="btnResetView">Reset View</button>
+    </div>
+    <div id="treeSvgWrap">
+      <svg id="treeSvg"><g id="viewport"></g></svg>
+      <div class="legendBox">
+        <div><span class="legendSwatch" style="background:#e58bb0"></span>Woman</div>
+        <div><span class="legendSwatch" style="background:#6fa8dc"></span>Man</div>
+        <div><span class="legendSwatch" style="background:#999"></span>Unknown / draft</div>
+        <div style="margin-top:4px;">Drag a box's bottom handle onto another box to connect them.<br/>Drag a line's end away from its box to cut it.</div>
+      </div>
+    </div>
+  </main>
+
+</div>
+
+<div id="relationPopup">
+  <select id="relationPopupSelect"></select>
+  <div class="popupBtns">
+    <button class="popupCancel">Cancel</button>
+    <button class="popupConfirm">Connect</button>
+  </div>
+</div>
+
+<script type="module" src="/src/spawn.js"></script>
+
+</body>
+</html>

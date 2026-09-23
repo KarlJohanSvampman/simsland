@@ -43,6 +43,9 @@ export default defineConfig({
         character_creator:
           resolve(__dirname, "character_creator.html"),
 
+        spawn:
+          resolve(__dirname, "spawn.html"),
+
         operator_view:
           resolve(__dirname, "operator_view.html"),
 

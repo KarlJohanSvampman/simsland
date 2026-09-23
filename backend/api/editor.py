@@ -168,6 +168,18 @@ def _spawn_character_locked(sim_id, template_id, x, y, body):
             if tmpl.get("household_id"):   overrides["household_id"] = tmpl["household_id"]
             if tmpl.get("bio"):             overrides["bio"] = tmpl["bio"]
             if tmpl.get("instance"): overrides.update(tmpl["instance"])
+
+            # Explicit request-body overrides win over the template's own
+            # defaults -- confirmed gap (Spawn tab): this branch only ever
+            # read template_id/x/y/sim_id from body, so there was no way
+            # to name a character or place them in a specific household
+            # when spawning from a template at all; the else branch below
+            # (no template) already merged the whole body in.
+            if body.get("name"):
+                overrides["name"] = body["name"]
+            if body.get("household_id"):
+                overrides["household_id"] = body["household_id"]
+
             character = generate_character(defs, overrides, world=world)
         else:
             overrides = {k: v for k, v in body.items()
@@ -353,3 +365,203 @@ async def generate_relative(template_id: str, request: Request):
     }
 
     return {"ok": True, "template_id": new_id, "template": new_template}
+
+
+# =====================================
+# FAMILY GRAPH (Spawn tab)
+# =====================================
+
+# Same vocabulary as systems/family.py::INVERSE, but split into which
+# direction is the "canonical" one to emit as a single edge -- family.py
+# stores both directed halves (a:b and b:a) of every relation, but a
+# graph UI only wants to draw one line per pair. Anything not listed
+# here (symmetric relations: sibling/half_sibling/spouse/ex_spouse/
+# cousin) is instead deduped by only emitting when a_id < b_id.
+_DOWNWARD_RELATIONS = {"parent", "grandparent", "aunt_uncle", "step_parent", "adoptive_parent", "guardian"}
+
+
+@router.get("/family_graph")
+def get_family_graph(sim_id: str = "default"):
+    """
+    Every live character (id/name/sex/age/age_group/household_id/
+    family_id) plus a deduped edge list {a, b, relation} describing
+    systems/family.py's real relations graph -- the data the Spawn tab's
+    family-tree panel renders as draggable boxes/lines. Read-only.
+    """
+    world = load_world(sim_id)
+    chars = world.get("characters", {})
+
+    characters = [
+        {
+            "id": cid,
+            "name": c.get("name", cid),
+            "sex": c.get("sex"),
+            "age": c.get("age"),
+            "age_group": c.get("age_group"),
+            "household_id": c.get("household_id"),
+            "family_id": c.get("family_id"),
+            "template": c.get("template"),
+        }
+        for cid, c in chars.items()
+        if c.get("alive", True)
+    ]
+
+    edges = []
+    seen = set()
+    for family in world.get("families", {}).values():
+        for key, relation in family.get("relations", {}).items():
+            a_id, b_id = key.split(":", 1)
+            if a_id not in chars or b_id not in chars:
+                continue
+            pair = tuple(sorted((a_id, b_id)))
+            if pair in seen:
+                continue
+            if relation in _DOWNWARD_RELATIONS:
+                edges.append({"a": a_id, "b": b_id, "relation": relation})
+                seen.add(pair)
+            elif a_id < b_id:
+                edges.append({"a": a_id, "b": b_id, "relation": relation})
+                seen.add(pair)
+
+    return {"ok": True, "characters": characters, "edges": edges}
+
+
+def _find_or_create_family(world, char_id):
+    c = world.get("characters", {}).get(char_id)
+    fam_id = c.get("family_id") if c else None
+    if fam_id and fam_id in world.get("families", {}):
+        return world["families"][fam_id]
+    from systems.family import _new_family
+    family = _new_family(c.get("name", char_id).split()[0] if c else "Family")
+    world.setdefault("families", {})[family["id"]] = family
+    family["members"].append(char_id)
+    if c:
+        c["family_id"] = family["id"]
+    return family
+
+
+def _merge_families(world, keep, drop):
+    """Folds drop's members/relations into keep, deletes drop. Used when
+    setting a relation between two characters who already each belong to
+    a DIFFERENT family -- rather than refuse, or silently leave one
+    character's real kinship graph split across two disconnected family
+    records, this makes them one family, the same way a real marriage
+    joining two families would be represented."""
+    if keep["id"] == drop["id"]:
+        return keep
+    chars = world.get("characters", {})
+    for mid in drop.get("members", []):
+        if mid not in keep["members"]:
+            keep["members"].append(mid)
+        if mid in chars:
+            chars[mid]["family_id"] = keep["id"]
+    keep.setdefault("relations", {}).update(drop.get("relations", {}))
+    world.get("families", {}).pop(drop["id"], None)
+    return keep
+
+
+def _set_family_relation_locked(sim_id, a_id, b_id, relation_type):
+    with world_lock():
+        world = load_world(sim_id)
+        chars = world.get("characters", {})
+        a = chars.get(a_id)
+        b = chars.get(b_id)
+        if not a or not b:
+            raise HTTPException(status_code=404, detail="Character not found")
+
+        from systems.family import _set_relation, sync_kinship_to_relationships, INVERSE
+        if relation_type not in INVERSE:
+            raise HTTPException(status_code=400, detail=f"Unknown relation_type '{relation_type}'")
+
+        fam_a = _find_or_create_family(world, a_id)
+        fam_b = _find_or_create_family(world, b_id)
+        family = _merge_families(world, fam_a, fam_b) if fam_a["id"] != fam_b["id"] else fam_a
+
+        _set_relation(family, a_id, b_id, relation_type)
+        a["family_role"] = a.get("family_role") or relation_type
+        b["family_role"] = b.get("family_role") or INVERSE[relation_type]
+
+        sync_kinship_to_relationships(family, world)
+        save_world(sim_id, world)
+        return {"ok": True, "family_id": family["id"]}
+
+
+@router.post("/family_relation")
+async def set_family_relation(request: Request):
+    """
+    Create or overwrite the relation between two existing characters.
+    Body: {sim_id, a_id, b_id, relation_type}
+    relation_type is a_id's relation TO b_id (e.g. "parent" means a_id is
+    b_id's parent) -- systems/family.py::INVERSE supplies the reverse
+    label automatically.
+    """
+    body = await request.json()
+    sim_id = body.get("sim_id", "default")
+    a_id = body.get("a_id")
+    b_id = body.get("b_id")
+    relation_type = body.get("relation_type")
+    if not a_id or not b_id or not relation_type:
+        raise HTTPException(status_code=400, detail="a_id, b_id and relation_type are required")
+    if a_id == b_id:
+        raise HTTPException(status_code=400, detail="a_id and b_id must differ")
+
+    return await asyncio.get_event_loop().run_in_executor(
+        None, _set_family_relation_locked, sim_id, a_id, b_id, relation_type
+    )
+
+
+def _remove_family_relation_locked(sim_id, a_id, b_id):
+    with world_lock():
+        world = load_world(sim_id)
+        chars = world.get("characters", {})
+        a = chars.get(a_id)
+        b = chars.get(b_id)
+        if not a or not b:
+            raise HTTPException(status_code=404, detail="Character not found")
+
+        fam_id = a.get("family_id")
+        family = world.get("families", {}).get(fam_id) if fam_id else None
+        removed = False
+        if family:
+            for key in (f"{a_id}:{b_id}", f"{b_id}:{a_id}"):
+                if key in family.get("relations", {}):
+                    del family["relations"][key]
+                    removed = True
+
+        # A cut relation leaves both characters as (unconnected) members
+        # of the same family record -- harmless, same as any other
+        # unrelated household member; not worth the complexity of
+        # splitting them back into separate family objects.
+
+        # Stale rel["kinship"]/"spouse" label cleanup -- sync_kinship_to_
+        # relationships() only ever ADDS/updates, so a cut relation would
+        # otherwise leave the live relationship dict claiming a kinship
+        # that no longer exists in the authoritative family graph.
+        rel_a = a.get("relationships", {}).get(b_id)
+        rel_b = b.get("relationships", {}).get(a_id)
+        for rel in (rel_a, rel_b):
+            if not rel:
+                continue
+            was_spouse = rel.get("kinship") == "spouse"
+            rel.pop("kinship", None)
+            if was_spouse and "spouse" in rel.get("labels", []):
+                rel["labels"].remove("spouse")
+
+        save_world(sim_id, world)
+        return {"ok": True, "removed": removed}
+
+
+@router.post("/family_relation/remove")
+async def remove_family_relation(request: Request):
+    """Body: {sim_id, a_id, b_id} -- cuts the relation between two
+    existing characters (both directions), if any."""
+    body = await request.json()
+    sim_id = body.get("sim_id", "default")
+    a_id = body.get("a_id")
+    b_id = body.get("b_id")
+    if not a_id or not b_id:
+        raise HTTPException(status_code=400, detail="a_id and b_id are required")
+
+    return await asyncio.get_event_loop().run_in_executor(
+        None, _remove_family_relation_locked, sim_id, a_id, b_id
+    )
