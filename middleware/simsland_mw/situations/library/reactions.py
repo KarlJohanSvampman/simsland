@@ -127,4 +127,87 @@ POST_ABOUT_SELF = S(
 )
 
 
-REACTIONS = (DOOR_SIGNAL, COMMOTION, POST_ABOUT_SELF)
+# ---- social_media.rumor_about_self ---------------------------------------
+# Same wake site as POST_ABOUT_SELF (systems/social_media.py::
+# _notify_mentioned_characters) but only when the post carries "rumor" in
+# its tags -- a genuinely different situation from an ordinary mention:
+# higher priority (this is actively about your reputation, not just
+# "someone brought you up"), and the real options are about managing an
+# unverified claim rather than just reading/replying to an ordinary post.
+# Per the belief/opinion spec's own point about this seed (a manipulative/
+# ambitious character might want to use a rumor rather than fight it):
+# that's left to the LLM's own judgment via what it actually writes, not
+# forced by a dedicated "use_rumor" option with no mechanical backend
+# effect of its own -- ignore_it already covers "don't fight it."
+
+RUMOR_ABOUT_SELF = S(
+    id="social_media.rumor_about_self", category="social_media", priority=75, cooldown_ticks=45 * 60,
+    triggers=(T("event", event="rumor_about_self",
+                key=lambda c: c.wake_payload.get("post_id") or c.wake_payload.get("author_id") or ""),),
+    required_data=("character.relationships", "environment.available_interactions"),
+    describe=lambda c: (f"People online are spreading something about you, posted by "
+                        f"{c.wake_payload.get('author_name', 'someone')}. You don't know "
+                        f"how far it's already gone."),
+    dynamic_options=lambda c: (
+        (O("confront_them_directly", "Confront them about it directly.",
+           action=lambda c: speak_to(c, c.wake_payload.get("author_id")),
+           speaks=True, speech_act="accuse",
+           default_line=lambda c: "Did you seriously post that about me?"),)
+        if c.person(c.wake_payload.get("author_id")) else ()
+    ),
+    options=(
+        O("deny_it_publicly", "Post a public denial.", action=lambda c: act(c, "post_social_media")),
+        O("explain_what_happened", "Post your own account of what actually happened.",
+          action=lambda c: act(c, "post_social_media")),
+        O("message_them_privately", "Message them about it privately.",
+          gap="remote_text_reply_with_llm_content"),
+        O("ignore_it", "Ignore it and hope it blows over.", noop=True),
+    ),
+    notes="deny_it_publicly/explain_what_happened both resolve to the same real post_social_media "
+          "action -- the difference is purely in what the LLM actually writes, which the middleware "
+          "has no way to distinguish after the fact (same shape as POST_ABOUT_SELF's comment_publicly "
+          "gap note: there's no dedicated 'reply to THIS post' capability yet, just 'make a new "
+          "post'). confront_them_directly only appears when the poster happens to already be "
+          "co-present.",
+    min_options=1,
+)
+
+
+# ---- social_media.rumor_seen -----------------------------------------------
+# Fired for an OBSERVER (not the rumor's subject, not its author) -- see
+# systems/social_media.py::view_post's _apply_rumor_exposure, called when a
+# character views a post tagged "rumor". That same call already nudges the
+# observer's own person:<subject_id> opinion (brain/opinions.py) -- the real
+# belief effect happens there, passively, regardless of whether this
+# situation gets selected at all. This situation is the deliberate choice
+# layered on top: does the character actually DO anything about what they
+# just passively absorbed.
+
+RUMOR_SEEN = S(
+    id="social_media.rumor_seen", category="social_media", priority=45, cooldown_ticks=30 * 60,
+    triggers=(T("event", event="rumor_seen",
+                key=lambda c: c.wake_payload.get("post_id") or ""),),
+    required_data=("character.relationships", "environment.available_interactions"),
+    describe=lambda c: (f"You see people online discussing something about "
+                        f"{c.wake_payload.get('subject_name', 'someone')}."),
+    dynamic_options=lambda c: (
+        (O("ask_them_directly", "Ask them directly about it.",
+           action=lambda c: speak_to(c, c.wake_payload.get("subject_id")),
+           speaks=True, speech_act="ask",
+           default_line=lambda c: "Hey, is it true what people are saying about you online?"),)
+        if c.person(c.wake_payload.get("subject_id")) else ()
+    ),
+    options=(
+        O("share_it", "Pass the information along.", action=lambda c: act(c, "post_social_media")),
+        O("defend_them", "Speak up for them publicly.", action=lambda c: act(c, "post_social_media")),
+        O("investigate", "Try to find out whether it's actually true.", gap="investigate_claim"),
+        O("ignore_it", "Don't get involved.", noop=True),
+    ),
+    notes="investigate has no dedicated backend capability yet (a real fact-finding action distinct "
+          "from just asking the subject, which ask_them_directly already covers when they're "
+          "co-present) -- gapped rather than faked.",
+    min_options=1,
+)
+
+
+REACTIONS = (DOOR_SIGNAL, COMMOTION, POST_ABOUT_SELF, RUMOR_ABOUT_SELF, RUMOR_SEEN)

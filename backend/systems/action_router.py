@@ -113,6 +113,10 @@ def apply_speech(c, world, speech):
         "topic":          topic,
         "target":         target_id,
         "volume":         volume,
+        # NOT the `medium` local var -- that's not assigned until further
+        # down this same function (confirmed: referencing it here would
+        # have been a real NameError, caught before ever running live).
+        "medium":         speech.get("medium", "in_person"),
         "expires_at_tick": tick + SPEECH_BUBBLE_TICKS,
     }
 
@@ -550,6 +554,7 @@ _INTERACTION_DURATIONS = {
     "sit_down_seat":   300,   # a real pause, not a placeholder leisure session --
                               # see _route_sit_down's own note on pairing this with
                               # an actual seated activity (watch TV, eat, computer, ...)
+    "check_on_kids":   180,   # a real but brief bedside stop, not an instant blip
 
     # real anchor interactions (systems/*.py prop templates)
     "open_fridge":     10,
@@ -737,6 +742,20 @@ def _route_interact(c, world, action, definitions):
             if interaction:
                 break
 
+    # Defensive backstop for systems/action_registry.py's
+    # INTERACTION_MIN_AGE -- context_builder.py's build_available_actions()
+    # is the primary gate (never OFFERS an under-age interaction in the
+    # first place), but this is the one point every _route_interact call
+    # actually passes through regardless of decision source (in-process
+    # brain or middleware /execute), so it's also where a stale/hallucinated
+    # choice that named an interaction never actually offered gets caught
+    # before it does anything, not just discouraged at the prompt level.
+    age = c.get("age")
+    if age is not None and interaction:
+        from systems.action_registry import INTERACTION_MIN_AGE
+        if age < INTERACTION_MIN_AGE.get(interaction, 0):
+            return
+
     # Confirmed live bug (player report: characters "drinking water"/etc while
     # visibly still sitting in a chair across the room): this used to call
     # _scaffold() straight into phase "using" -- SAME as jog/sit_ups, which
@@ -787,6 +806,12 @@ def _route_interact(c, world, action, definitions):
     if c.get("posture") != target_posture:
         from systems.posture import set_posture
         set_posture(c, world, target_posture)
+
+    # Already close enough to skip the walk branch above (which stamps
+    # building_id itself once a real route finishes) -- same fix as
+    # interactions.py::request_route_to_anchor's "already there" branch,
+    # for this LLM-driven interact path.
+    c["building_id"] = prop.get("building_id")
 
     c["activity"] = _scaffold(
         c, world, "interact",
@@ -2063,9 +2088,31 @@ def route_action(c, world, action, speech, definitions=None, available_actions=N
     # normally, purple for violent/illegal actions -- see debug_log.py)
     # every time an action actually dispatches, plus a low-importance
     # memory entry of the same event.
-    from systems.debug_log import log_action
+    from systems.debug_log import log_action, _resolve_target_name
     log_action(c, world, action_type, action.get("target_description") or "",
               target_id=action.get("target"))
+
+    # Per the user's explicit ask: the Inspector already shows a targeted
+    # activity's own target (c.activity.target_id) once it's scaffolded --
+    # but a quick, one-shot action like "examine" never scaffolds
+    # c["activity"] at all (action_router.py::_route_examine just sets
+    # animation_state and fires an incidental line), so its target was
+    # never visible anywhere in the Inspector at all, confirmed live.
+    # log_action()'s own current_debug_event expires in 6 ticks -- meant
+    # for the fleeting debug bubble, not a readable Inspector line -- so
+    # this is its own, longer-lived stamp instead of reusing that one.
+    # Every dispatched action passes through this exact point regardless
+    # of type, so this covers "any other action that has a target" the
+    # same way, not just examine specifically.
+    target_id = action.get("target")
+    if target_id:
+        c["last_action_target"] = {
+            "action_type":  action_type,
+            "target_id":    target_id,
+            "target_name":  _resolve_target_name(world, target_id),
+            "tick":         world.get("tick", 0),
+            "expires_at_tick": world.get("tick", 0) + 120,   # 2 sim-minutes
+        }
 
     if action_type == "move":
         _route_move(c, world, action)
@@ -2541,6 +2588,8 @@ def route_action(c, world, action, speech, definitions=None, available_actions=N
         _route_feed_child(c, world, action)
     elif action_type == "remind_child":
         _route_remind_child(c, world, action)
+    elif action_type == "check_on_kids":
+        _route_check_on_kids(c, world, action)
 
     # ── Posture ──────────────────────────────────────────────────────────
     elif action_type == "sit_down":
@@ -4087,6 +4136,49 @@ def _route_remind_child(c, world, action):
     _clear_parent_intention(c, f"remind_child_{child['id']}")
 
 
+def _route_check_on_kids(c, world, action):
+    """Parent's scheduled bedtime check (see systems/child_care.py::
+    _ensure_bedtime_check_contract, which is what actually puts this on
+    the parent's own weekly schedule -- see context_builder.py's
+    active_schedule_block gate for how this gets offered). Directly
+    addresses the reported bug of young kids being up in the middle of
+    the night while the parent sleeps: if the target child isn't
+    actually asleep yet, this nudges them toward bed (real add_intention,
+    the same "self_with_reminder" shape child_care.py's own
+    remind_child already uses for other self-manageable needs) rather
+    than just being a flavor action with no real effect."""
+    target_id = action.get("target_id") or action.get("target")
+    child = world.get("characters", {}).get(target_id) if target_id else None
+    if not child or child.get("building_id") != c.get("building_id"):
+        # No usable target from the LLM -- fall back to the youngest real
+        # dependent still in the same building (dependents is already
+        # youngest-first, see child_care.py::_sync_dependents).
+        chars = world.get("characters", {})
+        child = next(
+            (chars[cid] for cid in c.get("dependents", [])
+             if cid in chars and chars[cid].get("building_id") == c.get("building_id")),
+            None,
+        )
+    if not child:
+        return
+
+    c["activity"] = _scaffold(c, world, "check_on_kids", target_id=child["id"],
+                               interaction="check_on_kids")
+
+    is_asleep = (child.get("activity") or {}).get("type") == "sleep"
+    if not is_asleep and child.get("body", {}).get("fatigue", 0) >= 50:
+        from brain.intentions import add_intention
+        add_intention(child, {
+            "type":     "go_to_sleep",
+            "category": "survival",
+            "priority": 80,
+            "reason":   f"{c.get('name', 'your parent')} just checked on you and told you to settle down",
+        })
+
+    from systems.expectations import satisfy_expectation
+    satisfy_expectation(c, "child_bedtime_check", world)
+
+
 # =========================================================
 # PHONE HANDLERS
 # =========================================================
@@ -4832,6 +4924,7 @@ def _route_make_argument(c, world, action):
             listener, topic, delta, tick,
             reasoning=f"Heard {c.get('name', 'someone')}'s argument.",
             relevant_values=relevant_values,
+            source_id=c["id"],
         )
 
 
@@ -4931,6 +5024,10 @@ def _route_sit_down(c, world, action):
         if anchor:
             reserve_anchor(c, prop, anchor)
         c["seat_prop_id"] = target_id
+        # Assumes-already-there, same as _route_interact -- see that
+        # route's own building_id note for why this needs stamping here
+        # directly rather than relying on a walk that never happens.
+        c["building_id"] = prop.get("building_id")
 
 
 def _route_stand_up(c, world, action):

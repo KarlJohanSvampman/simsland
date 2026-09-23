@@ -194,7 +194,7 @@ ACTION_SPECS = {
     "advance_item_sale_round": {"group": "proposal", "target": "proposal", "doc": "Push a stalled item-sale/trade negotiation forward."},
 
     # ---- social media -------------------------------------------------------
-    "post_social_media":       {"group": "social", "target": "none", "doc": "Post to social media (text; media_description optional -- a photo/video isn't actually captured, just described)."},
+    "post_social_media":       {"group": "social", "target": "none", "doc": "Post to social media (text; media_description optional -- a photo/video isn't actually captured, just described). If the post repeats an unverified claim or piece of gossip about someone else rather than reporting something you directly know, include \"rumor\" in tags -- this is what lets other characters' reactions (and the subject's own) treat it as a rumor rather than a confirmed fact."},
     "like_social_post":        {"group": "social", "target": "any", "doc": "Like a social media post (post_id)."},
     "unlike_social_post":      {"group": "social", "target": "any", "doc": "Remove your like from a social media post (post_id)."},
     "comment_on_social_post":  {"group": "social", "target": "any", "doc": "Comment on a social media post (post_id, text)."},
@@ -328,6 +328,42 @@ ACTION_SPECS = {
     "play_alone":   {"group": "child", "target": "none", "doc": "Entertain yourself with solo make-believe play."},
     "homework":     {"group": "child", "target": "none", "doc": "Sit down and do schoolwork."},
     "jump_on_bed":  {"group": "child", "target": "prop", "doc": "Jump on a bed -- the kind of thing kids do when no one's telling them not to."},
+
+    # ---- parenting --------------------------------------------------------
+    "check_on_kids": {"group": "parenting", "target": "character", "doc": "Check on a dependent child before bed -- settle them if they're still up, tuck them in if they're already down."},
+}
+
+# Per the user's explicit ask: rather than hand-writing a fresh is_child (or
+# tag/prop-type) check in context_builder.py every time some new action
+# turns out to be age-inappropriate -- fragile and easy to miss, confirmed
+# live: a kitchen_counter's "prepare_food" anchor interaction slipped past
+# the old "cooking" prop-tag check entirely (that check only ever looked at
+# stove/oven-tagged props, never actually the interaction itself), letting
+# a 5-year-old prepare a meal -- age eligibility is declared ONCE here, as
+# a plain minimum age, and read generically by exactly one filter
+# (build_available_actions()'s own end-of-function pass, plus the matching
+# per-interaction filter over each visible prop's own interactions list)
+# instead of scattered per-action-type conditionals. An action/interaction
+# not listed here has no minimum age at all.
+#
+# Two separate namespaces, since they're offered through different
+# mechanisms: ACTION_TYPE_MIN_AGE gates whole top-level action_types
+# (jog/sit_ups/...); INTERACTION_MIN_AGE gates individual prop anchor
+# interactions (cook/prepare_food/...) WITHOUT hiding the whole prop --
+# e.g. a child can still use a kitchen counter as a surface even though
+# "prepare_food" specifically is filtered off it.
+ACTION_TYPE_MIN_AGE = {
+    "jog":            13,
+    "sit_ups":        13,
+    "chin_ups":       13,
+    "lift_weights":   13,
+}
+
+INTERACTION_MIN_AGE = {
+    "cook":            10,
+    "prepare_food":    10,
+    "use_microwave":    8,
+    "start_microwave":  8,
 }
 
 

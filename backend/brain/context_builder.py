@@ -1,5 +1,6 @@
 from systems.clothing import worn_summary, outfit_style_score, ALL_SLOTS
 from systems.personal_items import inventory_summary, phone_actions, wallet_cash
+from systems.action_registry import ACTION_TYPE_MIN_AGE, INTERACTION_MIN_AGE
 from brain.memory import (
     biased_recall
 )
@@ -378,6 +379,7 @@ def build_available_actions(c, world):
     interactable = []
     is_child = c.get("age_group") == "child"
 
+    char_age = c.get("age")
     for prop in perception.get("visible_props", []):
         tags = prop.get("tags", [])
         interactions = prop.get("interactions", [])
@@ -385,11 +387,22 @@ def build_available_actions(c, world):
         if not tags and not interactions:
             continue
 
-        # Children can't cook for themselves (see systems/child_care.py) —
-        # strip stove/oven/microwave-type props from what they're even
-        # told is available, rather than relying on the LLM to decline.
-        if is_child and "cooking" in tags:
-            continue
+        # Per-interaction age gate (systems/action_registry.py's
+        # INTERACTION_MIN_AGE) — e.g. a kitchen counter's "prepare_food"
+        # anchor is filtered off for a young child while the prop itself,
+        # and any OTHER interaction it offers, stays visible. Replaces the
+        # old "hide the whole prop if it's tagged cooking" check, which a
+        # confirmed live bug showed missing real cases entirely (a
+        # kitchen_counter's prepare_food anchor carries no "cooking" tag
+        # at all, just "furniture"/"kitchen"/"counter" — a 5-year-old
+        # could prepare a meal on it with the old check none the wiser).
+        if char_age is not None:
+            interactions = [
+                i for i in interactions
+                if char_age >= INTERACTION_MIN_AGE.get(i, 0)
+            ]
+            if not tags and not interactions:
+                continue
 
         interactable.append({
             "id":           prop["id"],
@@ -503,23 +516,21 @@ def build_available_actions(c, world):
     # need no target, offered unconditionally like hire_service/
     # propose_chore (the route handler needs no target validation).
     # chin_ups/lift_weights only when a prop with the matching anchor
-    # interaction (do_pull_ups / lift_weights) is actually visible.
-    #
-    # Confirmed live bug (player report: a 6-year-old doing sit-ups):
-    # these are structured fitness routines (systems/lt_needs.py's
-    # "exercise" need, same category adults use to train strength/
-    # cardio), not free play -- gated the same way is_child already
-    # strips cooking above and distribute_lt_needs() zeroes the
-    # romance/intimacy budget for children. practice_juggling stays
-    # available regardless -- it's a playful skill, not a workout.
-    action_types.append("practice_juggling")
-    if not is_child:
-        action_types.extend(["jog", "sit_ups"])
-        for entry in interactable:
-            if "do_pull_ups" in entry.get("interactions", []) and "chin_ups" not in action_types:
-                action_types.append("chin_ups")
-            if "lift_weights" in entry.get("interactions", []) and "lift_weights" not in action_types:
-                action_types.append("lift_weights")
+    # interaction (do_pull_ups / lift_weights) is actually visible. Age
+    # eligibility itself is no longer decided here at all -- these are
+    # structured fitness routines (systems/lt_needs.py's "exercise" need),
+    # not free play, so they're declared in ACTION_TYPE_MIN_AGE
+    # (systems/action_registry.py) and stripped by this function's own
+    # generic age filter below, same mechanism every other age-gated
+    # action/interaction now goes through. practice_juggling has no
+    # min_age entry at all -- it's a playful skill, not a workout, so it
+    # stays available regardless of age.
+    action_types.extend(["practice_juggling", "jog", "sit_ups"])
+    for entry in interactable:
+        if "do_pull_ups" in entry.get("interactions", []) and "chin_ups" not in action_types:
+            action_types.append("chin_ups")
+        if "lift_weights" in entry.get("interactions", []) and "lift_weights" not in action_types:
+            action_types.append("lift_weights")
 
     # Music (systems/lt_needs.py's "creative" need via
     # action_router.py's _route_listen_to_music/_route_play_instrument/
@@ -787,6 +798,16 @@ def build_available_actions(c, world):
                     action_types.append(a)
             if has_pushable_prop and "put_baby_in_carriage" not in action_types:
                 action_types.append("put_baby_in_carriage")
+
+    # check_on_kids (see systems/child_care.py::_ensure_bedtime_check_contract)
+    # -- every caretaker of a child under 12 gets a real recurring_activity
+    # contract that puts this on their own weekly schedule (systems/
+    # scheduling.py::_contract_blocks), so the offer follows that real
+    # signal (active_schedule_block) the same way feed_child/remind_child
+    # above follow a real flagged need, rather than being always-on.
+    active_block = c.get("active_schedule_block") or {}
+    if active_block.get("activity") == "check_on_kids" and c.get("dependents"):
+        action_types.append("check_on_kids")
 
     # respond_chore/advance_chore_round only make sense (and only appear)
     # when this character actually has something pending — see
@@ -1183,6 +1204,19 @@ def build_available_actions(c, world):
             "presence":        biz.get("presence"),
             "reason_options":  biz.get("reason_options"),
         })
+
+    # Generic age filter (systems/action_registry.py's ACTION_TYPE_MIN_AGE)
+    # -- the single place every top-level action_type's age eligibility is
+    # actually enforced, regardless of which of the many branches above
+    # added it. Catches this function's own current entries and, just as
+    # importantly, any FUTURE age-inappropriate action_type added above
+    # without anyone remembering to hand-write a matching is_child check
+    # for it specifically.
+    if char_age is not None and ACTION_TYPE_MIN_AGE:
+        action_types = [
+            t for t in action_types
+            if char_age >= ACTION_TYPE_MIN_AGE.get(t, 0)
+        ]
 
     return {
         "action_types":          action_types,
@@ -2311,27 +2345,56 @@ def _build_household_process_context(c, world):
 
 
 def _principle_bias_note(c, proposer, world):
-    """Real, data-grounded bias from c's own held principles toward
-    `proposer` (Phase I's wired consequence -- systems/mentality.py::
-    principle_stance_toward()) -- same "real accumulated state the LLM
-    can naturally lean on, not flavor text" precedent as the favors.py
-    fatigue note just above. Reused across EVERY incoming proposal kind
-    (chore/social_ask/request/item_loan/item_sale/recurring_offer) --
-    the same "would I really do this for/with someone like them" bias
-    applies regardless of what's actually being asked. Only a FIRM ('>')
-    conviction fires (a tentative '<' suspicion or a moderate '=='
-    generalization isn't strong enough to color a real decision) --
-    returns "" (safe to always += ) when there's no proposer or no firm
-    match."""
+    """Real, data-grounded bias toward `proposer`, for every incoming
+    proposal kind (chore/social_ask/request/item_loan/item_sale/
+    recurring_offer) -- the same "would I really do this for/with them"
+    bias applies regardless of what's actually being asked. Two
+    DIFFERENT, deliberately non-overlapping layers, per the belief/
+    opinion spec's own distinction between a generalized/stereotyped
+    attitude (section 56) and a specific belief about one individual
+    (sections 18-20):
+
+      - group-level: c's own held principles toward "people like them"
+        (systems/mentality.py::principle_stance_toward, Phase I) -- only
+        a FIRM ('>') conviction fires, same as before this note grew a
+        second half.
+      - individual-level: c's actual formed opinion of THIS proposer
+        specifically (brain/opinions.py, topic f"person:{id}") -- the
+        real "You trust John greatly" input spec section 110's example
+        LLM prompt calls for, previously entirely absent from proposal
+        context (nothing here reflected gossip/direct-experience about
+        the proposer as a person, only the group stereotype).
+
+    Returns "" (safe to always += ) when there's nothing worth saying
+    from either layer."""
     if not proposer:
         return ""
+
+    note = ""
+
     from systems.mentality import principle_stance_toward
     stance = principle_stance_toward(c, proposer, world)
-    if not stance or stance.get("op") != ">":
-        return ""
-    if stance["sentiment"] == "unfavorable":
-        return " Deep down, you've never quite trusted people like that — this doesn't sit right with you."
-    return " You've always felt a real kinship with people like them — you're inclined to help."
+    if stance and stance.get("op") == ">":
+        if stance["sentiment"] == "unfavorable":
+            note += " Deep down, you've never quite trusted people like that — this doesn't sit right with you."
+        else:
+            note += " You've always felt a real kinship with people like them — you're inclined to help."
+
+    from brain.opinions import get_current_opinion
+    opinion = get_current_opinion(c, f"person:{proposer['id']}")
+    if opinion and opinion.get("confidence", 0) >= 0.15:
+        s, conf = opinion["stance"], opinion["confidence"]
+        name = proposer.get("name", "them")
+        if s >= 0.5:
+            note += f" You genuinely trust {name}." if conf >= 0.4 else f" You've generally got a good feeling about {name}."
+        elif s >= 0.15:
+            note += f" You think reasonably well of {name}."
+        elif s <= -0.5:
+            note += f" You don't trust {name} much at all these days." if conf >= 0.4 else f" Something about {name} has been rubbing you the wrong way lately."
+        elif s <= -0.15:
+            note += f" You've got some real reservations about {name}."
+
+    return note
 
 
 def _build_proposal_context(c, world):

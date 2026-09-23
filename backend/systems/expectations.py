@@ -83,6 +83,20 @@ def _character_tags(c, world=None):
             if has_child_in_household and age_group in ("adult", "elderly"):
                 tags.add("parent")
                 tags.add("provider_archetype")
+            # Per the user's explicit ask (player report: young children
+            # awake in the middle of the night while the parent sleeps) --
+            # narrower than "parent" above, which fires for a household
+            # with ANY child/teen: this is specifically for a household
+            # with at least one child under 12, old enough that a teen-only
+            # household (already reasonably expected to self-manage
+            # bedtime) doesn't also pick up a nightly supervision duty.
+            has_young_child = any(
+                characters.get(mid, {}).get("age_group") == "child"
+                and (characters.get(mid, {}).get("age") or 0) < 12
+                for mid in members
+            )
+            if has_young_child and age_group in ("adult", "elderly"):
+                tags.add("parent_of_young_child")
             # Confirmed live bug: a 6-year-old sharing a household with
             # anyone else (no age check at all here) qualified for
             # make_dinner's "cohabiting" tag on its own -- make_dinner's
@@ -210,6 +224,7 @@ _SCHEDULE_LINKED_EXPECTATIONS = {
     "make_dinner":            "eat",
     "family_dinner_together": "eat",
     "go_to_work":             "work",
+    "child_bedtime_check":    "check_on_kids",
 }
 
 

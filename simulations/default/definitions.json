@@ -66548,6 +66548,18 @@
       ],
       "base_priority": 25,
       "category": "leisure"
+    },
+    "child_bedtime_check": {
+      "label": "Check on the kids before bed",
+      "cadence": "daily",
+      "value_category": "children",
+      "of_self": true,
+      "requires_others": false,
+      "tags": [
+        "parent_of_young_child"
+      ],
+      "base_priority": 60,
+      "category": "household"
     }
   },
   "exercise_type_registry": {

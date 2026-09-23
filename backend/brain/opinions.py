@@ -32,15 +32,27 @@ IDEOLOGY_AXES = {
 }
 
 
-def update_opinion(c, topic, stance, confidence, reasoning, relevant_values, tick):
+def update_opinion(c, topic, stance, confidence, reasoning, relevant_values, tick, source_id=None):
     """Append a new opinion snapshot for `topic`, capped to the last
-    _OPINION_HISTORY_CAP entries. Returns the new entry."""
+    _OPINION_HISTORY_CAP entries. Returns the new entry.
+
+    source_id (optional) -- who this snapshot's shift actually came from
+    (a character id for socially-transmitted opinions, None for direct
+    experience/media/etc). NOT full information-lineage tracking (the
+    belief/opinion spec's InformationLineage traces a claim back through
+    every hop to its origin) -- just enough to let a caller cheaply
+    detect "the same person telling me the same thing again" and
+    discount it, rather than letting one source's repeated retelling
+    compound as if it were independent corroboration each time (see
+    systems/conversation_analysis.py's gossip handling, the one caller
+    that reads it back)."""
     entry = {
         "tick":            tick,
         "stance":          max(-1.0, min(1.0, float(stance))),
         "confidence":      max(0.0, min(1.0, float(confidence))),
         "reasoning":       reasoning or "",
         "relevant_values": list(relevant_values or []),
+        "source_id":       source_id,
     }
     history = c.setdefault("opinions", {}).setdefault(topic, [])
     history.append(entry)
@@ -54,7 +66,7 @@ def get_current_opinion(c, topic):
     return history[-1] if history else None
 
 
-def shift_opinion(c, topic, delta, tick, reasoning="", relevant_values=None):
+def shift_opinion(c, topic, delta, tick, reasoning="", relevant_values=None, source_id=None):
     """
     Nudge an EXISTING opinion by `delta` (signed, typically a persuasion
     result from systems/action_router.py's make_argument resolution),
@@ -72,6 +84,21 @@ def shift_opinion(c, topic, delta, tick, reasoning="", relevant_values=None):
     if current is None:
         return None
 
+    # Partial source-independence guard (belief/opinion spec sections
+    # 37-38, invariant #10: "repeated copies of one claim are not
+    # automatically independent evidence"). NOT full information-lineage
+    # tracking (a claim relayed through several different people back to
+    # one shared origin still looks independent here) -- just the
+    # cheapest real case: the SAME source shifting you the SAME direction
+    # again right after already having done so shouldn't compound like
+    # fresh corroboration each time. Centralized here (not duplicated per
+    # caller -- see systems/action_router.py::_route_make_argument and
+    # systems/conversation_analysis.py's gossip handling, both of which
+    # pass source_id and get this for free) so every caller gets the same
+    # behavior automatically.
+    if source_id is not None and current.get("source_id") == source_id:
+        delta *= 0.15
+
     confidence = current.get("confidence", 0.1)
     resistance = 1 - confidence
     old_stance = current["stance"]
@@ -86,7 +113,7 @@ def shift_opinion(c, topic, delta, tick, reasoning="", relevant_values=None):
         c, topic, new_stance, new_confidence,
         reasoning or current.get("reasoning", ""),
         relevant_values or current.get("relevant_values", []),
-        tick,
+        tick, source_id=source_id,
     )
 
 
@@ -156,7 +183,7 @@ def polarize_opinions(c):
             entry["stance"] = max(-1.0, min(1.0, v + (0.005 * conf if v > 0 else -0.005 * conf)))
 
 
-def nudge_opinion(c, topic, sentiment, intensity, tick, reasoning=""):
+def nudge_opinion(c, topic, sentiment, intensity, tick, reasoning="", source_id=None):
     """Thin wrapper replacing the retired brain/beliefs.py::
     update_belief() at its 4 real call sites (systems/politics.py's
     election-winner reinforcement, systems/influence.py's news/peer
@@ -174,7 +201,7 @@ def nudge_opinion(c, topic, sentiment, intensity, tick, reasoning=""):
     else:
         delta = delta * 0.2
 
-    shifted = shift_opinion(c, topic, delta, tick, reasoning=reasoning)
+    shifted = shift_opinion(c, topic, delta, tick, reasoning=reasoning, source_id=source_id)
     if shifted is None:
-        shifted = update_opinion(c, topic, delta, 0.1, reasoning, [], tick)
+        shifted = update_opinion(c, topic, delta, 0.1, reasoning, [], tick, source_id=source_id)
     return shifted

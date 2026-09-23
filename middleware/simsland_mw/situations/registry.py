@@ -149,6 +149,22 @@ class SituationRegistry:
                     # resolutions (e.g. two seeds that both land on the same
                     # interact(fridge)) legitimately are.
                     sig = f"{sig}:{seed.speech_act}"
+                elif "target" not in outcome:
+                    # Same underlying reasoning as the speaks=True case just
+                    # above, for a different shape: a target-less outcome
+                    # (e.g. post_social_media -- {"type": "post_social_media"},
+                    # nothing else) is IDENTICAL no matter which of a
+                    # situation's own options resolves to it, because the real
+                    # differentiation (a denial vs. an explanation, sharing
+                    # vs. defending someone, ...) lives entirely in what the
+                    # LLM goes on to write, same as speech_act differentiates
+                    # two speaks=True seeds. Confirmed live: social_media.
+                    # rumor_about_self's deny_it_publicly/explain_what_happened
+                    # (and rumor_seen's share_it/defend_them) both silently
+                    # collapsed to one option before this -- deliberately
+                    # authored as distinct choices in the same situation, not
+                    # an accidental duplicate the dedup is meant to catch.
+                    sig = f"{sig}:{seed.id}"
                 if sig in seen_outcomes:            # two seeds that resolve to the same act
                     continue
                 seen_outcomes.add(sig)

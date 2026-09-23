@@ -4,13 +4,27 @@ def record_influence(source,target,amount,world):
     target.setdefault("influence_received",{})[source["id"]]=target.setdefault("influence_received",{}).get(source["id"],0)+amount
     world.setdefault("influence_graph",{}).setdefault(source["id"],{})[target["id"]]=world.setdefault("influence_graph",{}).setdefault(source["id"],{}).get(target["id"],0)+amount
 def apply_public_figure_influence(world):
+    media_by_id = {m["id"]: m for m in world.get("media", [])}
     for news in world.get("news",[])[-3:]:
+        outlet = media_by_id.get(news.get("source"))
         for pfid in news.get("related_entities",[]):
             pf=next((p for p in world.get("public_figures",[]) if p["id"]==pfid), None)
             if not pf: continue
             for c in world["characters"].values():
                 curiosity_scale=c.get("curiosity",50)/100.0
-                for tag in pf.get("tags",[])[:2]: nudge_opinion(c,tag,news.get("sentiment","neutral"),news.get("intensity",.3)*pf.get("influence_power",.5)*curiosity_scale,world["tick"])
+                # Character-specific trust in the outlet that actually
+                # published this scales how much it can move opinion --
+                # see systems/media.py::get_source_trust. A character who
+                # doesn't trust this particular outlet barely budges, even
+                # from a story they've fully read; one who trusts it
+                # moves close to the old, unscaled amount.
+                if outlet is not None:
+                    from systems.media import get_source_trust
+                    trust = get_source_trust(c, outlet, world)
+                    trust_scale = 0.15 + 0.85 * ((trust["stance"] + 1) / 2)
+                else:
+                    trust_scale = 1.0
+                for tag in pf.get("tags",[])[:2]: nudge_opinion(c,tag,news.get("sentiment","neutral"),news.get("intensity",.3)*pf.get("influence_power",.5)*curiosity_scale*trust_scale,world["tick"])
 def apply_social_influence(world):
     for c in world["characters"].values():
         for tid,weight in c.get("influence_given",{}).items():

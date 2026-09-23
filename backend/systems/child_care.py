@@ -94,6 +94,47 @@ def _ensure_departure_contract(child, parents, world):
     )
 
 
+def _ensure_bedtime_check_contract(child, parents, world):
+    """Per the user's explicit ask (player report: young children awake in
+    the middle of the night while the parent sleeps) -- gives every parent
+    of a child under 12 a real, recurring evening commitment to check on
+    them, the same way _ensure_departure_contract above gives every child
+    a real curfew-adjacent contract. Uses create_contract() directly
+    (not create_authority_contract()'s fixed TEMPLATES dict) because
+    check_type="recurring_activity" is what systems/scheduling.py::
+    _contract_blocks() actually reads to put a real "check_on_kids" block
+    on the parent's own weekly calendar -- the same mechanism
+    systems/proposals.py::offer_recurring() uses for a recurring game
+    night, just authority-created instead of proposed/accepted."""
+    if (child.get("age") or 0) >= 12:
+        return
+
+    from systems.social_contracts import get_contracts_for_character, create_contract
+
+    for parent in parents:
+        existing = get_contracts_for_character(parent["id"], world)
+        if any(ct.get("_bedtime_check_for") == child["id"] for ct in existing):
+            continue
+
+        contract = create_contract(
+            [parent["id"], child["id"]],
+            [{
+                "party":      parent["id"],
+                "commitment": f"check on {child.get('name', 'the kids')} before bed",
+                "check_type": "recurring_activity",
+                "params": {
+                    "days":       ["monday", "tuesday", "wednesday", "thursday",
+                                   "friday", "saturday", "sunday"],
+                    "start_hour": 20,
+                    "end_hour":   21,
+                    "activity":   "check_on_kids",
+                },
+            }],
+            world,
+        )
+        contract["_bedtime_check_for"] = child["id"]
+
+
 def _check_child_room_mess(c, parents, world):
     """Parents typically hold their kid's room to a stricter standard
     than the kid holds it themselves -- see systems/chores.py. Judged by
@@ -149,6 +190,7 @@ def tick_child_needs(world):
         _sync_dependents(c, parents, world)
 
         _ensure_departure_contract(c, parents, world)
+        _ensure_bedtime_check_contract(c, parents, world)
 
         _check_child_room_mess(c, parents, world)
 

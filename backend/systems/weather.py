@@ -174,6 +174,39 @@ _EXPOSURE_SICKNESS_THRESHOLD = 80
 _EXPOSURE_SICKNESS_CHANCE_PER_TICK = 0.02
 
 
+def _resolve_effective_building_id(c, world):
+    """c["building_id"] only updates when a character actually WALKS
+    across an indoor/outdoor route segment (systems/movement.py) or
+    starts a fresh activity at an anchor already in reach (systems/
+    interactions.py::request_route_to_anchor, action_router.py's
+    _route_interact/_route_sit_down). A character who's been mid-
+    activity since before one of those fixes landed -- or who's simply
+    never taken a real walk since spawn -- can carry a stale value (often
+    still the None default) for a long time.
+
+    Confirmed live bug (player report: three household members all
+    pinned at 100 stress): a sleeping/seated character with a stale
+    None building_id read as "permanently outdoors" here, ratcheting
+    cold_exposure to 100 and stress right along with it, with no way
+    back down until they happened to start a brand-new activity.
+
+    Prefer the prop actually backing the character's CURRENT activity
+    when there is one -- it's more current than c["building_id"] and
+    costs nothing extra to check, since every real activity is already
+    either at a real prop (with its own, always-accurate building_id)
+    or has no target at all (jog, sit_ups, ... -- genuinely outdoor-or-
+    unlocated activities, where falling back to c["building_id"] is
+    correct)."""
+    target_id = (c.get("activity") or {}).get("target_id")
+    if target_id:
+        props = world.get("props", {})
+        prop = (props.get(target_id) if isinstance(props, dict)
+                else next((p for p in props if p.get("id") == target_id), None))
+        if prop and prop.get("building_id"):
+            return prop["building_id"]
+    return c.get("building_id")
+
+
 def apply_weather_to_characters(world):
     weather = world.get("weather") or {}
     outdoor_temp = weather.get("temperature_c")
@@ -182,7 +215,7 @@ def apply_weather_to_characters(world):
 
     for c in world.get("characters", {}).values():
         body = c.setdefault("body", {})
-        outdoors = not c.get("building_id")
+        outdoors = not _resolve_effective_building_id(c, world)
 
         if not outdoors:
             body["cold_exposure"] = max(0, body.get("cold_exposure", 0) - _EXPOSURE_DECAY_PER_TICK)

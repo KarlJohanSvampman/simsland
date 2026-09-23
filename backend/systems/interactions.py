@@ -53,6 +53,21 @@ def request_route_to_anchor(c, world, prop, anchor):
     if plan_character_route(world, c, ax, ay):
         c["animation_state"] = "walk"
         c["is_moving"]       = True
+    else:
+        # Already at the anchor -- no route/tile-crossing needed, so
+        # movement.py's indoor/outdoor segment tracking (the ONLY other
+        # place c["building_id"] gets updated) never runs for this
+        # character. Confirmed live bug (player report: three household
+        # members all pinned at 100 stress): a character who never took a
+        # real walk since spawn (already standing at their own bed/couch/
+        # counter when an activity started) kept whatever building_id
+        # they happened to start with -- often stale None -- which
+        # systems/weather.py then read as "permanently outdoors,"
+        # ratcheting cold_exposure to 100 and stress right along with it.
+        # We already authoritatively know which building this prop
+        # belongs to (or that it's outdoors, if None) -- stamp it
+        # directly rather than depending on a walk that isn't happening.
+        c["building_id"] = prop.get("building_id")
 
 
 # =========================================================

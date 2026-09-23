@@ -82,8 +82,15 @@ WAKE_PRIORITY = {
     # ordinary reminder) but below anything involving a person actually
     # right there (person_entered_view/heard_speech/door_signal/provoked).
     "proposal_countered": 48,   # needs the proposer's own action to move forward
+    "rumor_about_self":   46,   # systems/social_media.py -- a rumor (not just
+                                 # an ordinary mention) ranks a bit above a
+                                 # plain proposal notification: it's actively
+                                 # about the character's own reputation
     "proposal_received":  45,
     "post_about_self":    44,
+    "rumor_seen":         43,   # systems/social_media.py -- an observer
+                                 # noticing someone else's rumor; real, but
+                                 # less personally urgent than post_about_self
     "proposal_resolved":  42,   # purely informational -- lowest of this group
     "schedule_block": 40,
     "wait_ready": 35,

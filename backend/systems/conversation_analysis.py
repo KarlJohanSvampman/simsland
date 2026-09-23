@@ -24,6 +24,10 @@ from brain.memory import (
     store_memory
 )
 
+from brain.opinions import (
+    nudge_opinion,
+)
+
 CUED_RECALL_CHANCE = 0.15
 _STOPWORDS = {
     "the", "a", "an", "is", "was", "were", "to", "of", "in", "on", "for",
@@ -681,6 +685,76 @@ def apply_speech_act_analysis(
 
                         "weight":
                             0.5
+                    })
+
+        # Real opinion-of-a-third-party transfer, alongside the secret
+        # transfer above -- same "pick something the speaker genuinely
+        # already holds, don't try to parse the free-text utterance" shape
+        # as the secret-reveal block. Belief/opinion spec sections 18-20
+        # are explicit that a belief about a person is NOT the same thing
+        # as a relationship score ("do not make love=0.87 the primary
+        # representation") -- so this updates the listener's real
+        # "person:<id>" opinion (brain/opinions.py, the SAME attitude
+        # engine systems/media.py::get_source_trust uses for outlets) as
+        # the one and only place this fact lives. It deliberately does
+        # NOT also nudge relationships[target]["trust"/"respect"] --
+        # those stay reserved for DIRECT interaction (compliments,
+        # insults, ...) via apply_relationship_effects above; writing
+        # hearsay into both would be exactly the parallel-state problem
+        # this is trying to avoid. Anything that should weigh hearsay
+        # (contract/proposal acceptance, per spec section 90) should read
+        # get_current_opinion(c, f"person:{id}") directly -- a later,
+        # separate migration, not grafted on here.
+        #
+        # nudge_opinion/shift_opinion's own resistance math (confidence-
+        # gated) already gives diminishing returns to repeated exposure
+        # (spec section 66), AND -- since source_id is passed below --
+        # automatically discounts a repeat from the SAME speaker (spec
+        # sections 37-38, invariant #10; see brain/opinions.py::
+        # shift_opinion's own note). That's still a partial, not full,
+        # fix: it doesn't trace a claim across multiple DIFFERENT people
+        # back to one shared origin (real InformationLineage tracking) --
+        # flagged as still-missing, not silently pretended away.
+        if world is not None:
+            chars = world.get("characters", {})
+            candidates = [
+                (oid, rel) for oid, rel in speaker.get("relationships", {}).items()
+                if oid not in (speaker["id"], listener["id"]) and oid in chars
+                and abs(rel.get("trust", 0)) + abs(rel.get("respect", 0)) >= 15
+            ]
+            if candidates:
+                target_id, srel = max(
+                    candidates,
+                    key=lambda kv: abs(kv[1].get("trust", 0)) + abs(kv[1].get("respect", 0)),
+                )
+                target = chars[target_id]
+                listener_trust_in_speaker = listener.get(
+                    "relationships", {}
+                ).get(speaker["id"], {}).get("trust", 0)
+                credence = max(0.1, min(1.0, 0.4 + listener_trust_in_speaker / 200.0))
+
+                topic = f"person:{target_id}"
+                magnitude = (abs(srel.get("trust", 0)) + abs(srel.get("respect", 0))) / 200.0
+                sentiment = "positive" if srel.get("trust", 0) + srel.get("respect", 0) >= 0 else "negative"
+                intensity = min(0.6, magnitude * credence)
+
+                if intensity > 0.03:
+                    nudge_opinion(
+                        listener, topic, sentiment, intensity, world.get("tick", 0),
+                        reasoning=f"heard from {name} about {target.get('name', target_id)}",
+                        source_id=speaker["id"],
+                    )
+
+                    result[
+                        "observations"
+                    ].append({
+
+                        "text":
+                            f"{name} told you what they really think of "
+                            f"{target.get('name', 'someone')}.",
+
+                        "weight":
+                            0.3
                     })
 
         # Chain spread (systems/stories.py) -- the listener re-evaluates

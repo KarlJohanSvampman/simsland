@@ -449,6 +449,19 @@ def ai_authority_decision(contract, authority, subject, world):
     if "fair" in traits:
         accept_prob += 0.05
 
+    # The authority's actual, specific opinion of the subject (brain/
+    # opinions.py, topic f"person:{id}") -- belief/opinion spec section
+    # 90's "Social Contract Integration": beliefs about someone (do they
+    # usually keep promises, are they honest) should influence contract
+    # decisions, not just this function's own compliance_score. compliance_
+    # score already IS a real track record signal, so this is a smaller
+    # modifier layered on top -- a person opinion that hasn't been formed
+    # yet (subject["id"] never gossiped/argued about) contributes nothing.
+    from brain.opinions import get_current_opinion
+    subject_opinion = get_current_opinion(authority, f"person:{subject['id']}")
+    if subject_opinion:
+        accept_prob += subject_opinion["stance"] * subject_opinion["confidence"] * 0.15
+
     # How big is the ask?
     proposed = neg.get("proposed_terms", {})
     original_hour = None

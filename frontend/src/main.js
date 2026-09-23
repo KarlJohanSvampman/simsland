@@ -4808,7 +4808,21 @@ function renderCharacterInspector(id){
         const targetName = prop?.template?.replace(/_/g, " ") || targetChar?.name || targetId;
         return `${verb}: ${label} (${targetName})${link}`;
       })()
-    : `State: ${c.animation_state || "idle"}`;
+    : (() => {
+        // Per the user's explicit ask: a quick, one-shot action (examine,
+        // or anything else with a target that never scaffolds a real
+        // c["activity"]) had nowhere to show its target once the animation
+        // itself was the only thing left -- action_router.py::route_action
+        // now stamps c.last_action_target for exactly this, expiring after
+        // 2 sim-minutes so a stale one never reads as current.
+        const lat = c.last_action_target;
+        const tick = _worldState.tick;
+        if(lat && tick != null && tick <= lat.expires_at_tick){
+          const label = lat.action_type.replace(/_/g, " ");
+          return `State: ${c.animation_state || "idle"} — ${label} (${lat.target_name || lat.target_id})`;
+        }
+        return `State: ${c.animation_state || "idle"}`;
+      })();
   rows.push(activityLabel);
 
   // The generic "wait" activity (systems/interactions.py's queueing path,
@@ -6652,6 +6666,32 @@ function renderBodyTab(c){
   }
 
   const summaryBits = [];
+
+  // Per the user's explicit ask: body.sickness (a plain 0-100 severity
+  // float -- weather exposure, general illness accumulation, ...) and
+  // cold_exposure/heat_exposure (systems/weather.py) were both real,
+  // live-tracked stats with NOTHING showing them anywhere on this tab --
+  // confirmed live (a character sat at sickness=50 with the tab reading
+  // "No injuries.", nothing else). Distinct from the "Diseases:" line
+  // below, which only ever covers c.physical_health's discrete named
+  // conditions (borrelia, nerve_damage, ...) -- a character can be
+  // generally unwell with zero named diseases, same as Dennis was here.
+  const body = c?.body || {};
+  const sickness = body.sickness || 0;
+  if(sickness >= 85) summaryBits.push(`<span style="color:#d33">Severely ill (sickness ${Math.round(sickness)})</span>`);
+  else if(sickness >= 60) summaryBits.push(`<span style="color:#e80">Quite sick (sickness ${Math.round(sickness)})</span>`);
+  else if(sickness >= 35) summaryBits.push(`<span style="color:#e80">Sick (sickness ${Math.round(sickness)})</span>`);
+  else if(sickness >= 15) summaryBits.push(`Feeling a bit under the weather (sickness ${Math.round(sickness)})`);
+
+  const cold = body.cold_exposure || 0;
+  const heat = body.heat_exposure || 0;
+  if(cold >= 85) summaryBits.push(`<span style="color:#d33">Dangerously cold</span>`);
+  else if(cold >= 60) summaryBits.push(`<span style="color:#e80">Very cold</span>`);
+  else if(cold >= 30) summaryBits.push(`Cold`);
+  if(heat >= 85) summaryBits.push(`<span style="color:#d33">Dangerously overheated</span>`);
+  else if(heat >= 60) summaryBits.push(`<span style="color:#e80">Very hot</span>`);
+  else if(heat >= 30) summaryBits.push(`Overheated`);
+
   const untreatedCount = Object.values(bodyParts).reduce(
     (n, bp) => n + Object.values(bp.hazards || {}).filter(h => !h.treated).length, 0
   );

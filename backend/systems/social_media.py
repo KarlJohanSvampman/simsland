@@ -93,7 +93,14 @@ def _notify_mentioned_characters(c, world, post):
     Uses systems/social_intentions.py's target-scoped add_social_intention
     (dedupes by type+target_id) rather than brain/intentions.py's plain
     add_intention (which only dedupes by type -- would collide across
-    different post authors)."""
+    different post authors).
+
+    A post tagged "rumor" (see systems/action_registry.py's
+    post_social_media doc -- the LLM is told to tag it this way when
+    repeating an unverified claim) wakes with "rumor_about_self" instead
+    of "post_about_self": a genuinely different, higher-priority
+    situation (middleware/simsland_mw/situations/library/reactions.py)
+    about managing an unverified claim, not just an ordinary mention."""
     about_ids = post.get("about_character_ids") or []
     if not about_ids:
         return
@@ -101,21 +108,23 @@ def _notify_mentioned_characters(c, world, post):
     from systems.social_intentions import add_social_intention
     from brain.cognition_scheduler import wake_character
 
+    is_rumor = "rumor" in (post.get("tags") or [])
+    reason = "rumor_about_self" if is_rumor else "post_about_self"
     tick = world.get("tick", 0)
     for target_id in about_ids:
         target = world.get("characters", {}).get(target_id)
         if not target:
             continue
         add_social_intention(target, {
-            "type":        "post_about_self",
+            "type":        reason,
             "category":    "social",
             "target_id":   c["id"],
-            "priority":    55,
-            "reason":      "someone_posted_about_you",
+            "priority":    75 if is_rumor else 55,
+            "reason":      "rumor_about_you_online" if is_rumor else "someone_posted_about_you",
             "created_at":  tick,
             "source":      "social_media",
         })
-        wake_character(target, world, "post_about_self", {
+        wake_character(target, world, reason, {
             "author_name": c.get("name", "someone"),
             "author_id":   c["id"],
             "post_id":     post["id"],
@@ -207,7 +216,70 @@ def view_post(c, world, post_id):
         return False
     if c["id"] not in post["views"]:
         post["views"].append(c["id"])
+        _apply_rumor_exposure(c, world, post)
     return True
+
+
+def _apply_rumor_exposure(viewer, world, post):
+    """Seeing a rumor post is itself a real information-transmission
+    event, through the SAME machinery direct gossip uses (brain/
+    opinions.py's person:<id> attitude, trust-scaled, source_id-tracked)
+    -- belief/opinion spec sections 100-101: "all information sources
+    flow through the same epistemic system," not a second, parallel
+    social-media-specific rumor structure. Only fires for a genuine
+    OBSERVER -- not the rumor's own author (their belief doesn't move
+    from reading their own post) and not its subject (their reaction to
+    being talked about is the separate rumor_about_self wake in
+    _notify_mentioned_characters, a decision, not a passive belief
+    update about themselves)."""
+    if "rumor" not in (post.get("tags") or []):
+        return
+    author_id = post.get("author_id")
+    if viewer["id"] == author_id:
+        return
+
+    from brain.opinions import nudge_opinion, get_current_opinion
+    from brain.cognition_scheduler import wake_character
+
+    chars = world.get("characters", {})
+    author = chars.get(author_id)
+    viewer_trust_in_author = viewer.get(
+        "relationships", {}
+    ).get(author_id, {}).get("trust", 0)
+    credence = max(0.1, min(1.0, 0.35 + viewer_trust_in_author / 250.0))
+    tick = world.get("tick", 0)
+
+    for subject_id in post.get("about_character_ids") or []:
+        if subject_id == viewer["id"]:
+            continue
+
+        # Prefer the AUTHOR's own real, already-formed opinion of the
+        # subject (same "pick something real, don't fabricate" rule
+        # systems/conversation_analysis.py's gossip handling follows) --
+        # only falls back to an assumed-negative default when the author
+        # has no formed opinion to draw from, since a rumor severe enough
+        # to post publicly skews negative in practice; a real "claim"
+        # field on the post recording actual sentiment would let this be
+        # precise instead of assumed, and is a reasonable later upgrade.
+        author_opinion = get_current_opinion(author, f"person:{subject_id}") if author else None
+        sentiment = "negative"
+        if author_opinion is not None:
+            sentiment = "positive" if author_opinion["stance"] >= 0 else "negative"
+
+        nudge_opinion(
+            viewer, f"person:{subject_id}", sentiment, 0.25 * credence, tick,
+            reasoning=f"saw a rumor online, posted by {author.get('name', 'someone') if author else 'someone'}",
+            source_id=author_id,
+        )
+
+        subject = chars.get(subject_id)
+        wake_character(viewer, world, "rumor_seen", {
+            "post_id":     post["id"],
+            "subject_id":  subject_id,
+            "subject_name": subject.get("name", "someone") if subject else "someone",
+            "author_id":   author_id,
+            "author_name": author.get("name", "someone") if author else "someone",
+        })
 
 
 def like_post(c, world, post_id):
