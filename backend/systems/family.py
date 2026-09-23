@@ -136,6 +136,19 @@ def sync_kinship_to_relationships(family, world):
     """
     After building/modifying a family, stamp kinship labels onto every pair's
     relationship object so the LLM context always has it without a lookup.
+
+    Confirmed real gap (Romance/Dating spec pass): a "spouse" kinship here
+    only ever wrote rel["kinship"] -- a completely SEPARATE field from
+    rel["labels"], which is what ~15 other modules (absence_suspicion.py,
+    detective_work.py, secret_keeping.py, bedroom_assignment.py,
+    domestic_control.py, sexual_release.py, crushes.py, attraction.py,
+    temporary_separation.py, ...) actually check for "partner"/"spouse".
+    Nothing anywhere else ever wrote "spouse" into rel["labels"] for a
+    generation-time married couple, so every one of those modules' real,
+    already-built spouse-gated behavior silently never fired for any
+    married NPC in the game. Stamped here too now -- the two fields stay
+    conceptually distinct (kinship is genealogical/narration-facing;
+    labels is the behavioral gate) but a spouse is always both.
     """
     chars = world.get("characters", {})
     for key, rel_label in family["relations"].items():
@@ -145,7 +158,12 @@ def sync_kinship_to_relationships(family, world):
             continue
         a.setdefault("relationships", {})
         a["relationships"].setdefault(b_id, {})
-        a["relationships"][b_id]["kinship"] = rel_label
+        rel = a["relationships"][b_id]
+        rel["kinship"] = rel_label
+        if rel_label == "spouse":
+            labels = rel.setdefault("labels", [])
+            if "spouse" not in labels:
+                labels.append("spouse")
         # Ensure family_id is stamped
         if a.get("family_id") is None:
             a["family_id"] = family["id"]

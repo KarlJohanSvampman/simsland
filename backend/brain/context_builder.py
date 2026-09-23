@@ -826,6 +826,12 @@ def build_available_actions(c, world):
             respond_action, advance_action = "respond_social", "advance_social_round"
         elif kind == "request":
             respond_action, advance_action = "respond_request", "advance_request_round"
+        elif kind == "romantic":
+            # No counter-proposing a relationship — advance_action is
+            # named but never actually reached (respond() rejects
+            # "counter" outright for kind=="romantic", so no response
+            # here is ever "counter").
+            respond_action, advance_action = "respond_romantic", "advance_romantic_round"
         else:
             respond_action, advance_action = "respond_chore", "advance_chore_round"
         if p.get("responses", {}).get(cid) == "pending" and respond_action not in action_types:

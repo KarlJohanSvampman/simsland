@@ -260,6 +260,8 @@ def apply_speech(c, world, speech):
         push_conversation_reaction(listener, speech_act, tick)
 
         apply_interaction(c, listener, speech_act)
+        if speech_act == "flirt":
+            _maybe_trigger_jealousy(c, listener, world)
 
         result = analyze_message(world, conv, c, listener, utterance, speech_act)
 
@@ -400,6 +402,8 @@ def apply_speech_to_group(c, world, speech, participant_ids):
 
         push_conversation_reaction(listener, speech_act, tick)
         apply_interaction(c, listener, speech_act)
+        if speech_act == "flirt":
+            _maybe_trigger_jealousy(c, listener, world)
         result = analyze_message(world, conv, c, listener, utterance, speech_act)
         check_goal_trending(conv, listener, topic_str)
 
@@ -2567,6 +2571,12 @@ def route_action(c, world, action, speech, definitions=None, available_actions=N
     elif action_type == "advance_social_round":
         _route_advance_chore_round(c, world, action)
 
+    elif action_type == "propose_romantic":
+        _route_propose_romantic(c, world, action)
+    elif action_type == "respond_romantic":
+        # Same kind-agnostic reuse as respond_social above.
+        _route_respond_chore(c, world, action)
+
     elif action_type == "propose_rule":
         _route_propose_rule(c, world, action)
     elif action_type == "add_rule_exception":
@@ -3752,6 +3762,33 @@ def _route_propose_social(c, world, action):
         pass
 
 
+def _route_propose_romantic(c, world, action):
+    """
+    Ask someone out or confess feelings — see systems/proposals.py::
+    propose_romantic(). Not offered to the LLM yet (context_builder.py
+    has no propose_romantic entry in its action_types list) -- the
+    Romance & Dating spec pass this round scoped to the REACTIVE half
+    (someone asks you out / tells you the answer / your partner flirts
+    with someone else / your partner breaks up with you), same as every
+    other spec revisited this session; this route exists and is real so
+    it's ready the moment something (an upgraded seek_romance mapping,
+    or a future situation) actually calls it.
+    action: {"type": "propose_romantic", "target": character_id, "chore_id": "ask_out"|"confess_love"}
+    """
+    target_id = action.get("target")
+    chore_id = action.get("chore_id", "ask_out")
+    if not target_id:
+        return
+    recipient = world.get("characters", {}).get(target_id)
+    if not recipient:
+        return
+    try:
+        from systems.proposals import propose_romantic
+        propose_romantic(c, recipient, world, chore_id)
+    except Exception:
+        pass
+
+
 def _route_propose_recurring(c, world, action):
     """
     Offer to turn a just-completed joint chore into a recurring social
@@ -4900,6 +4937,32 @@ def _route_form_theory(c, world, action):
     suspicion_of = action.get("suspicion_of")
     if suspicion_of:
         worry["suspicion_of"] = suspicion_of
+
+
+def _maybe_trigger_jealousy(flirter, flirted_with, world):
+    """A real, live-witnessed jealousy trigger (Romance & Dating spec
+    pass) -- confirmed gap: apply_interaction()'s own flirt handling
+    already bumps rel["attraction"]/rel["romantic_interest"] for real,
+    but nothing ever told a co-present partner it just happened in front
+    of them. Reuses _co_present_characters(), the same "broadcast to
+    bystanders" idiom _route_make_argument already relies on, rather
+    than a full perception/rumor pipeline (deliberately out of scope
+    this pass). Only the FLIRTER's own co-present partner is checked,
+    not the recipient's -- "my partner is flirting with someone" and
+    "someone is flirting with my partner" are two distinct framings;
+    this pass only builds the first."""
+    for other in _co_present_characters(flirter, world):
+        if other["id"] == flirted_with["id"]:
+            continue
+        rel = other.get("relationships", {}).get(flirter["id"], {})
+        if any(l in rel.get("labels", []) for l in ("partner", "spouse")):
+            from brain.cognition_scheduler import wake_character
+            wake_character(other, world, "partner_flirted_with_someone_else", {
+                "partner_id": flirter["id"],
+                "partner_name": flirter.get("name", "your partner"),
+                "flirted_with_id": flirted_with["id"],
+                "flirted_with_name": flirted_with.get("name", "someone"),
+            })
 
 
 def _co_present_characters(c, world):

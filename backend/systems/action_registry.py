@@ -187,6 +187,8 @@ ACTION_SPECS = {
     "propose_request":        {"group": "proposal", "target": "character", "doc": "Ask someone for something specific."},
     "respond_request":        {"group": "proposal", "target": "proposal", "doc": "Respond to a pending request."},
     "advance_request_round":  {"group": "proposal", "target": "proposal", "doc": "Push a stalled request negotiation forward."},
+    "propose_romantic":       {"group": "proposal", "target": "character", "doc": "Ask someone out or confess feelings."},
+    "respond_romantic":       {"group": "proposal", "target": "proposal", "doc": "Respond to a pending romantic proposal."},
     "propose_item_loan":      {"group": "proposal", "target": "character", "detail": "item_id", "doc": "Ask to borrow one of someone's items for a while (duration_days, default 7). Ownership doesn't change -- it's returned automatically when due."},
     "respond_item_loan":      {"group": "proposal", "target": "proposal", "doc": "Respond to a pending item-loan request."},
     "advance_item_loan_round": {"group": "proposal", "target": "proposal", "doc": "Push a stalled item-loan negotiation forward."},

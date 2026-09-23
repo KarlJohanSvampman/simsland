@@ -29,6 +29,12 @@ kinds share this one engine rather than being near-duplicate modules:
                        the caller (action_router.py) auto-responds on the
                        recipient's behalf immediately, no LLM turn needed;
                        otherwise it behaves exactly like social_ask.
+  "romantic"        — ask someone out / confess feelings (see
+                       propose_romantic()). Accept/decline only, like
+                       recurring_offer -- no counter-proposing a
+                       relationship makes sense. On accept, hands off to
+                       systems/romance.py::become_partners() rather than
+                       any generic finalize handling.
 
 Built after finding the one existing negotiation precedent in this
 codebase — systems/intimacy.py's touch-proposal system (hug/kiss/etc.) —
@@ -334,6 +340,15 @@ def _maybe_resolve(proposal, world):
             }
     elif proposal["kind"] == "recurring_offer":
         _finalize_recurring_offer(proposal, world)
+    elif proposal["kind"] == "romantic":
+        recipient_id = proposal["recipients"][0]
+        if proposal["responses"].get(recipient_id) == "accept":
+            chars = world.get("characters", {})
+            proposer_c = chars.get(proposal["proposer_id"])
+            recipient_c = chars.get(recipient_id)
+            if proposer_c and recipient_c:
+                from systems.romance import become_partners
+                become_partners(proposer_c, recipient_c, world)
     elif proposal["kind"] == "item_loan":
         _finalize_item_loan(proposal, world)
     elif proposal["kind"] == "item_sale":
@@ -376,6 +391,30 @@ def propose_social_ask(proposer, recipient, world, ask, params=None):
     (the caller — action_router.py's _route_propose_social — is what
     ensures there's a real target)."""
     proposal = propose(proposer, [recipient], "social_ask", ask, params, world)
+    return {"ok": True, "proposal": proposal}
+
+
+# =========================================================
+# ROMANTIC — ask someone out or confess feelings. No locality/household
+# gate, same as social_ask. Counter-proposing is NOT supported (see
+# respond()'s kind check) -- accept/decline only, like recurring_offer.
+# =========================================================
+
+def propose_romantic(proposer, recipient, world, chore_id):
+    """chore_id: "ask_out" | "confess_love" -- both resolve identically on
+    accept (see _maybe_resolve()'s kind == "romantic" branch, which hands
+    off to systems/romance.py::become_partners()); the two exist only so
+    the situation layer (middleware/situations/library/romance.py) can
+    frame a first ask differently from a deeper declaration.
+
+    Refuses outright unless both parties are adults -- confirmed by the
+    Romance & Dating spec survey that NOTHING downstream (attraction.py,
+    crushes.py, intimacy.py) gates age anywhere; this is the one real
+    backstop, checked again (belt and suspenders) in systems/romance.py::
+    become_partners() itself."""
+    if proposer.get("age", 0) < 18 or recipient.get("age", 0) < 18:
+        return {"ok": False, "reason": "underage"}
+    proposal = propose(proposer, [recipient], "romantic", chore_id, {}, world)
     return {"ok": True, "proposal": proposal}
 
 

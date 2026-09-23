@@ -69,6 +69,10 @@ WAKE_PRIORITY = {
     "intimate_object_discovered": 46,  # systems/intimate_item_discovery.py
     "plant_needs_water": 40,        # systems/plants.py
     "appliance_broken":  47,        # systems/appliance_degradation.py
+    "partner_broke_up_with_me": 70,          # systems/romance.py -- a major,
+                                              # unilateral life event
+    "partner_flirted_with_someone_else": 68, # systems/action_router.py::
+                                              # _maybe_trigger_jealousy
     "activity_finished": 70,
     "waiting_timed_out": 68,
     "gave_up_waiting": 69,     # systems/waiting.py -- genuinely abandoned a
