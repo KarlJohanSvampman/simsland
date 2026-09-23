@@ -5461,19 +5461,21 @@ function _renderMemoryList(title, allItems, page, pageSize, listKey){
 
   const lines = pageItems.map(m => {
     const stamp = _formatMemoryTimestamp(m.tick);
-    // Per the user's explicit ask: every action/activity memory should carry
-    // its real target and be openable for the full detail -- not just a
-    // flattened sentence. Any memory with structured fields beyond text
-    // (debug_event's target_id/action_type/activity_type, ...) gets one.
-    const hasDetail = m.target_id || m.target_name || m.action_type || m.activity_type;
+    // Per the user's explicit ask: every memory should be clickable, not
+    // just ones with target_id/action_type/activity_type -- a plain
+    // conversation-summary memory ("Talked about argument.") used to have
+    // no way to see more, even though openMemoryModal() already renders
+    // whatever fields a memory DOES have (When/Kind/Tags/Importance always
+    // apply) and, for a conversation-sourced memory, now links to the real
+    // transcript (see openMemoryModal()'s conv_id handling below).
     const idx = _lastRenderedMemories.length;
     _lastRenderedMemories.push(m);
     return `
-    <div class="viewerCard${hasDetail ? " viewerCardClickable" : ""}" ${hasDetail ? `data-memory-index="${idx}"` : ""}>
+    <div class="viewerCard viewerCardClickable" data-memory-index="${idx}">
       ${stamp ? `<div style="opacity:.6">${stamp}</div>` : ""}
       ${m.text}
       ${m.tags?.length ? `<div style="opacity:.6">${m.tags.join(", ")}</div>` : ""}
-      ${hasDetail ? `<a href="#" style="opacity:.7;font-size:.85em">details</a>` : ""}
+      <a href="#" style="opacity:.7;font-size:.85em">details</a>
     </div>`;
   }).join("");
 
@@ -5500,12 +5502,14 @@ function openMemoryModal(m){
   summary.className = "eventModalRowSummary";
   summary.textContent = m.text || "";
   body.appendChild(summary);
+  const peopleNames = (m.people || []).map(_charName).filter(Boolean);
   const fields = [
     ["When", _formatMemoryTimestamp(m.tick)],
     ["Kind", m.kind],
     ["Action type", m.action_type],
     ["Activity type", m.activity_type],
     ["Target", m.target_name ? `${m.target_name} (${m.target_id})` : m.target_id],
+    ["With", peopleNames.length ? peopleNames.join(", ") : null],
     ["Tags", m.tags?.length ? m.tags.join(", ") : null],
     ["Importance", m.importance != null ? m.importance.toFixed(2) : null],
   ];
@@ -5518,6 +5522,27 @@ function openMemoryModal(m){
     row.children[1].textContent = String(v);
     body.appendChild(row);
   }
+
+  // Per the user's explicit ask: a conversation-sourced memory ("Talked
+  // about argument.") is a compressed one-line summary of a real logged
+  // conversation -- link straight to it (see brain/conversations.py::
+  // add_message(), which now stamps conv_id onto exactly this memory)
+  // instead of leaving the full transcript undiscoverable.
+  if(m.conv_id){
+    const match = _lastRenderedConversations.find(e => e.conv_id === m.conv_id);
+    const link = document.createElement("a");
+    link.href = "#";
+    link.style.cssText = "display:inline-block;margin-top:8px;opacity:.85;";
+    link.textContent = match ? "View full conversation →" : "(full conversation no longer available)";
+    if(match){
+      link.addEventListener("click", (e) => { e.preventDefault(); openConversationModal(match); });
+    } else {
+      link.style.pointerEvents = "none";
+      link.style.opacity = ".5";
+    }
+    body.appendChild(link);
+  }
+
   openModal("modal-intention");
 }
 

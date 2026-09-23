@@ -407,6 +407,13 @@ def add_message(
                 speech_act
             ],
 
+            # Per the user's explicit ask: lets the frontend reliably match
+            # this memory back to the full conversation it came from
+            # (c.conversation_log entries already carry this same id, see
+            # _archive_conversation() below) instead of guessing from tags/
+            # timestamps.
+            conv_id=conv.get("id"),
+
             people=[
 
                 p for p in conv[
