@@ -579,6 +579,7 @@ _INTERACTION_DURATIONS = {
     "check_time":      5,
     "computer_use":    1800,
     "dispose_trash":   15,
+    "take_out_trash":  300,
     "do_laundry":      300,
     "flush_toilet":    5,
     "grab_drink":      15,

@@ -1986,6 +1986,10 @@
         {
           "name": "anchor_dispose_trash",
           "interaction": "dispose_trash"
+        },
+        {
+          "name": "anchor_take_out_trash",
+          "interaction": "take_out_trash"
         }
       ],
       "storage": {

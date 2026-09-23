@@ -701,9 +701,15 @@ ACTIVITIES = {
 
         "category": "maintenance"
     },
+    # "garbage_bin" was never a real anchor interaction name (trash_can's
+    # own anchors are "dispose_trash"/"take_out_trash" -- same bug class
+    # as wash_dishes' "sink" below), so this action never actually found
+    # a target before. take_out_trash is the "empty a full bin" chore --
+    # see systems/waste.py::move_waste_to_bin and complete_activity()'s
+    # matching branch.
     "take_out_trash": {
 
-        "interaction": "garbage_bin",
+        "interaction": "take_out_trash",
 
         "base_duration_minutes": 5,
 
@@ -841,25 +847,19 @@ ACTIVITIES = {
 
         "category": "chore"
     },
+    # Quick single-item toss -- distinct from the "take_out_trash" chore
+    # above (emptying the whole bin); this one just deposits whatever's
+    # in hand into the nearest trash_can via its real "dispose_trash"
+    # anchor (was "garbage_bin", same never-a-real-anchor bug).
     "throw_away_trash": {
 
-        "interaction": "garbage_bin",
+        "interaction": "dispose_trash",
 
         "base_duration_minutes": 3,
 
         "interruptible": True,
 
         "category": "chore"
-    },
-    "take_out_trash": {
-
-        "interaction": "trash",
-
-        "base_duration_minutes": 10,
-
-        "interruptible": True,
-
-        "category": "maintenance"
     },
 
     # =====================================================
@@ -2708,6 +2708,32 @@ def complete_activity(
     elif activity_type == "get_dressed":
         from systems.dressing import resolve_get_dressed
         resolve_get_dressed(c, world, act)
+
+    # =====================================
+    # TRASH — generic "interact" activities have no completion-side
+    # dispatch anywhere in this codebase (every anchor interaction not
+    # listed above -- browse, grab_towel, use_tap, ... -- only ever gets
+    # the universal waste/habit/queue bookkeping above and otherwise does
+    # nothing on finish). dispose_trash (trash_can's real, existing
+    # anchor) was the same: a character could already walk up and "use"
+    # it, but nothing ever actually moved TRASH_* resources out of
+    # general household storage into the bin. take_out_trash is a new
+    # second anchor (added to trash_can's definition alongside
+    # dispose_trash) for emptying a full bin -- see systems/waste.py and
+    # systems/household_monitoring.py::monitor_trash for the fullness
+    # check that nudges a responsible member toward it.
+    # =====================================
+    elif (activity_type in ("throw_away_trash", "take_out_trash")
+          or (activity_type == "interact" and act.get("interaction") in ("dispose_trash", "take_out_trash"))):
+        household = world["households"].get(c.get("household_id"))
+        if household:
+            from systems.waste import move_waste_to_bin
+            move_waste_to_bin(household)
+            emptying = activity_type == "take_out_trash" or act.get("interaction") == "take_out_trash"
+            if emptying:
+                garbage = household.setdefault("garbage_bin", {})
+                garbage["contents"] = []
+                garbage["fullness"] = 0.0
 
     # =====================================
     # RECORD HABIT

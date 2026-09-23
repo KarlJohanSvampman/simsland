@@ -58,6 +58,11 @@ def update_household(
         world
     )
 
+    monitor_trash(
+        household,
+        world
+    )
+
 
 # =========================================================
 # FOOD
@@ -330,6 +335,57 @@ def monitor_appliances(
 
             importance=
                 importance
+        )
+
+
+# =========================================================
+# TRASH — two-tier, matching systems/activities.py's two real chores:
+# throw_away_trash (bag up loose TRASH_* resources sitting in general
+# storage -- see systems/waste.py::total_waste) and take_out_trash (empty
+# a bin that's already full -- move_waste_to_bin's own fullness calc).
+# =========================================================
+
+def monitor_trash(
+
+    household,
+
+    world
+):
+
+    from systems.waste import total_waste
+
+    loose = total_waste(household)
+
+    if loose >= 8:
+        create_household_procurement_desire(
+            household,
+            world,
+            desire_type=
+                "throw_away_trash",
+            target=
+                "trash_can",
+            importance=
+                0.4
+        )
+
+    fullness = household.get(
+        "garbage_bin",
+        {}
+    ).get(
+        "fullness",
+        0.0
+    )
+
+    if fullness >= 0.8:
+        create_household_procurement_desire(
+            household,
+            world,
+            desire_type=
+                "take_out_trash",
+            target=
+                "trash_can",
+            importance=
+                0.7
         )
 
 
