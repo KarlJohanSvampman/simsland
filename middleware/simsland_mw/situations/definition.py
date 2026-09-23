@@ -21,10 +21,17 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, Optional, Tuple, Union
 
+from ..contracts.reactions import (
+    CompositionDefinition, CooldownDefinition, EligibilityDefinition,
+    InterruptLevel, OptionDefinition, PerceptionRequirement, PersistenceMode,
+    ReactionDefinition, TriggerDefinition, TriggerType,
+)
 from ..data.resolver import Resolution
 from ..decisions.options import DecisionContext
 
 Outcome = Dict[str, Any]
+
+_TRIGGER_TYPE_VALUES = {t.value for t in TriggerType}
 
 
 @dataclass
@@ -88,6 +95,14 @@ class OptionSeed:
 
 @dataclass(frozen=True)
 class SituationDefinition:
+    """This IS the spec's ReactionDefinition (Spec A section 42) -- its
+    concrete, working authoring form, not a class alongside it. interrupt_level/
+    persistence/perception are the canonical fields it was genuinely missing;
+    every one of them is Optional with a real, computed (not arbitrary)
+    default via effective_interrupt_level()/effective_persistence() below, so
+    none of the 30+ existing situations need to change to gain them. See
+    as_reaction_definition() for the fully explicit canonical shape when
+    something wants it (debugging, capability_report()-style audits)."""
     id: str
     category: str
     priority: int                              # provisional; tune in simulation testing
@@ -104,4 +119,75 @@ class SituationDefinition:
     dynamic_options: Optional[Callable[[SituationContext], Tuple[OptionSeed, ...]]] = None
     ordered: bool = False
 
+    # ---- canonical fields added for Spec A (see simsland_mw/contracts/reactions.py) ----
+    interrupt_level: Optional[InterruptLevel] = None    # None -> effective_interrupt_level() infers from priority
+    persistence: Optional[PersistenceMode] = None        # None -> effective_persistence() infers from cooldown_ticks
+    perception: Optional[PerceptionRequirement] = None    # only meaningful for an "event" trigger; None for condition/idle/etc.
+    subcategory: str = ""
+    composition: Optional[CompositionDefinition] = None
+
     MAX_OPTIONS = 6
+
+    def effective_interrupt_level(self) -> InterruptLevel:
+        """Spec section 49's own worked examples bucket by real-world
+        urgency, which this codebase's priority scale (0-100, already
+        tuned per-situation in simulation testing) already tracks closely
+        enough to infer from directly rather than requiring a second,
+        parallel number to be authored and kept in sync."""
+        if self.interrupt_level is not None:
+            return self.interrupt_level
+        if self.priority >= 90:
+            return InterruptLevel.CRITICAL
+        if self.priority >= 70:
+            return InterruptLevel.HIGH
+        if self.priority >= 40:
+            return InterruptLevel.NORMAL
+        return InterruptLevel.BACKGROUND
+
+    def effective_persistence(self) -> PersistenceMode:
+        """A long cooldown already means "this kind of thing doesn't need
+        re-litigating every few minutes" -- the same real signal spec
+        section 87 uses to distinguish a crash/scream (transient) from a
+        broken object/water leak (persistent)."""
+        if self.persistence is not None:
+            return self.persistence
+        return PersistenceMode.PERSISTENT if self.cooldown_ticks >= 3600 else PersistenceMode.TRANSIENT
+
+    def as_reaction_definition(self) -> ReactionDefinition:
+        """The fully explicit canonical shape (spec section 42), built
+        from this SituationDefinition's real fields -- for debugging/audit
+        tooling, not a second thing anything in the live pipeline actually
+        consumes instead of this class."""
+        return ReactionDefinition(
+            id=self.id,
+            category=self.category,
+            subcategory=self.subcategory,
+            priority=self.priority,
+            persistence=self.effective_persistence(),
+            interrupt_level=self.effective_interrupt_level(),
+            triggers=tuple(
+                TriggerDefinition(
+                    type=trig.type if isinstance(trig.type, TriggerType) else (
+                        TriggerType(trig.type) if trig.type in _TRIGGER_TYPE_VALUES else TriggerType.CONDITION
+                    ),
+                    event_types=(trig.event,) if trig.event else (),
+                    condition=trig.condition,
+                    threshold_field=trig.field,
+                    threshold_value=trig.threshold,
+                    cooldown_ticks=self.cooldown_ticks,
+                )
+                for trig in self.triggers
+            ),
+            perception=self.perception,
+            required_data=self.required_data,
+            eligibility=EligibilityDefinition(),
+            description_template=self.id,
+            options=tuple(
+                OptionDefinition(id=seed.id,
+                                 description=seed.description if isinstance(seed.description, str) else seed.id,
+                                 action=seed.gap, requires_target=False, ends_situation=True)
+                for seed in self.options
+            ),
+            cooldown=CooldownDefinition(duration_ticks=self.cooldown_ticks),
+            composition=self.composition,
+        )

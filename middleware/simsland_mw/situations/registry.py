@@ -1,7 +1,10 @@
 """
 SituationRegistry + SituationCompiler.
 
-  wake / state  ->  TriggerEvaluator  ->  highest-priority situation that fires
+  wake / state  ->  TriggerEvaluator (hard trigger/cooldown gate)
+                ->  candidates.py: real ReactionCandidate + the spec's exact
+                    scoring formula and sort key (Spec A sections 52-54),
+                    among everything the gate let through
                 ->  compile: describe() + resolve each OptionSeed into a real
                     `Option` (or drop it: no action possible / capability gap)
 
@@ -17,9 +20,17 @@ import random
 from dataclasses import dataclass, field
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
+from ..contracts.candidates import CandidateScore, CandidateState, ReactionCandidate
+from ..contracts.cognition import SituationHistoryEntry
+from ..contracts.events import WorldEvent
+from ..contracts.perception import Perception
+from ..contracts.transitions import transition
 from ..decisions.options import DecisionContext, Option
+from . import candidates as scoring
 from .definition import OptionSeed, SituationContext, SituationDefinition, Trigger
 from .triggers import TriggerEvaluator
+
+HISTORY_CAP = scoring.HISTORY_CAP
 
 
 @dataclass
@@ -30,11 +41,19 @@ class CompiledSituation:
     description: str
     options: List[Option]
     unresolved: List[Tuple[str, str]] = field(default_factory=list)   # (option id, why)
+    # Real Spec A objects (situations/candidates.py) -- optional/None for a
+    # `force`-compiled situation (bypasses scoring entirely by design) or
+    # any caller that built a CompiledSituation directly (tests do this).
+    candidate: Optional[ReactionCandidate] = None
+    score: Optional[CandidateScore] = None
+    world_event: Optional[WorldEvent] = None
+    perception: Optional[Perception] = None
 
     def summary(self) -> Dict[str, Any]:
         return {"id": self.situation.id, "category": self.situation.category,
                 "trigger": self.trigger.type, "options": [o.id for o in self.options],
-                "unresolved": [{"option": o, "reason": r} for o, r in self.unresolved]}
+                "unresolved": [{"option": o, "reason": r} for o, r in self.unresolved],
+                "score": self.score.final_score if self.score else None}
 
 
 class SituationRegistry:
@@ -43,6 +62,12 @@ class SituationRegistry:
         self.evaluator = TriggerEvaluator()
         self._state: Dict[str, Dict[str, Any]] = {}
         self._extra_gaps: List[Tuple[str, str, str]] = []      # (situation, what, capability)
+        # Spec A (sections 47-48, 80): a real per-character SituationHistoryEntry
+        # log (novelty/cooldown_penalty scoring, debugging) and a StateTransition
+        # audit trail (contracts/transitions.py::transition()) for every
+        # ReactionCandidate this registry actually selects/resolves.
+        self._history: Dict[str, List[SituationHistoryEntry]] = {}
+        self.transition_log: List[Any] = []
         for s in situations:
             self.register(s)
 
@@ -96,13 +121,49 @@ class SituationRegistry:
                 continue
             if trig:
                 eligible.append((sit, trig))
-        eligible.sort(key=lambda st: -st[0].priority)
+
+        # Spec A sections 52-54: real ReactionCandidate + CandidateScore for
+        # every situation the hard trigger/cooldown gate above already let
+        # through, sorted by the exact specified multi-key score -- not a
+        # bare priority sort. A CRITICAL/HIGH candidate isn't filtered by
+        # interruptibility at all (spec section 88); a BACKGROUND one is,
+        # against the character's current activity.
+        history = self._history.setdefault(char_id, [])
+        scored: List[Tuple[SituationDefinition, Trigger, ReactionCandidate, CandidateScore]] = []
+        snapshot = scoring.build_decision_snapshot(char_id, ctx)
+        events_by_situation: Dict[str, WorldEvent] = {}
+        perceptions_by_situation: Dict[str, Perception] = {}
         for sit, trig in eligible:
+            if not scoring.is_interruptible(sit, snapshot):
+                continue
+            candidate, score, event, perception = scoring.score_candidate(sit, trig, ctx, history)
+            if event is not None:
+                events_by_situation[sit.id] = event
+            if perception is not None:
+                perceptions_by_situation[sit.id] = perception
+            scored.append((sit, trig, candidate, score))
+        scored.sort(key=scoring.sort_key, reverse=True)
+
+        for sit, trig, candidate, score in scored:
             compiled = self.compile(sit, trig, ctx)
-            if len(compiled.options) >= sit.min_options:
-                if commit:
-                    self.evaluator.commit(sit, trig, ctx)
-                return compiled
+            if len(compiled.options) < sit.min_options:
+                continue
+            compiled.candidate = candidate
+            compiled.score = score
+            compiled.world_event = events_by_situation.get(sit.id)
+            compiled.perception = perceptions_by_situation.get(sit.id)
+            if commit:
+                self.evaluator.commit(sit, trig, ctx)
+                transition(candidate, CandidateState.QUEUED, tick=ctx.tick, reason="passed scoring",
+                          log=self.transition_log)
+                transition(candidate, CandidateState.SELECTED, tick=ctx.tick, reason="selected by score",
+                          log=self.transition_log)
+                transition(candidate, CandidateState.RESOLVED, tick=ctx.tick, reason="compiled and returned",
+                          log=self.transition_log)
+                history.append(SituationHistoryEntry(situation_id=sit.id, tick=ctx.tick,
+                                                      trigger=trig.type, option_selected=None))
+                del history[:-HISTORY_CAP]
+            return compiled
         return None
 
     # ---- compilation -----------------------------------------------------

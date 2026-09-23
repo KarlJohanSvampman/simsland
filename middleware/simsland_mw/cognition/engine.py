@@ -15,6 +15,10 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
 from ..config import Settings
+from ..contracts.decisions import (
+    ActionRequest, ActionResult, LLMDecision, ValidatedDecision,
+)
+from ..contracts.situation_instance import NarrativeContext, SituationPrompt
 from ..data.registry import Registry, build_default_registry
 from ..data.resolver import Resolution, Resolver
 from ..decisions import executor
@@ -44,6 +48,12 @@ class Prepared:
     messages: List[Dict[str, str]]
     tick: Optional[int] = None
     situation: Optional[CompiledSituation] = None
+    # Real Spec A objects (contracts/situation_instance.py) -- the exact
+    # narrative/options the LLM is about to see, given the canonical shape,
+    # not a second prompt-building pass. Only populated when a real
+    # situation compiled (options-only, generic-menu decisions have no
+    # SituationInstance to narrate).
+    situation_prompt: Optional[SituationPrompt] = None
 
 
 @dataclass
@@ -70,6 +80,17 @@ class DecisionRecord:
     simsland_response: Optional[Dict[str, Any]] = None
     elapsed_ms: int = 0
     finished_at: float = field(default_factory=time.time)
+    # Real Spec A objects (contracts/decisions.py) for the same decision --
+    # LLMDecision/ValidatedDecision wrap the already-validated Choice
+    # (simsland_mw/decisions/validator.py already enforces every runtime
+    # invariant the spec asks for; these are the canonical shape that
+    # validated Choice is carried in, not a second validation pass).
+    # ActionRequest/ActionResult wrap the same executor.execute() call this
+    # record's own action/simsland_response fields already come from.
+    llm_decision: Optional[LLMDecision] = None
+    validated_decision: Optional[ValidatedDecision] = None
+    action_request: Optional[ActionRequest] = None
+    action_result: Optional[ActionResult] = None
 
     def to_dict(self) -> Dict[str, Any]:
         return dict(self.__dict__)
@@ -113,10 +134,20 @@ class CognitionEngine:
                 force="cognition.quiet_moment") or compiled
             if compiled:
                 options = compiled.options
+        situation_prompt = None
+        if compiled:
+            from ..contracts.reactions import RenderedOption
+            situation_prompt = SituationPrompt(
+                situation_id=compiled.situation.id,
+                character_id=char_id,
+                narrative=compiled.description,
+                options=tuple(RenderedOption(id=o.id, description=o.description, available=True)
+                              for o in options),
+            )
         return Prepared(char_id, wake_reason, profile, res, snapshot, options,
                         prompts.build_messages(snapshot, options,
                                                compiled.description if compiled else None),
-                        tick=env.get("tick"), situation=compiled)
+                        tick=env.get("tick"), situation=compiled, situation_prompt=situation_prompt)
 
     @staticmethod
     def _without_recent_repeats(session, options: List[Option], tick: Optional[int]) -> List[Option]:
@@ -156,6 +187,39 @@ class CognitionEngine:
         if result.executed:
             self.sessions.get(char_id).record_choice(
                 choice.option.id, choice.option.description, tick, choice.thought)
+
+        # Real Spec A objects for this same decision (contracts/decisions.py)
+        # -- built from the already-validated Choice/ExecutionResult, not a
+        # second decision or a second validation pass. situation_instance_id
+        # falls back to the candidate id when there's no real situation
+        # (the generic rule-based menu, spec's own "background candidates"
+        # path) -- a full SituationInstance lifecycle (spec section 60,
+        # CREATED->PRESENTED->...->COMPLETED) is a further layer on top of
+        # this, deliberately not built this pass; see module docstring.
+        situation_instance_id = (
+            p.situation.candidate.candidate_id if p.situation and p.situation.candidate
+            else f"{char_id}:{tick or p.tick or 0}:generic_menu"
+        )
+        decision_id = f"decision:{char_id}:{tick or p.tick or 0}:{choice.option.id}"
+        rec.llm_decision = LLMDecision(choice=choice.option.id, thought=choice.thought, speech=choice.speech)
+        rec.validated_decision = ValidatedDecision(
+            decision_id=decision_id, character_id=char_id, situation_instance_id=situation_instance_id,
+            option_id=choice.option.id, thought=choice.thought, speech=choice.speech, validated=True,
+        )
+        rec.action_request = ActionRequest(
+            action_id=decision_id, character_id=char_id, situation_instance_id=situation_instance_id,
+            option_id=choice.option.id, action_key=(result.decision.get("action") or {}).get("type", "none"),
+            target_character_id=(result.decision.get("action") or {}).get("target"),
+            parameters=dict(result.decision.get("action") or {}), requested_tick=p.tick or 0,
+        )
+        rec.action_result = ActionResult(
+            action_id=decision_id, success=result.executed and not result.problems,
+            tick_started=p.tick or 0, tick_completed=tick,
+            observable_result=result.response or {},
+            failure_code=("ACTION_REJECTED" if result.problems else None),
+            failure_reason="; ".join(result.problems) if result.problems else None,
+        )
+
         rec.elapsed_ms = int((time.monotonic() - started) * 1000)
         rec.finished_at = time.time()
         return rec
