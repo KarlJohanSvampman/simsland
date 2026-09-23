@@ -271,6 +271,10 @@ def get_or_create_conversation(
 # ADD MESSAGE
 # =========================================================
 
+def _normalize_utterance(text):
+    return (text or "").strip().lower()
+
+
 def add_message(
 
     world,
@@ -287,6 +291,35 @@ def add_message(
 
     tick
 ):
+
+    # Confirmed live bug (player report: a conversation reads as a
+    # monologue -- the same character says the same line 4+ times with
+    # no reply in between): sim_loop.py's own AGENT_WAIT_BUDGET_SECONDS
+    # abandon/retry mechanism can't literally duplicate-execute one
+    # decision (an abandoned attempt only ever mutates a discarded,
+    # never-persisted world snapshot), but its real side effect is that
+    # the abandoned attempt's own state-advancing note_think() never
+    # lands either -- so should_think() re-offers the SAME situation next
+    # cycle, the character re-decides fresh, and with an unresolved
+    # expectation/frustration that hasn't changed between prompts, the
+    # LLM plausibly re-picks essentially the same line. Nothing here or
+    # in apply_speech() ever gated on conv["turn_owner"], so character A
+    # was always free to speak again before B's own turn ever landed.
+    # Same idempotent-retry fix already applied to this exact bug class
+    # in systems/proposals.py::propose() ("reusing an existing open
+    # proposal... makes a retried decision idempotent") -- a genuine
+    # repeat of the last line, same speaker, no reply in between, is
+    # treated as the SAME retried decision rather than a new one: no
+    # duplicate history entry, no duplicate memory, and (real fix for
+    # cleanup_conversations()'s own missing mutual-participation check)
+    # last_update is deliberately NOT refreshed, so a one-sided run like
+    # this now actually ages toward the real silence timeout instead of
+    # looking perpetually "active" forever.
+    last = conv.get("history", [])[-1] if conv.get("history") else None
+    if (last and last.get("speaker") == speaker_id
+            and last.get("speech_act") == speech_act
+            and _normalize_utterance(last.get("utterance")) == _normalize_utterance(utterance)):
+        return
 
     update_conversation_tone(
 
