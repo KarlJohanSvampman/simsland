@@ -35,12 +35,28 @@ async def test_insult_from_someone_nearby_fires_with_real_speech_options(sim, wo
 
 
 @pytest.mark.asyncio
-async def test_insult_names_the_leave_gap(sim, world):
+async def test_insult_walk_away_needs_leave_conversation_available(sim, world):
     world["character"]["body"]["hunger"] = 10
     wake(world, "provoked", {"actor_id": "den", "actor_name": "Dennis", "provocation_type": "insult"})
     p = await eng(sim).prepare("kim", "provoked")
+    ids = [o.id for o in p.options]
+    assert "walk_away" not in ids   # leave_conversation not in action_types yet
     reasons = dict(p.situation.unresolved)
-    assert "leave_conversation_deliberately" in reasons["walk_away"]
+    assert "walk_away" in reasons and "not possible right now" in reasons["walk_away"]
+
+
+@pytest.mark.asyncio
+async def test_insult_offers_walk_away_when_leave_conversation_is_available(sim, world):
+    world["character"]["body"]["hunger"] = 10
+    world["available_actions"]["action_types"].append("leave_conversation")
+    wake(world, "provoked", {"actor_id": "den", "actor_name": "Dennis", "provocation_type": "insult"})
+    e = eng(sim, json.dumps({"choice": "walk_away"}))
+    p = await e.prepare("kim", "provoked")
+    ids = [o.id for o in p.options]
+    assert "walk_away" in ids
+    rec = await e.decide("kim", "provoked", dry_run=False)
+    d = sim.executed[0]["decision"]
+    assert d["action"]["type"] == "leave_conversation"
 
 
 @pytest.mark.asyncio

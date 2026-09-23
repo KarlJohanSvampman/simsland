@@ -211,6 +211,25 @@ def find_conversation(
     return None
 
 
+def find_active_conversation_for(world, char_id):
+    """Any active conversation `char_id` is currently a participant in,
+    regardless of who else is in it -- unlike find_conversation() above
+    (which needs the exact participant set up front), this is for a
+    caller that only knows ONE side and wants "are they in a
+    conversation right now at all." Shared by context_builder.py's
+    leave_conversation offering-gate and action_router.py's
+    _route_leave_conversation so the two can never disagree about what
+    counts as "currently in one."""
+
+    ensure_conversations(world)
+
+    for conv in world["conversations"].values():
+        if conv.get("active") and char_id in conv.get("participants", []):
+            return conv
+
+    return None
+
+
 # =========================================================
 # GET OR CREATE
 # =========================================================

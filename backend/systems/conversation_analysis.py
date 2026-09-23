@@ -486,6 +486,89 @@ def apply_speech_act_analysis(
         }
 
     # =====================================================
+    # ACCUSE -- confirmed real gap: brain/llm_brain.py's own prompt tells
+    # the model "an insult or accuse raises tension and can damage trust,"
+    # and brain/conversations.py's apply_conversation_dynamics already
+    # raises tension for it, but this function -- the one that actually
+    # applies stored relationship/observation consequences -- had no
+    # branch for "accuse" at all, so being accused carried literally no
+    # lasting effect on how the listener regards the accuser despite the
+    # documented behavior. Smaller than insult's own effect (an accusation
+    # is a claim, not a demeaning attack -- see conversation.accusation's
+    # own real reply options, which already let the listener push back or
+    # explain rather than just react to raw hostility).
+    # =====================================================
+
+    elif speech_act == "accuse":
+
+        result[
+            "observations"
+        ].append({
+
+            "text":
+                f"{name} accused you of something.",
+
+            "weight":
+                0.7
+        })
+
+        result[
+            "relationship_effects"
+        ] = {
+
+            "trust": -5,
+
+            "resentment": 6
+        }
+
+        result[
+            "conversation_effects"
+        ] = {
+
+            "tension": 0.3,
+
+            "awkwardness": 0.15
+        }
+
+    # =====================================================
+    # CHALLENGE -- same confirmed-gap reasoning as ACCUSE above. Used as a
+    # real reply speech_act by both conversation.insult's challenge_them
+    # and conversation.accusation's get_defensive options, but had no
+    # consequence branch of its own -- picking either option previously
+    # had the exact same (zero) relationship effect as ignoring the
+    # provocation outright.
+    # =====================================================
+
+    elif speech_act == "challenge":
+
+        result[
+            "observations"
+        ].append({
+
+            "text":
+                f"{name} pushed back hard.",
+
+            "weight":
+                0.5
+        })
+
+        result[
+            "relationship_effects"
+        ] = {
+
+            "trust": -2,
+
+            "hostility": 4
+        }
+
+        result[
+            "conversation_effects"
+        ] = {
+
+            "tension": 0.25
+        }
+
+    # =====================================================
     # VULNERABILITY
     # =====================================================
 

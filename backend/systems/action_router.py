@@ -2363,6 +2363,8 @@ def route_action(c, world, action, speech, definitions=None, available_actions=N
         _route_form_theory(c, world, action)
     elif action_type == "make_argument":
         _route_make_argument(c, world, action)
+    elif action_type == "leave_conversation":
+        _route_leave_conversation(c, world, action)
     elif action_type == "contact_business":
         _route_contact_business(c, world, action)
     elif action_type == "book_appointment":
@@ -4926,6 +4928,34 @@ def _route_make_argument(c, world, action):
             relevant_values=relevant_values,
             source_id=c["id"],
         )
+
+
+def _route_leave_conversation(c, world, action):
+    """Deliberately end an active conversation -- named as a real gap by
+    conversation.insult/conversation.accusation's own walk_away option
+    (middleware/simsland_mw/situations/library/conversation.py) before
+    this: the only way a conversation ever ended was passively, via
+    brain/conversations.py::cleanup_conversations()'s timeout sweep --
+    nothing let a character deliberately end one mid-exchange. Archives
+    it immediately (the same _archive_conversation() the timeout sweep
+    itself uses, already idempotent).
+
+    Deliberately does NOT also generate a "walk to some random nearby
+    tile" movement -- no existing pathfinding utility picks an arbitrary
+    walkable destination, and inventing one just for cosmetic effect
+    isn't worth the risk here. The real, meaningful part of "walking
+    away" from an argument is ending the conversation itself, which this
+    does; physically relocating is a separate, smaller polish item."""
+    from brain.conversations import find_active_conversation_for, _archive_conversation
+
+    conv = find_active_conversation_for(world, c["id"])
+    if conv:
+        conv["active"] = False
+        _archive_conversation(world, conv)
+
+    c["current_speech"] = None
+    if (c.get("activity") or {}).get("type") == "socialize":
+        c["activity"] = None
 
 
 def _route_retrieve_phone(c, world, action):

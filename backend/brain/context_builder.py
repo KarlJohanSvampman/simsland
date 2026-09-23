@@ -884,6 +884,16 @@ def build_available_actions(c, world):
            for p in nearby_people):
         action_types.append("make_argument")
 
+    # Deliberately ending a conversation (see systems/action_router.py's
+    # _route_leave_conversation) -- only offered while actually in one.
+    # Named as a real gap by conversation.insult/conversation.accusation's
+    # own walk_away option (middleware) before this existed: the only way
+    # a conversation ever ended before was passively, via
+    # brain/conversations.py's timeout sweep.
+    from brain.conversations import find_active_conversation_for
+    if find_active_conversation_for(world, c["id"]):
+        action_types.append("leave_conversation")
+
     # Touch proposals (see systems/intimacy.py) — the six propose-touch
     # types listed whenever someone's nearby, same "route handler
     # validates the rest" pattern (propose_touch() already does its own

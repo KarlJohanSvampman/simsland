@@ -31,7 +31,7 @@ verbal "threaten" ACTION) is still real follow-up work, not done here.
 from __future__ import annotations
 
 from ..definition import OptionSeed as O, SituationContext, SituationDefinition as S, Trigger as T
-from ._helpers import speak_to
+from ._helpers import act, speak_to
 
 MINUTE = 60
 
@@ -72,12 +72,12 @@ INSULT = S(
         O("try_to_calm_things_down", "Try to calm things down instead of escalating.",
           action=lambda c: speak_to(c, _insulter(c)), speaks=True, speech_act="comfort",
           default_line=lambda c: "Let's not do this right now."),
-        O("walk_away", "End it there and walk away.", gap="leave_conversation_deliberately"),
+        O("walk_away", "End it there and walk away.", action=lambda c: act(c, "leave_conversation")),
     ),
-    notes="walk_away names a real gap: there's no backend action yet for deliberately disengaging "
-          "from an active conversation independent of a normal move-elsewhere destination -- picking "
-          "any of the real speak options above at least keeps the character in control of how this "
-          "goes, which is why it isn't the only option here despite the gap.",
+    notes="walk_away resolves to a real leave_conversation action (systems/action_router.py's "
+          "_route_leave_conversation) -- ends the active conversation for real; doesn't also generate "
+          "a walk-to-some-tile movement, since no existing pathfinding utility picks an arbitrary "
+          "destination and the real substance of 'walking away' from an argument is ending it.",
 )
 
 
@@ -120,13 +120,13 @@ ACCUSATION = S(
         O("get_defensive", "Get defensive and push back hard.",
           action=lambda c: speak_to(c, _accuser(c)), speaks=True, speech_act="challenge",
           default_line=lambda c: "How dare you accuse me of that."),
-        O("walk_away", "End it there and walk away.", gap="leave_conversation_deliberately"),
+        O("walk_away", "End it there and walk away.", action=lambda c: act(c, "leave_conversation")),
     ),
     notes="admit_it is offered unconditionally -- whether it's actually TRUE that the character did "
           "whatever they're accused of isn't something this seed has (or should have) access to; "
           "that's the character's own private knowledge, and the LLM is the one who knows whether "
-          "the admission is honest or a false confession. walk_away is the same real gap as "
-          "conversation.insult's.",
+          "the admission is honest or a false confession. walk_away is the same real leave_conversation "
+          "action as conversation.insult's.",
 )
 
 

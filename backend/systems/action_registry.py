@@ -208,6 +208,7 @@ ACTION_SPECS = {
     "answer_about_pattern": {"group": "social", "target": "character", "detail": "activity", "doc": "Answer someone who asked why you do something they've noticed a pattern in (activity, answer text) -- you can answer honestly or not."},
     "form_theory":         {"group": "social", "target": "any", "doc": "Voice a theory about what's going on."},
     "make_argument":       {"group": "social", "target": "character", "detail": "topic", "doc": "Argue your side of a topic you disagree with someone about -- counters their last point, or raises a new one for your own stance. Only offered when there's a real disagreement live (see the values/opinions section of your context). Whoever's listening forms their own reaction based on their own values, not yours."},
+    "leave_conversation":  {"group": "social", "target": "none", "doc": "Deliberately end the conversation you're currently in and disengage -- for walking away from an argument or an accusation instead of continuing it. Only offered while you're actually in an active conversation."},
 
     # ---- touch --------------------------------------------------------
     "hug":            {"group": "touch", "target": "character", "doc": "Propose a hug."},
