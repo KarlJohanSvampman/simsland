@@ -1,15 +1,20 @@
 # simshood
 
-## AIChatbot Driven Social Simulation
+## Social Simulation Powered By AI Chatbots
 
 ### Create
+  * Character Creator: Create sims with unique personas based in loosely interpreted Traits
 ### Observe
+  * Get classis sims view of neighborhood
+  * Increase Simulated Speed (Speed Up Progression of Time) 1x - 10x
+  * Observe relationships, daily habits, secrets & lies &
 ### Inject
+  * Inject Articles Into A Personalized News Feed
+  * Change probabilities of events by changing socioeconomic tatistics 
+  * Insert a sociopath stalker or a serial-killer psychopath 
 ### Jack-In (VR)
-#### Avatar Mode
-##### Interact & Manipulate 
-#### Director Mode
-##### Adjust and Fine-Tune Actors
+  * Avatar Mode: Interact & Manipulate 
+  * Director Mode: Adjust and Fine-Tune Actors
 
 ## Run
 ```bash
