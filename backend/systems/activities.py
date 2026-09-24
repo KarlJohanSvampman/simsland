@@ -309,26 +309,16 @@ ACTIVITIES = {
 
         "category": "social"
     },
-    "gossip": {
-
-        "interaction": "socialize",
-
-        "base_duration_minutes": 20,
-
-        "interruptible": True,
-
-        "category": "social"
-    },
-    "hangout": {
-
-        "interaction": "socialize",
-
-        "base_duration_minutes": 120,
-
-        "interruptible": True,
-
-        "category": "social"
-    },
+    # "gossip" and "hangout" were stray, unsectioned leftovers here --
+    # confirmed duplicate ACTIVITIES keys, each silently overwritten by a
+    # second, properly-sectioned declaration under "# SOCIAL" below
+    # (identical bug class to the take_out_trash duplicate-key bug fixed
+    # earlier this session). Removed rather than fixed in place: unlike
+    # that bug, both declarations of each key were individually valid
+    # (same real "socialize" interaction), so there was never a
+    # reachability issue -- just dead, shadowed config text plus an
+    # unintended base_duration_minutes (20/here vs the live 30 for
+    # gossip; hangout's two copies were byte-identical).
     # =====================================================
     # FOOD
     # =====================================================
@@ -636,16 +626,11 @@ ACTIVITIES = {
 
         "category": "leisure"
     },
-    "reflect": {
-
-    "interaction": "sit",
-
-    "base_duration_minutes": 25,
-
-    "interruptible": True,
-
-    "category": "internal" 
-    },
+    # "reflect" was a stray leftover here too (wrong section -- "internal"
+    # category sitting among "leisure"/"domestic" entries with no header),
+    # a duplicate ACTIVITIES key silently overwritten by the properly-
+    # sectioned declaration under "# SELF / INTERNAL" below. Same removal
+    # rationale as gossip/hangout above.
 
     "read_book": {
 
