@@ -63,9 +63,22 @@ def _next_intention_seq():
     return _intention_seq
 
 
-def _deadline_window(intention):
-    return INTENTION_DEADLINE_TICKS_BY_CATEGORY.get(
+# Real planning-horizon scaling by developmental stage (see brain/
+# context_builder.py's matching developmental_profile_registry prompt
+# injection) -- a child fixating on something for the same multi-hour
+# window an adult would is one more way simulated children ended up
+# reasoning like small adults. Adults/elderly are unscaled (1.0).
+_DEADLINE_WINDOW_SCALE_BY_AGE_GROUP = {
+    "child": 0.35,
+    "teen":  0.7,
+}
+
+
+def _deadline_window(intention, c=None):
+    base = INTENTION_DEADLINE_TICKS_BY_CATEGORY.get(
         intention.get("category"), INTENTION_DEFAULT_DEADLINE_TICKS)
+    scale = _DEADLINE_WINDOW_SCALE_BY_AGE_GROUP.get(c.get("age_group"), 1.0) if c else 1.0
+    return max(1, round(base * scale))
 
 
 CATEGORY_PRIORITY = {
@@ -260,7 +273,7 @@ def add_intention(
         if "_seq" not in intention:
             intention["_seq"] = _next_intention_seq()
         intention.setdefault("stage", 0)
-        intention.setdefault("deadline_tick", _CURRENT_TICK + _deadline_window(intention))
+        intention.setdefault("deadline_tick", _CURRENT_TICK + _deadline_window(intention, c))
 
     intention.setdefault(
         "source",
@@ -333,7 +346,7 @@ def check_intention_deadlines(c, world):
             continue
         i["stage"] = min(INTENTION_MAX_STAGE, i.get("stage", 0) + 1)
         i["priority"] = min(100, i.get("priority", 0) + INTENTION_PRIORITY_ESCALATION)
-        i["deadline_tick"] = tick + _deadline_window(i)
+        i["deadline_tick"] = tick + _deadline_window(i, c)
 
 # =========================================================
 # DECAY

@@ -1691,6 +1691,23 @@ def _sec_identity(c, world):
         style = world.get("definitions", {}).get("speech_style_registry", {}).get(style_id)
         if style:
             bits.append(f"How you talk and write: {style['description']}")
+
+    # Developmental profile -- same "registry id -> behavioral prose"
+    # pattern as speech_style just above, keyed by age_group instead of a
+    # per-character roll (a character's developmental stage isn't
+    # individually varied, so there's nothing to store on the character
+    # itself -- just look it up live). Confirmed live bug this fixes: age
+    # was previously only ever "N years old" in this prompt -- nothing
+    # ever told the model HOW that age should change reasoning, knowledge,
+    # or planning, so children reasoned and spoke like adults with a
+    # smaller vocabulary. Adults/elderly intentionally get no entry here
+    # (kept out of the registry entirely) -- ordinary adult LLM reasoning
+    # is already the right default, no need to spend prompt tokens on it
+    # every single think() call.
+    dev_profile = world.get("definitions", {}).get("developmental_profile_registry", {}).get(c.get("age_group"))
+    if dev_profile:
+        bits.append(dev_profile["description"])
+
     bits.append(f"Right now you feel {c.get('emotion', 'neutral')}.")
     if c.get("stress", 0) > 60:
         bits.append("You're under real stress.")
