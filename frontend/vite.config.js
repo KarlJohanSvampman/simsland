@@ -50,7 +50,10 @@ export default defineConfig({
           resolve(__dirname, "operator_view.html"),
 
         mentality_preview:
-          resolve(__dirname, "mentality_preview.html")
+          resolve(__dirname, "mentality_preview.html"),
+
+        vr_test:
+          resolve(__dirname, "vr_test.html")
       }
     }
   }
