@@ -1391,6 +1391,19 @@ def start_activity(
     if not config:
         return False
 
+    # Defensive backstop for systems/action_registry.py's ACTION_TYPE_MIN_AGE
+    # -- brain/context_builder.py's build_available_actions() is the primary
+    # gate (never offers an under-age activity_type in the first place), but
+    # this is the one point every activity actually starts through
+    # regardless of decision source (in-process brain or middleware
+    # /execute), same rationale as action_router.py's own _route_interact
+    # backstop for INTERACTION_MIN_AGE just below it in that file.
+    age = c.get("age")
+    if age is not None:
+        from systems.action_registry import ACTION_TYPE_MIN_AGE
+        if age < ACTION_TYPE_MIN_AGE.get(activity_type, 0):
+            return False
+
     if activity_type == "sleep":
         # Real, fatigue/energy/sleep_debt-aware duration instead of the
         # generic flat-base-plus-jitter formula -- see systems/body.py::

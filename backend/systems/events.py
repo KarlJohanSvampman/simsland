@@ -334,6 +334,20 @@ def _find_signal_weighted_pair(world, tier):
     active = [
         c for c in world["characters"].values()
         if is_reachable(c) and not c.get("off_grid")
+        # Confirmed live bug: negative tiers ("argument"/"conflict") produce
+        # real adult-toned content (llm/scripted_conversation.py's own tier
+        # guidance for "conflict": "sharp, heated, and hard to walk away
+        # from cleanly") from nothing more than two bare names plus a
+        # grievance/goodwill line -- no age, occupation, or relationship
+        # ever reaches that prompt. A 5- and a 6-year-old in different
+        # households, with zero real relationship, got picked as a
+        # "require_designation=False" pair below and received a full
+        # scripted phone call arguing about a work meeting and
+        # "leadership." There's no age-appropriate conflict-content model
+        # yet (that's separate, deliberately deferred work), so children
+        # are excluded from this pairing pool for negative tiers entirely
+        # rather than handed content that doesn't fit them.
+        and not (tier in _NEGATIVE_TIERS and c.get("age_group") == "child")
     ]
     if len(active) < 2:
         return None, None

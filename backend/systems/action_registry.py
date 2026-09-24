@@ -368,6 +368,48 @@ ACTION_TYPE_MIN_AGE = {
     "sit_ups":        13,
     "chin_ups":       13,
     "lift_weights":   13,
+
+    # Per the user's own "bigger overhaul" ask: this dict already generically
+    # gates every top-level activity_type (see context_builder.py's own
+    # comment on it), it just had only the four exercise entries above
+    # populated. Added here rather than inventing a second mechanism.
+
+    # Work/money -- matches systems/jobs.py's own real employment-eligibility
+    # floor (age_group != "child" -- i.e. teens 13+ can already work there);
+    # gating these activity_types any stricter would contradict that.
+    "work_shift":               13,
+    "apply_job":                13,
+    "look_for_job":             13,
+    "use_atm":                  13,
+    "go_shopping":              13,
+    "buy_food":                 13,
+    "convenience_store_checkout": 13,
+    "order_taxi":               13,
+    "pay_bills":                16,   # a real, unsupervised financial obligation
+
+    # Cooking -- matches the existing INTERACTION_MIN_AGE["cook"]/
+    # ["prepare_food"] = 10 below, just at the activity_type level too
+    # (cook_recipe/cook_meal don't route through those specific anchor
+    # interactions, so they weren't covered by that dict at all).
+    "cook_recipe":              10,
+    "cook_meal":                10,
+    "cook_together":            10,
+
+    # Household chores involving an appliance/hot water/carrying a load --
+    # same order of magnitude as INTERACTION_MIN_AGE["use_microwave"] = 8.
+    "do_laundry":                8,
+    "do_laundry_fill":           8,
+    "wash_dishes":               8,
+    "load_dishwasher":           8,
+    "take_out_trash":            8,
+
+    "shave":                    13,
+
+    # Matches systems/offgrid.py's own existing real age-21 threshold for
+    # this exact activity_key on the off-grid trip-summary path -- this is
+    # the same activity, just gated the same way on the on-grid path too.
+    "drink_alcohol":            21,
+    "have_drink":               21,
 }
 
 INTERACTION_MIN_AGE = {
