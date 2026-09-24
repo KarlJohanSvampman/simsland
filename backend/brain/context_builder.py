@@ -1680,7 +1680,15 @@ def _sec_identity(c, world):
     bits = [f"You are {name}"]
     if c.get("age") is not None:
         bits[0] += f", {c['age']} years old"
-    if c.get("occupation"):
+    # "none" is a real, deliberate sentinel for "no job" (character_gen.py's
+    # generation-time default, and what jobs.py's own job-separation path
+    # resets it to on quit/layoff/retirement) -- not a missing-value gap a
+    # bare truthy check would catch. systems/crime.py already has the
+    # correct idiom for this same field; this call site just never adopted
+    # it, so every unemployed character's prompt (every child, confirmed
+    # live for Dennis Davis/Justin Jackson) literally read "working as a
+    # none."
+    if c.get("occupation") and c["occupation"] != "none":
         bits[0] += f", working as a {c['occupation']}"
     bits[0] += "."
     traits = c.get("traits", [])
