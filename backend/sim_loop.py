@@ -845,11 +845,28 @@ def tick(world):
         # is the only thing that would ever clear "incapacitated" in the
         # first place. Confirmed live: two characters stayed off_grid,
         # unconscious, and stuck rendering at their pre-hospital position
-        # on the map indefinitely. Sweeping every character here,
-        # unconditionally, closes both gaps at once.
+        # on the map indefinitely. Sweeping every character here rescues
+        # exactly those characters.
+        #
+        # Confirmed live bug (duplicate timeline events, e.g. the SAME
+        # "had a routine cafe trip" appearing twice at the same tick): this
+        # used to sweep EVERY alive character "unconditionally," not just
+        # the incapacitated ones this block exists for. agent_chars (built
+        # above, still in scope) already gets its own worker-thread
+        # dispatch this same tick, and update_agent() calls these same two
+        # functions itself, on the SAME shared `world`/`c` dict, from a
+        # DIFFERENT thread -- a genuine TOCTOU race, not a stale-snapshot
+        # one: both threads can read off_grid==True before either writes
+        # it back False, so both run process_return()'s whole body
+        # (including the world["events"].append) to completion. Restricting
+        # this sweep to characters agent_chars actually excluded removes
+        # the second caller entirely instead of trying to lock around it --
+        # every character still gets covered exactly once, just by
+        # whichever path was always the real one for them.
         from systems.offgrid import process_return
+        _agent_char_ids = {c["id"] for c in agent_chars}
         for c in characters:
-            if c.get("alive") is not False:
+            if c.get("alive") is not False and c["id"] not in _agent_char_ids:
                 apply_severity_consequences(c, world)
                 process_return(c, world)
 
