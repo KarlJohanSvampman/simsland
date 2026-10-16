@@ -142,7 +142,9 @@ def compare_lives(c, other, world):
         o_child_match = _avg_ideal_match(c, o_kids, "ideal_child")
         dims["children"] = {"self": c_child_match, "other": o_child_match, "favors_other": o_child_match > c_child_match}
 
-    c_attr, o_attr = c.get("attractiveness", 0.5), other.get("attractiveness", 0.5)
+    c_attr, o_attr = c.get("attractiveness"), other.get("attractiveness")
+    c_attr = 0.5 if c_attr is None else c_attr
+    o_attr = 0.5 if o_attr is None else o_attr
     dims["appearance"] = {"self": c_attr, "other": o_attr, "favors_other": o_attr > c_attr}
 
     if c.get("employed") and other.get("employed"):
@@ -227,7 +229,14 @@ def tick_life_comparison(world):
     contact-scoped scan -- not a full world-wide comparison every day."""
     characters = world.get("characters", {})
     for c in characters.values():
-        if c.get("is_offscreen") or c.get("age_group") in ("child", "teen"):
+        # Confirmed live bug (froze the whole simulation): the workplace-NPC
+        # skip further down only guarded `other`, never `c` itself -- so the
+        # moment a colleague NPC existed (systems/workplace_npc.py: bare
+        # shape, no attractiveness/wealth/...), it got picked as the
+        # comparing character and compare_lives() crashed on
+        # `float > None`, uncaught inside tick(), before anything persisted.
+        if (c.get("is_offscreen") or c.get("is_workplace_npc")
+                or c.get("age_group") in ("child", "teen")):
             continue
         contact_ids = list(c.get("relationships", {}).keys())
         if not contact_ids:
