@@ -107,7 +107,13 @@ def get_view(
             {}
         ).items()
 
-        if in_view(
+        # Workplace NPCs (systems/workplace_npc.py) are a deliberately bare,
+        # narrative-only shape with no position at all. c["x"] on one raised
+        # KeyError inside every client's snapshot, so nobody got a map: the
+        # WebSocket opened and then sent nothing, ever.
+        if not c.get("is_workplace_npc")
+        and c.get("x") is not None and c.get("y") is not None
+        and in_view(
 
             c["x"],
             c["y"],

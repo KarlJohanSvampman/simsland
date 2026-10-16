@@ -151,7 +151,8 @@ def _build_delta(world: dict, dirty: dict, cx: int, cy: int, zoom: int,
 
     visible_chars = {
         cid: c for cid, c in dirty["chars"].items()
-        if in_view(c.get("x", 0), c.get("y", 0), cx, cy, radius)
+        if not c.get("is_workplace_npc")      # no position; would otherwise sit at the origin
+        and in_view(c.get("x", 0), c.get("y", 0), cx, cy, radius)
     }
     if selected_id and selected_id in dirty["chars"] and selected_id not in visible_chars:
         visible_chars[selected_id] = dirty["chars"][selected_id]
