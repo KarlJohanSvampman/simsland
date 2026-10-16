@@ -481,6 +481,11 @@ def add_message(
         speech_act
     )
 
+    # A child asking a grown-up something, or a grown-up answering one --
+    # see systems/child_cognition.py.
+    from systems.child_cognition import on_conversation_message
+    on_conversation_message(world, conv, speaker_id, utterance, speech_act, tick)
+
     # NOTE: reflection scheduling is handled by action_router.py's
     # apply_speech() after each turn so it is not duplicated here.
 

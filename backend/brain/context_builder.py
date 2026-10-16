@@ -1722,6 +1722,13 @@ def _sec_identity(c, world):
     return " ".join(bits)
 
 
+def _sec_child_cognition(c, world):
+    # Who a child believes, how readily, and what they're still wondering
+    # about -- None for everyone but children (systems/child_cognition.py).
+    from systems.child_cognition import get_child_cognition_context
+    return get_child_cognition_context(c, world)
+
+
 def _sec_body(c, world):
     # reuse the already-prose build_body_context
     body_issues = build_body_context(c)
@@ -2283,6 +2290,7 @@ NARRATIVE_SECTIONS = [
     ("attention",             "full", _sec_attention),
     ("claustrophobia",        "core", _sec_claustrophobia),
     ("identity",              "core", _sec_identity),
+    ("child_cognition",       "core", _sec_child_cognition),
     ("body",                  "core", _sec_body),
     ("health",                "core", _sec_health),
     ("bedroom",               "full", _sec_bedroom),

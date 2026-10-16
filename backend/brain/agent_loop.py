@@ -707,6 +707,11 @@ def update_agent(
     deliver_pending_relays(c, world)
     check_ask_whereabouts(c, world)
 
+    # A child who watched grown-ups argue wants to know why -- see
+    # systems/child_cognition.py. No-op for everyone else.
+    from systems.child_cognition import update_child_cognition
+    update_child_cognition(c, world)
+
     # =====================================
     # COOKING FOOD
     # =====================================
