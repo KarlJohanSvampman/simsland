@@ -73,6 +73,16 @@ CONTRADICTED_LOSS     = 0.08     # the less-trusted source of two that conflict 
 EVEN_CONFLICT_LOSS    = 0.03     # ...or each loses this when the child trusts them equally
 NAIVETY_PER_CONFLICT  = 0.04     # every time grown-ups visibly disagree
 
+# Another child as a source. Naive children barely credit one; as naivety falls,
+# an impressive peer starts to count.
+PEER_TRUST_SCALE      = 0.45
+TELLING_ACTS          = ("gossip", "brag")   # how a child passes on what they found out
+FELT_TELLING_GAIN     = 0.03     # proud, and nobody challenged them
+FELT_DISPUTE_WIN      = 0.04
+FELT_DISPUTE_LOSS     = 0.06
+FELT_RECONFIRMED_GAIN = 0.10     # lost an argument, checked with their source, were right: surer than ever
+PROUD_WINDOW_TICKS    = 10800    # how long a fresh discovery stays burning to be told
+
 SCAN_INTERVAL_TICKS   = 20
 SCENE_COOLDOWN_TICKS  = 7200     # don't re-ask about the same pair within 2h
 MAX_OPEN_QUESTIONS    = 3
@@ -149,6 +159,11 @@ def source_credibility(child, other, world=None):
     base = KIN_CREDIBILITY[kin] if kin else STRANGER_CREDIBILITY.get(other.get("age_group"), 0.25)
 
     bonus = 0.0
+    if not kin and world is not None and other.get("age_group") in ("child", "teen"):
+        # A peer is believed in proportion to how impressive they are and how much
+        # the child has stopped taking everything at face value.
+        from systems.standing import standing
+        bonus += PEER_TRUST_SCALE * (1.0 - naivety(child, world)) * standing(other, child, world)
     if _has_authority_title(other):
         bonus += AUTHORITY_TITLE_BONUS
     bonus += min(TIME_BONUS_MAX, (rel.get("hours_this_week") or 0.0) / TIME_BONUS_HOURS * TIME_BONUS_MAX)
@@ -280,6 +295,11 @@ def on_conversation_message(world, conv, speaker_id, utterance, speech_act, tick
             cog["awaiting"] = {"source_id": listener["id"], "question_id": q["id"], "tick": tick}
         return
 
+    # A child proudly passing on what they found out.
+    if is_child(speaker) and speech_act in TELLING_ACTS:
+        _tell_peers(speaker, [o for o in others if is_child(o)], tick, world)
+        return
+
     # Someone answering a child.
     for child in (o for o in others if is_child(o)):
         cog = _state(child)
@@ -308,17 +328,65 @@ def on_conversation_message(world, conv, speaker_id, utterance, speech_act, tick
             # agree -- queue the comparison and decide when it comes back.
             _queue_comparison(cog, q, prior, account, chars)
         elif source_credibility(child, speaker, world) >= SETTLE_CREDIBILITY:
-            q["settled"] = True
+            _settle(child, q)
+
+
+# ---------------------------------------------------------------------------
+# Telling other children
+# ---------------------------------------------------------------------------
+
+def _tell_peers(speaker, listeners, tick, world):
+    """A child who learned something wants to share it, whether or not they
+    understood it. The teller feels good -- nobody has challenged them yet. The
+    listener now has an account from a child; if they'd already been told
+    something by a grown-up, it gets compared like any other pair of accounts."""
+    from systems.standing import bump_felt
+    chars = world.get("characters", {})
+    cog = _state(speaker)
+    fact = next((q for q in reversed(cog["open_questions"])
+                 if not q.get("told") and any(not a.get("brushed_off") for a in q["accounts"])), None)
+    if not fact or not listeners:
+        return
+    told = next(a for a in reversed(fact["accounts"]) if not a.get("brushed_off"))
+    fact["told"] = True
+    bump_felt(speaker, FELT_TELLING_GAIN)
+
+    for listener in listeners:
+        lcog = _state(listener)
+        lq = next((x for x in lcog["open_questions"] if x["scene_key"] == fact["scene_key"]), None)
+        if lq is None:
+            lq = {"id": f"q_{uuid.uuid4().hex[:8]}", "text": fact["text"], "scene_key": fact["scene_key"],
+                  "created_tick": tick, "asked_of": [], "accounts": [], "settled": False,
+                  "contested": False, "pending_compare": False, "from_peer": True}
+            lcog["open_questions"].append(lq)
+            lcog["scene_seen"][fact["scene_key"]] = tick     # don't also scan-create a duplicate
+        prior = next((a for a in reversed(lq["accounts"])
+                      if a["source_id"] != speaker["id"] and not a.get("brushed_off")), None)
+        account = {"source_id": speaker["id"], "tick": tick, "text": told["text"], "peer": True}
+        lq["accounts"].append(account)
+        if speaker["id"] not in lcog["answered_by"]:
+            lcog["answered_by"].append(speaker["id"])
+        if prior:
+            _queue_comparison(lcog, lq, prior, account, chars, peer_teller_id=speaker["id"])
+        elif source_credibility(listener, speaker, world) >= SETTLE_CREDIBILITY:
+            _settle(listener, lq)
 
 
 # ---------------------------------------------------------------------------
 # Comparing what two grown-ups said
 # ---------------------------------------------------------------------------
 
-def _queue_comparison(cog, q, first, second, chars):
+def _queue_comparison(cog, q, first, second, chars, peer_teller_id=None):
+    if peer_teller_id is None:
+        # A child heard it from another child, and now a grown-up (or the reverse)
+        # has said something -- whichever account came from a peer is the one that
+        # may turn out to be a lie.
+        peer_teller_id = (first["source_id"] if first.get("peer")
+                          else second["source_id"] if second.get("peer") else None)
     q["pending_compare"] = True
     n = len(q["accounts"])
     cog["comparisons"].append({
+        "peer_teller_id": peer_teller_id,
         "key":    f"cmp:{q['id']}:{n}",
         "q_id":   q["id"],
         "q_text": q["text"],
@@ -327,6 +395,17 @@ def _queue_comparison(cog, q, first, second, chars):
         "b_id":   second["source_id"], "b_name": chars.get(second["source_id"], {}).get("name", "someone"),
         "b_text": second["text"],
     })
+
+
+def _settle(child, q):
+    """Mark a question settled. If they'd been told they were wrong and checked
+    with a source they believe, being right again leaves them surer than before."""
+    from systems.standing import bump_felt
+    q["settled"], q["contested"] = True, False
+    if q.get("reconfirm"):
+        q["reconfirm"] = False
+        q["accused_by"] = None
+        bump_felt(child, FELT_RECONFIRMED_GAIN)
 
 
 def _adjust(cog, source_id, delta):
@@ -341,7 +420,7 @@ def _apply_verdict(child, cog, q, cmp_entry, agree, world):
     if agree is True:
         _adjust(cog, cmp_entry["a_id"], REAFFIRM_GAIN)
         _adjust(cog, cmp_entry["b_id"], REAFFIRM_GAIN)
-        q["settled"], q["contested"] = True, False
+        _settle(child, q)
     elif agree is False:
         cog["conflicts_heard"] += 1
         q["settled"], q["contested"] = False, True
@@ -353,12 +432,41 @@ def _apply_verdict(child, cog, q, cmp_entry, agree, world):
                 _adjust(cog, b["id"], -EVEN_CONFLICT_LOSS)
             else:
                 _adjust(cog, (a if ca < cb else b)["id"], -CONTRADICTED_LOSS)
+            teller_id = cmp_entry.get("peer_teller_id")
+            if teller_id:
+                _peer_dispute(child, q, teller_id, ca if a and a["id"] == teller_id else cb,
+                              cb if a and a["id"] == teller_id else ca, cmp_entry, world)
     else:
         # Couldn't tell: no new information, so fall back to trusting the latest
         # answer only if it came from someone credible.
         later = chars.get(cmp_entry["b_id"])
         if later and source_credibility(child, later, world) >= SETTLE_CREDIBILITY:
-            q["settled"] = True
+            _settle(child, q)
+
+
+def _peer_dispute(child, q, teller_id, teller_cred, other_cred, entry, world):
+    """A child was told something by another child that contradicts what a grown-up
+    told them. If they trust the grown-up more, the other child is wrong -- and
+    they say so. Both feel it."""
+    chars = world.get("characters", {})
+    teller = chars.get(teller_id)
+    if not teller or teller_cred >= other_cred:
+        return    # they lean toward the peer: ordinary contested question, no accusation
+    from systems.standing import bump_felt
+    from systems.grievances import add_grievance
+    q["dispute_with"] = teller_id
+    q["dispute_text"] = entry["a_text"] if entry["a_id"] == teller_id else entry["b_text"]
+    add_grievance(child, teller_id, "lied", world,
+                  details={"context": "told_something_that_contradicts_a_grown_up"})
+    bump_felt(child, FELT_DISPUTE_WIN)
+    # The teller is the one who's been called a liar.
+    bump_felt(teller, -FELT_DISPUTE_LOSS)
+    tcog = _state(teller)
+    tq = next((x for x in tcog["open_questions"] if x["scene_key"] == q["scene_key"]), None)
+    if tq is not None:
+        tq["settled"] = False
+        tq["reconfirm"] = True
+        tq["accused_by"] = child["id"]
 
 
 def _service_comparisons(c, world):
@@ -420,11 +528,24 @@ def get_child_cognition_context(c, world):
     cog = c.get("child_cognition") or {}
     open_qs = _open_questions(cog)
     if open_qs:
-        # A question that's been answered two different ways matters most.
-        q = next((x for x in open_qs if x.get("contested")), open_qs[0])
+        # Fights over who's right matter most, then answers that conflict.
+        q = next((x for x in open_qs if x.get("dispute_with") or x.get("accused_by")),
+                 next((x for x in open_qs if x.get("contested")), open_qs[0]))
         line = f"You keep wondering: \"{q['text']}\""
         top = sources[0][0].get("name") if sources else None
-        if q.get("contested") and len(q.get("conflict_sources") or []) == 2:
+        if q.get("accused_by"):
+            acc = chars.get(q["accused_by"], {}).get("name", "another kid")
+            line = (f"{acc} says what you found out about \"{q['text']}\" is wrong -- called you a liar, even. "
+                    f"You don't want that to be true and it stings. You want to ask "
+                    f"{top or 'a grown-up'} to be sure you're right, and if you can't stand it you might tell a grown-up "
+                    f"that {acc} lies.")
+        elif q.get("dispute_with"):
+            tell = chars.get(q["dispute_with"], {}).get("name", "another kid")
+            adult_id = next((i for i in (q.get("conflict_sources") or []) if i != q["dispute_with"]), None)
+            adult = chars.get(adult_id, {}).get("name", "a grown-up")
+            line += (f" {tell} told you \"{q.get('dispute_text', '')}\" -- but that's not what {adult} told you. "
+                     f"You think {tell} is making it up, and you're ready to say so to their face.")
+        elif q.get("contested") and len(q.get("conflict_sources") or []) == 2:
             a, b = (chars.get(i) or {} for i in q["conflict_sources"])
             favoured = a if source_credibility(c, a, world) >= source_credibility(c, b, world) else b
             other = b if favoured is a else a
@@ -440,6 +561,13 @@ def get_child_cognition_context(c, world):
         elif top:
             line += f" You'd like to ask {top} about it."
         parts.append(line)
+
+    proud = next((x for x in reversed(cog.get("open_questions", []))
+                  if x["settled"] and not x.get("told") and x["accounts"]
+                  and world.get("tick", 0) - x["accounts"][-1]["tick"] <= PROUD_WINDOW_TICKS), None)
+    if proud:
+        parts.append(f"You found out the answer to \"{proud['text']}\" and you're proud you know something the "
+                     f"other kids might not -- you feel like telling them, even if you only half understood it.")
 
     from systems.standing import get_standing_context
     parts.extend(get_standing_context(c, world))

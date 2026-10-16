@@ -410,6 +410,15 @@ ACTION_TYPE_MIN_AGE = {
     # the same activity, just gated the same way on the on-grid path too.
     "drink_alcohol":            21,
     "have_drink":               21,
+
+    # Violence. Children keep the schoolyard kind (shove, punch, kick, grab,
+    # threaten, wrestle) -- hostile_actions.py caps their injuries to minor
+    # ones -- but weapons and robbery are not something a young child does.
+    # Confirmed: stab/knock were offered to a 5-year-old holding anything sharp.
+    "stab":                     14,
+    "knock":                    14,
+    "wield_item":               13,
+    "steal_from":               10,
 }
 
 INTERACTION_MIN_AGE = {

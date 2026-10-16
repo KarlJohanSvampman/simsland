@@ -336,7 +336,18 @@ def resolve_hostile_action(actor, target, action_id, world):
             _resolve_field(actor, "held_item.category", world) == required_weapon
         )
         if injury_eligible:
-            injury_pick = weighted_pick(tpl.get("possible_injuries", []))
+            possible_injuries = tpl.get("possible_injuries", [])
+            if actor.get("age_group") == "child":
+                # A small child's blow leaves a bruise or a pulled muscle, not a
+                # broken nose -- only "low" severity injuries stay on the table.
+                # (Their data can't be trusted to scale this: the generator gives
+                # a 5-year-old an adult body weight.)
+                injury_defs = (world.get("definitions") or {}).get("injury_templates", {})
+                possible_injuries = [
+                    p for p in possible_injuries
+                    if (injury_defs.get(p.get("injury_template")) or {}).get("severity_level") == "low"
+                ]
+            injury_pick = weighted_pick(possible_injuries)
             if injury_pick:
                 try:
                     from systems.health import apply_injury
