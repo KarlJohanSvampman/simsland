@@ -863,10 +863,26 @@ def tick(world):
         # the second caller entirely instead of trying to lock around it --
         # every character still gets covered exactly once, just by
         # whichever path was always the real one for them.
+        #
+        # "Excluded from agent_chars" is not enough on its own: a character
+        # whose previous dispatch is still running (_pending_agent_ids) is
+        # ALSO excluded from agent_chars, yet that thread is exactly who is
+        # mid-process_return. process_return() can sit for a long time --
+        # a returning worker blocks inside offgrid.py::_resolve_work_shift
+        # on a work-shift narration LLM call (up to llm_gate's 90s) with
+        # off_grid still True -- so sweeping pending characters re-ran the
+        # whole return on THIS (the main tick) thread: a second narration
+        # call, a duplicate world["events"] entry, and the entire tick
+        # blocked for the length of the call. Confirmed via a faulthandler
+        # dump: main thread in tick() -> process_return() ->
+        # generate_hourly_work_beats() -> run_llm_call(), simultaneously
+        # with an agent worker in the same chain for the same character.
+        # Only characters with NO agent thread at all (incapacitated, never
+        # dispatched) still need this sweep -- the deadlock it exists for.
         from systems.offgrid import process_return
-        _agent_char_ids = {c["id"] for c in agent_chars}
+        _has_agent_thread = {c["id"] for c in agent_chars} | set(_pending_agent_ids)
         for c in characters:
-            if c.get("alive") is not False and c["id"] not in _agent_char_ids:
+            if c.get("alive") is not False and c["id"] not in _has_agent_thread:
                 apply_severity_consequences(c, world)
                 process_return(c, world)
 
