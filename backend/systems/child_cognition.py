@@ -206,6 +206,8 @@ def update_child_cognition(c, world):
     tick = world.get("tick", 0)
     cog = _state(c)
     _service_comparisons(c, world)
+    from systems.standing import refresh_role_model
+    refresh_role_model(c, cog, world)
     if tick - cog.get("_last_scan", -SCAN_INTERVAL_TICKS) < SCAN_INTERVAL_TICKS:
         return
     cog["_last_scan"] = tick
@@ -438,5 +440,8 @@ def get_child_cognition_context(c, world):
         elif top:
             line += f" You'd like to ask {top} about it."
         parts.append(line)
+
+    from systems.standing import get_standing_context
+    parts.extend(get_standing_context(c, world))
 
     return " ".join(parts) if parts else None

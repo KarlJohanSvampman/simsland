@@ -546,6 +546,10 @@ def resolve_cognitive_adoption(world, defs, characters):
             # with more extreme beliefs themselves, they're a stronger
             # influencer.
             source_amp = 2.0 if any(t in ("fundamentalist", "extremist") for t in other_traits_all) else 1.0
+            # A child copies the person they look up to far more than anyone else
+            # (systems/standing.py picks the role model).
+            from systems.standing import role_model_amplifier
+            source_amp *= role_model_amplifier(c, other_id)
 
             # "More beliefs in common -> more influenced in traits"
             trait_sim_mult = 1.0 + _jaccard(my_beliefs, other_beliefs)
