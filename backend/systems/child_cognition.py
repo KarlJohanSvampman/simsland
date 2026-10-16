@@ -43,6 +43,10 @@ c["child_cognition"] = {
 
 import uuid
 
+from systems.child_worldview import (
+    IMAGINATION_ID, _IMAGINATION, imagination_credibility, service_imagination, get_worldview_context,
+)
+
 # What a child assumes about someone, by how they're related to the child.
 # Reads rel["labels"] AND rel["kinship"]: generation writes kin into labels
 # (kinship is None for most live characters), family sync writes kinship.
@@ -140,8 +144,12 @@ def _cap(text):
 
 
 def _person(chars, source_id):
-    """A character, or the internet pseudo-source."""
-    return _INTERNET if source_id == INTERNET_ID else chars.get(source_id)
+    """A character, or one of the two non-person sources (the internet, their own imagination)."""
+    if source_id == INTERNET_ID:
+        return _INTERNET
+    if source_id == IMAGINATION_ID:
+        return _IMAGINATION
+    return chars.get(source_id)
 
 
 def _state(c):
@@ -196,6 +204,8 @@ def _has_authority_title(other):
 def source_credibility(child, other, world=None):
     """How much `child` believes `other`, 0..1. Closeness of relation sets the
     baseline; an official role, time spent together and trust adjust it."""
+    if other.get("id") == IMAGINATION_ID:
+        return imagination_credibility(child, world)
     if other.get("id") == INTERNET_ID:
         learned = ((child.get("child_cognition") or {}).get("source_adjust") or {}).get(INTERNET_ID, 0.0)
         return max(0.0, min(0.65, INTERNET_BASE + INTERNET_SCALE * (1.0 - naivety(child, world)) + learned))
@@ -266,6 +276,7 @@ def update_child_cognition(c, world):
     tick = world.get("tick", 0)
     cog = _state(c)
     _service_comparisons(c, world)
+    service_imagination(c, world)
     from systems.standing import refresh_role_model
     refresh_role_model(c, cog, world)
     if tick - cog.get("_last_scan", -SCAN_INTERVAL_TICKS) < SCAN_INTERVAL_TICKS:
@@ -674,6 +685,11 @@ def get_child_cognition_context(c, world):
             adult = chars.get(adult_id, {}).get("name", "a grown-up")
             line += (f" {tell} told you \"{q.get('dispute_text', '')}\" -- but that's not what {adult} told you. "
                      f"You think {tell} is making it up, and you're ready to say so to their face.")
+        elif q.get("contested") and IMAGINATION_ID in (q.get("conflict_sources") or []):
+            other = next((_person(chars, i) or {} for i in q["conflict_sources"] if i != IMAGINATION_ID), {})
+            line += (f" You'd decided it was because \"{q.get('imagined', 'something')}\" -- but "
+                     f"{other.get('name', 'a grown-up')} told you something different. Maybe you were wrong, or maybe "
+                     f"they just don't want to tell you the real reason.")
         elif q.get("contested") and len(q.get("conflict_sources") or []) == 2:
             a, b = (_person(chars, i) or {} for i in q["conflict_sources"])
             favoured = a if source_credibility(c, a, world) >= source_credibility(c, b, world) else b
@@ -683,10 +699,14 @@ def get_child_cognition_context(c, world):
                      f"{favoured.get('name', 'one of them')} more, but you want to ask again to be sure -- and if "
                      f"someone says something that doesn't match what {other.get('name', 'the other')} told you, "
                      f"you say so: \"but {other.get('name', 'they')} said...\"")
-        elif q["accounts"]:
-            told = (_person(chars, q["accounts"][-1]["source_id"]) or {}).get("name", "someone")
+        elif [a for a in q["accounts"] if not a.get("imagined")]:
+            real = [a for a in q["accounts"] if not a.get("imagined")]
+            told = (_person(chars, real[-1]["source_id"]) or {}).get("name", "someone")
             line += (f" {_cap(told)} told you something, but you're not sure that's the whole story"
                      + (f" -- you want to ask {top} too." if top and top != told else "."))
+        elif q.get("imagined"):
+            line += (f" Nobody's told you, so you worked it out yourself: \"{q['imagined']}\" It makes sense to you, "
+                     f"even though nobody said so." + (f" You'd still like to ask {top} if you're right." if top else ""))
         elif top:
             line += f" You'd like to ask {top} about it."
         if q.get("ridiculed"):
@@ -706,6 +726,8 @@ def get_child_cognition_context(c, world):
     if proud:
         parts.append(f"You found out the answer to \"{proud['text']}\" and you're proud you know something the "
                      f"other kids might not -- you feel like telling them, even if you only half understood it.")
+
+    parts.extend(get_worldview_context(c, world))
 
     from systems.standing import get_standing_context
     parts.extend(get_standing_context(c, world))
