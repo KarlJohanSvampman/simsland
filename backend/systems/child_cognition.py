@@ -83,6 +83,39 @@ FELT_DISPUTE_LOSS     = 0.06
 FELT_RECONFIRMED_GAIN = 0.10     # lost an argument, checked with their source, were right: surer than ever
 PROUD_WINDOW_TICKS    = 10800    # how long a fresh discovery stays burning to be told
 
+# The internet: a source that isn't a person. A naive child barely credits it; as
+# they stop taking things at face value they lean on it more, and eventually
+# prefer it to asking grown-ups.
+INTERNET_ID           = "internet"
+INTERNET_BASE         = 0.20
+INTERNET_SCALE        = 0.45
+INTERNET_MIN_AGE      = 7
+LOOKUP_NAIVETY_MAX    = 0.60     # below this a child thinks of looking it up
+PREFERS_ONLINE_BELOW  = 0.40     # below this they'd rather look it up than ask
+RIDICULE_CHANCE       = 0.25     # asking something sensitive online can go badly
+FELT_RIDICULED        = -0.08
+INTERNET_RIDICULE_ADJUST = -0.05
+_INTERNET = {"id": INTERNET_ID, "name": "the internet", "age_group": "internet"}
+
+# Stems a lookup is matched against (so "argue", "arguing" and "argument" all
+# count), and the plain phrase a child would actually type -- by the kind of
+# scene that raised the question.
+_SCENE_KEYWORDS = {
+    "tense":     ["argu", "fight", "disagree", "anger", "angry", "yell", "conflict", "marriage"],
+    "emotional": ["sad", "cry", "upset", "feeling", "emotion"],
+}
+_SCENE_SEARCH = {"tense": "why grown-ups argue", "emotional": "why people feel sad"}
+# Worries a child predictably has next, once the surface question is answered:
+# (question, match stems, what they'd type).
+_FOLLOWUPS = {
+    "tense":     [("Is it because of me?", ["blame", "guilt", "parent", "family", "my fault"],
+                   "are kids to blame when parents argue"),
+                  ("Are they going to split up?", ["divorce", "separat", "split", "parent", "family"],
+                   "why parents split up")],
+    "emotional": [("Is everything going to be okay?", ["worry", "anxi", "okay", "feeling"],
+                   "what to do when you feel worried")],
+}
+
 SCAN_INTERVAL_TICKS   = 20
 SCENE_COOLDOWN_TICKS  = 7200     # don't re-ask about the same pair within 2h
 MAX_OPEN_QUESTIONS    = 3
@@ -100,6 +133,15 @@ _KIN_WORDS = {
 
 def is_child(c):
     return c.get("age_group") == "child"
+
+
+def _cap(text):
+    return text[:1].upper() + text[1:]
+
+
+def _person(chars, source_id):
+    """A character, or the internet pseudo-source."""
+    return _INTERNET if source_id == INTERNET_ID else chars.get(source_id)
 
 
 def _state(c):
@@ -154,6 +196,9 @@ def _has_authority_title(other):
 def source_credibility(child, other, world=None):
     """How much `child` believes `other`, 0..1. Closeness of relation sets the
     baseline; an official role, time spent together and trust adjust it."""
+    if other.get("id") == INTERNET_ID:
+        learned = ((child.get("child_cognition") or {}).get("source_adjust") or {}).get(INTERNET_ID, 0.0)
+        return max(0.0, min(0.65, INTERNET_BASE + INTERNET_SCALE * (1.0 - naivety(child, world)) + learned))
     rel = (child.get("relationships") or {}).get(other.get("id")) or {}
     kin = _kin_label(rel, other, child)
     base = KIN_CREDIBILITY[kin] if kin else STRANGER_CREDIBILITY.get(other.get("age_group"), 0.25)
@@ -255,6 +300,9 @@ def update_child_cognition(c, world):
             "settled":      False,
             "contested":    False,
             "pending_compare": False,
+            "tone":         tone,
+            "keywords":     list(_SCENE_KEYWORDS.get(tone, [])),
+            "search":       _SCENE_SEARCH.get(tone),
         })
         break   # one new question per scan is plenty
 
@@ -332,6 +380,57 @@ def on_conversation_message(world, conv, speaker_id, utterance, speech_act, tick
 
 
 # ---------------------------------------------------------------------------
+# The internet
+# ---------------------------------------------------------------------------
+
+def _lookup_matches(q, keyword):
+    kw = (keyword or "").lower()
+    if not kw:
+        return False
+    if any(k in kw for k in q.get("keywords") or []):
+        return True
+    return any(w in kw for w in q["text"].lower().replace("?", "").split() if len(w) >= 5)
+
+
+def on_internet_lookup(c, world, keyword, extract):
+    """Called by the computer_wiki_research route. If a child looks something up
+    that bears on a question they're carrying, what they read becomes an account
+    like any other, to be compared with what the grown-ups said. Sensitive
+    questions can get them laughed at."""
+    if not is_child(c) or not extract:
+        return
+    cog = _state(c)
+    q = next((x for x in sorted(_open_questions(cog), key=lambda x: not x.get("contested"))
+              if _lookup_matches(x, keyword)), None)
+    if q is None:
+        return
+    import random
+    from systems.standing import bump_felt
+    tick = world.get("tick", 0)
+
+    if q.get("followup") and not q.get("ridiculed") and random.random() < RIDICULE_CHANCE:
+        q["ridiculed"] = True
+        bump_felt(c, FELT_RIDICULED)
+        _adjust(cog, INTERNET_ID, INTERNET_RIDICULE_ADJUST)
+        from brain.memory import store_memory
+        store_memory(c, f"I asked online about \"{q['text']}\" and people laughed at me.", 0.6,
+                     ["internet", "ridiculed"], "memory", tick, emotional_impact=-0.5)
+        return
+
+    chars = world.get("characters", {})
+    prior = next((a for a in reversed(q["accounts"])
+                  if a["source_id"] != INTERNET_ID and not a.get("brushed_off")), None)
+    account = {"source_id": INTERNET_ID, "tick": tick, "text": extract[:ACCOUNT_TEXT_CAP], "internet": True}
+    q["accounts"].append(account)
+    if INTERNET_ID not in cog["answered_by"]:
+        cog["answered_by"].append(INTERNET_ID)
+    if prior:
+        _queue_comparison(cog, q, prior, account, chars)
+    elif source_credibility(c, _INTERNET, world) >= SETTLE_CREDIBILITY:
+        _settle(c, q)
+
+
+# ---------------------------------------------------------------------------
 # Telling other children
 # ---------------------------------------------------------------------------
 
@@ -357,7 +456,9 @@ def _tell_peers(speaker, listeners, tick, world):
         if lq is None:
             lq = {"id": f"q_{uuid.uuid4().hex[:8]}", "text": fact["text"], "scene_key": fact["scene_key"],
                   "created_tick": tick, "asked_of": [], "accounts": [], "settled": False,
-                  "contested": False, "pending_compare": False, "from_peer": True}
+                  "contested": False, "pending_compare": False, "from_peer": True,
+                  "tone": fact.get("tone"), "keywords": list(fact.get("keywords") or []),
+                  "search": fact.get("search")}
             lcog["open_questions"].append(lq)
             lcog["scene_seen"][fact["scene_key"]] = tick     # don't also scan-create a duplicate
         prior = next((a for a in reversed(lq["accounts"])
@@ -390,9 +491,9 @@ def _queue_comparison(cog, q, first, second, chars, peer_teller_id=None):
         "key":    f"cmp:{q['id']}:{n}",
         "q_id":   q["id"],
         "q_text": q["text"],
-        "a_id":   first["source_id"],  "a_name": chars.get(first["source_id"], {}).get("name", "someone"),
+        "a_id":   first["source_id"],  "a_name": (_person(chars, first["source_id"]) or {}).get("name", "someone"),
         "a_text": first["text"],
-        "b_id":   second["source_id"], "b_name": chars.get(second["source_id"], {}).get("name", "someone"),
+        "b_id":   second["source_id"], "b_name": (_person(chars, second["source_id"]) or {}).get("name", "someone"),
         "b_text": second["text"],
     })
 
@@ -402,10 +503,33 @@ def _settle(child, q):
     with a source they believe, being right again leaves them surer than before."""
     from systems.standing import bump_felt
     q["settled"], q["contested"] = True, False
+    _raise_followup(child, q)
     if q.get("reconfirm"):
         q["reconfirm"] = False
         q["accused_by"] = None
         bump_felt(child, FELT_RECONFIRMED_GAIN)
+
+
+def _raise_followup(child, q):
+    """Once the surface question is answered, a child predictably worries about
+    the next thing (is it my fault? will they split up?). Once per scene."""
+    if q.get("followup") or q.get("followup_raised") or not q.get("tone"):
+        return
+    options = _FOLLOWUPS.get(q["tone"])
+    if not options:
+        return
+    cog = _state(child)
+    if any(x.get("followup_of") == q["id"] for x in cog["open_questions"]):
+        return
+    text, keywords, search = options[sum(map(ord, q["id"])) % len(options)]
+    q["followup_raised"] = True
+    cog["open_questions"].append({
+        "id": f"q_{uuid.uuid4().hex[:8]}", "text": text, "scene_key": q["scene_key"] + "#followup",
+        "created_tick": (q["accounts"][-1]["tick"] if q["accounts"] else q["created_tick"]),
+        "asked_of": [], "accounts": [], "settled": False, "contested": False, "pending_compare": False,
+        "followup": True, "followup_of": q["id"], "tone": None, "keywords": list(keywords),
+        "search": search,
+    })
 
 
 def _adjust(cog, source_id, delta):
@@ -416,7 +540,7 @@ def _adjust(cog, source_id, delta):
 def _apply_verdict(child, cog, q, cmp_entry, agree, world):
     chars = world.get("characters", {})
     q["pending_compare"] = False
-    a, b = chars.get(cmp_entry["a_id"]), chars.get(cmp_entry["b_id"])
+    a, b = _person(chars, cmp_entry["a_id"]), _person(chars, cmp_entry["b_id"])
     if agree is True:
         _adjust(cog, cmp_entry["a_id"], REAFFIRM_GAIN)
         _adjust(cog, cmp_entry["b_id"], REAFFIRM_GAIN)
@@ -439,7 +563,7 @@ def _apply_verdict(child, cog, q, cmp_entry, agree, world):
     else:
         # Couldn't tell: no new information, so fall back to trusting the latest
         # answer only if it came from someone credible.
-        later = chars.get(cmp_entry["b_id"])
+        later = _person(chars, cmp_entry["b_id"])
         if later and source_credibility(child, later, world) >= SETTLE_CREDIBILITY:
             _settle(child, q)
 
@@ -495,6 +619,11 @@ def _service_comparisons(c, world):
 # Prompt context
 # ---------------------------------------------------------------------------
 
+def _has_computer(c, world):
+    from systems.personal_items import get_computer
+    return get_computer(c, world) is not None
+
+
 def get_child_cognition_context(c, world):
     """Prose for a child's think() prompt, or None for anyone else."""
     if not is_child(c):
@@ -546,20 +675,29 @@ def get_child_cognition_context(c, world):
             line += (f" {tell} told you \"{q.get('dispute_text', '')}\" -- but that's not what {adult} told you. "
                      f"You think {tell} is making it up, and you're ready to say so to their face.")
         elif q.get("contested") and len(q.get("conflict_sources") or []) == 2:
-            a, b = (chars.get(i) or {} for i in q["conflict_sources"])
+            a, b = (_person(chars, i) or {} for i in q["conflict_sources"])
             favoured = a if source_credibility(c, a, world) >= source_credibility(c, b, world) else b
             other = b if favoured is a else a
-            line += (f" {a.get('name', 'Someone')} told you one thing and {b.get('name', 'someone')} told you "
+            line += (f" {_cap(a.get('name', 'Someone'))} told you one thing and {b.get('name', 'someone')} told you "
                      f"something different, and now you don't know who to believe. You trust "
                      f"{favoured.get('name', 'one of them')} more, but you want to ask again to be sure -- and if "
                      f"someone says something that doesn't match what {other.get('name', 'the other')} told you, "
                      f"you say so: \"but {other.get('name', 'they')} said...\"")
         elif q["accounts"]:
-            told = chars.get(q["accounts"][-1]["source_id"], {}).get("name", "someone")
-            line += (f" {told} told you something, but you're not sure that's the whole story"
+            told = (_person(chars, q["accounts"][-1]["source_id"]) or {}).get("name", "someone")
+            line += (f" {_cap(told)} told you something, but you're not sure that's the whole story"
                      + (f" -- you want to ask {top} too." if top and top != told else "."))
         elif top:
             line += f" You'd like to ask {top} about it."
+        if q.get("ridiculed"):
+            line += (" You asked about it online and people laughed at you -- you feel embarrassed and don't "
+                     "want to ask anyone else about it.")
+        elif (not q["settled"] and (c.get("age") or 0) >= INTERNET_MIN_AGE and naivety(c, world) < LOOKUP_NAIVETY_MAX
+              and q.get("keywords") and not any(a.get("internet") for a in q["accounts"]) and _has_computer(c, world)):
+            line += (f" You could look it up on the computer instead of asking a grown-up (search for something like "
+                     f"\"{q.get('search') or q['keywords'][0]}\").")
+            if naivety(c, world) < PREFERS_ONLINE_BELOW:
+                line += " Honestly you'd rather look it up -- grown-ups just say it's nothing."
         parts.append(line)
 
     proud = next((x for x in reversed(cog.get("open_questions", []))

@@ -415,6 +415,26 @@ ACTION_TYPE_MIN_AGE = {
     # threaten, wrestle) -- hostile_actions.py caps their injuries to minor
     # ones -- but weapons and robbery are not something a young child does.
     # Confirmed: stab/knock were offered to a 5-year-old holding anything sharp.
+    # The computer. Until now nothing here was gated: a 5-year-old was offered
+    # dating, stock trading and job applications. Looking things up, games and
+    # videos stay open; accounts, money and adult services do not.
+    "computer_wiki_research":    7,
+    "computer_check_email":      9,
+    "computer_send_email":       9,
+    "computer_respond_email":    9,
+    "computer_news":            10,
+    "computer_social_media":    13,
+    "computer_window_shopping": 13,
+    "computer_order_item":      13,
+    "computer_order_service":   13,
+    "computer_job_search":      14,
+    "computer_apply_for_job":   14,
+    "computer_list_stocks":     18,
+    "computer_check_stock_value": 18,
+    "computer_buy_stock":       18,
+    "computer_sell_stock":      18,
+    "computer_dating":          18,
+
     "stab":                     14,
     "knock":                    14,
     "wield_item":               13,

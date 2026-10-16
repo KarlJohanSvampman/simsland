@@ -5325,6 +5325,7 @@ def _route_computer_wiki_research(c, world, action):
         return
 
     # Live Wikipedia API call — store result in character memory
+    extract = ""
     try:
         import urllib.request, urllib.parse, json as _json
         params  = urllib.parse.urlencode({
@@ -5349,6 +5350,11 @@ def _route_computer_wiki_research(c, world, action):
             c["activity"]["research_result"] = extract[:200]
     except Exception:
         pass   # silently ignore network failures in sim tick
+
+    # A child looking something up that bears on a question they're carrying --
+    # see systems/child_cognition.py. Outside the try so a bug here isn't swallowed.
+    from systems.child_cognition import on_internet_lookup
+    on_internet_lookup(c, world, keyword, extract)
 
 
 # ─── news (see systems/curiosity.py -- only offered to curious characters) ────
