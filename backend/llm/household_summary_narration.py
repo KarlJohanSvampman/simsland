@@ -94,7 +94,10 @@ def generate_hourly_summary(household, events, world):
         _generate_hourly_text(household, events, world, characters),
         priority=PRIORITY_BACKGROUND,
     )
-    if not text:
+    # run_llm_call returns the truthy dict {"error": "timeout..."} when the
+    # gate gives up waiting, so a bare `not text` let it through: it was stored
+    # as the summary and later crashed the weekly roll-up's " ".join().
+    if not isinstance(text, str) or not text.strip():
         text = _fallback_hourly_text(events, characters)
     return text
 
@@ -135,7 +138,10 @@ def generate_daily_summary(household, hourly_texts, world):
         _generate_daily_text(household, hourly_texts, world),
         priority=PRIORITY_BACKGROUND,
     )
-    if not text:
+    # run_llm_call returns the truthy dict {"error": "timeout..."} when the
+    # gate gives up waiting, so a bare `not text` let it through: it was stored
+    # as the summary and later crashed the weekly roll-up's " ".join().
+    if not isinstance(text, str) or not text.strip():
         text = _fallback_daily_text(hourly_texts)
     return text
 
@@ -179,6 +185,9 @@ def generate_weekly_summary(household, daily_texts, world):
         _generate_weekly_text(household, daily_texts, world),
         priority=PRIORITY_BACKGROUND,
     )
-    if not text:
+    # run_llm_call returns the truthy dict {"error": "timeout..."} when the
+    # gate gives up waiting, so a bare `not text` let it through: it was stored
+    # as the summary and later crashed the weekly roll-up's " ".join().
+    if not isinstance(text, str) or not text.strip():
         text = _fallback_weekly_text(daily_texts)
     return text

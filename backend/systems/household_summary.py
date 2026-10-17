@@ -198,7 +198,9 @@ def update_household_daily_summaries(world):
         hourlies = household.get("hourly_summaries") or []
         if not hourlies:
             continue
-        hourly_texts = [h["text"] for h in hourlies]
+        # Entries written before the generators validated their result can hold an
+        # {"error": "timeout..."} dict as "text" -- skip them rather than crash the roll-up.
+        hourly_texts = [h["text"] for h in hourlies if isinstance(h.get("text"), str)]
         text = generate_daily_summary(household, hourly_texts, world)
         household.setdefault("daily_summaries", []).append({
             "id": f"d{tick}",
@@ -225,7 +227,7 @@ def update_household_weekly_summaries(world):
         dailies = household.get("daily_summaries") or []
         if not dailies:
             continue
-        daily_texts = [d["text"] for d in dailies]
+        daily_texts = [d["text"] for d in dailies if isinstance(d.get("text"), str)]
         text = generate_weekly_summary(household, daily_texts, world)
         household.setdefault("weekly_summaries", []).append({
             "id": f"w{tick}",
