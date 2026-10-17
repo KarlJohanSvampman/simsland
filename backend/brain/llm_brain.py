@@ -180,7 +180,7 @@ Rules:
 - If no suitable prop exists for your intended action, choose "wait" instead.
 - If you're waiting on something specific rather than just idling (a person to show up, a business to call back, a delivery), set "wait"'s "waiting_for" field: {"kind": "person"|"business"|"delivery", "ref": <character id, business key, or a short description>}. This arms a patience timer (shorter if you're stressed or impatient, longer if patient) that nudges you to follow up once it runs out — a plain "wait" with no waiting_for is just idling and has no timer.
 - "examine" or "search": target a prop or character id. Use examine to look closely at something; search to rummage a container (fridge, cabinet, drawer).
-- "carry": target a prop id marked carryable. Include "destination": {"x": N, "y": N} for where to put it.
+- "carry": move a whole portable prop (a chair, basket, lamp) -- target its prop id and include "destination": {"x": N, "y": N} for where to put it. It does NOT take things out of furniture: to get utensils, food or other items from a drawer, cabinet or fridge, use "interact" on it (grab_item) or "search" it.
 - "clean": target a prop or tile id. Animation is chosen automatically from the object type (mop for floors, scrub for toilet/sink, wipe for tables, etc.).
 - "trash" or "destroy": target a prop id. The prop will be removed from the world on completion.
 - Only use trash/destroy when the character intentionally wants to discard or break something.

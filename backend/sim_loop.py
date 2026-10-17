@@ -580,6 +580,11 @@ def tick(world):
     if t % 3600 == 0:
         tick_post_engagement(world)
 
+    # -- Orphaned carried props (÷30) ───────────────────────
+    if every(world, 30, offset=5):
+        from systems.occupancy import release_orphan_carried_props
+        release_orphan_carried_props(world)
+
     # -- Fast: perception + attention (÷5) ──────────────────
     if every(world, CADENCE["perception"]):
         for c in characters:

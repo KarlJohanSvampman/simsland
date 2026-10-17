@@ -1836,8 +1836,9 @@ def _route_carry(c, world, action):
     if not prop:
         return
 
-    # Only carry props flagged carryable (or small by default)
-    if not prop.get("carryable", True):
+    # Only props that can actually be picked up (see props.is_carryable)
+    from systems.props import is_carryable
+    if not is_carryable(world, prop):
         return
 
     dest = action.get("destination", {})

@@ -484,7 +484,11 @@ def build_available_actions(c, world):
         # offered before this round, same class of gap as trash/destroy
         # above; the route handler validates the specific target the same
         # way.
-        action_types.extend(["examine", "search", "carry", "clean"])
+        action_types.extend(["examine", "search", "clean"])
+        # carry only when something visible can really be picked up
+        from systems.props import is_carryable
+        if any(is_carryable(world, {"template": entry.get("template")}) for entry in interactable):
+            action_types.append("carry")
 
     # sit_down/lie_down (see action_router.py's _route_sit_down/
     # _route_lie_down) — routed but never offered before this round. The

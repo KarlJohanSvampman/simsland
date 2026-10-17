@@ -16,6 +16,31 @@ def get_prop_by_id(world, prop_id):
     return None
 
 
+# Templates a person can pick up and carry across a room. Everything else
+# (fixtures, appliances, drawers, beds, tables...) is built in or far too heavy.
+# This used to default to "carryable" for any prop that didn't say otherwise --
+# and nothing ever said otherwise, so a six-year-old could "pick up" the
+# kitchen utensil drawer (hiding it from the world) or the fridge. An instance
+# or template "carryable" field still overrides this list either way.
+CARRYABLE_TEMPLATES = frozenset({
+    "chair_modern_a", "outdoor_chair", "laundry_basket", "laundry_hamper",
+    "storage_box", "trash_can", "desk_lamp", "table_lamp", "bedside_lamp",
+    "bath_mat", "plant_stand", "indoor_plant_large",
+})
+
+
+def is_carryable(world, prop):
+    """True if this prop can be picked up and carried."""
+    if prop.get("carryable") is not None:
+        return bool(prop["carryable"])
+    template = get_prop_template(world, prop) or {}
+    if template.get("carryable") is not None:
+        return bool(template["carryable"])
+    if prop.get("template") not in CARRYABLE_TEMPLATES:
+        return False
+    return not (template.get("wall_mounted") or template.get("ceiling_mounted"))
+
+
 def get_props_by_template(world, template_id):
 
     return [

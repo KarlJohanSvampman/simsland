@@ -1619,15 +1619,26 @@ def execute_activity(
             elapsed = world["tick"] - act["phase_started_tick"]
             if elapsed < 3:
                 return True
-            dest = act.get("destination", {})
-            c["move_target"] = {
-                "x": dest.get("x", c.get("x", 0)),
-                "y": dest.get("y", c.get("y", 0)),
-                "target_type": "tile",
-            }
-            c["is_moving"] = True
-            set_activity_phase(act, "delivering", world)
-            c["animation_state"] = "carry_walk"
+            dest = act.get("destination") or {}
+            dest_x = dest.get("x", c.get("x", 0))
+            dest_y = dest.get("y", c.get("y", 0))
+            c["move_target"] = {"x": dest_x, "y": dest_y, "target_type": "tile"}
+            # A move_target alone moves nobody -- only a planned route does. This
+            # used to just set is_moving=True, so the character stood there
+            # "moving" with no route until the activity watchdog gave up ~600
+            # ticks later, leaving the prop hidden in their hands. No route
+            # (no destination given, already there, unreachable) means put it
+            # down right here.
+            from systems.navigation import plan_character_route
+            routed = bool(dest) and plan_character_route(world, c, dest_x, dest_y)
+            c["is_moving"] = bool(routed)
+            if routed:
+                set_activity_phase(act, "delivering", world)
+                c["animation_state"] = "carry_walk"
+            else:
+                c["move_target"] = None
+                set_activity_phase(act, "put_down", world)
+                c["animation_state"] = "put_down"
             return True
 
         if phase == "delivering":

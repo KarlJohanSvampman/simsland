@@ -71,9 +71,50 @@ def interrupt_activity(c, world):
         })
 
     release_anchor(c, world)
+    drop_carried_prop(c, world)
     c["activity"] = None
     from systems.posture import set_posture
     set_posture(c, world, "standing")
+
+
+def drop_carried_prop(c, world):
+    """Put down a prop the character is carrying where they stand. A carry
+    that is interrupted (or cancelled by the activity watchdog) otherwise left
+    the prop hidden and attached to them forever -- the world copy is invisible
+    while carried_by is set."""
+    prop_id = c.get("carrying")
+    if not prop_id:
+        return
+    c.pop("carrying", None)
+    for p in world.get("props", []):
+        if p.get("id") == prop_id and p.get("carried_by") == c.get("id"):
+            p["x"], p["y"] = c.get("x", p.get("x")), c.get("y", p.get("y"))
+            p.pop("carried_by", None)
+            p["visible"] = True
+            break
+
+
+def release_orphan_carried_props(world):
+    """Safety net: a prop marked carried_by someone who isn't carrying it (or
+    who no longer exists) is put back in the world where its carrier stands."""
+    chars = world.get("characters", {})
+    for p in world.get("props", []):
+        holder_id = p.get("carried_by")
+        if not holder_id:
+            continue
+        holder = chars.get(holder_id)
+        carrying_now = (
+            holder
+            and holder.get("carrying") == p.get("id")
+            and (holder.get("activity") or {}).get("interaction") == "carry"
+        )
+        if carrying_now:
+            continue
+        if holder:
+            p["x"], p["y"] = holder.get("x", p.get("x")), holder.get("y", p.get("y"))
+            holder.pop("carrying", None)
+        p.pop("carried_by", None)
+        p["visible"] = True
 
 
 def release_anchor(c, world):
