@@ -157,9 +157,10 @@ def sync_kinship_to_relationships(family, world):
         a = chars.get(a_id)
         if not a:
             continue
-        a.setdefault("relationships", {})
-        a["relationships"].setdefault(b_id, {})
-        rel = a["relationships"][b_id]
+        # A complete entry, not a bare {}: anything reading rel["familiarity"] etc.
+        # before the next ensure_relationship() would otherwise raise.
+        from brain.relationships import ensure_relationship
+        rel = ensure_relationship(a, b_id)
         rel["kinship"] = rel_label
         if rel_label == "spouse":
             labels = rel.setdefault("labels", [])

@@ -27,6 +27,147 @@ def ensure_relationships(c):
 # ENSURE RELATIONSHIP
 # =========================================================
 
+def _default_relationship():
+    """A complete relationship entry. A fresh dict every call -- it holds lists
+    and dicts, which must never be shared between relationships."""
+    return {
+
+        # =============================================
+        # CORE SOCIAL STATE
+        # =============================================
+
+        "familiarity": 0,
+
+        "trust": 0,
+
+        "friendship": 0,
+
+        "respect": 0,
+
+        "attraction": 0,
+
+        # True once the character makes a public approach revealing their interest
+        "attraction_visible": False,
+
+        "romantic_interest": 0,
+
+        "sexual_interest": 0,
+
+        "comfort": 0,
+
+        "dependency": 0,
+
+        "resentment": 0,
+
+        "hostility": 0,
+
+        "fear": 0,
+
+        "rivalry": 0,
+
+        "chemistry": 0,
+
+        # =============================================
+        # HISTORY
+        # =============================================
+
+        "history_score": 0,
+
+        "memories_shared": 0,
+
+        "interaction_count": 0,
+
+        # Cumulative proximity/exposure ticks, distinct from
+        # interaction_count -- incremented just by being visibly nearby,
+        # not by actually interacting. See systems/influence.py.
+        "exposure_ticks": 0,
+
+        "positive_interactions": 0,
+
+        "negative_interactions": 0,
+
+        # =============================================
+        # METADATA
+        # =============================================
+
+        "compatibility": 0,
+
+        "state": "stranger",
+
+        # Contact-designation tier (definitions.json's
+        # contact_designations) -- deliberately separate from "state"
+        # above (that's live stat-threshold-driven and gates 10+
+        # unrelated behavior systems). This is purely hours-in-room
+        # driven, re-evaluated once a week -- see
+        # systems/contact_designation.py.
+        "designation": "stranger",
+
+        # Real hours spent physically co-present this week, reset by
+        # the weekly designation-evaluation pass. See
+        # systems/contact_designation.py.
+        "hours_this_week": 0.0,
+
+        "labels": [],
+
+        "kinship": None,
+
+        # Personal expectations THIS character holds of this specific
+        # other one (dress/friends/career/faith/partner-choice type
+        # value-alignment clashes, not the role-based checkboxes in
+        # c["expectations"]) -- keyed by topic string, see
+        # systems/persona_expectations.py.
+        "personal_expectations": {},
+
+        # Favor ledger -- recent favors THIS character granted TO the
+        # other party (systems/favors.py), plus the frustration that
+        # committing to (and not being repaid for) favors builds up.
+        "favors": [],
+        "favor_frustration": 0.0,
+
+        # systems/intimate_item_discovery.py -- stumbled onto
+        # evidence of the other person's private sex life (a found
+        # item, discovered computer history). Not a grievance --
+        # nothing was done TO the discoverer, just a standing dent
+        # to how they see this person.
+        "creeped_out": 0.0,
+
+        # systems/life_comparison.py -- builds only from comparisons
+        # that land favorably for the OTHER person, never the
+        # observer's own wins. Decays like every other relationship-
+        # stat tracker this session has built.
+        "jealousy": 0.0,
+
+        # systems/sociopathy.py -- what THIS character believes the
+        # other's name/identity actually is, when it differs from
+        # reality (a sociopath's persona_bank). None = knows them by
+        # their real name.
+        "known_as": None,
+
+        "known_secrets": [],
+
+        # systems/workplace_reputation.py -- how THIS character
+        # subjectively feels about a workplace contact (-100..100,
+        # 0 = neutral; criticism/jealousy push it down, praise/
+        # attraction/fondness push it up) and how much they depend
+        # on that person's cooperation to do their own job well
+        # (0-100) -- a deliberately SEPARATE axis from reputation:
+        # you can dislike someone you desperately need, or like
+        # someone whose cooperation barely matters, and either
+        # combination is real workplace-drama material. Only ever
+        # populated for a real workplace_contact_ids entry (see
+        # systems/workplace_npc.py); stays at neutral defaults for
+        # every other relationship.
+        "workplace_reputation": 0.0,
+        "workplace_dependency": 0.0,
+
+        "shared_groups": [],
+
+        "last_interaction": 0,
+
+        "last_seen": 0
+    }
+
+
 def ensure_relationship(
 
     c,
@@ -39,143 +180,18 @@ def ensure_relationship(
     rels = c["relationships"]
 
     if other_id not in rels:
-
-        rels[other_id] = {
-
-            # =============================================
-            # CORE SOCIAL STATE
-            # =============================================
-
-            "familiarity": 0,
-
-            "trust": 0,
-
-            "friendship": 0,
-
-            "respect": 0,
-
-            "attraction": 0,
-
-            # True once the character makes a public approach revealing their interest
-            "attraction_visible": False,
-
-            "romantic_interest": 0,
-
-            "sexual_interest": 0,
-
-            "comfort": 0,
-
-            "dependency": 0,
-
-            "resentment": 0,
-
-            "hostility": 0,
-
-            "fear": 0,
-
-            "rivalry": 0,
-
-            "chemistry": 0,
-
-            # =============================================
-            # HISTORY
-            # =============================================
-
-            "history_score": 0,
-
-            "memories_shared": 0,
-
-            "interaction_count": 0,
-
-            # Cumulative proximity/exposure ticks, distinct from
-            # interaction_count -- incremented just by being visibly nearby,
-            # not by actually interacting. See systems/influence.py.
-            "exposure_ticks": 0,
-
-            "positive_interactions": 0,
-
-            "negative_interactions": 0,
-
-            # =============================================
-            # METADATA
-            # =============================================
-
-            "compatibility": 0,
-
-            "state": "stranger",
-
-            # Contact-designation tier (definitions.json's
-            # contact_designations) -- deliberately separate from "state"
-            # above (that's live stat-threshold-driven and gates 10+
-            # unrelated behavior systems). This is purely hours-in-room
-            # driven, re-evaluated once a week -- see
-            # systems/contact_designation.py.
-            "designation": "stranger",
-
-            # Real hours spent physically co-present this week, reset by
-            # the weekly designation-evaluation pass. See
-            # systems/contact_designation.py.
-            "hours_this_week": 0.0,
-
-            "labels": [],
-
-            "kinship": None,
-
-            # Personal expectations THIS character holds of this specific
-            # other one (dress/friends/career/faith/partner-choice type
-            # value-alignment clashes, not the role-based checkboxes in
-            # c["expectations"]) -- keyed by topic string, see
-            # systems/persona_expectations.py.
-            "personal_expectations": {},
-
-            # Favor ledger -- recent favors THIS character granted TO the
-            # other party (systems/favors.py), plus the frustration that
-            # committing to (and not being repaid for) favors builds up.
-            "favors": [],
-            "favor_frustration": 0.0,
-
-            # systems/intimate_item_discovery.py -- stumbled onto
-            # evidence of the other person's private sex life (a found
-            # item, discovered computer history). Not a grievance --
-            # nothing was done TO the discoverer, just a standing dent
-            # to how they see this person.
-            "creeped_out": 0.0,
-
-            # systems/life_comparison.py -- builds only from comparisons
-            # that land favorably for the OTHER person, never the
-            # observer's own wins. Decays like every other relationship-
-            # stat tracker this session has built.
-            "jealousy": 0.0,
-
-            # systems/sociopathy.py -- what THIS character believes the
-            # other's name/identity actually is, when it differs from
-            # reality (a sociopath's persona_bank). None = knows them by
-            # their real name.
-            "known_as": None,
-
-            "known_secrets": [],
-
-            # systems/workplace_reputation.py -- how THIS character
-            # subjectively feels about a workplace contact (-100..100,
-            # 0 = neutral; criticism/jealousy push it down, praise/
-            # attraction/fondness push it up) and how much they depend
-            # on that person's cooperation to do their own job well
-            # (0-100) -- a deliberately SEPARATE axis from reputation:
-            # you can dislike someone you desperately need, or like
-            # someone whose cooperation barely matters, and either
-            # combination is real workplace-drama material. Only ever
-            # populated for a real workplace_contact_ids entry (see
-            # systems/workplace_npc.py); stays at neutral defaults for
-            # every other relationship.
-            "workplace_reputation": 0.0,
-            "workplace_dependency": 0.0,
-
-            "shared_groups": [],
-
-            "last_interaction": 0,
-
-            "last_seen": 0
-        }
+        rels[other_id] = _default_relationship()
+    elif "familiarity" not in rels[other_id]:
+        # Confirmed live freeze: systems/family.py::sync_kinship_to_relationships
+        # (the Spawn page's "family relation" call) pre-creates entries as bare
+        # {} and stamps only kinship/labels, and the exposure/sighting
+        # bookkeeping creates partial ones too. This function only built a full
+        # entry when the key was ABSENT, so a partial one came back as-is and
+        # first_impression()'s rel["familiarity"] raised KeyError inside tick() --
+        # the whole sim crashed every tick, unsaved, forever. Fill in whatever's
+        # missing without touching anything already set.
+        for key, value in _default_relationship().items():
+            rels[other_id].setdefault(key, value)
 
     return rels[other_id]
 
