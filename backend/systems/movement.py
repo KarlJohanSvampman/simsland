@@ -12,15 +12,11 @@ import math
 OFFSET_DRAG = 0.6   # matches the pre-existing baby-carriage "in front" offset
 OFFSET_PUSH = 1.1   # pusher trails further back than the dragged prop itself
 
-# Per-character-template locomotion speeds, in tiles/tick (see
-# schema_defaults.py::ensure_character_defaults() for the matching
-# defaults applied when a template doesn't set its own, and
-# simulations/default/definitions.json's character_templates[...].instance
-# for the per-template override values). Ratios are real-world-plausible
-# relative to walk (jog ~1.8x, sprint ~3.6x, crawl/sneak both well under
-# half walk speed) at the existing deliberately-slow pacing (walk=0.05
-# already meant 4 tiles took ~80 real seconds at 1x time_scale before any
-# of this existed -- these keep that same scale, not a real m/s figure).
+# Per-character locomotion speeds (see schema_defaults.py::
+# ensure_character_defaults() and the character_templates[...].instance
+# overrides in definitions.json). Stored in "base units"; SPEED_TO_TILES_PER_SECOND
+# (below) turns them into real tiles per second. Ratios are real-world-plausible
+# relative to walk (jog ~1.8x, sprint ~3.6x, crawl/sneak both well under half).
 DEFAULT_WALK_SPEED   = 0.05
 DEFAULT_JOG_SPEED    = 0.09
 DEFAULT_SPRINT_SPEED = 0.18
@@ -106,12 +102,47 @@ def _auto_lock_on_exit(c, world):
         lock_home(c, world)
 
 
-def update_character_movement(
+# Locomotion speeds are stored per character in the old "tiles per tick at 1x"
+# units (walk 0.05, jog 0.09, ...) -- those fields are persisted and written by
+# baby.py / pregnancy.py, so they keep their numbers and this factor converts
+# them to real tiles per second. 28 puts a walk at 1.4 tiles/s (~1.4 m/s at one
+# metre a tile), jog 2.5, sprint 5.0, sneak 0.7, crawl 0.55; a toddler (0.02)
+# 0.56, a 5-year-old (0.04) 1.1.
+SPEED_TO_TILES_PER_SECOND = 28.0
 
-    c,
+# Hard cap on waypoints crossed in one tick: a route is a few dozen tiles at
+# most, this only stops a malformed one (zero-length segments forever) spinning.
+_MAX_STEPS_PER_TICK = 64
 
-    world
-):
+
+def update_character_movement(c, world):
+    """Advance c along its route by one tick's worth of distance.
+
+    The distance a character can cover this tick is a budget computed once from
+    their speed; it is spent across as many waypoints and route segments as it
+    reaches, so movement is a steady glide at the real speed instead of one
+    waypoint per tick (which made the pace depend on how far apart the
+    waypoints happened to be).
+    """
+    state = {"budget": None, "first": True}
+    result = False
+    for _ in range(_MAX_STEPS_PER_TICK):
+        status = _advance(c, world, state)
+        state["first"] = False
+        if status == "again":
+            continue
+        result = status == "moved"
+        break
+    else:
+        result = True
+    return result
+
+
+def _advance(c, world, state):
+    """One step of update_character_movement. Returns "again" when a free
+    transition (waypoint arrival, segment change) happened and the budget may
+    still have something left, "moved" when the tick's budget is spent (or the
+    walk continues next tick), "stop" when there is nothing more to do."""
 
     # Defense-in-depth: a route already in flight when a character dies or
     # collapses (see systems/health.py::apply_severity_consequences)
@@ -122,7 +153,7 @@ def update_character_movement(
     if c.get("alive") is False or c.get("posture") == "incapacitated":
         c["route"] = []
         c["is_moving"] = False
-        return False
+        return "stop"
 
     # A pusher has no route/move_target of their own — they're attached to
     # the prop, not independently walking. Position is driven entirely by
@@ -146,7 +177,7 @@ def update_character_movement(
         else:
             # Dragger let go or prop gone — detach.
             c["pushing_prop_id"] = None
-        return True
+        return "moved"
 
     route = c.get(
         "route",
@@ -154,7 +185,7 @@ def update_character_movement(
     )
 
     if not route:
-        return False
+        return "stop"
 
     segment_index = c.get(
         "route_segment_index",
@@ -182,7 +213,7 @@ def update_character_movement(
 
         c["animation_state"] = "idle"
 
-        return False
+        return "stop"
 
     segment = route[
         segment_index
@@ -237,7 +268,7 @@ def update_character_movement(
                 new_building = next_segment.get("building_id")
                 c["building_id"] = new_building
 
-        return True
+        return "again"
 
     # =====================================
     # NEXT TILE
@@ -259,41 +290,36 @@ def update_character_movement(
     # speed constant even though more ticks are being processed per second
     # -- the one place this file needs to know about time_scale at all.
     time_scale = max(1, min(50, world.get("time_scale", 1)))
-    # movement_speed_multiplier (api/admin.py's /admin/movement_speed) is
-    # the independent knob for this -- per the user's explicit ask, NOT
-    # the same thing as time_scale: they wanted characters to visibly walk
-    # faster on screen without also speeding up every other simulated
-    # system (needs decay, schedules, ...) the way time_scale does.
+    # movement_speed_multiplier (api/admin.py's /admin/movement_speed) is the
+    # independent "make everyone faster on screen" knob; 1 is real speed.
     speed_multiplier = max(1, min(200, world.get("movement_speed_multiplier", 1)))
-    speed = _current_move_speed(c) / time_scale * speed_multiplier
+    speed = _current_move_speed(c) * SPEED_TO_TILES_PER_SECOND / time_scale * speed_multiplier
 
     # =====================================
-    # STUCK DETECTION
+    # STUCK DETECTION (once per tick, by actual displacement)
     # =====================================
-    # The interpolation below always closes `dist` by exactly `speed` per
-    # tick, so it can't stall on its own — but nothing upstream guarantees
-    # `path`/`route` stay valid (e.g. a stale route computed against a
-    # since-changed building, or c["x"]/c["y"] getting perturbed by
-    # another system). Previously a character wedged into that state had
-    # no way out until the next LLM decision cycle, which can be minutes
-    # away — track lack of progress here and abandon the route so a fresh
-    # decision gets made promptly instead of leaving them frozen.
-    last_dist = c.get("_stuck_last_dist")
-    if last_dist is not None and dist >= last_dist - (speed * 0.5):
-        c["_stuck_ticks"] = c.get("_stuck_ticks", 0) + 1
-    else:
-        c["_stuck_ticks"] = 0
-    c["_stuck_last_dist"] = dist
+    # Nothing upstream guarantees `path`/`route` stay valid (a stale route
+    # computed against a since-changed building, c["x"]/c["y"] perturbed by
+    # another system). A character that stops making progress abandons the
+    # route so a fresh decision happens promptly instead of leaving them
+    # frozen until the next LLM cycle.
+    if state["first"]:
+        last_pos = c.get("_stuck_last_pos")
+        if last_pos and math.hypot(c["x"] - last_pos[0], c["y"] - last_pos[1]) < max(speed * 0.25, 0.01):
+            c["_stuck_ticks"] = c.get("_stuck_ticks", 0) + 1
+        else:
+            c["_stuck_ticks"] = 0
+        c["_stuck_last_pos"] = [c["x"], c["y"]]
 
-    if c["_stuck_ticks"] > 60:
-        c["route"] = []
-        c["route_segment_index"] = 0
-        c["path_index"] = 0
-        c["is_moving"] = False
-        c["animation_state"] = "idle"
-        c["_stuck_ticks"] = 0
-        c["_stuck_last_dist"] = None
-        return False
+        if c["_stuck_ticks"] > 60:
+            c["route"] = []
+            c["route_segment_index"] = 0
+            c["path_index"] = 0
+            c["is_moving"] = False
+            c["animation_state"] = "idle"
+            c["_stuck_ticks"] = 0
+            c["_stuck_last_pos"] = None
+            return "stop"
 
     # Pushable prop (baby carriage / lawnmower) — apply walk_speed_modifier
     # and set the push animation directly. Previously looked up a
@@ -318,6 +344,9 @@ def update_character_movement(
             # Prop gone — detach
             c.pop("pushed_prop_id", None)
 
+    if state["budget"] is None:
+        state["budget"] = speed
+
     # Dragged prop (chairs/sofas/etc. — see systems/prop_movement.py)
     dragged_prop = None
     dragged_prop_id = c.get("dragged_prop_id")
@@ -341,7 +370,7 @@ def update_character_movement(
 
         c["path_index"] += 1
 
-        return True
+        return "again"
 
     # =====================================
     # MOVE
@@ -349,15 +378,11 @@ def update_character_movement(
 
     if dist > 0:
 
-        # Never step past the tile. This used to move a flat `speed` toward
-        # the tile every tick, which can only stop once dist < 0.05 -- but
-        # with world["movement_speed_multiplier"] (10 here) a jog is ~0.9 tiles
-        # per tick, so from 1.0 away the character lands 0.1 PAST the tile,
-        # the next tick steps 0.9 back, and so on: a permanent two-cycle that
-        # the stuck detector above never catches (dist alternates ~0.1/~0.8,
-        # so "no progress" keeps resetting). Seen live as a child jogging
-        # back and forth in a bathroom, trying to reach the shower, forever.
-        step = min(speed, dist)
+        # Never step past the tile (a flat step overshoots and oscillates around
+        # it forever -- seen live as a child jogging back and forth in a
+        # bathroom), and never past what is left of this tick's budget.
+        step = min(state["budget"], dist)
+        state["budget"] -= step
 
         c["x"] += (
             dx / dist
@@ -387,4 +412,6 @@ def update_character_movement(
                 dragged_prop["x"] = c["x"] - (dx / dist) * OFFSET_DRAG
                 dragged_prop["y"] = c["y"] - (dy / dist) * OFFSET_DRAG
 
-    return True
+    # budget left over means the waypoint was reached with distance to spare:
+    # carry on to the next one this same tick
+    return "again" if state["budget"] > 1e-9 and dist - step < 1e-9 else "moved"

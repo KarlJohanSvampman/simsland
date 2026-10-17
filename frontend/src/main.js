@@ -1349,33 +1349,53 @@ const FADE_TIME = 0.2;  // seconds
 // to the next available one.
 // =========================================================
 
-// A character standing around with nothing to do (activity type "wait")
-// or truly idle (no activity at all, not moving) visually shifts weight/
-// paces a little instead of standing perfectly still. Purely a render-
-// layer position offset on top of the server's real x/y -- never touches
-// c.x/c.y, so it can't affect pathfinding, anchor reservation, or
-// occupancy. Per-character phase (hashed from id) keeps a room full of
-// idling characters from swaying in unison.
-function _idlePaceOffset(id, c, isMoving) {
-  if (isMoving) return null;
-  const activityType = c.activity?.type;
-  const isWaiting = activityType === "wait";
-  const isTrulyIdle = !activityType;
-  if (!isWaiting && !isTrulyIdle) return null;
+// Characters are moved on the server in discrete per-tick steps (about a second
+// apart). Rendering a step as a teleport looked like jumping, so each update
+// only sets a glide target and _glideCharacters() (called every frame from
+// animate()) moves the mesh there at constant speed over one tick interval.
+const GLIDE_SNAP_DISTANCE = 4;       // a bigger jump is a teleport (spawn, vehicle, door), not a step
+const GLIDE_MIN_INTERVAL_MS = 150;
+const GLIDE_MAX_INTERVAL_MS = 2500;
 
-  let hash = 0;
-  for (let i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) | 0;
-  const phase = ((hash % 1000) / 1000) * Math.PI * 2;
+function _setGlideTarget(id, mesh, x, z) {
+  const rec = characterAnimations[id];
+  if (!rec) { mesh.position.set(x, 0, z); return; }
+  const now = performance.now();
+  const g = rec.glide;
+  if (!g || Math.hypot(x - mesh.position.x, z - mesh.position.z) > GLIDE_SNAP_DISTANCE) {
+    mesh.position.set(x, 0, z);
+    rec.glide = { fromX: x, fromZ: z, toX: x, toZ: z, t0: now, interval: 1000, lastUpdate: now };
+    return;
+  }
+  // Interval = observed time between server updates, smoothed, so the glide
+  // ends just as the next step arrives whatever the tick rate / time scale is.
+  const observed = Math.min(GLIDE_MAX_INTERVAL_MS, Math.max(GLIDE_MIN_INTERVAL_MS, now - g.lastUpdate));
+  g.interval = g.interval * 0.6 + observed * 0.4;
+  g.lastUpdate = now;
+  g.fromX = mesh.position.x;
+  g.fromZ = mesh.position.z;
+  g.toX = x;
+  g.toZ = z;
+  g.t0 = now;
+}
 
-  const t = performance.now() / 1000;
-  // Waiting on something reads a bit more restless than plain idling.
-  const period = isWaiting ? 3.2 : 5.5;
-  const amplitude = isWaiting ? 0.18 : 0.10;
-  const angle = (t / period) * Math.PI * 2 + phase;
-  return {
-    dx: Math.sin(angle) * amplitude,
-    dz: Math.sin(angle * 0.6) * amplitude * 0.5,
-  };
+function _glideCharacters() {
+  const now = performance.now();
+  for (const id in characterAnimations) {
+    const rec = characterAnimations[id];
+    const mesh = sims[id];
+    const g = rec.glide;
+    if (!mesh || !g || rec.isAnchored) continue;
+    const k = Math.min(1, (now - g.t0) / g.interval);
+    mesh.position.x = g.fromX + (g.toX - g.fromX) * k;
+    mesh.position.z = g.fromZ + (g.toZ - g.fromZ) * k;
+    if (rec.targetYaw !== undefined) {
+      // shortest-way turn towards the direction of travel instead of snapping
+      let d = rec.targetYaw - mesh.rotation.y;
+      d = Math.atan2(Math.sin(d), Math.cos(d));
+      mesh.rotation.y += d * 0.25;
+    }
+  }
 }
 
 const ANIM_VARIANTS = {
@@ -3600,11 +3620,8 @@ async function updateCharacters(state){
       if (!characterAnimations[id]?.isAnchored) {
         const newX = c.x - 10;
         const newZ = c.y - 7;
-        // Compared against the last known SERVER (base) position, not the
-        // rendered mesh position -- the idle/wait pacing sway below adds a
-        // small offset directly to the mesh, and comparing against that
-        // would make the facing logic misread its own cosmetic wobble as
-        // real movement and spin the model back and forth every frame.
+        // Compared against the last known SERVER position (not the rendered,
+        // gliding mesh position) to work out which way they are heading.
         const animRec = characterAnimations[id];
         const lastBase = animRec?.lastBasePos;
         const dx = lastBase ? newX - lastBase.x : 0;
@@ -3613,18 +3630,16 @@ async function updateCharacters(state){
         // facing logic only fires while there's a specific interaction
         // target to look at (activity.target_id); plain point-to-point
         // walking (to the bus stop, home, wandering, ...) never rotated
-        // the model at all otherwise, since this position sync just set
-        // x/y/z with no corresponding turn. updateIK() still takes
-        // priority once a real target exists -- it runs every frame and
-        // overwrites rotation.y unconditionally when viewTargetId is set,
-        // this only matters on the (majority of) ticks where it isn't.
-        if (Math.abs(dx) > 0.01 || Math.abs(dz) > 0.01) {
-          sims[id].rotation.y = Math.atan2(dx, dz);
+        // the model at all otherwise. updateIK() still takes priority once a
+        // real target exists -- it runs every frame and overwrites
+        // rotation.y unconditionally when viewTargetId is set.
+        if (animRec && (Math.abs(dx) > 0.01 || Math.abs(dz) > 0.01)) {
+          animRec.targetYaw = Math.atan2(dx, dz);
+          if (Math.hypot(dx, dz) > GLIDE_SNAP_DISTANCE) sims[id].rotation.y = animRec.targetYaw;
         }
         if (animRec) animRec.lastBasePos = { x: newX, z: newZ };
 
-        const pace = _idlePaceOffset(id, c, !!c.is_moving);
-        sims[id].position.set(newX + (pace?.dx || 0), 0, newZ + (pace?.dz || 0));
+        _setGlideTarget(id, sims[id], newX, newZ);
       }
 
       // See _isCharacterHidden()'s own comment (above createFallbackCharacter)
@@ -8427,6 +8442,8 @@ function animate() {
   _animClockSeconds += delta;
   updateSelectionOverlay(_animClockSeconds);
   updateXRFrame();
+
+  _glideCharacters();
 
   for (const id in characterAnimations) {
     const data = characterAnimations[id];
