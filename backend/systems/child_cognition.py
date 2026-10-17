@@ -48,8 +48,14 @@ from systems.child_worldview import (
 )
 
 # What a child assumes about someone, by how they're related to the child.
-# Reads rel["labels"] AND rel["kinship"]: generation writes kin into labels
-# (kinship is None for most live characters), family sync writes kinship.
+# Reads rel["labels"] AND rel["kinship"] -- and the two point in OPPOSITE directions:
+#   labels   (written at generation)        = what `other` IS to this character
+#                                             ("parent" -> they're my parent)
+#   kinship  (systems/family.py's sync, i.e. api/editor.py's family_relation and
+#             everything that builds a family graph) = what this character is TO
+#             `other` ("child" -> I'm their child)
+# so kinship goes through family.INVERSE before it means anything here. Without
+# that, a child's own parents came out as strangers (credibility 0.30, not 1.0).
 KIN_CREDIBILITY = {
     "parent":          1.0,
     "guardian":        0.95,
@@ -174,7 +180,8 @@ def _kin_label(rel, other, child=None):
     parent), so c["family_role"] gets the last word where it's unambiguous."""
     names = set(rel.get("labels") or [])
     if rel.get("kinship"):
-        names.add(rel["kinship"])
+        from systems.family import INVERSE
+        names.add(INVERSE.get(rel["kinship"], rel["kinship"]))
     best, best_score = None, 0.0
     for name in names:
         score = KIN_CREDIBILITY.get(name)
