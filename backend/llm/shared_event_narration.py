@@ -178,7 +178,8 @@ def generate_shared_event_narration(world, event, participant_names, location_na
         _generate(world, event, participant_names, location_name),
         priority=PRIORITY_BACKGROUND,
     )
-    if not result:
+    from llm.llm_gate import gate_failed
+    if not result or gate_failed(result):
         return _fallback(event.get("type"), event.get("severity"), participant_names,
                           subcategory=event.get("subcategory"), world=world)
     return result

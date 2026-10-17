@@ -60,7 +60,8 @@ def _respond_to_inquiry(world, business_key, business, state, entry):
         generate_business_response(business, business_key, inquiry, world, session),
         priority=PRIORITY_BACKGROUND,
     )
-    if not reply:
+    from llm.llm_gate import gate_failed
+    if not reply or gate_failed(reply):
         return False
 
     tick = world.get("tick", 0)

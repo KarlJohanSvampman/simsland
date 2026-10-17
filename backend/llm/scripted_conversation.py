@@ -155,6 +155,7 @@ def generate_conversation_script(a, b, tier, world, severity=None, medium="call"
         _generate(world, a, b, tier, severity, medium, subcategory),
         priority=PRIORITY_BACKGROUND,
     )
-    if not result:
+    from llm.llm_gate import gate_failed
+    if not result or gate_failed(result) or not isinstance(result, list):
         result = _fallback_script(a["name"], b["name"], tier, medium)
     return _to_speaker_ids(result, a, b)

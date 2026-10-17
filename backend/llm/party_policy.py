@@ -126,7 +126,8 @@ def generate_party_policy(world, party_id, topic):
         _generate_policy(party_name, topic, ideology_tags),
         priority=PRIORITY_BACKGROUND,
     )
-    if not raw:
+    from llm.llm_gate import gate_failed
+    if not raw or gate_failed(raw):
         raw = _fallback_policy(party_name, topic)
 
     primary = _safe_pairs(raw.get("primary"))

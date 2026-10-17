@@ -589,7 +589,8 @@ def compile_political_views(c, world, mentality_tags):
         _generate_political_views(c, principle_lines, mentality_summary, environment_lines),
         priority=PRIORITY_BACKGROUND,
     )
-    if not raw:
+    from llm.llm_gate import gate_failed
+    if not raw or gate_failed(raw):
         raw = _fallback_political_views(mentality_tags, world)
 
     stances = {}

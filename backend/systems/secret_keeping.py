@@ -93,7 +93,8 @@ def _ensure_cover_story(c, world, secret):
         result = run_llm_call(generate_secret_cover(c, world, secret, session), priority=PRIORITY_BACKGROUND)
     except Exception:
         result = None
-    if not result:
+    from llm.llm_gate import gate_failed
+    if not result or gate_failed(result):
         category = secret.get("category", "other")
         from llm.secret_authoring import _FALLBACK_REASONS, _FALLBACK_LIES
         result = {

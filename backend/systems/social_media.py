@@ -140,7 +140,8 @@ def _project_engagement(c, world, post):
     except Exception:
         projection = None
 
-    if not projection:
+    from llm.llm_gate import gate_failed
+    if not projection or gate_failed(projection):
         # Deterministic fallback, scaled by the author's existing
         # standing -- an already-popular character's posts land bigger,
         # same real-world dynamic the LLM path judges on content quality

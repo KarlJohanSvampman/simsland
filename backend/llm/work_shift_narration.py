@@ -139,6 +139,10 @@ def generate_hourly_work_beats(c, world, hours, job_title, roster, hour_rolls):
         _generate(c, world, hours, job_title, roster, hour_rolls),
         priority=PRIORITY_BACKGROUND,
     )
-    if not beats:
+    # A timeout used to come back as {"error": ...}; offgrid.py then iterated it as
+    # beats, got the string "error", and beat.get() raised inside process_return --
+    # aborting the return before off_grid was cleared, so it retried every tick.
+    from llm.llm_gate import gate_failed
+    if not beats or gate_failed(beats) or not isinstance(beats, list):
         return _fallback_beats(hours, job_title, hour_rolls)
     return beats

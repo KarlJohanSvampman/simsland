@@ -5055,7 +5055,8 @@ def _route_make_argument(c, world, action):
     }
 
     result = run_llm_call(generate_opinion(c, topic, context, world, session))
-    if not result:
+    from llm.llm_gate import gate_failed
+    if not result or gate_failed(result):
         return
 
     speaker_stance = result.get("stance", 0)

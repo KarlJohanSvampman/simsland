@@ -247,7 +247,8 @@ def _handle_opinion_reflection(c, world, reflection):
     context = {"reason": reflection.get("reason", ""), "prior_stance": None}
 
     result = run_llm_call(generate_opinion(c, topic, context, world, session), priority=PRIORITY_BACKGROUND)
-    if not result:
+    from llm.llm_gate import gate_failed
+    if not result or gate_failed(result):
         return
 
     update_opinion(

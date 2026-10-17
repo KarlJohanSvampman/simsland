@@ -111,4 +111,5 @@ def generate_chapter_plan(c, world, story, chapter, candidates):
         result = run_llm_call(_generate(c, world, story, chapter, candidates, session), priority=PRIORITY_BACKGROUND)
     except Exception:
         result = None
-    return result or dict(_FALLBACK_OUTCOME)
+    from llm.llm_gate import gate_failed
+    return (None if gate_failed(result) else result) or dict(_FALLBACK_OUTCOME)

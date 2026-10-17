@@ -162,6 +162,20 @@ def run_llm_call(coro, priority=PRIORITY_NORMAL, timeout=None):
         return dict(_TIMEOUT_ERROR)
 
 
+def gate_failed(result):
+    """True when `result` is the {"error": ...} dict run_llm_call hands back on
+    a timeout, a preemption, or a dispatcher exception -- as opposed to the
+    coroutine's own return value.
+
+    Callers are written against the coroutine's contract (a valid payload, or
+    None on failure) and guard with a bare `if not result:` -- but that dict is
+    truthy, so it sailed past the fallback and was then used as if it were a
+    real narration/opinion/beat list. Confirmed live: three household daily
+    summaries had {"error": "timeout: ..."} stored as their text.
+    """
+    return isinstance(result, dict) and set(result) == {"error"}
+
+
 async def run_llm_call_async(coro, priority=PRIORITY_NORMAL, timeout=None):
     """Async equivalent of run_llm_call, for callers already inside an
     event loop (e.g. cognition_jobs.py) -- schedules onto the gate's loop
