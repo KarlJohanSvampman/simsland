@@ -349,13 +349,23 @@ def update_character_movement(
 
     if dist > 0:
 
+        # Never step past the tile. This used to move a flat `speed` toward
+        # the tile every tick, which can only stop once dist < 0.05 -- but
+        # with world["movement_speed_multiplier"] (10 here) a jog is ~0.9 tiles
+        # per tick, so from 1.0 away the character lands 0.1 PAST the tile,
+        # the next tick steps 0.9 back, and so on: a permanent two-cycle that
+        # the stuck detector above never catches (dist alternates ~0.1/~0.8,
+        # so "no progress" keeps resetting). Seen live as a child jogging
+        # back and forth in a bathroom, trying to reach the shower, forever.
+        step = min(speed, dist)
+
         c["x"] += (
             dx / dist
-        ) * speed
+        ) * step
 
         c["y"] += (
             dy / dist
-        ) * speed
+        ) * step
 
         # Keep pushed prop in front of character
         pushed_prop_id = c.get("pushed_prop_id")
