@@ -90,7 +90,8 @@ def _build_listing(c, job_tid, category, world):
                      "title": "Counterfeit cash bundle"})
         return base
     if category == "fake_id":
-        others = [oc for oc in world.get("characters", {}).values() if oc["id"] != c["id"]]
+        others = [oc for oc in world.get("characters", {}).values()
+                  if oc["id"] != c["id"] and not oc.get("is_workplace_npc")]
         if not others:
             return None
         target = random.choice(others)

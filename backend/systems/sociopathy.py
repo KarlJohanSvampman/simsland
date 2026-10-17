@@ -161,7 +161,7 @@ def maybe_plant_drama(c, world, listener=None):
         listener = random.choice(contacts)
 
     victim_pool = [oc for oc in characters.values()
-                   if oc["id"] not in (c["id"], listener["id"])]
+                   if oc["id"] not in (c["id"], listener["id"]) and not oc.get("is_workplace_npc")]
     if not victim_pool:
         return None
     victim = random.choice(victim_pool)

@@ -88,6 +88,7 @@ def _random_char_for_role(world, defs, age_lo, age_hi, sex=None, exclude_ids=Non
         c for c in world.get("characters", {}).values()
         if age_lo <= c.get("age", 0) <= age_hi
         and not c.get("family_id")
+        and not c.get("is_workplace_npc")      # an NPC must never become someone's relative
         and c["id"] not in exclude_ids
         and (sex is None or c.get("sex") == sex)
     ]

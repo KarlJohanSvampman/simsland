@@ -127,7 +127,7 @@ _SUBCATEGORY_GOODWILL_EVENT_TYPE = {
 
 def _pick_unrelated_third_party(world, a, b):
     candidates = [c for c in world.get("characters", {}).values()
-                  if c["id"] not in (a["id"], b["id"])]
+                  if c["id"] not in (a["id"], b["id"]) and not c.get("is_workplace_npc")]
     if not candidates:
         return None
     return random.choice(candidates)["id"]
@@ -333,7 +333,12 @@ def _find_signal_weighted_pair(world, tier):
     designation (no strangers)."""
     active = [
         c for c in world["characters"].values()
-        if is_reachable(c) and not c.get("off_grid")
+        # Confirmed (400/400 negative-tier draws with 6 NPCs present): the standalone
+        # ambient roll paired real residents with workplace NPCs, producing
+        # argument/conflict calls with a "person" who has no household or location and
+        # doesn't exist outside a contact list. A bare NPC has no off_grid key, so it
+        # also counted as on-grid.
+        if is_reachable(c) and not c.get("off_grid") and not c.get("is_workplace_npc")
         # Confirmed live bug: negative tiers ("argument"/"conflict") produce
         # real adult-toned content (llm/scripted_conversation.py's own tier
         # guidance for "conflict": "sharp, heated, and hard to walk away
