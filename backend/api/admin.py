@@ -111,6 +111,83 @@ def set_movement_speed(payload: dict, sim_id: str = DEFAULT_SIM_ID):
     return {"movement_speed_multiplier": value}
 
 
+# World-level state that exists only in relation to characters. After a full wipe it has
+# nobody to belong to, so it's emptied (same container type, so hard-subscripting code
+# like world["families"] keeps working) -- the same reasoning reset_characters already
+# applies to events/incidents/calls.
+_CHARACTER_KEYED_CONTAINERS = {
+    "conversations": dict, "proposals": dict, "social_contracts": dict,
+    "influence_graph": dict, "families": dict,
+    "social_posts": list, "offmap": list, "shared_events": list,
+    "court_cases": list, "director_log": list, "leaders": list,
+}
+
+
+def _scrub_leftovers_after_wipe(world):
+    """Called by reset_characters once every character and household is gone.
+
+    The original reset only dealt with characters, households, building owners, a
+    few history logs and ANCHOR occupancy. Everything else that still pointed at
+    the dead was left behind. Confirmed from a live world: every home still
+    marked vacant=False (several pointing at households from earlier resets that
+    no longer exist), so new residents couldn't be housed; props still
+    occupied_by deleted characters at the PROP level (the old code only cleared
+    anchors); carried props still hidden; bank accounts, faction rosters,
+    company payrolls, local-team rosters, ~1,000 social posts, conversations,
+    contracts and the family graph all referencing people who no longer exist.
+
+    Structural data (props, buildings, homes, banks, factions, teams, companies)
+    keeps its shape and only loses the references; history that only means
+    something with its characters is emptied.
+    """
+    for key, kind in _CHARACTER_KEYED_CONTAINERS.items():
+        if key in world:
+            world[key] = kind()
+    for key in [k for k in world if k.startswith("_") and k.endswith("_sessions")]:
+        world[key] = {}      # per-character LLM session caches
+
+    for prop in world.get("props", []):
+        for holder in [prop] + list(prop.get("anchors") or []):
+            for field in ("occupied_by", "reserved_by"):
+                if holder.get(field):
+                    holder[field] = None
+            if "queue" in holder:
+                holder["queue"] = []
+        if prop.get("carried_by"):
+            prop.pop("carried_by", None)
+            prop["visible"] = True           # picking a prop up hides it; nobody is left to put it down
+        if prop.get("household_id"):
+            prop["household_id"] = None
+
+    for building in world.get("runtime_buildings", []):
+        building["owner_household_id"] = None
+
+    for home in (world.get("homes") or {}).values():
+        if home.get("household_id") not in (world.get("households") or {}):
+            home["household_id"] = None
+            home["vacant"] = True
+
+    for bank in (world.get("banks") or {}).values():
+        bank["accounts"] = {}                # every account holder is gone
+
+    for faction in (world.get("factions") or {}).values():
+        if "members" in faction:
+            faction["members"] = []
+
+    for company in (world.get("companies") or {}).values():
+        company["employee_ids"] = []
+        company["boss_id"] = None
+
+    def _clear_rosters(node):
+        if isinstance(node, dict):
+            for k, v in node.items():
+                if k == "roster" and isinstance(v, list):
+                    node[k] = []
+                else:
+                    _clear_rosters(v)
+    _clear_rosters(world.get("local_teams"))
+
+
 @router.post("/reset_characters")
 def reset_characters(sim_id: str = DEFAULT_SIM_ID):
     """Wipes all characters and households -- the map/buildings/roads/props
@@ -182,6 +259,8 @@ def reset_characters(sim_id: str = DEFAULT_SIM_ID):
             for anchor in prop.get("anchors", []) or []:
                 if anchor.get("occupied_by"):
                     anchor["occupied_by"] = None
+
+        _scrub_leftovers_after_wipe(world)
 
         save_world(sim_id, world)
 
