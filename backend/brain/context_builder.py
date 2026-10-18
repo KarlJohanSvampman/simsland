@@ -1406,6 +1406,11 @@ def _conversation_frame_line(conv):
     return f"You're {medium_verb} with {who} about {topic}"
 
 
+def _sec_concern_raised(c, world):
+    from systems.pattern_concern import context_line
+    return context_line(c, world)
+
+
 def _floor_note(c, conv, world):
     try:
         from systems.conversation_floor import context_line
@@ -2306,6 +2311,7 @@ NARRATIVE_SECTIONS = [
     ("claustrophobia",        "core", _sec_claustrophobia),
     ("identity",              "core", _sec_identity),
     ("child_cognition",       "core", _sec_child_cognition),
+    ("concern_raised",        "core", _sec_concern_raised),
     ("body",                  "core", _sec_body),
     ("health",                "core", _sec_health),
     ("bedroom",               "full", _sec_bedroom),

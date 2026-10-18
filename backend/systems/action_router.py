@@ -271,6 +271,10 @@ def apply_speech(c, world, speech):
             topic or conv.get("topic", "general"), tick
         )
 
+        # Someone who has been worried about this person is raising it now.
+        from systems.pattern_concern import on_speech as _concern_on_speech
+        _concern_on_speech(c, listener, world)
+
         # What the line MEANT (insult, apology, compliment, lie, ...) -> the
         # relationship-impact ledger. Emit-only from this worker thread; see
         # systems/relationship_ledger.py.

@@ -268,6 +268,14 @@ def maybe_log_sighting_observation(c, other, world):
         drop_probability=compute_drop_probability(urgent, closeness),
     )
 
+    # Compare with what was noted about them last time: the same everyday thing in
+    # the same place twice running is worth worrying about (systems/pattern_concern.py).
+    try:
+        from systems.pattern_concern import check_sighting
+        check_sighting(c, other, world, (other.get("activity") or {}).get("type"))
+    except Exception:
+        pass
+
 
 def maybe_review_on_sighting(c, other, world):
     """other is the real character dict (world["characters"][id]) --
