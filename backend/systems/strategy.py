@@ -132,8 +132,17 @@ def resolve_strategy(
 
     if t == "clean_zone":
 
-        from systems.chores import chore_activity_for_zone
-        return chore_activity_for_zone(world, c, intention.get("zone_key"))
+        from systems.chores import chore_activity_for_zone, get_room_cleanliness
+        # Stale once the zone is clean again. Nothing ever removed this intention, so
+        # after the first real cleaning it kept re-dispatching the chore every ~3
+        # minutes, forever (confirmed live: a child dusted a spotless house for ten
+        # hours while starving).
+        zone_key = intention.get("zone_key")
+        if zone_key and get_room_cleanliness(world, zone_key) >= c.get("cleanliness_threshold", 40):
+            from brain.intentions import remove_intention
+            remove_intention(c, "clean_zone")
+            return None
+        return chore_activity_for_zone(world, c, zone_key)
 
     if t in ("water_plants", "weed_plants", "harvest_plants", "redecorate_room"):
         return t
@@ -274,6 +283,14 @@ def resolve_hunger_strategy(
     # =====================================================
     # NO FOOD
     # =====================================================
+
+    # A child can't order delivery or shop on their own, and has nothing to cook:
+    # returning an activity that can never start just left a hungry kid dusting
+    # the house for ten hours (every blocked intention is skipped and the first
+    # thing that CAN start wins). None hands the problem to their own judgment --
+    # ask a parent, look for food.
+    if c.get("age_group") == "child":
+        return None
 
     money = c.get(
         "money",

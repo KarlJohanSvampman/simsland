@@ -1000,10 +1000,20 @@ def update_agent(
     # EXECUTE SOCIAL / BODY INTENTIONS
     # =====================================
 
+    # A survival/health need that resolved to something but couldn't actually be
+    # started (no food and no way to get any, ...) is BLOCKED, not done: nothing
+    # lower down -- chores, leisure -- may autopilot in its place, because that
+    # returns before the character ever gets to think and they'd keep doing
+    # busywork while starving. Falling through lets their own judgment handle it.
+    blocked_urgent = False
+
     for intention in c.get(
         "active_intentions",
         []
     ):
+
+        if blocked_urgent and intention.get("category") in ("chores", "leisure", "identity"):
+            continue
 
         activity_type = resolve_strategy(
             c,
@@ -1012,6 +1022,8 @@ def update_agent(
         )
 
         if not activity_type:
+            if intention.get("type") == "eat_food":
+                blocked_urgent = True       # nothing to eat and no way to get any: their own judgment, not busywork
             continue
 
         started = start_activity(
@@ -1019,6 +1031,9 @@ def update_agent(
             world,
             activity_type
         )
+
+        if not started and intention.get("category") in ("survival", "health"):
+            blocked_urgent = True
 
         if started:
 
