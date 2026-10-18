@@ -81,6 +81,12 @@ def fire_incidental(character, speech_type, text, world, target_id=None):
         "type":      speech_type,
     })
     character["speech_log"] = character["speech_log"][-20:]
+    if speech_type == "exclaim":
+        try:
+            from systems.expressions import broadcast
+            broadcast(character, world, text, speech_act="exclaim", target_id=target_id)
+        except Exception:
+            pass
 
 
 def _on_cooldown(c, other_id, world):

@@ -229,6 +229,12 @@ def add_intention(
 
     ensure_intentions(c)
 
+    # An intention dropped for erratic behaviour (systems/loop_guard.py) stays
+    # dropped for a while instead of being re-created by whatever made it.
+    until = (c.get("_intention_suppressed") or {}).get(intention.get("type"))
+    if until is not None and _CURRENT_TICK < until:
+        return
+
     intentions = c[
         "active_intentions"
     ]

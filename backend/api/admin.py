@@ -120,6 +120,7 @@ _CHARACTER_KEYED_CONTAINERS = {
     "influence_graph": dict, "families": dict,
     "social_posts": list, "offmap": list, "shared_events": list,
     "court_cases": list, "director_log": list, "leaders": list,
+    "relationship_ledgers": dict, "expressions": list,
 }
 
 

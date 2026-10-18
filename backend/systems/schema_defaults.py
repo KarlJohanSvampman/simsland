@@ -102,6 +102,11 @@ def ensure_world_defaults(world, defs=None):
     # Active intercourse scenes (systems/intercourse_session.py)
     world.setdefault("intercourse_sessions", {})
 
+    # Relationship impact ledgers, one per pair (systems/relationship_ledger.py), and
+    # the recent one-way expressions log (systems/expressions.py).
+    world.setdefault("relationship_ledgers", {})
+    world.setdefault("expressions", [])
+
     # Init community stats from definitions if provided
     if defs is not None:
         try:

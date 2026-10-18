@@ -85,6 +85,8 @@ Reply in EXACTLY this shape, one line each. Skip a line entirely if it doesn't a
 <what you do, ONLY if it's worth describing -- skip this line for a routine action, don't narrate every single move>
 ACTION: <type> | <target, in your own words> | <extra detail, if needed>
 SAY: <exact words, REQUIRED whenever your action is speak/socialize/phone_call/phone_answer -- never leave this blank if you're talking to someone>
+REMARK: <words said aloud when you are NOT talking with anyone -- an exclaim, mutter, vent, curse or yell that isn't meant to start a conversation; use this instead of SAY>
+INTENT: <hurt | help | deceive | neutral> | <who it is aimed at, in your own words, if anyone> | <how covert 0-10, optional> -- ONLY when you mean to hurt, help or deceive someone with your words or action
 THEN: <short next intention>
 """
 
@@ -450,6 +452,26 @@ def build_prompt(context):
 _ACTION_LINE_RE = re.compile(r'(?im)^[ \t>*_-]*ACTION[ \t]*:[ \t]*(.+)$')
 _SAY_LINE_RE    = re.compile(r'(?im)^[ \t>*_-]*SAY[ \t]*:[ \t]*(.*)$')
 _THEN_LINE_RE   = re.compile(r'(?im)^[ \t>*_-]*THEN[ \t]*:[ \t]*(.*)$')
+_REMARK_LINE_RE = re.compile(r'(?im)^[ \t>*_-]*REMARK[ \t]*:[ \t]*(.*)$')
+_INTENT_LINE_RE = re.compile(r'(?im)^[ \t>*_-]*INTENT[ \t]*:[ \t]*(.*)$')
+_INTENT_VALENCES = {"hurt", "help", "deceive", "neutral"}
+
+
+def _parse_intent_line(line):
+    '''INTENT: hurt | Marcus | 7  ->  {"valence": "hurt", "target_description": "Marcus",
+    "discretion": 0.7}. None when the valence isn't hurt/help/deceive.'''
+    parts = [p.strip() for p in (line or "").split("|")]
+    valence = (parts[0] if parts else "").lower().strip(" .*")
+    if valence not in _INTENT_VALENCES or valence == "neutral":
+        return None
+    intent = {"valence": valence}
+    if len(parts) > 1 and parts[1] and parts[1].lower() not in ("none", "nobody", "no one", "n/a", "-"):
+        intent["target_description"] = parts[1]
+    if len(parts) > 2:
+        m = re.search(r"\d+(?:\.\d+)?", parts[2])
+        if m:
+            intent["discretion"] = max(0.0, min(1.0, float(m.group(0)) / 10.0))
+    return intent
 _CODE_FENCE_RE  = re.compile(r'^```[a-zA-Z]*\n?|\n?```$')
 
 
@@ -473,6 +495,8 @@ def _parse_compact_envelope(raw):
 
     say_match = _SAY_LINE_RE.search(text)
     then_match = _THEN_LINE_RE.search(text)
+    remark_match = _REMARK_LINE_RE.search(text)
+    intent_match = _INTENT_LINE_RE.search(text)
 
     parts = [p.strip() for p in action_line.split("|")]
     action_type = (parts[0] if parts else "").lower().replace(" ", "_")
@@ -485,6 +509,8 @@ def _parse_compact_envelope(raw):
             "detail": parts[2] if len(parts) > 2 and parts[2] else "",
         },
         "say": say_match.group(1).strip() if say_match else "",
+        "remark": remark_match.group(1).strip() if remark_match else "",
+        "intent": _parse_intent_line(intent_match.group(1)) if intent_match else None,
         "then": then_match.group(1).strip() if then_match else "",
     }
 
@@ -896,7 +922,21 @@ def _to_legacy_decision(envelope, char_id=None):
         decision["action"] = legacy_action
 
     say = (envelope.get("say") or "").strip()
-    if not say:
+    remark = (envelope.get("remark") or "").strip()
+    intent = envelope.get("intent")
+    if not say and remark:
+        # Said aloud but not TO anyone: handled by systems/expressions.py, never
+        # threaded into a conversation or defaulted onto the nearest person.
+        decision["speech"] = {
+            "utterance": remark,
+            "speech_act": "remark",
+            "mode": "remark",
+            "topic": "",
+            "target": None,
+        }
+        if intent and intent.get("target_description"):
+            decision["speech"]["target_description"] = intent["target_description"]
+    elif not say:
         say = _extract_quoted_speech(narration) or ""
     if say:
         speech = {
@@ -927,6 +967,19 @@ def _to_legacy_decision(envelope, char_id=None):
                 speech["target_description"] = target_name
 
         decision["speech"] = speech
+
+    # What the character MEANS by what they say/do (hurt/help/deceive): handed to
+    # the relationship-impact system. Where the speech act was left at the neutral
+    # default, the intent also picks the matching act so the older tone and
+    # relationship analysis reacts to it too.
+    if intent:
+        sp = decision.get("speech")
+        if sp:
+            sp["intent"] = intent
+            if sp.get("speech_act") == "declare":
+                sp["speech_act"] = {"hurt": "insult", "deceive": "lie", "help": "supportive"}[intent["valence"]]
+        if decision.get("action"):
+            decision["action"]["intent"] = intent
 
     then = (envelope.get("then") or "").strip()
     if then:

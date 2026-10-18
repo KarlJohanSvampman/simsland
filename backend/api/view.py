@@ -465,3 +465,20 @@ def get_perception_range(
         "visual_range": visual_range(c, world),
         "hearing_range": hearing_range(c)
     }
+
+
+@router.get("/view/relationship-impact")
+def relationship_impact(a: str, b: str, sim_id: str = "default", limit: int = 40):
+    """The impact ledger for one pair: derived scores/percentages plus the most recent
+    entries (systems/relationship_ledger.py). `intent` entries are what the source
+    meant, `perceived` entries what actually registered with the recipient."""
+    from systems.relationship_ledger import get_ledger, summarize
+    world = load_world(sim_id)
+    led = get_ledger(world, a, b, create=False)
+    if not led:
+        return {"ids": sorted([a, b]), "summary": None, "entries": []}
+    names = {cid: (world.get("characters", {}).get(cid) or {}).get("name") for cid in led["ids"]}
+    return {
+        "ids": led["ids"], "names": names, "summary": summarize(world, a, b),
+        "entries": led["entries"][-max(1, min(limit, 400)):][::-1],
+    }

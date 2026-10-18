@@ -416,6 +416,13 @@ def _on_activity_started(data, world):
         act = c.get("activity") or {}
         log_activity(c, world, data.get("activity_type", "?"), "started", target_id=data.get("target_id"),
                     interaction=act.get("interaction"), anchor_name=act.get("anchor_name"))
+        # A character stuck repeating the same activity notices and breaks out
+        # (systems/loop_guard.py).
+        try:
+            from systems.loop_guard import note_start
+            note_start(c, world, data.get("activity_type"))
+        except Exception as exc:
+            print(f"[loop_guard] error: {exc}")
 
 subscribe("activity_started", _on_activity_started)
 
@@ -487,3 +494,7 @@ def _on_household_speech_spoken(data, world):
     on_speech_spoken(data, world)
 
 subscribe("speech_spoken", _on_household_speech_spoken)
+
+
+# ── Relationship impact (systems/relationship_ledger.py subscribes on import) ──
+import systems.relationship_ledger  # noqa: E402,F401

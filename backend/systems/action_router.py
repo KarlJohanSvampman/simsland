@@ -60,6 +60,13 @@ def apply_speech(c, world, speech):
     if not utterance:
         return
 
+    # One-way expressions (exclaim/mutter/vent/yell, or the model's REMARK line) --
+    # no conversation, no default listener, no floor. systems/expressions.py.
+    from systems.expressions import is_expression, express
+    if is_expression(speech):
+        express(c, world, speech)
+        return
+
     tick = world.get("tick", 0)
     speech_act = speech.get("speech_act", "speak")
     topic = speech.get("topic", "")
@@ -263,6 +270,21 @@ def apply_speech(c, world, speech):
             world, conv, c["id"], utterance, speech_act,
             topic or conv.get("topic", "general"), tick
         )
+
+        # What the line MEANT (insult, apology, compliment, lie, ...) -> the
+        # relationship-impact ledger. Emit-only from this worker thread; see
+        # systems/relationship_ledger.py.
+        from systems.impact_kinds import kind_for_speech
+        _impact_kind = kind_for_speech(speech_act, speech.get("intent"))
+        if _impact_kind:
+            from systems.relationship_ledger import emit_impact
+            emit_impact(
+                c, _impact_kind, target_id=target_id, channel="speech" if medium == "in_person" else medium,
+                audience="hearing" if medium == "in_person" else "targets", volume=volume,
+                text=utterance, ref={"type": "conversation", "id": conv.get("id"),
+                                     "line": len(conv.get("history", [])) - 1},
+                intent=speech.get("intent"),
+            )
 
         # Per the user's explicit ask: commit every spoken exchange to
         # real memory, both what was said and what was heard, keyword-

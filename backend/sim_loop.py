@@ -633,6 +633,10 @@ def tick(world):
             except Exception as exc:
                 print(f"[sim_loop] movement error for {c.get('id')}: {exc}")
 
+    if every(world, 5, offset=2):
+        from systems.loop_guard import service_all as _loop_guard_service
+        _loop_guard_service(world)
+
     # -- Per-tick: conversation floor (who has the ball, notice/ignore timers) --
     try:
         from systems.conversation_floor import tick as _floor_tick

@@ -289,6 +289,19 @@ def resolve_hostile_action(actor, target, action_id, world):
     else:
         outcome = "hit"
 
+    # The attempt itself is what was meant, hit or miss -- the target and anyone
+    # watching register it through the relationship-impact ledger.
+    from systems.impact_kinds import ACTION_KIND, OUTCOME_FACTOR, kinds as _impact_kinds
+    _kind = ACTION_KIND.get(template_id)
+    if _kind:
+        from systems.relationship_ledger import emit_impact
+        emit_impact(
+            actor, _kind, target_id=target["id"], victim_id=target["id"], channel="action",
+            audience="sight", discretion=0.05,
+            magnitude=_impact_kinds(world)[_kind]["base"] * OUTCOME_FACTOR.get(outcome, 1.0),
+            ref={"type": "hostile_action", "action": action_id, "outcome": outcome},
+        )
+
     # Captured on "hit"/"fumble" below (report_assault_incident's return)
     # and threaded through to flag_provocation()/hostile_action_resolved
     # so the middleware's reactive situations (violence.attacked/
