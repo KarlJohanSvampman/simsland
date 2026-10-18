@@ -92,7 +92,21 @@ def apply_speech(c, world, speech):
     # these two parties already in its heated_argument/shouting_match
     # fight_stage (systems/conflict_pipeline.py). Plain conversation stays
     # "medium" (default speaking volume).
+    # Ball discipline (systems/conversation_floor.py): while the other person
+    # holds the floor and is still within their time to respond, a line from
+    # the speaker is dropped rather than talking over them -- the stale-context
+    # pile-ups where both sides keep opening the conversation.
+    if target_id and speech.get("medium", "in_person") in ("in_person", "call"):
+        from brain.conversations import find_conversation
+        from systems.conversation_floor import blocks
+        _existing = find_conversation(world, [c["id"], target_id])
+        if _existing and blocks(world, _existing, c["id"]):
+            return
+
     volume = speech.get("volume")
+    if not volume and target_id:
+        from systems.conversation_floor import repeat_volume
+        volume = repeat_volume(world, c["id"], target_id)
     if not volume:
         if speech.get("conversation_type") == "argument":
             volume = "high"

@@ -486,6 +486,10 @@ def add_message(
     from systems.child_cognition import on_conversation_message
     on_conversation_message(world, conv, speaker_id, utterance, speech_act, tick)
 
+    # Who has the ball now, and how long they get -- systems/conversation_floor.py.
+    from systems.conversation_floor import on_message as _floor_on_message
+    _floor_on_message(world, conv, speaker_id, utterance, speech_act, tick)
+
     # NOTE: reflection scheduling is handled by action_router.py's
     # apply_speech() after each turn so it is not duplicated here.
 

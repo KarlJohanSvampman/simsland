@@ -340,6 +340,7 @@ def build_active_conversations(c, world):
             "my_goal":            my_goal.get("label") if my_goal else None,
             "libido_hint":        libido_hint,
             "your_turn":       conv.get("turn_owner") == c["id"],
+            "floor_note":      _floor_note(c, conv, world),
             "recent_messages": [
                 {
                     "speaker": _speaker_label(m.get("speaker")),
@@ -1405,6 +1406,14 @@ def _conversation_frame_line(conv):
     return f"You're {medium_verb} with {who} about {topic}"
 
 
+def _floor_note(c, conv, world):
+    try:
+        from systems.conversation_floor import context_line
+        return context_line(c, conv, world)
+    except Exception:
+        return None
+
+
 def build_scene_description(c, world):
 
     perception = c.get("perception", {})
@@ -1435,6 +1444,8 @@ def build_scene_description(c, world):
     for conv in build_active_conversations(c, world):
         turn_note = " — it's your turn to respond." if conv.get("your_turn") else "."
         lines.append(_conversation_frame_line(conv) + turn_note)
+        if conv.get("floor_note"):
+            lines.append(conv["floor_note"])
         for m in conv.get("recent_messages", [])[-2:]:
             lines.append(f'{m["speaker"]}: "{m["utterance"]}"')
 

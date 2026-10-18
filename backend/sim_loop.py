@@ -633,6 +633,13 @@ def tick(world):
             except Exception as exc:
                 print(f"[sim_loop] movement error for {c.get('id')}: {exc}")
 
+    # -- Per-tick: conversation floor (who has the ball, notice/ignore timers) --
+    try:
+        from systems.conversation_floor import tick as _floor_tick
+        _floor_tick(world)
+    except Exception as exc:
+        print(f"[sim_loop] conversation floor error: {exc}")
+
     # -- Per-tick: agent brain (parallel) ─────────────────
     # Service worker NPCs are driven by update_services, not LLM — skip them.
     # Each character's LLM call is I/O-bound; workers release the GIL while

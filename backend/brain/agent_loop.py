@@ -1092,12 +1092,19 @@ def update_agent(
         else PRIORITY_NORMAL
     )
 
-    decision = think(
-        context,
-        char_id=c["id"],
-        session=c.get("_llm_session"),
-        priority=llm_priority,
-    )
+    # "Is generating a reply" -- what makes a spoken-to character count as having
+    # noticed (systems/conversation_floor.py).
+    from systems.conversation_floor import mark_thinking, clear_thinking
+    mark_thinking(c["id"], world.get("tick", 0))
+    try:
+        decision = think(
+            context,
+            char_id=c["id"],
+            session=c.get("_llm_session"),
+            priority=llm_priority,
+        )
+    finally:
+        clear_thinking(c["id"], world.get("tick", 0))
 
     # Clear the wake state and schedule the next idle check-in regardless
     # of whether the LLM call succeeded — a failed call must not leave the
