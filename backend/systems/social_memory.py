@@ -154,7 +154,7 @@ def _review_social_contracts(c, other, world):
 # maybe_review_on_sighting() below -- that one only RECALLS existing
 # memories once per calendar day; this one CREATES a new observational
 # one, on its own 30-minute gate.
-SIGHTING_OBSERVATION_GAP_TICKS = 3 * 3600   # per observed person, per observer (see below)
+SIGHTING_OBSERVATION_GAP_TICKS = 1 * 3600   # per observed person, per observer (see below)
 
 
 def _describe_activity(target):
