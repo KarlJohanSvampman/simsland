@@ -636,6 +636,8 @@ def tick(world):
     if every(world, 5, offset=2):
         from systems.loop_guard import service_all as _loop_guard_service
         _loop_guard_service(world)
+        from systems.behavior_patterns import service_theories as _service_theories
+        _service_theories(world)
 
     # -- Per-tick: conversation floor (who has the ball, notice/ignore timers) --
     try:

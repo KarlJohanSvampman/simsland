@@ -134,6 +134,41 @@ async def _generate(c, other, pattern, world):
     return parsed
 
 
+async def _generate_from_prompt(prompt, force_optimistic, char_id):
+    """The model call for an already-built prompt -- touches no world state, so it
+    can run on a systems/bg_llm worker."""
+    messages = [
+        {"role": "system", "content": "You invent plausible in-character theories about why someone in a life-simulation game exhibits a behavior pattern. Keep every theory appropriate to the ages of the people involved. Return STRICT JSON only."},
+        {"role": "user", "content": prompt},
+    ]
+    result = await call_llm_safe(messages, session={"history": []}, char_id=char_id)
+    if isinstance(result, dict) and result.get("error"):
+        return None
+    text = result.get("text", "") if isinstance(result, dict) else result
+    if not isinstance(text, str) or not text.strip():
+        return None
+    try:
+        parsed = json.loads(text)
+    except Exception:
+        return None
+    if not isinstance(parsed, dict):
+        return None
+    if force_optimistic or parsed.get("valence") not in ("optimistic", "pessimistic"):
+        parsed["valence"] = "optimistic"
+    return parsed
+
+
+def theory_from_prompt(prompt, force_optimistic, char_id):
+    """Blocking; call from a bg_llm worker."""
+    result = run_llm_call(_generate_from_prompt(prompt, force_optimistic, char_id), priority=PRIORITY_BACKGROUND)
+    return result if isinstance(result, dict) else None
+
+
+def build_theory_prompt(c, other, pattern, world):
+    """Main-thread half: reads the world to build the prompt text."""
+    return _build_prompt(c, other, pattern, world)
+
+
 def generate_theory(c, other, pattern, world):
     """Sync entry point -- bridges the async LLM call the same way
     systems/choice.py::choose() already does via run_llm_call()."""

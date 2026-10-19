@@ -114,19 +114,23 @@ def aggregate_daily_observations(c, world):
 
 
 def _generate_theory_for(c, other_id, pattern, world):
+    """Gives a new pattern a plain provisional theory and queues the real one.
+
+    This used to make the model call right here -- on the tick thread, inside the
+    once-a-day aggregation -- so every new pattern for every character stalled the
+    whole simulation for up to the LLM gate's 90-second timeout, one after another
+    (confirmed live: the sim froze at the first day rollover after a restart). The
+    call now runs in the background (service_theories) and replaces the provisional
+    theory when it lands."""
     other = world.get("characters", {}).get(other_id)
     if not other:
         return
-    theory = None
-    try:
-        from llm.behavior_theory import generate_theory
-        theory = generate_theory(c, other, pattern, world)
-    except Exception:
-        theory = None
-    if not theory:
-        theory = {"text": f"Probably just {pattern['activity']}.", "valence": "optimistic"}
-    pattern["theory"] = theory
+    pattern["theory"] = {"text": f"Probably just {pattern['activity']}.", "valence": "optimistic"}
+    pattern["theory_pending"] = True
 
+
+def _apply_pessimistic_followup(c, other_id, other, pattern, world):
+    theory = pattern.get("theory") or {}
     if theory.get("valence") == "pessimistic":
         try:
             from systems.worries import bump_suspicion
@@ -144,6 +148,38 @@ def _generate_theory_for(c, other_id, pattern, world):
                 )
         except Exception:
             pass
+
+
+def service_theories(world):
+    """Submit and collect the background theory calls. The request lives on the
+    pattern (theory_pending), so a restart simply re-submits it."""
+    from systems import bg_llm
+    for c in world.get("characters", {}).values():
+        for other_id, patterns in (c.get("behavior_patterns") or {}).items():
+            for pattern in patterns:
+                if not pattern.get("theory_pending"):
+                    continue
+                key = f"theory:{c['id']}:{pattern['id']}"
+                other = world.get("characters", {}).get(other_id)
+                if not other:
+                    pattern["theory_pending"] = False
+                    continue
+                if not bg_llm.is_pending(key):
+                    try:
+                        from llm.behavior_theory import build_theory_prompt, theory_from_prompt
+                        prompt, force_optimistic = build_theory_prompt(c, other, pattern, world)
+                    except Exception:
+                        pattern["theory_pending"] = False
+                        continue
+                    bg_llm.submit(key, theory_from_prompt, prompt, force_optimistic, c["id"])
+                    continue
+                ready, theory = bg_llm.take(key)
+                if not ready:
+                    continue
+                pattern["theory_pending"] = False
+                if theory and theory.get("text"):
+                    pattern["theory"] = theory
+                    _apply_pessimistic_followup(c, other_id, other, pattern, world)
 
 
 def find_pattern(c, other_id, activity=None):
