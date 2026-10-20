@@ -30,6 +30,30 @@ from systems.home_presence import is_character_home
 MAX_HOURLY_SUMMARIES = 24
 MAX_DAILY_SUMMARIES = 7
 MAX_WEEKLY_SUMMARIES = 20
+NARRATION_INPUT_CAP = 30
+
+
+def service_narrations(world):
+    """Submit and collect the background narrations for roll-up entries that still
+    carry a "pending" request (stored on the entry, so a restart re-submits it)."""
+    from systems import bg_llm
+    from llm.household_summary_narration import narrate_blocking
+    for household in world.get("households", {}).values():
+        label = household.get("name") or "the household"
+        for tier in ("hourly_summaries", "daily_summaries", "weekly_summaries"):
+            for entry in household.get(tier) or []:
+                pending = entry.get("pending")
+                if not pending:
+                    continue
+                key = f"hhsum:{household.get('id')}:{entry.get('id')}"
+                if not bg_llm.is_pending(key):
+                    bg_llm.submit(key, narrate_blocking, pending["kind"], label, pending["lines"])
+                    continue
+                ready, text = bg_llm.take(key)
+                if ready:
+                    if text:
+                        entry["text"] = text
+                    entry.pop("pending", None)
 
 
 # =========================================================
@@ -155,7 +179,7 @@ def on_speech_spoken(data, world):
 # =========================================================
 
 def update_household_hourly_summaries(world):
-    from llm.household_summary_narration import generate_hourly_summary
+    from llm.household_summary_narration import hourly_lines, fallback_text
     from systems.events import maybe_generate_summary_linked_event
     tick = world.get("tick", 0)
     characters = world.get("characters", {})
@@ -172,13 +196,14 @@ def update_household_hourly_summaries(world):
         events = household.get("event_log") or []
         if not events:
             continue
-        text = generate_hourly_summary(household, events, world)
+        lines = hourly_lines(events, characters)
         household.setdefault("hourly_summaries", []).append({
             "id": f"h{tick}",
             "period_start_tick": events[0]["tick"],
             "period_end_tick": tick,
-            "text": text,
+            "text": fallback_text("hourly", lines),      # replaced when the narration lands
             "tick_generated": tick,
+            "pending": {"kind": "hourly", "lines": lines},
         })
         del household["hourly_summaries"][:-MAX_HOURLY_SUMMARIES]
         household["event_log"] = []
@@ -190,7 +215,7 @@ def update_household_hourly_summaries(world):
 # =========================================================
 
 def update_household_daily_summaries(world):
-    from llm.household_summary_narration import generate_daily_summary
+    from llm.household_summary_narration import fallback_text
     tick = world.get("tick", 0)
     cal = world.get("calendar", {})
     day_key = f"{cal.get('year')}-{cal.get('month')}-{cal.get('day')}"
@@ -201,12 +226,12 @@ def update_household_daily_summaries(world):
         # Entries written before the generators validated their result can hold an
         # {"error": "timeout..."} dict as "text" -- skip them rather than crash the roll-up.
         hourly_texts = [h["text"] for h in hourlies if isinstance(h.get("text"), str)]
-        text = generate_daily_summary(household, hourly_texts, world)
         household.setdefault("daily_summaries", []).append({
             "id": f"d{tick}",
             "day_key": day_key,
-            "text": text,
+            "text": fallback_text("daily", hourly_texts),
             "tick_generated": tick,
+            "pending": {"kind": "daily", "lines": hourly_texts[-NARRATION_INPUT_CAP:]},
         })
         del household["daily_summaries"][:-MAX_DAILY_SUMMARIES]
         household["hourly_summaries"] = []
@@ -219,7 +244,7 @@ def update_household_daily_summaries(world):
 # =========================================================
 
 def update_household_weekly_summaries(world):
-    from llm.household_summary_narration import generate_weekly_summary
+    from llm.household_summary_narration import fallback_text
     tick = world.get("tick", 0)
     cal = world.get("calendar", {})
     week_key = f"{cal.get('year')}-{cal.get('month')}-{cal.get('day')}"
@@ -228,12 +253,12 @@ def update_household_weekly_summaries(world):
         if not dailies:
             continue
         daily_texts = [d["text"] for d in dailies if isinstance(d.get("text"), str)]
-        text = generate_weekly_summary(household, daily_texts, world)
         household.setdefault("weekly_summaries", []).append({
             "id": f"w{tick}",
             "week_key": week_key,
-            "text": text,
+            "text": fallback_text("weekly", daily_texts),
             "tick_generated": tick,
+            "pending": {"kind": "weekly", "lines": daily_texts[-NARRATION_INPUT_CAP:]},
         })
         del household["weekly_summaries"][:-MAX_WEEKLY_SUMMARIES]
         household["daily_summaries"] = []

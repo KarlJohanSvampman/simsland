@@ -191,3 +191,79 @@ def generate_weekly_summary(household, daily_texts, world):
     if not isinstance(text, str) or not text.strip():
         text = _fallback_weekly_text(daily_texts)
     return text
+
+
+# =========================================================
+# BACKGROUND (off the tick thread) -- see systems/household_summary.py::
+# service_narrations. The roll-ups used to call run_llm_call() from inside
+# the tick, so a slow model stalled the whole simulation (and every API route
+# behind the world lock) for the duration. Now the tick records a deterministic
+# fallback text plus the inputs, and a worker narrates from plain data later.
+# =========================================================
+
+NARRATION_LINE_CAP = 40
+
+
+def hourly_lines(events, characters):
+    return [_format_event_line(e, characters) for e in events[-NARRATION_LINE_CAP:]]
+
+
+def fallback_text(kind, lines):
+    if kind == "hourly":
+        return " ".join(lines[:6]) if lines else "A quiet hour at home."
+    if kind == "daily":
+        return " ".join(lines[:4]) if lines else "Not much of note happened at home today."
+    return ("This week, under my roof: " + " ".join(lines[:4])) if lines else "I kept quiet watch over an uneventful week."
+
+
+def _prompt(kind, label, lines):
+    NL = chr(10)
+    joined = NL.join(lines) if kind == "hourly" else NL.join(f"- {t}" for t in lines)
+    if kind == "hourly":
+        return ("You narrate a household's hour-by-hour activity for a life-simulation game.", f"""
+Here is a raw log of everything that happened at {label}'s
+home over the last hour, in order:
+
+{joined}
+
+Write a short (2-4 sentence) third-person summary of the hour. Mention
+who did what, where in the house, and -- for anything that finished --
+what the result was. Keep routine moments brief; don't invent detail
+that isn't implied by the log.
+
+Respond with ONLY the summary, no quotes, no extra text.
+""")
+    if kind == "daily":
+        return ("You condense a household's hourly activity logs into one daily summary for a life-simulation game.", f"""
+Here are the hour-by-hour summaries of what happened at
+{label}'s home today, in order:
+
+{joined}
+
+Condense this into one short (3-5 sentence) daily summary -- the
+throughline of the day, not a list. Keep it grounded in what's actually
+described above.
+
+Respond with ONLY the summary, no quotes, no extra text.
+""")
+    return ("You are a house narrating the week just past, in your own first-person voice, for a life-simulation game.", f"""
+Here are the daily summaries of what happened inside {label}'s
+home this past week, in order:
+
+{joined}
+
+Write this week's summary as if the HOUSE ITSELF is narrating its own
+story -- first person ("I watched...", "my walls heard...", "under my
+roof..."), warm and a little wry, the way an old house that's seen a
+lot might talk about the people living in it. 4-6 sentences. Stay
+grounded in what's actually described above -- don't invent new events.
+
+Respond with ONLY the narration, no quotes, no extra text.
+""")
+
+
+def narrate_blocking(kind, label, lines):
+    """Blocking; call from a bg_llm worker. Text, or None (the stored fallback stays)."""
+    system, user = _prompt(kind, label, lines)
+    text = run_llm_call(_call(system, user, {"history": []}), priority=PRIORITY_BACKGROUND)
+    return text if isinstance(text, str) and text.strip() else None

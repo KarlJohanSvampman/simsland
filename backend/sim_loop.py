@@ -638,6 +638,8 @@ def tick(world):
         _loop_guard_service(world)
         from systems.behavior_patterns import service_theories as _service_theories
         _service_theories(world)
+        from systems.household_summary import service_narrations as _service_narrations
+        _service_narrations(world)
 
     # -- Per-tick: conversation floor (who has the ball, notice/ignore timers) --
     try:

@@ -48,6 +48,7 @@ import heapq
 import itertools
 import os
 import threading
+import time
 
 OLLAMA_MAX_CONCURRENCY = int(os.getenv("OLLAMA_MAX_CONCURRENCY", "2"))
 
@@ -153,13 +154,36 @@ def run_llm_call(coro, priority=PRIORITY_NORMAL, timeout=None):
     loop and block the calling thread until it completes (or is aborted
     for a higher-priority arrival -- see module docstring), bounded by
     OLLAMA_MAX_CONCURRENCY concurrent in-flight calls across all callers."""
+    from core import tick_state
+    on_tick = tick_state.in_tick_thread()
+    if on_tick:
+        # The tick holds the world lock for its whole run, so a model call made from
+        # the tick thread stalls the simulation and every API route behind that lock
+        # for as long as the call takes (up to the 90s gate timeout). Bound it: a short
+        # per-call cap and a per-tick budget; callers fall back on a failed call.
+        remaining = tick_state.remaining_budget()
+        if remaining <= 0:
+            coro.close()
+            return dict(_TIMEOUT_ERROR)
+        timeout = min(timeout if timeout is not None else tick_state.TICK_LLM_CALL_MAX_SECONDS,
+                      tick_state.TICK_LLM_CALL_MAX_SECONDS, remaining)
     future = asyncio.run_coroutine_threadsafe(_submit_and_await(coro, priority), _loop)
+    t0 = time.perf_counter()
     try:
         return future.result(timeout=timeout if timeout is not None else LLM_CALL_MAX_WAIT_SECONDS)
     except concurrent.futures.TimeoutError:
         future.cancel()
-        print(f"[llm_gate] call abandoned after {timeout or LLM_CALL_MAX_WAIT_SECONDS}s")
+        print(f"[llm_gate] call abandoned after {timeout or LLM_CALL_MAX_WAIT_SECONDS}s"
+              + (" (on the tick thread)" if on_tick else ""))
         return dict(_TIMEOUT_ERROR)
+    finally:
+        if on_tick:
+            took = time.perf_counter() - t0
+            tick_state.spend(took)
+            import traceback
+            caller = " <- ".join(f"{f.name}({f.filename.rsplit('/', 1)[-1]}:{f.lineno})"
+                                  for f in reversed(traceback.extract_stack(limit=7)[:-1]))
+            print(f"[llm_gate] LLM call on the TICK THREAD took {took:.1f}s (move it to bg_llm): {caller}", flush=True)
 
 
 def gate_failed(result):

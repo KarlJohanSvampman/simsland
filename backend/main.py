@@ -15,7 +15,7 @@ Key changes vs. original:
     removed (redundant LLM cost, and a second silent data-loss path).
 """
 
-import asyncio, os, json, traceback, time
+import asyncio, os, json, traceback, time, threading
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -252,7 +252,12 @@ def _run_tick_and_persist(sim_id: str) -> tuple[dict, dict]:
     and update_world_tick() ran inline on the event loop. Bundling
     everything here moves all of it off that thread too.
     """
+    _t_wait = time.perf_counter()
     with _world_lock:
+        _t_held = time.perf_counter()
+        _tick_watch["thread"] = threading.get_ident()
+        _tick_watch["started"] = _t_held
+        _tick_watch["reported"] = 0.0
         world = load_world(sim_id)
         ensure_world_defaults(world)
         # Loaded fresh every tick (cheap on a cache hit) rather than once
@@ -264,7 +269,12 @@ def _run_tick_and_persist(sim_id: str) -> tuple[dict, dict]:
 
         _maybe_resync_clock_to_real_time(world)
 
-        tick(world)
+        from core import tick_state
+        tick_state.enter()
+        try:
+            tick(world)
+        finally:
+            tick_state.leave()
 
         update_world_tick(sim_id, world["tick"])
 
@@ -298,10 +308,41 @@ def _run_tick_and_persist(sim_id: str) -> tuple[dict, dict]:
         # Durability: periodically persist to Postgres too, so simulation
         # progress survives a backend restart instead of only reflecting
         # whatever was last explicitly saved via the World Editor.
+        _t_persist = time.perf_counter()
         if world["tick"] % 30 == 0:
             save_world(sim_id, persisted_snapshot)
+        _t_end = time.perf_counter()
+        _tick_watch["started"] = None
+        if _t_end - _t_held > SLOW_TICK_LOG_SECONDS:
+            print(f"[tick] tick {world['tick']} held the world lock {_t_end - _t_held:.1f}s "
+                  f"(waited {_t_held - _t_wait:.1f}s for it; tick+persist {_t_persist - _t_held:.1f}s, "
+                  f"db save {_t_end - _t_persist:.1f}s)", flush=True)
 
     return world, dirty
+
+
+SLOW_TICK_LOG_SECONDS = 2.0
+_tick_watch = {"thread": None, "started": None, "reported": 0.0}
+
+
+def _tick_watchdog():
+    """Logs the tick thread's stack whenever a tick has held the world lock longer than
+    SLOW_TICK_LOG_SECONDS (once per 5s of that tick): the long holds are what turn API
+    calls into "simulation busy" 503s, and a stack shows exactly what it is doing."""
+    import sys
+    while True:
+        time.sleep(1.0)
+        started, ident = _tick_watch.get("started"), _tick_watch.get("thread")
+        if not started or not ident:
+            continue
+        held = time.perf_counter() - started
+        if held < SLOW_TICK_LOG_SECONDS * 2 or held - _tick_watch.get("reported", 0.0) < 5.0:
+            continue
+        _tick_watch["reported"] = held
+        frame = sys._current_frames().get(ident)
+        if frame:
+            stack = "".join(traceback.format_stack(frame)[-14:])
+            print(f"[tick] still running after {held:.1f}s holding the world lock; tick thread is at:\n{stack}", flush=True)
 
 
 async def loop():
@@ -377,6 +418,7 @@ async def startup():
     from core.memory_guard import start as _start_memory_guard
     _start_memory_guard()
     init_db()
+    threading.Thread(target=_tick_watchdog, name="tick-watchdog", daemon=True).start()
     asyncio.create_task(loop())
 
 
