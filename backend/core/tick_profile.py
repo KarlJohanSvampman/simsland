@@ -25,6 +25,7 @@ _state = threading.local()
 
 
 def begin_tick():
+    _state.active = True
     _state.prev = None
     _state.prev_t = 0.0
     _state.tick_start = time.perf_counter()
@@ -32,7 +33,10 @@ def begin_tick():
 
 
 def mark(label):
-    """Close the previous section (attributing the elapsed time to it) and open `label`."""
+    """Close the previous section (attributing the elapsed time to it) and open `label`.
+    A no-op outside a tick (tests, tools, a timer fired from elsewhere)."""
+    if not getattr(_state, "active", False):
+        return
     now = time.perf_counter()
     prev = getattr(_state, "prev", None)
     if prev is not None:
@@ -45,6 +49,7 @@ def mark(label):
 def end_tick():
     now = time.perf_counter()
     prev = getattr(_state, "prev", None)
+    _state.active = False
     if prev is None:
         return
     local = _state.local

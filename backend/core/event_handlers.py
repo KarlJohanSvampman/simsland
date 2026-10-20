@@ -498,3 +498,7 @@ subscribe("speech_spoken", _on_household_speech_spoken)
 
 # ── Relationship impact (systems/relationship_ledger.py subscribes on import) ──
 import systems.relationship_ledger  # noqa: E402,F401
+
+
+# ── Clock boundary events + scheduled jobs (systems/calendar_handlers.py) ──
+import systems.calendar_handlers  # noqa: E402,F401

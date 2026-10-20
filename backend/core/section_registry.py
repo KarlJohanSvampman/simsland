@@ -22,24 +22,18 @@ be added without deciding how it will be triggered.
 
 # label -> (kind, owner, becomes)
 REGISTRY = {
-    "tick_head": ("housekeeping", "clock", "calendar advance -> sim clock; schedule self-heal -> on character creation"),
+    "tick_head": ("housekeeping", "clock", "schedule self-heal -> on character creation"),
+    "clock_and_scheduler": ("housekeeping", "clock", "the clock emits boundary events, the scheduler fires due timers (core/clock.py, core/scheduler.py)"),
+
+    # ---- scheduled jobs registered in systems/calendar_handlers.py ----
+    "every:popularity_decay": ("threshold", "social", "lazy decay; no per-minute work"),
+    "every:post_engagement": ("calendar", "social", "time.hour"),
+    "every:orphan_props": ("housekeeping", "world", "fixed at the source: release on interrupt (already done)"),
+    "every:background_services": ("timer", "character", "each background job schedules its own collection wake"),
 
     # ---- calendar boundaries ----
-    "calendar:monday_midnight": ("calendar", "world", "clock event time.week"),
-    "calendar:hour_boundary": ("calendar", "world", "clock event time.hour"),
-    "calendar:new_calendar_day": ("calendar", "world", "clock event time.day"),
-    "calendar:month_start_midnight": ("calendar", "world", "clock event time.month"),
-    "section:weekly": ("calendar", "world", "clock event time.week"),
-    "section:hourly_household_activity_log_narrated_summa": ("calendar", "household", "time.hour -> household narration (already background)"),
-    "section:daily_household_hourly_summaries_one_daily_s": ("calendar", "household", "time.day -> household narration (already background)"),
-    "section:monthly_adult_elderly_trait_belief_adoption": ("calendar", "character", "time.month"),
-    "section:every_sim_minute_popularity_decay": ("threshold", "social", "lazy decay; no per-minute work"),
-    "section:every_sim_hour_social_post_engagement": ("calendar", "social", "time.hour"),
 
     # ---- housekeeping ----
-    "section:orphaned_carried_props": ("housekeeping", "world", "fixed at the source: release on interrupt (already done)"),
-    "every:30_offset_5": ("housekeeping", "world", "orphan-carry sweep; drop once nothing can orphan a prop"),
-    "every:5_offset_2": ("timer", "character", "loop-guard / theory / narration services -> each schedules its own wake"),
     "section:clear_one_tick_departure_flags": ("housekeeping", "character", "flag cleared by the handler that consumes it"),
     "section:prune_expired_transient_ambient_sounds": ("timer", "perception", "expiry timer per sound"),
 
@@ -155,7 +149,13 @@ def base_label(label):
 
 
 def classify(label):
-    return REGISTRY.get(base_label(label))
+    base = base_label(label)      # strips a "#2" suffix, so every:reading#2 -> every:reading
+    if base.startswith("timer:"):
+        owner = base.split(":", 1)[1]
+        # a recurring job that used to be an every() block in tick(): its classification is
+        # kept under the old "every:<cadence key>" label
+        return REGISTRY.get("every:" + owner) or ("timer", owner, "a scheduled handler (core/scheduler.py)")
+    return REGISTRY.get(base)
 
 
 def summary():
