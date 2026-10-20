@@ -1,4 +1,8 @@
-# From one main tick to components with their own clocks — plan
+# Simsland event-driven architecture — canonical plan
+
+(Replaces "components with their own clocks": a component doesn't have a tick, it has
+**handlers, timers, and optionally a temporary active loop**. Revised after an outside review;
+the changes are marked "(review)".)
 
 Status: proposal. Nothing here is built. It is a migration plan, not a rewrite-from-scratch:
 the 261 `systems/` modules and 21 `brain/` modules hold the actual simulation logic and
@@ -48,6 +52,32 @@ ten hours — all come from one structure: everything shares one clock, one lock
 6. **Cross-entity effects are eventual and idempotent.** "A insults B" is an event; B's owner
    applies it when it arrives. At-least-once delivery, idempotent handlers.
 
+### Invariants (review)
+
+These are the rules every later decision is checked against.
+
+- **NO global simulation tick; YES global simulation clock.** The clock answers `now()` and
+  announces meaningful boundaries. It never iterates over entities or "asks everyone".
+- **A component is: event handlers + timers + optionally a temporary active loop.** Never "a tick".
+- **The scheduler is infrastructure and stays dumb.** `schedule(owner, key, at, payload)` means
+  "deliver this event at that time" — it has no idea what the event means. The meaning of a timer
+  belongs to the owner that set it.
+- **Single owner per piece of state** (the rule that removes the global lock). Hunger → body;
+  intentions and the active activity → the character's agency actor; a household's balance →
+  household/economy; relationship A→B → social. Everyone else sends the owner an event or
+  command, the owner mutates and emits the resulting event.
+- **Commands vs events.** A command asks an owner to do something and can be refused; an event
+  says something happened and cannot.
+- **Three consistency tiers** (not "everything is eventual"):
+  1. *character-local state* — strongly ordered (one owner, in-order inbox);
+  2. *direct interactions between entities* (a punch, a handover, a conversation turn) —
+     causally ordered: resolved by one owner of the interaction that re-validates its
+     preconditions (positions, reach, who is awake) **at resolution time**, with the pair's
+     entities locked together in id order for that short step. Stale intent yields "missed"
+     or "no longer possible", never a contradictory result;
+  3. *side effects across domains and read models* (reputation, news, analytics, the view) —
+     eventually consistent and idempotent.
+
 ## 3. Target shape
 
 ```
@@ -75,11 +105,16 @@ ten hours — all come from one structure: everything shares one clock, one lock
   re-keyed idempotently. Replaces activity-duration polling, intention deadlines, appointment due
   checks, wait timers, patience timers, floor timers, loop-guard assessments, conversation
   cleanup, expectation windows, `every()` polling of "is X due".
-- **Character actor** — one logical actor per character owning that character's state: activity
-  lifecycle, intentions, memories, relationships *as seen by them*. It wakes on events addressed
+- **Character agency actor (review)** — one logical actor per character owning that character's
+  *agency*: active activity, intentions, subjective memory, decisions. It does **not** own
+  everything attached to the character — physiology belongs to Body, finances to
+  Household/Economy, relationships and reputation to Social — otherwise it quietly becomes the
+  old `world["characters"][id]` blob again. It wakes on events addressed
   to it (heard, seen, hurt, timer) and on its own timers; decides by async LLM request; applies
   the answer when it returns. No pool, no wait budget, no abandoned decisions (the response
-  is just another event). Replaces `_run_agent`, `AGENT_WAIT_BUDGET`, `cognition_scheduler`
+  is just another event). The decision path is: event/timer wakes the actor → cognition request
+  (the asynchronous context-compiling middleware prepares the prompt) → LLM → a **command**
+  back to the actor → the owning domain handler validates and applies it → resulting events. Replaces `_run_agent`, `AGENT_WAIT_BUDGET`, `cognition_scheduler`
   polling (it already has wake reasons — that's the seed of this).
 - **Movement** — the one legitimately rate-driven component, but only for entities with a
   route: its own loop at its own rate (e.g. 10 Hz), sleeping when nothing moves. It emits
@@ -195,6 +230,7 @@ component; a replayable event log.
 2. In-process first (recommended) or straight to separate processes?
 3. OK to introduce the `WorldView` façade so the 261 systems modules keep working while they
    migrate?
-4. Is eventual consistency between characters acceptable (an effect on B lands a moment after
-   A's action)?
+4. Is the three-tier consistency model (invariants above) acceptable -- strong inside one
+   character, causal and re-validated for direct interactions, eventual for everything else?
+   (review: replaces the earlier blanket "eventual".)
 5. Do you want the event log/replay harness (step 0) built before anything else? I'd say yes.
