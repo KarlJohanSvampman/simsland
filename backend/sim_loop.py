@@ -28,6 +28,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed, wait as _futures_wait
 
 import core.event_handlers  # noqa: F401 — registers all subscriptions on import
+from core import tick_profile as _prof
 
 from core.tick_schedule import every, CADENCE, TICK_RATE_SECONDS
 from core.event_bus     import flush as flush_events
@@ -464,9 +465,21 @@ def _update_nearby_relationships(characters, world):
 # =========================================================
 
 def tick(world):
+    """One simulation tick (profiled per section -- see core/tick_profile.py)."""
+    _prof.begin_tick()
+    try:
+        return _tick_impl(world)
+    finally:
+        _prof.end_tick()
+
+
+def _tick_impl(world):
     world["tick"] += 1
     t = world["tick"]
     set_current_tick(t)
+    _prof.mark("tick_head")
+    from core import event_log as _event_log
+    _event_log.set_tick(t)
 
     advance_calendar(world)
     # Workplace NPCs (systems/workplace_npc.py) are real characters (they
@@ -499,7 +512,9 @@ def tick(world):
             c["schedule"] = generate_week_schedule(c, world)
             adjust_for_household(c, world)
 
+    _prof.mark("section:weekly")
     # -- Weekly ─────────────────────────────────────────────
+    _prof.mark("calendar:monday_midnight")
     if _is_monday_midnight(world):
         for c in characters:
             c["schedule"] = generate_week_schedule(c, world)
@@ -535,17 +550,23 @@ def tick(world):
         from systems.household_summary import update_household_weekly_summaries
         update_household_weekly_summaries(world)
 
+    _prof.mark("section:hourly_household_activity_log_narrated_summa")
     # -- Hourly: household activity log -> narrated summary ─
+    _prof.mark("calendar:hour_boundary")
     if _is_hour_boundary(world):
         from systems.household_summary import update_household_hourly_summaries
         update_household_hourly_summaries(world)
 
+    _prof.mark("section:daily_household_hourly_summaries_one_daily_s")
     # -- Daily: household hourly summaries -> one daily summary ─
+    _prof.mark("calendar:new_calendar_day")
     if _is_new_calendar_day(world, "household_daily_summary"):
         from systems.household_summary import update_household_daily_summaries
         update_household_daily_summaries(world)
 
+    _prof.mark("section:monthly_adult_elderly_trait_belief_adoption")
     # -- Monthly: adult/elderly trait+belief adoption ──────
+    _prof.mark("calendar:month_start_midnight")
     if _is_month_start_midnight(world):
         try:
             from core.definitions import load_definitions
@@ -572,20 +593,26 @@ def tick(world):
         from systems.politics import tick_environment_opinion_drift
         tick_environment_opinion_drift(world)
 
+    _prof.mark("section:every_sim_minute_popularity_decay")
     # -- Every sim-minute: popularity decay (systems/validation.py) ──
     if t % 60 == 0:
         tick_popularity_decay(world)
 
+    _prof.mark("section:every_sim_hour_social_post_engagement")
     # -- Every sim-hour: social post engagement (systems/social_media.py) --
     if t % 3600 == 0:
         tick_post_engagement(world)
 
+    _prof.mark("section:orphaned_carried_props")
     # -- Orphaned carried props (÷30) ───────────────────────
+    _prof.mark("every:30_offset_5")
     if every(world, 30, offset=5):
         from systems.occupancy import release_orphan_carried_props
         release_orphan_carried_props(world)
 
+    _prof.mark("section:fast_perception_attention")
     # -- Fast: perception + attention (÷5) ──────────────────
+    _prof.mark("every:perception")
     if every(world, CADENCE["perception"]):
         for c in characters:
             perceive(c, world)
@@ -596,10 +623,12 @@ def tick(world):
             # systems/excuses.py::check_witnessed_hostility_for_observer.
             check_witnessed_hostility_for_observer(c, world)
 
+    _prof.mark("every:attention")
     if every(world, CADENCE["attention"], offset=1):
         for c in characters:
             update_attention(c, world)
 
+    _prof.mark("section:per_tick_movement")
     # -- Per-tick: movement (main thread, always, before any dispatch) ──
     # Confirmed live bug (player report: a character mid-walk to the
     # kitchen frozen in place for well over a minute, moving only in
@@ -633,6 +662,7 @@ def tick(world):
             except Exception as exc:
                 print(f"[sim_loop] movement error for {c.get('id')}: {exc}")
 
+    _prof.mark("every:5_offset_2")
     if every(world, 5, offset=2):
         from systems.loop_guard import service_all as _loop_guard_service
         _loop_guard_service(world)
@@ -641,6 +671,7 @@ def tick(world):
         from systems.household_summary import service_narrations as _service_narrations
         _service_narrations(world)
 
+    _prof.mark("section:per_tick_conversation_floor")
     # -- Per-tick: conversation floor (who has the ball, notice/ignore timers) --
     try:
         from systems.conversation_floor import tick as _floor_tick
@@ -648,6 +679,7 @@ def tick(world):
     except Exception as exc:
         print(f"[sim_loop] conversation floor error: {exc}")
 
+    _prof.mark("section:per_tick_agent_brain")
     # -- Per-tick: agent brain (parallel) ─────────────────
     # Service worker NPCs are driven by update_services, not LLM — skip them.
     # Each character's LLM call is I/O-bound; workers release the GIL while
@@ -704,16 +736,20 @@ def tick(world):
 
     _mark_dirty(world, char_ids=dirty_char_ids)
 
+    _prof.mark("section:medium_memory_beliefs_relationships")
     # -- Medium: memory / beliefs / relationships (÷15) ─────
+    _prof.mark("every:memory_decay")
     if every(world, CADENCE["memory_decay"], offset=2):
         for c in characters:
             decay_memories(c)
 
+    _prof.mark("every:polarization")
     if every(world, CADENCE["polarization"], offset=3):
         for c in characters:
             polarize_opinions(c)
             compute_political_lean(c)
 
+    _prof.mark("every:relationships")
     if every(world, CADENCE["relationships"], offset=4):
         _update_nearby_relationships(characters, world)
 
@@ -721,6 +757,7 @@ def tick(world):
     # most (perception.py's exposure_ticks) shapes whether they adopt that
     # person's beliefs/traits (trusted) or grow suspicious (distrusted).
     # See systems/influence.py.
+    _prof.mark("every:influence_exposure")
     if every(world, CADENCE["influence_exposure"], offset=21):
         resolve_exposure_influence(world)
 
@@ -729,16 +766,20 @@ def tick(world):
     # deliberately a separate, once-a-day cadence from the exposure
     # resolver above, per the "impact over time... sum it all up maybe on
     # a daily basis" ask. See systems/influence.py::resolve_value_influence.
+    _prof.mark("every:value_influence")
     if every(world, CADENCE["value_influence"], offset=13) and _is_new_calendar_day(world, "value_influence"):
         resolve_value_influence(world)
 
+    _prof.mark("section:medium_household_systems")
     # -- Medium: household systems (÷10) ────────────────────
+    _prof.mark("every:cooking")
     if every(world, CADENCE["cooking"], offset=5):
         for c in characters:
             hh = world.get("households", {}).get(c.get("household_id"))
             if hh:
                 update_cooking_process(c, hh, world)
 
+    _prof.mark("every:reading")
     if every(world, CADENCE["reading"], offset=9):
         for c in characters:
             update_reading_process(c, world)
@@ -747,6 +788,7 @@ def tick(world):
     # character can enter from stress/sleep-deprivation/intoxication;
     # schizophrenia raises the baseline rate rather than getting a
     # separate mechanic.
+    _prof.mark("every:health")
     if every(world, CADENCE["health"], offset=19):
         for c in characters:
             tick_psychosis(c, world)
@@ -757,6 +799,7 @@ def tick(world):
     # on-grid. Same fine-grained cadence as reading (a game window is much
     # longer than a news pick, but attendees shouldn't wait up to a full
     # day to actually leave for kickoff).
+    _prof.mark("every:reading#2")
     if every(world, CADENCE["reading"], offset=17):
         kickoff_scheduled_games(world)
         for c in characters:
@@ -765,35 +808,44 @@ def tick(world):
     # Household-scoped multi-stage processes (laundry, etc.) — ticks
     # forward for every household regardless of who's nearby, same
     # cadence tier as cooking. See systems/task_process.py.
+    _prof.mark("every:cooking#2")
     if every(world, CADENCE["cooking"], offset=33):
         update_household_processes(world)
 
+    _prof.mark("every:deliveries")
     if every(world, CADENCE["deliveries"], offset=6):
         deliver_messages(world)
         update_deliveries(world)
 
+    _prof.mark("every:service_workers")
     if every(world, CADENCE["service_workers"], offset=7):
         update_service_workers(world)
 
+    _prof.mark("every:service_workers#2")
     if every(world, CADENCE["service_workers"], offset=17):
         update_convenience_store_staffing(world)
 
+    _prof.mark("every:household_monitoring")
     if every(world, CADENCE["household_monitoring"], offset=8):
         update_household_monitoring(world)
         tick_caretaker_negotiation(world)
         tick_babysitting_requests(world)
 
+    _prof.mark("every:mentality_compilation")
     if every(world, CADENCE["mentality_compilation"], offset=12):
         from systems.mentality import tick_mentality_compilation
         tick_mentality_compilation(world)
 
+    _prof.mark("section:medium_market")
     # -- Medium: market (÷20) ───────────────────────────────
+    _prof.mark("every:market")
     if every(world, CADENCE["market"], offset=9):
         update_market(world)
         update_stocks(world)
         produce(world)
         consume_households(world)
 
+    _prof.mark("section:slow_still_periodic_systems")
     # -- Slow: still-periodic systems (÷30-60) ──────────────
 
     # Job market — init slots once, refresh daily, process interviews each cycle
@@ -801,6 +853,7 @@ def tick(world):
         init_company_slots(world)
     if not world.get("job_listings"):
         generate_job_listings(world)
+    _prof.mark("every:job_market")
     if every(world, CADENCE["job_market"], offset=10):
         tick_job_market(world)          # daily turnover + new listings
         for c in characters:
@@ -809,6 +862,7 @@ def tick(world):
             advance_driver_license(c, world)       # same real multi-stage-pipeline shape as job_application
             maybe_practice_with_companion(c, world)
 
+    _prof.mark("every:traffic")
     if every(world, CADENCE["traffic"], offset=11):
         update_ambient_traffic(world)
 
@@ -816,28 +870,36 @@ def tick(world):
     # needs single-tick precision to catch the boundary reliably.
     update_bus(world)
 
+    _prof.mark("every:postal")
     if every(world, CADENCE["postal"], offset=12):
         update_postal_service(world)
 
+    _prof.mark("every:postal#2")
     if every(world, CADENCE["postal"], offset=34):
         update_newspaper_delivery(world)
 
+    _prof.mark("every:business_support")
     if every(world, CADENCE["business_support"], offset=14):
         process_business_inboxes(world)
 
+    _prof.mark("every:appliance_degradation")
     if every(world, CADENCE["appliance_degradation"], offset=13):
         update_appliance_degradation(world)
 
+    _prof.mark("every:service_workers#3")
     if every(world, CADENCE["service_workers"], offset=14):
         update_service_vehicles(world)
 
+    _prof.mark("every:service_workers#4")
     if every(world, CADENCE["service_workers"], offset=48):
         update_rideshare_vehicles(world)
 
+    _prof.mark("every:service_workers#5")
     if every(world, CADENCE["service_workers"], offset=18):
         update_services(world)
 
     # World-level random incidents (character-level ones emitted in agent_loop)
+    _prof.mark("every:arrests")
     if every(world, CADENCE["arrests"], offset=15):
         trigger_incident(world, None)  # world-level random only
         # Live bug report: auto_report_incidents() only ran reactively, off
@@ -906,10 +968,12 @@ def tick(world):
                 apply_severity_consequences(c, world)
                 process_return(c, world)
 
+    _prof.mark("every:fires")
     if every(world, CADENCE["fires"], offset=16):
         tick_fire_incidents(world)
 
     # Jail release still needs tick poll
+    _prof.mark("every:trials")
     if every(world, CADENCE["trials"], offset=16):
         for c in characters:
             process_jail(c, world)     # emits character_released
@@ -918,10 +982,12 @@ def tick(world):
         from systems.offgrid import tick_long_stay_checkins
         tick_long_stay_checkins(world)  # periodic narration for long off-grid stays
 
+    _prof.mark("every:news")
     if every(world, CADENCE["news"], offset=17):
         generate_news(world)
         maybe_generate_shared_event(world)
 
+    _prof.mark("every:reading#3")
     if every(world, CADENCE["reading"], offset=23):
         from systems.scripted_conversations import tick_scripted_conversations
         tick_scripted_conversations(world)  # plays back a remote call/sms shared_event's script
@@ -929,9 +995,11 @@ def tick(world):
     # Conversations threaded via action_router.py's apply_speech() aren't
     # tied to a scripted activity with its own end condition anymore, so
     # this is what retires them after a period of silence.
+    _prof.mark("every:conversation_cleanup")
     if every(world, CADENCE["conversation_cleanup"], offset=19):
         cleanup_conversations(world)
 
+    _prof.mark("every:conversation_seating")
     if every(world, CADENCE["conversation_seating"], offset=21):
         from systems.conversation_seating import tick_conversation_seating
         tick_conversation_seating(world)
@@ -939,6 +1007,7 @@ def tick(world):
     # Weather + outdoor temperature exposure (systems/weather.py) --
     # world["weather"] was read by brain/perception.py's room-summary
     # narration but never actually set anywhere before this.
+    _prof.mark("every:weather")
     if every(world, CADENCE["weather"], offset=44):
         from systems.weather import generate_weather_tick, apply_weather_to_characters
         generate_weather_tick(world)
@@ -947,6 +1016,7 @@ def tick(world):
     # Social Projects (systems/social_projects.py) -- proposal expiry
     # (timeout defaults to declined, never auto-accepted) + SCHEDULED ->
     # ACTIVE transition once a project's planned_start_tick arrives.
+    _prof.mark("every:social_projects")
     if every(world, CADENCE["social_projects"], offset=48):
         from systems.social_projects import tick_social_projects
         tick_social_projects(world)
@@ -962,28 +1032,36 @@ def tick(world):
     # fallen asleep or gone off-grid (systems/social.py) -- confirmed live
     # bug: a character could be left mid-conversation with someone asleep
     # for the rest of that activity's real duration.
+    _prof.mark("every:social_availability")
     if every(world, CADENCE["social_availability"], offset=52):
         interrupt_socializing_with_unavailable_targets(world)
 
+    _prof.mark("every:job_market#2")
     if every(world, CADENCE["job_market"], offset=20):
         for c in characters:
             update_investment_behavior(c, world)
 
     # Eviction / migration: emit events when thresholds crossed
+    _prof.mark("every:evictions")
     if every(world, CADENCE["evictions"], offset=18):
         for hh in world.get("households", {}).values():
             check_household_for_eviction(hh, world)  # emits bills_overdue
 
+    _prof.mark("every:migration")
     if every(world, CADENCE["migration"], offset=19):
         check_migration_desires(world)               # emits household_wants_to_move
 
+    _prof.mark("section:conflict_social_drama")
     # -- Conflict / social drama ────────────────────────────────────────
+    _prof.mark("every:conflicts")
     if every(world, CADENCE["conflicts"], offset=24):
         process_conflicts(world)
 
+    _prof.mark("every:grapples")
     if every(world, CADENCE["grapples"], offset=35):
         process_grapples(world)
 
+    _prof.mark("every:grievances")
     if every(world, CADENCE["grievances"], offset=25):
         update_grievances(world)    # decay + emit confrontation_desired
         from systems.goodwill import update_goodwill
@@ -993,14 +1071,17 @@ def tick(world):
             if c.get("_guilt_paranoia"):
                 decay_guilt_paranoia(c)
 
+    _prof.mark("every:contract_checks")
     if every(world, CADENCE["contract_checks"], offset=26):
         check_contract_violations(world)  # emits contract_violated
         cleanup_expired_rule_exceptions(world)  # GC only, see social_rules.py
         decay_worries(world)  # passive suspicion decay, see worries.py
 
+    _prof.mark("every:persona_expectations")
     if every(world, CADENCE["persona_expectations"], offset=42):
         tick_persona_expectations(world)  # value-alignment clashes between close kin
 
+    _prof.mark("every:cleanliness")
     if every(world, CADENCE["cleanliness"], offset=43):
         from systems.chores import tick_room_cleanliness_decay, maybe_react_to_mess
         from systems.refurnishing import maybe_want_to_redecorate
@@ -1012,7 +1093,9 @@ def tick(world):
                 maybe_want_to_redecorate(c, world)
                 tick_clothing_dirty(c, world)
 
+    _prof.mark("section:daily_stats_drift")
     # -- Daily stats drift ──────────────────────────────────
+    _prof.mark("every:socioeconomics")
     if every(world, CADENCE["socioeconomics"], offset=19):
         try:
             from core.definitions import load_definitions
@@ -1026,10 +1109,12 @@ def tick(world):
         tick_trauma(world)
         tick_domestic_control(world)
 
+    _prof.mark("section:police_rss_feed")
     # -- Police RSS feed (real-world-flavored news + crime/traffic stat
     # nudges, see systems/police_feed.py) -- try/except-wrapped the same
     # way the block above is; a network hiccup here must never take the
     # sim down. ─────────────────────────────────────────
+    _prof.mark("every:police_feed")
     if every(world, CADENCE["police_feed"], offset=21):
         try:
             from core.definitions import load_definitions as _load_defs_pf
@@ -1080,16 +1165,20 @@ def tick(world):
             if bd and bd.get("month") == cal.get("month") and bd.get("day") == cal.get("day"):
                 recompute_budget_on_birthday(_c, world)
 
+    _prof.mark("section:clear_one_tick_departure_flags")
     # -- Clear one-tick departure flags (must be first) ────
     clear_departure_flags(world)
 
+    _prof.mark("section:prune_expired_transient_ambient_sounds")
     # -- Prune expired transient ambient sounds (see brain/perception.py's
     # emit_ambient_sound/VOLUME_TIERS) ──────────────────────
     cleanup_ambient_sounds(world)
 
+    _prof.mark("section:intimacy_arousal_decay")
     # -- Intimacy arousal decay (every tick) ───────────────
     tick_intimacy(world)
 
+    _prof.mark("section:impulse_control_pressure_boilover")
     # -- Impulse control pressure + boilover (every tick) ───
     tick_impulse(world)
     tick_harassment(world)
@@ -1098,26 +1187,33 @@ def tick(world):
     tick_crushes(world)
     tick_incidental_speech(world)
 
+    _prof.mark("section:very_slow")
     # -- Very slow (÷300) ───────────────────────────────────
+    _prof.mark("every:crisis")
     if every(world, CADENCE["crisis"], offset=20):
         check_crises(world)
         process_crises(world)
 
+    _prof.mark("every:election")
     if every(world, CADENCE["election"], offset=21):
         check_election(world)
         process_pending_effects(world)
         resolve_legislation_votes(world)
 
+    _prof.mark("every:faction")
     if every(world, CADENCE["faction"], offset=22):
         apply_faction_influence(world)
         apply_public_figure_influence(world)
         apply_social_influence(world)
         process_rival_tensions(world)
 
+    _prof.mark("every:hierarchy")
     if every(world, CADENCE["hierarchy"], offset=23):
         update_hierarchy(world)
 
+    _prof.mark("section:body_lt_needs_systems")
     # -- Body / lt_needs systems ────────────────────────────
+    _prof.mark("every:lt_needs")
     if every(world, CADENCE["lt_needs"], offset=27):
         for c in characters:
             update_lt_needs(c, world)
@@ -1129,11 +1225,14 @@ def tick(world):
             generate_socialize_intention(c, world)
             generate_lt_need_intentions(c, world)
 
+    _prof.mark("every:social_odor")
     if every(world, CADENCE["social_odor"], offset=28):
         for c in characters:
             apply_odor_social_pressure(c, world)
 
+    _prof.mark("section:disease_contagion_proximity_sweep_grouped_by")
     # -- Disease/contagion proximity sweep, grouped by building ────
+    _prof.mark("every:contagion")
     if every(world, CADENCE["contagion"], offset=36):
         groups = {}
         for c in characters:
@@ -1143,7 +1242,9 @@ def tick(world):
             if len(group) > 1:
                 tick_contagion_location(group, world)
 
+    _prof.mark("section:child_needs_oversight_baseline_accountabilit")
     # -- Child needs oversight + baseline accountability contract ──
+    _prof.mark("every:child_care")
     if every(world, CADENCE["child_care"], offset=37):
         tick_child_needs(world)
         tick_child_welfare(world)
@@ -1152,11 +1253,15 @@ def tick(world):
             if c.get("dependents"):
                 tick_dependent_checks(c, world)
 
+    _prof.mark("section:age_based_bedroom_ownership")
     # -- Age-based bedroom ownership ────────────────────────────────
+    _prof.mark("every:bedroom_assignment")
     if every(world, CADENCE["bedroom_assignment"], offset=38):
         tick_bedroom_assignments(world)
 
+    _prof.mark("section:plant_growth_moisture_weeds_character_reacti")
     # -- Plant growth/moisture/weeds + character reaction to neglect ──
+    _prof.mark("every:plants")
     if every(world, CADENCE["plants"], offset=39):
         tick_plants(world)
         from systems.chores import maybe_tend_plants
@@ -1164,10 +1269,13 @@ def tick(world):
             if c.get("alive", True) and not c.get("off_grid"):
                 maybe_tend_plants(c, world)
 
+    _prof.mark("section:food_freshness_decay")
     # -- Food freshness decay ─────────────────────────────────────────
+    _prof.mark("every:food_aging")
     if every(world, CADENCE["food_aging"], offset=40):
         age_food_items(world)
 
+    _prof.mark("section:mobile_data_consumption_entertainment_subscr")
     # -- Mobile data consumption + entertainment-subscription peer
     # desire (systems/telecom.py, systems/subscriptions.py) + the daily
     # home-presence rollover (systems/home_presence.py -- ONE owner of
@@ -1176,6 +1284,7 @@ def tick(world):
     # symptoms (systems/mental_health_effects.py) + noticing a
     # household member's sustained withdrawal (systems/
     # withdrawal_concern.py) ─────────────────────────────────────────
+    _prof.mark("every:daily_finance")
     if every(world, CADENCE["daily_finance"], offset=45) and _is_new_calendar_day(world, "daily_finance"):
         from systems.telecom import tick_daily_data_usage
         from systems.subscriptions import maybe_grow_subscription_desire
@@ -1214,47 +1323,60 @@ def tick(world):
                 resolve_confide_opportunities(c, world)
                 maybe_form_crush(c, world)
 
+    _prof.mark("section:hourly_home_presence_sample")
     # -- Hourly home-presence sample (systems/home_presence.py) -- feeds
     # the mobile-data home-wifi discount above, and is general-purpose
     # for anything else that ever wants "how much of today has this
     # character spent home." ───────────────────────────────────────────
+    _prof.mark("every:home_presence")
     if every(world, CADENCE["home_presence"], offset=46):
         from systems.home_presence import tick_home_presence_sample
         for c in characters:
             if c.get("alive", True) and not c.get("off_grid"):
                 tick_home_presence_sample(c, world)
 
+    _prof.mark("section:body_weight_fitness_trait_sync")
     # -- Body weight/fitness-trait sync ────────────────────────────────
+    _prof.mark("every:body_composition")
     if every(world, CADENCE["body_composition"], offset=41):
         tick_body_composition(world)
 
+    _prof.mark("section:autonomous_intercourse_scene_progression")
     # -- Autonomous intercourse-scene progression (systems/
     # intercourse_session.py) -- foreplay -> main -> afterglow -> reroll,
     # each session paced by its own next_action_tick, not this cadence's
     # interval itself. ─────────────────────────────────────────────────
+    _prof.mark("every:intercourse_sessions")
     if every(world, CADENCE["intercourse_sessions"], offset=48):
         if world.get("intercourse_sessions"):
             from systems.intercourse_session import tick_intercourse_sessions
             tick_intercourse_sessions(world)
 
+    _prof.mark("section:detective_story_chapter_progression")
     # -- Detective-story chapter progression (systems/detective_work.py) --
+    _prof.mark("every:detective_work")
     if every(world, CADENCE["detective_work"], offset=49):
         from systems.detective_work import tick_detective_work
         tick_detective_work(world)
 
+    _prof.mark("every:addictions")
     if every(world, CADENCE["addictions"], offset=47):
         from systems.addictions import tick_addictions
         tick_addictions(world)
 
+    _prof.mark("section:claustrophobia_panic_sweep")
     # -- Claustrophobia/panic sweep (systems/claustrophobia.py) -- catches
     # ANY character stuck making no real position progress while trying to
     # get somewhere, not just a room-specific case; escalates panic, climbs
     # out a real window if one's found once panic's high enough. ─────────
+    _prof.mark("every:claustrophobia")
     if every(world, CADENCE["claustrophobia"], offset=50):
         from systems.claustrophobia import tick_claustrophobia
         tick_claustrophobia(world)
 
+    _prof.mark("section:battery_drain_charging")
     # -- Battery drain + charging (phone, laptop, ...) (÷5) ───────────
+    _prof.mark("every:phone_battery")
     if every(world, CADENCE["phone_battery"], offset=29):
         for c in characters:
             act = c.get("activity") or {}
@@ -1263,7 +1385,9 @@ def tick(world):
             else:
                 update_phone_battery(c)
 
+    _prof.mark("section:phone_carry_drop_forget_behavior")
     # -- Phone carry/drop/forget behavior ────────────────────────────
+    _prof.mark("every:phone_behavior")
     if every(world, CADENCE["phone_behavior"], offset=30):
         for c in characters:
             maybe_set_phone_down(c, world)
@@ -1273,6 +1397,7 @@ def tick(world):
                 maybe_forget_phone(c, world, last_building)
             c["_last_building_id"] = current_building
 
+    _prof.mark("section:individual_wait_activities")
     # -- Individual wait activities (microwave, phone hold, ...) ────
     # c["character_wait"] is deliberately its own field, not folded into
     # c["activity"] — agent_loop.py returns early every tick whenever
@@ -1281,6 +1406,7 @@ def tick(world):
     # sitting in c["activity"] can never be "free to do other things
     # meanwhile." The wait state has to live somewhere the LLM loop
     # doesn't treat as blocking.
+    _prof.mark("every:character_wait")
     if every(world, CADENCE["character_wait"], offset=34):
         for c in characters:
             wait = c.get("character_wait")
@@ -1289,6 +1415,7 @@ def tick(world):
                 from brain.cognition_scheduler import wake_character
                 wake_character(c, world, "wait_ready")
 
+    _prof.mark("every:calendar_events")
     if every(world, CADENCE["calendar_events"], offset=32):
         check_calendar_reminders(world)
         check_reminders(world)

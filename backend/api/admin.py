@@ -784,3 +784,41 @@ def preview_mentality(payload: dict, sim_id: str = DEFAULT_SIM_ID):
         "concepts": throwaway_world["principle_concepts"],
         "adjectives": defs.get("adjectives_registry", {}),
     }
+
+
+# ── Step 0 of the event-driven migration: see docs/distributed_architecture_plan.md ──
+
+@router.get("/tick_profile")
+def tick_profile(top: int = 0, reset: bool = False):
+    """Where the tick spends its time, per section (core/tick_profile.py): how often each
+    section was reached, how often it actually did work (active_pct), and its cost."""
+    from core import tick_profile as tp
+    out = tp.report(top or None)
+    if reset:
+        tp.reset()
+    return out
+
+
+@router.get("/event_log")
+def event_log_recent(limit: int = 100, type: str | None = None, source: str = "ring"):
+    """The newest events through the bus. source=ring (this process) or stream (Redis, survives restarts)."""
+    from core import event_log
+    limit = max(1, min(limit, 2000))
+    if source == "stream":
+        return {"source": "stream", "events": event_log.stream_range(limit, type)}
+    return {"source": "ring", "events": event_log.recent(limit, type)}
+
+
+@router.get("/event_log/export")
+def event_log_export(limit: int = 1000, type: str | None = None):
+    """One JSON event per line, oldest first: the input for tools/replay_events.py."""
+    from fastapi.responses import PlainTextResponse
+    from core import event_log
+    return PlainTextResponse(event_log.export_jsonl(max(1, min(limit, 20000)), type), media_type="application/x-ndjson")
+
+
+@router.get("/event_log/handlers")
+def event_log_handlers(top: int = 40):
+    """Per event type and handler: calls, errors, total/avg/max milliseconds."""
+    from core import event_log, event_bus
+    return {"handlers": event_log.handler_stats(top), "bus": event_bus.stats()}

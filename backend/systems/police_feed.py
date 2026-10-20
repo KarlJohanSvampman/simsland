@@ -172,9 +172,17 @@ def tick_police_feed(world, defs):
     Network/parse failures are swallowed entirely -- same "a bad tick
     from an external service must never take down the sim" precedent
     action_router.py's Wikipedia lookup already established."""
-    try:
-        items = _fetch_feed_items()
-    except Exception:
+    # The HTTPS fetch used to run right here, on the tick thread under the world lock
+    # (the tick profile showed it as most of a quiet tick, and it can stall for its whole
+    # timeout when the network is slow). Fetch in the background; this call either starts
+    # a fetch or collects the one that finished since the last call.
+    from systems import bg_llm
+    key = "police_feed_fetch"
+    if not bg_llm.is_pending(key):
+        bg_llm.submit(key, _fetch_feed_items)
+        return
+    ready, items = bg_llm.take(key)
+    if not ready or not items:
         return
 
     seen = world.setdefault("_police_feed_seen", [])
