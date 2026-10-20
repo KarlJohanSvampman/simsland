@@ -146,6 +146,8 @@ def _scrub_leftovers_after_wipe(world):
             world[key] = kind()
     for key in [k for k in world if k.startswith("_") and k.endswith("_sessions")]:
         world[key] = {}      # per-character LLM session caches
+    # character-owned timers ("body:<id>", ...); the recurring jobs have no ":" in their owner
+    world["timers"] = [t for t in world.get("timers", []) if ":" not in t.get("owner", "")]
 
     for prop in world.get("props", []):
         for holder in [prop] + list(prop.get("anchors") or []):
@@ -326,6 +328,8 @@ def remove_character(payload: dict, sim_id: str = DEFAULT_SIM_ID):
             for anchor in prop.get("anchors", []) or []:
                 if anchor.get("occupied_by") == char_id:
                     anchor["occupied_by"] = None
+
+        world["timers"] = [t for t in world.get("timers", []) if not t.get("owner", "").endswith(f":{char_id}")]
 
         save_world(sim_id, world)
 

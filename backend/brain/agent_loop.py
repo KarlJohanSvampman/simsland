@@ -211,7 +211,11 @@ def update_internal_state(
         _mark_dirty(world, char_ids={c["id"]})
 
     ensure_body(c)           # migrate old characters; no-op on new ones
-    update_body_needs(c, world=world)
+    # The needs are lazy values (systems/body_lazy.py): nothing is integrated here per tick.
+    # This O(1) check only reacts to a regime flip (sleep started/ended, a stimulant ran out),
+    # a meal/shower/toilet that touched the body, or values getting staler than 30 ticks.
+    from systems.body_lazy import tick_check as _body_tick_check
+    _body_tick_check(c, world)
     update_emotion(
         c,
         world
@@ -244,7 +248,9 @@ def update_internal_state(
     consolidate_life_narratives(c)
 
     consolidate_identity(c)
-    generate_body_intentions(c, world)
+    # generate_body_intentions() is no longer polled every tick: it runs when the body-driven
+    # intentions would change (forward-probed timer), on a regime flip, or after a meal/
+    # shower/toilet -- see systems/body_lazy.py.
 
 # =========================================================
 # ECONOMY
@@ -641,6 +647,11 @@ def update_agent(
         # progresses or clears it while they're off-grid.
         from systems.occupancy import interrupt_activity
         interrupt_activity(c, world)
+
+    # Needs don't move while off-grid or on a trip: catch the body up under the regime that
+    # just ended before this character stops being updated (systems/body_lazy.py).
+    from systems.body_lazy import tick_check as _body_tick_check_early
+    _body_tick_check_early(c, world)
 
     if c.get(
         "off_grid"

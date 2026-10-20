@@ -253,11 +253,18 @@ def drain_stamina(c, amount):
 
 # ── main tick ─────────────────────────────────────────────────────────────────
 
-def update_body_needs(c, dt=1.0, world=None):
+def update_body_needs(c, dt=1.0, world=None, asleep=None, stimulant=None, check_health=True):
+    """Advance the needs by `dt` ticks. Every rate is per tick and is multiplied by dt, so
+    one call with dt=N stands in for N one-tick calls while the regime (asleep / awake /
+    stimulant) is constant -- which is how systems/body_lazy.py uses it.
+
+    asleep / stimulant: override the regime read from the character (the lazy integrator
+    catches up an interval under the regime that held DURING it, not the one now).
+    check_health=False skips the health-threshold events (forward probes must not emit)."""
     ensure_body(c)
     b  = c["body"]
     tr = c.get("traits", [])
-    is_asleep = (c.get("activity") or {}).get("type") == "sleep"
+    is_asleep = asleep if asleep is not None else (c.get("activity") or {}).get("type") == "sleep"
 
     # ── HOURS AWAKE  (real-seconds based, not tick-rate dependent) ───────────
     if world is not None:
@@ -307,7 +314,10 @@ def update_body_needs(c, dt=1.0, world=None):
     # see on_consume_complete) -- suppresses fatigue accrual and eases
     # energy drain while active, a real "push through it" effect rather
     # than caffeine just being an instant flat energy top-up.
-    stimulant_active = world is not None and world.get("tick", 0) < b.get("_stimulant_until_tick", 0)
+    if stimulant is not None:
+        stimulant_active = stimulant
+    else:
+        stimulant_active = world is not None and world.get("tick", 0) < b.get("_stimulant_until_tick", 0)
 
     # Carried sleep debt makes awake hours feel harder -- both fatigue and
     # energy move faster while debt is elevated (see
@@ -429,7 +439,8 @@ def update_body_needs(c, dt=1.0, world=None):
             b["_nutrients_reset_day"] = today_key
 
     clamp_body(c)
-    _check_health_thresholds(c)
+    if check_health:
+        _check_health_thresholds(c)
 
 
 def _apply_sleep_debt_effects(c):
@@ -541,6 +552,7 @@ def on_sleep_complete(c, duration_minutes, world=None):
     b["hours_awake"] = 0.0
     if world is not None:
         b["_wake_sim_time"] = world.get("sim_time", 0.0)
+    touch(c)
 
 
 def on_shower_complete(c):
@@ -549,22 +561,26 @@ def on_shower_complete(c):
     b["odor"]      = 2
     # Partial mouth hygiene improvement (steam/rinsing)
     b["mouth_hygiene"] = min(100, b["mouth_hygiene"] + 15)
+    touch(c)
 
 
 def on_bath_complete(c):
     b = c["body"]
     b["hygiene"]   = 95
     b["odor"]      = 3
+    touch(c)
 
 
 def on_brush_teeth_complete(c):
     b = c["body"]
     b["mouth_hygiene"] = 98
+    touch(c)
 
 
 def on_wash_hands_complete(c):
     b = c["body"]
     b["hygiene"] = min(100, b["hygiene"] + 8)
+    touch(c)
 
 
 def on_eat_complete(c, nutrition=0.5):
@@ -575,6 +591,7 @@ def on_eat_complete(c, nutrition=0.5):
 
     from systems.body_composition import record_calories_in
     record_calories_in(c, nutrition)
+    touch(c)
 
 
 def on_drink_complete(c, hydration_value=40, volume=0):
@@ -583,6 +600,7 @@ def on_drink_complete(c, hydration_value=40, volume=0):
     b["recent_intake"] = min(100, b["recent_intake"] + 30)
     if volume:
         b["bladder"] = min(100, b["bladder"] + volume)
+    touch(c)
 
 
 def on_consume_complete(c, world, item_tmpl):
@@ -664,6 +682,7 @@ def on_toilet_complete(c):
     # randomized starting point above.
     b["bladder"] = random.uniform(2, 8)
     b["bowels"]  = max(0, b["bowels"] - random.uniform(50, 65))
+    touch(c)
 
 
 def on_vomit_complete(c, world=None):
@@ -677,6 +696,7 @@ def on_vomit_complete(c, world=None):
     b["hygiene"] = max(0, b.get("hygiene", 100) - 20)
     b["mouth_hygiene"] = max(0, b.get("mouth_hygiene", 100) - 15)
     c["stress"] = max(0, c.get("stress", 0) - 5)
+    touch(c)
 
     state = c.get("condition_state", {})
     for cond_key, cond_state in state.items():
@@ -711,6 +731,12 @@ def get_breath_label(mouth_hygiene):
 
 
 # ── clamping ──────────────────────────────────────────────────────────────────
+
+def touch(c):
+    """Something changed the body directly (a meal, a shower, the toilet, ...): the
+    intentions derived from it must be re-evaluated now, not at the next timer."""
+    c.setdefault("_body_lazy", {})["touched"] = True
+
 
 def clamp_body(c):
     for k, v in c["body"].items():

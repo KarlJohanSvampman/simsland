@@ -2443,6 +2443,13 @@ def build_context(
     staged=()
 ):
 
+    # Needs are lazy (systems/body_lazy.py): bring them up to now before describing them.
+    try:
+        from systems.body_lazy import sync as _sync_body
+        _sync_body(c, world)
+    except Exception:
+        pass
+
     tick = world.get("tick", 0)
     last_full = c.get("_last_full_context_tick")
     due_for_reorient = last_full is None or (tick - last_full) >= FULL_CONTEXT_REORIENT_TICKS

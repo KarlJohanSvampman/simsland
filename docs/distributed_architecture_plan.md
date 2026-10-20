@@ -234,3 +234,22 @@ component; a replayable event log.
    character, causal and re-validated for direct interactions, eventual for everything else?
    (review: replaces the earlier blanket "eventual".)
 5. Do you want the event log/replay harness (step 0) built before anything else? I'd say yes.
+
+## 10. Progress log
+
+- **Step 0 (done, `4f4667e`)** — per-section tick profiling (`/admin/tick_profile`), section registry
+  (`core/section_registry.py`), durable event log + handler timing + replay
+  (`core/event_log.py`, `tools/replay_events.py`).
+- **Step 1 (done, `e5f001d`)** — `core/clock.py` (time.hour/day/week/month), `core/scheduler.py`
+  (durable timers), 71 recurring jobs extracted from `tick()` (`_tick_impl` ~850 → ~490 lines).
+- **Step 2 (done)** — lazy needs: `systems/body_lazy.py`. The body is integrated on demand under the
+  regime that held during the interval (asleep / awake / frozen / stimulant) using the existing
+  `update_body_needs(dt=...)`; a per-character timer wakes the character at the moment its
+  body-driven intentions would change, found by **forward-probing a copy of the body with the real
+  update function and the real intention generator** (chunked, then bisected) — no threshold is
+  duplicated. Per tick there is only an O(1) check (regime flip / touched / staler than 30 ticks).
+  Equivalence test: `tests/test_body_lazy.py`.
+  The same forward-probe technique applies to the other threshold-kind sections (cleanliness,
+  plants, food aging, batteries, addictions, lt_needs).
+- **Next** — step 3: character actors (replace the agent pool / per-tick `update_agent`), then the
+  per-entity state store.
