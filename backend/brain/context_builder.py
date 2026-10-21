@@ -2450,6 +2450,11 @@ def build_context(
     except Exception:
         pass
 
+    # What deserves the character's attention right now: computed when a decision actually
+    # needs it, not every tick (see brain/agent_loop.py).
+    from brain.situations.selector import select_situation
+    c["selected_situation"] = select_situation(c, world)
+
     tick = world.get("tick", 0)
     last_full = c.get("_last_full_context_tick")
     due_for_reorient = last_full is None or (tick - last_full) >= FULL_CONTEXT_REORIENT_TICKS

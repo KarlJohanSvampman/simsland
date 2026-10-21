@@ -150,6 +150,8 @@ def base_label(label):
 
 def classify(label):
     base = base_label(label)      # strips a "#2" suffix, so every:reading#2 -> every:reading
+    if base.split(":", 1)[0] in ("agent", "internal", "economy", "offgrid"):
+        return ("agent_step", "character", "per-character steps of update_agent(): to be made lazy / timer-driven")
     if base.startswith("timer:"):
         owner = base.split(":", 1)[1]
         # a recurring job that used to be an every() block in tick(): its classification is

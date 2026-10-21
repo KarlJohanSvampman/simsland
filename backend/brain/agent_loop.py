@@ -61,6 +61,7 @@ from brain.llm_brain import (
     think
 )
 
+from core import tick_profile as _prof
 from brain.cognition_scheduler import (
     should_think,
     note_think,
@@ -205,48 +206,63 @@ def update_internal_state(
     # character: not off-grid and not mid-trip means NOT travel_hidden,
     # full stop -- self-heals within one tick regardless of which
     # specific code path caused the staleness.
+    _prof.mark("internal:if_L208")
     if c.get("travel_hidden") and not c.get("off_grid") and not c.get("travel_state"):
         c["travel_hidden"] = False
         from sim_loop import _mark_dirty
         _mark_dirty(world, char_ids={c["id"]})
 
+    _prof.mark("internal:ensure_body")
     ensure_body(c)           # migrate old characters; no-op on new ones
     # The needs are lazy values (systems/body_lazy.py): nothing is integrated here per tick.
     # This O(1) check only reacts to a regime flip (sleep started/ended, a stimulant ran out),
     # a meal/shower/toilet that touched the body, or values getting staler than 30 ticks.
     from systems.body_lazy import tick_check as _body_tick_check
+    _prof.mark("internal:_body_tick_check")
     _body_tick_check(c, world)
+    _prof.mark("internal:update_emotion")
     update_emotion(
         c,
         world
     )
     # Ensure lt_needs distributed (idempotent — no-op if already set)
     from systems.lt_needs import distribute_lt_needs
+    _prof.mark("internal:distribute_lt_needs")
     distribute_lt_needs(c, world=world)
 
+    _prof.mark("internal:clear_expired_speech")
     clear_expired_speech(c, world)
 
+    _prof.mark("internal:promote_pending_posture")
     promote_pending_posture(c, world)
 
+    _prof.mark("internal:decay_memories")
     decay_memories(c)
 
+    _prof.mark("internal:decay_habits")
     decay_habits(c)
 
+    _prof.mark("internal:process_health")
     process_health(
         c,
         world
     )
 
     from systems.waiting import tick_waiting
+    _prof.mark("internal:tick_waiting")
     tick_waiting(c, world)
 
     from systems.curiosity import tick_curiosity
+    _prof.mark("internal:tick_curiosity")
     tick_curiosity(c, world)
 
+    _prof.mark("internal:consolidate_relationship_narratives")
     consolidate_relationship_narratives(c)
 
+    _prof.mark("internal:consolidate_life_narratives")
     consolidate_life_narratives(c)
 
+    _prof.mark("internal:consolidate_identity")
     consolidate_identity(c)
     # generate_body_intentions() is no longer polled every tick: it runs when the body-driven
     # intentions would change (forward-probed timer), on a regime flip, or after a meal/
@@ -274,11 +290,13 @@ def update_economy(
     # c.get("interview"): return`), matching its own docstring's "automatic
     # per-economy-tick path" framing.
 
+    _prof.mark("economy:apply_for_job")
     apply_for_job(
         c,
         world
     )
 
+    _prof.mark("economy:attempt_pay_bills")
     attempt_pay_bills(
         c,
         world
@@ -288,20 +306,25 @@ def update_economy(
     # bank balance should try to pay off debt sooner, not just let it
     # carry along at minimum forever. Self-gated to once per calendar day.
     from systems.loans import maybe_prepay_debt
+    _prof.mark("economy:maybe_prepay_debt")
     maybe_prepay_debt(c, world)
 
     # Per the user's explicit ask: an elderly character past retirement
     # age stops working (and stops being expected to) instead of working
     # indefinitely. Self-gated on c["retired"], cheap no-op afterward.
     from systems.retirement import maybe_retire, maybe_retire_disabled
+    _prof.mark("economy:maybe_retire")
     maybe_retire(c, world)
+    _prof.mark("economy:maybe_retire_disabled")
     maybe_retire_disabled(c, world)
 
     # Per the user's explicit ask: hourly memory consolidation into a
     # separate long-term store, plus periodic random forgetting of the
     # raw short-term log. Both self-gate on their own tick interval.
     from systems.memory_consolidation import maybe_consolidate_memories, maybe_forget_short_term
+    _prof.mark("economy:maybe_consolidate_memories")
     maybe_consolidate_memories(c, world)
+    _prof.mark("economy:maybe_forget_short_term")
     maybe_forget_short_term(c, world)
 
 
@@ -316,36 +339,43 @@ def update_offgrid(
     world
 ):
 
+    _prof.mark("offgrid:process_return")
     process_return(
         c,
         world
     )
 
+    _prof.mark("offgrid:update_travel")
     update_travel(
         c,
         world
     )
 
+    _prof.mark("offgrid:maybe_go_offgrid")
     maybe_go_offgrid(
         c,
         world
     )
 
+    _prof.mark("offgrid:maybe_schedule_doctor_visit")
     maybe_schedule_doctor_visit(
         c,
         world
     )
 
+    _prof.mark("offgrid:resolve_due_appointments")
     resolve_due_appointments(
         c,
         world
     )
 
+    _prof.mark("offgrid:maybe_seek_validation_from_queue")
     maybe_seek_validation_from_queue(
         c,
         world
     )
 
+    _prof.mark("offgrid:check_validation_refresh")
     check_validation_refresh(
         c,
         world
@@ -635,6 +665,7 @@ def update_agent(
     # OFFGRID
     # =====================================
 
+    _prof.mark("agent:update_offgrid")
     update_offgrid(
 
         c,
@@ -642,6 +673,7 @@ def update_agent(
         world
     )
 
+    _prof.mark("agent:if_L645")
     if c.get("off_grid") and c.get("activity"):
         # Whoever is away can't also be mid-activity at home; nothing else ever
         # progresses or clears it while they're off-grid.
@@ -651,8 +683,10 @@ def update_agent(
     # Needs don't move while off-grid or on a trip: catch the body up under the regime that
     # just ended before this character stops being updated (systems/body_lazy.py).
     from systems.body_lazy import tick_check as _body_tick_check_early
+    _prof.mark("agent:_body_tick_check_early")
     _body_tick_check_early(c, world)
 
+    _prof.mark("agent:if_L656")
     if c.get(
         "off_grid"
     ) or c.get(
@@ -661,15 +695,18 @@ def update_agent(
         return
 
     from systems.activity_watchdog import check_activity_watchdog
+    _prof.mark("agent:check_activity_watchdog")
     check_activity_watchdog(c, world)
 
     from systems.idle_quirks import advance_idle_quirk
+    _prof.mark("agent:advance_idle_quirk")
     advance_idle_quirk(c, world)
 
     # =====================================
     # INTERNAL STATE
     # =====================================
 
+    _prof.mark("agent:update_internal_state")
     update_internal_state(
 
         c,
@@ -681,18 +718,21 @@ def update_agent(
     # PERSISTENT DESIRES
     # =====================================
 
+    _prof.mark("agent:update_desires")
     update_desires(
     c,
     world
     )
 
     from brain.intentions import check_intention_deadlines
+    _prof.mark("agent:check_intention_deadlines")
     check_intention_deadlines(c, world)
 
     # =====================================
     # EXPECTATIONS
     # =====================================
 
+    _prof.mark("agent:update_expectations")
     update_expectations(
         c,
         world
@@ -702,6 +742,7 @@ def update_agent(
     # CONVENIENCE / STABILITY
     # =====================================
 
+    _prof.mark("agent:update_convenience")
     update_convenience(
         c,
         world
@@ -715,24 +756,29 @@ def update_agent(
     # =====================================
 
     from systems.whereabouts import check_ask_whereabouts, deliver_pending_relays
+    _prof.mark("agent:deliver_pending_relays")
     deliver_pending_relays(c, world)
+    _prof.mark("agent:check_ask_whereabouts")
     check_ask_whereabouts(c, world)
 
     # A child who watched grown-ups argue wants to know why -- see
     # systems/child_cognition.py. No-op for everyone else.
     from systems.child_cognition import update_child_cognition
+    _prof.mark("agent:update_child_cognition")
     update_child_cognition(c, world)
 
     # =====================================
     # COOKING FOOD
     # =====================================
 
+    _prof.mark("agent:get")
     household = world[
         "households"
     ].get(
         c.get("household_id")
     )
 
+    _prof.mark("agent:if_L736")
     if household:
 
         update_cooking_process(
@@ -748,6 +794,7 @@ def update_agent(
     # REFLECTIONS
     # =====================================
 
+    _prof.mark("agent:process_reflections")
     process_reflections(
 
         c,
@@ -759,6 +806,7 @@ def update_agent(
     # SOCIAL INTENTIONS
     # =====================================
 
+    _prof.mark("agent:update_social_intentions")
     update_social_intentions(
 
         c,
@@ -770,6 +818,7 @@ def update_agent(
     # ECONOMY
     # =====================================
 
+    _prof.mark("agent:update_economy")
     update_economy(
 
         c,
@@ -781,6 +830,7 @@ def update_agent(
     # SCHEDULES
     # =====================================
 
+    _prof.mark("agent:update_schedule_runtime")
     update_schedule_runtime(
 
         c,
@@ -792,12 +842,15 @@ def update_agent(
     # CLEAN / SORT INTENTIONS
     # =====================================
 
+    _prof.mark("agent:clean_intentions")
     clean_intentions(c)
 
     # Boost priorities for activities the character habitually does at this hour
     from systems.habits import apply_habit_bias_to_intentions
+    _prof.mark("agent:apply_habit_bias_to_intentions")
     apply_habit_bias_to_intentions(c, world)
 
+    _prof.mark("agent:sort_intentions")
     sort_intentions(c)
 
     # =====================================
@@ -813,19 +866,26 @@ def update_agent(
     # one" framing.
     # =====================================
 
-    from brain.situations.selector import select_situation
-    c["selected_situation"] = select_situation(c, world)
+    # select_situation() is NOT run here any more: its only reader is the prompt built for a
+    # decision, so it is computed lazily in brain/context_builder.py::build_context (the
+    # moment it is needed). Running it every tick also recorded a "selection" into
+    # c["_situation_history"] every tick -- a 40-entry window, so the novelty/cooldown
+    # scoring only ever saw the last 40 TICKS and penalised whatever had just been chosen
+    # for being chosen. Recorded once per decision it now covers the last 40 decisions,
+    # which is what the cooldowns (5-60 minutes) were written for.
 
     # =====================================
     # ITEM KNOWLEDGE DECAY
     # =====================================
 
+    _prof.mark("agent:update_item_knowledge")
     update_item_knowledge(c, world)
 
     # =====================================
     # ACTIVE ACTIVITY
     # =====================================
 
+    _prof.mark("agent:if_L829")
     if c.get("activity"):
 
         # An activity's own "walking" phase (activities.py::execute_activity)
@@ -1003,6 +1063,7 @@ def update_agent(
     # always counts as "still moving" here even though it doesn't drive
     # is_moving itself -- it's attached to the dragger, not walking its
     # own route.
+    _prof.mark("agent:if_L1006")
     if (c.get("is_moving") or c.get("pushing_prop_id")
             or c.get("travel_state") in TRAVEL_WALKING_STATES):
         return
@@ -1066,11 +1127,14 @@ def update_agent(
     # A decision already with the model (brain/cognition_actor.py): the character carries on
     # living -- everything above this point still ran -- but doesn't ask again.
     from brain.cognition_actor import is_waiting, request_decision
+    _prof.mark("agent:if_L1069")
     if is_waiting(c):
         return
 
+    _prof.mark("agent:should_think")
     wake_reason = should_think(c, world)
 
+    _prof.mark("agent:if_L1074")
     if not wake_reason:
         return
 
@@ -1078,6 +1142,7 @@ def update_agent(
     # the built-in think() below ever sees it, so roaming/checking the door/
     # pausing at a window is real base behavior, not something either brain
     # has to remember to offer. See systems/idle_quirks.py.
+    _prof.mark("agent:if_L1081")
     if wake_reason == "idle":
         from systems.idle_quirks import maybe_delay_or_quirk
         if maybe_delay_or_quirk(c, world):
@@ -1088,6 +1153,7 @@ def update_agent(
     # is_external() is only true while the middleware's heartbeat is fresh, so
     # a dead middleware falls straight back to the built-in think() below.
     from brain.external_brain import is_external
+    _prof.mark("agent:if_L1091")
     if is_external(c):
         return
 
@@ -1096,6 +1162,7 @@ def update_agent(
     # =====================================
 
     from brain.cognition_scheduler import wake_line as _wake_line
+    _prof.mark("agent:build_context")
     context = build_context(
         c,
         world,
@@ -1116,6 +1183,7 @@ def update_agent(
     # PRIORITY_URGENT; everything else is PRIORITY_NORMAL.
     from brain.intentions import final_priority
     from llm.llm_gate import PRIORITY_URGENT, PRIORITY_NORMAL
+    _prof.mark("agent:get#2")
     top_intentions = c.get("active_intentions", [])
     top_category = max(top_intentions, key=lambda i: final_priority(i, c)).get("category") if top_intentions else None
     llm_priority = (
@@ -1127,4 +1195,5 @@ def update_agent(
     # Ask the model in the background and carry on: the answer comes back as a
     # `decision_ready` event, is noted and processed (re-validated against the world as it is
     # THEN) by brain/cognition_actor.py::on_decision_ready. Nothing here blocks the tick.
+    _prof.mark("agent:request_decision")
     request_decision(c, world, context, wake_reason, llm_priority)

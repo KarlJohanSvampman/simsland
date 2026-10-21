@@ -259,6 +259,18 @@ component; a replayable event log.
   event and `process_decision()` re-validates it against the world as it is *then*. Late answers for
   someone who died / went off-grid are dropped; a request with no answer after 240 s is re-asked.
   Tests: `tests/test_cognition_actor.py`.
+- **Step 4 (partial; "step 5" in chat)** — the per-character pipeline is now profiled (`agent:*` / `internal:*` /
+  `economy:*` / `offgrid:*` marks in `/admin/tick_profile`). Measured on a populated world (4 characters,
+  1200 ticks, ~0.6 ms per character-tick in total), the cost is concentrated in four derivations:
+  `select_situation` 19%, `update_social_intentions` 16%, `update_expectations` 14%, `sort_intentions` 6%;
+  everything else is ≤ 4% each and 95–100% of calls change nothing. Done: **`select_situation` is computed
+  when a decision needs it** (in `build_context`), not every tick — this also fixes its history, which
+  recorded a selection per *tick* into a 40-entry window, so novelty/cooldown (written for minutes) only ever
+  saw the last 40 ticks. Not done, deliberately: the other derivations are pure functions of state that many
+  systems write directly (relationships, emotion, lt_needs, expectations, intentions). Gating them exactly
+  needs a *change notification* on those writes (dirty flags), otherwise a gate has to guess its inputs and
+  silently changes behaviour — that is what the per-entity state store (versions + change events) provides,
+  so it comes first; the derivations then become "recompute when my inputs' version changed".
 - **Next** — move the remaining per-tick polls inside `update_agent()` (emotion, habits, health,
   waiting, curiosity, expectations, economy, ...) onto the same lazy/timer pattern so an idle
   character costs nothing, then the per-entity state store (removes the global world lock).

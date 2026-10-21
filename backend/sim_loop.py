@@ -192,7 +192,9 @@ STALE_PENDING_SECONDS = 180.0
 
 def _run_agent(c, world, t):
     """Run one character's agent tick. Called from a worker thread."""
+    _prof.mark("agent:item_knowledge")
     update_item_knowledge(c, world)
+    _prof.mark("agent:reaction_queue")
     process_reaction_queue(c, t)
     update_agent(c, world)
     return c["id"]

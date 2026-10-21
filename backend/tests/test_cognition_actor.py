@@ -139,16 +139,13 @@ check("the answers are applied on a later tick", len(processed) == asked and not
 t_applied = {p[0]: p[1] for p in processed}
 check("they landed at the tick after the model finished, not mid-way", all(v > 25 for v in t_applied.values()), str(t_applied))
 
-# ── restart: a pending request with no worker is re-asked after the timeout ────────────
-calls.clear(); processed.clear(); delay[0] = 0.2
+# ── restart: a pending request with no worker no longer blocks the character ──────────
 w, c = fresh()
 c["cognition"]["pending"] = {"id": "lost", "tick": w["tick"], "wall": time.time() - ca.REQUEST_TIMEOUT_SECONDS - 1, "wake_reason": "idle"}
-c["cognition"]["next_think_tick"] = 0; c["cognition"]["wake_reason"] = "idle"; c["activity"] = None; c["active_intentions"] = []
-for _ in range(3):
-    ensure_world_defaults(w); sim_loop.tick(w)
-time.sleep(0.6)
-ensure_world_defaults(w); sim_loop.tick(w)
-check("after a restart a lost request is re-asked", any(call[0] == cid for call in calls), str(calls))
+check("after a restart a request nobody is working on is dropped, so the character is asked again", not ca.is_waiting(c) and ca.pending(c) is None)
+fresh_req = {"id": "mine", "tick": w["tick"], "wall": time.time(), "wake_reason": "idle"}
+c["cognition"]["pending"] = fresh_req
+check("a recent request still blocks a second one", ca.is_waiting(c) and ca.pending(c)["id"] == "mine")
 
 print()
 print("FAILED: " + ", ".join(failures) if failures else "ALL OK")
