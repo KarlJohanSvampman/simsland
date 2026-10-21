@@ -128,8 +128,42 @@ def _build_full_snapshot(world, definitions, cx, cy, zoom):
     return get_view(sim_id=SIM_ID, cx=cx, cy=cy, zoom=zoom)
 
 
+def _character_patches(world: dict, visible_chars: dict, selected_id, sent: dict) -> dict:
+    """Turn the visible dirty characters into what THIS client still needs.
+
+    A character the client has never been sent goes whole. After that only the top-level keys
+    whose value changed since what this client last got are sent -- for the character the client
+    has selected the rarely-changing "cold" keys are re-checked every tick too, so the Inspector
+    never lags, as {"__patch__": True, <key>: value, ...,
+    "__deleted__": [keys]}; a character with nothing new is skipped entirely. A whole character
+    is ~90 KB; a patch is usually a few hundred bytes. See core/entity_versions.py.
+    """
+    from core import entity_versions as ev
+    tick = world.get("tick", 0)
+    out = {}
+    for cid, c in visible_chars.items():
+        have = sent.get(cid)
+        digests = ev.char_digests(c, tick, fresh_cold=(cid == selected_id))
+        if have is None:
+            out[cid] = c
+            sent[cid] = digests
+            continue
+        changed = [k for k, d in digests.items() if have.get(k) != d]
+        deleted = [k for k in have if k not in digests]
+        if not changed and not deleted:
+            continue
+        patch = {"__patch__": True}
+        for k in changed:
+            patch[k] = c[k]
+        if deleted:
+            patch["__deleted__"] = deleted
+        out[cid] = patch
+        sent[cid] = digests
+    return out
+
+
 def _build_delta(world: dict, dirty: dict, cx: int, cy: int, zoom: int,
-                 selected_id: str | None = None) -> dict | None:
+                 selected_id: str | None = None, sent: dict | None = None) -> dict | None:
     """
     Filter the dirty entities to only what falls within this client's viewport.
     Returns None if nothing in the delta is visible to this client.
@@ -156,6 +190,8 @@ def _build_delta(world: dict, dirty: dict, cx: int, cy: int, zoom: int,
     }
     if selected_id and selected_id in dirty["chars"] and selected_id not in visible_chars:
         visible_chars[selected_id] = dirty["chars"][selected_id]
+    if sent is not None:
+        visible_chars = _character_patches(world, visible_chars, selected_id, sent)
     visible_props = {
         pid: p for pid, p in dirty["props"].items()
         if in_view(p.get("x", 0), p.get("y", 0), cx, cy, radius)
@@ -353,10 +389,19 @@ async def loop():
                     if client.get("needs_full"):
                         snapshot = _build_full_snapshot(world, world["definitions"], cx, cy, zoom)
                         snapshot["type"] = "snapshot"
+                        # what this client now has of each character: the baseline later deltas
+                        # are patched against (core/entity_versions.py)
+                        from core import entity_versions as _ev
+                        client["sent"] = {
+                            cid: _ev.char_digests(ch, world.get("tick", 0))
+                            for cid, ch in (snapshot.get("characters") or {}).items()
+                            if isinstance(ch, dict) and ch.get("id")
+                        }
                         await ws.send_json(snapshot)
                         client["needs_full"] = False
                     else:
-                        delta = _build_delta(world, dirty, cx, cy, zoom, client.get("selected_id"))
+                        delta = _build_delta(world, dirty, cx, cy, zoom, client.get("selected_id"),
+                                             sent=client.setdefault("sent", {}))
                         if delta:
                             await ws.send_json(delta)
                 except Exception:

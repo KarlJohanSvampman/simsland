@@ -285,8 +285,21 @@ component; a replayable event log.
   Caveats: processes other than the server (docker-exec scripts) now read Postgres, which lags by up to 15
   ticks; a route that mutates the world and then errors out before saving now leaves its partial change in the
   live world (the old private copy was discarded).
-- **Next** — per-entity versions + change events (so the derived per-character steps can recompute only when
-  their inputs changed) and moving mutating API routes to commands for the tick owner (no lock at all);
-  then move the remaining per-tick polls inside `update_agent()` (emotion, habits, health,
-  waiting, curiosity, expectations, economy, ...) onto the same lazy/timer pattern so an idle
-  character costs nothing, then the per-entity state store (removes the global world lock).
+- **State store, stage 2 (done; "step 7" in chat)** — per-entity versions and patch deltas
+  (`core/entity_versions.py`). No proxies and no hooks on the thousands of write sites: a character
+  is hashed key by key (JSON of each top-level key), so a changed key is exactly a changed hash;
+  `version(kind,id)` and `last_changed(kind,id)` expose it. The few big, slow blobs nobody animates
+  (LLM sessions, grievances, memories, ...) are "cold" and re-hashed only every 15 ticks, staggered per
+  character (the selected character's are re-hashed every tick). The websocket used to send every
+  dirty character whole every tick -- 176 KB/tick for two characters, ~90 KB each, mostly those blobs;
+  it now sends a character whole on first sight and afterwards `{"__patch__": true, <changed keys>,
+  "__deleted__": [...]}` relative to what *that* client holds (the frontend merges them). Measured live:
+  24 deltas in 25 s = 116 KB instead of ~4.2 MB (-97%); 120 simulated ticks 20.8 MB -> 1.1 MB, and a
+  client applying only patches ends identical to the server. The versions are also the change signal the
+  derived per-character steps need (recompute when the version of the keys you read changed) -- not
+  wired into those steps yet.
+- **Next** — (a) wire the versions into the derived per-character steps (`update_social_intentions`,
+  `update_expectations`, `sort_intentions`): recompute only when the keys they read changed;
+  (b) move mutating API routes to commands run by the tick owner, which removes the world lock
+  entirely; (c) then the remaining per-tick polls inside `update_agent()` (emotion, habits, health,
+  waiting, curiosity, economy, ...) onto the lazy/timer pattern so an idle character costs nothing.

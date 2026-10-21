@@ -7625,7 +7625,23 @@ async function _applyDelta(delta) {
     _worldState.tick = delta.tick;
   }
   if (delta.characters) {
-    _worldState.characters = { ...(_worldState.characters || {}), ...delta.characters };
+    // A character arrives whole (first sight, or the selected one) or as a patch of just the
+    // top-level keys that changed ("__patch__", plus "__deleted__" keys) -- see main.py's
+    // _character_patches. Patches are merged onto what we already hold.
+    const merged = { ...(_worldState.characters || {}) };
+    for (const [id, v] of Object.entries(delta.characters)) {
+      if (v && v.__patch__) {
+        const next = { ...(merged[id] || {}) };
+        for (const [k, val] of Object.entries(v)) {
+          if (k !== "__patch__" && k !== "__deleted__") next[k] = val;
+        }
+        for (const k of (v.__deleted__ || [])) delete next[k];
+        merged[id] = next;
+      } else {
+        merged[id] = v;
+      }
+    }
+    _worldState.characters = merged;
   }
   if (delta.props) {
     // Props may be array or dict on the server; normalise to dict by id
