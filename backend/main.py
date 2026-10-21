@@ -252,20 +252,32 @@ def _run_tick_and_persist(sim_id: str) -> tuple[dict, dict]:
     and update_world_tick() ran inline on the event loop. Bundling
     everything here moves all of it off that thread too.
     """
+    from core import world_state
     _t_wait = time.perf_counter()
-    with _world_lock:
+    with _world_lock, world_state.hold():
         _t_held = time.perf_counter()
         _tick_watch["thread"] = threading.get_ident()
         _tick_watch["started"] = _t_held
         _tick_watch["reported"] = 0.0
-        world = load_world(sim_id)
+        # The live world stays in memory between ticks (core/world_state.py): no per-tick load,
+        # JSON round trip or database write. The idempotent ensure_* passes still run each tick.
+        world = world_state.resident(sim_id)
         ensure_world_defaults(world)
-        # Loaded fresh every tick (cheap on a cache hit) rather than once
-        # at loop() startup — definitions.json edits via the Definitions
-        # editor otherwise never reach a running simulation until restart,
-        # even though save_definitions() already invalidates the read
-        # cache correctly on its end.
-        world["definitions"] = load_definitions(sim_id)
+        # Loaded fresh every tick (cheap on a cache hit) rather than once at loop() startup --
+        # definitions.json edits via the Definitions editor otherwise never reach a running
+        # simulation until restart, even though save_definitions() already invalidates the
+        # read cache correctly on its end.
+        defs = load_definitions(sim_id)
+        if world.get("definitions") is not defs:
+            world["definitions"] = defs
+        from systems.schema_defaults import ensure_prop_template_fields
+        from systems.electrical import ensure_power_outlets
+        from systems.vehicles import ensure_vehicle_fields
+        from systems.market import init_market_catalog
+        ensure_prop_template_fields(world, defs)
+        ensure_power_outlets(world, defs)
+        ensure_vehicle_fields(world, defs)
+        init_market_catalog(world)
 
         _maybe_resync_clock_to_real_time(world)
 
@@ -276,47 +288,20 @@ def _run_tick_and_persist(sim_id: str) -> tuple[dict, dict]:
         finally:
             tick_state.leave()
 
-        update_world_tick(sim_id, world["tick"])
-
-        # Collect what changed this tick — must happen before persisting
-        # below, since it pops world["_dirty"] (which holds raw Python
-        # sets, not JSON-serializable) out of the tree entirely.
+        # Collect what changed this tick -- must happen before anything serialises the world,
+        # since it pops world["_dirty"] (raw Python sets, not JSON-serialisable) out of the tree.
         dirty = collect_dirty(world)
 
-        # Persist this tick's mutations. Without this, load_world() on the
-        # next iteration serves a stale cached snapshot (or, once the 5s
-        # Redis TTL expires, rebuilds from Postgres) and every character
-        # decision / movement update / need decay this tick made is
-        # silently discarded. Re-caching every tick also means the TTL
-        # never actually expires during normal operation, so the expensive
-        # cache-miss rebuild (build_world_geometry, generate_world_tiles,
-        # build_outdoor_navigation, ...) only runs once at startup.
-        #
-        # world_tiles/world_tile_lookup/outdoor_navigation/etc. (~46MB of
-        # static, purely-derived grid data) and "definitions" (loaded once,
-        # never mutated through this path, ~71% of the blob's bytes) are
-        # excluded here — see db.py's _STATIC_WORLD_KEYS, which load_world()
-        # backfills on every call so no caller notices either is missing
-        # from what's actually persisted.
-        persisted_snapshot = {
-            k: v for k, v in world.items()
-            if k not in _STATIC_WORLD_KEYS
-        }
-
-        set_world_cache(sim_id, persisted_snapshot)
-
-        # Durability: periodically persist to Postgres too, so simulation
-        # progress survives a backend restart instead of only reflecting
-        # whatever was last explicitly saved via the World Editor.
         _t_persist = time.perf_counter()
-        if world["tick"] % 30 == 0:
-            save_world(sim_id, persisted_snapshot)
+        # Durable persistence is write-behind: every PERSIST_EVERY_TICKS ticks the world is
+        # serialised here (under the lock) and a background thread writes it to Postgres.
+        world_state.after_tick(sim_id, world)
         _t_end = time.perf_counter()
         _tick_watch["started"] = None
         if _t_end - _t_held > SLOW_TICK_LOG_SECONDS:
             print(f"[tick] tick {world['tick']} held the world lock {_t_end - _t_held:.1f}s "
-                  f"(waited {_t_held - _t_wait:.1f}s for it; tick+persist {_t_persist - _t_held:.1f}s, "
-                  f"db save {_t_end - _t_persist:.1f}s)", flush=True)
+                  f"(waited {_t_held - _t_wait:.1f}s for it; tick {_t_persist - _t_held:.1f}s, "
+                  f"persist {_t_end - _t_persist:.1f}s)", flush=True)
 
     return world, dirty
 
@@ -412,6 +397,16 @@ async def loop():
 # =========================================================
 # STARTUP
 # =========================================================
+
+@app.on_event("shutdown")
+def shutdown_persist():
+    """The world lives in memory (core/world_state.py): write it out before the process exits."""
+    try:
+        from core import world_state
+        world_state.persist_now(SIM_ID)
+    except Exception as exc:
+        print(f"[shutdown] could not persist the world: {exc!r}")
+
 
 @app.on_event("startup")
 async def startup():

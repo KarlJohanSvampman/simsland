@@ -822,3 +822,12 @@ def event_log_handlers(top: int = 40):
     """Per event type and handler: calls, errors, total/avg/max milliseconds."""
     from core import event_log, event_bus
     return {"handlers": event_log.handler_stats(top), "bus": event_bus.stats()}
+
+
+@router.get("/world_state")
+def world_state_stats():
+    """The in-memory world store (core/world_state.py): resident ticks/versions, how many
+    snapshots were rendered for readers, and the write-behind persistence counters."""
+    from core import world_state
+    return world_state.stats()
+

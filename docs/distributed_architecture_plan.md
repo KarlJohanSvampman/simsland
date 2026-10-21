@@ -271,6 +271,22 @@ component; a replayable event log.
   needs a *change notification* on those writes (dirty flags), otherwise a gate has to guess its inputs and
   silently changes behaviour — that is what the per-entity state store (versions + change events) provides,
   so it comes first; the derivations then become "recompute when my inputs' version changed".
-- **Next** — move the remaining per-tick polls inside `update_agent()` (emotion, habits, health,
+- **State store, stage 1 (done; "step 6" in chat)** — `core/world_state.py`: the authoritative world is a
+  resident dict in the tick process. Measured before: ~130 ms of every tick was persistence (23 ms load +
+  59 ms validated serialise + 48 ms Postgres `jsonb_set`) and 210 ms every 30 ticks for the durable save —
+  and it grows with world size, not with activity. Now: no per-tick load/serialise/DB write. Inside
+  `world_lock()` (and the tick) `load_world()` returns the live world, so a route's load → mutate → save
+  happens in place; outside it a reader gets a private snapshot copy rendered from JSON at most once per
+  tick and only on demand; durable saves are write-behind (every 15 ticks serialised under the lock, written by a
+  background thread) plus a synchronous save on shutdown. `/admin/world_state` shows the counters.
+  Equivalence: `tools/diff_world_modes.py` runs the same seeded sim both ways (1500 ticks across a week
+  boundary: identical except one "once per day" guard that only ever worked in the resident mode — the
+  round trip had turned its tuple into a list). 112 s → 4.8 s for those 1500 ticks.
+  Caveats: processes other than the server (docker-exec scripts) now read Postgres, which lags by up to 15
+  ticks; a route that mutates the world and then errors out before saving now leaves its partial change in the
+  live world (the old private copy was discarded).
+- **Next** — per-entity versions + change events (so the derived per-character steps can recompute only when
+  their inputs changed) and moving mutating API routes to commands for the tick owner (no lock at all);
+  then move the remaining per-tick polls inside `update_agent()` (emotion, habits, health,
   waiting, curiosity, expectations, economy, ...) onto the same lazy/timer pattern so an idle
   character costs nothing, then the per-entity state store (removes the global world lock).

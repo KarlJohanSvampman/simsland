@@ -196,7 +196,11 @@ def world_lock(timeout=30):
     if not acquired:
         raise HTTPException(status_code=503, detail="simulation busy, try again")
     try:
-        yield
+        # While held, load_world() hands out the resident (live) world itself, so a route's
+        # load -> mutate -> save happens in place (core/world_state.py).
+        from core import world_state
+        with world_state.hold():
+            yield
     finally:
         _world_lock.release()
 
@@ -275,6 +279,15 @@ def init_db():
         )
 
 def load_world(sim_id):
+    """The world. Inside world_lock() (or the tick) this is the live resident world, mutated
+    in place; anywhere else it is a private snapshot copy -- see core/world_state.py."""
+    from core import world_state
+    return world_state.load(sim_id)
+
+
+def _load_world_cold(sim_id):
+    """Build the world from the cache or Postgres -- done once per process by
+    core/world_state.py::resident()."""
 
     # =====================================
     # TRY CACHE
@@ -427,17 +440,18 @@ def load_world(sim_id):
     return world
 
 def save_world(sim_id, world):
-    with _conn_lock, conn:
-        with conn.cursor() as cur:
-            cur.execute("""
-                INSERT INTO world (simulation_id, data)
-                VALUES (%s, %s)
-                ON CONFLICT (simulation_id)
-                DO UPDATE SET data=%s
-            """, (sim_id, json.dumps(world), json.dumps(world)))
-
-    # 🔥 update cache
-    set_world_cache(sim_id, world)
+    """Apply and persist a world (core/world_state.py): in place when `world` is the resident
+    world, otherwise the resident contents are replaced. The durable write happens in the
+    background."""
+    from core import world_state
+    if world_state._residents.get(sim_id) is None:
+        # nothing live yet in this process (init_db creating the first world): write it
+        # straight to Postgres; the first resident() load will build the live world from it
+        static = set(_STATIC_WORLD_KEYS)
+        text = json.dumps({k: v for k, v in world.items() if k not in static})
+        world_state._write(sim_id, text, world.get("tick", 0), "initial")
+        return
+    world_state.save(sim_id, world)
 
 
 def save_character_safe(c, sim_id="default"):
