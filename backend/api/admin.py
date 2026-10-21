@@ -334,9 +334,6 @@ def remove_character(payload: dict, sim_id: str = DEFAULT_SIM_ID):
         save_world(sim_id, world)
 
     import sim_loop
-    sim_loop._pending_agent_ids.discard(char_id)
-    sim_loop._pending_agent_since.pop(char_id, None)
-    sim_loop._agent_generation.pop(char_id, None)
 
     try:
         from main import _clients
@@ -653,21 +650,20 @@ def get_llm_gate_state():
 
 
 @router.get("/pending_agents")
-def get_pending_agents():
-    """Live-debug introspection into sim_loop.py's in-process
-    _pending_agent_ids/_pending_agent_since state (not persisted world
-    data -- this reads the actual running process's module state)."""
-    import sim_loop
+def get_pending_agents(sim_id: str = DEFAULT_SIM_ID):
+    """Characters whose decision is currently with the model (brain/cognition_actor.py):
+    the request is recorded on the character, so this reads the persisted world."""
     import time
-    now = time.time()
-    return {
-        "pending_ids": sorted(sim_loop._pending_agent_ids),
-        "pending_since_ago_seconds": {
-            cid: round(now - since, 1) for cid, since in sim_loop._pending_agent_since.items()
-        },
-        "generations": dict(sim_loop._agent_generation),
-        "stale_pending_threshold": sim_loop.STALE_PENDING_SECONDS,
-    }
+    world = load_world(sim_id)
+    now_wall = time.time()
+    out = {}
+    for cid, c in world.get("characters", {}).items():
+        p = (c.get("cognition") or {}).get("pending")
+        if p:
+            out[cid] = {"name": c.get("name"), "request": p.get("id"), "wake_reason": p.get("wake_reason"),
+                        "waiting_seconds": round(now_wall - p.get("wall", now_wall), 1),
+                        "ticks_ago": world.get("tick", 0) - p.get("tick", 0)}
+    return {"pending": out, "request_timeout_seconds": __import__("brain.cognition_actor", fromlist=["x"]).REQUEST_TIMEOUT_SECONDS}
 
 
 @router.get("/cognition")

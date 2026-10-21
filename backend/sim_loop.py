@@ -25,7 +25,6 @@ from datetime import datetime
 import os
 import random
 import time
-from concurrent.futures import ThreadPoolExecutor, as_completed, wait as _futures_wait
 
 import core.event_handlers  # noqa: F401 — registers all subscriptions on import
 from core import tick_profile as _prof
@@ -175,79 +174,20 @@ from systems.events     import maybe_generate_shared_event
 
 
 # =========================================================
-# AGENT THREAD POOL
-# LLM calls are I/O-bound — threads release the GIL during network waits,
-# giving real parallelism even under CPython.
+# CHARACTER UPDATES
+# Each character's update_agent() runs on the tick thread, in turn. Nothing in it waits for
+# a model any more: a decision is REQUESTED (brain/cognition_actor.py) and arrives later as a
+# `decision_ready` event. The old design ran every character's whole update on a thread pool
+# and abandoned (discarded) whatever hadn't finished within a 3-second budget -- every slow
+# model call cost the world lock 3 seconds and lost the decision.
 # =========================================================
 
-_AGENT_WORKERS = 8
-_agent_pool = ThreadPoolExecutor(max_workers=_AGENT_WORKERS, thread_name_prefix="agent")
-
-# Confirmed live: world is fully reloaded from Redis/Postgres on every
-# single tick() invocation (main.py::_run_tick_and_persist), not kept as
-# one long-lived in-memory object -- so a character whose think() call
-# is still running when this tick's wait budget expires is holding a
-# reference to an already-stale `c`/`world` pair. There is no safe way
-# to splice that result into a LATER tick's freshly-reloaded world
-# (whatever it mutated already moved on independently in the meantime),
-# so rather than build risky merge logic, a decision that overruns the
-# budget is simply abandoned -- the character just tries again on their
-# next cognition cycle (should_think() naturally re-offers them, since
-# the abandoned attempt's own note_think()/cognition update also lands
-# on the same stale, discarded object). _pending_agent_ids stops the
-# SAME character being redispatched while their abandoned attempt is
-# still physically running in a pool thread.
-AGENT_WAIT_BUDGET_SECONDS = 3.0
+# Kept only so older introspection (api/admin.py) keeps importing; always empty now.
 _pending_agent_ids = set()
-
-# Confirmed live regression from the abandon-on-timeout design above: a
-# character whose call doesn't just overrun the budget but genuinely
-# NEVER completes (a real hang somewhere in update_agent, not just a
-# slow LLM response) stayed in _pending_agent_ids forever -- discard()
-# in the finally block below never runs because the thread never
-# reaches it. Confirmed via logs: "Charles Walker" got abandoned ~10
-# times (each one a real, if slow, completion) before one attempt
-# hung outright, after which he was silently never redispatched again
-# -- generate_body_intentions/update_internal_state/etc. all live
-# inside update_agent(), so a permanently-pending character stops
-# getting ANY per-tick processing at all, not just decisions (bladder
-# forced to 92 for a live test never even produced a use_toilet
-# intention, because the character never ran again to generate one).
-# A staleness timeout forces them back into circulation -- the old
-# thread may still be leaked and running forever, but the character
-# themselves gets to make progress again rather than being silently
-# frozen for the rest of the session.
-#
-# Confirmed live regression from THIS design in turn, once
-# llm/llm_gate.py's real single-concurrency priority queue existed:
-# 30s is comfortably SHORTER than this deployment's actual think()
-# latency (confirmed via the live prompt log -- routinely 34-90s per
-# call, remote Ollama). Every 30s a character was still "pending," a
-# BRAND NEW think() got dispatched and queued behind the still-running
-# old one (same priority -- same-tier arrivals never preempt each
-# other, they just FIFO), which only delayed that new call's own start
-# time further. With several characters doing this simultaneously,
-# fresh same-character retries piled up in the gate faster than the
-# single concurrent slot could drain them, so almost no decision ever
-# finished before being superseded by yet another retry -- confirmed
-# live: a freshly-spawned household's cognition state showed
-# last_think_tick stuck at -1 (never once completed) after 15+ minutes
-# and dozens of dispatches, despite the prompt log showing real,
-# successfully-decided actions the whole time. Set safely above
-# llm_client.py::call_llm_safe's own 150s worst-case timeout instead --
-# a call that's merely slow (the common case here) now has room to
-# actually land, and a genuinely hung one still recovers, just later.
-STALE_PENDING_SECONDS = 180.0
 _pending_agent_since = {}
-
-# Per-character dispatch counter -- guards against a genuinely leaked
-# thread (one force-released by the staleness timeout above, while
-# still physically running) finishing AFTER a fresh dispatch for the
-# same character has already started, and clobbering that NEW attempt's
-# pending state. Each dispatch captures its own generation number and
-# only clears _pending_agent_ids/_pending_agent_since if it's still the
-# most recent one for that character.
 _agent_generation = {}
+AGENT_WAIT_BUDGET_SECONDS = None
+STALE_PENDING_SECONDS = 180.0
 
 
 def _run_agent(c, world, t):
@@ -256,15 +196,6 @@ def _run_agent(c, world, t):
     process_reaction_queue(c, t)
     update_agent(c, world)
     return c["id"]
-
-
-def _run_agent_and_release(c, world, t, generation):
-    try:
-        return _run_agent(c, world, t)
-    finally:
-        if _agent_generation.get(c["id"]) == generation:
-            _pending_agent_ids.discard(c["id"])
-            _pending_agent_since.pop(c["id"], None)
 
 
 # =========================================================
@@ -571,59 +502,22 @@ def _tick_impl(world):
         print(f"[sim_loop] conversation floor error: {exc}")
 
     _prof.mark("section:per_tick_agent_brain")
-    # -- Per-tick: agent brain (parallel) ─────────────────
-    # Service worker NPCs are driven by update_services, not LLM — skip them.
-    # Each character's LLM call is I/O-bound; workers release the GIL while
-    # waiting for the network, so this gives real throughput scaling.
-    now = time.time()
-    stale_ids = {
-        cid for cid, since in _pending_agent_since.items()
-        if now - since > STALE_PENDING_SECONDS
-    }
-    if stale_ids:
-        print(f"[sim_loop] tick {t}: force-releasing {len(stale_ids)} character(s) stuck pending past {STALE_PENDING_SECONDS}s "
-              f"(their old attempt may still be leaked/running, but they're eligible again): {sorted(stale_ids)}")
-        _pending_agent_ids.difference_update(stale_ids)
-        for cid in stale_ids:
-            _pending_agent_since.pop(cid, None)
-
+    # -- Per-tick: character updates (sequential; decisions are requested, not awaited) --
+    # Service worker NPCs are driven by update_services, not LLM -- skip them.
     agent_chars = [
         c for c in characters
         if not c.get("is_service_worker")
         and not c.get("is_workplace_npc")
         and c.get("alive") is not False
         and c.get("posture") != "incapacitated"
-        and c["id"] not in _pending_agent_ids
     ]
     for c in agent_chars:
-        _pending_agent_ids.add(c["id"])
-        _pending_agent_since[c["id"]] = now
-        _agent_generation[c["id"]] = _agent_generation.get(c["id"], 0) + 1
-    futs = {
-        _agent_pool.submit(_run_agent_and_release, c, world, t, _agent_generation[c["id"]]): c
-        for c in agent_chars
-    }
-
-    if futs:
-        # Bounded wait -- per this block's module-level comment, a
-        # character whose decision doesn't land within the budget is
-        # abandoned for THIS tick (their attempt keeps running in the
-        # pool and self-cleans _pending_agent_ids when it finishes; its
-        # eventual result is never read) rather than holding the clock
-        # and every system after this point hostage to one slow LLM call.
-        # Movement itself is unaffected by any of this -- see the
-        # dedicated movement pass above, which already ran before this
-        # dispatch even started.
-        done, not_done = _futures_wait(futs, timeout=AGENT_WAIT_BUDGET_SECONDS)
-        for fut in done:
-            try:
-                dirty_char_ids.add(fut.result())
-            except Exception as exc:
-                c = futs[fut]
-                print(f"[sim_loop] agent error for {c.get('id')}: {exc}")
-        if not_done:
-            abandoned = [futs[fut].get("name", futs[fut].get("id")) for fut in not_done]
-            print(f"[sim_loop] tick {t}: abandoned {len(not_done)} slow agent decision(s) past the {AGENT_WAIT_BUDGET_SECONDS}s budget: {abandoned}")
+        try:
+            _run_agent(c, world, t)
+            dirty_char_ids.add(c["id"])
+        except Exception as exc:
+            import traceback as _tb
+            print(f"[sim_loop] agent error for {c.get('id')}: {exc!r}\n{_tb.format_exc()[-600:]}")
 
     _mark_dirty(world, char_ids=dirty_char_ids)
 
@@ -758,7 +652,7 @@ def _tick_impl(world):
         # Only characters with NO agent thread at all (incapacitated, never
         # dispatched) still need this sweep -- the deadlock it exists for.
         from systems.offgrid import process_return
-        _has_agent_thread = {c["id"] for c in agent_chars} | set(_pending_agent_ids)
+        _has_agent_thread = {c["id"] for c in agent_chars}
         for c in characters:
             if c.get("alive") is not False and c["id"] not in _has_agent_thread:
                 apply_severity_consequences(c, world)

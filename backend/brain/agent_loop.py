@@ -1063,6 +1063,12 @@ def update_agent(
     # brain/cognition_scheduler.py for why this replaced calling think()
     # on every single tick.
 
+    # A decision already with the model (brain/cognition_actor.py): the character carries on
+    # living -- everything above this point still ran -- but doesn't ask again.
+    from brain.cognition_actor import is_waiting, request_decision
+    if is_waiting(c):
+        return
+
     wake_reason = should_think(c, world)
 
     if not wake_reason:
@@ -1118,45 +1124,7 @@ def update_agent(
         else PRIORITY_NORMAL
     )
 
-    # "Is generating a reply" -- what makes a spoken-to character count as having
-    # noticed (systems/conversation_floor.py).
-    from systems.conversation_floor import mark_thinking, clear_thinking
-    mark_thinking(c["id"], world.get("tick", 0))
-    try:
-        decision = think(
-            context,
-            char_id=c["id"],
-            session=c.get("_llm_session"),
-            priority=llm_priority,
-        )
-    finally:
-        clear_thinking(c["id"], world.get("tick", 0))
-
-    # Clear the wake state and schedule the next idle check-in regardless
-    # of whether the LLM call succeeded — a failed call must not leave the
-    # character re-triggering should_think() every tick forever.
-    note_think(c, world, decision, wake_reason=wake_reason)
-
-    if not decision:
-        return
-
-    # =====================================
-    # PROCESS DECISION
-    # =====================================
-
-    process_decision(
-        c,
-        world,
-        decision,
-        available_actions=context.get("available_actions")
-    )
-
-    # =====================================
-    # POST
-    # =====================================
-
-    post_update(
-        c,
-        world
-    )
-    #
+    # Ask the model in the background and carry on: the answer comes back as a
+    # `decision_ready` event, is noted and processed (re-validated against the world as it is
+    # THEN) by brain/cognition_actor.py::on_decision_ready. Nothing here blocks the tick.
+    request_decision(c, world, context, wake_reason, llm_priority)

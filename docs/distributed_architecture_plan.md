@@ -251,5 +251,14 @@ component; a replayable event log.
   Equivalence test: `tests/test_body_lazy.py`.
   The same forward-probe technique applies to the other threshold-kind sections (cleanliness,
   plants, food aging, batteries, addictions, lt_needs).
-- **Next** — step 3: character actors (replace the agent pool / per-tick `update_agent`), then the
-  per-entity state store.
+- **Step 3 (done)** — character decisions as requests/responses: `brain/cognition_actor.py`. The agent thread
+  pool, the 3-second wait budget and the abandon-and-lose-the-decision machinery are gone.
+  `update_agent()` runs on the tick thread (nothing in it waits on a model); when a character has
+  something to decide it records `cognition.pending`, builds the context on the tick thread and hands
+  the model call to a worker that touches no world state; the answer returns as a `decision_ready`
+  event and `process_decision()` re-validates it against the world as it is *then*. Late answers for
+  someone who died / went off-grid are dropped; a request with no answer after 240 s is re-asked.
+  Tests: `tests/test_cognition_actor.py`.
+- **Next** — move the remaining per-tick polls inside `update_agent()` (emotion, habits, health,
+  waiting, curiosity, expectations, economy, ...) onto the same lazy/timer pattern so an idle
+  character costs nothing, then the per-entity state store (removes the global world lock).

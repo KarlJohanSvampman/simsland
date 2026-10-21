@@ -506,3 +506,7 @@ import systems.calendar_handlers  # noqa: E402,F401
 
 # ── Lazy needs: the scheduler handler for per-character body timers ──
 import systems.body_lazy  # noqa: E402,F401
+
+
+# ── Character actors: model answers arrive as events (brain/cognition_actor.py) ──
+import brain.cognition_actor  # noqa: E402,F401
