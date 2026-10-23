@@ -25,6 +25,12 @@ def log_prompt_entry(char_id: str, messages: list, response: str, elapsed: float
         "cached": cached,
     })
 
+def add_prompt_entry(char_id: str, entry: dict):
+    """Store an entry made elsewhere (a cognition worker's) as-is."""
+    if char_id not in _PROMPT_LOG:
+        _PROMPT_LOG[char_id] = deque(maxlen=_PROMPT_LOG_MAX)
+    _PROMPT_LOG[char_id].appendleft(entry)
+
 def get_prompt_log(char_id: str) -> list:
     """Return prompt history for a character, newest first."""
     return list(_PROMPT_LOG.get(char_id, []))

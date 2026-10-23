@@ -325,3 +325,24 @@ component; a replayable event log.
   (2) mutating routes as commands run by the tick owner (removes the lock; mechanical but touches 52
   sites); (3) turning the polled steps into event/timer handlers one at a time, each proven neutral with the
   determinism harness.
+- **Container split, stage 1: cognition workers (done)** — the model round-trip for character decisions now
+  runs in its own container(s). `core/cognition_queue.py` is the wire (Redis Streams: `cognition:req` with a
+  consumer group, `cognition:res`; a worker's short-lived heartbeat key advertises it), `workers/cognition.py`
+  is the worker (`python -m workers.cognition`; N threads, no database, no world state — it gets the
+  character's context and recent turns and returns the decision, the prompt-log entries and the prompt
+  size), and `brain/cognition_actor.py` chooses where each request runs (`COGNITION_MODE`: `local` /
+  `remote` / `auto` = remote while a worker's heartbeat is current, in-process otherwise). A result-reader
+  thread in the core turns answers into the same `decision_ready` event as before, so everything after it
+  (re-validation against the world as it is now, `process_decision`) is unchanged. Failure behaviour:
+  a worker that dies mid-request leaves it unacked and another worker takes it over after 150 s; requests
+  carry a deadline and are dropped unanswered once nobody is waiting; if no worker is alive 20 s after a
+  request went out the core runs it locally, and whichever answer comes second is ignored by the existing
+  pending-id check. Stopping the worker container never stalls the sim. Scale with
+  `docker compose up -d --scale cognition=N` (Ollama concurrency applies per worker process). Not yet
+  shipped back: the LLM client's call-count/latency gauges stay per process (prompt log and prompt bytes
+  are merged). Verified: `tests/test_cognition_split.py` (wire, redelivery, deadline, heartbeat, fallback,
+  concurrency, failing model, duplicate result, real contexts strictly JSON-serialisable) and a live
+  round trip through the worker container to Ollama. The other tests pin `COGNITION_MODE=local` so a live
+  worker can never answer for them.
+  Next in the split: background LLM jobs (`systems/bg_llm`) as a second worker type, then the API/gateway
+  process once the 52 mutating routes are commands.

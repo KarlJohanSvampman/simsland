@@ -30,6 +30,33 @@ services:
     command: >
       uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 
+  # Cognition worker: the model round-trip for character decisions, off the simulation core's
+  # process (backend/workers/cognition.py). The core uses it while its heartbeat is current and
+  # runs decisions in-process otherwise, so stopping this never stalls the sim.
+  #   docker compose up -d --scale cognition=2      (OLLAMA_MAX_CONCURRENCY applies per worker)
+  # Bind-mounted like the backend; restart it after editing brain/ or llm/ code.
+  cognition:
+    build: ./backend
+    restart: unless-stopped
+    mem_limit: 1g
+    environment:
+      - REDIS_HOST=redis
+      - OLLAMA_BASE_URL=http://192.168.10.203:11434
+      - OLLAMA_MODEL=llama3.1:latest
+      - OLLAMA_NUM_CTX=8192
+      - OLLAMA_KEEP_ALIVE=10m
+      - OLLAMA_MAX_CONCURRENCY=2
+      - LLM_CALL_MAX_WAIT_SECONDS=90
+      - COGNITION_WORKER_THREADS=8
+      - PYTHONPATH=/app
+      - PYTHONUNBUFFERED=1
+    depends_on:
+      - redis
+    volumes:
+      - ./backend:/app
+      - ./resources:/resources
+    command: python -m workers.cognition
+
   frontend:
     build: ./frontend
     container_name: sim-frontend

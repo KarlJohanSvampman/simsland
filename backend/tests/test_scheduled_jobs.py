@@ -14,6 +14,8 @@ import os
 import sys
 import traceback
 
+import os
+os.environ.setdefault("COGNITION_MODE", "local")     # never reach a live cognition worker
 sys.path.insert(0, "/app")
 sys.path.insert(0, ".")
 

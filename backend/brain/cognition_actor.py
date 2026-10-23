@@ -32,14 +32,29 @@ While a request is pending the character keeps living (activities progress, need
 react to events); they just don't ask the model again. A request that never answers (the
 process restarted, the worker died) is given up on after REQUEST_TIMEOUT_SECONDS of wall
 time and the character is offered the decision again.
+
+WHERE the model round-trip runs (COGNITION_MODE):
+
+    local    on this process's thread pool (the original behaviour)
+    remote   over the Redis stream to cognition workers (workers/cognition.py), always
+    auto     (default) remote while at least one worker's heartbeat is current, local otherwise
+
+A remote request that isn't answered within REMOTE_FALLBACK_SECONDS while no worker is alive is
+run locally instead; if the worker's answer arrives after all, whichever comes second is ignored
+by the pending-id check in on_decision_ready.
 """
 
+import json
+import os
+import threading
 import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 
 from core.event_bus import emit, subscribe
 
+MODE = os.getenv("COGNITION_MODE", "auto").lower()
+REMOTE_FALLBACK_SECONDS = 20.0
 WORKERS = 16
 REQUEST_TIMEOUT_SECONDS = 240.0       # comfortably above llm_gate's own worst-case wait
 SESSION_TURNS = 6
@@ -75,8 +90,135 @@ def request_decision(c, world, context, wake_reason, priority):
     }
     mark_thinking(c["id"], tick)           # "is generating a reply" -- the floor's notice cue
     session = {"history": list(((c.get("_llm_session") or {}).get("history") or [])[-SESSION_TURNS:])}
-    _pool.submit(_worker, c["id"], req_id, tick, context, session, priority, wake_reason)
+    args = (c["id"], req_id, tick, context, session, priority, wake_reason)
+    if not _send_remote(*args):
+        _pool.submit(_worker, *args)
     return req_id
+
+
+# ---------------------------------------------------------------------------
+# remote path
+# ---------------------------------------------------------------------------
+
+_inflight = {}                     # req_id -> {"args": (...), "sent": wall time}
+_inflight_lock = threading.Lock()
+_reader = None
+_reader_lock = threading.Lock()
+
+
+def _use_remote():
+    if MODE == "local":
+        return False
+    if MODE == "remote":
+        return True
+    try:
+        from core import cognition_queue
+        return cognition_queue.workers_alive() > 0
+    except Exception:
+        return False
+
+
+def _send_remote(char_id, req_id, tick, context, session, priority, wake_reason):
+    """Hand the request to the worker fleet. False -> caller runs it locally."""
+    if not _use_remote():
+        return False
+    args = (char_id, req_id, tick, context, session, priority, wake_reason)
+    try:
+        from core import cognition_queue
+        json.dumps(context, default=str)          # the wire is JSON; fail here, not on the worker
+        _ensure_reader()                          # listening before the request exists: no missed answer
+        with _inflight_lock:                      # registered first: a fast answer must find it
+            _inflight[req_id] = {"args": args, "sent": time.time()}
+        cognition_queue.enqueue({
+            "req_id": req_id, "char_id": char_id, "tick": tick, "context": context,
+            "session": session, "priority": priority, "wake_reason": wake_reason,
+            "deadline": time.time() + REQUEST_TIMEOUT_SECONDS,
+        })
+    except Exception as exc:
+        with _inflight_lock:
+            _inflight.pop(req_id, None)
+        print(f"[cognition] could not queue {char_id}'s decision remotely ({exc!r}); running it locally")
+        return False
+    return True
+
+
+def _ensure_reader():
+    global _reader
+    with _reader_lock:
+        if _reader is None or not _reader.is_alive():
+            from core import cognition_queue
+            _reader = threading.Thread(target=_read_results, args=(cognition_queue.latest_result_id(),),
+                                       daemon=True, name="cognition-results")
+            _reader.start()
+
+
+def _read_results(last_id):
+    """Results from the workers -> decision_ready events; stranded requests -> local fallback."""
+    from core import cognition_queue
+    while True:
+        try:
+            last_id, results = cognition_queue.read_results(last_id, block_ms=1000)
+        except Exception as exc:
+            print(f"[cognition] result stream error: {exc!r}")
+            time.sleep(2.0)
+            results = []
+        for res in results:
+            _accept_remote_result(res)
+        _fallback_stranded()
+
+
+def _accept_remote_result(res):
+    with _inflight_lock:
+        entry = _inflight.pop(res.get("req_id"), None)
+    if entry is None:
+        return                                    # not ours (another core, or already handled)
+    char_id, req_id, tick, context, _session, _priority, wake_reason = entry["args"]
+    _merge_worker_telemetry(res)
+    from systems.conversation_floor import clear_thinking
+    clear_thinking(char_id, tick)
+    if res.get("error"):
+        print(f"[cognition] worker {res.get('worker')} failed {char_id}'s decision: {res['error']}")
+    emit("decision_ready", {
+        "character_id": char_id, "request_id": req_id, "decision": res.get("decision"),
+        "wake_reason": wake_reason, "available_actions": context.get("available_actions"),
+    })
+
+
+def _merge_worker_telemetry(res):
+    """The debug views read process-local gauges; fold the worker's contribution in."""
+    try:
+        from brain.cognition_scheduler import record_prompt_bytes
+        if res.get("prompt_bytes"):
+            record_prompt_bytes(res["prompt_bytes"])
+        from llm import llm_client
+        for e in reversed(res.get("prompt_log") or []):        # stored newest-first; re-add oldest first
+            llm_client.add_prompt_entry(res["char_id"], e)
+    except Exception as exc:
+        print(f"[cognition] could not merge worker telemetry: {exc!r}")
+
+
+def _fallback_stranded():
+    """No worker alive and a request has waited too long: run it here."""
+    now = time.time()
+    with _inflight_lock:
+        for rid in [rid for rid, e in _inflight.items() if now - e["sent"] > REQUEST_TIMEOUT_SECONDS + 10]:
+            del _inflight[rid]                    # is_waiting() has already given up on these
+        old = [(rid, e) for rid, e in _inflight.items() if now - e["sent"] > REMOTE_FALLBACK_SECONDS]
+    if not old:
+        return
+    try:
+        from core import cognition_queue
+        cognition_queue.forget_alive_cache()
+        if cognition_queue.workers_alive() > 0:
+            return
+    except Exception:
+        pass
+    for rid, e in old:
+        with _inflight_lock:
+            if _inflight.pop(rid, None) is None:
+                continue
+        print(f"[cognition] no cognition worker answered {e['args'][0]} -- running the decision here")
+        _pool.submit(_worker, *e["args"])
 
 
 def _worker(char_id, req_id, tick, context, session, priority, wake_reason):

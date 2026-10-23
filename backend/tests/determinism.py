@@ -18,6 +18,8 @@ import time
 import traceback
 import uuid
 
+import os
+os.environ.setdefault("COGNITION_MODE", "local")     # never reach a live cognition worker
 sys.path.insert(0, "/app")
 
 from db import load_world, _STATIC_WORLD_KEYS
