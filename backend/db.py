@@ -54,6 +54,15 @@ _STATIC_WORLD_KEYS = (
 _static_world_cache = {}
 
 
+def _note_static_changed():
+    """The map was rebuilt or edited: gateway replicas must fetch it again (core/replication.py)."""
+    try:
+        from core import replication
+        replication.note_static_changed()
+    except Exception:
+        pass
+
+
 def _ensure_static_world_data(world, sim_id):
     cached_static = _static_world_cache.get(sim_id)
 
@@ -88,6 +97,7 @@ def invalidate_static_world_cache(sim_id):
     through that too and unconditionally invalidating there would
     reintroduce the rebuild cost this cache exists to avoid."""
     _static_world_cache.pop(sim_id, None)
+    _note_static_changed()
 
 
 def refresh_static_world_cache(sim_id, world_tiles):
@@ -117,6 +127,7 @@ def refresh_static_world_cache(sim_id, world_tiles):
     _static_world_cache[sim_id] = {
         k: world[k] for k in _STATIC_WORLD_KEYS if k in world
     }
+    _note_static_changed()
 
 
 #conn = psycopg2.connect(

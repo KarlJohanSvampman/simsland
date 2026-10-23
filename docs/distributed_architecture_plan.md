@@ -360,3 +360,39 @@ component; a replayable event log.
   `tests/test_bg_llm_split.py` (fallback, concurrency, allow-list, non-JSON args, failing call, expired
   deadline, stale token, prompt-log merge) and live: a self-assessment went core -> bg_llm container ->
   Ollama -> back in 17 s. `docker compose up -d --scale bg_llm=N`; Ollama concurrency is per worker process.
+- **API gateway split, stages 1-2: commands and a read replica (done; websocket moved)** — the gateway is the
+  same FastAPI app run with `SIM_ROLE=api` (compose service `api`, direct access on :8001). It runs no tick
+  and owns no world; it does two things:
+  *Mutations are commands* (`core/commands.py`). A route's body is decorated `@command("name")`; in the
+  owner process (role `all`/`core`) the decorator does nothing, in a gateway it is replaced by a stub that
+  sends the arguments over a Redis stream and returns the core's result (HTTP errors keep their status,
+  pydantic arguments are rebuilt, a command has a 30 s deadline and a late one is never run). 43 routes
+  converted — every route that held `world_lock()` or saved the world; the `Request`-bodied editor routes became
+  plain dict-bodied sync routes (same URLs, same bodies). In a gateway `world_state.save()` raises, so a
+  mutating route that was missed fails loudly instead of changing a copy.
+  *Reads come from a replica* (`core/replication.py`). While a gateway's heartbeat is current the core
+  publishes, after every tick and under the lock, one frame to a Redis stream: patches of the characters
+  that changed (same per-key digests the websocket already used), dirty props/items/objects whole, any
+  other top-level key whose digest changed (big slow ones every 10 ticks), and the dirty ids; every 15
+  ticks or after a route saved the world everything is re-checked, so something nobody marked dirty is at
+  most 15 ticks late. A zlib snapshot (~250 KB for this world) in a key bootstraps a new gateway; every
+  operation is idempotent so a snapshot newer than the frames replayed after it is harmless; a gap or a
+  new epoch (core restart) makes the gateway bootstrap again; the map (world_tiles) is shipped once per
+  epoch and whenever the editor changes it, and definitions.json changes are noticed by mtime. The
+  replica is installed as the gateway's resident world, so every existing `load_world()` / `read_world()`
+  caller works unchanged, and frames are applied on the event-loop thread so a broadcast never sees the
+  world change under it. With no gateway the core pays nothing.
+  Measured (3 characters): publishing 16 ms mean per tick on the tick thread (most of it the existing
+  per-key hashing of dirty characters, which the websocket used to pay per client), 52 KB mean frame
+  (the stocks/market/timers keys dominate), 250 KB snapshot. Verified: `tests/test_commands.py`,
+  `tests/test_replication.py` (a seeded 250-tick sim; the replica equals the core at every full pass; gaps,
+  restarts, forced passes, add/remove of characters and keys), and live: gateway websocket vs core
+  websocket carry the same snapshot and the same per-tick deltas, an `/admin/time_scale` posted to the
+  gateway reaches the core and comes back through the replica, and the game renders from the gateway.
+  Adopted so far: **only `/ws`** (frontend/nginx.conf sends it to the gateway and falls back to the core if
+  the gateway is down; nginx resolves the name per request so it starts either way). REST stays on the core
+  until each read route is checked for process-local state it reads (e.g. `/admin/cognition`, prompt logs,
+  the tick profile, the middleware bridge's heartbeat, `/api/llm/logs` -- those must stay on the core or
+  have their data shipped). Open items: the gateway has no `--reload` (restart `api` after code edits);
+  its first boot rebuilds the map's lookup tables (tens of seconds); the selected-character cold keys
+  can lag up to 15 ticks (the core used to hash them fresh each tick for that client).

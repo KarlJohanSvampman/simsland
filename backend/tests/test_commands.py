@@ -20,8 +20,10 @@ sys.path.insert(0, ".")
 
 from fastapi import HTTPException
 from pydantic import BaseModel
-from core import commands
+from core import commands, world_state
 from core.cache import r
+
+world_state.REPLICA_MODE = False                    # this process plays gateway AND core; the command runs here
 
 failures = []
 

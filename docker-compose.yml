@@ -83,6 +83,33 @@ services:
       - ./resources:/resources
     command: python -m workers.bg_llm
 
+  # API gateway: serves the REST reads and the websocket from a read replica of the core's world
+  # (backend/core/replication.py) and sends every mutation to the core as a command
+  # (backend/core/commands.py). It runs no tick. The core (the `backend` service) still serves
+  # everything itself, so the gateway can be adopted route by route (see frontend/nginx.conf).
+  # Direct access for testing: http://localhost:8001
+  api:
+    build: ./backend
+    restart: unless-stopped
+    mem_limit: 2g
+    ports:
+      - "8001:8000"
+    environment:
+      - SIM_ROLE=api
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/sim
+      - REDIS_HOST=redis
+      - PYTHONPATH=/app
+      - PYTHONUNBUFFERED=1
+    depends_on:
+      - db
+      - redis
+      - backend
+    volumes:
+      - ./backend:/app
+      - ./resources:/resources
+      - ./simulations:/data/simulations
+    command: uvicorn main:app --host 0.0.0.0 --port 8000
+
   frontend:
     build: ./frontend
     container_name: sim-frontend

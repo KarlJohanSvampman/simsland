@@ -87,9 +87,35 @@ def _static_keys():
     return set(_STATIC_WORLD_KEYS)
 
 
+import os
+REPLICA_MODE = os.getenv("SIM_ROLE", "all").lower() == "api"     # a gateway: the world is a copy fed by the core
+REPLICA = False                                                    # ... and it has synced at least once
+
+
+def install_replica(sim_id, world):
+    """Gateway: (re)place the world with a snapshot from the core. Caller holds the world lock."""
+    global REPLICA
+    REPLICA = True
+    entry = _residents.get(sim_id)
+    if entry is None:
+        _residents[sim_id] = _Resident(world)
+        return
+    entry.world.clear()
+    entry.world.update(world)
+    entry.version += 1
+    entry.snap_key = None
+
+
+def replica_entry(sim_id):
+    return _residents[sim_id]
+
+
 def resident(sim_id):
     """The live world, loaded once (from the cache or Postgres) on first use."""
     entry = _residents.get(sim_id)
+    if entry is None and REPLICA_MODE:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=503, detail="the world replica has not synced with the simulation core yet")
     if entry is None:
         with _lock:
             entry = _residents.get(sim_id)
@@ -162,6 +188,9 @@ def snapshot(sim_id):
 def save(sim_id, world):
     """Apply a route's changes. In place when `world` is the resident world."""
     import db
+    if REPLICA_MODE:
+        raise RuntimeError("this process serves a read replica of the world; a mutation must be a command "
+                           "(core/commands.py) run by the simulation core")
     entry = _entry(sim_id)
     if entry.world is not world:
         # a foreign dict (generated world, editor import, or a stale snapshot): replace the
@@ -179,6 +208,11 @@ def save(sim_id, world):
                 replace()
     entry.version += 1
     entry.snap_key = None
+    try:
+        from core import replication
+        replication.publisher.force_full()
+    except Exception:
+        pass
     persist_async(sim_id, "save")
 
 

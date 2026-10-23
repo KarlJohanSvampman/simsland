@@ -330,6 +330,10 @@ def _run_tick_and_persist(sim_id: str) -> tuple[dict, dict]:
         # since it pops world["_dirty"] (raw Python sets, not JSON-serialisable) out of the tree.
         dirty = collect_dirty(world)
 
+        # Gateway replicas (core/replication.py): a no-op unless one is connected.
+        from core import replication
+        replication.publisher.publish(sim_id, world, dirty)
+
         _t_persist = time.perf_counter()
         # Durable persistence is write-behind: every PERSIST_EVERY_TICKS ticks the world is
         # serialised here (under the lock) and a background thread writes it to Postgres.
@@ -368,6 +372,52 @@ def _tick_watchdog():
             print(f"[tick] still running after {held:.1f}s holding the world lock; tick thread is at:\n{stack}", flush=True)
 
 
+async def _broadcast(world, dirty):
+    """Send each connected client its snapshot or delta for this tick."""
+    # Broadcast to each client
+    dead = []
+    for client in _clients:
+        ws   = client["ws"]
+        cx   = client.get("cx", 0)
+        cy   = client.get("cy", 0)
+        zoom = client.get("zoom", 2)
+        try:
+            if client.get("needs_full"):
+                snapshot = _build_full_snapshot(world, world.get("definitions"), cx, cy, zoom)
+                snapshot["type"] = "snapshot"
+                # what this client now has of each character: the baseline later deltas
+                # are patched against (core/entity_versions.py)
+                from core import entity_versions as _ev
+                client["sent"] = {
+                    cid: _ev.char_digests(ch, world.get("tick", 0))
+                    for cid, ch in (snapshot.get("characters") or {}).items()
+                    if isinstance(ch, dict) and ch.get("id")
+                }
+                await ws.send_json(snapshot)
+                client["needs_full"] = False
+            else:
+                delta = _build_delta(world, dirty, cx, cy, zoom, client.get("selected_id"),
+                                     sent=client.setdefault("sent", {}))
+                if delta:
+                    await ws.send_json(delta)
+        except Exception:
+            # Log instead of swallowing: a bug in snapshot/delta
+            # building (e.g. the missing RESPONDER_FADE_TICKS
+            # import that used to crash _build_delta on every
+            # single call) previously killed every client here
+            # with zero trace, silently disabling all live
+            # updates while still leaving reconnect+one-shot
+            # snapshot working -- which looked exactly like
+            # "nothing updates until I refresh".
+            traceback.print_exc()
+            dead.append(client)
+
+    for client in dead:
+        if client in _clients:
+            _clients.remove(client)
+
+
+
 async def loop():
     from core.tick_schedule import TICK_RATE_SECONDS
 
@@ -380,47 +430,7 @@ async def loop():
             world, dirty = await asyncio.get_event_loop().run_in_executor(
                 _tick_executor, _run_tick_and_persist, SIM_ID
             )
-            # Broadcast to each client
-            dead = []
-            for client in _clients:
-                ws   = client["ws"]
-                cx   = client.get("cx", 0)
-                cy   = client.get("cy", 0)
-                zoom = client.get("zoom", 2)
-                try:
-                    if client.get("needs_full"):
-                        snapshot = _build_full_snapshot(world, world["definitions"], cx, cy, zoom)
-                        snapshot["type"] = "snapshot"
-                        # what this client now has of each character: the baseline later deltas
-                        # are patched against (core/entity_versions.py)
-                        from core import entity_versions as _ev
-                        client["sent"] = {
-                            cid: _ev.char_digests(ch, world.get("tick", 0))
-                            for cid, ch in (snapshot.get("characters") or {}).items()
-                            if isinstance(ch, dict) and ch.get("id")
-                        }
-                        await ws.send_json(snapshot)
-                        client["needs_full"] = False
-                    else:
-                        delta = _build_delta(world, dirty, cx, cy, zoom, client.get("selected_id"),
-                                             sent=client.setdefault("sent", {}))
-                        if delta:
-                            await ws.send_json(delta)
-                except Exception:
-                    # Log instead of swallowing: a bug in snapshot/delta
-                    # building (e.g. the missing RESPONDER_FADE_TICKS
-                    # import that used to crash _build_delta on every
-                    # single call) previously killed every client here
-                    # with zero trace, silently disabling all live
-                    # updates while still leaving reconnect+one-shot
-                    # snapshot working -- which looked exactly like
-                    # "nothing updates until I refresh".
-                    traceback.print_exc()
-                    dead.append(client)
-
-            for client in dead:
-                if client in _clients:
-                    _clients.remove(client)
+            await _broadcast(world, dirty)
         except Exception:
             # This loop is a single long-lived background task that nothing
             # supervises or restarts — an unhandled exception here (e.g. the
@@ -447,7 +457,11 @@ async def loop():
 
 @app.on_event("shutdown")
 def shutdown_persist():
-    """The world lives in memory (core/world_state.py): write it out before the process exits."""
+    """The world lives in memory (core/world_state.py): write it out before the process exits.
+    A gateway holds only a copy of the core's world and never writes it."""
+    from core import commands
+    if commands.ROLE == "api":
+        return
     try:
         from core import world_state
         world_state.persist_now(SIM_ID)
@@ -455,15 +469,46 @@ def shutdown_persist():
         print(f"[shutdown] could not persist the world: {exc!r}")
 
 
+async def replica_loop(feed):
+    """Gateway: whenever the core's frames have been applied to this process's copy of the world,
+    send the connected clients what changed (the core's own loop() does the same after a tick)."""
+    from core import replication, world_state
+    loop = asyncio.get_event_loop()
+    counter = -1
+    resyncs = 0
+    while True:
+        counter = await loop.run_in_executor(None, feed.wait_for_update, counter, 1.0)
+        try:
+            feed.pump()                       # applied here, on the event-loop thread: nothing changes the world mid-broadcast
+            if not feed.ready.is_set():
+                continue
+            if feed.stats["resyncs"] != resyncs:
+                resyncs = feed.stats["resyncs"]
+                for client in _clients:
+                    client["needs_full"] = True
+            world = world_state.replica_entry(SIM_ID).world
+            dirty = replication.collect_dirty(world, feed.take_dirty())
+            await _broadcast(world, dirty)
+        except Exception:
+            traceback.print_exc()
+
+
 @app.on_event("startup")
 async def startup():
     from core.memory_guard import start as _start_memory_guard
     _start_memory_guard()
     init_db()
-    # Answer commands from gateway processes (core/commands.py). A no-op cost when none exist.
     from core import commands
-    if commands.ROLE != "api":
-        commands.serve()
+    if commands.ROLE == "api":
+        # A gateway: no tick, no world of its own. It follows the core's world over Redis
+        # (core/replication.py) and sends every mutation back as a command (core/commands.py).
+        from core import replication
+        feed = replication.Feed(SIM_ID, manual=True).start()
+        app.state.feed = feed
+        asyncio.create_task(replica_loop(feed))
+        return
+    # Answer commands from gateway processes (core/commands.py). A no-op cost when none exist.
+    commands.serve()
     threading.Thread(target=_tick_watchdog, name="tick-watchdog", daemon=True).start()
     asyncio.create_task(loop())
 
