@@ -74,6 +74,8 @@ from fastapi.responses import JSONResponse
 
 from db import load_world, save_world, world_lock
 
+from core.commands import command
+
 router = APIRouter(prefix="/admin", tags=["admin"])
 
 DEFAULT_SIM_ID = "default"
@@ -89,6 +91,7 @@ def get_state(sim_id: str = DEFAULT_SIM_ID):
 
 
 @router.post("/time_scale")
+@command("admin.set_time_scale")
 def set_time_scale(payload: dict, sim_id: str = DEFAULT_SIM_ID):
     value = max(1, min(50, int(payload.get("value", 1))))
     with world_lock():
@@ -99,6 +102,7 @@ def set_time_scale(payload: dict, sim_id: str = DEFAULT_SIM_ID):
 
 
 @router.post("/movement_speed")
+@command("admin.set_movement_speed")
 def set_movement_speed(payload: dict, sim_id: str = DEFAULT_SIM_ID):
     """Per the user's explicit ask: a knob for how fast characters walk on
     screen that's independent of time_scale (see systems/movement.py's
@@ -192,6 +196,7 @@ def _scrub_leftovers_after_wipe(world):
 
 
 @router.post("/reset_characters")
+@command("admin.reset_characters")
 def reset_characters(sim_id: str = DEFAULT_SIM_ID):
     """Wipes all characters and households -- the map/buildings/roads/props
     are hand-placed via the World Editor and aren't code-regenerable, so
@@ -290,6 +295,7 @@ def reset_characters(sim_id: str = DEFAULT_SIM_ID):
 
 
 @router.post("/remove_character")
+@command("admin.remove_character")
 def remove_character(payload: dict, sim_id: str = DEFAULT_SIM_ID):
     """Remove a single character -- everyone else keeps going. Applies the
     same orphan cleanup as reset_characters (placed_items/world_objects
@@ -346,6 +352,7 @@ def remove_character(payload: dict, sim_id: str = DEFAULT_SIM_ID):
 
 
 @router.post("/fix_malnutrition")
+@command("admin.fix_malnutrition")
 def fix_malnutrition(sim_id: str = DEFAULT_SIM_ID):
     """Item nutrition values were miscalibrated far below what
     nutrition.py's daily settlement AND body_composition.py's calorie-
@@ -393,6 +400,7 @@ def fix_malnutrition(sim_id: str = DEFAULT_SIM_ID):
 
 
 @router.post("/purge_garbage_intentions")
+@command("admin.purge_garbage_intentions")
 def purge_garbage_intentions(sim_id: str = DEFAULT_SIM_ID):
     """store_intention() (brain/agent_loop.py) used to fall back to the
     LLM's raw, free-text "then" phrase as an intention's own "type" field
@@ -418,6 +426,7 @@ def purge_garbage_intentions(sim_id: str = DEFAULT_SIM_ID):
 
 
 @router.post("/clear_stale_anchor_occupancy")
+@command("admin.clear_stale_anchor_occupancy")
 def clear_stale_anchor_occupancy(sim_id: str = DEFAULT_SIM_ID):
     """One-off cleanup for anchors reserved by a character that no
     longer exists (e.g. from before a reset_characters call made before
@@ -439,6 +448,7 @@ def clear_stale_anchor_occupancy(sim_id: str = DEFAULT_SIM_ID):
 
 
 @router.post("/release_stuck_anchor")
+@command("admin.release_stuck_anchor")
 def release_stuck_anchor(payload: dict, sim_id: str = DEFAULT_SIM_ID):
     """One-off correction for the pre-fix interrupt_activity() gap (see
     systems/occupancy.py) -- a character whose activity was interrupted
@@ -460,6 +470,7 @@ def release_stuck_anchor(payload: dict, sim_id: str = DEFAULT_SIM_ID):
 
 
 @router.post("/clear_stuck_travel_state")
+@command("admin.clear_stuck_travel_state")
 def clear_stuck_travel_state(sim_id: str = DEFAULT_SIM_ID):
     """Live-testing helper for a real, still-unfixed bug: a character can
     end up with off_grid=False (marked home) while travel_state is still
@@ -482,6 +493,7 @@ def clear_stuck_travel_state(sim_id: str = DEFAULT_SIM_ID):
 
 
 @router.post("/set_body_need")
+@command("admin.set_body_need")
 def set_body_need(payload: dict, sim_id: str = DEFAULT_SIM_ID):
     """Live-testing helper: force one character's body need to a value
     without waiting for it to occur naturally. payload: {"character_id",
@@ -502,6 +514,7 @@ def set_body_need(payload: dict, sim_id: str = DEFAULT_SIM_ID):
 
 
 @router.post("/reset_character_state")
+@command("admin.reset_character_state")
 def reset_character_state(payload: dict, sim_id: str = DEFAULT_SIM_ID):
     """Per the user's explicit ask: reset the SAME characters' state
     (accumulated fatigue/sleep_debt/other body needs, stuck activities,
@@ -555,6 +568,7 @@ def reset_character_state(payload: dict, sim_id: str = DEFAULT_SIM_ID):
 
 
 @router.post("/toggle_light")
+@command("admin.toggle_light_admin")
 def toggle_light_admin(payload: dict, sim_id: str = DEFAULT_SIM_ID):
     """Live-testing helper: flip a lamp or wall switch's on/off state
     without waiting for a character to actually walk up and interact
@@ -585,6 +599,7 @@ def toggle_light_admin(payload: dict, sim_id: str = DEFAULT_SIM_ID):
 
 
 @router.post("/set_relationship")
+@command("admin.set_relationship")
 def set_relationship(payload: dict, sim_id: str = DEFAULT_SIM_ID):
     """Live-fix helper: overwrite fields on one directed relationship edge
     (from_id's view of to_id). payload: {"from_id", "to_id", "fields": {...}}.
@@ -603,6 +618,7 @@ def set_relationship(payload: dict, sim_id: str = DEFAULT_SIM_ID):
 
 
 @router.post("/dedupe_long_term_memory")
+@command("admin.dedupe_long_term_memory")
 def dedupe_long_term_memory(payload: dict, sim_id: str = DEFAULT_SIM_ID):
     """Live-testing/cleanup helper: collapse a character's long_term_memory
     down to one entry per unique text, keeping the most recent (highest
@@ -719,6 +735,7 @@ def get_cognition_for_char(char_id: str, sim_id: str = DEFAULT_SIM_ID):
 
 
 @router.post("/preview_mentality")
+@command("admin.preview_mentality")
 def preview_mentality(payload: dict, sim_id: str = DEFAULT_SIM_ID):
     """held_beliefs: [belief_template_id, ...], plus optional
     society_categories: [id, ...] (max 3), traits: [trait_id, ...], and

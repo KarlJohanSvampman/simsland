@@ -53,6 +53,8 @@ from api.dependents import router as dependents_router
 from api.director  import router as director_router
 from api.middleware_bridge import router as middleware_bridge_router
 
+from core.commands import command
+
 app = FastAPI(title="Simsland")
 app.add_middleware(
     CORSMiddleware,
@@ -458,6 +460,10 @@ async def startup():
     from core.memory_guard import start as _start_memory_guard
     _start_memory_guard()
     init_db()
+    # Answer commands from gateway processes (core/commands.py). A no-op cost when none exist.
+    from core import commands
+    if commands.ROLE != "api":
+        commands.serve()
     threading.Thread(target=_tick_watchdog, name="tick-watchdog", daemon=True).start()
     asyncio.create_task(loop())
 
@@ -584,6 +590,7 @@ def household(household_id: str):
 
 
 @app.post("/api/config/environment")
+@command("main.update_environment")
 def update_environment(payload: dict):
     with world_lock():
         world = load_world(SIM_ID)
@@ -599,6 +606,7 @@ def llm_logs():
 
 
 @app.delete("/api/llm/logs")
+@command("main.clear_llm_logs")
 def clear_llm_logs():
     with world_lock():
         world = load_world(SIM_ID)

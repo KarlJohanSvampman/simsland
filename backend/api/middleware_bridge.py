@@ -22,6 +22,8 @@ from typing import Any, Dict, Optional
 from db import load_world, save_world, world_lock
 from brain import external_brain
 
+from core.commands import command
+
 router = APIRouter(prefix="/mw", tags=["middleware"])
 
 SIM_ID = "default"
@@ -199,6 +201,7 @@ class ExternalBrainReq(BaseModel):
 
 
 @router.post("/characters/{char_id}/external_brain")
+@command("middleware_bridge.set_external_brain")
 def set_external_brain(char_id: str, req: ExternalBrainReq):
     external_brain.touch()
     with world_lock():
@@ -225,6 +228,7 @@ class ExecuteReq(BaseModel):
 
 
 @router.post("/characters/{char_id}/execute")
+@command("middleware_bridge.execute")
 def execute(char_id: str, req: ExecuteReq):
     external_brain.touch()
     from brain.agent_loop import process_decision, post_update

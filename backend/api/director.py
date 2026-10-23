@@ -23,6 +23,8 @@ from fastapi.responses import JSONResponse
 from db import load_world, save_world, world_lock
 from systems import director_mode
 
+from core.commands import command
+
 router = APIRouter(prefix="/director", tags=["director"])
 
 DEFAULT_SIM_ID = "default"
@@ -33,6 +35,7 @@ def _get_character(world, char_id):
 
 
 @router.post("/start_session")
+@command("director.start_session")
 def start_session(payload: dict, sim_id: str = DEFAULT_SIM_ID):
     with world_lock():
         world = load_world(sim_id)
@@ -45,6 +48,7 @@ def start_session(payload: dict, sim_id: str = DEFAULT_SIM_ID):
 
 
 @router.post("/interrupt_attention")
+@command("director.interrupt_attention")
 def interrupt_attention(payload: dict, sim_id: str = DEFAULT_SIM_ID):
     with world_lock():
         world = load_world(sim_id)
@@ -57,6 +61,7 @@ def interrupt_attention(payload: dict, sim_id: str = DEFAULT_SIM_ID):
 
 
 @router.post("/inject_line")
+@command("director.inject_line")
 def inject_line(payload: dict, sim_id: str = DEFAULT_SIM_ID):
     with world_lock():
         world = load_world(sim_id)
@@ -69,6 +74,7 @@ def inject_line(payload: dict, sim_id: str = DEFAULT_SIM_ID):
 
 
 @router.post("/set_preference")
+@command("director.set_preference")
 def set_preference(payload: dict, sim_id: str = DEFAULT_SIM_ID):
     with world_lock():
         world = load_world(sim_id)
@@ -83,6 +89,7 @@ def set_preference(payload: dict, sim_id: str = DEFAULT_SIM_ID):
 
 
 @router.post("/end_session")
+@command("director.end_session")
 def end_session(payload: dict, sim_id: str = DEFAULT_SIM_ID):
     with world_lock():
         world = load_world(sim_id)
@@ -95,6 +102,7 @@ def end_session(payload: dict, sim_id: str = DEFAULT_SIM_ID):
 
 
 @router.post("/call_attention_radius")
+@command("director.call_attention_radius")
 def call_attention_radius(payload: dict, sim_id: str = DEFAULT_SIM_ID):
     with world_lock():
         world = load_world(sim_id)

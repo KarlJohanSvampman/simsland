@@ -11,6 +11,8 @@ from systems.household_manager import (
     remove_member_from_household,
 )
 
+from core.commands import command
+
 router = APIRouter()
 
 
@@ -19,6 +21,7 @@ router = APIRouter()
 # =========================================================
 
 @router.post("/household/create")
+@command("household.create")
 def create(sim_id: str, payload: dict):
     with world_lock():
         world = load_world(sim_id)
@@ -45,6 +48,7 @@ def create(sim_id: str, payload: dict):
 # =========================================================
 
 @router.post("/household/set_name")
+@command("household.set_name")
 def set_name(sim_id: str, payload: dict):
     with world_lock():
         world = load_world(sim_id)
@@ -59,6 +63,7 @@ def set_name(sim_id: str, payload: dict):
 
 
 @router.post("/household/set_newspaper_subscription")
+@command("household.set_newspaper_subscription")
 def set_newspaper_subscription(sim_id: str, payload: dict):
     with world_lock():
         world = load_world(sim_id)
@@ -77,6 +82,7 @@ def set_newspaper_subscription(sim_id: str, payload: dict):
 # =========================================================
 
 @router.post("/household/set_building_address")
+@command("household.set_building_address")
 def set_building_address(sim_id: str, payload: dict):
     with world_lock():
         world = load_world(sim_id)
@@ -91,6 +97,7 @@ def set_building_address(sim_id: str, payload: dict):
 
 
 @router.post("/household/assign_building")
+@command("household.assign_building")
 def assign_building(sim_id: str, payload: dict):
     with world_lock():
         world = load_world(sim_id)
@@ -109,6 +116,7 @@ def assign_building(sim_id: str, payload: dict):
 
 
 @router.post("/household/unassign_building")
+@command("household.unassign_building_route")
 def unassign_building_route(sim_id: str, payload: dict):
     with world_lock():
         world = load_world(sim_id)
@@ -128,6 +136,7 @@ def unassign_building_route(sim_id: str, payload: dict):
 # =========================================================
 
 @router.post("/household/add_member")
+@command("household.add_member")
 def add_member(sim_id: str, payload: dict):
     with world_lock():
         world = load_world(sim_id)
@@ -146,6 +155,7 @@ def add_member(sim_id: str, payload: dict):
 
 
 @router.post("/household/remove_member")
+@command("household.remove_member")
 def remove_member(sim_id: str, payload: dict):
     with world_lock():
         world = load_world(sim_id)

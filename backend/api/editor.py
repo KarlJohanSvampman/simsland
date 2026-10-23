@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Body, HTTPException, Request
 from pathlib import Path
 import json
 import uuid
@@ -10,6 +10,8 @@ from core.definitions import load_definitions as _load_defs_core, invalidate_def
 from systems.navigation import cache_floorplan
 from systems.character_gen import generate_character
 
+from core.commands import command
+
 router = APIRouter()
 
 @router.get("/world")
@@ -17,6 +19,7 @@ def get_world(sim_id: str):
     return load_world(sim_id)
 
 @router.post("/world")
+@command("editor.save")
 def save(sim_id: str, data: dict):
     # Minimum-clearance check (systems/prop_placement.py) -- this editor
     # edits a client-side buffer and posts the whole world back in one
@@ -101,8 +104,8 @@ def load_definitions(sim_id: str):
 # =====================================
 
 @router.post("/definitions")
-async def save_definitions(sim_id: str, request: Request):
-    data = await request.json()
+@command("editor.save_definitions")
+def save_definitions(sim_id: str, data: dict):
     path = defs_path(sim_id)
     path.parent.mkdir(parents=True, exist_ok=True)
     # Write to a temp file then atomically replace — writing the real
@@ -207,7 +210,8 @@ def _spawn_character_locked(sim_id, template_id, x, y, body):
 
 
 @router.post("/spawn_character")
-async def spawn_character(request: Request):
+@command("editor.spawn_character")
+def spawn_character(body: dict):
     """
     Spawn a character into the simulation.
 
@@ -218,20 +222,14 @@ async def spawn_character(request: Request):
       x, y      – world position
       overrides – dict of any other field overrides forwarded to generate_character
     """
-    body        = await request.json()
     sim_id      = body.get("sim_id", "default")
     template_id = body.get("template")
     x           = body.get("x", 0)
     y           = body.get("y", 0)
 
-    # world_lock() blocks (a real blocking call, not asyncio-aware) — run
-    # the whole critical section on a background thread so a contended
-    # lock doesn't freeze the event loop (this route used to call
-    # load_world/save_world directly inline here, already blocking the
-    # event loop for its DB round-trip; this fixes that too).
-    return await asyncio.get_event_loop().run_in_executor(
-        None, _spawn_character_locked, sim_id, template_id, x, y, body
-    )
+    # A plain (sync) route: FastAPI runs it on its thread pool, so the blocking
+    # world_lock() in the critical section never touches the event loop.
+    return _spawn_character_locked(sim_id, template_id, x, y, body)
 
 
 # =====================================
@@ -286,7 +284,8 @@ def _generate_family_locked(sim_id, char_id, depth, replace):
 
 
 @router.post("/characters/{char_id}/generate_family")
-async def generate_family(char_id: str, request: Request):
+@command("editor.generate_family")
+def generate_family(char_id: str, body: dict = Body(default=None)):
     """
     Procedurally generate a family tree for the given character and persist it.
     The character must already exist in the world.
@@ -296,14 +295,12 @@ async def generate_family(char_id: str, request: Request):
       depth   – 1 = immediate family (default), 2 = extended (grandparents, cousins)
       replace – if true, removes any existing family first (default: false)
     """
-    body   = await request.json() if request.headers.get("content-length", "0") != "0" else {}
+    body   = body or {}
     sim_id = body.get("sim_id", "default")
     depth  = int(body.get("depth", 1))
     replace= bool(body.get("replace", False))
 
-    return await asyncio.get_event_loop().run_in_executor(
-        None, _generate_family_locked, sim_id, char_id, depth, replace
-    )
+    return _generate_family_locked(sim_id, char_id, depth, replace)
 
 
 # =====================================
@@ -487,7 +484,8 @@ def _set_family_relation_locked(sim_id, a_id, b_id, relation_type):
 
 
 @router.post("/family_relation")
-async def set_family_relation(request: Request):
+@command("editor.set_family_relation")
+def set_family_relation(body: dict):
     """
     Create or overwrite the relation between two existing characters.
     Body: {sim_id, a_id, b_id, relation_type}
@@ -495,7 +493,6 @@ async def set_family_relation(request: Request):
     b_id's parent) -- systems/family.py::INVERSE supplies the reverse
     label automatically.
     """
-    body = await request.json()
     sim_id = body.get("sim_id", "default")
     a_id = body.get("a_id")
     b_id = body.get("b_id")
@@ -505,9 +502,7 @@ async def set_family_relation(request: Request):
     if a_id == b_id:
         raise HTTPException(status_code=400, detail="a_id and b_id must differ")
 
-    return await asyncio.get_event_loop().run_in_executor(
-        None, _set_family_relation_locked, sim_id, a_id, b_id, relation_type
-    )
+    return _set_family_relation_locked(sim_id, a_id, b_id, relation_type)
 
 
 def _remove_family_relation_locked(sim_id, a_id, b_id):
@@ -552,16 +547,14 @@ def _remove_family_relation_locked(sim_id, a_id, b_id):
 
 
 @router.post("/family_relation/remove")
-async def remove_family_relation(request: Request):
+@command("editor.remove_family_relation")
+def remove_family_relation(body: dict):
     """Body: {sim_id, a_id, b_id} -- cuts the relation between two
     existing characters (both directions), if any."""
-    body = await request.json()
     sim_id = body.get("sim_id", "default")
     a_id = body.get("a_id")
     b_id = body.get("b_id")
     if not a_id or not b_id:
         raise HTTPException(status_code=400, detail="a_id and b_id are required")
 
-    return await asyncio.get_event_loop().run_in_executor(
-        None, _remove_family_relation_locked, sim_id, a_id, b_id
-    )
+    return _remove_family_relation_locked(sim_id, a_id, b_id)
