@@ -33,12 +33,14 @@ services:
   frontend:
     build: ./frontend
     container_name: sim-frontend
+    restart: unless-stopped
     ports:
       - "3000:80"
     depends_on:
       - backend
   db:
     image: postgres:16
+    restart: unless-stopped
     environment:
       POSTGRES_DB: sim
       POSTGRES_USER: postgres
@@ -51,6 +53,7 @@ services:
   redis:
     image: redis:7
     container_name: sim-redis
+    restart: unless-stopped
     ports:
       - "6379:6379"
 

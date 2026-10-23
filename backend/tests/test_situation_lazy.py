@@ -66,7 +66,8 @@ per_char = {}
 for cid in requests:
     per_char[cid] = per_char.get(cid, 0) + 1
 hist_len = {cid: len(c.get("_situation_history") or []) for cid, c in w["characters"].items()}
-check("the history records decisions, not ticks", all(hist_len.get(cid, 0) <= per_char.get(cid, 0) for cid in hist_len), f"history {hist_len} vs decisions {per_char}")
+# (+1: a request may still be in flight when the count is taken)
+check("the history records decisions, not ticks", all(hist_len.get(cid, 0) <= per_char.get(cid, 0) + 1 for cid in hist_len), f"history {hist_len} vs decisions {per_char}")
 
 # the selection is the same function of the same state, whether it was computed per tick or at read time
 c = next(iter(w["characters"].values()))

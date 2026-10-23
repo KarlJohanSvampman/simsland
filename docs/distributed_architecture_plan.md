@@ -298,8 +298,30 @@ component; a replayable event log.
   client applying only patches ends identical to the server. The versions are also the change signal the
   derived per-character steps need (recompute when the version of the keys you read changed) -- not
   wired into those steps yet.
-- **Next** — (a) wire the versions into the derived per-character steps (`update_social_intentions`,
-  `update_expectations`, `sort_intentions`): recompute only when the keys they read changed;
-  (b) move mutating API routes to commands run by the tick owner, which removes the world lock
-  entirely; (c) then the remaining per-tick polls inside `update_agent()` (emotion, habits, health,
-  waiting, curiosity, economy, ...) onto the lazy/timer pattern so an idle character costs nothing.
+- **Derived steps, measured (done; "step 8" in chat)** — I tried gating `update_expectations` on its inputs and
+  checked it with a differential run (same seeded sim, gate on vs off, fresh process each, diffed): it
+  caught a real subtlety (a skipped run no longer re-appends each expectation's intention, which changes the
+  order of exactly-tied intentions) and was fixed to be exactly equivalent — but a cheap-enough signature
+  (tuple per expectation + household-derived tags + intention presence) cost as much as the step it
+  skipped (~0.3 ms per character-tick), so the gate was **reverted**: at 2-100 characters the whole
+  per-character pipeline is 0.5 ms per tick, and change-signalling only pays when it is nearly free.
+  Kept: the harness (`tests/determinism.py`, `run_det.py`, `test_determinism.py`: seeded, fake clock, counter
+  uuids, inline workers, `PYTHONHASHSEED=0`, fresh process per run) — the way to prove a future change
+  (a gate, a refactor, a persistence mode) is behaviour-neutral; and a free win from the profile:
+  `generate_social_intentions` computed `relationship_score(c, other)` and never read it (a fifth of that
+  step, per pair, per tick) — removed, verified identical (0 differences over 1500 ticks).
+  Also: REST read endpoints the frontend polls every second (`/api/household/characters|list`,
+  `/api/events`) copied the whole world (~20 ms of JSON parsing) to read a few fields; `db.read_world()` lets a
+  short read-only route use the live world under the lock without copying: 19 ms → 4 ms per call.
+  And an operational fix: only the backend had a restart policy, so every Docker restart left the
+  database, Redis and frontend down (the "map is empty" episodes) — all four services now `restart:
+  unless-stopped`.
+- **Where the time is now** — the per-tick cost is no longer where the architecture hurts: the tick runs
+  in a few ms, persistence is write-behind, decisions are asynchronous, the websocket sends patches, and the
+  lock is uncontended. What is still *structurally* centralised: one process owns the world, API routes that
+  mutate it still run on request threads under the lock (52 call sites), and `update_agent()` still polls
+  every step every tick. Remaining options, in order of value: (1) per-process component split (movement /
+  cognition workers / API as separate containers) — needs the entity store behind a network boundary;
+  (2) mutating routes as commands run by the tick owner (removes the lock; mechanical but touches 52
+  sites); (3) turning the polled steps into event/timer handlers one at a time, each proven neutral with the
+  determinism harness.

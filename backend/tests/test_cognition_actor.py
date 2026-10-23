@@ -53,6 +53,11 @@ processed = []
 real_process = agent_loop.process_decision
 agent_loop.process_decision = lambda c, w, d, available_actions=None: (processed.append((c["id"], w["tick"], d["action"]["type"])), None)[1]
 
+# Characters must stay put for this test: whether the live ones happen to be away at work or
+# shopping right now must not matter.
+agent_loop.maybe_go_offgrid = lambda c, w: None
+agent_loop.maybe_schedule_doctor_visit = lambda c, w: None
+agent_loop.resolve_strategy = lambda c, w, i: None        # no autopilot activity may start instead of a decision
 live = load_world("default")
 base = copy.deepcopy(live)
 base["definitions"] = load_definitions("default")

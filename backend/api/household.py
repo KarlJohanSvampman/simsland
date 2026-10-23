@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from db import load_world, save_world, world_lock
+from db import read_world, load_world, save_world, world_lock
 from systems.props import get_prop_by_id
 from systems.building_entrances import get_building_by_id
 from systems.household_manager import (
@@ -169,32 +169,33 @@ def remove_member(sim_id: str, payload: dict):
 
 @router.get("/household/list")
 def list_households(sim_id: str):
-    world = load_world(sim_id)
-
-    households = [
-        {"id": hid, "name": h.get("name"), "member_count": len(h.get("members", []))}
-        for hid, h in world.get("households", {}).items()
-    ]
+    with read_world(sim_id) as world:
+        households = [
+            {"id": hid, "name": h.get("name"), "member_count": len(h.get("members", []))}
+            for hid, h in world.get("households", {}).items()
+        ]
     return {"ok": True, "households": households}
 
 
 @router.get("/household/available_buildings")
 def available_buildings(sim_id: str):
-    world = load_world(sim_id)
-
-    buildings = [
-        {"id": b["id"], "template": b.get("template"), "x": b.get("x"), "y": b.get("y"),
-         "address": b.get("address")}
-        for b in world.get("buildings", [])
-        if b.get("owner_household_id") is None
-    ]
+    with read_world(sim_id) as world:
+        buildings = [
+            {"id": b["id"], "template": b.get("template"), "x": b.get("x"), "y": b.get("y"),
+             "address": b.get("address")}
+            for b in world.get("buildings", [])
+            if b.get("owner_household_id") is None
+        ]
     return {"ok": True, "buildings": buildings}
 
 
 @router.get("/household/characters")
 def all_characters(sim_id: str):
-    world = load_world(sim_id)
+    with read_world(sim_id) as world:
+        return _all_characters(world)
 
+
+def _all_characters(world):
     characters = [
         {
             "id": c["id"],

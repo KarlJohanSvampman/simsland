@@ -11,7 +11,7 @@ WS snapshot/delta protocol.
 
 from fastapi import APIRouter
 
-from db import load_world
+from db import load_world, read_world
 
 router = APIRouter()
 
@@ -90,14 +90,14 @@ def _format_event(world, event):
 
 @router.get("/events")
 def get_events(sim_id: str = "default", limit: int = 50):
-    world = load_world(sim_id)
-    events = world.get("events", [])
-    recent = list(reversed(events[-limit:]))  # newest-first
-    return {
-        "ok": True,
-        "tick": world.get("tick", 0),
-        "events": [_format_event(world, e) for e in recent],
-    }
+    with read_world(sim_id) as world:
+        events = world.get("events", [])
+        recent = list(reversed(events[-limit:]))  # newest-first
+        return {
+            "ok": True,
+            "tick": world.get("tick", 0),
+            "events": [_format_event(world, e) for e in recent],
+        }
 
 
 @router.get("/conversation/{conv_id}")

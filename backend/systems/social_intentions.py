@@ -82,10 +82,8 @@ def generate_social_intentions(
         "neutral"
     )
 
-    score = relationship_score(
-        c,
-        other
-    )
+    # (A relationship_score(c, other) call used to sit here whose result was never read -- it
+    # was a fifth of this function's cost on every pair, every tick.)
 
     # =====================================================
     # SOCIAL NEEDS

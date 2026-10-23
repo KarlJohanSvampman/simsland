@@ -205,6 +205,30 @@ def world_lock(timeout=30):
         _world_lock.release()
 
 
+@contextmanager
+def read_world(sim_id, timeout=2.0):
+    """Quick read-only access to the LIVE world, with no copy.
+
+    load_world() outside the lock builds a private snapshot -- parsing ~1 MB of JSON (~20 ms)
+    -- which is wasteful for a route that reads a few fields (the frontend polls several of
+    these every second). This holds the world lock for the duration of the block and yields
+    the resident world itself: the caller must NOT mutate it, and must be quick (it blocks the
+    tick). Falls back to a snapshot if the lock can't be had within `timeout`.
+    """
+    from core import world_state
+    if world_state.holding():
+        yield world_state.resident(sim_id)
+        return
+    if not _world_lock.acquire(timeout=timeout):
+        yield world_state.snapshot(sim_id)
+        return
+    try:
+        with world_state.hold():
+            yield world_state.resident(sim_id)
+    finally:
+        _world_lock.release()
+
+
 def init_db():
     with _conn_lock, conn:
         with conn.cursor() as cur:
