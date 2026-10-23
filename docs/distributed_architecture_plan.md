@@ -344,5 +344,19 @@ component; a replayable event log.
   concurrency, failing model, duplicate result, real contexts strictly JSON-serialisable) and a live
   round trip through the worker container to Ollama. The other tests pin `COGNITION_MODE=local` so a live
   worker can never answer for them.
-  Next in the split: background LLM jobs (`systems/bg_llm`) as a second worker type, then the API/gateway
-  process once the 52 mutating routes are commands.
+  Next in the split: background LLM jobs (`systems/bg_llm`) as a second worker type (done, below), then the
+  API/gateway process once the 52 mutating routes are commands.
+- **Container split, stage 2: background LLM jobs on workers (done)** — `systems/bg_llm.submit(key, fn, *args)`
+  keeps its API, so none of the five call sites changed. The queue plumbing was generalised into
+  `core/work_queue.py` (a `WorkQueue` per kind of work: streams, consumer group, heartbeat keys, redelivery,
+  a result-reader thread) and `workers/common.py` (the shared worker loop); cognition now runs on both. For the
+  five functions on `bg_llm.REMOTE_TASKS` (behaviour theories, account comparison, child imagination,
+  household-summary narration, self-assessment — all pure model calls, plain JSON in and out) a submission
+  goes to the `bg_llm` worker container(s) while one is alive and runs on the core's two pool threads
+  otherwise; a function off the list, or arguments that aren't plain JSON, always run locally, and the
+  worker refuses any task not on the list. Each submission carries a token: an answer whose token isn't the
+  current one (re-submitted, or taken over by the local fallback after 20 s with no worker) is ignored. The
+  police-feed RSS fetch also goes through bg_llm but is not a model call, so it stays local. Tested in
+  `tests/test_bg_llm_split.py` (fallback, concurrency, allow-list, non-JSON args, failing call, expired
+  deadline, stale token, prompt-log merge) and live: a self-assessment went core -> bg_llm container ->
+  Ollama -> back in 17 s. `docker compose up -d --scale bg_llm=N`; Ollama concurrency is per worker process.

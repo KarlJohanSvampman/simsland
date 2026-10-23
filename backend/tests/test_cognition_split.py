@@ -35,14 +35,13 @@ def check(name, cond, detail=""):
 
 
 # isolate from anything live
-q.REQ_STREAM, q.RES_STREAM, q.GROUP = "test:cog:req", "test:cog:res", "test-workers"
-q.WORKER_KEY_PREFIX = "test:cog:worker:"
-for k in (q.REQ_STREAM, q.RES_STREAM):
+q.queue.rename("test:cog")
+q.queue.alive_cache_seconds = 0.0
+for k in (q.queue.req_stream, q.queue.res_stream):
     r.delete(k)
-for k in r.scan_iter(match=q.WORKER_KEY_PREFIX + "*"):
+for k in r.scan_iter(match=q.queue.worker_prefix + "*"):
     r.delete(k)
 q.forget_alive_cache()
-q.ALIVE_CACHE_SECONDS = 0.0
 
 emitted = []
 ca.emit = lambda name, data: emitted.append((name, data))
@@ -71,7 +70,7 @@ q.enqueue({"req_id": "r1", "n": 1})
 sid, req = q.claim("w1", block_ms=500)
 check("a request survives the wire", req == {"req_id": "r1", "n": 1})
 check("nothing else is queued", q.claim("w1", block_ms=100) is None)
-q.CLAIM_IDLE_MS = 300                           # w1 "dies" without acking
+q.queue.claim_idle_ms = 300                           # w1 "dies" without acking
 time.sleep(0.45)
 got = q.claim("w2", block_ms=300)
 check("an unacked request is taken over by another worker", got is not None and got[1]["req_id"] == "r1")
@@ -79,13 +78,13 @@ q.complete(got[0], {"req_id": "r1", "ok": True})
 last, res = q.read_results("0-0", block_ms=300)
 check("the result is readable", res == [{"req_id": "r1", "ok": True}])
 check("a completed request is gone", q.claim("w3", block_ms=100) is None)
-q.CLAIM_IDLE_MS = 150_000
+q.queue.claim_idle_ms = 150_000
 
 # ---- heartbeat ----------------------------------------------------------------------------
 check("no workers, none alive", q.workers_alive() == 0)
 q.heartbeat("hb1")
 check("a heartbeat counts", q.workers_alive() == 1)
-r.delete(q.WORKER_KEY_PREFIX + "hb1")
+r.delete(q.queue.worker_prefix + "hb1")
 check("a missing heartbeat does not", q.workers_alive() == 0)
 
 # ---- no worker -> local --------------------------------------------------------------------
@@ -101,11 +100,12 @@ q.heartbeat("hb1")
 ca.request_decision(c, world, CTX, "t", 1)
 check("local mode ignores workers", len(local_runs) == 1)
 local_runs.clear()
-r.delete(q.WORKER_KEY_PREFIX + "hb1")
+r.delete(q.queue.worker_prefix + "hb1")
 
 # ---- worker in this process, end to end ----------------------------------------------------
 import workers.cognition as wk
-wk.WORKER_ID = "test-worker"
+wk.runtime.worker_id = "test-worker"
+wk.runtime.heartbeat_seconds = 0.5
 think_calls = []
 
 
@@ -118,11 +118,8 @@ def fake_think(context, char_id=None, session=None, priority=None):
 
 llm_brain.think = fake_think
 wk._patch_prompt_bytes()
-threads = [threading.Thread(target=wk._loop, daemon=True) for _ in range(2)]
-for t in threads:
-    t.start()
-hb = threading.Thread(target=wk._heartbeat, daemon=True)
-hb.start()
+wk.runtime.threads = 2
+wk.runtime.start()
 check("the worker's heartbeat is seen", wait_for(lambda: q.workers_alive() == 1))
 
 ca.MODE = "auto"
@@ -178,9 +175,9 @@ check("a failing model call is reported, not lost", wait_for(lambda: emitted) an
 llm_brain.think = fake_think
 
 # ---- worker disappears with a request outstanding -----------------------------------------
-wk._stop.set()                                   # the worker stops and its heartbeat lapses
+wk.runtime.stop.set()                                   # the worker stops and its heartbeat lapses
 time.sleep(2.5)
-r.delete(q.WORKER_KEY_PREFIX + "test-worker")
+r.delete(q.queue.worker_prefix + "test-worker")
 q.forget_alive_cache()
 check("the stopped worker is no longer alive", q.workers_alive() == 0)
 
@@ -203,7 +200,7 @@ ca.request_decision(c, {"tick": 3}, {"available_actions": {}, "bad": object()}, 
 check("a context json can only stringify still goes (default=str), request tracked", "u1" in str(ca._inflight) or local_runs)
 
 # ---- real contexts are wire-safe -----------------------------------------------------------
-r.delete(q.WORKER_KEY_PREFIX + "hb2")
+r.delete(q.queue.worker_prefix + "hb2")
 ca.MODE = "local"
 seen = []
 real_request = ca.request_decision

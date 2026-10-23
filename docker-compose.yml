@@ -57,6 +57,32 @@ services:
       - ./resources:/resources
     command: python -m workers.cognition
 
+  # Background-LLM worker: the one-off model calls the sim fires and collects later (theories,
+  # child imagination, account comparisons, household narration, self-assessments --
+  # backend/workers/bg_llm.py). Same fallback rule as cognition: the core runs them itself
+  # whenever no worker is alive.   docker compose up -d --scale bg_llm=2
+  bg_llm:
+    build: ./backend
+    restart: unless-stopped
+    mem_limit: 1g
+    environment:
+      - REDIS_HOST=redis
+      - OLLAMA_BASE_URL=http://192.168.10.203:11434
+      - OLLAMA_MODEL=llama3.1:latest
+      - OLLAMA_NUM_CTX=8192
+      - OLLAMA_KEEP_ALIVE=10m
+      - OLLAMA_MAX_CONCURRENCY=1
+      - LLM_CALL_MAX_WAIT_SECONDS=90
+      - BG_LLM_WORKER_THREADS=4
+      - PYTHONPATH=/app
+      - PYTHONUNBUFFERED=1
+    depends_on:
+      - redis
+    volumes:
+      - ./backend:/app
+      - ./resources:/resources
+    command: python -m workers.bg_llm
+
   frontend:
     build: ./frontend
     container_name: sim-frontend

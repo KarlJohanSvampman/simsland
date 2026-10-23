@@ -147,24 +147,7 @@ def _ensure_reader():
     with _reader_lock:
         if _reader is None or not _reader.is_alive():
             from core import cognition_queue
-            _reader = threading.Thread(target=_read_results, args=(cognition_queue.latest_result_id(),),
-                                       daemon=True, name="cognition-results")
-            _reader.start()
-
-
-def _read_results(last_id):
-    """Results from the workers -> decision_ready events; stranded requests -> local fallback."""
-    from core import cognition_queue
-    while True:
-        try:
-            last_id, results = cognition_queue.read_results(last_id, block_ms=1000)
-        except Exception as exc:
-            print(f"[cognition] result stream error: {exc!r}")
-            time.sleep(2.0)
-            results = []
-        for res in results:
-            _accept_remote_result(res)
-        _fallback_stranded()
+            _reader = cognition_queue.start_reader(_accept_remote_result, _fallback_stranded, label="cognition")
 
 
 def _accept_remote_result(res):
