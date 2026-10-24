@@ -69220,5 +69220,132 @@
         "crime"
       ]
     }
+  },
+  "activity_required_focus": {
+    "study": 70,
+    "work_shift": 60,
+    "write": 60,
+    "practice_skill": 55,
+    "pay_bills": 55,
+    "fill_form": 50,
+    "apply_job": 50,
+    "cook_recipe": 50,
+    "paint": 50,
+    "read_book": 45,
+    "respond_to_mail": 40,
+    "look_for_job": 40,
+    "make_drawing": 40,
+    "sort_mail": 25,
+    "jog": 15,
+    "exercise": 15
+  },
+  "worry_relief": {
+    "browse_news": {
+      "mode": "inform",
+      "reduce_pct": 25,
+      "area_tags": [
+        "news",
+        "media",
+        "politics",
+        "neighbourhood",
+        "crime",
+        "finances",
+        "health"
+      ]
+    },
+    "read_newspaper": {
+      "mode": "inform",
+      "reduce_pct": 25,
+      "area_tags": [
+        "news",
+        "media",
+        "politics",
+        "neighbourhood",
+        "crime",
+        "finances"
+      ]
+    },
+    "call_person": {
+      "mode": "inform",
+      "reduce_pct": 25
+    },
+    "phone_call": {
+      "mode": "inform",
+      "reduce_pct": 25
+    },
+    "visit_person": {
+      "mode": "inform",
+      "reduce_pct": 30
+    },
+    "text_person": {
+      "mode": "inform",
+      "reduce_pct": 15
+    },
+    "watch_tv": {
+      "mode": "distract",
+      "reduce_pct": 10
+    },
+    "listen_to_music": {
+      "mode": "distract",
+      "reduce_pct": 10
+    },
+    "jog": {
+      "mode": "distract",
+      "reduce_pct": 12
+    },
+    "exercise": {
+      "mode": "distract",
+      "reduce_pct": 12
+    },
+    "walk_neighborhood": {
+      "mode": "distract",
+      "reduce_pct": 10
+    },
+    "sit_in_park": {
+      "mode": "distract",
+      "reduce_pct": 10
+    },
+    "sit_and_relax": {
+      "mode": "distract",
+      "reduce_pct": 8
+    },
+    "hangout": {
+      "mode": "distract",
+      "reduce_pct": 12
+    },
+    "watch_movie_together": {
+      "mode": "distract",
+      "reduce_pct": 10
+    },
+    "daydream": {
+      "mode": "distract",
+      "reduce_pct": 8
+    },
+    "reflect": {
+      "mode": "transcend",
+      "reduce_pct": 25
+    },
+    "journal": {
+      "mode": "transcend",
+      "reduce_pct": 30
+    },
+    "meditate": {
+      "mode": "transcend",
+      "reduce_pct": 35
+    },
+    "cry": {
+      "mode": "transcend",
+      "reduce_pct": 15
+    },
+    "drink_alcohol": {
+      "mode": "transcend",
+      "reduce_pct": 30,
+      "min_age": 21
+    },
+    "have_drink": {
+      "mode": "transcend",
+      "reduce_pct": 30,
+      "min_age": 21
+    }
   }
 }

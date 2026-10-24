@@ -1,6 +1,6 @@
 # Worry system — draft
 
-Status: **build steps 1 and 2 are done** (see "Progress" at the end); steps 3-5 are not. Sighting notes are
+Status: **build steps 1, 2 and 3 are done** (see "Progress" at the end); steps 4-5 are not. Sighting notes are
 already down to one per person per hour (`social_memory.SIGHTING_OBSERVATION_GAP_TICKS`).
 
 ## 1. Idea in one paragraph
@@ -228,7 +228,43 @@ falling behind on everything"); grudges and grave events are not scaled by close
 they involve), only health of others is. With those, the Marlowe adults in a 30000-tick run sit at 64-74% focus
 (the first version had them at the 20% floor) and the children at ~94%.
 
-Next is step 3: `required_focus` on activities, the 3-minute abort roll (the shortfall reading), mitigation
-intentions and the `worry_relief` table / new relief activities. Nothing yet reads the focus number besides
-the prompt.
+**Step 3 -- focus matters (built).** `systems/worry_relief.py`, `tests/test_worry_relief.py`.
+
+- *Required focus.* `definitions.json -> activity_required_focus` (the module has the same table as a
+  fallback): study 70, work_shift 60, write 60, practice_skill / pay_bills 55, cook_recipe / fill_form /
+  apply_job / paint 50, read_book 45, respond_to_mail / look_for_job / make_drawing 40, sort_mail 25,
+  jog / exercise 15. While a character is in the `using` phase of one, a scheduled job (every sim-minute)
+  rolls once per 180 ticks; the chance to give up is the **shortfall** (required - available, so a
+  70% task at 40% focus aborts 30% of the time; nobody aborts with enough focus). An abort interrupts the
+  activity, stores "I couldn't concentrate on X" (tagged so it isn't taken for evidence), records a
+  failure like the loop guard does and holds the intention that drove it back for 30 sim-minutes, raises a
+  mitigation intention and wakes the character ("You tried to X but couldn't concentrate ...", wake reason
+  `worry_overload`); the prompt keeps saying so for two hours.
+- *Overwhelmed.* Below 25% focus `start_activity` refuses a demanding activity (requirement above 15;
+  survival and health activities are exempt, as is anything with no requirement) and raises the mitigation
+  intention instead.
+- *Mitigation.* At 50% focus or less (or after an abort) a `relieve_worry` intention appears (category
+  identity, priority 60; dropped again above 62%, when the worries are gone, or after relief; at most one
+  per hour). Its mode is drawn by weight from the heaviest case, traits and age: inform (talk it over with
+  someone / read the news) is likelier for a worry about a person, a grudge or a question, and for
+  empathetic, charismatic or codependent characters; distract for adventurous or lazy ones; transcend
+  for thoughtful, wise, calm or religious ones, and rarely for a small child. The intention carries an
+  ordered list of concrete activities (weighted by taste: runners jog, writers journal, the calm meditate)
+  which `resolve_strategy` hands out one at a time until one can start. Adults who tend to drink are told a
+  drink is an option; having it stays the character's own choice (the existing `drink_alcohol` action).
+- *Relief.* `definitions.json -> worry_relief` (also in the module): when the activity completes, the
+  remaining time and the severity of the cases it targets shrink by `reduce_pct` -- inform (browse_news,
+  read_newspaper, call/visit/text, 15-30%) the case it matches by area tags, else the heaviest; distract
+  (TV, music, jog, a walk, the park, hanging out, 8-12%) and transcend (reflect 25, journal 30,
+  meditate 35, cry 15, a drink 30 with a minimum age of 21) every case. A case eased below the
+  registration threshold is closed. The hourly scan does not push an eased case back up for three hours.
+- New activity `meditate`: needs no seat or desk, 20 minutes, the strongest relief available to everyone.
+- Verified with a seeded run where both adults start with four heavy worries and a calm scene: they
+  start meditating and reflecting by themselves (47 relief events in 30000 ticks) and their cases ease.
+  What the simulation can't show: nobody in the fixture does a demanding activity, so the roll is tested
+  in isolation (600 trials per setting, ~30% at a 30% shortfall).
+
+Not yet: relief for activities chosen by the model that are not in the table (every table entry is an
+`activity_completed` event, so adding a row in definitions.json is all it takes); the UI. Next is step 4
+(breakdown episodes) and step 5 (a worry panel and focus gauge).
 

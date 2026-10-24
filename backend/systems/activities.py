@@ -1199,6 +1199,18 @@ ACTIVITIES = {
         "category": "internal"
     },
 
+    # No seat or desk needed: sit with it wherever you are (systems/worry_relief.py's strongest relief).
+    "meditate": {
+
+        "no_target": True,
+
+        "base_duration_minutes": 20,
+
+        "interruptible": True,
+
+        "category": "internal"
+    },
+
     "journal": {
 
         "interaction": "desk",
@@ -1388,6 +1400,12 @@ def start_activity(
         from systems.action_registry import ACTION_TYPE_MIN_AGE
         if age < ACTION_TYPE_MIN_AGE.get(activity_type, 0):
             return False
+
+    # Too worried to concentrate: a demanding activity can't even be started (systems/worry_relief.py)
+    from systems.worry_relief import blocks_start, maybe_raise_mitigation
+    if blocks_start(c, world, activity_type):
+        maybe_raise_mitigation(c, world, force=True)
+        return False
 
     if activity_type == "sleep":
         # Real, fatigue/energy/sleep_debt-aware duration instead of the

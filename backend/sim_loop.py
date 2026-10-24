@@ -1148,6 +1148,13 @@ def _job_worry_poll(world, entry):
     tick_worry_polls(world)
 
 
+def _job_focus_check(world, entry):
+    """Scheduled job `focus_check`: worried characters' mitigation intentions and the 3-minute concentration
+    roll (systems/worry_relief.py)."""
+    from systems.worry_relief import tick_focus_checks
+    tick_focus_checks(world)
+
+
 def _job_persona_expectations(world, entry):
     """Scheduled job `persona_expectations` (was an every() block in tick()); see core/scheduler.py."""
     tick_persona_expectations(world)  # value-alignment clashes between close kin
@@ -1413,6 +1420,7 @@ scheduler.register_recurring("memory_decay", _job_memory_decay, every=CADENCE["m
 scheduler.register_recurring("polarization", _job_polarization, every=CADENCE["polarization"], offset=(-3) % CADENCE["polarization"])
 scheduler.register_recurring("relationships", _job_relationships, every=CADENCE["relationships"], offset=(-4) % CADENCE["relationships"])
 scheduler.register_recurring("worry_poll", _job_worry_poll, every=CADENCE["worry_poll"], offset=(-6) % CADENCE["worry_poll"])
+scheduler.register_recurring("focus_check", _job_focus_check, every=CADENCE["focus_check"], offset=(-7) % CADENCE["focus_check"])
 scheduler.register_recurring("influence_exposure", _job_influence_exposure, every=CADENCE["influence_exposure"], offset=(-21) % CADENCE["influence_exposure"])
 scheduler.register_recurring("cooking", _job_cooking, every=CADENCE["cooking"], offset=(-5) % CADENCE["cooking"])
 scheduler.register_recurring("reading", _job_reading, every=CADENCE["reading"], offset=(-9) % CADENCE["reading"])

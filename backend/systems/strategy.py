@@ -82,6 +82,14 @@ def resolve_strategy(
     # this just needed the dispatch. "take_nap" has no dedicated activity
     # type of its own; a nap is just a shorter sleep, so it reuses "sleep".
 
+    # A worry that has eaten their focus: the relief activity systems/worry_relief.py picked (or the next
+    # one to try if the last couldn't start).
+    if t == "relieve_worry":
+
+        from systems.worry_relief import strategy_for
+
+        return strategy_for(c, world, intention)
+
     if t in ("sleep", "take_nap"):
         return "sleep"
 

@@ -123,6 +123,8 @@ CADENCE["calendar_events"]  = 60
 # Worry polls (systems/worry_cases.py): the job looks at every character once a minute and polls
 # those whose hour is up, so each character is polled about once an hour, staggered.
 CADENCE["worry_poll"]       = 60
+# Concentration rolls and mitigation intentions for worried characters (systems/worry_relief.py).
+CADENCE["focus_check"]      = 60
 
 # Socioeconomics — once per simulated day (~24 ticks)
 CADENCE["socioeconomics"]   = 24

@@ -51,6 +51,7 @@ WAKE_PRIORITY = {
                                  # but ranked below being the direct target
     "heard_speech": 100,
     "self_assessment": 99,     # systems/loop_guard.py -- caught themselves in a loop
+    "worry_overload": 97,      # systems/worry_relief.py -- couldn't concentrate and gave up on what they were doing
     "floor_unnoticed": 98,     # systems/conversation_floor.py -- spoke, got no reaction
     "floor_unanswered": 98,    # ... or was heard and brushed off
     "door_signal": 95,        # systems/doorbell.py -- noticed a doorbell/
@@ -199,6 +200,7 @@ _WAKE_LINE_TEMPLATES = {
     "person_entered_view": "{subject_name} has just come into view.",
     "heard_speech": '{speaker_name} just said to you: "{utterance}"',
     "self_assessment": "You just caught yourself repeating the same thing over and over, so you stopped. {thought}",
+    "worry_overload": "You tried to {activity} but couldn't concentrate -- your worries keep pulling your mind away. Do something about it first.",
     "floor_unnoticed": "{holder_name} hasn't reacted to what you said -- they're {doing}. Say it again louder, call their attention, or let it go.",
     "floor_unanswered": "{holder_name} heard you but didn't answer (they're {doing}).",
     "provoked": "{actor_name} just {verb_phrase} you. {reaction_hint}",

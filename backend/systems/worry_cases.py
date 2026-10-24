@@ -165,7 +165,10 @@ def register_worry(c, subject, severity, source, note, world, tags=None, summary
 
     if case and case.get("status") == "active":
         if str(source).startswith("scan:"):
-            # derived from a standing situation: the case follows the situation (up or down), it doesn't creep
+            # derived from a standing situation: the case follows the situation (up or down), it doesn't creep;
+            # while relief is fresh (systems/worry_relief.py) it is not pushed back above what relief brought it to
+            if tick < case.get("eased_until", 0):
+                sev = min(sev, case["severity"])
             case["severity"] = case["reported"] = sev
             case["focus_cost"] = _focus_cost(sev)
             return _refresh(c, case, sev, entry, tick, nudge=False)
@@ -185,6 +188,7 @@ def register_worry(c, subject, severity, source, note, world, tags=None, summary
     _prune_closed(cases)
     _remember(c, case, world, created=True)
     update_focus(c, world)
+    _mitigate(c, world)
     return case
 
 
@@ -242,6 +246,15 @@ def _remember(c, case, world, created):
                      tick=(world or {}).get("tick", 0), source="internal")
     except Exception:
         pass
+
+
+def _mitigate(c, world):
+    """Someone whose focus is low starts looking for relief (systems/worry_relief.py)."""
+    try:
+        from systems.worry_relief import sync_mitigation
+        sync_mitigation(c, world)
+    except Exception as exc:
+        print(f"[worry_cases] mitigation failed: {exc!r}")
 
 
 # ---------------------------------------------------------------------------
@@ -357,6 +370,7 @@ def poll_worries(c, world):
                     started.append(cid)
                     act = {cs["id"]: cs for cs in active_cases(c)}
     update_focus(c, world)
+    _mitigate(c, world)
     return {"refreshed": refreshed, "started": started, "scan": scanned}
 
 
@@ -388,6 +402,9 @@ def context_lines(c, world):
     lines = []
     for case in act[:3]:
         lines.append(f"On your mind: {case['summary']}")
+    abort = c.get("_focus_abort")
+    if abort and world.get("tick", 0) - abort.get("tick", 0) < 2 * HOUR:
+        lines.append(f"You tried to {str(abort.get('activity')).replace('_', ' ')} but couldn't concentrate on it.")
     avail = state["available"]
     if avail <= 30:
         lines.append(f"Your worries take up almost all of your attention; you can barely concentrate ({avail}% of your focus is left).")
