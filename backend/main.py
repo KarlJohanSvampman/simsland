@@ -53,7 +53,7 @@ from api.dependents import router as dependents_router
 from api.director  import router as director_router
 from api.middleware_bridge import router as middleware_bridge_router
 
-from core.commands import command
+from core.commands import command, core_only
 
 app = FastAPI(title="Simsland")
 app.add_middleware(
@@ -650,6 +650,7 @@ def update_environment(payload: dict):
 
 
 @app.get("/api/llm/logs")
+@core_only
 def llm_logs():
     world = load_world(SIM_ID)
     return world.get("llm_logs", [])

@@ -74,7 +74,7 @@ from fastapi.responses import JSONResponse
 
 from db import load_world, save_world, world_lock
 
-from core.commands import command
+from core.commands import command, core_only
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -652,6 +652,7 @@ def dedupe_long_term_memory(payload: dict, sim_id: str = DEFAULT_SIM_ID):
 
 
 @router.get("/llm_gate_state")
+@core_only
 def get_llm_gate_state():
     """Live-debug introspection into llm_gate.py's in-process queue --
     _heap has no size cap at all, so a live read is the fastest way to
@@ -666,6 +667,7 @@ def get_llm_gate_state():
 
 
 @router.get("/pending_agents")
+@core_only
 def get_pending_agents(sim_id: str = DEFAULT_SIM_ID):
     """Characters whose decision is currently with the model (brain/cognition_actor.py):
     the request is recorded on the character, so this reads the persisted world."""
@@ -683,6 +685,7 @@ def get_pending_agents(sim_id: str = DEFAULT_SIM_ID):
 
 
 @router.get("/cognition")
+@core_only
 def get_cognition_histogram(sim_id: str = DEFAULT_SIM_ID):
     world = load_world(sim_id)
     tick = world.get("tick", 0)
@@ -723,6 +726,7 @@ def get_cognition_histogram(sim_id: str = DEFAULT_SIM_ID):
 
 
 @router.get("/cognition/{char_id}")
+@core_only
 def get_cognition_for_char(char_id: str, sim_id: str = DEFAULT_SIM_ID):
     world = load_world(sim_id)
     c = world.get("characters", {}).get(char_id)
@@ -806,6 +810,7 @@ def preview_mentality(payload: dict, sim_id: str = DEFAULT_SIM_ID):
 # ── Step 0 of the event-driven migration: see docs/distributed_architecture_plan.md ──
 
 @router.get("/tick_profile")
+@core_only
 def tick_profile(top: int = 0, reset: bool = False):
     """Where the tick spends its time, per section (core/tick_profile.py): how often each
     section was reached, how often it actually did work (active_pct), and its cost."""
@@ -817,6 +822,7 @@ def tick_profile(top: int = 0, reset: bool = False):
 
 
 @router.get("/event_log")
+@core_only
 def event_log_recent(limit: int = 100, type: str | None = None, source: str = "ring"):
     """The newest events through the bus. source=ring (this process) or stream (Redis, survives restarts)."""
     from core import event_log
@@ -827,6 +833,7 @@ def event_log_recent(limit: int = 100, type: str | None = None, source: str = "r
 
 
 @router.get("/event_log/export")
+@core_only
 def event_log_export(limit: int = 1000, type: str | None = None):
     """One JSON event per line, oldest first: the input for tools/replay_events.py."""
     from fastapi.responses import PlainTextResponse
@@ -835,6 +842,7 @@ def event_log_export(limit: int = 1000, type: str | None = None):
 
 
 @router.get("/event_log/handlers")
+@core_only
 def event_log_handlers(top: int = 40):
     """Per event type and handler: calls, errors, total/avg/max milliseconds."""
     from core import event_log, event_bus
@@ -842,6 +850,7 @@ def event_log_handlers(top: int = 40):
 
 
 @router.get("/world_state")
+@core_only
 def world_state_stats():
     """The in-memory world store (core/world_state.py): resident ticks/versions, how many
     snapshots were rendered for readers, and the write-behind persistence counters."""

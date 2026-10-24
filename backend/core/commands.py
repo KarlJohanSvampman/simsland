@@ -80,6 +80,7 @@ def command(name=None):
         if cname in REGISTRY and REGISTRY[cname] is not fn:
             raise ValueError(f"duplicate command name {cname!r}")
         REGISTRY[cname] = fn
+        fn.__command__ = cname
         if ROLE != "api":
             return fn
         sig = inspect.signature(fn)
@@ -92,6 +93,24 @@ def command(name=None):
         stub.__command__ = cname
         return stub
     return deco
+
+
+def core_only(fn):
+    """Mark a route that depends on state which exists only inside the simulation core process
+    (cognition and tick statistics, prompt logs, the LLM gate, the middleware bridge's heartbeat,
+    sandbox worlds, ...). In the core nothing changes. In a gateway the route answers 503, which
+    the nginx front end retries against the core. tests/test_route_audit.py makes sure every route
+    that reaches such state carries this mark, and that none is routed to the gateway."""
+    fn.__core_only__ = True
+    if ROLE != "api":
+        return fn
+    from fastapi import HTTPException
+
+    @functools.wraps(fn)
+    def stub(*args, **kwargs):
+        raise HTTPException(status_code=503, detail="this route is served by the simulation core")
+    stub.__core_only__ = True
+    return stub
 
 
 # ---------------------------------------------------------------------------

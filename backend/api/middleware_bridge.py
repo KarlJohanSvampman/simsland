@@ -22,7 +22,7 @@ from typing import Any, Dict, Optional
 from db import load_world, save_world, world_lock
 from brain import external_brain
 
-from core.commands import command
+from core.commands import command, core_only
 
 router = APIRouter(prefix="/mw", tags=["middleware"])
 
@@ -75,6 +75,7 @@ def _cognition(c):
 
 
 @router.get("/characters")
+@core_only
 def list_characters():
     world = load_world(SIM_ID)
     tick = world.get("tick", 0)
@@ -92,6 +93,7 @@ def list_characters():
 
 
 @router.get("/due")
+@core_only
 def due():
     """Externally-driven characters whose think tick has arrived. Polling
     this doubles as the middleware heartbeat."""
@@ -135,6 +137,7 @@ def due():
 
 
 @router.get("/characters/{char_id}/snapshot")
+@core_only
 def snapshot(char_id: str, sections: str = ",".join(ALL_SECTIONS)):
     external_brain.touch()
     wanted = {s.strip() for s in sections.split(",") if s.strip()}

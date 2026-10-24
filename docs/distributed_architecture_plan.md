@@ -428,4 +428,27 @@ component; a replayable event log.
   publisher stays silent. Remaining known flake (not from this change, seen once in six runs):
   `test_determinism` "ordinary afternoon" diffed one household event's `room_label` (a floorplan cache
   that is filled lazily); worth a look when determinism work resumes.
+- **Core-only route check (done)** — "which routes may run on the gateway" is now decided by a tool instead of by
+  reading. `tools/route_audit.py` indexes the backend, follows what every route endpoint references (names,
+  attribute chains and calls, resolved through module- and function-level imports) through project code, and
+  reports the first path to (a) a way to change the world (`world_lock`, `save_world`, ...) or (b) state that
+  only exists in the core process (cognition/tick statistics, the event bus and log, the scheduler, the LLM
+  gate and prompt log, background-LLM mailbox, the middleware heartbeat, `sim_loop`; the list is
+  `CORE_ONLY_STATE`). A route passes if it is a `@command`, is marked `@core_only`, or reaches neither.
+  `@core_only` (core/commands.py) changes nothing in the core; in a gateway the route answers 503, which
+  nginx retries on the core -- so a route nginx sends to the gateway by mistake still works, and a
+  gateway asked directly says where the route lives. 31 routes carry it (all of `/debug/*` incl. the
+  sandbox, the middleware bridge reads, the `/admin` statistics endpoints, `/api/llm/logs`).
+  The tool also reads `frontend/nginx.conf` (mounted read-only into the backend container) and applies
+  nginx's location matching, so the audit knows which routes are on the gateway.
+  `tests/test_route_audit.py` fails when: any route reaches core-only state or the world unmarked; a
+  `@core_only` route is sent to the gateway; nginx matching drifts from the expected paths; or, in a
+  gateway process, a core-only route does not answer 503 / a command is not a stub. It also tests the
+  analyzer on synthetic code (alias imports, `from pkg import module`, function-local imports, call
+  chains, recursion) -- which caught a bug in the first version (module-level `from pkg import module`
+  was resolved before all modules were indexed, so those references were silently missed).
+  For a new route: the test names what it reaches; add `@core_only`, make it a `@command`, or (false
+  positive) record it in `ALLOWED` with the reason. Today's result: 116 routes, 35 on the gateway,
+  43 commands, 31 core-only, nothing unmarked reaches either. Limits: it follows names, not dynamic
+  dispatch (`getattr`, event handlers, `self.method()`), so state reached that way is invisible to it.
 

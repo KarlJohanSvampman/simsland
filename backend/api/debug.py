@@ -21,6 +21,8 @@ from pydantic import BaseModel
 from pathlib import Path
 
 
+from core.commands import core_only
+
 router = APIRouter(prefix="/debug", tags=["debug"])
 
 # ─── Defaults ─────────────────────────────────────────────────────────────────
@@ -163,6 +165,7 @@ class ActivityPlanReq(BaseModel):
 # ─── Endpoints ─────────────────────────────────────────────────────────────────
 
 @router.get("/architecture")
+@core_only
 def architecture_page():
     path = Path(__file__).parent.parent / "frontend" / "architecture.html"
     if path.exists():
@@ -171,6 +174,7 @@ def architecture_page():
 
 
 @router.get("/events")
+@core_only
 def events_stats_ep():
     from core.event_bus import stats
     return stats()
@@ -178,6 +182,7 @@ def events_stats_ep():
 
 @router.get("")
 @router.get("/")
+@core_only
 def debug_page():
     path = Path(__file__).parent.parent / "frontend" / "debug.html"
     if path.exists():
@@ -186,6 +191,7 @@ def debug_page():
 
 
 @router.post("/build-context")
+@core_only
 def build_context_ep(req: CharWorldReq):
     from brain.context_builder import build_context
     from systems.schema_defaults import ensure_world_defaults
@@ -207,6 +213,7 @@ def build_context_ep(req: CharWorldReq):
 
 
 @router.post("/resolve-target")
+@core_only
 def resolve_target_ep(req: ResolveTargetReq):
     """Deterministic, LLM-free — the verification + threshold-tuning tool
     for brain/action_resolver.py."""
@@ -252,6 +259,7 @@ def _partial_context(c, world, out, errors):
 
 
 @router.post("/llm-test")
+@core_only
 async def llm_test_ep(req: LLMTestReq):
     from brain.context_builder import build_context
     from brain.llm_brain import build_system_prompt, build_prompt, validate_response
@@ -330,6 +338,7 @@ async def llm_test_ep(req: LLMTestReq):
 
 
 @router.post("/generate-schedule")
+@core_only
 def generate_schedule_ep(req: ScheduleReq):
     from systems.scheduling import generate_week_schedule
     from systems.schema_defaults import ensure_world_defaults
@@ -359,6 +368,7 @@ def generate_schedule_ep(req: ScheduleReq):
 
 
 @router.post("/plan-activity")
+@core_only
 def plan_activity_ep(req: ActivityPlanReq):
     from systems.activities import INTERACTION_ANIMATIONS
     from systems.schema_defaults import ensure_world_defaults
@@ -416,6 +426,7 @@ def plan_activity_ep(req: ActivityPlanReq):
 # ─── LLM Prompt Log endpoints ─────────────────────────────────────────────────
 
 @router.get("/prompt-log/{char_id}")
+@core_only
 def get_prompt_log_ep(char_id: str):
     """Return stored LLM prompt/response history for a character (newest first)."""
     from llm.llm_client import get_prompt_log
@@ -423,6 +434,7 @@ def get_prompt_log_ep(char_id: str):
 
 
 @router.delete("/prompt-log/{char_id}")
+@core_only
 def clear_prompt_log_ep(char_id: str):
     from llm.llm_client import clear_prompt_log
     clear_prompt_log(char_id)
@@ -430,6 +442,7 @@ def clear_prompt_log_ep(char_id: str):
 
 
 @router.post("/prompt-send")
+@core_only
 async def prompt_send_ep(req: LLMSendReq):
     """
     Send a custom system+user prompt to the LLM on behalf of a character.

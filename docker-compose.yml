@@ -27,6 +27,7 @@ services:
       - ./backend:/app
       - ./resources:/resources   # 👈 important for models/assets
       - ./simulations:/data/simulations
+      - ./frontend/nginx.conf:/frontend/nginx.conf:ro   # read by tools/route_audit.py (which routes go to the gateway)
     command: >
       uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 

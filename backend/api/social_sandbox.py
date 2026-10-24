@@ -28,6 +28,8 @@ from systems.perception.descriptions import build_visible_person_description
 from brain.relationships import ensure_relationship
 
 
+from core.commands import core_only
+
 router = APIRouter(prefix="/debug/sandbox", tags=["social_sandbox"])
 
 # ─── State ──────────────────────────────────────────────────────────────────
@@ -166,6 +168,7 @@ def _build_visible_people(world: dict, defs: dict, present_ids: List[str]) -> No
 # ─── Staging ─────────────────────────────────────────────────────────────────
 
 @router.post("/stage")
+@core_only
 def stage_sandbox(req: StageRequest):
     defs = load_definitions(req.sim_id)
     world = _new_sandbox_world(defs)
@@ -242,6 +245,7 @@ def stage_sandbox(req: StageRequest):
 # ─── Character fetch ────────────────────────────────────────────────────────
 
 @router.get("/{sandbox_id}/characters/{char_id}")
+@core_only
 def get_sandbox_character(sandbox_id: str, char_id: str):
     world = _SANDBOXES.get(sandbox_id)
     if world is None:
@@ -296,6 +300,7 @@ class TurnRequest(BaseModel):
 
 
 @router.post("/{sandbox_id}/turn")
+@core_only
 async def sandbox_turn(sandbox_id: str, req: TurnRequest):
     from brain.context_builder import build_context
     from brain.llm_brain import think
@@ -357,6 +362,7 @@ class OffgridRequest(BaseModel):
 
 
 @router.post("/{sandbox_id}/offgrid")
+@core_only
 def sandbox_offgrid(sandbox_id: str, req: OffgridRequest):
     from systems.offgrid import send_offgrid, process_return
 
@@ -401,6 +407,7 @@ def _apply_patch(c: dict, patch: dict) -> None:
 
 
 @router.patch("/{sandbox_id}/characters/{char_id}")
+@core_only
 def patch_sandbox_character(sandbox_id: str, char_id: str, patch: Dict[str, Any]):
     world = _SANDBOXES.get(sandbox_id)
     if world is None:
@@ -420,6 +427,7 @@ def patch_sandbox_character(sandbox_id: str, char_id: str, patch: Dict[str, Any]
 # from _SANDBOXES, so it 404s for every sandbox character today.
 
 @router.post("/{sandbox_id}/characters/{char_id}/generate_family")
+@core_only
 def sandbox_generate_family(sandbox_id: str, char_id: str, depth: int = 1):
     from systems.family import generate_family_for_character, get_family_summary
 
