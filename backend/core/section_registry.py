@@ -52,6 +52,7 @@ REGISTRY = {
     "every:memory_decay": ("threshold", "character", "lazy salience; decay computed on read"),
     "every:polarization": ("event", "character", "on opinion/belief change"),
     "every:relationships": ("event", "social", "on proximity/interaction events"),
+    "every:worry_poll": ("calendar", "character", "time.hour per character (staggered); new memories/news are the input (systems/worry_cases.py)"),
     "every:influence_exposure": ("calendar", "social", "time.hour"),
     "every:value_influence": ("calendar", "social", "time.day"),
     "every:persona_expectations": ("timer", "character", "expectation window start/end timers"),

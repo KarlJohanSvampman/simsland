@@ -69088,5 +69088,137 @@
       "name": "Teen",
       "description": "You think like a real teenager -- more capable than a young child, but you still lean on immediate wants, friends, and how things feel over careful long-term planning. You're starting to understand adult matters like money, work, and relationships, but not as deeply or automatically as an adult would, and you can still misjudge how serious something is. What you say out loud doesn't always match what you're actually thinking or feeling inside."
     }
+  },
+  "worry_areas": {
+    "workplace": {
+      "tags": [
+        "work",
+        "job",
+        "boss",
+        "coworker",
+        "workplace",
+        "fired",
+        "layoff",
+        "shift",
+        "career"
+      ],
+      "keywords": [
+        "my job",
+        "boss",
+        "fired",
+        "laid off",
+        "coworker",
+        "work shift",
+        "my career"
+      ]
+    },
+    "family": {
+      "tags": [
+        "family",
+        "relative",
+        "parent",
+        "child",
+        "sibling",
+        "kin",
+        "household"
+      ],
+      "keywords": [
+        "my family",
+        "my kids",
+        "my parents",
+        "my brother",
+        "my sister"
+      ]
+    },
+    "finances": {
+      "tags": [
+        "money",
+        "finance",
+        "bill",
+        "debt",
+        "rent",
+        "loan",
+        "eviction",
+        "unpaid",
+        "broke"
+      ],
+      "keywords": [
+        "overdue",
+        "can't afford",
+        "cannot afford",
+        "debt",
+        "rent is",
+        "eviction",
+        "overdraft",
+        "unpaid bill"
+      ]
+    },
+    "politics": {
+      "tags": [
+        "politics",
+        "election",
+        "government",
+        "tax",
+        "policy",
+        "protest",
+        "party"
+      ],
+      "keywords": [
+        "election",
+        "government",
+        "new tax",
+        "protest",
+        "the council"
+      ]
+    },
+    "media": {
+      "tags": [
+        "news",
+        "media",
+        "headline"
+      ],
+      "keywords": [
+        "on the news",
+        "headline",
+        "newspaper"
+      ]
+    },
+    "health": {
+      "tags": [
+        "health",
+        "illness",
+        "sick",
+        "doctor",
+        "injury",
+        "symptom",
+        "hospital",
+        "disease"
+      ],
+      "keywords": [
+        "feeling ill",
+        "my health",
+        "diagnos",
+        "symptom",
+        "hospital"
+      ]
+    },
+    "neighbourhood": {
+      "tags": [
+        "neighbourhood",
+        "local",
+        "crime",
+        "police",
+        "burglary",
+        "noise",
+        "safety"
+      ],
+      "keywords": [
+        "break-in",
+        "burglary",
+        "unsafe",
+        "police activity",
+        "crime"
+      ]
+    }
   }
 }

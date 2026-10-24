@@ -83,12 +83,12 @@ def check_sighting(observer, subject, world, activity_type):
         or _starts_since(subject, activity_type, prev[0]) >= 3
     )
     if not odd:
-        _maybe_lapse(observer, sid, state, repeat)
+        _maybe_lapse(observer, sid, state, repeat, world)
         return None
     return _escalate(observer, subject, world, activity_type, place, state)
 
 
-def _maybe_lapse(observer, sid, state, repeat):
+def _maybe_lapse(observer, sid, state, repeat, world):
     if not state or repeat:
         return
     state["normal_since"] = state.get("normal_since", 0) + 1
@@ -97,6 +97,11 @@ def _maybe_lapse(observer, sid, state, repeat):
         for t in ("check_in_on", "suggest_doctor"):
             remove_intention(observer, t)
         observer["_pattern_concern"].pop(sid, None)
+        try:
+            from systems.worry_cases import close_case
+            close_case(observer, f"person:{sid}", world, status="resolved", reason="they stopped")
+        except Exception:
+            pass
 
 
 def _persuasion_chance(observer, subject):
@@ -108,6 +113,18 @@ def _persuasion_chance(observer, subject):
         return persuasion_chance(subject, {"definitions": {}}, 3)
     except Exception:
         return 0.35
+
+
+def _register_worry(observer, subject, world, base, note, tick):
+    """The noticing becomes a case file that takes up some of the observer's focus (systems/worry_cases.py)."""
+    try:
+        from systems.worry_cases import register_worry, compute_severity
+        sid = subject["id"]
+        register_worry(observer, {"kind": "person", "ref": sid, "label": subject.get("name", "them")},
+                       compute_severity(observer, base, sid), "pattern_concern", note, world,
+                       tags=["pattern", "concern"], summary=note)
+    except Exception as exc:
+        print(f"[worry_cases] could not register a pattern concern: {exc!r}")
 
 
 def _escalate(observer, subject, world, activity, place, state):
@@ -127,6 +144,7 @@ def _escalate(observer, subject, world, activity, place, state):
         store_memory(observer, f"I noticed {name} doing {what} again -- the same thing in the same place as last time. "
                                f"That seems strange; I should ask if they're alright.",
                      importance=0.5, tags=["worry", "pattern", "concern"], people=[sid], tick=tick, source="internal")
+        _register_worry(observer, subject, world, 3.5, f"{name} keeps doing {what} over and over, and I don't know why", tick)
         return state
 
     state["normal_since"] = 0
@@ -150,6 +168,7 @@ def _escalate(observer, subject, world, activity, place, state):
                                f"They couldn't explain it. I think they should see a doctor.",
                      importance=0.6, tags=["worry", "pattern", "concern", "doctor"], people=[sid],
                      tick=tick, source="internal")
+        _register_worry(observer, subject, world, 5.5, f"{name} is still stuck repeating {what} and can't explain it", tick)
         return state
     if state["stage"] == "doctor":
         add_intention(observer, {

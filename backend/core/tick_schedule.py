@@ -120,6 +120,10 @@ CADENCE["phone_battery"]    = 1    # every tick
 # ["social_projects"], see sim_loop.py), not a separate cadence.
 CADENCE["calendar_events"]  = 60
 
+# Worry polls (systems/worry_cases.py): the job looks at every character once a minute and polls
+# those whose hour is up, so each character is polled about once an hour, staggered.
+CADENCE["worry_poll"]       = 60
+
 # Socioeconomics — once per simulated day (~24 ticks)
 CADENCE["socioeconomics"]   = 24
 

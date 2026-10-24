@@ -1,7 +1,7 @@
 # Worry system — draft
 
-Status: draft for review (nothing built). Sighting notes are already down to one
-per person per hour (`social_memory.SIGHTING_OBSERVATION_GAP_TICKS`).
+Status: **build step 1 is done** (see "Progress" at the end); steps 2-5 are not. Sighting notes are
+already down to one per person per hour (`social_memory.SIGHTING_OBSERVATION_GAP_TICKS`).
 
 ## 1. Idea in one paragraph
 
@@ -165,3 +165,38 @@ need new activities. A `worry_relief` table in `definitions.json` maps
 3. Starting numbers (1 sim-hour per severity point, 2 focus points per severity, max 80%
    total, comfort threshold 50%, breakdown at ≤5%) fine to tune from?
 4. Breakdown cooldown of 6 sim-hours and 30% relief?
+
+## 10. Progress
+
+**Step 1 -- the core (built).** `systems/worry_cases.py`, `tests/test_worry_cases.py`.
+
+- Case files in `c["worry_cases"]`, the focus budget in `c["focus_state"]` (`available`, `load`, `top_case`,
+  `last_poll`); `register_worry / refresh_case / close_case / update_focus / poll_worries /
+  context_lines`. All the numbers are constants at the top of the module.
+- The four open questions were not answered, so the readings and numbers above are what is built, to tune
+  from: the abort chance (step 3, not built yet) will be the *shortfall*; the generic-area rule is as in
+  section 4 (an area only starts when nothing specific is on their mind, and is only refreshed by tagged
+  evidence); 1 sim-hour per severity point (areas half), 2 focus points per severity point, load capped at
+  80%; breakdown cooldown and relief percentages are step 4.
+- A small child (under 8) worries only about themselves and their family; their only generic areas are
+  `family` and `health`. A severity-10 case costs 20 focus (the 25-point per-case cap only bites if the
+  constants are raised).
+- The poll: a scheduled job every sim-minute looks at each character whose hour is up (spread over the hour
+  per character) and examines only *new* memories and news since the last poll: a memory/news item that
+  mentions the case's person or one of its tags refreshes it (a negative one nudges severity up by one, at
+  most once per poll, never above what was reported + 2); a negative item matching a generic area starts an
+  area worry if nothing else is active. Memories the worry system writes itself are tagged `worry_case`
+  and never count as evidence. Area keywords/tags come from `definitions.json -> worry_areas` (added;
+  `DEFAULT_AREAS` in the module is the fallback).
+- Producers wired: `pattern_concern` (noticing a repeating pattern: severity 3.5 base, 5.5 when it
+  persists after asking; closed as resolved when the pattern stops) and `systems/worries.py` suspicion
+  (becomes a case at 0.3). Severity = base x closeness (kin 1.5, friends 1.0-1.3, strangers 0.5) x
+  propensity (nervous/paranoid/pessimistic up, calm/resilient/optimistic down, current stress up).
+- The prompt: a `worry_cases` context section lists up to three things on their mind and, when focus is
+  low, says so.
+- In a 9000-tick run of the fixture world, worries do start (a politics area worry from negative news, one
+  per person); nothing else changed yet -- focus does not gate anything until step 3.
+
+Next is step 2 (more producers: expectations, conflicts/grievances, the ledger, health, money, events,
+choices), then step 3 (`required_focus`, the abort roll, mitigation intentions and relief activities).
+

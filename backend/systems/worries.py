@@ -55,7 +55,27 @@ def bump_suspicion(observer, subject_id, delta, kind, note, world):
     worry["triggers"].append({"tick": world.get("tick", 0), "kind": kind, "note": note})
     worry["triggers"] = worry["triggers"][-MAX_TRIGGERS:]
     worry["last_updated_tick"] = world.get("tick", 0)
+    _maybe_open_case(observer, subject_id, worry, note, world)
     return worry
+
+
+# Suspicion above this becomes a worry case that takes up focus (systems/worry_cases.py).
+CASE_THRESHOLD = 0.3
+
+
+def _maybe_open_case(observer, subject_id, worry, note, world):
+    if worry["suspicion_level"] < CASE_THRESHOLD:
+        return
+    try:
+        from systems.worry_cases import register_worry, compute_severity
+        name = (world.get("characters", {}).get(subject_id) or {}).get("name", "someone")
+        base = 2.0 + 6.0 * worry["suspicion_level"]
+        register_worry(observer, {"kind": "person", "ref": subject_id, "label": name},
+                       compute_severity(observer, base, subject_id), "suspicion",
+                       note or "something is off", world, tags=["suspicion"],
+                       summary=f"Something feels off about {name}" + (f" ({note})" if note else ""))
+    except Exception as exc:
+        print(f"[worry_cases] could not register a suspicion: {exc!r}")
 
 
 def decay_worries(world):
