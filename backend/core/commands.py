@@ -38,6 +38,7 @@ COMMAND_TIMEOUT_SECONDS = 30.0
 SERVE_THREADS = int(os.getenv("COMMAND_THREADS", "4"))
 
 REGISTRY = {}                                         # command name -> the original function
+TIMEOUTS = {}                                         # command name -> seconds, where not the default
 queue = WorkQueue("cmd", claim_idle_ms=COMMAND_TIMEOUT_SECONDS * 1000 * 2)
 
 _waiters = {}                                         # request id -> {"event", "result"}
@@ -72,7 +73,8 @@ def _decode(value):
 # the decorator
 # ---------------------------------------------------------------------------
 
-def command(name=None):
+def command(name=None, timeout=None):
+    """timeout: seconds a caller waits (default COMMAND_TIMEOUT_SECONDS); for commands that call a model."""
     def deco(fn):
         if inspect.iscoroutinefunction(fn):
             raise TypeError(f"{fn.__qualname__}: a command must be a plain (sync) function")
@@ -80,6 +82,8 @@ def command(name=None):
         if cname in REGISTRY and REGISTRY[cname] is not fn:
             raise ValueError(f"duplicate command name {cname!r}")
         REGISTRY[cname] = fn
+        if timeout:
+            TIMEOUTS[cname] = timeout
         fn.__command__ = cname
         if ROLE != "api":
             return fn
@@ -89,7 +93,8 @@ def command(name=None):
         def stub(*args, **kwargs):
             bound = sig.bind(*args, **kwargs)
             bound.apply_defaults()
-            return call(cname, {k: _encode(v) for k, v in bound.arguments.items()})
+            return call(cname, {k: _encode(v) for k, v in bound.arguments.items()},
+                        timeout=TIMEOUTS.get(cname, COMMAND_TIMEOUT_SECONDS))
         stub.__command__ = cname
         return stub
     return deco

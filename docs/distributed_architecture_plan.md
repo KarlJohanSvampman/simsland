@@ -451,4 +451,21 @@ component; a replayable event log.
   positive) record it in `ALLOWED` with the reason. Today's result: 116 routes, 35 on the gateway,
   43 commands, 31 core-only, nothing unmarked reaches either. Limits: it follows names, not dynamic
   dispatch (`getattr`, event handlers, `self.method()`), so state reached that way is invisible to it.
+- **Editor, props and asset banks moved to the gateway (done)** — nginx now also sends `/api/editor/*`, `/api/prop/*`,
+  `/api/meshbank`, `/api/animbank` and `/api/assets*` to the gateway (56 routes there now, was 35). Nearly all of it
+  was already in place: the editor's writes were commands, its reads come from the replica
+  (`/world`, `/family_graph`) or from the shared definitions file (`/definitions`; a save is a command and the
+  gateway notices the new mtime in the next frame), the banks are plain files on the shared `/resources`
+  mount. Two things needed work. `generate_relative` called the model from an async route on the core's
+  event loop; it is now a sync `@command` (with a per-command timeout, `command(name, timeout=150)`)
+  that goes through the LLM gate -- the gateway has no Ollama configuration, so a route that calls a model
+  must run on the core. The audit gained a rule for that (`llm.llm_client.call_llm*` is core-only state),
+  so a new unmarked route that calls a model is reported. The editor's Save World is a command carrying the
+  whole world (~7 MB): it works, and it changes the map, so every gateway rebuilds its lookup tables
+  (tens of seconds, answered by the core meanwhile) -- acceptable for a rare action, and the thing to
+  remember if it ever becomes frequent.
+  Checked: gateway vs core GETs identical (definitions, family graph, banks; the world differs only by
+  a tick of drift); a definitions save through the gateway reaches the file and both sides read it back
+  equal; `generate_relative` through the gateway returned a bio from the model (38 s); a 404 from a
+  command keeps its status; the World Editor loads and renders its world through nginx -> gateway.
 

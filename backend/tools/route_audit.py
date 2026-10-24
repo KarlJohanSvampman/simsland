@@ -52,6 +52,7 @@ CORE_ONLY_STATE = [
     ("core.memory_guard", "*"),
     ("core.cognition_queue", "*"),
     ("llm.llm_gate", "*"),                     # the per-process concurrency gate and its queue
+    ("llm.llm_client", "call_llm*"),           # a model call: the gateway has no Ollama configuration
     ("llm.llm_client", "*prompt_log*"),        # per-process prompt ring buffer
     ("llm.llm_client", "*stats*"),
     ("systems.bg_llm", "*"),                   # per-process mailbox of background results

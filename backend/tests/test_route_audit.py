@@ -61,8 +61,9 @@ expect = {
     "/ws": True, "/api/state": True, "/api/household/list": True, "/api/household/abc/admin": True,
     "/api/overview/stocks": True, "/api/finances/c1": True, "/api/dependents/c1": True, "/api/events": True,
     "/api/conversation/c1": True, "/view": True, "/view/perception-range/c1": True, "/director/log": True,
-    "/api/editor/world": False, "/api/editor/definitions": False, "/admin/state": False, "/admin/cognition": False,
-    "/debug/prompt-log/c1": False, "/api/meshbank": False, "/resources/x.glb": False, "/api/prop/create": False,
+    "/api/editor/world": True, "/api/editor/definitions": True, "/api/prop/create": True, "/api/meshbank": True,
+    "/api/animbank": True, "/api/assets/upload": True, "/admin/state": False, "/admin/cognition": False,
+    "/debug/prompt-log/c1": False, "/resources/x.glb": False, "/api/llm/logs": False,
     "/index.html": False,
 }
 wrong = {p: nginx.to_gateway(p) for p, want in expect.items() if bool(nginx.to_gateway(p)) != want}

@@ -308,7 +308,8 @@ def generate_family(char_id: str, body: dict = Body(default=None)):
 # =====================================
 
 @router.post("/character_templates/{template_id}/generate_relative")
-async def generate_relative(template_id: str, request: Request):
+@command("editor.generate_relative", timeout=150)
+def generate_relative(template_id: str, body: dict = Body(default=None)):
     """
     Derive a new character_template for a relative of an existing template,
     using relative_gen's procedural trait/hobby/physical_trait inheritance
@@ -324,7 +325,7 @@ async def generate_relative(template_id: str, request: Request):
     from systems.relative_gen import derive_relative, estimate_age_sex, _fallback_bio
     from llm.relative_narration import generate_relative_narration
 
-    body = await request.json() if request.headers.get("content-length", "0") != "0" else {}
+    body = body or {}
     sim_id = body.get("sim_id", "default")
     relation_type = body.get("relation_type")
     if not relation_type:
@@ -338,8 +339,13 @@ async def generate_relative(template_id: str, request: Request):
     derived = derive_relative(source, relation_type, defs)
     derived_age, derived_sex = estimate_age_sex(source.get("age", 25), source.get("sex", "male"), relation_type)
 
-    bio = await generate_relative_narration(
-        source, relation_type, derived["traits"], derived["hobbies"], derived_age, derived_sex,
+    # a command runs on a plain thread: the model call goes through the LLM gate like every other
+    from llm.llm_gate import run_llm_call, PRIORITY_NORMAL
+    bio = run_llm_call(
+        generate_relative_narration(
+            source, relation_type, derived["traits"], derived["hobbies"], derived_age, derived_sex,
+        ),
+        priority=PRIORITY_NORMAL,
     )
     if not bio:
         bio = _fallback_bio(source, relation_type, derived["traits"])
