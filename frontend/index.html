@@ -125,7 +125,7 @@
     border-top: 1px solid #444;
   }
 
-  #viewerRelationshipsTab, #viewerMindTab, #viewerMemoryTab, #viewerLifeTab, #viewerPlansTab, #viewerWorkTab, #viewerHabitsTab, #viewerSkillsTab {
+  #viewerRelationshipsTab, #viewerMindTab, #viewerWorriesTab, #viewerMemoryTab, #viewerLifeTab, #viewerPlansTab, #viewerWorkTab, #viewerHabitsTab, #viewerSkillsTab {
     font-size: 12px;
   }
 
@@ -411,6 +411,53 @@
   }
 
   .viewerEmpty { opacity: .5; font-style: italic; }
+
+  /* =========================
+     WORRIES / FOCUS (systems/worry_cases.py, worry_relief.py, worry_breakdown.py)
+  ========================= */
+  .focusGauge { margin: 4px 0 6px; }
+  .focusGaugeTrack {
+    position: relative;
+    height: 12px;
+    background: rgba(255,255,255,0.08);
+    border: 1px solid #444;
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .focusGaugeFill { height: 100%; transition: width 0.4s ease, background 0.4s ease; }
+  .focusGaugeFill.focusCritical { animation: needMeterPulse 1s ease-in-out infinite; }
+  .focusMark { position: absolute; top: 0; bottom: 0; width: 1px; background: rgba(255,255,255,0.55); }
+  .focusGaugeLabel { display: flex; justify-content: space-between; font-size: 11px; margin-top: 2px; opacity: .85; }
+  .focusGaugeScale { position: relative; height: 10px; font-size: 9px; opacity: .55; }
+  .focusGaugeScale span { position: absolute; transform: translateX(-50%); }
+
+  .worryBadge {
+    display: inline-block;
+    padding: 1px 6px;
+    margin: 2px 4px 2px 0;
+    border-radius: 9px;
+    font-size: 11px;
+    background: rgba(255,255,255,0.1);
+  }
+  .worryBadge.bad  { background: rgba(230,69,69,0.28); color: #ff9a9a; }
+  .worryBadge.warn { background: rgba(230,194,0,0.22); color: #f2d664; }
+  .worryBadge.good { background: rgba(62,207,94,0.2);  color: #7ee787; }
+
+  .worryCase { padding: 6px 0; border-bottom: 1px solid #292d35; }
+  .worryCase:last-child { border-bottom: none; }
+  .worryHead { display: flex; justify-content: space-between; gap: 8px; font-weight: bold; }
+  .worryCost { font-weight: normal; color: #ff9a9a; white-space: nowrap; }
+  .worrySummary { margin: 2px 0 4px; }
+  .worrySevTrack {
+    position: relative;
+    height: 6px;
+    background: rgba(255,255,255,0.08);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .worrySevFill { height: 100%; }
+  .worryMeta { font-size: 11px; opacity: .7; margin-top: 2px; }
+  details.worryClosed summary { cursor: pointer; opacity: .7; font-size: 11px; }
 
   .viewerPos { color: #7ee787; }
   .viewerNeg { color: #ff8080; }
@@ -1012,6 +1059,7 @@
     <button class="viewerTabBtn" data-tab="body">Body</button>
     <button class="viewerTabBtn" data-tab="relationships">Relations</button>
     <button class="viewerTabBtn" data-tab="mind">Mind</button>
+    <button class="viewerTabBtn" data-tab="worries">Worries</button>
     <button class="viewerTabBtn" data-tab="memory">Memory</button>
     <button class="viewerTabBtn" data-tab="life">Life</button>
     <button class="viewerTabBtn" data-tab="plans">Plans</button>
@@ -1046,6 +1094,7 @@
 
   <div id="viewerRelationshipsTab" class="hidden"></div>
   <div id="viewerMindTab" class="hidden"></div>
+  <div id="viewerWorriesTab" class="hidden"></div>
   <div id="viewerMemoryTab" class="hidden"></div>
   <div id="viewerLifeTab" class="hidden"></div>
   <div id="viewerPlansTab" class="hidden"></div>

@@ -513,6 +513,43 @@ def set_body_need(payload: dict, sim_id: str = DEFAULT_SIM_ID):
     return {"ok": True, "character_id": char_id, "need": need, "value": value}
 
 
+@router.post("/register_worry")
+@command("admin.register_worry")
+def register_worry_admin(payload: dict, sim_id: str = DEFAULT_SIM_ID):
+    """Live-testing helper for the worry system (systems/worry_cases.py): give a character a worry, or push them
+    into a breakdown. payload: {"character_id", "kind" (self/person/event/expectation/choice/conflict/area),
+    "ref", "label", "severity", "note"} or {"character_id", "breakdown": true}, or {"character_id", "clear": true}
+    to wipe their worries."""
+    char_id = payload.get("character_id")
+    with world_lock():
+        world = load_world(sim_id)
+        c = world.get("characters", {}).get(char_id)
+        if not c:
+            return {"ok": False, "error": "character not found"}
+        from systems import worry_cases as wc
+        out = {"ok": True, "character_id": char_id}
+        if payload.get("clear"):
+            for key in ("worry_cases", "focus_state", "_breakdown", "_focus_abort"):
+                c.pop(key, None)
+            c["active_intentions"] = [i for i in c.get("active_intentions", []) if i.get("type") != "relieve_worry"]
+        elif payload.get("breakdown"):
+            from systems.worry_breakdown import start_breakdown
+            start_breakdown(c, world, "admin")
+        else:
+            label = payload.get("label") or payload.get("ref") or "something"
+            case = wc.register_worry(
+                c, {"kind": payload.get("kind", "self"), "ref": payload.get("ref") or label, "label": label},
+                float(payload.get("severity", 5)), "admin", payload.get("note") or f"I can't stop thinking about {label}",
+                world, tags=payload.get("tags") or [])
+            out["case"] = case
+        wc.update_focus(c, world)
+        out["focus"] = c.get("focus_state")
+        from sim_loop import _mark_dirty
+        _mark_dirty(world, char_ids=[char_id])
+        save_world(sim_id, world)
+    return out
+
+
 @router.post("/reset_character_state")
 @command("admin.reset_character_state")
 def reset_character_state(payload: dict, sim_id: str = DEFAULT_SIM_ID):

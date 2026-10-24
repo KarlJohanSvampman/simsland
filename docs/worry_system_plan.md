@@ -1,6 +1,6 @@
 # Worry system — draft
 
-Status: **build steps 1-4 are done** (see "Progress" at the end); step 5 (the UI) is not. Sighting notes are
+Status: **all five build steps are done** (see "Progress" at the end). Sighting notes are
 already down to one per person per hour (`social_memory.SIGHTING_OBSERVATION_GAP_TICKS`).
 
 ## 1. Idea in one paragraph
@@ -298,5 +298,30 @@ Not yet from step 3: relief for activities chosen by the model that are not in t
   check-in intention), and that a late model answer is dropped; plus a seeded run where both adults sit at the
   floor: two episodes, 15-17 spoken lines, no errors, and one episode per character within the cooldown.
 
-Next is step 5: a worry panel per character and a focus gauge in the UI.
+**Step 5 -- the UI (built).** `frontend/index.html`, `frontend/src/main.js`; a testing helper in `backend/api/admin.py`.
+
+- *Worries tab* in the character Inspector (between Mind and Memory): a **focus gauge** (green above 75%, yellow, orange
+  at 50% and below, red and pulsing below 25%, with marks at 25 and 50 for "can't start demanding tasks" and "looking
+  for relief"), state badges (Breaking down -- about Xm left; Broke down Xh ago; Overwhelmed; Struggling to
+  concentrate; Looking for relief (mode); Gave up on X Ym ago; the breakdown cooldown; counters of activities given up
+  and breakdowns), the current relief intention with its mode and candidate activities, then **On their mind (N)**:
+  one card per active case, heaviest first -- an icon for the kind (self, person, event, expectation, choice,
+  quarrel, general unease), the label, `-N% focus`, the summary, a severity bar and number, time left, how often it
+  was kept alive, where it came from (a scan, a witnessed event, admin, ...), the latest evidence, and the last
+  relief that eased it. Past worries (resolved or faded, with the reason) are in a collapsed list.
+- *Status tab*: when something is on their mind, a one-line count, the same gauge and the badges sit under the need
+  meters. The gauge is computed from the cases themselves, so it doesn't wait for the server to process an expiry.
+- Everything shown is read from what the server already sends (`worry_cases`, `focus_state`, `_breakdown`,
+  `_focus_abort`, the `relieve_worry` intention); the thresholds are mirrored constants at the top of the new block.
+  Text from the simulation is HTML-escaped.
+- *`POST /admin/register_worry`* (a command, so the gateways forward it): give a character a worry
+  (`character_id, kind, ref, label, severity, note`), push them into a breakdown (`breakdown: true`) or wipe their
+  worries (`clear: true`). Used to check the UI with real data: with four injected worries the live character
+  showed 33% focus, "Struggling to concentrate", "Looking for relief (inform)" with the activities it would try, and
+  seven cards (three had arisen on their own: a quarrel, a pending question, a politics worry); after the admin call
+  for a breakdown the badge read "Breaking down -- about 14m left". The injected worries were cleared afterwards.
+
+Open for tuning (all constants at the top of `systems/worry_cases.py`, `worry_relief.py`, `worry_breakdown.py`,
+`worry_producers.py`): the abort chance (shortfall), the generic-area rule, the starting numbers, the 6-hour breakdown
+cooldown and 30% relief, the activity pool of a breakdown, and the lash-out chance.
 

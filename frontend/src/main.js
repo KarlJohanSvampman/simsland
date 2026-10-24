@@ -4688,7 +4688,7 @@ function _clearInspector(){
   if(nameEl) nameEl.textContent = "";
   const empty = _empty("Nothing selected.");
   const panelIds = [
-    "viewerSelection", "viewerRelationshipsTab", "viewerMindTab",
+    "viewerSelection", "viewerRelationshipsTab", "viewerMindTab", "viewerWorriesTab",
     "viewerMemoryTab", "viewerLifeTab", "viewerPlansTab", "viewerWorkTab",
     "viewerHabitsTab", "viewerSkillsTab",
   ];
@@ -4931,6 +4931,8 @@ function renderCharacterInspector(id){
   const b = c.body || {};
   const needsMeters = _renderNeedsMeters(b, c.stress);
   if(needsMeters) rows.push(needsMeters);
+  const focusRow = _renderFocusStatus(c);
+  if(focusRow) rows.push(focusRow);
   if(b.sickness > 30) rows.push(`<span style="color:#fc6">Sick</span>`);
 
   const hs = c.health_state || {};
@@ -5004,6 +5006,7 @@ function renderCharacterInspector(id){
   renderBodyTab(c);
   renderRelationshipsTab(c);
   renderMindTab(c);
+  renderWorriesTab(c);
   renderMemoryTab(c);
   renderLifeTab(c);
   renderPlansTab(c);
@@ -5034,6 +5037,178 @@ function _signed(n, digits = 0){
   const cls = v > 0 ? "viewerPos" : (v < 0 ? "viewerNeg" : "");
   const text = v.toFixed(digits);
   return cls ? `<span class="${cls}">${v > 0 ? "+" : ""}${text}</span>` : text;
+}
+
+
+// =========================================================
+// WORRIES TAB + FOCUS GAUGE
+// What a character is anxious about and how much of their attention it takes
+// (backend: systems/worry_cases.py case files + focus budget, worry_relief.py
+// required focus / mitigation / relief, worry_breakdown.py episodes). Everything
+// here is read from the character the server already sends:
+//   c.worry_cases   { id: {status, subject:{kind,ref,label}, severity, focus_cost,
+//                          expires, created, refreshes, evidence[], summary,
+//                          mitigated_by[], origin, closed_reason} }
+//   c.focus_state   { available, load, aborts, breakdowns, breakdown_cooldown_until, ... }
+//   c._breakdown    present while an episode runs {start, end, beats}
+//   c._focus_abort  the last activity they gave up on
+// =========================================================
+
+// Mirrors backend/systems/worry_cases.py + worry_relief.py + worry_breakdown.py.
+const FOCUS_MAX_LOAD = 80;
+const FOCUS_COMFORT = 50;        // at or below: looking for relief
+const FOCUS_OVERWHELMED = 25;    // below: demanding activities can't be started
+const FOCUS_FLOOR = 100 - FOCUS_MAX_LOAD;
+
+const _WORRY_KIND = {
+  self:        { icon: "🧍", label: "about themselves" },
+  person:      { icon: "👤", label: "about a person" },
+  event:       { icon: "⚡", label: "about something that happened" },
+  expectation: { icon: "☑",  label: "about something they should have done" },
+  choice:      { icon: "❓", label: "waiting on an answer" },
+  conflict:    { icon: "⚔",  label: "an unsettled quarrel" },
+  area:        { icon: "🌫", label: "general unease" },
+};
+
+function _activeWorries(c){
+  const tick = _worldState.tick || 0;
+  return Object.values(c.worry_cases || {})
+    .filter(w => w.status === "active" && (w.expires == null || w.expires > tick))
+    .sort((a, b) => (b.focus_cost || 0) - (a.focus_cost || 0));
+}
+
+// Focus left after the active worries, computed from the cases themselves so the gauge doesn't lag behind an
+// expiry the server hasn't processed yet.
+function _focusAvailable(c){
+  const active = _activeWorries(c);
+  if(!active.length) return 100;
+  const load = Math.min(FOCUS_MAX_LOAD, active.reduce((s, w) => s + (w.focus_cost || 0), 0));
+  return 100 - load;
+}
+
+function _focusColor(avail){
+  if(avail < FOCUS_OVERWHELMED) return "#e64545";
+  if(avail <= FOCUS_COMFORT) return "#f08a3c";
+  if(avail <= 75) return "#e6c200";
+  return "#3ecf5e";
+}
+
+function _renderFocusGauge(avail){
+  const critical = avail < FOCUS_OVERWHELMED;
+  return `
+    <div class="focusGauge" title="Focus ${avail}% -- worries take ${100 - avail}% of it. Below ${FOCUS_COMFORT}% they look for relief; below ${FOCUS_OVERWHELMED}% demanding tasks can't be started; at the floor (${FOCUS_FLOOR}%) they can break down.">
+      <div class="focusGaugeTrack">
+        <div class="focusGaugeFill${critical ? " focusCritical" : ""}" style="width:${avail}%; background:${_focusColor(avail)};"></div>
+        <div class="focusMark" style="left:${FOCUS_OVERWHELMED}%"></div>
+        <div class="focusMark" style="left:${FOCUS_COMFORT}%"></div>
+      </div>
+      <div class="focusGaugeScale">
+        <span style="left:${FOCUS_OVERWHELMED}%">${FOCUS_OVERWHELMED}</span>
+        <span style="left:${FOCUS_COMFORT}%">${FOCUS_COMFORT}</span>
+      </div>
+      <div class="focusGaugeLabel"><span>Focus ${avail}%</span><span>${100 - avail}% taken by worries</span></div>
+    </div>`;
+}
+
+// The state a worried character is in, as badges: [text, "bad"|"warn"|"good"|""].
+function _focusBadges(c, avail){
+  const tick = _worldState.tick || 0;
+  const fs = c.focus_state || {};
+  const badges = [];
+  if(c._breakdown){
+    const left = Math.max(0, (c._breakdown.end || tick) - tick);
+    badges.push([`Breaking down — about ${_durationLabel(left)} left`, "bad"]);
+  } else if((fs.last_breakdown != null) && tick - fs.last_breakdown < 3 * 3600){
+    badges.push([`Broke down ${_ticksAgoLabel(tick - fs.last_breakdown)}`, "warn"]);
+  }
+  if(avail < FOCUS_OVERWHELMED) badges.push(["Overwhelmed — can't start demanding tasks", "bad"]);
+  else if(avail <= FOCUS_COMFORT) badges.push(["Struggling to concentrate", "warn"]);
+  const relief = (c.active_intentions || []).find(i => i.type === "relieve_worry");
+  if(relief) badges.push([`Looking for relief (${relief.mode || "?"})`, "warn"]);
+  const abort = c._focus_abort;
+  if(abort && tick - abort.tick < 2 * 3600){
+    badges.push([`Gave up on ${String(abort.activity).replace(/_/g, " ")} ${_ticksAgoLabel(tick - abort.tick)}`, "warn"]);
+  }
+  if(fs.breakdown_cooldown_until && fs.breakdown_cooldown_until > tick && !c._breakdown){
+    badges.push([`Can't break down again for ${_durationLabel(fs.breakdown_cooldown_until - tick)}`, ""]);
+  }
+  return badges;
+}
+
+function _renderBadges(badges){
+  return badges.map(([text, kind]) => `<span class="worryBadge ${kind}">${_escapeHTML(text)}</span>`).join("");
+}
+
+// Compact version for the Status tab: shown only when something is on their mind.
+function _renderFocusStatus(c){
+  const active = _activeWorries(c);
+  if(!active.length && !c._breakdown) return "";
+  const avail = _focusAvailable(c);
+  return `<div class="viewerStatRow" style="display:block">Worries: ${active.length} — see the Worries tab</div>`
+    + _renderFocusGauge(avail) + `<div>${_renderBadges(_focusBadges(c, avail))}</div>`;
+}
+
+function _renderWorryCase(w){
+  const tick = _worldState.tick || 0;
+  const kind = _WORRY_KIND[w.subject?.kind] || { icon: "•", label: "" };
+  const label = w.subject?.label || w.subject?.ref || w.id;
+  const sev = Math.max(0, Math.min(10, w.severity || 0));
+  const sevColor = sev >= 7 ? "#e64545" : sev >= 4 ? "#f08a3c" : "#e6c200";
+  const left = w.expires != null ? Math.max(0, w.expires - tick) : null;
+  const last = (w.evidence || []).slice(-1)[0];
+  const eased = (w.mitigated_by || []).slice(-1)[0];
+  const bits = [];
+  if(left != null) bits.push(`about ${_durationLabel(left)} left`);
+  if(w.refreshes) bits.push(`kept alive ${w.refreshes}×`);
+  if(w.origin) bits.push(`from ${String(w.origin).replace(/^scan:/, "").replace(/_/g, " ")}`);
+  return `
+    <div class="worryCase" title="${_escapeHTML(kind.label)}">
+      <div class="worryHead"><span>${kind.icon} ${_escapeHTML(label)}</span><span class="worryCost">−${w.focus_cost || 0}% focus</span></div>
+      <div class="worrySummary">${_escapeHTML(w.summary || "")}</div>
+      <div class="worrySevTrack" title="Severity ${sev.toFixed(1)} / 10"><div class="worrySevFill" style="width:${sev * 10}%; background:${sevColor};"></div></div>
+      <div class="worryMeta">severity ${sev.toFixed(1)} · ${bits.join(" · ")}</div>
+      ${last && last.note && last.note !== w.summary ? `<div class="worryMeta">latest: ${_escapeHTML(String(last.note).slice(0, 110))} (${_ticksAgoLabel(tick - (last.tick || tick))})</div>` : ""}
+      ${eased ? `<div class="worryMeta viewerPos">eased: ${_escapeHTML(String(eased.activity).replace(/_/g, " "))} −${eased.reduced_pct}% (${_ticksAgoLabel(tick - eased.tick)})</div>` : ""}
+    </div>`;
+}
+
+function renderWorriesTab(c){
+  const el = document.getElementById("viewerWorriesTab");
+  if(!el) return;
+  const tick = _worldState.tick || 0;
+  const active = _activeWorries(c);
+  const closed = Object.values(c.worry_cases || {})
+    .filter(w => w.status !== "active" || (w.expires != null && w.expires <= tick))
+    .sort((a, b) => (b.closed || 0) - (a.closed || 0));
+  const avail = _focusAvailable(c);
+  const fs = c.focus_state || {};
+
+  const sections = [];
+  const stats = [];
+  if(fs.aborts) stats.push(`gave up on ${fs.aborts} activit${fs.aborts === 1 ? "y" : "ies"}`);
+  if(fs.breakdowns) stats.push(`${fs.breakdowns} breakdown${fs.breakdowns === 1 ? "" : "s"}`);
+  sections.push(_section("Focus",
+    _renderFocusGauge(avail)
+    + `<div>${_renderBadges(_focusBadges(c, avail))}</div>`
+    + (stats.length ? `<div class="worryMeta">so far: ${stats.join(", ")}</div>` : "")));
+
+  const relief = (c.active_intentions || []).find(i => i.type === "relieve_worry");
+  if(relief){
+    sections.push(_section("Looking for relief",
+      `<div>${_escapeHTML(relief.reason || "")}</div>`
+      + `<div class="worryMeta">${_escapeHTML(relief.mode || "")}: ${(relief.candidates || []).map(a => _escapeHTML(String(a).replace(/_/g, " "))).join(", ")}</div>`));
+  }
+
+  sections.push(_section(`On their mind (${active.length})`,
+    active.length ? active.map(_renderWorryCase).join("") : _empty("Nothing is worrying them.")));
+
+  if(closed.length){
+    sections.push(`<details class="worryClosed"><summary>Past worries (${closed.length})</summary>${
+      closed.map(w => `<div class="worryMeta">${_escapeHTML(w.subject?.label || w.id)} — ${_escapeHTML(w.summary || "")} `
+        + `(${w.status === "resolved" ? "resolved" : "faded"}${w.closed_reason ? `: ${_escapeHTML(w.closed_reason)}` : ""})</div>`).join("")
+    }</details>`);
+  }
+  el.innerHTML = sections.join("");
 }
 
 // =========================================================
@@ -6833,6 +7008,7 @@ const VIEWER_TAB_PANELS = {
   body:          "viewerBodyTab",
   relationships: "viewerRelationshipsTab",
   mind:          "viewerMindTab",
+  worries:       "viewerWorriesTab",
   memory:        "viewerMemoryTab",
   life:          "viewerLifeTab",
   plans:         "viewerPlansTab",
