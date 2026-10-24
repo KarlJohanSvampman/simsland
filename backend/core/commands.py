@@ -132,6 +132,12 @@ def call(name, args, timeout=COMMAND_TIMEOUT_SECONDS):
         with _waiters_lock:
             _waiters.pop(req_id, None)
     res = waiter["result"]
+    if res.get("repl") and not (res.get("http") or res.get("error")):
+        # read-your-writes: the change reaches this process in the next frame the core publishes
+        from core import replication
+        feed = replication.current_feed
+        if feed is not None:
+            feed.wait_applied(res["repl"][0], res["repl"][1], timeout=5.0)
     if res.get("http"):
         raise HTTPException(status_code=res["http"][0], detail=res["http"][1])
     if res.get("error"):
@@ -160,6 +166,10 @@ def execute(req):
     except Exception as exc:
         traceback.print_exc()
         out["error"] = repr(exc)
+    from core import replication
+    pub = replication.publisher
+    if pub.epoch is not None:
+        out["repl"] = [pub.epoch, pub.seq + 1]          # the frame that will carry this command's changes
     return out
 
 

@@ -313,6 +313,7 @@ def _defs_mtime(world):
 
 
 publisher = Publisher()
+current_feed = None                                       # the gateway's Feed, once started
 
 
 # ---------------------------------------------------------------------------
@@ -398,6 +399,8 @@ class Feed:
     # -- lifecycle ----------------------------------------------------------------------
 
     def start(self):
+        global current_feed
+        current_feed = self
         threading.Thread(target=self._heartbeat, daemon=True, name="replica-heartbeat").start()
         self._thread = threading.Thread(target=self._run, daemon=True, name="replica-feed")
         self._thread.start()
@@ -431,6 +434,14 @@ class Feed:
         with self.cv:
             out, self.dirty = self.dirty, {k: set() for k in self.dirty}
         return out
+
+    def wait_applied(self, epoch, seq, timeout=5.0):
+        """Block until frame `seq` of `epoch` has been applied (or the replica started over).
+        True if it was applied -- what a gateway waits for after a command, so a read that follows
+        a write sees it."""
+        with self.cv:
+            return self.cv.wait_for(
+                lambda: self.epoch != epoch or self.applied_seq >= seq, timeout) and self.epoch == epoch
 
     # -- reader thread ------------------------------------------------------------------
 

@@ -140,6 +140,15 @@ tick()
 check("a forced pass delivers unmarked changes immediately", synced() and replica_world()["characters"][cid]["name"] == "Renamed By A Route"
       and replica_world()["environment"]["temperature"] == 3.5)
 
+# ---- read-your-writes: wait for the frame that carries a change -----------------------------------------
+w["environment"]["temperature"] = 9.25
+pub.force_full()
+target = (pub.epoch, pub.seq + 1)
+tick()
+check("wait_applied returns once the frame is applied", feed.wait_applied(*target, timeout=10) and replica_world()["environment"]["temperature"] == 9.25)
+check("wait_applied times out for a frame that never comes", not feed.wait_applied(pub.epoch, pub.seq + 100, timeout=0.3))
+check("wait_applied gives up when the epoch is not the current one", not feed.wait_applied("some-other-epoch", 1, timeout=0.3))
+
 # ---- characters come and go ---------------------------------------------------------------------------
 newc = copy.deepcopy(w["characters"][cid])
 newc["id"] = "newcomer"

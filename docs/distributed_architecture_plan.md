@@ -396,3 +396,18 @@ component; a replayable event log.
   have their data shipped). Open items: the gateway has no `--reload` (restart `api` after code edits);
   its first boot rebuilds the map's lookup tables (tens of seconds); the selected-character cold keys
   can lag up to 15 ticks (the core used to hash them fresh each tick for that client).
+- **API gateway split, stage 3: the safe REST routes moved (done)** — nginx now sends `/api/household/*`,
+  `/api/overview/*`, `/api/finances/*`, `/api/dependents/*`, `/api/events`, `/api/conversation/*`, `/api/state`,
+  `/view*`, `/director*` and `/ws` to the gateway (POSTs under those prefixes arrive as commands). Chosen by
+  reading every route for process-local core state: those that read none were compared against the core
+  (same JSON apart from a tick's drift) before being moved. Left on the core: `/admin/*` (cognition,
+  tick profile, event log, LLM gate, world_state stats), `/debug/*` (prompt logs, sandbox worlds, LLM
+  stats), `/api/editor/*`, the middleware bridge, `/api/llm/logs`, asset/mesh/anim banks, static pages.
+  Failure behaviour: 502/503 from the gateway (down, no world yet, core away) retries the request against
+  the core, which still serves every route itself; 504 is not retried because a command may have run.
+  Read-your-writes: a command's result carries the frame number that will contain its changes, and the
+  gateway holds the response until its replica has applied it (`Feed.wait_applied`, 5 s cap), so the
+  refetch the UI does right after a save sees it -- checked through nginx (rename a household, list it
+  immediately, rename back). Ongoing rule for new routes: a read that touches process-local state, or a
+  mutation that isn't a `@command`, must stay on the core.
+
