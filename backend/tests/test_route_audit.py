@@ -45,12 +45,13 @@ gateway = [r for r in rows if r["gateway"]]
 core_only = [r for r in rows if r["mark"] == "core_only"]
 commands = [r for r in rows if r["mark"] == "command"]
 print(f"   {len(rows)} routes: {len(gateway)} on the gateway, {len(commands)} commands, {len(core_only)} core-only")
-check("a meaningful number of routes are on the gateway", len(gateway) >= 25, str(len(gateway)))
-check("no core-only route is sent to the gateway", not [r for r in gateway if r["mark"] == "core_only"])
+check("a meaningful number of routes are on the gateway", len(gateway) >= 100, str(len(gateway)))
+check("every API route is reached through the gateway", all(r["gateway"] for r in rows if r["path"].startswith(("/api/", "/admin/", "/debug/", "/view", "/director/", "/mw/"))),
+      str([r["path"] for r in rows if not r["gateway"] and r["path"].startswith(("/api/", "/admin/", "/debug/", "/view", "/director/", "/mw/"))][:5]))
 check("the websocket is on the gateway", any(r["path"] == "/ws" and r["gateway"] for r in rows))
 for must_stay in ("/admin/cognition", "/admin/tick_profile", "/debug/prompt-log/{char_id}", "/api/llm/logs"):
     row = next((r for r in rows if r["path"] == must_stay), None)
-    check(f"{must_stay} is core-only and not on the gateway", row and row["mark"] == "core_only" and not row["gateway"])
+    check(f"{must_stay} needs the core's in-process state (@core_only)", row and row["mark"] == "core_only")
 
 gw_commands = [r for r in commands if r["gateway"]]
 check("there are mutations on the gateway, and they are all commands", len(gw_commands) >= 8)
@@ -62,8 +63,8 @@ expect = {
     "/api/overview/stocks": True, "/api/finances/c1": True, "/api/dependents/c1": True, "/api/events": True,
     "/api/conversation/c1": True, "/view": True, "/view/perception-range/c1": True, "/director/log": True,
     "/api/editor/world": True, "/api/editor/definitions": True, "/api/prop/create": True, "/api/meshbank": True,
-    "/api/animbank": True, "/api/assets/upload": True, "/admin/state": False, "/admin/cognition": False,
-    "/debug/prompt-log/c1": False, "/resources/x.glb": False, "/api/llm/logs": False,
+    "/api/animbank": True, "/api/assets/upload": True, "/admin/state": True, "/admin/cognition": True,
+    "/debug/prompt-log/c1": True, "/resources/x.glb": True, "/api/llm/logs": True, "/mw/due": True,
     "/index.html": False,
 }
 wrong = {p: nginx.to_gateway(p) for p, want in expect.items() if bool(nginx.to_gateway(p)) != want}
@@ -160,6 +161,60 @@ line = next((l for l in res.stdout.splitlines() if l.startswith("RESULT")), None
 data = json.loads(line[6:]) if line else {"error": res.stderr[-400:]}
 check("in a gateway every core-only route answers 503", data.get("core_only") == len(core_only) == data.get("core_only_503") and not data.get("core_only_bad"), str(data)[:400])
 check("in a gateway every command is a stub", data.get("commands") == len(commands) == data.get("commands_stubs"), str(data)[:400])
+
+# ---- the core process serves only what needs its state ---------------------------------------------------------
+code = textwrap.dedent("""
+    import json
+    import main
+    from tools import route_audit as ra
+    paths = sorted({p for p, m, ep in ra.routes(main.app)})
+    print("RESULT" + json.dumps(paths))
+""")
+res = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, cwd="/app", env=dict(os.environ, SIM_ROLE="core"))
+line = next((l for l in res.stdout.splitlines() if l.startswith("RESULT")), None)
+core_paths = set(json.loads(line[6:])) if line else {"error " + res.stderr[-300:]}
+expected = {r["path"] for r in core_only} | {"/healthz"}
+check("the core process serves exactly the @core_only routes and /healthz", core_paths == expected,
+      str(sorted(core_paths ^ expected))[:300])
+
+# ---- the gateway relays @core_only routes to the core --------------------------------------------------------------
+code = textwrap.dedent("""
+    import json
+    import httpx
+    import main
+    from fastapi.testclient import TestClient
+    seen = []
+    def handler(request):
+        seen.append((request.method, request.url.path, request.url.query.decode(), request.content.decode()))
+        return httpx.Response(207, json={"from": "core"}, headers={"access-control-allow-origin": "http://core", "x-core": "1"})
+    main._core_client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    client = TestClient(main.app)
+    out = {}
+    r = client.get("/admin/cognition?sim_id=default&x=1")
+    out["get"] = [r.status_code, r.json(), r.headers.get("x-core"), r.headers.get("access-control-allow-origin")]
+    r = client.post("/debug/build-context", json={"a": 1})
+    out["post"] = [r.status_code, r.json()]
+    out["seen"] = seen
+    n = len(seen)
+    r = client.get("/healthz")                      # not a core-only route: must not be relayed
+    out["healthz"] = [r.status_code, len(seen) == n]
+    class Down(httpx.AsyncBaseTransport):
+        async def handle_async_request(self, request):
+            raise httpx.ConnectError("refused")
+    main._core_client = httpx.AsyncClient(transport=Down())
+    r = client.get("/admin/tick_profile")
+    out["down"] = [r.status_code, r.json()["detail"][:40]]
+    print("RESULT" + json.dumps(out))
+""")
+res = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, cwd="/app", env=dict(os.environ, SIM_ROLE="api"))
+line = next((l for l in res.stdout.splitlines() if l.startswith("RESULT")), None)
+g = json.loads(line[6:]) if line else {"error": res.stderr[-500:]}
+check("a core-only GET is relayed with its query and answered with the core's response",
+      g.get("get", [None])[:3] == [207, {"from": "core"}, "1"] and g["seen"][0][:3] == ["GET", "/admin/cognition", "sim_id=default&x=1"], str(g)[:300])
+check("the core's CORS headers are not copied", g.get("get", [0] * 4)[3] != "http://core", str(g.get("get")))
+check("a core-only POST is relayed with its body", g.get("post") == [207, {"from": "core"}] and g["seen"][1][3] == '{"a": 1}', str(g)[:300])
+check("other routes are not relayed", g.get("healthz", [0, False])[1] is True, str(g.get("healthz")))
+check("an unreachable core is a 503", g.get("down", [0])[0] == 503, str(g.get("down")))
 
 print()
 print("FAILED: " + ", ".join(failures) if failures else "ALL OK")

@@ -16,8 +16,9 @@ or the function) through project code, and reports the first path from the route
     core-only state         the modules and functions in CORE_ONLY_STATE
 
 A route is fine if it is a @command (it runs in the core, nothing to check), is marked @core_only
-(served by the core; the gateway answers 503, nginx retries on the core), or reaches neither.
-Also parses frontend/nginx.conf to learn which URL paths are sent to the gateway.
+(answered by the core itself: in the core process it is the only kind of route served, the gateway
+relays requests for it over HTTP -- see main.py), or reaches neither.
+Also parses frontend/nginx.conf to learn which URL paths are sent to the gateway (all API paths are).
 
     python tools/route_audit.py            print the report, exit 1 on a violation
 
@@ -293,8 +294,6 @@ def audit(app, nginx_text=None, index=None):
         problems = []
         for (kind, label), chain in found.items():
             problems.append(f"{kind} {label}  via {' -> '.join(chain)}")
-        if mark == "core_only" and gw:
-            problems.append("marked @core_only but nginx sends it to the gateway")
         rows.append({"path": path, "methods": methods, "endpoint": f"{module}:{qual}", "mark": mark,
                      "gateway": gw, "findings": found, "problems": problems})
     return rows

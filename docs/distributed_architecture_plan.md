@@ -468,4 +468,26 @@ component; a replayable event log.
   a tick of drift); a definitions save through the gateway reaches the file and both sides read it back
   equal; `generate_relative` through the gateway returned a bio from the model (38 s); a 404 from a
   command keeps its status; the World Editor loads and renders its world through nginx -> gateway.
+- **The tick is out of the API process (done)** — three processes, three jobs. `SIM_ROLE=core` (compose service
+  `backend`): the tick, the command consumer, the replica publisher, the cognition/bg-LLM queues; its HTTP
+  server answers only the `@core_only` routes (31: cognition and tick statistics, prompt logs, the event
+  log, the middleware bridge, sandbox worlds, the debug tools) and `/healthz`, and is no longer the public
+  address (published on :8002 for operators only). `SIM_ROLE=api` (service `api`, now on :8000): every public
+  route and the websocket; a `@core_only` request is relayed to the core over HTTP by a middleware in the
+  gateway (method, path, query, body; the core's CORS headers are dropped; an unreachable core is a 503), so
+  the routes did not have to be rewritten as commands and keep their async/pydantic/file behaviour.
+  `SIM_ROLE=all` still runs everything in one process (the test suites, development). nginx now has one
+  upstream for the API and the websocket -- the gateway -- and no path to the core; the fallback to the
+  core that covered a missing gateway is gone because the core no longer serves those routes.
+  What made that safe: (1) the gateway's boot used to rebuild the map's lookup tables (tens of seconds); the
+  core now ships the whole static set (map, lookup, navigation, road graph: JSON-clean, 260 KB compressed)
+  and the gateway installs it as is -- a restarted gateway is healthy in ~20 s (compose healthcheck on
+  `/healthz`, which is 503 until the replica has synced); (2) a route table test per role
+  (`tests/test_route_audit.py`: the core serves exactly the `@core_only` routes + `/healthz`; the gateway
+  relays them, strips CORS headers, relays bodies, answers 503 for an absent core, and does not relay
+  anything else). Checked live through nginx: reads, a command (`/admin/time_scale` there and back),
+  `/admin/cognition` and `/debug/prompt-log/*` relayed to the core, the websocket and the game page.
+  Operating notes: edits to the core reload it automatically; the gateway has no `--reload`
+  (`docker compose restart api`); while the gateway restarts the site answers 502; to remove that, run two
+  gateways behind the same name (nothing in them is stateful beyond the replica).
 

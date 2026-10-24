@@ -8,7 +8,7 @@ nothing, and sends every mutation back as a command (core/commands.py).
     core     Publisher.publish()  after every tick, under the world lock
                  -> stream <prefix>:frames   one JSON frame per tick: what changed
                  -> key    <prefix>:snap     the whole dynamic world (zlib JSON) + :meta {epoch, seq, tick}
-                 -> key    <prefix>:static   world_tiles, when the map was (re)built or edited
+                 -> key    <prefix>:static   the map (world_tiles + derived lookups), when it was (re)built or edited
     gateway  Feed (a thread) bootstraps from snap, then applies frames in order
 
 Cost control: publishing only happens while at least one gateway's heartbeat (<prefix>:sub:<id>)
@@ -220,11 +220,13 @@ class Publisher:
         if not force and self.static_sent == static_gen:
             return
         import db
-        cached = db._static_world_cache.get(self.sim_id) or {}
-        tiles = cached.get("world_tiles") or world.get("world_tiles")
-        if not tiles:
+        # The map and everything derived from it (lookup, navigation, road graph, ...), JSON-clean and
+        # ~260 KB compressed: a gateway installs it as is instead of spending tens of seconds rebuilding it.
+        cached = db._static_world_cache.get(self.sim_id) or {k: world[k] for k in _static_keys() if k in world}
+        static = {k: v for k, v in cached.items() if k != "definitions"}
+        if not static.get("world_tiles"):
             return
-        blob = zlib.compress(_dumps(tiles).encode("utf-8"), 3)
+        blob = zlib.compress(_dumps(static).encode("utf-8"), 3)
         _rb.set(self.ch.static, blob)
         self.static_sent = static_gen
         self.static_blob_bytes = len(blob)
@@ -533,12 +535,12 @@ class Feed:
             return False
         meta = json.loads(meta_raw)
         world = json.loads(zlib.decompress(blob))
-        tiles = None
+        static = None
         if self.static_gen is None or meta.get("static_gen") != self.static_gen:
-            tblob = _rb.get(self.ch.static)
-            if tblob:
-                tiles = json.loads(zlib.decompress(tblob))
-        self._post(("snapshot", world, meta, tiles))
+            sblob = _rb.get(self.ch.static)
+            if sblob:
+                static = json.loads(zlib.decompress(sblob))
+        self._post(("snapshot", world, meta, static))
         return True
 
     # -- applying (pump) ------------------------------------------------------------------
@@ -568,11 +570,12 @@ class Feed:
         except Exception:
             pass
 
-    def _install(self, world, meta, tiles):
+    def _install(self, world, meta, static):
         import db
         from core import world_state
-        if tiles:
-            db.refresh_static_world_cache(self.sim_id, tiles)
+        if static:
+            from core.definitions import load_definitions
+            db._static_world_cache[self.sim_id] = dict(static, definitions=load_definitions(self.sim_id))
         self.static_gen = meta.get("static_gen")
         with db._world_lock:
             world_state.install_replica(self.sim_id, world)

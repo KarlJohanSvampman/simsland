@@ -8,8 +8,9 @@ services:
     mem_limit: 3g                 # hard cap; core/memory_guard.py exits cleanly (soft 1.5GB / hard 2.6GB RSS) before the kernel OOM-kills
     memswap_limit: 3g
     ports:
-      - "8000:8000"
+      - "8002:8000"                  # the core's own (ops-only) HTTP server; the public API is the `api` service on :8000
     environment:
+      - SIM_ROLE=core                # the tick, the command consumer, the replica publisher; serves only @core_only routes
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/sim
       - REDIS_HOST=redis
       - OLLAMA_BASE_URL=http://192.168.10.203:11434  # 👈 your remote Ollama
@@ -84,19 +85,19 @@ services:
       - ./resources:/resources
     command: python -m workers.bg_llm
 
-  # API gateway: serves the REST reads and the websocket from a read replica of the core's world
-  # (backend/core/replication.py) and sends every mutation to the core as a command
-  # (backend/core/commands.py). It runs no tick. The core (the `backend` service) still serves
-  # everything itself, so the gateway can be adopted route by route (see frontend/nginx.conf).
-  # Direct access for testing: http://localhost:8001
+  # API gateway: the public face of the simulation. Serves every route and the websocket from a read
+  # replica of the core's world (backend/core/replication.py), sends every mutation to the core as a
+  # command (backend/core/commands.py) and relays the few routes that need the core's in-process state
+  # (@core_only) to it over HTTP. It runs no tick. The core is the `backend` service (SIM_ROLE=core).
   api:
     build: ./backend
     restart: unless-stopped
     mem_limit: 2g
     ports:
-      - "8001:8000"
+      - "8000:8000"                  # the public API and websocket (nginx in `frontend` proxies to it too)
     environment:
       - SIM_ROLE=api
+      - CORE_URL=http://backend:8000   # where @core_only routes are relayed
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/sim
       - REDIS_HOST=redis
       - PYTHONPATH=/app
@@ -110,6 +111,12 @@ services:
       - ./resources:/resources
       - ./simulations:/data/simulations
     command: uvicorn main:app --host 0.0.0.0 --port 8000
+    healthcheck:                       # 503 until the world replica has synced with the core
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/healthz', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
 
   frontend:
     build: ./frontend
@@ -118,7 +125,7 @@ services:
     ports:
       - "3000:80"
     depends_on:
-      - backend
+      - api
   db:
     image: postgres:16
     restart: unless-stopped

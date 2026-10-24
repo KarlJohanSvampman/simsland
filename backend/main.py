@@ -95,6 +95,72 @@ if frontend_dir.exists():
 SIM_ID = "default"
 
 # =========================================================
+# ROLES (core/commands.py, core/replication.py)
+#   all   one process does everything (development, the test suites)
+#   core  the simulation: the tick, the command consumer, the replica publisher. Its HTTP server
+#         serves only the routes marked @core_only -- the ones that read state that exists nowhere
+#         but in this process -- plus /healthz.
+#   api   the gateway: every public route, the websocket, a read replica of the world. A @core_only
+#         route is forwarded to the core over HTTP (below); everything else is served here.
+# =========================================================
+from core import commands as _commands
+
+CORE_URL = os.getenv("CORE_URL", "http://backend:8000")
+
+@app.get("/healthz")
+def healthz():
+    from core import replication, world_state
+    if _commands.ROLE == "api":
+        feed = replication.current_feed
+        if feed is None or not feed.ready.is_set():
+            from fastapi import HTTPException
+            raise HTTPException(status_code=503, detail="the world replica has not synced yet")
+        return {"ok": True, "role": "api", "tick": feed.stats.get("last_tick"), "resyncs": feed.stats["resyncs"]}
+    entry = world_state._residents.get(SIM_ID)
+    return {"ok": True, "role": _commands.ROLE, "tick": entry.world.get("tick") if entry else None}
+
+
+_HOP_BY_HOP = {"connection", "keep-alive", "transfer-encoding", "te", "trailer", "upgrade", "proxy-authorization",
+               "proxy-authenticate", "content-length", "content-encoding", "host"}
+_core_client = None
+_core_only_routes = None
+
+
+def _core_only_route(scope):
+    """The @core_only route (if any) this request would be handled by."""
+    global _core_only_routes
+    from starlette.routing import Match
+    if _core_only_routes is None:
+        _core_only_routes = [r for r in app.router.routes if getattr(getattr(r, "endpoint", None), "__core_only__", False)]
+    for route in _core_only_routes:
+        if route.matches(scope)[0] == Match.FULL:
+            return route
+    return None
+
+
+if _commands.ROLE == "api":
+    @app.middleware("http")
+    async def forward_core_only(request, call_next):
+        """A route that needs the core's in-process state is answered by the core itself: this process
+        relays the request over HTTP (method, path, query, body) and returns the core's response."""
+        if _core_only_route(request.scope) is None:
+            return await call_next(request)
+        global _core_client
+        import httpx
+        if _core_client is None:
+            _core_client = httpx.AsyncClient(timeout=300.0)
+        url = CORE_URL + request.url.path + (("?" + request.url.query) if request.url.query else "")
+        headers = {k: v for k, v in request.headers.items() if k.lower() not in _HOP_BY_HOP}
+        try:
+            upstream = await _core_client.request(request.method, url, content=await request.body(), headers=headers)
+        except httpx.HTTPError as exc:
+            return Response(content=json.dumps({"detail": f"the simulation core did not answer: {exc!r}"}),
+                            status_code=503, media_type="application/json")
+        out = {k: v for k, v in upstream.headers.items()
+               if k.lower() not in _HOP_BY_HOP and not k.lower().startswith("access-control-")}
+        return Response(content=upstream.content, status_code=upstream.status_code, headers=out)
+
+# =========================================================
 # CLIENT REGISTRY
 # Each entry: {"ws": WebSocket, "cx": int, "cy": int,
 #              "zoom": int, "needs_full": bool}
@@ -664,3 +730,12 @@ def clear_llm_logs():
         world["llm_logs"] = []
         save_world(SIM_ID, world)
         return {"ok": True}
+
+
+# The simulation core answers only the routes that need its in-process state (and /healthz).
+# Done last, so it also covers the routes defined in this file after the routers were included.
+if _commands.ROLE == "core":
+    app.router.routes[:] = [r for r in app.router.routes
+                            if getattr(getattr(r, "endpoint", None), "__core_only__", False)
+                            or getattr(getattr(r, "endpoint", None), "__name__", "") == "healthz"]
+
