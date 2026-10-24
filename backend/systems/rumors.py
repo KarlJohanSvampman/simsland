@@ -29,6 +29,7 @@ RUMOR_LIFETIME_TICKS = 72 * HOUR
 TELL_CHANCE_PER_LOOK = 0.15              # per believer, per look (every 5 sim-minutes) while the subject is in view
 MAX_RUMORS = 200
 BELIEF_FLOOR, BELIEF_CEIL = 0.1, 0.95
+HEARD_OF_FAMILIARITY = 2                 # familiarity a believed compliment gives with someone the listener had not met
 LISTENER_SCALE = 0.6                     # how much of the kind's effect a believed remark has on the listener's own view
 CHATTY_TRAITS = {"gossipy", "talkative", "honest", "loyal", "tactless", "blunt", "extroverted", "charismatic"}
 DISCREET_TRAITS = {"secretive", "discreet", "reserved", "tactful", "diplomatic", "private"}
@@ -113,6 +114,8 @@ def _shift_listener(listener, subject_id, polarity, value):
     rel = ensure_relationship(listener, subject_id)
     for field, per10 in REMARK_DELTAS[polarity].items():
         rel[field] = round(max(-100, min(100, (rel.get(field, 0) or 0) + per10 * value / 10.0 * LISTENER_SCALE)), 3)
+    if polarity > 0 and (rel.get("familiarity", 0) or 0) < HEARD_OF_FAMILIARITY:      # praise makes a stranger a name you know
+        rel["familiarity"] = HEARD_OF_FAMILIARITY
 
 
 def _remember(listener, speaker, subject, kind, text, believed, tick):

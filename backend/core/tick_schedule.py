@@ -133,6 +133,8 @@ CADENCE["rumors"]           = 300
 CADENCE["neighbours"]       = 600
 # Free children with a free friend get the urge to play together (systems/kids_play.py).
 CADENCE["kids_play"]        = 600
+# A friend who sees two strangers together may introduce them (systems/introductions.py).
+CADENCE["introductions"]    = 300
 
 # Socioeconomics — once per simulated day (~24 ticks)
 CADENCE["socioeconomics"]   = 24

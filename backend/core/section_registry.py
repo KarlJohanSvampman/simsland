@@ -54,6 +54,7 @@ REGISTRY = {
     "every:relationships": ("event", "social", "on proximity/interaction events"),
     "every:neighbours": ("event", "social", "a character-created event seeds that character's neighbour ties once (systems/neighbours.py)"),
     "every:kids_play": ("timer", "social", "a free child with a free friend nearby gets a play_with_friend intention, per-friend cooldown (systems/kids_play.py)"),
+    "every:introductions": ("timer", "social", "a character who sees two strangers they both know well may introduce them (systems/introductions.py)"),
     "every:rumors": ("event", "social", "a believer coming into view of the subject (entered_view) rolls to tell them (systems/rumors.py)"),
     "every:grudges": ("timer", "social", "a grudge's own timers: short-term end, fade, the nudge to the offender (systems/grudges.py)"),
     "every:focus_check": ("timer", "character", "the 3-minute concentration roll becomes a timer set when a demanding activity starts (systems/worry_relief.py)"),
