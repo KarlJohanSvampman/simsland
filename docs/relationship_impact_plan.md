@@ -264,6 +264,25 @@ Marcus makes a sly dig at Theo while Theo is across the room: `M = 6`,
 - Worth knowing: a jab is itself an insult, so a feud can feed itself (the seeded run ends with retention 1.0); the
   intended way out is the offender's apology, which in that run never comes because the model is stubbed.
 
-Next in this plan: step 4 (third-party / slander / observer pathways) and step 6 (memory-reference acknowledgement and
-the pair panel UI).
+Next in this plan: step 4 (third-party / slander / observer pathways) and the memory-reference half of step 6
+(underlined `personal_acknowledgement` links); the pair panel is built, below.
+
+**Step 6, first half -- the pair panel (built).** `frontend/src/main.js` (Relations tab), `frontend/index.html`;
+`POST /admin/impact` in `backend/api/admin.py` for testing.
+
+- Every relationship card in the Inspector's **Relations** tab now shows an *impact line* (the pair's balance and the
+  share that is negative, mirrored onto the relationship by the ledger) and a **grudge badge**: "Furious with them /
+  Still holds it against them -- waiting for an apology (what it was, how firmly held)", "Grudge over: <how>", and, when
+  the other character is loaded and has an open grudge against this one that they are aware of, "They are upset with
+  this character".
+- Clicking a card expands the **pair panel** (fetched from the existing `GET /view/relationship-impact`, refreshed every 5 s
+  while open, which survives the tab re-rendering on every update): balance and engagement, a green/red bar of total
+  positive vs negative impact, for each of the two characters what they caused (+/-), their own negative share and
+  their share of the pair's negative, how many of the meant acts registered, chips for the kinds, and the latest 12
+  entries -- what registered (value, kind, source -> target, the line itself, how long ago, how many ladder checks
+  passed, "witnessed" / "assumed it was aimed at them") and, separately, acts that were meant but did not land.
+- `POST /admin/impact` (a command): `{source, target, kind, magnitude, text}` registers an impact between two characters
+  without the perception ladder (so grudges and the panel can be exercised); `{source, target, clear: true}` forgets the
+  pair's ledger and grudges again. Checked live: a humiliation opened a grudge ("Furious with them ... 82% held"), a second
+  hurt refreshed it, the panel showed the 83% negative balance and each entry; the pair was cleared afterwards.
 

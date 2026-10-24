@@ -459,6 +459,29 @@
   .worryMeta { font-size: 11px; opacity: .7; margin-top: 2px; }
   details.worryClosed summary { cursor: pointer; opacity: .7; font-size: 11px; }
 
+  /* =========================
+     RELATIONS: grudges + the pair's impact ledger (systems/grudges.py, relationship_ledger.py)
+  ========================= */
+  .relCard { cursor: pointer; }
+  .relCard:hover { background: rgba(255,255,255,0.05); }
+  .relCardHint { float: right; opacity: .45; font-size: 10px; }
+  .pairPanel {
+    margin: 6px 0 2px;
+    padding: 6px 8px;
+    border-left: 2px solid #3d4757;
+    background: rgba(255,255,255,0.03);
+    cursor: default;
+  }
+  .pairTotals { display: flex; height: 8px; border-radius: 4px; overflow: hidden; background: rgba(255,255,255,0.08); margin: 4px 0; }
+  .pairTotalsPos { background: #3ecf5e; }
+  .pairTotalsNeg { background: #e64545; }
+  .pairRow { display: flex; justify-content: space-between; gap: 8px; font-size: 11px; opacity: .85; }
+  .pairKinds { margin: 4px 0; }
+  .pairEntry { padding: 3px 0; border-top: 1px solid #292d35; font-size: 11px; }
+  .pairEntry.meant { opacity: .55; }
+  .pairEntryHead { display: flex; justify-content: space-between; gap: 6px; }
+  .pairEntryText { opacity: .75; font-style: italic; }
+
   .viewerPos { color: #7ee787; }
   .viewerNeg { color: #ff8080; }
   .viewerWarn { color: #fc6; }

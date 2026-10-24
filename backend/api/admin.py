@@ -513,6 +513,47 @@ def set_body_need(payload: dict, sim_id: str = DEFAULT_SIM_ID):
     return {"ok": True, "character_id": char_id, "need": need, "value": value}
 
 
+@router.post("/impact")
+@command("admin.impact")
+def impact_admin(payload: dict, sim_id: str = DEFAULT_SIM_ID):
+    """Live-testing helper for the relationship ledger and grudges (systems/relationship_ledger.py, grudges.py): make
+    something registered between two characters without going through the perception ladder. payload: {"source",
+    "target", "kind" (an impact kind, e.g. insult / humiliation / apology / kindness), "magnitude" (default: the kind's
+    base), "text"}; or {"source", "target", "clear": true} to forget the pair's ledger and grudges."""
+    from systems import impact_kinds, relationship_ledger as rl
+    src_id, dst_id, kind = payload.get("source"), payload.get("target"), payload.get("kind", "insult")
+    with world_lock():
+        world = load_world(sim_id)
+        chars = world.get("characters", {})
+        if src_id not in chars or dst_id not in chars:
+            return {"ok": False, "error": "character not found"}
+        if payload.get("clear"):
+            # forget the pair's ledger and any grudge between them (undo for testing)
+            world.get("relationship_ledgers", {}).pop(rl.pair_key(src_id, dst_id), None)
+            for me, other in ((src_id, dst_id), (dst_id, src_id)):
+                chars[me].get("grudges", {}).pop(other, None)
+                chars[me].get("_grudge_pressure", {}).pop(other, None)
+                rel = (chars[me].get("relationships") or {}).get(other)
+                if rel:
+                    rel.pop("impact_balance", None)
+                    rel.pop("impact_neg_ratio", None)
+            chars[dst_id]["active_intentions"] = [i for i in chars[dst_id].get("active_intentions", []) if i.get("type") != "apologize_to"]
+            chars[src_id]["active_intentions"] = [i for i in chars[src_id].get("active_intentions", []) if i.get("type") != "apologize_to"]
+            save_world(sim_id, world)
+            return {"ok": True, "cleared": True}
+        specs = impact_kinds.kinds(world)
+        if kind not in specs:
+            return {"ok": False, "error": f"unknown kind {kind!r}", "kinds": sorted(specs)}
+        value = float(payload.get("magnitude", specs[kind]["base"]))
+        intent = rl.log_intent(world, src_id, dst_id, kind, value, 0.2, "admin", text=payload.get("text"))
+        rl.register(world, intent, chars[dst_id], value, rl.CHECKS_TOTAL, [])
+        from sim_loop import _mark_dirty
+        _mark_dirty(world, char_ids=[src_id, dst_id])
+        save_world(sim_id, world)
+        grudge = (chars[dst_id].get("grudges") or {}).get(src_id)
+    return {"ok": True, "kind": kind, "value": value, "grudge": grudge}
+
+
 @router.post("/register_worry")
 @command("admin.register_worry")
 def register_worry_admin(payload: dict, sim_id: str = DEFAULT_SIM_ID):

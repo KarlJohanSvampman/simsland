@@ -5226,6 +5226,99 @@ const _REL_NOTABLE_FIELDS = [
   "favor_frustration",
 ];
 
+// ---- the pair panel: a relationship card expands into the pair's impact ledger -------------------------------
+// (backend: systems/relationship_ledger.py via GET /view/relationship-impact; grudges: systems/grudges.py)
+const _pairOpen = new Set();          // "<me>|<other>" keys of expanded cards
+const _pairCache = {};                // key -> { fetched: ms, data }
+const PAIR_REFRESH_MS = 5000;
+
+function _pairKey(a, b){ return `${a}|${b}`; }
+
+async function _loadPair(meId, otherId){
+  const key = _pairKey(meId, otherId);
+  const have = _pairCache[key];
+  if(have && Date.now() - have.fetched < PAIR_REFRESH_MS) return;
+  _pairCache[key] = { fetched: Date.now(), data: have?.data };       // rate-limit before the request returns
+  try{
+    const res = await fetch(`/view/relationship-impact?a=${encodeURIComponent(meId)}&b=${encodeURIComponent(otherId)}&sim_id=default&limit=30`);
+    if(!res.ok) return;
+    _pairCache[key] = { fetched: Date.now(), data: await res.json() };
+    const me = _worldState.characters?.[meId];
+    if(me && selectedCharacterId === meId) renderRelationshipsTab(me);
+  } catch(e){
+    // auxiliary: a failed fetch leaves the last panel in place
+  }
+}
+
+function _grudgeBadges(c, otherId){
+  const out = [];
+  const tick = _worldState.tick || 0;
+  const mine = c.grudges?.[otherId];
+  if(mine && mine.status === "open"){
+    const hot = tick <= mine.short_term_until;
+    out.push(`<span class="worryBadge bad" title="${_escapeHTML(mine.origin?.text || "")}">${hot ? "Furious with them" : "Still holds it against them"} — waiting for an apology (${String(mine.origin?.kind || "").replace(/_/g, " ")}, ${Math.round((mine.retention || 0) * 100)}% held)</span>`);
+  } else if(mine && mine.status !== "open" && mine.closed_how){
+    out.push(`<span class="worryBadge good">Grudge over: ${_escapeHTML(mine.closed_how)}</span>`);
+  }
+  const theirs = _worldState.characters?.[otherId]?.grudges?.[c.id];
+  if(theirs && theirs.status === "open" && theirs.aware){
+    out.push(`<span class="worryBadge warn">They are upset with this character (${String(theirs.origin?.kind || "").replace(/_/g, " ")})</span>`);
+  }
+  return out.join("");
+}
+
+function _pairEntryRow(e, meId){
+  const tick = _worldState.tick || 0;
+  const src = _charName(e.source) || e.source;
+  const dst = e.target ? (_charName(e.target) || e.target) : "everyone nearby";
+  const perceived = e.layer === "perceived";
+  const sign = e.polarity > 0 ? "viewerPos" : "viewerNeg";
+  const flags = [];
+  if(e.witnessed) flags.push("witnessed");
+  if(e.misattributed) flags.push("assumed it was aimed at them");
+  if(perceived && e.checks_total) flags.push(`${e.checks_passed}/${e.checks_total} checks`);
+  const kind = String(e.kind || "").replace(/_/g, " ");
+  const what = perceived
+    ? `<span class="${sign}">${e.polarity > 0 ? "+" : "−"}${Number(e.magnitude).toFixed(1)}</span> registered`
+    : (e.registered ? `meant ${Number(e.magnitude).toFixed(1)} — landed` : `meant ${Number(e.magnitude).toFixed(1)} — <span class="viewerWarn">didn't land</span>`);
+  return `
+    <div class="pairEntry${perceived ? "" : " meant"}">
+      <div class="pairEntryHead"><span>${_escapeHTML(src)} → ${_escapeHTML(dst)}: <b>${_escapeHTML(kind)}</b></span><span>${what}</span></div>
+      <div class="worryMeta">${_ticksAgoLabel(tick - (e.tick || tick))}${flags.length ? " · " + flags.join(" · ") : ""}</div>
+      ${e.text ? `<div class="pairEntryText">“${_escapeHTML(String(e.text).slice(0, 120))}”</div>` : ""}
+    </div>`;
+}
+
+function _renderPairPanel(c, otherId){
+  const entry = _pairCache[_pairKey(c.id, otherId)];
+  const data = entry?.data;
+  if(!data) return `<div class="pairPanel">${_empty("Loading…")}</div>`;
+  const s = data.summary;
+  if(!s) return `<div class="pairPanel">${_empty("Nothing registered between them yet.")}</div>`;
+  const total = (s.pos_total || 0) + (s.neg_total || 0);
+  const posPct = total ? (100 * s.pos_total / total) : 0;
+  const me = s.by_char?.[c.id] || {};
+  const them = s.by_char?.[otherId] || {};
+  const nameMe = _charName(c.id), nameThem = _charName(otherId);
+  const kinds = Object.entries(s.counts || {}).sort((a, b) => b[1] - a[1])
+    .map(([k, n]) => `<span class="worryBadge">${_escapeHTML(k.replace(/_/g, " "))} ×${n}</span>`).join("");
+  const who = (name, x) => `<div class="pairRow"><span>${_escapeHTML(name)} caused</span>
+      <span><span class="viewerPos">+${(x.pos_caused || 0).toFixed(1)}</span> / <span class="viewerNeg">−${(x.neg_caused || 0).toFixed(1)}</span>
+      · ${Math.round(x.neg_ratio || 0)}% negative · ${Math.round(x.share_of_neg || 0)}% of the pair's negative</span></div>`;
+  return `
+    <div class="pairPanel">
+      <div class="pairRow"><span>Balance <b>${_signed(s.balance, 1)}</b> · engagement ${(s.engagement || 0).toFixed(1)}</span>
+        <span>${Math.round(s.neg_ratio || 0)}% negative overall</span></div>
+      <div class="pairTotals" title="positive ${(s.pos_total || 0).toFixed(1)} / negative ${(s.neg_total || 0).toFixed(1)}">
+        <div class="pairTotalsPos" style="width:${posPct}%"></div><div class="pairTotalsNeg" style="width:${100 - posPct}%"></div>
+      </div>
+      ${who(nameMe, me)}${who(nameThem, them)}
+      <div class="worryMeta">${s.perceived || 0} registered of ${s.intended || 0} meant</div>
+      ${kinds ? `<div class="pairKinds">${kinds}</div>` : ""}
+      ${(data.entries || []).filter(e => e.layer === "perceived" || !e.registered).slice(0, 12).map(e => _pairEntryRow(e, c.id)).join("") || _empty("No entries.")}
+    </div>`;
+}
+
 function renderRelationshipsTab(c){
   const el = document.getElementById("viewerRelationshipsTab");
   if(!el) return;
@@ -5268,16 +5361,32 @@ function renderRelationshipsTab(c){
     const knownAs = rel.known_as && rel.known_as !== name
       ? `<div class="viewerWarn">Known to them as: ${rel.known_as}</div>` : "";
 
+    const key = _pairKey(c.id, otherId);
+    const open = _pairOpen.has(key);
+    if(open) _loadPair(c.id, otherId);
+    const impact = rel.impact_balance != null && (rel.impact_balance || rel.impact_neg_ratio)
+      ? `<div class="viewerStatRow">impact balance ${_signed(rel.impact_balance, 0)} · ${Math.round(rel.impact_neg_ratio || 0)}% negative</div>` : "";
     return `
-      <div class="viewerCard">
-        <div class="viewerCardTitle">${name || otherId}</div>
+      <div class="viewerCard relCard" data-pair-other="${_escapeHTML(otherId)}">
+        <div class="viewerCardTitle">${_escapeHTML(name || otherId)}<span class="relCardHint">${open ? "▾ impact" : "▸ impact"}</span></div>
         ${labels || designation ? `<div style="opacity:.7">${[designation, labels].filter(Boolean).join(" · ")}</div>` : ""}
+        ${_grudgeBadges(c, otherId)}
         ${stats.length ? `<div class="viewerStatRow">${stats.join(" · ")}</div>` : ""}
+        ${impact}
         ${knownAs}
+        ${open ? _renderPairPanel(c, otherId) : ""}
       </div>`;
   });
 
   el.innerHTML = _section(`Relationships (${entries.length})`, cards.join(""));
+  el.querySelectorAll("[data-pair-other]").forEach(card => {
+    card.addEventListener("click", (ev) => {
+      if(ev.target.closest(".pairPanel")) return;                       // clicks inside the open panel don't collapse it
+      const key = _pairKey(c.id, card.dataset.pairOther);
+      if(_pairOpen.has(key)) _pairOpen.delete(key); else _pairOpen.add(key);
+      renderRelationshipsTab(c);
+    });
+  });
 }
 
 // =========================================================
