@@ -237,6 +237,9 @@ def on_decision_ready(data, world):
     note_think(c, world, decision, wake_reason=data.get("wake_reason"))
     if not decision:
         return
+    from systems.worry_breakdown import in_breakdown
+    if in_breakdown(c):
+        return                              # they are not themselves right now: a plan made before it does not apply
 
     # The world moved while the model thought. Someone who has since died, collapsed or left
     # the map can't act on the answer.

@@ -1068,6 +1068,13 @@ def update_agent(
             or c.get("travel_state") in TRAVEL_WALKING_STATES):
         return
 
+    # A breakdown (systems/worry_breakdown.py): their own intentions are suspended and nobody asks their model what
+    # to do; only a survival need can still take over. The episode's own beats run from the minute job.
+    from systems.worry_breakdown import in_breakdown, survival_only
+    if in_breakdown(c):
+        survival_only(c, world)
+        return
+
     # =====================================
     # EXECUTE SOCIAL / BODY INTENTIONS
     # =====================================

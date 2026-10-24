@@ -402,6 +402,11 @@ def context_lines(c, world):
     lines = []
     for case in act[:3]:
         lines.append(f"On your mind: {case['summary']}")
+    from systems.worry_breakdown import in_breakdown, recently_broke_down
+    if in_breakdown(c):
+        lines.append("You are falling apart: you can't think, you can only react.")
+    elif recently_broke_down(c, world):
+        lines.append("You broke down a little while ago. You are drained, and a bit lighter for it.")
     abort = c.get("_focus_abort")
     if abort and world.get("tick", 0) - abort.get("tick", 0) < 2 * HOUR:
         lines.append(f"You tried to {str(abort.get('activity')).replace('_', ' ')} but couldn't concentrate on it.")

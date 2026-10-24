@@ -32,6 +32,8 @@ BASE_BEHIND = 3.0
 BASE_WITNESSED_VIOLENCE = 4.5
 BASE_WITNESSED_DEATH = 8.0
 BASE_LOOP_TRIP = 3.0
+BASE_OWN_BREAKDOWN = 3.0
+BASE_WITNESSED_BREAKDOWN = 5.0
 
 # --- states ----------------------------------------------------------------------------------------------------
 GRIEVANCE_SCORE_TO_WORRY = 12.0          # (systems/grievances.py: cold shoulder starts at 15, confrontation at 30)
@@ -118,6 +120,33 @@ def on_death_witnessed(dead, world):
             wc.register_worry(c, {"kind": "event", "ref": f"death:{dead.get('id')}", "label": f"{dead.get('name', 'a death')}"},
                               wc.compute_severity(c, BASE_WITNESSED_DEATH), "witnessed", note, world,
                               tags=["death", "incident", str(dead.get("id"))], summary=note)
+    _safe(go)
+
+
+def on_own_breakdown(c, world):
+    note = "I fell apart, and I'm afraid it will happen again"
+    _safe(wc.register_worry, c, {"kind": "self", "ref": "breakdown", "label": "how I fell apart"},
+          wc.compute_severity(c, BASE_OWN_BREAKDOWN), "breakdown", note, world, tags=["breakdown", "erratic"], summary=note)
+
+
+def on_witnessed_breakdown(observer, subject, world, minutes):
+    """Someone fell apart where this character could see it: they are worried about them, and if they are close
+    they mean to check in."""
+    def go():
+        sid = subject["id"]
+        name = subject.get("name", "them")
+        note = f"{name} fell apart in front of me and I'm worried about them"
+        wc.register_worry(observer, {"kind": "person", "ref": sid, "label": name},
+                          wc.compute_severity(observer, BASE_WITNESSED_BREAKDOWN, sid), "witnessed", note, world,
+                          tags=["breakdown", "pattern", "concern", sid], summary=note)
+        from brain.memory import store_memory
+        store_memory(observer, f"I saw {name} break down for about {minutes} minutes -- crying, snapping, not themselves at all. "
+                               f"I should check on them.", importance=0.6, tags=["worry", "pattern", "concern", "breakdown"],
+                     people=[sid], tick=world.get("tick", 0), source="internal")
+        if wc.closeness(observer, sid) >= 1.0 and (observer.get("age") or 30) >= 8:
+            from brain.intentions import add_intention
+            add_intention(observer, {"type": "check_in_on", "category": "social", "priority": 50, "target_id": sid,
+                                     "reason": f"{name} had a breakdown in front of you -- ask if they're alright"})
     _safe(go)
 
 

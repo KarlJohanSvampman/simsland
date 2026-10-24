@@ -154,6 +154,10 @@ def tick_focus_checks(world):
         if not c.get("worry_cases"):
             continue
         avail = wc.focus_available(c, world)
+        from systems.worry_breakdown import tick_breakdown, in_breakdown
+        tick_breakdown(c, world, avail)                   # starts, steps or ends a breakdown episode
+        if in_breakdown(c):
+            continue                                       # nothing else applies while they are falling apart
         sync_mitigation(c, world, avail)
         act = c.get("activity")
         if not act or act.get("phase") != "using":
@@ -201,6 +205,8 @@ def abort_activity(c, world, act, req, avail):
     c["_focus_abort"] = {"tick": tick, "activity": activity, "required": req, "available": avail}
     state = c.setdefault("focus_state", {})
     state["aborts"] = state.get("aborts", 0) + 1
+    from systems.worry_breakdown import note_abort
+    note_abort(c, world)
     try:
         from brain.memory import store_memory
         store_memory(c, thought, importance=0.45, tags=["worry_case", "concentration"], tick=tick, source="internal")

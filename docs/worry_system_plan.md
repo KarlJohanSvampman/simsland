@@ -1,6 +1,6 @@
 # Worry system — draft
 
-Status: **build steps 1, 2 and 3 are done** (see "Progress" at the end); steps 4-5 are not. Sighting notes are
+Status: **build steps 1-4 are done** (see "Progress" at the end); step 5 (the UI) is not. Sighting notes are
 already down to one per person per hour (`social_memory.SIGHTING_OBSERVATION_GAP_TICKS`).
 
 ## 1. Idea in one paragraph
@@ -264,7 +264,39 @@ they involve), only health of others is. With those, the Marlowe adults in a 300
   What the simulation can't show: nobody in the fixture does a demanding activity, so the roll is tested
   in isolation (600 trials per setting, ~30% at a 30% shortfall).
 
-Not yet: relief for activities chosen by the model that are not in the table (every table entry is an
-`activity_completed` event, so adding a row in definitions.json is all it takes); the UI. Next is step 4
-(breakdown episodes) and step 5 (a worry panel and focus gauge).
+Not yet from step 3: relief for activities chosen by the model that are not in the table (every table entry is an
+`activity_completed` event, so adding a row in definitions.json is all it takes).
+
+**Step 4 -- breakdown episodes (built).** `systems/worry_breakdown.py`, `tests/test_worry_breakdown.py`.
+
+- *When.* The plan says "focus <= 5%", but worries can never take more than 80% of focus, so 5% is unreachable;
+  the trigger is **focus at its floor (20%) for 3 simulated minutes**, or **3 given-up activities within 2
+  simulated hours** (the "abort rolls keep failing" case). Not while asleep, away, unconscious, under 3 years
+  old, in the 6-hour cooldown, or already in an episode. Checked every sim-minute by the focus job.
+- *The episode.* 10-30 simulated minutes. It starts with a beat and then another every 1-3 minutes (the minute
+  job's resolution): a random intention of the character's own is paired with a random activity that does not
+  fit it (leisure, internal, emotional, chore, creative, appearance, maintenance; nothing vital, nothing that
+  needs another person, nothing that is somebody's job; age-gated; the first six candidates are tried until one
+  can start), and they say something aloud as a one-way expression -- cry ("I can't do this. I just can't."),
+  snap, mutter ("I can't even think about X right now"), sigh -- which the relationship ledger already
+  evaluates per hearer. A hot-tempered, short-tempered, aggressive, impulsive, spiteful or impatient character
+  lashes out at someone nearby half the time (a yelled, targeted line marked as an insult).
+- *What is suspended.* Their own intention dispatch (the `update_agent` loop returns early, except a survival
+  intention can still start a toilet/water/food activity), their model is not asked (pending request cleared,
+  next think pushed past the episode), and a decision that arrives late is ignored.
+- *The end.* Every active case is eased 30% (and the episode is noted on it), a 6-hour cooldown starts, they
+  remember it, they are left with a `self:breakdown` worry ("I'm afraid it will happen again"), and each
+  person who was near during the episode gets a worry case about them plus a memory; if they are close
+  (closeness >= 1.0, age 8+) they also get a `check_in_on` intention. The character is woken to think again
+  and the prompt says "You broke down a little while ago" for three hours (and "You are falling apart" during).
+- Found by the simulation test: the expression system expects an intent dict (`{"valence": ...}`), not a string;
+  the ledger's `expression_made` handler raised on a string. Breakdown lines now pass `{"source": "breakdown"}`,
+  plus `"valence": "hurt"` when aimed at someone.
+- Verified: unit tests for the trigger (sustained, reset by relief, cooldown, aborts in a window, who is
+  excluded), the beat pacing and content (variety of activity kinds, none vital/others'/age-forbidden, lash-outs
+  only for the short-tempered), the survival exception, the end (30%, cooldown, memories, witnesses, the
+  check-in intention), and that a late model answer is dropped; plus a seeded run where both adults sit at the
+  floor: two episodes, 15-17 spoken lines, no errors, and one episode per character within the cooldown.
+
+Next is step 5: a worry panel per character and a focus gauge in the UI.
 
