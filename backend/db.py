@@ -349,6 +349,11 @@ def _load_world_cold(sim_id):
         if "definitions" not in cached:
             cached["definitions"] = load_definitions(sim_id)
 
+        # This branch skips build_world_geometry(), which is what fills the process-local navigation cache
+        # for the world's buildings: do it here, or this process resolves no rooms until something primes them.
+        from systems.building_manager import prime_nav_cache
+        prime_nav_cache(cached)
+
         ensure_prop_template_fields(cached, cached["definitions"])
         from systems.electrical import ensure_power_outlets
         ensure_power_outlets(cached, cached["definitions"])

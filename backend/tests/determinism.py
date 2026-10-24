@@ -73,6 +73,10 @@ def fixture(start=None):
         if k in live:
             w[k] = live[k]
     w["definitions"] = load_definitions("default")
+    # Rooms must resolve the same way in every process, whatever the live world's buildings were or whichever branch
+    # of the world loader ran (it depends on whether another process loaded the world in the last 5 seconds).
+    from systems.building_manager import prime_nav_cache
+    prime_nav_cache(w, force=True)
     for c in w["characters"].values():
         c["off_grid"] = False
         c["travel_state"] = None

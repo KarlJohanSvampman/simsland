@@ -24,6 +24,24 @@ from systems.transforms import (
 
 
 # =========================================================
+# PRIME THE NAVIGATION CACHE
+# =========================================================
+
+def prime_nav_cache(world, force=False):
+    """Make every building of `world` resolvable by systems/navigation.py (NAV_CACHE is process-local and keyed
+    by building id). build_world_geometry() above does it when a world is generated; a world that is merely
+    loaded must do it too, however it was loaded -- otherwise room lookups (household event room labels, ...)
+    return None until something happens to touch the building. force=True re-caches buildings already there."""
+    from systems.navigation import NAV_CACHE
+    for building in world.get("buildings", []):
+        if building["id"] in NAV_CACHE and not force:
+            continue
+        floorplan = get_floorplan_template(world, building)
+        if floorplan:
+            cache_floorplan(building["id"], floorplan)
+
+
+# =========================================================
 # SPAWN BUILDING PROPS FROM FLOORPLAN
 # =========================================================
 # floorplan_templates[...]["prop_spawns"] (authored via the World Editor's
