@@ -1436,6 +1436,8 @@ def _trigger_death(char, world, cause):
     char["death_tick"] = world.get("tick", 0)
     _remember(char, f"Died: {cause.replace('_', ' ')}.", 1.0,
               ["death", cause], "health", world.get("tick", 0))
+    from systems.worry_producers import on_death_witnessed
+    on_death_witnessed(char, world)
 
 
 # ---------------------------------------------------------------------------

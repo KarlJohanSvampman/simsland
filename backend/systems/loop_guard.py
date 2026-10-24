@@ -165,6 +165,8 @@ def trip(c, world, kind, what, count):
             c.setdefault("_intention_suppressed", {})[intention_type] = tick + SUPPRESS_TICKS
     c.setdefault("failed_intentions", []).append(record)
     del c["failed_intentions"][:-FAILED_CAP]
+    from systems.worry_producers import on_loop_trip
+    on_loop_trip(c, label, world)
     c["_loop_assessment"] = {"record_id": record["id"], "tick": tick, "activity": activities[0],
                              "count": count, "minutes": max(1, round(span / 60)),
                              "reason": reason, "submitted": False}

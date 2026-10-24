@@ -164,6 +164,11 @@ def register_worry(c, subject, severity, source, note, world, tags=None, summary
     entry = {"tick": tick, "source": source, "ref": ref, "note": note}
 
     if case and case.get("status") == "active":
+        if str(source).startswith("scan:"):
+            # derived from a standing situation: the case follows the situation (up or down), it doesn't creep
+            case["severity"] = case["reported"] = sev
+            case["focus_cost"] = _focus_cost(sev)
+            return _refresh(c, case, sev, entry, tick, nudge=False)
         return _refresh(c, case, sev, entry, tick)
 
     if kind == "area" and active_cases(c):
@@ -171,6 +176,7 @@ def register_worry(c, subject, severity, source, note, world, tags=None, summary
     case = cases[cid] = {
         "id": cid, "status": "active", "subject": dict(subject),
         "severity": sev, "focus_cost": _focus_cost(sev), "reported": sev,
+        "origin": source,                            # who opened it ("scan:*" cases are closed by the scan when the situation ends)
         "created": tick, "expires": tick + _duration(sev, kind), "last_refreshed": tick, "refreshes": 0,
         "tags": sorted(set(tags or []) | ({str(subject["ref"])} if subject.get("ref") else set())),
         "evidence": [entry],
@@ -304,6 +310,12 @@ def poll_worries(c, world):
     since = state.get("last_poll", tick - POLL_EVERY_TICKS)
     state["last_poll"] = tick
     update_focus(c, world)
+    scanned = {}
+    try:
+        from systems.worry_producers import scan_state          # standing situations: grudges, health, money, ...
+        scanned = scan_state(c, world)
+    except Exception as exc:
+        print(f"[worry_cases] state scan failed: {exc!r}")
     areas = _areas(world)
     act = {cs["id"]: cs for cs in active_cases(c)}
 
@@ -345,7 +357,7 @@ def poll_worries(c, world):
                     started.append(cid)
                     act = {cs["id"]: cs for cs in active_cases(c)}
     update_focus(c, world)
-    return {"refreshed": refreshed, "started": started}
+    return {"refreshed": refreshed, "started": started, "scan": scanned}
 
 
 def tick_worry_polls(world):

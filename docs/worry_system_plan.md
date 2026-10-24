@@ -1,6 +1,6 @@
 # Worry system — draft
 
-Status: **build step 1 is done** (see "Progress" at the end); steps 2-5 are not. Sighting notes are
+Status: **build steps 1 and 2 are done** (see "Progress" at the end); steps 3-5 are not. Sighting notes are
 already down to one per person per hour (`social_memory.SIGHTING_OBSERVATION_GAP_TICKS`).
 
 ## 1. Idea in one paragraph
@@ -199,4 +199,36 @@ need new activities. A `worry_relief` table in `definitions.json` maps
 
 Next is step 2 (more producers: expectations, conflicts/grievances, the ledger, health, money, events,
 choices), then step 3 (`required_focus`, the abort roll, mitigation intentions and relief activities).
+
+**Step 2 -- the producers (built).** `systems/worry_producers.py`, `tests/test_worry_producers.py`.
+
+*Moments* (the code that makes the thing happen says so): a self-expectation missed
+(`expectations._apply_miss_feedback`; satisfying it closes the case); witnessing violence
+(`excuses.check_witnessed_hostility_for_observer`; one event case per offender per hour); a death in view
+(`health._trigger_death`, severity ~8, everyone who had the dead character in perception); the character's own
+loop guard tripping (`loop_guard.trip` -> a `self` case about how they've been acting).
+
+*States* (read off the world once an hour by `scan_state`, as part of the poll; every case a scan opens is
+tagged `origin: scan:<what>`, follows the situation up and down rather than creeping, and is closed as
+resolved by the next scan when the situation is over; a case opened by something else for the same
+person is refreshed but never closed by a scan):
+
+| scan | wants a case when | subject | base |
+|---|---|---|---|
+| grievance | open grievances against one person weigh >= 12 | `conflict:<person>` | 2 + score/12 (max 5.5) |
+| ledger | that person has caused >= 12 of the pair's negative impact, >= 65% of it and twice what the character caused | `person:<person>` | 2 + caused/12 (max 5) |
+| health | own doctor visits needed / emergencies / sick; a close person's (closeness >= 1.2) | `self:health`, `person:<id>` | 2 + 1.5/visit + 3/emergency; loved one 3.5 (+2) |
+| money | a household bill past its due date with money still owing; unpaid government tax | `self:money` | 5 (+0.5 per extra bill); tax 3 |
+| choice | a romantic / social-ask / request / item-sale proposal the character made or owes an answer to, open for 1-24 h; at most the two freshest | `choice:<proposal>` | 2.5 (romantic 3.5) |
+
+Numbers that came from watching a seeded run: routine expectation misses start at 1.6 (+1.5 x frustration, which a
+miss itself raises by 0.4), work at 3.0, so one miss registers only for a character who is prone to worry or
+already frustrated; at most two expectation cases at a time -- more become one `self:behind` case ("I'm
+falling behind on everything"); grudges and grave events are not scaled by closeness (they are bad whoever
+they involve), only health of others is. With those, the Marlowe adults in a 30000-tick run sit at 64-74% focus
+(the first version had them at the 20% floor) and the children at ~94%.
+
+Next is step 3: `required_focus` on activities, the 3-minute abort roll (the shortfall reading), mitigation
+intentions and the `worry_relief` table / new relief activities. Nothing yet reads the focus number besides
+the prompt.
 

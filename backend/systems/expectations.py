@@ -537,6 +537,8 @@ def _apply_miss_feedback(c, nd, world):
     nd["frustration"] = min(1.0, nd.get("frustration", 0.0) + FRUSTRATION_DELTA)
     nd["last_miss_reason"] = _diagnose_miss_reason(c, world, nd)
     _attribute_blame(c, nd, world)
+    from systems.worry_producers import on_expectation_missed
+    on_expectation_missed(c, nd, world)
 
 
 def _attribute_blame(c, nd, world):
@@ -589,4 +591,6 @@ def satisfy_expectation(c, expectation_id, world):
     nd["streak"] = nd.get("streak", 0) + 1
     nd["frustration"] = max(0.0, nd.get("frustration", 0.0) - FRUSTRATION_DELTA)
     c["stress"] = max(0.0, c.get("stress", 0.0) - SATISFY_STRESS_DELTA)
+    from systems.worry_producers import on_expectation_satisfied
+    on_expectation_satisfied(c, expectation_id, world)
     return True

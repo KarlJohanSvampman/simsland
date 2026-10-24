@@ -592,6 +592,8 @@ def check_witnessed_hostility_for_observer(observer, world):
             if tick - last_tagged <= _WITNESSED_OFFENSE_WINDOW_TICKS:
                 continue  # already tagged this same window, don't re-fire
             witnessed[offender["id"]] = tick
+            from systems.worry_producers import on_witnessed_violence
+            on_witnessed_violence(observer, offender, world)
             break
 
 
