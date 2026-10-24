@@ -42,9 +42,24 @@ _cold_cache = {}    # (kind, id) -> {key: digest} -- last computed cold digests
 _memo_cold_fresh = {}   # (kind, id) -> tick at which the cold keys were last re-hashed
 
 
+_encode = json.JSONEncoder(separators=(",", ":"), default=str).encode     # one encoder, not one per call
+_SCALARS = (bool, int, float, str, type(None))
+_CONTAINERS = (list, dict)
+
+
 def _digest(value):
+    """Something that is equal across calls exactly when the value's JSON is. A scalar is its own
+    digest (tagged with its type, so 1 and True differ): no serialising, which is most of a
+    character's keys. Anything else is the CRC of its JSON."""
+    cls = value.__class__
+    if cls in _SCALARS:
+        if cls is float and value != value:
+            return "nan"                                 # NaN is never equal to itself
+        return (cls, value)
+    if cls in _CONTAINERS and not value:
+        return (cls, 0)                                  # an empty list/dict: a lot of a character's keys
     try:
-        text = json.dumps(value, separators=(",", ":"), default=str)
+        text = _encode(value)
     except Exception:
         text = repr(value)
     return zlib.crc32(text.encode("utf-8", "replace"))

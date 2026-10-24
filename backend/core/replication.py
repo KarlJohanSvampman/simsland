@@ -47,6 +47,7 @@ BIG_EVERY = 10
 SNAP_EVERY_TICKS = 300
 FRAME_MAXLEN = 2500
 SUB_TTL = 10
+OWNER_TTL = 10
 ENTITY_KINDS = ("props", "placed_items", "world_objects")
 SKIP_KEYS = frozenset({"characters", "_dirty"})
 
@@ -71,6 +72,7 @@ class Channel:
         self.meta = f"{prefix}:meta"
         self.static = f"{prefix}:static"
         self.want = f"{prefix}:want_snap"
+        self.owner = f"{prefix}:owner"
         self.sub_prefix = f"{prefix}:sub:"
 
 
@@ -97,6 +99,9 @@ class Publisher:
         self.alive_cache_seconds = 2.0
         self.sim_id = "default"
         self.forced = False
+        self.token = os.urandom(6).hex()
+        self.owner_checked = 0.0
+        self.owns = False
         self.stats = {"frames": 0, "snapshots": 0, "bytes": 0, "ms": 0.0, "last_ms": 0.0, "last_bytes": 0}
         self._reset()
 
@@ -128,6 +133,36 @@ class Publisher:
     def forget_alive_cache(self):
         self.alive_cache["t"] = 0.0
 
+    def _is_owner(self):
+        """Only one process may publish to a channel: whoever holds <prefix>:owner. A second one (a test
+        harness, a stray second core) would otherwise interleave its own world into the stream.
+        The claim lasts OWNER_TTL seconds and is renewed every couple of seconds."""
+        now = time.time()
+        if self.owns and now - self.owner_checked < 2.0:
+            return True
+        cur = r.get(self.ch.owner)
+        if cur == self.token:
+            r.expire(self.ch.owner, OWNER_TTL)
+            self.owns = True
+        elif cur is None and r.set(self.ch.owner, self.token, nx=True, ex=OWNER_TTL):
+            self.owns = True
+        else:
+            if self.owns:
+                print("[replication] another process owns the replica channel; not publishing")
+            self.owns = False
+            self._reset()
+        self.owner_checked = now
+        return self.owns
+
+    def release(self):
+        """Give the channel up (shutdown), so a successor does not wait for the claim to lapse."""
+        try:
+            if r.get(self.ch.owner) == self.token:
+                r.delete(self.ch.owner)
+        except Exception:
+            pass
+        self.owns = False
+
     # -- publishing ----------------------------------------------------------------------
 
     def publish(self, sim_id, world, dirty):
@@ -138,6 +173,8 @@ class Publisher:
             if not self.subscribers_alive():
                 if self.epoch is not None:
                     self._reset()
+                return
+            if not self._is_owner():
                 return
             t0 = time.perf_counter()
             if self.epoch is None:
@@ -209,19 +246,25 @@ class Publisher:
 
     def _frame(self, world, dirty, want_snap=False):
         tick = world.get("tick", 0)
-        full = self.forced or tick - self.last_full_tick >= FULL_EVERY
+        forced = self.forced                # a route saved the world: look at everything now
         self.forced = False
         chars_now = world.get("characters", {})
         frame = {"epoch": self.epoch, "seq": self.seq + 1, "tick": tick}
 
         # characters
-        examine = list(chars_now) if full else [cid for cid in (dirty.get("chars") or {}) if cid in chars_now]
+        # every tick: the characters marked dirty, plus those whose staggered re-check of their rarely
+        # changing keys is due (each character once per FULL_EVERY ticks, so the cost is spread)
+        if forced:
+            examine = list(chars_now)
+        else:
+            due = {cid for cid in chars_now if ev._is_cold_tick(cid, tick) or cid not in self.chars}
+            examine = [cid for cid in (set(dirty.get("chars") or ()) | due) if cid in chars_now]
         out = {}
         for cid in examine:
             c = chars_now[cid]
             if not isinstance(c, dict):
                 continue
-            digests = ev.char_digests(c, tick, fresh_cold=full)
+            digests = ev.char_digests(c, tick, fresh_cold=forced)
             have = self.chars.get(cid)
             if have is None:
                 out[cid] = c
@@ -255,29 +298,30 @@ class Publisher:
         if up:
             frame["up"] = up
 
-        # everything else, by digest
+        # everything else, by digest. Small keys are looked at every tick; big slow ones, and the
+        # entity lists (which dirty ids already cover), once per BIG_EVERY / FULL_EVERY ticks,
+        # staggered by name. A forced pass looks at all of them.
         sets, dels = {}, []
         live = set()
         for k in self._dynamic_keys(world):
             live.add(k)
-            big = self.sizes.get(k, 0) > BIG_BYTES
-            if not full and (k in ENTITY_KINDS or (big and (tick + zlib.crc32(k.encode())) % BIG_EVERY)):
-                continue
+            if not forced:
+                if k in ENTITY_KINDS:
+                    if (tick + zlib.crc32(k.encode())) % FULL_EVERY:
+                        continue
+                elif self.sizes.get(k, 0) > BIG_BYTES and (tick + zlib.crc32(k.encode())) % BIG_EVERY:
+                    continue
             text = _dumps(world[k])
             d = zlib.crc32(text.encode("utf-8", "replace"))
             self.sizes[k] = len(text)
             if self.keys.get(k) != d:
                 self.keys[k] = d
-                sets[k] = world[k]
+                sets[k] = text                 # already serialised; spliced into the frame below
         for k in [k for k in self.keys if k not in live]:
             del self.keys[k]
             dels.append(k)
-        if sets:
-            frame["set"] = sets
         if dels:
             frame["del"] = dels
-        if full:
-            self.last_full_tick = tick
         frame["dirty"] = {"chars": list(set(dirty.get("chars") or ()) | set(out)), "props": list(dirty.get("props") or ()),
                           "placed_items": list(dirty.get("placed_items") or ()),
                           "world_objects": list(dirty.get("world_objects") or ())}
@@ -287,6 +331,8 @@ class Publisher:
         frame["defs_mtime"] = _defs_mtime(world)
 
         text = _dumps(frame)
+        if sets:
+            text = text[:-1] + ',"set":{' + ",".join(f"{json.dumps(k)}:{v}" for k, v in sets.items()) + "}}"
         self.seq += 1
         r.xadd(self.ch.stream, {"p": text}, maxlen=FRAME_MAXLEN, approximate=True)
         self.stats["frames"] += 1

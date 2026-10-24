@@ -83,6 +83,15 @@ for _ in range(3):
     tick()
 check("no subscriber, no frames", r.xlen(ch.stream) == 0 and pub.epoch is None)
 
+# ---- only one process may publish to a channel ---------------------------------------------------------
+rogue = rep.Publisher(ch)
+rogue.alive_cache_seconds = 0.0
+rogue.subscribers_alive = lambda: 1                # pretend a subscriber is there
+r.set(ch.owner, pub.token, ex=30)
+rogue.publish(SIM, w, {})
+check("a second publisher stays silent", r.xlen(ch.stream) == 0 and rogue.epoch is None and not rogue.owns)
+r.delete(ch.owner)
+
 # ---- a gateway connects -----------------------------------------------------------------------
 feed = rep.Feed(SIM, ch)
 feed.start()
@@ -97,12 +106,14 @@ for _ in range(5):
     tick()
 check("the replica follows frames", synced(), f"{feed.stats} vs tick {w['tick']}")
 
-# ---- a long run, compared at every full pass ---------------------------------------------------
+# ---- a long run, compared at every forced pass ---------------------------------------------------
 mismatches = []
 checks = 0
 for i in range(N_TICKS):
+    if i % 20 == 19:
+        pub.force_full()
     dirty = tick()
-    if pub.last_full_tick == w["tick"]:
+    if i % 20 == 19:
         if not synced():
             mismatches.append((w["tick"], "replica did not catch up"))
             continue
@@ -110,8 +121,8 @@ for i in range(N_TICKS):
         checks += 1
         if d:
             mismatches.append((w["tick"], d[:3]))
-print(f"   {N_TICKS} ticks, {checks} full-pass comparisons, publisher: {pub.stats}")
-check("the replica equals the core at every full pass", checks > N_TICKS // 20 and not mismatches, str(mismatches[:2]))
+print(f"   {N_TICKS} ticks, {checks} forced comparisons, publisher: {pub.stats}")
+check("the replica equals the core at every forced pass", checks > N_TICKS // 25 and not mismatches, str(mismatches[:2]))
 
 # between full passes the hot parts agree too: positions and activity of every character
 for _ in range(7):
@@ -139,6 +150,29 @@ pub.force_full()
 tick()
 check("a forced pass delivers unmarked changes immediately", synced() and replica_world()["characters"][cid]["name"] == "Renamed By A Route"
       and replica_world()["environment"]["temperature"] == 3.5)
+
+# ---- nobody marked it dirty, nobody forced a pass: it still arrives within FULL_EVERY ticks ----------------------
+cid0 = next(iter(w["characters"]))
+w["characters"][cid0]["memories"] = list(w["characters"][cid0].get("memories") or []) + [{"text": "stagger test"}]   # a cold key
+w["characters"][cid0]["quiet_flag"] = "stagger"                      # a new top-level key of the character
+w["environment"]["wind"] = 77.5                                        # a small world key
+w["props"] = list(w["props"]) if isinstance(w["props"], list) else w["props"]
+first_prop = w["props"][0] if isinstance(w["props"], list) else next(iter(w["props"].values()))
+first_prop["stagger_mark"] = 1                                         # an entity-list change nobody marked dirty
+seen = None
+for n in range(rep.FULL_EVERY + 2):
+    tick()
+    if not synced():
+        continue
+    rw = replica_world()
+    ok = (any(m.get("text") == "stagger test" for m in rw["characters"][cid0].get("memories", []))
+          and rw["characters"][cid0].get("quiet_flag") == "stagger" and rw["environment"].get("wind") == 77.5
+          and (rw["props"][0] if isinstance(rw["props"], list) else next(iter(rw["props"].values()))).get("stagger_mark") == 1)
+    if ok:
+        seen = n + 1
+        break
+print(f"   unmarked changes reached the replica after {seen} ticks")
+check("unmarked changes arrive within FULL_EVERY ticks without a forced pass", seen is not None and seen <= rep.FULL_EVERY + 1, str(seen))
 
 # ---- read-your-writes: wait for the frame that carries a change -----------------------------------------
 w["environment"]["temperature"] = 9.25

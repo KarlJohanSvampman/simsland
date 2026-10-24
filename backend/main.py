@@ -463,6 +463,11 @@ def shutdown_persist():
     if commands.ROLE == "api":
         return
     try:
+        from core import replication
+        replication.publisher.release()
+    except Exception:
+        pass
+    try:
         from core import world_state
         world_state.persist_now(SIM_ID)
     except Exception as exc:

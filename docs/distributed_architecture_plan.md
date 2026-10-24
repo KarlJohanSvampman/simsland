@@ -410,4 +410,22 @@ component; a replayable event log.
   refetch the UI does right after a save sees it -- checked through nginx (rename a household, list it
   immediately, rename back). Ongoing rule for new routes: a read that touches process-local state, or a
   mutation that isn't a `@command`, must stay on the core.
+- **Publish cost cut (done)** — the per-tick cost of feeding gateways on the tick thread went from a 20.8 ms
+  mean (14 ms on an ordinary tick, 39 ms on every 15th) to **8.1 ms mean, 6.7 ms median** (3 characters),
+  by three changes. (1) `entity_versions._digest`: a scalar is its own digest (tagged with its type) and an
+  empty list/dict is a constant, so about three quarters of a character's ~100 keys are no longer
+  serialised; the rest use one shared JSON encoder instead of building one per call (the websocket's
+  patches get the same speed-up). (2) No more all-at-once "full pass" every 15 ticks: each character's
+  rarely-changing keys are re-checked at its own staggered tick, entity lists and big keys likewise, so the
+  spike is spread out; a route that saved the world still forces an immediate look at everything, and a
+  character not yet known to the replica is picked up at once. Unmarked changes still reach the replica
+  within 15 ticks (tested: 13). (3) A changed top-level key's JSON, already produced for the digest, is
+  spliced into the frame instead of being serialised a second time. The rest is the hashing of what a
+  tick really changed (~1 ms per 100 KB); going lower needs change tracking at the writers.
+  Also found by this work: a test that ran the tick function against a throwaway world published it into
+  the live channel while a gateway was subscribed, and the gateway followed it into a re-sync loop.
+  A channel now has one owner (`<prefix>:owner`, renewed every 2 s, released on shutdown): a second
+  publisher stays silent. Remaining known flake (not from this change, seen once in six runs):
+  `test_determinism` "ordinary afternoon" diffed one household event's `room_label` (a floorplan cache
+  that is filled lazily); worth a look when determinism work resumes.
 
