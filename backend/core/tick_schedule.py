@@ -131,6 +131,8 @@ CADENCE["grudges"]          = 60
 CADENCE["rumors"]           = 300
 # New characters get the ties of their street (systems/neighbours.py); a cheap check for who has not yet.
 CADENCE["neighbours"]       = 600
+# Free children with a free friend get the urge to play together (systems/kids_play.py).
+CADENCE["kids_play"]        = 600
 
 # Socioeconomics — once per simulated day (~24 ticks)
 CADENCE["socioeconomics"]   = 24

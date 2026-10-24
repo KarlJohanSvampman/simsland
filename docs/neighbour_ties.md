@@ -35,3 +35,18 @@ friends aren't given a shared history beyond the single memory.
 
 The live world has two households with one adult each, who already knew each other (familiarity 7.5, five interactions),
 so nothing changes there; the unit tests build streets with children, a far-away house, siblings, cousins and crowds.
+
+## Playing together (`systems/kids_play.py`)
+
+Ties alone leave a child with friends and no way to act on it. Every 600 ticks (`kids_play` job) each child aged 4-17 who is
+*free* -- awake, on the grid, no activity running, not in a school/sleep/work schedule block, hunger and thirst not pressing --
+and between 09:00 and 19:00 looks at their friends (friendship >= 10, not kin). A friend counts if they are also a child and
+also free, and has not been suggested within `PLAY_COOLDOWN` (3 h, `c["_play_log"][friend_id]`). With probability
+`PLAY_CHANCE` (0.5) the closest such friend becomes a `play_with_friend` intention (social, priority 48, `target_id` = the
+friend) with a reason like "Mo lives close by and you feel like playing together -- go and ask Mo if they can play, or invite
+them over." The child's own thinking decides what to do with it (walk over, `socialize`, `invite_over`); nothing is forced.
+
+Tuning: `PLAY_COOLDOWN`, `PLAY_HOURS`, `PLAY_CHANCE`, `PLAY_PRIORITY`, `MAX_NEED_PRESSURE`. Tests: `tests/test_kids_play.py`.
+
+**Not done.** The intention is only a nudge for the LLM; there is no autopilot that walks a child to the friend's door, and a
+parent isn't asked for permission.
