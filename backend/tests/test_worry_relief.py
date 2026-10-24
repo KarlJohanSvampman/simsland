@@ -294,7 +294,9 @@ for ch in w2["characters"].values():
     if ch.get("worry_cases"):
         stats["worried"] += 1
 print(f"   30000 simulated ticks with heavy worries: errors={dict(errs)} {dict(stats)} relief: {dict(relief_used)}")
-check("the simulation runs with required focus, mitigation and relief attached", not errs)
+check("the simulation runs with required focus, mitigation and relief attached", not errs,
+      "
+".join(determinism.ERROR_TRACES.values())[:1500])
 check("worried characters do find relief by themselves (an intention became an activity that completed)", stats["eased"] > 0, str(dict(stats)))
 adults = [ch for ch in w2["characters"].values() if (ch.get("age") or 0) >= 18 and ch.get("focus_state")]
 check("... and their focus recovers above where it started", any(ch["focus_state"]["available"] > 40 for ch in adults),

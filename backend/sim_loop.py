@@ -1148,6 +1148,12 @@ def _job_worry_poll(world, entry):
     tick_worry_polls(world)
 
 
+def _job_grudges(world, entry):
+    """Scheduled job `grudges`: open grudges fade, jab, escalate and nudge the offender to apologise (systems/grudges.py)."""
+    from systems.grudges import tick_grudges
+    tick_grudges(world)
+
+
 def _job_focus_check(world, entry):
     """Scheduled job `focus_check`: worried characters' mitigation intentions and the 3-minute concentration
     roll (systems/worry_relief.py)."""
@@ -1421,6 +1427,7 @@ scheduler.register_recurring("polarization", _job_polarization, every=CADENCE["p
 scheduler.register_recurring("relationships", _job_relationships, every=CADENCE["relationships"], offset=(-4) % CADENCE["relationships"])
 scheduler.register_recurring("worry_poll", _job_worry_poll, every=CADENCE["worry_poll"], offset=(-6) % CADENCE["worry_poll"])
 scheduler.register_recurring("focus_check", _job_focus_check, every=CADENCE["focus_check"], offset=(-7) % CADENCE["focus_check"])
+scheduler.register_recurring("grudges", _job_grudges, every=CADENCE["grudges"], offset=(-8) % CADENCE["grudges"])
 scheduler.register_recurring("influence_exposure", _job_influence_exposure, every=CADENCE["influence_exposure"], offset=(-21) % CADENCE["influence_exposure"])
 scheduler.register_recurring("cooking", _job_cooking, every=CADENCE["cooking"], offset=(-5) % CADENCE["cooking"])
 scheduler.register_recurring("reading", _job_reading, every=CADENCE["reading"], offset=(-9) % CADENCE["reading"])

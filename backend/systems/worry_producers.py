@@ -178,6 +178,21 @@ def _wanted_grievances(c, world):
     return out
 
 
+def _wanted_grudges(c, world):
+    """An open grudge is a quarrel that isn't settled (systems/grudges.py); it asks for the same case as an angry
+    pile of grievances, and the graver of the two wins."""
+    from systems.grudges import open_grudges
+    out = {}
+    for g in open_grudges(c):
+        pid = g["offender"]
+        if pid not in world.get("characters", {}):
+            continue
+        name = _name(world, pid)
+        out[f"conflict:{pid}"] = ({"kind": "conflict", "ref": pid, "label": name}, 2.0 + min(3.5, g["priority"] / 3.0),
+                                  f"I'm still angry with {name} and waiting for an apology", ["conflict", "grudge", pid], None)
+    return out
+
+
 def _wanted_ledger(c, world):
     from systems.relationship_ledger import summarize
     out = {}
@@ -265,7 +280,7 @@ def _wanted_choices(c, world):
     return out
 
 
-_SCANS = {"grievance": _wanted_grievances, "ledger": _wanted_ledger, "health": _wanted_health,
+_SCANS = {"grievance": _wanted_grievances, "grudge": _wanted_grudges, "ledger": _wanted_ledger, "health": _wanted_health,
           "money": _wanted_money, "choice": _wanted_choices}
 
 

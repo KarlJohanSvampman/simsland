@@ -1,7 +1,9 @@
 # Relationship impact system — plan
 
-Status: proposal (nothing here is built yet except the conversation floor, which
-emits `conversation_ignored` — the first producer this system will consume).
+Status: build steps 1, 2, 3 and 5 are done (the ledger and its perception ladder, speech/action producers,
+grudges with apology/resolution -- see the Progress section at the end -- and one-way expressions). Not yet:
+the third-party / learned / slander / online / observer pathways (step 4) and memory-reference acknowledgement
+with the pair panel UI (step 6).
 
 ## 1. Goal
 
@@ -224,3 +226,44 @@ Marcus makes a sly dig at Theo while Theo is across the room: `M = 6`,
 3. `engagement` as the **sum of absolute values** (hostility counts as
    engagement) with signed `balance` kept separately — agreed?
 4. Order: ledger first, or one-way expressions first?
+
+## 14. Progress
+
+**Step 3 -- grudges, apology expectations and resolution (built).** `systems/grudges.py`, `tests/test_grudges.py`.
+
+- *Where it hooks.* `relationship_ledger.register()` calls `grudges.on_perceived()` after writing a perceived entry on
+  the character it was aimed at. A witness's entry or an assumed one (`witnessed` / `misattributed` flags) never counts.
+- *Opening.* One registered negative act of value >= 8, or several from the same person within two sim-hours adding
+  to >= 12. The grudge lives on the holder, `c["grudges"][offender_id]`: the origin (kind, value, line), a short term
+  (2 sim-hours), a `retention` 0.2-1.0 (0.3 + value/30, times temperament: forgiving 0.6, patient 0.85, calm 0.9;
+  petty 1.4, vindictive 1.5, spiteful 1.4, stubborn 1.2, sensitive 1.2 ...) and a `priority` 1-10 (ceil(0.6 x value)).
+  They store a memory of it.
+- *Refreshing.* Another registered hurt from the same person extends the short term by an hour (at most 12 h from
+  now), adds to the retention and raises the priority by one.
+- *Expecting an apology.* The holder's prompt says "you are still furious/upset with X over ... you are waiting for them
+  to apologise" (a `grudges` context section); once the offender is aware of it (a jab was aimed at them, they were
+  nudged, a confrontation was asked for) theirs says "X is upset with you ... an apology would help".
+- *Behaviour while open.* While the short term lasts and the offender is in view, about once per 20 sim-minutes (35%
+  chance per look): hot-tempered, short-tempered, aggressive, spiteful, vindictive or impulsive holders jab at them
+  (a targeted `insult` expression, marked as hurtful, so the ledger registers it on the offender and a mirror grudge
+  can open); everyone else mutters ("I'm still not over what X did...") or sighs, aimed at no one. At priority >= 6
+  they want a confrontation: the existing `confrontation_desired` event, once. After half a sim-hour the offender,
+  unless proud (arrogant, stubborn, vindictive, egotistical, entitled), is 60% likely to get an `apologize_to`
+  intention. An open grudge is also a worry for the holder (`conflict:<offender>` in the worry scan).
+- *Resolution.* An apology from the offender that registers clears the short term and halves the retention; a second
+  one (or any retention under 0.15 after an apology) settles it. Kind acts (concession, altruism, solidarity,
+  compliment, favour, generosity, encouragement, pride, love, kindness, congratulation, personal acknowledgement)
+  shorten the retention by up to 30% of the retention per act (value/50). After the short term the retention fades
+  linearly over 48 sim-hours x its starting value; at none the grudge fades by itself. Closing stores one memory (how it
+  began, how it ended), removes the offender's `apologize_to` intention and adds
+  `ceil(hours open x retention at creation)` to the pair's `engagement`. A grudge against someone who has died fades.
+- Verified: unit tests for each rule (thresholds, the pressure window, witness exclusion, temperament, refresh, apology,
+  kindness, third parties, fading, behaviour by temperament and visibility, the cooldown, nudge, escalation, prompts,
+  the worry link) and a seeded 9000-tick run of a hot-tempered holder and a humiliation: the holder jabs, the offender
+  is nudged, a confrontation is asked for, the offender's retaliation refreshes the grudge three times.
+- Worth knowing: a jab is itself an insult, so a feud can feed itself (the seeded run ends with retention 1.0); the
+  intended way out is the offender's apology, which in that run never comes because the model is stubbed.
+
+Next in this plan: step 4 (third-party / slander / observer pathways) and step 6 (memory-reference acknowledgement and
+the pair panel UI).
+

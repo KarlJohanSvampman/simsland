@@ -156,6 +156,11 @@ def register(world, intent, recipient, value, passed, log, scale=1.0, flags=None
     intent["registered"] = intent.get("registered", 0) + 1
     _apply_deltas(world, recipient, source_id, intent["kind"], v)
     _mirror_pair_fields(world, led)
+    try:
+        from systems import grudges
+        grudges.on_perceived(world, recipient, source_id, intent, entry, v)       # a heavy enough hurt becomes a grudge
+    except Exception as exc:
+        print(f"[grudges] could not update a grudge: {exc!r}")
     return entry
 
 

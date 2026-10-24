@@ -1971,6 +1971,12 @@ def _sec_worries(c, world):
     return list(lines) if lines else None
 
 
+def _sec_grudges(c, world):
+    from systems.grudges import context_lines
+    lines = context_lines(c, world)
+    return list(lines) if lines else None
+
+
 def _sec_worry_cases(c, world):
     from systems.worry_cases import context_lines
     lines = context_lines(c, world)
@@ -2335,6 +2341,7 @@ NARRATIVE_SECTIONS = [
     ("social_rules",          "full", _sec_social_rules),
     ("worries",               "full", _sec_worries),
     ("worry_cases",           "full", _sec_worry_cases),
+    ("grudges",               "full", _sec_grudges),
     ("finances",              "full", _sec_finances),
     ("social_feed",           "full", _sec_social_feed),
     ("popularity",            "full", _sec_popularity),

@@ -29,6 +29,7 @@ import llm.llm_gate as _g
 _g.run_llm_call = lambda coro, *a, **k: (coro.close(), None)[1]
 
 STATIC = set(_STATIC_WORLD_KEYS)
+ERROR_TRACES = {}                       # last line of an exception -> its first full traceback (see run_sim)
 _real_time = time.time
 _installed = False
 
@@ -108,7 +109,9 @@ def run_sim(ticks, start="2026-11-01T23:50:00", seed=1234, setup=None, checkpoin
         try:
             sim_loop.tick(w)
         except Exception:
-            errs[traceback.format_exc().strip().splitlines()[-1]] += 1
+            text = traceback.format_exc().strip()
+            errs[text.splitlines()[-1]] += 1
+            ERROR_TRACES.setdefault(text.splitlines()[-1], text)         # first full traceback of each kind, for debugging
         if checkpoint_every and (i + 1) % checkpoint_every == 0 and checkpoint_fn:
             checkpoints.append((i + 1, checkpoint_fn(w)))
     return w, errs, checkpoints
