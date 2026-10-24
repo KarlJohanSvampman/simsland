@@ -428,7 +428,7 @@ class Feed:
         self.sim_id = sim_id
         self.ch = ch or channel
         self.manual = manual
-        self.id = f"{os.getenv('HOSTNAME', 'gw')}-{os.getpid()}"
+        self.id = f"{os.getenv('HOSTNAME', 'gw')}-{os.getpid()}-{os.urandom(2).hex()}"
         self.epoch = None                # None: waiting for a snapshot
         self.applied_seq = 0
         self.static_gen = None

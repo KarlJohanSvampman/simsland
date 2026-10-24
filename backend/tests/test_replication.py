@@ -234,6 +234,53 @@ pub.force_full()
 tick()
 check("and it converges again after the restart", synced() and not agree(), str(agree()[:3]))
 
+# ---- two gateways on one channel ------------------------------------------------------------------------------
+SIM_B = SIM + "_b"
+feed_b = rep.Feed(SIM_B, ch)
+feed_b.start()
+deadline = time.time() + 60
+while not feed_b.ready.is_set() and time.time() < deadline:
+    tick()
+    time.sleep(0.05)
+check("a second gateway bootstraps while the first is running", feed_b.ready.is_set())
+pub.force_full()
+tick()
+
+
+def b_synced(timeout=10.0):
+    end = time.time() + timeout
+    while time.time() < end:
+        if feed_b.stats["last_tick"] == w["tick"] and feed_b.epoch is not None:
+            return True
+        time.sleep(0.02)
+    return False
+
+
+def replica_b():
+    return world_state.replica_entry(SIM_B).world
+
+
+check("both gateways equal the core", synced() and b_synced() and not agree() and not diff(norm(w), norm(replica_b())))
+# one of them falls behind and re-syncs (a gap): the other is untouched, and both converge again
+gaps_before = feed.stats["resyncs"]
+b_resyncs = feed_b.stats["resyncs"]
+feed_b._resync("test: pretend a gap")
+for _ in range(5):
+    tick()
+    time.sleep(0.3)
+pub.force_full()
+tick()
+check("a gateway that re-syncs does not disturb the other", feed.stats["resyncs"] == gaps_before and feed_b.stats["resyncs"] > b_resyncs,
+      f"{feed.stats} {feed_b.stats}")
+check("and both converge again", synced() and b_synced() and not agree() and not diff(norm(w), norm(replica_b())))
+feed_b.stop()
+time.sleep(0.2)
+pub.forget_alive_cache()
+frames_before = r.xlen(ch.stream)
+tick()
+check("with one gateway left the core keeps publishing", r.xlen(ch.stream) > frames_before and pub.epoch is not None,
+      f"xlen {frames_before}->{r.xlen(ch.stream)} epoch={pub.epoch} subs={pub.subscribers_alive()} owns={pub.owns} keys={list(r.scan_iter(match=ch.sub_prefix + '*'))}")
+
 # ---- gateway disappears: the core goes back to paying nothing ------------------------------------------------
 feed.stop()
 time.sleep(0.2)

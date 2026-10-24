@@ -93,8 +93,10 @@ services:
     build: ./backend
     restart: unless-stopped
     mem_limit: 2g
-    ports:
-      - "8000:8000"                  # the public API and websocket (nginx in `frontend` proxies to it too)
+    deploy:
+      replicas: 2                    # two gateways: nothing in one is unique (a replica, a relay), so either can serve
+                                     # any request and one can be restarted while the other answers. nginx (in `frontend`)
+                                     # spreads requests over both through Docker's DNS name `api`.
     environment:
       - SIM_ROLE=api
       - CORE_URL=http://backend:8000   # where @core_only routes are relayed
@@ -123,7 +125,8 @@ services:
     container_name: sim-frontend
     restart: unless-stopped
     ports:
-      - "3000:80"
+      - "3000:80"                    # the game
+      - "8000:80"                    # the API and websocket at the address the page's scripts use (location.hostname:8000)
     depends_on:
       - api
   db:

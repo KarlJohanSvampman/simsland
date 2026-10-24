@@ -490,4 +490,21 @@ component; a replayable event log.
   Operating notes: edits to the core reload it automatically; the gateway has no `--reload`
   (`docker compose restart api`); while the gateway restarts the site answers 502; to remove that, run two
   gateways behind the same name (nothing in them is stateful beyond the replica).
+- **Two gateways (done)** — compose runs `api` with `deploy.replicas: 2`. Nothing in a gateway is unique (a world
+  replica, a relay, a command client), so either can serve any request: nginx resolves `api` through Docker's
+  DNS to both addresses and alternates between them, and for requests that are safe to repeat moves on to the
+  other one when a connection fails or a gateway answers 502/503 (one that is restarting and has no world yet).
+  POSTs are never repeated by nginx. The host no longer publishes the gateway directly: `frontend` (nginx)
+  publishes :3000 (the game) and :8000 -- the address the page's scripts use for the websocket and
+  `/admin`, `/director` (`location.hostname:8000`) -- so both reach the same two gateways. Each gateway has
+  its own heartbeat key and its own replica, reads frames from the same stream and the command results from
+  the same stream (waiters are keyed by request id, so one gateway ignores the other's answers); a gateway that
+  re-syncs does not disturb the other (tested). Checked live: 31 requests split 15/16; stopping one gateway
+  under a 80-request loop gave 80 x 200; `scripts/rolling_restart_api.ps1` restarts the gateways one at a time,
+  waiting for each to be healthy, with a GET and a POST loop running throughout: 32 x 200; both gateways'
+  websockets carried identical snapshots and the same deltas at the same ticks. `tests/test_replication.py`
+  now also runs a second `Feed` on the channel (bootstrap while the first runs, re-sync of one without
+  touching the other, the core keeps publishing with one left); a heartbeat id collision between two feeds in
+  one process that this exposed is fixed (the id carries a random suffix). Remaining single points: the core
+  (one tick owner -- by design), Redis, Postgres, nginx.
 
