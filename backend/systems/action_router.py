@@ -290,6 +290,20 @@ def apply_speech(c, world, speech):
                 intent=speech.get("intent"),
             )
 
+        # What the line said ABOUT someone who isn't part of this conversation (gossip, a lie about them, praise):
+        # the listener weighs it and may carry it to them (systems/rumors.py). Emit-only, like the above.
+        try:
+            from systems.rumors import remark_kind, emit_remark
+            from systems.expressions import mentions as _mentions_in
+            _remark = remark_kind(speech_act, speech.get("intent"))
+            if _remark:
+                for _subject_id in _mentions_in(world, utterance, c["id"]):
+                    if _subject_id not in (target_id, c["id"]):
+                        emit_remark(c, listener, _subject_id, _remark, text=utterance,
+                                    ref={"type": "conversation", "id": conv.get("id")})
+        except Exception as _exc:
+            print(f"[rumors] could not record a remark: {_exc!r}")
+
         # Per the user's explicit ask: commit every spoken exchange to
         # real memory, both what was said and what was heard, keyword-
         # tagged so it's searchable later.

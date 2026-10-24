@@ -511,3 +511,4 @@ import systems.body_lazy  # noqa: E402,F401
 # ── Character actors: model answers arrive as events (brain/cognition_actor.py) ──
 import brain.cognition_actor  # noqa: E402,F401
 import systems.worry_relief  # noqa: E402,F401  (subscribes to activity_completed)
+import systems.rumors  # noqa: E402,F401  (subscribes to third_party_remark)

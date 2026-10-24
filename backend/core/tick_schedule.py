@@ -127,6 +127,8 @@ CADENCE["worry_poll"]       = 60
 CADENCE["focus_check"]      = 60
 # Open grudges (systems/grudges.py): fading, jabs, escalation, nudging the offender to apologise.
 CADENCE["grudges"]          = 60
+# Rumors about a third person that believers may carry to them (systems/rumors.py).
+CADENCE["rumors"]           = 300
 
 # Socioeconomics — once per simulated day (~24 ticks)
 CADENCE["socioeconomics"]   = 24

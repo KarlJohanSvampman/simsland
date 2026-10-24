@@ -2,8 +2,7 @@
 
 Status: build steps 1, 2, 3 and 5 are done (the ledger and its perception ladder, speech/action producers,
 grudges with apology/resolution -- see the Progress section at the end -- and one-way expressions). Not yet:
-the third-party / learned / slander / online / observer pathways (step 4) and memory-reference acknowledgement
-with the pair panel UI (step 6).
+the online (posts) and learned-by-reading pathways (rest of step 4) and memory-reference acknowledgement (step 6).
 
 ## 1. Goal
 
@@ -285,4 +284,27 @@ Next in this plan: step 4 (third-party / slander / observer pathways) and the me
   without the perception ladder (so grudges and the panel can be exercised); `{source, target, clear: true}` forgets the
   pair's ledger and grudges again. Checked live: a humiliation opened a grudge ("Furious with them ... 82% held"), a second
   hurt refreshed it, the panel showed the 83% negative balance and each entry; the pair was cleared afterwards.
+
+**Step 4, third-party remarks and rumors (built).** `systems/rumors.py`, `tests/test_rumors.py`.
+
+- *The remark.* In `apply_speech`, after a spoken line has gone through its ordinary path, any other character it names
+  who is not in the conversation turns it into a `third_party_remark` when the line is gossip or a lie, or the speaker
+  declared an intent to hurt (meanness), deceive (slander) or help (a compliment). Emit-only from the worker thread.
+- *The listener weighs it* (credibility 0.1-0.95): 0.35 + their trust in the speaker / 150 + friendship / 300; a hurtful
+  remark is resisted by fondness for the subject; a lie is 0.15 harder to swallow; children believe more. Believed: their own
+  feelings about the subject shift a little (friendship / respect / trust, 60% of the kind's effect); either way they
+  remember who said what about whom (and, if doubtful, that they weren't sure).
+- *The rumor.* `world["rumors"]` holds the speaker, subject, kind, line and its believers. Nothing is written on the
+  (speaker, subject) pair's ledger yet -- the subject hasn't heard (if they were within earshot, the existing speech path
+  already treated them as a `mentioned` hearer).
+- *Reaching the subject.* A scheduled job (every 5 sim-minutes) lets each believer who has the subject in view tell them with
+  a chance of 15% x (0.3-1.5 by how fond they are of them) x 1.6 for the gossipy/honest/loyal/blunt, x 0.4 for the secretive/
+  discreet/tactful, x 1.5 for good news. Telling delivers an `impact_intent` from the ORIGINAL speaker straight to the subject
+  on the learned channel (so the ordinary ladder runs for them and, if it registers, it is written on the (speaker, subject)
+  pair -- which is where a grudge opens against the one who said it, and the pair panel says "heard through <teller>").
+  Both of them remember it. Told once; a rumor lapses after 72 sim-hours.
+- Verified: remark kinds, credibility (trusted friend, a friend of the subject, a stranger, a child, bounds), believed vs doubted
+  remarks, one rumor for a repeated remark, the carrying rules and chances, the whole chain from slander to a registered entry
+  and an open grudge, praise that reaches its subject, and a real `apply_speech` from the seeded fixture creating the rumor.
+- Not built: online posts, and a subject learning of it by reading something.
 

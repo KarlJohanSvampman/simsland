@@ -67,9 +67,21 @@ def _install():
     bg_llm.submit = lambda key, fn, *a: (bg_llm._done.__setitem__(key, None), True)[1]
 
 
+def _fixture_path():
+    """/tmp/backup_world.json if someone put one there, else the populated snapshot in the mounted backups/ folder."""
+    import glob
+    import os
+    if os.path.exists("/tmp/backup_world.json"):
+        return "/tmp/backup_world.json"
+    found = sorted(glob.glob("/backups/world_default_before_reset_*.json"), reverse=True)    # newest first
+    if not found:
+        raise FileNotFoundError("no /tmp/backup_world.json and no /backups/world_default_before_reset_*.json (mount ./backups)")
+    return found[0]
+
+
 def fixture(start=None):
     live = load_world("default")
-    w = json.load(open("/tmp/backup_world.json", encoding="utf-8"))
+    w = json.load(open(_fixture_path(), encoding="utf-8"))
     for k in STATIC:
         if k in live:
             w[k] = live[k]
