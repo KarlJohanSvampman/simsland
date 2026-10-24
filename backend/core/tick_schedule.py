@@ -129,6 +129,8 @@ CADENCE["focus_check"]      = 60
 CADENCE["grudges"]          = 60
 # Rumors about a third person that believers may carry to them (systems/rumors.py).
 CADENCE["rumors"]           = 300
+# New characters get the ties of their street (systems/neighbours.py); a cheap check for who has not yet.
+CADENCE["neighbours"]       = 600
 
 # Socioeconomics — once per simulated day (~24 ticks)
 CADENCE["socioeconomics"]   = 24

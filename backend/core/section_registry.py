@@ -52,6 +52,7 @@ REGISTRY = {
     "every:memory_decay": ("threshold", "character", "lazy salience; decay computed on read"),
     "every:polarization": ("event", "character", "on opinion/belief change"),
     "every:relationships": ("event", "social", "on proximity/interaction events"),
+    "every:neighbours": ("event", "social", "a character-created event seeds that character's neighbour ties once (systems/neighbours.py)"),
     "every:rumors": ("event", "social", "a believer coming into view of the subject (entered_view) rolls to tell them (systems/rumors.py)"),
     "every:grudges": ("timer", "social", "a grudge's own timers: short-term end, fade, the nudge to the offender (systems/grudges.py)"),
     "every:focus_check": ("timer", "character", "the 3-minute concentration roll becomes a timer set when a demanding activity starts (systems/worry_relief.py)"),

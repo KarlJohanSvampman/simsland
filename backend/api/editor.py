@@ -205,6 +205,10 @@ def _spawn_character_locked(sim_id, template_id, x, y, body):
                 from systems.household_manager import add_member_to_household
                 add_member_to_household(world, character, household)
 
+        # They already know the people next door (systems/neighbours.py).
+        from systems.neighbours import seed_neighbour_ties
+        seed_neighbour_ties(world, character)
+
         save_world(sim_id, world)
     return {"ok": True, "id": character["id"], "name": character.get("name")}
 

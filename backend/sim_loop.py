@@ -1148,6 +1148,13 @@ def _job_worry_poll(world, entry):
     tick_worry_polls(world)
 
 
+def _job_neighbours(world, entry):
+    """Scheduled job `neighbours`: characters that haven't yet been given the ties of their street get them
+    (systems/neighbours.py)."""
+    from systems.neighbours import tick_seed_neighbours
+    tick_seed_neighbours(world)
+
+
 def _job_rumors(world, entry):
     """Scheduled job `rumors`: someone who heard a remark about a third person and is now near them may tell them
     (systems/rumors.py)."""
@@ -1436,6 +1443,7 @@ scheduler.register_recurring("worry_poll", _job_worry_poll, every=CADENCE["worry
 scheduler.register_recurring("focus_check", _job_focus_check, every=CADENCE["focus_check"], offset=(-7) % CADENCE["focus_check"])
 scheduler.register_recurring("grudges", _job_grudges, every=CADENCE["grudges"], offset=(-8) % CADENCE["grudges"])
 scheduler.register_recurring("rumors", _job_rumors, every=CADENCE["rumors"], offset=(-9) % CADENCE["rumors"])
+scheduler.register_recurring("neighbours", _job_neighbours, every=CADENCE["neighbours"], offset=(-10) % CADENCE["neighbours"])
 scheduler.register_recurring("influence_exposure", _job_influence_exposure, every=CADENCE["influence_exposure"], offset=(-21) % CADENCE["influence_exposure"])
 scheduler.register_recurring("cooking", _job_cooking, every=CADENCE["cooking"], offset=(-5) % CADENCE["cooking"])
 scheduler.register_recurring("reading", _job_reading, every=CADENCE["reading"], offset=(-9) % CADENCE["reading"])
