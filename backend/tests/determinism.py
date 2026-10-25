@@ -76,7 +76,13 @@ def _fixture_path():
     found = sorted(glob.glob("/backups/world_default_before_reset_*.json"), reverse=True)    # newest first
     if not found:
         raise FileNotFoundError("no /tmp/backup_world.json and no /backups/world_default_before_reset_*.json (mount ./backups)")
-    return found[0]
+    # the most populated snapshot (newest among equals): a fresh reset backup of a nearly empty world must not become the fixture
+    def population(path):
+        try:
+            return len(json.load(open(path, encoding="utf-8")).get("characters") or {})
+        except (OSError, ValueError):
+            return 0
+    return max(found, key=lambda path: (population(path), os.path.basename(path)))
 
 
 def fixture(start=None):

@@ -162,6 +162,8 @@ def sync_kinship_to_relationships(family, world):
         from brain.relationships import ensure_relationship
         rel = ensure_relationship(a, b_id)
         rel["kinship"] = rel_label
+        from systems.household_bonds import bond          # housemates start out as close as the label says
+        bond(world, a, b_id, rel_label)
         if rel_label == "spouse":
             labels = rel.setdefault("labels", [])
             if "spouse" not in labels:

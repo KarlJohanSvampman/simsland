@@ -50,3 +50,11 @@ Tuning: `PLAY_COOLDOWN`, `PLAY_HOURS`, `PLAY_CHANCE`, `PLAY_PRIORITY`, `MAX_NEED
 
 **Not done.** The intention is only a nudge for the LLM; there is no autopilot that walks a child to the friend's door, and a
 parent isn't asked for permission.
+
+## Housemates (`systems/household_bonds.py`)
+
+Related people living in the same household used to start with zeroed feelings (only the kinship label was stamped). When
+`family.sync_kinship_to_relationships` stamps a pair that shares a household, each side is raised once (never lowered; marked
+`bonded` so a re-stamp does not undo a falling-out) to: spouse familiarity 90 / trust 70 / friendship 65 / comfort 60;
+parent->child 90/60/60/60; child->parent 90/65/60/65; sibling 90/45/45/50; other kin 60/30/30/25; ex-spouses are skipped.
+Tests: `tests/test_household_bonds.py`.
