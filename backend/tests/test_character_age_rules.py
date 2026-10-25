@@ -111,6 +111,21 @@ check("and if nothing is left, an appropriate one is picked", c["hobbies"] and a
 c = generate_character(defs, {"age": 30, "hobbies": ["poker", "hunting"]})
 check("adults keep what they chose", c["hobbies"] == ["poker", "hunting"])
 
+# ---- brothers and sisters share a school -------------------------------------------------------------------------------------------------
+random.seed(5)
+same = 0
+trials = 60
+for _ in range(trials):
+    first = generate_character(defs, {"age": 9, "household_id": "hh1"})
+    world = {"characters": {first["id"]: first}}
+    second = generate_character(defs, {"age": 7, "household_id": "hh1"}, world=world)
+    same += first["current_school"] == second["current_school"]
+check("siblings mostly go to the same primary school", same >= trials * 0.7, f"{same}/{trials}")
+other = generate_character(defs, {"age": 9, "household_id": "hh1"})
+world = {"characters": {other["id"]: other}}
+hs = generate_character(defs, {"age": 16, "household_id": "hh1"}, world=world)
+check("but a high-schooler is not put in the primary school", schools[hs["current_school"]]["education_level"] == "high_school")
+
 # ---- the prompt ----------------------------------------------------------------------------------------------------------------------------
 from brain.context_builder import _sec_identity
 kid = generate_character(defs, {"age": 9})

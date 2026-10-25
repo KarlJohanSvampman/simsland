@@ -294,6 +294,47 @@ def reset_characters(sim_id: str = DEFAULT_SIM_ID):
     return {"ok": True}
 
 
+@router.post("/add_building")
+@command("admin.add_building")
+def add_building(payload: dict, sim_id: str = DEFAULT_SIM_ID):
+    """Place another building of an existing floorplan template (the World Editor's save rejects a whole world over
+    furniture clearance in buildings that are already there, so this is the way to add a house without it).
+
+    payload: {"template": floorplan template id (default "starter_house"), "x", "y", "address"?, "id"?, "rotation"?}
+    The footprint (the template's width x height) must lie inside the world and not overlap another building. The geometry
+    and the furniture of the template are built straight away."""
+    template = payload.get("template", "starter_house")
+    x, y = payload.get("x"), payload.get("y")
+    if x is None or y is None:
+        return JSONResponse({"error": "x and y required"}, status_code=400)
+    with world_lock():
+        world = load_world(sim_id)
+        floorplan = (world.get("definitions", {}).get("floorplan_templates") or {}).get(template)
+        if not floorplan:
+            return JSONResponse({"error": f"no floorplan template '{template}'"}, status_code=404)
+        width, height = floorplan.get("width", 20), floorplan.get("height", 20)
+        if x < 0 or y < 0 or x + width > world.get("world_width", 100) or y + height > world.get("world_height", 100):
+            return JSONResponse({"error": "the building would not fit inside the world"}, status_code=400)
+        for other in world.get("buildings", []):
+            ow, oh = ((world["definitions"]["floorplan_templates"].get(other.get("template")) or {}).get(k, 20) for k in ("width", "height"))
+            if x < other["x"] + ow and other["x"] < x + width and y < other["y"] + oh and other["y"] < y + height:
+                return JSONResponse({"error": f"overlaps {other['id']}"}, status_code=409)
+        existing = {b["id"] for b in world.get("buildings", [])}
+        n = 1
+        while f"{template}_{n}" in existing:
+            n += 1
+        building = {"x": x, "y": y, "id": payload.get("id") or f"{template}_{n}", "address": payload.get("address"),
+                    "rotation": payload.get("rotation", 0), "template": template, "owner_household_id": None}
+        if building["id"] in existing:
+            return JSONResponse({"error": f"building '{building['id']}' already exists"}, status_code=409)
+        world["buildings"].append(building)
+        from systems.building_manager import build_world_geometry
+        build_world_geometry(sim_id, world)
+        save_world(sim_id, world)
+        props = sum(1 for pr in world.get("props", []) if pr.get("building_id") == building["id"])
+    return {"ok": True, "building": building, "props": props}
+
+
 @router.post("/remove_character")
 @command("admin.remove_character")
 def remove_character(payload: dict, sim_id: str = DEFAULT_SIM_ID):

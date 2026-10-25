@@ -393,6 +393,9 @@ def _assign_job(defs, age_group, education):
         "adult_industry":  job.get("adult_industry", False),
     }
 
+_SIBLING_SAME_SCHOOL_CHANCE = 0.85
+
+
 def _school_grade(age, current_school):
     """Grade a school-age child is in (0 = kindergarten), or None."""
     if not current_school or age >= _age_rules.ADULT_AGE:
@@ -400,7 +403,7 @@ def _school_grade(age, current_school):
     return _age_rules.school_placement(age)[1]
 
 
-def _assign_school(defs, age, age_group):
+def _assign_school(defs, age, age_group, world=None, household_id=None):
     """Confirmed live bug: every school_templates entry stores its real
     age eligibility as `age_range: [lo, hi]`, never `min_age`/`max_age`
     -- this read the wrong field names, so `.get(..., default)` always
@@ -412,6 +415,12 @@ def _assign_school(defs, age, age_group):
     if age < _age_rules.ADULT_AGE:
         # a child goes to a general school of the right level for their grade (systems/age_rules.py)
         eligible = _age_rules.pick_school_ids(schools, age)
+        # brothers and sisters usually go to the same school when it takes their age
+        housemates = [m.get("current_school") for m in (world or {}).get("characters", {}).values()
+                      if household_id and m.get("household_id") == household_id and (m.get("age") or 99) < _age_rules.ADULT_AGE
+                      and m.get("current_school") in eligible]
+        if housemates and random.random() < _SIBLING_SAME_SCHOOL_CHANCE:
+            return random.choice(housemates)
         return random.choice(eligible) if eligible else None
     eligible = [
         k for k, s in schools.items()
@@ -536,7 +545,7 @@ def generate_character(defs, overrides=None, world=None):
         job = _assign_job(defs, age_group, education)
     skills       = overrides.get("skills")             or _random_skills(defs, job)
     current_school = overrides.get("current_school") or (
-        _assign_school(defs, age, age_group)
+        _assign_school(defs, age, age_group, world=world, household_id=overrides.get("household_id"))
         if age_group in ("child", "teen") or (age_group == "adult" and age < 26)
         else None
     )
