@@ -1977,6 +1977,12 @@ def _sec_grudges(c, world):
     return list(lines) if lines else None
 
 
+def _sec_remembered_about(c, world):
+    from systems.memory_acknowledgement import context_lines
+    lines = context_lines(c, world)
+    return list(lines) if lines else None
+
+
 def _sec_worry_cases(c, world):
     from systems.worry_cases import context_lines
     lines = context_lines(c, world)
@@ -2334,6 +2340,7 @@ NARRATIVE_SECTIONS = [
     ("grievances",            "full", _sec_grievances),
     ("conflict",              "full", _sec_conflict),
     ("memories",              "full", _sec_memories),
+    ("remembered_about",      "full", _sec_remembered_about),
     ("sighting_recall",       "full", _sec_sighting_recall),
     ("family",                "full", _sec_family),
     ("household_processes",   "full", _sec_household_processes),

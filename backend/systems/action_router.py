@@ -290,6 +290,18 @@ def apply_speech(c, world, speech):
                 intent=speech.get("intent"),
             )
 
+        # A line that draws on something the speaker remembers about the listener ("I remember you"): the ids the model
+        # listed are checked, and what holds up is a personal acknowledgement (systems/memory_acknowledgement.py).
+        if speech.get("uses_memories"):
+            try:
+                from systems.memory_acknowledgement import acknowledge
+                acknowledge(c, listener, speech["uses_memories"], utterance, world, intent=speech.get("intent"),
+                            channel="speech" if medium == "in_person" else medium,
+                            audience="hearing" if medium == "in_person" else "targets", volume=volume,
+                            ref={"type": "conversation", "id": conv.get("id"), "line": len(conv.get("history", [])) - 1})
+            except Exception as _exc:
+                print(f"[memory_acknowledgement] could not record an acknowledgement: {_exc!r}")
+
         # What the line said ABOUT someone who isn't part of this conversation (gossip, a lie about them, praise):
         # the listener weighs it and may carry it to them (systems/rumors.py). Emit-only, like the above.
         try:

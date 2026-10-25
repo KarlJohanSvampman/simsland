@@ -5267,6 +5267,22 @@ function _grudgeBadges(c, otherId){
   return out.join("");
 }
 
+// A line that drew on a memory ("I remember you"): the words it shares with the memory are underlined, the memory is the tooltip.
+function _lineWithMemoryLinks(text, memories){
+  const raw = String(text || "").slice(0, 120);
+  const words = new Set();
+  const memOf = {};
+  for(const m of memories || []){
+    for(const w of String(m.text || "").toLowerCase().match(/[a-zà-ÿ']{4,}/g) || []){
+      if(!(w in memOf)){ memOf[w] = m.text; words.add(w); }
+    }
+  }
+  return raw.split(/([A-Za-zÀ-ÿ']+)/).map(part => {
+    const m = memOf[part.toLowerCase()];
+    return m && part.length >= 4 ? `<u class="memLink" title="${_escapeHTML("Remembered: " + m)}">${_escapeHTML(part)}</u>` : _escapeHTML(part);
+  }).join("");
+}
+
 function _pairEntryRow(e, meId){
   const tick = _worldState.tick || 0;
   const src = _charName(e.source) || e.source;
@@ -5277,6 +5293,7 @@ function _pairEntryRow(e, meId){
   if(e.witnessed) flags.push("witnessed");
   if(e.misattributed) flags.push("assumed it was aimed at them");
   if(e.channel === "post") flags.push("read online");
+  if(e.memory_refs?.length) flags.push(`remembered ${e.memory_refs.length} thing${e.memory_refs.length > 1 ? "s" : ""} about them`);
   if(e.channel === "learned_secondhand") flags.push(`heard through ${_escapeHTML(_charName(e.ref?.told_by) || "someone")}`);
   if(perceived && e.checks_total) flags.push(`${e.checks_passed}/${e.checks_total} checks`);
   const kind = String(e.kind || "").replace(/_/g, " ");
@@ -5287,7 +5304,7 @@ function _pairEntryRow(e, meId){
     <div class="pairEntry${perceived ? "" : " meant"}">
       <div class="pairEntryHead"><span>${_escapeHTML(src)} → ${_escapeHTML(dst)}: <b>${_escapeHTML(kind)}</b></span><span>${what}</span></div>
       <div class="worryMeta">${_ticksAgoLabel(tick - (e.tick || tick))}${flags.length ? " · " + flags.join(" · ") : ""}</div>
-      ${e.text ? `<div class="pairEntryText">“${_escapeHTML(String(e.text).slice(0, 120))}”</div>` : ""}
+      ${e.text ? `<div class="pairEntryText">“${e.memory_refs?.length ? _lineWithMemoryLinks(e.text, e.ref?.memories) : _escapeHTML(String(e.text).slice(0, 120))}”</div>` : ""}
     </div>`;
 }
 

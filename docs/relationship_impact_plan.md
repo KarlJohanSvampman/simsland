@@ -2,7 +2,7 @@
 
 Status: build steps 1, 2, 3 and 5 are done (the ledger and its perception ladder, speech/action producers,
 grudges with apology/resolution -- see the Progress section at the end -- and one-way expressions). Not yet:
-memory-reference acknowledgement (step 6). The online (posts) pathway is built (step 4b).
+The online (posts) pathway (step 4b) and memory-reference acknowledgement (step 6) are built.
 
 ## 1. Goal
 
@@ -327,3 +327,17 @@ Next in this plan: step 4 (third-party / slander / observer pathways) and the me
 - *Not touched.* The prompt for `post_social_media` is unchanged: the model already tags rumors, and `intent` is read if it
   supplies one (not advertised). The older opinion nudge for rumor posts (`_apply_rumor_exposure`) is left as it was.
 
+**Step 6, memory-reference acknowledgement (built).** `systems/memory_acknowledgement.py`, `tests/test_memory_acknowledgement.py`.
+
+- *What the model sees.* While in a two-person conversation, the context gets a `remembered_about` section: up to 4 of the
+  speaker's memories that involve the listener, each as `[mem_xxxxxxxx] text`. Only memories fit to bring up are offered
+  (importance >= 0.3; not tagged grudge, conflict, gossip, rumor, heard_about_me, secret, private, introduction or worry).
+- *What it is asked.* One new optional line in the reply format: `USES: <ids of the remembered things your SAY draws on>`.
+  The envelope parser reads the ids; they ride on the speech as `uses_memories`.
+- *Validation.* In `apply_speech`, each id must be one of the speaker's memories, about the listener, fit to bring up, and the
+  line must share a word of 4+ letters with it. Up to 3 hold up. Not for lines meant to hurt or deceive; at most one per
+  pair per 30 sim-minutes.
+- *Result.* A `personal_acknowledgement` impact (positive) aimed at the listener with `memory_refs` = the ids and magnitude
+  3-8 by how much the memory mattered; the entry's `ref.memories` keeps their text. The pair panel marks such entries
+  "remembered N things about them" and underlines the words the line shares with the memory (hover for the memory).
+- *Cost.* One extra line in the system prompt on every call, plus 5 lines of context during a conversation.
