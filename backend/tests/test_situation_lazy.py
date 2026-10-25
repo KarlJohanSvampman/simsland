@@ -38,7 +38,8 @@ requests = []
 llm_brain.think = lambda context, char_id=None, session=None, priority=None: (requests.append(char_id), {"thought": "ok", "action": {"type": "wait", "reason": "x"}})[1]
 
 live = load_world("default")
-w = json.load(open("/tmp/backup_world.json", encoding="utf-8"))
+from tests.determinism import _fixture_path
+w = json.load(open(_fixture_path(), encoding="utf-8"))
 for k in set(_STATIC_WORLD_KEYS):
     if k in live:
         w[k] = live[k]

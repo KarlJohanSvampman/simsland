@@ -1711,6 +1711,12 @@ def _sec_identity(c, world):
     if c.get("occupation") and c["occupation"] != "none":
         bits[0] += f", working as a {c['occupation']}"
     bits[0] += "."
+    school = (world.get("definitions", {}).get("school_templates") or {}).get(c.get("current_school") or "")
+    if school and (c.get("age") or 99) < 18:
+        from systems.age_rules import grade_label
+        grade = c.get("school_grade")
+        bits.append(f"You are in {grade_label(grade)} at {school.get('name', 'school')}." if grade is not None
+                    else f"You go to {school.get('name', 'school')}.")
     traits = c.get("traits", [])
     if traits:
         bits.append(f"Your personality: {', '.join(traits)}.")

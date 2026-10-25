@@ -12,6 +12,7 @@ TICKS_PER_YEAR = 365 * 24  # ~8760 ticks per simulated year
 # hand-duplicated copy of jobs.py::apply_for_job()'s local edu_rank dict,
 # "kept in sync only by a comment" -- both now import the same table).
 from systems.job_complexity import DEGREE_RANK as _EDU_RANK
+from systems import age_rules as _age_rules
 
 # Fraction of characters who get a distinctive speech/writing quirk (see
 # speech_style_registry in definitions.json) -- most sims talk/write in
@@ -55,9 +56,7 @@ def _random_ssn():
     return f"{random.randint(0, 999):03d}-{random.randint(0, 99):02d}-{random.randint(0, 9999):04d}"
 
 def _attained_education(age):
-    if age < 10:  return "primary"
-    if age < 13:  return "middle_school"
-    if age < 18:  return "high_school"
+    if age < 18:  return _age_rules.attained_education(age)       # the level completed so far, not the one being attended
     r = random.random()
     if r < 0.10:  return "high_school"
     if r < 0.22:  return "certificate"
@@ -293,11 +292,14 @@ def _seed_curiosity(traits):
     return max(0, min(100, curiosity))
 
 
-def _random_hobbies(defs):
+def _random_hobbies(defs, age=None):
     pool = defs.get("hobby_templates", {})
     keys = [k for k in pool if not k.startswith("_")] if isinstance(pool, dict) else list(pool)
+    if age is not None:
+        keys = _age_rules.appropriate_hobbies(pool if isinstance(pool, dict) else keys, age)
     if not keys: return []
-    return random.sample(keys, min(2, len(keys)))
+    count = 1 if (age is not None and age < 6) else 2
+    return random.sample(keys, min(count, len(keys)))
 
 def _random_orientation():
     r = random.random()
@@ -306,8 +308,8 @@ def _random_orientation():
     if r < 0.98: return "bisexual"
     return "asexual"
 
-def _random_problems(defs):
-    pool = defs.get("problems_registry", [])
+def _random_problems(defs, age=None):
+    pool = _age_rules.problems_pool(defs.get("problems_registry", []), age)
     if not pool: return []
     if random.random() < 0.7: return []
     return random.sample(pool, min(1, len(pool)))
@@ -355,7 +357,7 @@ def _random_physical_traits(defs):
 # ── Job assignment ────────────────────────────────────────────────────────────
 
 def _assign_job(defs, age_group, education):
-    if age_group == "child":
+    if age_group in ("child", "teen"):         # nobody under 18 has a job: they go to school (_assign_school)
         return {}
     if age_group == "elderly" and random.random() < 0.60:
         return {"id": "retired", "title": "Retired", "industry": None,
@@ -373,11 +375,6 @@ def _assign_job(defs, age_group, education):
         if _EDU_RANK.get(j.get("degree_required", "none"), 0) <= my_rank
         and not j.get("illegal")
     ]
-    if age_group == "teen":
-        candidates = [
-            (jid, j) for jid, j in candidates
-            if j.get("service_job") or j.get("degree_required") in ("none", "high_school", None)
-        ]
     if not candidates: return {}
     jid, job = random.choice(candidates)
     return {
@@ -396,6 +393,13 @@ def _assign_job(defs, age_group, education):
         "adult_industry":  job.get("adult_industry", False),
     }
 
+def _school_grade(age, current_school):
+    """Grade a school-age child is in (0 = kindergarten), or None."""
+    if not current_school or age >= _age_rules.ADULT_AGE:
+        return None
+    return _age_rules.school_placement(age)[1]
+
+
 def _assign_school(defs, age, age_group):
     """Confirmed live bug: every school_templates entry stores its real
     age eligibility as `age_range: [lo, hi]`, never `min_age`/`max_age`
@@ -405,9 +409,14 @@ def _assign_school(defs, age, age_group):
     college. Fixed to read the real field."""
     schools = defs.get("school_templates", {})
     if not schools: return None
+    if age < _age_rules.ADULT_AGE:
+        # a child goes to a general school of the right level for their grade (systems/age_rules.py)
+        eligible = _age_rules.pick_school_ids(schools, age)
+        return random.choice(eligible) if eligible else None
     eligible = [
         k for k, s in schools.items()
         if (s.get("age_range") or [0, 99])[0] <= age <= (s.get("age_range") or [0, 99])[1]
+        and not _age_rules.is_specialist_school(k, s)
     ]
     return random.choice(eligible) if eligible else None
 
@@ -507,9 +516,13 @@ def generate_character(defs, overrides=None, world=None):
     held_beliefs    = overrides.get("held_beliefs")        or _random_beliefs(defs, traits, sex=sex, age=age)
     curiosity       = overrides.get("curiosity")           if overrides.get("curiosity") is not None else _seed_curiosity(traits)
     physical_traits = overrides.get("physical_traits")    or _random_physical_traits(defs)
-    hobbies      = overrides.get("hobbies")            or _random_hobbies(defs)
+    hobbies      = overrides.get("hobbies")            or _random_hobbies(defs, age)
+    if age < _age_rules.ADULT_AGE or any(not _age_rules.hobby_ok(h, age, (defs.get("hobby_templates") or {}).get(h)) for h in hobbies):
+        # whatever the source (random, inherited from a relative, a template), a hobby the age does not allow is dropped
+        hobbies = [h for h in hobbies if _age_rules.hobby_ok(h, age, (defs.get("hobby_templates") or {}).get(h))] or _random_hobbies(defs, age)
     orientation  = overrides.get("sexual_orientation") or _random_orientation()
-    problems     = overrides.get("problems")           or _random_problems(defs)
+    problems     = overrides.get("problems")           or _random_problems(defs, age)
+    problems     = [p for p in problems if p in _age_rules.problems_pool(problems, age)]
     nat_talents  = overrides.get("natural_talents")    or _random_natural_talents(defs)
     hairstyle    = overrides.get("current_hairstyle")  or _random_hairstyle(defs, sex)
     education    = overrides.get("education")          or _attained_education(age)
@@ -517,7 +530,9 @@ def generate_character(defs, overrides=None, world=None):
         _assign_field_of_study(defs, education, world=world, household_id=overrides.get("household_id"))
     )
     job          = overrides.get("job")
-    if job is None:
+    if age < _age_rules.ADULT_AGE:
+        job = {}                                   # no jobs under 18, whatever a template says
+    elif job is None:
         job = _assign_job(defs, age_group, education)
     skills       = overrides.get("skills")             or _random_skills(defs, job)
     current_school = overrides.get("current_school") or (
@@ -532,9 +547,9 @@ def generate_character(defs, overrides=None, world=None):
     from systems.subscriptions import generate_online_profile
     online_profile = generate_online_profile(defs)
 
-    abnormal  = _pick_from_registry(defs.get("abnormal_traits_registry", []), 2, 0.70)
+    abnormal  = _pick_from_registry(_age_rules.abnormal_pool(defs.get("abnormal_traits_registry", []), age), 2, 0.70)
     phobias   = _pick_from_registry(defs.get("phobias_registry",          []), 2, 0.75)
-    fetishes  = _pick_from_registry(defs.get("fetishes_registry",         []), 2, 0.80)
+    fetishes  = _pick_from_registry(defs.get("fetishes_registry",         []), 2, 0.80) if age >= _age_rules.ADULT_AGE else []
     allergies = _pick_from_registry(defs.get("allergies_registry",        []), 2, 0.75)
 
     if age_group == "child":
@@ -610,6 +625,7 @@ def generate_character(defs, overrides=None, world=None):
         "field_of_study":     field_of_study,
         "skills":             skills,
         "current_school":     current_school,
+        "school_grade":       _school_grade(age, current_school),
         "hourly_wage":        job.get("hourly_wage", 0.0) if has_job else 0.0,
         "wealth":             wealth,
         # Employment & work history
@@ -628,7 +644,7 @@ def generate_character(defs, overrides=None, world=None):
         # other purpose.
         "employed":                has_job and job.get("id") != "retired",
         "retired":                 job.get("id") == "retired",
-        "job_searching":           not has_job and age_group not in ("child",),
+        "job_searching":           not has_job and age >= _age_rules.ADULT_AGE,
         "job_template_id":         job_template_id,
         "company_id":              None,
         "current_job_start_tick":  current_job_start_tick,
@@ -717,7 +733,7 @@ def generate_character(defs, overrides=None, world=None):
         "_confrontation_emitted":  [],
         "recent_behavior_tags":    [],
         # Misc
-        "job_searching":           not has_job and age_group not in ("child",),
+        "job_searching":           not has_job and age >= _age_rules.ADULT_AGE,
         "look_target":             None,
     }
 
