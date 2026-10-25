@@ -34,9 +34,10 @@ import uuid
 DEFAULT_ENGAGEMENT_ACTIVE_HOURS = 24
 
 
-def create_post(c, world, text, media=None, tags=None):
+def create_post(c, world, text, media=None, tags=None, intent=None):
     """media: optional {"kind": "photo"|"video", "description": str,
-    "subjects": [char_id, ...]}."""
+    "subjects": [char_id, ...]}. intent: optional {"valence": "hurt"|"deceive"|"help"} -- what the author means by it
+    (systems/online_posts.py)."""
     about_ids = _find_mentioned_characters(world, text, exclude_id=c["id"])
     if media:
         about_ids = sorted(set(about_ids) | {
@@ -56,7 +57,14 @@ def create_post(c, world, text, media=None, tags=None):
         "comments": [],   # [{"id", "author_id", "text", "tick"}]
         "about_character_ids": about_ids,
     }
+    if intent:
+        post["intent"] = intent
     world.setdefault("social_posts", []).append(post)
+    try:
+        from systems.online_posts import tag_remark
+        tag_remark(post, c, world)
+    except Exception as exc:
+        print(f"[online_posts] could not tag a remark: {exc!r}")
     _project_engagement(c, world, post)
     _notify_mentioned_characters(c, world, post)
     return post
@@ -218,6 +226,11 @@ def view_post(c, world, post_id):
     if c["id"] not in post["views"]:
         post["views"].append(c["id"])
         _apply_rumor_exposure(c, world, post)
+        try:
+            from systems.online_posts import on_read
+            on_read(c, world, post)
+        except Exception as exc:
+            print(f"[online_posts] could not record a read: {exc!r}")
     return True
 
 

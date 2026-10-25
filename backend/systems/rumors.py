@@ -54,10 +54,10 @@ def remark_kind(speech_act, intent):
     return None
 
 
-def emit_remark(speaker, listener, subject_id, kind, *, text, magnitude=None, discretion=0.6, ref=None):
+def emit_remark(speaker, listener, subject_id, kind, *, text, magnitude=None, discretion=0.6, ref=None, via=None):
     """From the speech path (a worker thread): only posts an event."""
     emit("third_party_remark", {"speaker_id": speaker["id"], "listener_id": listener["id"], "subject_id": subject_id,
-                                "kind": kind, "magnitude": magnitude, "discretion": discretion, "text": text, "ref": ref})
+                                "kind": kind, "magnitude": magnitude, "discretion": discretion, "text": text, "ref": ref, "via": via})
 
 
 def _rel(c, other_id):
@@ -93,7 +93,7 @@ def _on_remark(data, world):
     believed = random.random() < credibility(listener, speaker["id"], subject["id"], kind, polarity)
     if believed:
         _shift_listener(listener, subject["id"], polarity, M)
-    _remember(listener, speaker, subject, kind, data.get("text"), believed, tick)
+    _remember(listener, speaker, subject, kind, data.get("text"), believed, tick, via=data.get("via"))
     rumors = world.setdefault("rumors", {})
     rid = next((k for k, r in rumors.items() if r["source"] == speaker["id"] and r["subject"] == subject["id"]
                 and r["kind"] == kind and r["text"] == (data.get("text") or "")[:160]), None)
@@ -118,13 +118,18 @@ def _shift_listener(listener, subject_id, polarity, value):
         rel["familiarity"] = HEARD_OF_FAMILIARITY
 
 
-def _remember(listener, speaker, subject, kind, text, believed, tick):
+def _remember(listener, speaker, subject, kind, text, believed, tick, via=None):
     try:
         from brain.memory import store_memory
         said = f"\"{text}\"" if text else "something"
         mood = "" if believed else " I'm not sure I believe it."
-        what = "praised" if kind == "compliment" else "talked about"
-        store_memory(listener, f"{speaker['name']} {what} {subject['name']} to me: {said}.{mood}",
+        if via == "post":
+            what = "posted nice things about" if kind == "compliment" else "posted about"
+            line = f"I read that {speaker['name']} {what} {subject['name']}: {said}.{mood}"
+        else:
+            what = "praised" if kind == "compliment" else "talked about"
+            line = f"{speaker['name']} {what} {subject['name']} to me: {said}.{mood}"
+        store_memory(listener, line,
                      importance=0.45 if believed else 0.3, tags=["gossip", "rumor"], people=[speaker["id"], subject["id"]],
                      tick=tick, source="heard")
     except Exception:
@@ -139,6 +144,11 @@ def tick_rumors(world):
     """Scheduled job: believers near the subject may tell them; old rumors lapse."""
     tick = world.get("tick", 0)
     chars = world.get("characters", {})
+    try:
+        from systems.online_posts import tick_post_discovery
+        tick_post_discovery(world)
+    except Exception as exc:
+        print(f"[online_posts] discovery failed: {exc!r}")
     rumors = world.get("rumors")
     if not rumors:
         return

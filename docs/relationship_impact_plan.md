@@ -2,7 +2,7 @@
 
 Status: build steps 1, 2, 3 and 5 are done (the ledger and its perception ladder, speech/action producers,
 grudges with apology/resolution -- see the Progress section at the end -- and one-way expressions). Not yet:
-the online (posts) and learned-by-reading pathways (rest of step 4) and memory-reference acknowledgement (step 6).
+memory-reference acknowledgement (step 6). The online (posts) pathway is built (step 4b).
 
 ## 1. Goal
 
@@ -306,5 +306,24 @@ Next in this plan: step 4 (third-party / slander / observer pathways) and the me
 - Verified: remark kinds, credibility (trusted friend, a friend of the subject, a stranger, a child, bounds), believed vs doubted
   remarks, one rumor for a repeated remark, the carrying rules and chances, the whole chain from slander to a registered entry
   and an open grudge, praise that reaches its subject, and a real `apply_speech` from the seeded fixture creating the rumor.
-- Not built: online posts, and a subject learning of it by reading something.
+- Not built here: online posts (see step 4b below).
+
+**Step 4b, online posts (built).** `systems/online_posts.py`, `tests/test_online_posts.py`.
+
+- *A post is a remark.* When a post names other characters and carries a sign of what it is, `create_post` stores
+  `post["remark"] = {"kinds": {subject_id: kind}, "delivered": []}`. The sign is the author's `intent.valence` (hurt ->
+  meanness, deceive -> slander, help -> compliment) or a `rumor`/`gossip` tag, in which case the kind follows the author's own
+  standing opinion of that person (fond -> compliment, otherwise meanness). A plain mention is not a remark.
+- *Readers weigh it.* The first time someone other than the author or the subject views the post, a `third_party_remark`
+  (`via: "post"`) goes through the same credibility step as a spoken one; a believer's feelings about the subject shift,
+  they remember "I read that X posted about Y", and they join the rumor's believers (so they may tell the subject too).
+- *The subject learns of it by reading.* When the subject first views the post an `impact_intent` is delivered to them on
+  the `post` channel (certain, low discretion); the ordinary ladder runs and, if it registers, it is written on the
+  (author, subject) pair -- where a grudge can open against the author. Once per subject (`remark["delivered"]`). The pair
+  panel flags such entries "read online".
+- *How posts get read.* Finishing a `computer_social_media` activity reads up to 4 unread posts of the last 72 h (those about
+  the reader first, then by people they know, then the newest); liking or commenting views a post; and each rumors-job check
+  (5 sim-minutes) an undelivered subject comes across a fresh post about them with probability 2%.
+- *Not touched.* The prompt for `post_social_media` is unchanged: the model already tags rumors, and `intent` is read if it
+  supplies one (not advertised). The older opinion nudge for rumor posts (`_apply_rumor_exposure`) is left as it was.
 

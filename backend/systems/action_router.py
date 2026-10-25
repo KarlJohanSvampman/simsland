@@ -4133,7 +4133,8 @@ def _route_post_social_media(c, world, action):
         media = {"kind": "photo", "description": action["media_description"], "subjects": [c["id"]]}
     try:
         from systems.social_media import create_post
-        create_post(c, world, text, media=media, tags=action.get("tags"))
+        create_post(c, world, text, media=media, tags=action.get("tags"),
+                    intent=action.get("intent") if isinstance(action.get("intent"), dict) else None)
     except Exception:
         pass
 

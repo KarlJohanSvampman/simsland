@@ -5276,6 +5276,7 @@ function _pairEntryRow(e, meId){
   const flags = [];
   if(e.witnessed) flags.push("witnessed");
   if(e.misattributed) flags.push("assumed it was aimed at them");
+  if(e.channel === "post") flags.push("read online");
   if(e.channel === "learned_secondhand") flags.push(`heard through ${_escapeHTML(_charName(e.ref?.told_by) || "someone")}`);
   if(perceived && e.checks_total) flags.push(`${e.checks_passed}/${e.checks_total} checks`);
   const kind = String(e.kind || "").replace(/_/g, " ");
