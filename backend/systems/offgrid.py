@@ -573,6 +573,41 @@ _TRAVEL_ELIGIBLE_REASONS = {
 }
 
 
+# A trip that has just ended does not start again straight away: nobody goes to the gym twice in the same hour, or practises
+# driving with the same companion a second time before the first has had any chance to sink in. Appointments and obligations
+# that have their own state machines (work, school, medical, the licence pipeline, a stay with relatives, ...) are exempt.
+DEFAULT_REPEAT_GAP_SECONDS = 2 * 3600
+REPEAT_GAP_SECONDS = {"practice_driving": 20 * 3600}
+REPEAT_EXEMPT = {
+    "work", "school", "jail", "held_pending_trial", "hospital", "hospital_treatment", "surgery", "cps_care", "temporary_separation",
+    "interview", "sign_contract", "driving_test", "driving_lesson", "credit_card_application", "account_setup", "loan_application",
+    "attend_game", "play_local_match", "doctor", "pharmacy",
+}
+
+
+def _today(world):
+    cal = world.get("calendar", {})
+    return [cal.get("year"), cal.get("month"), cal.get("day")]
+
+
+def same_as_last_trip_today(c, world, reason):
+    """Is this the same kind of trip as the LAST one they took, and was that today? The gym straight after the gym, or a second
+    shopping trip the same day, does not make sense."""
+    last = c.get("_offgrid_last_trip") or {}
+    return last.get("reason") == reason and list(last.get("day") or []) == _today(world)
+
+
+def repeat_blocked(c, world, reason):
+    """True when this trip makes no sense so soon after the last one: the same kind as the trip they last took, the same day, or
+    the same kind that ended too recently (a gap per kind)."""
+    if reason in REPEAT_EXEMPT or reason.startswith("event:"):
+        return False
+    if same_as_last_trip_today(c, world, reason):
+        return True
+    last = (c.get("_offgrid_last") or {}).get(reason)
+    return last is not None and world.get("tick", 0) - last < REPEAT_GAP_SECONDS.get(reason, DEFAULT_REPEAT_GAP_SECONDS)
+
+
 def send_offgrid(c, world, reason, duration_minutes):
     """duration_minutes: how long this trip should take, in minutes (see
     _minutes_to_ticks/MAX_OFFGRID_MINUTES above) -- converted to ticks and
@@ -595,6 +630,8 @@ def send_offgrid(c, world, reason, duration_minutes):
     if c.get("off_grid") or c.get("legal", {}).get("status") == "jailed":
         return False
     if c.get("travel_state"):
+        return False
+    if repeat_blocked(c, world, reason):
         return False
 
     # Real check, every departure reason included (work shifts too, per
@@ -650,6 +687,7 @@ def _send_offgrid_immediate(c, world, reason, duration_minutes):
     # #8) -- this is the single lowest-level function every off-grid
     # reason eventually funnels through, travel-based or immediate.
     c["_offgrid_departure_tick"] = world["tick"]
+    c["off_grid_detail"] = trip_detail(world, world["tick"], c["return_tick"])
 
     # Per the user's explicit ask: commit a real memory of leaving --
     # where and for how long -- tagged with a trip id that process_return
@@ -798,6 +836,34 @@ def school_run_pending(c, world):
     return False
 
 
+def trip_detail(world, started_tick, return_tick):
+    """When they left and when they are due back, as clock times (the inspector shows them next to the countdown)."""
+    from systems.offgrid_summary import _clock
+    now = world.get("tick", started_tick)
+    return {"started_tick": started_tick, "started_clock": _clock(world, started_tick, now), "returns_clock": _clock(world, return_tick, now)}
+
+
+def backfill_detail(c, world):
+    """A character already away when this was added: work out when they left and are due back, and for a separation what the
+    fight was (from their own memory of it)."""
+    if not c.get("off_grid") or (c.get("off_grid_detail") or {}).get("started_clock"):
+        return False
+    started = c.get("_offgrid_departure_tick")
+    if started is None or not c.get("return_tick"):
+        return False
+    detail = dict(c.get("off_grid_detail") or {}, **trip_detail(world, started, c["return_tick"]))
+    if c.get("off_grid_reason") == "temporary_separation" and not detail.get("why"):
+        from systems.temporary_separation import explain
+        fight = next((m for m in reversed(c.get("memories") or []) if str(m.get("text", "")).startswith("Had a real fight that ended in")), None)
+        outcome = None
+        if fight:
+            text = fight["text"]
+            outcome = next((k for k, w in (("storm_off", "storm"), ("cold_shoulder", "cold"), ("physical_resolved", "physical"), ("suppressed", "suppress")) if w in text), None)
+        detail.update(explain(world, c, {"with_ids": list((fight or {}).get("people") or []), "outcome": outcome}))
+    c["off_grid_detail"] = detail
+    return True
+
+
 def _separation_story(c, world, elapsed):
     detail = c.get("off_grid_detail") or {}
     days = max(1, round(elapsed / 86400.0)) if elapsed else 0
@@ -838,6 +904,34 @@ def _work_block_active_or_imminent(c, world):
         if start_minute - 60 <= now_minute < end_minute:
             return True
     return False
+
+
+GROCERY_TRIP_MINUTES = 45
+HUNGRY_ENOUGH_TO_SHOP = 50
+
+
+def _fatigue_too_high_to_go_out(c):
+    return _leisure_fatigue_multiplier(c) <= 0
+
+
+def needs_groceries(c, world):
+    """A grown-up who is hungry, in a household whose larder cannot feed it, and nobody from the household is already out shopping.
+    Deterministic: the same situation always sends the same person (the household's first hungry grown-up)."""
+    from systems.household_pantry import food_units
+    if (c.get("age") or 0) < 18 or ((c.get("body") or {}).get("hunger", 0) or 0) < HUNGRY_ENOUGH_TO_SHOP:
+        return False
+    household = (world.get("households") or {}).get(c.get("household_id"))
+    if not household:
+        return False
+    if (household.get("_shopping_until") or 0) > world.get("tick", 0):
+        return False
+    if food_units(household) >= max(2, len(household.get("members", []))):
+        return False
+    chars = world.get("characters", {})
+    hungry_adults = sorted((chars[m] for m in household.get("members", []) if m in chars and (chars[m].get("age") or 0) >= 18
+                            and not chars[m].get("off_grid") and ((chars[m].get("body") or {}).get("hunger", 0) or 0) >= HUNGRY_ENOUGH_TO_SHOP),
+                           key=lambda p: p["id"])
+    return bool(hungry_adults) and hungry_adults[0]["id"] == c["id"]
 
 
 def _leisure_fatigue_multiplier(c):
@@ -936,8 +1030,6 @@ def maybe_go_offgrid(c, world):
     if c.get("age_group") == "child":
         return
 
-    r = random.random()
-
     # Job searching/applying is real, on-grid, computer/phone-driven work
     # now (jobs.py::apply_for_job(), called automatically every tick for
     # any unemployed character, plus the computer_apply_for_job/
@@ -948,46 +1040,20 @@ def maybe_go_offgrid(c, world):
     # interview (advance_job_application()'s on-site interview_2 stage,
     # reason "interview") sends anyone off-grid for job-market reasons now.
 
-    # Leisure/shopping/gym/cafe: never during (or about to start) a real
-    # work/contract commitment -- work gets real priority now that it no
-    # longer shares a daily trip-count cap with these -- and increasingly
-    # unlikely the more tired/depleted the character already is.
+    # No dice. Leisure outings, a coffee, the gym and "a bit of shopping" used to be rolled every tick (0.4-0.8% a tick: every few
+    # minutes for everybody), which had characters leaving the house for nothing while their intentions and expectations went
+    # unmet. Characters are creatures of habit: a trip happens because the schedule (work, school), an expectation or appointment's
+    # own pipeline, or a real need calls for it. The one need that sends a grown-up out of the house is an empty larder.
     if _work_block_active_or_imminent(c, world):
         return
     if school_run_pending(c, world):          # the kids still have to get to school
         return
-    fatigue_mult = _leisure_fatigue_multiplier(c)
-    if fatigue_mult <= 0:
+    if _fatigue_too_high_to_go_out(c):
         return
-
-    # Depression reduces (not zeroes) the chance of a leisure-flavored
-    # trip specifically -- work/job-search stay unaffected (systems/
-    # mental_health_effects.py::home_leaving_multiplier, feeding
-    # systems/withdrawal_concern.py's "staying home too much" drama).
-    from systems.mental_health_effects import home_leaving_multiplier
-    leave_mult = home_leaving_multiplier(c) * fatigue_mult
-    if r < 0.004 * leave_mult:
-        if _errand_hours_ok("shopping", world):
-            _send_errand(c, world, "shopping", 45)
-    elif r < 0.008 * leave_mult:
-        choice = random.choice(["leisure", "gym", "cafe"])
-        is_night_out = choice == "leisure" and random.random() < 0.25
-        if is_night_out:
-            # This leisure trip is specifically a night out at a bar/club
-            # -- see systems/id_check.py's module docstring for why the
-            # age/ID check happens right here at dispatch time rather than
-            # at a specific business (no real per-instance venue selection
-            # exists for leisure trips). Denied -> no trip this attempt,
-            # same real-world outcome as getting turned away at the door.
-            # Deliberately NOT subject to _errand_hours_ok's daytime
-            # leisure window below -- bars/clubs are legitimately open
-            # late, that's the point of a "night out".
-            from systems.id_check import check_id_for_entry
-            if not check_id_for_entry(c, world):
-                return
-        elif not _errand_hours_ok(choice, world):
-            return
-        _send_errand(c, world, choice, random.randint(30, 60))
+    if needs_groceries(c, world) and _errand_hours_ok("shopping", world):
+        household = (world.get("households") or {}).get(c.get("household_id")) or {}
+        if send_offgrid(c, world, "shopping", GROCERY_TRIP_MINUTES):
+            household["_shopping_until"] = c.get("return_tick")
 
 
 def maybe_schedule_doctor_visit(c, world):
@@ -1024,7 +1090,7 @@ def maybe_schedule_doctor_visit(c, world):
     # No appointment booked yet -- same probability gate as before decides
     # *whether* the character now realizes they need to be seen, but the
     # trip itself waits for the booked slot rather than firing instantly.
-    if random.random() < 0.002 * needed:
+    if 9 * 60 <= world.get("calendar", {}).get("minute_of_day", -1) < 9 * 60 + 5:        # a health need is seen to the next morning, not left to a dice roll
         from core.definitions import load_definitions
         business = (load_definitions("default").get("company_templates") or {}).get(business_key)
         if business:
@@ -1345,6 +1411,8 @@ def process_return(c, world):
 
     c["off_grid"]        = False
     c.pop("off_grid_detail", None)
+    c.setdefault("_offgrid_last", {})[reason] = world["tick"]
+    c["_offgrid_last_trip"] = {"reason": reason, "day": _today(world), "tick": world["tick"]}
     c["off_grid_reason"] = None
     c["return_tick"]     = None
     c.setdefault("off_grid_story_arc", []).append(story)
@@ -1531,6 +1599,10 @@ def process_return(c, world):
         elif cost:
             story["summary"] += f" Cost ${cost:.0f}."
     elif reason == "shopping":
+        from systems.household_pantry import restock
+        bought = restock(world, (world.get("households") or {}).get(c.get("household_id")), c)
+        if bought:
+            story["summary"] += f" Came home with groceries (${bought['cost']:.0f})."
         # choose_from_catalog()/purchase_from_catalog() (procurement.py)
         # already existed as real, working infrastructure but had zero
         # callers anywhere -- a "shopping" trip was pure narrative flavor

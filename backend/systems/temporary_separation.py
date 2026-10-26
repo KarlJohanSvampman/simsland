@@ -149,7 +149,7 @@ def begin_temporary_separation(c, world, reason="argument", cause=None):
     host_person = found[0] if found else None
     detail = explain(world, c, cause, host_person, found[2] if found else None)
     if send_offgrid(c, world, "temporary_separation", OFFGRID_SEPARATION_DAYS * 24 * 60):
-        c["off_grid_detail"] = dict(detail, started_tick=world.get("tick", 0))
+        c.setdefault("off_grid_detail", {}).update(detail)
     tag_dramatic_memory(
         c, world,
         f"Needed to get away for a few days after {detail['why']}.",

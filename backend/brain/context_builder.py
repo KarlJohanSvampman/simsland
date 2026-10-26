@@ -1859,6 +1859,31 @@ def _intention_phrases(i, world):
     return (reason or t.replace("_", " ")), "doing something about it"
 
 
+TODO_PRESSING_SHOWN = 4
+TODO_FREE_SHOWN = 3
+
+
+def _todo_line(i, world):
+    text = str(i.get("reason") or i.get("type", "something")).strip().rstrip(".")
+    if str(i.get("type", "")).startswith("expectation:") and not i.get("reason"):
+        text = str(i["type"]).split(":", 1)[1].replace("_", " ")
+    return text[:110]
+
+
+def _sec_todo(c, world):
+    """The character's intentions and expectations as one list, most pressing first, with what is only for when there is time kept
+    apart (systems/todo.py)."""
+    from systems.todo import todo_list
+    todo = todo_list(c)
+    lines = []
+    if todo["pressing"]:
+        lines.append("What you have to see to, most pressing first: " + "; ".join(f"{n}. {_todo_line(i, world)}" for n, i in enumerate(todo["pressing"][:TODO_PRESSING_SHOWN], 1)) + ".")
+    if todo["when_free"]:
+        head = "When you have the time (not before the above): " if todo["pressing"] else "Nothing pressing right now. You have time for: "
+        lines.append(head + "; ".join(_todo_line(i, world) for i in todo["when_free"][:TODO_FREE_SHOWN]) + ".")
+    return lines or None
+
+
 def _sec_exhaustion(c, world):
     from systems.exhaustion import context_lines
     return context_lines(c, world)
@@ -2409,6 +2434,7 @@ NARRATIVE_SECTIONS = [
     ("health",                "core", _sec_health),
     ("bedroom",               "full", _sec_bedroom),
     ("intentions",            "core", _sec_intentions),
+    ("todo",                  "core", _sec_todo),
     ("pressing_intentions",   "core", _sec_pressing_intentions),
     ("exhaustion",            "core", _sec_exhaustion),
     ("glimpsed",              "full", _sec_glimpsed),

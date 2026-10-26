@@ -66,6 +66,8 @@ def _set_body_clock(c, world):
 def settle_new_character(world, c):
     from systems.scheduling import generate_week_schedule, adjust_for_household, _lookup_block
     done = {"placed_in": _place(world, c)}
+    from systems.offgrid import backfill_detail
+    done["offgrid_detail"] = backfill_detail(c, world)
     from systems.vision import ensure_vision
     done["vision_added"] = ensure_vision(c)
     household = (world.get("households") or {}).get(c.get("household_id"))

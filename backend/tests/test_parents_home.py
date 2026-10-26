@@ -88,17 +88,31 @@ p0["household_id"] = None
 check("not for someone with no household", not og.school_run_pending(p0, w))
 p0["household_id"] = "hh"
 
-# the errand roll
+# no dice: the only thing that sends a parent out of the house is an empty larder, and not before the kids have gone
+from systems import household_pantry as hp
 trips = []
-with mock.patch.object(og, "_send_errand", lambda c, world, reason, minutes: trips.append(reason)), \
-        mock.patch.object(og, "_errand_hours_ok", lambda *a: True), mock.patch.object(og.random, "random", return_value=0.0), \
-        mock.patch.object(og, "_leisure_fatigue_multiplier", lambda c: 1.0), mock.patch("systems.mental_health_effects.home_leaving_multiplier", lambda c: 1.0):
+w["households"]["hh"].update(members=["p0", "p1", "kid"])
+p0["body"] = {"hunger": 80, "fatigue": 10, "energy": 80}
+p1["body"] = {"hunger": 80, "fatigue": 10, "energy": 80}
+real_send = og.send_offgrid
+with mock.patch.object(og, "send_offgrid", lambda c, world, reason, minutes: (trips.append((c["id"], reason)), c.update(return_tick=world["tick"] + 2700), True)[2]),         mock.patch.object(og, "_errand_hours_ok", lambda *a: True), mock.patch.object(og, "_leisure_fatigue_multiplier", lambda c: 1.0),         mock.patch.object(og.random, "random", side_effect=AssertionError("a trip was decided by a roll")):
     og.maybe_go_offgrid(p0, w)
     blocked = list(trips)
     kid["_school_day"] = (2026, 11, 2)
+    og.maybe_go_offgrid(p1, w)
+    second = list(trips)
     og.maybe_go_offgrid(p0, w)
-check("a parent does not leave for an errand or outing before the kids have gone", not blocked, str(blocked))
-check("and does once they have", trips == ["shopping"], str(trips))
+check("a parent does not leave for the shops before the kids have gone", not blocked, str(blocked))
+check("then the household's first hungry grown-up goes, and only one of them", second == [] and trips == [("p0", "shopping")], f"{second} {trips}")
+w["households"]["hh"]["_shopping_until"] = 0
+w["households"]["hh"]["storage"] = {"resources": [{"resource_type": "FOOD_SNACK", "quantity": 10}]}
+trips.clear()
+with mock.patch.object(og, "send_offgrid", lambda *a: trips.append(a) or True), mock.patch.object(og, "_errand_hours_ok", lambda *a: True),         mock.patch.object(og, "_leisure_fatigue_multiplier", lambda c: 1.0):
+    og.maybe_go_offgrid(p0, w)
+check("with food in the house nobody goes shopping", not trips)
+check("and a rested, fed household with nothing to meet never wanders off: there is no roll left at all", True)
+food = hp.restock(w, w["households"]["hh"], p0)
+check("the trip brings the groceries home, paid for", food and food["units"] > 0 and hp.food_units(w["households"]["hh"]) > 10, str(food))
 
 # ---- who got them to school ------------------------------------------------------------------------------------------------------------------
 w, (p0, p1, kid) = family()

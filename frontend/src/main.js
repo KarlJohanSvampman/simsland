@@ -4962,8 +4962,9 @@ function renderCharacterInspector(id){
 
   if(c.off_grid){
     const backIn = _offgridBackIn(c, _worldState.tick);
-    rows.push(`<span style="color:#fc6">Off-grid: ${(c.off_grid_reason || "?").replace(/_/g, " ")} — back ${backIn}</span>`);
     const det = c.off_grid_detail;
+    const clocks = det?.started_clock ? ` — since ${_escapeHTML(det.started_clock)}${det.returns_clock ? `, due back ${_escapeHTML(det.returns_clock)}` : ""}` : "";
+    rows.push(`<span style="color:#fc6">Off-grid: ${(c.off_grid_reason || "?").replace(/_/g, " ")}${clocks} (back ${backIn})</span>`);
     if(det && (det.why || det.where)) rows.push(`<span style="color:#fc6;opacity:.85">&nbsp;&nbsp;${_escapeHTML(det.where || "")}${det.why ? ` — after ${_escapeHTML(det.why)}` : ""}</span>`);
   } else if(c.travel_state){
     // Human-readable gloss per systems/travel.py + systems/transit.py's

@@ -87,6 +87,9 @@ def tick_curiosity(c, world):
     if not target:
         return
 
+    from systems.unresolved import has_unresolved
+    if has_unresolved(c, world):
+        return                          # nothing is left to chance while an intention or expectation is open
     if random.random() > (curiosity / 100.0) * CURIOSITY_MAX_ROLL_CHANCE:
         return
 

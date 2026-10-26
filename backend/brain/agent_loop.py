@@ -1109,6 +1109,8 @@ def update_agent(
     # returns before the character ever gets to think and they'd keep doing
     # busywork while starving. Falling through lets their own judgment handle it.
     blocked_urgent = False
+    from systems.todo import tier as _todo_tier, has_pressing as _has_pressing
+    pressing_open = _has_pressing(c)
 
     for intention in c.get(
         "active_intentions",
@@ -1117,6 +1119,8 @@ def update_agent(
 
         if blocked_urgent and intention.get("category") in ("chores", "leisure", "identity"):
             continue
+        if pressing_open and _todo_tier(intention) == "when_free":
+            continue                       # for when there is time: not while something pressing is still open
 
         # Feeding or reminding a child: done directly (systems/child_care.py::tend_child), not left to the model's choice
         if intention.get("child_id") and str(intention.get("type", "")).startswith(("feed_child_", "remind_child_")):
@@ -1183,7 +1187,9 @@ def update_agent(
     _prof.mark("agent:if_L1081")
     if wake_reason == "idle":
         from systems.idle_quirks import maybe_delay_or_quirk
-        if maybe_delay_or_quirk(c, world):
+        from systems.unresolved import has_unresolved
+        # wandering the house or checking the door because the dice said so: only for someone with nothing open (systems/unresolved.py)
+        if not has_unresolved(c, world) and maybe_delay_or_quirk(c, world):
             return
 
     # Characters owned by the standalone AI middleware (../middleware) are

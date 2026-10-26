@@ -38,7 +38,8 @@ LESSON_COOLDOWN_DAYS = (2, 6)
 TEST_RETRY_COOLDOWN_DAYS = (14, 30)  # approximate DMV retest waiting period
 
 BASE_TEST_PASS = 0.52
-_PRACTICE_ROLL_CHANCE = 0.02  # per driver_license-cadence poll, per unlicensed pursuer
+PRACTICE_COOLDOWN_DAYS = (1, 3)   # between informal practice sessions: they used to roll again the moment one ended
+MAX_PRACTICE_PER_LESSON = 1.5     # sessions allowed per formal lesson taken so far (practice supplements lessons, never replaces them)
 
 
 def _start_pursuit(c, world):
@@ -154,6 +155,7 @@ def on_driver_license_return(c, world, reason):
         state["awaiting_travel_return"] = False
         state["pending_action"] = None
         state["practice_sessions"] += 1
+        state["next_practice_tick"] = world["tick"] + _days_to_ticks(*PRACTICE_COOLDOWN_DAYS)
 
 
 def advance_driver_license(c, world):
@@ -213,7 +215,14 @@ def _find_practice_companion(c, world):
         oc for oc in world.get("characters", {}).values()
         if _eligible_companion(c, oc, world)
     ]
-    return random.choice(candidates) if candidates else None
+    if not candidates:
+        return None
+    # the best companion, not a random one: someone from the household first, then the closest friend or relative
+    def closeness(other):
+        rel = c.get("relationships", {}).get(other["id"]) or {}
+        return ((100 if other.get("household_id") and other.get("household_id") == c.get("household_id") else 0)
+                + (rel.get("friendship", 0) or 0), other["id"])
+    return max(candidates, key=closeness)
 
 
 def _send_practice_session(c, companion, world):
@@ -229,6 +238,7 @@ def _send_practice_session(c, companion, world):
         c["off_grid"] = False
         c["off_grid_reason"] = None
         c["return_tick"] = None
+        c.pop("off_grid_detail", None)
         return False
     c["driver_license_pursuit"]["pending_action"] = "practice"
     c["driver_license_pursuit"]["awaiting_travel_return"] = True
@@ -243,8 +253,12 @@ def maybe_practice_with_companion(c, world):
     state = c.get("driver_license_pursuit")
     if not state or state.get("awaiting_travel_return"):
         return
-    if has_valid_license(c) or random.random() > _PRACTICE_ROLL_CHANCE:
+    if has_valid_license(c):
         return
+    if world.get("tick", 0) < state.get("next_practice_tick", 0):
+        return                                           # one has only just ended
+    if state.get("practice_sessions", 0) >= max(1, int(state.get("lessons_taken", 0) * MAX_PRACTICE_PER_LESSON)):
+        return                                           # as much as the lessons so far can use
     companion = _find_practice_companion(c, world)
     if not companion:
         return
