@@ -4688,7 +4688,7 @@ function _clearInspector(){
   if(nameEl) nameEl.textContent = "";
   const empty = _empty("Nothing selected.");
   const panelIds = [
-    "viewerSelection", "viewerRelationshipsTab", "viewerMindTab", "viewerWorriesTab",
+    "viewerSelection", "viewerRelationshipsTab", "viewerMindTab", "viewerWorriesTab", "viewerOffgridTab",
     "viewerMemoryTab", "viewerLifeTab", "viewerPlansTab", "viewerWorkTab",
     "viewerHabitsTab", "viewerSkillsTab",
   ];
@@ -5007,6 +5007,7 @@ function renderCharacterInspector(id){
   renderRelationshipsTab(c);
   renderMindTab(c);
   renderWorriesTab(c);
+  renderOffgridTab(c);
   renderMemoryTab(c);
   renderLifeTab(c);
   renderPlansTab(c);
@@ -5170,6 +5171,64 @@ function _renderWorryCase(w){
       ${last && last.note && last.note !== w.summary ? `<div class="worryMeta">latest: ${_escapeHTML(String(last.note).slice(0, 110))} (${_ticksAgoLabel(tick - (last.tick || tick))})</div>` : ""}
       ${eased ? `<div class="worryMeta viewerPos">eased: ${_escapeHTML(String(eased.activity).replace(/_/g, " "))} −${eased.reduced_pct}% (${_ticksAgoLabel(tick - eased.tick)})</div>` : ""}
     </div>`;
+}
+
+// ── Off-Grid tab: one summary per stay away (systems/offgrid_summary.py) ──────────────────────────────────────────────────
+let _offgridShown = [];
+
+function renderOffgridTab(c){
+  const el = document.getElementById("viewerOffgridTab");
+  if(!el) return;
+  const list = [...(c.offgrid_summaries || [])].sort((a, b) => (b.end_tick || 0) - (a.end_tick || 0));
+  _offgridShown = list;
+  if(!list.length){ el.innerHTML = _section("Off-Grid (0)", _empty("No time away from the grid yet.")); return; }
+  const cards = list.map((s, i) => {
+    const mins = s.duration_minutes || 0;
+    const dur = mins >= 120 ? `${Math.round(mins / 60)} h` : `${mins} min`;
+    const n = Object.keys(s.key_events || {}).length;
+    return `
+    <div class="viewerCard viewerCardClickable" data-offgrid-index="${i}">
+      <div style="opacity:.6">${_escapeHTML(s.start_clock || "")} → ${_escapeHTML(s.end_clock || "")} · ${dur}</div>
+      <div><b>${_escapeHTML(s.label || s.reason || "Away")}</b> <span style="opacity:.5">(${n} key event${n === 1 ? "" : "s"})</span></div>
+      <div style="opacity:.75">${_escapeHTML(String(s.description || "").slice(0, 140))}</div>
+      <a href="#" style="opacity:.7;font-size:.85em">details</a>
+    </div>`;
+  }).join("");
+  el.innerHTML = _section(`Off-Grid (${list.length})`, cards);
+}
+
+document.getElementById("viewerOffgridTab")?.addEventListener("click", (e) => {
+  const card = e.target.closest("[data-offgrid-index]");
+  if(!card) return;
+  e.preventDefault();
+  openOffgridModal(_offgridShown[Number(card.dataset.offgridIndex)]);
+});
+
+function openOffgridModal(s){
+  const titleEl = document.getElementById("intentionModalTitle");
+  const body = document.getElementById("intentionModalBody");
+  if(!s || !body) return;
+  if(titleEl) titleEl.textContent = `${s.label || s.reason || "Away"} — ${s.start_clock || ""} to ${s.end_clock || ""}`;
+  const span = Math.max(1, (s.end_tick || 0) - (s.start_tick || 0));
+  const events = Object.entries(s.key_events || {});
+  const rows = events.map(([name, ev]) => {
+    const left = Math.max(0, Math.min(100, 100 * ((ev.start_tick || 0) - (s.start_tick || 0)) / span));
+    const width = Math.max(1.5, Math.min(100 - left, 100 * ((ev.stop_tick || 0) - (ev.start_tick || 0)) / span));
+    return `
+      <div class="ogRow">
+        <div class="ogRowHead"><b>${_escapeHTML(name)}</b><span class="ogTimes">${_escapeHTML(ev.start || "")} – ${_escapeHTML(ev.stop || "")}</span></div>
+        <div class="ogTrack"><div class="ogBar" style="left:${left.toFixed(1)}%;width:${width.toFixed(1)}%"></div></div>
+        ${ev.note ? `<div class="ogNote">${_escapeHTML(ev.note)}</div>` : ""}
+      </div>`;
+  }).join("");
+  body.innerHTML = `
+    <div>${_escapeHTML(s.description || "")}</div>
+    <div class="ogTimeline">
+      <div class="eventModalRowMeta" style="margin-bottom:6px">Timeline</div>
+      <div class="ogAxis"><span>${_escapeHTML(s.start_clock || "")}</span><span>${_escapeHTML(s.end_clock || "")}</span></div>
+      ${rows || `<div style="opacity:.6">No key events recorded.</div>`}
+    </div>`;
+  openModal("modal-intention");
 }
 
 function renderWorriesTab(c){
@@ -7145,6 +7204,7 @@ const VIEWER_TAB_PANELS = {
   relationships: "viewerRelationshipsTab",
   mind:          "viewerMindTab",
   worries:       "viewerWorriesTab",
+  offgrid:       "viewerOffgridTab",
   memory:        "viewerMemoryTab",
   life:          "viewerLifeTab",
   plans:         "viewerPlansTab",

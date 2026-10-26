@@ -152,13 +152,7 @@ def _resolve_work_shift(c, world, duration_minutes):
         if notable:
             notable_count += 1
 
-        store_memory(
-            c, beat.get("text", f"Continued working as a {job_title}."),
-            importance=0.65 if notable else 0.25,
-            tags=["work_beat", f"hour:{i + 1}"],
-            kind="work_beat", tick=tick, people=mentions_ids,
-            detail=beat.get("detail"),
-        )
+        # (no memory per beat: the beats become the key events of the shift's summary object, systems/offgrid_summary.py)
 
         sentiment = beat.get("sentiment", "neutral")
         for mid in mentions_ids:
@@ -178,23 +172,12 @@ def _resolve_work_shift(c, world, duration_minutes):
             c["_stuck_in_mind"] = {
                 "thought": stuck.get("thought"), "reason": stuck.get("reason"), "tick": tick,
             }
-            # Feeds the SAME shared top-10 "what's on my mind" table
-            # (systems/stories.py::notable_stories) real objectively-
-            # notable work beats above already use -- a random musing
-            # would never keyword-match into any real category on its
-            # own, so this forces real routing via store_memory()'s
-            # story_category/story_value passthrough (brain/memory.py).
-            store_memory(
-                c, f"{stuck['thought']} ({stuck.get('reason', 'not sure why')})",
-                importance=0.3, tags=["musing", "stuck_in_mind"],
-                kind="musing", tick=tick,
-                story_category="musing", story_value=0.6,
-            )
 
     summary = f"Worked a {hours}-hour shift as a {job_title}"
     summary += f" -- {notable_count} notable moment{'s' if notable_count != 1 else ''}." if notable_count else "."
 
     return {
+        "_beats": beats,                      # consumed by process_return() for the summary object, never stored on the story
         "id": f"story_{uuid.uuid4().hex[:6]}",
         "summary": summary,
         "emotion": "surprised" if notable_count else "calm",
@@ -1244,15 +1227,9 @@ def process_return(c, world):
             body["fatigue"] = min(100.0, body.get("fatigue", 20.0) + cost * elapsed * (90.0 / (8 * 3600)))
             body["energy"]  = max(0.0,   body.get("energy", 70.0)  - cost * elapsed * (60.0 / (8 * 3600)))
 
-    # Real chance this trip included a genuine exchange with someone --
-    # in-person if the partner happens to be co-located, remote (a real
-    # scripted call/sms) otherwise. Feeds the same shared_event pipeline
-    # the standalone ambient roll uses, just scoped to this character's
-    # own real contacts (systems/events.py::maybe_generate_summary_
-    # linked_event). Rolled while still off_grid, so a real remote
-    # exchange is the natural outcome for most trips.
-    from systems.events import maybe_generate_summary_linked_event
-    maybe_generate_summary_linked_event(c, world)
+    # (No exchange with anyone is rolled for the trip any more: nothing happens to a character while they are away, what they
+    # did is told by the summary object built below -- systems/offgrid_summary.py.)
+    work_beats = None
 
     if reason == "cps_care":
         # A real, if deliberately simple, return -- the child just comes
@@ -1298,6 +1275,7 @@ def process_return(c, world):
             # below for every other off-grid category, unchanged.
             shift_minutes = max(60, (elapsed if departed is not None else 480 * 60) // 60)
             story = _resolve_work_shift(c, world, shift_minutes)
+            work_beats = story.pop("_beats", None)
         elif is_event:
             details_fn, weights = _SOCIAL_EVENT_NARRATOR
             category = "social_event"
@@ -1635,6 +1613,11 @@ def process_return(c, world):
 
     handle_return_transport(c, world)
 
+    # What the stay amounted to: ONE summary object, with the key events of the stay. It rides on the return announcement (the
+    # world event) and is listed on the character; the memory below carries only the text.
+    from systems.offgrid_summary import build_summary, keep
+    summary_object = keep(c, build_summary(c, world, reason, story["summary"], departed, world["tick"], beats=work_beats))
+
     # Only the PUBLIC summary goes into shared memory and world events
     public_story = {k: v for k, v in story.items() if k != "private"}
     # Reuses the SAME trip id stamped at departure (_send_offgrid_
@@ -1650,7 +1633,7 @@ def process_return(c, world):
         "type":         "offgrid_story",
         "character_id": c["id"],
         "tick":         world["tick"],
-        "story":        public_story,
+        "story":        dict(public_story, summary_object=summary_object),
     })
     del events[:-300]  # world["events"] otherwise grows forever
 

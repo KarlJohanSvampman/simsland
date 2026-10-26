@@ -125,7 +125,7 @@
     border-top: 1px solid #444;
   }
 
-  #viewerRelationshipsTab, #viewerMindTab, #viewerWorriesTab, #viewerMemoryTab, #viewerLifeTab, #viewerPlansTab, #viewerWorkTab, #viewerHabitsTab, #viewerSkillsTab {
+  #viewerRelationshipsTab, #viewerMindTab, #viewerWorriesTab, #viewerOffgridTab, #viewerMemoryTab, #viewerLifeTab, #viewerPlansTab, #viewerWorkTab, #viewerHabitsTab, #viewerSkillsTab {
     font-size: 12px;
   }
 
@@ -481,6 +481,14 @@
   .pairEntry.meant { opacity: .55; }
   .pairEntryHead { display: flex; justify-content: space-between; gap: 6px; }
   .pairEntryText { opacity: .75; font-style: italic; }
+  .ogTimeline { margin-top: 12px; }
+  .ogRow { margin-bottom: 8px; }
+  .ogRowHead { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; }
+  .ogRowHead .ogTimes { opacity: .6; white-space: nowrap; }
+  .ogTrack { position: relative; height: 8px; margin: 3px 0; background: #1e222a; border-radius: 4px; }
+  .ogBar { position: absolute; top: 0; height: 100%; border-radius: 4px; background: #4a90d9; }
+  .ogNote { opacity: .65; font-size: 11px; }
+  .ogAxis { display: flex; justify-content: space-between; font-size: 11px; opacity: .55; margin-bottom: 6px; }
   .pairEntryText .memLink { text-decoration: underline dotted; text-underline-offset: 2px; cursor: help; }
 
   .viewerPos { color: #7ee787; }
@@ -1084,6 +1092,7 @@
     <button class="viewerTabBtn" data-tab="relationships">Relations</button>
     <button class="viewerTabBtn" data-tab="mind">Mind</button>
     <button class="viewerTabBtn" data-tab="worries">Worries</button>
+    <button class="viewerTabBtn" data-tab="offgrid">Off-Grid</button>
     <button class="viewerTabBtn" data-tab="memory">Memory</button>
     <button class="viewerTabBtn" data-tab="life">Life</button>
     <button class="viewerTabBtn" data-tab="plans">Plans</button>
@@ -1119,6 +1128,7 @@
   <div id="viewerRelationshipsTab" class="hidden"></div>
   <div id="viewerMindTab" class="hidden"></div>
   <div id="viewerWorriesTab" class="hidden"></div>
+  <div id="viewerOffgridTab" class="hidden"></div>
   <div id="viewerMemoryTab" class="hidden"></div>
   <div id="viewerLifeTab" class="hidden"></div>
   <div id="viewerPlansTab" class="hidden"></div>

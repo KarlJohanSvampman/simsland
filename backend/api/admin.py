@@ -316,6 +316,28 @@ def settle_characters(payload: dict = None, sim_id: str = DEFAULT_SIM_ID):
     return {"ok": True, "settled": out}
 
 
+@router.post("/clear_legal")
+@command("admin.clear_legal")
+def clear_legal(payload: dict = None, sim_id: str = DEFAULT_SIM_ID):
+    """Wipe legal records and the incident log (cleaning up after something that should never have happened, e.g. the
+    off-grid assaults the old impulse system produced). payload: {"character_ids": [...]} (default: everyone)."""
+    ids = (payload or {}).get("character_ids")
+    with world_lock():
+        world = load_world(sim_id)
+        cleared = []
+        for cid, c in world.get("characters", {}).items():
+            if ids and cid not in ids:
+                continue
+            legal = c.get("legal")
+            if legal and (legal.get("record") or legal.get("status") not in (None, "free")):
+                c["legal"] = {"status": "free", "record": [], "jail_until": None}
+                cleared.append(cid)
+        if not ids:
+            world["incidents"] = []
+        save_world(sim_id, world)
+    return {"ok": True, "cleared": cleared}
+
+
 @router.post("/recall_characters")
 @command("admin.recall_characters")
 def recall_characters(payload: dict = None, sim_id: str = DEFAULT_SIM_ID):

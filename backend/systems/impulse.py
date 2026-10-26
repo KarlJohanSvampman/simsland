@@ -39,6 +39,7 @@ OUTBURST_THRESHOLD    = 0.75    # base boilover point
 ANGER_DECAY_PER_TICK  = 0.00008 # slow natural decay
 ANGER_DECAY_FAST      = 0.00020 # hot_tempered — spikes fast, cools faster
 OUTBURST_COOLDOWN     = 60 * 60 * 6   # 6 game hours between outbursts (ticks)
+OUTBURST_REACH        = 6             # tiles: an outburst can only land on someone this close (or in the same room)
 SELF_CONTROL_BASE     = 0.50
 
 
@@ -125,7 +126,7 @@ def tick_impulse(world):
     tick = world.get("tick", 0)
 
     for c in chars.values():
-        if c.get("is_offscreen"):
+        if c.get("is_offscreen") or c.get("off_grid"):         # nothing happens to someone who is away (see offgrid summaries)
             continue
         imp = c.get("impulse_state")
         if not imp or imp.get("anger_pressure", 0) < 0.05:
@@ -148,6 +149,19 @@ def tick_impulse(world):
         _trigger_outburst(c, imp, threshold, world)
 
 
+def within_reach(actor, other):
+    """Can `actor` physically get at `other` right now: both on the grid, and in the same room or within OUTBURST_REACH tiles.
+    An outburst used to pick the most resented person anywhere in the world and assault them from across town (or while
+    the actor was off-grid at the gym), with the arrest, the 911 call and the guilt following."""
+    if actor.get("off_grid") or other.get("off_grid") or other.get("is_workplace_npc"):
+        return False
+    if actor.get("room_id") and actor.get("room_id") == other.get("room_id"):
+        return True
+    if actor.get("building_id") != other.get("building_id"):
+        return False
+    return abs(actor.get("x", 0) - other.get("x", 0)) + abs(actor.get("y", 0) - other.get("y", 0)) <= OUTBURST_REACH
+
+
 # ── Internal ──────────────────────────────────────────────────────────────
 
 def _trigger_outburst(c, imp, threshold, world):
@@ -165,7 +179,7 @@ def _trigger_outburst(c, imp, threshold, world):
     try:
         from systems.domestic_control import get_domestic_target
         override = get_domestic_target(c, chars)
-        if override and override in chars:
+        if override and override in chars and within_reach(c, chars[override]):
             target = chars[override]
             _apply_outburst_consequences(c, target, "assault", world)
             imp["anger_pressure"] = round(imp["anger_pressure"] * 0.45, 4)
@@ -184,7 +198,7 @@ def _trigger_outburst(c, imp, threshold, world):
     best_target_id = None
     best_score     = 0.0
     for oid, rel in c.get("relationships", {}).items():
-        if oid not in chars:
+        if oid not in chars or not within_reach(c, chars[oid]):
             continue
         score = get_grievance_score(c, oid)
         # Weight by resentment too
