@@ -364,6 +364,9 @@ def _on_conversation_ignored(data, world):
     ignorer = chars.get(data.get("ignorer_id"))
     if not ignorer:
         return
+    from systems.addressing import addressed_elsewhere
+    if addressed_elsewhere(world, data.get("speaker_id"), ignorer["id"], data.get("utterance")):
+        return                      # "Daddy, can we play?" said near a sibling: the sibling has ignored nobody
     handle_intent({
         "source_id": ignorer["id"], "target_id": data.get("speaker_id"),
         "kind": "ignored_heard" if data.get("heard") else "ignored",

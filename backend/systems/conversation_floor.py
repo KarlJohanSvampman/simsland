@@ -216,15 +216,19 @@ def _end(world, conv, reason):
 def _ignored(world, conv, speaker, holder, f, heard):
     tick = world.get("tick", 0)
     _end(world, conv, "ignored")
-    try:
-        from brain.memory import store_memory
-        what = "asked" if f.get("expects_reply") else "told"
-        text = (f"{_name(holder)} heard me out and ignored me." if heard
-                else f"I {what} {_name(holder)} something and they didn't even react.")
-        store_memory(speaker, text, importance=0.5, tags=["ignored", "conversation"],
-                     people=[holder["id"]], emotional_impact=-0.3, source="conversation", tick=tick)
-    except Exception:
-        pass
+    from systems.addressing import addressed_elsewhere
+    last_line = ((conv.get("history") or [{}])[-1] or {}).get("utterance")
+    meant_for_someone_else = addressed_elsewhere(world, speaker["id"], holder["id"], last_line)
+    if not meant_for_someone_else:                 # a line for somebody else was not ignored by this listener
+        try:
+            from brain.memory import store_memory
+            what = "asked" if f.get("expects_reply") else "told"
+            text = (f"{_name(holder)} heard me out and ignored me." if heard
+                    else f"I {what} {_name(holder)} something and they didn't even react.")
+            store_memory(speaker, text, importance=0.5, tags=["ignored", "conversation"],
+                         people=[holder["id"]], emotional_impact=-0.3, source="conversation", tick=tick)
+        except Exception:
+            pass
     from core.event_bus import emit
     emit("conversation_ignored", {
         "conv_id": conv.get("id"), "speaker_id": speaker["id"], "ignorer_id": holder["id"],

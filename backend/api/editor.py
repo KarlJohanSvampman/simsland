@@ -193,6 +193,14 @@ def _spawn_character_locked(sim_id, template_id, x, y, body):
 
         world.setdefault("characters", {})[character["id"]] = character
 
+        # Placed inside a building: they are in it (and in that room), not standing outside on the building's tiles --
+        # otherwise they never go to bed, and call to be let in.
+        from systems.navigation import find_building_at, get_room_at_position
+        placed_in, _ = find_building_at(world, character.get("x", 0), character.get("y", 0))
+        if placed_in:
+            character["building_id"] = placed_in["id"]
+            character["room_id"] = get_room_at_position(placed_in, character["x"], character["y"])
+
         # generate_character() only sets the character's own pointer --
         # the household record's members list needs a separate sync or
         # this character would be a dangling reference the household

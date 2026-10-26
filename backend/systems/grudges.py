@@ -61,6 +61,8 @@ _JABS = ["Don't think I've forgotten what you did.", "Look who it is.", "You've 
          "I haven't forgotten, you know."]
 _MUTTERS = ["I'm still not over what {name} did...", "{name} still hasn't said sorry...", "I can't believe {name}..."]
 _SIGHS = ["Hmph.", "Some people.", "Not a word of apology..."]
+_KID_MUTTERS = ["I'm still mad at {name}.", "{name} was mean to me.", "{name} didn't say sorry."]
+_KID_SIGHS = ["Hmph!", "I'm not talking to you.", "Humph."]
 
 
 def _grudges(c):
@@ -256,6 +258,15 @@ def _behave(world, holder, offender, g, tick):
     from systems.expressions import express
     traits = set(holder.get("traits") or [])
     name = offender.get("name", "them")
+    child = (holder.get("age") or 99) < 13
+    if child:                           # a child sulks; they do not trade adult insults
+        if random.random() < 0.5:
+            express(holder, world, {"utterance": random.choice(_KID_MUTTERS).format(name=name.split(" ")[0]), "speech_act": "mutter",
+                                    "volume": "low", "target": None, "intent": {"source": "grudge"}})
+        else:
+            express(holder, world, {"utterance": random.choice(_KID_SIGHS), "speech_act": "sigh", "volume": "low", "target": None,
+                                    "intent": {"source": "grudge"}})
+        return
     if traits & HOT_TRAITS:
         express(holder, world, {"utterance": random.choice(_JABS), "speech_act": "insult", "volume": "medium",
                                 "target": offender["id"], "intent": {"valence": "hurt", "source": "grudge"}})

@@ -75,7 +75,7 @@ def assign_character_room(
 
     room_id = get_room_at_position(
 
-        building_id,
+        building,
 
         character["x"],
 

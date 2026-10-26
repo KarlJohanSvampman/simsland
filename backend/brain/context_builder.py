@@ -1165,8 +1165,8 @@ def build_available_actions(c, world):
             "id":           other_id,
             "name":         other.get("name", other_id),
             "age_group":    other.get("age_group"),
-            "relationship": rel.get("labels") or rel.get("state"),
-            "last_contact": rel.get("last_contact", 0),
+            "relationship": ", ".join(rel["labels"]) if rel.get("labels") else rel.get("state"),
+            "last_contact": rel.get("last_contact") or 0,       # the key can be present and None
         })
     known_contacts.sort(key=lambda k: -k["last_contact"])
     known_contacts = known_contacts[:15]

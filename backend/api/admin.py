@@ -244,6 +244,9 @@ def reset_characters(sim_id: str = DEFAULT_SIM_ID):
         # some of them -- clearing them outright is simpler and more
         # correct than filtering, and matches this route's existing
         # placed_items/world_objects cleanup above in spirit.
+        world["rumors"]      = {}          # rumors, introductions and the relationship ledgers all name the people being removed
+        world["introductions"] = {}
+        world["relationship_ledgers"] = {}
         world["events"]      = []
         world["incidents"]   = []
         world["calls"]       = []

@@ -41,6 +41,8 @@ _STOPWORDS = {
 
 
 def _normalize(text):
+    if isinstance(text, (list, tuple, set)):          # e.g. a relationship given as its list of labels
+        text = " ".join(str(t) for t in text)
     text = (text or "").lower()
     text = re.sub(r"[^a-z0-9\s]", " ", text)
     tokens = [t for t in text.split() if t and t not in _STOPWORDS]
