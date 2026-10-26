@@ -860,6 +860,8 @@ def backfill_detail(c, world):
             text = fight["text"]
             outcome = next((k for k, w in (("storm_off", "storm"), ("cold_shoulder", "cold"), ("physical_resolved", "physical"), ("suppressed", "suppress")) if w in text), None)
         detail.update(explain(world, c, {"with_ids": list((fight or {}).get("people") or []), "outcome": outcome}))
+        if not fight:
+            detail["why"] = "a falling-out at home (the cause was not recorded)"
     c["off_grid_detail"] = detail
     return True
 
@@ -1279,8 +1281,21 @@ def handle_return_transport(c, world):
         c["transport"] = None
 
 
+def scheduled_trip_over(c, world):
+    """A school day or a work shift ends when the schedule says it does, by the calendar -- not only when the tick count they were
+    given at departure runs out (a restart that moves the calendar on would otherwise keep a child at school until a quarter to four)."""
+    reason = c.get("off_grid_reason")
+    if reason not in ("school", "work"):
+        return False
+    block = next((b for b in _todays_schedule_blocks(c, world) if b.get("activity") == reason), None)
+    departed = c.get("_offgrid_departure_tick")
+    if not block or departed is None or world["tick"] - departed > 16 * 3600:
+        return False
+    return world.get("calendar", {}).get("minute_of_day", -1) >= int(block["end"][:2]) * 60
+
+
 def process_return(c, world):
-    if not c.get("off_grid") or world["tick"] < (c.get("return_tick") or 0):
+    if not c.get("off_grid") or (world["tick"] < (c.get("return_tick") or 0) and not scheduled_trip_over(c, world)):
         return
 
     # Bring home any dependent currently placed with a temporary

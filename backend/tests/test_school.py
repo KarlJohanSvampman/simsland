@@ -104,6 +104,21 @@ check("a school day tires them far less than a shift (under 45 of 100)", kid["bo
 check("it satisfies the need to learn", needs == ["learning"], str(needs))
 check("they ate during the day: hungry in the morning, not starving by the afternoon", kid["body"].get("hunger", 100) <= 90 - 40, str(kid["body"].get("hunger")))
 
+# ---- the school day ends by the clock ------------------------------------------------------------------------------------------------------
+w = world(hour=15, minute=1)
+child = generate_character(defs, {"age": 9})
+child.update(off_grid=True, off_grid_reason="school", _offgrid_departure_tick=w["tick"] - 6 * 3600, return_tick=w["tick"] + 3000)
+child["schedule"] = generate_week_schedule(child, w)
+check("by the clock the school day is over though the tick count they left with has 50 minutes to run", og.scheduled_trip_over(child, w))
+w["calendar"].update(hour=14, minute=30, minute_of_day=14 * 60 + 30)
+check("not before the end", not og.scheduled_trip_over(child, w))
+w["calendar"].update(hour=15, minute=1, minute_of_day=15 * 60 + 1)
+child["_offgrid_departure_tick"] = w["tick"] - 20 * 3600
+check("not for a trip that began yesterday", not og.scheduled_trip_over(child, w))
+child["off_grid_reason"] = "gym"
+child["_offgrid_departure_tick"] = w["tick"] - 3600
+check("only school days and shifts", not og.scheduled_trip_over(child, w))
+
 # ---- in the simulation ----------------------------------------------------------------------------------------------------------------------
 from tests import determinism
 import systems.scheduling as sched
