@@ -66,6 +66,10 @@ def _set_body_clock(c, world):
 def settle_new_character(world, c):
     from systems.scheduling import generate_week_schedule, adjust_for_household, _lookup_block
     done = {"placed_in": _place(world, c)}
+    household = (world.get("households") or {}).get(c.get("household_id"))
+    if household:
+        from systems.household_beds import ensure_household_beds
+        done["beds_added"] = ensure_household_beds(world, household)
 
     c["schedule"] = generate_week_schedule(c, world)
     adjust_for_household(c, world)
@@ -78,6 +82,10 @@ def settle_new_character(world, c):
     done["block"] = (c["active_schedule_block"] or {}).get("activity")
 
     done["hours_awake"] = _set_body_clock(c, world)
+
+    if c.get("conversation_log"):                     # one thread per set of people, whatever was logged before
+        from brain.conversations import add_to_conversation_log
+        add_to_conversation_log(c, None)
 
     try:
         from systems.body_intentions import generate_body_intentions

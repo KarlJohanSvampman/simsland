@@ -134,9 +134,12 @@ for extra in range(ev.COLD_EVERY + 1):
         js_merge(client, json.loads(json.dumps(delta["characters"], default=str)))
 
 mismatch = []
+radius = main._view_radius(2)
 for cid, ch in w["characters"].items():
     if ch.get("is_workplace_npc"):
         continue
+    if not main.in_view(ch.get("x", 0), ch.get("y", 0), 10, 10, radius):
+        continue                    # the viewport filter: a client holds only what is (or was) in view of its camera
     want = json.loads(json.dumps(ch, default=str))
     have = client.get(cid, {})
     for k in want:

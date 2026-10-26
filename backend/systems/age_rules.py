@@ -46,6 +46,15 @@ def school_placement(age):
     return "high_school", grade
 
 
+SCHOOL_HOURS = {"preschool": (9, 12), "primary": (8, 15), "middle_school": (8, 15), "high_school": (8, 16)}     # (start, end) hours
+
+
+def school_hours(age):
+    """(start_hour, end_hour) of this child's school day, Monday to Friday, or None when not of school age."""
+    level, _ = school_placement(age)
+    return SCHOOL_HOURS.get(level)
+
+
 def attained_education(age):
     """Highest level completed by a child of this age (None for adults: character_gen rolls those)."""
     if age >= ADULT_AGE:

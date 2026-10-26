@@ -35,3 +35,29 @@ demand through `POST /admin/settle_characters {"character_ids": [...]}` (default
 - A discretionary activity that LLM-chosen "work" at home at night is only interrupted at bedtime, it is not prevented.
 
 Tests: `tests/test_bedtime.py`.
+
+## Beds for everyone (`systems/household_beds.py`)
+`ensure_household_beds` adds single beds until the home has a sleep anchor per member (the starter house has two). It runs when
+someone joins a household and in the settle step. A bed goes on the first free 2x2 block that keeps the furniture clearance, in
+a bedroom, living room, dining room, laundry or corridor, in that order; with no clear block a cramped one is used, and with
+no block at all the household is left short (`household["beds_short"]`). Tests: `tests/test_household_beds.py`.
+
+## School (`systems/age_rules.py::school_hours`, `systems/scheduling.py`, `systems/offgrid.py`, `brain/agent_loop.py`)
+- Schedule: a child with a school gets a `school` block Monday to Friday: preschool 09-12, primary and middle 08-15, high school
+  08-16. A school block also counts as the daytime obligation for bedtime.
+- The bell: from the start of the block to an hour after it (never in its last half hour), a child who has not been sent today is
+  got up (a sleeping child too; only the toilet and breakfast are kept) and sent off-grid with reason `school` until the block
+  ends. `_school_day` is stamped so it happens once a day, and their parents' "get the kids to school" expectation is satisfied.
+- The return: a plain "spent the day at <school> in <grade>" story (no private events or cover stories), a school day costs 35%
+  of the fatigue a work shift does, and it satisfies the need to learn.
+- Not done: no holidays or sick days, no classmates, no homework or grades, and school is an off-grid trip (the child is not
+  shown walking there).
+Tests: `tests/test_school.py` (the last section runs the simulation across the bell).
+
+## Conversation log
+A character's `conversation_log` now has ONE object per set of people (a running thread) instead of one per conversation:
+`brain/conversations.py::add_to_conversation_log` folds a finished conversation into the thread with the same people, keeps the
+ids in `conv_ids`, tags each line with its `conv_id`, lists all `mediums`, and shows the same line said again as one line with
+`repeats`. Lines are stripped of the quote marks the model wraps them in (`systems/text_clean.py`; the same line retried came back
+with another pair each time). Entries written earlier are folded together the first time it runs (and by settle). The timeline's
+"details" lookup finds a conversation through `conv_ids`. Tests: `tests/test_conversation_log.py`.

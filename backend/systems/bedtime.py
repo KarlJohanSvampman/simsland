@@ -26,11 +26,17 @@ def _next_day(day):
 
 
 def in_sleep_time(c, world):
-    block = c.get("active_schedule_block")
-    if block:
-        return block.get("activity") == "sleep"
-    hour = (world.get("calendar") or {}).get("hour")
+    """Is it their sleep time? Read from the schedule against the clock rather than from c["active_schedule_block"], which
+    lags the clock by a tick (and can be stale on a world that has just been loaded)."""
+    cal = world.get("calendar") or {}
+    plan = (c.get("schedule") or {}).get("week", {}).get(str(cal.get("weekday", "")).lower())
+    if plan:
+        from systems.scheduling import _lookup_block
+        block = _lookup_block(plan, f"{cal.get('hour', 0):02d}:{cal.get('minute', 0):02d}")
+        return bool(block) and block.get("activity") == "sleep"      # a gap in the schedule is not sleep time
+    hour = cal.get("hour")
     return hour is not None and (hour >= SLEEP_FALLBACK[0] or hour < SLEEP_FALLBACK[1])
+
 
 
 def morning_day(world):
@@ -49,7 +55,7 @@ def has_daytime_obligation(c, day):
     plan = (c.get("schedule") or {}).get("week", {}).get(day)
     if plan is not None:
         for b in plan:
-            if b.get("activity") == "work":
+            if b.get("activity") in ("work", "school"):
                 try:
                     if WORK_START_EARLIEST <= int(b["start"][:2]) <= WORK_START_LATEST:
                         return True

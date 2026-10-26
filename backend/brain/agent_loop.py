@@ -947,6 +947,8 @@ def update_agent(
         _PROTECTED_FOR_WORK = ("sleep", "use_toilet", "use_toilet_bowels", "eat")
         _KEPT_AT_BEDTIME = _PROTECTED_FOR_WORK + ("take_shower", "take_bath", "brush_teeth", "wash_hands", "vomit", "nap", "take_nap")
         from systems.bedtime import wants_bed
+        from systems.offgrid import school_starting_now
+        school_starting = school_starting_now(c, world)
         from systems.offgrid import _work_block_starting_now
         work_starting = c.get("employed") and _work_block_starting_now(c, world)
 
@@ -1020,6 +1022,11 @@ def update_agent(
             from systems.occupancy import interrupt_activity
             interrupt_activity(c, world)
             start_activity(c, world, "use_toilet")
+        elif school_starting and act_type not in ("use_toilet", "use_toilet_bowels", "eat"):
+            # The school bell: a child still asleep (or busy with anything but the bathroom or breakfast) is got up and sent
+            # on their way -- the next step of this same tick lets maybe_go_offgrid() dispatch the school day.
+            from systems.occupancy import interrupt_activity
+            interrupt_activity(c, world)
         elif (act_type not in _KEPT_AT_BEDTIME and world.get("tick", 0) - c.get("_bedtime_interrupt_tick", -10 ** 9) >= 600
               and wants_bed(c, world)):
             # Bedtime before a work or school day (systems/bedtime.py) outranks whatever discretionary thing is running

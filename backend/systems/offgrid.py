@@ -742,6 +742,64 @@ def _work_block_starting_now(c, world):
     return start_minute <= now_minute < start_minute + 10
 
 
+def _day_key(world):
+    cal = world.get("calendar", {})
+    return (cal.get("year"), cal.get("month"), cal.get("day"))
+
+
+SCHOOL_LATE_WINDOW_MINUTES = 60          # a child can still be sent to school this long after the bell
+SCHOOL_LAST_DEPARTURE_BEFORE_END = 30    # ... but never in the last half hour of the school day
+
+
+def _school_block(c, world):
+    return next((b for b in _todays_schedule_blocks(c, world) if b.get("activity") == "school"), None)
+
+
+def school_starting_now(c, world):
+    """True for a child with a school, on a school day, from the bell to an hour after it, who has not been sent today.
+    (The child's `_school_day` is stamped when they leave, so it is once a day.)"""
+    if (c.get("age") or 99) >= 18 or not c.get("current_school") or c.get("off_grid"):
+        return False
+    block = _school_block(c, world)
+    if not block or c.get("_school_day") == _day_key(world):
+        return False
+    now_minute = world.get("calendar", {}).get("minute_of_day", -1)
+    start, end = int(block["start"][:2]) * 60, int(block["end"][:2]) * 60
+    return start <= now_minute < min(start + SCHOOL_LATE_WINDOW_MINUTES, end - SCHOOL_LAST_DEPARTURE_BEFORE_END)
+
+
+def send_to_school(c, world):
+    """The child leaves for school and is gone until the school day ends. Their parents' "get the kids to school" is done."""
+    block = _school_block(c, world)
+    now_minute = world.get("calendar", {}).get("minute_of_day", 0)
+    minutes = max(30, int(block["end"][:2]) * 60 - now_minute)
+    if not send_offgrid(c, world, "school", minutes):
+        return False
+    c["_school_day"] = _day_key(world)
+    from systems.expectations import satisfy_expectation
+    chars = world.get("characters", {})
+    for parent_id in ((world.get("households") or {}).get(c.get("household_id")) or {}).get("members", []):
+        parent = chars.get(parent_id)
+        if parent and parent["id"] != c["id"] and (parent.get("age") or 0) >= 18:
+            try:
+                satisfy_expectation(parent, "get_kids_to_school", world)
+            except Exception:
+                pass
+    return True
+
+
+def _school_story(c, world):
+    from systems.age_rules import grade_label
+    school = ((world.get("definitions") or {}).get("school_templates") or {}).get(c.get("current_school") or "") or {}
+    grade = c.get("school_grade")
+    where = school.get("name", "school")
+    return {
+        "id": f"story_{uuid.uuid4().hex[:6]}",
+        "summary": f"{c['name']} spent the day at {where}" + (f" in {grade_label(grade)}." if grade is not None else "."),
+        "emotion": "calm", "impact": {"stress": 0, "temp": 0}, "tags": ["school"],
+    }
+
+
 def _work_block_active_or_imminent(c, world):
     """Used to gate LEISURE, not work itself -- true while a work or
     contract-commitment block is currently active or starts within the
@@ -824,6 +882,10 @@ def maybe_go_offgrid(c, world):
         return
 
     if c.get("off_grid") or c.get("conversation"):
+        return
+
+    if school_starting_now(c, world):
+        send_to_school(c, world)
         return
 
     if c.get("employed") and _work_block_starting_now(c, world):
@@ -1153,8 +1215,9 @@ def process_return(c, world):
         elapsed = max(0, world["tick"] - departed)
         if elapsed:
             body = c.setdefault("body", {})
-            body["fatigue"] = min(100.0, body.get("fatigue", 20.0) + elapsed * (90.0 / (8 * 3600)))
-            body["energy"]  = max(0.0,   body.get("energy", 70.0)  - elapsed * (60.0 / (8 * 3600)))
+            cost = 0.35 if reason == "school" else 1.0          # a school day tires a child far less than a shift does
+            body["fatigue"] = min(100.0, body.get("fatigue", 20.0) + cost * elapsed * (90.0 / (8 * 3600)))
+            body["energy"]  = max(0.0,   body.get("energy", 70.0)  - cost * elapsed * (60.0 / (8 * 3600)))
 
     # Real chance this trip included a genuine exchange with someone --
     # in-person if the partner happens to be co-located, remote (a real
@@ -1175,7 +1238,10 @@ def process_return(c, world):
         from systems.child_welfare import process_cps_care_return
         process_cps_care_return(c, world)
 
-    if reason in _NARRATOR_CATEGORIES or is_event:
+    private_events = []
+    if reason == "school":
+        story = _school_story(c, world)           # no private events, no cover stories for a child's school day
+    elif reason in _NARRATOR_CATEGORIES or is_event:
         if reason == "jail":
             # law.py::process_jail() only checks jail_until on a cadence
             # (CADENCE["trials"], ~every 60 ticks), while this function
@@ -1319,6 +1385,12 @@ def process_return(c, world):
         advance_career_progress(c, world, shift_hours)
         if not c.get("career_progress"):
             choose_career_path(c, world)
+    elif reason == "school":
+        try:
+            from systems.lt_needs import satisfy_lt_need
+            satisfy_lt_need(c, "learning", world)
+        except Exception:
+            pass
     elif reason in ("doctor", "hospital"):
         from core.definitions import load_definitions
         defs = load_definitions(world.get("sim_id", "default"))

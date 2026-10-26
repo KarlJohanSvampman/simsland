@@ -5924,14 +5924,16 @@ function _renderConversationLog(c){
     const idx = _lastRenderedConversations.length;
     _lastRenderedConversations.push(entry);
     const withNames = entry.with?.map(p => p.name || p.id).join(", ") || "someone";
-    const medium = _MEDIUM_LABELS[entry.medium] || entry.medium || "in person";
+    const mediums = (entry.mediums?.length ? entry.mediums : [entry.medium]).map(m => _MEDIUM_LABELS[m] || m || "in person");
+    const medium = [...new Set(mediums)].join(" / ");
     const stamp = _formatMemoryTimestamp(entry.ended_tick);
     const lastLine = entry.lines?.length ? entry.lines[entry.lines.length - 1] : null;
-    const excerpt = lastLine ? `"${lastLine.utterance}"` : "(no lines recorded)";
+    const excerpt = lastLine ? `"${_escapeHTML(lastLine.utterance)}"` : "(no lines recorded)";
+    const count = entry.lines?.length ? ` · ${entry.lines.length} line${entry.lines.length > 1 ? "s" : ""}` : "";
     return `
     <div class="viewerCard viewerCardClickable" data-conv-index="${idx}">
       ${stamp ? `<div style="opacity:.6">${stamp}</div>` : ""}
-      <div>${withNames} <span style="opacity:.5">(${medium}${entry.topic && entry.topic !== "general" ? `, ${entry.topic}` : ""})</span></div>
+      <div>${withNames} <span style="opacity:.5">(${medium}${entry.topic && entry.topic !== "general" ? `, ${entry.topic}` : ""}${count})</span></div>
       <div style="opacity:.75">${excerpt}</div>
       <a href="#" style="opacity:.7;font-size:.85em">details</a>
     </div>`;
@@ -5949,7 +5951,7 @@ function openConversationModal(entry){
   body.innerHTML = "";
 
   const meta = [
-    ["Medium", _MEDIUM_LABELS[entry.medium] || entry.medium],
+    ["Medium", [...new Set((entry.mediums?.length ? entry.mediums : [entry.medium]).map(m => _MEDIUM_LABELS[m] || m))].join(" / ")],
     ["Topic", entry.topic],
     ["Started", _formatMemoryTimestamp(entry.started_tick)],
     ["Ended", _formatMemoryTimestamp(entry.ended_tick)],
@@ -5969,10 +5971,16 @@ function openConversationModal(entry){
   if(!entry.lines?.length){
     transcript.innerHTML = `<div style="opacity:.6">No lines recorded.</div>`;
   } else {
+    // One thread per set of people: a heading marks where each separate conversation began.
+    let lastConv = null;
     transcript.innerHTML = entry.lines.map(l => {
       const speakerName = _charName(l.speaker) || l.speaker;
-      return `<div style="margin-bottom:6px;"><b>${speakerName}:</b> ${l.utterance}
-        <span style="opacity:.5;font-size:.85em">(${l.speech_act || ""})</span></div>`;
+      const heading = (l.conv_id && l.conv_id !== lastConv && entry.conv_ids?.length > 1)
+        ? `<div style="opacity:.55;font-size:.85em;margin:10px 0 4px;border-top:1px solid #292d35;padding-top:4px">${_formatMemoryTimestamp(l.tick) || ""}</div>` : "";
+      lastConv = l.conv_id || lastConv;
+      const repeats = l.repeats > 1 ? ` <span style="opacity:.6">×${l.repeats}</span>` : "";
+      return `${heading}<div style="margin-bottom:6px;"><b>${_escapeHTML(speakerName)}:</b> ${_escapeHTML(l.utterance)}${repeats}
+        <span style="opacity:.5;font-size:.85em">(${_escapeHTML(l.speech_act || "")})</span></div>`;
     }).join("");
   }
   body.appendChild(transcript);

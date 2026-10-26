@@ -1033,6 +1033,69 @@ def conversation_score(
 CONVERSATION_LOG_CAP = 50
 
 
+from systems.text_clean import clean_utterance
+
+LOG_LINES_CAP = 400
+
+
+def _people_key(entry):
+    return frozenset(p.get("id") for p in entry.get("with", []))
+
+
+def _merge_entry(into, entry):
+    """Fold one finished conversation (`entry`) into the running thread `into` between the same people."""
+    into.setdefault("conv_ids", [into.get("conv_id")])
+    for cid in entry.get("conv_ids") or [entry.get("conv_id")]:
+        if cid and cid not in into["conv_ids"]:
+            into["conv_ids"].append(cid)
+    into["conv_id"] = entry.get("conv_id") or into.get("conv_id")
+    starts = [t for t in (into.get("started_tick"), entry.get("started_tick")) if t is not None]
+    ends = [t for t in (into.get("ended_tick"), entry.get("ended_tick")) if t is not None]
+    into["started_tick"] = min(starts) if starts else None
+    into["ended_tick"] = max(ends) if ends else None
+    mediums = into.setdefault("mediums", [into.get("medium", "in_person")])
+    if entry.get("medium") and entry["medium"] not in mediums:
+        mediums.append(entry["medium"])
+    into["medium"] = entry.get("medium") or into.get("medium")
+    if entry.get("topic") and entry["topic"] != "general":
+        into["topic"] = entry["topic"]
+    lines = into.setdefault("lines", [])
+    for h in entry.get("lines", []):
+        line = dict(h)
+        line["utterance"] = clean_utterance(line.get("utterance"))
+        if lines and lines[-1].get("speaker") == line.get("speaker")                 and _normalize_utterance(lines[-1].get("utterance")) == _normalize_utterance(line["utterance"]):
+            lines[-1]["repeats"] = lines[-1].get("repeats", 1) + 1       # the same line said again: one line, said N times
+            continue
+        lines.append(line)
+    into["lines"] = lines[-LOG_LINES_CAP:]
+
+
+def add_to_conversation_log(c, entry):
+    """All conversations between the same individuals live in ONE log object per character (a running thread): a finished
+    conversation is appended to the thread with those people instead of becoming an entry of its own. Entries written before
+    this (one per conversation) are folded together the first time it runs."""
+    log = c.setdefault("conversation_log", [])
+    if entry is not None:                  # None: just fold together what is already there
+        log.append(entry)
+    threads = {}
+    merged = []
+    for e in log:
+        key = _people_key(e)
+        if key in threads:
+            _merge_entry(threads[key], e)
+        else:
+            e.setdefault("conv_ids", [e.get("conv_id")])
+            for l in e.get("lines", []):
+                l.setdefault("conv_id", e.get("conv_id"))
+            threads[key] = e
+            merged.append(e)
+    for e in merged:                       # a thread that is a single conversation still gets its text cleaned
+        for l in e.get("lines", []):
+            l["utterance"] = clean_utterance(l.get("utterance"))
+    merged.sort(key=lambda e: e.get("ended_tick") or 0)
+    c["conversation_log"] = merged[-CONVERSATION_LOG_CAP:]
+
+
 def _archive_conversation(world, conv):
     if conv.get("_archived"):
         return
@@ -1052,10 +1115,9 @@ def _archive_conversation(world, conv):
             "medium":       conv.get("medium", "in_person"),
             "topic":        conv.get("topic"),
             "with":         others,
-            "lines":        [dict(h) for h in conv.get("history", [])],
+            "lines":        [dict(h, conv_id=conv.get("id")) for h in conv.get("history", [])],
         }
-        c.setdefault("conversation_log", []).append(entry)
-        c["conversation_log"] = c["conversation_log"][-CONVERSATION_LOG_CAP:]
+        add_to_conversation_log(c, entry)
 
 
 def cleanup_conversations(

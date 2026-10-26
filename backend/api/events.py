@@ -141,7 +141,7 @@ def get_conversation(conv_id: str, sim_id: str = "default", participants: str = 
         if not c:
             continue
         for entry in c.get("conversation_log", []):
-            if entry.get("conv_id") == conv_id:
+            if entry.get("conv_id") == conv_id or conv_id in (entry.get("conv_ids") or []):
                 return {"ok": True, **entry, "active": False}
 
     return {"ok": False, "error": "conversation not found"}

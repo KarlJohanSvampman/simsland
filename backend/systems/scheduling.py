@@ -350,6 +350,14 @@ def generate_week_schedule(c, world):
                     "activity": "hygiene",
                 })
 
+        # 3b. School -- a child with a school has a school day, Monday to Friday (systems/age_rules.py::school_hours); what
+        # sends them there is systems/offgrid.py (the "school" trip).
+        if (c.get("age") or 99) < 18 and c.get("current_school") and day in WORK_DAYS:
+            from systems.age_rules import school_hours
+            hours = school_hours(c.get("age"))
+            if hours:
+                blocks.append({"start": f"{hours[0]:02d}:00", "end": f"{hours[1]:02d}:00", "activity": "school"})
+
         # 4. Meals — only add if not overlapping with work/contract
         occupied = _occupied_hours(blocks)
         if 12 not in occupied and 13 not in occupied:

@@ -56,9 +56,11 @@ def apply_speech(c, world, speech):
     if not speech:
         return
 
-    utterance = speech.get("utterance", "").strip()
+    from systems.text_clean import clean_utterance
+    utterance = clean_utterance(speech.get("utterance", ""))
     if not utterance:
         return
+    speech["utterance"] = utterance
 
     # One-way expressions (exclaim/mutter/vent/yell, or the model's REMARK line) --
     # no conversation, no default listener, no floor. systems/expressions.py.
@@ -417,7 +419,8 @@ def apply_speech_to_group(c, world, speech, participant_ids):
     if not speech:
         return None
 
-    utterance = speech.get("utterance", "").strip()
+    from systems.text_clean import clean_utterance
+    utterance = clean_utterance(speech.get("utterance", ""))
     if not utterance:
         return None
 

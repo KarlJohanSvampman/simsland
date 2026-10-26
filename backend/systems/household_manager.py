@@ -92,6 +92,11 @@ def add_member_to_household(world, character, household):
         household["members"].append(character["id"])
     _grant_household_keys(world, character, household)
     _ensure_household_housing_setup(world, household)
+    try:
+        from systems.household_beds import ensure_household_beds      # a bed for everyone who lives there
+        ensure_household_beds(world, household)
+    except Exception as exc:
+        print(f"[household_beds] could not add beds for {household.get('name')}: {exc!r}")
 
 
 def _grant_household_keys(world, character, household):
