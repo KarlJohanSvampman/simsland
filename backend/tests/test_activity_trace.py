@@ -105,6 +105,27 @@ with mock.patch("brain.memory.store_memory", lambda c, text, **kw: memories.appe
     log_activity(c, w, "take_out_trash", "reached target, interaction begun")
     check("a step is a timeline entry, not a memory", not memories and c["activity"]["timeline"][-1]["step"] == "reached target, interaction begun")
 
+# ---- through the real event, with the real ordering, a timeline has its plan, its start and each entry once ---------------------------------------------
+from core.event_handlers import _on_activity_started
+from systems.activities import finish_activity
+memories.clear()
+with mock.patch("brain.memory.store_memory", lambda c, text, **kw: memories.append((text, kw))):
+    w = world(7000)
+    c = char(walking("take_out_trash", 300, 7000))
+    w["characters"]["k"] = c
+    _on_activity_started({"character_id": "k", "activity_type": "take_out_trash", "target_id": None}, w)
+    check("the started event leaves the plan and the real start tick", [s["name"] for s in c["activity"]["steps"]] == ["walk", "use", "finish"]
+          and c["activity"]["started_tick"] == 7000 and len(c["activity"]["timeline"]) == 1)
+    w["tick"] = 7030
+    set_activity_phase(c["activity"], "using", w)
+    w["tick"] = 7330
+    set_activity_phase(c["activity"], "finishing", w)
+    finish_activity(c, w)
+    rec = memories[0][1]["activity_record"] if memories else {}
+    check("a finished activity records its true length (330 ticks, not the last phase)", rec.get("actual_ticks") == 330, str(rec.get("actual_ticks")))
+    check("... with one 'started' and one closing entry", [t["step"] for t in rec.get("timeline", [])].count("started") == 1
+          and [t["step"] for t in rec.get("timeline", [])][-1] == "completed", str(rec.get("timeline")))
+
 # ---- a chore is not cut short by a late answer ---------------------------------------------------------------------------------------------
 w = world(5000)
 chore = {"type": "take_out_trash", "phase": "using", "phase_started_tick": 4900, "duration": 300, "target_id": "p", "state": {}}

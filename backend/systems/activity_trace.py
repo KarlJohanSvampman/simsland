@@ -81,7 +81,7 @@ def phase_changed(act, old, new, world):
 
 def begin(c, world):
     act = c.get("activity")
-    if not act or act.get("timeline") is not None:
+    if not act or act.get("steps") is not None:
         return
     leftover = c.pop("_trace_open", None)
     if leftover and leftover is not act and not leftover.get("_closed"):
@@ -104,12 +104,15 @@ def close(c, world, outcome, reason=None):
 def _write(c, world, act, outcome, reason):
     act["_closed"] = True
     tick = world.get("tick", 0)
-    started = act.get("started_tick", act.get("phase_started_tick", tick))
+    first = (act.get("timeline") or [{}])[0].get("tick")
+    started = act.get("started_tick", first if first is not None else act.get("phase_started_tick", tick))
     if outcome == "completed":
         step_done(act, world, "walk")
         step_done(act, world, "use")
         step_done(act, world, "finish")
-    note(act, world, outcome, reason=reason)
+    timeline = act.get("timeline") or []
+    if not (timeline and timeline[-1]["step"] in (outcome, "ended", "completed", "interrupted")):
+        note(act, world, outcome, reason=reason)           # the event log has usually put it there already
     actual, planned = max(0, tick - started), act.get("duration") or 0
     target = _target_name(world, act)
     label = _label(act)

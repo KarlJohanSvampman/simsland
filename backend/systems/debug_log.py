@@ -150,7 +150,8 @@ def log_activity(c, world, activity_type, event, target_id=None, interaction=Non
                     interaction=interaction, anchor_name=anchor_name, remember=False)
     # What happened goes on the activity's own timeline; the whole activity is remembered once when it ends.
     from systems.activity_trace import note
-    note(c.get("activity"), world, event, reason=reason)
+    if event != "started":                      # begin() has already written that one, with the plan
+        note(c.get("activity"), world, event, reason=reason)
 
 
 def log_reaction(c, world, reaction_type, detail=""):

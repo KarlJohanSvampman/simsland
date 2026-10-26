@@ -415,10 +415,10 @@ def _on_activity_started(data, world):
     c = world.get("characters", {}).get(data.get("character_id"))
     if c:
         act = c.get("activity") or {}
-        log_activity(c, world, data.get("activity_type", "?"), "started", target_id=data.get("target_id"),
-                    interaction=act.get("interaction"), anchor_name=act.get("anchor_name"))
         from systems.activity_trace import begin
         begin(c, world)
+        log_activity(c, world, data.get("activity_type", "?"), "started", target_id=data.get("target_id"),
+                    interaction=act.get("interaction"), anchor_name=act.get("anchor_name"))
         # A character stuck repeating the same activity notices and breaks out
         # (systems/loop_guard.py).
         try:
