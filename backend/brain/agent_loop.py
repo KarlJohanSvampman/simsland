@@ -1111,6 +1111,13 @@ def update_agent(
         if blocked_urgent and intention.get("category") in ("chores", "leisure", "identity"):
             continue
 
+        # Feeding or reminding a child: done directly (systems/child_care.py::tend_child), not left to the model's choice
+        if intention.get("child_id") and str(intention.get("type", "")).startswith(("feed_child_", "remind_child_")):
+            from systems.child_care import tend_child
+            if tend_child(c, world, intention):
+                return
+            continue
+
         activity_type = resolve_strategy(
             c,
             world,

@@ -273,7 +273,7 @@ def add_intention(
     # what actually escalates one whose deadline has passed.
     if not str(intention.get("type", "")).startswith("expectation:"):
         if existing is not None:
-            for field in ("_seq", "stage", "deadline_tick"):
+            for field in ("_seq", "stage", "deadline_tick", "checkins", "doing_at_checkin"):
                 if field in existing and field not in intention:
                     intention[field] = existing[field]
         if "_seq" not in intention:
@@ -353,6 +353,22 @@ def check_intention_deadlines(c, world):
         i["stage"] = min(INTENTION_MAX_STAGE, i.get("stage", 0) + 1)
         i["priority"] = min(100, i.get("priority", 0) + INTENTION_PRIORITY_ESCALATION)
         i["deadline_tick"] = tick + _deadline_window(i, c)
+        record_checkin(c, world, i)
+
+
+CHECKINS_KEPT = 5
+
+
+def record_checkin(c, world, intention):
+    """Each time an unanswered intention is checked in on (its deadline passing and it getting more urgent), note what the
+    character was actually doing at that moment: `doing_at_checkin` is the latest, `checkins` the last few. The prompt turns
+    that into the question "why am I not doing this right now? what could be more important?"."""
+    from systems.doing import describe_doing
+    doing = describe_doing(c, world)
+    intention["doing_at_checkin"] = doing
+    log = intention.setdefault("checkins", [])
+    log.append({"tick": world.get("tick", 0), "stage": intention.get("stage", 0), "doing": doing})
+    del log[:-CHECKINS_KEPT]
 
 # =========================================================
 # DECAY

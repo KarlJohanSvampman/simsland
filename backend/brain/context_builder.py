@@ -1833,6 +1833,59 @@ def _sec_intentions(c, world):
     return line
 
 
+# What an intention is, as a thing to do and as a thing one could be doing right now, for the "why am I not ...?" question.
+_INTENTION_PHRASES = {
+    "feed_child": ("feed {child}", "feeding {child}"),
+    "remind_child": ("remind {child} about something", "reminding {child}"),
+    "check_on_child": ("check on {child}", "checking on {child}"),
+    "eat_food": ("eat something", "eating"),
+    "drink": ("get something to drink", "getting a drink"),
+    "sleep": ("go to bed", "going to bed"),
+    "take_nap": ("take a nap", "napping"),
+    "use_toilet": ("use the bathroom", "using the bathroom"),
+    "take_shower": ("take a shower", "showering"),
+    "brush_teeth": ("brush your teeth", "brushing your teeth"),
+}
+PRESSING_SHOWN = 2
+
+
+def _intention_phrases(i, world):
+    t = str(i.get("type", ""))
+    for prefix, (inf, ger) in _INTENTION_PHRASES.items():
+        if t == prefix or t.startswith(prefix + "_"):
+            child = (world.get("characters", {}).get(i.get("child_id")) or {}).get("name", "the child")
+            return inf.format(child=child), ger.format(child=child)
+    reason = str(i.get("reason") or "").strip().rstrip(".")
+    return (reason or t.replace("_", " ")), "doing something about it"
+
+
+def _sec_pressing_intentions(c, world):
+    """An intention that has gone unanswered past a check-in (it got more urgent) says what the character was doing at that
+    moment, and the character is asked to account for it: why am I not doing this right now, what could be more important,
+    what is the problem? (brain/intentions.py::record_checkin). Survival/health/child-care intentions and anything that has
+    escalated twice; the two most pressing only, to keep the prompt short."""
+    tick = world.get("tick", 0)
+    pressing = [i for i in c.get("active_intentions", [])
+                if i.get("stage", 0) >= 1 and not str(i.get("type", "")).startswith("expectation:")
+                and (i.get("category") in ("survival", "health") or i.get("child_id") or i.get("stage", 0) >= 2)]
+    if not pressing:
+        return None
+    pressing.sort(key=lambda i: (-i.get("stage", 0), -i.get("priority", 0)))
+    lines = []
+    for i in pressing[:PRESSING_SHOWN]:
+        infinitive, gerund = _intention_phrases(i, world)
+        minutes = max(1, int((tick - i.get("created_at", tick)) / 60))
+        doing = i.get("doing_at_checkin")
+        line = f"You have been meaning to {infinitive} for {minutes} minutes and it keeps getting more pressing."
+        if doing:
+            line += f" The last time you checked in on it you were {doing}."
+        line += f" Ask yourself: why am I not {gerund} right now? What could be more important than this, and what is actually in the way?"
+        if i.get("stage", 0) >= 2:
+            line += " This cannot wait any longer."
+        lines.append(line)
+    return lines
+
+
 def _sec_examine_reminder(c, world):
     """Only shown outside full re-orientation mode -- the explicit,
     one-sentence reason it's safe to trim the default context down to
@@ -2340,6 +2393,7 @@ NARRATIVE_SECTIONS = [
     ("health",                "core", _sec_health),
     ("bedroom",               "full", _sec_bedroom),
     ("intentions",            "core", _sec_intentions),
+    ("pressing_intentions",   "core", _sec_pressing_intentions),
     ("turn_budget",           "core", _sec_turn_budget),
     ("examine_reminder",      "core", _sec_examine_reminder),
     ("relationships",         "full", _sec_relationships),

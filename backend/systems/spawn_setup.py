@@ -70,6 +70,8 @@ def settle_new_character(world, c):
     if household:
         from systems.household_beds import ensure_household_beds
         done["beds_added"] = ensure_household_beds(world, household)
+        from systems.household_pantry import stock_pantry
+        done["food_added"] = stock_pantry(world, household)
 
     c["schedule"] = generate_week_schedule(c, world)
     adjust_for_household(c, world)

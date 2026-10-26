@@ -172,6 +172,50 @@ def _check_child_room_mess(c, parents, world):
         break
 
 
+TENDED_PREFIXES = ("feed_child_", "remind_child_")
+
+
+def _drop_for_parents(world, child, intention_type):
+    chars = world.get("characters", {})
+    household = (world.get("households") or {}).get(child.get("household_id")) or {}
+    for mid in household.get("members", []):
+        p = chars.get(mid)
+        if p and p.get("active_intentions"):
+            p["active_intentions"] = [i for i in p["active_intentions"] if i.get("type") != intention_type]
+
+
+def tend_child(c, world, intention):
+    """A parent's feed-the-child / remind-the-child intention acted on directly, with no model in the loop: these are about the
+    most pressing things a household has, and left to the model's choice among dozens of intentions they waited minutes or
+    hours (or for ever, when the model server was slow). Called from the agent loop for a parent with nothing in progress.
+    Returns True if the parent did it. The child must be on the grid in the same building; a stale intention (the need has gone)
+    is dropped from every parent."""
+    t = str(intention.get("type", ""))
+    child_id = intention.get("child_id")
+    child = world.get("characters", {}).get(child_id)
+    if not child or child.get("alive") is False:
+        c["active_intentions"] = [i for i in c.get("active_intentions", []) if i is not intention]
+        return False
+    feeding = t.startswith("feed_child_")
+    if (feeding and not child.get("_awaiting_caregiver")) or (not feeding and not child.get("_awaiting_reminder")):
+        _drop_for_parents(world, child, t)                     # somebody already saw to it
+        return False
+    if c.get("off_grid") or child.get("off_grid") or not c.get("building_id") or c.get("building_id") != child.get("building_id"):
+        return False
+    from systems.action_router import _route_feed_child, _route_remind_child
+    action = {"type": "feed_child" if feeding else "remind_child", "target_id": child_id}
+    (_route_feed_child if feeding else _route_remind_child)(c, world, action)
+    _drop_for_parents(world, child, t)
+    try:
+        from brain.memory import store_memory
+        what = "fed" if feeding else "reminded"
+        store_memory(c, f"I {what} {child.get('name', 'the child')}.", importance=0.3, tags=["child_care"],
+                     people=[child_id], tick=world.get("tick", 0), source="internal")
+    except Exception:
+        pass
+    return True
+
+
 def tick_child_needs(world):
     """Called on a moderate cadence (see CADENCE["child_care"]). For every
     age_group=="child" character, checks body needs against

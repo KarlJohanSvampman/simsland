@@ -1,4 +1,5 @@
 import json
+import os
 import difflib
 import re
 
@@ -1007,6 +1008,9 @@ def _to_legacy_decision(envelope, char_id=None):
     return decision
 
 
+DECISION_MAX_TOKENS = int(os.getenv("DECISION_MAX_TOKENS", "220"))
+
+
 def think(
 
     context,
@@ -1064,7 +1068,7 @@ def think(
     # manual /debug/prompt-send tool, never by real gameplay decisions.
     from llm.llm_gate import PRIORITY_NORMAL
     raw = run_llm_call(
-        call_llm_safe(messages, char_id=char_id),
+        call_llm_safe(messages, char_id=char_id, max_tokens=DECISION_MAX_TOKENS),
         priority=PRIORITY_NORMAL if priority is None else priority,
     )
 

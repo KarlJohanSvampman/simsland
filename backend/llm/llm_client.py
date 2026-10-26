@@ -106,7 +106,9 @@ async def _call_llm(
 
     messages,
 
-    timeout=60.0
+    timeout=60.0,
+
+    max_tokens=None
 ):
 
     base = os.getenv(
@@ -155,7 +157,11 @@ async def _call_llm(
 
                 "options": {
 
-                    "num_ctx": num_ctx
+                    "num_ctx": num_ctx,
+
+                    # a cap on the reply, when the caller wants one (the decision reply is a few short lines; on a slow
+                    # server every token it is left to ramble on for is seconds of waiting)
+                    **({"num_predict": int(max_tokens)} if max_tokens else {})
                 }
             }
         )
@@ -187,7 +193,9 @@ async def call_llm_safe(
 
     session=None,
 
-    char_id=None
+    char_id=None,
+
+    max_tokens=None
 ):
 
     try:
@@ -200,7 +208,9 @@ async def call_llm_safe(
 
                 session=session,
 
-                char_id=char_id
+                char_id=char_id,
+
+                max_tokens=max_tokens
             ),
 
             # Ollama cold-starts a model on its first call after being idle
@@ -234,7 +244,9 @@ async def call_llm(
 
     session=None,
 
-    char_id=None
+    char_id=None,
+
+    max_tokens=None
 ):
 
     # =====================================================
@@ -302,7 +314,9 @@ async def call_llm(
 
         full_messages,
 
-        timeout
+        timeout,
+
+        max_tokens
     )
 
     _elapsed = time.time() - _t0

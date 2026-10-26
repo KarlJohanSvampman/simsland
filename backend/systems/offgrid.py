@@ -730,6 +730,9 @@ def _day_key(world):
     return (cal.get("year"), cal.get("month"), cal.get("day"))
 
 
+MEAL_AFTER_AWAY_SECONDS = 3 * 3600      # away at least this long: they ate and drank while out
+MEAL_HUNGER_RELIEF_PER_HOUR = 9.0
+MEAL_MAX_HUNGER_RELIEF = 60.0
 SCHOOL_LATE_WINDOW_MINUTES = 60          # a child can still be sent to school this long after the bell
 SCHOOL_LAST_DEPARTURE_BEFORE_END = 30    # ... but never in the last half hour of the school day
 
@@ -1226,6 +1229,12 @@ def process_return(c, world):
             cost = 0.35 if reason == "school" else 1.0          # a school day tires a child far less than a shift does
             body["fatigue"] = min(100.0, body.get("fatigue", 20.0) + cost * elapsed * (90.0 / (8 * 3600)))
             body["energy"]  = max(0.0,   body.get("energy", 70.0)  - cost * elapsed * (60.0 / (8 * 3600)))
+            # A long stay away (a school day, a work shift, days at a relative's) includes meals and drinks: they do not come
+            # back from a seven-hour school day or an eight-hour shift having eaten nothing since breakfast.
+            if elapsed >= MEAL_AFTER_AWAY_SECONDS:
+                hours_away = elapsed / 3600.0
+                body["hunger"] = max(0.0, body.get("hunger", 20.0) - min(MEAL_MAX_HUNGER_RELIEF, MEAL_HUNGER_RELIEF_PER_HOUR * hours_away))
+                body["hydration"] = min(100.0, body.get("hydration", 80.0) + min(40.0, 6.0 * hours_away))
 
     # (No exchange with anyone is rolled for the trip any more: nothing happens to a character while they are away, what they
     # did is told by the summary object built below -- systems/offgrid_summary.py.)

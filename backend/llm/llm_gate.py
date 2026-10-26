@@ -68,7 +68,9 @@ _TIMEOUT_ERROR = {"error": "timeout: gave up waiting for the LLM gate"}
 # whole world copy, and abandoned decisions piled up until the container ran
 # out of memory. On expiry the call is cancelled (dropped from the queue, or
 # the running request cancelled) and the caller gets the usual {"error": ...}.
-LLM_CALL_MAX_WAIT_SECONDS = float(os.getenv("LLM_CALL_MAX_WAIT_SECONDS", "90"))
+# a character's decision on a modest server takes a minute or more (reading ~1.5k tokens, then writing the reply at a few tokens
+# a second): 90 seconds abandoned most of them, and an abandoned decision is simply asked for again
+LLM_CALL_MAX_WAIT_SECONDS = float(os.getenv("LLM_CALL_MAX_WAIT_SECONDS", "170"))
 
 _loop = asyncio.new_event_loop()
 _counter = itertools.count()

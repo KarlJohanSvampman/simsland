@@ -91,7 +91,7 @@ check("only once a day", not og.school_starting_now(dict(kid, off_grid=False), w
 # ---- the return ---------------------------------------------------------------------------------------------------------------------------
 w["tick"] = kid["return_tick"]
 body_before = dict(kid.get("body") or {})
-kid.setdefault("body", {}).update(fatigue=30.0, energy=70.0)
+kid.setdefault("body", {}).update(fatigue=30.0, energy=70.0, hunger=90.0, hydration=50.0)
 needs = []
 with mock.patch("systems.lt_needs.satisfy_lt_need", lambda c, nid, world, **k: needs.append(nid)), \
         mock.patch("systems.events.maybe_generate_summary_linked_event", lambda c, world: None), \
@@ -102,6 +102,7 @@ story = kid["off_grid_story_arc"][-1]
 check("the day is remembered as a school day, with no private events", "school" in story["tags"] and "private" not in story, str(story))
 check("a school day tires them far less than a shift (under 45 of 100)", kid["body"]["fatigue"] - 30.0 < 45, str(kid["body"]["fatigue"]))
 check("it satisfies the need to learn", needs == ["learning"], str(needs))
+check("they ate during the day: hungry in the morning, not starving by the afternoon", kid["body"].get("hunger", 100) <= 90 - 40, str(kid["body"].get("hunger")))
 
 # ---- in the simulation ----------------------------------------------------------------------------------------------------------------------
 from tests import determinism
