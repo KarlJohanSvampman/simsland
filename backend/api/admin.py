@@ -297,6 +297,25 @@ def reset_characters(sim_id: str = DEFAULT_SIM_ID):
     return {"ok": True}
 
 
+@router.post("/settle_characters")
+@command("admin.settle_characters")
+def settle_characters(payload: dict = None, sim_id: str = DEFAULT_SIM_ID):
+    """Run the spawn-time settling (systems/spawn_setup.py: placement, a fresh schedule, the body clock for the time of day,
+    bedtime) on characters already in the world. payload: {"character_ids": [...]} (default: everyone who is not a workplace
+    NPC). Returns what was done for each."""
+    ids = (payload or {}).get("character_ids")
+    with world_lock():
+        world = load_world(sim_id)
+        from systems.spawn_setup import settle_new_character
+        out = {}
+        for cid, c in world.get("characters", {}).items():
+            if (ids and cid not in ids) or c.get("is_workplace_npc"):
+                continue
+            out[cid] = settle_new_character(world, c)
+        save_world(sim_id, world)
+    return {"ok": True, "settled": out}
+
+
 @router.post("/add_building")
 @command("admin.add_building")
 def add_building(payload: dict, sim_id: str = DEFAULT_SIM_ID):

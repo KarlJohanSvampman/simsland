@@ -817,6 +817,12 @@ def maybe_go_offgrid(c, world):
     if (c.get("activity") or {}).get("type") == "sleep":
         return
 
+    # Nor out for the evening when it is bedtime before a work or school day (systems/bedtime.py): a leisure outing or a
+    # driving lesson at one in the morning. (A work shift is daytime, so this never blocks the dispatch of one.)
+    from systems.bedtime import wants_bed
+    if wants_bed(c, world):
+        return
+
     if c.get("off_grid") or c.get("conversation"):
         return
 

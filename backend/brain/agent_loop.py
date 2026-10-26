@@ -945,6 +945,8 @@ def update_agent(
         # or sleeping itself -- consistent with "only pee/being woken/
         # noise interrupts sleep" from the bathroom-urgency branch below).
         _PROTECTED_FOR_WORK = ("sleep", "use_toilet", "use_toilet_bowels", "eat")
+        _KEPT_AT_BEDTIME = _PROTECTED_FOR_WORK + ("take_shower", "take_bath", "brush_teeth", "wash_hands", "vomit", "nap", "take_nap")
+        from systems.bedtime import wants_bed
         from systems.offgrid import _work_block_starting_now
         work_starting = c.get("employed") and _work_block_starting_now(c, world)
 
@@ -1018,6 +1020,14 @@ def update_agent(
             from systems.occupancy import interrupt_activity
             interrupt_activity(c, world)
             start_activity(c, world, "use_toilet")
+        elif (act_type not in _KEPT_AT_BEDTIME and world.get("tick", 0) - c.get("_bedtime_interrupt_tick", -10 ** 9) >= 600
+              and wants_bed(c, world)):
+            # Bedtime before a work or school day (systems/bedtime.py) outranks whatever discretionary thing is running
+            # -- an 8-hour "work" session at home at 1 a.m. -- so the "bedtime" sleep intention gets its turn. At most once
+            # every 10 minutes, so a different activity that wins instead is not cut short again and again.
+            c["_bedtime_interrupt_tick"] = world.get("tick", 0)
+            from systems.occupancy import interrupt_activity
+            interrupt_activity(c, world)
         elif work_starting and act_type not in _PROTECTED_FOR_WORK:
             c.pop("_last_work_miss_reason", None)
             from systems.occupancy import interrupt_activity

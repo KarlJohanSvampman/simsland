@@ -145,6 +145,19 @@ def generate_body_intentions(c, world=None):
                 "reason":   "very_tired"
             })
 
+    # ── BEDTIME ──────────────────────────────────────────────────────────────
+    # A night before a work day (or a school day, for a child): go to bed whatever the fatigue meter says -- it takes ~36h
+    # awake to reach "very tired", so without this nobody who was not already worn out ever went to bed (systems/bedtime.py).
+    if world is not None and not any(i.get("type") == "sleep" for i in c.get("active_intentions", [])):
+        from systems.bedtime import wants_bed
+        if wants_bed(c, world):
+            add_intention(c, {
+                "type":     "sleep",
+                "category": "survival",
+                "priority": 72,
+                "reason":   "bedtime",
+            })
+
     # Sleep debt makes them want a nap even when not fully fatigued
     if sleep_debt > 50 and fatigue > 55:
         add_intention(c, {
