@@ -91,7 +91,31 @@ def would_leave_children_alone(c, world):
     return not any((m.get("age") or 0) >= 18 and not m.get("off_grid") and not m.get("temporary_residence") for m in members)
 
 
-def begin_temporary_separation(c, world, reason="argument"):
+def _name(world, cid):
+    return ((world.get("characters") or {}).get(cid) or {}).get("name", "someone")
+
+
+OUTCOME_WORDS = {"storm_off": "ended with somebody storming off", "cold_shoulder": "ended in a cold silence",
+                 "physical_resolved": "got physical", "suppressed": "was swallowed and left to fester"}
+
+
+def explain(world, c, cause, host=None, is_family=None):
+    """Plain words for why they went and where: {"why", "where", "with_ids"} (shown on the inspector and told in the summary)."""
+    cause = cause or {}
+    with_ids = [i for i in cause.get("with_ids", []) if i != c["id"]]
+    names = ", ".join(_name(world, i) for i in with_ids)
+    if names:
+        why = f"a fight with {names}" + (f" that {OUTCOME_WORDS[cause['outcome']]}" if cause.get("outcome") in OUTCOME_WORDS else "")
+    else:
+        why = "an argument at home"
+    if host is not None:
+        where = f"with {host.get('name', 'someone')} ({'family' if is_family else 'a close friend'})"
+    else:
+        where = "with family or friends somewhere else"
+    return {"kind": "temporary_separation", "why": why, "where": where, "with_ids": with_ids}
+
+
+def begin_temporary_separation(c, world, reason="argument", cause=None):
     """Called after a bad conflict outcome. Returns True if the character
     actually moved out (on-grid or off-grid), False if nothing happened
     (e.g. already off-grid, already separated, a child, or the only grown-up at home with a young child)."""
@@ -112,6 +136,7 @@ def begin_temporary_separation(c, world, reason="argument"):
                 "started_tick": world.get("tick", 0),
             }
             c["building_id"] = host_household["home_id"]
+            c["temporary_residence"].update(explain(world, c, cause, other, is_family))
             tag_dramatic_memory(
                 c, world,
                 f"Things got so bad at home that I'm staying with {other.get('name', 'them')} for a while.",
@@ -121,10 +146,13 @@ def begin_temporary_separation(c, world, reason="argument"):
 
     # Fallback: an abstracted off-grid stay with family/friends elsewhere.
     from systems.offgrid import send_offgrid
-    send_offgrid(c, world, "temporary_separation", OFFGRID_SEPARATION_DAYS * 24 * 60)
+    host_person = found[0] if found else None
+    detail = explain(world, c, cause, host_person, found[2] if found else None)
+    if send_offgrid(c, world, "temporary_separation", OFFGRID_SEPARATION_DAYS * 24 * 60):
+        c["off_grid_detail"] = dict(detail, started_tick=world.get("tick", 0))
     tag_dramatic_memory(
         c, world,
-        "Needed to get away for a few days after everything that happened at home.",
+        f"Needed to get away for a few days after {detail['why']}.",
         importance=0.7,
     )
     return True

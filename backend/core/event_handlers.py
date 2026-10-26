@@ -219,7 +219,8 @@ def _on_conflict_resolved(data, world):
     if outcome in _BAD_CONFLICT_OUTCOMES:
         for c in parties:
             if random.random() < 0.35:
-                begin_temporary_separation(c, world, reason="conflict")
+                begin_temporary_separation(c, world, reason="conflict",
+                                           cause={"with_ids": [p["id"] for p in parties if p["id"] != c["id"]], "outcome": outcome})
 
 subscribe("conflict_resolved", _on_conflict_resolved)
 

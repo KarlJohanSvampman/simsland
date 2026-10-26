@@ -327,6 +327,8 @@ def resolve(world):
             loc = r["location"]
             if r["type"] == "police":
                 for c in world["characters"].values():
+                    if c.get("x") is None or c.get("y") is None:       # workplace NPCs have no position
+                        continue
                     if abs(c["x"] - loc["x"]) + abs(c["y"] - loc["y"]) < 4:
                         c["emotional_temperature"] = max(0, c.get("emotional_temperature", 20) - 20)
             elif r["type"] == "medical":

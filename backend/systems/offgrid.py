@@ -730,6 +730,7 @@ def _day_key(world):
     return (cal.get("year"), cal.get("month"), cal.get("day"))
 
 
+FATIGUE_FREE_AFTER_AWAY_SECONDS = 14 * 3600
 MEAL_AFTER_AWAY_SECONDS = 3 * 3600      # away at least this long: they ate and drank while out
 MEAL_HUNGER_RELIEF_PER_HOUR = 9.0
 MEAL_MAX_HUNGER_RELIEF = 60.0
@@ -795,6 +796,19 @@ def school_run_pending(c, world):
         if start - 120 <= now_minute < start + SCHOOL_LATE_WINDOW_MINUTES:
             return True
     return False
+
+
+def _separation_story(c, world, elapsed):
+    detail = c.get("off_grid_detail") or {}
+    days = max(1, round(elapsed / 86400.0)) if elapsed else 0
+    spent = f"{days} day{'s' if days != 1 else ''}" if days else "a while"
+    why = detail.get("why") or "everything that had happened at home"
+    where = detail.get("where") or "with family or friends somewhere else"
+    return {
+        "id": f"story_{uuid.uuid4().hex[:6]}",
+        "summary": f"{c['name']} stayed away from home for {spent}, {where}, after {why}.",
+        "emotion": "sad", "impact": {"stress": -4, "temp": 0}, "tags": ["temporary_separation"],
+    }
 
 
 def _school_story(c, world):
@@ -1227,6 +1241,8 @@ def process_return(c, world):
         if elapsed:
             body = c.setdefault("body", {})
             cost = 0.35 if reason == "school" else 1.0          # a school day tires a child far less than a shift does
+            if elapsed > FATIGUE_FREE_AFTER_AWAY_SECONDS:
+                cost = 0.0                                      # days away (at a relative's...) were spent resting, not working
             body["fatigue"] = min(100.0, body.get("fatigue", 20.0) + cost * elapsed * (90.0 / (8 * 3600)))
             body["energy"]  = max(0.0,   body.get("energy", 70.0)  - cost * elapsed * (60.0 / (8 * 3600)))
             # A long stay away (a school day, a work shift, days at a relative's) includes meals and drinks: they do not come
@@ -1252,6 +1268,8 @@ def process_return(c, world):
     private_events = []
     if reason == "school":
         story = _school_story(c, world)           # no private events, no cover stories for a child's school day
+    elif reason == "temporary_separation":
+        story = _separation_story(c, world, (world["tick"] - departed) if departed is not None else 0)
     elif reason in _NARRATOR_CATEGORIES or is_event:
         if reason == "jail":
             # law.py::process_jail() only checks jail_until on a cadence
@@ -1326,6 +1344,7 @@ def process_return(c, world):
                     ev["lie_id"] = _seed_lie_for_private_event(c, world, ev)
 
     c["off_grid"]        = False
+    c.pop("off_grid_detail", None)
     c["off_grid_reason"] = None
     c["return_tick"]     = None
     c.setdefault("off_grid_story_arc", []).append(story)

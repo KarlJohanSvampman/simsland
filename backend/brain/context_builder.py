@@ -1859,6 +1859,22 @@ def _intention_phrases(i, world):
     return (reason or t.replace("_", " ")), "doing something about it"
 
 
+def _sec_exhaustion(c, world):
+    from systems.exhaustion import context_lines
+    return context_lines(c, world)
+
+
+def _sec_glimpsed(c, world):
+    """People too far to recognise but still made out (brain/perception.py::perceive_glimpsed) -- never named."""
+    glimpsed = (c.get("perception") or {}).get("glimpsed") or []
+    if not glimpsed:
+        return None
+    lines = ["Further off you can make out:"]
+    for e in glimpsed[:4]:
+        lines.append(f"- {e['what']}, about {e['distance_m']} m to the {e['direction']} (too far to tell who)")
+    return lines
+
+
 def _sec_pressing_intentions(c, world):
     """An intention that has gone unanswered past a check-in (it got more urgent) says what the character was doing at that
     moment, and the character is asked to account for it: why am I not doing this right now, what could be more important,
@@ -2394,6 +2410,8 @@ NARRATIVE_SECTIONS = [
     ("bedroom",               "full", _sec_bedroom),
     ("intentions",            "core", _sec_intentions),
     ("pressing_intentions",   "core", _sec_pressing_intentions),
+    ("exhaustion",            "core", _sec_exhaustion),
+    ("glimpsed",              "full", _sec_glimpsed),
     ("turn_budget",           "core", _sec_turn_budget),
     ("examine_reminder",      "core", _sec_examine_reminder),
     ("relationships",         "full", _sec_relationships),

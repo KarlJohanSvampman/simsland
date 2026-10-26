@@ -39,7 +39,6 @@ OUTBURST_THRESHOLD    = 0.75    # base boilover point
 ANGER_DECAY_PER_TICK  = 0.00008 # slow natural decay
 ANGER_DECAY_FAST      = 0.00020 # hot_tempered — spikes fast, cools faster
 OUTBURST_COOLDOWN     = 60 * 60 * 6   # 6 game hours between outbursts (ticks)
-OUTBURST_REACH        = 6             # tiles: an outburst can only land on someone this close (or in the same room)
 SELF_CONTROL_BASE     = 0.50
 
 
@@ -149,17 +148,23 @@ def tick_impulse(world):
         _trigger_outburst(c, imp, threshold, world)
 
 
-def within_reach(actor, other):
-    """Can `actor` physically get at `other` right now: both on the grid, and in the same room or within OUTBURST_REACH tiles.
-    An outburst used to pick the most resented person anywhere in the world and assault them from across town (or while
-    the actor was off-grid at the gym), with the arrest, the 911 call and the guilt following."""
+def within_reach(actor, other, world):
+    """Can `actor` get at `other` right now: both on the grid, the actor able to see, and the other in the same room or in the
+    same building (or both outdoors) within the actor's own vision -- the distance at which they can tell who it is
+    (systems/vision.py: Normal, Exceptional, Impaired, indoors and at night shortened). An outburst used to pick the most
+    resented person anywhere in the world and assault them from across town (or while the actor was off-grid at the gym),
+    with the arrest, the 911 call and the guilt following."""
     if actor.get("off_grid") or other.get("off_grid") or other.get("is_workplace_npc"):
         return False
+    from systems.vision import distance_tiles, recognize_tiles
+    reach = recognize_tiles(actor, world)
+    if reach <= 0:
+        return False                                             # blind
     if actor.get("room_id") and actor.get("room_id") == other.get("room_id"):
         return True
     if actor.get("building_id") != other.get("building_id"):
         return False
-    return abs(actor.get("x", 0) - other.get("x", 0)) + abs(actor.get("y", 0) - other.get("y", 0)) <= OUTBURST_REACH
+    return distance_tiles(actor, other) <= reach
 
 
 # ── Internal ──────────────────────────────────────────────────────────────
@@ -179,7 +184,7 @@ def _trigger_outburst(c, imp, threshold, world):
     try:
         from systems.domestic_control import get_domestic_target
         override = get_domestic_target(c, chars)
-        if override and override in chars and within_reach(c, chars[override]):
+        if override and override in chars and within_reach(c, chars[override], world):
             target = chars[override]
             _apply_outburst_consequences(c, target, "assault", world)
             imp["anger_pressure"] = round(imp["anger_pressure"] * 0.45, 4)
@@ -198,7 +203,7 @@ def _trigger_outburst(c, imp, threshold, world):
     best_target_id = None
     best_score     = 0.0
     for oid, rel in c.get("relationships", {}).items():
-        if oid not in chars or not within_reach(c, chars[oid]):
+        if oid not in chars or not within_reach(c, chars[oid], world):
             continue
         score = get_grievance_score(c, oid)
         # Weight by resentment too

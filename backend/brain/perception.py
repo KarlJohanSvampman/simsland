@@ -24,9 +24,8 @@ def manhattan(a, b):
 # is for personality traits (c["traits"]), a different purpose from
 # sense-related physical traits (c["physical_traits"]).
 
+# (Sight is no longer a trait multiplier: poor_eyesight / keen_eyesight now set a character's Vision level, see systems/vision.py.)
 SENSE_TRAIT_MODIFIERS = {
-    "poor_eyesight":  {"vision": 0.6},
-    "keen_eyesight":  {"vision": 1.3},
     "poor_hearing":   {"hearing": 0.6},
     "keen_hearing":   {"hearing": 1.3},
 }
@@ -65,22 +64,17 @@ def _is_night(world):
 # =========================================================
 
 def visual_range(c, world):
+    """Tiles at which this character can still tell who someone is: their Vision level's recognition distance
+    (systems/vision.py), shortened indoors and at night."""
+    from systems.vision import recognize_tiles
+    return recognize_tiles(c, world)
 
-    # c.get("inside") is never written anywhere in this codebase — always
-    # falsy, so this branch never fired and every character got the
-    # outdoor range regardless of actually being indoors. building_id is
-    # the one live-maintained spatial field (movement.py, room_assignment.py).
-    indoors = bool(c.get("building_id"))
 
-    base = 8 if indoors else 14
-
-    if _is_night(world):
-        # No lighting/lamp-state system exists to model per-room darkness,
-        # so this is a flat reduction rather than lit/unlit per room — a
-        # deliberate simplification, not a hidden gap.
-        base *= 0.55 if indoors else 0.35
-
-    return base * _sense_modifier(c, "vision")
+def detection_range(c, world):
+    """Tiles at which they can still make out that somebody is there (twice the recognition range by default), with
+    less detail the further it is."""
+    from systems.vision import detect_tiles
+    return detect_tiles(c, world)
 
 
 # =========================================================
@@ -503,22 +497,11 @@ def visibility_score(
     world
 ):
 
-    d = manhattan(
-        c,
-        other
-    )
+    from systems.vision import distance_tiles
+    d = distance_tiles(c, other)
 
-    base = max(
-
-        0,
-
-        1 - (
-            d / visual_range(
-                c,
-                world
-            )
-        )
-    )
+    rng = visual_range(c, world)
+    base = max(0, 1 - (d / rng)) if rng > 0 else 0
 
     if other.get(
         "current_speech"
@@ -602,10 +585,8 @@ def perceive_people(
         ):
             continue
 
-        d = manhattan(
-            c,
-            other
-        )
+        from systems.vision import distance_tiles
+        d = distance_tiles(c, other)
 
         if d > vrange:
             continue
@@ -1013,6 +994,9 @@ def perceive_props(
 
     results = []
 
+    from systems.exhaustion import attention_factor
+    max_props = max(4, int(max_props * attention_factor(c, world)))      # worn out: fewer things noticed
+
     vrange = visual_range(
         c,
         world
@@ -1025,11 +1009,8 @@ def perceive_props(
         []
     ):
 
-        d = abs(
-            p["x"] - c["x"]
-        ) + abs(
-            p["y"] - c["y"]
-        )
+        from systems.vision import distance_tiles
+        d = distance_tiles(p, c)
 
         if d > vrange:
             continue
@@ -1220,10 +1201,8 @@ def perceive_social_scenes(
                 p.get("name")
             )
 
-            d = manhattan(
-                c,
-                p
-            )
+            from systems.vision import distance_tiles
+            d = distance_tiles(c, p)
 
             if d <= visual_range(
                 c,
@@ -1359,6 +1338,60 @@ def select_focus(
 # MAIN PERCEPTION
 # =========================================================
 
+_COMPASS = ("east", "south-east", "south", "south-west", "west", "north-west", "north", "north-east")
+
+
+def _kind_of_person(other):
+    age = other.get("age")
+    if age is not None and age < 13:
+        return "a child"
+    if age is not None and age < 18:
+        return "a teenager"
+    sex = other.get("sex")
+    return "a woman" if sex == "female" else ("a man" if sex == "male" else "a person")
+
+
+def _coarse_doing(other):
+    act = (other.get("activity") or {}).get("type")
+    if other.get("is_moving") or act in ("roam", "jog", "walk"):
+        return "moving about"
+    if act in ("sit_down_seat", "relax", "watch_tv", "read"):
+        return "sitting"
+    return "standing there"
+
+
+def perceive_glimpsed(c, world, max_people=5):
+    """People too far to recognise but near enough to make out at all (systems/vision.py). Never named: a nearer figure
+    is a man, a woman, a child, and roughly what they are doing; a farther one is only a shape that looks like a person.
+    The nearest first."""
+    from systems.vision import distance_tiles, detail_tier, settings as vision_settings
+    recognize, detect = visual_range(c, world), detection_range(c, world)
+    if detect <= 0:
+        return []
+    meters = vision_settings(world)["tile_meters"]
+    out = []
+    for other in world.get("characters", {}).values():
+        if other["id"] == c["id"] or other.get("off_grid") or other.get("is_workplace_npc"):
+            continue
+        d = distance_tiles(c, other)
+        tier = detail_tier(d, recognize, detect)
+        if tier not in ("figure", "silhouette"):
+            continue
+        if not line_of_sight(c, other, world):
+            continue
+        angle = math.atan2(other.get("y", 0) - c.get("y", 0), other.get("x", 0) - c.get("x", 0))
+        direction = _COMPASS[int(round(angle / (math.pi / 4))) % 8]
+        if tier == "figure":
+            what = f"{_kind_of_person(other)}, {_coarse_doing(other)}"
+        else:
+            what = "a shape that looks like a person"
+        out.append({"tier": tier, "distance_m": round(d * meters), "direction": direction, "what": what, "_d": d})
+    out.sort(key=lambda e: e["_d"])
+    for e in out:
+        e.pop("_d")
+    return out[:max_people]
+
+
 def perceive(
     c,
     world
@@ -1380,6 +1413,7 @@ def perceive(
     )
 
     visible_people = []
+    glimpsed = [] if is_asleep else perceive_glimpsed(c, world)
 
     for other in perception_people:
 
@@ -1393,6 +1427,8 @@ def perceive(
 
         enriched = dict(other)
 
+        # a worn-out character picks up less of what they look at (systems/exhaustion.py)
+        from systems.exhaustion import attention_factor
         enriched["description"] = (
             systems.perception.descriptions.build_visible_person_description(
                 c,
@@ -1402,6 +1438,7 @@ def perceive(
                     {}
                 )
             )
+            if attention_factor(c, world) >= 0.75 else ""
         )
 
         # Include body snapshot so context_builder can surface odor/breath cues
@@ -1447,6 +1484,9 @@ def perceive(
 
         "visible_people":
             visible_people,
+
+        "glimpsed":
+            glimpsed,
 
         "social_scenes":
             perceive_social_scenes(

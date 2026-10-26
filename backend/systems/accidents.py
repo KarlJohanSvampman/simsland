@@ -25,6 +25,11 @@ def maybe_trigger_cooking_accident(c, world, primitive_key):
     if not possible_accidents:
         return
 
+    # a worn-out cook makes more mistakes: every accident's chance is scaled up (systems/exhaustion.py)
+    from systems.exhaustion import mistake_multiplier
+    mult = mistake_multiplier(c, world)
+    if mult > 1.0:
+        possible_accidents = [dict(a, probability=min(1.0, a.get("probability", 0.0) * mult)) for a in possible_accidents]
     accident_pick = weighted_pick(possible_accidents)
     if not accident_pick:
         return

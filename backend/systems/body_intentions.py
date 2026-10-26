@@ -114,7 +114,20 @@ def generate_body_intentions(c, world=None):
     # always winning outright -- still allowed to happen (collapsing from
     # real exhaustion during the day is realistic), just rarer.
     critical_threshold = 90 if is_night else 95
-    if fatigue > critical_threshold:
+    # While a responsibility is open (a hungry child) fatigue does not put an adult to sleep by day: it shows as strain instead
+    # (systems/exhaustion.py), until somebody takes the responsibility over and they agree to rest.
+    from systems.exhaustion import blocks_daytime_sleep, rest_accepted
+    day_blocked = (not is_night) and world is not None and blocks_daytime_sleep(c, world)
+    if world is not None and rest_accepted(c, world):
+        add_intention(c, {
+            "type":     "sleep",
+            "category": "survival",
+            "priority": 88,
+            "reason":   "rest_accepted",
+        })
+    elif day_blocked:
+        pass
+    elif fatigue > critical_threshold:
         add_intention(c, {
             "type":       "sleep",
             "category":   "survival",
@@ -159,7 +172,7 @@ def generate_body_intentions(c, world=None):
             })
 
     # Sleep debt makes them want a nap even when not fully fatigued
-    if sleep_debt > 50 and fatigue > 55:
+    if sleep_debt > 50 and fatigue > 55 and not day_blocked:
         add_intention(c, {
             "type":     "take_nap",
             "category": "health",

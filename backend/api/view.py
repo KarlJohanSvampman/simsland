@@ -461,8 +461,13 @@ def get_perception_range(
     if not c:
         return {"visual_range": None, "hearing_range": None}
 
+    from brain.perception import detection_range
+    from systems.vision import effective_level, natural_level
     return {
         "visual_range": visual_range(c, world),
+        "detection_range": detection_range(c, world),
+        "vision": natural_level(c),
+        "vision_effective": effective_level(c),
         "hearing_range": hearing_range(c)
     }
 

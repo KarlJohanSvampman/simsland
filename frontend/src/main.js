@@ -3300,10 +3300,11 @@ const PERCEPTION_OVERLAY_CHANNELS = [
 
 let _perceptionRanges = null;         // { visual_range, hearing_range } | null
 let _lastSelectedBuildingId = undefined;
-let perceptionOverlay = { visionRing: null, hearingRing: null, losLines: [] };
+let perceptionOverlay = { visionRing: null, detectRing: null, hearingRing: null, losLines: [] };
 
 const _visionRingMaterial  = new THREE.LineBasicMaterial({ color: 0xf5c518 });
 const _hearingRingMaterial = new THREE.LineBasicMaterial({ color: 0x5ac8fa });
+const _detectRingMaterial  = new THREE.LineBasicMaterial({ color: 0x8a6d0b });   // how far a person can still be made out (not recognised)
 const _losLineMaterial     = new THREE.LineBasicMaterial({ color: 0xff5a5a });
 
 function _buildRingGeometry(cx, cz, radius, segs = 48){
@@ -3372,6 +3373,8 @@ function updatePerceptionOverlay(state){
     _disposeRing(perceptionOverlay.hearingRing);
     _disposeLosLines();
     perceptionOverlay.visionRing = null;
+    _disposeRing(perceptionOverlay.detectRing);
+    perceptionOverlay.detectRing = null;
     perceptionOverlay.hearingRing = null;
     _lastSelectedBuildingId = undefined;
     return;
@@ -3394,6 +3397,8 @@ function updatePerceptionOverlay(state){
     _disposeRing(perceptionOverlay.hearingRing);
     _disposeLosLines();
     perceptionOverlay.visionRing = null;
+    _disposeRing(perceptionOverlay.detectRing);
+    perceptionOverlay.detectRing = null;
     perceptionOverlay.hearingRing = null;
     return;
   }
@@ -3412,10 +3417,17 @@ function updatePerceptionOverlay(state){
 
   _disposeRing(perceptionOverlay.visionRing);
   perceptionOverlay.visionRing = null;
+  _disposeRing(perceptionOverlay.detectRing);
+  perceptionOverlay.detectRing = null;
   if(settings.visionRange && _perceptionRanges.visual_range != null){
     const geom = _buildRingGeometry(cx, cz, _perceptionRanges.visual_range);
     perceptionOverlay.visionRing = new THREE.Line(geom, _visionRingMaterial);
     scene.add(perceptionOverlay.visionRing);
+  }
+  if(settings.visionRange && _perceptionRanges.detection_range > 0){
+    const geom = _buildRingGeometry(cx, cz, _perceptionRanges.detection_range);
+    perceptionOverlay.detectRing = new THREE.Line(geom, _detectRingMaterial);
+    scene.add(perceptionOverlay.detectRing);
   }
 
   _disposeRing(perceptionOverlay.hearingRing);
@@ -3492,7 +3504,10 @@ function renderDebugSettingsModal(){
     ${_renderChannelCheckboxes(BADGE_CHANNELS, _debugSettings.badgeChannels, "badgeChannels")}
     <h4>Perception overlays (selected character only)</h4>
     ${_renderChannelCheckboxes(PERCEPTION_OVERLAY_CHANNELS, _debugSettings.perceptionOverlays, "perceptionOverlays")}
+    <h4>Vision (simulation setting)</h4>
+    <div id="visionSettingsBox" style="font-size:12px">Loading…</div>
   `;
+  loadVisionSettingsBox();
 
   document.getElementById("dbgShowThoughtBubbles").addEventListener("change", (e) => {
     _debugSettings.showThoughtBubbles = e.target.checked;
@@ -3514,6 +3529,54 @@ function renderDebugSettingsModal(){
       _saveDebugSettings();
     });
   });
+}
+
+// Vision settings (systems/vision.py), kept on the server: metres at which a face can still be told, per level.
+const VISION_FIELDS = [
+  ["normal_m", "Normal — face recognised up to (m)"],
+  ["exceptional_m", "Exceptional — face recognised up to (m)"],
+  ["impaired_m", "Impaired (no glasses) — face recognised up to (m)"],
+  ["detect_factor", "Seen at all up to (× the recognition distance)"],
+  ["tile_meters", "Length of one tile (m)"],
+];
+
+async function loadVisionSettingsBox(){
+  const box = document.getElementById("visionSettingsBox");
+  if(!box) return;
+  try{
+    const resp = await fetch("/admin/vision?sim_id=default");
+    if(!resp.ok) throw new Error(resp.status);
+    const data = await resp.json();
+    const s = data.settings || {};
+    const counts = data.characters_by_level || {};
+    box.innerHTML = VISION_FIELDS.map(([key, label]) => `
+      <div class="modal-row" style="gap:8px;align-items:center">
+        <label style="flex:1">${label}</label>
+        <input type="number" step="0.5" min="0" data-vision-key="${key}" value="${s[key]}" style="width:80px" />
+      </div>`).join("") + `
+      <div style="opacity:.65;margin:4px 0">Blind characters see nothing (none are generated; it is a state for accidents and illness). Characters now:
+        ${Object.entries(counts).map(([k, n]) => `${k} ${n}`).join(" · ")}</div>
+      <button id="visionSaveBtn">Save vision settings</button> <span id="visionSaveMsg" style="margin-left:8px"></span>`;
+    document.getElementById("visionSaveBtn").addEventListener("click", saveVisionSettingsBox);
+  } catch(e){
+    box.textContent = "Could not load the vision settings.";
+  }
+}
+
+async function saveVisionSettingsBox(){
+  const msg = document.getElementById("visionSaveMsg");
+  const body = {};
+  document.querySelectorAll("#visionSettingsBox input[data-vision-key]").forEach(i => { body[i.dataset.visionKey] = Number(i.value); });
+  try{
+    const resp = await fetch("/admin/vision?sim_id=default", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    const data = await resp.json();
+    msg.textContent = resp.ok ? "Saved." : (data.error || "Not saved.");
+    msg.style.color = resp.ok ? "#7c7" : "#f77";
+    if(resp.ok && selectedCharacterId) fetchPerceptionRanges(selectedCharacterId);
+  } catch(e){
+    msg.textContent = "Not saved.";
+    msg.style.color = "#f77";
+  }
 }
 
 function openDebugSettingsModal(){
@@ -4892,10 +4955,16 @@ function renderCharacterInspector(id){
   }
 
   if(c.emotion) rows.push(`Mood: ${c.emotion}`);
+  if(c.vision){
+    const glasses = c.glasses?.owned ? " (with glasses)" : (c.vision === "impaired" ? " (no glasses)" : "");
+    rows.push(`<span style="opacity:.8">Vision: ${c.vision}${glasses}</span>`);
+  }
 
   if(c.off_grid){
     const backIn = _offgridBackIn(c, _worldState.tick);
     rows.push(`<span style="color:#fc6">Off-grid: ${(c.off_grid_reason || "?").replace(/_/g, " ")} — back ${backIn}</span>`);
+    const det = c.off_grid_detail;
+    if(det && (det.why || det.where)) rows.push(`<span style="color:#fc6;opacity:.85">&nbsp;&nbsp;${_escapeHTML(det.where || "")}${det.why ? ` — after ${_escapeHTML(det.why)}` : ""}</span>`);
   } else if(c.travel_state){
     // Human-readable gloss per systems/travel.py + systems/transit.py's
     // state machine.
@@ -8529,7 +8598,11 @@ function _offgridBackIn(c, fallbackTick){
   const tick = _worldState.tick ?? fallbackTick ?? 0;
   const returnTick = live?.return_tick ?? c.return_tick ?? tick;
   const remain = returnTick - tick;
-  return remain > 0 ? `in ~${Math.max(1, Math.round(remain / 60))}m` : "due now";
+  if(remain <= 0) return "due now";
+  const m = Math.max(1, Math.round(remain / 60));
+  if(m < 180) return `in ~${m}m`;
+  const h = Math.round(m / 60);
+  return h < 48 ? `in ~${h} h` : `in ~${Math.floor(h / 24)} d ${h % 24} h`;
 }
 
 function _outlinerStatus(c, tick){

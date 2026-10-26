@@ -135,6 +135,8 @@ CADENCE["neighbours"]       = 600
 CADENCE["kids_play"]        = 600
 # A friend who sees two strangers together may introduce them (systems/introductions.py).
 CADENCE["introductions"]    = 300
+# Strain from fatigue by day, offers to take over, mistakes (systems/exhaustion.py).
+CADENCE["exhaustion"]       = 60
 
 # Socioeconomics — once per simulated day (~24 ticks)
 CADENCE["socioeconomics"]   = 24

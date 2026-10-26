@@ -164,10 +164,11 @@ with mock.patch.object(impulse, "_apply_outburst_consequences", lambda actor, ta
     b["building_id"] = a["building_id"] = "b1"
     impulse.tick_impulse(w)
     check("not someone who is away", not consequences)
+reach_world = world()
 check("reach: same room counts, a few tiles in the same building counts, a different building does not",
-      impulse.within_reach({"room_id": "r", "x": 0, "y": 0}, {"room_id": "r", "x": 30, "y": 0})
-      and impulse.within_reach({"building_id": "b", "x": 0, "y": 0}, {"building_id": "b", "x": 4, "y": 2})
-      and not impulse.within_reach({"building_id": "b", "x": 0, "y": 0}, {"building_id": "c", "x": 0, "y": 1}))
+      impulse.within_reach({"room_id": "r", "x": 0, "y": 0}, {"room_id": "r", "x": 30, "y": 0}, reach_world)
+      and impulse.within_reach({"building_id": "b", "x": 0, "y": 0}, {"building_id": "b", "x": 4, "y": 2}, reach_world)
+      and not impulse.within_reach({"building_id": "b", "x": 0, "y": 0}, {"building_id": "c", "x": 0, "y": 1}, reach_world))
 
 print()
 print("FAILED: " + ", ".join(failures) if failures else "ALL OK")

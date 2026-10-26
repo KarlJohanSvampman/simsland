@@ -525,6 +525,9 @@ def generate_character(defs, overrides=None, world=None):
     held_beliefs    = overrides.get("held_beliefs")        or _random_beliefs(defs, traits, sex=sex, age=age)
     curiosity       = overrides.get("curiosity")           if overrides.get("curiosity") is not None else _seed_curiosity(traits)
     physical_traits = overrides.get("physical_traits")    or _random_physical_traits(defs)
+    from systems.vision import Vision, random_vision, random_glasses
+    vision       = overrides.get("vision") if overrides.get("vision") in Vision.ALL else random_vision(age, physical_traits)
+    glasses      = overrides.get("glasses") or random_glasses(vision)
     hobbies      = overrides.get("hobbies")            or _random_hobbies(defs, age)
     if age < _age_rules.ADULT_AGE or any(not _age_rules.hobby_ok(h, age, (defs.get("hobby_templates") or {}).get(h)) for h in hobbies):
         # whatever the source (random, inherited from a relative, a template), a hobby the age does not allow is dropped
@@ -625,6 +628,8 @@ def generate_character(defs, overrides=None, world=None):
         "online_profile":     online_profile,
         "phone_data_gb_remaining": 0,
         "physical_traits":    physical_traits,
+        "vision":             vision,               # natural level: Vision.NORMAL / EXCEPTIONAL / IMPAIRED / BLIND (systems/vision.py)
+        "glasses":            glasses,              # {"owned": bool}: an impaired character with glasses sees at the normal range
         "hobbies":            hobbies,
         "sexual_orientation": orientation,
         "gender_identity":    "cisgender",

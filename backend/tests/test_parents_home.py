@@ -109,6 +109,23 @@ with mock.patch("systems.expectations.satisfy_expectation", lambda c, eid, world
     og.send_to_school(kid, w)
 check("only the parent who was home is credited with the school run", done == ["p0"], str(done))
 
+# ---- saying why and where -------------------------------------------------------------------------------------------------------------------
+w, (p0, p1, kid) = family(kid_age=16)
+w["characters"]["p1"]["name"] = "Karim Haddad"
+p0["name"] = "Lena Haddad"
+exp = ts.explain(w, p0, {"with_ids": ["p1"], "outcome": "storm_off"})
+check("the explanation names the fight and who it was with", exp["why"] == "a fight with Karim Haddad that ended with somebody storming off", str(exp))
+check("and where, when nobody in particular took them in", exp["where"] == "with family or friends somewhere else")
+host = {"name": "Jane Ross"}
+check("or with whom, when somebody did", ts.explain(w, p0, None, host, True)["where"] == "with Jane Ross (family)" and ts.explain(w, p0, None, host, False)["where"] == "with Jane Ross (a close friend)")
+check("with no known cause, an argument at home", ts.explain(w, p0, None)["why"] == "an argument at home")
+with mock.patch.object(ts, "_find_separation_host", return_value=None), mock.patch("systems.offgrid.send_offgrid", return_value=True):
+    ts.begin_temporary_separation(p0, w, "conflict", cause={"with_ids": ["p1"], "outcome": "cold_shoulder"})
+check("the stay carries its explanation while it lasts", p0["off_grid_detail"]["why"] == "a fight with Karim Haddad that ended in a cold silence" and p0["off_grid_detail"]["with_ids"] == ["p1"], str(p0.get("off_grid_detail")))
+check("and the memory says what happened", any("a fight with Karim Haddad" in m["text"] for m in p0["memories"]), str([m["text"] for m in p0["memories"]]))
+story = og._separation_story(p0, w, 3 * 86400)
+check("the summary of the stay tells it", story["summary"] == "Lena Haddad stayed away from home for 3 days, with family or friends somewhere else, after a fight with Karim Haddad that ended in a cold silence.", story["summary"])
+
 print()
 print("FAILED: " + ", ".join(failures) if failures else "ALL OK")
 sys.exit(1 if failures else 0)

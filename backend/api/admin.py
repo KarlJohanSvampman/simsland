@@ -316,6 +316,55 @@ def settle_characters(payload: dict = None, sim_id: str = DEFAULT_SIM_ID):
     return {"ok": True, "settled": out}
 
 
+@router.get("/vision")
+def get_vision_settings(sim_id: str = DEFAULT_SIM_ID):
+    """The vision settings in force (metres at which a face can still be told, per level; the detection multiplier; the length of a
+    tile in metres) and the character counts per level -- systems/vision.py."""
+    from systems.vision import settings, effective_level, natural_level, Vision
+    world = load_world(sim_id)
+    counts = {lvl: 0 for lvl in Vision.ALL}
+    for c in world.get("characters", {}).values():
+        if not c.get("is_workplace_npc"):
+            counts[natural_level(c)] += 1
+    return {"settings": settings(world), "levels": list(Vision.ALL), "characters_by_level": counts}
+
+
+@router.post("/vision")
+@command("admin.set_vision_settings")
+def set_vision_settings(payload: dict, sim_id: str = DEFAULT_SIM_ID):
+    """payload: any of normal_m, exceptional_m, impaired_m, detect_factor, tile_meters."""
+    from systems.vision import set_settings
+    with world_lock():
+        world = load_world(sim_id)
+        try:
+            now = set_settings(world, payload or {})
+        except ValueError as exc:
+            return JSONResponse({"error": str(exc)}, status_code=400)
+        save_world(sim_id, world)
+    return {"ok": True, "settings": now}
+
+
+@router.post("/set_vision")
+@command("admin.set_vision")
+def set_vision(payload: dict, sim_id: str = DEFAULT_SIM_ID):
+    """Set one character's natural vision level (accidents, disease, tests): {"character_id", "vision": normal|exceptional|impaired|blind,
+    "glasses": bool (optional)}."""
+    from systems.vision import Vision
+    cid, level = payload.get("character_id"), payload.get("vision")
+    if level not in Vision.ALL:
+        return JSONResponse({"error": f"vision must be one of {list(Vision.ALL)}"}, status_code=400)
+    with world_lock():
+        world = load_world(sim_id)
+        c = world.get("characters", {}).get(cid)
+        if not c:
+            return JSONResponse({"error": f"no character {cid}"}, status_code=404)
+        c["vision"] = level
+        if "glasses" in payload:
+            c["glasses"] = {"owned": bool(payload["glasses"])}
+        save_world(sim_id, world)
+    return {"ok": True, "character_id": cid, "vision": level}
+
+
 @router.post("/clear_legal")
 @command("admin.clear_legal")
 def clear_legal(payload: dict = None, sim_id: str = DEFAULT_SIM_ID):
