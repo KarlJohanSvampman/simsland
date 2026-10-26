@@ -589,8 +589,22 @@ def process_decision(
             action
         )
 
-        if valid:
+        from systems.activity_guard import defer_reason
+        deferred = defer_reason(c, world, action) if valid else None
+        if deferred:
+            # The answer arrived after they had already started something they have to finish (systems/activity_guard.py): it
+            # does not cut that short. Anything they said still goes through.
+            from systems.activity_trace import note
+            note(c.get("activity"), world, "kept going", reason=deferred)
+            if speech:
+                from systems.action_router import apply_speech
+                apply_speech(c, world, speech)
+        elif valid:
 
+            if c.get("activity"):
+                # If this replaces what they are doing, the record says why.
+                c["_interrupt_reason"] = (f"they chose to {str(action.get('type')).replace('_', ' ')}"
+                                          + (f" ({action['reason']})" if action.get("reason") else ""))
             route_action(
                 c,
                 world,
@@ -599,6 +613,7 @@ def process_decision(
                 definitions=world.get("definitions", {}),
                 available_actions=available_actions
             )
+            c.pop("_interrupt_reason", None)
 
             # route_action() above scaffolds c["activity"] for activity-style
             # action types (eat, sleep, work, ...) via _scaffold()/start_activity().
@@ -678,7 +693,7 @@ def update_agent(
         # Whoever is away can't also be mid-activity at home; nothing else ever
         # progresses or clears it while they're off-grid.
         from systems.occupancy import interrupt_activity
-        interrupt_activity(c, world)
+        interrupt_activity(c, world, reason="they went off-grid")
 
     # Needs don't move while off-grid or on a trip: catch the body up under the regime that
     # just ended before this character stops being updated (systems/body_lazy.py).
@@ -990,7 +1005,7 @@ def update_agent(
                 c.pop("_alarm_snooze", None)
                 from systems.occupancy import interrupt_activity
                 from systems.reactions import trigger_reaction
-                interrupt_activity(c, world)
+                interrupt_activity(c, world, reason="their alarm went off")
                 try:
                     trigger_reaction(c, world, "surprise", tick=world.get("tick", 0))
                 except Exception:
@@ -1021,19 +1036,19 @@ def update_agent(
             # them there.
             c["_resume_sleep_after_bathroom"] = True
             from systems.occupancy import interrupt_activity
-            interrupt_activity(c, world)
+            interrupt_activity(c, world, reason="they needed the toilet urgently")
             start_activity(c, world, "use_toilet")
         elif act_type in ("sleep", "nap") and should_wake_for_duty(c, world):
             # A hungry child is waiting for them and nobody has taken it over: they are got up (groggy and short-tempered -- it
             # shows as strain, systems/exhaustion.py).
             c["_duty_wake_tick"] = world.get("tick", 0)
             from systems.occupancy import interrupt_activity
-            interrupt_activity(c, world)
+            interrupt_activity(c, world, reason="a hungry child was waiting and nobody had taken over")
         elif school_starting and act_type not in ("use_toilet", "use_toilet_bowels", "eat"):
             # The school bell: a child still asleep (or busy with anything but the bathroom or breakfast) is got up and sent
             # on their way -- the next step of this same tick lets maybe_go_offgrid() dispatch the school day.
             from systems.occupancy import interrupt_activity
-            interrupt_activity(c, world)
+            interrupt_activity(c, world, reason="the school bell: time to go")
         elif (act_type not in _KEPT_AT_BEDTIME and world.get("tick", 0) - c.get("_bedtime_interrupt_tick", -10 ** 9) >= 600
               and wants_bed(c, world)):
             # Bedtime before a work or school day (systems/bedtime.py) outranks whatever discretionary thing is running
@@ -1041,11 +1056,11 @@ def update_agent(
             # every 10 minutes, so a different activity that wins instead is not cut short again and again.
             c["_bedtime_interrupt_tick"] = world.get("tick", 0)
             from systems.occupancy import interrupt_activity
-            interrupt_activity(c, world)
+            interrupt_activity(c, world, reason="bedtime: an early start tomorrow")
         elif work_starting and act_type not in _PROTECTED_FOR_WORK:
             c.pop("_last_work_miss_reason", None)
             from systems.occupancy import interrupt_activity
-            interrupt_activity(c, world)
+            interrupt_activity(c, world, reason="their shift was starting")
             # Fall through: no activity now, this same tick's normal flow
             # below will let maybe_go_offgrid() actually dispatch the shift.
         elif work_starting and act_type in _PROTECTED_FOR_WORK:

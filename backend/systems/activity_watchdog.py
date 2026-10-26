@@ -20,13 +20,17 @@ USING_MAX_FACTOR = 2.0            # ...or by this multiple, whichever is larger
 EXEMPT_TYPES = {"sleep"}          # sleep length is driven by fatigue/alarms, not the clock
 
 
+MAX_OVERRUN_TICKS = 7200          # however long it was meant to take, never more than two hours past that
+NO_DURATION_LIMIT_TICKS = 3600    # an activity with no usable duration at all gets an hour
+
+
 def _limit(act):
     if act.get("phase", "using") != "using":
         return WALK_LIMIT_TICKS
     duration = act.get("duration")
     if not isinstance(duration, (int, float)) or duration <= 0:
-        return None
-    return max(duration * USING_MAX_FACTOR, duration + USING_SLACK_TICKS)
+        return NO_DURATION_LIMIT_TICKS
+    return min(max(duration * USING_MAX_FACTOR, duration + USING_SLACK_TICKS), duration + MAX_OVERRUN_TICKS)
 
 
 def check_activity_watchdog(c, world):
@@ -56,7 +60,7 @@ def check_activity_watchdog(c, world):
     phase = act.get("phase", "using")
     print(f"[watchdog] tick {tick}: {c.get('name', c.get('id'))} stuck {tick - wd['since']} ticks in "
           f"{act_type}/{phase} (target {target}) -- cancelling")
-    interrupt_activity(c, world)
+    interrupt_activity(c, world, reason=f"timed out: stuck {tick - wd['since']} ticks in the {phase} phase", outcome="timed_out")
     c["is_moving"] = False
     c["move_target"] = None
     c.pop("_watchdog", None)

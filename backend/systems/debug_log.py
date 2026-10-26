@@ -63,8 +63,9 @@ def _resolve_target_name(world, target_id):
 
 def log_debug_event(c, world, category, text, target_id=None, target_name=None,
                     action_type=None, activity_type=None, interaction=None,
-                    anchor_name=None):
-    """category: "action" | "activity" | "reaction" | "violation" """
+                    anchor_name=None, remember=True):
+    """category: "action" | "activity" | "reaction" | "violation". remember=False shows the bubble only (activities keep their own
+    timeline and are remembered once, whole -- systems/activity_trace.py)."""
     text = (text or "").strip()
     if not text:
         return
@@ -75,6 +76,9 @@ def log_debug_event(c, world, category, text, target_id=None, target_name=None,
         "category":        category,
         "expires_at_tick": tick + 6,
     }
+
+    if not remember:
+        return
 
     # The same trace line firing several times inside a few seconds (an
     # activity started/completed/restarted in a loop) is one event to a
@@ -131,17 +135,22 @@ def log_action(c, world, action_type, detail="", target_id=None):
 
 
 def log_activity(c, world, activity_type, event, target_id=None, interaction=None,
-                 anchor_name=None):
-    """event: "started" | "completed" | "interrupted" | "timed out" """
+                 anchor_name=None, reason=None):
+    """event: "started" | "completed" | "interrupted" | "timed out". reason says what took its place or why it ended early."""
     category = _category_for_activity(activity_type)
     label = activity_type.replace("_", " ")
     if interaction and interaction != activity_type:
         label += f" — {interaction.replace('_', ' ')}"
     target_name = _resolve_target_name(world, target_id)
     text = f"Activity {event}: {label}" + (f" ({target_name})" if target_name else "")
+    if reason:
+        text += f" -- {reason}"
     log_debug_event(c, world, category, text, target_id=target_id,
                     target_name=target_name, activity_type=activity_type,
-                    interaction=interaction, anchor_name=anchor_name)
+                    interaction=interaction, anchor_name=anchor_name, remember=False)
+    # What happened goes on the activity's own timeline; the whole activity is remembered once when it ends.
+    from systems.activity_trace import note
+    note(c.get("activity"), world, event, reason=reason)
 
 
 def log_reaction(c, world, reaction_type, detail=""):

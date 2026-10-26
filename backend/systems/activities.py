@@ -248,8 +248,11 @@ def set_activity_phase(act, phase, world):
     branch) reads act["phase_started_tick"] relative to world["tick"], so
     the two must always change together.
     """
+    old = act.get("phase")
     act["phase"] = phase
     act["phase_started_tick"] = world.get("tick", 0)
+    from systems.activity_trace import phase_changed
+    phase_changed(act, old, phase, world)
 
 
 # =========================================================
@@ -1564,7 +1567,7 @@ def _execute_use_seat(c, world, act):
         from systems.activity_queue import mark_queue_task_done
         from systems.occupancy import interrupt_activity
         mark_queue_task_done(c, "use_seat", success=True)
-        interrupt_activity(c, world)
+        interrupt_activity(c, world, reason="sat down; the seat is theirs until they stand up", outcome="completed")
         c["current_intention"] = None
         return False
 
@@ -1842,6 +1845,8 @@ def execute_activity(
         # fixing; the missed transition clip is a minor, accepted cosmetic
         # trade-off of reusing this one shared insertion point.
         target_posture = _ACTIVITY_POSTURE.get(act.get("type"))
+        if not target_posture and str(act.get("anchor_name") or "").startswith("anchor_sit"):
+            target_posture = "sitting_seat"        # sit in park, sit and relax, ...: whatever uses a seat anchor sits
         if target_posture:
             from systems.posture import set_posture
             set_posture(c, world, target_posture)
@@ -2818,9 +2823,14 @@ def finish_activity(c, world):
         put_away_reading_item(c, world)
         c["active_process"] = None
 
+    from systems.activity_trace import close
+    close(c, world, "completed")
     c["activity"] = None
     c["current_intention"] = None
     c["animation_state"] = "idle"
+    if c.get("posture") == "sitting_seat" and not c.get("seat_prop_id"):
+        from systems.posture import set_posture
+        set_posture(c, world, "standing")      # got up from the park bench / chair when it was over
 
     # Wake the character now that it's actually free to decide again — see
     # brain/cognition_scheduler.py. activity_phase_changed (fired one tick

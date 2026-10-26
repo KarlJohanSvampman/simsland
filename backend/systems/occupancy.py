@@ -22,7 +22,31 @@ def enqueue_anchor(c, prop, anchor):
     if c["id"] not in anchor["queue"]:
         anchor["queue"].append(c["id"])
 
-def interrupt_activity(c, world):
+CALLER_REASONS = {
+    "systems.curiosity": "something caught their attention",
+    "systems.loop_guard": "they were stuck repeating the same thing",
+    "systems.social": "a conversation started",
+    "systems.travel": "they set off on a trip",
+    "systems.whereabouts": "they left home",
+    "systems.psychosis": "a psychotic episode",
+    "systems.claustrophobia": "a wave of claustrophobia",
+    "systems.worry_breakdown": "they broke down under their worries",
+    "systems.worry_relief": "they were too worried to carry on",
+    "systems.reading_process": "the reading ended",
+    "systems.activity_watchdog": "it stalled",
+    "systems.director_mode": "the admin took over",
+    "api.admin": "the admin reset it",
+}
+
+
+def _caller_reason():
+    import sys
+    frame = sys._getframe(2)
+    module = frame.f_globals.get("__name__", "?")
+    return CALLER_REASONS.get(module) or f"cut off by {module}.{frame.f_code.co_name}"
+
+
+def interrupt_activity(c, world, reason=None, outcome="interrupted"):
     """Confirmed live bug: at least a dozen call sites across this
     codebase clear a character's activity directly (`c["activity"] =
     None`) to interrupt it -- a conversation starting, curiosity
@@ -60,9 +84,12 @@ def interrupt_activity(c, world):
     act = c.get("activity") or {}
     act_type = act.get("type")
     if act_type:
+        reason = reason or c.pop("_interrupt_reason", None) or _caller_reason()
         from systems.debug_log import log_activity
-        log_activity(c, world, act_type, "interrupted", target_id=act.get("target_id"),
-                    interaction=act.get("interaction"), anchor_name=act.get("anchor_name"))
+        log_activity(c, world, act_type, "ended" if outcome == "completed" else "interrupted", target_id=act.get("target_id"),
+                    interaction=act.get("interaction"), anchor_name=act.get("anchor_name"), reason=reason)
+        from systems.activity_trace import close
+        close(c, world, outcome, reason)
         from core.event_bus import emit
         emit("activity_interrupted", {
             "character_id": c["id"], "activity_type": act_type,

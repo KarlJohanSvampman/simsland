@@ -4777,6 +4777,32 @@ function _clearInspector(){
   _applyInspectorVisibility();
 }
 
+// An activity's plan and what happened, in order (backend/systems/activity_trace.py): the steps with the clock time each was
+// reached, then the timeline with any reason (what interrupted it, what it kept going for).
+function _appendActivityTrace(body, steps, timeline){
+  const add = (title, lines) => {
+    if(!lines.length) return;
+    const head = document.createElement("div");
+    head.className = "eventModalRowSummary";
+    head.textContent = title;
+    body.appendChild(head);
+    for(const [k, v, done] of lines){
+      const row = document.createElement("div");
+      row.className = "eventModalRow";
+      row.innerHTML = `<div class="eventModalRowMeta"></div><div></div>`;
+      row.children[0].textContent = k;
+      row.children[1].textContent = v;
+      if(done === false) row.children[1].style.opacity = ".55";
+      body.appendChild(row);
+    }
+  };
+  add("Steps", (steps || []).map(s => [s.done_clock || "—", `${s.done_tick != null ? "✓" : "…"} ${s.label}`, s.done_tick != null]));
+  add("Timeline", (timeline || []).map(t => {
+    const extra = [t.target && `at ${t.target}`, t.planned_minutes && `planned ${t.planned_minutes} min`, t.reason].filter(Boolean).join(" — ");
+    return [t.clock || "", `${t.step}${extra ? ": " + extra : ""}`];
+  }));
+}
+
 // Everything the activity carries, in the shared intention modal. A wait with
 // no condition, or an interact with no target, is called out explicitly.
 function openActivityModal(charId){
@@ -4821,6 +4847,7 @@ function openActivityModal(charId){
     row.children[1].textContent = String(v);
     body.appendChild(row);
   }
+  _appendActivityTrace(body, act.steps, act.timeline);
   openModal("modal-intention");
 }
 
@@ -5975,7 +6002,7 @@ function openMemoryModal(m){
   // being available at the call site -- see systems/debug_log.py), PLUS
   // a generic catch-all below for anything else present that isn't
   // already shown elsewhere in this modal or purely internal bookkeeping.
-  const _shown = new Set(["id", "text", "fading_details", "created_at", "conv_id", "people", "tags", "importance"]);
+  const _shown = new Set(["id", "text", "fading_details", "created_at", "conv_id", "people", "tags", "importance", "activity_record"]);
   const fields = [
     ["When", _formatMemoryTimestamp(m.tick)],
     ["Kind", m.kind],
@@ -6016,6 +6043,21 @@ function openMemoryModal(m){
     row.children[0].textContent = label;
     row.children[1].textContent = typeof v === "object" ? JSON.stringify(v) : String(v);
     body.appendChild(row);
+  }
+
+  if(m.activity_record){
+    const r = m.activity_record;
+    for(const [k, v] of [["Outcome", r.outcome], ["Why", r.reason], ["Planned", r.planned_ticks ? `${Math.round(r.planned_ticks / 60)} min` : null],
+                         ["Took", `${Math.round((r.actual_ticks || 0) / 60)} min`]]){
+      if(v == null || v === "") continue;
+      const row = document.createElement("div");
+      row.className = "eventModalRow";
+      row.innerHTML = `<div class="eventModalRowMeta"></div><div></div>`;
+      row.children[0].textContent = k;
+      row.children[1].textContent = String(v);
+      body.appendChild(row);
+    }
+    _appendActivityTrace(body, r.steps, r.timeline);
   }
 
   // Per the user's explicit ask: a conversation-sourced memory ("Talked
