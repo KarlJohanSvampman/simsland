@@ -780,12 +780,35 @@ def send_to_school(c, world):
     chars = world.get("characters", {})
     for parent_id in ((world.get("households") or {}).get(c.get("household_id")) or {}).get("members", []):
         parent = chars.get(parent_id)
-        if parent and parent["id"] != c["id"] and (parent.get("age") or 0) >= 18:
+        # only a parent who is actually there got them off to school
+        if parent and parent["id"] != c["id"] and (parent.get("age") or 0) >= 18 and not parent.get("off_grid"):
             try:
                 satisfy_expectation(parent, "get_kids_to_school", world)
             except Exception:
                 pass
     return True
+
+
+def school_run_pending(c, world):
+    """True for a grown-up of a household where a school child has not yet left for school today and the school run is about to
+    happen (from two hours before the bell until the late window closes): the grown-ups stay home for it rather than going
+    out for leisure, a coffee or a workout."""
+    if (c.get("age") or 0) < 18:
+        return False
+    household = (world.get("households") or {}).get(c.get("household_id")) or {}
+    chars = world.get("characters", {})
+    now_minute = world.get("calendar", {}).get("minute_of_day", -1)
+    for mid in household.get("members", []):
+        kid = chars.get(mid)
+        if not kid or kid["id"] == c["id"] or (kid.get("age") or 99) >= 18 or not kid.get("current_school") or kid.get("off_grid"):
+            continue
+        block = _school_block(kid, world)
+        if not block or kid.get("_school_day") == _day_key(world):
+            continue
+        start = int(block["start"][:2]) * 60
+        if start - 120 <= now_minute < start + SCHOOL_LATE_WINDOW_MINUTES:
+            return True
+    return False
 
 
 def _school_story(c, world):
@@ -930,6 +953,8 @@ def maybe_go_offgrid(c, world):
     # longer shares a daily trip-count cap with these -- and increasingly
     # unlikely the more tired/depleted the character already is.
     if _work_block_active_or_imminent(c, world):
+        return
+    if school_run_pending(c, world):          # the kids still have to get to school
         return
     fatigue_mult = _leisure_fatigue_multiplier(c)
     if fatigue_mult <= 0:

@@ -316,6 +316,29 @@ def settle_characters(payload: dict = None, sim_id: str = DEFAULT_SIM_ID):
     return {"ok": True, "settled": out}
 
 
+@router.post("/recall_characters")
+@command("admin.recall_characters")
+def recall_characters(payload: dict = None, sim_id: str = DEFAULT_SIM_ID):
+    """Bring characters who are away (off-grid) home now: their return is due this tick and the normal return handling runs
+    (story, fatigue, the trip home). payload: {"character_ids": [...], "reason": "temporary_separation"} -- both optional
+    (default: everyone away; with a reason, only those away for it)."""
+    payload = payload or {}
+    ids, reason = payload.get("character_ids"), payload.get("reason")
+    with world_lock():
+        world = load_world(sim_id)
+        recalled = []
+        for cid, c in world.get("characters", {}).items():
+            if (ids and cid not in ids) or not c.get("off_grid") or (reason and c.get("off_grid_reason") != reason):
+                continue
+            c["return_tick"] = world.get("tick", 0)
+            for o in world.get("offmap", []):
+                if o.get("character_id") == cid:
+                    o["return_tick"] = c["return_tick"]
+            recalled.append(cid)
+        save_world(sim_id, world)
+    return {"ok": True, "recalled": recalled}
+
+
 @router.post("/add_building")
 @command("admin.add_building")
 def add_building(payload: dict, sim_id: str = DEFAULT_SIM_ID):

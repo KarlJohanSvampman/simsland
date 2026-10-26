@@ -61,3 +61,13 @@ ids in `conv_ids`, tags each line with its `conv_id`, lists all `mediums`, and s
 `repeats`. Lines are stripped of the quote marks the model wraps them in (`systems/text_clean.py`; the same line retried came back
 with another pair each time). Entries written earlier are folded together the first time it runs (and by settle). The timeline's
 "details" lookup finds a conversation through `conv_ids`. Tests: `tests/test_conversation_log.py`.
+
+## Parents stay home (school run, young children)
+- `systems/offgrid.py::school_run_pending`: from two hours before the bell until the late window closes, a grown-up of a household
+  with a school child who has not yet left does not go out for shopping, leisure, a coffee or a workout.
+- `send_to_school` only credits ("get the kids to school") parents who are actually at home.
+- `systems/temporary_separation.py`: a child never moves out after a fight, and a grown-up who is the only one at home with a child
+  under 14 does not either (`would_leave_children_alone`; a parent already staying elsewhere does not count as home). One
+  conflict used to send both parents away for three days and leave the children alone.
+- `POST /admin/recall_characters {"character_ids": [...], "reason": "temporary_separation"}` brings away characters home now (their
+  return is due this tick and the normal return handling runs). Tests: `tests/test_parents_home.py`.

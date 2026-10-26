@@ -77,11 +77,27 @@ def _find_separation_host(c, world):
     return other, host_household, is_family, chance
 
 
+YOUNG_CHILD_AGE = 14        # below this a child is not left in the house with no adult in it
+
+
+def would_leave_children_alone(c, world):
+    """True if `c` is a grown-up whose household has a child under YOUNG_CHILD_AGE and no OTHER grown-up of the household
+    who is still at home (on the grid and not staying elsewhere) -- leaving would leave the child on their own."""
+    chars = world.get("characters", {})
+    household = (world.get("households") or {}).get(c.get("household_id")) or {}
+    members = [chars[m] for m in household.get("members", []) if m in chars and m != c["id"]]
+    if not any((m.get("age") or 99) < YOUNG_CHILD_AGE for m in members):
+        return False
+    return not any((m.get("age") or 0) >= 18 and not m.get("off_grid") and not m.get("temporary_residence") for m in members)
+
+
 def begin_temporary_separation(c, world, reason="argument"):
     """Called after a bad conflict outcome. Returns True if the character
     actually moved out (on-grid or off-grid), False if nothing happened
-    (e.g. already off-grid, already separated)."""
+    (e.g. already off-grid, already separated, a child, or the only grown-up at home with a young child)."""
     if c.get("off_grid") or c.get("temporary_residence"):
+        return False
+    if (c.get("age") or 99) < 18 or would_leave_children_alone(c, world):
         return False
 
     found = _find_separation_host(c, world)
