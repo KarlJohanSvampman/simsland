@@ -2286,7 +2286,7 @@ def complete_activity(
             if plate:
                 from systems.body import on_consume_complete
                 on_consume_complete(c, world, plate)
-                c["last_meal"] = {"name": plate.get("name"), "reaction": meal_reaction(plate), "taste": plate.get("taste"),
+                c["last_meal"] = {"name": plate.get("name"), "reaction": meal_reaction(plate, c), "taste": plate.get("taste"),
                                   "health": plate.get("health"), "tick": world.get("tick", 0)}
                 from systems.activity_trace import note
                 note(act, world, "ate", food=plate.get("dish_name"), reaction=c["last_meal"]["reaction"])
@@ -2352,6 +2352,8 @@ def complete_activity(
         household = world["households"].get(c.get("household_id"))
 
         if household:
+            from brain.intentions import remove_intention
+            remove_intention(c, "cook_dinner")
             vessel = cookware.start_dinner(c, world, household)
             if vessel:
                 minutes = round((vessel["done_tick"] - vessel["started_tick"]) / 60)
@@ -2767,7 +2769,7 @@ def complete_activity(
             from systems.body import on_consume_complete
             on_consume_complete(c, world, item)
             from systems.eating import meal_reaction
-            reaction = meal_reaction(item)
+            reaction = meal_reaction(item, c)
             if reaction:
                 c["last_meal"] = {"name": item.get("name"), "reaction": reaction, "taste": item.get("taste"), "health": item.get("health"), "tick": world.get("tick", 0)}
             note(act, world, "ate", food=(item.get("name") or item.get("template_id") or "food").replace("_", " "), reaction=reaction)

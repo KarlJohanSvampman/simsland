@@ -155,6 +155,19 @@ def resolve_strategy(
     if t in ("water_plants", "weed_plants", "harvest_plants", "redecorate_room"):
         return t
 
+    # Dinner time and it is this person's turn (systems/dinner.py): cook if there is anything to make it from.
+    if t == "cook_dinner":
+        from systems import cookware
+        from brain.intentions import remove_intention
+        household = world.get("households", {}).get(c.get("household_id"))
+        if household and not cookware.vessel_for(household, "pot") and not cookware.vessel_for(household, "pan") and not cookware.vessel_for(household, "oven"):
+            remove_intention(c, "cook_dinner")          # every pot is busy or dirty
+            return None
+        if household and cookware.feasible_recipes(household, 1):
+            return "cook_recipe"
+        remove_intention(c, "cook_dinner")
+        return None
+
     return None
 
 

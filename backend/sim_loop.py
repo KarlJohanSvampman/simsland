@@ -1369,7 +1369,9 @@ def _job_plants(world, entry):
 def _job_cookware(world, entry):
     """Scheduled job `cookware`: pots, pans and the oven finish cooking, and served food ends its window (systems/cookware.py)."""
     from systems.cookware import update
+    from systems import dinner
     update(world)
+    dinner.plan(world)
 
 
 def _job_food_aging(world, entry):

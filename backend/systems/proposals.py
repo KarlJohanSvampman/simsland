@@ -340,6 +340,9 @@ def _maybe_resolve(proposal, world):
             }
     elif proposal["kind"] == "recurring_offer":
         _finalize_recurring_offer(proposal, world)
+    elif proposal["kind"] == "dinner_rota":
+        from systems import dinner_rota
+        dinner_rota.finalize(proposal, world)
     elif proposal["kind"] == "romantic":
         recipient_id = proposal["recipients"][0]
         if proposal["responses"].get(recipient_id) == "accept":

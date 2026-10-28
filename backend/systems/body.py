@@ -636,6 +636,9 @@ def on_consume_complete(c, world, item_tmpl):
             b["calories_today"] = b.get("calories_today", 0) + calories
             b["fat_cal_today"] = b.get("fat_cal_today", 0) + calories * (item_tmpl.get("fat_pct") or 0)
         on_eat_complete(c, nutrition=nutrition, calories=calories)
+        if calories:
+            from systems import food_habits
+            food_habits.on_meal(c, world, item_tmpl)
         # A real plate/bowl/cutlery used for a meal -- see systems/
         # chores.py, which tracks this as a simple household-wide count
         # rather than real per-instance dishware (see that module's

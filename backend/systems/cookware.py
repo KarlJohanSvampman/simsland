@@ -197,7 +197,8 @@ def end_of_dinner(world, household, vessel):
     close_out(household, vessel, store=dish.get("taste", 0) >= 0.4)
     add_dirty_dishes(household, 1)
     characters = world.get("characters", {})
-    washer = characters.get(household.get("dish_duty") or vessel.get("maker_id"))
+    from systems import dinner_rota
+    washer = characters.get(dinner_rota.washer_for(world, household, vessel.get("maker_id")))
     zone = kitchen_zone_key(world, household)
     if washer and zone:
         add_intention(washer, {"type": "clean_zone", "category": "chores", "priority": 50, "reason": "the dishes from dinner", "zone_key": zone})
@@ -229,7 +230,7 @@ def plate_item(dish, weakness=None):
         "id": f"plate_{uuid.uuid4().hex[:8]}", "template_id": "plated_dish", "name": f"{dish['name']} (plate)",
         "category": "food", "food_group": "dish", "edible": True, "consumable": True, "uses": 1, "size": 1, "stackable": False,
         "calories": plate["calories"], "fat_pct": plate["fat_pct"], "health": plate["health"], "taste": plate["taste"],
-        "addictive": plate["addictive"], "dish_name": dish["name"], "recipe_id": dish.get("recipe_id"),
+        "addictive": plate["addictive"], "ingredients": list(dish.get("ingredients") or []), "dish_name": dish["name"], "recipe_id": dish.get("recipe_id"),
         "nutrition": round(plate["calories"] / 2000, 3), "hunger_restore": round(plate["calories"] / 8),
     }
 
@@ -284,17 +285,22 @@ def people_at_home(c, world, household):
 
 def start_dinner(c, world, household, rank=None, recipe_id=None):
     """Decide a recipe and how many it is for, take the ingredients out of the stock into a free pot, pan or oven, and begin.
+    The cook's own tastes pick the recipe and which ingredients go in (systems/food_habits.py).
     Returns the vessel, or None when there is nothing they can make."""
+    from systems import food_habits
     ensure_vessels(household)
+    rank = rank or food_habits.rank_fn(c)
     people = people_at_home(c, world, household)
     while people >= 1:
         options = [r for r in ([recipe_id] if recipe_id else feasible_recipes(household, people))
                    if can_make(household, fs.DISH_RECIPES[r], people) and vessel_for(household, fs.DISH_RECIPES[r]["method"])]
         if options:
-            rid = random.choice(options)
+            rid = recipe_id or food_habits.choose_recipe(c, household, people, options)
             rec = fs.DISH_RECIPES[rid]
             vessel = vessel_for(household, rec["method"])
             load(vessel, pull_ingredients(household, rec, people, rank))
+            from systems import dinner_rota
+            dinner_rota.note_cook(household, c.get("id"))
             return begin(c, world, vessel, rid, people)
         people -= 1
     return None

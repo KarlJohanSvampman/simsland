@@ -106,9 +106,12 @@ def stock_item(c, world, groups=("fruit", "bread", "none")):
     return {**get_template(tid), "id": f"item_{tid}_{uuid.uuid4().hex[:6]}", "template_id": tid, "quantity": 1}
 
 
-def meal_reaction(item):
-    """What they would honestly say about it, for anything that carries a taste (a plate) or calories (an ingredient)."""
-    from systems import food_scoring as fs
+def meal_reaction(item, c=None):
+    """What they would honestly say about it, for anything that carries a taste (a plate) or calories (an ingredient). Given the
+    eater, their own likes for what is in it count (systems/food_habits.py)."""
+    from systems import food_scoring as fs, food_habits
+    if c is not None and (item.get("taste") is not None or item.get("calories")):
+        return fs.reaction(food_habits.personal_taste(c, item))
     if item.get("taste") is not None:
         return fs.reaction(item["taste"])
     if item.get("calories"):

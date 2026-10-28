@@ -2785,6 +2785,11 @@ def _build_proposal_context(c, world):
                             f"to buy your {item_name}, {price_note}{trade_note} — you can accept, "
                             f"decline, or counter with a different price.")
                     note += _principle_bias_note(c, proposer, world)
+                elif kind == "dinner_rota":
+                    proposer = chars.get(p.get("proposer_id"))
+                    note = (f"{proposer.get('name', 'Someone') if proposer else 'Someone'} suggests sharing dinner out so one person "
+                            f"isn't cooking every night. {(p.get('params') or {}).get('text', '')} You can accept or decline.")
+                    note += _principle_bias_note(c, proposer, world)
                 else:
                     proposer = chars.get(p.get("proposer_id"))
                     note = f"Someone offered to make {p.get('chore_id')} a recurring thing."

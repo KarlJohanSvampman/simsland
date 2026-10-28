@@ -174,6 +174,8 @@ def settle_nutrition_day(c, world):
     else:
         toilet_visits = 1
 
+    from systems import food_habits
+    food_habits.note_day(c)
     b["toilet_visits_needed_today"] = toilet_visits
     b["nutrients_today"] = 0.0
     b["calories_today"] = 0.0
