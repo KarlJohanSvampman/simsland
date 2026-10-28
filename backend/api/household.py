@@ -319,5 +319,37 @@ def admin_detail(household_id: str, sim_id: str):
                 "unopened_count": mailbox.get("unopened_count", 0),
                 "items": mail_items,
             },
+            "kitchen": _kitchen_of(household, characters, world.get("tick", 0)),
         },
+    }
+
+
+def _kitchen_of(household, characters, tick):
+    """What is on the stove and in the fridge (docs/food_system.md): the pots, pans and oven, what is being served, leftovers, ready meals,
+    the planned dinners, the rota and the dirty plates -- read-only, for the Household tab."""
+    def name(cid):
+        return (characters.get(cid) or {}).get("name", cid)
+
+    cookware = []
+    for v in household.get("cookware", []):
+        row = {"kind": v["kind"], "state": v["state"]}
+        if v["state"] in ("cooking", "ready"):
+            row.update(dish=(v.get("dish") or {}).get("name"), people=v.get("people"), maker=name(v.get("maker_id")),
+                       health=(v.get("dish") or {}).get("health"), taste=(v.get("dish") or {}).get("taste"))
+        if v["state"] == "cooking":
+            row["minutes_left"] = max(0, round((v.get("done_tick", tick) - tick) / 60))
+        if v["state"] == "ready":
+            row.update(charges=v.get("charges"), served_minutes_left=max(0, round((v.get("serve_until_tick", tick) - tick) / 60)))
+        cookware.append(row)
+    rota = household.get("dinner_rota")
+    return {
+        "cookware": cookware,
+        "leftovers": [{"name": l.get("name"), "portions": l.get("portions")} for l in household.get("leftovers", [])],
+        "ready_meals": [{"name": m["name"], "temperature": m["temperature"]} for m in household.get("ready_meals", [])],
+        "deliveries": [{"meal": d["template_id"], "portions": d["portions"], "minutes": max(0, round((d["arrives_tick"] - tick) / 60))} for d in household.get("deliveries", [])],
+        "dinner_plan": household.get("dinner_plan") or {},
+        "tonight": household.get("dinner_mode"),
+        "rota": ({"cooks": {d: name(w) for d, w in rota["cooks"].items()}, "dishes": rota.get("dishes")} if rota else None),
+        "dirty_plates": [i.get("name") for i in household.get("dirty_items", [])],
+        "dirty_dishes": household.get("dirty_dishes", 0),
     }

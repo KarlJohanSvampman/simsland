@@ -46,23 +46,11 @@ def stock_group(household, group, units, rng=random):
     return units
 
 
-TRIP_PER_PERSON = (("protein", 4), ("carb", 4), ("vegetable", 4), ("fruit", 3), ("dairy", 2), ("bread", 1), ("none", 2), ("spice", 1))
-COST_PER_PERSON = 14.0
-
-
 def restock(world, household, shopper):
-    """A grocery trip brings home a few days of food for the household, paid from the shopper's money (or, with none, the household's
-    wealth, and failing that on credit -- nobody comes home empty-handed from a food shop). Returns {"units", "cost"} or None."""
+    """A grocery trip (systems/grocery.py): the shopper buys what their plan for the coming dinners needs, paid from their money (or, with
+    none, the household's wealth, and failing that on credit -- nobody comes home empty-handed from a food shop). {"units", "cost"} or None."""
     if not household:
         return None
-    members = max(1, len(household.get("members", [])))
-    cost = COST_PER_PERSON * members
-    paid = min(cost, shopper.get("money", 0) or 0)
-    shopper["money"] = (shopper.get("money", 0) or 0) - paid
-    rest = cost - paid
-    if rest > 0:
-        household["wealth"] = max(0, (household.get("wealth", 0) or 0) - rest)
-    units = 0
-    for group, per_person in TRIP_PER_PERSON:
-        units += stock_group(household, group, per_person * members)
-    return {"units": units, "cost": cost}
+    from systems import grocery
+    got = grocery.buy(world, household, shopper)
+    return {"units": got["units"], "cost": got["cost"]}

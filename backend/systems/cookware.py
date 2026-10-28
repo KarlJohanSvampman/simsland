@@ -156,6 +156,9 @@ def name_legacy_stock(household, rng=random):
 
 def update(world):
     """Finish what is done, and close out food whose serving window has passed. Run about once a minute."""
+    from systems import ready_meals
+    ready_meals.cool_down(world)
+    ready_meals.deliver(world)
     tick = world.get("tick", 0)
     for household in world.get("households", {}).values():
         if not household.get("_stock_named"):
@@ -295,7 +298,11 @@ def start_dinner(c, world, household, rank=None, recipe_id=None):
         options = [r for r in ([recipe_id] if recipe_id else feasible_recipes(household, people))
                    if can_make(household, fs.DISH_RECIPES[r], people) and vessel_for(household, fs.DISH_RECIPES[r]["method"])]
         if options:
-            rid = recipe_id or food_habits.choose_recipe(c, household, people, options)
+            from systems import grocery
+            planned = grocery.planned_recipe(household, world)
+            rid = recipe_id or (planned if planned in options else None) or food_habits.choose_recipe(c, household, people, options)
+            if rid == planned:
+                grocery.consumed(household, world)
             rec = fs.DISH_RECIPES[rid]
             vessel = vessel_for(household, rec["method"])
             load(vessel, pull_ingredients(household, rec, people, rank))

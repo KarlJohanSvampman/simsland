@@ -84,14 +84,65 @@ def served_plate(c, world):
     vessel = cookware.ready_vessel(household, world.get("tick", 0))
     if vessel:
         return cookware.take_portion(vessel, world, weakness_of(c))
-    return cookware.take_leftover(household, weakness_of(c))
+    plate = cookware.take_leftover(household, weakness_of(c))
+    if plate:
+        return plate
+    from systems import ready_meals
+    return ready_meals.take(household, c)
 
 
-def stock_item(c, world, groups=("fruit", "bread", "none")):
-    """One ready-to-eat item out of the household's stock (fruit, bread, a snack), as an item they now hold, or None."""
+SANDWICH_FILLINGS = (("protein", 1), ("dairy", 1), ("vitamin", 1))      # what goes between the bread: one of each, if there is any
+SANDWICH_ODDS = 0.6                                                      # a person with bread and fillings in the house usually builds one
+
+
+def sandwich_item(c, world, rng=None):
+    """A slice of bread takes fillings from the stock and turns into a sandwich: one item, eaten as it is, scored like any dish
+    (health, taste, calories, what is in it). Returns the item, or None when there is no bread or nothing to put in it."""
+    import random
+    import uuid
+    from systems import cookware, food_scoring as fs, food_habits
+    rng = rng or random
     household = _household(c, world)
     if not household:
         return None
+    breads = cookware.stock(household, "bread")
+    if not breads:
+        return None
+    parts = []
+    from data.ingredients import INGREDIENTS
+    for group, n in SANDWICH_FILLINGS:
+        # fruit shares the vegetables' recipe group but doesn't go in a sandwich
+        rows = sorted((r for r in cookware.stock(household, group) if group != "vitamin" or INGREDIENTS[cookware.row_template(r)]["food_group"] == "vegetable"),
+                      key=lambda r: -food_habits.liking(c, cookware.row_template(r)))
+        if rows:
+            parts.append((rows[0], n))
+    if not parts:
+        return None
+    bread = max(breads, key=lambda r: r.get("quantity", 0))
+    taken = []
+    for row, n in [(bread, 1)] + parts:
+        take = min(n, row["quantity"])
+        row["quantity"] -= take
+        taken.append({"template_id": cookware.row_template(row), "quantity": take})
+    household["storage"]["resources"][:] = [r for r in household["storage"]["resources"] if (r.get("quantity") or 0) > 0 or not str(r.get("resource_type", "")).startswith("FOOD_")]
+    dish = fs.dish_from_items(taken, 1, "Sandwich")
+    item = cookware.plate_item(dish)
+    item.update(id=f"sandwich_{uuid.uuid4().hex[:8]}", template_id="sandwich", name="Sandwich", dish_name="Sandwich", food_group="dish")
+    return item
+
+
+def stock_item(c, world, groups=("fruit", "bread", "none")):
+    """One ready-to-eat item out of the household's stock (fruit, bread, a snack), as an item they now hold, or None. Bread with something
+    to put in it is usually made into a sandwich."""
+    household = _household(c, world)
+    if not household:
+        return None
+    if "bread" in groups:
+        import random
+        if random.random() < SANDWICH_ODDS:
+            sandwich = sandwich_item(c, world)
+            if sandwich:
+                return sandwich
     import uuid
     from data.item_templates import get_template
     from systems import cookware

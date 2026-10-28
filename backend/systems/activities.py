@@ -2271,6 +2271,16 @@ def complete_activity(
     # =====================================
     # MEAL
     # =====================================
+    elif activity_type == "heat_meal":
+        from systems import ready_meals
+        from systems.activity_trace import note
+        household = world["households"].get(c.get("household_id"))
+        warmed = ready_meals.warm_one(household, world.get("tick", 0)) if household else None
+        if warmed:
+            note(act, world, "heated", food=warmed["name"])
+            from brain.intentions import add_intention
+            add_intention(c, {"type": "eat_food", "category": "survival", "priority": 55, "reason": "it is hot"})
+
     elif activity_type == "eat_meal":
 
         household = world[

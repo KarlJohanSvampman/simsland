@@ -647,7 +647,11 @@ def on_consume_complete(c, world, item_tmpl):
             household = world.get("households", {}).get(c.get("household_id"))
             if household:
                 from systems.chores import add_dirty_dishes
-                add_dirty_dishes(household)
+                if str(item_tmpl.get("template_id") or "").startswith("takeout_"):
+                    pass                                            # a takeout comes in a box that goes in the bin, nothing to wash
+                else:
+                    # a plated meal leaves a plate behind (a real item); a piece of fruit just adds to the count
+                    add_dirty_dishes(household, source=item_tmpl if item_tmpl.get("dish_name") else None, eater=c, tick=world.get("tick", 0))
 
     # ── nutrition-day tally (fraction of a daily requirement) ───────────────
     b["nutrients_today"] = b.get("nutrients_today", 0) + nutrition

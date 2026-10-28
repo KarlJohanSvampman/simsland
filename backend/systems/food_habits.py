@@ -152,6 +152,17 @@ def dinner_mode(c, world, household, rng=random):
     return "cook" if rng.random() < chance else "easy"
 
 
+def easy_choice(c, world, household):
+    """When not cooking: the ready meal in the freezer, a takeout (when they can afford it and are too worn out for the microwave to
+    feel like enough), or just whatever there is to nibble."""
+    from systems import ready_meals
+    money = c.get("money", 0) or 0
+    have = ready_meals.count(household) > 0
+    if money >= 25 and (pressure(c) >= 55 or not have):
+        return "takeout"
+    return "processed" if have else "snack"
+
+
 # ---- choosing a recipe -------------------------------------------------------------------------------------------------------------------
 def recipe_score(c, household, rid, people):
     """How much this person fancies a recipe, from the ingredients they would actually use; a craving favours the unhealthy ones."""

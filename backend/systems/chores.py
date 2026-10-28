@@ -240,16 +240,28 @@ def dirty_dish_count(household):
     return household.get("dirty_dishes", 0) if household else 0
 
 
-def add_dirty_dishes(household, amount=1):
+def add_dirty_dishes(household, amount=1, source=None, eater=None, tick=0):
+    """One more dirty dish on the household's count. With `source` (the dish that was eaten) there is also a real dirty-plate item
+    left behind, in household["dirty_items"], recording what was on it and who left it."""
     if household is None:
         return
     household["dirty_dishes"] = household.get("dirty_dishes", 0) + amount
+    if source is not None:
+        household.setdefault("dirty_items", []).append({
+            "id": f"dirty_{len(household.get('dirty_items', []))}_{tick}", "template_id": "dirty_plate",
+            "name": f"Dirty plate ({source.get('dish_name') or source.get('name') or 'plate'})", "from": source.get("dish_name") or source.get("name"),
+            "left_by": eater.get("id") if eater else None, "building_id": eater.get("building_id") if eater else None, "tick": tick})
+
+
+def dirty_items(household):
+    return (household or {}).get("dirty_items", [])
 
 
 def clear_dirty_dishes(household):
     if household is None:
         return
     household["dirty_dishes"] = 0
+    household["dirty_items"] = []
 
 
 def dish_count_for_wash(household):

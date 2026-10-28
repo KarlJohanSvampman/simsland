@@ -9,7 +9,7 @@ from the cookware job.
 
 import random
 
-from systems import cookware, dinner_rota, food_habits
+from systems import cookware, dinner_rota, food_habits, ready_meals
 
 LATE_FOR_ROTA = 18.5      # the rota's cook is given until half past six to be home before somebody else steps in
 
@@ -56,10 +56,18 @@ def plan(world, rng=random):
         household["dinner_day"] = _day_key(world)
         mode = food_habits.dinner_mode(cook, world, household, rng)
         household["dinner_mode"] = {"mode": mode, "cook": cook["id"], "tick": world.get("tick", 0)}
+        from brain.intentions import add_intention
         if mode == "cook":
-            from brain.intentions import add_intention
             add_intention(cook, {"type": "cook_dinner", "category": "schedule", "priority": 52, "reason": "it is dinner time and it is my turn"
                                  if scheduled is cook else "it is dinner time"})
+        else:
+            how = food_habits.easy_choice(cook, world, household)
+            if how == "takeout" and not ready_meals.order_takeout(cook, world, household, rng):
+                how = "processed" if ready_meals.count(household) else "snack"
+            household["dinner_mode"]["how"] = how
+            if how == "processed":
+                for who in home:
+                    add_intention(who, {"type": "eat_food", "category": "survival", "priority": 55, "reason": "dinner from the freezer"})
         dinner_rota.maybe_propose(world, household, rng)
 
 

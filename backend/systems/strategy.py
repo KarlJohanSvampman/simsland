@@ -203,6 +203,13 @@ def resolve_hunger_strategy(
     if cookware.ready_vessel(household, world.get("tick", 0)) or any(l.get("portions", 0) > 0 for l in household.get("leftovers", [])):
         return "eat_meal"
 
+    # a ready meal: eat it if it is warm (takeout that just came), else it goes in the microwave first
+    from systems import ready_meals
+    if ready_meals.count(household, "warm"):
+        return "eat_meal"
+    if ready_meals.count(household, "cold"):
+        return "heat_meal"
+
     # =====================================================
     # READY MEALS
     # =====================================================

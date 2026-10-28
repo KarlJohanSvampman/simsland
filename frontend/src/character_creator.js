@@ -1538,6 +1538,7 @@ async function renderHouseholdFinances() {
       </div>`;
     }).join('') : '<div class="deriveNote">No members yet.</div>';
 
+    renderHouseholdKitchen(data.household.kitchen);
     const loans = data.household.loans || [];
     loansEl.innerHTML = loans.length ? loans.map(l => `<div class="deriveNote" style="margin-bottom:4px;">
       <b>${l.provider}</b> (${l.kind}) — balance $${(l.balance || 0).toFixed(2)} of $${(l.principal || 0).toFixed(2)},
@@ -1548,6 +1549,35 @@ async function renderHouseholdFinances() {
     membersEl.innerHTML = '<div class="deriveNote">Could not load finances.</div>';
     loansEl.innerHTML = '';
   }
+}
+
+// Read-only kitchen summary (docs/food_system.md): what is cooking or being served, what is in the fridge, who cooks when.
+function renderHouseholdKitchen(k) {
+  const el = document.getElementById('householdKitchen');
+  if (!el) return;
+  if (!k) { el.innerHTML = ''; return; }
+  const line = (label, text) => `<div class="deriveNote" style="margin-bottom:4px;"><b>${label}</b> — ${text}</div>`;
+  const pct = x => (x == null ? '—' : Math.round(x * 100) + '%');
+  const vessels = (k.cookware || []).map(v => {
+    if (v.state === 'cooking') return `${v.kind}: ${v.dish} for ${v.people} (${v.maker}), ${v.minutes_left} min left`;
+    if (v.state === 'ready') return `${v.kind}: ${v.dish}, ${v.charges} portion(s) left, served for ${v.served_minutes_left} more min (health ${pct(v.health)}, taste ${pct(v.taste)})`;
+    return `${v.kind}: ${v.state}`;
+  }).join(' · ') || 'none yet';
+  const plan = Object.entries(k.dinner_plan || {}).map(([d, r]) => `${d} ${r.replace(/_/g, ' ')}`).join(', ') || 'nothing planned';
+  const rota = k.rota
+    ? Object.entries(k.rota.cooks).map(([d, n]) => `${d} ${n}`).join(', ') + (k.rota.dishes === 'other' ? ' (the other washes up)' : ' (the cook washes up)')
+    : 'none';
+  const ready = (k.ready_meals || []).map(m => `${m.name} (${m.temperature})`).join(', ') || 'none';
+  const tonight = k.tonight ? `${k.tonight.mode === 'cook' ? 'cooking' : 'easy: ' + (k.tonight.how || 'nibble')}` : '—';
+  el.innerHTML = '<div class="deriveNote" style="margin:8px 0 4px;"><b>Kitchen</b></div>'
+    + line('Cookware', vessels)
+    + line('Tonight', tonight)
+    + line('Leftovers', (k.leftovers || []).map(l => `${l.name} ×${l.portions}`).join(', ') || 'none')
+    + line('Ready meals', ready)
+    + (k.deliveries && k.deliveries.length ? line('On the way', k.deliveries.map(d => `${d.portions} takeout, ${d.minutes} min`).join(', ')) : '')
+    + line('Dinner plan', plan)
+    + line('Dinner rota', rota)
+    + line('Dirty plates', (k.dirty_plates || []).join(', ') || `none (${k.dirty_dishes} dishes counted)`);
 }
 
 async function renderHouseholdAddress() {

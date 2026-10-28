@@ -109,10 +109,35 @@ ingredients, with a weak bias per category.
 dirty because it was served, not tracked per plate. `household["dish_duty"]` (a member id) is read for who washes up and is
 ready for the social-contract rota to set.
 
-## Build order (remaining)
+**Phases 3-7 are built** (tests: `test_food_habits.py`, `test_grocery_ready.py`, `test_dirty_plates.py`).
 
-3. Taste affinity per ingredient and stress-based dinner habits (cook, processed food, takeout).
-4. Shopping by ratio and budget; the chosen recipe on the schedule.
-5. Processed food with cold / warm and the microwave.
-6. Dinner rota proposals in the social contract (sets `dish_duty` and who cooks which day).
-7. Dirty plates as real items; showing the cooking / served state in the front end.
+* `systems/food_habits.py` -- a liking per ingredient (-1..1) that starts as a fixed personal lean and drifts with every meal (better
+  than a middling meal pleases, worse disappoints, plus a little for exposure); a craving that junk raises and good meals lower; a
+  comfort-eating habit that builds when they eat badly under stress. `pressure(c)` = 0.6 x stress now + 0.4 x the week's average
+  (`food_habits.stress_days`, appended at the daily nutrition settle). `dinner_mode` is "cook" or "easy": a calm person nearly always
+  cooks, a worn-out one with a comfort habit mostly doesn't. `easy_choice` is takeout (money and strain), the freezer, or a nibble.
+  Cooks take the ingredients they like best out of the stock and pick recipes by taste and craving; the honest reaction word counts
+  their own likes.
+* `systems/dinner.py` -- once an evening, at 17:00-20:00, each household decides who cooks (the rota's cook if home, with until 18:30
+  to arrive, else the adult at home under least strain; never a child) and whether they do; a cook gets a `cook_dinner` intention
+  (strategy -> `cook_recipe`). It runs from the cookware job (about once a minute).
+* `systems/dinner_rota.py` -- the household log of who cooked; an adult who made three of the last four dinners proposes a
+  `dinner_rota` through the ordinary proposals engine (accept / decline). Accepted: `household["dinner_rota"] = {cooks: {weekday: id},
+  dishes: "cook" | "other"}`; the end of dinner sends the rota's washer to the sink.
+* `systems/grocery.py` -- a shopping trip is planned when the shopper leaves: dinners for the next days chosen by taste, the plan is the
+  recipes' ratios times the people, scaled down to the units the shopper's money buys at the going price. The trip buys named
+  ingredients (taste, held back by price), pays for them, lays in fruit / bread / a snack, and puts the recipes on
+  `household["dinner_plan"]` and on the adults' evening "eat" schedule block (`recipe_id`). The cook follows tonight's planned
+  recipe when it can be made. A larder that can't make a dinner now sends someone shopping, not just an empty one.
+* `systems/ready_meals.py`, `data/ready_meals.py` -- processed food and takeout as individual items with a temperature. Shop-bought
+  meals are cold (hungry people go to the microwave -- the `heat_meal` activity -- and then eat), cheaper, lower on the health scale
+  and tastier; the more strained the shopper, the more of them they buy. Takeout is paid for at once, arrives 20-45 minutes later
+  warm, calls everyone home to eat, and goes cold after 40 minutes; its box goes in the bin.
+* Dirty plates: a plated meal or a microwaved meal leaves a real item in `household["dirty_items"]` (the dish, who left it, where);
+  washing up clears the items, the count and the pots. Fruit only adds to the count. The Household tab in the character creator
+  now has a Kitchen block (`api/household.py::_kitchen_of`): cookware and what is being served, leftovers, ready meals, deliveries,
+  the dinner plan, the rota and the dirty plates.
+
+**Not done:** bread / sandwich crafting on the counter (templates have `holds_ingredients` and `capacity`, nothing fills them yet);
+the old `cooking_process.py`, `data/recipes.py` and the `cook_meal` activity are untouched legacy; leftovers are not yet reheated in
+the microwave; the cook's reminder to go and fetch the others is the spoken announcement, not a separate errand.

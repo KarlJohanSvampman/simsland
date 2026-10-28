@@ -105,11 +105,14 @@ with mock.patch.object(og, "send_offgrid", lambda c, world, reason, minutes: (tr
 check("a parent does not leave for the shops before the kids have gone", not blocked, str(blocked))
 check("then the household's first hungry grown-up goes, and only one of them", second == [] and trips == [("p0", "shopping")], f"{second} {trips}")
 w["households"]["hh"]["_shopping_until"] = 0
-w["households"]["hh"]["storage"] = {"resources": [{"resource_type": "FOOD_SNACK", "quantity": 10}]}
+w["households"]["hh"]["storage"] = {"resources": []}
+from systems import cookware
+for tid, n in dict(chicken=4, rice=4, broccoli=4, salt=2, apple=2).items():       # enough to cook a dinner from
+    cookware.add_stock(w["households"]["hh"], tid, n)
 trips.clear()
 with mock.patch.object(og, "send_offgrid", lambda *a: trips.append(a) or True), mock.patch.object(og, "_errand_hours_ok", lambda *a: True),         mock.patch.object(og, "_leisure_fatigue_multiplier", lambda c: 1.0):
     og.maybe_go_offgrid(p0, w)
-check("with food in the house nobody goes shopping", not trips)
+check("with a dinner in the house nobody goes shopping", not trips)
 check("and a rested, fed household with nothing to meet never wanders off: there is no roll left at all", True)
 food = hp.restock(w, w["households"]["hh"], p0)
 check("the trip brings the groceries home, paid for", food and food["units"] > 0 and hp.food_units(w["households"]["hh"]) > 10, str(food))

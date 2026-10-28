@@ -927,7 +927,9 @@ def needs_groceries(c, world):
         return False
     if (household.get("_shopping_until") or 0) > world.get("tick", 0):
         return False
-    if food_units(household) >= max(2, len(household.get("members", []))):
+    from systems import cookware
+    members = max(1, len(household.get("members", [])))
+    if food_units(household) >= max(2, members) and cookware.feasible_recipes(household, min(members, 2)):
         return False
     chars = world.get("characters", {})
     hungry_adults = sorted((chars[m] for m in household.get("members", []) if m in chars and (chars[m].get("age") or 0) >= 18
@@ -1056,6 +1058,8 @@ def maybe_go_offgrid(c, world):
         household = (world.get("households") or {}).get(c.get("household_id")) or {}
         if send_offgrid(c, world, "shopping", GROCERY_TRIP_MINUTES):
             household["_shopping_until"] = c.get("return_tick")
+            from systems import grocery
+            grocery.make_plan(world, household, c)         # decided before they left: which dinners, how many units they can afford
 
 
 def maybe_schedule_doctor_visit(c, world):
