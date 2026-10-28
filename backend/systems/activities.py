@@ -2739,11 +2739,16 @@ def complete_activity(
     # category.
     # =====================================
     elif activity_type == "eat":
-        target_id = act.get("target_id")
+        # the meal chosen when it started (systems/eating.py); an old-style activity names the item as its target
+        target_id = (act.get("state") or {}).get("food_id") or act.get("target_id")
         item = _take_item_anywhere(c, world, target_id) if target_id else None
+        from systems.activity_trace import note
         if item:
             from systems.body import on_consume_complete
             on_consume_complete(c, world, item)
+            note(act, world, "ate", food=(item.get("name") or item.get("template_id") or "food").replace("_", " "))
+        else:
+            note(act, world, "nothing to eat", reason="the food was gone by the time they sat down")
 
     elif activity_type == "convenience_store_checkout":
         from systems.convenience_store import resolve_checkout

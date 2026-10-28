@@ -4823,6 +4823,7 @@ function openActivityModal(charId){
     ["Target", act.target_id
       ? `${prop?.template?.replace(/_/g, " ") || targetChar?.name || "unknown"} (${act.target_id})` : null],
     ["Anchor", act.anchor_name],
+    ["Eating", act.state?.food_name],
     ["Started", act.phase_started_tick != null ? `${Math.max(0, tick - act.phase_started_tick)} ticks ago` : null],
     ["Duration", act.duration != null ? `${act.duration} ticks` : null],
     ["Waiting for", act.state?.waiting_for ? JSON.stringify(act.state.waiting_for) : null],
@@ -4916,7 +4917,8 @@ function renderCharacterInspector(id){
         // carries (use_toilet, open_fridge, ...) -- show that, not the shell.
         const kind = c.activity.type === "interact" && c.activity.interaction
           ? c.activity.interaction : c.activity.type;
-        const label = kind.replace(/_/g, " ");
+        const food = c.activity.state?.food_name;     // what is being eaten (backend/systems/eating.py)
+        const label = kind.replace(/_/g, " ") + (food ? ` — ${food}` : "");
         const targetId = c.activity.target_id;
         const link = `<a href="#" class="activityDetailsLink" style="opacity:.7;margin-left:6px">details</a>`;
         if (!targetId) {

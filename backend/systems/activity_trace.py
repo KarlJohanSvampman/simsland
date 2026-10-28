@@ -88,7 +88,7 @@ def begin(c, world):
         _write(c, world, leftover, "replaced", c.get("_interrupt_reason") or f"replaced by {_label(act)}")
     act["started_tick"] = world.get("tick", 0)
     act["steps"] = planned_steps(act, world)
-    act["timeline"] = []
+    act.setdefault("timeline", [])
     note(act, world, "started", target=_target_name(world, act), planned_minutes=_minutes(act.get("duration") or 0))
     c["_trace_open"] = act
 

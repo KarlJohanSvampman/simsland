@@ -916,60 +916,64 @@ def _route_interact(c, world, action, definitions):
 # =========================================================
 
 def _route_eat(c, world, action):
-    """Per the user's explicit ask: eating should pair with a real seat when
-    one's already nearby (same _seat_near lookup as computer_use), not just
-    stand at the food source. Locating a genuinely PREFERRED eating surface
-    (a dining table specifically, over wherever the food itself is) isn't
-    built -- this only adds a seat near whichever prop the food came from."""
-    target_id = action.get("target")
-    if target_id:
-        from systems.props import get_prop_by_id, prop_distance
-        prop = get_prop_by_id(world, target_id)
-        if prop:
-            seat = _seat_near(world, prop, "eat")
-            if prop_distance(c, seat or prop) > INTERACT_WALK_RADIUS:
-                target_posture = "sitting_seat" if seat else "standing"
-                if c.get("posture") != target_posture:
-                    from systems.posture import set_posture
-                    set_posture(c, world, target_posture)
-                from systems.navigation import plan_character_route
-                wx, wy = _walk_target_for(seat, "sit") if seat else _walk_target_for(prop, "eat")
-                if plan_character_route(world, c, wx, wy):
-                    c["animation_state"] = "walk"
-                    c["is_moving"] = True
-                c["activity"] = {
-                    "type": "eat", "phase": "walking",
-                    "phase_started_tick": world.get("tick", 0),
-                    "duration": _INTERACTION_DURATIONS.get("eat", _FALLBACK_INTERACTION_DURATION),
-                    "target_id": target_id, "interaction": "eat", "state": {},
-                }
-                if seat:
-                    from systems.occupancy import find_free_anchor, reserve_anchor
-                    anchor = find_free_anchor(seat, "sit")
-                    if anchor:
-                        reserve_anchor(c, seat, anchor)
-                    c["seat_prop_id"] = seat["id"]
-                return
+    """Eating is a real meal at a real place (systems/eating.py): a food item they carry or the household keeps, taken to a dining
+    table or seat in the building they are in -- not whatever the action happened to name, eaten wherever they stand (a bathroom).
+    The food is written on the activity so the inspector can say what it is and the end of the activity consumes exactly that. With
+    nothing to eat in hand or in storage, the ordinary hunger routine (a ready meal, leftovers, a snack) takes over instead."""
+    from systems.eating import resolve_meal, food_name
+    meal = resolve_meal(c, world, action.get("target"))
+    if not meal:
+        from systems.strategy import resolve_hunger_strategy
+        kind = resolve_hunger_strategy(c, world)
+        if kind:
+            from systems.activities import start_activity
+            start_activity(c, world, kind)
+        return
+    item, prop = meal["item"], meal["place"]
+    food = {"food_id": item["id"], "food_name": food_name(item)}
+    from systems.activity_trace import note
+
+    if prop:
+        from systems.props import prop_distance
+        seat = _seat_near(world, prop, "eat")
+        if prop_distance(c, seat or prop) > INTERACT_WALK_RADIUS:
             target_posture = "sitting_seat" if seat else "standing"
             if c.get("posture") != target_posture:
                 from systems.posture import set_posture
                 set_posture(c, world, target_posture)
+            from systems.navigation import plan_character_route
+            wx, wy = _walk_target_for(seat, "sit") if seat else _walk_target_for(prop, "eat")
+            if plan_character_route(world, c, wx, wy):
+                c["animation_state"] = "walk"
+                c["is_moving"] = True
+            c["activity"] = {
+                "type": "eat", "phase": "walking",
+                "phase_started_tick": world.get("tick", 0),
+                "duration": _INTERACTION_DURATIONS.get("eat", _FALLBACK_INTERACTION_DURATION),
+                "target_id": prop["id"], "interaction": "eat", "state": dict(food),
+            }
             if seat:
-                _sit_in(c, world, seat)
-            c["activity"] = _scaffold(
-                c, world, "eat",
-                target_id=target_id,
-                interaction="eat",
-            )
+                from systems.occupancy import find_free_anchor, reserve_anchor
+                anchor = find_free_anchor(seat, "sit")
+                if anchor:
+                    reserve_anchor(c, seat, anchor)
+                c["seat_prop_id"] = seat["id"]
+            note(c["activity"], world, "chose food", food=food["food_name"], at=prop.get("template"))
             return
-    if c.get("posture") not in (None, "standing"):
-        from systems.posture import set_posture
-        set_posture(c, world, "standing")
-    c["activity"] = _scaffold(
-        c, world, "eat",
-        target_id=target_id,
-        interaction="eat",
-    )
+        target_posture = "sitting_seat" if seat else "standing"
+        if c.get("posture") != target_posture:
+            from systems.posture import set_posture
+            set_posture(c, world, target_posture)
+        if seat:
+            _sit_in(c, world, seat)
+        c["activity"] = _scaffold(c, world, "eat", target_id=prop["id"], interaction="eat")
+    else:
+        if c.get("posture") not in (None, "standing"):
+            from systems.posture import set_posture
+            set_posture(c, world, "standing")
+        c["activity"] = _scaffold(c, world, "eat", target_id=None, interaction="eat")
+    c["activity"].setdefault("state", {}).update(food)
+    note(c["activity"], world, "chose food", food=food["food_name"], at=prop.get("template") if prop else None)
 
 
 # =========================================================
