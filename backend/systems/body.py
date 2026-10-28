@@ -58,6 +58,8 @@ _BODY_DEFAULTS = {
     "energy":             70,
     "hours_awake":         0,
     "nutrients_today":     0,
+    "calories_today":      0,   # real kcal eaten today (items that carry calories)
+    "fat_cal_today":       0,   # of which from fat
     "toilet_visits_needed_today": 1,
     "cold_exposure":       0,   # systems/weather.py
     "heat_exposure":       0,   # systems/weather.py
@@ -80,7 +82,7 @@ _RANDOMIZED_ON_INSERT = {
 # leave them alone (hours_awake/nutrients_today are unbounded accumulators;
 # the private trackers are timestamps/day-numbers, not meters).
 _NON_PERCENT_BODY_FIELDS = {
-    "hours_awake", "nutrients_today", "toilet_visits_needed_today",
+    "hours_awake", "nutrients_today", "calories_today", "fat_cal_today", "toilet_visits_needed_today",
     "_wake_sim_time", "_nutrients_reset_day",
     "_sleep_hours_today", "sleep_hours_log", "_stimulant_until_tick",
 }
@@ -583,9 +585,10 @@ def on_wash_hands_complete(c):
     touch(c)
 
 
-def on_eat_complete(c, nutrition=0.5):
+def on_eat_complete(c, nutrition=0.5, calories=None):
     b = c["body"]
-    restore = 40 + nutrition * 40
+    # an item with real calories fills by what it is (about a point of hunger per 8 kcal: hunger runs out in ~10 h, so a day of eating is ~2000 kcal); the older items by their nutrition value
+    restore = min(100, calories / 8) if calories else 40 + nutrition * 40
     b["hunger"]       = max(0, b["hunger"] - restore)
     b["recent_intake"] = min(100, b["recent_intake"] + 50)
 
@@ -625,7 +628,14 @@ def on_consume_complete(c, world, item_tmpl):
     if category == "drink" or hydration_restore is not None or volume:
         on_drink_complete(c, hydration_value=hydration_restore or 0, volume=volume)
     elif category == "food" or nutrition:
-        on_eat_complete(c, nutrition=nutrition)
+        calories = item_tmpl.get("calories") or 0
+        if calories:
+            # real calories: the day's tally in kcal and fat, and the nutrition fraction is a share of THIS person's daily need
+            from systems.nutrition import daily_kcal_need
+            nutrition = calories / daily_kcal_need(c)
+            b["calories_today"] = b.get("calories_today", 0) + calories
+            b["fat_cal_today"] = b.get("fat_cal_today", 0) + calories * (item_tmpl.get("fat_pct") or 0)
+        on_eat_complete(c, nutrition=nutrition, calories=calories)
         # A real plate/bowl/cutlery used for a meal -- see systems/
         # chores.py, which tracks this as a simple household-wide count
         # rather than real per-instance dishware (see that module's

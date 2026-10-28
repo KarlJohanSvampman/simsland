@@ -2281,7 +2281,20 @@ def complete_activity(
 
         if household:
 
-            meal = find_household_resource(
+            from systems.eating import served_plate, meal_reaction
+            plate = served_plate(c, world)
+            if plate:
+                from systems.body import on_consume_complete
+                on_consume_complete(c, world, plate)
+                c["last_meal"] = {"name": plate.get("name"), "reaction": meal_reaction(plate), "taste": plate.get("taste"),
+                                  "health": plate.get("health"), "tick": world.get("tick", 0)}
+                from systems.activity_trace import note
+                note(act, world, "ate", food=plate.get("dish_name"), reaction=c["last_meal"]["reaction"])
+                return_meal = True
+            else:
+                return_meal = False
+
+            meal = None if return_meal else find_household_resource(
                 household,
                 resource_type="MEAL"
             )
@@ -2332,14 +2345,20 @@ def complete_activity(
     # =====================================
     elif activity_type == "cook_recipe":
 
-        from systems.cooking_process import start_cooking_process, choose_recipe
+        from systems import cookware
+        from systems.activity_trace import note
+        from systems.incidental_speech import fire_incidental
 
         household = world["households"].get(c.get("household_id"))
 
         if household:
-            recipe_id = choose_recipe(c, world, household)
-            if recipe_id:
-                start_cooking_process(c, household, recipe_id, world)
+            vessel = cookware.start_dinner(c, world, household)
+            if vessel:
+                minutes = round((vessel["done_tick"] - vessel["started_tick"]) / 60)
+                note(act, world, "put it on", recipe=vessel["dish"]["name"], people=vessel["people"], cookware=vessel["kind"], minutes=minutes)
+                fire_incidental(c, "inform", f"{vessel['dish']['name']} for {vessel['people']} -- it needs about {minutes} minutes.", world)
+            else:
+                note(act, world, "nothing to cook", reason="not enough of the right ingredients")
 
     # =====================================
     # LAUNDRY — hand off to the household-scoped process engine
@@ -2569,7 +2588,8 @@ def complete_activity(
 
     elif activity_type == "eat_snack":
         from systems.body import on_consume_complete
-        item = _find_and_consume_food(c, world, category="food")
+        from systems.eating import stock_item
+        item = _find_and_consume_food(c, world, category="food") or stock_item(c, world)
         if item:
             on_consume_complete(c, world, item)
         else:
@@ -2746,7 +2766,11 @@ def complete_activity(
         if item:
             from systems.body import on_consume_complete
             on_consume_complete(c, world, item)
-            note(act, world, "ate", food=(item.get("name") or item.get("template_id") or "food").replace("_", " "))
+            from systems.eating import meal_reaction
+            reaction = meal_reaction(item)
+            if reaction:
+                c["last_meal"] = {"name": item.get("name"), "reaction": reaction, "taste": item.get("taste"), "health": item.get("health"), "tick": world.get("tick", 0)}
+            note(act, world, "ate", food=(item.get("name") or item.get("template_id") or "food").replace("_", " "), reaction=reaction)
         else:
             note(act, world, "nothing to eat", reason="the food was gone by the time they sat down")
 

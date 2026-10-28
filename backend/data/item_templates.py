@@ -934,6 +934,10 @@ ITEM_TEMPLATES = {
 }
 
 
+from data.ingredients import INGREDIENTS as _INGREDIENTS
+for _tid, _tmpl in _INGREDIENTS.items():
+    ITEM_TEMPLATES[_tid] = {**ITEM_TEMPLATES.get(_tid, {}), **_tmpl}
+
 # =========================================================
 # LOOKUPS
 # =========================================================

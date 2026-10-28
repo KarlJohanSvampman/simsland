@@ -183,6 +183,14 @@ def resolve_hunger_strategy(
     )
 
     # =====================================================
+    # SOMEONE HAS COOKED (food that is still being served)
+    # =====================================================
+
+    from systems import cookware
+    if cookware.ready_vessel(household, world.get("tick", 0)) or any(l.get("portions", 0) > 0 for l in household.get("leftovers", [])):
+        return "eat_meal"
+
+    # =====================================================
     # READY MEALS
     # =====================================================
 
@@ -240,7 +248,7 @@ def resolve_hunger_strategy(
             "FOOD_FRUIT"
     )
 
-    if fruit:
+    if fruit or find_household_resource(household, resource_type="FOOD_BREAD"):
 
         return "eat_snack"
 
@@ -284,7 +292,7 @@ def resolve_hunger_strategy(
             "FOOD_VEGETABLE"
     )
 
-    if protein and carbs and vegetables:
+    if (protein and carbs and vegetables) or cookware.feasible_recipes(household, 1):
 
         return "cook_recipe"
 

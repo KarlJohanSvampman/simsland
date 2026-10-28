@@ -274,6 +274,8 @@ def _dishes_on_complete(household, process, world):
 
     create_household_resource(household, "CLEAN_DISHES", quantity=1, container="cabinet")
     clear_dirty_dishes(household)
+    from systems.cookware import wash
+    wash(household)             # the pots and pans are washed with the rest
     zone_key = kitchen_zone_key(world, household)
     if zone_key:
         adjust_room_cleanliness(world, zone_key, 20.0)

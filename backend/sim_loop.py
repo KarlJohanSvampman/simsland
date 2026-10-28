@@ -1366,6 +1366,12 @@ def _job_plants(world, entry):
             maybe_tend_plants(c, world)
 
 
+def _job_cookware(world, entry):
+    """Scheduled job `cookware`: pots, pans and the oven finish cooking, and served food ends its window (systems/cookware.py)."""
+    from systems.cookware import update
+    update(world)
+
+
 def _job_food_aging(world, entry):
     """Scheduled job `food_aging` (was an every() block in tick()); see core/scheduler.py."""
     age_food_items(world)
@@ -1517,6 +1523,7 @@ scheduler.register_recurring("contagion", _job_contagion, every=CADENCE["contagi
 scheduler.register_recurring("child_care", _job_child_care, every=CADENCE["child_care"], offset=(-37) % CADENCE["child_care"])
 scheduler.register_recurring("bedroom_assignment", _job_bedroom_assignment, every=CADENCE["bedroom_assignment"], offset=(-38) % CADENCE["bedroom_assignment"])
 scheduler.register_recurring("plants", _job_plants, every=CADENCE["plants"], offset=(-39) % CADENCE["plants"])
+scheduler.register_recurring("cookware", _job_cookware, every=CADENCE["cookware"], offset=(-47) % CADENCE["cookware"])
 scheduler.register_recurring("food_aging", _job_food_aging, every=CADENCE["food_aging"], offset=(-40) % CADENCE["food_aging"])
 scheduler.register_recurring("home_presence", _job_home_presence, every=CADENCE["home_presence"], offset=(-46) % CADENCE["home_presence"])
 scheduler.register_recurring("body_composition", _job_body_composition, every=CADENCE["body_composition"], offset=(-41) % CADENCE["body_composition"])

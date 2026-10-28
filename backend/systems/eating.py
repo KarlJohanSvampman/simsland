@@ -62,10 +62,95 @@ def eating_place(c, world):
     return min(places, key=lambda p: prop_distance(c, p)) if places else None
 
 
+def weakness_of(c):
+    """How much this person is drawn to meat, fat and a big helping, each -1..1 (negative: puts them off). Fixed per person."""
+    if "food_weakness" not in c:
+        import random
+        rng = random.Random(f"weakness:{c.get('id')}")
+        c["food_weakness"] = {k: round(max(-1.0, min(1.0, rng.gauss(0.2, 0.5))), 2) for k in ("meat", "fat", "calories")}
+    return c["food_weakness"]
+
+
+def _household(c, world):
+    return (world.get("households") or {}).get(c.get("household_id"))
+
+
+def served_plate(c, world):
+    """One plate of what the household has cooked and is still serving (a portion comes off the vessel), or None."""
+    household = _household(c, world)
+    if not household:
+        return None
+    from systems import cookware
+    vessel = cookware.ready_vessel(household, world.get("tick", 0))
+    if vessel:
+        return cookware.take_portion(vessel, world, weakness_of(c))
+    return cookware.take_leftover(household, weakness_of(c))
+
+
+def stock_item(c, world, groups=("fruit", "bread", "none")):
+    """One ready-to-eat item out of the household's stock (fruit, bread, a snack), as an item they now hold, or None."""
+    household = _household(c, world)
+    if not household:
+        return None
+    import uuid
+    from data.item_templates import get_template
+    from systems import cookware
+    rows = [r for r in cookware.stock(household) if (get_template(cookware.row_template(r)) or {}).get("food_group") in groups]
+    if not rows:
+        return None
+    row = max(rows, key=lambda r: ((get_template(cookware.row_template(r)) or {}).get("food_group") == "fruit", r.get("quantity", 0)))
+    tid = cookware.row_template(row)
+    row["quantity"] -= 1
+    if row["quantity"] <= 0:
+        household["storage"]["resources"].remove(row)
+    return {**get_template(tid), "id": f"item_{tid}_{uuid.uuid4().hex[:6]}", "template_id": tid, "quantity": 1}
+
+
+def meal_reaction(item):
+    """What they would honestly say about it, for anything that carries a taste (a plate) or calories (an ingredient)."""
+    from systems import food_scoring as fs
+    if item.get("taste") is not None:
+        return fs.reaction(item["taste"])
+    if item.get("calories"):
+        group = item.get("food_group")
+        if group in ("fruit", "bread", "none"):
+            health = fs.dish_from_items([item])["health"]
+            return fs.reaction(fs.taste_of(health))
+    return None
+
+
 def resolve_meal(c, world, target_id):
+    """What they eat: the item they named; else a plate of what is being served; else what they carry or the household keeps."""
     item = find_item(c, world, target_id)
     if not is_food(item):
+        item = served_plate(c, world)
+        if item:
+            c.setdefault("inventory", []).append(item)       # on the plate in their hands until they have eaten it
+    if not item:
         item = pick_food(c, world)
+    if not item:
+        item = stock_item(c, world)
+        if item:
+            c.setdefault("inventory", []).append(item)
     if not item:
         return None
     return {"item": item, "place": eating_place(c, world)}
+
+
+def food_context(c, world):
+    """What the person knows about food right now: dinner served or cooking in their house, and how their last meal was."""
+    lines = []
+    household = _household(c, world)
+    tick = world.get("tick", 0)
+    if household:
+        for v in household.get("cookware", []):
+            if v["state"] == "ready" and v.get("charges", 0) > 0 and tick < v.get("serve_until_tick", 0):
+                lines.append(f"{v['dish']['name']} is served at home ({v['charges']} portion{'s' if v['charges'] != 1 else ''} left).")
+            elif v["state"] == "cooking":
+                lines.append(f"{v['dish']['name']} is cooking, ready in about {max(1, round((v['done_tick'] - tick) / 60))} minutes.")
+        if any(l.get("portions", 0) > 0 for l in household.get("leftovers", [])):
+            lines.append("There are leftovers in the fridge.")
+    meal = c.get("last_meal")
+    if meal and tick - meal.get("tick", 0) < 3 * 3600 and meal.get("reaction"):
+        lines.append(f"Your last meal, {meal.get('name') or 'the food'}, was {meal['reaction']}.")
+    return lines

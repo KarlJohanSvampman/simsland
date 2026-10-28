@@ -25,6 +25,20 @@ RESOURCE_TYPES = {
         "cookable": True
     },
 
+    "FOOD_DAIRY": {
+
+        "category": "ingredient",
+
+        "cookable": True
+    },
+
+    "FOOD_BREAD": {
+
+        "category": "quick_food",
+
+        "ready_to_eat": True
+    },
+
     "FOOD_SPICE": {
 
         "category": "ingredient",

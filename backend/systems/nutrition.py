@@ -56,6 +56,33 @@ _WEIGHT_BAND_HAZARDS = {
 }
 
 
+KCAL_PER_KG       = 7700.0
+MAX_DAILY_KG      = 0.3        # one day never moves weight further than this
+HEALTHY_FAT_SHARE = 0.35       # share of calories from fat above which the surplus weighs a little more
+FAT_EXTRA         = 0.5        # how much more (of the surplus' kg) fat above that share adds
+
+
+def daily_kcal_need(c):
+    """What this person burns in a day (Mifflin-St Jeor at light activity), from weight, height, age and sex."""
+    weight = c.get("weight_kg", 70)
+    height = c.get("body_features", {}).get("height_cm", 170)
+    age = c.get("age", 30) or 0
+    base = 10 * weight + 6.25 * height - 5 * age + (5 if c.get("sex") != "female" else -161)
+    if age < 18:
+        base = max(base, 1200 + 80 * age)       # growing children eat for growth too
+    return max(1200.0, base * 1.4)
+
+
+def weight_change_kg(c, kcal_in, fat_cal=0.0):
+    """The day's weight change from calories eaten against what was burned; fat above a healthy share adds a little more."""
+    need = daily_kcal_need(c)
+    delta = (kcal_in - need) / KCAL_PER_KG
+    if delta > 0 and kcal_in > 0:
+        over = max(0.0, fat_cal / kcal_in - HEALTHY_FAT_SHARE)
+        delta *= 1 + FAT_EXTRA * over / (1 - HEALTHY_FAT_SHARE)
+    return max(-MAX_DAILY_KG, min(MAX_DAILY_KG, delta))
+
+
 def compute_bmi(c):
     height_cm = c.get("body_features", {}).get("height_cm", 170)
     weight_kg = c.get("weight_kg", 70)
@@ -130,10 +157,12 @@ def settle_nutrition_day(c, world):
     load (decision #8) -- then resets the running tally."""
     b = c.setdefault("body", {})
     nutrients = b.get("nutrients_today", 0.0)
+    need = daily_kcal_need(c)
+    kcal_in = nutrients * need          # nutrients_today is a share of this person's day; calories_today is the real kcal part of it
+    c["weight_kg"] = max(WEIGHT_MIN_KG, c.get("weight_kg", 70) + weight_change_kg(c, kcal_in, b.get("fat_cal_today", 0.0)))
 
     if nutrients > 1.0:
         excess = nutrients - 1.0
-        c["weight_kg"] = c.get("weight_kg", 70) + WEIGHT_STEP_KG * (1 + excess)
         toilet_visits = 1 + math.floor(excess / 0.5)
 
         # Excess-nutrition day -> food-addiction bump (decision #10).
@@ -143,12 +172,12 @@ def settle_nutrition_day(c, world):
         except ImportError:
             pass
     else:
-        deficit = 1.0 - nutrients
-        c["weight_kg"] = max(WEIGHT_MIN_KG, c.get("weight_kg", 70) - WEIGHT_STEP_KG * (1 + deficit))
         toilet_visits = 1
 
     b["toilet_visits_needed_today"] = toilet_visits
     b["nutrients_today"] = 0.0
+    b["calories_today"] = 0.0
+    b["fat_cal_today"] = 0.0
 
     bmi = compute_bmi(c)
     band = get_weight_band(bmi)

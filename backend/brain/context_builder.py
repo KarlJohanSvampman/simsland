@@ -1639,9 +1639,12 @@ def _sec_body_fitness(c, world):
     # nudge-not-force pattern in this file.
     from systems.body_composition import get_body_composition_context
     from systems.exercise import get_exercise_context
+    from systems.eating import food_context
     body_lines = get_body_composition_context(c).get("body_composition", [])
     fitness_lines = get_exercise_context(c).get("fitness", [])
-    return " ".join(body_lines + fitness_lines) if (body_lines or fitness_lines) else None
+    food_lines = food_context(c, world)
+    lines = body_lines + fitness_lines + food_lines
+    return " ".join(lines) if lines else None
 
 
 def _sec_aggressor(c, world):

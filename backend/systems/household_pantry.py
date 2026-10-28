@@ -7,11 +7,13 @@ and a hungry child could only wait for a parent. stock_pantry() gives a househol
 once (household["_pantry_stocked"]); after that, keeping the house stocked is the household's own business (shopping).
 """
 
-from systems.household_storage import create_household_resource, ensure_household_storage
+import random
 
-FOOD_TYPES = ("FOOD_PROTEIN", "FOOD_CARB", "FOOD_VEGETABLE", "FOOD_FRUIT", "FOOD_SNACK", "FOOD_SPICE", "MEAL", "STORED_MEAL", "PROCESSED_MEAL")
-# units per household member
-STARTER_SUPPLY = (("FOOD_PROTEIN", 6), ("FOOD_CARB", 6), ("FOOD_VEGETABLE", 6), ("FOOD_FRUIT", 4), ("FOOD_SNACK", 4), ("FOOD_SPICE", 2))
+from systems.household_storage import ensure_household_storage
+
+FOOD_TYPES = ("FOOD_PROTEIN", "FOOD_CARB", "FOOD_VEGETABLE", "FOOD_FRUIT", "FOOD_DAIRY", "FOOD_BREAD", "FOOD_SNACK", "FOOD_SPICE", "MEAL", "STORED_MEAL", "PROCESSED_MEAL")
+# units per household member, by ingredient group (the actual ingredients are picked from data/ingredients.py)
+STARTER_SUPPLY = (("protein", 6), ("carb", 6), ("vegetable", 6), ("fruit", 4), ("dairy", 3), ("bread", 2), ("none", 3), ("spice", 2))
 
 
 def food_units(household):
@@ -26,14 +28,25 @@ def stock_pantry(world, household):
         return 0
     members = max(1, len(household.get("members", [])))
     added = 0
-    for resource_type, per_person in STARTER_SUPPLY:
-        create_household_resource(household, resource_type, quantity=per_person * members)
-        added += per_person * members
+    for group, per_person in STARTER_SUPPLY:
+        added += stock_group(household, group, per_person * members)
     household["_pantry_stocked"] = world.get("tick", 0)
     return added
 
 
-TRIP_PER_PERSON = (("FOOD_PROTEIN", 4), ("FOOD_CARB", 4), ("FOOD_VEGETABLE", 4), ("FOOD_FRUIT", 3), ("FOOD_SNACK", 3))
+def stock_group(household, group, units, rng=random):
+    """Put `units` of a food group into the household's stock, spread over a few of the ingredients of that group."""
+    from data.ingredients import INGREDIENTS
+    from systems.cookware import add_stock
+    choices = [tid for tid, t in INGREDIENTS.items() if t["food_group"] == group]
+    if not choices or units <= 0:
+        return 0
+    for _ in range(units):
+        add_stock(household, rng.choice(choices), 1)
+    return units
+
+
+TRIP_PER_PERSON = (("protein", 4), ("carb", 4), ("vegetable", 4), ("fruit", 3), ("dairy", 2), ("bread", 1), ("none", 2), ("spice", 1))
 COST_PER_PERSON = 14.0
 
 
@@ -50,7 +63,6 @@ def restock(world, household, shopper):
     if rest > 0:
         household["wealth"] = max(0, (household.get("wealth", 0) or 0) - rest)
     units = 0
-    for resource_type, per_person in TRIP_PER_PERSON:
-        create_household_resource(household, resource_type, quantity=per_person * members)
-        units += per_person * members
+    for group, per_person in TRIP_PER_PERSON:
+        units += stock_group(household, group, per_person * members)
     return {"units": units, "cost": cost}

@@ -303,10 +303,10 @@ def _deliver_prop(household, catalog_id, world):
 # =========================================================
 
 def determine_container(resource_type):
-    if resource_type in ("FOOD_PROTEIN", "FOOD_VEGETABLE", "MEAL",
+    if resource_type in ("FOOD_PROTEIN", "FOOD_VEGETABLE", "FOOD_DAIRY", "MEAL",
                          "STORED_MEAL", "PROCESSED_MEAL", "DRINK_MILK"):
         return "fridge"
-    if resource_type in ("FOOD_CARB", "FOOD_SNACK", "FOOD_SPICE",
+    if resource_type in ("FOOD_CARB", "FOOD_SNACK", "FOOD_SPICE", "FOOD_BREAD",
                          "DRINK_COFFEE", "DRINK_TEA", "DRINK_SOFT",
                          "DRINK_ALCOHOL"):
         return "pantry"

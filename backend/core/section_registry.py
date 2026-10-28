@@ -53,6 +53,7 @@ REGISTRY = {
     "every:polarization": ("event", "character", "on opinion/belief change"),
     "every:relationships": ("event", "social", "on proximity/interaction events"),
     "every:neighbours": ("event", "social", "a character-created event seeds that character's neighbour ties once (systems/neighbours.py)"),
+    "every:cookware": ("timer", "household", "cooking vessels finish on their clock; served food whose 1-2 hour window has passed is flagged for the cook (systems/cookware.py)"),
     "every:kids_play": ("timer", "social", "a free child with a free friend nearby gets a play_with_friend intention, per-friend cooldown (systems/kids_play.py)"),
     "every:introductions": ("timer", "social", "a character who sees two strangers they both know well may introduce them (systems/introductions.py)"),
     "every:exhaustion": ("timer", "character", "fatigue by day builds strain (anger, stress, mistakes); a helper may offer to take over a duty (systems/exhaustion.py)"),

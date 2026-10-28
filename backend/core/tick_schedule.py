@@ -133,6 +133,8 @@ CADENCE["rumors"]           = 300
 CADENCE["neighbours"]       = 600
 # Free children with a free friend get the urge to play together (systems/kids_play.py).
 CADENCE["kids_play"]        = 600
+# Pots, pans and the oven: finishing what is cooked, ending the serving window (systems/cookware.py).
+CADENCE["cookware"]         = 30
 # A friend who sees two strangers together may introduce them (systems/introductions.py).
 CADENCE["introductions"]    = 300
 # Strain from fatigue by day, offers to take over, mistakes (systems/exhaustion.py).
