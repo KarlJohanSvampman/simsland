@@ -338,7 +338,30 @@ def _maybe_resync_clock_to_real_time(world):
         return
     _resynced_clock_this_process = True
     if max(1, min(50, world.get("time_scale", 1))) == 1:
+        before = world.get("sim_time", time.time())
         world["sim_time"] = time.time()
+        if world["sim_time"] - before > CLOCK_JUMP_WAKES_SLEEPERS_AFTER:
+            _wake_sleepers_after_clock_jump(world)
+
+
+CLOCK_JUMP_WAKES_SLEEPERS_AFTER = 3600      # seconds the resync may move the clock forward before mid-sleep characters are woken
+
+
+def _wake_sleepers_after_clock_jump(world):
+    """A sleep activity runs for a number of ticks, not until a time of day, so when the resync jumps the
+    clock hours ahead (a restart after the sim fell behind real time) everyone mid-sleep kept sleeping
+    through the afternoon. Wake those whose schedule, at the new time, does not say sleep."""
+    from datetime import datetime
+    from systems.occupancy import interrupt_activity
+    from systems.scheduling import get_current_activity
+    now = datetime.fromtimestamp(world["sim_time"])
+    at_new_time = {"calendar": {"weekday": now.strftime("%A"), "hour": now.hour, "minute": now.minute}}
+    for c in world.get("characters", {}).values():
+        if (c.get("activity") or {}).get("type") != "sleep":
+            continue
+        if get_current_activity(c, at_new_time) == "sleep":
+            continue
+        interrupt_activity(c, world, reason="the clock moved on to the day while they slept")
 
 
 def _run_tick_and_persist(sim_id: str) -> tuple[dict, dict]:
