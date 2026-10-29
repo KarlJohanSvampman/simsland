@@ -36,6 +36,8 @@ BASE_OWN_BREAKDOWN = 3.0
 BASE_WITNESSED_BREAKDOWN = 5.0
 
 # --- states ----------------------------------------------------------------------------------------------------
+ENVY_WORRY_SHARE = 0.2                   # envy / rivalry piles up in volume (hundreds of small ones) and is not a quarrel: it counts for a fifth
+ENVY_EVENTS = {"life_envy", "team_rivalry"}
 GRIEVANCE_SCORE_TO_WORRY = 12.0          # (systems/grievances.py: cold shoulder starts at 15, confrontation at 30)
 LEDGER_MIN_NEG_CAUSED = 12.0             # what the other person has done to them, in the ledger's units
 LEDGER_OTHER_SHARE = 0.65                # ... and they are the source of at least this share of it
@@ -164,15 +166,16 @@ def _wanted_grievances(c, world):
     scores = {}
     top = {}
     for g in c.get("grievances", []):
-        scores[g["caused_by"]] = scores.get(g["caused_by"], 0) + g["weight"]
-        if g["caused_by"] not in top or g["weight"] > top[g["caused_by"]]["weight"]:
+        share = ENVY_WORRY_SHARE if g.get("event_type") in ENVY_EVENTS else 1.0
+        scores[g["caused_by"]] = scores.get(g["caused_by"], 0) + g["weight"] * share
+        if g.get("event_type") not in ENVY_EVENTS and (g["caused_by"] not in top or g["weight"] > top[g["caused_by"]]["weight"]):
             top[g["caused_by"]] = g
     out = {}
     for pid, score in scores.items():
         if score < GRIEVANCE_SCORE_TO_WORRY or pid not in world.get("characters", {}):
             continue
         name = _name(world, pid)
-        what = str(top[pid].get("event_type", "what they did")).replace("_", " ")
+        what = str((top.get(pid) or {"event_type": "life_envy"}).get("event_type", "what they did")).replace("_", " ")
         out[f"conflict:{pid}"] = ({"kind": "conflict", "ref": pid, "label": name}, 2.0 + min(3.5, score / 12.0),
                                   f"I'm still angry with {name} ({what}) and it isn't settled", ["conflict", "grievance", pid], None)
     return out

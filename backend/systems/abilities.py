@@ -7,7 +7,7 @@ rather than hardcoded per skill:
 
     "cooking": {
         "name": "Cooking",
-        "trains_via": ["cook_meal", "bake"],        -- which actions
+        "trains_via": ["cook_recipe", "bake"],        -- which actions
             practicing this ability actually trains it (attempting one
             of these counts as a real training attempt, win or lose).
         "proficiency_levels": [

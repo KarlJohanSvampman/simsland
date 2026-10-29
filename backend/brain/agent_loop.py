@@ -29,10 +29,6 @@ from brain.self_model import (
     consolidate_identity
 )
 
-from systems.cooking_process import (
-        update_cooking_process
-)
-
 
 from systems.strategy import (
     resolve_strategy
@@ -782,28 +778,6 @@ def update_agent(
     _prof.mark("agent:update_child_cognition")
     update_child_cognition(c, world)
 
-    # =====================================
-    # COOKING FOOD
-    # =====================================
-
-    _prof.mark("agent:get")
-    household = world[
-        "households"
-    ].get(
-        c.get("household_id")
-    )
-
-    _prof.mark("agent:if_L736")
-    if household:
-
-        update_cooking_process(
-
-            c,
-
-            household,
-
-            world
-        )
 
     # =====================================
     # REFLECTIONS

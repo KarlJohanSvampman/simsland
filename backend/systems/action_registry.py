@@ -392,7 +392,6 @@ ACTION_TYPE_MIN_AGE = {
     # (cook_recipe/cook_meal don't route through those specific anchor
     # interactions, so they weren't covered by that dict at all).
     "cook_recipe":              10,
-    "cook_meal":                10,
     "cook_together":            10,
 
     # Household chores involving an appliance/hot water/carrying a load --

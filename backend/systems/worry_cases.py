@@ -39,6 +39,7 @@ AREA_DURATION_FACTOR = 0.5
 FOCUS_PER_SEVERITY = 2                   # percentage points of focus per severity point
 CASE_COST_CAP = 25
 MAX_LOAD = 80                            # the most focus worries can take together
+CONFLICT_LOAD_CAP = 35                   # ... and quarrels with other people, however many, take no more than this of it
 MIN_SEVERITY = 2                         # below this nothing is registered
 AREA_SEVERITY_CAP = 3
 REFRESH_NUDGE = 1                        # a refresh may raise severity by this much ...
@@ -270,7 +271,8 @@ def update_focus(c, world):
             case["status"] = "lapsed"
             case["closed"] = tick
     act = active_cases(c)
-    load = min(MAX_LOAD, sum(cs["focus_cost"] for cs in act))
+    quarrels = sum(cs["focus_cost"] for cs in act if (cs.get("subject") or {}).get("kind") == "conflict")
+    load = min(MAX_LOAD, sum(cs["focus_cost"] for cs in act) - quarrels + min(CONFLICT_LOAD_CAP, quarrels))
     top = max(act, key=lambda cs: cs["focus_cost"], default=None)
     state = c.setdefault("focus_state", {})
     new = {"available": 100 - load, "load": load, "top_case": top["id"] if top else None}

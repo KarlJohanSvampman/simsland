@@ -53,7 +53,6 @@ from brain.relationships import first_impression, update_relationship_state, ens
 from systems.contact_designation import accumulate_hours, evaluate_weekly_designations
 from systems.peer_influence import resolve_cognitive_adoption
 from systems.trait_budget import recompute_budget_on_birthday
-from systems.cooking_process import update_cooking_process
 from systems.reading_process import update_reading_process
 from systems.task_process import update_household_processes
 from systems.market     import update_market, produce, consume_households
@@ -905,15 +904,6 @@ def _job_influence_exposure(world, entry):
     resolve_exposure_influence(world)
 
 
-def _job_cooking(world, entry):
-    """Scheduled job `cooking` (was an every() block in tick()); see core/scheduler.py."""
-    characters = [c for c in world.get("characters", {}).values() if not c.get("is_workplace_npc")]
-    for c in characters:
-        hh = world.get("households", {}).get(c.get("household_id"))
-        if hh:
-            update_cooking_process(c, hh, world)
-
-
 def _job_reading(world, entry):
     """Scheduled job `reading` (was an every() block in tick()); see core/scheduler.py."""
     characters = [c for c in world.get("characters", {}).values() if not c.get("is_workplace_npc")]
@@ -938,7 +928,8 @@ def _job_reading_2(world, entry):
 
 
 def _job_cooking_2(world, entry):
-    """Scheduled job `cooking#2` (was an every() block in tick()); see core/scheduler.py."""
+    """Scheduled job `cooking#2`: the household's background processes (laundry, dishes, ...); see core/scheduler.py. (The old per-character
+    cooking process is gone -- pots, pans and the oven are systems/cookware.py.)"""
     update_household_processes(world)
 
 
@@ -1475,7 +1466,6 @@ scheduler.register_recurring("kids_play", _job_kids_play, every=CADENCE["kids_pl
 scheduler.register_recurring("introductions", _job_introductions, every=CADENCE["introductions"], offset=(-12) % CADENCE["introductions"])
 scheduler.register_recurring("exhaustion", _job_exhaustion, every=CADENCE["exhaustion"], offset=(-13) % CADENCE["exhaustion"])
 scheduler.register_recurring("influence_exposure", _job_influence_exposure, every=CADENCE["influence_exposure"], offset=(-21) % CADENCE["influence_exposure"])
-scheduler.register_recurring("cooking", _job_cooking, every=CADENCE["cooking"], offset=(-5) % CADENCE["cooking"])
 scheduler.register_recurring("reading", _job_reading, every=CADENCE["reading"], offset=(-9) % CADENCE["reading"])
 scheduler.register_recurring("health", _job_health, every=CADENCE["health"], offset=(-19) % CADENCE["health"])
 scheduler.register_recurring("reading#2", _job_reading_2, every=CADENCE["reading"], offset=(-17) % CADENCE["reading"])

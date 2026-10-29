@@ -18522,62 +18522,6 @@
         }
       ]
     },
-    "cook_meal": {
-      "name": "Cook a Meal",
-      "category": "food",
-      "interruptible": false,
-      "satisfies_needs": [
-        "creative"
-      ],
-      "steps": [
-        {
-          "id": "prep",
-          "interaction": "open_fridge",
-          "target_interaction": "open_fridge",
-          "target_tags": [
-            "fridge"
-          ],
-          "duration_minutes": 3,
-          "requires": []
-        },
-        {
-          "id": "cook",
-          "interaction": "cook",
-          "target_interaction": "cook",
-          "target_tags": [
-            "stove"
-          ],
-          "duration_minutes": 30,
-          "requires": [
-            "prep"
-          ]
-        },
-        {
-          "id": "eat",
-          "interaction": "eat",
-          "target_interaction": "eat",
-          "target_tags": [
-            "table"
-          ],
-          "duration_minutes": 20,
-          "requires": [
-            "cook"
-          ]
-        },
-        {
-          "id": "wash_up",
-          "interaction": "wash_dishes",
-          "target_interaction": "wash_dishes",
-          "target_tags": [
-            "sink"
-          ],
-          "duration_minutes": 10,
-          "requires": [
-            "eat"
-          ]
-        }
-      ]
-    },
     "heat_meal": {
       "name": "Heat a Meal",
       "category": "food",
@@ -33114,82 +33058,7 @@
       "conditions": []
     }
   },
-  "recipe_templates": {
-    "simple_pasta": {
-      "difficulty": 0.3,
-      "time_minutes": 25,
-      "nutrition": 0.7,
-      "stages": [
-        {
-          "name": "boil_water",
-          "primitive": "boil",
-          "duration": 5,
-          "active": false
-        },
-        {
-          "name": "cook_carbs",
-          "primitive": "boil",
-          "inputs": {
-            "FOOD_CARB": 1
-          },
-          "duration": 12,
-          "active": false
-        },
-        {
-          "name": "prepare_sauce",
-          "primitive": "mix",
-          "inputs": {
-            "FOOD_VEGETABLE": 1,
-            "FOOD_SPICE": 1
-          },
-          "duration": 8,
-          "active": true
-        }
-      ],
-      "output": {
-        "resource_type": "MEAL",
-        "servings": 3
-      }
-    },
-    "protein_plate": {
-      "difficulty": 0.5,
-      "time_minutes": 40,
-      "nutrition": 0.9,
-      "stages": [
-        {
-          "name": "roast_protein",
-          "primitive": "roast",
-          "inputs": {
-            "FOOD_PROTEIN": 1
-          },
-          "duration": 30,
-          "active": false
-        },
-        {
-          "name": "cook_vegetables",
-          "primitive": "fry",
-          "inputs": {
-            "FOOD_VEGETABLE": 1
-          },
-          "duration": 12,
-          "active": true
-        },
-        {
-          "name": "prepare_carbs",
-          "primitive": "boil",
-          "inputs": {
-            "FOOD_CARB": 1
-          },
-          "duration": 15,
-          "active": false
-        }
-      ],
-      "output": {
-        "resource_type": "MEAL",
-        "servings": 4
-      }
-    }
-  },
+  "recipe_templates": {},
   "service_templates": {
     "insurance_home_meridian": {
       "name": "Meridian HomeGuard",
@@ -68897,7 +68766,7 @@
       "name": "Cooking",
       "category": "practical",
       "trains_via": [
-        "cook_meal",
+        "cook_recipe",
         "bake"
       ],
       "proficiency_levels": [

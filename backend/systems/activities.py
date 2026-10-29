@@ -534,19 +534,6 @@ ACTIVITIES = {
         "category": "survival"
     },
 
-    "cook_meal": {
-
-        "interaction": "cook",
-
-        "base_duration_minutes": 35,
-
-        "interruptible": False,
-
-        "category": "survival",
-
-        "skill_check": {"requiresSkill": True, "skill": "cooking", "minProficiencyLevel": None, "baseDifficulty": 35, "competitive": False},
-    },
-
     "eat_meal": {
 
         "interaction": "eat",
@@ -722,7 +709,7 @@ ACTIVITIES = {
     # from there (systems/sim_loop.py's update_household_processes()), not
     # through further activities.py entries. See complete_activity()'s
     # do_laundry_fill branch below, mirroring cook_recipe's hand-off to
-    # systems/cooking_process.py.
+    # systems/cookware.py.
     "do_laundry_fill": {
 
         "interaction": "do_laundry",
@@ -2320,37 +2307,6 @@ def complete_activity(
                     convert_meal_to_leftovers(meal)
 
     # =====================================
-    # COOK -- plain "make a meal" activity, distinct from cook_recipe's
-    # own separate recipe/cooking_process.py system just below (that one
-    # is now ALSO on systems/skill_checks.py -- see
-    # cooking_process.py::finish_recipe() -- both share the same real
-    # abilities.py "cooking" proficiency; c["cooking_skill"] is retired).
-    # =====================================
-    elif activity_type == "cook_meal":
-
-        from systems.skill_checks import resolve_skill_check
-        from systems.abilities import record_attempt
-        from systems.incidental_speech import fire_incidental
-
-        result = resolve_skill_check("cook_meal", c, world)
-        household = world["households"].get(c.get("household_id"))
-
-        if result and not result.get("blocked"):
-            record_attempt(c, "cooking", world, result["success"], margin=result["actor_margin"])
-            if result["success"] and household:
-                from systems.household_storage import add_household_resource
-                from systems.resource_runtime import create_resource
-                meal = create_resource(
-                    "MEAL", quantity=1, servings=2, nutrition=0.5,
-                    quality=min(1.0, result["actor_margin"] / 100),
-                    cooked_by=c["id"], created_tick=world["tick"], container="fridge",
-                )
-                add_household_resource(household, meal)
-                fire_incidental(c, "inform", "Dinner's ready -- turned out pretty well.", world)
-            else:
-                fire_incidental(c, "inform", "That didn't come out right -- back to the drawing board.", world)
-
-    # =====================================
     # COOK
     # =====================================
     elif activity_type == "cook_recipe":
@@ -2366,6 +2322,12 @@ def complete_activity(
             remove_intention(c, "cook_dinner")
             vessel = cookware.start_dinner(c, world, household)
             if vessel:
+                # cooking is a real, trained skill (systems/abilities.py "cooking"): every dinner is an attempt
+                from systems.skill_checks import resolve_skill_check
+                from systems.abilities import record_attempt
+                result = resolve_skill_check("cook_recipe", c, world)
+                if result and not result.get("blocked"):
+                    record_attempt(c, "cooking", world, result["success"], margin=result["actor_margin"])
                 minutes = round((vessel["done_tick"] - vessel["started_tick"]) / 60)
                 note(act, world, "put it on", recipe=vessel["dish"]["name"], people=vessel["people"], cookware=vessel["kind"], minutes=minutes)
                 fire_incidental(c, "inform", f"{vessel['dish']['name']} for {vessel['people']} -- it needs about {minutes} minutes.", world)

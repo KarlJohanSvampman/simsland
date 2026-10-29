@@ -8,9 +8,8 @@ interaction/stage_primitive's `possible_accidents` array (definitions.json,
 own `possible_injuries` array, and hands off to health.py::apply_injury --
 the same chain combat interactions use, just via an accident_template
 middleman instead of going straight to an injury_template. Generalizes to
-any future interaction with a possible_accidents array, not just cooking's
-stage_primitives (currently the only content authored, see cooking_process.py's
-active-stage block).
+any future interaction with a possible_accidents array. (The old per-stage cooking process that used to call this has been
+retired; cooking is systems/cookware.py now, with no accident hook yet.)
 """
 
 from systems.health import apply_injury, weighted_pick

@@ -86,7 +86,7 @@ def get_skill_check_spec(action_type, world):
     """Looks up the "skill_check" sub-object from whichever registry
     declares this action/activity type. action_registry.py's
     ACTION_SPECS and activities.py's ACTIVITIES are mutually exclusive
-    today (confirmed: cook_meal exists only in the latter,
+    today (confirmed: cook_recipe exists only in the latter,
     practice_juggling only in the former), so checking both in sequence
     is safe -- neither currently defines the same id as the other."""
     from systems.action_registry import ACTION_SPECS

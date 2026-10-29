@@ -67,7 +67,7 @@ REGISTRY = {
 
     # ---- household ----
     "section:medium_household_systems": ("housekeeping", "household", "grouping header"),
-    "every:cooking": ("timer", "household", "cook-step completion timers"),
+    "every:cooking": ("timer", "household", "household process timers (laundry, dishes, plants)"),
     "every:reading": ("timer", "character", "reading-process timers"),
     "every:health": ("threshold", "body", "lazy needs + threshold timers"),
     "every:deliveries": ("timer", "world", "delivery due timers"),

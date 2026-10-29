@@ -55,9 +55,9 @@ c, w = maxed()
 check("at the floor", wc.focus_available(c, w) == bd.BREAKDOWN_AT)
 check("not at the very first look", bd.should_break_down(c, w, 20) is None and "low_since" in c["focus_state"])
 w["tick"] += bd.BREAKDOWN_AFTER_TICKS - 1
-check("... nor a moment short of three minutes", bd.should_break_down(c, w, 20) is None)
+check("... nor a moment short of the time it takes", bd.should_break_down(c, w, 20) is None)
 w["tick"] += 1
-check("... but after three minutes at the floor", bd.should_break_down(c, w, 20) == "overwhelmed")
+check("... but after long enough at the floor", bd.should_break_down(c, w, 20) == "overwhelmed")
 c2, w2 = maxed()
 bd.should_break_down(c2, w2, 20)
 w2["tick"] += bd.BREAKDOWN_AFTER_TICKS + 10
@@ -65,10 +65,10 @@ bd.should_break_down(c2, w2, 45)
 check("a moment of relief resets the clock", "low_since" not in c2["focus_state"] and bd.should_break_down(c2, w2, 20) is None)
 
 c3, w3 = maxed()
-c3["focus_state"]["breakdown_cooldown_until"] = w3["tick"] + HOUR
-w3["tick"] += 10 * bd.BREAKDOWN_AFTER_TICKS
+c3["focus_state"]["breakdown_cooldown_until"] = w3["tick"] + 4 * bd.BREAKDOWN_AFTER_TICKS
+w3["tick"] += bd.BREAKDOWN_AFTER_TICKS
 bd.should_break_down(c3, w3, 20)
-w3["tick"] += 10 * bd.BREAKDOWN_AFTER_TICKS
+w3["tick"] += bd.BREAKDOWN_AFTER_TICKS
 check("the cooldown holds it off", bd.should_break_down(c3, w3, 20) is None)
 
 for label, kw in (("asleep", {"activity": {"type": "sleep"}}), ("away", {"off_grid": True}), ("a toddler", {"age": 2}),
@@ -99,7 +99,7 @@ started = []
 real_start = acts.start_activity
 acts.start_activity = lambda c, w, a: (started.append(a), True)[1]
 import systems.occupancy as occ
-occ.interrupt_activity = lambda c, w: c.__setitem__("activity", None)
+occ.interrupt_activity = lambda c, w, **kw: c.__setitem__("activity", None)
 
 random.seed(4)
 c, w = maxed(traits=["calm"])
@@ -198,7 +198,7 @@ check("the episode is over", not bd.in_breakdown(c))
 check("30% of every case's severity is relieved", all(abs(cs["severity"] - round(before[cs["id"]] * 0.7, 2)) < 0.02 for cs in wc.active_cases(c)
       if cs["id"] in before), str({cs["id"]: cs["severity"] for cs in wc.active_cases(c)}))
 check("... and it is noted", all(cs["mitigated_by"][-1]["activity"] == "breakdown" for cs in wc.active_cases(c) if cs["id"] in before))
-check("a six-hour cooldown starts", c["focus_state"]["breakdown_cooldown_until"] == w["tick"] + 6 * HOUR)
+check("a long cooldown starts", c["focus_state"]["breakdown_cooldown_until"] == w["tick"] + bd.BREAKDOWN_COOLDOWN_TICKS)
 check("they remember it", any("fell apart" in m["text"] for m in c["memories"]))
 check("they are left with a worry about the episode itself", wc.active_cases(c) and "self:breakdown" in c["worry_cases"])
 check("someone who saw it is worried about them", "person:p" in (watcher.get("worry_cases") or {}) and "fell apart" in watcher["worry_cases"]["person:p"]["summary"])
@@ -252,8 +252,9 @@ agent_loop2.maybe_go_offgrid = lambda c, w: None
 agent_loop2.maybe_schedule_doctor_visit = lambda c, w: None
 import systems.worry_relief as wr
 wr.maybe_raise_mitigation = lambda c, w, force=False: None            # nobody looks for relief: the floor holds
-wr.sync_mitigation = lambda c, w, avail=None: None
-w2, errs, _ = determinism.run_sim(4000, start="2026-11-04T08:00:00", setup=pile_on)
+wr.sync_mitigation = lambda c, w, avail=None, **kw: None
+SIM_TICKS = bd.BREAKDOWN_AFTER_TICKS + 3000     # long enough at the floor for the first episodes to start
+w2, errs, _ = determinism.run_sim(SIM_TICKS, start="2026-11-04T08:00:00", setup=pile_on)
 stats = collections.Counter()
 for ch in w2["characters"].values():
     fs = ch.get("focus_state") or {}
@@ -261,13 +262,13 @@ for ch in w2["characters"].values():
     if bd.in_breakdown(ch):
         stats["in_episode_now"] += 1
 bd_exprs = [e for e in w2.get("expressions", []) if (e.get("intent") or {}).get("source") == "breakdown"]
-print(f"   4000 simulated ticks, maxed adults: errors={dict(errs)} {dict(stats)} breakdown lines={len(bd_exprs)} sample: {[e['text'] for e in bd_exprs[:3]]}")
+print(f"   {SIM_TICKS} simulated ticks, maxed adults: errors={dict(errs)} {dict(stats)} breakdown lines={len(bd_exprs)} sample: {[e['text'] for e in bd_exprs[:3]]}")
 check("the simulation runs with episodes attached", not errs)
 check("adults at the floor really do break down", stats["breakdowns"] >= 2, str(dict(stats)))
 check("... and say things aloud while they do", len(bd_exprs) >= 4, str(len(bd_exprs)))
 adults = [ch for ch in w2["characters"].values() if (ch.get("age") or 0) >= 18 and ch.get("focus_state")]
 check("after one, the cooldown keeps it from happening again at once",
-      all(ch["focus_state"].get("breakdowns", 0) <= 1 + 4000 // bd.BREAKDOWN_COOLDOWN_TICKS for ch in adults))
+      all(ch["focus_state"].get("breakdowns", 0) <= 1 + SIM_TICKS // bd.BREAKDOWN_COOLDOWN_TICKS for ch in adults))
 
 print()
 print("FAILED: " + ", ".join(failures) if failures else "ALL OK")

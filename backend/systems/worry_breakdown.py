@@ -29,12 +29,12 @@ from systems.worry_cases import HOUR
 
 MINUTE = 60
 BREAKDOWN_AT = 100 - wc.MAX_LOAD            # focus at the floor: worries at their maximum
-BREAKDOWN_AFTER_TICKS = 3 * MINUTE          # ... for this long
+BREAKDOWN_AFTER_TICKS = 90 * MINUTE         # ... for this long (it was three minutes: one bad moment and they were gone)
 BREAKDOWN_ABORTS = 3                        # or this many given-up activities ...
 BREAKDOWN_ABORT_WINDOW = 2 * HOUR           # ... within this long
 EPISODE_TICKS = (10 * MINUTE, 30 * MINUTE)
 BEAT_TICKS = (1 * MINUTE, 3 * MINUTE)
-BREAKDOWN_COOLDOWN_TICKS = 6 * HOUR
+BREAKDOWN_COOLDOWN_TICKS = 18 * HOUR
 BREAKDOWN_RELIEF_PCT = 30
 MIN_AGE = 3
 LASH_OUT_TRAITS = {"hot_tempered", "short_tempered", "aggressive", "impulsive", "spiteful", "impatient"}

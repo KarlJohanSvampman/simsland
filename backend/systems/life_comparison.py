@@ -26,9 +26,10 @@ _EDU_RANK = {
     "associate": 3, "bachelor": 4, "master": 5, "doctorate": 6, "professional": 6,
 }
 
-JEALOUSY_GAIN_PER_DIMENSION = 3.0
+JEALOUSY_GAIN_PER_DIMENSION = 1.5
 JEALOUSY_DECAY_RATE         = 0.97   # per day, mirrors grievances.py's DECAY_RATE shape
 JEALOUSY_GRIEVANCE_THRESHOLD = 60.0
+MAX_ENVY_GRIEVANCES_PER_PERSON = 5   # a pile of hundreds of small envy grievances against one person helps no one
 COMPARISON_SAMPLE_SIZE      = 4      # bounded scan, mirrors check_envy_events' contact scope
 
 
@@ -196,8 +197,9 @@ def _apply_comparison(c, other, world):
         jealousy_at_threshold = rel["jealousy"]
 
         from systems.grievances import add_grievance
-        add_grievance(c, other["id"], "life_envy", world,
-                      details={"favorable_dimensions": list(favorable.keys())})
+        if not at_envy_cap(c, other["id"]):
+            add_grievance(c, other["id"], "life_envy", world,
+                          details={"favorable_dimensions": list(favorable.keys())})
 
         # Losing a comparison doesn't just breed resentment -- it creates a
         # real, acted-on urge to keep up with the single most-unfavorable
@@ -223,6 +225,25 @@ def _apply_comparison(c, other, world):
     return dims
 
 
+def at_envy_cap(c, other_id):
+    return sum(1 for g in c.get("grievances", []) if g.get("caused_by") == other_id and g.get("event_type") == "life_envy") >= MAX_ENVY_GRIEVANCES_PER_PERSON
+
+
+def trim_envy_grievances(c):
+    """Keep only the newest few envy grievances against each person (older worlds had hundreds). Returns how many were dropped."""
+    seen, keep, dropped = {}, [], 0
+    for g in sorted(c.get("grievances", []), key=lambda g: -g.get("tick", 0)):
+        if g.get("event_type") == "life_envy":
+            seen[g["caused_by"]] = seen.get(g["caused_by"], 0) + 1
+            if seen[g["caused_by"]] > MAX_ENVY_GRIEVANCES_PER_PERSON:
+                dropped += 1
+                continue
+        keep.append(g)
+    if dropped:
+        c["grievances"] = keep
+    return dropped
+
+
 def tick_life_comparison(world):
     """Daily cadence (see sim_loop.py). Bounded per-character contact
     sample, same spirit as attraction.py::check_envy_events()'s own
@@ -238,6 +259,7 @@ def tick_life_comparison(world):
         if (c.get("is_offscreen") or c.get("is_workplace_npc")
                 or c.get("age_group") in ("child", "teen")):
             continue
+        trim_envy_grievances(c)
         contact_ids = list(c.get("relationships", {}).keys())
         if not contact_ids:
             continue

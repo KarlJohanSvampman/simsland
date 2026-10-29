@@ -21,9 +21,7 @@ whole stage list is exhausted. Hooks are plain functions kept in a
 module-level registry (_PROCESS_HOOKS), not stored on the process dict
 itself, since the process dict is persisted to Redis/Postgres as JSON.
 
-systems/cooking_process.py is NOT migrated to this engine this round — it
-works fine as-is for a single cook seeing one recipe through, and
-migrating it isn't required to ship laundry.
+(Cooking is not on this engine: pots, pans and the oven keep their own clock in systems/cookware.py.)
 """
 
 from uuid import uuid4
@@ -212,7 +210,7 @@ def update_household_processes(world):
 # =========================================================
 # Only the FIRST active stage (fill_washer) currently has a real
 # activities.py hand-off (do_laundry_fill -> start_process(), mirroring
-# cook_recipe's hand-off to systems/cooking_process.py) — every stage
+# cook_recipe's hand-off to systems/cookware.py) — every stage
 # after that (empty_washer, fold_laundry, put_away) is timer-only today;
 # their "active" flag doesn't yet gate on any character actually being
 # present, since advance_process() is only ever called from the cadence

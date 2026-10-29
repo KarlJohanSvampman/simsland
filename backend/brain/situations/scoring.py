@@ -102,7 +102,6 @@ ACTIVITY_INTERRUPTIBILITY = {
     "eat_meal":     NONE_,
     "eat_snack":    LOW,
     "cook":         LOW,
-    "cook_meal":    LOW,
     "shower":       NONE_,
     "use_toilet":   NONE_,
     "use_toilet_bowels": NONE_,
