@@ -8579,7 +8579,7 @@ setInterval(fetchEvents, 5000);
 
 const OUTLINER_VISIBLE_KEY = "holosims_outliner_visible";
 let _outlinerVisible = localStorage.getItem(OUTLINER_VISIBLE_KEY) !== "0";
-const _outlinerCollapsedGroups = new Set();
+const _outlinerCollapsedGroups = new Set(["__workplace_npcs", "__service_workers"]);   // background NPCs start folded away
 let _outlinerSearchTerm = "";
 
 const outlinerSidebarEl    = document.getElementById("outlinerSidebar");
@@ -8699,14 +8699,20 @@ function renderOutliner(data){
   const term = _outlinerSearchTerm;
   const groups = new Map();
   for(const h of data.households) groups.set(h.id, { id: h.id, name: h.name, members: [] });
+  // Non-playable NPCs have no household by design; keep them out of the "No Household" list.
   const noHousehold = { id: null, name: "No Household", members: [] };
+  const workplaceNpcs = { id: "__workplace_npcs", name: "Workplace NPCs", members: [] };
+  const serviceWorkers = { id: "__service_workers", name: "Service Workers", members: [] };
 
   for(const c of data.characters){
     const g = c.household_id ? groups.get(c.household_id) : null;
-    (g || noHousehold).members.push(c);
+    if(g) g.members.push(c);
+    else if(c.is_workplace_npc) workplaceNpcs.members.push(c);
+    else if(c.is_service_worker) serviceWorkers.members.push(c);
+    else noHousehold.members.push(c);
   }
 
-  const allGroups = [...groups.values(), noHousehold].filter(g => g.members.length > 0);
+  const allGroups = [...groups.values(), noHousehold, workplaceNpcs, serviceWorkers].filter(g => g.members.length > 0);
 
   let anyRendered = false;
   for(const g of allGroups){

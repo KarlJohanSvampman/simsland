@@ -47,6 +47,8 @@ import random, uuid
 
 from systems.child_care import _find_parents_for_child
 
+CPS_VISIT_TICKS = 2 * 3600          # a CPS worker stays about two hours
+
 
 def _caregiver_unavailable(c):
     if not c or c.get("alive") is False:
@@ -172,8 +174,22 @@ def _dispatch_cps_worker(child, world):
         "service_role":     "cps_worker",
         "animation_state":  "walk",
         "alive":            True,
+        "leaves_tick":      world.get("tick", 0) + CPS_VISIT_TICKS,
     }
     return wid
+
+
+def retire_cps_workers(world):
+    """The visit is over: the worker goes home. (Nothing used to remove them, so each visit left one standing at the mailbox for good;
+    ones from before this get a visit's worth of time from the first time they are seen.)"""
+    tick = world.get("tick", 0)
+    chars = world.get("characters", {})
+    for wid in [i for i, c in chars.items() if c.get("service_role") == "cps_worker"]:
+        w = chars[wid]
+        if "leaves_tick" not in w:
+            w["leaves_tick"] = tick + CPS_VISIT_TICKS
+        elif tick >= w["leaves_tick"]:
+            del chars[wid]
 
 
 def _send_child_to_cps_care(child, world, parents):
@@ -193,6 +209,7 @@ def _send_child_to_cps_care(child, world, parents):
 
 
 def tick_child_welfare(world):
+    retire_cps_workers(world)
     _review_existing_placements(world)
 
     for c in list(world.get("characters", {}).values()):

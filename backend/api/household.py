@@ -212,6 +212,8 @@ def _all_characters(world):
             "name": c.get("name"),
             "age": c.get("age"),
             "household_id": c.get("household_id"),
+            "is_workplace_npc": bool(c.get("is_workplace_npc")),
+            "is_service_worker": bool(c.get("is_service_worker")),
             "x": c.get("x"),
             "y": c.get("y"),
             "alive": c.get("alive") is not False,
