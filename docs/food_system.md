@@ -138,6 +138,13 @@ ready for the social-contract rota to set.
   now has a Kitchen block (`api/household.py::_kitchen_of`): cookware and what is being served, leftovers, ready meals, deliveries,
   the dinner plan, the rota and the dirty plates.
 
+**Tonight's strain and running late.** The choice between cooking and the easy way out also reads `food_habits.strain`: getting home late from
+work (0.8 points per minute the shift ran over), feeling ill (`body["sickness"]` from 15) and running on empty (`body["energy"]` below 45) each
+cut the chance of cooking however calm the week has been, and push the easy choice towards takeout. The household's `dinner_mode` records why
+(`why`). The planner prefers the adult least under strain as the cook. Lateness itself is `systems/lateness.py`: 25% of work shifts and booked
+appointments set off 10-60 minutes late, and 25% run 10-60 minutes over, with a reason in the trip's summary and key events ("Arrived late",
+"Held up at the end"); a shift that ran over leaves `c["late_home"]` for the dinner decision.
+
 **Not done:** bread / sandwich crafting on the counter (templates have `holds_ingredients` and `capacity`, nothing fills them yet);
 the old `cooking_process.py`, `data/recipes.py` and the `cook_meal` activity are untouched legacy; leftovers are not yet reheated in
 the microwave; the cook's reminder to go and fetch the others is the spoken announcement, not a separate errand.

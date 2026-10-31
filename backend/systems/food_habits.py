@@ -134,21 +134,47 @@ def pressure(c):
     return 0.6 * (c.get("stress", 0) or 0) + 0.4 * week_stress(c)
 
 
+STRAIN_SCALE = 60.0         # strain points that take the whole chance of cooking away (capped at 85%)
+LATE_HOME_POINTS = 0.8      # per minute a shift ran over today (an hour late: +48)
+SICK_FROM = 15              # body["sickness"] below this does not weigh on dinner
+TIRED_BELOW = 45            # body["energy"] below this does (empty: +45)
+
+
+def strain(c, world):
+    """Beyond stress, what makes cooking dinner feel like too much tonight: (points to add to the pressure, why). Getting home late from
+    work, feeling ill, and running on empty each push towards the easy way out."""
+    from systems import lateness
+    body = c.get("body") or {}
+    parts = []
+    late = lateness.late_home_today(c, world)
+    if late:
+        parts.append((late * LATE_HOME_POINTS, f"got home {late} minutes late from work"))
+    sick = body.get("sickness", 0) or 0
+    if sick >= SICK_FROM:
+        parts.append((min(50.0, float(sick)), "feeling ill"))
+    energy = body.get("energy", 70)
+    if energy is not None and energy < TIRED_BELOW:
+        parts.append((TIRED_BELOW - energy, "worn out"))
+    return sum(p for p, _ in parts), [why for _, why in parts]
+
+
 def can_cook(c):
     return c.get("age_group") not in ("child", "toddler", "infant", "baby") and (c.get("age") or 30) >= 13
 
 
 def dinner_mode(c, world, household, rng=random):
-    """"cook" or "easy" (a snack, leftovers, something ordered or bought). A calm person cooks. Strain, a comfort-eating habit and a
-    craving each make the easy way likelier; a person who likes what is in the cupboard is likelier to cook."""
+    """"cook" or "easy" (a snack, leftovers, something ordered or bought). A calm person cooks. Stress, getting home late from work,
+    being ill or worn out (`strain`), a comfort-eating habit and a craving each make the easy way likelier."""
     from systems import cookware
     if not cookware.feasible_recipes(household, 1):
         return "easy"
     p = pressure(c)
     h = habits(c)
     p += 25 * h.get("comfort", 0.0) + 15 * h.get("craving", 0.0)
-    # chance of cooking: certain when calm, falling to ~15% when worn out
+    # chance of cooking: certain when calm, falling to ~15% when worn out ...
     chance = _clamp(1.0 - (p - 30) / 60.0, 0.15, 1.0)
+    # ... and cut by what tonight has added (a late finish, being ill, running on empty), however calm the week has been
+    chance = max(0.05, chance * (1.0 - min(0.85, strain(c, world)[0] / STRAIN_SCALE)))
     return "cook" if rng.random() < chance else "easy"
 
 
@@ -158,7 +184,7 @@ def easy_choice(c, world, household):
     from systems import ready_meals
     money = c.get("money", 0) or 0
     have = ready_meals.count(household) > 0
-    if money >= 25 and (pressure(c) >= 55 or not have):
+    if money >= 25 and (pressure(c) + strain(c, world)[0] >= 55 or not have):
         return "takeout"
     return "processed" if have else "snack"
 

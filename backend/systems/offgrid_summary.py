@@ -125,7 +125,20 @@ def _work_events(world, c, start, end, end_tick, beats, events):
         _add(events, title, _event(world, b_start, b_stop, end_tick, text[:240] or f"Worked as a {job.lower()}."))
 
 
-def build_summary(c, world, reason, description, departed_tick, end_tick, beats=None):
+def _late_events(world, late, start, end, end_tick, events):
+    """"Arrived late" first and "Held up" last, from the trip's lateness record (systems/lateness.py); returns the events in order."""
+    ordered = {}
+    if late.get("start"):
+        stop = min(end, start + MIN_SEGMENT_MINUTES * 60)
+        ordered["Arrived late"] = _event(world, start, stop, end_tick, f"Set off {late['start']['minutes']} minutes late: {late['start']['reason']}.")
+    ordered.update(events)
+    if late.get("over"):
+        begin = max(start, end - late["over"]["minutes"] * 60)
+        ordered["Held up at the end"] = _event(world, begin, end, end_tick, f"Ran {late['over']['minutes']} minutes over: {late['over']['reason']}.")
+    return ordered
+
+
+def build_summary(c, world, reason, description, departed_tick, end_tick, beats=None, lateness=None):
     """The summary object for a trip that ran from `departed_tick` to `end_tick` (see the module docstring)."""
     start = departed_tick if departed_tick is not None else end_tick
     end = max(end_tick, start + 60)
@@ -141,6 +154,8 @@ def build_summary(c, world, reason, description, departed_tick, end_tick, beats=
             _add(events, f"Day {d + 1}", _event(world, d_start, d_stop, end_tick, "Away from home." if d else "Settled in away from home."))
     else:
         _from_template(world, TEMPLATES.get(reason, GENERIC), start, end, end_tick, events)
+    if lateness:
+        events = _late_events(world, lateness, start, end, end_tick, events)
     return {
         "id": f"ogs_{uuid.uuid4().hex[:8]}", "reason": reason, "label": LABELS.get(reason, reason.replace("_", " ").capitalize()),
         "start_tick": int(start), "end_tick": int(end), "duration_minutes": round((end - start) / 60.0),

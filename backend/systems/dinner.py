@@ -52,10 +52,13 @@ def plan(world, rng=random):
         elif scheduled is not None and hour < LATE_FOR_ROTA:
             continue                                            # the rota's cook has until half past six to come home
         else:
-            cook = min(home, key=lambda x: (food_habits.pressure(x), rng.random()))
+            cook = min(home, key=lambda x: (food_habits.pressure(x) + food_habits.strain(x, world)[0], rng.random()))
         household["dinner_day"] = _day_key(world)
         mode = food_habits.dinner_mode(cook, world, household, rng)
         household["dinner_mode"] = {"mode": mode, "cook": cook["id"], "tick": world.get("tick", 0)}
+        why = food_habits.strain(cook, world)[1]
+        if why:
+            household["dinner_mode"]["why"] = why
         from brain.intentions import add_intention
         if mode == "cook":
             add_intention(cook, {"type": "cook_dinner", "category": "schedule", "priority": 52, "reason": "it is dinner time and it is my turn"

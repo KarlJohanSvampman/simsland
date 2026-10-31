@@ -2,6 +2,7 @@ import random, uuid
 from brain.memory import store_memory
 from core.event_bus import emit
 from core.tick_schedule import TICK_RATE_SECONDS
+from systems import lateness
 from systems.offgrid_narrative import request_offgrid_summary, roll_normalcy, _find_trip_cover_lie
 
 # Every send_offgrid()/_send_offgrid_immediate() "duration" argument across
@@ -763,6 +764,13 @@ def _work_block_starting_now(c, world):
     return start_minute <= now_minute < start_minute + 10
 
 
+def _work_block_open(c, world):
+    """Between the start and the end of today's work block (a late start can still set off, but never after the shift is over)."""
+    now_minute = world.get("calendar", {}).get("minute_of_day", -1)
+    block = next((b for b in _todays_schedule_blocks(c, world) if b.get("activity") == "work"), None)
+    return bool(block) and int(block["start"][:2]) * 60 <= now_minute < int(block["end"][:2]) * 60
+
+
 def _day_key(world):
     cal = world.get("calendar", {})
     return (cal.get("year"), cal.get("month"), cal.get("day"))
@@ -854,12 +862,12 @@ def backfill_detail(c, world):
     detail = dict(c.get("off_grid_detail") or {}, **trip_detail(world, started, c["return_tick"]))
     if c.get("off_grid_reason") == "temporary_separation" and not detail.get("why"):
         from systems.temporary_separation import explain
-        fight = next((m for m in reversed(c.get("memories") or []) if str(m.get("text", "")).startswith("Had a real fight that ended in")), None)
+        fight = next((m for m in reversed(c.get("memories") or []) if m.get("conflict_outcome") or str(m.get("text", "")).startswith("Had a real fight that ended in")), None)
         outcome = None
         if fight:
             text = fight["text"]
-            outcome = next((k for k, w in (("storm_off", "storm"), ("cold_shoulder", "cold"), ("physical_resolved", "physical"), ("suppressed", "suppress")) if w in text), None)
-        detail.update(explain(world, c, {"with_ids": list((fight or {}).get("people") or []), "outcome": outcome}))
+            outcome = fight.get("conflict_outcome") or next((k for k, w in (("storm_off", "storm"), ("cold_shoulder", "cold"), ("physical_resolved", "physical"), ("suppressed", "suppress")) if w in text), None)
+        detail.update(explain(world, c, {"with_ids": list((fight or {}).get("people") or []), "outcome": outcome, "topic": (fight or {}).get("fight_topic")}))
         if not fight:
             detail["why"] = "a falling-out at home (the cause was not recorded)"
     c["off_grid_detail"] = detail
@@ -1009,7 +1017,9 @@ def maybe_go_offgrid(c, world):
         send_to_school(c, world)
         return
 
-    if c.get("employed") and _work_block_starting_now(c, world):
+    if c.get("employed") and (_work_block_starting_now(c, world) or (lateness.start_pending(c, world, "work") and _work_block_open(c, world))):
+        if lateness.holds_start(c, world, "work"):
+            return                                  # running late for the shift (systems/lateness.py)
         # Per the user's explicit ask: a job whose template defines an
         # optional work_uniform (slot -> item template id) gets worn for
         # the trip -- restored back to whatever they had on before, on
@@ -1018,7 +1028,8 @@ def maybe_go_offgrid(c, world):
         job_template = (world.get("definitions", {}) or {}).get("job_templates", {}).get(c.get("job_template_id"))
         from systems.clothing import equip_work_uniform
         equip_work_uniform(c, world, job_template)
-        send_offgrid(c, world, "work", 8 * 60)
+        if send_offgrid(c, world, "work", 8 * 60):
+            lateness.departed(c, world, "work")
         return
 
     # A child (age_group=="child") never independently rolls into a
@@ -1126,9 +1137,13 @@ def resolve_due_appointments(c, world):
         if appt.get("fulfilled") or appt.get("reason") in _DEDICATED_SCHEDULER_REASONS:
             continue
         if is_appointment_due(appt, world):
+            key = f"appt:{appt.get('id') or appt.get('tick')}"
+            if lateness.holds_start(c, world, "appt", key=key):
+                return                              # running late for it (systems/lateness.py)
             appt["fulfilled"] = True
             c["_pending_appointment_business"] = appt.get("business")
-            send_offgrid(c, world, appt.get("reason", "outing"), 30)
+            if send_offgrid(c, world, appt.get("reason", "outing"), 30):
+                lateness.departed(c, world, "appt", key=key)
             return
 
 
@@ -1298,8 +1313,19 @@ def scheduled_trip_over(c, world):
     return world.get("calendar", {}).get("minute_of_day", -1) >= int(block["end"][:2]) * 60
 
 
+def _held_up_at_the_end(c, world):
+    """A shift ends by the schedule, an appointment by its return tick: either may run over (systems/lateness.py)."""
+    if c.get("off_grid_reason") == "work":
+        return scheduled_trip_over(c, world) and lateness.holds_end(c, world, "work")
+    if (c.get("_trip_late") or {}).get("kind") == "appt":
+        return lateness.holds_end(c, world, "appt")
+    return False
+
+
 def process_return(c, world):
     if not c.get("off_grid") or (world["tick"] < (c.get("return_tick") or 0) and not scheduled_trip_over(c, world)):
+        return
+    if _held_up_at_the_end(c, world):
         return
 
     # Bring home any dependent currently placed with a temporary
@@ -1735,7 +1761,10 @@ def process_return(c, world):
     # What the stay amounted to: ONE summary object, with the key events of the stay. It rides on the return announcement (the
     # world event) and is listed on the character; the memory below carries only the text.
     from systems.offgrid_summary import build_summary, keep
-    summary_object = keep(c, build_summary(c, world, reason, story["summary"], departed, world["tick"], beats=work_beats))
+    late = lateness.finish(c, world)
+    if late:
+        story["summary"] += " " + lateness.note(late)
+    summary_object = keep(c, build_summary(c, world, reason, story["summary"], departed, world["tick"], beats=work_beats, lateness=late))
 
     # Only the PUBLIC summary goes into shared memory and world events
     public_story = {k: v for k, v in story.items() if k != "private"}
