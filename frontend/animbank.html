@@ -19,7 +19,8 @@ html, body {
     display: flex; flex-direction: column;
     overflow: hidden;
 }
-#sidebarTop { flex-shrink: 0; }
+/* Sources + Stances + Transitions can be taller than the window; scroll them instead of clipping, and leave the clip list some room */
+#sidebarTop { flex-shrink: 0; max-height: 62vh; overflow-y: auto; }
 #clipScroll  { flex: 1; overflow-y: auto; }
 
 /* Both tab panels must be flex columns filling the remaining sidebar
