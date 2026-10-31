@@ -74,6 +74,9 @@ def is_waiting(c):
         return False
     if time.time() - p.get("wall", 0) > REQUEST_TIMEOUT_SECONDS:
         c["cognition"]["pending"] = None
+        from systems.conversation_floor import note_llm_result, clear_thinking
+        note_llm_result(False)
+        clear_thinking(c["id"], p.get("tick", 0))
         print(f"[cognition] {c.get('name', c.get('id'))}: request {p.get('id')} got no answer in "
               f"{REQUEST_TIMEOUT_SECONDS:.0f}s -- asking again")
         return False
@@ -157,8 +160,9 @@ def _accept_remote_result(res):
         return                                    # not ours (another core, or already handled)
     char_id, req_id, tick, context, _session, _priority, wake_reason = entry["args"]
     _merge_worker_telemetry(res)
-    from systems.conversation_floor import clear_thinking
+    from systems.conversation_floor import clear_thinking, note_llm_result
     clear_thinking(char_id, tick)
+    note_llm_result(bool(res.get("decision")) and not res.get("error"), time.time() - entry["sent"])
     if res.get("error"):
         print(f"[cognition] worker {res.get('worker')} failed {char_id}'s decision: {res['error']}")
     emit("decision_ready", {
@@ -207,14 +211,16 @@ def _fallback_stranded():
 def _worker(char_id, req_id, tick, context, session, priority, wake_reason):
     """Runs on a pool thread. Touches no world state: context and session are plain data."""
     from brain.llm_brain import think
-    from systems.conversation_floor import clear_thinking
+    from systems.conversation_floor import clear_thinking, note_llm_result
     decision = None
+    started = time.time()
     try:
         decision = think(context, char_id=char_id, session=session, priority=priority)
     except Exception as exc:
         print(f"[cognition] decision for {char_id} failed: {exc!r}")
     finally:
         clear_thinking(char_id, tick)
+        note_llm_result(bool(decision), time.time() - started)
     emit("decision_ready", {
         "character_id": char_id, "request_id": req_id, "decision": decision,
         "wake_reason": wake_reason, "available_actions": context.get("available_actions"),

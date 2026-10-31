@@ -71,9 +71,35 @@ _BINARY_START = re.compile(
 # away (slow decisions are abandoned), so this lives in process memory.
 _gen = {}
 
+# Is the model keeping up? When a reply is slow or failing the listener isn't being rude -- the answer just hasn't been
+# written. Fed by brain/cognition_actor.py (real seconds, process memory like _gen).
+SLOW_REPLY_SECONDS = 30.0      # a decision still unanswered after this long means the model is behind
+DEGRADED_MAX_TICKS = 360       # even then nobody waits forever: the conversation lapses quietly
+_llm = {"fail_wall": 0.0, "ok_wall": 0.0}
+
+
+def note_llm_result(ok, seconds=0.0, now=None):
+    """A decision came back (ok) or failed/timed out. A fast answer clears the slow-model flag, a failure or a slow one sets it."""
+    import time
+    now = time.time() if now is None else now
+    if ok and seconds < SLOW_REPLY_SECONDS:
+        _llm["ok_wall"] = now
+    else:
+        _llm["fail_wall"] = now
+
+
+def llm_degraded(now=None):
+    """True while the model is failing or has a decision outstanding for longer than SLOW_REPLY_SECONDS."""
+    import time
+    now = time.time() if now is None else now
+    if _llm["fail_wall"] > _llm["ok_wall"]:
+        return True
+    return any(g["finished"] < g["began"] and now - g.get("wall", now) > SLOW_REPLY_SECONDS for g in _gen.values())
+
 
 def mark_thinking(char_id, tick):
-    _gen[char_id] = {"began": tick, "finished": -1}
+    import time
+    _gen[char_id] = {"began": tick, "finished": -1, "wall": time.time()}
 
 
 def clear_thinking(char_id, tick):
@@ -262,6 +288,21 @@ def tick(world):
         if aware and not f["aware"]:
             f["aware"] = True
         state = f["state"]
+        slow = llm_degraded()
+
+        if slow and f["expects_reply"] and state in ("waiting", "thinking", "unnoticed", "unanswered", "declined"):
+            # The model is behind: silence now says nothing about the listener. Hold the floor (they may still answer)
+            # and let it lapse quietly if nothing comes -- no "ignored" memory, insult or grudge.
+            if t - f["said_tick"] > DEGRADED_MAX_TICKS or (not thinking and t >= f["aware_by"] + RETRY_TICKS):
+                _end(world, conv, "lapsed")
+                continue
+            if aware and not thinking:
+                _end(world, conv, "lapsed")        # they gave up on an answer (failed or timed-out decision)
+                continue
+            status.setdefault(sid, "waiting_for_reply")
+            if thinking:
+                status[hid] = "thinking"
+            continue
 
         if f["expects_reply"]:
             if state == "waiting":
