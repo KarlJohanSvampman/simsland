@@ -97,7 +97,7 @@ _BAIL_AMOUNT = {
 _DEFAULT_BAIL = 1000
 
 
-def schedule_trial(c, world, crime):
+def schedule_trial(c, world, crime, incident=None):
     trial_wait = _days_to_ticks(3, 14)
     case = {
         "id":           f"case_{uuid.uuid4().hex[:6]}",
@@ -106,6 +106,14 @@ def schedule_trial(c, world, crime):
         "trial_tick":   world["tick"] + trial_wait,
         "status":       "scheduled",
     }
+    if incident is not None:
+        # what the police wrote down at the scene and got out of the station interview moves the verdict (systems/police_report.py)
+        from systems import police_report
+        report = police_report.report_for(world, incident)
+        if report:
+            police_report.questioned_at_station(world, c, incident)
+            case["report_id"] = report["id"]
+            case["evidence"] = report["evidence"]
     world.setdefault("court_cases", []).append(case)
 
     if crime in _NO_BAIL_CRIMES:
@@ -161,6 +169,10 @@ def maybe_arrest_from_incidents(world):
                 continue
             if not inc.get("reported"):
                 continue
+            # the police have to get there and talk to people first (systems/police_report.py)
+            from systems import police_report
+            if not police_report.ensure_report(world, inc):
+                continue
         inc["arrest_checked"] = True
         # "crime" dropped -- nothing in the codebase ever creates an
         # incident of that type (see systems/emergency.py's incident
@@ -177,11 +189,19 @@ def maybe_arrest_from_incidents(world):
                 suspect = world["characters"].get(suspect_id) if suspect_id else None
                 if suspect:
                     solve_rate = min(0.95, solve_rate + suspect.get("corruption", 0.0) / 200.0)
+            report = None
+            if inc["type"] in ("assault", "domestic_disturbance"):
+                from systems import police_report
+                report = police_report.report_for(world, inc)
+                if report:
+                    solve_rate = max(0.05, min(0.95, solve_rate + report["evidence"]))
             if random.random() < solve_rate:
                 for cid in inc.get("participants", [])[:1]:
                     c = world["characters"].get(cid)
                     if c and c["legal"]["status"] == "free":
-                        schedule_trial(c, world, inc["type"])
+                        schedule_trial(c, world, inc["type"], incident=inc)
+            elif report:
+                police_report.closed_without_charge(world, inc)
 
 
 def process_trials(world):
@@ -191,7 +211,9 @@ def process_trials(world):
         c = world["characters"].get(case["character_id"])
         if not c:
             continue
-        guilty = random.random() < world["environment"].get("crime_solve_rate", .5)
+        # an admission and witnesses make a guilty verdict likelier, a complainant who backed out makes it less likely
+        odds = world["environment"].get("crime_solve_rate", .5) + case.get("evidence", 0.0) / 2
+        guilty = random.random() < max(0.05, min(0.95, odds))
         if guilty:
             sentence = _roll_sentence_ticks(case["crime"])
             was_held = c["legal"].get("status") == "held_pending_trial"

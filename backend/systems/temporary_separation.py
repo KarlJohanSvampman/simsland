@@ -105,7 +105,8 @@ def explain(world, c, cause, host=None, is_family=None):
     with_ids = [i for i in cause.get("with_ids", []) if i != c["id"]]
     names = ", ".join(_name(world, i) for i in with_ids)
     if names:
-        why = f"a fight with {names}" + (f" that {OUTCOME_WORDS[cause['outcome']]}" if cause.get("outcome") in OUTCOME_WORDS else "")
+        why = f"a fight with {names}" + (f" about {cause['topic']}" if cause.get("topic") else "")
+        why += f" that {OUTCOME_WORDS[cause['outcome']]}" if cause.get("outcome") in OUTCOME_WORDS else ""
     else:
         why = "an argument at home"
     if host is not None:

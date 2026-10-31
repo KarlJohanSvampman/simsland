@@ -968,7 +968,8 @@ def build_available_actions(c, world):
         action_types.append("confront")
 
     active_incidents = [
-        inc for inc in _build_incident_context(c, world) if not inc["reported"]
+        inc for inc in _build_incident_context(c, world)
+        if not inc["reported"] and inc["offender_id"] != cid        # the one who did it does not report it
     ]
     if active_incidents:
         action_types.append("call_911")

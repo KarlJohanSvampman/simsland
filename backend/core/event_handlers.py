@@ -202,25 +202,50 @@ def _on_conflict_resolved(data, world):
     from systems.confiding import tag_dramatic_memory
     from systems.temporary_separation import begin_temporary_separation
 
+    from systems import fights
+
     chars = world.get("characters", {})
     parties = [chars[pid] for pid in data.get("parties", []) if pid in chars]
     if not parties:
         return
 
     outcome = data.get("outcome")
+    conflict = (world.get("conflicts") or {}).get(data.get("conflict_id")) or {}
+    topic = conflict.get("topic") or fights.topic_of(conflict.get("issues"))
+    aggressor = conflict.get("aggressor")
+
+    # what the fight was about and who was in it goes on the record (a suppressed one never got said, an agreement was no fight)
+    entry = None
+    if outcome not in ("agreement", "suppressed"):
+        inc = next((i for i in world.get("incidents", []) if data.get("conflict_id") and i.get("conflict_id") == data.get("conflict_id")), None)
+        entry = fights.log_fight(world, [p["id"] for p in parties], topic, outcome, aggressor=aggressor, conflict=conflict,
+                                 incident_id=inc["id"] if inc else None)
+        if inc:
+            inc["fight_id"] = entry["id"]
+
     for c in parties:
         others = [p["id"] for p in parties if p["id"] != c["id"]]
-        tag_dramatic_memory(
-            c, world,
-            f"Had a real fight that ended in {outcome or 'a mess'}.",
-            importance=0.65, people=others,
-        )
+        if outcome == "suppressed":
+            if c["id"] == conflict.get("initiator"):
+                text = f"Wanted to take up {topic} with {fights.names(world, others)} but backed down and kept it in."
+            else:
+                text = f"Sensed that {fights.names(world, others)} was upset, but nothing was said."
+            importance = 0.45
+        else:
+            text = fights.memory_line(world, c, others, topic, outcome, conflict=conflict, aggressor=aggressor)
+            importance = 0.5 if outcome in ("agreement", "de_escalated") else 0.65
+        mem = tag_dramatic_memory(c, world, text, importance=importance, people=others)
+        if mem is not None:
+            mem["conflict_outcome"] = outcome
+            mem["fight_topic"] = topic
+            if entry:
+                mem["fight_id"] = entry["id"]
 
     if outcome in _BAD_CONFLICT_OUTCOMES:
         for c in parties:
             if random.random() < 0.35:
                 begin_temporary_separation(c, world, reason="conflict",
-                                           cause={"with_ids": [p["id"] for p in parties if p["id"] != c["id"]], "outcome": outcome})
+                                           cause={"with_ids": [p["id"] for p in parties if p["id"] != c["id"]], "outcome": outcome, "topic": topic})
 
 subscribe("conflict_resolved", _on_conflict_resolved)
 
@@ -254,11 +279,22 @@ def _on_fight_physical(data, world):
     dice-roll trigger_incident(), which almost never fires for the exact
     fight that just happened)."""
     from systems.emergency import report_assault_incident
-    for pid in data.get("parties", []):
-        c = world.get("characters", {}).get(pid)
-        if c:
-            report_assault_incident(world, c)
-            break  # one incident per fight is enough
+    from systems import fights
+    chars = world.get("characters", {})
+    parties = [p for p in data.get("parties", []) if p in chars]
+    if not parties:
+        return
+    # one incident per fight: whoever threw the first punch is the offender, the other the victim
+    aggressor_id = data.get("aggressor") if data.get("aggressor") in parties else parties[0]
+    victim_id = next((p for p in parties if p != aggressor_id), None)
+    topic = data.get("topic") or fights.topic_of(data.get("issues"), data.get("context"))
+    inc = report_assault_incident(world, chars[aggressor_id], chars.get(victim_id), topic=topic,
+                                  context=data.get("context"), conflict_id=data.get("conflict_id"))
+    if not data.get("conflict_id"):
+        # nothing else will log a fight that came from a one-off outburst (a conflict is logged when it resolves)
+        entry = fights.log_fight(world, parties, topic, "physical_resolved", aggressor=aggressor_id, context=data.get("context"),
+                                 issues=data.get("issues"), incident_id=inc["id"])
+        inc["fight_id"] = entry["id"]
 
 subscribe("fight_physical", _on_fight_physical)
 

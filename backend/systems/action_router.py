@@ -2981,6 +2981,8 @@ def _route_call_911(c, world, action):
     )
     if not incident or incident.get("reported"):
         return
+    if incident.get("offender_id") == c["id"]:
+        return                       # nobody phones the police on their own assault
 
     # Awareness gate: either a direct participant, or physically close
     # enough to have witnessed it — same Manhattan-4 radius
@@ -2999,9 +3001,10 @@ def _route_call_911(c, world, action):
     emergency_type, report = (entry[0], entry[1]) if entry else ("police", "There's an emergency.")
 
     try:
-        from systems.emergency import create_911_call
-        create_911_call(world, c, emergency_type, report, incident_id=incident["id"])
+        from systems.emergency import create_911_call, call_report
+        create_911_call(world, c, emergency_type, call_report(world, incident, report), incident_id=incident["id"])
         incident["reported"] = True
+        incident["caller_id"] = c["id"]
     except Exception:
         pass
 

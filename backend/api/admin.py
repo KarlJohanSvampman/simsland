@@ -90,6 +90,24 @@ def get_state(sim_id: str = DEFAULT_SIM_ID):
     }
 
 
+@router.get("/police_reports")
+def get_police_reports(limit: int = 20, sim_id: str = DEFAULT_SIM_ID):
+    """The newest police reports first, each with the statements taken (systems/police_report.py)."""
+    world = load_world(sim_id)
+    return list(reversed((world.get("police_reports") or [])[-max(1, limit):]))
+
+
+@router.get("/fights")
+def get_fights(limit: int = 30, sim_id: str = DEFAULT_SIM_ID):
+    """The newest fights first: who, what about, how it ended (systems/fights.py)."""
+    world = load_world(sim_id)
+    names = {cid: c.get("name") for cid, c in (world.get("characters") or {}).items()}
+    out = []
+    for f in reversed((world.get("fight_log") or [])[-max(1, limit):]):
+        out.append(dict(f, party_names=[names.get(p, p) for p in f.get("parties", [])], aggressor_name=names.get(f.get("aggressor"))))
+    return out
+
+
 @router.post("/time_scale")
 @command("admin.set_time_scale")
 def set_time_scale(payload: dict, sim_id: str = DEFAULT_SIM_ID):

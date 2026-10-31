@@ -39,6 +39,7 @@ import uuid
 import random
 
 from core.event_bus import emit
+from systems.fights import topic_of
 
 
 # ── Constants ─────────────────────────────────────────────────────────────
@@ -215,6 +216,7 @@ def start_conflict(initiator_id, target_id, world):
         "willingness":       {},
         "grievances_addressed": [g["id"] for g in grievances],
         "issues":            [g["event_type"] for g in grievances],
+        "topic":             topic_of([g["event_type"] for g in grievances]),
         "proposed_terms":    [],
         "accepted_terms":    [],
         "exchanges":         0,
@@ -434,6 +436,7 @@ def _raise_stage(conflict, world):
     if conflict["fight_stage_idx"] < len(FIGHT_STAGES) - 1:
         conflict["fight_stage_idx"] += 1
         conflict["fight_stage"] = FIGHT_STAGES[conflict["fight_stage_idx"]]
+        conflict["peak_stage"] = conflict["fight_stage"]
         conflict["log"].append({
             "tick": world["tick"],
             "event": "escalated",
@@ -455,10 +458,17 @@ def _drop_stage(conflict, world):
 
 def _handle_physical(conflict, a, b, world):
     """Resolve a physical altercation — may trigger law pipeline."""
-    conflict["log"].append({"tick": world["tick"], "event": "physical"})
+    # whoever was readier to escalate threw the first punch (ties go to whoever started it)
+    esc = {a["id"]: _escalation_chance(a, b, 3, world), b["id"]: _escalation_chance(b, a, 3, world)}
+    aggressor = max(esc, key=lambda pid: (esc[pid], pid == conflict["initiator"]))
+    conflict["aggressor"] = aggressor
+    conflict["log"].append({"tick": world["tick"], "event": "physical", "aggressor": aggressor})
     emit("fight_physical", {
         "conflict_id": conflict["id"],
         "parties":     conflict["parties"],
+        "aggressor":   aggressor,
+        "topic":       conflict.get("topic") or topic_of(conflict.get("issues")),
+        "issues":      conflict.get("issues") or [],
     })
     # Relationship damage
     for c, other in [(a, b), (b, a)]:

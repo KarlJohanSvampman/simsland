@@ -39,7 +39,7 @@ def create_911_call(world, caller, emergency_type, report, incident_id=None):
     return call
 
 
-def report_assault_incident(world, offender, victim=None):
+def report_assault_incident(world, offender, victim=None, topic=None, context=None, conflict_id=None):
     """
     Create a real, deterministic incident for a physical altercation
     (see core/event_handlers.py::_on_fight_physical, and
@@ -69,6 +69,14 @@ def report_assault_incident(world, offender, victim=None):
         "reported":     False,
         "tick":         world["tick"],
     }
+    if victim:
+        inc["victim_id"] = victim["id"]
+    if topic:
+        inc["topic"] = topic                       # what the fight was about (systems/fights.py)
+    if context:
+        inc["context"] = context
+    if conflict_id:
+        inc["conflict_id"] = conflict_id
     world.setdefault("incidents", []).append(inc)
     emit("incident_created", {"incident_id": inc["id"], "type": inc["type"]})
 
@@ -218,12 +226,11 @@ def trigger_incident(world, c):
 
 # Real, witness-based caller selection for the two incident types that
 # most plausibly happen with no one calling at all: a domestic assault
-# with no one else around genuinely can go unreported, and even a
-# perpetrator calling on himself is a real (if less usual) possibility --
-# NOT the participants[0]-is-always-the-caller default this used to fall
-# back on, which is what made an offender always "call 911 on himself."
+# with no one else around genuinely can go unreported. Only someone
+# else calls it in -- the victim first, then whoever saw it. The offender
+# never phones the police on their own assault (that used to be a 15%
+# "self report" that put the person who threw the punch on the line).
 _WITNESS_CALL_CHANCE = 0.40
-_SELF_REPORT_CHANCE = 0.15
 _MAX_REPORT_ATTEMPTS = 3
 
 
@@ -231,8 +238,8 @@ def _find_incident_witnesses(world, inc):
     """Real co-present adult/teen characters near an incident's location
     (Manhattan-4, matching resolve()'s own proximity radius below) --
     excludes the offender and any child participant (a young child victim
-    doesn't call 911 on their own). This is the candidate pool for "does
-    someone actually report this," not the offender by default."""
+    doesn't call 911 on their own). The victim comes first. This is the
+    candidate pool for "does someone actually report this"."""
     loc = inc.get("location", {})
     lx, ly = loc.get("x"), loc.get("y")
     if lx is None or ly is None:
@@ -240,14 +247,25 @@ def _find_incident_witnesses(world, inc):
     offender_id = inc.get("offender_id")
     witnesses = []
     for cid, c in world.get("characters", {}).items():
-        if c.get("alive") is False or cid == offender_id:
+        if c.get("alive") is False or cid == offender_id or c.get("off_grid"):
             continue
         if c.get("age_group") == "child":
             continue
-        if abs(c.get("x", 0) - lx) + abs(c.get("y", 0) - ly) >= 4:
+        if c.get("x") is None or c.get("y") is None:       # workplace NPCs have no position
+            continue
+        if abs(c["x"] - lx) + abs(c["y"] - ly) >= 4:
             continue
         witnesses.append(c)
+    witnesses.sort(key=lambda w: w["id"] != inc.get("victim_id"))
     return witnesses
+
+
+def call_report(world, inc, default):
+    """What the caller says: names and the place when the incident knows them, else the stock line."""
+    from systems.fights import name_of
+    if inc.get("type") == "assault" and inc.get("offender_id") and inc.get("victim_id"):
+        return f"{name_of(world, inc['offender_id'])} just attacked {name_of(world, inc['victim_id'])}."
+    return default
 
 
 def auto_report_incidents(world):
@@ -268,10 +286,6 @@ def auto_report_incidents(world):
                     caller = witness
                     break
             if caller is None:
-                offender = world["characters"].get(inc.get("offender_id"))
-                if offender and random.random() < _SELF_REPORT_CHANCE:
-                    caller = offender
-            if caller is None:
                 if attempts >= _MAX_REPORT_ATTEMPTS:
                     # Nobody called it in across every real attempt --
                     # stays genuinely unwitnessed-by-authorities. No
@@ -285,8 +299,9 @@ def auto_report_incidents(world):
                         except Exception:
                             pass
                 continue
-            create_911_call(world, caller, service, report, incident_id=inc["id"])
+            create_911_call(world, caller, service, call_report(world, inc, report), incident_id=inc["id"])
             inc["reported"] = True
+            inc["caller_id"] = caller["id"]
             continue
 
         # Every other reportable incident type keeps its original,
@@ -326,6 +341,12 @@ def resolve(world):
             r["status"] = "resolved"
             loc = r["location"]
             if r["type"] == "police":
+                try:
+                    from systems.police_report import file_report
+                    file_report(world, r)                  # the officers take statements and write it up
+                except Exception:
+                    import traceback
+                    traceback.print_exc()
                 for c in world["characters"].values():
                     if c.get("x") is None or c.get("y") is None:       # workplace NPCs have no position
                         continue
