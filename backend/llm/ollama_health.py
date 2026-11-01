@@ -23,6 +23,8 @@ _PROC = f"{socket.gethostname()}:{os.getpid()}"
 
 # a reply within this many seconds counts as "Ollama has been responding"
 RECENT_SECONDS = int(os.getenv("OLLAMA_HEALTH_RECENT_SECONDS", "300"))
+# calls made for this long with no reply since count as "Ollama is not answering"
+UNANSWERED_SECONDS = int(os.getenv("OLLAMA_HEALTH_UNANSWERED_SECONDS", "30"))
 
 
 def base_url():
@@ -38,6 +40,26 @@ def _redis():
     return r
 
 
+def record_attempt():
+    try:
+        r = _redis()
+        r.hset(_KEY, "last_attempt", time.time())
+        r.hsetnx(_KEY, "unanswered_since", time.time())       # the first call since the last reply
+        r.hincrby(_KEY, "attempt_count", 1)
+    except Exception:
+        pass
+
+
+def record_cancelled(elapsed):
+    """The caller gave up waiting (it is not counted as a failure: the server may simply be slow)."""
+    try:
+        r = _redis()
+        r.hset(_KEY, mapping={"last_cancelled": time.time(), "last_cancelled_after_seconds": round(elapsed, 2)})
+        r.hincrby(_KEY, "cancelled_count", 1)
+    except Exception:
+        pass
+
+
 def record_success(elapsed):
     """A model call came back. Never raises: health bookkeeping must not break a real call."""
     try:
@@ -46,6 +68,7 @@ def record_success(elapsed):
         pipe.hset(_KEY, mapping={"last_ok": now, "last_ok_seconds": round(elapsed, 2), "last_ok_process": _PROC})
         pipe.hincrby(_KEY, "ok_count", 1)
         pipe.hset(_KEY, "consecutive_failures", 0)
+        pipe.hdel(_KEY, "unanswered_since")
         pipe.execute()
     except Exception:
         pass
@@ -78,13 +101,19 @@ def recorded():
             out[k] = float(v) if k not in ("last_error_text", "last_ok_process", "last_error_process") else v
         except ValueError:
             out[k] = v
-    for k in ("ok_count", "error_count", "consecutive_failures"):
+    for k in ("ok_count", "error_count", "consecutive_failures", "attempt_count", "cancelled_count"):
         if k in out:
             out[k] = int(out[k])
     if out.get("last_ok"):
         out["last_ok_ago_seconds"] = round(now - out["last_ok"], 1)
     if out.get("last_error"):
         out["last_error_ago_seconds"] = round(now - out["last_error"], 1)
+    if out.get("last_attempt"):
+        out["last_attempt_ago_seconds"] = round(now - out["last_attempt"], 1)
+    if out.get("unanswered_since"):
+        out["unanswered_for_seconds"] = round(now - out["unanswered_since"], 1)
+    if out.get("last_cancelled"):
+        out["last_cancelled_ago_seconds"] = round(now - out["last_cancelled"], 1)
     return out
 
 
@@ -108,7 +137,7 @@ def probe(timeout=5.0):
 def status(do_probe=True):
     """The full picture, with a one-word verdict:
        up        the server answers the probe and has the configured model
-       degraded  it answers, but the configured model is missing, or recent calls are failing
+       degraded  it answers, but the configured model is missing, or recent calls are failing or going unanswered
        down      the probe cannot reach it
        unknown   not probed and no call has been recorded"""
     rec = recorded()
@@ -116,6 +145,11 @@ def status(do_probe=True):
     recent_ok = rec.get("last_ok_ago_seconds") is not None and rec["last_ok_ago_seconds"] <= RECENT_SECONDS
     out["responding_recently"] = recent_ok
     failing = rec.get("consecutive_failures", 0) >= 3
+    # calls have been made for a while and not one has come back since: that is not answering, whatever the reason
+    tried_recently = rec.get("last_attempt_ago_seconds") is not None and rec["last_attempt_ago_seconds"] <= RECENT_SECONDS
+    unanswered = tried_recently and rec.get("unanswered_for_seconds", 0) > UNANSWERED_SECONDS
+    out["calls_unanswered"] = unanswered
+    failing = failing or unanswered
     if do_probe:
         p = probe()
         out["probe"] = p

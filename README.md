@@ -23,6 +23,16 @@ docker compose up --build
 ```
 Open http://localhost:8000
 
+Without Docker (Postgres, Redis and Python installed locally):
+```bash
+scripts/local_db.sh
+```
+```bash
+scripts/run_local.sh
+```
+`local_db.sh` starts Postgres and Redis with the same settings as docker-compose (creating the `sim` database the first
+time); `scripts/local_db.sh stop` stops them.
+
 If Ollama has no model yet:
 ```bash
 docker compose exec ollama ollama pull llama3

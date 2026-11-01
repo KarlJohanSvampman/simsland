@@ -137,8 +137,14 @@ async def _call_llm(
 
     from llm import ollama_health
     _t0 = time.time()
+    ollama_health.record_attempt()
     try:
         content = await _post_chat(base, model, messages, timeout, max_tokens, num_ctx, keep_alive)
+    except asyncio.CancelledError:
+        # abandoned by the caller before Ollama answered (llm_gate's short tick-thread budget, a preemption) --
+        # not proof Ollama is down, but a server that never answers shows up as nothing but these
+        ollama_health.record_cancelled(time.time() - _t0)
+        raise
     except Exception as e:
         ollama_health.record_failure(e, time.time() - _t0)
         raise
