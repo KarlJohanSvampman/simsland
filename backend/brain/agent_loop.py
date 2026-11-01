@@ -589,6 +589,9 @@ def process_decision(
         if result["id"] is not None:
             speech["target"] = result["id"]
 
+    if speech:
+        _direct_speech(c, world, speech)
+
     if action:
 
         valid = validate_action(
@@ -1071,6 +1074,10 @@ def update_agent(
                 return
         else:
             execute_activity(c, world, c["activity"])
+            # Spoken to in the middle of something light (chatting, sitting, watching TV): they
+            # keep at it, but get to decide how to answer -- LISTENING_ACTIVITIES below.
+            if c.get("activity") and _spoken_to_while_busy(c, world, act_type):
+                _think_now(c, world)
             return
 
     # =====================================
@@ -1167,6 +1174,33 @@ def update_agent(
     # brain/cognition_scheduler.py for why this replaced calling think()
     # on every single tick.
 
+    _think_now(c, world)
+
+
+# Activities a character can be talked to in the middle of: they keep doing it, but hearing someone
+# speak to them lets them decide what to say (systems/conversation_floor.py gives a listener 3 ticks to
+# start responding). Everything else -- sleep, the toilet, a shower, eating, work, chores -- still runs
+# to the end first, as before. Live (2026-11-01): two children "socializing" with each other could
+# never answer each other -- every line was "ignored" and every conversation died after one line.
+LISTENING_ACTIVITIES = {
+    "socialize", "speak", "wait", "sit_and_relax", "watch_tv", "listen_to_music", "read_newspaper",
+    "browse_news", "hangout", "meditate", "daydream", "reflect", "make_drawing",
+}
+SPOKEN_TO_WAKES = {"heard_speech", "floor_unnoticed", "floor_unanswered", "door_signal"}
+
+
+def _spoken_to_while_busy(c, world, act_type):
+    """In a listening activity, and due to think because someone spoke to them."""
+    if act_type not in LISTENING_ACTIVITIES:
+        return False
+    cog = c.get("cognition") or {}
+    return (cog.get("wake_reason") in SPOKEN_TO_WAKES
+            and world.get("tick", 0) >= cog.get("next_think_tick", 0))
+
+
+def _think_now(c, world):
+    """The cognition gate and the model request: everything update_agent() does once nothing else has
+    claimed the tick. Also called mid-activity for a character who was spoken to (LISTENING_ACTIVITIES)."""
     # A decision already with the model (brain/cognition_actor.py): the character carries on
     # living -- everything above this point still ran -- but doesn't ask again.
     from brain.cognition_actor import is_waiting, request_decision
@@ -1242,3 +1276,22 @@ def update_agent(
     # THEN) by brain/cognition_actor.py::on_decision_ready. Nothing here blocks the tick.
     _prof.mark("agent:request_decision")
     request_decision(c, world, context, wake_reason, llm_priority)
+
+
+def _direct_speech(c, world, speech):
+    """Give a line to the person it is for (systems/addressing.py::addressee). Someone the line names who is in view
+    gets it; someone it names who isn't here gets it called out to them (a remark aimed at them -- systems/expressions.py
+    decides who hears it), instead of apply_speech() handing it to whoever happens to be nearest. A line that names
+    nobody is left as it was."""
+    from systems.addressing import addressee, addressed_elsewhere
+    utterance = speech.get("utterance") or ""
+    current = speech.get("target")
+    if current and not addressed_elsewhere(world, c["id"], current, utterance):
+        return
+    meant_for = addressee(world, c, utterance, None if current else speech.get("target_description"))
+    if not meant_for or meant_for == current:
+        return
+    in_view = {p.get("id") for p in (c.get("perception") or {}).get("visible_people", [])}
+    speech["target"] = meant_for
+    if meant_for not in in_view:
+        speech["mode"] = "remark"                  # called out to them, not a conversation with a bystander
