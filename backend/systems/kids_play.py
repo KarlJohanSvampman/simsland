@@ -110,11 +110,39 @@ def settle_play_urges(world):
                          people=[friend["id"]] if friend else None)
 
 
+def start_agreed_play(world):
+    """A time two children agreed to play at (systems/conversation_outcome.py, "after dinner", "at 4") has come: each
+    gets the urge to go and play with the other now."""
+    from brain.intentions import add_intention
+    tick = world.get("tick", 0)
+    chars = world.get("characters", {})
+    for c in chars.values():
+        plans = c.get("_play_plans") or []
+        due = [p for p in plans if tick >= p.get("at_tick", 0)]
+        if not due:
+            continue
+        c["_play_plans"] = [p for p in plans if p not in due]
+        for plan in due:
+            friend = chars.get(plan.get("with"))
+            if not friend or c.get("off_grid"):
+                continue
+            add_intention(c, {
+                "type": "play_with_friend",
+                "category": "social",
+                "priority": PLAY_PRIORITY + 10,
+                "target_id": friend["id"],
+                "source": "agreed_plan",
+                "created_at": tick,
+                "reason": f"You and {friend['name']} agreed to play now -- go and find {friend['name']}.",
+            })
+
+
 def tick_kids_play(world):
-    """Scheduled job: end the urges to play that are done or have lapsed, then give free children
-    with a free friend the urge to play with them."""
+    """Scheduled job: end the urges to play that are done or have lapsed, start the play two children
+    agreed on for now, then give free children with a free friend the urge to play with them."""
     from brain.intentions import add_intention
     settle_play_urges(world)
+    start_agreed_play(world)
     tick = world.get("tick", 0)
     for c in list(world.get("characters", {}).values()):
         friend = want_to_play(world, c)

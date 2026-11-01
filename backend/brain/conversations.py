@@ -490,6 +490,10 @@ def add_message(
     from systems.conversation_floor import on_message as _floor_on_message
     _floor_on_message(world, conv, speaker_id, utterance, speech_act, tick)
 
+    # Was what was asked answered? A conversation ends once it is (systems/conversation_outcome.py).
+    from systems.conversation_outcome import on_message as _outcome_on_message
+    _outcome_on_message(world, conv, speaker_id, utterance, speech_act, tick)
+
     # NOTE: reflection scheduling is handled by action_router.py's
     # apply_speech() after each turn so it is not duplicated here.
 
