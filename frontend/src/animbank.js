@@ -1381,9 +1381,40 @@ let STANCES = [
     { key: "pushing",       label: "Pushing",         moves: [{ slot: "idle", label: "Idle" }] },
 ];
 
-function _templateOptionsHTML(templates, current) {
-    return `<option value="">— none —</option>` +
-        templates.map(t => `<option value="${t.id}"${t.id === current ? " selected" : ""}>${t.name}</option>`).join("");
+function _escAttr(v) {
+    return String(v).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+// Options for a stance/transition dropdown: the character's templates, then (when `clips` is given) its raw clips. A clip option is
+// "clip:<name>"; picking one goes through templateForChoice(), which finds or makes the one-clip template that wraps it.
+function _templateOptionsHTML(templates, current, clips) {
+    const tmplOpts = templates.map(t => `<option value="${_escAttr(t.id)}"${t.id === current ? " selected" : ""}>${_escAttr(t.name)}</option>`).join("");
+    let html = `<option value="">— none —</option>`;
+    html += clips && clips.length ? `<optgroup label="Templates">${tmplOpts}</optgroup>` : tmplOpts;
+    if (clips && clips.length) {
+        html += `<optgroup label="Clips (picking one makes a template)">` +
+            clips.map(c => `<option value="clip:${_escAttr(c.name)}">[${_escAttr(c.category || "uncategorized")}] ${_escAttr(c.name)}</option>`).join("") +
+            `</optgroup>`;
+    }
+    return html;
+}
+
+// A dropdown value -> a template id. A "clip:<name>" value reuses this source's existing single-clip template for that clip, or creates
+// one (named after the clip, looping, like the hand-made idle/walk ones). The new template is part of the bank, saved with Save Bank.
+function templateForChoice(value) {
+    if (!value || !value.startsWith("clip:")) return value;
+    const clipName = value.slice(5);
+    const templates = getTemplates();
+    const same = Object.values(templates).filter(t =>
+        t.source_key === currentSourceKey && (t.chain || []).length === 1 && t.chain[0].clip === clipName);
+    if (same.length) return (same.find(t => t.name === clipName) || same[0]).id;
+    const id = crypto.randomUUID();
+    templates[id] = {
+        id, name: clipName, source_key: currentSourceKey || "",
+        chain: [{ id: crypto.randomUUID(), clip: clipName, start_frame: 0, end_frame: null, speed: 1, loop: "repeat", loop_count: -1 }],
+        alternatives: [], notifies: [], ik_targets: [],
+    };
+    return id;
 }
 
 function renderStancesPanel() {
@@ -1400,8 +1431,8 @@ function renderStancesPanel() {
 
     const templates = Object.values(getTemplates())
         .filter(t => t.source_key === currentSourceKey);
-    const title = templates.length === 0
-        ? "No templates for this character yet — create one in the Templates tab first." : "";
+    const clips = src.clips || [];
+    const title = "";
 
     const listEl = document.getElementById("stanceList");
     listEl.innerHTML = "";
@@ -1424,10 +1455,12 @@ function renderStancesPanel() {
             lbl.textContent = label;
             const select = document.createElement("select");
             select.title = title;
-            select.innerHTML = _templateOptionsHTML(templates, slots[slot] || "");
+            select.innerHTML = _templateOptionsHTML(templates, slots[slot] || "", clips);
             select.onchange = () => {
-                if (select.value) slots[slot] = select.value;
+                const id = templateForChoice(select.value);
+                if (id) slots[slot] = id;
                 else delete slots[slot];
+                if (select.value.startsWith("clip:")) { renderStancesPanel(); renderTransitionsPanel(); renderTemplateTab(); }
             };
             row.appendChild(lbl);
             row.appendChild(select);
@@ -1483,8 +1516,12 @@ function renderTransitionsPanel() {
         toSel.addEventListener("change", () => { t.to = toSel.value; });
 
         const tmplSel = document.createElement("select");
-        tmplSel.innerHTML = _templateOptionsHTML(templates, t.template || "");
-        tmplSel.addEventListener("change", () => { t.template = tmplSel.value || null; });
+        tmplSel.innerHTML = _templateOptionsHTML(templates, t.template || "", src.clips || []);
+        tmplSel.addEventListener("change", () => {
+            const picked = tmplSel.value;
+            t.template = templateForChoice(picked) || null;
+            if (picked.startsWith("clip:")) { renderStancesPanel(); renderTransitionsPanel(); renderTemplateTab(); }
+        });
 
         const del = document.createElement("button");
         del.textContent = "✕"; del.className = "danger transDel";
