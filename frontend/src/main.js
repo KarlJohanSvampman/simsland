@@ -4752,7 +4752,7 @@ function _clearInspector(){
   const empty = _empty("Nothing selected.");
   const panelIds = [
     "viewerSelection", "viewerRelationshipsTab", "viewerMindTab", "viewerWorriesTab", "viewerOffgridTab",
-    "viewerMemoryTab", "viewerLifeTab", "viewerPlansTab", "viewerWorkTab",
+    "viewerMemoryTab", "viewerConversationsTab", "viewerLifeTab", "viewerPlansTab", "viewerWorkTab",
     "viewerHabitsTab", "viewerSkillsTab",
   ];
   for(const id of panelIds){
@@ -5108,6 +5108,7 @@ function renderCharacterInspector(id){
   renderWorriesTab(c);
   renderOffgridTab(c);
   renderMemoryTab(c);
+  renderConversationsTab(c);
   renderLifeTab(c);
   renderPlansTab(c);
   renderWorkTab(c);
@@ -6068,7 +6069,7 @@ function openMemoryModal(m){
   // add_message(), which now stamps conv_id onto exactly this memory)
   // instead of leaving the full transcript undiscoverable.
   if(m.conv_id){
-    const match = _lastRenderedConversations.find(e => e.conv_id === m.conv_id);
+    const match = _lastRenderedConversations.find(e => e.conv_id === m.conv_id || (e.conv_ids || []).includes(m.conv_id));
     const link = document.createElement("a");
     link.href = "#";
     link.style.cssText = "display:inline-block;margin-top:8px;opacity:.85;";
@@ -6160,15 +6161,16 @@ function openConversationModal(entry){
   openModal("modal-intention");
 }
 
-document.getElementById("viewerMemoryTab")?.addEventListener("click", (e) => {
+document.getElementById("viewerConversationsTab")?.addEventListener("click", (e) => {
   const convCard = e.target.closest("[data-conv-index]");
-  if(convCard){
-    e.preventDefault();
-    openConversationModal(_lastRenderedConversations[Number(convCard.dataset.convIndex)]);
-    return;
-  }
+  if(!convCard) return;
+  e.preventDefault();
+  openConversationModal(_lastRenderedConversations[Number(convCard.dataset.convIndex)]);
+});
+
+document.getElementById("viewerMemoryTab")?.addEventListener("click", (e) => {
   const card = e.target.closest(".viewerCardClickable");
-  if(card && !card.hasAttribute("data-conv-index")){
+  if(card){
     e.preventDefault();
     openMemoryModal(_lastRenderedMemories[Number(card.dataset.memoryIndex)]);
     return;
@@ -6196,7 +6198,6 @@ function renderMemoryTab(c){
   }
 
   _lastRenderedMemories = [];
-  _lastRenderedConversations = [];
   const sections = [];
 
   const shortTerm = [...(c.memories || [])].sort((a, b) => (b.tick || 0) - (a.tick || 0));
@@ -6204,30 +6205,6 @@ function renderMemoryTab(c){
 
   const longTerm = [...(c.long_term_memory || [])].sort((a, b) => (b.tick || 0) - (a.tick || 0));
   sections.push(_renderMemoryList("Long-Term Memory", longTerm, _longTermMemoryPage, LONG_TERM_MEMORY_PAGE_SIZE, "long"));
-
-  // Per the user's explicit ask: a durable log of this character's own
-  // conversations/dialogue, including calls and texts (backend/brain/
-  // conversations.py::_archive_conversation, written once a conversation
-  // naturally closes -- not the same thing as the short-term "You told X..."
-  // memory lines above, which fade/get forgotten like any other memory).
-  sections.push(_renderConversationLog(c));
-
-  // -- Conversation topics -- pure client-side aggregation of the
-  // already-real `topic` field stamped on memories by work-shift/
-  // shared-event narration (llm/work_shift_narration.py,
-  // llm/shared_event_narration.py), no backend change needed.
-  const topicCounts = {};
-  for(const m of (c.memories || [])){
-    if(!m.topic) continue;
-    topicCounts[m.topic] = (topicCounts[m.topic] || 0) + 1;
-  }
-  const topicEntries = Object.entries(topicCounts).sort((a, b) => b[1] - a[1]);
-  if(topicEntries.length){
-    const lines = topicEntries.map(([topic, count]) =>
-      `<div class="viewerStatRow" style="justify-content:space-between;"><span>${topic}</span><span style="opacity:.7">${count}×</span></div>`
-    );
-    sections.push(_section(`Conversation Topics (${topicEntries.length})`, lines.join("")));
-  }
 
   // -- Notable stories --
   const stories = c.notable_stories || [];
@@ -6273,6 +6250,37 @@ function renderMemoryTab(c){
           : "cover story -- hasn't told anyone yet"}</div>
       </div>`);
     sections.push(_section(`Cover stories (${lies.length})`, lines.join("")));
+  }
+
+  el.innerHTML = sections.join("");
+}
+
+// =========================================================
+// CONVERSATIONS TAB -- everything this character has said to anyone, in one place
+// (it used to be a section of the Memory tab). The log is backend/brain/conversations.py::
+// _archive_conversation, written once a conversation closes -- not the short-term "Talked about..."
+// memory lines, which fade like any other memory (those still link here via openConversationModal).
+// =========================================================
+function renderConversationsTab(c){
+  const el = document.getElementById("viewerConversationsTab");
+  if(!el) return;
+
+  _lastRenderedConversations = [];
+  const sections = [_renderConversationLog(c)];
+
+  // Conversation topics -- pure client-side aggregation of the `topic` field stamped on memories by work-shift/
+  // shared-event narration (llm/work_shift_narration.py, llm/shared_event_narration.py).
+  const topicCounts = {};
+  for(const m of (c.memories || [])){
+    if(!m.topic) continue;
+    topicCounts[m.topic] = (topicCounts[m.topic] || 0) + 1;
+  }
+  const topicEntries = Object.entries(topicCounts).sort((a, b) => b[1] - a[1]);
+  if(topicEntries.length){
+    const lines = topicEntries.map(([topic, count]) =>
+      `<div class="viewerStatRow" style="justify-content:space-between;"><span>${_escapeHTML(topic)}</span><span style="opacity:.7">${count}×</span></div>`
+    );
+    sections.push(_section(`Conversation Topics (${topicEntries.length})`, lines.join("")));
   }
 
   el.innerHTML = sections.join("");
@@ -7320,6 +7328,7 @@ const VIEWER_TAB_PANELS = {
   worries:       "viewerWorriesTab",
   offgrid:       "viewerOffgridTab",
   memory:        "viewerMemoryTab",
+  conversations: "viewerConversationsTab",
   life:          "viewerLifeTab",
   plans:         "viewerPlansTab",
   work:          "viewerWorkTab",
