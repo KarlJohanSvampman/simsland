@@ -100,4 +100,4 @@ temp/
 # =========================
 *.bak
 *.old
-*.orig
+*.origdump.rdb
