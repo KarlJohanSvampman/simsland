@@ -1,7 +1,7 @@
 # Why intentions did not lead to anything (measured 2026-10-26)
 
 ## 1. The model server was the bottleneck
-- `docker-compose.yml` points the sim at `llama3.1:latest` on the Ollama box (192.168.10.203). Measured there: reading a
+- `docker-compose.yml` points the sim at `llama3.1:latest` on the Ollama box (192.168.10.176). Measured there: reading a
   4,200-token prompt took 46 s (92 tokens/s) and writing 80 tokens took 32 s (2.5 tokens/s); the loaded model is only partly on
   the GPU (2.6 of 3.4 GB). A character's real decision prompt is about 1,450 tokens (359 system + 1,083 context) and the reply
   was uncapped, so one decision took 60-100 s. The gate gave up at 90 s, so most decisions were thrown away and asked for again

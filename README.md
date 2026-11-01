@@ -27,3 +27,17 @@ If Ollama has no model yet:
 ```bash
 docker compose exec ollama ollama pull llama3
 ```
+
+## Is Ollama up?
+```bash
+scripts/check_ollama.sh
+```
+Probes the Ollama server (default `http://192.168.10.176:11434`, override with `OLLAMA=...`) and prints what the sim
+has seen at `GET /admin/ollama_status`: `status` (up / degraded / down), last reply and last error from the real
+model calls (core and workers), and whether the configured model is installed.
+
+## Add families
+A fresh world starts with three extra households of three, each in its own house. To add more to a running world:
+```bash
+curl -X POST localhost:8000/admin/generate_households -H 'Content-Type: application/json' -d '{"count": 3, "members": 3}'
+```

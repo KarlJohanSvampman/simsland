@@ -469,6 +469,36 @@ def add_building(payload: dict, sim_id: str = DEFAULT_SIM_ID):
     return {"ok": True, "building": building, "props": props}
 
 
+@router.post("/generate_households")
+@command("admin.generate_households", timeout=120)
+def generate_households_route(payload: dict = None, sim_id: str = DEFAULT_SIM_ID):
+    """Move new families into the neighbourhood: for each one a house (built on the first free lot), a household that
+    owns it, and its members -- related to each other, standing in their living room, settled into a schedule
+    (systems/household_generation.py).
+
+    payload (all optional): {"count": 3, "members": 3, "template": "starter_house"}"""
+    payload = payload or {}
+    count, members = int(payload.get("count", 3)), int(payload.get("members", 3))
+    if not (1 <= count <= 10 and 1 <= members <= 8):
+        return JSONResponse({"error": "count must be 1-10 and members 1-8"}, status_code=400)
+    from systems.household_generation import generate_households
+    with world_lock():
+        world = load_world(sim_id)
+        try:
+            result = generate_households(world, sim_id, count=count, members=members,
+                                         template=payload.get("template", "starter_house"))
+        except ValueError as e:
+            return JSONResponse({"error": str(e)}, status_code=404)
+        save_world(sim_id, world)
+    try:
+        from main import _clients
+        for client in _clients:
+            client["needs_full"] = True
+    except Exception:
+        pass
+    return {"ok": True, **result}
+
+
 @router.post("/remove_character")
 @command("admin.remove_character")
 def remove_character(payload: dict, sim_id: str = DEFAULT_SIM_ID):
@@ -902,6 +932,17 @@ def dedupe_long_term_memory(payload: dict, sim_id: str = DEFAULT_SIM_ID):
                 results[c["id"]] = {"before": len(ltm), "after": len(deduped)}
         save_world(sim_id, world)
     return {"ok": True, "results": results}
+
+
+@router.get("/ollama_status")
+@core_only
+def get_ollama_status(probe: bool = True):
+    """Is Ollama up, and has it been answering? A live probe of the server (GET /api/tags: reachable, latency,
+    models, whether the configured model is there) plus what the real model calls -- core and workers -- have
+    recorded: last reply, last failure, counts. status: up / degraded / down / unknown (llm/ollama_health.py).
+    ?probe=false skips the live probe."""
+    from llm import ollama_health
+    return ollama_health.status(do_probe=probe)
 
 
 @router.get("/llm_gate_state")

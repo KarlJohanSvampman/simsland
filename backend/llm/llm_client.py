@@ -135,6 +135,19 @@ async def _call_llm(
     num_ctx = int(os.getenv("OLLAMA_NUM_CTX", "8192"))
     keep_alive = os.getenv("OLLAMA_KEEP_ALIVE", "10m")
 
+    from llm import ollama_health
+    _t0 = time.time()
+    try:
+        content = await _post_chat(base, model, messages, timeout, max_tokens, num_ctx, keep_alive)
+    except Exception as e:
+        ollama_health.record_failure(e, time.time() - _t0)
+        raise
+    ollama_health.record_success(time.time() - _t0)
+    return content
+
+
+async def _post_chat(base, model, messages, timeout, max_tokens, num_ctx, keep_alive):
+
     async with httpx.AsyncClient(
 
         timeout=timeout

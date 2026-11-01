@@ -606,6 +606,12 @@ def generate_initial_world():
         if not c.get("hobbies"):
             assign_hobbies(c, world)
 
+    from core.definitions import load_definitions as _ld
+    try:
+        _defs_for_families = _ld(world.get("sim_id", "default"))
+    except Exception:
+        _defs_for_families = {}
+
     # Seed faction instances from criminal company templates
     from systems.faction_ai import seed_factions_from_companies
     try:
@@ -615,11 +621,6 @@ def generate_initial_world():
 
     # Seed family trees for adult characters (probabilistic — ~60% get one)
     from systems.family import generate_family_for_character
-    from core.definitions import load_definitions as _ld
-    try:
-        _defs_for_families = _ld(world.get("sim_id", "default"))
-    except Exception:
-        _defs_for_families = {}
     for c in list(world["characters"].values()):
         if c.get("age", 0) >= 18 and not c.get("family_id") and random.random() < 0.60:
             try:
@@ -653,5 +654,13 @@ def generate_initial_world():
 
     spawn_household_car(world, household, house_1)
     spawn_bus_stop(world, world["road_y"])
+
+    # Three more families, each in a house of their own (systems/household_generation.py; the same thing
+    # POST /admin/generate_households does for a world that already exists).
+    from systems.household_generation import generate_households
+    try:
+        generate_households(world, world.get("sim_id", "default"), count=3, members=3)
+    except Exception as e:
+        print("[generate_world] household generation error:", e)
 
     return world
