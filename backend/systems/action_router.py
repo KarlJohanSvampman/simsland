@@ -94,6 +94,11 @@ def apply_speech(c, world, speech):
             nearest = max(visible, key=lambda p: p.get("visibility", 0))
             target_id = nearest.get("id")
 
+    # Said once: the same line to the same person again is dropped (systems/speech_repeat.py).
+    from systems.speech_repeat import is_repeat
+    if is_repeat(c, world, utterance, target_id):
+        return
+
     # Volume (see brain/perception.py's VOLUME_TIERS) -- explicit caller
     # value wins (e.g. a future hostile-action shout), otherwise inferred
     # from the same signals already tracked elsewhere: an "argument"
@@ -424,6 +429,11 @@ def apply_speech_to_group(c, world, speech, participant_ids):
     if not utterance:
         return None
 
+    # Said once (systems/speech_repeat.py) -- a group line is logged with no single target.
+    from systems.speech_repeat import is_repeat
+    if is_repeat(c, world, utterance, None):
+        return None
+
     tick = world.get("tick", 0)
     speech_act = speech.get("speech_act", "speak")
     topic = speech.get("topic", "")
@@ -561,6 +571,46 @@ def _route_move(c, world, action, mode="walk"):
 
     target_id = action.get("target")
     if not target_id:
+        return
+
+    # A room of the building ("towards the kitchen") -- brain/action_resolver.py
+    # resolves those to "room:<building_id>:<room_id>" (systems/room_targets.py).
+    from systems.room_targets import (is_room_target, room_destination,
+                                      is_building_target, building_destination)
+    # A household's home ("Susan Moreau's house"): their front door, or inside if it's
+    # this character's own home (systems/room_targets.py).
+    if is_building_target(target_id):
+        dest = building_destination(world, c, target_id)
+        if not dest:
+            return
+        x, y, inside = dest
+        c["move_target"] = {
+            "x": x,
+            "y": y,
+            "target_id": target_id,
+            "target_type": "building",
+            "inside": inside,
+        }
+        if plan_character_route(world, c, x, y):
+            c["animation_state"] = mode
+            c["is_moving"]       = True
+        return
+
+    if is_room_target(target_id):
+        dest = room_destination(world, target_id)
+        if not dest:
+            return
+        x, y, room = dest
+        c["move_target"] = {
+            "x": x,
+            "y": y,
+            "target_id": target_id,
+            "target_type": "room",
+            "room_type": room.get("type"),
+        }
+        if plan_character_route(world, c, x, y):
+            c["animation_state"] = mode
+            c["is_moving"]       = True
         return
 
     # Find target position from characters or props

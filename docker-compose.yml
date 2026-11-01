@@ -13,7 +13,7 @@ services:
       - SIM_ROLE=core                # the tick, the command consumer, the replica publisher; serves only @core_only routes
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/sim
       - REDIS_HOST=redis
-      - OLLAMA_BASE_URL=http://192.168.10.203:11434  # 👈 your remote Ollama
+      - OLLAMA_BASE_URL=http://192.168.10.176:11434  # 👈 your remote Ollama
       - OLLAMA_MODEL=llama3.1:latest
       - OLLAMA_NUM_CTX=8192          # 👈 explicit context window (was implicit 4096)
       - OLLAMA_KEEP_ALIVE=10m        # 👈 reduce cold-start reloads between ticks
@@ -44,7 +44,7 @@ services:
     mem_limit: 1g
     environment:
       - REDIS_HOST=redis
-      - OLLAMA_BASE_URL=http://192.168.10.203:11434
+      - OLLAMA_BASE_URL=http://192.168.10.176:11434
       - OLLAMA_MODEL=llama3.1:latest
       - OLLAMA_NUM_CTX=8192
       - OLLAMA_KEEP_ALIVE=10m
@@ -70,7 +70,7 @@ services:
     mem_limit: 1g
     environment:
       - REDIS_HOST=redis
-      - OLLAMA_BASE_URL=http://192.168.10.203:11434
+      - OLLAMA_BASE_URL=http://192.168.10.176:11434
       - OLLAMA_MODEL=llama3.1:latest
       - OLLAMA_NUM_CTX=8192
       - OLLAMA_KEEP_ALIVE=10m

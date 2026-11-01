@@ -65,6 +65,13 @@ def fire_incidental(character, speech_type, text, world, target_id=None):
     if (character.get("activity") or {}).get("type") == "sleep":
         return
 
+    # Said once: the same line to the same person again is dropped -- e.g. a
+    # busy listener's stock "Sorry, I'm right in the middle of ..." excuse to
+    # someone who keeps asking (systems/speech_repeat.py).
+    from systems.speech_repeat import is_repeat
+    if is_repeat(character, world, text, target_id):
+        return
+
     tick = world.get("tick", 0)
     character["current_speech"] = {
         "utterance":       text,

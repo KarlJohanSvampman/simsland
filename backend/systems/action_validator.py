@@ -91,6 +91,19 @@ def validate_target(
             return True
 
     # =====================================
+    # ROOM TARGET (walking to a room -- systems/room_targets.py)
+    # =====================================
+
+    from systems.room_targets import (is_room_target, room_destination,
+                                      is_building_target, building_destination)
+    if is_room_target(target):
+        return (action.get("type") in ("move", "jog_to", "sneak_to")
+                and room_destination(world, target) is not None)
+    if is_building_target(target):                 # a household's home ("Susan's house")
+        return (action.get("type") in ("move", "jog_to", "sneak_to")
+                and c is not None and building_destination(world, c, target) is not None)
+
+    # =====================================
     # BUILDING TARGET
     # =====================================
 

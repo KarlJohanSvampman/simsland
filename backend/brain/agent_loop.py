@@ -511,7 +511,12 @@ def process_decision(
     # MEMORY
     # =====================================
 
-    if decision.get("thought"):
+    # A thought is had once: a repeat isn't stored again -- the character notices
+    # they can't think of anything else and their focus gets more pressing
+    # (systems/thought_repeat.py).
+    from systems.thought_repeat import handle_thought
+
+    if decision.get("thought") and handle_thought(c, world, decision["thought"]):
 
         store_memory(
 

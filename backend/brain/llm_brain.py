@@ -726,9 +726,15 @@ _CANNED_NARRATION = {
 _CANNED_NARRATION_DEFAULT = "I get on with it."
 
 
+_LEADING_DIRECTION = re.compile(r"^\s*(?:towards?|to|into|over to|up to)\s+", re.IGNORECASE)
+
+
 def _canned_narration(action_type, target):
     template = _CANNED_NARRATION.get(action_type, _CANNED_NARRATION_DEFAULT)
     if "{target}" in template:
+        # "I head toward towards the kitchen" -- the model's target often already starts with a direction word.
+        if target and action_type in ("move", "jog_to", "sneak_to"):
+            target = _LEADING_DIRECTION.sub("", target) or target
         return template.format(target=target or "it")
     return template
 
