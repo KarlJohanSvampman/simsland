@@ -712,6 +712,12 @@ def update_agent(
     _prof.mark("agent:_body_tick_check_early")
     _body_tick_check_early(c, world)
 
+    # Arm / re-arm this character's step timeout (systems/step_timeouts.py) -- before the early return below, so a
+    # frozen trip leg (waiting for the bus, driving) has one too.
+    from systems.step_timeouts import note_step
+    _prof.mark("agent:note_step")
+    note_step(c, world)
+
     _prof.mark("agent:if_L656")
     if c.get(
         "off_grid"
@@ -719,10 +725,6 @@ def update_agent(
         "travel_state"
     ) in TRAVEL_FROZEN_STATES:
         return
-
-    from systems.activity_watchdog import check_activity_watchdog
-    _prof.mark("agent:check_activity_watchdog")
-    check_activity_watchdog(c, world)
 
     from systems.idle_quirks import advance_idle_quirk
     _prof.mark("agent:advance_idle_quirk")

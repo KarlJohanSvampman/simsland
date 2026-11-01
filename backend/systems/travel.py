@@ -40,9 +40,8 @@ TRAVEL_FROZEN_STATES = (
 # hijacking the trip before update_travel() ever sees the arrival.
 TRAVEL_WALKING_STATES = ("to_garage", "to_bus_stop", "walking_home")
 
-# The longest a trip's walk (to the garage, to the bus stop, home) may take before it is given up on: an outbound trip
-# then happens without the walk (straight off-grid, as when no route exists), a walk home just ends.
-WALK_MAX_TICKS = 900   # 15 sim-minutes
+# A trip's walk that stalls or runs too long is handled by its step timeout (systems/step_timeouts.py): a fresh route
+# first, then _give_up_walk -- an outbound trip happens without the walk, a walk home just ends.
 
 _CAR_PROBABILITY = 0.8
 
@@ -99,33 +98,10 @@ def _walk_target(c, world, state):
 def _give_up_walk(c, world, state):
     c["route"] = []
     c["is_moving"] = False
-    c.pop("_walk_since", None)
     if state == "walking_home":
         _finish_travel(c, world)
     else:
         _abort_travel_to_immediate(c, world)
-
-
-def _keep_walking(c, world, state):
-    """A walking trip state that has stalled -- not moving (an old route never set off, or one planned before the
-    navigation fix that leads nowhere) -- gets a fresh route and sets off; one that cannot, or that has taken longer
-    than WALK_MAX_TICKS, is given up on. Returns True if the walk is still on."""
-    tick = world.get("tick", 0)
-    since = c.get("_walk_since")
-    if not since or since.get("state") != state:
-        c["_walk_since"] = since = {"state": state, "tick": tick}
-    if tick - since["tick"] > WALK_MAX_TICKS:
-        _give_up_walk(c, world, state)
-        return False
-    if c.get("route") and not c.get("is_moving"):
-        target = _walk_target(c, world, state)
-        c["route"] = []
-        if not target or not (_at_position(c, {"x": target[0], "y": target[1]})
-                              or plan_character_route(world, c, target[0], target[1])):
-            _give_up_walk(c, world, state)
-            return False
-        _set_off(c)
-    return True
 
 
 def _route_or_already_there(c, world, target):
@@ -502,12 +478,6 @@ def _finish_travel(c, world):
 
 def update_travel(c, world):
     state = c.get("travel_state")
-
-    if state in TRAVEL_WALKING_STATES:
-        if not _keep_walking(c, world, state):
-            return
-    else:
-        c.pop("_walk_since", None)
 
     if state == "to_garage":
         if not c.get("route"):

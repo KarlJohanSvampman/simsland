@@ -1,5 +1,9 @@
 """
-Activity watchdog: nobody stays in one activity phase forever.
+Activity watchdog -- RETIRED as a per-tick check: stuck steps are now caught by timeout events
+(systems/step_timeouts.py). check_activity_watchdog is no longer called by the agent loop; it is kept for the old
+limits (_limit) and as a direct "release this character now if their activity is stale" helper.
+
+Original description: nobody stays in one activity phase forever.
 
 Activities finish by themselves once they reach their "using" phase and their
 duration elapses. Everything else -- the walking phase, carry legs, any phase
