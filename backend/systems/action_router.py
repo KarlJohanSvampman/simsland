@@ -1447,6 +1447,20 @@ def _scheduled_block_end_ticks(c, world, activity_name):
     return max(0, end_tick - tick)
 
 
+def _route_work(c, world):
+    """"work" is no longer offered (brain/context_builder.py), but a model can still answer with it.
+    It used to stand the character where they were for up to 8 hours doing nothing. Now: an employed
+    character during their work block sets off for the shift (off-grid, systems/offgrid.py::go_to_work);
+    anyone else just doesn't, and the memory log says why."""
+    from systems.offgrid import go_to_work
+    if go_to_work(c, world):
+        return
+    from systems.debug_log import log_action
+    why = ("There is no job to go to." if not c.get("employed")
+           else "It isn't time for their shift -- they go when the work block starts.")
+    log_action(c, world, "wait", "", reason=f'Asked to "work": {why}')
+
+
 def _work_duration_ticks(c, world, default=28800):
     """Per the user's explicit ask: work should run to the end of today's
     actual scheduled work block (systems/scheduling.py), not a flat 8h --
@@ -2408,8 +2422,7 @@ def route_action(c, world, action, speech, definitions=None, available_actions=N
         _route_wait(c, world, action)
 
     elif action_type == "work":
-        c["activity"] = _scaffold(c, world, "work", interaction="work",
-                                  duration=_work_duration_ticks(c, world))
+        _route_work(c, world)
 
     elif action_type == "describe":
         _route_describe(c, world, action)
@@ -4646,6 +4659,9 @@ def _route_door_signal(c, world, action, method):
 
     from systems.doorbell import resolve_door_signal
     resolve_door_signal(c, world, household, target_id=target_id, method=method)
+    # ...and they wait for someone to come -- at most 10 minutes (systems/waiting.py).
+    from systems.waiting import start_door_wait
+    start_door_wait(c, world, household, target_id=target_id)
 
 
 def _route_phone_call(c, world, action):

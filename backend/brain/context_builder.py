@@ -449,7 +449,9 @@ def build_available_actions(c, world):
         "wait",
         "eat",
         "sleep",
-        "work",
+        # no "work": choosing it only stood the character where they were for up to 8 hours with
+        # no effect at all (live: a 14-year-old with no job, 5+ sim-hours in). Going to work is the
+        # scheduled off-grid shift (systems/offgrid.py::go_to_work), not a menu choice.
         "socialize",
         "call",
         "text",

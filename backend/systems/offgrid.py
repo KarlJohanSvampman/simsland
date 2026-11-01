@@ -771,6 +771,28 @@ def _work_block_open(c, world):
     return bool(block) and int(block["start"][:2]) * 60 <= now_minute < int(block["end"][:2]) * 60
 
 
+def go_to_work(c, world):
+    """Set off for today's shift: off-grid for the work block. The one way a character goes to work --
+    the schedule's dispatch in maybe_go_offgrid() and a model that still asks for "work"
+    (systems/action_router.py) both come here. True if they left. Only an employed character, during
+    their work block."""
+    if not c.get("employed") or not _work_block_open(c, world):
+        return False
+    # Per the user's explicit ask: a job whose template defines an
+    # optional work_uniform (slot -> item template id) gets worn for
+    # the trip -- restored back to whatever they had on before, on
+    # return (see process_return()'s "work" branch below). A no-op
+    # for the vast majority of jobs, which define no work_uniform.
+    job_template = (world.get("definitions", {}) or {}).get("job_templates", {}).get(c.get("job_template_id"))
+    from systems.clothing import equip_work_uniform
+    equip_work_uniform(c, world, job_template)
+    if send_offgrid(c, world, "work", 8 * 60):
+        from systems import lateness
+        lateness.departed(c, world, "work")
+        return True
+    return False
+
+
 def _day_key(world):
     cal = world.get("calendar", {})
     return (cal.get("year"), cal.get("month"), cal.get("day"))
@@ -1020,16 +1042,7 @@ def maybe_go_offgrid(c, world):
     if c.get("employed") and (_work_block_starting_now(c, world) or (lateness.start_pending(c, world, "work") and _work_block_open(c, world))):
         if lateness.holds_start(c, world, "work"):
             return                                  # running late for the shift (systems/lateness.py)
-        # Per the user's explicit ask: a job whose template defines an
-        # optional work_uniform (slot -> item template id) gets worn for
-        # the trip -- restored back to whatever they had on before, on
-        # return (see process_return()'s "work" branch below). A no-op
-        # for the vast majority of jobs, which define no work_uniform.
-        job_template = (world.get("definitions", {}) or {}).get("job_templates", {}).get(c.get("job_template_id"))
-        from systems.clothing import equip_work_uniform
-        equip_work_uniform(c, world, job_template)
-        if send_offgrid(c, world, "work", 8 * 60):
-            lateness.departed(c, world, "work")
+        go_to_work(c, world)
         return
 
     # A child (age_group=="child") never independently rolls into a

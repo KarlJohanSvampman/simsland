@@ -40,6 +40,17 @@ def check_activity_watchdog(c, world):
         c.pop("_watchdog", None)
         return False
 
+    # The retired at-home "work" action (systems/action_router.py::_route_work) left characters
+    # standing in an activity of type "work" for up to 8 hours; nothing starts one any more, so one
+    # still running is a leftover -- end it now rather than when it times out.
+    if act.get("type") == "work" and not c.get("off_grid"):
+        from systems.occupancy import interrupt_activity
+        from brain.cognition_scheduler import wake_character
+        interrupt_activity(c, world, reason="the at-home \"work\" action no longer exists")
+        c.pop("_watchdog", None)
+        wake_character(c, world, "activity_aborted", {"activity": "work", "target_id": None, "phase": act.get("phase")})
+        return True
+
     tick = world.get("tick", 0)
     key = [act.get("type"), act.get("target_id"), act.get("phase", "using"),
            act.get("phase_started_tick")]
