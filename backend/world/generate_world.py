@@ -657,9 +657,9 @@ def generate_initial_world():
 
     # Three more families, each in a house of their own (systems/household_generation.py; the same thing
     # POST /admin/generate_households does for a world that already exists).
-    from systems.household_generation import generate_households
+    from systems.household_generation import ensure_seed_households
     try:
-        generate_households(world, world.get("sim_id", "default"), count=3, members=3)
+        ensure_seed_households(world, world.get("sim_id", "default"))
     except Exception as e:
         print("[generate_world] household generation error:", e)
 

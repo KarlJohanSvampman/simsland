@@ -587,6 +587,23 @@ async def replica_loop(feed):
             traceback.print_exc()
 
 
+def _seed_households():
+    """A world from before the starting families existed gets them now, once (systems/household_generation.py)."""
+    from systems.household_generation import ensure_seed_households
+    try:
+        with world_lock():
+            world = load_world(SIM_ID)
+            if world.get("seed_households_done"):
+                return
+            result = ensure_seed_households(world, SIM_ID)
+            save_world(SIM_ID, world)
+        for h in (result or {}).get("households", []):
+            print(f"[startup] moved in: {h['name']} ({h['kind']}) at {h['address']} -- "
+                  + ", ".join(m["name"] for m in h["members"]))
+    except Exception as e:
+        print(f"[startup] could not add the starting households: {e!r}")
+
+
 @app.on_event("startup")
 async def startup():
     from core.memory_guard import start as _start_memory_guard
@@ -603,6 +620,7 @@ async def startup():
         return
     # Answer commands from gateway processes (core/commands.py). A no-op cost when none exist.
     commands.serve()
+    _seed_households()
     threading.Thread(target=_tick_watchdog, name="tick-watchdog", daemon=True).start()
     asyncio.create_task(loop())
 

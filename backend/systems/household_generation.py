@@ -242,6 +242,7 @@ def generate_households(world, sim_id="default", count=3, members=3, template=DE
         used_surnames.add(f"The {surname} Household")
 
         household = create_household(world, f"The {surname} Household")
+        household["generated"] = True
         assign_building_to_household(world, building, household)
         building["address"] = building.get("address") or _address(world, building)
 
@@ -297,3 +298,26 @@ def generate_households(world, sim_id="default", count=3, members=3, template=DE
         })
     return {"households": made, "requested": count, "made": len(made),
             "out_of_room": len(made) < count}
+
+
+# =========================================================
+# THE STARTING FAMILIES
+# =========================================================
+
+SEED_HOUSEHOLDS = 3
+SEED_MEMBERS = 3
+
+
+def ensure_seed_households(world, sim_id="default"):
+    """Once per world: make sure it has SEED_HOUSEHOLDS generated families of SEED_MEMBERS, adding only the missing
+    ones. A world created before this existed (only Alex) gets them on its next start; a fresh world already has them
+    (world/generate_world.py). The world remembers it was done, so a household removed later is not brought back.
+    Returns the generate_households() summary, or None when there was nothing to do."""
+    if world.get("seed_households_done"):
+        return None
+    have = sum(1 for h in (world.get("households") or {}).values() if h.get("generated") and h.get("members"))
+    result = None
+    if have < SEED_HOUSEHOLDS:
+        result = generate_households(world, sim_id, count=SEED_HOUSEHOLDS - have, members=SEED_MEMBERS)
+    world["seed_households_done"] = True
+    return result
