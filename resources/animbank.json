@@ -331,6 +331,24 @@
       "alternatives": [],
       "notifies": [],
       "ik_targets": []
+    },
+    "935a7a7b-826d-4ec7-9014-54fd49a5a7e7": {
+      "id": "935a7a7b-826d-4ec7-9014-54fd49a5a7e7",
+      "name": "crawl_idle",
+      "source_key": "adult_male",
+      "chain": [],
+      "alternatives": [],
+      "notifies": [],
+      "ik_targets": []
+    },
+    "79909ed4-b1a4-4ce1-8d95-68011a6f0cd3": {
+      "id": "79909ed4-b1a4-4ce1-8d95-68011a6f0cd3",
+      "name": "crawl_move",
+      "source_key": "adult_male",
+      "chain": [],
+      "alternatives": [],
+      "notifies": [],
+      "ik_targets": []
     }
   },
   "adult_female": {
@@ -1603,6 +1621,188 @@
         "pair_group": null,
         "tags": [],
         "notifies": []
+      },
+      {
+        "id": "3a049da7-1795-4da7-9788-f5f8a622914d",
+        "name": "action_enter_car",
+        "original_name": "action_enter_car",
+        "category": "action",
+        "duration": 5.5,
+        "loop": false,
+        "paired": false,
+        "pair_role": null,
+        "pair_group": null,
+        "tags": [],
+        "notifies": []
+      },
+      {
+        "id": "b7a98d34-cb6d-44f2-9c75-e52e7977ecec",
+        "name": "action_exit_car",
+        "original_name": "action_exit_car",
+        "category": "action",
+        "duration": 5.833,
+        "loop": false,
+        "paired": false,
+        "pair_role": null,
+        "pair_group": null,
+        "tags": [],
+        "notifies": []
+      },
+      {
+        "id": "c76633af-64e0-4b31-8eb9-15bd9c025ac7",
+        "name": "idle_eavesdrop",
+        "original_name": "idle_eavesdrop",
+        "category": "idle",
+        "duration": 0.067,
+        "loop": true,
+        "paired": false,
+        "pair_role": null,
+        "pair_group": null,
+        "tags": [],
+        "notifies": []
+      },
+      {
+        "id": "8a711e5f-d649-48e6-8e9e-c8f6c8617079",
+        "name": "idle_leaning",
+        "original_name": "idle_leaning",
+        "category": "idle",
+        "duration": 2.367,
+        "loop": true,
+        "paired": false,
+        "pair_role": null,
+        "pair_group": null,
+        "tags": [],
+        "notifies": []
+      },
+      {
+        "id": "360415ec-f092-42a8-82c2-75451e2c3077",
+        "name": "idle_leaning2",
+        "original_name": "idle_leaning2",
+        "category": "idle",
+        "duration": 3.367,
+        "loop": true,
+        "paired": false,
+        "pair_role": null,
+        "pair_group": null,
+        "tags": [],
+        "notifies": []
+      },
+      {
+        "id": "c518c011-1d66-4af5-8f62-424c3d6c30c4",
+        "name": "idle_leaning3",
+        "original_name": "idle_leaning3",
+        "category": "idle",
+        "duration": 3.367,
+        "loop": true,
+        "paired": false,
+        "pair_role": null,
+        "pair_group": null,
+        "tags": [],
+        "notifies": []
+      },
+      {
+        "id": "e947fe7c-1591-4488-8ac5-4959fe6073f8",
+        "name": "phone_call",
+        "original_name": "phone_call",
+        "category": "phone",
+        "duration": 6.3,
+        "loop": false,
+        "paired": false,
+        "pair_role": null,
+        "pair_group": null,
+        "tags": [],
+        "notifies": []
+      },
+      {
+        "id": "051747e2-bd01-4435-b4b0-7baf64f55194",
+        "name": "phone_call_answer",
+        "original_name": "phone_call_answer",
+        "category": "phone",
+        "duration": 38.867,
+        "loop": false,
+        "paired": false,
+        "pair_role": null,
+        "pair_group": null,
+        "tags": [],
+        "notifies": []
+      },
+      {
+        "id": "1073cc29-2f63-461d-8157-fc0c9a77d921",
+        "name": "phone_text_walk",
+        "original_name": "phone_text_walk",
+        "category": "phone",
+        "duration": 4.033,
+        "loop": false,
+        "paired": false,
+        "pair_role": null,
+        "pair_group": null,
+        "tags": [],
+        "notifies": []
+      },
+      {
+        "id": "6523f6e8-52b2-4752-8845-08eab34737b9",
+        "name": "phone_texting",
+        "original_name": "phone_texting",
+        "category": "phone",
+        "duration": 18.567,
+        "loop": false,
+        "paired": false,
+        "pair_role": null,
+        "pair_group": null,
+        "tags": [],
+        "notifies": []
+      },
+      {
+        "id": "a71b6be9-3616-41a0-a0a7-270ccba6af0f",
+        "name": "phone_texting2",
+        "original_name": "phone_texting2",
+        "category": "phone",
+        "duration": 33.167,
+        "loop": false,
+        "paired": false,
+        "pair_role": null,
+        "pair_group": null,
+        "tags": [],
+        "notifies": []
+      },
+      {
+        "id": "5309b307-ad79-4839-91e2-c97931c5a37b",
+        "name": "transition_ground_to_stand",
+        "original_name": "transition_ground_to_stand",
+        "category": "transition",
+        "duration": 7.633,
+        "loop": false,
+        "paired": false,
+        "pair_role": null,
+        "pair_group": null,
+        "tags": [],
+        "notifies": []
+      },
+      {
+        "id": "15565ce6-ebfa-4629-9adb-cf478de6bd11",
+        "name": "transition_seat_to_stand",
+        "original_name": "transition_seat_to_stand",
+        "category": "transition",
+        "duration": 2,
+        "loop": false,
+        "paired": false,
+        "pair_role": null,
+        "pair_group": null,
+        "tags": [],
+        "notifies": []
+      },
+      {
+        "id": "2bcf1ded-101d-4372-ad91-d59c0677c222",
+        "name": "transition_stand_to_sleep",
+        "original_name": "transition_stand_to_sleep",
+        "category": "transition",
+        "duration": 2.3,
+        "loop": false,
+        "paired": false,
+        "pair_role": null,
+        "pair_group": null,
+        "tags": [],
+        "notifies": []
       }
     ],
     "stances": {
@@ -1611,12 +1811,16 @@
       "sitting_floor": {},
       "lying": {},
       "crouching": {},
-      "crawling": {},
+      "crawling": {
+        "idle": "935a7a7b-826d-4ec7-9014-54fd49a5a7e7",
+        "move": "79909ed4-b1a4-4ce1-8d95-68011a6f0cd3"
+      },
       "fallen_front": {},
       "fallen_back": {},
       "leaning_wall": {},
       "carry": {
-        "idle": "2f2afb9e-96ab-48a5-b3c5-a7558218dc3e"
+        "idle": "2f2afb9e-96ab-48a5-b3c5-a7558218dc3e",
+        "move": "f5ceb67d-e8c8-4e03-a056-d93b916af02b"
       },
       "held_down": {},
       "holding_down": {},
