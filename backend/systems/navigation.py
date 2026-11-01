@@ -1066,6 +1066,11 @@ def plan_character_route(world, c, target_x, target_y):
                 target_building, target_floorplan, target_entrance["inside"], (tx, ty)
             )
 
+            # The target is the tile just inside the door itself (the walk home goes there): there is no indoor
+            # path to plan, but they still have to step in off the doorstep.
+            if not indoor_tiles and tuple(target_entrance["inside"]) == (tx, ty):
+                indoor_tiles = [(tx, ty)]
+
             if indoor_tiles:
                 segments.append({
                     "type": "indoor",

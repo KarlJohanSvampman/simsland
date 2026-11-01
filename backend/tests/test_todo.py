@@ -85,7 +85,8 @@ with mock.patch.object(curiosity, "_find_notable_target", return_value={"id": "t
 
 # the agent loop: the quirks are only for the idle with nothing open; and for when there is time waits for the pressing
 import inspect
-src = inspect.getsource(brain.agent_loop.update_agent)
+# update_agent() hands the decision step (the idle-quirk roll included) to _think_now()
+src = inspect.getsource(brain.agent_loop.update_agent) + inspect.getsource(brain.agent_loop._think_now)
 check("the idle quirks are gated on there being nothing open", "not has_unresolved(c, world) and maybe_delay_or_quirk(c, world)" in src)
 check("what is for when there is time does not run by itself while something pressing is open", "pressing_open and _todo_tier(intention) == \"when_free\"" in src)
 
