@@ -32,6 +32,6 @@ if [ "${FRESH:-}" = 1 ]; then
   psql -h localhost -U postgres -d sim -q -f "$ROOT/scripts/init_db.sql"
 fi
 
-redis-cli ping >/dev/null 2>&1 || redis-server --port 6379 --daemonize yes >/dev/null
+redis-cli ping >/dev/null 2>&1 || redis-server --port 6379 --daemonize yes --dir "${REDIS_DIR:-/tmp}" >/dev/null
 echo "Postgres: postgresql://postgres:postgres@localhost:5432/sim   ($DATA)"
 echo "Redis:    localhost:6379 ($(redis-cli ping))"
