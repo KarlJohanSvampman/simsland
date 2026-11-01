@@ -500,7 +500,14 @@ def process_decision(
         "intention"
     )
 
-    if intention:
+    if decision.get("then_steps"):
+        # The THEN line, one intention per step ("play with Kathleen, then apologize to Dad" is
+        # two) -- brain/plans.py.
+        from brain.plans import intentions_from_plan
+        for planned in intentions_from_plan(c, world, decision["then_steps"]):
+            store_intention(c, planned)
+
+    elif intention:
 
         store_intention(
             c,

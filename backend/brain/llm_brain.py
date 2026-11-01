@@ -838,6 +838,16 @@ def _canned_narration(action_type, target):
     return template
 
 
+_THEN_SPLIT_RE = re.compile(
+    r"(?i)\s*(?:[,;]\s*)?\b(?:(?:and\s+)?then|after\s+that|afterwards|and\s+later)\b[,:]?\s*|\s*;\s*|(?<=[.!?])\s+")
+
+
+def _then_steps(then):
+    """"try to talk to Kathleen, then apologize to Dad." -> ["try to talk to Kathleen", "apologize to Dad"]."""
+    steps = [st.strip(" ,.;:-") for st in _THEN_SPLIT_RE.split(then or "")]
+    return [st for st in steps if st]
+
+
 def _match_intention_type(phrase):
     """Fuzzy-match a free-text "then" phrase against real activity types
     (systems/activities.py::ACTIVITIES) using the same scorer brain/
@@ -1124,13 +1134,25 @@ def _to_legacy_decision(envelope, char_id=None):
 
     then = (envelope.get("then") or "").strip()
     if then:
-        matched_type = _match_intention_type(then)
-        if matched_type:
-            decision["intention"] = {
-                "type": matched_type,
-                "reason": then,
-                "priority": 40,
-            }
+        # A THEN line is often several plans in a row ("talk to Kathleen about playing, then
+        # apologize to Dad"). Matched as one, the whole line became the reason of whichever activity
+        # it happened to match -- live, an "apologize" intention whose reason was mostly about
+        # playing with Kathleen. Each step is matched on its own; the first that is a real activity
+        # becomes the intention, with only that step as its reason.
+        steps = _then_steps(then)
+        # Every step becomes its own intention in process_decision (brain/plans.py), which has the
+        # world to tell who a step is about; "intention" stays as the first match for older readers.
+        decision["then_steps"] = steps
+        for step in steps:
+            matched_type = _match_intention_type(step)
+            if matched_type:
+                decision["intention"] = {
+                    "type": matched_type,
+                    "reason": step,
+                    "priority": 40,
+                    "source": "own_plan",          # the character's own THEN line (was shown as "unknown")
+                }
+                break
 
     return decision
 

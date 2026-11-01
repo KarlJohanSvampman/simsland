@@ -76,6 +76,26 @@ decision = lb._to_legacy_decision(lb._parse_compact_envelope(
 check("the forgiving reading gives a real decision, not the fallback wait",
       decision["action"]["type"] == "examine" and not decision["action"].get("fallback"), str(decision["action"]))
 
+# ---- THEN: one intention, from one step ----------------------------------------------------------------------------
+live_then = ("try to talk to Kathleen and see if she wants to play, then think about how to actually apologize to Dad "
+             "and make it right.")
+check("a THEN line is split into its steps",
+      lb._then_steps(live_then) == ["try to talk to Kathleen and see if she wants to play",
+                                    "think about how to actually apologize to Dad and make it right"],
+      str(lb._then_steps(live_then)))
+check("'go next door' / 'ask her later' are one step each",
+      lb._then_steps("go next door to see Susan") == ["go next door to see Susan"]
+      and lb._then_steps("ask her later") == ["ask her later"])
+d = lb._to_legacy_decision(lb._parse_compact_envelope("ACTION: wait\nTHEN: " + live_then), char_id=None)
+check("the live case: the apology intention carries only the apology step (no playing with Kathleen in it)",
+      d["intention"] == {"type": "apologize", "reason": "think about how to actually apologize to Dad and make it right",
+                         "priority": 40, "source": "own_plan"}, str(d.get("intention")))
+d = lb._to_legacy_decision(lb._parse_compact_envelope("ACTION: wait\nTHEN: take a shower, then go to sleep"), char_id=None)
+check("only one intention: the first step that is a real activity", d["intention"]["type"] == "take_shower"
+      and d["intention"]["reason"] == "take a shower", str(d.get("intention")))
+d = lb._to_legacy_decision(lb._parse_compact_envelope("ACTION: wait\nTHEN: ponder life"), char_id=None)
+check("a step that is no activity gives no intention", not d.get("intention"))
+
 print()
 if failures:
     print(f"FAILED: {len(failures)}")
