@@ -482,6 +482,15 @@ def _parse_uses_line(line):
 
 
 _CODE_FENCE_RE  = re.compile(r'^```[a-zA-Z]*\n?|\n?```$')
+_LABEL_ONLY_LINE_RE = re.compile(r'^[ \t>*_#-]*[A-Za-z][A-Za-z _]{0,24}[ \t]*:[ \t*_]*$')     # "MOVE:", "THOUGHT:" -- a heading with nothing after it
+_NARRATION_LABEL_RE = re.compile(r'(?i)^[ \t>*_#-]*(?:narration|thought|thoughts|inner monologue)[ \t]*:[ \t*_]*')
+
+
+def _clean_narration(text):
+    """The words before the ACTION line, minus stray headings the model puts there ("MOVE:" on a line by itself was being stored as
+    the character's thought). Empty is fine: think() writes a short canned line from the action instead."""
+    lines = [ln for ln in (text or "").strip().split("\n") if not _LABEL_ONLY_LINE_RE.match(ln)]
+    return _NARRATION_LABEL_RE.sub("", "\n".join(lines).strip(), count=1).strip()
 
 
 def _parse_compact_envelope(raw):
@@ -499,7 +508,7 @@ def _parse_compact_envelope(raw):
     if not action_match:
         return None
 
-    narration = text[:action_match.start()].strip()
+    narration = _clean_narration(text[:action_match.start()])
     action_line = action_match.group(1).strip()
 
     say_match = _SAY_LINE_RE.search(text)
@@ -557,7 +566,9 @@ def validate_response(data):
 # FALLBACK
 # =========================================================
 
-def fallback_response():
+def fallback_response(why=None):
+    """The decision the character gets when the model's reply can't be used. `why` says what went wrong; it becomes the wait
+    action's reason (shown in the memory log) instead of the old unexplained "No valid action."."""
 
     return {
 
@@ -580,7 +591,10 @@ def fallback_response():
                 None,
 
             "reason":
-                "No valid action."
+                why or "No valid action.",
+
+            "fallback":
+                True
         },
 
         "speech": None,
@@ -591,6 +605,14 @@ def fallback_response():
         "confidence":
             0.1
     }
+
+
+def _why_unusable(raw, what):
+    """A short, readable cause for a fallback wait: the model never answered, or what its reply looked like."""
+    if isinstance(raw, dict) and raw.get("error"):
+        return f"The model gave no usable answer ({str(raw['error'])[:80]})."
+    snippet = " ".join(str(raw or "").split())[:90]
+    return what + (f' It said: "{snippet}"' if snippet else " The reply was empty.")
 
 
 # =========================================================
@@ -1084,7 +1106,7 @@ def think(
 
         if not validate_response(envelope):
 
-            return fallback_response()
+            return fallback_response(_why_unusable(raw, "The reply's action was not usable."))
 
         decision = _to_legacy_decision(envelope, char_id=char_id)
 
@@ -1096,11 +1118,11 @@ def think(
 
         except Exception:
 
-            return fallback_response()
+            return fallback_response(_why_unusable(raw, "The reply had no ACTION line."))
 
         if not isinstance(data, dict):
 
-            return fallback_response()
+            return fallback_response(_why_unusable(raw, "The reply had no ACTION line."))
 
         # Compatibility branch: the OLD ("thought"/"emotion"/"goal"/
         # "action") shape, from even further back. Detect and pass it
@@ -1113,7 +1135,7 @@ def think(
 
             if not validate_response(data):
 
-                return fallback_response()
+                return fallback_response(_why_unusable(raw, "The reply's action was not usable."))
 
             decision = _to_legacy_decision(data, char_id=char_id)
 

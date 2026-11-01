@@ -2168,7 +2168,7 @@ def route_action(c, world, action, speech, definitions=None, available_actions=N
     # memory entry of the same event.
     from systems.debug_log import log_action, _resolve_target_name
     log_action(c, world, action_type, action.get("target_description") or "",
-              target_id=action.get("target"))
+              target_id=action.get("target"), reason=action.get("reason"))
 
     # Per the user's explicit ask: the Inspector already shows a targeted
     # activity's own target (c.activity.target_id) once it's scaffolded --

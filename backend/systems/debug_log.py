@@ -63,7 +63,7 @@ def _resolve_target_name(world, target_id):
 
 def log_debug_event(c, world, category, text, target_id=None, target_name=None,
                     action_type=None, activity_type=None, interaction=None,
-                    anchor_name=None, remember=True):
+                    anchor_name=None, remember=True, reason=None, before=None):
     """category: "action" | "activity" | "reaction" | "violation". remember=False shows the bubble only (activities keep their own
     timeline and are remembered once, whole -- systems/activity_trace.py)."""
     text = (text or "").strip()
@@ -113,6 +113,10 @@ def log_debug_event(c, world, category, text, target_id=None, target_name=None,
         extra["interaction"] = interaction
     if anchor_name:
         extra["anchor_name"] = anchor_name
+    if reason:
+        extra["reason"] = reason
+    if before:
+        extra["before"] = before
 
     from brain.memory import store_memory
     store_memory(
@@ -124,14 +128,39 @@ def log_debug_event(c, world, category, text, target_id=None, target_name=None,
     )
 
 
-def log_action(c, world, action_type, detail="", target_id=None):
+def what_was_happening(c, world):
+    """What the character was doing just before now, in a few words: the activity they are in, or the last thing the log recorded
+    for them ("Drink water ... 3 min ago"). None when there is nothing to say."""
+    act = c.get("activity") or {}
+    if act.get("type"):
+        who = _resolve_target_name(world, act.get("target_id"))
+        return str(act["type"]).replace("_", " ") + (f" ({who})" if who else "")
+    tick = world.get("tick", 0)
+    for m in reversed(c.get("memories") or []):
+        if m.get("kind") == "debug_event" and m.get("text"):
+            ago = max(0, tick - (m.get("tick") or tick)) // 60
+            return f"{m['text']}, {ago} min ago" if ago else m["text"]
+    return None
+
+
+def log_action(c, world, action_type, detail="", target_id=None, reason=None):
     category = _category_for_action(action_type, c)
     label = action_type.replace("_", " ")
     target_name = _resolve_target_name(world, target_id)
     shown = detail or target_name
     text = f"Action: {label}" + (f" ({shown})" if shown else "")
+    why = before = None
+    if action_type == "wait":
+        # A bare "Action: wait" explains nothing: say why it was chosen (or why the model's reply could not be used) and what
+        # was going on just before.
+        why = " ".join(str(reason or "").split())[:200] or None
+        before = what_was_happening(c, world)
+        if why:
+            text += f" -- {why}"
+        if before:
+            text += f" [before: {before}]"
     log_debug_event(c, world, category, text, target_id=target_id,
-                    target_name=target_name, action_type=action_type)
+                    target_name=target_name, action_type=action_type, reason=why, before=before)
 
 
 def log_activity(c, world, activity_type, event, target_id=None, interaction=None,
