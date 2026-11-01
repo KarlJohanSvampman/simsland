@@ -1164,7 +1164,7 @@ def update_agent(
     # living -- everything above this point still ran -- but doesn't ask again.
     from brain.cognition_actor import is_waiting, request_decision
     _prof.mark("agent:if_L1069")
-    if is_waiting(c):
+    if is_waiting(c, world):
         return
 
     _prof.mark("agent:should_think")

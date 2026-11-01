@@ -493,6 +493,83 @@ def _clean_narration(text):
     return _NARRATION_LABEL_RE.sub("", "\n".join(lines).strip(), count=1).strip()
 
 
+# ---- a forgiving reading of a slightly-off ACTION line -------------------------------------------------------
+# llama3.1 regularly drifts from the format: it drops "ACTION:", copies the template's
+# <placeholder> brackets, uses the action word itself as the label ("MOVE | ..."), or leaves the
+# action word out (" | the kitchen cabinet | ..."). Each of those used to be "no ACTION line" -- a
+# lost turn spent waiting (live, 2026-11-01). Only real action types count, so narration that just
+# happens to contain a "|" is not mistaken for an action.
+
+_INLINE_LABEL_RE = re.compile(r"(?i)\s*\b(?:SAY|REMARK|INTENT|USES|THEN)[ \t]*:.*$")
+_OTHER_LABEL_LINE_RE = re.compile(r"(?i)^[ \t>*_-]*(?:SAY|REMARK|INTENT|USES|THEN)[ \t]*:")
+
+# Words a model uses for an action -> the action type (only used when the type itself is missing
+# or not a real type). First match in the reply wins.
+_ACTION_WORDS = (
+    (r"\b(?:take a closer look|look (?:at|into|over|inside)|examine|inspect|check out|check)\b", "examine"),
+    (r"\b(?:look around|glance around|scan the room)\b", "look_around"),
+    (r"\b(?:hurry|rush|run|jog)\b", "jog_to"),
+    (r"\b(?:sneak|creep|tiptoe|slip)\b", "sneak_to"),
+    (r"\b(?:head|go|walk|move|make my way|step)\b", "move"),
+    (r"\b(?:pick up|grab|take)\b", "carry"),
+    (r"\b(?:search|rummage|look for)\b", "search"),
+    (r"\b(?:talk|chat|say|tell|ask|speak)\b", "speak"),
+    (r"\b(?:use|open|turn on|switch on)\b", "interact"),
+    (r"\b(?:eat|snack)\b", "eat"),
+    (r"\b(?:sleep|nap|lie down to rest)\b", "sleep"),
+    (r"\b(?:wait|stay put|do nothing)\b", "wait"),
+)
+
+
+def _known_action_types():
+    try:
+        from systems.action_registry import ACTION_SPECS
+        return ACTION_SPECS
+    except ImportError:
+        return {}
+
+
+def _clean_action_type(raw):
+    """"<examine>", "**Move**", "`jog to`" -> "examine", "move", "jog_to"."""
+    t = re.sub(r"[<>\[\]*`'\"]", "", raw or "").strip().lower()
+    t = re.sub(r"^action\s*[:\-]?\s*", "", t)          # "ACTION examine" without the colon
+    return re.sub(r"[\s\-]+", "_", t).strip("_.:")
+
+
+def _infer_action_type(text):
+    known = _known_action_types()
+    lowered = (text or "").lower()
+    for pattern, action_type in _ACTION_WORDS:
+        if action_type in known and re.search(pattern, lowered):
+            return action_type
+    return None
+
+
+def _cut_inline_labels(line):
+    """'| the cabinet | for dishes REMARK: ...' -- another field run onto the action line."""
+    return _INLINE_LABEL_RE.sub("", line or "").strip()
+
+
+def _find_loose_action_line(text):
+    """(start offset, action line) for the first line that reads as an action without the
+    "ACTION:" label -- "<type> | target | detail" with a real type, or " | target | detail" --
+    else None."""
+    known = _known_action_types()
+    offset = 0
+    for line in text.split("\n"):
+        start, offset = offset, offset + len(line) + 1
+        if "|" not in line or _OTHER_LABEL_LINE_RE.match(line):
+            continue
+        body = re.sub(r"^[ \t>*_-]+", "", line)
+        first, _, rest = body.partition("|")
+        kind = _clean_action_type(first)
+        if kind in known:
+            return start, body.strip()
+        if not kind and rest.strip(" |"):              # " | the kitchen cabinet | ..."
+            return start, body.strip()
+    return None
+
+
 def _parse_compact_envelope(raw):
     """Parses _ENVELOPE_FORMAT's line-based reply into the same
     {"narration", "action": {"type","target_description","detail"},
@@ -505,11 +582,18 @@ def _parse_compact_envelope(raw):
     text = _CODE_FENCE_RE.sub("", raw.strip()).strip()
 
     action_match = _ACTION_LINE_RE.search(text)
-    if not action_match:
-        return None
+    if action_match:
+        action_start, action_line = action_match.start(), action_match.group(1).strip()
+    else:
+        # The model got the format slightly wrong ("<examine> | the cabinet", "MOVE | to the
+        # bathroom", " | the kitchen cabinet | ..."): read the line anyway rather than lose the turn.
+        loose = _find_loose_action_line(text)
+        if loose is None:
+            return None
+        action_start, action_line = loose
 
-    narration = _clean_narration(text[:action_match.start()])
-    action_line = action_match.group(1).strip()
+    narration = _clean_narration(text[:action_start])
+    action_line = _cut_inline_labels(action_line)
 
     say_match = _SAY_LINE_RE.search(text)
     then_match = _THEN_LINE_RE.search(text)
@@ -518,7 +602,10 @@ def _parse_compact_envelope(raw):
     uses_match = _USES_LINE_RE.search(text)
 
     parts = [p.strip() for p in action_line.split("|")]
-    action_type = (parts[0] if parts else "").lower().replace(" ", "_")
+    action_type = _clean_action_type(parts[0] if parts else "")
+    if not action_type and len(parts) > 1 and parts[1]:
+        # " | the kitchen cabinet | ..." -- a target but no action word: take it from the reply's own words
+        action_type = _infer_action_type(text) or "move"
 
     return {
         "narration": narration,
@@ -608,9 +695,21 @@ def fallback_response(why=None):
 
 
 def _why_unusable(raw, what):
-    """A short, readable cause for a fallback wait: the model never answered, or what its reply looked like."""
+    """A short, readable cause for a fallback wait: the model never answered (and why -- a timeout says
+    so plainly), or what its reply looked like."""
     if isinstance(raw, dict) and raw.get("error"):
-        return f"The model gave no usable answer ({str(raw['error'])[:80]})."
+        error = str(raw["error"]).strip()
+        kind, _, detail = error.partition(":")
+        detail = detail.strip()
+        if kind == "timeout":
+            return f"Timed out waiting for the model -- {detail}." if detail else "Timed out waiting for the model."
+        if kind == "unreachable":
+            return f"The model is unreachable -- {detail}."
+        if kind == "aborted":
+            return "The model call was cancelled to make room for a more urgent one."
+        if kind.startswith("http "):
+            return f"The model server returned an error ({error[:140]})."
+        return f"The model gave no usable answer ({error[:120] or 'no details'})."
     snippet = " ".join(str(raw or "").split())[:90]
     return what + (f' It said: "{snippet}"' if snippet else " The reply was empty.")
 

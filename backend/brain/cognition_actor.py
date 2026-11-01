@@ -66,9 +66,11 @@ def pending(c):
     return (c.get("cognition") or {}).get("pending")
 
 
-def is_waiting(c):
+def is_waiting(c, world=None):
     """True while this character has a decision request the model hasn't answered yet.
-    A request older than the timeout is dropped (and False returned) so it gets re-asked."""
+    A request older than the timeout is dropped (and False returned) so it gets re-asked --
+    and, given `world`, noted in the character's memory log, so a timeout is visible in
+    the Inspector rather than only in the container log."""
     p = pending(c)
     if not p:
         return False
@@ -79,6 +81,14 @@ def is_waiting(c):
         clear_thinking(c["id"], p.get("tick", 0))
         print(f"[cognition] {c.get('name', c.get('id'))}: request {p.get('id')} got no answer in "
               f"{REQUEST_TIMEOUT_SECONDS:.0f}s -- asking again")
+        if world is not None:
+            try:
+                from systems.debug_log import log_action
+                log_action(c, world, "wait", "", reason=(
+                    f"Timed out waiting for the model -- no decision came back within "
+                    f"{REQUEST_TIMEOUT_SECONDS:.0f} s, so it is being asked again."))
+            except Exception as exc:                   # noqa: BLE001 -- logging must never stall a character
+                print(f"[cognition] could not log the timeout for {c.get('id')}: {exc!r}")
         return False
     return True
 
