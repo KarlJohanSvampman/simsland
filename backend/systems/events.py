@@ -210,27 +210,15 @@ def create_shared_event(world, participants, tier, location_id=None, severity=No
     del events[:-300]  # world["events"] otherwise grows forever
 
     if medium in ("call", "text") and a and b:
-        # A real remote exchange -- generate the whole script once, play
-        # it back on realistic timing (systems/scripted_conversations.py),
-        # and defer the consequence until it actually concludes, rather
-        # than resolving instantly like an in-person encounter.
-        from llm.scripted_conversation import generate_conversation_script
-        from systems.scripted_conversations import begin_scripted_call, begin_scripted_sms
-        script = generate_conversation_script(a, b, tier, world, severity=severity,
-                                               medium=medium, subcategory=subcategory)
-        if medium == "call":
-            conv = begin_scripted_call(world, a, b, script, tier, severity, subcategory)
-        else:
-            conv = begin_scripted_sms(world, a, b, script, tier, severity, subcategory)
+        # A real remote exchange -- the whole script is written ahead of time by one model call made off the tick thread
+        # (systems/scripted_conversations.py::request_script), then played back on realistic timing, and the consequence is
+        # deferred until it actually concludes, rather than resolving instantly like an in-person encounter.
+        from systems.scripted_conversations import request_script
+        request_script(world, event, a, b, tier, severity, subcategory)
         event["text"] = f"{a['name']} and {b['name']} are exchanging {'a call' if medium == 'call' else 'texts'}."
         event["topic"] = (subcategory or {}).get("subcategory") or tier
-        # Per the user's explicit ask: lets the timeline's event modal
-        # link straight to the real transcript this scripted call/text
-        # actually produces (via brain/conversations.py::add_message(),
-        # ticked by systems/scripted_conversations.py::
-        # tick_scripted_conversations()) instead of just a one-line
-        # "exchanging a call" summary with nothing behind it.
-        event["conv_id"] = conv["id"]
+        # event["conv_id"] is stamped when the script arrives and the call/text starts, so the timeline's event modal can link
+        # straight to the real transcript (see tick_pending_scripts).
         return event
 
     from llm.shared_event_narration import generate_shared_event_narration

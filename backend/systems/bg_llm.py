@@ -61,6 +61,7 @@ REMOTE_TASKS = {
     "llm.child_imagination:imagine_explanation": None,
     "llm.household_summary_narration:narrate_blocking": None,
     "llm.self_assessment:assess": None,
+    "llm.scripted_conversation:write_script": None,
 }
 
 
