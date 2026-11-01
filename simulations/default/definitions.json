@@ -66824,6 +66824,46 @@
     }
   },
   "stance_templates": {
+    "crouching": {
+      "key": "crouching",
+      "label": "Crouching",
+      "is_posture": true,
+      "idle_key": "crouch_idle",
+      "moves": [
+        {
+          "slot": "move",
+          "key": "crouch_walk"
+        }
+      ]
+    },
+    "fallen_front": {
+      "key": "fallen_front",
+      "label": "Fallen (Front)",
+      "is_posture": true,
+      "idle_key": "fallen_front_idle",
+      "moves": []
+    },
+    "fallen_back": {
+      "key": "fallen_back",
+      "label": "Fallen (Back)",
+      "is_posture": true,
+      "idle_key": "fallen_back_idle",
+      "moves": []
+    },
+    "unconscious": {
+      "key": "unconscious",
+      "label": "Unconscious",
+      "is_posture": true,
+      "idle_key": "unconscious_idle",
+      "moves": []
+    },
+    "dead": {
+      "key": "dead",
+      "label": "Dead",
+      "is_posture": true,
+      "idle_key": "dead_idle",
+      "moves": []
+    },
     "standing": {
       "key": "standing",
       "label": "Standing",
