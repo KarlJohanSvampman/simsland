@@ -1843,6 +1843,11 @@ def _route_examine(c, world, action, available_actions=None):
         return
     name, text = _resolve_examine_target(c, world, target_id, available_actions)
 
+    # Something looked at closely is remembered (systems/spotted.py).
+    from systems.props import get_prop_by_id
+    from systems.spotted import notice
+    notice(c, world, get_prop_by_id(world, target_id))
+
     c["animation_state"] = get_phase_animation("examine", "using")
     from systems.incidental_speech import fire_incidental
     fire_incidental(c, "inform", text, world)

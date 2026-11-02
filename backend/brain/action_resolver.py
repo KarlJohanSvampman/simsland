@@ -188,6 +188,28 @@ def _room_target(c, world, description):
 
 
 def resolve_target(c, world, action_type, description, available_actions):
+    """resolve_in_view(), then -- for a prop nothing in view matches -- the things the character knows are around but
+    can't see right now (systems/spotted.py: their home, what they've noticed elsewhere), nearest first."""
+    result = resolve_in_view(c, world, action_type, description, available_actions)
+    if result["id"] is not None or result["ambiguous"] or not description:
+        return result
+    from systems.action_registry import ACTION_SPECS
+    kind = ACTION_SPECS.get(action_type, {}).get("target", "any")
+    remembered = (available_actions or {}).get("remembered_props") or []
+    if kind not in ("prop", "prop_or_character", "any") or not remembered:
+        return result
+    best = None
+    for entry in remembered:                       # already nearest first: the first of equal scores wins
+        score = _score(description, _prop_bag(entry))
+        if score >= ACCEPT_THRESHOLD and (best is None or score > best[1]):
+            best = (entry["id"], score)
+    if best is None:
+        return result
+    return {"id": best[0], "score": best[1], "kind": "prop", "ranked": [best], "ambiguous": False,
+            "remembered": True}
+
+
+def resolve_in_view(c, world, action_type, description, available_actions):
     """Resolve a free-text target description against the real candidate
     ids for this action type (via systems/action_registry.py's target
     spec). Returns:

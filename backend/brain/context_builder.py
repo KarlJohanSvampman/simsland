@@ -370,6 +370,21 @@ def build_active_conversations(c, world):
 # LLM can reference real prop/character IDs in its action.
 # =========================================================
 
+def _remembered_props(c, world, in_view):
+    try:
+        from systems.spotted import remembered_pool
+        return remembered_pool(c, world, exclude=in_view)
+    except Exception as exc:                       # noqa: BLE001
+        print(f"[spotted] remembered pool for {c.get('id')}: {exc!r}")
+        return []
+
+
+def _sec_known_places(c, world):
+    """What their pressing needs and plans bring to mind -- known things that would help, and where (systems/spotted.py)."""
+    from systems.spotted import context_lines
+    return context_lines(c, world) or None
+
+
 def build_available_actions(c, world):
 
     perception = c.get("perception", {})
@@ -1318,6 +1333,8 @@ def build_available_actions(c, world):
     return {
         "action_types":          action_types,
         "interactable_props":    interactable,
+        # things known to be around but not in view (systems/spotted.py) -- targets, not "Things here"
+        "remembered_props":      _remembered_props(c, world, {p["id"] for p in interactable}),
         "nearby_characters":     nearby_people,
         "known_contacts":        known_contacts,
         "known_businesses":      known_businesses,
@@ -2448,6 +2465,7 @@ NARRATIVE_SECTIONS = [
     ("bedroom",               "full", _sec_bedroom),
     ("intentions",            "core", _sec_intentions),
     ("todo",                  "core", _sec_todo),
+    ("known_places",          "core", _sec_known_places),
     ("pressing_intentions",   "core", _sec_pressing_intentions),
     ("exhaustion",            "core", _sec_exhaustion),
     ("glimpsed",              "full", _sec_glimpsed),

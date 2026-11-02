@@ -1624,6 +1624,13 @@ def perceive(
 
     c["perception"] = perception
 
+    # Notice some of what's in view, and where people are (systems/spotted.py).
+    try:
+        from systems.spotted import on_perceive
+        on_perceive(c, world, perception.get("visible_props"), perception.get("visible_people"))
+    except Exception as exc:                       # noqa: BLE001 -- noticing must never break perception
+        print(f"[spotted] {c.get('id')}: {exc!r}")
+
     # Diff this tick's visible people against last tick's to fire
     # person_entered_view wakes (see brain/cognition_scheduler.py) for
     # newly-visible people only — not a poll every tick regardless of
