@@ -266,6 +266,13 @@ def _edge_blocks(tiles, a, b, closed_doors):
     return False
 
 
+def can_see(c, target, world):
+    """Whether c has a line of sight to a target -- a character or a prop (anything with x/y)."""
+    if not target or target.get("x") is None or target.get("y") is None:
+        return False
+    return line_of_sight(c, target, world)
+
+
 def walls_between(a, b, world):
     """True if a wall (or a closed door) of any building stands between a and b."""
     from systems.templates import resolve_floorplan
@@ -1087,6 +1094,10 @@ def perceive_props(
         d = distance_tiles(p, c)
 
         if d > vrange:
+            continue
+
+        # Behind a wall: not seen, so not on the list of things here (and not something to examine or use).
+        if walls_between(c, p, world):
             continue
 
         tags, interactions = build_prop_tags(p, definitions)

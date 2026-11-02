@@ -73,6 +73,26 @@ check("moving to the room you're already in goes nowhere: no 'heading to the kit
 check("... and he's told so (and how to reach someone in another room)",
       any("already in the kitchen" in t for t in robert["cognition"].get("staged_knowledge", [])))
 
+# ---- examine only what's in sight ---------------------------------------------------------------------------------
+from brain.perception import perceive_props
+from systems.action_router import _route_examine
+from systems.activity_queue import _dispatch_task
+w["props"] = [{"id": "chair_dining", "template": "chair_modern_a", "x": 60, "y": 8, "state": {}},
+              {"id": "fridge_kitchen", "template": "fridge_a", "x": 61, "y": 4, "state": {}}]
+robert.update(x=59, y=4, building_id="starter_house_2", activity=None, cognition={}, memories=[])
+seen = {p["id"] for p in perceive_props(robert, w)}
+check("a chair in the dining room isn't among the things Robert sees from the kitchen",
+      "chair_dining" not in seen and "fridge_kitchen" in seen, str(seen))
+_route_examine(robert, w, {"type": "examine", "target": "chair_dining"})
+check("examining it anyway: nothing happens, and he's told there's a wall in the way",
+      not robert.get("memories") and any("wall in the way" in t for t in robert["cognition"].get("staged_knowledge", [])))
+check("... a queued 'examine' of it doesn't start either",
+      _dispatch_task(robert, w, {"id": "t1", "type": "examine_prop", "params": {"target_id": "chair_dining"}}) is False
+      and not robert.get("activity"))
+check("... but one in sight does",
+      _dispatch_task(robert, w, {"id": "t2", "type": "examine_prop", "params": {"target_id": "fridge_kitchen"}}) is True
+      and robert["activity"]["type"] == "examine")
+
 print()
 if failures:
     print(f"FAILED: {len(failures)}")

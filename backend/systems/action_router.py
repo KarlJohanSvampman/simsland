@@ -1816,8 +1816,31 @@ def _resolve_examine_target(c, world, target_id, available_actions):
     return name, text
 
 
+def _not_in_sight(c, world, target_id):
+    """The prop or character target_id is, if c has no line of sight to it (behind a wall, in another room); else
+    None. A target that is neither (a held item, a proposal, a wall) isn't checked."""
+    from brain.perception import can_see
+    from systems.props import get_prop_by_id
+    target = (world.get("characters") or {}).get(target_id) or get_prop_by_id(world, target_id)
+    if not target or target.get("x") is None or target is c:
+        return None
+    return None if can_see(c, target, world) else target
+
+
 def _route_examine(c, world, action, available_actions=None):
     target_id = action.get("target")
+    hidden = _not_in_sight(c, world, target_id)
+    if hidden is not None:
+        # Only what you can see can be examined: nothing happens, and they're told why.
+        label = str(hidden.get("name") or hidden.get("template") or "that").replace("_", " ")
+        cog = c.setdefault("cognition", {})
+        cog.setdefault("staged_knowledge", []).append(
+            f"You can't see the {label} from where you are -- there's a wall in the way. Go to it first if you "
+            f"want a closer look." if not hidden.get("name") else
+            f"You can't see {label} from where you are -- there's a wall in the way.")
+        from brain.cognition_scheduler import wake_character
+        wake_character(c, world, "resolution_failed")
+        return
     name, text = _resolve_examine_target(c, world, target_id, available_actions)
 
     c["animation_state"] = get_phase_animation("examine", "using")
