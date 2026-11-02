@@ -54,7 +54,9 @@ WAKE_PRIORITY = {
     "worry_overload": 97,      # systems/worry_relief.py -- couldn't concentrate and gave up on what they were doing
     "floor_unnoticed": 98,     # systems/conversation_floor.py -- spoke, got no reaction
     "floor_unanswered": 98,    # ... or was heard and brushed off
-    "door_signal": 95,        # systems/doorbell.py -- noticed a doorbell/
+    "door_signal": 95,
+    "asked_to_leave": 96,      # systems/guests.py -- someone whose home you're in told you to go
+    "house_guest": 93,         # systems/guests.py -- someone came into your home / won't leave it        # systems/doorbell.py -- noticed a doorbell/
                                  # knock; ranks just under actually being
                                  # spoken to, above a body need
     "urgent_need": 90,
@@ -211,6 +213,8 @@ _WAKE_LINE_TEMPLATES = {
     "gave_up_waiting": "You gave up waiting -- it's taken too long, so you're moving on for now.",
     "noticed_commotion": "{summary}",
     "door_signal": "You hear someone at the door -- {visitor_name} is here.",
+    "house_guest": "{message}",
+    "asked_to_leave": "{message}",
     "post_about_self": "You come across a social media post from {author_name} that mentions you.",
     "contract_violated": "{violator_name} just missed {commitment}.",
     "proposal_received": "{from_name} has proposed something -- {topic}.",

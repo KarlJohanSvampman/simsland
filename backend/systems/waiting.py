@@ -252,6 +252,9 @@ def tick_door_wait(c, world):
         return
     household = (world.get("households") or {}).get(wait.get("household_id"))
     if not household or _door_answered(c, world, household):
+        if household and c.get("building_id") != household.get("home_id"):
+            # someone who lives there came to the door: being let in (systems/guests.py) -- not walking in on your own
+            c["_let_in"] = {"household_id": household.get("id"), "tick": world.get("tick", 0)}
         c.pop("_door_wait", None)
         return
     if world.get("tick", 0) < wait.get("expires_at_tick", 0):

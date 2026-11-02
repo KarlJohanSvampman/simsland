@@ -721,6 +721,9 @@ def update_agent(
     # Which room they are in now (systems/room_assignment.py) -- it used to be set only at spawn.
     from systems.room_assignment import refresh_character_room
     refresh_character_room(c, world)
+    # ... and whether that makes them a guest in someone else's home (systems/guests.py).
+    from systems.guests import track as track_guest
+    track_guest(c, world)
 
     _prof.mark("agent:if_L656")
     if c.get(

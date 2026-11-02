@@ -494,6 +494,10 @@ def add_message(
     from systems.conversation_outcome import on_message as _outcome_on_message
     _outcome_on_message(world, conv, speaker_id, utterance, speech_act, tick)
 
+    # "Please leave" / "come in" from someone who lives there, to a guest (systems/guests.py).
+    from systems.guests import on_line as _guests_on_line
+    _guests_on_line(world, conv, speaker_id, utterance)
+
     # A line said is something happening: it pushes back the step timeout of everyone in it (systems/step_timeouts.py).
     from systems.step_timeouts import progress as _step_progress
     for pid in conv.get("participants") or []:

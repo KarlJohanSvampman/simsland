@@ -40,6 +40,7 @@ from brain.agent_loop   import update_agent
 from brain.intentions   import set_current_tick
 from systems.reactions  import process_reaction_queue
 import systems.step_timeouts  # noqa: F401 -- registers the "stuck" timeout handler before any timer fires
+import systems.guests         # noqa: F401 -- registers the "guest" timeout handler (visits, being asked to leave)
 from systems.item_knowledge import update_item_knowledge
 
 # -- Fast (÷5) ---------------------------------------------------

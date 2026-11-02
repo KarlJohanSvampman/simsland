@@ -1449,6 +1449,13 @@ def build_scene_description(c, world):
     else:
         lines.append("No one else is nearby.")
 
+    # Whose home this is, for a guest; who is in it, for those who live here (systems/guests.py).
+    try:
+        from systems.guests import context_lines as _guest_lines
+        lines.extend(_guest_lines(c, world))
+    except Exception:                                  # noqa: BLE001
+        pass
+
     for conv in build_active_conversations(c, world):
         turn_note = " — it's your turn to respond." if conv.get("your_turn") else "."
         lines.append(_conversation_frame_line(conv) + turn_note)

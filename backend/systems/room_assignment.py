@@ -162,7 +162,10 @@ def refresh_character_room(c, world):
     if c.get("x") is None or c.get("y") is None:
         return
     tile = [int(round(c["x"])), int(round(c["y"]))]
-    if c.get("_room_tile") == tile and "room_id" in c:
+    if c.get("_room_tile") == tile and "room_id" in c and "_in_building" in c:
         return
     c["_room_tile"] = tile
     c["room_id"] = room_at(world, tile[0], tile[1])
+    from systems.navigation import find_building_at
+    building, _ = find_building_at(world, tile[0], tile[1])
+    c["_in_building"] = building["id"] if building else None
