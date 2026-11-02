@@ -718,6 +718,10 @@ def update_agent(
     _prof.mark("agent:note_step")
     note_step(c, world)
 
+    # Which room they are in now (systems/room_assignment.py) -- it used to be set only at spawn.
+    from systems.room_assignment import refresh_character_room
+    refresh_character_room(c, world)
+
     _prof.mark("agent:if_L656")
     if c.get(
         "off_grid"

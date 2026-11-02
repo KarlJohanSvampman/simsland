@@ -601,6 +601,18 @@ def _route_move(c, world, action, mode="walk"):
         if not dest:
             return
         x, y, room = dest
+        # Already in that room: there is nowhere to go. Say so instead of "heading to the kitchen" while standing in it
+        # (live, 2026-11-02: Robert Okafor, over and over).
+        from systems.room_assignment import room_at
+        if room_at(world, c.get("x", 0), c.get("y", 0)) == target_id[len("room:"):]:
+            c["move_target"] = None
+            c["is_moving"] = False
+            label = str(room.get("type") or room.get("id") or "room").replace("_", " ")
+            cog = c.setdefault("cognition", {})
+            cog.setdefault("staged_knowledge", []).append(
+                f"You're already in the {label} -- there's nowhere to walk to. To reach someone in another room, go "
+                f"into their room, or call out to them.")
+            return
         c["move_target"] = {
             "x": x,
             "y": y,

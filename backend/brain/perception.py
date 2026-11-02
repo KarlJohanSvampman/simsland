@@ -221,6 +221,77 @@ def sound_direction(listener, source):
 # LINE OF SIGHT
 # =========================================================
 
+# =========================================================
+# WALLS
+# =========================================================
+# line_of_sight() used to know only about props and closed doors -- a building's walls (the "walls" on each floorplan
+# tile's edges) did not stop anyone from seeing anyone, so two people in different rooms saw each other as "People
+# here" and talked through the wall as if face to face (live, 2026-11-02: Robert in the kitchen, Carol eating in the
+# dining room). A sightline is now walked tile by tile through each building it crosses; any edge with a wall, or a
+# door that is closed, blocks it. A window does not.
+
+_EDGE_SIDES = {(1, 0): ("east", "west"), (-1, 0): ("west", "east"), (0, 1): ("south", "north"), (0, -1): ("north", "south")}
+
+
+def _grid_steps(x0, y0, x1, y1):
+    """The tiles a straight line from (x0, y0) to (x1, y1) passes through, one 4-neighbour step at a time."""
+    dx, dy = abs(x1 - x0), abs(y1 - y0)
+    sx, sy = (1 if x1 > x0 else -1), (1 if y1 > y0 else -1)
+    x, y, err = x0, y0, dx - dy
+    out = [(x, y)]
+    for _ in range(dx + dy):
+        if err > 0 or (err == 0 and dx > dy):
+            x += sx
+            err -= 2 * dy
+        else:
+            y += sy
+            err += 2 * dx
+        out.append((x, y))
+    return out
+
+
+def _edge_blocks(tiles, a, b, closed_doors):
+    near, far = _EDGE_SIDES.get((b[0] - a[0], b[1] - a[1]), (None, None))
+    if not near:
+        return False
+    for tile, side in ((a, near), (b, far)):
+        wall = ((tiles.get(f"{tile[0]},{tile[1]}") or {}).get("walls") or {}).get(side)
+        if not wall:
+            continue
+        kind = wall.get("type")
+        if kind == "wall":
+            return True
+        if kind == "door" and (a in closed_doors or b in closed_doors):
+            return True
+    return False
+
+
+def walls_between(a, b, world):
+    """True if a wall (or a closed door) of any building stands between a and b."""
+    from systems.templates import resolve_floorplan
+    from systems.transforms import world_to_local
+    ax, ay = int(round(a["x"])), int(round(a["y"]))
+    bx, by = int(round(b["x"])), int(round(b["y"]))
+    if (ax, ay) == (bx, by):
+        return False
+    for bld in world.get("buildings", []):
+        floorplan = resolve_floorplan(world, bld)
+        tiles = (floorplan or {}).get("tiles") or {}
+        if not tiles:
+            continue
+        la, lb = world_to_local(bld, ax, ay), world_to_local(bld, bx, by)
+        w, h = floorplan.get("width") or 0, floorplan.get("height") or 0
+        if w and h and (max(la[0], lb[0]) < 0 or min(la[0], lb[0]) >= w
+                        or max(la[1], lb[1]) < 0 or min(la[1], lb[1]) >= h):
+            continue                                     # the line doesn't cross this building's plot
+        closed = {tuple(world_to_local(bld, d["x"], d["y"])) for d in bld.get("doors", []) if not d.get("is_open", True)}
+        steps = _grid_steps(la[0], la[1], lb[0], lb[1])
+        for here, nxt in zip(steps, steps[1:]):
+            if _edge_blocks(tiles, here, nxt, closed):
+                return True
+    return False
+
+
 def line_of_sight(a, b, world):
 
     x0, y0 = a["x"], a["y"]
@@ -300,6 +371,9 @@ def line_of_sight(a, b, world):
                         d["y"]
                     )
                 )
+
+    if walls_between(a, b, world):
+        return False
 
     for _ in range(n):
 
