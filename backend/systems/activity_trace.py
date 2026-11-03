@@ -91,6 +91,8 @@ def begin(c, world):
     act.setdefault("timeline", [])
     note(act, world, "started", target=_target_name(world, act), planned_minutes=_minutes(act.get("duration") or 0))
     c["_trace_open"] = act
+    from systems.movement_log import note_event
+    note_event(c, world, "start", _label(act))
 
 
 def close(c, world, outcome, reason=None):
@@ -103,6 +105,8 @@ def close(c, world, outcome, reason=None):
 
 def _write(c, world, act, outcome, reason):
     act["_closed"] = True
+    from systems.movement_log import note_event
+    note_event(c, world, "timeout" if outcome == "timed_out" else "end", f"{_label(act)} ({outcome})")
     tick = world.get("tick", 0)
     first = (act.get("timeline") or [{}])[0].get("tick")
     started = act.get("started_tick", first if first is not None else act.get("phase_started_tick", tick))

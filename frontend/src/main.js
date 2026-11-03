@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { renderMovementTab } from "./movementLog.js";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { OrbitControls }
 from "three/examples/jsm/controls/OrbitControls.js";
@@ -4753,7 +4754,7 @@ function _clearInspector(){
   const panelIds = [
     "viewerSelection", "viewerRelationshipsTab", "viewerMindTab", "viewerWorriesTab", "viewerOffgridTab",
     "viewerMemoryTab", "viewerConversationsTab", "viewerLifeTab", "viewerPlansTab", "viewerWorkTab",
-    "viewerHabitsTab", "viewerSkillsTab",
+    "viewerHabitsTab", "viewerSkillsTab", "viewerMovementTab",
   ];
   for(const id of panelIds){
     const el = document.getElementById(id);
@@ -5114,6 +5115,7 @@ function renderCharacterInspector(id){
   renderWorkTab(c);
   renderHabitsTab(c);
   renderSkillsTab(c);
+  renderMovementTab(c, _worldState && _worldState.tick);
 }
 
 // =========================================================
@@ -7334,6 +7336,7 @@ const VIEWER_TAB_PANELS = {
   work:          "viewerWorkTab",
   habits:        "viewerHabitsTab",
   skills:        "viewerSkillsTab",
+  movement:      "viewerMovementTab",
 };
 
 document.getElementById("viewerTabs")?.addEventListener("click", (e) => {
@@ -8180,24 +8183,48 @@ function connectWS() {
     if(selectedCharacterId) ws.send(JSON.stringify({ type: "select", character_id: selectedCharacterId }));
   };
 
-  ws.onmessage = async (e) => {
-    const msg = JSON.parse(e.data);
+  // Messages are applied one at a time, in order: each apply awaits (model loading), and letting a later delta's apply
+  // run in the middle of an earlier one's could leave the scene showing an older state than the one we hold.
+  let _applying = Promise.resolve();
+  ws._lastMessageAt = Date.now();
 
-    if (msg.type === "snapshot") {
-      // Full state for this viewport — store and apply
-      _worldState = msg;
-      await _applyState(msg);
-    } else if (msg.type === "delta") {
-      // Partial update — merge and apply
-      await _applyDelta(msg);
-    } else {
-      // Legacy: server sent plain state without a type field
-      _worldState = msg;
-      await _applyState(msg);
+  ws.onmessage = (e) => {
+    ws._lastMessageAt = Date.now();
+    const msg = JSON.parse(e.data);
+    if (msg.type === "heartbeat") {     // nothing in view changed this tick; the connection is alive
+      if (_worldState && msg.tick != null) _worldState.tick = msg.tick;
+      return;
     }
+    _applying = _applying.then(async () => {
+      if (msg.type === "snapshot") {
+        // Full state for this viewport — store and apply
+        _worldState = msg;
+        await _applyState(msg);
+      } else if (msg.type === "delta") {
+        // Partial update — merge and apply
+        await _applyDelta(msg);
+      } else {
+        // Legacy: server sent plain state without a type field
+        _worldState = msg;
+        await _applyState(msg);
+      }
+    }).catch((err) => console.error("[ws] applying an update failed", err));
   };
 
+  // The sim ticks every second and something is always moving or changing, so a connection that has gone quiet for
+  // WS_STALE_MS is a dead one the browser hasn't noticed (or one the server stopped feeding): reconnect, which starts
+  // again from a fresh snapshot -- instead of the page silently freezing until a manual refresh.
+  const WS_STALE_MS = 8000;
+  const staleTimer = setInterval(() => {
+    if (ws.readyState === WebSocket.OPEN && Date.now() - ws._lastMessageAt > WS_STALE_MS) {
+      console.warn("[ws] no updates for", WS_STALE_MS / 1000, "s -- reconnecting");
+      ws.close();
+    }
+  }, 2000);
+
   ws.onclose = () => {
+    clearInterval(staleTimer);
+    if (_wsRef !== ws) return;           // an older socket closing after a newer one took over
     // Reconnect after 2 s
     setTimeout(connectWS, 2000);
   };

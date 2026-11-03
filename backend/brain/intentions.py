@@ -174,6 +174,15 @@ def final_priority(i, c=None):
     if i.get("fixation_boost"):
         base = min(100, base + i["fixation_boost"])
 
+    # Stuck on it (systems/roam.py): what led to a timed-out activity is set back for a while, and the next most
+    # urgent intention lifted, so the next choice is a different one.
+    if c is not None and (c.get("_setbacks") or c.get("_lifts")):
+        from systems.roam import setback_active, lift_active, SETBACK_PENALTY, LIFT_POINTS
+        if lift_active(c, i.get("type"), _CURRENT_TICK):
+            base = min(100, base + LIFT_POINTS)
+        if setback_active(c, i.get("type"), _CURRENT_TICK):
+            return category_score * 1000 + base - SETBACK_PENALTY
+
     return category_score * 1000 + base
 # =========================================================
 # ENSURE ACTIVE INTENTIONS

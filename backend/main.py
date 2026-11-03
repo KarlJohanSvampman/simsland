@@ -213,10 +213,10 @@ def _character_patches(world: dict, visible_chars: dict, selected_id, sent: dict
         have = sent.get(cid)
         digests = ev.char_digests(c, tick, fresh_cold=(cid == selected_id))
         if have is None:
-            out[cid] = c
+            out[cid] = {k: v for k, v in c.items() if k not in _NOT_SENT_CHAR_KEYS}
             sent[cid] = digests
             continue
-        changed = [k for k, d in digests.items() if have.get(k) != d]
+        changed = [k for k, d in digests.items() if have.get(k) != d and k not in _NOT_SENT_CHAR_KEYS]
         deleted = [k for k in have if k not in digests]
         if not changed and not deleted:
             continue
@@ -461,9 +461,21 @@ def _tick_watchdog():
             print(f"[tick] still running after {held:.1f}s holding the world lock; tick thread is at:\n{stack}", flush=True)
 
 
+# Keys of a character the client never uses -- server-side bookkeeping that would only add weight to every patch:
+# what they've noticed (systems/spotted.py), where they last saw people, and the per-tick trackers.
+_NOT_SENT_CHAR_KEYS = frozenset({"spotted", "last_seen", "_room_tile", "_in_building", "_step", "_move_purpose",
+                                 "_stuck_last_pos", "_daily_observations"})
+
+
 async def _broadcast(world, dirty):
-    """Send each connected client its snapshot or delta for this tick."""
-    # Broadcast to each client
+    """Send each connected client its snapshot or delta for this tick.
+
+    A client must never be left connected but forgotten: that is exactly "nothing updates until I refresh" (the
+    socket stays open, so the page never reconnects, but nothing is sent to it any more). So:
+      - building a client's update failing (a bug, bad data) is logged and that client gets a full snapshot next
+        tick instead -- it stays subscribed;
+      - sending failing (the client went away, or the socket is broken) closes the socket and drops the client, so a
+        page that is still there reconnects (main.js does, after 2 s) and starts again from a snapshot."""
     dead = []
     for client in _clients:
         ws   = client["ws"]
@@ -472,39 +484,45 @@ async def _broadcast(world, dirty):
         zoom = client.get("zoom", 2)
         try:
             if client.get("needs_full"):
-                snapshot = _build_full_snapshot(world, world.get("definitions"), cx, cy, zoom)
-                snapshot["type"] = "snapshot"
+                payload = _build_full_snapshot(world, world.get("definitions"), cx, cy, zoom)
+                payload["type"] = "snapshot"
                 # what this client now has of each character: the baseline later deltas
                 # are patched against (core/entity_versions.py)
                 from core import entity_versions as _ev
-                client["sent"] = {
+                sent = {
                     cid: _ev.char_digests(ch, world.get("tick", 0))
-                    for cid, ch in (snapshot.get("characters") or {}).items()
+                    for cid, ch in (payload.get("characters") or {}).items()
                     if isinstance(ch, dict) and ch.get("id")
                 }
-                await ws.send_json(snapshot)
-                client["needs_full"] = False
             else:
-                delta = _build_delta(world, dirty, cx, cy, zoom, client.get("selected_id"),
-                                     sent=client.setdefault("sent", {}))
-                if delta:
-                    await ws.send_json(delta)
+                payload = _build_delta(world, dirty, cx, cy, zoom, client.get("selected_id"),
+                                       sent=client.setdefault("sent", {}))
+                sent = None
         except Exception:
-            # Log instead of swallowing: a bug in snapshot/delta
-            # building (e.g. the missing RESPONDER_FADE_TICKS
-            # import that used to crash _build_delta on every
-            # single call) previously killed every client here
-            # with zero trace, silently disabling all live
-            # updates while still leaving reconnect+one-shot
-            # snapshot working -- which looked exactly like
-            # "nothing updates until I refresh".
             traceback.print_exc()
+            client["needs_full"] = True          # try again from scratch next tick; keep the client
+            continue
+        if not payload:
+            # nothing in view changed: still say the world is alive, so the page can tell a quiet world from a dead
+            # connection (main.js reconnects after a few seconds of silence)
+            payload = {"type": "heartbeat", "tick": world.get("tick", 0)}
+        try:
+            await ws.send_json(payload)
+        except Exception as exc:
+            print(f"[ws] dropping a client: sending failed ({exc!r})", flush=True)
             dead.append(client)
+            continue
+        if sent is not None:
+            client["sent"] = sent
+            client["needs_full"] = False
 
     for client in dead:
         if client in _clients:
             _clients.remove(client)
-
+        try:
+            await client["ws"].close()           # so the page notices and reconnects
+        except Exception:
+            pass
 
 
 async def loop():
