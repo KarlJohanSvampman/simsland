@@ -649,15 +649,10 @@ def _route_move(c, world, action, mode="walk"):
     from systems.props import get_prop_by_id
     p = get_prop_by_id(world, target_id)
     if p:
-        c["move_target"] = {
-            "x": p.get("x", 0),
-            "y": p.get("y", 0),
-            "target_id": target_id,
-            "target_type": "prop",
-        }
-        if plan_character_route(world, c, p.get("x", 0), p.get("y", 0)):
-            c["animation_state"] = mode
-            c["is_moving"]       = True
+        # To where it's used from, not into it; and on getting there (or if already there), do what they came for
+        # (systems/move_purpose.py).
+        from systems.move_purpose import move_to_prop
+        move_to_prop(c, world, p, action, mode)
         return
 
 

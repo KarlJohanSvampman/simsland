@@ -724,6 +724,9 @@ def update_agent(
     # ... and whether that makes them a guest in someone else's home (systems/guests.py).
     from systems.guests import track as track_guest
     track_guest(c, world)
+    # A walk to a thing that has just ended: do what they went there for, or say they got there (systems/move_purpose.py).
+    from systems.move_purpose import check_arrival
+    check_arrival(c, world)
 
     _prof.mark("agent:if_L656")
     if c.get(
