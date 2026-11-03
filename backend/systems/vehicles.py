@@ -379,4 +379,16 @@ def household_home_entrance(world, household_id):
         if doors:
             d = doors[0]
             return (d["x"], d["y"])
+    # Buildings placed as floorplan templates (every starter_house) carry no "doors" list: their way in is a door
+    # in the floorplan itself -- just inside it, so the walk home ends indoors. Without this, a character coming
+    # back by bus stopped at the bus stop.
+    from systems.navigation import find_building_entrances
+    from systems.templates import resolve_floorplan
+    for bid in household.get("building_ids", []):
+        building = buildings_by_id.get(bid)
+        floorplan = resolve_floorplan(world, building) if building else None
+        if floorplan and floorplan.get("tiles"):
+            entrances = find_building_entrances(building, floorplan)
+            if entrances:
+                return tuple(entrances[0]["inside"])
     return None

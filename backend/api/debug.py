@@ -8,6 +8,7 @@ POST /debug/build-context      → run context builder on dummy entities
 POST /debug/llm-test           → build context + call LLM
 POST /debug/generate-schedule  → run schedule generator
 POST /debug/plan-activity      → show activity phases for intention + props
+GET  /debug/ollama_status      → is the Ollama server up and answering (the view page's status light)
 """
 
 import json
@@ -495,3 +496,62 @@ async def prompt_send_ep(req: LLMSendReq):
         "valid":         valid,
         "elapsed_s":     elapsed,
     }
+
+
+# ─── Ollama status (the view page's status light) ─────────────────────────────
+
+_ollama_status_cache: Dict[str, Any] = {"at": 0.0, "value": None}
+_OLLAMA_STATUS_TTL = 5.0       # seconds; every open page polls, Ollama is asked at most once per this
+
+
+@router.get("/ollama_status")
+@core_only
+def ollama_status_ep():
+    """Is the Ollama server this simulation decides with up and answering? Read by the status light in the
+    top-right corner of the view page (frontend/src/ollamaStatus.js).
+
+    Asks Ollama for its installed models (GET /api/tags -- cheap, loads no model) and the models it holds in
+    memory (GET /api/ps), with a short timeout, and caches the answer for _OLLAMA_STATUS_TTL so any number of
+    open pages costs Ollama one request per interval. Core-only because OLLAMA_BASE_URL / OLLAMA_MODEL are
+    set on the core (docker-compose.yml), not on the gateway.
+
+    state: "up"       -- answered, and the configured model is installed
+           "degraded" -- answered, but the configured model is not among its models
+           "down"     -- did not answer (refused, timed out, or an HTTP error)"""
+    import os
+    import httpx
+
+    now = time.monotonic()
+    cached = _ollama_status_cache["value"]
+    if cached is not None and now - _ollama_status_cache["at"] < _OLLAMA_STATUS_TTL:
+        return cached
+
+    base = os.getenv("OLLAMA_BASE_URL", "http://ollama:11434").rstrip("/")
+    model = os.getenv("OLLAMA_MODEL", "llama3")
+    out: Dict[str, Any] = {"base_url": base, "model": model, "checked_at": time.time(), "error": None}
+    try:
+        started = time.monotonic()
+        with httpx.Client(timeout=3.0) as client:
+            tags = client.get(f"{base}/api/tags")
+            tags.raise_for_status()
+            out["latency_ms"] = round((time.monotonic() - started) * 1000)
+            installed = [m.get("name") or m.get("model") for m in tags.json().get("models", [])]
+            try:
+                ps = client.get(f"{base}/api/ps")
+                ps.raise_for_status()
+                out["loaded"] = [m.get("name") or m.get("model") for m in ps.json().get("models", [])]
+            except (httpx.HTTPError, ValueError):
+                out["loaded"] = None          # older Ollama without /api/ps -- not a reason to call it down
+        # "llama3" and "llama3:latest" name the same model
+        wanted = {model, model if ":" in model else f"{model}:latest"}
+        out["model_available"] = any(name in wanted for name in installed)
+        out["state"] = "up" if out["model_available"] else "degraded"
+        if not out["model_available"]:
+            out["error"] = f"model '{model}' is not installed on this Ollama server"
+    except httpx.TimeoutException:
+        out.update(state="down", error="no answer within 3 s")
+    except (httpx.HTTPError, ValueError) as exc:
+        out.update(state="down", error=f"{type(exc).__name__}: {exc}"[:200])
+
+    _ollama_status_cache.update(at=now, value=out)
+    return out

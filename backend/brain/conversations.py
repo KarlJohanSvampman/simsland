@@ -490,6 +490,21 @@ def add_message(
     from systems.conversation_floor import on_message as _floor_on_message
     _floor_on_message(world, conv, speaker_id, utterance, speech_act, tick)
 
+    # Was what was asked answered? A conversation ends once it is (systems/conversation_outcome.py).
+    from systems.conversation_outcome import on_message as _outcome_on_message
+    _outcome_on_message(world, conv, speaker_id, utterance, speech_act, tick)
+
+    # "Please leave" / "come in" from someone who lives there, to a guest (systems/guests.py).
+    from systems.guests import on_line as _guests_on_line
+    _guests_on_line(world, conv, speaker_id, utterance)
+
+    # A line said is something happening: it pushes back the step timeout of everyone in it (systems/step_timeouts.py).
+    from systems.step_timeouts import progress as _step_progress
+    for pid in conv.get("participants") or []:
+        other = (world.get("characters") or {}).get(pid)
+        if other:
+            _step_progress(other, world)
+
     # NOTE: reflection scheduling is handled by action_router.py's
     # apply_speech() after each turn so it is not duplicated here.
 

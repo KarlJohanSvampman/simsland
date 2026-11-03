@@ -172,7 +172,44 @@ def _candidate_pool(kind, available_actions):
     return out
 
 
+# Move-type actions may also target a room of the building the character is in.
+_ROOM_MOVE_TYPES = {"move", "jog_to", "sneak_to"}
+
+
+def _room_target(c, world, description):
+    """A room of this building ("towards the kitchen"), else a household's home
+    ("Susan Moreau's house", "the Moreaus") -- systems/room_targets.py."""
+    try:
+        from systems.room_targets import match_room, match_building
+        return match_room(c, world, description) or match_building(c, world, description)
+    except Exception as exc:                       # noqa: BLE001 -- a place fallback must never break resolution
+        print(f"[action_resolver] place match failed for {c.get('id')}: {exc!r}")
+        return None
+
+
 def resolve_target(c, world, action_type, description, available_actions):
+    """resolve_in_view(), then -- for a prop nothing in view matches -- the things the character knows are around but
+    can't see right now (systems/spotted.py: their home, what they've noticed elsewhere), nearest first."""
+    result = resolve_in_view(c, world, action_type, description, available_actions)
+    if result["id"] is not None or result["ambiguous"] or not description:
+        return result
+    from systems.action_registry import ACTION_SPECS
+    kind = ACTION_SPECS.get(action_type, {}).get("target", "any")
+    remembered = (available_actions or {}).get("remembered_props") or []
+    if kind not in ("prop", "prop_or_character", "any") or not remembered:
+        return result
+    best = None
+    for entry in remembered:                       # already nearest first: the first of equal scores wins
+        score = _score(description, _prop_bag(entry))
+        if score >= ACCEPT_THRESHOLD and (best is None or score > best[1]):
+            best = (entry["id"], score)
+    if best is None:
+        return result
+    return {"id": best[0], "score": best[1], "kind": "prop", "ranked": [best], "ambiguous": False,
+            "remembered": True}
+
+
+def resolve_in_view(c, world, action_type, description, available_actions):
     """Resolve a free-text target description against the real candidate
     ids for this action type (via systems/action_registry.py's target
     spec). Returns:
@@ -199,6 +236,11 @@ def resolve_target(c, world, action_type, description, available_actions):
 
     if not ranked:
         from brain.cognition_scheduler import record_resolver_outcome
+        room = _room_target(c, world, description) if action_type in _ROOM_MOVE_TYPES else None
+        if room:                                    # nothing nearby at all, but a room was named
+            record_resolver_outcome("accept")
+            return {"id": room, "score": ACCEPT_THRESHOLD, "kind": room.split(":", 1)[0],
+                    "ranked": [(room, ACCEPT_THRESHOLD)], "ambiguous": False}
         record_resolver_outcome("fail")
         return {"id": None, "score": 0.0, "kind": kind, "ranked": [], "ambiguous": False}
 
@@ -210,6 +252,15 @@ def resolve_target(c, world, action_type, description, available_actions):
     )
 
     from brain.cognition_scheduler import record_resolver_outcome
+
+    # A walk to a ROOM ("towards the kitchen") or someone's HOUSE ("Susan's house") matches no
+    # person or prop: before failing, see whether the description names one (systems/room_targets.py).
+    if (top_score < ACCEPT_THRESHOLD or ambiguous) and action_type in _ROOM_MOVE_TYPES:
+        room = _room_target(c, world, description)
+        if room:
+            record_resolver_outcome("accept")
+            return {"id": room, "score": ACCEPT_THRESHOLD, "kind": room.split(":", 1)[0],
+                    "ranked": [(room, ACCEPT_THRESHOLD)] + ranked[:4], "ambiguous": False}
 
     if top_score < ACCEPT_THRESHOLD or ambiguous:
         record_resolver_outcome("ambiguous" if ambiguous else "fail")

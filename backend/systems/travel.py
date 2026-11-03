@@ -40,6 +40,9 @@ TRAVEL_FROZEN_STATES = (
 # hijacking the trip before update_travel() ever sees the arrival.
 TRAVEL_WALKING_STATES = ("to_garage", "to_bus_stop", "walking_home")
 
+# A trip's walk that stalls or runs too long is handled by its step timeout (systems/step_timeouts.py): a fresh route
+# first, then _give_up_walk -- an outbound trip happens without the walk, a walk home just ends.
+
 _CAR_PROBABILITY = 0.8
 
 
@@ -67,6 +70,38 @@ def _at_position(c, target, tolerance=0.6):
         abs(c.get("x", 0) - target["x"]) < tolerance
         and abs(c.get("y", 0) - target["y"]) < tolerance
     )
+
+
+def _set_off(c):
+    """Start walking the route just planned. Movement (sim_loop.py -> movement.update_character_movement) only
+    advances characters with is_moving set; the trip walks never set it, so a character "walking to the bus stop"
+    stood still for good (live, 2026-11-01: Robert and Stephanie Okafor, for hours)."""
+    if c.get("route"):
+        c["is_moving"] = True
+        c["animation_state"] = "walk"
+
+
+def _walk_target(c, world, state):
+    """(x, y) the walking state is heading for, or None."""
+    if state == "to_bus_stop":
+        stop = bus_stop(world)
+        return (stop["x"], stop["y"]) if stop else None
+    if state == "to_garage":
+        garage = household_garage(world, c.get("household_id"))
+        return (garage["x"], garage["y"]) if garage else None
+    if state == "walking_home":
+        entrance = household_home_entrance(world, c.get("household_id"))
+        return (entrance[0], entrance[1]) if entrance else None
+    return None
+
+
+def _give_up_walk(c, world, state):
+    c["route"] = []
+    c["is_moving"] = False
+    if state == "walking_home":
+        _finish_travel(c, world)
+    else:
+        _abort_travel_to_immediate(c, world)
 
 
 def _route_or_already_there(c, world, target):
@@ -108,6 +143,7 @@ def begin_travel(c, world, reason, duration):
             car["state"]["in_use"] = True
             c["travel_mode"] = "car"
             c["travel_state"] = "to_garage"
+            _set_off(c)
             # Every other movement-initiating call site (activity_queue.py,
             # curiosity.py, interactions.py, action_router.py) sets this the
             # moment it starts a route -- this one didn't, so a character
@@ -121,6 +157,7 @@ def begin_travel(c, world, reason, duration):
         if stop and _route_or_already_there(c, world, stop):
             c["travel_mode"] = "bus"
             c["travel_state"] = "to_bus_stop"
+            _set_off(c)
             c["animation_state"] = "walk"
             return True
 
@@ -423,6 +460,7 @@ def _begin_walking_home(c, world):
     entrance = household_home_entrance(world, c.get("household_id"))
     if entrance and plan_character_route(world, c, entrance[0], entrance[1]):
         c["travel_state"] = "walking_home"
+        _set_off(c)
     else:
         _finish_travel(c, world)
 

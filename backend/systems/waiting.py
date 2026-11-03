@@ -47,6 +47,13 @@ REARM_TICKS = 300  # 5 min
 # avoidance check).
 GIVE_UP_AVOID_TICKS = 600  # 10 min
 
+# Per the user's ask (2026-11-01): waiting for a PERSON -- someone to come to the door, someone
+# to show up -- lasts at most 10 minutes; then the character gives up, and gives up on what they
+# wanted from that person too (the intention aimed at them is dropped), instead of standing there
+# with an ever more "overdue" intention.
+PERSON_WAIT_MAX_TICKS = 600   # 10 min
+DOOR_ANSWER_DISTANCE = 3      # someone from the household this close to the visitor = the door was answered
+
 
 def _patience_modifier(c):
     traits = set(c.get("traits", []) + c.get("personality_traits", []))
@@ -71,6 +78,8 @@ def start_waiting_for(c, world, kind, ref):
 
     timer = BASE_PATIENCE_TICKS * _patience_modifier(c) - _stress_penalty_ticks(c)
     timer = max(MIN_PATIENCE_TICKS, round(timer))
+    if kind == "person":
+        timer = min(timer, PERSON_WAIT_MAX_TICKS)
 
     act.setdefault("state", {})["waiting_for"] = {
         "kind": kind,          # "person" | "business" | "delivery"
@@ -85,6 +94,8 @@ def tick_waiting(c, world):
     """Call once per character per tick (mirrors process_health's spot in
     brain/agent_loop.py::update_internal_state). No-ops unless the
     character is currently waiting-for-a-reason."""
+    tick_door_wait(c, world)
+
     act = c.get("activity")
     if not act or act.get("type") != "wait":
         return
@@ -160,9 +171,104 @@ def tick_waiting(c, world):
                 "kind": kind,
                 "ref":  waiting_for["ref"],
             })
+        elif kind == "person":
+            # Waited the most they will for someone: stop waiting, and let go of what they wanted from them.
+            waiting_for["timed_out"] = True
+            c["activity"] = None
+            give_up_on_person(c, world, waiting_for.get("ref"), "they never came")
         else:
             waiting_for["timed_out"] = True
             wake_character(c, world, "waiting_timed_out", {
                 "kind": kind,
                 "ref":  waiting_for["ref"],
             })
+
+
+# =========================================================
+# GIVING UP ON SOMEONE
+# =========================================================
+
+def _wanted_from(c, intention, person_name):
+    kind = intention.get("type", "")
+    if kind == "play_with_friend":
+        return f"playing with {person_name}"
+    return f"{kind.replace('expectation:', '').replace('_', ' ')} with {person_name}"
+
+
+def give_up_on_person(c, world, person_id, why):
+    """Stop waiting for `person_id` and drop the intentions aimed at them -- one memory says so,
+    and the character is woken to choose what to do instead (wake reason gave_up_waiting)."""
+    from brain.memory import store_memory
+    tick = world.get("tick", 0)
+    person = (world.get("characters") or {}).get(person_id) or {}
+    name = person.get("name") or "them"
+    dropped = [i for i in (c.get("active_intentions") or []) if person_id and i.get("target_id") == person_id]
+    if dropped:
+        c["active_intentions"] = [i for i in c["active_intentions"] if i not in dropped]
+    what = ", ".join(_wanted_from(c, i, name) for i in dropped)
+    store_memory(c, f"I waited for {name} but {why}, so I gave up" + (f" on {what}." if what else "."),
+                 importance=0.4, tags=["gave_up", "waiting"], tick=tick, source="internal", people=[person_id] if person_id else None)
+    wake_character(c, world, "gave_up_waiting", {"kind": "person", "ref": person_id})
+
+
+# =========================================================
+# WAITING AT SOMEONE'S DOOR
+# =========================================================
+# Ringing the doorbell or knocking (systems/doorbell.py) used to leave the visitor standing there
+# with nothing to end it: whether anyone came was up to the household's own thinking, and the
+# visitor's intention ("go and ask Susan if she can play") kept escalating to "long overdue" while
+# they waited. Now the visitor waits at most PERSON_WAIT_MAX_TICKS for someone from the household
+# to come to them (or to be talking with them, or for the visitor to be let in); else they give up.
+
+def start_door_wait(c, world, household, target_id=None):
+    tick = world.get("tick", 0)
+    current = c.get("_door_wait") or {}
+    if current.get("household_id") == household.get("id") and tick < current.get("expires_at_tick", 0):
+        return                                   # ringing again doesn't make them wait longer
+    c["_door_wait"] = {"household_id": household.get("id"), "target_id": target_id,
+                       "started_at_tick": tick, "expires_at_tick": tick + PERSON_WAIT_MAX_TICKS}
+
+
+def _door_answered(c, world, household):
+    chars = world.get("characters") or {}
+    members = [chars[m] for m in household.get("members") or [] if m in chars]
+    if household.get("home_id") and c.get("building_id") == household.get("home_id"):
+        return True                              # let in (or walked in)
+    cx, cy = c.get("x", 0), c.get("y", 0)
+    for m in members:
+        if abs(m.get("x", 0) - cx) + abs(m.get("y", 0) - cy) <= DOOR_ANSWER_DISTANCE and not m.get("off_grid"):
+            return True
+    try:
+        from brain.conversations import find_active_conversation_for
+        conv = find_active_conversation_for(world, c["id"])
+    except Exception:                            # noqa: BLE001
+        conv = None
+    return bool(conv and any(m["id"] in (conv.get("participants") or []) for m in members))
+
+
+def tick_door_wait(c, world):
+    wait = c.get("_door_wait")
+    if not wait:
+        return
+    household = (world.get("households") or {}).get(wait.get("household_id"))
+    if not household or _door_answered(c, world, household):
+        if household and c.get("building_id") != household.get("home_id"):
+            # someone who lives there came to the door: being let in (systems/guests.py) -- not walking in on your own
+            c["_let_in"] = {"household_id": household.get("id"), "tick": world.get("tick", 0)}
+        c.pop("_door_wait", None)
+        return
+    if world.get("tick", 0) < wait.get("expires_at_tick", 0):
+        return
+    c.pop("_door_wait", None)
+    act = c.get("activity") or {}
+    if act.get("type") in ("ring_doorbell", "knock_on_door", "wait"):
+        c["activity"] = None
+    target_id = wait.get("target_id")
+    if target_id:
+        give_up_on_person(c, world, target_id, "nobody came to the door")
+    else:
+        from brain.memory import store_memory
+        store_memory(c, f"Nobody came to the door at {household.get('name', 'their house')}, so I gave up.",
+                     importance=0.4, tags=["gave_up", "waiting"], tick=world.get("tick", 0), source="internal")
+        wake_character(c, world, "gave_up_waiting", {"kind": "door", "ref": household.get("id")})
+

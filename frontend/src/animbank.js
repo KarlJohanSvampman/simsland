@@ -775,6 +775,14 @@ function getTemplates() {
     return bank["_templates"] || (bank["_templates"] = {});
 }
 
+// The character source a new template belongs to: the selected one, else the first in the bank.
+// A template with no source ("" -- what one made before picking a source used to get) has no clips
+// to offer in its chain, while the Source dropdown still showed the first source as if picked.
+function defaultSourceKey() {
+    if (currentSourceKey && bank[currentSourceKey]) return currentSourceKey;
+    return Object.keys(bank).find(k => !k.startsWith("_")) || "";
+}
+
 function createTemplate() {
     // Reuse an already-open, never-renamed-or-populated scaffold for this
     // source rather than creating another one — otherwise clicking
@@ -783,8 +791,9 @@ function createTemplate() {
     // up, since createTemplate() inserts into the bank immediately, before
     // the user has typed a name or saved anything.
     const templates = getTemplates();
+    const sourceKey = defaultSourceKey();
     const existingScaffold = Object.values(templates).find(t =>
-        t.source_key === (currentSourceKey || "") &&
+        t.source_key === sourceKey &&
         t.name === "new_template" &&
         (t.chain || []).length === 0
     );
@@ -798,7 +807,7 @@ function createTemplate() {
     const tmpl = {
         id,
         name: "new_template",
-        source_key: currentSourceKey || "",
+        source_key: sourceKey,
         chain: [],
         alternatives: [],
         notifies: [],
@@ -835,10 +844,16 @@ function openTemplateEditor(tmpl) {
         if (key === tmpl.source_key) opt.selected = true;
         srcSel.appendChild(opt);
     }
-    srcSel.addEventListener("change", () => {
+    // A template whose source is missing (made before a source was picked, or its source was
+    // removed) takes the source the dropdown shows, so what you see is what the chain offers.
+    if (!bank[tmpl.source_key] && srcSel.value) tmpl.source_key = srcSel.value;
+    // onchange, not addEventListener: this runs every time a template is opened, and stacked
+    // listeners kept the earlier templates' closures -- changing this template's source also
+    // changed the source of every template opened before it.
+    srcSel.onchange = () => {
         tmpl.source_key = srcSel.value;
         renderChainList(tmpl);
-    });
+    };
 
     renderChainList(tmpl);
     renderTemplateNotifyList(tmpl);
@@ -964,14 +979,16 @@ function renderTemplateNotifyList(tmpl) {
     }
 }
 
-function saveCurrentTemplate() {
+async function saveCurrentTemplate() {
     if (!currentTemplate) return;
     currentTemplate.name        = document.getElementById("teName").value.trim() || currentTemplate.name;
     currentTemplate.alternatives = document.getElementById("teAlternatives").value
         .split(",").map(s => s.trim()).filter(Boolean);
     getTemplates()[currentTemplate.id] = currentTemplate;
     renderTemplateTab();
-    showStatus("Template saved.");
+    // "Save Template" used to only update this page -- "Template saved." while nothing reached the
+    // server, so a new template was gone on reload unless Save Bank was clicked as well.
+    if (await saveBank()) showStatus(`Template "${currentTemplate.name}" saved.`);
 }
 
 function deleteCurrentTemplate() {
@@ -1245,12 +1262,21 @@ async function loadBank() {
 }
 
 async function saveBank() {
-    await fetch("/api/animbank", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(bank),
-    });
-    showStatus("Bank saved.");
+    // Says so when the save fails, instead of always reporting success.
+    try {
+        const r = await fetch("/api/animbank", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(bank),
+        });
+        if (!r.ok) throw new Error(`the server answered ${r.status}`);
+        showStatus("Bank saved.");
+        return true;
+    } catch (err) {
+        console.error("[animbank] save failed:", err);
+        showStatus(`NOT saved: ${err.message}`, true);
+        return false;
+    }
 }
 
 // =========================================================
@@ -1758,12 +1784,12 @@ function renderNotifyList(clipMeta) {
 // STATUS BAR
 // =========================================================
 
-function showStatus(msg) {
+function showStatus(msg, isError = false) {
     const el = document.getElementById("clipDurLabel");
     const orig = el.textContent;
-    el.textContent = "✓ " + msg;
-    el.style.color = "#4acc88";
-    setTimeout(() => { el.textContent = orig; el.style.color = "#666"; }, 2000);
+    el.textContent = (isError ? "✗ " : "✓ ") + msg;
+    el.style.color = isError ? "#ff6b6b" : "#4acc88";
+    setTimeout(() => { el.textContent = orig; el.style.color = "#666"; }, isError ? 6000 : 2000);
 }
 
 // =========================================================

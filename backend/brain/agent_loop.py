@@ -500,7 +500,14 @@ def process_decision(
         "intention"
     )
 
-    if intention:
+    if decision.get("then_steps"):
+        # The THEN line, one intention per step ("play with Kathleen, then apologize to Dad" is
+        # two) -- brain/plans.py.
+        from brain.plans import intentions_from_plan
+        for planned in intentions_from_plan(c, world, decision["then_steps"]):
+            store_intention(c, planned)
+
+    elif intention:
 
         store_intention(
             c,
@@ -511,7 +518,12 @@ def process_decision(
     # MEMORY
     # =====================================
 
-    if decision.get("thought"):
+    # A thought is had once: a repeat isn't stored again -- the character notices
+    # they can't think of anything else and their focus gets more pressing
+    # (systems/thought_repeat.py).
+    from systems.thought_repeat import handle_thought
+
+    if decision.get("thought") and handle_thought(c, world, decision["thought"]):
 
         store_memory(
 
@@ -576,6 +588,9 @@ def process_decision(
         result = resolve_target(c, world, "speak", speech["target_description"], available_actions)
         if result["id"] is not None:
             speech["target"] = result["id"]
+
+    if speech:
+        _direct_speech(c, world, speech)
 
     if action:
 
@@ -697,6 +712,19 @@ def update_agent(
     _prof.mark("agent:_body_tick_check_early")
     _body_tick_check_early(c, world)
 
+    # Arm / re-arm this character's step timeout (systems/step_timeouts.py) -- before the early return below, so a
+    # frozen trip leg (waiting for the bus, driving) has one too.
+    from systems.step_timeouts import note_step
+    _prof.mark("agent:note_step")
+    note_step(c, world)
+
+    # Which room they are in now (systems/room_assignment.py) -- it used to be set only at spawn.
+    from systems.room_assignment import refresh_character_room
+    refresh_character_room(c, world)
+    # ... and whether that makes them a guest in someone else's home (systems/guests.py).
+    from systems.guests import track as track_guest
+    track_guest(c, world)
+
     _prof.mark("agent:if_L656")
     if c.get(
         "off_grid"
@@ -704,10 +732,6 @@ def update_agent(
         "travel_state"
     ) in TRAVEL_FROZEN_STATES:
         return
-
-    from systems.activity_watchdog import check_activity_watchdog
-    _prof.mark("agent:check_activity_watchdog")
-    check_activity_watchdog(c, world)
 
     from systems.idle_quirks import advance_idle_quirk
     _prof.mark("agent:advance_idle_quirk")
@@ -1059,6 +1083,10 @@ def update_agent(
                 return
         else:
             execute_activity(c, world, c["activity"])
+            # Spoken to in the middle of something light (chatting, sitting, watching TV): they
+            # keep at it, but get to decide how to answer -- LISTENING_ACTIVITIES below.
+            if c.get("activity") and _spoken_to_while_busy(c, world, act_type):
+                _think_now(c, world)
             return
 
     # =====================================
@@ -1155,11 +1183,38 @@ def update_agent(
     # brain/cognition_scheduler.py for why this replaced calling think()
     # on every single tick.
 
+    _think_now(c, world)
+
+
+# Activities a character can be talked to in the middle of: they keep doing it, but hearing someone
+# speak to them lets them decide what to say (systems/conversation_floor.py gives a listener 3 ticks to
+# start responding). Everything else -- sleep, the toilet, a shower, eating, work, chores -- still runs
+# to the end first, as before. Live (2026-11-01): two children "socializing" with each other could
+# never answer each other -- every line was "ignored" and every conversation died after one line.
+LISTENING_ACTIVITIES = {
+    "socialize", "speak", "wait", "sit_and_relax", "watch_tv", "listen_to_music", "read_newspaper",
+    "browse_news", "hangout", "meditate", "daydream", "reflect", "make_drawing",
+}
+SPOKEN_TO_WAKES = {"heard_speech", "floor_unnoticed", "floor_unanswered", "door_signal"}
+
+
+def _spoken_to_while_busy(c, world, act_type):
+    """In a listening activity, and due to think because someone spoke to them."""
+    if act_type not in LISTENING_ACTIVITIES:
+        return False
+    cog = c.get("cognition") or {}
+    return (cog.get("wake_reason") in SPOKEN_TO_WAKES
+            and world.get("tick", 0) >= cog.get("next_think_tick", 0))
+
+
+def _think_now(c, world):
+    """The cognition gate and the model request: everything update_agent() does once nothing else has
+    claimed the tick. Also called mid-activity for a character who was spoken to (LISTENING_ACTIVITIES)."""
     # A decision already with the model (brain/cognition_actor.py): the character carries on
     # living -- everything above this point still ran -- but doesn't ask again.
     from brain.cognition_actor import is_waiting, request_decision
     _prof.mark("agent:if_L1069")
-    if is_waiting(c):
+    if is_waiting(c, world):
         return
 
     _prof.mark("agent:should_think")
@@ -1230,3 +1285,22 @@ def update_agent(
     # THEN) by brain/cognition_actor.py::on_decision_ready. Nothing here blocks the tick.
     _prof.mark("agent:request_decision")
     request_decision(c, world, context, wake_reason, llm_priority)
+
+
+def _direct_speech(c, world, speech):
+    """Give a line to the person it is for (systems/addressing.py::addressee). Someone the line names who is in view
+    gets it; someone it names who isn't here gets it called out to them (a remark aimed at them -- systems/expressions.py
+    decides who hears it), instead of apply_speech() handing it to whoever happens to be nearest. A line that names
+    nobody is left as it was."""
+    from systems.addressing import addressee, addressed_elsewhere
+    utterance = speech.get("utterance") or ""
+    current = speech.get("target")
+    if current and not addressed_elsewhere(world, c["id"], current, utterance):
+        return
+    meant_for = addressee(world, c, utterance, None if current else speech.get("target_description"))
+    if not meant_for or meant_for == current:
+        return
+    in_view = {p.get("id") for p in (c.get("perception") or {}).get("visible_people", [])}
+    speech["target"] = meant_for
+    if meant_for not in in_view:
+        speech["mode"] = "remark"                  # called out to them, not a conversation with a bystander

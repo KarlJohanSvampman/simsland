@@ -94,6 +94,11 @@ def apply_speech(c, world, speech):
             nearest = max(visible, key=lambda p: p.get("visibility", 0))
             target_id = nearest.get("id")
 
+    # Said once: the same line to the same person again is dropped (systems/speech_repeat.py).
+    from systems.speech_repeat import is_repeat
+    if is_repeat(c, world, utterance, target_id):
+        return
+
     # Volume (see brain/perception.py's VOLUME_TIERS) -- explicit caller
     # value wins (e.g. a future hostile-action shout), otherwise inferred
     # from the same signals already tracked elsewhere: an "argument"
@@ -424,6 +429,11 @@ def apply_speech_to_group(c, world, speech, participant_ids):
     if not utterance:
         return None
 
+    # Said once (systems/speech_repeat.py) -- a group line is logged with no single target.
+    from systems.speech_repeat import is_repeat
+    if is_repeat(c, world, utterance, None):
+        return None
+
     tick = world.get("tick", 0)
     speech_act = speech.get("speech_act", "speak")
     topic = speech.get("topic", "")
@@ -561,6 +571,58 @@ def _route_move(c, world, action, mode="walk"):
 
     target_id = action.get("target")
     if not target_id:
+        return
+
+    # A room of the building ("towards the kitchen") -- brain/action_resolver.py
+    # resolves those to "room:<building_id>:<room_id>" (systems/room_targets.py).
+    from systems.room_targets import (is_room_target, room_destination,
+                                      is_building_target, building_destination)
+    # A household's home ("Susan Moreau's house"): their front door, or inside if it's
+    # this character's own home (systems/room_targets.py).
+    if is_building_target(target_id):
+        dest = building_destination(world, c, target_id)
+        if not dest:
+            return
+        x, y, inside = dest
+        c["move_target"] = {
+            "x": x,
+            "y": y,
+            "target_id": target_id,
+            "target_type": "building",
+            "inside": inside,
+        }
+        if plan_character_route(world, c, x, y):
+            c["animation_state"] = mode
+            c["is_moving"]       = True
+        return
+
+    if is_room_target(target_id):
+        dest = room_destination(world, target_id)
+        if not dest:
+            return
+        x, y, room = dest
+        # Already in that room: there is nowhere to go. Say so instead of "heading to the kitchen" while standing in it
+        # (live, 2026-11-02: Robert Okafor, over and over).
+        from systems.room_assignment import room_at
+        if room_at(world, c.get("x", 0), c.get("y", 0)) == target_id[len("room:"):]:
+            c["move_target"] = None
+            c["is_moving"] = False
+            label = str(room.get("type") or room.get("id") or "room").replace("_", " ")
+            cog = c.setdefault("cognition", {})
+            cog.setdefault("staged_knowledge", []).append(
+                f"You're already in the {label} -- there's nowhere to walk to. To reach someone in another room, go "
+                f"into their room, or call out to them.")
+            return
+        c["move_target"] = {
+            "x": x,
+            "y": y,
+            "target_id": target_id,
+            "target_type": "room",
+            "room_type": room.get("type"),
+        }
+        if plan_character_route(world, c, x, y):
+            c["animation_state"] = mode
+            c["is_moving"]       = True
         return
 
     # Find target position from characters or props
@@ -1397,6 +1459,20 @@ def _scheduled_block_end_ticks(c, world, activity_name):
     return max(0, end_tick - tick)
 
 
+def _route_work(c, world):
+    """"work" is no longer offered (brain/context_builder.py), but a model can still answer with it.
+    It used to stand the character where they were for up to 8 hours doing nothing. Now: an employed
+    character during their work block sets off for the shift (off-grid, systems/offgrid.py::go_to_work);
+    anyone else just doesn't, and the memory log says why."""
+    from systems.offgrid import go_to_work
+    if go_to_work(c, world):
+        return
+    from systems.debug_log import log_action
+    why = ("There is no job to go to." if not c.get("employed")
+           else "It isn't time for their shift -- they go when the work block starts.")
+    log_action(c, world, "wait", "", reason=f'Asked to "work": {why}')
+
+
 def _work_duration_ticks(c, world, default=28800):
     """Per the user's explicit ask: work should run to the end of today's
     actual scheduled work block (systems/scheduling.py), not a flat 8h --
@@ -1740,9 +1816,37 @@ def _resolve_examine_target(c, world, target_id, available_actions):
     return name, text
 
 
+def _not_in_sight(c, world, target_id):
+    """The prop or character target_id is, if c has no line of sight to it (behind a wall, in another room); else
+    None. A target that is neither (a held item, a proposal, a wall) isn't checked."""
+    from brain.perception import can_see
+    from systems.props import get_prop_by_id
+    target = (world.get("characters") or {}).get(target_id) or get_prop_by_id(world, target_id)
+    if not target or target.get("x") is None or target is c:
+        return None
+    return None if can_see(c, target, world) else target
+
+
 def _route_examine(c, world, action, available_actions=None):
     target_id = action.get("target")
+    hidden = _not_in_sight(c, world, target_id)
+    if hidden is not None:
+        # Only what you can see can be examined: nothing happens, and they're told why.
+        label = str(hidden.get("name") or hidden.get("template") or "that").replace("_", " ")
+        cog = c.setdefault("cognition", {})
+        cog.setdefault("staged_knowledge", []).append(
+            f"You can't see the {label} from where you are -- there's a wall in the way. Go to it first if you "
+            f"want a closer look." if not hidden.get("name") else
+            f"You can't see {label} from where you are -- there's a wall in the way.")
+        from brain.cognition_scheduler import wake_character
+        wake_character(c, world, "resolution_failed")
+        return
     name, text = _resolve_examine_target(c, world, target_id, available_actions)
+
+    # Something looked at closely is remembered (systems/spotted.py).
+    from systems.props import get_prop_by_id
+    from systems.spotted import notice
+    notice(c, world, get_prop_by_id(world, target_id))
 
     c["animation_state"] = get_phase_animation("examine", "using")
     from systems.incidental_speech import fire_incidental
@@ -2358,8 +2462,7 @@ def route_action(c, world, action, speech, definitions=None, available_actions=N
         _route_wait(c, world, action)
 
     elif action_type == "work":
-        c["activity"] = _scaffold(c, world, "work", interaction="work",
-                                  duration=_work_duration_ticks(c, world))
+        _route_work(c, world)
 
     elif action_type == "describe":
         _route_describe(c, world, action)
@@ -4596,6 +4699,9 @@ def _route_door_signal(c, world, action, method):
 
     from systems.doorbell import resolve_door_signal
     resolve_door_signal(c, world, household, target_id=target_id, method=method)
+    # ...and they wait for someone to come -- at most 10 minutes (systems/waiting.py).
+    from systems.waiting import start_door_wait
+    start_door_wait(c, world, household, target_id=target_id)
 
 
 def _route_phone_call(c, world, action):

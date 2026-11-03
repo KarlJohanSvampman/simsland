@@ -40,7 +40,28 @@ check("several stray headings all go", lb._clean_narration("MOVE:\nTHINK:\nI nee
 fb = lb.fallback_response(lb._why_unusable("I examine the bathroom_sink to assess the state of hygiene.", "The reply had no ACTION line."))
 check("a reply with no ACTION line is a wait that says so and shows what the model said",
       fb["action"]["type"] == "wait" and "no ACTION line" in fb["action"]["reason"] and "bathroom_sink" in fb["action"]["reason"], fb["action"]["reason"])
-check("a timeout says the model gave no answer", "no usable answer" in lb.fallback_response(lb._why_unusable({"error": "timeout: gave up waiting for the LLM gate"}, "x"))["action"]["reason"])
+check("a timeout says it timed out", lb.fallback_response(lb._why_unusable(
+    {"error": "timeout: Ollama at http://x:11434 didn't answer within 120 s"}, "x"))["action"]["reason"]
+    == "Timed out waiting for the model -- Ollama at http://x:11434 didn't answer within 120 s.")
+check("... and so does a call given up on in the queue", lb._why_unusable(
+    {"error": "timeout: gave up waiting for the model (queued behind other calls, or it never answered)"}, "x")
+    .startswith("Timed out waiting for the model"))
+check("an unreachable Ollama says so", lb._why_unusable({"error": "unreachable: couldn't connect to Ollama at http://x"}, "x")
+    == "The model is unreachable -- couldn't connect to Ollama at http://x.")
+check("a preempted call says so", "more urgent" in lb._why_unusable({"error": "aborted: preempted by a higher-priority request"}, "x"))
+check("anything else still says no usable answer", "no usable answer" in lb._why_unusable({"error": "ValueError: bad"}, "x"))
+
+# ---- the error text a model call fails with (llm/llm_client.py::describe_llm_error) -----------------------------------------
+import asyncio
+import httpx
+from llm.llm_client import describe_llm_error
+_req = httpx.Request("POST", "http://x/api/chat")
+check("an httpx timeout is a timeout, not an empty string",
+      describe_llm_error(httpx.ReadTimeout("", request=_req)).startswith("timeout: Ollama at "))
+check("the overall timeout is a timeout", describe_llm_error(asyncio.TimeoutError()).startswith("timeout: no answer"))
+check("a refused connection is unreachable", describe_llm_error(httpx.ConnectError("refused", request=_req)).startswith("unreachable:"))
+check("an HTTP error carries its status", describe_llm_error(httpx.HTTPStatusError(
+    "x", request=_req, response=httpx.Response(500, text="model not found", request=_req))).startswith("http 500:"))
 check("an empty reply says it was empty", "empty" in lb._why_unusable("", "The reply had no ACTION line."))
 check("with no reason given the old text stays", lb.fallback_response()["action"]["reason"] == "No valid action.")
 

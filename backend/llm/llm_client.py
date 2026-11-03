@@ -226,8 +226,30 @@ async def call_llm_safe(
 
         return {
 
-            "error": str(e)
+            "error": describe_llm_error(e)
         }
+
+
+def describe_llm_error(e, call_timeout=120, overall_timeout=150):
+    """What went wrong with a model call, in words a person can act on. Timeouts
+    used to come through as an empty string (str() of a timeout exception is
+    usually ""), so a character's "wait" said "The model gave no usable answer ()."
+    The text starts with a kind ("timeout:", "unreachable:", "http 500:", ...) that
+    brain/llm_brain.py::_why_unusable() turns into the line shown in memory."""
+    base = os.getenv("OLLAMA_BASE_URL", "http://ollama:11434").rstrip("/")
+    if isinstance(e, asyncio.TimeoutError):
+        return f"timeout: no answer from the model within {overall_timeout} s"
+    if isinstance(e, httpx.ConnectTimeout):
+        return f"unreachable: couldn't connect to Ollama at {base} (connection timed out)"
+    if isinstance(e, httpx.TimeoutException):
+        return f"timeout: Ollama at {base} didn't answer within {call_timeout} s"
+    if isinstance(e, httpx.ConnectError):
+        return f"unreachable: couldn't connect to Ollama at {base}"
+    if isinstance(e, httpx.HTTPStatusError):
+        body = (e.response.text or "").strip().replace("\n", " ")[:120]
+        return f"http {e.response.status_code}: Ollama refused the request" + (f" -- {body}" if body else "")
+    detail = str(e).strip()
+    return f"{type(e).__name__}" + (f": {detail}" if detail else "")
 
 
 # =========================================================

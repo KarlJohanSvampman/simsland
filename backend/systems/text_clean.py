@@ -4,6 +4,11 @@ systems/text_clean.py -- small text clean-ups shared by the speech and conversat
 
 _QUOTES = '"“”„«»'
 
+# What a model writes on its SAY line when it means "nothing" -- said aloud, it came out as a character saying "None"
+# (live, 2026-11-01: "Kathleen: None").
+_PLACEHOLDERS = {"none", "n/a", "na", "null", "nil", "nothing", "-", "--", "...", "…", "(none)", "[none]", "<none>",
+                 "no speech", "silence", "(silence)", "*silence*", "nothing to say", "(nothing)", "empty"}
+
 
 def clean_utterance(text):
     """A spoken line without the quotation marks wrapped around it. The model often writes its SAY in quotes, a retried or
@@ -22,4 +27,6 @@ def clean_utterance(text):
     inner = t[start:end].strip()
     if any(q in inner for q in _QUOTES):
         return t
+    if inner.lower().strip(" .!*_") in _PLACEHOLDERS or inner.lower() in _PLACEHOLDERS:
+        return ""                                   # a placeholder for "no line" -- nothing is said
     return inner

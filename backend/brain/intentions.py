@@ -168,6 +168,12 @@ def final_priority(i, c=None):
     # as before this round).
     base *= _fatigue_effort_multiplier(i, c)
 
+    # Can't think of anything else (systems/thought_repeat.py): each repeated
+    # thought while this was the focus made it more pressing. Capped at 100 so it
+    # never crosses into the next category's band.
+    if i.get("fixation_boost"):
+        base = min(100, base + i["fixation_boost"])
+
     return category_score * 1000 + base
 # =========================================================
 # ENSURE ACTIVE INTENTIONS
@@ -257,6 +263,11 @@ def add_intention(
     if "created_at" not in intention:
         if existing and "created_at" in existing:
             intention["created_at"] = existing["created_at"]
+
+    # A refresh recomputes "priority" from scratch; the pressure built up by
+    # repeated thoughts (systems/thought_repeat.py) is its own field and is kept.
+    if existing and existing.get("fixation_boost") and "fixation_boost" not in intention:
+        intention["fixation_boost"] = existing["fixation_boost"]
 
     intention.setdefault(
         "created_at",

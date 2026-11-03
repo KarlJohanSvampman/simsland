@@ -269,6 +269,11 @@ def _wake_speaker(world, speaker, holder, reason):
 
 
 def tick(world):
+    # Conversations that are resolved, or have gone on too long without it, end first
+    # (systems/conversation_outcome.py).
+    from systems.conversation_outcome import tick as _outcome_tick
+    _outcome_tick(world)
+
     chars = world.get("characters", {})
     t = world.get("tick", 0)
     status = {}

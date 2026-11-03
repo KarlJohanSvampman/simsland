@@ -258,6 +258,10 @@ def _dispatch_task(c, world, task):
         target_id = p.get("target_id") or p.get("main_prop_id")
         if not target_id:
             return False
+        # Only what's in sight can be examined (not a chair in the next room, through the wall).
+        from systems.action_router import _not_in_sight
+        if _not_in_sight(c, world, target_id) is not None:
+            return False
         c["activity"]        = _scaffold(c, world, "examine",
                                          target_id=target_id,
                                          interaction="examine",

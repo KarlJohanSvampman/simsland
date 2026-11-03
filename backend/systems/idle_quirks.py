@@ -47,7 +47,7 @@ LOOK_OUT_WINDOW_LINGER_TICKS = (30, 60)
 PHONE_CHANCE = 0.30
 
 QUIRK_TYPES = ("roam", "check_door_lock", "look_out_window")
-WALK_BUDGET_TICKS = 600   # matches activity_watchdog.WALK_LIMIT_TICKS
+WALK_BUDGET_TICKS = 600   # well inside step_timeouts.WALK_MAX_TICKS
 
 
 def _lingering(c) -> bool:
@@ -99,7 +99,7 @@ def advance_idle_quirk(c, world) -> None:
     tick = world.get("tick", 0)
     if act.get("phase") == "walking":
         if c.get("is_moving"):
-            return   # activity_watchdog already bounds an unreachable target
+            return   # the step timeout (systems/step_timeouts.py) already bounds an unreachable target
         act["phase"] = "using"
         act["phase_started_tick"] = tick
         return

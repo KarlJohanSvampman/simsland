@@ -1076,9 +1076,59 @@
     padding: 12px 0;
   }
 
+
+  /* =========================
+     OLLAMA STATUS LIGHT
+     Top-right corner. Above the inspector (z-index 9999) so it stays
+     visible when a character is selected -- it then sits in the empty
+     right end of the inspector's header row. Driven by
+     src/ollamaStatus.js polling GET /debug/ollama_status.
+  ========================= */
+
+  #ollamaStatus {
+    position: fixed;
+    top: 10px;
+    right: 10px;
+    z-index: 10000;
+    height: 34px;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 0 10px;
+    background: rgba(0,0,0,0.85);
+    color: #ddd;
+    border: 1px solid #444;
+    border-radius: 6px;
+    font-family: monospace;
+    font-size: 12px;
+    cursor: pointer;
+    user-select: none;
+  }
+
+  #ollamaStatus:hover { background: rgba(40,40,40,0.9); }
+
+  #ollamaStatusDot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #777;                       /* checking */
+  }
+
+  #ollamaStatus.up       #ollamaStatusDot { background: #3fb950; box-shadow: 0 0 6px #3fb950; }
+  #ollamaStatus.degraded #ollamaStatusDot { background: #d29922; box-shadow: 0 0 6px #d29922; }
+  #ollamaStatus.down     #ollamaStatusDot { background: #f85149; box-shadow: 0 0 6px #f85149; }
+  #ollamaStatus.checking #ollamaStatusDot { animation: ollamaPulse 1s ease-in-out infinite; }
+
+  @keyframes ollamaPulse { 50% { opacity: .35; } }
+
   </style>
 </head>
 <body>
+
+<div id="ollamaStatus" class="checking" title="Ollama: checking…" role="status">
+  <span id="ollamaStatusDot"></span><span>Ollama</span>
+</div>
 
 <div id="viewerInspector">
 
@@ -1275,5 +1325,6 @@
   <canvas id="c"></canvas>
 
   <script type="module" src="/src/main.js"></script>
+  <script type="module" src="/src/ollamaStatus.js"></script>
 </body>
 </html>

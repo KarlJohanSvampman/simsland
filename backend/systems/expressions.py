@@ -151,6 +151,9 @@ def express(c, world, speech):
     act = (speech.get("speech_act") or "remark").lower()
     volume = speech.get("volume") or default_volume(act)
     target_id = speech.get("target")
+    from systems.speech_repeat import is_repeat    # said once (systems/speech_repeat.py)
+    if is_repeat(c, world, text, target_id):
+        return None
     c["current_speech"] = {
         "utterance": text,
         "speech_act": act,

@@ -20,6 +20,8 @@ PLAY_CHANCE = 0.5                          # per eligible child per check, so no
 PLAY_PRIORITY = 48
 BUSY_BLOCKS = {"school", "sleep", "work"}
 MAX_NEED_PRESSURE = 80                     # a child this hungry/tired thinks about food or bed, not playing
+PLAY_URGE_TTL = HOUR                       # an urge to play that hasn't happened within this is dropped
+TOGETHER_DISTANCE = 2
 
 
 def _is_child(c):
@@ -70,9 +72,77 @@ def want_to_play(world, c):
     return mates[0] if mates else None
 
 
-def tick_kids_play(world):
-    """Scheduled job: give free children with a free friend the urge to play with them."""
+def _together(world, c, friend):
+    """Playing (or at least together): talking with each other, or side by side in the same building."""
+    if c.get("off_grid") or friend.get("off_grid"):
+        return False
+    from brain.conversations import find_conversation
+    if find_conversation(world, [c["id"], friend["id"]]):
+        return True
+    for a, b in ((c, friend), (friend, c)):
+        act = a.get("activity") or {}
+        if act.get("target_id") == b["id"] and act.get("type") in ("socialize", "speak", "hug", "high_five"):
+            return True
+    return (c.get("building_id") and c.get("building_id") == friend.get("building_id")
+            and abs(c.get("x", 0) - friend.get("x", 0)) + abs(c.get("y", 0) - friend.get("y", 0)) <= TOGETHER_DISTANCE)
+
+
+def settle_play_urges(world):
+    """A play_with_friend intention ends: done once the two are together, dropped once it has lapsed
+    (PLAY_URGE_TTL). Before this nothing ever removed one -- it escalated to "long overdue" at
+    priority 100 and stayed, every hour asking "why am I not doing this?"."""
+    from brain.memory import store_memory
+    tick = world.get("tick", 0)
+    chars = world.get("characters", {})
+    for c in chars.values():
+        urges = [i for i in (c.get("active_intentions") or []) if i.get("type") == "play_with_friend"]
+        for urge in urges:
+            friend = chars.get(urge.get("target_id"))
+            name = (friend or {}).get("name", "my friend")
+            if friend and _together(world, c, friend):
+                text = f"I got to play with {name}."
+            elif tick - (urge.get("created_at") or tick) >= PLAY_URGE_TTL or not friend:
+                text = f"I didn't get to play with {name} after all."
+            else:
+                continue
+            c["active_intentions"] = [i for i in c["active_intentions"] if i is not urge]
+            store_memory(c, text, importance=0.3, tags=["play"], tick=tick, source="internal",
+                         people=[friend["id"]] if friend else None)
+
+
+def start_agreed_play(world):
+    """A time two children agreed to play at (systems/conversation_outcome.py, "after dinner", "at 4") has come: each
+    gets the urge to go and play with the other now."""
     from brain.intentions import add_intention
+    tick = world.get("tick", 0)
+    chars = world.get("characters", {})
+    for c in chars.values():
+        plans = c.get("_play_plans") or []
+        due = [p for p in plans if tick >= p.get("at_tick", 0)]
+        if not due:
+            continue
+        c["_play_plans"] = [p for p in plans if p not in due]
+        for plan in due:
+            friend = chars.get(plan.get("with"))
+            if not friend or c.get("off_grid"):
+                continue
+            add_intention(c, {
+                "type": "play_with_friend",
+                "category": "social",
+                "priority": PLAY_PRIORITY + 10,
+                "target_id": friend["id"],
+                "source": "agreed_plan",
+                "created_at": tick,
+                "reason": f"You and {friend['name']} agreed to play now -- go and find {friend['name']}.",
+            })
+
+
+def tick_kids_play(world):
+    """Scheduled job: end the urges to play that are done or have lapsed, start the play two children
+    agreed on for now, then give free children with a free friend the urge to play with them."""
+    from brain.intentions import add_intention
+    settle_play_urges(world)
+    start_agreed_play(world)
     tick = world.get("tick", 0)
     for c in list(world.get("characters", {}).values()):
         friend = want_to_play(world, c)

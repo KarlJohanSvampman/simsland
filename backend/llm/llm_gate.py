@@ -60,7 +60,7 @@ PRIORITY_NORMAL     = 1   # the default -- routine character decisions, anything
 PRIORITY_BACKGROUND = 2   # one-off flavor/content generation (diary entries, item content, ...)
 
 _ABORTED_ERROR = {"error": "aborted: preempted by a higher-priority request"}
-_TIMEOUT_ERROR = {"error": "timeout: gave up waiting for the LLM gate"}
+_TIMEOUT_ERROR = {"error": "timeout: gave up waiting for the model (queued behind other calls, or it never answered)"}
 
 # Hard ceiling on how long ANY caller thread may block in run_llm_call (queue
 # wait + the call itself). Without one, a slow/unreachable Ollama leaves the

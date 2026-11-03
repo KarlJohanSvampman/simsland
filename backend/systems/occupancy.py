@@ -34,6 +34,7 @@ CALLER_REASONS = {
     "systems.worry_relief": "they were too worried to carry on",
     "systems.reading_process": "the reading ended",
     "systems.activity_watchdog": "it stalled",
+    "systems.step_timeouts": "it got stuck",
     "systems.director_mode": "the admin took over",
     "api.admin": "the admin reset it",
 }

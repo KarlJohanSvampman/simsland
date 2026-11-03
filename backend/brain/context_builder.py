@@ -370,6 +370,21 @@ def build_active_conversations(c, world):
 # LLM can reference real prop/character IDs in its action.
 # =========================================================
 
+def _remembered_props(c, world, in_view):
+    try:
+        from systems.spotted import remembered_pool
+        return remembered_pool(c, world, exclude=in_view)
+    except Exception as exc:                       # noqa: BLE001
+        print(f"[spotted] remembered pool for {c.get('id')}: {exc!r}")
+        return []
+
+
+def _sec_known_places(c, world):
+    """What their pressing needs and plans bring to mind -- known things that would help, and where (systems/spotted.py)."""
+    from systems.spotted import context_lines
+    return context_lines(c, world) or None
+
+
 def build_available_actions(c, world):
 
     perception = c.get("perception", {})
@@ -449,7 +464,9 @@ def build_available_actions(c, world):
         "wait",
         "eat",
         "sleep",
-        "work",
+        # no "work": choosing it only stood the character where they were for up to 8 hours with
+        # no effect at all (live: a 14-year-old with no job, 5+ sim-hours in). Going to work is the
+        # scheduled off-grid shift (systems/offgrid.py::go_to_work), not a menu choice.
         "socialize",
         "call",
         "text",
@@ -1316,6 +1333,8 @@ def build_available_actions(c, world):
     return {
         "action_types":          action_types,
         "interactable_props":    interactable,
+        # things known to be around but not in view (systems/spotted.py) -- targets, not "Things here"
+        "remembered_props":      _remembered_props(c, world, {p["id"] for p in interactable}),
         "nearby_characters":     nearby_people,
         "known_contacts":        known_contacts,
         "known_businesses":      known_businesses,
@@ -1446,6 +1465,13 @@ def build_scene_description(c, world):
             lines.append(" — ".join(bits))
     else:
         lines.append("No one else is nearby.")
+
+    # Whose home this is, for a guest; who is in it, for those who live here (systems/guests.py).
+    try:
+        from systems.guests import context_lines as _guest_lines
+        lines.extend(_guest_lines(c, world))
+    except Exception:                                  # noqa: BLE001
+        pass
 
     for conv in build_active_conversations(c, world):
         turn_note = " — it's your turn to respond." if conv.get("your_turn") else "."
@@ -2439,6 +2465,7 @@ NARRATIVE_SECTIONS = [
     ("bedroom",               "full", _sec_bedroom),
     ("intentions",            "core", _sec_intentions),
     ("todo",                  "core", _sec_todo),
+    ("known_places",          "core", _sec_known_places),
     ("pressing_intentions",   "core", _sec_pressing_intentions),
     ("exhaustion",            "core", _sec_exhaustion),
     ("glimpsed",              "full", _sec_glimpsed),
