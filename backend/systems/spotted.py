@@ -16,7 +16,8 @@ kitchen and the fridge in it. Two things make that possible here:
 
 How it's used:
 
-  - what they need, most pressing first, brings to mind the known things that would help, and where they are
+  - what they need, most pressing first, brings to mind the known things that would help (what satisfies each
+    intention: brain/intention_needs.py), and where they are
     ("To eat: the fridge and the microwave in your kitchen.") -- prompt section "known_places";
   - a pressing plan about a person brings to mind where that person was last seen;
   - a remembered thing can be named as a target (brain/action_resolver.py's "remembered_props" pool): walking to
@@ -34,29 +35,6 @@ NOTICE_CHANCE_CLOSE = 0.15      # ...or one within CLOSE_TILES
 CLOSE_TILES = 2.5
 RECALL_PER_NEED = 3
 NEEDS_SHOWN = 3
-
-# What a need or plan calls for: (words in the intention, words in a prop's template/tags/interactions).
-_NEED_PROPS = (
-    (r"hungr|eat|food|meal|dinner|lunch|breakfast|snack|cook|starv",
-     ("eat", "prepare_food", "cook", "fridge", "microwave", "stove", "oven", "food", "kitchen_counter")),
-    (r"thirst|drink|water",
-     ("drink", "fridge", "sink", "water", "coffee")),
-    (r"bladder|toilet|pee|restroom|bathroom",
-     ("use_toilet", "toilet")),
-    (r"shower|hygien|wash|bath|smell|dirty|odor|clean myself",
-     ("shower", "bathe", "bathtub", "wash")),
-    (r"teeth|mouth|breath|brush",
-     ("brush_teeth", "sink")),
-    (r"sleep|tired|energy|rest|nap|exhaust|fatigue",
-     ("sleep", "bed", "nap", "couch", "sofa")),
-    (r"bored|fun|entertain|relax|play|tv|television|game",
-     ("watch_tv", "tv", "television", "play", "computer", "game", "book")),
-    (r"laundry|clothes",
-     ("laundry", "washing_machine", "dryer", "wash_clothes")),
-    (r"dish",
-     ("wash_dishes", "sink", "dishwasher")),
-)
-
 
 # =========================================================
 # NOTICING
@@ -158,11 +136,6 @@ def known_props(c, world):
     return out
 
 
-def _bag(entry):
-    return " ".join([str(entry.get("template") or "")] + [str(t) for t in entry.get("tags") or []]
-                    + [str(i) for i in entry.get("interactions") or []]).lower()
-
-
 def _where(c, world, entry):
     room_id = entry.get("room_id")
     if not room_id:
@@ -182,18 +155,24 @@ def _label(entry):
     return re.sub(r"_[a-z]$", "", str(entry.get("template") or "thing")).replace("_", " ")
 
 
-def things_for(c, world, need_text, exclude=()):
-    """[(prop id, entry)] of known things that would help with this need or plan, nearest-known first."""
-    for pattern, wants in _NEED_PROPS:
-        if re.search(pattern, need_text, re.I):
-            break
-    else:
+def things_for(c, world, intention_type, exclude=()):
+    """[(prop id, entry)] of known things that would help with this intention (brain/intention_needs.py's
+    SATISFIED_BY): the better kind first, the nearer of a kind first."""
+    from brain.intention_needs import satisfied_by
+    wants = satisfied_by(intention_type)
+    if not wants:
         return []
+    rank = {w: n for n, w in enumerate(wants)}
     cx, cy = c.get("x", 0), c.get("y", 0)
-    hits = [(pid, e) for pid, e in known_props(c, world).items()
-            if pid not in exclude and any(w in _bag(e) for w in wants)]
-    hits.sort(key=lambda kv: (kv[1].get("x", 0) - cx) ** 2 + (kv[1].get("y", 0) - cy) ** 2)
-    return hits[:RECALL_PER_NEED]
+    hits = []
+    for pid, e in known_props(c, world).items():
+        if pid in exclude:
+            continue
+        offered = [rank[i] for i in e.get("interactions") or [] if i in rank]
+        if offered:
+            hits.append((min(offered), (e.get("x", 0) - cx) ** 2 + (e.get("y", 0) - cy) ** 2, pid, e))
+    hits.sort(key=lambda h: (h[0], h[1]))
+    return [(pid, e) for _, _, pid, e in hits[:RECALL_PER_NEED]]
 
 
 def remembered_pool(c, world, exclude=()):
@@ -215,7 +194,6 @@ def context_lines(c, world):
     chars = world.get("characters") or {}
     lines, said_people, said_props = [], set(), set()
     for i in todo_list(c)["pressing"][:NEEDS_SHOWN]:
-        text = f"{i.get('type', '')} {i.get('reason') or ''}"
         target = chars.get(i.get("target_id"))
         if target and target["id"] not in visible_people and target["id"] not in said_people:
             seen = (c.get("last_seen") or {}).get(target["id"])
@@ -226,7 +204,7 @@ def context_lines(c, world):
                 lines.append(f"You last saw {target.get('name')} in {_where(c, world, seen)}, {ago}.")
                 said_people.add(target["id"])
             continue
-        hits = [(pid, e) for pid, e in things_for(c, world, text, exclude=in_view) if pid not in said_props]
+        hits = [(pid, e) for pid, e in things_for(c, world, i.get("type"), exclude=in_view) if pid not in said_props]
         if not hits:
             continue
         said_props.update(pid for pid, _ in hits)

@@ -40,6 +40,8 @@ w["households"]["lind"]["name"] = "The Lindqvist Household"
 w["props"] = [
     {"id": "oka_fridge", "template": "fridge_a", "x": 61, "y": 4, "state": {}, "building_id": "starter_house_2"},
     {"id": "oka_bed", "template": "bed_double_a", "x": 64, "y": 10, "state": {}, "building_id": "starter_house_2"},
+    {"id": "oka_microwave", "template": "microwave", "x": 57, "y": 4, "state": {}, "building_id": "starter_house_2"},
+    {"id": "oka_stove", "template": "oven_stove", "x": 58, "y": 4, "state": {}, "building_id": "starter_house_2"},
     {"id": "lind_fridge", "template": "fridge_a", "x": 36, "y": 4, "state": {}, "building_id": "starter_house_1"},
 ]
 r = w["characters"]["robert"]
@@ -64,6 +66,15 @@ from systems.action_router import _route_interact
 _route_interact(r, w, {"type": "interact", "target": "oka_fridge"}, w["definitions"])
 check("... and using it means walking to the kitchen first",
       (r.get("activity") or {}).get("phase") == "walking" and r.get("is_moving"), str(r.get("activity")))
+
+# ---- what satisfies what (brain/intention_needs.py), best first --------------------------------------------------------
+order = [pid for pid, _ in spotted.things_for(r, w, "eat_food")]
+check("hungry: the fridge first, then the microwave, then the stove", order == ["oka_fridge", "oka_microwave", "oka_stove"],
+      str(order))
+order = [pid for pid, _ in spotted.things_for(r, w, "expectation:make_dinner")]
+check("making dinner: the stove first", order[:1] == ["oka_stove"], str(order))
+check("tired: the bed", [pid for pid, _ in spotted.things_for(r, w, "sleep")] == ["oka_bed"])
+check("an intention nothing in a house helps with brings nothing to mind", not spotted.things_for(r, w, "apologize_to"))
 
 # ---- somewhere else: only what they happen to notice -----------------------------------------------------------------
 r.update(x=35, y=5, building_id="starter_house_1", activity=None, is_moving=False, route=[])
@@ -96,7 +107,7 @@ check("a plan about Kathleen brings to mind where he last saw her",
 # ---- examining something always registers it -------------------------------------------------------------------------
 s = w["characters"]["susan"]
 s.update(spotted={})
-spotted.notice(s, w, w["props"][2])
+spotted.notice(s, w, next(p for p in w["props"] if p["id"] == "lind_fridge"))
 check("something examined is remembered", "lind_fridge" in s["spotted"])
 
 print()
