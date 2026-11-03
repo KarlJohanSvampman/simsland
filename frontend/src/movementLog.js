@@ -23,7 +23,7 @@ export function renderMovementTab(c, nowTick) {
   const events = log.events || [];
   if (!samples.length && !events.length) {
     el.innerHTML = `<div class="viewerEmpty">No movement recorded yet -- samples are taken every 15 seconds while ` +
-                   `${esc(c.name || "they")} is on the move.</div>`;
+                   `${esc(c.name || "they")} is on the move.</div>` + renderPathPlans(c, nowTick);
     return;
   }
   const now = nowTick ?? Math.max(...samples.map(s => s[0]), ...events.map(e => e[0]));
@@ -77,5 +77,79 @@ export function renderMovementTab(c, nowTick) {
     `<span style="color:${EVENT_COLORS.start}">|</span> start &nbsp; <span style="color:${EVENT_COLORS.end}">|</span> end &nbsp; ` +
     `<span style="color:${EVENT_COLORS.timeout}">|</span> timeout</div></div>` +
     `<div class="viewerSection"><div class="viewerSectionTitle">Stuck: ${stuck} of ${moving} samples on the move (${pct}%), ${timeouts} timeouts</div>` +
-    `${recent || '<div class="viewerEmpty">No activity events yet.</div>'}</div>`;
+    `${recent || '<div class="viewerEmpty">No activity events yet.</div>'}</div>` +
+    renderPathPlans(c, now);
+}
+
+// ---- the planned route of the selected character, drawn in the scene ---------------------------------------------------
+// c.route = [{type, tiles: [[x, y], ...]}, ...] (backend/systems/navigation.py), walked from route_segment_index /
+// path_index; c.path_plans = the recent plans with why one failed (backend/systems/path_debug.py). Scene coordinates
+// are the character's (x - 10, y - 7), the same mapping main.js uses for the models.
+
+const ROUTE_Y = 0.06;
+let _routeObjects = [];
+let _routeKey = null;
+
+function _clearRoute(scene) {
+  for (const o of _routeObjects) {
+    scene.remove(o);
+    o.geometry?.dispose?.();
+  }
+  _routeObjects = [];
+}
+
+export function updateRouteOverlay(THREE, scene, state, selectedId) {
+  const c = selectedId ? state.characters?.[selectedId] : null;
+  const plans = c?.path_plans || [];
+  const lastPlan = plans[plans.length - 1];
+  const key = c ? JSON.stringify([c.route, c.route_segment_index, c.path_index, lastPlan?.tick, c.is_moving]) : null;
+  if (key === _routeKey) return;
+  _routeKey = key;
+  _clearRoute(scene);
+  if (!c) return;
+
+  const pts = [new THREE.Vector3(c.x - 10, ROUTE_Y, c.y - 7)];
+  const route = c.route || [];
+  for (let s = c.route_segment_index || 0; s < route.length; s++) {
+    const tiles = route[s].tiles || [];
+    for (let i = (s === (c.route_segment_index || 0) ? (c.path_index || 0) : 0); i < tiles.length; i++) {
+      const t = tiles[i];
+      pts.push(new THREE.Vector3(t[0] - 10, ROUTE_Y, t[1] - 7));
+    }
+  }
+  if (pts.length > 1) {
+    const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),
+                                new THREE.LineBasicMaterial({ color: 0x58a6ff }));
+    scene.add(line);
+    _routeObjects.push(line);
+    const end = new THREE.Mesh(new THREE.RingGeometry(0.18, 0.3, 24),
+                               new THREE.MeshBasicMaterial({ color: 0x58a6ff, side: THREE.DoubleSide }));
+    end.rotation.x = -Math.PI / 2;
+    end.position.copy(pts[pts.length - 1]);
+    scene.add(end);
+    _routeObjects.push(end);
+  }
+  // the last plan failed: a red line to where they couldn't get to
+  if (lastPlan && !lastPlan.ok && !["already_there"].includes(lastPlan.reason)) {
+    const a = new THREE.Vector3(c.x - 10, ROUTE_Y, c.y - 7);
+    const b = new THREE.Vector3(lastPlan.to[0] - 10, ROUTE_Y, lastPlan.to[1] - 7);
+    const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints([a, b]),
+                                new THREE.LineDashedMaterial({ color: 0xf85149, dashSize: 0.3, gapSize: 0.2 }));
+    line.computeLineDistances();
+    scene.add(line);
+    _routeObjects.push(line);
+  }
+}
+
+export function renderPathPlans(c, nowTick) {
+  const plans = (c.path_plans || []).slice().reverse();
+  if (!plans.length) return "";
+  const rows = plans.map(p => {
+    const col = p.ok ? (p.reason === "ok" ? "#3fb950" : "#d29922") : (p.reason === "already_there" ? "#8b949e" : "#f85149");
+    return `<div class="viewerCard"><span style="color:${col}">${p.ok ? "path" : "NO PATH"}</span> ` +
+           `${esc(p.from.join(","))} → ${esc(p.to.join(","))} ` +
+           `<span style="opacity:.7">${esc(p.reason.replace(/_/g, " "))}${p.ok ? `, ${p.tiles} tiles (${esc(p.segments.join(" + "))})` : ""}` +
+           `${p.target_id ? `, for ${esc(p.target_id)}` : ""}</span> <span style="opacity:.6">${clock(p.tick, nowTick ?? p.tick)}</span></div>`;
+  }).join("");
+  return `<div class="viewerSection"><div class="viewerSectionTitle">Route plans (the current one is drawn on the map)</div>${rows}</div>`;
 }

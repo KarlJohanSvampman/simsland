@@ -169,11 +169,14 @@ def _start_roam(c, world) -> bool:
     here = str(c.get("room_id") or "").split(":", 1)[-1]      # room_id is "<building>:<room>"
     rooms = [r for r in floorplan.get("rooms", []) if r.get("id") != here]
     random.shuffle(rooms)
+    from systems.path_debug import probing
     for room in rooms:
         point = _random_point_in_room(world, building, room)
         if not point:
             continue
-        if not plan_character_route(world, c, point[0], point[1]):
+        with probing():                              # trying rooms until one is reachable: a miss is no alarm
+            reachable = plan_character_route(world, c, point[0], point[1])
+        if not reachable:
             continue
         c["animation_state"] = "walk"
         c["is_moving"] = True

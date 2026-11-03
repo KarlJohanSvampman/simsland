@@ -141,7 +141,9 @@ def _random_outdoor_point(c, world):
 def start_roam(c, world, retry=None):
     """Walk somewhere else nearby (another room here, or a few tiles off outdoors), then retry `retry` there.
     Returns True if they set off."""
-    where = _random_room_point(c, world) or _random_outdoor_point(c, world)
+    from systems.path_debug import probing
+    with probing():                                  # trying spots until one is reachable: a miss is no alarm
+        where = _random_room_point(c, world) or _random_outdoor_point(c, world)
     if not where:
         return False
     c["animation_state"] = "walk"

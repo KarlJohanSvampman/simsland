@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { renderMovementTab } from "./movementLog.js";
+import { renderMovementTab, updateRouteOverlay } from "./movementLog.js";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { OrbitControls }
 from "three/examples/jsm/controls/OrbitControls.js";
@@ -8113,6 +8113,7 @@ async function _applyState(state) {
   updateDebugEventBubbles(state);
   updateBadges(state);
   updatePerceptionOverlay(state);
+  updateRouteOverlay(THREE, scene, state, selectedCharacterId);
   updateSelectionInspector(state);
   _followSelectedCharacter(state);
 }

@@ -961,6 +961,20 @@ def _nearest_entrance(entrances, key, x, y):
 
 
 def plan_character_route(world, c, target_x, target_y):
+    """Plan c's route to (target_x, target_y) into c["route"]. True if there is one. Every plan is recorded for
+    debugging (systems/path_debug.py: c["path_plans"], drawn in the Inspector), and a real failure to find a way is
+    made impossible to miss."""
+    ok, reason = _plan_route(world, c, target_x, target_y)
+    try:
+        from systems.path_debug import record
+        record(c, world, (target_x, target_y), ok, reason)
+    except Exception as exc:                       # noqa: BLE001 -- debugging must never break movement
+        print(f"[path_debug] {c.get('id')}: {exc!r}")
+    return ok
+
+
+def _plan_route(world, c, target_x, target_y):
+    """plan_character_route()'s planning: (ok, reason)."""
 
     sx = int(round(c.get("x", 0)))
     sy = int(round(c.get("y", 0)))
@@ -1006,7 +1020,7 @@ def plan_character_route(world, c, target_x, target_y):
         )
 
         if not tiles:
-            return False
+            return False, ("already_there" if (sx, sy) == (tx, ty) else "no_indoor_path")
 
         segments.append({
             "type": "indoor", "tiles": tiles, "building_id": start_building["id"]
@@ -1021,7 +1035,7 @@ def plan_character_route(world, c, target_x, target_y):
             entrances = find_building_entrances(start_building, start_floorplan)
 
             if not entrances:
-                return False
+                return False, "start_building_has_no_entrance"
 
             entrance = _nearest_entrance(entrances, "inside", sx, sy)
 
@@ -1045,7 +1059,7 @@ def plan_character_route(world, c, target_x, target_y):
             target_entrances = find_building_entrances(target_building, target_floorplan)
 
             if not target_entrances:
-                return False
+                return False, "target_building_has_no_entrance"
 
             target_entrance = _nearest_entrance(target_entrances, "outside", *exit_point)
 
@@ -1056,7 +1070,7 @@ def plan_character_route(world, c, target_x, target_y):
             outdoor_tiles = _outdoor_tiles(world, exit_point, entry_point)
 
             if not outdoor_tiles:
-                return False
+                return False, "no_outdoor_path"
 
             segments.append({"type": "outdoor", "tiles": outdoor_tiles})
 
@@ -1079,10 +1093,11 @@ def plan_character_route(world, c, target_x, target_y):
                 })
 
     if not segments:
-        return False
+        return False, "already_there" if (sx, sy) == (tx, ty) else "no_route"
 
     c["route"] = segments
     c["route_segment_index"] = 0
     c["path_index"] = 0
 
-    return True
+    partial = target_building and not any(seg.get("building_id") == target_building["id"] for seg in segments)
+    return True, "partial_stops_outside" if partial else "ok"
