@@ -1516,11 +1516,46 @@ def _sleep_duration_ticks_scheduled(c, world):
     genuinely need MORE than that, the real biological calculation wins
     instead -- per the user's explicit ask, sleep follows the schedule
     "unless there is too much debt/fatigue"."""
+    from systems.body import compute_needed_sleep_ticks
+    raw_need = compute_needed_sleep_ticks(c, floor=False)
     needed = _sleep_duration_ticks(c)
     scheduled = _scheduled_block_end_ticks(c, world, "sleep")
-    if scheduled is None:
-        return needed
-    return max(600, scheduled, needed)
+    if scheduled is not None:
+        # Going back to bed before the alarm (woke at 5:50, up at 7): until the scheduled wake time -- the 90-minute
+        # floor for a fresh sleep used to carry them past it, so a whole household slept through the school run.
+        if raw_need <= scheduled:
+            return max(600, scheduled)
+        return max(600, scheduled, needed)
+    # A lie-down outside the night's block doesn't run into the next thing they have to do (school, work).
+    nxt = _next_commitment_ticks(c, world)
+    if nxt is not None:
+        return max(600, min(needed, nxt - 1800))
+    return needed
+
+
+_NOT_COMMITMENTS = {"sleep", "relax", "free", "leisure", "idle", "eat"}
+
+
+def _next_commitment_ticks(c, world):
+    """Ticks until the next scheduled block today that isn't sleep or free time, or None."""
+    cal = world.get("calendar") or {}
+    if cal.get("hour") is None:
+        return None
+    now_min = cal.get("minute_of_day", cal["hour"] * 60 + (cal.get("minute") or 0))
+    day = str(cal.get("weekday") or "").lower()
+    blocks = ((c.get("schedule") or {}).get("week") or {}).get(day) or []
+    best = None
+    for b in blocks:
+        if str(b.get("activity")) in _NOT_COMMITMENTS or not b.get("start"):
+            continue
+        try:
+            h, m = (int(x) for x in str(b["start"]).split(":")[:2])
+        except ValueError:
+            continue
+        start = h * 60 + m
+        if start > now_min and (best is None or start < best):
+            best = start
+    return None if best is None else (best - now_min) * 60
 
 
 # =========================================================
