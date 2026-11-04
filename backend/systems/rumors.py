@@ -11,7 +11,8 @@ them (slander), or praise. Three things follow:
   2. It becomes a RUMOR (world["rumors"]) that the believers carry. Nothing is written on the speaker/subject pair's
      ledger yet: the subject has not heard it. (If the subject WAS within earshot the ordinary speech path
      already handled it -- they are a `mentioned` hearer there.)
-  3. A believer who later finds themselves near the subject may TELL them. Then it arrives through the learned
+  3. (now) Whoever has heard it may pass it on -- or tell the subject -- in their own conversations; the AI reading
+     the conversation says so (social/discourse.py, social/rumours.py). Formerly: a believer near the subject may TELL them. Then it arrives through the learned
      channel: the ordinary evaluation ladder runs for the subject (it is delivered, so it is perceivable and
      aimed at them), and if it registers it is written on the (speaker, subject) pair -- which is where a grudge can
      open against the person who said it. The teller's own part (loose tongue or honest friend) is remembered too.
@@ -76,141 +77,41 @@ def credibility(listener, speaker_id, subject_id, kind, polarity):
     return max(BELIEF_FLOOR, min(BELIEF_CEIL, c))
 
 
-def _on_remark(data, world):
-    chars = world.get("characters", {})
-    speaker, listener, subject = chars.get(data["speaker_id"]), chars.get(data["listener_id"]), chars.get(data["subject_id"])
-    if not speaker or not listener or not subject or subject["id"] in (speaker["id"], listener["id"]):
-        return None
-    from systems import impact_kinds
-    specs = impact_kinds.kinds(world)
-    kind = data["kind"]
-    if kind not in specs:
-        return None
-    spec = specs[kind]
-    polarity = spec["polarity"]
-    M = data.get("magnitude") if data.get("magnitude") is not None else spec["base"]
-    tick = world.get("tick", 0)
-    believed = random.random() < credibility(listener, speaker["id"], subject["id"], kind, polarity)
-    if believed:
-        _shift_listener(listener, subject["id"], polarity, M)
-    _remember(listener, speaker, subject, kind, data.get("text"), believed, tick, via=data.get("via"))
-    rumors = world.setdefault("rumors", {})
-    rid = next((k for k, r in rumors.items() if r["source"] == speaker["id"] and r["subject"] == subject["id"]
-                and r["kind"] == kind and r["text"] == (data.get("text") or "")[:160]), None)
-    if rid is None:
-        rid = f"rumor_{tick}_{len(rumors)}"
-        rumors[rid] = {"id": rid, "source": speaker["id"], "subject": subject["id"], "kind": kind, "polarity": polarity,
-                       "magnitude": M, "discretion": data.get("discretion", 0.6), "text": (data.get("text") or "")[:160],
-                       "tick": tick, "believers": [], "told_to_subject": False, "ref": data.get("ref")}
-        for old in sorted(rumors, key=lambda k: rumors[k]["tick"])[:max(0, len(rumors) - MAX_RUMORS)]:
-            rumors.pop(old, None)
-    if believed and listener["id"] not in rumors[rid]["believers"]:
-        rumors[rid]["believers"].append(listener["id"])
-    return rumors[rid], believed
-
-
 def _shift_listener(listener, subject_id, polarity, value):
+    """A believed remark moves the listener's own feelings about the subject a little; praise makes a stranger a
+    name they know."""
     from brain.relationships import ensure_relationship
     rel = ensure_relationship(listener, subject_id)
     for field, per10 in REMARK_DELTAS[polarity].items():
         rel[field] = round(max(-100, min(100, (rel.get(field, 0) or 0) + per10 * value / 10.0 * LISTENER_SCALE)), 3)
-    if polarity > 0 and (rel.get("familiarity", 0) or 0) < HEARD_OF_FAMILIARITY:      # praise makes a stranger a name you know
+    if polarity > 0 and (rel.get("familiarity", 0) or 0) < HEARD_OF_FAMILIARITY:
         rel["familiarity"] = HEARD_OF_FAMILIARITY
 
 
-def _remember(listener, speaker, subject, kind, text, believed, tick, via=None):
-    try:
-        from brain.memory import store_memory
-        said = f"\"{text}\"" if text else "something"
-        mood = "" if believed else " I'm not sure I believe it."
-        if via == "post":
-            what = "posted nice things about" if kind == "compliment" else "posted about"
-            line = f"I read that {speaker['name']} {what} {subject['name']}: {said}.{mood}"
-        else:
-            what = "praised" if kind == "compliment" else "talked about"
-            line = f"{speaker['name']} {what} {subject['name']} to me: {said}.{mood}"
-        store_memory(listener, line,
-                     importance=0.45 if believed else 0.3, tags=["gossip", "rumor"], people=[speaker["id"], subject["id"]],
-                     tick=tick, source="heard")
-    except Exception:
-        pass
+def _on_remark(data, world):
+    """A remark about someone outside the conversation (an online post, systems/online_posts.py): passed on as a
+    rumour transmission (social/rumours.py) -- the listener's own credibility judgement, no dice."""
+    chars = world.get("characters", {})
+    speaker, listener, subject = chars.get(data["speaker_id"]), chars.get(data["listener_id"]), chars.get(data["subject_id"])
+    if not speaker or not listener or not subject or subject["id"] in (speaker["id"], listener["id"]):
+        return None
+    tone = {"slander": -2, "meanness": -1, "compliment": 1}.get(data.get("kind"), 0)
+    from social import rumours as R
+    return R.transmit(world, speaker["id"], listener["id"], subject["id"], data.get("text") or "", tone=tone,
+                      rumour=data.get("kind") == "slander" or data.get("via") == "post", conv_id=None,
+                      via=data.get("via"), ref=(data.get("ref") or {}).get("id") if isinstance(data.get("ref"), dict) else data.get("ref"))
 
-
-# ---------------------------------------------------------------------------
-# carrying it to the subject
-# ---------------------------------------------------------------------------
 
 def tick_rumors(world):
-    """Scheduled job: believers near the subject may tell them; old rumors lapse."""
-    tick = world.get("tick", 0)
-    chars = world.get("characters", {})
+    """Scheduled job: online posts get discovered; old talk is forgotten. Passing a rumour on -- including to the
+    person it's about -- is the characters' own choice, in conversation (social/discourse.py)."""
     try:
         from systems.online_posts import tick_post_discovery
         tick_post_discovery(world)
     except Exception as exc:
         print(f"[online_posts] discovery failed: {exc!r}")
-    rumors = world.get("rumors")
-    if not rumors:
-        return
-    for rid in list(rumors):
-        r = rumors[rid]
-        if r["told_to_subject"] or tick - r["tick"] > RUMOR_LIFETIME_TICKS:
-            if tick - r["tick"] > RUMOR_LIFETIME_TICKS:
-                rumors.pop(rid, None)
-            continue
-        subject = chars.get(r["subject"])
-        if not subject or subject.get("alive") is False or subject.get("off_grid"):
-            continue
-        for bid in r["believers"]:
-            teller = chars.get(bid)
-            if not teller or teller.get("alive") is False or teller.get("off_grid"):
-                continue
-            if not any(p.get("id") == subject["id"] for p in (teller.get("perception") or {}).get("visible_people", [])):
-                continue
-            if random.random() < _tell_chance(teller, subject, r):
-                _tell(world, r, teller, subject)
-                break
-
-
-def _tell_chance(teller, subject, rumor):
-    traits = set(teller.get("traits") or [])
-    f = max(0.3, min(1.5, 0.3 + (_rel(teller, subject["id"]).get("friendship", 0) or 0) / 60.0))
-    if traits & CHATTY_TRAITS:
-        f *= 1.6
-    if traits & DISCREET_TRAITS:
-        f *= 0.4
-    if rumor["polarity"] > 0:
-        f *= 1.5                                       # good news is easier to pass on
-    return TELL_CHANCE_PER_LOOK * f
-
-
-def _tell(world, rumor, teller, subject):
-    chars = world.get("characters", {})
-    speaker = chars.get(rumor["source"])
-    if not speaker:
-        rumor["told_to_subject"] = True
-        return
-    rumor["told_to_subject"] = True
-    rumor["told_by"] = teller["id"]
-    rumor["told_tick"] = world.get("tick", 0)
-    # delivered straight to them: the ladder runs for the subject; if it registers, it is written on (speaker, subject)
-    emit("impact_intent", {
-        "source_id": speaker["id"], "target_id": subject["id"], "kind": rumor["kind"], "magnitude": rumor["magnitude"],
-        "discretion": 0.1, "channel": "learned_secondhand", "audience": "targets", "volume": "low",
-        "text": rumor["text"], "ref": {"type": "rumor", "id": rumor["id"], "told_by": teller["id"]},
-        "mentions": [], "victim_id": None, "memory_refs": [],
-    })
-    try:
-        from brain.memory import store_memory
-        tick = world.get("tick", 0)
-        about = "said nice things about" if rumor["polarity"] > 0 else "was talking about"
-        store_memory(subject, f"{teller['name']} told me that {speaker['name']} {about} me: \"{rumor['text']}\".",
-                     importance=0.6, tags=["gossip", "rumor", "heard_about_me"], people=[teller["id"], speaker["id"]],
-                     tick=tick, source="heard")
-        store_memory(teller, f"I told {subject['name']} what {speaker['name']} had said about them.",
-                     importance=0.3, tags=["gossip", "rumor"], people=[subject["id"], speaker["id"]], tick=tick, source="internal")
-    except Exception:
-        pass
+    from social import rumours as R
+    R.tick(world)
 
 
 subscribe("third_party_remark", _on_remark)

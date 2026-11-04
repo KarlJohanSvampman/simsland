@@ -6182,7 +6182,10 @@ function _convTagsLine(entry){
   if(!t) return `<div style="opacity:.45;font-size:.85em">not read yet</div>`;
   const chips = [t.opening && `<span class="viewerChip">${_escapeHTML(t.opening.replace(/_/g, " "))}</span>`,
                  ...(t.tags || []).map(x => `<span class="viewerChip" style="opacity:.75">${_escapeHTML(x)}</span>`),
-                 entry.argument_id ? `<span class="viewerChip" style="color:#f85149">argument</span>` : ""]
+                 ...(entry.interaction_tags || t.interaction_tags || []).map(x => `<span class="viewerChip" style="opacity:.75;font-style:italic">${_escapeHTML(x.replace(/_/g, " "))}</span>`),
+                 t.confrontation ? `<span class="viewerChip" style="color:#f85149">${_escapeHTML(t.confrontation.type.replace(/_/g, " "))}: ${_escapeHTML(t.confrontation.outcome.replace(/_/g, " "))}</span>` : "",
+                 t.agreement ? `<span class="viewerChip" style="color:#3fb950">agreement</span>` : "",
+                 (entry.issue_ids || []).length ? `<span class="viewerChip" style="color:#d29922">issue</span>` : ""]
     .filter(Boolean).join(" ");
   return `<div style="margin-top:2px"><b>${_escapeHTML(t.subject || "")}</b> ${chips}</div>`;
 }
@@ -6239,7 +6242,15 @@ function openConversationModal(entry){
     ["Opened with", t.opening ? t.opening.replace(/_/g, " ") : null],
     ["Tags", (t.tags || []).join(", ") || null],
     ["Follows on from", t.relates_to ? (_formatMemoryTimestamp(((_worldState.characters?.[selectedCharacterId]?.conversation_log) || []).find(e => (e.id || e.conv_id) === t.relates_to)?.ended_tick) || t.relates_to) : null],
-    ["Argument", t.argument ? `${t.argument.subject} (${t.argument.type.replace(/_/g, " ")}, started by ${t.argument.started_by || "?"})` : null],
+    ["Tone", t.tone || entry.tone || null],
+    ["Interaction", (t.interaction_tags || entry.interaction_tags || []).join(", ").replace(/_/g, " ") || null],
+    ["Issues", (t.issues || []).map(i => `${i.subject} (${i.category.replace(/_/g, " ")}, ${i.status})` +
+        Object.entries(i.positions || {}).map(([n, p]) => ` -- ${n}: ${p.position}`).join("")).join("; ") || null],
+    ["Confrontation", t.confrontation ? `${t.confrontation.initiator} took up "${t.confrontation.problem_statement || t.confrontation.issue || "?"}" with ${t.confrontation.target} (${t.confrontation.type.replace(/_/g, " ")}) -- ${t.confrontation.outcome.replace(/_/g, " ")}${t.confrontation.summary ? ": " + t.confrontation.summary : ""}` : null],
+    ["Agreement", t.agreement ? `${t.agreement.title || ""}: ` + t.agreement.terms.map(x => `${x.responsible} will ${x.obligation}${x.frequency ? " (" + x.frequency + ")" : ""}`).join("; ") : null],
+    ["Broken agreements", (t.violations || []).map(v => `${v.responsible}: ${v.what}${v.disputed ? " (disputed)" : ""}`).join("; ") || null],
+    ["Opener received", t.initiative_response ? t.initiative_response.replace(/_/g, " ") : null],
+    ["Regard", (t.standing_events || []).map(e => `${e.observer} on ${e.subject}: ${e.kind.replace(/_/g, " ")}${e.why ? " (" + e.why + ")" : ""}`).join("; ") || null],
     ["About others", (t.about_others || []).map(a => `${a.said_by} on ${a.name}: ${a.claim}${a.rumour ? " (rumour)" : ""}`).join("; ") || null],
     ["Started", _formatMemoryTimestamp(entry.started_tick)],
     ["Ended", `${_formatMemoryTimestamp(entry.ended_tick) || ""}${entry.end_reason ? ` (${String(entry.end_reason).replace(/_/g, " ")})` : ""}`],

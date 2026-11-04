@@ -10,16 +10,17 @@ having sunk below STANDING_BAD -- opens a rift (c["rifts"][other id]), about som
 grievance between them.
 
 While a rift is open, once a day (timeout event "rift:<id>", key "try:<other id>"), the character recalls what led
-to it -- the fights and grievances, with when -- and tries to find a way forward, one of:
+to it -- the fights and grievances, with when -- and is woken wanting to find a way forward (c["wants_to_repair"],
+shown in their prompt by social/context.py). The ways forward are theirs to choose and to say:
 
   step_down    give in on it and apologise;
-  agreement    sit down and work out terms -- the existing negotiation (systems/conflict_pipeline.py), which can end
-               in an agreement and a social contract, or in another fight;
-  trade        offer something for it (taking over a chore, a favour) -- if accepted, they owe it;
-  third_party  ask someone both of them trust to plead their case.
+  agreement    sit down and work out terms -- an agreement becomes a social contract (social/contracts.py);
+  trade        offer something for it (taking over a chore, a favour);
+  third_party  ask someone both of them trust to put in a word (that someone joins as a mediator).
 
-Which one depends on who they are and what has already failed. An understanding closes the rift (both sides'
-resentment and hostility toward each other come down so their standing is back above the line).
+Whatever they say to the other person while a rift is open is a reconciliation confrontation (social/confrontations.py)
+and the AI reading the conversation says how it went. An understanding closes the rift; anything else is one try
+down. Standing here is social/standing.py's (-100..100).
 
 After MAX_ATTEMPTS failed attempts, or STAY_DAYS days of bad standing, they consider leaving for a while -- and
 leaving has a purpose:
@@ -38,8 +39,8 @@ import random
 
 from core import scheduler
 
-STANDING_BAD = -50              # below this, things are bad between them
-STANDING_VERY_BAD = -150        # beyond repair, as far as they can tell
+STANDING_BAD = -30              # below this, things are bad between them
+STANDING_VERY_BAD = -70         # beyond repair, as far as they can tell
 MAX_ATTEMPTS = 3
 STAY_DAYS = 7
 DAY = 86400
@@ -65,10 +66,9 @@ _TRADERS = {"pragmatic", "rational", "calculating", "materialistic", "ambitious"
 # =========================================================
 
 def standing(c, other_id):
-    """How c feels about other, in one number: liking and trust against resentment and hostility."""
-    rel = (c.get("relationships") or {}).get(other_id) or {}
-    return ((rel.get("friendship") or 0) + 0.5 * (rel.get("trust") or 0) + 0.5 * (rel.get("respect") or 0)
-            + 0.3 * (rel.get("warmth") or 0) - (rel.get("resentment") or 0) - (rel.get("hostility") or 0))
+    """How c regards other (social/standing.py)."""
+    from social.standing import score
+    return score(c, other_id)
 
 
 def _housemates(c, world):
@@ -132,41 +132,55 @@ def open_rift(c, world, other_id, topic=None, physical=False):
 
 
 def on_conflict_resolved(world, data):
-    """A fight between two people who live together that ended badly opens a rift for both (instead of a chance of
-    moving out on the spot); an agreement reached in a reconciliation closes it."""
+    """A confrontation between two people who live together that ended badly opens a rift for both (instead of a
+    chance of moving out on the spot); one that was a try at making peace counts as a try (or closes the rift)."""
     chars = world.get("characters") or {}
     parties = [chars[p] for p in data.get("parties", []) if p in chars]
     if len(parties) != 2:
         return
     a, b = parties
-    conflict = (world.get("conflicts") or {}).get(data.get("conflict_id")) or {}
+    from social.confrontations import lookup
+    conflict = lookup(world, data.get("conflict_id")) or {}
     outcome = data.get("outcome")
     reconciling = conflict.get("reconciliation")
     if reconciling:
         c = chars.get(conflict.get("initiator"))
         other = b if c is a else a
         if c is not None:
-            _attempt_result(c, world, other, "agreement",
-                            success=outcome in ("agreement", "de_escalated"), outcome=outcome)
+            how = (conflict.get("resolution") or {}).get("outcome")
+            _attempt_result(c, world, other, _approach_of(conflict), success=outcome in ("agreement", "de_escalated"),
+                            outcome=how or outcome, by=_mediator_in(world, conflict))
         return
     if a.get("household_id") != b.get("household_id") or outcome not in _BAD_OUTCOMES:
         return
     from systems import fights
     topic = conflict.get("topic") or fights.topic_of(conflict.get("issues"))
     for c, other in ((a, b), (b, a)):
-        # a fight that ends badly costs standing; whether that makes a rift depends on how things stood before
-        rel = c.setdefault("relationships", {}).setdefault(other["id"], {})
-        rel["resentment"] = min(100, (rel.get("resentment") or 0) + FIGHT_RESENTMENT.get(outcome, 0))
-        if outcome == "physical_resolved":
-            rel["hostility"] = min(100, (rel.get("hostility") or 0) + 30)
-        from systems.feelings import agitate
-        agitate(c, other["id"], world, 50 if outcome == "physical_resolved" else 25,
-                cause=f"fight about {topic} ({outcome.replace('_', ' ')})")
-        if standing(c, other["id"]) >= STANDING_BAD:
+        # what the confrontation cost them was applied by social/confrontations.py; a rift is whether it's bad now
+        if standing(c, other["id"]) >= STANDING_BAD and outcome != "physical_resolved":
             continue
         rift = open_rift(c, world, other["id"], topic, physical=outcome == "physical_resolved")
         if rift:
             rift["history"].append({"tick": world.get("tick", 0), "what": f"fight about {topic}", "outcome": outcome})
+
+
+def _approach_of(conflict):
+    t = conflict.get("confrontation_type")
+    hist = " ".join(str(h.get("why", "")) for h in conflict.get("escalation_history") or []).lower()
+    if any(p.get("role") == "mediator" for p in (conflict.get("participants") or {}).values()):
+        return "third_party"
+    if "sorry" in hist or "apolog" in hist:
+        return "step_down"
+    if t == "contract_proposal" or "if you" in hist or "i'll " in hist:
+        return "trade" if "i'll " in hist else "agreement"
+    return "agreement"
+
+
+def _mediator_in(world, conflict):
+    for pid, p in (conflict.get("participants") or {}).items():
+        if p.get("role") == "mediator":
+            return (world.get("characters") or {}).get(pid)
+    return None
 
 
 def scan(world, entry=None):
@@ -210,25 +224,6 @@ def _recall(c, world, other, rift):
     return text
 
 
-def _choose_approach(c, world, other, rift):
-    traits = _traits(c)
-    tried = rift.get("tried") or []
-    order = []
-    if traits & _YIELDING:
-        order += ["step_down", "agreement"]
-    if traits & _TRADERS:
-        order += ["trade"]
-    if traits & _PROUD:
-        order += ["agreement", "third_party", "trade"]
-    order += ["agreement", "step_down", "trade", "third_party"]
-    if rift.get("physical") or standing(c, other["id"]) < STANDING_VERY_BAD:
-        order = ["third_party"] + order               # too raw to face them alone
-    for a in order:
-        if a not in tried:
-            return a
-    return random.choice(["agreement", "third_party", "step_down"])
-
-
 def _mediator(c, world, other):
     chars = world.get("characters") or {}
     best, score = None, -10**9
@@ -242,66 +237,24 @@ def _mediator(c, world, other):
     return best
 
 
-def _receptive(other, c_id):
-    """How likely the other is to come round: their nature, and how bad it is from their side."""
-    traits = _traits(other)
-    p = 0.35 + 0.1 * len(traits & _YIELDING) - 0.1 * len(traits & _PROUD)
-    p += max(-0.25, min(0.2, standing(other, c_id) / 400.0))
-    return max(0.05, min(0.85, p))
-
-
 def try_once(c, world, other):
-    """One attempt at an understanding with `other`."""
+    """Another day of it: recall what led here and be woken wanting to find a way forward. What they do about it
+    -- and how the other takes it -- is theirs (their AI turns, and the AI's reading of the conversation)."""
     rift = (c.get("rifts") or {}).get(other["id"])
     if not rift or rift.get("status") not in ("open",):
         return None
-    _recall(c, world, other, rift)
-    approach = _choose_approach(c, world, other, rift)
-    rift["tried"].append(approach)
+    recalled = _recall(c, world, other, rift)
     topic = rift["topics"][-1]
-    if approach == "agreement" and not c.get("off_grid") and not other.get("off_grid"):
-        from systems.conflict_pipeline import start_conflict
-        conflict = start_conflict(c["id"], other["id"], world)
-        if conflict:
-            conflict["reconciliation"] = True
-            conflict["topic"] = topic
-            _mem(c, world, f"I asked {other.get('name')} to sit down with me and work out {topic} properly.",
-                 people=[other["id"]])
-            return "agreement"                     # the outcome comes back through on_conflict_resolved
-        approach = "step_down"
-    if approach == "agreement":
-        approach = "third_party"
-    if approach == "third_party":
-        m = _mediator(c, world, other)
-        if not m:
-            approach = "step_down"
-        else:
-            p = _receptive(other, c["id"]) + max(-0.2, min(0.25, standing(other, m["id"]) / 300.0))
-            ok = random.random() < p
-            _mem(m, world, f"{c.get('name')} asked me to talk to {other.get('name')} for them about {topic}. "
-                           + ("They listened." if ok else "They wouldn't hear it."), 0.45, people=[c["id"], other["id"]])
-            _mem(other, world, f"{m.get('name')} came to me on {c.get('name')}'s behalf about {topic}."
-                 + (" Maybe they have a point." if ok else " I'm not ready to let it go."), 0.5, people=[c["id"], m["id"]])
-            _attempt_result(c, world, other, "third_party", ok, by=m)
-            return approach
-    if approach == "trade":
-        offer = random.choice(["take over the chores for a week", "make it up to them with a favour",
-                               "pay for the next dinner out", "give them the space they asked for"])
-        ok = random.random() < _receptive(other, c["id"]) + 0.05
-        _mem(other, world, f"{c.get('name')} offered to {offer} to put {topic} behind us."
-             + (" I took it." if ok else " It's not that simple."), 0.5, people=[c["id"]])
-        if ok:
-            from brain.intentions import add_intention
-            add_intention(c, {"type": "keep_deal", "reason": f"I promised {other.get('name')} to {offer}",
-                              "category": "social", "priority": 70, "target_id": other["id"]})
-        _attempt_result(c, world, other, "trade", ok, offer=offer)
-        return approach
-    # step_down
-    ok = random.random() < _receptive(other, c["id"]) + 0.1
-    _mem(other, world, f"{c.get('name')} came to me, gave in on {topic} and apologised."
-         + (" I accepted." if ok else " It's not enough."), 0.5, people=[c["id"]])
-    _attempt_result(c, world, other, "step_down", ok)
-    return "step_down"
+    m = _mediator(c, world, other)
+    c.setdefault("wants_to_repair", {})[other["id"]] = {
+        "since": world.get("tick", 0), "topic": topic, "recalled": recalled,
+        "tried": list(rift.get("tried") or []), "go_between": (m or {}).get("id"),
+        "ways": ["step_down", "agreement", "trade", "third_party"],
+    }
+    from brain.cognition_scheduler import wake_character
+    wake_character(c, world, "wants_to_repair", {"target_id": other["id"], "target_name": other.get("name"),
+                                                 "topic": topic})
+    return "woken"
 
 
 _SAID = {
@@ -319,6 +272,8 @@ def _attempt_result(c, world, other, approach, success, by=None, offer=None, out
     topic = rift["topics"][-1]
     said = _SAID[approach].format(topic=topic, name=other.get("name"), by=(by or {}).get("name", "someone"),
                                   offer=offer or "make it up")
+    rift["tried"].append(approach)
+    (c.get("wants_to_repair") or {}).pop(other["id"], None)
     rift["history"].append({"tick": world.get("tick", 0), "what": approach, "outcome": "understanding" if success
                             else (outcome or "no understanding")})
     if success:
@@ -328,24 +283,22 @@ def _attempt_result(c, world, other, approach, success, by=None, offer=None, out
     _mem(c, world, f"{said}, but we got nowhere ({rift['attempts']} of {MAX_ATTEMPTS} tries).", people=[other["id"]])
 
 
-def _repair(c, other_id):
-    rel = c.setdefault("relationships", {}).setdefault(other_id, {})
-    for key, cut in (("resentment", 40), ("hostility", 30)):
-        rel[key] = max(0, (rel.get(key) or 0) - cut)
-    rel["trust"] = min(100, (rel.get("trust") or 0) + 10)
+def _repair(c, world, other_id):
+    """An understanding: the line is crossed back."""
+    from social import standing as S, frustration
     gap = STANDING_BAD + 25 - standing(c, other_id)
-    if gap > 0:                                        # an understanding means the line is crossed back
-        rel["resentment"] = max(0, (rel.get("resentment") or 0) - gap)
-        if standing(c, other_id) < STANDING_BAD + 25:
-            rel["hostility"] = 0
+    S.change(c, other_id, world, "reconciliation", delta=max(8, gap) if gap > 0 else None,
+             cause="we came to an understanding")
+    frustration.calm(c, other_id, world, 30, kind="acknowledged")
 
 
 def _close(c, world, other, how):
-    from systems.conversation_archive import resolve_between
+    from social.issues import resolve_between
     resolve_between(world, c["id"], other["id"], how)
     for a, b in ((c, other), (other, c)):
         rift = (a.get("rifts") or {}).get(b["id"])
-        _repair(a, b["id"])
+        _repair(a, world, b["id"])
+        (a.get("wants_to_repair") or {}).pop(b["id"], None)
         if rift:
             rift["status"] = "resolved"
             rift["resolved_tick"] = world.get("tick", 0)
@@ -541,10 +494,15 @@ def context_lines(c, world):
         days = (tick - rift.get("since", tick)) // DAY
         topic = (rift.get("topics") or ["it"])[-1]
         if status == "open":
+            want = (c.get("wants_to_repair") or {}).get(oid) or {}
+            go = _name(world, want["go_between"]) if want.get("go_between") else None
+            tried = ", ".join(t.replace("_", " ") for t in rift.get("tried") or []) or "nothing yet"
             lines.append(f"Things are bad between you and {name} (over {topic}, {days} day{'s' if days != 1 else ''}). "
                          f"You've tried {rift.get('attempts', 0)} time{'s' if rift.get('attempts', 0) != 1 else ''} "
-                         f"to make it right. It needs resolving: one of you giving in, an agreement, a deal -- or "
-                         f"someone you both trust putting in a word.")
+                         f"to make it right ({tried}). Ways forward: give in and apologise, sit down and agree "
+                         f"how it'll be from now on, offer something in return"
+                         + (f", or ask {go} -- someone you both trust -- to put in a word" if go else "")
+                         + ". Or leave it for now; it's up to you.")
         elif status == "away":
             lines.append(f"You're away from home, {_PURPOSE_WORDS.get(rift.get('purpose'), 'for a while').format(name=name)}.")
         else:

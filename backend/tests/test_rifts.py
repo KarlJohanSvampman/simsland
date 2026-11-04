@@ -1,8 +1,9 @@
 """
-Falling out with someone you live with (systems/rifts.py): a bad fight no longer sends anyone off on the spot; it
-opens a rift they try to resolve, daily -- giving in, an agreement, a deal, or a go-between -- and only after
-MAX_ATTEMPTS tries or STAY_DAYS days do they consider leaving, for a purpose: time away to come back and make peace,
-or moving out for good, which the household sees as they come back for their things.
+Falling out with someone you live with (systems/rifts.py): a confrontation that ends badly no longer sends anyone off
+on the spot; it opens a rift. Each day they're woken wanting to find a way forward (their own choice what, and the
+AI's reading of the conversation says how it went -- here, the confrontation's outcome stands in for that), and only
+after MAX_ATTEMPTS tries or STAY_DAYS days do they consider leaving, for a purpose: time away to come back and make
+peace, or moving out for good, which the household sees as they come back for their things.
 
 Run inside the backend container:   python tests/test_rifts.py
 """
@@ -25,8 +26,11 @@ def check(name, cond, detail=""):
 
 
 from house_world import make_world
-from core import scheduler
+import core.event_handlers  # noqa: F401
+import social.tick  # noqa: F401
+from core import scheduler, event_bus
 from systems import rifts
+from social import confrontations as X, standing
 
 
 def setup():
@@ -40,16 +44,20 @@ def setup():
     j["relationships"]["robert"] = {"trust": 70, "friendship": 60}
     j["relationships"]["kathleen"] = {"trust": 60, "friendship": 50}
     k["relationships"]["joseph"] = {"trust": 60, "friendship": 50}
+    # things were already strained (one ordinary disagreement shouldn't sink anyone's regard)
+    k["relationships"]["robert"] = {"standing": {"score": -29, "confidence": 0.5, "history": []}}
+    r["relationships"]["kathleen"] = {"standing": {"score": -29, "confidence": 0.5, "history": []}}
     w["fight_log"] = []
     return w, k, r, j
 
 
-def bad_fight(w, a, b, outcome="storm_off", topic="the dishes"):
-    cid = f"conflict_{w['tick']}"
-    w.setdefault("conflicts", {})[cid] = {"id": cid, "parties": [a["id"], b["id"]], "initiator": a["id"],
-                                         "topic": topic, "issues": [], "outcome": outcome}
-    w["fight_log"].append({"tick": w["tick"], "parties": [a["id"], b["id"]], "topic": topic, "outcome": outcome})
-    rifts.on_conflict_resolved(w, {"conflict_id": cid, "outcome": outcome, "parties": [a["id"], b["id"]]})
+def bad_fight(w, a, b, outcome="relationship_deterioration", topic="the dishes", physical=False):
+    conf = X.start(w, a["id"], b["id"], ctype="criticism", problem=topic)
+    conf["stage_idx"], conf["peak_stage"] = 2, "verbal_confrontation"
+    if physical:
+        X.on_hostile_act(w, a["id"], b["id"], "punch")
+    X.end(w, conf, outcome)
+    event_bus.flush(w)
 
 
 def advance(w, ticks):
@@ -61,45 +69,45 @@ def mems(c, *words):
     return [m["text"] for m in c.get("memories", []) if all(x.lower() in m["text"].lower() for x in words)]
 
 
-def settle_conflicts(w, outcome):
-    """A reconciliation sit-down started by the rift: end it with `outcome`."""
-    for conflict in list((w.get("conflicts") or {}).values()):
-        if conflict.get("reconciliation") and conflict.get("outcome") is None:
-            conflict["outcome"] = outcome
-            rifts.on_conflict_resolved(w, {"conflict_id": conflict["id"], "outcome": outcome,
-                                           "parties": conflict["parties"]})
+def settle_conflicts(w, outcome, by="robert", with_="kathleen"):
+    """The one woken wanting to make peace talks to the other; the AI's reading says how it went (outcome)."""
+    c = w["characters"][by]
+    if with_ in (c.get("wants_to_repair") or {}):
+        conf = X.start(w, by, with_, ctype="negotiation", reconciliation=True, problem="making peace")
+        X.end(w, conf, outcome)
+        event_bus.flush(w)
 
 
 # ---- a bad fight opens a rift, not a suitcase ----------------------------------------------------------------------
 w, k, r, j = setup()
 bad_fight(w, r, k)
-check("a fight that ends with someone storming off: a rift for both, about what it was about",
-      r["rifts"]["kathleen"]["status"] == "open" and k["rifts"]["robert"]["topics"] == ["the dishes"])
+check("a confrontation that ends badly: a rift for both, about what it was about",
+      r["rifts"]["kathleen"]["status"] == "open" and k["rifts"]["robert"]["topics"] == ["the dishes"],
+      str((standing.score(r, "kathleen"), r.get("rifts"))))
 check("... nobody moves out on the spot", not r.get("temporary_residence") and not r.get("off_grid")
       and not k.get("temporary_residence") and not k.get("off_grid"))
 
 # ---- trying, and getting nowhere -------------------------------------------------------------------------------------
-rifts._receptive = lambda other, cid: -1.0              # nobody comes round in this part
-rifts.LEAVE_CHANCE = 0.0                                 # ... and nobody leaves yet
+rifts.LEAVE_CHANCE = 0.0                                 # nobody leaves yet
 advance(w, rifts.FIRST_TRY_TICKS + 1)
-settle_conflicts(w, "cold_shoulder")
+check("a few hours later he's woken wanting to find a way forward", "kathleen" in (r.get("wants_to_repair") or {})
+      and r["cognition"].get("wake_reason") in (None, "wants_to_repair") or r.get("wants_to_repair"))
+check("... with the go-between he could ask in his prompt", any("ask Joseph" in l for l in rifts.context_lines(r, w)),
+      str(rifts.context_lines(r, w)))
+settle_conflicts(w, "apology_rejected")
 check("a few hours later he recalls what led to it", mems(r, "things have been bad with kathleen", "the dishes"),
       str([m["text"] for m in r["memories"]][-4:]))
 check("... and tries something: no understanding, one try down", r["rifts"]["kathleen"]["attempts"] >= 1,
       str(r["rifts"]["kathleen"]))
-for _ in range(4):
-    advance(w, rifts.DAY)
-    settle_conflicts(w, "cold_shoulder")
-tried = set(r["rifts"]["kathleen"]["tried"])
-check("each day a different way forward: more than one kind tried", len(tried) >= 2, str(tried))
-check("... a go-between among them, with Joseph hearing about it",
-      "third_party" not in tried or mems(j, "asked me to talk to"), str(tried))
+advance(w, rifts.DAY)
+settle_conflicts(w, "unresolved")
+check("what he tried is recorded", len(r["rifts"]["kathleen"]["tried"]) >= 2, str(r["rifts"]["kathleen"]))
 
 # ---- after three tries he considers leaving: time away, with a purpose ----------------------------------------------
 rifts.LEAVE_CHANCE = 1.0
 for _ in range(3):
     advance(w, rifts.DAY)
-    settle_conflicts(w, "cold_shoulder")
+    settle_conflicts(w, "unresolved")
     if (r.get("temporary_residence") or r.get("off_grid")):
         break
 res = r.get("temporary_residence") or {}
@@ -115,9 +123,8 @@ check("... he heads for Joseph's house", (r.get("move_target") or {}).get("targe
 advance(w, rifts.AWAY_DAYS[1] * rifts.DAY + 1)
 check("after a few days he comes back home to try again", not r.get("temporary_residence")
       and r["rifts"]["kathleen"]["status"] == "open" and mems(r, "came back home to try to make peace"))
-rifts._receptive = lambda other, cid: 1.0                # this time she comes round
 advance(w, 1801)
-settle_conflicts(w, "agreement")
+settle_conflicts(w, "mutual_understanding")                 # this time she comes round
 check("... and this time they come to an understanding: the rift is closed for both",
       r["rifts"]["kathleen"]["status"] == "resolved" and k["rifts"]["robert"]["status"] == "resolved",
       str(r["rifts"]["kathleen"]))
@@ -126,12 +133,11 @@ check("... with standing back above the line", rifts.standing(r, "kathleen") >= 
 
 # ---- beyond repair: moving out, and coming back for his things -----------------------------------------------------
 w, k, r, j = setup()
-rifts._receptive = lambda other, cid: -1.0
 rifts.LEAVE_CHANCE = 1.0
-bad_fight(w, r, k, outcome="physical_resolved", topic="money")
+bad_fight(w, r, k, outcome="physical_fight", topic="money", physical=True)
 for _ in range(10):
     advance(w, rifts.DAY)
-    settle_conflicts(w, "cold_shoulder")
+    settle_conflicts(w, "unresolved")
     if r.get("temporary_residence"):
         break
 res = r.get("temporary_residence") or {}
@@ -145,7 +151,7 @@ check("... until the last of them: moved out", r["rifts"]["kathleen"]["status"] 
 
 # ---- bad standing alone, and children ------------------------------------------------------------------------------
 w, k, r, j = setup()
-k["relationships"]["robert"] = {"resentment": 90, "hostility": 20}
+k["relationships"]["robert"] = {"standing": {"score": -60, "confidence": 0.6, "history": []}}
 rifts.scan(w)
 check("standing sunk below the line, no fight needed: a rift", (k.get("rifts") or {}).get("robert", {}).get("status") == "open")
 s = w["characters"]["susan"]

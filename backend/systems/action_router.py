@@ -127,12 +127,10 @@ def apply_speech(c, world, speech):
         else:
             volume = "medium"
             if target_id:
-                for conflict in world.get("conflicts", {}).values():
-                    parties = conflict.get("parties", [])
-                    if (c["id"] in parties and target_id in parties
-                            and conflict.get("fight_stage") in ("heated_argument", "shouting_match")):
-                        volume = "high"
-                        break
+                from social.confrontations import active_between
+                _conf = active_between(world, c["id"], target_id)
+                if _conf and _conf.get("stage_idx", 0) >= 1:          # heated discussion or worse: raised voices
+                    volume = "high"
 
     c["current_speech"] = {
         "utterance":      utterance,
@@ -215,7 +213,20 @@ def apply_speech(c, world, speech):
         # stays ungated -- it's async by nature, the listener can always
         # just not reply, so gating at send time buys nothing a real
         # reply-or-don't already covers.
-        is_new_conversation = medium in ("in_person", "call") and not find_conversation(world, [c["id"], target_id])
+        from brain.conversations import _recently_ended
+        is_new_conversation = medium in ("in_person", "call") and not find_conversation(world, [c["id"], target_id]) \
+            and not _recently_ended(world, [c["id"], target_id])
+
+        # Still waiting on an answer from someone else: don't open a second conversation in the same minute (a line
+        # to somebody new while your question hangs is you not waiting for the reply).
+        if is_new_conversation:
+            from brain.conversations import REOPEN_TICKS
+            for _other in (world.get("conversations") or {}).values():
+                if not _other.get("active") or c["id"] not in (_other.get("participants") or []):
+                    continue
+                _hist = _other.get("history") or []
+                if _hist and _hist[-1].get("speaker") == c["id"] and tick - (_hist[-1].get("tick") or 0) < REOPEN_TICKS:
+                    return
 
         # Per the user's explicit ask: a NEW conversation isn't automatic --
         # the listener's real willingness to engage right now (their
@@ -278,6 +289,15 @@ def apply_speech(c, world, speech):
             topic or conv.get("topic", "general"), tick
         )
 
+        # What it's about (kept on the conversation so nobody loses the thread), and what the line does socially
+        # (social/discourse.py: applied on the main thread).
+        from brain.conversations import set_subject
+        _social = speech.get("social") if isinstance(speech.get("social"), dict) else {}
+        set_subject(conv, _social.get("issue") or speech.get("subject") or topic, by=c["id"])
+        emit("social_line", {"conversation_id": conv.get("id"), "speaker_id": c["id"], "target_id": target_id,
+                             "utterance": utterance, "speech_act": speech_act, "social": _social, "tick": tick,
+                             "listeners": [p.get("id") for p in (c.get("perception") or {}).get("visible_people", [])]})
+
         # Someone who has been worried about this person is raising it now.
         from systems.pattern_concern import on_speech as _concern_on_speech
         _concern_on_speech(c, listener, world)
@@ -309,19 +329,9 @@ def apply_speech(c, world, speech):
             except Exception as _exc:
                 print(f"[memory_acknowledgement] could not record an acknowledgement: {_exc!r}")
 
-        # What the line said ABOUT someone who isn't part of this conversation (gossip, a lie about them, praise):
-        # the listener weighs it and may carry it to them (systems/rumors.py). Emit-only, like the above.
-        try:
-            from systems.rumors import remark_kind, emit_remark
-            from systems.expressions import mentions as _mentions_in
-            _remark = remark_kind(speech_act, speech.get("intent"))
-            if _remark:
-                for _subject_id in _mentions_in(world, utterance, c["id"]):
-                    if _subject_id not in (target_id, c["id"]):
-                        emit_remark(c, listener, _subject_id, _remark, text=utterance,
-                                    ref={"type": "conversation", "id": conv.get("id")})
-        except Exception as _exc:
-            print(f"[rumors] could not record a remark: {_exc!r}")
+        # What the line said ABOUT someone who isn't part of this conversation (gossip, praise, a lie about them) is read
+        # from the whole conversation once it ends (social/discourse.py -> social/rumours.py), not guessed per line.
+
 
         # Per the user's explicit ask: commit every spoken exchange to
         # real memory, both what was said and what was heard, keyword-
@@ -3065,11 +3075,13 @@ def _route_confront(c, world, action):
     if c.get("building_id") != target.get("building_id"):
         return
 
-    try:
-        from systems.conflict_pipeline import start_conflict
-        start_conflict(c["id"], target_id, world)
-    except Exception:
-        pass
+    # the confrontation itself (social/confrontations.py) is opened on the main thread; what is said, and how it
+    # goes, is the characters' own doing from here
+    from core.event_bus import emit
+    emit("confront_requested", {"initiator_id": c["id"], "target_id": target_id,
+                                "type": action.get("confrontation_type") or action.get("kind"),
+                                "problem": action.get("issue") or action.get("problem") or action.get("reason"),
+                                "desired_outcome": action.get("desired_outcome")})
 
 
 def _route_call_911(c, world, action):

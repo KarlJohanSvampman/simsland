@@ -255,6 +255,14 @@ def get_or_create_conversation(
     if conv:
         return conv
 
+    # The same people again within the same minute: that is the talk that just ended (an unanswered question
+    # ended as "ignored", a line that came a moment too late), carried on -- not a new conversation. Lines a few
+    # seconds apart were showing up as three separate conversations.
+    conv = _recently_ended(world, participant_ids)
+    if conv:
+        reopen_conversation(world, conv)
+        return conv
+
     return create_conversation(
 
         world,
@@ -265,6 +273,48 @@ def get_or_create_conversation(
 
         medium=medium
     )
+
+
+REOPEN_TICKS = 60
+
+
+def _recently_ended(world, participant_ids):
+    target = set(participant_ids)
+    t = world.get("tick", 0)
+    best = None
+    for conv in (world.get("conversations") or {}).values():
+        if conv.get("active") or set(conv.get("participants") or []) != target:
+            continue
+        if conv.get("end_reason") in ("left", "resolved") or t - (conv.get("last_update") or 0) > REOPEN_TICKS:
+            continue
+        if best is None or (conv.get("last_update") or 0) > (best.get("last_update") or 0):
+            best = conv
+    return best
+
+
+def reopen_conversation(world, conv):
+    """Undo an ending that came too soon: active again, out of the archive until it really ends."""
+    conv["active"] = True
+    conv["_archived"] = False
+    conv["end_reason"] = None
+    f = conv.get("floor")
+    if f:
+        f["state"] = "open"
+    from systems.conversation_archive import unarchive
+    unarchive(world, conv["id"])
+
+
+def set_subject(conv, subject, by=None):
+    """What the conversation is about right now, in words: kept on the conversation (and shown to everyone in it)
+    so a talk about cleaning the room stays about cleaning the room."""
+    subject = str(subject or "").strip()
+    if not subject or subject.lower() in ("general", "incidental", "smalltalk", "small talk", "none", "null"):
+        return
+    if conv.get("subject") != subject:
+        if conv.get("subject"):
+            conv.setdefault("subject_history", []).append(conv["subject"])
+        conv["subject"] = subject[:80]
+        conv["subject_by"] = by
 
 
 # =========================================================

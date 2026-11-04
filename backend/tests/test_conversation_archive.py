@@ -75,54 +75,84 @@ conv3 = talk([(r, "a"), (k, "b"), (r, "c"), (k, "d"), (r, "e"), (k, "f")])
 co.tick(w)
 check(f"conversations are short: over at {co.MAX_LINES} lines", not conv3["active"])
 
-# ---- the AI's tags: argument, filing, hearsay ------------------------------------------------------------------------
+# ---- picked up again within the minute: the same conversation ----------------------------------------------------------
+from brain.conversations import get_or_create_conversation, REOPEN_TICKS
+from systems.conversation_floor import _end
+c5 = talk([(r, "Can you help me with the shelf?")])
+_end(w, c5, "ignored")
+w["tick"] += 10
+again = get_or_create_conversation(w, ["robert", "kathleen"])
+check("asked again a few seconds later: the same conversation carried on, not a new one",
+      again["id"] == c5["id"] and again["active"] and c5["id"] not in w["conversation_archive"])
+check("... and it's not in their logs twice", sum(1 for e in r["conversation_log"] if e["id"] == c5["id"]) == 0)
+_end(w, again, "no_response")
+w["tick"] += REOPEN_TICKS + 5
+later = get_or_create_conversation(w, ["robert", "kathleen"])
+check("a minute later it is a new conversation", later["id"] != c5["id"])
+_end(w, later, "no_response")
+
+# ---- the subject is kept on the conversation --------------------------------------------------------------------------
+from brain.conversations import set_subject
+c6 = create_conversation(w, ["robert", "kathleen"], topic="general")
+set_subject(c6, "general")
+check("'general' is not a subject", not c6.get("subject"))
+set_subject(c6, "cleaning her room", by="kathleen")
+set_subject(c6, None)
+check("once it's about cleaning her room it stays that, until someone changes it", c6["subject"] == "cleaning her room")
+_end(w, c6, "no_response")
+
+# ---- the AI's reading: issues, positions, gossip --------------------------------------------------------------------------
+from social import issues as I, standing, rumours as R
 ca.apply_tags(w, w["conversation_archive"][conv["id"]],
-              {"subject": "the dishes", "opening": "criticism", "tags": ["chores", "dishes"], "relates_to": None,
-               "argument": {"type": "unmet_expectation", "subject": "the dishes", "started_by": "Robert"},
-               "about_others": []})
-arg = next(iter(w["arguments"].values()))
-check("tagged as an argument: an argument record is opened, who started it and what kind",
-      arg["type"] == "unmet_expectation" and arg["initiator"] == "robert" and arg["status"] == "open")
-check("... the conversation is filed under it", conv["id"] in arg["conversation_ids"]
-      and w["conversation_archive"][conv["id"]]["argument_id"] == arg["id"])
-check("... both have it in their argument log", any(a["id"] == arg["id"] for a in k.get("argument_log", []))
-      and any(a["id"] == arg["id"] for a in r.get("argument_log", [])))
-check("... and their copies of the conversation carry the tags",
+              {"subject": "the dishes", "opening": "criticism", "tags": ["chores", "dishes"], "interaction_tags": ["criticism"],
+               "tone": "tense", "relates_to": None,
+               "issues": [{"same_as": None, "subject": "the dishes", "category": "household_responsibility",
+                           "raised_by": "Robert", "between": ["Robert", "Kathleen"],
+                           "positions": {"Robert": {"position": "She never does them", "stance": "opposed"},
+                                         "Kathleen": {"position": "I do them after dinner", "stance": "opposed"}},
+                           "status": "open"}],
+               "confrontation": None, "agreement": None, "violations": [], "initiative_response": "accepted_reluctantly",
+               "standing_events": [], "about_others": [], "told_about_themselves": []})
+iss = I.between(w, "robert", "kathleen")
+check("an issue is opened, with each one's own position", len(iss) == 1 and I.position(iss[0], "robert")["position"]
+      == "She never does them" and I.position(iss[0], "kathleen")["position"] == "I do them after dinner")
+check("... the conversation is filed under it", conv["id"] in iss[0]["conversation_ids"]
+      and iss[0]["id"] in w["conversation_archive"][conv["id"]]["issue_ids"])
+check("... and their copies of the conversation carry the reading",
       next(e for e in k["conversation_log"] if e["id"] == conv["id"])["tags"]["opening"] == "criticism")
-
 ca.apply_tags(w, w["conversation_archive"][conv2["id"]],
-              {"subject": "the dishes again", "opening": "complaint", "tags": ["dishes"], "relates_to": conv["id"],
-               "argument": {"type": "unmet_expectation", "subject": "dishes", "started_by": "Robert"},
-               "about_others": []})
-check("a later conversation that continues it goes under the same argument",
-      conv2["id"] in arg["conversation_ids"] and len(w["arguments"]) == 1)
-
-ca.file_fight(w, {"id": "fight_1", "tick": w["tick"], "parties": ["kathleen", "robert"], "topic": "the dishes",
-                  "outcome": "storm_off", "peak": "heated_argument"})
-check("a fight between them about it is filed there too", "fight_1" in arg["fight_ids"])
-ca.resolve_between(w, "robert", "kathleen", "they agreed who does the dishes")
-check("when they come to an understanding the argument is resolved", arg["status"] == "resolved"
-      and any(a["status"] == "resolved" for a in k["argument_log"]))
+              {"subject": "the dishes again", "opening": "complaint", "tags": ["dishes"], "interaction_tags": [],
+               "tone": "tense", "relates_to": conv["id"],
+               "issues": [{"same_as": iss[0]["id"], "subject": "dishes", "category": "household_responsibility",
+                           "raised_by": "Robert", "between": [], "positions": {}, "status": "open"}],
+               "confrontation": None, "agreement": None, "violations": [], "initiative_response": None,
+               "standing_events": [], "about_others": [], "told_about_themselves": []})
+check("a later conversation on it goes under the same issue", conv2["id"] in iss[0]["conversation_ids"]
+      and len(I.between(w, "robert", "kathleen")) == 1)
 
 conv4 = talk([(r, "Did you hear about Joseph?"), (k, "No, what?")])
 w["tick"] += co.NO_REPLY_TICKS + 1
 co.tick(w)
-before = feelings.standing(k, "joseph")
+before = standing.score(k, "joseph")
 ca.apply_tags(w, w["conversation_archive"][conv4["id"]],
-              {"subject": "joseph's debts", "opening": "news", "tags": ["gossip"], "relates_to": None, "argument": None,
+              {"subject": "joseph's debts", "opening": "news", "tags": ["gossip"], "interaction_tags": ["gossip"],
+               "tone": "neutral", "relates_to": None, "issues": [], "confrontation": None, "agreement": None,
+               "violations": [], "initiative_response": None, "standing_events": [],
                "about_others": [{"name": "Joseph", "said_by": "Robert", "claim": "he stole from work", "tone": -2,
-                                 "rumour": True}]})
-check("gossip about Joseph: Kathleen thinks less of him", feelings.standing(k, "joseph") < before,
-      str((before, feelings.standing(k, "joseph"))))
+                                 "rumour": True, "same_as": None}], "told_about_themselves": []})
+check("gossip about Joseph: Kathleen thinks less of him", standing.score(k, "joseph") < before,
+      str((before, standing.score(k, "joseph"))))
 log = k["relationships"]["joseph"]["standing_log"]
-check("... and her standing history with him says what she heard and from whom",
+check("... her history with him says what she heard and from whom",
       "heard from Robert Okafor (a rumour): he stole from work" in log[-1]["cause"], str(log[-1]))
+check("... it's a rumour she now knows, from Robert", any(r_["subject_id"] == "joseph" for r_ in R.known_by(w, "kathleen", 0.0)))
 check("... Robert, who said it, isn't moved by his own gossip", "joseph" not in r["relationships"])
 
 # ---- agitation fades ---------------------------------------------------------------------------------------------------
-feelings.agitate(k, "robert", w, 60, cause="test")
-w["tick"] += 2 * feelings.DAY
-check("agitation fades by itself: 60, two days later 30", feelings.agitation(k, "robert", w) == 30.0,
+feelings.agitate(k, "robert", w, 50, cause="test")
+a0 = feelings.agitation(k, "robert", w)
+w["tick"] += 2 * 86400
+check("how worked up she is fades by itself: 30 down in two days", feelings.agitation(k, "robert", w) == max(0.0, round(a0 - 30, 1)),
       str(feelings.agitation(k, "robert", w)))
 
 print()
