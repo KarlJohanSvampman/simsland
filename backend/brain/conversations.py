@@ -255,6 +255,14 @@ def get_or_create_conversation(
     if conv:
         return conv
 
+    # The same people again within the same minute: that is the talk that just ended (an unanswered question
+    # ended as "ignored", a line that came a moment too late), carried on -- not a new conversation. Lines a few
+    # seconds apart were showing up as three separate conversations.
+    conv = _recently_ended(world, participant_ids)
+    if conv:
+        reopen_conversation(world, conv)
+        return conv
+
     return create_conversation(
 
         world,
@@ -265,6 +273,48 @@ def get_or_create_conversation(
 
         medium=medium
     )
+
+
+REOPEN_TICKS = 60
+
+
+def _recently_ended(world, participant_ids):
+    target = set(participant_ids)
+    t = world.get("tick", 0)
+    best = None
+    for conv in (world.get("conversations") or {}).values():
+        if conv.get("active") or set(conv.get("participants") or []) != target:
+            continue
+        if conv.get("end_reason") in ("left", "resolved") or t - (conv.get("last_update") or 0) > REOPEN_TICKS:
+            continue
+        if best is None or (conv.get("last_update") or 0) > (best.get("last_update") or 0):
+            best = conv
+    return best
+
+
+def reopen_conversation(world, conv):
+    """Undo an ending that came too soon: active again, out of the archive until it really ends."""
+    conv["active"] = True
+    conv["_archived"] = False
+    conv["end_reason"] = None
+    f = conv.get("floor")
+    if f:
+        f["state"] = "open"
+    from systems.conversation_archive import unarchive
+    unarchive(world, conv["id"])
+
+
+def set_subject(conv, subject, by=None):
+    """What the conversation is about right now, in words: kept on the conversation (and shown to everyone in it)
+    so a talk about cleaning the room stays about cleaning the room."""
+    subject = str(subject or "").strip()
+    if not subject or subject.lower() in ("general", "incidental", "smalltalk", "small talk", "none", "null"):
+        return
+    if conv.get("subject") != subject:
+        if conv.get("subject"):
+            conv.setdefault("subject_history", []).append(conv["subject"])
+        conv["subject"] = subject[:80]
+        conv["subject_by"] = by
 
 
 # =========================================================
@@ -410,6 +460,15 @@ def add_message(
         speaker_id
     )
 
+    # One memory per person per conversation (not one per line): "Talked about general." repeated for every
+    # line flooded the hour's log, and the hourly summary had nothing to say about it. The first line they say
+    # writes it; systems/conversation_archive.py rewrites it with the real subject once the AI has tagged the talk.
+    _written = conv.setdefault("_mem_written", [])
+    if speaker and speaker_id in _written:
+        speaker = None
+    elif speaker:
+        _written.append(speaker_id)
+
     if speaker:
 
         emotional_impact = (
@@ -422,14 +481,7 @@ def add_message(
 
             speaker,
 
-            compress_conversation_memory(
-
-                speech_act,
-
-                topic,
-
-                utterance
-            ),
+            _conversation_memory_text(world, conv, speaker_id, topic, utterance),
 
             tags=[
 
@@ -933,6 +985,18 @@ def schedule_conversation_reflection(
 # COMPRESS MEMORY
 # =========================================================
 
+def _conversation_memory_text(world, conv, speaker_id, topic, utterance):
+    names = [((world.get("characters") or {}).get(p) or {}).get("name") or "someone"
+             for p in conv.get("participants", []) if p != speaker_id]
+    who = " and ".join(names) or "someone"
+    about = f" about {topic}" if topic and topic != "general" else ""
+    medium = " on the phone" if conv.get("medium") == "phone" else ""
+    said = (utterance or "").strip()
+    if len(said) > 90:
+        said = said[:87].rstrip() + "..."
+    return f'Talked with {who}{medium}{about}. I said: "{said}"' if said else f"Talked with {who}{medium}{about}."
+
+
 def compress_conversation_memory(
 
     speech_act,
@@ -1112,34 +1176,20 @@ def add_to_conversation_log(c, entry):
 
 
 def _archive_conversation(world, conv):
+    """A finished conversation is kept as its own record (systems/conversation_archive.py) -- one talk, start to end;
+    talks between the same people are no longer folded into one running thread."""
     if conv.get("_archived"):
         return
     conv["_archived"] = True
-    chars = world.get("characters", {})
-    participants = conv.get("participants", [])
-    for pid in participants:
-        c = chars.get(pid)
-        if not c:
-            continue
-        others = [{"id": other_id, "name": chars[other_id].get("name")}
-                 for other_id in participants if other_id != pid and other_id in chars]
-        entry = {
-            "conv_id":      conv.get("id"),
-            "started_tick": conv.get("started_at"),
-            "ended_tick":   conv.get("last_update"),
-            "medium":       conv.get("medium", "in_person"),
-            "topic":        conv.get("topic"),
-            "with":         others,
-            "lines":        [dict(h, conv_id=conv.get("id")) for h in conv.get("history", [])],
-        }
-        add_to_conversation_log(c, entry)
+    from systems.conversation_archive import archive
+    archive(world, conv)
 
 
 def cleanup_conversations(
 
     world,
 
-    timeout=600
+    timeout=120
 ):
 
     now = world["tick"]

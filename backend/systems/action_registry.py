@@ -232,7 +232,9 @@ ACTION_SPECS = {
     "respond_touch":  {"group": "touch", "target": "character", "doc": "Respond to a pending touch proposal."},
 
     # ---- hostile / defensive -------------------------------------------
-    "confront":         {"group": "hostile", "target": "character", "doc": "Confront someone over a grievance."},
+    "confront":         {"group": "hostile", "target": "character", "doc": "Take a problem up with someone (it needn't be aggressive: a request, a complaint, a negotiation). Optional fields: \"issue\" (the problem, a few words), \"confrontation_type\" (provocation | bullying | ridicule | criticism | behavioural_request | expectations_dispute | power_play | negotiation | contract_proposal | defence), \"desired_outcome\". Then say it -- your speech is the confrontation."},
+    "announce_leaving": {"group": "hostile", "target": "none", "doc": "Tell the household you're leaving because of how things are with someone you live with -- in 2 or 3 days, not on the spot. Fields: \"about\" (their name), \"days\" (2 or 3), \"purpose\" (time_away -- to come back and try again -- or moving_out), \"reason\". Say it too."},
+    "call_off_leaving": {"group": "hostile", "target": "none", "doc": "You've announced you're leaving, and changed your mind: you're staying. Field: \"about\" (their name), \"reason\"."},
     "call_911":         {"group": "hostile", "target": "incident", "doc": "Call emergency services about an incident."},
     "call_parent":      {"group": "hostile", "target": "character", "doc": "Call a minor offender's parent instead of 911."},
 

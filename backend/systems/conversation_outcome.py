@@ -21,8 +21,10 @@ kids_play.settle_play_urges() sees them play.
 
 import re
 
-MAX_LINES = 8                 # a conversation longer than this ends, settled or not
-MAX_TICKS = 300               # 5 sim-minutes
+MAX_LINES = 6                 # a conversation longer than this ends, settled or not
+MAX_TICKS = 240               # 4 sim-minutes
+NO_REPLY_TICKS = 60           # a minute without a line: nobody is answering any more
+EARSHOT_TILES = 6.0           # in person, further apart than this and they have parted
 CLOSE_GRACE_TICKS = 20        # after the answer, the asker's closing line (or this long) and it's over
 LATER_DEFAULT_MINUTES = 60    # "later" with no time given
 
@@ -139,6 +141,8 @@ def _names(world, conv):
 def on_message(world, conv, speaker_id, utterance, speech_act, tick):
     """After each line (brain/conversations.py::add_message)."""
     from systems.conversation_floor import classify, expects_reply
+    if len(conv.get("history") or []) <= 1:
+        record_gaps(world, conv)
     purpose = conv.get("purpose")
     if conv.get("outcome"):
         # the closing line after the answer: that's the conversation done
@@ -173,8 +177,53 @@ def tick(world):
             continue
         if conv.get("outcome") and t >= conv.get("resolved_tick", t) + CLOSE_GRACE_TICKS:
             end(world, conv, "resolved")
+        elif _someone_left(world, conv):
+            end(world, conv, "left")
+        elif t - (conv.get("last_update") or t) >= NO_REPLY_TICKS and conv.get("history"):
+            end(world, conv, "no_response")
         elif len(conv.get("history") or []) >= MAX_LINES or t - (conv.get("started_at") or t) >= MAX_TICKS:
             end(world, conv, "timed_out")
+
+
+def record_gaps(world, conv):
+    """How far apart everyone was when the conversation started (taken at its first line)."""
+    start = conv.setdefault("_start_gaps", {})
+    chars = world.get("characters") or {}
+    people = [chars.get(p) for p in conv.get("participants") or [] if chars.get(p)]
+    for i, a in enumerate(people):
+        for b in people[i + 1:]:
+            key = f"{a.get('id')}|{b.get('id')}"
+            if key not in start:
+                start[key] = {"gap": abs(a.get("x", 0) - b.get("x", 0)) + abs(a.get("y", 0) - b.get("y", 0)),
+                              "same_building": (a.get("_in_building") or None) == (b.get("_in_building") or None)}
+    return start
+
+
+def _someone_left(world, conv):
+    """One conversation is one sitting: once someone has gone (out of earshot, another building, off-grid, asleep,
+    or -- on the phone -- off it) it is over, not paused to pick up later."""
+    chars = world.get("characters") or {}
+    people = [chars.get(p) for p in conv.get("participants") or []]
+    if any(p is None or p.get("off_grid") or p.get("alive") is False
+           or (p.get("activity") or {}).get("type") == "sleep" for p in people):
+        return True
+    if conv.get("medium", "in_person") != "in_person":
+        return False
+    # Measured against how far apart they were when it started: a talk called across the house (or begun from the
+    # doorway) isn't over the moment it starts -- someone has to actually walk off. Ending those at once made every
+    # line its own conversation.
+    start = record_gaps(world, conv)
+    for i, a in enumerate(people):
+        for b in people[i + 1:]:
+            key = f"{a.get('id')}|{b.get('id')}"
+            gap = abs(a.get("x", 0) - b.get("x", 0)) + abs(a.get("y", 0) - b.get("y", 0))
+            where = [(a.get("_in_building") or None), (b.get("_in_building") or None)]
+            first = start.get(key) or {"gap": gap, "same_building": where[0] == where[1]}
+            if gap > max(EARSHOT_TILES, first["gap"] + 3):
+                return True
+            if first["same_building"] and where[0] != where[1]:
+                return True
+    return False
 
 
 def end(world, conv, reason):

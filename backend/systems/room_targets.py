@@ -275,6 +275,10 @@ def building_destination(world, c, target_id):
     entrances = find_building_entrances(building, floorplan) if floorplan.get("tiles") else []
     household = (world.get("households") or {}).get(building.get("owner_household_id")) or {}
     own_home = bool(household) and household.get("id") == c.get("household_id")
+    # staying with them for now (systems/temporary_separation.py, systems/rifts.py): their home is where you live
+    host = (world.get("characters") or {}).get((c.get("temporary_residence") or {}).get("host_id")) or {}
+    if household and host.get("household_id") == household.get("id"):
+        own_home = True
     cx, cy = c.get("x", 0), c.get("y", 0)
     if own_home:
         # somewhere to be, not the doormat: the living room if there is one, else just inside the door

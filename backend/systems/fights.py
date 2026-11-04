@@ -48,7 +48,12 @@ CONTEXT_PHRASES = {
 }
 
 STAGE_WORDS = {"verbal_dispute": "a quarrel", "heated_argument": "a heated argument", "shouting_match": "a shouting match",
-               "physical_altercation": "a physical fight"}
+               "physical_altercation": "a physical fight",
+               # social/confrontations.py's stages
+               "disagreement": "a disagreement", "heated_discussion": "a heated discussion",
+               "verbal_confrontation": "an argument", "hostile_confrontation": "a nasty argument",
+               "threatening_behaviour": "an argument with threats", "physical_intimidation": "a shoving match",
+               "physical_aggression": "a fight", "physical_fight": "a physical fight"}
 
 
 def name_of(world, cid):

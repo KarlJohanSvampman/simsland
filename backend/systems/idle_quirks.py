@@ -110,6 +110,11 @@ def advance_idle_quirk(c, world) -> None:
     kind = act["type"]
     if kind == "roam":
         _finish_roam(c, world)
+        # a roam after being stuck (systems/roam.py): now try again what they were doing
+        if act.get("retry"):
+            from systems.roam import after_roam
+            if after_roam(c, world, act):
+                return
     elif kind == "check_door_lock":
         _finish_check_door(c, world, act)
     elif kind == "look_out_window":
@@ -161,13 +166,17 @@ def _start_roam(c, world) -> bool:
     if not building:
         return False
     floorplan = resolve_floorplan(world, building) or {}
-    rooms = [r for r in floorplan.get("rooms", []) if r.get("id") != c.get("room_id")]
+    here = str(c.get("room_id") or "").split(":", 1)[-1]      # room_id is "<building>:<room>"
+    rooms = [r for r in floorplan.get("rooms", []) if r.get("id") != here]
     random.shuffle(rooms)
+    from systems.path_debug import probing
     for room in rooms:
         point = _random_point_in_room(world, building, room)
         if not point:
             continue
-        if not plan_character_route(world, c, point[0], point[1]):
+        with probing():                              # trying rooms until one is reachable: a miss is no alarm
+            reachable = plan_character_route(world, c, point[0], point[1])
+        if not reachable:
             continue
         c["animation_state"] = "walk"
         c["is_moving"] = True

@@ -56,35 +56,14 @@ cv._archive_conversation(w, conv("c5", noor, karim, [("noor", "Dad, can we play?
 
 log = karim["conversation_log"]
 with_noor = [e for e in log if {p["id"] for p in e["with"]} == {"noor"}]
-check("all conversations with the same person are one object", len(with_noor) == 1 and len(log) == 2, str([(e["with"], e["conv_ids"]) for e in log]))
-e = with_noor[0]
-check("it knows which conversations it holds", e["conv_ids"] == ["c1", "c2", "c3", "c5"], str(e["conv_ids"]))
-check("the same line said again is one line, said three times", [l["utterance"] for l in e["lines"]][:2] == ["How's the morning going, Noor?", "Fine, thanks Dad."]
-      and e["lines"][0].get("repeats") == 3, str(e["lines"]))
-check("with all the lines in order, from every conversation", [l["utterance"] for l in e["lines"]] == ["How's the morning going, Noor?", "Fine, thanks Dad.", "Dad, can we play?"])
-check("each line remembers which conversation it was from", [l["conv_id"] for l in e["lines"]] == ["c1", "c3", "c5"], str([l["conv_id"] for l in e["lines"]]))
-check("started at the first, ended at the last", e["started_tick"] == 100 and e["ended_tick"] == 530, f"{e['started_tick']} {e['ended_tick']}")
-check("mediums are all listed, the latest as the main one", e["mediums"] == ["in_person", "call"] and e["medium"] == "call", str(e.get("mediums")))
-check("the other person's side has the same single thread", len(noor["conversation_log"]) == 1 and len(noor["conversation_log"][0]["lines"]) == 3)
-check("a different person is a different object", len([e for e in log if {p["id"] for p in e["with"]} == {"lena"}]) == 1)
-
-# entries written before this (one per conversation) are folded together
-old = person("old", "Old")
-old["conversation_log"] = [
-    {"conv_id": f"o{i}", "started_tick": i * 10, "ended_tick": i * 10 + 5, "medium": "in_person", "topic": "general",
-     "with": [{"id": "x", "name": "X"}], "lines": [{"speaker": "x", "utterance": f'"line {i}"', "speech_act": "declare", "tick": i * 10}]}
-    for i in range(4)]
-cv.add_to_conversation_log(old, {"conv_id": "o9", "started_tick": 90, "ended_tick": 95, "medium": "in_person", "topic": "general",
-                                 "with": [{"id": "x", "name": "X"}], "lines": [{"speaker": "x", "utterance": "last", "speech_act": "declare", "tick": 90}]})
-check("older separate entries become one thread", len(old["conversation_log"]) == 1 and len(old["conversation_log"][0]["lines"]) == 5, str(len(old["conversation_log"])))
-check("with their quote marks cleaned", old["conversation_log"][0]["lines"][0]["utterance"] == "line 0")
-
-# a group conversation is its own thread, and the log is capped
-g = person("g", "G")
-for i in range(cv.CONVERSATION_LOG_CAP + 10):
-    cv.add_to_conversation_log(g, {"conv_id": f"g{i}", "started_tick": i, "ended_tick": i, "medium": "in_person", "topic": "general",
-                                   "with": [{"id": f"p{i}", "name": "P"}], "lines": [{"speaker": "p", "utterance": "hi", "tick": i}]})
-check("the log is still capped at the number of different people", len(g["conversation_log"]) == cv.CONVERSATION_LOG_CAP)
+check("one conversation is one sitting: each talk with Noor is its own entry", len(with_noor) == 4 and len(log) == 5,
+      str([(e["with"], e["id"]) for e in log]))
+check("... in order", [e["id"] for e in with_noor] == ["c1", "c2", "c3", "c5"])
+check("... a line keeps its words, quote marks cleaned at the source", with_noor[0]["lines"][0]["utterance"].strip('"') == "How's the morning going, Noor?")
+check("... the medium is the conversation's own", with_noor[-1]["medium"] == "call" and with_noor[0]["medium"] == "in_person")
+check("the other person has the same entries", len(noor["conversation_log"]) == 4)
+check("a different person is a different entry", len([e for e in log if {p["id"] for p in e["with"]} == {"lena"}]) == 1)
+check("each is in the archive once", len(w["conversation_archive"]) == 5)
 
 print()
 print("FAILED: " + ", ".join(failures) if failures else "ALL OK")

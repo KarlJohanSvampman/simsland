@@ -127,12 +127,10 @@ def apply_speech(c, world, speech):
         else:
             volume = "medium"
             if target_id:
-                for conflict in world.get("conflicts", {}).values():
-                    parties = conflict.get("parties", [])
-                    if (c["id"] in parties and target_id in parties
-                            and conflict.get("fight_stage") in ("heated_argument", "shouting_match")):
-                        volume = "high"
-                        break
+                from social.confrontations import active_between
+                _conf = active_between(world, c["id"], target_id)
+                if _conf and _conf.get("stage_idx", 0) >= 1:          # heated discussion or worse: raised voices
+                    volume = "high"
 
     c["current_speech"] = {
         "utterance":      utterance,
@@ -215,7 +213,20 @@ def apply_speech(c, world, speech):
         # stays ungated -- it's async by nature, the listener can always
         # just not reply, so gating at send time buys nothing a real
         # reply-or-don't already covers.
-        is_new_conversation = medium in ("in_person", "call") and not find_conversation(world, [c["id"], target_id])
+        from brain.conversations import _recently_ended
+        is_new_conversation = medium in ("in_person", "call") and not find_conversation(world, [c["id"], target_id]) \
+            and not _recently_ended(world, [c["id"], target_id])
+
+        # Still waiting on an answer from someone else: don't open a second conversation in the same minute (a line
+        # to somebody new while your question hangs is you not waiting for the reply).
+        if is_new_conversation:
+            from brain.conversations import REOPEN_TICKS
+            for _other in (world.get("conversations") or {}).values():
+                if not _other.get("active") or c["id"] not in (_other.get("participants") or []):
+                    continue
+                _hist = _other.get("history") or []
+                if _hist and _hist[-1].get("speaker") == c["id"] and tick - (_hist[-1].get("tick") or 0) < REOPEN_TICKS:
+                    return
 
         # Per the user's explicit ask: a NEW conversation isn't automatic --
         # the listener's real willingness to engage right now (their
@@ -278,6 +289,15 @@ def apply_speech(c, world, speech):
             topic or conv.get("topic", "general"), tick
         )
 
+        # What it's about (kept on the conversation so nobody loses the thread), and what the line does socially
+        # (social/discourse.py: applied on the main thread).
+        from brain.conversations import set_subject
+        _social = speech.get("social") if isinstance(speech.get("social"), dict) else {}
+        set_subject(conv, _social.get("issue") or speech.get("subject") or topic, by=c["id"])
+        emit("social_line", {"conversation_id": conv.get("id"), "speaker_id": c["id"], "target_id": target_id,
+                             "utterance": utterance, "speech_act": speech_act, "social": _social, "tick": tick,
+                             "listeners": [p.get("id") for p in (c.get("perception") or {}).get("visible_people", [])]})
+
         # Someone who has been worried about this person is raising it now.
         from systems.pattern_concern import on_speech as _concern_on_speech
         _concern_on_speech(c, listener, world)
@@ -309,19 +329,9 @@ def apply_speech(c, world, speech):
             except Exception as _exc:
                 print(f"[memory_acknowledgement] could not record an acknowledgement: {_exc!r}")
 
-        # What the line said ABOUT someone who isn't part of this conversation (gossip, a lie about them, praise):
-        # the listener weighs it and may carry it to them (systems/rumors.py). Emit-only, like the above.
-        try:
-            from systems.rumors import remark_kind, emit_remark
-            from systems.expressions import mentions as _mentions_in
-            _remark = remark_kind(speech_act, speech.get("intent"))
-            if _remark:
-                for _subject_id in _mentions_in(world, utterance, c["id"]):
-                    if _subject_id not in (target_id, c["id"]):
-                        emit_remark(c, listener, _subject_id, _remark, text=utterance,
-                                    ref={"type": "conversation", "id": conv.get("id")})
-        except Exception as _exc:
-            print(f"[rumors] could not record a remark: {_exc!r}")
+        # What the line said ABOUT someone who isn't part of this conversation (gossip, praise, a lie about them) is read
+        # from the whole conversation once it ends (social/discourse.py -> social/rumours.py), not guessed per line.
+
 
         # Per the user's explicit ask: commit every spoken exchange to
         # real memory, both what was said and what was heard, keyword-
@@ -649,15 +659,10 @@ def _route_move(c, world, action, mode="walk"):
     from systems.props import get_prop_by_id
     p = get_prop_by_id(world, target_id)
     if p:
-        c["move_target"] = {
-            "x": p.get("x", 0),
-            "y": p.get("y", 0),
-            "target_id": target_id,
-            "target_type": "prop",
-        }
-        if plan_character_route(world, c, p.get("x", 0), p.get("y", 0)):
-            c["animation_state"] = mode
-            c["is_moving"]       = True
+        # To where it's used from, not into it; and on getting there (or if already there), do what they came for
+        # (systems/move_purpose.py).
+        from systems.move_purpose import move_to_prop
+        move_to_prop(c, world, p, action, mode)
         return
 
 
@@ -1051,11 +1056,23 @@ def _route_sleep(c, world, action):
     # ticks) only overrides it upward, when the character is genuinely too
     # tired/behind for the scheduled block to be enough. See
     # _sleep_duration_ticks_scheduled() above.
+    duration = _sleep_duration_ticks_scheduled(c, world)
+    # Going to sleep means going to bed: walk to one first, and lie down there (live, 2026-11-04: Robert Okafor
+    # asleep on the restroom floor -- "sleep" used to start right where they stood, lying down on the spot).
+    # start_activity("sleep") finds the nearest free bed and walks there (activities.begin_interaction); lying
+    # down happens on arrival (the walking phase sets the posture).
+    from systems.activities import start_activity
+    from systems.props import get_prop_by_id
+    bed = get_prop_by_id(world, target_id) if target_id else None
+    already_in_bed = bed is not None and abs(c.get("x", 0) - bed.get("x", 0)) + abs(c.get("y", 0) - bed.get("y", 0)) <= 1.5
+    if not already_in_bed and start_activity(c, world, "sleep"):
+        c["activity"]["duration"] = duration
+        return
     c["activity"] = _scaffold(
         c, world, "sleep",
         target_id=target_id,
         interaction="sleep",
-        duration=_sleep_duration_ticks_scheduled(c, world),
+        duration=duration,
     )
     set_posture(c, world, "lying")
 
@@ -1499,11 +1516,46 @@ def _sleep_duration_ticks_scheduled(c, world):
     genuinely need MORE than that, the real biological calculation wins
     instead -- per the user's explicit ask, sleep follows the schedule
     "unless there is too much debt/fatigue"."""
+    from systems.body import compute_needed_sleep_ticks
+    raw_need = compute_needed_sleep_ticks(c, floor=False)
     needed = _sleep_duration_ticks(c)
     scheduled = _scheduled_block_end_ticks(c, world, "sleep")
-    if scheduled is None:
-        return needed
-    return max(600, scheduled, needed)
+    if scheduled is not None:
+        # Going back to bed before the alarm (woke at 5:50, up at 7): until the scheduled wake time -- the 90-minute
+        # floor for a fresh sleep used to carry them past it, so a whole household slept through the school run.
+        if raw_need <= scheduled:
+            return max(600, scheduled)
+        return max(600, scheduled, needed)
+    # A lie-down outside the night's block doesn't run into the next thing they have to do (school, work).
+    nxt = _next_commitment_ticks(c, world)
+    if nxt is not None:
+        return max(600, min(needed, nxt - 1800))
+    return needed
+
+
+_NOT_COMMITMENTS = {"sleep", "relax", "free", "leisure", "idle", "eat"}
+
+
+def _next_commitment_ticks(c, world):
+    """Ticks until the next scheduled block today that isn't sleep or free time, or None."""
+    cal = world.get("calendar") or {}
+    if cal.get("hour") is None:
+        return None
+    now_min = cal.get("minute_of_day", cal["hour"] * 60 + (cal.get("minute") or 0))
+    day = str(cal.get("weekday") or "").lower()
+    blocks = ((c.get("schedule") or {}).get("week") or {}).get(day) or []
+    best = None
+    for b in blocks:
+        if str(b.get("activity")) in _NOT_COMMITMENTS or not b.get("start"):
+            continue
+        try:
+            h, m = (int(x) for x in str(b["start"]).split(":")[:2])
+        except ValueError:
+            continue
+        start = h * 60 + m
+        if start > now_min and (best is None or start < best):
+            best = start
+    return None if best is None else (best - now_min) * 60
 
 
 # =========================================================
@@ -2664,6 +2716,12 @@ def route_action(c, world, action, speech, definitions=None, available_actions=N
 
     elif action_type == "confront":
         _route_confront(c, world, action)
+    elif action_type in ("announce_leaving", "call_off_leaving"):
+        # systems/rifts.py, on the main thread
+        from core.event_bus import emit
+        emit("leaving_" + ("announced" if action_type == "announce_leaving" else "called_off"),
+             {"character_id": c["id"], "about": action.get("about") or action.get("target"),
+              "days": action.get("days"), "purpose": action.get("purpose"), "reason": action.get("reason")})
     elif action_type == "call_911":
         _route_call_911(c, world, action)
     elif action_type == "call_parent":
@@ -3058,11 +3116,13 @@ def _route_confront(c, world, action):
     if c.get("building_id") != target.get("building_id"):
         return
 
-    try:
-        from systems.conflict_pipeline import start_conflict
-        start_conflict(c["id"], target_id, world)
-    except Exception:
-        pass
+    # the confrontation itself (social/confrontations.py) is opened on the main thread; what is said, and how it
+    # goes, is the characters' own doing from here
+    from core.event_bus import emit
+    emit("confront_requested", {"initiator_id": c["id"], "target_id": target_id,
+                                "type": action.get("confrontation_type") or action.get("kind"),
+                                "problem": action.get("issue") or action.get("problem") or action.get("reason"),
+                                "desired_outcome": action.get("desired_outcome")})
 
 
 def _route_call_911(c, world, action):

@@ -40,6 +40,12 @@ from brain.agent_loop   import update_agent
 from brain.intentions   import set_current_tick
 from systems.reactions  import process_reaction_queue
 import systems.step_timeouts  # noqa: F401 -- registers the "stuck" timeout handler before any timer fires
+import systems.path_debug     # noqa: F401 -- registers the "pathalarm" handler (the end of a lost episode)
+import systems.movement_log   # noqa: F401 -- registers the 15-second movement sampling job
+import systems.feelings       # noqa: F401 -- registers the daily standing snapshot
+import systems.conversation_archive  # noqa: F401 -- registers the conversation-tagging job
+import social.tick           # noqa: F401 -- social discourse: handlers, the old-data conversion, upkeep
+import systems.rifts          # noqa: F401 -- registers the rift timers and the hourly standing scan
 import systems.guests         # noqa: F401 -- registers the "guest" timeout handler (visits, being asked to leave)
 from systems.item_knowledge import update_item_knowledge
 
@@ -97,7 +103,7 @@ from systems.convenience_store import update_convenience_store_staffing
 
 # -- Conflict / social drama ──────────────────────────────────────────────
 from systems.grievances        import update_grievances
-from systems.conflict_pipeline import process_conflicts
+from social.tick import process_social as process_conflicts
 from systems.grapple         import process_grapples
 from systems.social_contracts  import check_contract_violations
 from systems.social_rules      import cleanup_expired_rule_exceptions
@@ -1106,7 +1112,8 @@ def _job_migration(world, entry):
 
 
 def _job_conflicts(world, entry):
-    """Scheduled job `conflicts` (was an every() block in tick()); see core/scheduler.py."""
+    """Scheduled job `conflicts`: confrontations that never got said or never got read, quiet issues
+    (social/tick.py -- the old dice-driven systems/conflict_pipeline.py is retired)."""
     process_conflicts(world)
 
 

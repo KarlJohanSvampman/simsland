@@ -64,9 +64,11 @@ check("... due 3 minutes out", scheduler.pending(w, "stuck:kathleen")[0]["at"] =
 run(w, k, STALL_TICKS - 1)
 check("walking to the fridge without moving: still on it just before 3 minutes", (k.get("activity") or {}).get("type") == "examine")
 run(w, k, 2)
-check("... at 3 minutes: taken out of it", not k.get("activity"), str(k.get("activity")))
+check("... at 3 minutes: taken out of it -- roaming somewhere else, to try again after (systems/roam.py)",
+      (k.get("activity") or {}).get("type") == "roam"
+      and (k["activity"].get("retry") or {}).get("type") == "examine", str(k.get("activity")))
 check("... reported in the memory log", stuck_log(k) and "examine" in stuck_log(k)[-1], str(stuck_log(k)))
-check("... and woken to choose again", woken(k))
+check("... and saying so out loud", "where was I going" in ((k.get("current_speech") or {}).get("utterance") or ""))
 
 # ---- a walk that is making progress is left alone --------------------------------------------------------------------
 w, k = setup()
@@ -83,7 +85,7 @@ run(w, k, 600, each=creep)
 check("a slow walk that keeps getting further isn't stuck (10 minutes in)", (k.get("activity") or {}).get("type") == "examine")
 check("... and progress didn't reschedule every tick: still one timer", len(scheduler.pending(w, "stuck:kathleen")) == 1)
 run(w, k, st.WALK_MAX_TICKS - 600 + 2, each=creep)
-check("... but no walk goes on past 15 minutes", not k.get("activity"))
+check("... but no walk goes on past 15 minutes", (k.get("activity") or {}).get("type") == "roam")
 
 # ---- a step with a known length gets it, plus 3 minutes --------------------------------------------------------------
 w, k = setup()
@@ -92,7 +94,8 @@ k["activity"] = {"type": "take_shower", "target_id": None, "phase": "using", "ph
 run(w, k, 600 + STALL_TICKS - 2)
 check("a 10-minute shower isn't cut off at 10 minutes (or 3)", (k.get("activity") or {}).get("type") == "take_shower")
 run(w, k, 3)
-check("... but is if it's still going 3 minutes after it should have ended", not k.get("activity"))
+check("... but is if it's still going 3 minutes after it should have ended",
+      (k.get("activity") or {}).get("type") != "take_shower")
 
 # ---- something happening pushes it back: a conversation line --------------------------------------------------------
 w, k = setup()
@@ -103,7 +106,7 @@ st.progress(k, w)                                    # what brain/conversations.
 run(w, k, STALL_TICKS - 10)
 check("a line said in the conversation counts as something happening", (k.get("activity") or {}).get("type") == "order_food")
 run(w, k, 20)
-check("... 3 minutes after the last one, it's over", not k.get("activity"))
+check("... 3 minutes after the last one, it's over", (k.get("activity") or {}).get("type") != "order_food")
 
 # ---- the step changing re-arms, the step ending disarms --------------------------------------------------------------
 w, k = setup()

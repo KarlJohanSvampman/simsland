@@ -62,6 +62,7 @@ REMOTE_TASKS = {
     "llm.household_summary_narration:narrate_blocking": None,
     "llm.self_assessment:assess": None,
     "llm.scripted_conversation:write_script": None,
+    "llm.conversation_tags:tag": None,
 }
 
 

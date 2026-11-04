@@ -159,6 +159,16 @@ def report_violation(contract, violator_id, term, world):
         "tick":        world["tick"],
     })
     contract.setdefault("_last_violation_tick", {})[violator_id] = world["tick"]
+    # the design's ContractViolation record (social/contracts.py); disputed when someone says it wasn't so
+    try:
+        from social.contracts import record_violation
+        pending = contract.get("_pending_violation") or {}
+        record_violation(world, contract, term, violator_id,
+                         observed_by=pending.get("observed_by") or [p for p in contract["parties"] if p != violator_id],
+                         violation_type=term.get("check_type", "manual"), evidence=pending.get("evidence"),
+                         disputed=pending.get("disputed", False))
+    except Exception as exc:
+        print(f"[social_contracts] could not record the violation: {exc!r}")
 
     # Nobody's stored memory ever recorded a missed commitment before
     # this (confirmed via grep -- only add_grievance(), fired from

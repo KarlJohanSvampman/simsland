@@ -125,7 +125,7 @@
     border-top: 1px solid #444;
   }
 
-  #viewerRelationshipsTab, #viewerMindTab, #viewerWorriesTab, #viewerOffgridTab, #viewerMemoryTab, #viewerConversationsTab, #viewerLifeTab, #viewerPlansTab, #viewerWorkTab, #viewerHabitsTab, #viewerSkillsTab {
+  #viewerRelationshipsTab, #viewerMindTab, #viewerWorriesTab, #viewerOffgridTab, #viewerMemoryTab, #viewerConversationsTab, #viewerLifeTab, #viewerPlansTab, #viewerWorkTab, #viewerHabitsTab, #viewerSkillsTab, #viewerMovementTab, #viewerArgumentsTab, #viewerStandingTab {
     font-size: 12px;
   }
 
@@ -391,6 +391,8 @@
     margin-bottom: 6px;
   }
 
+  .viewerChip { display:inline-block; padding:0 6px; margin-right:3px; border-radius:8px; font-size:.8em;
+                background:rgba(255,255,255,0.08); }
   .viewerCard {
     padding: 6px 0;
     border-bottom: 1px solid #292d35;
@@ -1150,6 +1152,9 @@
     <button class="viewerTabBtn" data-tab="work" id="viewerWorkTabBtn">Work</button>
     <button class="viewerTabBtn" data-tab="habits">Habits</button>
     <button class="viewerTabBtn" data-tab="skills">Skills</button>
+    <button class="viewerTabBtn" data-tab="movement">Movement</button>
+    <button class="viewerTabBtn" data-tab="arguments">Issues</button>
+    <button class="viewerTabBtn" data-tab="standing">Standing</button>
   </div>
 
   <div id="viewerEffectIcons"></div>
@@ -1187,6 +1192,9 @@
   <div id="viewerWorkTab" class="hidden"></div>
   <div id="viewerHabitsTab" class="hidden"></div>
   <div id="viewerSkillsTab" class="hidden"></div>
+  <div id="viewerMovementTab" class="hidden"></div>
+  <div id="viewerArgumentsTab" class="hidden"></div>
+  <div id="viewerStandingTab" class="hidden"></div>
 
 </div>
 

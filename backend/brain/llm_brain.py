@@ -221,6 +221,18 @@ SPEECH
   target gets an actual reaction to it, not just a neutral reply.
   compliment, flirt, joke, and guilt_trip are real attempts that can succeed or visibly flop
   depending on how stressed/prepared you are, and who you're targeting (systems/contested_checks.py) — don't assume it always lands.
+- "subject": what the conversation is about. Keep it the same while you're still on it (if you
+  started talking about cleaning your room, it's still about cleaning your room) -- the CURRENT
+  CONVERSATION block shows the subject so far. One conversation is one sitting: wait for the other
+  person's reply before saying more, and don't start talking to someone else while they still owe
+  you an answer.
+- "social" says what your line DOES between you (fill it whenever you speak to someone):
+  intent -- what you're doing with the line; issue -- the problem, if there is one (reuse the wording
+  of an issue you already have with them); position -- your honest view of it (it can differ from
+  theirs, and can be wrong); escalation -- are you pushing it further, holding, or calming it down
+  (low regard for someone makes you shorter and less patient with them, but you can just as well
+  avoid a fight); side -- only when you step into an argument between others; continue -- false
+  when you're done talking and want to end the conversation.
 - "conversation_type" is optional — set it when you're starting a conversation or deliberately
   steering its shape: smalltalk, argument, negotiation, persuasion, competition, gossip. Leave it
   out to just continue naturally. It's yours to set or change any time, not locked in once picked.
@@ -296,7 +308,17 @@ OUTPUT FORMAT  (strict JSON, no other text)
     "speech_act":        "greet | ask | declare | joke | comfort | argue | whisper | ...",
     "topic":             "topic keyword",
     "utterance":         "exact words you say aloud — shown as speech bubble",
-    "conversation_type": "smalltalk | argument | negotiation | persuasion | competition | gossip | null"
+    "conversation_type": "smalltalk | argument | negotiation | persuasion | competition | gossip | null",
+    "subject":           "what this conversation is about, a few words (keep it while it's still about that)",
+    "social": {
+      "intent":          "chat | inform | ask | suggest | request_change | remind_obligation | criticise | complain | accuse | provoke | ridicule | bully | power_play | negotiate | propose_agreement | accept | refuse | apologise | forgive | defend | mediate | reconcile | gossip | threaten | end",
+      "issue":           "the problem you're raising or answering, a few words, or null",
+      "position":        "how YOU see that issue, one sentence, or null",
+      "desired_outcome": "what you want from them, or null",
+      "escalation":      "escalate | hold | de-escalate",
+      "side":            "only when joining someone else's disagreement: 'initiator' or 'target' (whose side you take), 'mediator' or 'neutral'",
+      "continue":        true
+    }
   },
   "reflection": "brief reflection on recent events",
   "confidence": 0.0
