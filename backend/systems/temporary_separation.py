@@ -165,8 +165,8 @@ def maybe_return_from_separation(c, world):
     return-tick machinery). Chance of reconciling and heading home rises
     the longer they've been away."""
     residence = c.get("temporary_residence")
-    if not residence:
-        return
+    if not residence or residence.get("purpose"):
+        return                                    # a stay with a purpose comes back (or doesn't) by systems/rifts.py
 
     started = residence.get("started_tick", 0)
     days_away = max(0, (world.get("tick", 0) - started) // TICKS_PER_DAY)

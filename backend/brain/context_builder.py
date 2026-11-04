@@ -379,6 +379,12 @@ def _remembered_props(c, world, in_view):
         return []
 
 
+def _sec_rifts(c, world):
+    """Bad blood with someone they live with, and where it stands (systems/rifts.py)."""
+    from systems.rifts import context_lines
+    return context_lines(c, world) or None
+
+
 def _sec_known_places(c, world):
     """What their pressing needs and plans bring to mind -- known things that would help, and where (systems/spotted.py)."""
     from systems.spotted import context_lines
@@ -2466,6 +2472,7 @@ NARRATIVE_SECTIONS = [
     ("intentions",            "core", _sec_intentions),
     ("todo",                  "core", _sec_todo),
     ("known_places",          "core", _sec_known_places),
+    ("rifts",                 "core", _sec_rifts),
     ("pressing_intentions",   "core", _sec_pressing_intentions),
     ("exhaustion",            "core", _sec_exhaustion),
     ("glimpsed",              "full", _sec_glimpsed),

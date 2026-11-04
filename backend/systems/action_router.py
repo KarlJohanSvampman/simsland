@@ -1046,11 +1046,23 @@ def _route_sleep(c, world, action):
     # ticks) only overrides it upward, when the character is genuinely too
     # tired/behind for the scheduled block to be enough. See
     # _sleep_duration_ticks_scheduled() above.
+    duration = _sleep_duration_ticks_scheduled(c, world)
+    # Going to sleep means going to bed: walk to one first, and lie down there (live, 2026-11-04: Robert Okafor
+    # asleep on the restroom floor -- "sleep" used to start right where they stood, lying down on the spot).
+    # start_activity("sleep") finds the nearest free bed and walks there (activities.begin_interaction); lying
+    # down happens on arrival (the walking phase sets the posture).
+    from systems.activities import start_activity
+    from systems.props import get_prop_by_id
+    bed = get_prop_by_id(world, target_id) if target_id else None
+    already_in_bed = bed is not None and abs(c.get("x", 0) - bed.get("x", 0)) + abs(c.get("y", 0) - bed.get("y", 0)) <= 1.5
+    if not already_in_bed and start_activity(c, world, "sleep"):
+        c["activity"]["duration"] = duration
+        return
     c["activity"] = _scaffold(
         c, world, "sleep",
         target_id=target_id,
         interaction="sleep",
-        duration=_sleep_duration_ticks_scheduled(c, world),
+        duration=duration,
     )
     set_posture(c, world, "lying")
 

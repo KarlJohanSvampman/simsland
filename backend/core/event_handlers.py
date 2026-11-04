@@ -200,8 +200,6 @@ def _on_conflict_resolved(data, world):
     tag their own. A bad-enough outcome also gives each party a real
     chance of moving out for a while (systems/temporary_separation.py)."""
     from systems.confiding import tag_dramatic_memory
-    from systems.temporary_separation import begin_temporary_separation
-
     from systems import fights
 
     chars = world.get("characters", {})
@@ -241,11 +239,11 @@ def _on_conflict_resolved(data, world):
             if entry:
                 mem["fight_id"] = entry["id"]
 
-    if outcome in _BAD_CONFLICT_OUTCOMES:
-        for c in parties:
-            if random.random() < 0.35:
-                begin_temporary_separation(c, world, reason="conflict",
-                                           cause={"with_ids": [p["id"] for p in parties if p["id"] != c["id"]], "outcome": outcome, "topic": topic})
+    # A bad ending between people who live together no longer has a chance of sending someone off to stay elsewhere
+    # on the spot: it opens a rift, which they try to resolve first -- leaving comes later, and for a reason
+    # (systems/rifts.py).
+    from systems.rifts import on_conflict_resolved as _rift_on_conflict
+    _rift_on_conflict(world, data)
 
 subscribe("conflict_resolved", _on_conflict_resolved)
 

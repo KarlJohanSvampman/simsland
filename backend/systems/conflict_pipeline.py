@@ -72,6 +72,9 @@ def _willingness_to_compromise(c, conflict, world):
     Driven by traits, emotion, relationship state, and how bad the grievance is.
     """
     score = 0.5  # base
+    # one of them came to make peace (systems/rifts.py): both sit down meaning to work it out
+    if conflict.get("reconciliation"):
+        score += 0.25
 
     # Personality
     if _has(c, "agreeable", "empathetic", "conflict_averse"):
