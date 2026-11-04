@@ -40,7 +40,9 @@ check("... and recorded: from, to, ok, how many tiles", p["ok"] and p["reason"] 
 check("to where he already stands: no route, but not a failure", not plan_character_route(w, r, 60, 8)
       and r["path_plans"][-1]["reason"] == "already_there" and not (r.get("psychosis_state") or {}).get("active"))
 
-w["outdoor_navigation"] = {}                     # nowhere to walk outdoors
+w["outdoor_navigation"] = {}                     # nowhere to walk outdoors: no street graph, and no ground either
+for _t in w.get("world_tile_lookup", {}).values():
+    _t["walkable"] = False
 with path_debug.probing():
     plan_character_route(w, r, 85, 6)
 check("a probe that finds no way (picking a spot to roam to) raises no alarm",

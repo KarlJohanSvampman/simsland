@@ -82,6 +82,8 @@ w["props"] = [{"id": "bus_stop_1", "template": "bus_stop_a", "x": 8, "y": 11, "s
 r.update(travel_state="to_bus_stop", travel_mode="bus", _pending_offgrid={"reason": "shopping", "duration": 45},
          route=[{"type": "outdoor", "tiles": [[59, 5]]}], is_moving=False)
 w["outdoor_navigation"] = {}                       # nowhere to walk: no route can be found
+for _t in w.get("world_tile_lookup", {}).values():
+    _t["walkable"] = False
 run(w, r, STALL_TICKS + 2)
 check("no route at all: the trip happens without the walk", r.get("off_grid") is True
       and r.get("off_grid_reason") == "shopping" and not r.get("travel_state"), str((r.get("off_grid"), r.get("travel_state"))))
