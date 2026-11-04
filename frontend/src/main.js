@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { renderMovementTab, updateRouteOverlay } from "./movementLog.js";
+import { renderArgumentsTab, openArgumentModal, renderStandingTab, openStandingModal } from "./socialTabs.js";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { OrbitControls }
 from "three/examples/jsm/controls/OrbitControls.js";
@@ -557,6 +558,7 @@ let _lastCalendarWorldTick = null;
     const hour = cal.hour ?? 0, minute = cal.minute ?? 0;
     _lastCalendar = cal;
     _lastCalendarWorldTick = _worldState.tick ?? null;
+    applyDayNight(cal.minute_of_day ?? (hour * 60 + minute));
 
     document.getElementById("clockDateLine").textContent =
       `${(cal.weekday || WEEKDAY_ORDER[0]).slice(0, 3)}, ${MONTH_NAMES[(cal.month || 1) - 1]} ${cal.day ?? "?"}, ${cal.year ?? "?"}`;
@@ -610,7 +612,7 @@ function _projectCalendarForward(cal, seconds){
 
   return {
     year: base.getUTCFullYear(), month: base.getUTCMonth() + 1, day: base.getUTCDate(),
-    hour: base.getUTCHours(), minute: base.getUTCMinutes(), weekday,
+    hour: base.getUTCHours(), minute: base.getUTCMinutes(), second: base.getUTCSeconds(), weekday,
   };
 }
 
@@ -628,20 +630,43 @@ function _formatProjectedTime(proj){
 // live calendar exactly like the "Wakes up: ..." display above does --
 // this works for a PAST tick too (a negative seconds delta), not just a
 // future one.
+// "14:05:32" -- the clock time of one line in a conversation.
+function _clockAt(tick){
+  if(!_lastCalendar || _lastCalendarWorldTick == null || tick == null) return "";
+  const proj = _projectCalendarForward(_lastCalendar, tick - _lastCalendarWorldTick);
+  if(!proj || proj.hour == null) return "";
+  const p2 = (n) => String(n ?? 0).padStart(2, "0");
+  return `${p2(proj.hour)}:${p2(proj.minute)}${proj.second != null ? ":" + p2(proj.second) : ""}`;
+}
+
 function _formatMemoryTimestamp(tick){
   if(!_lastCalendar || _lastCalendarWorldTick == null || tick == null) return null;
   const proj = _projectCalendarForward(_lastCalendar, tick - _lastCalendarWorldTick);
   return _formatProjectedTime(proj);
 }
 
-scene.add(
-  new THREE.AmbientLight(0xffffff, 0.6)
-);
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+scene.add(ambientLight);
 
 const light = new THREE.DirectionalLight(
   0xffffff,
   1
 );
+
+// Day and night follow the sim clock: full light by day, dim and blue-ish at night, dawn and dusk in between --
+// before this the scene was lit like noon around the clock, so a household asleep at 1 a.m. looked like it was
+// sleeping in broad daylight.
+function _daylight(minuteOfDay){
+  const m = ((minuteOfDay ?? 720) % 1440 + 1440) % 1440;
+  const ramp = (a, b) => Math.min(1, Math.max(0, (m - a) / (b - a)));
+  return m < 720 ? ramp(5 * 60, 7 * 60 + 30) : 1 - ramp(18 * 60 + 30, 21 * 60);
+}
+function applyDayNight(minuteOfDay){
+  const d = _daylight(minuteOfDay);
+  ambientLight.intensity = 0.18 + 0.42 * d;
+  light.intensity = 0.12 + 0.88 * d;
+  ambientLight.color.setRGB(0.55 + 0.45 * d, 0.6 + 0.4 * d, 0.85 + 0.15 * d);
+}
 
 light.position.set(10,20,10);
 
@@ -2762,6 +2787,15 @@ function getOrCreateBubble(id){
   return speechBubbles[id];
 }
 
+// When a sleeping character wakes, as HH:MM (activity start + duration, projected through the last-fetched calendar).
+function _sleepUntil(c){
+  if(c.activity?.type !== "sleep" || c.activity.phase !== "using" || !_lastCalendar || _lastCalendarWorldTick == null) return null;
+  const wakeTick = (c.activity.phase_started_tick || 0) + (c.activity.duration || 0);
+  const proj = _projectCalendarForward(_lastCalendar, wakeTick - _lastCalendarWorldTick);
+  if(!proj || proj.hour == null) return null;
+  return `${String(proj.hour).padStart(2, "0")}:${String(proj.minute ?? 0).padStart(2, "0")}`;
+}
+
 function updateSpeechBubbles(state){
 
   const active = new Set(
@@ -2810,10 +2844,18 @@ function updateSpeechBubbles(state){
     // manually-set "none" here gets clobbered on the very next frame and the
     // bubble reappears as an empty white box. .visible is the one flag the
     // renderer actually checks before doing that.
+    const wake = !utterance ? _sleepUntil(c) : null;
     if(utterance){
       div.textContent = utterance;
+      div.style.opacity = "";
+      cssObject.visible = true;
+    } else if(wake){
+      // Asleep: say so above them, with when they'll wake (the Status tab shows the full date).
+      div.textContent = `Zzz… until ${wake}`;
+      div.style.opacity = "0.7";
       cssObject.visible = true;
     } else {
+      div.style.opacity = "";
       cssObject.visible = false;
     }
   }
@@ -4754,7 +4796,7 @@ function _clearInspector(){
   const panelIds = [
     "viewerSelection", "viewerRelationshipsTab", "viewerMindTab", "viewerWorriesTab", "viewerOffgridTab",
     "viewerMemoryTab", "viewerConversationsTab", "viewerLifeTab", "viewerPlansTab", "viewerWorkTab",
-    "viewerHabitsTab", "viewerSkillsTab", "viewerMovementTab",
+    "viewerHabitsTab", "viewerSkillsTab", "viewerMovementTab", "viewerArgumentsTab", "viewerStandingTab",
   ];
   for(const id of panelIds){
     const el = document.getElementById(id);
@@ -5116,7 +5158,46 @@ function renderCharacterInspector(id){
   renderHabitsTab(c);
   renderSkillsTab(c);
   renderMovementTab(c, _worldState && _worldState.tick);
+  renderArgumentsTab(c, _socialCtx());
+  renderStandingTab(c, _socialCtx());
 }
+
+// What the Arguments / Standing tabs (socialTabs.js) need from here.
+function _socialCtx(){
+  return {
+    name: (id) => _charName(id) || "someone",
+    esc: _escapeHTML,
+    fmt: _formatMemoryTimestamp,
+    clock: _clockAt,
+    section: _section,
+    empty: _empty,
+    tick: () => _worldState.tick || 0,
+    isCharacter: (id) => !!_worldState.characters?.[id],
+    openConversation: (entry) => openConversationModal(entry),
+    modal: (title, fill) => {
+      const titleEl = document.getElementById("intentionModalTitle");
+      const body = document.getElementById("intentionModalBody");
+      if(!body) return;
+      if(titleEl) titleEl.textContent = title;
+      body.innerHTML = "";
+      body.onclick = null;
+      fill(body);
+      openModal("modal-intention");
+    },
+  };
+}
+
+document.getElementById("viewerArgumentsTab")?.addEventListener("click", (e) => {
+  const card = e.target.closest("[data-arg-id]");
+  const c = _worldState.characters?.[selectedCharacterId];
+  if(card && c) openArgumentModal(c, card.dataset.argId, _socialCtx());
+});
+
+document.getElementById("viewerStandingTab")?.addEventListener("click", (e) => {
+  const card = e.target.closest("[data-standing-id]");
+  const c = _worldState.characters?.[selectedCharacterId];
+  if(card && c) openStandingModal(c, card.dataset.standingId, _socialCtx());
+});
 
 // =========================================================
 // Small shared helpers for the new category tabs below.
@@ -6092,30 +6173,54 @@ const _MEDIUM_LABELS = { in_person: "in person", call: "call", text: "text", ema
 
 let _lastRenderedConversations = [];
 
+// Conversation filter: only conversations with this person (null = everyone). Reset when the selection changes.
+let _convFilter = null;
+let _convFilterCharId = null;
+
+function _convTagsLine(entry){
+  const t = entry.tags;
+  if(!t) return `<div style="opacity:.45;font-size:.85em">not read yet</div>`;
+  const chips = [t.opening && `<span class="viewerChip">${_escapeHTML(t.opening.replace(/_/g, " "))}</span>`,
+                 ...(t.tags || []).map(x => `<span class="viewerChip" style="opacity:.75">${_escapeHTML(x)}</span>`),
+                 entry.argument_id ? `<span class="viewerChip" style="color:#f85149">argument</span>` : ""]
+    .filter(Boolean).join(" ");
+  return `<div style="margin-top:2px"><b>${_escapeHTML(t.subject || "")}</b> ${chips}</div>`;
+}
+
 function _renderConversationLog(c){
-  const log = [...(c.conversation_log || [])].sort((a, b) => (b.ended_tick || 0) - (a.ended_tick || 0));
-  if(!log.length) return _section("Conversations (0)", _empty("No conversations logged yet."));
+  if(_convFilterCharId !== c.id){ _convFilter = null; _convFilterCharId = c.id; }
+  const all = [...(c.conversation_log || [])].sort((a, b) => (b.ended_tick || 0) - (a.ended_tick || 0));
+  if(!all.length) return _section("Conversations (0)", _empty("No conversations logged yet."));
+
+  const people = {};
+  for(const e of all) for(const p of (e.with || [])) people[p.id] = p.name || _charName(p.id) || p.id;
+  const options = [`<option value="">Everyone (${all.length})</option>`].concat(
+    Object.entries(people).sort((a, b) => String(a[1]).localeCompare(String(b[1]))).map(([id, name]) => {
+      const n = all.filter(e => (e.with || []).some(p => p.id === id)).length;
+      return `<option value="${_escapeHTML(id)}" ${_convFilter === id ? "selected" : ""}>${_escapeHTML(name)} (${n})</option>`;
+    }));
+  const filter = `<select id="convFilterSelect" style="width:100%;margin-bottom:8px">${options.join("")}</select>`;
+  const log = _convFilter ? all.filter(e => (e.with || []).some(p => p.id === _convFilter)) : all;
 
   const lines = log.map(entry => {
     const idx = _lastRenderedConversations.length;
     _lastRenderedConversations.push(entry);
     const withNames = entry.with?.map(p => p.name || p.id).join(", ") || "someone";
-    const mediums = (entry.mediums?.length ? entry.mediums : [entry.medium]).map(m => _MEDIUM_LABELS[m] || m || "in person");
-    const medium = [...new Set(mediums)].join(" / ");
+    const medium = _MEDIUM_LABELS[entry.medium] || entry.medium || "in person";
     const stamp = _formatMemoryTimestamp(entry.ended_tick);
-    const lastLine = entry.lines?.length ? entry.lines[entry.lines.length - 1] : null;
-    const excerpt = lastLine ? `"${_escapeHTML(lastLine.utterance)}"` : "(no lines recorded)";
-    const count = entry.lines?.length ? ` · ${entry.lines.length} line${entry.lines.length > 1 ? "s" : ""}` : "";
+    const starter = entry.initiator ? (entry.initiator === c.id ? "you started it" : `${_escapeHTML(_charName(entry.initiator))} started it`) : "";
+    const count = entry.lines?.length ? `${entry.lines.length} line${entry.lines.length > 1 ? "s" : ""}` : "";
+    const ended = entry.end_reason ? `ended: ${_escapeHTML(String(entry.end_reason).replace(/_/g, " "))}` : "";
     return `
     <div class="viewerCard viewerCardClickable" data-conv-index="${idx}">
       ${stamp ? `<div style="opacity:.6">${stamp}</div>` : ""}
-      <div>${withNames} <span style="opacity:.5">(${medium}${entry.topic && entry.topic !== "general" ? `, ${entry.topic}` : ""}${count})</span></div>
-      <div style="opacity:.75">${excerpt}</div>
+      <div>${_escapeHTML(withNames)} <span style="opacity:.5">(${[medium, starter, count, ended].filter(Boolean).join(" · ")})</span></div>
+      ${_convTagsLine(entry)}
       <a href="#" style="opacity:.7;font-size:.85em">details</a>
     </div>`;
   }).join("");
 
-  return _section(`Conversations (${log.length})`, lines);
+  return _section(`Conversations (${log.length})`, filter + (lines || _empty("None with this person.")));
 }
 
 function openConversationModal(entry){
@@ -6126,11 +6231,18 @@ function openConversationModal(entry){
   if(titleEl) titleEl.textContent = `Conversation with ${withNames}`;
   body.innerHTML = "";
 
+  const t = entry.tags || {};
   const meta = [
     ["Medium", [...new Set((entry.mediums?.length ? entry.mediums : [entry.medium]).map(m => _MEDIUM_LABELS[m] || m))].join(" / ")],
-    ["Topic", entry.topic],
+    ["Subject", t.subject || (entry.tags ? null : "not read yet")],
+    ["Started by", entry.initiator ? _charName(entry.initiator) : null],
+    ["Opened with", t.opening ? t.opening.replace(/_/g, " ") : null],
+    ["Tags", (t.tags || []).join(", ") || null],
+    ["Follows on from", t.relates_to ? (_formatMemoryTimestamp(((_worldState.characters?.[selectedCharacterId]?.conversation_log) || []).find(e => (e.id || e.conv_id) === t.relates_to)?.ended_tick) || t.relates_to) : null],
+    ["Argument", t.argument ? `${t.argument.subject} (${t.argument.type.replace(/_/g, " ")}, started by ${t.argument.started_by || "?"})` : null],
+    ["About others", (t.about_others || []).map(a => `${a.said_by} on ${a.name}: ${a.claim}${a.rumour ? " (rumour)" : ""}`).join("; ") || null],
     ["Started", _formatMemoryTimestamp(entry.started_tick)],
-    ["Ended", _formatMemoryTimestamp(entry.ended_tick)],
+    ["Ended", `${_formatMemoryTimestamp(entry.ended_tick) || ""}${entry.end_reason ? ` (${String(entry.end_reason).replace(/_/g, " ")})` : ""}`],
   ];
   for(const [k, v] of meta){
     if(v == null || v === "") continue;
@@ -6155,13 +6267,20 @@ function openConversationModal(entry){
         ? `<div style="opacity:.55;font-size:.85em;margin:10px 0 4px;border-top:1px solid #292d35;padding-top:4px">${_formatMemoryTimestamp(l.tick) || ""}</div>` : "";
       lastConv = l.conv_id || lastConv;
       const repeats = l.repeats > 1 ? ` <span style="opacity:.6">×${l.repeats}</span>` : "";
-      return `${heading}<div style="margin-bottom:6px;"><b>${_escapeHTML(speakerName)}:</b> ${_escapeHTML(l.utterance)}${repeats}
+      return `${heading}<div style="margin-bottom:6px;"><span style="opacity:.5;font-size:.85em;font-variant-numeric:tabular-nums">${_clockAt(l.tick)}</span> <b>${_escapeHTML(speakerName)}:</b> ${_escapeHTML(l.utterance)}${repeats}
         <span style="opacity:.5;font-size:.85em">(${_escapeHTML(l.speech_act || "")})</span></div>`;
     }).join("");
   }
   body.appendChild(transcript);
   openModal("modal-intention");
 }
+
+document.getElementById("viewerConversationsTab")?.addEventListener("change", (e) => {
+  if(e.target?.id !== "convFilterSelect") return;
+  _convFilter = e.target.value || null;
+  const c = _worldState.characters?.[selectedCharacterId];
+  if(c) renderConversationsTab(c);
+});
 
 document.getElementById("viewerConversationsTab")?.addEventListener("click", (e) => {
   const convCard = e.target.closest("[data-conv-index]");
@@ -7337,6 +7456,8 @@ const VIEWER_TAB_PANELS = {
   habits:        "viewerHabitsTab",
   skills:        "viewerSkillsTab",
   movement:      "viewerMovementTab",
+  arguments:     "viewerArgumentsTab",
+  standing:      "viewerStandingTab",
 };
 
 document.getElementById("viewerTabs")?.addEventListener("click", (e) => {

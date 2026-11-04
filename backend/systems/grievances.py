@@ -144,6 +144,10 @@ def add_grievance(c, caused_by_id, event_type, world, severity=None, details=Non
         "tick":        world["tick"],
         "details":     details or {},
     })
+    # how worked up they are at them now, and a point on their standing history (systems/feelings.py)
+    from systems.feelings import agitate
+    agitate(c, caused_by_id, world, min(40.0, base_severity * 2),
+            cause=f"grievance: {str(event_type).replace('_', ' ')}")
 
 
 def get_grievance_score(c, against_id):

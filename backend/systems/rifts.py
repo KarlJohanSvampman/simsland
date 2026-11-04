@@ -159,6 +159,9 @@ def on_conflict_resolved(world, data):
         rel["resentment"] = min(100, (rel.get("resentment") or 0) + FIGHT_RESENTMENT.get(outcome, 0))
         if outcome == "physical_resolved":
             rel["hostility"] = min(100, (rel.get("hostility") or 0) + 30)
+        from systems.feelings import agitate
+        agitate(c, other["id"], world, 50 if outcome == "physical_resolved" else 25,
+                cause=f"fight about {topic} ({outcome.replace('_', ' ')})")
         if standing(c, other["id"]) >= STANDING_BAD:
             continue
         rift = open_rift(c, world, other["id"], topic, physical=outcome == "physical_resolved")
@@ -338,6 +341,8 @@ def _repair(c, other_id):
 
 
 def _close(c, world, other, how):
+    from systems.conversation_archive import resolve_between
+    resolve_between(world, c["id"], other["id"], how)
     for a, b in ((c, other), (other, c)):
         rift = (a.get("rifts") or {}).get(b["id"])
         _repair(a, b["id"])

@@ -220,6 +220,9 @@ def _on_conflict_resolved(data, world):
                                  incident_id=inc["id"] if inc else None)
         if inc:
             inc["fight_id"] = entry["id"]
+        # filed under the argument between them (systems/conversation_archive.py)
+        from systems.conversation_archive import file_fight
+        file_fight(world, entry)
 
     for c in parties:
         others = [p["id"] for p in parties if p["id"] != c["id"]]

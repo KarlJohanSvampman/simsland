@@ -80,6 +80,7 @@ check("... nobody moves out on the spot", not r.get("temporary_residence") and n
 
 # ---- trying, and getting nowhere -------------------------------------------------------------------------------------
 rifts._receptive = lambda other, cid: -1.0              # nobody comes round in this part
+rifts.LEAVE_CHANCE = 0.0                                 # ... and nobody leaves yet
 advance(w, rifts.FIRST_TRY_TICKS + 1)
 settle_conflicts(w, "cold_shoulder")
 check("a few hours later he recalls what led to it", mems(r, "things have been bad with kathleen", "the dishes"),

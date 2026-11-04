@@ -67,6 +67,7 @@ def setup():
     k, s = w["characters"]["kathleen"], w["characters"]["susan"]
     for c in (k, s):
         c.update(memories=[], active_intentions=[], age_group="child")
+    s.update(x=k["x"] + 1, y=k["y"], building_id=k.get("building_id"))      # talking face to face, in earshot
     intents.add_intention(k, {"type": "play_with_friend", "category": "social", "priority": 48, "target_id": "susan",
                               "reason": "Susan Moreau lives close by"})
     conv = get_or_create_conversation(w, ["kathleen", "susan"], topic="general", medium="in_person")
@@ -135,6 +136,7 @@ w, k, s, conv = setup()
 s["activity"] = {"type": "socialize", "target_id": "kathleen", "phase": "using"}
 say(w, conv, "kathleen", "So how was school?", "ask")
 w["tick"] = conv["started_at"] + co.MAX_TICKS
+conv["last_update"] = w["tick"] - 5                 # still talking, just for too long
 co.tick(w)
 check(f"{co.MAX_TICKS // 60} sim-minutes and nothing settled: it ends", not conv.get("active")
       and conv["end_reason"] == "timed_out")
