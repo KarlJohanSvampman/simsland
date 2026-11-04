@@ -45,7 +45,8 @@ MAX_ATTEMPTS = 3
 STAY_DAYS = 7
 DAY = 86400
 FIRST_TRY_TICKS = 4 * 3600      # a few hours to cool off before the first try
-LEAVE_CHANCE = 0.6              # once it's come to that, per daily consideration
+NOTICE_DAYS = (2, 3)            # leaving is announced this many days ahead
+POSTPONE_GAP = 20 * 3600        # an attempt to mend things holds it off a day, at most once a day
 AWAY_DAYS = (2, 5)
 PICKUP_DAYS = (2, 4)
 PICKUPS = 3
@@ -146,6 +147,13 @@ def on_conflict_resolved(world, data):
     if reconciling:
         c = chars.get(conflict.get("initiator"))
         other = b if c is a else a
+        success = outcome in ("agreement", "de_escalated")
+        if c is not None and not ((c.get("rifts") or {}).get(other["id"]) or {}).get("status") == "open" \
+                and ((other.get("rifts") or {}).get(c["id"]) or {}).get("status") == "open":
+            # the one who had the rift (and maybe a notice) is the other: the attempt came to them
+            if success:
+                _close(other, world, c, f"{c.get('name')} came to me and we worked it out")
+            return
         if c is not None:
             how = (conflict.get("resolution") or {}).get("outcome")
             _attempt_result(c, world, other, _approach_of(conflict), success=outcome in ("agreement", "de_escalated"),
@@ -299,6 +307,11 @@ def _close(c, world, other, how):
         rift = (a.get("rifts") or {}).get(b["id"])
         _repair(a, world, b["id"])
         (a.get("wants_to_repair") or {}).pop(b["id"], None)
+        if rift and rift.get("notice"):
+            rift.pop("notice", None)
+            scheduler.cancel(world, _owner(a), f"leave:{b['id']}")
+        if rift:
+            rift.pop("may_leave", None)
         if rift:
             rift["status"] = "resolved"
             rift["resolved_tick"] = world.get("tick", 0)
@@ -339,17 +352,133 @@ _PURPOSE_WORDS = {
 
 
 def consider_leaving(c, world, other, rift):
-    if not _can_leave(c, world):
+    """It has come to this (MAX_ATTEMPTS tries, or STAY_DAYS days): leaving is now theirs to decide. Nothing is
+    rolled -- they're woken with it on their mind, and announce_leaving / staying is their choice."""
+    if not _can_leave(c, world) or rift.get("notice"):
         return False
-    days = (world.get("tick", 0) - rift["since"]) // DAY
-    if random.random() >= LEAVE_CHANCE:
-        _mem(c, world, f"I thought about leaving for a while because of how things are with {other.get('name')} "
-                       f"({days} days now), but I'm staying for now.", people=[other["id"]])
+    if not rift.get("may_leave"):
+        rift["may_leave"] = world.get("tick", 0)
+        days = (world.get("tick", 0) - rift["since"]) // DAY
+        _mem(c, world, f"I've started to think about leaving for a while because of how things are with "
+                       f"{other.get('name')} ({days} days now).", people=[other["id"]])
+    from brain.cognition_scheduler import wake_character
+    wake_character(c, world, "considering_leaving", {"target_id": other["id"], "target_name": other.get("name")})
+    return False
+
+
+def _rift_by_name(c, world, about):
+    rifts = {oid: r for oid, r in (c.get("rifts") or {}).items() if r.get("status") == "open"}
+    if about in rifts:
+        return about, rifts[about]
+    from social.core import id_by_name
+    oid = id_by_name(world, about, among=list(rifts)) if about else None
+    if oid:
+        return oid, rifts[oid]
+    if len(rifts) == 1:
+        return next(iter(rifts.items()))
+    return None, None
+
+
+def announce(world, data):
+    """They've decided: they're leaving in 2-3 days (systems/action_router.py "announce_leaving")."""
+    chars = world.get("characters") or {}
+    c = chars.get(data.get("character_id"))
+    if not c:
+        return
+    oid, rift = _rift_by_name(c, world, data.get("about"))
+    other = chars.get(oid)
+    if not rift or not other or rift.get("notice") or not _can_leave(c, world):
+        return
+    try:
+        days = int(data.get("days") or NOTICE_DAYS[0])
+    except (TypeError, ValueError):
+        days = NOTICE_DAYS[0]
+    days = max(NOTICE_DAYS[0], min(NOTICE_DAYS[1], days))
+    purpose = data.get("purpose") if data.get("purpose") in ("time_away", "moving_out") else None
+    tick = world.get("tick", 0)
+    rift["notice"] = {"announced": tick, "leave_tick": tick + days * DAY, "days": days, "purpose": purpose,
+                      "why": str(data.get("reason") or "")[:200], "postponed": 0, "last_postponed": None,
+                      "attempts_seen": []}
+    scheduler.schedule(world, _owner(c), f"leave:{oid}", tick + days * DAY)
+    what = "for good" if purpose == "moving_out" else "for a while"
+    _mem(c, world, f"I told them I'm leaving {what} in {days} days because of how things are with "
+                   f"{other.get('name')}" + (f": {rift['notice']['why']}" if rift['notice']['why'] else "") + ".",
+         0.7, people=[oid], tags=("rift", "notice"))
+    for m in _housemates(c, world):
+        if m["id"] == oid:
+            _mem(m, world, f"{c.get('name')} says they're leaving {what} in {days} days because of me -- "
+                           f"unless things change between us.", 0.75, people=[c["id"]], tags=("rift", "notice"))
+            from brain.cognition_scheduler import wake_character
+            wake_character(m, world, "housemate_leaving", {"target_id": c["id"], "target_name": c.get("name")})
+        else:
+            _mem(m, world, f"{c.get('name')} says they're leaving {what} in {days} days, because of "
+                           f"{other.get('name')}.", 0.6, people=[c["id"], oid], tags=("rift", "notice"))
+
+
+def call_off(world, data):
+    """They've changed their mind and are staying."""
+    chars = world.get("characters") or {}
+    c = chars.get(data.get("character_id"))
+    if not c:
+        return
+    oid, rift = _rift_by_name(c, world, data.get("about"))
+    if not rift or not rift.get("notice"):
+        return
+    _cancel_notice(c, world, oid, rift, f"I've decided to stay after all" +
+                   (f": {data['reason']}" if data.get("reason") else "."))
+
+
+def _cancel_notice(c, world, oid, rift, line):
+    rift.pop("notice", None)
+    scheduler.cancel(world, _owner(c), f"leave:{oid}")
+    _mem(c, world, line, 0.6, people=[oid], tags=("rift", "notice"))
+    for m in _housemates(c, world):
+        _mem(m, world, f"{c.get('name')} isn't leaving after all.", 0.55, people=[c["id"]], tags=("rift", "notice"))
+
+
+def note_attempt(world, attempter_id, noticer_id):
+    """attempter is trying to mend things with someone who has said they're leaving because of them: that's worth
+    holding off a day for (at most once a day). If they stop trying, the notice runs out and they go."""
+    chars = world.get("characters") or {}
+    c, other = chars.get(noticer_id), chars.get(attempter_id)
+    rift = ((c or {}).get("rifts") or {}).get(attempter_id) if c else None
+    n = (rift or {}).get("notice")
+    if not n or not other:
+        return False
+    tick = world.get("tick", 0)
+    n["attempts_seen"].append(tick)
+    del n["attempts_seen"][:-10]
+    if n.get("last_postponed") is not None and tick - n["last_postponed"] < POSTPONE_GAP:
+        return False
+    # at least a day left from now: one more day to see whether they mean it
+    n["leave_tick"] = max(n["leave_tick"], tick) + DAY if n["leave_tick"] - tick < DAY else n["leave_tick"] + DAY
+    n["postponed"] += 1
+    n["last_postponed"] = tick
+    scheduler.cancel(world, _owner(c), f"leave:{attempter_id}")
+    scheduler.schedule(world, _owner(c), f"leave:{attempter_id}", n["leave_tick"])
+    _mem(c, world, f"{other.get('name')} is trying to make things right. I'll hold off leaving another day "
+                   f"and see whether they mean it.", 0.6, people=[attempter_id], tags=("rift", "notice"))
+    return True
+
+
+def _leave_now(c, world, other, rift):
+    """The notice has run out with no one meeting them halfway: they go."""
+    n = rift.pop("notice", None) or {}
+    if not _can_leave(c, world):
+        scheduler.schedule_in(world, _owner(c), f"leave:{other['id']}", 6 * 3600)
+        rift["notice"] = n
         return False
     purpose, host = _purpose(c, world, other, rift)
+    if n.get("purpose") == "moving_out" and host:
+        purpose = "moving_out"
+    elif n.get("purpose") == "time_away" and purpose == "moving_out":
+        purpose = "time_away"
     tick = world.get("tick", 0)
-    why = (f"{rift['attempts']} tries at making it right with {other.get('name')} got nowhere"
-           if rift["attempts"] >= MAX_ATTEMPTS else f"{days} days of bad blood with {other.get('name')}")
+    days = (tick - rift["since"]) // DAY
+    why = n.get("why") or (f"{rift['attempts']} tries at making it right with {other.get('name')} got nowhere"
+                           if rift["attempts"] >= MAX_ATTEMPTS else f"{days} days of bad blood with {other.get('name')}")
+    if n.get("postponed"):
+        why += f" (held off {n['postponed']} day{'s' if n['postponed'] != 1 else ''} while they tried, then they stopped)"
     words = _PURPOSE_WORDS[purpose].format(name=other.get("name"))
     if host:
         h_other, host_household, is_family, _chance = host
@@ -404,6 +533,7 @@ def _come_back(c, world, other, rift):
         scheduler.schedule_in(world, _owner(c), f"return:{other['id']}", DAY)
         return
     rift["status"] = "open"
+    rift.pop("may_leave", None)
     rift["back_tick"] = world.get("tick", 0)
     rift["returns"] = rift.get("returns", 0) + 1
     rift["attempts"] = max(0, MAX_ATTEMPTS - 1)      # one more real try after coming back
@@ -461,14 +591,16 @@ def on_timer(world, entry):
             return
         days = (world.get("tick", 0) - rift.get("back_tick", rift["since"])) // DAY    # since coming back, if they've been away
         if rift["attempts"] >= MAX_ATTEMPTS or days >= STAY_DAYS:
-            if consider_leaving(c, world, other, rift):
-                return
+            consider_leaving(c, world, other, rift)
         if c.get("off_grid") or c.get("travel_state") or (c.get("activity") or {}).get("type") == "sleep":
             scheduler.schedule_in(world, _owner(c), f"try:{other_id}", 2 * 3600)   # not now: in a couple of hours
             return
         try_once(c, world, other)
         if rift.get("status") == "open":
             scheduler.schedule_in(world, _owner(c), f"try:{other_id}", DAY)
+    elif kind == "leave" and rift.get("status") == "open" and rift.get("notice"):
+        if world.get("tick", 0) >= rift["notice"]["leave_tick"]:
+            _leave_now(c, world, other, rift)
     elif kind == "return" and rift.get("status") == "away":
         _come_back(c, world, other, rift)
     elif kind == "pickup" and rift.get("status") == "moving_out":
@@ -476,6 +608,10 @@ def on_timer(world, entry):
 
 
 scheduler.register(OWNER, on_timer)
+
+from core.event_bus import subscribe as _subscribe   # noqa: E402
+_subscribe("leaving_announced", lambda data, world: announce(world, data))
+_subscribe("leaving_called_off", lambda data, world: call_off(world, data))
 scheduler.register_recurring("riftscan", on_timer, SCAN_EVERY, offset=1234)
 
 
@@ -497,6 +633,20 @@ def context_lines(c, world):
             want = (c.get("wants_to_repair") or {}).get(oid) or {}
             go = _name(world, want["go_between"]) if want.get("go_between") else None
             tried = ", ".join(t.replace("_", " ") for t in rift.get("tried") or []) or "nothing yet"
+            n = rift.get("notice")
+            if n:
+                left = max(0, n["leave_tick"] - tick)
+                when = f"in {round(left / DAY, 1)} days" if left >= DAY else f"in {max(1, round(left / 3600))} hours"
+                lines.append(f"You've told the household you're leaving {'for good' if n.get('purpose') == 'moving_out' else 'for a while'} "
+                             f"{when}, because of {name}. Each day {name.split(' ')[0]} genuinely tries to meet you halfway, "
+                             f"you hold off another day"
+                             + (f" (you've held off {n['postponed']} so far)" if n.get("postponed") else "")
+                             + ". You can also call it off and stay.")
+                continue
+            if rift.get("may_leave"):
+                lines.append(f"It has come to the point where you're thinking about leaving home for a while -- or for "
+                             f"good -- because of {name}. If you decide to, you'd tell the others 2 or 3 days ahead "
+                             f"(announce_leaving). Or you stay and keep trying. It's your call.")
             lines.append(f"Things are bad between you and {name} (over {topic}, {days} day{'s' if days != 1 else ''}). "
                          f"You've tried {rift.get('attempts', 0)} time{'s' if rift.get('attempts', 0) != 1 else ''} "
                          f"to make it right ({tried}). Ways forward: give in and apologise, sit down and agree "
@@ -507,4 +657,18 @@ def context_lines(c, world):
             lines.append(f"You're away from home, {_PURPOSE_WORDS.get(rift.get('purpose'), 'for a while').format(name=name)}.")
         else:
             lines.append(f"You've left home for good because of {name}; you go back now and then for your things.")
+    # someone else in the house has said they're leaving: because of you, or not
+    for m in _housemates(c, world):
+        for oid, rift in (m.get("rifts") or {}).items():
+            n = rift.get("notice")
+            if not n or rift.get("status") != "open":
+                continue
+            left = max(0, n["leave_tick"] - tick)
+            when = f"in about {round(left / DAY, 1)} days" if left >= DAY else "within hours"
+            if oid == c["id"]:
+                lines.append(f"{m.get('name')} has said they're leaving {when} because of how things are with you. "
+                             f"Each day you genuinely try to make it right -- meet them halfway -- they hold off a day; "
+                             f"stop trying and they go.")
+            else:
+                lines.append(f"{m.get('name')} has said they're leaving {when}, because of {_name(world, oid)}.")
     return lines

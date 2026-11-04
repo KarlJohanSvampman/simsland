@@ -112,6 +112,13 @@ def on_line(data, world):
                 if conf:
                     break
     rift = ((speaker.get("rifts") or {}).get(target_id) or {}) if target_id else {}
+    their_rift = (((cs.get(target_id) or {}).get("rifts") or {}).get(speaker_id) or {}) if target_id else {}
+    if target_id and their_rift.get("notice") and social.get("intent") in REPAIRING:
+        # they've said they're leaving because of the speaker, and the speaker is trying: a day's grace
+        from systems.rifts import note_attempt
+        note_attempt(world, speaker_id, target_id)
+        if not rift.get("status") == "open":
+            rift = their_rift
     if conf is None and target_id and rift.get("status") == "open" and social.get("intent") in REPAIRING:
         conf = X.start(world, speaker_id, target_id, ctype="negotiation", conversation_id=conv.get("id"),
                        problem=social.get("issue") or (rift.get("topics") or [None])[-1],

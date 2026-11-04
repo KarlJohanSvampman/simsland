@@ -2716,6 +2716,12 @@ def route_action(c, world, action, speech, definitions=None, available_actions=N
 
     elif action_type == "confront":
         _route_confront(c, world, action)
+    elif action_type in ("announce_leaving", "call_off_leaving"):
+        # systems/rifts.py, on the main thread
+        from core.event_bus import emit
+        emit("leaving_" + ("announced" if action_type == "announce_leaving" else "called_off"),
+             {"character_id": c["id"], "about": action.get("about") or action.get("target"),
+              "days": action.get("days"), "purpose": action.get("purpose"), "reason": action.get("reason")})
     elif action_type == "call_911":
         _route_call_911(c, world, action)
     elif action_type == "call_parent":

@@ -88,7 +88,6 @@ check("... nobody moves out on the spot", not r.get("temporary_residence") and n
       and not k.get("temporary_residence") and not k.get("off_grid"))
 
 # ---- trying, and getting nowhere -------------------------------------------------------------------------------------
-rifts.LEAVE_CHANCE = 0.0                                 # nobody leaves yet
 advance(w, rifts.FIRST_TRY_TICKS + 1)
 check("a few hours later he's woken wanting to find a way forward", "kathleen" in (r.get("wants_to_repair") or {})
       and r["cognition"].get("wake_reason") in (None, "wants_to_repair") or r.get("wants_to_repair"))
@@ -103,18 +102,66 @@ advance(w, rifts.DAY)
 settle_conflicts(w, "unresolved")
 check("what he tried is recorded", len(r["rifts"]["kathleen"]["tried"]) >= 2, str(r["rifts"]["kathleen"]))
 
-# ---- after three tries he considers leaving: time away, with a purpose ----------------------------------------------
-rifts.LEAVE_CHANCE = 1.0
+# ---- after three tries leaving is on his mind -- his decision, with notice ---------------------------------------
 for _ in range(3):
     advance(w, rifts.DAY)
     settle_conflicts(w, "unresolved")
-    if (r.get("temporary_residence") or r.get("off_grid")):
-        break
+rk = r["rifts"]["kathleen"]
+check("three tries with nothing: leaving is on his mind, nothing rolled -- he hasn't gone",
+      rk.get("may_leave") and not r.get("temporary_residence") and not r.get("off_grid"), str(rk))
+check("... his prompt says it's his call, with 2-3 days' notice", any("announce_leaving" in l for l in rifts.context_lines(r, w)))
+
+
+def announce(days=2, purpose="time_away"):
+    event_bus.emit("leaving_announced", {"character_id": "robert", "about": "Kathleen", "days": days,
+                                         "purpose": purpose, "reason": "we just keep fighting"})
+    event_bus.flush(w)
+
+
+announce(days=5)
+n = rk.get("notice") or {}
+check("he announces it: 2-3 days ahead (5 is held to 3)", n.get("days") == 3 and n["leave_tick"] == w["tick"] + 3 * rifts.DAY, str(n))
+check("... the household is told, Kathleen that it's because of her", mems(k, "leaving for a while in 3 days because of me")
+      and mems(j, "leaving for a while in 3 days") if "joseph" in [m["id"] for m in rifts._housemates(r, w)]
+      else mems(k, "leaving for a while in 3 days because of me"), str([m["text"] for m in k["memories"]][-2:]))
+check("... and her prompt says trying to make it right holds him off", any("each day you genuinely try" in l.lower()
+      for l in rifts.context_lines(k, w)))
+event_bus.emit("leaving_called_off", {"character_id": "robert", "about": "Kathleen", "reason": "I'll give it time"})
+event_bus.flush(w)
+check("he can call it off", not rk.get("notice") and mems(k, "isn't leaving after all"))
+announce(days=2)
+leave_at = rk["notice"]["leave_tick"]
+
+from brain.conversations import create_conversation, add_message
+from social import discourse
+
+
+def kathleen_tries():
+    conv = create_conversation(w, ["kathleen", "robert"], topic="general")
+    w["tick"] += 3
+    add_message(w, conv, "kathleen", "I'm sorry about the dishes. Can we talk?", "apology", "general", w["tick"])
+    discourse.on_line({"conversation_id": conv["id"], "speaker_id": "kathleen", "target_id": "robert",
+                       "utterance": "I'm sorry", "social": {"intent": "apologise", "escalation": "de-escalate"}}, w)
+    return conv
+
+
+advance(w, rifts.DAY + 60)
+kathleen_tries()
+check("Kathleen tries to make it right: he holds off another day", rk["notice"]["leave_tick"] == leave_at + rifts.DAY
+      and mems(r, "hold off leaving another day"), str(rk["notice"]))
+kathleen_tries()
+check("... once a day, not per sentence", rk["notice"]["leave_tick"] == leave_at + rifts.DAY)
+from social import confrontations as XX
+for conf in XX.active(w):
+    XX.end(w, conf, "unresolved")
+event_bus.flush(w)
+# then she stops trying: the notice runs out and he goes
+advance(w, 2 * rifts.DAY + 1)
 res = r.get("temporary_residence") or {}
-check("three tries with nothing: he leaves for a while, to stay with his close friend Joseph",
-      res.get("host_id") == "joseph" and res.get("purpose") == "time_away", str(res) + str(r["rifts"]["kathleen"]))
-check("... and knows why he's going", mems(r, "leaving to get some distance from kathleen"),
-      str([m["text"] for m in r["memories"]][-2:]))
+check("she stops trying: the notice runs out and he leaves, to stay with his close friend Joseph",
+      res.get("host_id") == "joseph" and res.get("purpose") == "time_away", str(res) + str(rk))
+check("... and knows why he's going, including the day he held off", mems(r, "leaving to get some distance from kathleen")
+      and mems(r, "held off 1 day"), str([m["text"] for m in r["memories"]][-2:]))
 check("... Kathleen notices he's gone", mems(k, "robert okafor has left for a while"))
 check("... he heads for Joseph's house", (r.get("move_target") or {}).get("target_id") == "building:starter_house_1"
       or r.get("is_moving"), str(r.get("move_target")))
@@ -133,13 +180,15 @@ check("... with standing back above the line", rifts.standing(r, "kathleen") >= 
 
 # ---- beyond repair: moving out, and coming back for his things -----------------------------------------------------
 w, k, r, j = setup()
-rifts.LEAVE_CHANCE = 1.0
 bad_fight(w, r, k, outcome="physical_fight", topic="money", physical=True)
 for _ in range(10):
     advance(w, rifts.DAY)
     settle_conflicts(w, "unresolved")
-    if r.get("temporary_residence"):
+    if r["rifts"]["kathleen"].get("may_leave"):
         break
+event_bus.emit("leaving_announced", {"character_id": "robert", "about": "Kathleen", "days": 2, "purpose": "moving_out"})
+event_bus.flush(w)
+advance(w, 2 * rifts.DAY + 1)
 res = r.get("temporary_residence") or {}
 check("a fight that got physical and won't mend: he moves out", res.get("purpose") == "moving_out", str(res))
 for _ in range(rifts.PICKUPS):
@@ -148,6 +197,26 @@ check("... coming back every few days for his things, which Kathleen sees", len(
       str(mems(k, "came by")))
 check("... until the last of them: moved out", r["rifts"]["kathleen"]["status"] == "moved_out"
       and mems(k, "they've moved out"))
+
+# ---- on notice, and she wins him round: he stays --------------------------------------------------------------------
+w, k, r, j = setup()
+bad_fight(w, r, k)
+for _ in range(6):
+    advance(w, rifts.DAY)
+    settle_conflicts(w, "unresolved")
+    if r["rifts"]["kathleen"].get("may_leave"):
+        break
+event_bus.emit("leaving_announced", {"character_id": "robert", "about": "Kathleen", "days": 2})
+event_bus.flush(w)
+conv = kathleen_tries()
+conf = XX.get(w, conv.get("related_confrontation_id"))
+check("her try is a reconciliation he takes part in", conf and conf["reconciliation"])
+XX.end(w, conf, "mutual_understanding")
+event_bus.flush(w)
+check("they work it out: the rift is closed and the notice with it -- he stays",
+      r["rifts"]["kathleen"]["status"] == "resolved" and not r["rifts"]["kathleen"].get("notice"))
+advance(w, 4 * rifts.DAY)
+check("... and he doesn't leave when the notice would have run out", not r.get("temporary_residence") and not r.get("off_grid"))
 
 # ---- bad standing alone, and children ------------------------------------------------------------------------------
 w, k, r, j = setup()

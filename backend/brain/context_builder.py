@@ -990,6 +990,14 @@ def build_available_actions(c, world):
     if nearby_people and not build_conflict_context(c, world):
         action_types.append("confront")
 
+    # Leaving home over a rift is the character's own decision (systems/rifts.py): offered once it has come to that,
+    # and calling it off while they're on notice.
+    _rifts = [r for r in (c.get("rifts") or {}).values() if r.get("status") == "open"]
+    if any(r.get("may_leave") and not r.get("notice") for r in _rifts):
+        action_types.append("announce_leaving")
+    if any(r.get("notice") for r in _rifts):
+        action_types.append("call_off_leaving")
+
     active_incidents = [
         inc for inc in _build_incident_context(c, world)
         if not inc["reported"] and inc["offender_id"] != cid        # the one who did it does not report it
