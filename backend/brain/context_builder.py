@@ -2012,6 +2012,12 @@ def _sec_grievances(c, world):
     return f"You're still bothered by {top['with']} over {', '.join(top['top_issues'])}."
 
 
+def _sec_ai_blackout(c, world):
+    """Someone nearby who can't think straight (systems/ai_blackout.py)."""
+    from systems.ai_blackout import context_lines
+    return context_lines(c, world) or None
+
+
 def _sec_conflict(c, world):
     """Standing, frustration, issues, confrontations, agreements, what's been heard (social/context.py)."""
     from social.context import lines
@@ -2471,6 +2477,7 @@ NARRATIVE_SECTIONS = [
     ("relationships",         "full", _sec_relationships),
     ("grievances",            "full", _sec_grievances),
     ("conflict",              "core", _sec_conflict),
+    ("ai_blackout",           "core", _sec_ai_blackout),
     ("memories",              "full", _sec_memories),
     ("remembered_about",      "full", _sec_remembered_about),
     ("sighting_recall",       "full", _sec_sighting_recall),

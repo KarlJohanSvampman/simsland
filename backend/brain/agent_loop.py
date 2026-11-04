@@ -455,6 +455,13 @@ def process_decision(
     # THOUGHT
     # =====================================
 
+    # The AI couldn't answer for them (systems/ai_blackout.py): no stand-in decision -- they can't think straight.
+    from systems import ai_blackout
+    if ((decision or {}).get("action") or {}).get("fallback") and not decision["action"].get("blackout"):
+        decision = ai_blackout.decision(c, world, why=decision["action"].get("reason"))
+    elif not ((decision or {}).get("action") or {}).get("fallback"):
+        ai_blackout.on_success(c, world)
+
     c["last_thought"] = (
         decision.get(
             "thought"

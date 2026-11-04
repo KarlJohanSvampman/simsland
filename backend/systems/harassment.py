@@ -118,6 +118,11 @@ def consume_alcohol(c, units, world):
     Called when a character drinks something with alcohol_units.
     units: standard alcohol units (1 unit ≈ 1 glass of wine)
     """
+    try:
+        from systems.ai_blackout import on_intoxicant
+        on_intoxicant(c, world, "a drink")
+    except Exception:
+        pass
     init_intoxication_state(c)
     state = c["intoxication_state"]
     # Each unit raises level by ~0.08 (capped at 1.0)
@@ -127,6 +132,11 @@ def consume_alcohol(c, units, world):
 
 def consume_drug(c, drug_id, world):
     """Called when a character consumes a drug item."""
+    try:
+        from systems.ai_blackout import on_intoxicant
+        on_intoxicant(c, world, str(drug_id).replace("_", " "))
+    except Exception:
+        pass
     init_intoxication_state(c)
     state = c["intoxication_state"]
     # Generic drug effect — can be tuned by drug_id later

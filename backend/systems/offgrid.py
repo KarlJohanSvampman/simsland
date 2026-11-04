@@ -1349,6 +1349,9 @@ def process_return(c, world):
 
     reason = c.get("off_grid_reason") or "outing"
     is_event = reason.startswith("event:")
+    if reason == "hospital":
+        from systems.ai_blackout import on_hospital_return
+        on_hospital_return(c, world)
 
     # Real fatigue/energy cost, scaled by how long the trip actually took --
     # replaces the old flat MAX_OFFGRID_TRIPS_PER_DAY counter (removed from

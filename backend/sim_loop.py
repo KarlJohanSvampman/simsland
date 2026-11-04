@@ -44,6 +44,7 @@ import systems.path_debug     # noqa: F401 -- registers the "pathalarm" handler 
 import systems.movement_log   # noqa: F401 -- registers the 15-second movement sampling job
 import systems.feelings       # noqa: F401 -- registers the daily standing snapshot
 import systems.conversation_archive  # noqa: F401 -- registers the conversation-tagging job
+import systems.ai_blackout   # noqa: F401 -- the AI not answering: confusion, and the episode's timer
 import social.tick           # noqa: F401 -- social discourse: handlers, the old-data conversion, upkeep
 import systems.rifts          # noqa: F401 -- registers the rift timers and the hourly standing scan
 import systems.guests         # noqa: F401 -- registers the "guest" timeout handler (visits, being asked to leave)
