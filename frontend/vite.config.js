@@ -9,7 +9,9 @@ export default defineConfig({
       "/resources": "http://localhost:8000",
       "/debug": "http://localhost:8000",
       "/view": "http://localhost:8000",
-      "/admin": "http://localhost:8000"
+      "/admin": "http://localhost:8000",
+      "/director": "http://localhost:8000",
+      "/ws": { target: "ws://localhost:8000", ws: true }
     }
   },
 

@@ -13,7 +13,7 @@
 // path through nginx's /director proxy -- works identically whether this
 // page is served by the built nginx container or a local `npm run dev`.
 
-const DIRECTOR_BASE = `http://${location.hostname}:8000/director`;
+const DIRECTOR_BASE = `/director`;   // same origin, proxied by nginx
 
 const targetEl          = document.getElementById("directorTarget");
 const interruptBtn      = document.getElementById("directorInterruptBtn");

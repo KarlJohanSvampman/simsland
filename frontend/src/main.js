@@ -491,7 +491,7 @@ let _lastCalendar = null;
 let _lastCalendarWorldTick = null;
 
 (function setupClockPanel(){
-  const ADMIN_BASE = `http://${location.hostname}:8000/admin`;
+  const ADMIN_BASE = `/admin`;   // same origin (nginx proxies it): a page served from :3000 may not reach :8000 (the Claude app's browser blocks it)
 
   const toggleBtn = document.createElement("button");
   toggleBtn.id = "clockToggleBtn";
@@ -3384,8 +3384,7 @@ async function fetchPerceptionRanges(id){
     // (/api, /resources, /debug are all proxied through nginx in
     // production and vite's dev-server proxy locally; /view is added
     // alongside them in both nginx.conf and vite.config.js for this).
-    // The WS connection is the one deliberate exception (an absolute
-    // host:8000 URL) -- not a pattern to extend to plain fetches.
+    // The WS connection goes through the same origin too (nginx /ws).
     const resp = await fetch(`/view/perception-range/${encodeURIComponent(id)}?sim_id=default`);
     if(!resp.ok) return;
     const data = await resp.json();
@@ -8305,7 +8304,7 @@ async function _applyDelta(delta) {
 }
 
 function connectWS() {
-  const ws = new WebSocket(`ws://${location.hostname}:8000/ws`);
+  const ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`);   // same origin, proxied by nginx (and vite in dev)
   _wsRef = ws;
 
   ws.onopen = () => {
