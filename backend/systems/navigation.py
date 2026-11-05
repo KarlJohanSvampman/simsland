@@ -925,8 +925,8 @@ def _plots(world):
     from systems.building_grid import analyse
     buildings = world.get("buildings", [])
     key = (id(buildings), len(buildings),
-           tuple((b.get("id"), id(resolve_floorplan(world, b)), len((resolve_floorplan(world, b) or {}).get("tiles") or {}))
-                 for b in buildings))
+           tuple((b.get("id"), id((resolve_floorplan(world, b) or {}).get("tiles")),
+                  len((resolve_floorplan(world, b) or {}).get("tiles") or {})) for b in buildings))
     hit = _PLOT_CACHE.get("key")
     if hit == key:
         return _PLOT_CACHE["map"]

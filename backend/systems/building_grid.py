@@ -56,8 +56,10 @@ def analyse(floorplan):
     """{"inside": set of (x, y), "entrances": [...]} for a floorplan, cached on it."""
     tiles = floorplan.get("tiles") or {}
     sig = (len(tiles), floorplan.get("width"), floorplan.get("height"))
-    cached = _CACHE.get(id(floorplan))
-    if cached and cached.get("sig") == sig and cached.get("ref") is floorplan:
+    # keyed by the tiles dict: resolve_floorplan() hands back a fresh merged dict every call, but its "tiles" is the
+    # template's own, shared (keying on the floorplan itself missed every time and re-flooded on every lookup)
+    cached = _CACHE.get(id(tiles))
+    if cached and cached.get("sig") == sig and cached.get("ref") is tiles:
         return cached
     w, h = _bounds(floorplan)
     has_walls = any((t or {}).get("walls") and any((t.get("walls") or {}).values()) for t in tiles.values())
@@ -110,10 +112,10 @@ def analyse(floorplan):
             seen.add(pair)
             entrances.append({"inside": pair[0], "outside": pair[1], "side": side})
 
-    out = {"sig": sig, "ref": floorplan, "inside": inside, "entrances": entrances, "width": w, "height": h}
+    out = {"sig": sig, "ref": tiles, "inside": inside, "entrances": entrances, "width": w, "height": h}
     if len(_CACHE) > 200:
         _CACHE.clear()
-    _CACHE[id(floorplan)] = out                      # kept off the floorplan itself: it may be saved with the world
+    _CACHE[id(tiles)] = out                      # kept off the floorplan itself: it may be saved with the world
     return out
 
 
