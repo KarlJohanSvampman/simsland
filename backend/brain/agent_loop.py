@@ -569,8 +569,14 @@ def process_decision(
         # swallow a real utterance).
         if available_actions is not None:
             from brain.action_resolver import resolve_and_apply
+            was = action.get("type")
             if not resolve_and_apply(c, world, action, available_actions):
                 action = None
+            elif was == "interact" and action.get("type") == "socialize":
+                # "use" a person became talking to them: the stand-in thought said "I use <name>."
+                if str(c.get("last_thought") or "").startswith("I use "):
+                    who = ((world.get("characters") or {}).get(action.get("target")) or {}).get("name") or "them"
+                    c["last_thought"] = f"I go over to talk to {who}."
 
         # brain/llm_brain.py::_to_legacy_decision() gives speech the same
         # target_description as the action when they're plausibly the

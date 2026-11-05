@@ -289,6 +289,15 @@ def resolve_and_apply(c, world, action, available_actions):
     if not description or action.get("target"):
         return True
 
+    # "ACTION: interact | Donna Moreau" -- the model "using" a person (the thought log read "I use Donna Moreau").
+    # A person isn't a prop: if the target is someone they can see, it's talking to them.
+    if action.get("type") == "interact":
+        person = resolve_target(c, world, "socialize", description, available_actions)
+        if person["id"] is not None and person["id"] in (world.get("characters") or {}):
+            action["type"] = "socialize"
+            action["target"] = person["id"]
+            return True
+
     result = resolve_target(c, world, action.get("type", ""), description, available_actions)
     if result["id"] is not None:
         action["target"] = result["id"]
