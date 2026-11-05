@@ -2834,7 +2834,7 @@ function updateSpeechBubbles(state){
       const seenBefore = Object.prototype.hasOwnProperty.call(_lastLoggedSpeech, id);
       if(utterance !== _lastLoggedSpeech[id]){
         _lastLoggedSpeech[id] = utterance;
-        if(seenBefore) terminalLog("said", c.name || id, utterance);
+        if(seenBefore) terminalLog("said", c.name || _worldState.characters?.[id]?.name || _charName(id) || id, utterance);
       }
     }
 
@@ -8540,7 +8540,7 @@ function _logCharacterEvents(state){
     const seenBefore = Object.prototype.hasOwnProperty.call(_lastLoggedThought, id);
     if(thought !== _lastLoggedThought[id]){
       _lastLoggedThought[id] = thought;
-      if(seenBefore) terminalLog("thought", c.name || id, thought);
+      if(seenBefore) terminalLog("thought", c.name || _worldState.characters?.[id]?.name || _charName(id) || id, thought);
     }
   }
 }

@@ -508,11 +508,33 @@ _LABEL_ONLY_LINE_RE = re.compile(r'^[ \t>*_#-]*[A-Za-z][A-Za-z _]{0,24}[ \t]*:[ 
 _NARRATION_LABEL_RE = re.compile(r'(?i)^[ \t>*_#-]*(?:narration|thought|thoughts|inner monologue)[ \t]*:[ \t*_]*')
 
 
+# The model copying the reply template's own instructions as its "thought" ("<what you do, ONLY if it's worth
+# describing -- skip this line ...>"), or filling the line with a non-thought ("says nothing", "(none)", "...").
+_TEMPLATE_ECHO_RE = re.compile(r"(?i)worth describing|skip this line|don't narrate|REQUIRED whenever|"
+                               r"in your own words>|<exact words|<short next intention|<type>|<target")
+_EMPTY_LINE_RE = re.compile(r"(?i)^[\s(\[*_\"'-]*(?:(?:he|she|they|i)\s+)?(?:says?|said|thinks?|do(?:es)?)?\s*"
+                            r"(?:nothing|none|no(?:thing)?\s+(?:to\s+say|thought|narration|comment)|n/?a|null|silence|"
+                            r"silent|empty|blank|no\s+thoughts?|-+|\.{2,}|…)[\s)\].*_\"'!.]*$")
+
+
+def _meaningless(line):
+    line = (line or "").strip()
+    if not line:
+        return True
+    if line.startswith("<") and line.endswith(">"):
+        return True
+    if _TEMPLATE_ECHO_RE.search(line):
+        return True
+    return bool(_EMPTY_LINE_RE.match(line))
+
+
 def _clean_narration(text):
     """The words before the ACTION line, minus stray headings the model puts there ("MOVE:" on a line by itself was being stored as
-    the character's thought). Empty is fine: think() writes a short canned line from the action instead."""
+    the character's thought), template lines it copied back, and non-thoughts like "says nothing". Empty is fine: think() writes a
+    short canned line from the action instead."""
     lines = [ln for ln in (text or "").strip().split("\n") if not _LABEL_ONLY_LINE_RE.match(ln)]
-    return _NARRATION_LABEL_RE.sub("", "\n".join(lines).strip(), count=1).strip()
+    lines = [_NARRATION_LABEL_RE.sub("", ln, count=1).strip() for ln in lines]
+    return "\n".join(ln for ln in lines if not _meaningless(ln)).strip()
 
 
 # ---- a forgiving reading of a slightly-off ACTION line -------------------------------------------------------
@@ -636,8 +658,8 @@ def _parse_compact_envelope(raw):
             "target_description": parts[1] if len(parts) > 1 and parts[1] else "",
             "detail": parts[2] if len(parts) > 2 and parts[2] else "",
         },
-        "say": say_match.group(1).strip() if say_match else "",
-        "remark": remark_match.group(1).strip() if remark_match else "",
+        "say": "" if not say_match or _meaningless(say_match.group(1)) else say_match.group(1).strip(),
+        "remark": "" if not remark_match or _meaningless(remark_match.group(1)) else remark_match.group(1).strip(),
         "intent": _parse_intent_line(intent_match.group(1)) if intent_match else None,
         "uses": _parse_uses_line(uses_match.group(1)) if uses_match else [],
         "then": then_match.group(1).strip() if then_match else "",
