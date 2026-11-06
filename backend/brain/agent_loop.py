@@ -1166,9 +1166,9 @@ def update_agent(
                 return
             continue
 
-        # A LIVE intention (brain/plans: Reduce Hunger, ...) has taken over this intention type: its ActionPlans decide,
+        # A LIVE intention (brain/actionplans: Reduce Hunger, ...) has taken over this intention type: its ActionPlans decide,
         # step by step, with gates and fallbacks -- not resolve_strategy's if-chain.
-        from brain.plans.runner import autopilot as _plans_autopilot
+        from brain.actionplans.runner import autopilot as _plans_autopilot
         _plan = _plans_autopilot(c, world, intention)
         if _plan == "started":
             c["current_intention"] = intention

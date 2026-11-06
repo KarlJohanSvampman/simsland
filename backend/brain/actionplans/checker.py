@@ -5,8 +5,8 @@ check(data, definitions=None) -> [problem, ...]; problem = {"level": "error" | "
 "text": "..."}. An intention can only be live with no errors in it or in any plan it reaches.
 """
 
-from brain.plans.resolvers import RESOLVERS
-from brain.plans.actions import ACTIONS
+from brain.actionplans.resolvers import RESOLVERS
+from brain.actionplans.actions import ACTIONS
 
 NODE_KINDS = ("gate", "decision", "step", "action", "wait", "plan", "end")
 END_OUTCOMES_INTENTION = ("satisfied", "fallback", "blocked")
@@ -91,7 +91,7 @@ def check(data, definitions=None):
 
     for r in reqs.values():
         if r.get("resolver") not in RESOLVERS:
-            P("error", f"requirement:{r['id']}", f"its resolver '{r.get('resolver')}' is not in brain/plans/resolvers.py")
+            P("error", f"requirement:{r['id']}", f"its resolver '{r.get('resolver')}' is not in brain/actionplans/resolvers.py")
 
     sub_of = {pid for p in plans.values() for n in p.get("nodes") or [] if n.get("kind") == "plan" for pid in [n.get("plan")]}
     for p in plans.values():
@@ -179,7 +179,7 @@ def _check_plan(p, plans, reqs, variables, offered, activities, P, sub_of):
                   f"activity '{n['activity']}' needs the interaction '{act['interaction']}', which no prop template offers")
         elif k == "action":
             if n.get("action") not in ACTIONS:
-                P("error", where, f"action '{n.get('action')}' is not in brain/plans/actions.py")
+                P("error", where, f"action '{n.get('action')}' is not in brain/actionplans/actions.py")
         elif k == "plan":
             sub = plans.get(n.get("plan"))
             if not sub:

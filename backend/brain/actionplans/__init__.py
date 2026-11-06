@@ -1,5 +1,5 @@
 """
-brain/plans -- needs, wants and expectations drive intentions; intentions are satisfied through ActionPlans.
+brain/actionplans -- needs, wants and expectations drive intentions; intentions are satisfied through ActionPlans.
 
     Drive        a need / want / expectation with a level and a threshold      (behaviour.json "drives")
     Intention    one per drive; holds plans in preference order + a scout plan ("intentions")

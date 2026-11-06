@@ -5,7 +5,7 @@ list finished intentions in the order they came -- done ones green and ticked of
     {"type", "target", "reason", "category", "since", "ended", "outcome": "done" | "blocked" | "dropped", "how"}
 
 An intention is DONE when, while it was there, something that satisfies it happened:
-  - a live intention's plan satisfied it (brain/plans/runner.py emits intention.satisfied -> every type it replaces)
+  - a live intention's plan satisfied it (brain/actionplans/runner.py emits intention.satisfied -> every type it replaces)
   - its expectation was satisfied (expectation:<id>)
   - an activity completed that satisfies it: the same type, or one brain/intention_needs.satisfied_by() lists
 BLOCKED when its plan was blocked; otherwise DROPPED (it went away -- the need eased, it lapsed, it was replaced).
@@ -69,7 +69,7 @@ def _on_plan_end(outcome):
         c = (world.get("characters") or {}).get(data.get("character_id"))
         if not c:
             return
-        from brain.plans import store
+        from brain.actionplans import store
         intent = store.get(store.load(), "intentions", data.get("intention")) or {}
         for t in intent.get("replaces") or []:
             mark(c, world, t, "done" if outcome == "satisfied" else "blocked", data.get("why"))

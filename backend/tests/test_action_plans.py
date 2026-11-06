@@ -1,5 +1,5 @@
 """
-Intentions and ActionPlans (brain/plans): Reduce Hunger end to end on the real house world.
+Intentions and ActionPlans (brain/actionplans): Reduce Hunger end to end on the real house world.
 
 The definitions (simulations/default/behaviour.json) pass the path checker; then each way of satisfying hunger is walked:
 food served -> eat; only ingredients -> cook; a child with nothing ready -> asks a grown-up; nothing at all -> blocked with
@@ -27,7 +27,7 @@ def check(name, cond, detail=""):
 
 from house_world import make_world
 from systems.schema_defaults import ensure_world_defaults
-from brain.plans import store, checker, runner
+from brain.actionplans import store, checker, runner
 from core.definitions import load_definitions
 from core import event_bus
 
@@ -96,7 +96,7 @@ cw.ready_vessel = real_ready
 w = world()
 r = w["characters"]["robert"]
 r["age"], r["age_group"] = 42, "adult"
-from brain.plans import resolvers as R
+from brain.actionplans import resolvers as R
 real_ingr = R.RESOLVERS["has_ingredients"]
 R.RESOLVERS["has_ingredients"] = lambda c, w_: True
 res = runner.autopilot(r, w, EAT)
@@ -153,6 +153,16 @@ att = (j.get("plan_attempts") or {}).get("reduce_hunger") or {}
 check("19:00 with money: takeout is ordered and they wait for the delivery",
       ("order_takeout", "order", "action", "done") in [(t.get("plan"), t.get("node"), t.get("what"), t.get("out")) for t in att.get("trace", [])]
       and (att.get("wait") or {}).get("node") == "wait" and w["households"]["lind"].get("deliveries"), str(att.get("trace", [])[-4:]))
+
+# ---- a leftover eat_food while the need is already met: no attempt, and it is cleared --------------------------------
+w = world()
+j = w["characters"]["joseph"]
+j["body"]["hunger"] = 5
+j["active_intentions"] = [{"type": "eat_food", "reason": "it is hot", "category": "survival", "priority": 55}]
+before = len(j.get("plan_log") or [])
+res = runner.autopilot(j, w, j["active_intentions"][0])
+check("a leftover eat_food with hunger already met starts nothing, logs nothing, and goes",
+      res == "busy" and len(j.get("plan_log") or []) == before and not j["active_intentions"], str((res, j.get("plan_log"))))
 
 # ---- an intention that is not live leaves the old path alone -----------------------------------------------------------
 check("an intention type no live intention replaces is not handled here",

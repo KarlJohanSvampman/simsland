@@ -14,10 +14,10 @@ Entry points into this module:
 Nothing else starts an activity for a live intention (systems/occupancy.py::occupy keeps it to one at a time).
 """
 
-from brain.plans import store
-from brain.plans.checker import outputs_for
-from brain.plans.resolvers import RESOLVERS
-from brain.plans.actions import ACTIONS
+from brain.actionplans import store
+from brain.actionplans.checker import outputs_for
+from brain.actionplans.resolvers import RESOLVERS
+from brain.actionplans.actions import ACTIONS
 
 MAX_HOPS = 60                 # node transitions per call: a path the checker allowed can't need more
 WAIT_RECHECK_SECONDS = 60
@@ -160,8 +160,18 @@ def _start_plan(c, world, att, pid, entry=None, return_to=None):
     _trace(att, world, plan=pid, what="plan", why=("sidetrack" if return_to else "chosen") + (f" via entry {entry}" if entry else ""))
 
 
+def _clear_replaced(c, intention):
+    """Remove the old intention types this intention took over (eat_food for Reduce Hunger) from the list."""
+    old = set(intention.get("replaces") or [])
+    c["active_intentions"] = [i for i in c.get("active_intentions") or [] if i.get("type") not in old]
+
+
 def _finish(c, world, iid, att, status, why):
     att["status"], att["ended"], att["why"] = status, world.get("tick", 0), why
+    if status == "satisfied":
+        intention = store.get(_data(world), "intentions", iid)
+        if intention:
+            _clear_replaced(c, intention)
     _trace(att, world, what=status, why=why)
     c.setdefault("plan_log", []).append({k: att[k] for k in ("id", "intention", "started", "ended", "status", "why",
                                                              "tried", "trace", "vars") if k in att})
@@ -199,6 +209,11 @@ def autopilot(c, world, intention_entry):
     if world.get("tick", 0) < (c.get("_plan_cooldown") or {}).get(iid, -1):
         return "busy"
     att = (c.setdefault("plan_attempts", {})).get(iid)
+    if att is None and _satisfied(c, world, intention):
+        # a leftover old-style intention (heat_meal's "eat it, it's hot") while the need is already met: nothing to do,
+        # and it goes -- not a new "satisfied" attempt every tick
+        _clear_replaced(c, intention)
+        return "busy"
     if att is None:
         att = c["plan_attempts"][iid] = {"id": f"{iid}@{world.get('tick', 0)}", "intention": iid,
                                          "started": world.get("tick", 0), "stack": [], "tried": [], "vars": {},

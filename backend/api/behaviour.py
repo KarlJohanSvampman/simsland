@@ -7,15 +7,15 @@ frontend/behaviour.html: drives, intentions, requirements, plans and the variabl
     DELETE /admin/behaviour/{kind}/{id}     remove one object (refused while something still refers to it)
     POST   /admin/behaviour/check           check a draft without saving it
 
-Every save is checked; a save is refused if it would leave a LIVE intention with an error (brain/plans/checker.py).
+Every save is checked; a save is refused if it would leave a LIVE intention with an error (brain/actionplans/checker.py).
 The file is shared by the gateways and the core (the core re-reads it when it changes), so no command round trip.
 """
 
 from fastapi import APIRouter, HTTPException
 
-from brain.plans import store, checker
-from brain.plans.resolvers import RESOLVERS
-from brain.plans.actions import ACTIONS
+from brain.actionplans import store, checker
+from brain.actionplans.resolvers import RESOLVERS
+from brain.actionplans.actions import ACTIONS
 
 router = APIRouter(prefix="/admin/behaviour", tags=["behaviour"])
 

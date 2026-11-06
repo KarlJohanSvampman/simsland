@@ -49,7 +49,7 @@ import systems.ai_blackout   # noqa: F401 -- the AI not answering: confusion, an
 import social.tick           # noqa: F401 -- social discourse: handlers, the old-data conversion, upkeep
 import systems.rifts          # noqa: F401 -- registers the rift timers and the hourly standing scan
 import brain.intention_history  # noqa: F401 -- finished intentions, for the inspector
-import brain.plans.runner     # noqa: F401 -- ActionPlans: step-end events and wait timers (brain/plans)
+import brain.actionplans.runner     # noqa: F401 -- ActionPlans: step-end events and wait timers (brain/actionplans)
 import systems.guests         # noqa: F401 -- registers the "guest" timeout handler (visits, being asked to leave)
 from systems.item_knowledge import update_item_knowledge
 

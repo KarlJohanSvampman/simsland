@@ -46,7 +46,7 @@ def ask_caretaker_for_food(c, world, attempt):
 @action("check_kitchen")
 def check_kitchen(c, world, attempt):
     """Scouting: look in the fridge, freezer and cupboards -- every food requirement becomes a known belief."""
-    from brain.plans import runner
+    from brain.actionplans import runner
     for rid in ("food_served", "has_warm_ready_meal", "has_ready_meal", "has_stored_meal", "has_snack", "has_ingredients",
                 "money_for_takeout", "phone_usable"):
         runner.observe(c, world, rid, how="looked")

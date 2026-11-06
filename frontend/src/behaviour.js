@@ -4,7 +4,7 @@
 // A plan is a graph: nodes (gate, decision, step, action, wait, plan, end) wired output -> node, plus named entry
 // points that may carry variables. The editor draws each node's NAMED OUTPUTS as ports (a gate's yes / no, a step's
 // done / failed, a decision's own options); a wire can set variables as it passes ({"set": {...}}) and a sidetrack wire
-// can name the entry point it goes into. Every change is checked on the server (brain/plans/checker.py) as you go.
+// can name the entry point it goes into. Every change is checked on the server (brain/actionplans/checker.py) as you go.
 
 const API = "/admin/behaviour";
 const KIND_LABEL = { drives: "drive", intentions: "intention", plans: "plan", requirements: "requirement", variables: "variable" };
