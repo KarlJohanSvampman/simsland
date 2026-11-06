@@ -189,6 +189,7 @@ def wake_character(c, world, reason, payload=None, delay=0):
     if current is None or WAKE_PRIORITY.get(reason, 0) >= WAKE_PRIORITY.get(current, 0):
         cog["wake_reason"] = reason
         cog["wake_payload"] = payload or {}
+    cog["wake_seq"] = cog.get("wake_seq", 0) + 1      # note_think() keeps a wake that came after the decision was asked for
 
     cog["next_think_tick"] = min(cog.get("next_think_tick", tick), target_tick)
 
@@ -240,7 +241,7 @@ def wake_line(c):
         return None
 
 
-def note_think(c, world, decision, wake_reason=None):
+def note_think(c, world, decision, wake_reason=None, asked_at_seq=None):
     """Call after every think() attempt (even a failed/None one) to clear
     the wake state and schedule the next idle check-in. wake_reason is the
     string should_think() returned for this cycle (agent_loop.py already
@@ -253,8 +254,13 @@ def note_think(c, world, decision, wake_reason=None):
 
     record_think(world, wake_reason or cog.get("wake_reason") or "idle")
 
-    cog["wake_reason"] = None
-    cog["wake_payload"] = None
+    # A wake that came in while this decision was with the model (asked_at_seq: cog["wake_seq"] when it was asked for --
+    # brain/cognition_actor.py) is something the decision never saw: "Susan just said to you: ..." arriving during a slow
+    # idle think. It stays, and they think again straight away -- clearing it here meant the line was never answered.
+    woken_since = asked_at_seq is not None and cog.get("wake_seq", 0) > asked_at_seq
+    if not woken_since:
+        cog["wake_reason"] = None
+        cog["wake_payload"] = None
     cog["staged_knowledge"] = []
     cog["last_think_tick"] = tick
 
@@ -273,7 +279,7 @@ def note_think(c, world, decision, wake_reason=None):
     interval = min(IDLE_BASE_TICKS + streak * IDLE_BASE_TICKS, IDLE_MAX_TICKS) if streak else IDLE_BASE_TICKS
     jitter = _jitter(c, IDLE_BASE_TICKS // 2)
 
-    cog["next_think_tick"] = tick + interval + jitter
+    cog["next_think_tick"] = tick if woken_since else tick + interval + jitter
 
     # Refill the describe/recall turn budget on every real think() — see
     # stage_and_wake() below, which spends it. Full Round-10 tuning

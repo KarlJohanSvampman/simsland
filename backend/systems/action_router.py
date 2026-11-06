@@ -44,6 +44,17 @@ _ACTION_ANIMATION = {
 # display it as a speech bubble.
 # =========================================================
 
+def _answering(c, world, target_id):
+    """True when c holds the floor (systems/conversation_floor.py) of an active conversation with target_id."""
+    if not target_id:
+        return False
+    from brain.conversations import find_conversation
+    conv = find_conversation(world, [c["id"], target_id])
+    f = (conv or {}).get("floor") or {}
+    return bool(conv and conv.get("active") and f.get("state") != "closed" and f.get("holder") == c["id"]
+                and f.get("from") == target_id)
+
+
 def apply_speech(c, world, speech):
     """
     speech = {
@@ -94,9 +105,12 @@ def apply_speech(c, world, speech):
             nearest = max(visible, key=lambda p: p.get("visibility", 0))
             target_id = nearest.get("id")
 
-    # Said once: the same line to the same person again is dropped (systems/speech_repeat.py).
+    # Said once: the same line to the same person again is dropped (systems/speech_repeat.py) -- unless it is an answer.
+    # Someone holding the floor of a live conversation with this person is being waited on: "Okay!" or "Yeah!" said twice
+    # in half an hour is ordinary talk, and dropping it made the other person's wait run out -- the conversation ended
+    # as "ignored" and they remembered being ignored by someone who had answered.
     from systems.speech_repeat import is_repeat
-    if is_repeat(c, world, utterance, target_id):
+    if is_repeat(c, world, utterance, target_id) and not _answering(c, world, target_id):
         return
 
     # Volume (see brain/perception.py's VOLUME_TIERS) -- explicit caller

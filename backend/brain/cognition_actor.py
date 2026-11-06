@@ -108,6 +108,7 @@ def request_decision(c, world, context, wake_reason, priority):
     req_id = uuid.uuid4().hex[:10]
     c.setdefault("cognition", {})["pending"] = {
         "id": req_id, "tick": tick, "wall": time.time(), "wake_reason": wake_reason,
+        "wake_seq": c["cognition"].get("wake_seq", 0),
     }
     mark_thinking(c["id"], tick)           # "is generating a reply" -- the floor's notice cue
     session = {"history": list(((c.get("_llm_session") or {}).get("history") or [])[-SESSION_TURNS:])}
@@ -178,13 +179,12 @@ def _accept_remote_result(res):
         return                                    # not ours (another core, or already handled)
     char_id, req_id, tick, context, _session, _priority, wake_reason = entry["args"]
     _merge_worker_telemetry(res)
-    from systems.conversation_floor import clear_thinking, note_llm_result
-    clear_thinking(char_id, tick)
+    from systems.conversation_floor import note_llm_result
     note_llm_result(bool(res.get("decision")) and not res.get("error"), time.time() - entry["sent"])
     if res.get("error"):
         print(f"[cognition] worker {res.get('worker')} failed {char_id}'s decision: {res['error']}")
     emit("decision_ready", {
-        "character_id": char_id, "request_id": req_id, "decision": res.get("decision"),
+        "character_id": char_id, "request_id": req_id, "tick": tick, "decision": res.get("decision"),
         "wake_reason": wake_reason, "available_actions": context.get("available_actions"),
     })
 
@@ -229,7 +229,7 @@ def _fallback_stranded():
 def _worker(char_id, req_id, tick, context, session, priority, wake_reason):
     """Runs on a pool thread. Touches no world state: context and session are plain data."""
     from brain.llm_brain import think
-    from systems.conversation_floor import clear_thinking, note_llm_result
+    from systems.conversation_floor import note_llm_result
     decision = None
     started = time.time()
     try:
@@ -237,10 +237,12 @@ def _worker(char_id, req_id, tick, context, session, priority, wake_reason):
     except Exception as exc:
         print(f"[cognition] decision for {char_id} failed: {exc!r}")
     finally:
-        clear_thinking(char_id, tick)
         note_llm_result(bool(decision), time.time() - started)
+    # Still "thinking" (systems/conversation_floor.py) until on_decision_ready has applied the answer on the tick thread: the
+    # floor's tick runs before the event flush, and clearing it here let the floor see a listener who had stopped thinking
+    # without answering -- "ignored", while their reply sat in the event queue (it then opened a new conversation).
     emit("decision_ready", {
-        "character_id": char_id, "request_id": req_id, "decision": decision,
+        "character_id": char_id, "request_id": req_id, "tick": tick, "decision": decision,
         "wake_reason": wake_reason, "available_actions": context.get("available_actions"),
     })
 
@@ -248,6 +250,8 @@ def _worker(char_id, req_id, tick, context, session, priority, wake_reason):
 def on_decision_ready(data, world):
     """The model answered (tick thread, at flush)."""
     cid = data.get("character_id")
+    from systems.conversation_floor import clear_thinking
+    clear_thinking(cid, data.get("tick", 0))     # only now: the reply (if any) is applied below, in the same flush
     c = world.get("characters", {}).get(cid)
     if not c:
         return
@@ -258,7 +262,7 @@ def on_decision_ready(data, world):
 
     from brain.cognition_scheduler import note_think
     decision = data.get("decision")
-    note_think(c, world, decision, wake_reason=data.get("wake_reason"))
+    note_think(c, world, decision, wake_reason=data.get("wake_reason"), asked_at_seq=p.get("wake_seq"))
     if not decision:
         # the model failed outright: no stand-in -- they can't think straight (systems/ai_blackout.py)
         decision = {"action": {"type": "wait", "fallback": True, "reason": "The model call failed."}}
@@ -275,12 +279,28 @@ def on_decision_ready(data, world):
 
     from brain.agent_loop import process_decision, post_update
     process_decision(c, world, decision, available_actions=data.get("available_actions"))
+    _drop_answered_wake(c, world)
     post_update(c, world)
     try:
         from sim_loop import _mark_dirty
         _mark_dirty(world, char_ids={cid})
     except Exception:
         pass
+
+
+def _drop_answered_wake(c, world):
+    """note_think() kept a "heard_speech" wake that came in while this decision was with the model; if the decision has
+    just said something to that very speaker anyway, it has been answered -- no second think about the same line."""
+    cog = c.get("cognition") or {}
+    if cog.get("wake_reason") != "heard_speech":
+        return
+    speaker = (cog.get("wake_payload") or {}).get("speaker_id")
+    last = (c.get("speech_log") or [{}])[-1]
+    if speaker and last.get("tick") == world.get("tick", 0) and last.get("target") == speaker:
+        from brain.cognition_scheduler import IDLE_BASE_TICKS
+        cog["wake_reason"] = None
+        cog["wake_payload"] = None
+        cog["next_think_tick"] = world.get("tick", 0) + IDLE_BASE_TICKS
 
 
 subscribe("decision_ready", on_decision_ready)
