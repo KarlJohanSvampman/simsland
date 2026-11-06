@@ -1,3 +1,4 @@
+from systems.occupancy import occupy as _occupy  # one activity at a time (systems/occupancy.py)
 import random
 
 from systems.occupancy import (
@@ -1422,13 +1423,13 @@ def start_activity(
     # all, so there's no anchor to find -- start straight at "using",
     # same as action_router.py's _scaffold()-based actions (jog, etc.).
     if config.get("no_target"):
-        c["activity"] = {
+        c["activity"] = _occupy(c, world, {
             "type": activity_type,
             "phase": "using",
             "phase_started_tick": world["tick"],
             "duration": duration,
             "state": {},
-        }
+        })
         from core.event_bus import emit
         emit("activity_started", {
             "character_id": c["id"], "activity_type": activity_type,
@@ -1464,7 +1465,7 @@ def start_activity(
     prop = interaction["prop"]
     anchor = interaction["anchor"]
 
-    c["activity"] = {
+    c["activity"] = _occupy(c, world, {
 
         "type":
             activity_type,
@@ -1485,7 +1486,7 @@ def start_activity(
             duration,
 
         "state": {}
-    }
+    })
 
     # convenience_store_checkout has no external caller-supplied item --
     # pick from the register's own catalog (definitions.json's "register"
@@ -2063,6 +2064,9 @@ def complete_activity(
 ):
 
     activity_type = act["type"]
+    # Done: what its completion starts next (the next queued task, back to bed after the toilet) is not a second
+    # activity on top of this one (systems/occupancy.py::occupy).
+    act["_completed"] = True
 
     # =====================================
     # RELEASE RESERVED ANCHOR
@@ -2540,6 +2544,9 @@ def complete_activity(
             "resume_interaction": "take_out_of_microwave",
             "ready":              False,
         }
+        # Ready when the time is up: a timer due then (sim_loop.py::_on_wait_ready), not a poll every few seconds.
+        from core import scheduler
+        scheduler.schedule_in(world, f"wait:{c['id']}", "ready", wait_minutes * 60)
         # c["activity"] clears normally via finish_activity() right after
         # this branch returns — the character is genuinely free from here,
         # unlike household chores/recipes where a background process

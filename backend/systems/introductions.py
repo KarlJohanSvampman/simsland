@@ -112,10 +112,13 @@ def introduce(world, m, a, b, strength):
     return True
 
 
-def tick_introductions(world):
-    """Scheduled job: friends in view of two strangers may introduce them."""
+def tick_introductions(world, only=None):
+    """Friends in view of two strangers may introduce them. `only`: just these would-be introducers (the ones who just saw
+    someone come into view -- core/flow.py); None: everyone."""
     chars = world.get("characters", {})
     for m in list(chars.values()):
+        if only is not None and m.get("id") not in only:
+            continue
         if not _available(m):
             continue
         seen = [chars[p["id"]] for p in (m.get("perception") or {}).get("visible_people", [])

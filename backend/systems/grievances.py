@@ -162,8 +162,10 @@ def _to_issue(c, caused_by_id, event_type, severity, gid, details, world):
         subject = str(event_type).replace("_", " ")
     issue, created = I.find_or_open(world, [c["id"], caused_by_id], subject, I.category_for(event_type),
                                     created_by=c["id"], affected=[c["id"]])
-    I.add_evidence(world, issue, "incident", subject + (f" ({details.get('commitment')})" if details.get("commitment") else ""),
-                   by=c["id"], ref=gid)
+    text = subject + (f" ({details.get('commitment')})" if details.get("commitment") else "")
+    if details.get("trigger"):
+        text += f": {details['trigger']}"            # what brought it up (systems/life_comparison.py::on_reminded)
+    I.add_evidence(world, issue, "incident", text, by=c["id"], ref=gid)
     if not I.position(issue, c["id"]):
         I.set_position(world, issue, c["id"], f"{chars[caused_by_id].get('name', 'they')}: {subject}",
                        stance="opposed", confidence=0.6, investment=min(1.0, severity / 15), basis="observed")

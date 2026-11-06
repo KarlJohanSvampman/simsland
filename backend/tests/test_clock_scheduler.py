@@ -130,18 +130,48 @@ from core import tick_profile
 base = copy.deepcopy(load_world("default")); base["definitions"] = load_definitions("default")
 base.pop("timers", None)
 
-# recurring jobs fire on schedule through tick()
+# recurring jobs fire on schedule through tick() -- on SIM TIME (world["sim_time"]), not tick counts
 import systems.calendar_handlers as ch
 fired = {"popularity_decay": [], "post_engagement": [], "orphan_props": [], "background_services": []}
 for name in fired:
-    scheduler.register_recurring(name, (lambda n: lambda w, e: fired[n].append(w["tick"]))(name), every=scheduler._recurring[name][0], offset=scheduler._recurring[name][1])
+    spec = scheduler._recurring[name]
+    scheduler._register(name, (lambda n: lambda w, e: fired[n].append((w["tick"], w["sim_time"], dict(w["calendar"]))))(name), spec)
 w = copy.deepcopy(base)
-w["tick"] = 7199 - 125
-for _ in range(130):
+w["sim_time"] = datetime(2026, 11, 3, 13, 57, 50).timestamp()          # 130 s before 14:00
+w.pop("timers", None); w.pop("_sched_sig", None)
+for _ in range(260):
     ensure_world_defaults(w); sim_loop.tick(w)
-check("popularity decay runs every 60 ticks via the scheduler", all(t % 60 == 0 for t in fired["popularity_decay"]) and len(fired["popularity_decay"]) >= 2, str(fired["popularity_decay"]))
-check("post engagement runs at the hour tick", fired["post_engagement"] == [7200], str(fired["post_engagement"]))
-check("orphan sweep and background services run on their offsets", all(t % 30 == 5 for t in fired["orphan_props"]) and all(t % 5 == 2 for t in fired["background_services"]) and fired["background_services"])
+ts = lambda n: [f[1] for f in fired[n]]
+check("popularity decay runs every 60 sim seconds", len(ts("popularity_decay")) >= 3 and all(round(b - a) == 60 for a, b in zip(ts("popularity_decay"), ts("popularity_decay")[1:])), str(ts("popularity_decay")))
+check("post engagement runs once, at the top of the hour by the clock", [(f[2]["hour"], f[2]["minute"]) for f in fired["post_engagement"]] == [(14, 0)], str([f[2] for f in fired["post_engagement"]]))
+check("orphan sweep and background services keep their sim-second offsets", all(round(t) % 30 == 5 for t in ts("orphan_props")) and all(round(t) % 5 == 2 for t in ts("background_services")) and fired["background_services"])
+
+# a daily job fires at its time of day, once, and re-arms for the next day
+dl = []
+scheduler.register_daily("t_daily", lambda w, e: dl.append(dict(w["calendar"])), at=14 * 3600 + 4 * 60)   # now is 14:02:10
+w["timers"] = [t for t in w["timers"]]; w.pop("_sched_sig", None)
+for _ in range(120):
+    ensure_world_defaults(w); sim_loop.tick(w)
+check("a daily job fires when the clock reads its time", [(d["hour"], d["minute"]) for d in dl] == [(14, 4)], str(dl))
+nxt = [t for t in scheduler.pending(w, "t_daily")]
+check("... and is next due the same time tomorrow", nxt and round(nxt[0]["due"] - w["sim_time"]) > 23 * 3600, str(nxt))
+
+# a timer saved by an older version (due at a tick) becomes due at the matching time
+wo = {"tick": 1000, "sim_time": 5000.0, "timers": [{"at": 1010, "seq": 1, "owner": "char:1", "key": "old", "payload": {}}]}
+check("an old tick timer is converted to a timestamp", scheduler.pending(wo)[0]["due"] == 5010.0, str(wo["timers"]))
+
+# an event job with a settle window coalesces a burst into one run
+from core import flow
+runs = []
+job = {"name": "t_settle", "run": "x", "kind": "event", "on": ["t.burst"], "settle": 5}
+scheduler.register("flow:t_settle", lambda w, e: runs.append(sorted(e["payload"]["ids"])))
+h = flow._event_handler(job, lambda w, e: None, "t.burst")
+ws = {"tick": 0, "sim_time": 100.0}
+for i, who in enumerate(["a", "b", "a", "c"]):
+    ws["tick"] += 1; ws["sim_time"] += 1; h({"character_id": who}, ws); scheduler.fire_due(ws)
+for _ in range(5):
+    ws["tick"] += 1; ws["sim_time"] += 1; scheduler.fire_due(ws)
+check("a burst of events within the settle window is one run, for everyone it named", runs == [["a", "b", "c"]], str(runs))
 
 # the weekly/hourly/daily/monthly handlers run for real, no exceptions
 import traceback

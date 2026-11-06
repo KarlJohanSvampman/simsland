@@ -206,6 +206,9 @@ def _start_visit(c, world, bid, hh):
         status, how = "uninvited", "walked in without being let in"
     visit = c["guest_visit"] = {"building_id": bid, "household_id": hh["id"], "since": tick, "status": status,
                                 "how": how, "relation": relation, "stage": 0}
+    from core.event_bus import emit
+    emit("guest.visit_started", {"guest_id": c["id"], "household_id": hh["id"], "building_id": bid, "status": status,
+                                 "host_ids": [m["id"] for m in residents_here(world, visit)]})
     c.pop("_let_in", None)
     if status == "welcome":
         _welcome(c, world, visit, how)

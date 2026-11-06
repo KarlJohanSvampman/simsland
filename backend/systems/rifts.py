@@ -612,7 +612,7 @@ scheduler.register(OWNER, on_timer)
 from core.event_bus import subscribe as _subscribe   # noqa: E402
 _subscribe("leaving_announced", lambda data, world: announce(world, data))
 _subscribe("leaving_called_off", lambda data, world: call_off(world, data))
-scheduler.register_recurring("riftscan", on_timer, SCAN_EVERY, offset=1234)
+# (scheduled from core/flow.py)
 
 
 # =========================================================

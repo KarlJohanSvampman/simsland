@@ -1,3 +1,4 @@
+from systems.occupancy import occupy as _occupy  # one activity at a time (systems/occupancy.py)
 from systems.personal_items import unlock_home
 from systems.props import (
     find_nearest_anchor
@@ -174,13 +175,13 @@ def begin_interaction(c, world, interaction_name):
             # they were simultaneously using the appliance they were
             # actually just standing in line for.
             set_posture(c, world, "standing")
-            c["activity"] = {
+            c["activity"] = _occupy(c, world, {
                 "type": "wait",
                 "phase": "using",
                 "phase_started_tick": world.get("tick", 0),
                 "duration": 120,
                 "state": {},
-            }
+            })
             start_waiting_for(c, world, "prop", f"{prop['id']}:{anchor['name']}")
             return None
 

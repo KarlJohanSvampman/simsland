@@ -16,6 +16,8 @@ sink on the way out of the bathroom, a counter "examined" and "moved to" over an
      afresh. A second time out of the same thing in a row is given up on.
 """
 
+from systems.occupancy import occupy as _occupy  # one activity at a time (systems/occupancy.py)
+
 import random
 
 SETBACK_TICKS = 1800            # 30 sim-minutes
@@ -149,8 +151,8 @@ def start_roam(c, world, retry=None):
     c["animation_state"] = "walk"
     c["is_moving"] = True
     lo, hi = ROAM_LINGER_TICKS
-    c["activity"] = {"type": "roam", "phase": "walking", "phase_started_tick": world.get("tick", 0),
-                     "duration": random.randint(lo, hi), "target_room": where, "state": {}}
+    c["activity"] = _occupy(c, world, {"type": "roam", "phase": "walking", "phase_started_tick": world.get("tick", 0),
+                     "duration": random.randint(lo, hi), "target_room": where, "state": {}})
     if retry:
         c["activity"]["retry"] = retry
     return True

@@ -23,6 +23,7 @@ See core/event_handlers.py for all subscriptions.
 
 from datetime import datetime
 import os
+import sys
 import random
 import time
 
@@ -414,9 +415,25 @@ def tick(world):
         _prof.end_tick()
 
 
+def _announce_new_characters(world):
+    """`character.added` for each character that was not there last tick (spawned, born, moved in, made in the editor).
+    A set difference per tick -- a bridge until every place that creates a character says so itself."""
+    ids = set(world.get("characters", {}))
+    known = world.get("_known_char_ids")
+    world["_known_char_ids"] = sorted(ids)
+    if known is None:
+        from core.event_bus import emit
+        emit("world.loaded", {"tick": world.get("tick", 0)})     # first look after a load: everyone looks around once
+        return
+    from core.event_bus import emit
+    for cid in sorted(ids - set(known)):
+        emit("character.added", {"character_id": cid})
+
+
 def _tick_impl(world):
     world["tick"] += 1
     t = world["tick"]
+    _announce_new_characters(world)
     set_current_tick(t)
     _prof.mark("tick_head")
     from core import event_log as _event_log
@@ -546,9 +563,6 @@ def _tick_impl(world):
     # deliberately a separate, once-a-day cadence from the exposure
     # resolver above, per the "impact over time... sum it all up maybe on
     # a daily basis" ask. See systems/influence.py::resolve_value_influence.
-    _prof.mark("every:value_influence")
-    if every(world, CADENCE["value_influence"], offset=13) and _is_new_calendar_day(world, "value_influence"):
-        resolve_value_influence(world)
 
     _prof.mark("section:medium_household_systems")
     # -- Medium: household systems (÷10) ────────────────────
@@ -599,74 +613,6 @@ def _tick_impl(world):
 
 
     # World-level random incidents (character-level ones emitted in agent_loop)
-    _prof.mark("every:arrests")
-    if every(world, CADENCE["arrests"], offset=15):
-        trigger_incident(world, None)  # world-level random only
-        # Live bug report: auto_report_incidents() only ran reactively, off
-        # the "incident_created" event -- a lone unreported incident (e.g.
-        # a medical emergency with nobody else around to generate a fresh
-        # incident elsewhere) could sit unreported indefinitely since
-        # nothing ever re-rolled its 911-report chance. Confirmed live: a
-        # medical_emergency incident stayed reported=False for tens of
-        # thousands of ticks. Also polling it here on the same cadence
-        # resolve() already uses gives every unreported incident a repeat
-        # chance regardless of what else is happening in the world.
-        auto_report_incidents(world)
-        resolve(world)                 # poll responder arrival ticks
-        maybe_arrest_from_incidents(world)
-        # Incapacitated characters are deliberately excluded from
-        # agent_chars above (same reason their LLM doesn't get called) --
-        # but apply_severity_consequences() (posture recovery, and the
-        # medical-emergency retry inside it) and offgrid.py::process_return()
-        # (which is what actually cures a hospital patient -- clears
-        # unconscious/bleeding/severe_trauma -- and brings anyone off_grid
-        # back once their return_tick passes) only ever ran from INSIDE
-        # that per-character agent tick. That's a deadlock for anyone sent
-        # off_grid while incapacitated: they can never re-enter agent_chars
-        # to get treated or come home, because getting treated/coming home
-        # is the only thing that would ever clear "incapacitated" in the
-        # first place. Confirmed live: two characters stayed off_grid,
-        # unconscious, and stuck rendering at their pre-hospital position
-        # on the map indefinitely. Sweeping every character here rescues
-        # exactly those characters.
-        #
-        # Confirmed live bug (duplicate timeline events, e.g. the SAME
-        # "had a routine cafe trip" appearing twice at the same tick): this
-        # used to sweep EVERY alive character "unconditionally," not just
-        # the incapacitated ones this block exists for. agent_chars (built
-        # above, still in scope) already gets its own worker-thread
-        # dispatch this same tick, and update_agent() calls these same two
-        # functions itself, on the SAME shared `world`/`c` dict, from a
-        # DIFFERENT thread -- a genuine TOCTOU race, not a stale-snapshot
-        # one: both threads can read off_grid==True before either writes
-        # it back False, so both run process_return()'s whole body
-        # (including the world["events"].append) to completion. Restricting
-        # this sweep to characters agent_chars actually excluded removes
-        # the second caller entirely instead of trying to lock around it --
-        # every character still gets covered exactly once, just by
-        # whichever path was always the real one for them.
-        #
-        # "Excluded from agent_chars" is not enough on its own: a character
-        # whose previous dispatch is still running (_pending_agent_ids) is
-        # ALSO excluded from agent_chars, yet that thread is exactly who is
-        # mid-process_return. process_return() can sit for a long time --
-        # a returning worker blocks inside offgrid.py::_resolve_work_shift
-        # on a work-shift narration LLM call (up to llm_gate's 90s) with
-        # off_grid still True -- so sweeping pending characters re-ran the
-        # whole return on THIS (the main tick) thread: a second narration
-        # call, a duplicate world["events"] entry, and the entire tick
-        # blocked for the length of the call. Confirmed via a faulthandler
-        # dump: main thread in tick() -> process_return() ->
-        # generate_hourly_work_beats() -> run_llm_call(), simultaneously
-        # with an agent worker in the same chain for the same character.
-        # Only characters with NO agent thread at all (incapacitated, never
-        # dispatched) still need this sweep -- the deadlock it exists for.
-        from systems.offgrid import process_return
-        _has_agent_thread = {c["id"] for c in agent_chars}
-        for c in characters:
-            if c.get("alive") is not False and c["id"] not in _has_agent_thread:
-                apply_severity_consequences(c, world)
-                process_return(c, world)
 
 
     # Jail release still needs tick poll
@@ -723,16 +669,6 @@ def _tick_impl(world):
 
     _prof.mark("section:intimacy_arousal_decay")
     # -- Intimacy arousal decay (every tick) ───────────────
-    tick_intimacy(world)
-
-    _prof.mark("section:impulse_control_pressure_boilover")
-    # -- Impulse control pressure + boilover (every tick) ───
-    tick_impulse(world)
-    tick_harassment(world)
-    tick_baby_hourly(world)
-    tick_nudity_perception(world)
-    tick_crushes(world)
-    tick_incidental_speech(world)
 
     _prof.mark("section:very_slow")
     # -- Very slow (÷300) ───────────────────────────────────
@@ -768,45 +704,6 @@ def _tick_impl(world):
     # symptoms (systems/mental_health_effects.py) + noticing a
     # household member's sustained withdrawal (systems/
     # withdrawal_concern.py) ─────────────────────────────────────────
-    _prof.mark("every:daily_finance")
-    if every(world, CADENCE["daily_finance"], offset=45) and _is_new_calendar_day(world, "daily_finance"):
-        from systems.telecom import tick_daily_data_usage
-        from systems.subscriptions import maybe_grow_subscription_desire
-        from systems.home_presence import roll_over_home_presence_day
-        from systems.mental_health_effects import tick_depression_effects
-        from systems.withdrawal_concern import maybe_notice_withdrawal
-        from systems.absence_suspicion import maybe_notice_absence
-        from systems.secret_keeping import maybe_generate_secret, tick_all_secrets
-        from systems.confiding import resolve_confide_opportunities
-        from systems.temporary_separation import maybe_return_from_separation
-        from systems.crushes import maybe_form_crush
-        from systems.detective_work import (
-            maybe_send_unsettling_letter, check_personal_mail, maybe_report_missing_item,
-            maybe_report_mysterious_appearance, maybe_notice_gambling_problem,
-            tick_aggression_patterns,
-        )
-        tick_all_secrets(world)
-        maybe_send_unsettling_letter(world)
-        maybe_report_missing_item(world)
-        maybe_report_mysterious_appearance(world)
-        maybe_notice_gambling_problem(world)
-        tick_aggression_patterns(world)
-        for c in characters:
-            if not c.get("alive", True):
-                continue
-            home_fraction = roll_over_home_presence_day(c)
-            tick_daily_data_usage(c, world, home_fraction)
-            tick_depression_effects(c, world)
-            maybe_return_from_separation(c, world)
-            check_personal_mail(c, world)
-            if not c.get("off_grid"):
-                maybe_grow_subscription_desire(c, world)
-                maybe_notice_withdrawal(c, world)
-                maybe_notice_absence(c, world)
-                maybe_generate_secret(c, world)
-                resolve_confide_opportunities(c, world)
-                maybe_form_crush(c, world)
-
     _prof.mark("section:hourly_home_presence_sample")
     # -- Hourly home-presence sample (systems/home_presence.py) -- feeds
     # the mobile-data home-wifi discount above, and is general-purpose
@@ -867,9 +764,208 @@ def _tick_impl(world):
 from core import scheduler  # noqa: E402
 
 
+
+# ── jobs moved out of the tick body (core/flow.py says what sets each off) ─────────────────────────────────────────
+
+def _alive_characters(world):
+    return [c for c in world.get("characters", {}).values() if not c.get("is_workplace_npc")]
+
+
+def _job_value_influence(world, entry):
+    """Daily: today's value influence settles (systems/influence.py::resolve_value_influence)."""
+    resolve_value_influence(world)
+
+
+def _job_daily_finance(world, entry):
+    """Daily: data plans, subscriptions, the home-presence day, depression's symptoms, noticing withdrawal or absence,
+    secrets, confiding, crushes forming, the detective post. Then `finance.day_settled` (evictions read the day's books)."""
+    characters = _alive_characters(world)
+    from systems.telecom import tick_daily_data_usage
+    from systems.subscriptions import maybe_grow_subscription_desire
+    from systems.home_presence import roll_over_home_presence_day
+    from systems.mental_health_effects import tick_depression_effects
+    from systems.withdrawal_concern import maybe_notice_withdrawal
+    from systems.absence_suspicion import maybe_notice_absence
+    from systems.secret_keeping import maybe_generate_secret, tick_all_secrets
+    from systems.confiding import resolve_confide_opportunities
+    from systems.temporary_separation import maybe_return_from_separation
+    from systems.crushes import maybe_form_crush
+    from systems.detective_work import (
+        maybe_send_unsettling_letter, check_personal_mail, maybe_report_missing_item,
+        maybe_report_mysterious_appearance, maybe_notice_gambling_problem,
+        tick_aggression_patterns,
+    )
+    tick_all_secrets(world)
+    maybe_send_unsettling_letter(world)
+    maybe_report_missing_item(world)
+    maybe_report_mysterious_appearance(world)
+    maybe_notice_gambling_problem(world)
+    tick_aggression_patterns(world)
+    for c in characters:
+        if not c.get("alive", True):
+            continue
+        home_fraction = roll_over_home_presence_day(c)
+        tick_daily_data_usage(c, world, home_fraction)
+        tick_depression_effects(c, world)
+        maybe_return_from_separation(c, world)
+        check_personal_mail(c, world)
+        if not c.get("off_grid"):
+            maybe_grow_subscription_desire(c, world)
+            maybe_notice_withdrawal(c, world)
+            maybe_notice_absence(c, world)
+            maybe_generate_secret(c, world)
+            resolve_confide_opportunities(c, world)
+            maybe_form_crush(c, world)
+    from core.event_bus import emit
+    emit("finance.day_settled", {"tick": world.get("tick", 0)})
+
+
+def _job_arrests(world, entry):
+    """Every 30 s: world-level random incidents, 911 reports, responders arriving, arrests -- and the posture recovery /
+    return home of anyone the agent loop is not updating (incapacitated: see the long note below)."""
+    characters = _alive_characters(world)
+    agent_chars = [c for c in characters if not c.get("is_service_worker") and c.get("alive") is not False
+                   and c.get("posture") != "incapacitated"]
+    trigger_incident(world, None)  # world-level random only
+    # Live bug report: auto_report_incidents() only ran reactively, off
+    # the "incident_created" event -- a lone unreported incident (e.g.
+    # a medical emergency with nobody else around to generate a fresh
+    # incident elsewhere) could sit unreported indefinitely since
+    # nothing ever re-rolled its 911-report chance. Confirmed live: a
+    # medical_emergency incident stayed reported=False for tens of
+    # thousands of ticks. Also polling it here on the same cadence
+    # resolve() already uses gives every unreported incident a repeat
+    # chance regardless of what else is happening in the world.
+    auto_report_incidents(world)
+    resolve(world)                 # poll responder arrival ticks
+    maybe_arrest_from_incidents(world)
+    # Incapacitated characters are deliberately excluded from
+    # agent_chars above (same reason their LLM doesn't get called) --
+    # but apply_severity_consequences() (posture recovery, and the
+    # medical-emergency retry inside it) and offgrid.py::process_return()
+    # (which is what actually cures a hospital patient -- clears
+    # unconscious/bleeding/severe_trauma -- and brings anyone off_grid
+    # back once their return_tick passes) only ever ran from INSIDE
+    # that per-character agent tick. That's a deadlock for anyone sent
+    # off_grid while incapacitated: they can never re-enter agent_chars
+    # to get treated or come home, because getting treated/coming home
+    # is the only thing that would ever clear "incapacitated" in the
+    # first place. Confirmed live: two characters stayed off_grid,
+    # unconscious, and stuck rendering at their pre-hospital position
+    # on the map indefinitely. Sweeping every character here rescues
+    # exactly those characters.
+    #
+    # Confirmed live bug (duplicate timeline events, e.g. the SAME
+    # "had a routine cafe trip" appearing twice at the same tick): this
+    # used to sweep EVERY alive character "unconditionally," not just
+    # the incapacitated ones this block exists for. agent_chars (built
+    # above, still in scope) already gets its own worker-thread
+    # dispatch this same tick, and update_agent() calls these same two
+    # functions itself, on the SAME shared `world`/`c` dict, from a
+    # DIFFERENT thread -- a genuine TOCTOU race, not a stale-snapshot
+    # one: both threads can read off_grid==True before either writes
+    # it back False, so both run process_return()'s whole body
+    # (including the world["events"].append) to completion. Restricting
+    # this sweep to characters agent_chars actually excluded removes
+    # the second caller entirely instead of trying to lock around it --
+    # every character still gets covered exactly once, just by
+    # whichever path was always the real one for them.
+    #
+    # "Excluded from agent_chars" is not enough on its own: a character
+    # whose previous dispatch is still running (_pending_agent_ids) is
+    # ALSO excluded from agent_chars, yet that thread is exactly who is
+    # mid-process_return. process_return() can sit for a long time --
+    # a returning worker blocks inside offgrid.py::_resolve_work_shift
+    # on a work-shift narration LLM call (up to llm_gate's 90s) with
+    # off_grid still True -- so sweeping pending characters re-ran the
+    # whole return on THIS (the main tick) thread: a second narration
+    # call, a duplicate world["events"] entry, and the entire tick
+    # blocked for the length of the call. Confirmed via a faulthandler
+    # dump: main thread in tick() -> process_return() ->
+    # generate_hourly_work_beats() -> run_llm_call(), simultaneously
+    # with an agent worker in the same chain for the same character.
+    # Only characters with NO agent thread at all (incapacitated, never
+    # dispatched) still need this sweep -- the deadlock it exists for.
+    from systems.offgrid import process_return
+    _has_agent_thread = {c["id"] for c in agent_chars}
+    for c in characters:
+        if c.get("alive") is not False and c["id"] not in _has_agent_thread:
+            apply_severity_consequences(c, world)
+            process_return(c, world)
+
+
+def _job_body_moment(world, entry):
+    """Every second: arousal, anger pressure, intoxication, baby needs, blushes and daydreams; walking in on someone
+    undressed; small spoken requests answered."""
+    tick_intimacy(world)
+
+    _prof.mark("section:impulse_control_pressure_boilover")
+    # -- Impulse control pressure + boilover (every tick) ───
+    tick_impulse(world)
+    tick_harassment(world)
+    tick_baby_hourly(world)
+    tick_nudity_perception(world)
+    tick_crushes(world)
+    tick_incidental_speech(world)
+
+
+def _job_domestic_control(world, entry):
+    """Controlling partners: tactics, quid pro quo, emotional control (their own medium cadence)."""
+    tick_domestic_control(world)
+    tick_quid_pro_quo(world)
+    tick_emotional_control(world)
+
+
+def _job_libido(world, entry):
+    tick_libido(world)
+
+
+def _job_life_comparison(world, entry):
+    """Event: someone was seen, mentioned or visited -- they may compare lives (systems/life_comparison.py)."""
+    from systems.life_comparison import on_reminded_event
+    on_reminded_event(world, entry.get("event"), entry.get("data") or {})
+
+
+def _job_incidental_speech(world, entry):
+    """Event: someone left or arrived at a building -- a goodbye or a 'where are you going?' (systems/incidental_speech.py)."""
+    from systems.incidental_speech import mark_departure
+    data = entry.get("data") or {}
+    c = world.get("characters", {}).get(data.get("character_id"))
+    if c and data.get("from_building"):
+        mark_departure(c, data.get("from_building"))
+        tick_incidental_speech(world)
+
+PERCEPTION_RADIUS_OUTDOORS = 24      # tiles: who outdoors may see a change (vision tops out well inside this)
+
+
+def _affected(world, ids):
+    """The characters an event about `ids` can matter to: them, and whoever is near them -- the same building, or outdoors
+    within PERCEPTION_RADIUS_OUTDOORS. No ids (the clock struck): everyone."""
+    chars = world.get("characters", {})
+    every = [c for c in chars.values() if not c.get("is_workplace_npc")]
+    if not ids:
+        return every
+    subjects = [chars[i] for i in ids if i in chars]
+    out = {c["id"]: c for c in subjects}
+    for o in every:
+        if o["id"] in out:
+            continue
+        for s_ in subjects:
+            b = s_.get("_in_building", s_.get("building_id"))
+            ob = o.get("_in_building", o.get("building_id"))
+            if b and ob == b:
+                out[o["id"]] = o
+                break
+            if not b and not ob and abs((o.get("x") or 0) - (s_.get("x") or 0)) + abs((o.get("y") or 0) - (s_.get("y") or 0)) <= PERCEPTION_RADIUS_OUTDOORS:
+                out[o["id"]] = o
+                break
+    return list(out.values())
+
+
 def _job_perception(world, entry):
-    """Scheduled job `perception` (was an every() block in tick()); see core/scheduler.py."""
-    characters = [c for c in world.get("characters", {}).values() if not c.get("is_workplace_npc")]
+    """Event (core/flow.py): someone moved, changed room, started/stopped something, came back, spoke, or the hour
+    struck -- the people who could see it look again, then `perception.updated` says who did."""
+    characters = _affected(world, entry.get("ids") or [])
     for c in characters:
         perceive(c, world)
         # "Authority hears a conflicting account via observation" —
@@ -878,13 +974,18 @@ def _job_perception(world, entry):
         # Same shape, for witnessing a punch/kick/shove/... — see
         # systems/excuses.py::check_witnessed_hostility_for_observer.
         check_witnessed_hostility_for_observer(c, world)
+    if characters:
+        from core.event_bus import emit
+        emit("perception.updated", {"character_ids": [c["id"] for c in characters]})
 
 
 def _job_attention(world, entry):
-    """Scheduled job `attention` (was an every() block in tick()); see core/scheduler.py."""
-    characters = [c for c in world.get("characters", {}).values() if not c.get("is_workplace_npc")]
-    for c in characters:
-        update_attention(c, world)
+    """Event: attention follows what was just seen (`perception.updated` names who looked)."""
+    chars = world.get("characters", {})
+    for cid in entry.get("ids") or []:
+        c = chars.get(cid)
+        if c and not c.get("is_workplace_npc"):
+            update_attention(c, world)
 
 
 def _job_memory_decay(world, entry):
@@ -1163,9 +1264,10 @@ def _job_kids_play(world, entry):
 
 
 def _job_introductions(world, entry):
-    """Scheduled job `introductions`: a friend in view of two strangers may introduce them (systems/introductions.py)."""
+    """Event: someone came into view -- the one who saw them may introduce two strangers they can see
+    (systems/introductions.py)."""
     from systems.introductions import tick_introductions
-    tick_introductions(world)
+    tick_introductions(world, only=set(entry.get("ids") or []) or None)
 
 
 def _job_exhaustion(world, entry):
@@ -1226,7 +1328,6 @@ def _job_socioeconomics(world, entry):
     tick_secrets(world)
     tick_envy(world)
     tick_trauma(world)
-    tick_domestic_control(world)
 
 
 def _job_police_feed(world, entry):
@@ -1238,13 +1339,9 @@ def _job_police_feed(world, entry):
         tick_police_feed(world, _load_defs_pf(world.get("sim_id", "default")))
     except Exception:
         pass
-    tick_quid_pro_quo(world)
-    tick_emotional_control(world)
     tick_religious_repression(world)
     tick_harassment_daily(world)
-    tick_libido(world)
     tick_discovery_checks(world)
-    tick_life_comparison(world)
     tick_sports_leagues(world)
     schedule_game_day_events(world)
     apply_game_day_outcomes(world)
@@ -1431,15 +1528,29 @@ def _job_phone_battery(world, entry):
 
 
 def _job_phone_behavior(world, entry):
-    """Scheduled job `phone_behavior` (was an every() block in tick()); see core/scheduler.py."""
-    characters = [c for c in world.get("characters", {}).values() if not c.get("is_workplace_npc")]
-    for c in characters:
+    """Event: someone settled into something (the phone may be set down) or left a building (it may be left behind)."""
+    data = entry.get("data") or {}
+    c = world.get("characters", {}).get(data.get("character_id"))
+    if not c or c.get("is_workplace_npc"):
+        return
+    if entry.get("event") == "character.building_changed":
+        if data.get("from_building"):
+            maybe_forget_phone(c, world, data["from_building"])
+    else:
         maybe_set_phone_down(c, world)
-        last_building = c.get("_last_building_id")
-        current_building = c.get("building_id")
-        if last_building is not None and current_building != last_building:
-            maybe_forget_phone(c, world, last_building)
-        c["_last_building_id"] = current_building
+
+
+def _on_wait_ready(world, entry):
+    """A character's wait (the microwave) is over: they are woken to take it out. Timer set when the wait began."""
+    c = world.get("characters", {}).get(entry["owner"].split(":", 1)[1])
+    wait = (c or {}).get("character_wait")
+    if wait and not wait.get("ready"):
+        wait["ready"] = True
+        from brain.cognition_scheduler import wake_character
+        wake_character(c, world, "wait_ready")
+
+
+scheduler.register("wait", _on_wait_ready)
 
 
 def _job_character_wait(world, entry):
@@ -1462,78 +1573,7 @@ def _job_calendar_events(world, entry):
     tick_insurance_renewals(world)
 
 
-scheduler.register_recurring("perception", _job_perception, every=CADENCE["perception"], offset=(-0) % CADENCE["perception"])
-scheduler.register_recurring("attention", _job_attention, every=CADENCE["attention"], offset=(-1) % CADENCE["attention"])
-scheduler.register_recurring("memory_decay", _job_memory_decay, every=CADENCE["memory_decay"], offset=(-2) % CADENCE["memory_decay"])
-scheduler.register_recurring("polarization", _job_polarization, every=CADENCE["polarization"], offset=(-3) % CADENCE["polarization"])
-scheduler.register_recurring("relationships", _job_relationships, every=CADENCE["relationships"], offset=(-4) % CADENCE["relationships"])
-scheduler.register_recurring("worry_poll", _job_worry_poll, every=CADENCE["worry_poll"], offset=(-6) % CADENCE["worry_poll"])
-scheduler.register_recurring("focus_check", _job_focus_check, every=CADENCE["focus_check"], offset=(-7) % CADENCE["focus_check"])
-scheduler.register_recurring("grudges", _job_grudges, every=CADENCE["grudges"], offset=(-8) % CADENCE["grudges"])
-scheduler.register_recurring("rumors", _job_rumors, every=CADENCE["rumors"], offset=(-9) % CADENCE["rumors"])
-scheduler.register_recurring("neighbours", _job_neighbours, every=CADENCE["neighbours"], offset=(-10) % CADENCE["neighbours"])
-scheduler.register_recurring("kids_play", _job_kids_play, every=CADENCE["kids_play"], offset=(-11) % CADENCE["kids_play"])
-scheduler.register_recurring("introductions", _job_introductions, every=CADENCE["introductions"], offset=(-12) % CADENCE["introductions"])
-scheduler.register_recurring("exhaustion", _job_exhaustion, every=CADENCE["exhaustion"], offset=(-13) % CADENCE["exhaustion"])
-scheduler.register_recurring("influence_exposure", _job_influence_exposure, every=CADENCE["influence_exposure"], offset=(-21) % CADENCE["influence_exposure"])
-scheduler.register_recurring("reading", _job_reading, every=CADENCE["reading"], offset=(-9) % CADENCE["reading"])
-scheduler.register_recurring("health", _job_health, every=CADENCE["health"], offset=(-19) % CADENCE["health"])
-scheduler.register_recurring("reading#2", _job_reading_2, every=CADENCE["reading"], offset=(-17) % CADENCE["reading"])
-scheduler.register_recurring("cooking#2", _job_cooking_2, every=CADENCE["cooking"], offset=(-33) % CADENCE["cooking"])
-scheduler.register_recurring("deliveries", _job_deliveries, every=CADENCE["deliveries"], offset=(-6) % CADENCE["deliveries"])
-scheduler.register_recurring("service_workers", _job_service_workers, every=CADENCE["service_workers"], offset=(-7) % CADENCE["service_workers"])
-scheduler.register_recurring("service_workers#2", _job_service_workers_2, every=CADENCE["service_workers"], offset=(-17) % CADENCE["service_workers"])
-scheduler.register_recurring("household_monitoring", _job_household_monitoring, every=CADENCE["household_monitoring"], offset=(-8) % CADENCE["household_monitoring"])
-scheduler.register_recurring("mentality_compilation", _job_mentality_compilation, every=CADENCE["mentality_compilation"], offset=(-12) % CADENCE["mentality_compilation"])
-scheduler.register_recurring("market", _job_market, every=CADENCE["market"], offset=(-9) % CADENCE["market"])
-scheduler.register_recurring("job_market", _job_job_market, every=CADENCE["job_market"], offset=(-10) % CADENCE["job_market"])
-scheduler.register_recurring("traffic", _job_traffic, every=CADENCE["traffic"], offset=(-11) % CADENCE["traffic"])
-scheduler.register_recurring("postal", _job_postal, every=CADENCE["postal"], offset=(-12) % CADENCE["postal"])
-scheduler.register_recurring("postal#2", _job_postal_2, every=CADENCE["postal"], offset=(-34) % CADENCE["postal"])
-scheduler.register_recurring("business_support", _job_business_support, every=CADENCE["business_support"], offset=(-14) % CADENCE["business_support"])
-scheduler.register_recurring("appliance_degradation", _job_appliance_degradation, every=CADENCE["appliance_degradation"], offset=(-13) % CADENCE["appliance_degradation"])
-scheduler.register_recurring("service_workers#3", _job_service_workers_3, every=CADENCE["service_workers"], offset=(-14) % CADENCE["service_workers"])
-scheduler.register_recurring("service_workers#4", _job_service_workers_4, every=CADENCE["service_workers"], offset=(-48) % CADENCE["service_workers"])
-scheduler.register_recurring("service_workers#5", _job_service_workers_5, every=CADENCE["service_workers"], offset=(-18) % CADENCE["service_workers"])
-scheduler.register_recurring("fires", _job_fires, every=CADENCE["fires"], offset=(-16) % CADENCE["fires"])
-scheduler.register_recurring("trials", _job_trials, every=CADENCE["trials"], offset=(-16) % CADENCE["trials"])
-scheduler.register_recurring("news", _job_news, every=CADENCE["news"], offset=(-17) % CADENCE["news"])
-scheduler.register_recurring("reading#3", _job_reading_3, every=CADENCE["reading"], offset=(-23) % CADENCE["reading"])
-scheduler.register_recurring("conversation_cleanup", _job_conversation_cleanup, every=CADENCE["conversation_cleanup"], offset=(-19) % CADENCE["conversation_cleanup"])
-scheduler.register_recurring("conversation_seating", _job_conversation_seating, every=CADENCE["conversation_seating"], offset=(-21) % CADENCE["conversation_seating"])
-scheduler.register_recurring("weather", _job_weather, every=CADENCE["weather"], offset=(-44) % CADENCE["weather"])
-scheduler.register_recurring("social_projects", _job_social_projects, every=CADENCE["social_projects"], offset=(-48) % CADENCE["social_projects"])
-scheduler.register_recurring("social_availability", _job_social_availability, every=CADENCE["social_availability"], offset=(-52) % CADENCE["social_availability"])
-scheduler.register_recurring("job_market#2", _job_job_market_2, every=CADENCE["job_market"], offset=(-20) % CADENCE["job_market"])
-scheduler.register_recurring("evictions", _job_evictions, every=CADENCE["evictions"], offset=(-18) % CADENCE["evictions"])
-scheduler.register_recurring("migration", _job_migration, every=CADENCE["migration"], offset=(-19) % CADENCE["migration"])
-scheduler.register_recurring("conflicts", _job_conflicts, every=CADENCE["conflicts"], offset=(-24) % CADENCE["conflicts"])
-scheduler.register_recurring("grapples", _job_grapples, every=CADENCE["grapples"], offset=(-35) % CADENCE["grapples"])
-scheduler.register_recurring("grievances", _job_grievances, every=CADENCE["grievances"], offset=(-25) % CADENCE["grievances"])
-scheduler.register_recurring("contract_checks", _job_contract_checks, every=CADENCE["contract_checks"], offset=(-26) % CADENCE["contract_checks"])
-scheduler.register_recurring("persona_expectations", _job_persona_expectations, every=CADENCE["persona_expectations"], offset=(-42) % CADENCE["persona_expectations"])
-scheduler.register_recurring("cleanliness", _job_cleanliness, every=CADENCE["cleanliness"], offset=(-43) % CADENCE["cleanliness"])
-scheduler.register_recurring("socioeconomics", _job_socioeconomics, every=CADENCE["socioeconomics"], offset=(-19) % CADENCE["socioeconomics"])
-scheduler.register_recurring("police_feed", _job_police_feed, every=CADENCE["police_feed"], offset=(-21) % CADENCE["police_feed"])
-scheduler.register_recurring("crisis", _job_crisis, every=CADENCE["crisis"], offset=(-20) % CADENCE["crisis"])
-scheduler.register_recurring("election", _job_election, every=CADENCE["election"], offset=(-21) % CADENCE["election"])
-scheduler.register_recurring("faction", _job_faction, every=CADENCE["faction"], offset=(-22) % CADENCE["faction"])
-scheduler.register_recurring("hierarchy", _job_hierarchy, every=CADENCE["hierarchy"], offset=(-23) % CADENCE["hierarchy"])
-scheduler.register_recurring("lt_needs", _job_lt_needs, every=CADENCE["lt_needs"], offset=(-27) % CADENCE["lt_needs"])
-scheduler.register_recurring("social_odor", _job_social_odor, every=CADENCE["social_odor"], offset=(-28) % CADENCE["social_odor"])
-scheduler.register_recurring("contagion", _job_contagion, every=CADENCE["contagion"], offset=(-36) % CADENCE["contagion"])
-scheduler.register_recurring("child_care", _job_child_care, every=CADENCE["child_care"], offset=(-37) % CADENCE["child_care"])
-scheduler.register_recurring("bedroom_assignment", _job_bedroom_assignment, every=CADENCE["bedroom_assignment"], offset=(-38) % CADENCE["bedroom_assignment"])
-scheduler.register_recurring("plants", _job_plants, every=CADENCE["plants"], offset=(-39) % CADENCE["plants"])
-scheduler.register_recurring("cookware", _job_cookware, every=CADENCE["cookware"], offset=(-47) % CADENCE["cookware"])
-scheduler.register_recurring("food_aging", _job_food_aging, every=CADENCE["food_aging"], offset=(-40) % CADENCE["food_aging"])
-scheduler.register_recurring("home_presence", _job_home_presence, every=CADENCE["home_presence"], offset=(-46) % CADENCE["home_presence"])
-scheduler.register_recurring("body_composition", _job_body_composition, every=CADENCE["body_composition"], offset=(-41) % CADENCE["body_composition"])
-scheduler.register_recurring("intercourse_sessions", _job_intercourse_sessions, every=CADENCE["intercourse_sessions"], offset=(-48) % CADENCE["intercourse_sessions"])
-scheduler.register_recurring("detective_work", _job_detective_work, every=CADENCE["detective_work"], offset=(-49) % CADENCE["detective_work"])
-scheduler.register_recurring("addictions", _job_addictions, every=CADENCE["addictions"], offset=(-47) % CADENCE["addictions"])
-scheduler.register_recurring("claustrophobia", _job_claustrophobia, every=CADENCE["claustrophobia"], offset=(-50) % CADENCE["claustrophobia"])
-scheduler.register_recurring("phone_battery", _job_phone_battery, every=CADENCE["phone_battery"], offset=(-29) % CADENCE["phone_battery"])
-scheduler.register_recurring("phone_behavior", _job_phone_behavior, every=CADENCE["phone_behavior"], offset=(-30) % CADENCE["phone_behavior"])
-scheduler.register_recurring("character_wait", _job_character_wait, every=CADENCE["character_wait"], offset=(-34) % CADENCE["character_wait"])
-scheduler.register_recurring("calendar_events", _job_calendar_events, every=CADENCE["calendar_events"], offset=(-32) % CADENCE["calendar_events"])
+# Every background job, and what sets it off -- an event, the clock, or time passing: core/flow.py (the flow map is drawn
+# from the same table: tools/flow_map/).
+from core import flow as _flow
+_flow.install(sys.modules[__name__])

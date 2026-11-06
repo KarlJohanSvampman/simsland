@@ -25,6 +25,8 @@ Two entry points, both called from brain/agent_loop.py::update_agent():
 
 from __future__ import annotations
 
+from systems.occupancy import occupy as _occupy  # one activity at a time (systems/occupancy.py)
+
 import random
 from typing import Optional
 
@@ -181,10 +183,10 @@ def _start_roam(c, world) -> bool:
         c["animation_state"] = "walk"
         c["is_moving"] = True
         lo, hi = ROAM_LINGER_TICKS
-        c["activity"] = {"type": "roam", "phase": "walking",
+        c["activity"] = _occupy(c, world, {"type": "roam", "phase": "walking",
                          "phase_started_tick": world.get("tick", 0),
                          "duration": random.randint(lo, hi), "target_room": room.get("id"),
-                         "state": {}}
+                         "state": {}})
         return True
     return False
 
@@ -225,10 +227,10 @@ def _start_check_door(c, world) -> bool:
     c["animation_state"] = "walk"
     c["is_moving"] = True
     lo, hi = CHECK_DOOR_LINGER_TICKS
-    c["activity"] = {"type": "check_door_lock", "phase": "walking",
+    c["activity"] = _occupy(c, world, {"type": "check_door_lock", "phase": "walking",
                      "phase_started_tick": world.get("tick", 0),
                      "duration": random.randint(lo, hi),
-                     "state": {"door_id": door["id"]}}
+                     "state": {"door_id": door["id"]}})
     return True
 
 
@@ -261,9 +263,9 @@ def _start_look_out_window(c, world) -> bool:
     c["animation_state"] = "walk"
     c["is_moving"] = True
     lo, hi = LOOK_OUT_WINDOW_LINGER_TICKS
-    c["activity"] = {"type": "look_out_window", "phase": "walking",
+    c["activity"] = _occupy(c, world, {"type": "look_out_window", "phase": "walking",
                      "phase_started_tick": world.get("tick", 0),
-                     "duration": random.randint(lo, hi), "target_id": window["id"], "state": {}}
+                     "duration": random.randint(lo, hi), "target_id": window["id"], "state": {}})
     return True
 
 

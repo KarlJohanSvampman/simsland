@@ -199,4 +199,4 @@ def _rewrite_memories(world, entry, tags):
                 m.setdefault("tags", []).append(subject)
 
 
-scheduler.register_recurring("convtags", _service, SERVICE_EVERY)
+# (scheduled from core/flow.py)

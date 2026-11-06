@@ -25,9 +25,54 @@ fired, and `cal["minute"] == 0` staying true for 60 ticks can't fire it 60 times
 
 from core.event_bus import emit
 
+# Durations are sim time, in seconds. Write them with these: 5 * MINUTE, 2 * HOUR, DAY -- never as a bare tick count
+# (a tick is one step of the loop; that it currently equals one sim second is a fact about TICK_RATE_SECONDS, not a unit).
+SECOND = 1
+MINUTE = 60 * SECOND
+HOUR = 60 * MINUTE
+DAY = 24 * HOUR
+WEEK = 7 * DAY
+
 
 def now(world):
     return world.get("tick", 0)
+
+
+def now_ts(world):
+    """The simulation's current time as a timestamp (sim seconds, world["sim_time"]). A world without a sim clock (a bare
+    test world) counts its ticks as seconds."""
+    ts = world.get("sim_time")
+    return float(ts) if ts is not None else float(world.get("tick", 0))
+
+
+def seconds_into_day(world):
+    """Sim seconds since midnight, from the calendar the sim keeps (or the timestamp when there is none)."""
+    cal = world.get("calendar") or {}
+    if cal.get("hour") is not None:
+        return cal.get("hour", 0) * HOUR + cal.get("minute", 0) * MINUTE + int(cal.get("second", 0) or 0)
+    if world.get("sim_time") is None:
+        return int(now_ts(world)) % DAY
+    from datetime import datetime
+    d = datetime.fromtimestamp(world["sim_time"])
+    return d.hour * HOUR + d.minute * MINUTE + d.second
+
+
+def next_time_of_day(world, at_seconds):
+    """The timestamp of the next time the clock reads `at_seconds` past midnight (strictly after now)."""
+    now = now_ts(world)
+    due = now - seconds_into_day(world) + at_seconds
+    while due <= now:
+        due += DAY
+    return due
+
+
+def next_minute_of_hour(world, at_seconds):
+    """The timestamp of the next time the clock reads `at_seconds` past the hour (strictly after now)."""
+    now = now_ts(world)
+    due = now - (seconds_into_day(world) % HOUR) + at_seconds
+    while due <= now:
+        due += HOUR
+    return due
 
 
 def calendar(world):

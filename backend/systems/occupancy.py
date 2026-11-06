@@ -196,3 +196,116 @@ def release_reservation(c, world):
             if a.get("reserved_by") == c["id"]:
                 a["reserved_by"] = None
                 a["reserved_until"] = None
+
+# =========================================================
+# ONE THING AT A TIME
+# =========================================================
+# A character does one activity at a time. Starting another while one is still running -- not finished, interrupted
+# or paused -- is a bug in whatever started it: it used to overwrite the running one silently (its anchor never
+# released, its record written off as "replaced", or not at all), which is how characters ended up "doing" several
+# things and finishing none. Every assignment of a character's activity goes through occupy() now:
+#
+#   c["activity"] = occupy(c, world, new_activity)
+#
+# A clash is logged as an error with where it came from (and kept in world["activity_clashes"]), the running activity
+# ends ("clash"), the new one is dropped, and the character loses a few minutes standing there flustered -- and thinks
+# so. A deliberate switch (a decision to do something else) says so first: `with switching(c, reason): ...` ends the
+# running activity properly before the new one starts.
+
+import contextlib
+
+CLASH_WASTE_SECONDS = 3 * 60
+CLASH_LOG_KEPT = 200
+
+
+def is_running(act):
+    """An activity still under way: not closed (activity_trace), not already completed (its completion side-effects
+    ran; only the one-tick finishing animation is left), not paused."""
+    return bool(act) and not act.get("_closed") and not act.get("_completed") and not act.get("paused") \
+        and act.get("phase") != "finishing"
+
+
+@contextlib.contextmanager
+def switching(c, reason):
+    """Within this block, a new activity replaces the running one on purpose (interrupting it properly first)."""
+    prev = c.get("_switching")
+    c["_switching"] = reason or "they chose to do something else"
+    try:
+        yield
+    finally:
+        if prev is None:
+            c.pop("_switching", None)
+        else:
+            c["_switching"] = prev
+
+
+def occupy(c, world, new):
+    """The activity to put in c["activity"]: `new`, or -- when it would go on top of one still running without that one
+    being ended first -- the result of a clash (see above)."""
+    if new is None:
+        return None
+    cur = c.get("activity")
+    if cur is None or cur is new or not is_running(cur) or world is None:
+        return new
+    if c.get("_switching"):
+        interrupt_activity(c, world, reason=c["_switching"])
+        return new
+    return _clash(c, world, cur, new)
+
+
+def _origin():
+    import traceback
+    frames = [f for f in traceback.extract_stack()[:-3] if "occupancy.py" not in f.filename]
+    return " <- ".join(f"{f.filename.rsplit('/', 2)[-1] if '/' in f.filename else f.filename}:{f.lineno} {f.name}"
+                       for f in reversed(frames[-3:]))
+
+
+def _label(act):
+    return str((act or {}).get("type") or "something").replace("_", " ")
+
+
+def _clash(c, world, cur, new):
+    tick = world.get("tick", 0)
+    name = c.get("name") or c.get("id")
+    where = _origin()
+    print(f"[activity] ERROR one-thing-at-a-time: {name} was made to start '{_label(new)}' while still "
+          f"'{_label(cur)}' (since tick {cur.get('phase_started_tick')}) -- both dropped. Started from: {where}",
+          flush=True)
+    log = world.setdefault("activity_clashes", [])
+    log.append({"tick": tick, "character_id": c.get("id"), "running": cur.get("type"), "started": new.get("type"),
+                "from": where})
+    del log[:-CLASH_LOG_KEPT]
+    interrupt_activity(c, world, reason=f"tried to start {_label(new)} on top of it", outcome="clash")
+    thought = (f"I tried to {_label(new)} while I was still {_label(cur)}, and now I'm doing neither. "
+               f"That's a few minutes wasted -- I must look so slow. I can't do two things at once.")
+    c["last_thought"] = thought
+    try:
+        from brain.memory import store_memory
+        store_memory(c, thought, importance=0.4, tags=["thought", "clash"], tick=tick, source="internal")
+    except Exception as exc:                                   # noqa: BLE001 -- the clash itself must stand
+        print(f"[activity] could not remember the clash for {c.get('id')}: {exc!r}")
+    from core.event_bus import emit
+    emit("activity_clash", {"character_id": c.get("id"), "running": cur.get("type"), "started": new.get("type"),
+                            "from": where})
+    from core import scheduler
+    scheduler.schedule_in(world, f"fluster:{c.get('id')}", "end", CLASH_WASTE_SECONDS)
+    return {"type": "wait", "phase": "using", "phase_started_tick": tick, "duration": CLASH_WASTE_SECONDS,
+            "state": {"reason": "flustered"}, "reason": "standing there, flustered, after trying to do two things at once"}
+
+
+def _end_fluster(world, entry):
+    """The few minutes lost to a clash are over: free to decide again."""
+    c = world.get("characters", {}).get(entry["owner"].split(":", 1)[1])
+    act = (c or {}).get("activity") or {}
+    if act.get("type") == "wait" and (act.get("state") or {}).get("reason") == "flustered":
+        c["activity"] = None
+        from brain.cognition_scheduler import wake_character
+        wake_character(c, world, "activity_finished", {"activity": "being flustered"})
+
+
+def _register():
+    from core import scheduler
+    scheduler.register("fluster", _end_fluster)
+
+
+_register()

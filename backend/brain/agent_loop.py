@@ -625,19 +625,20 @@ def process_decision(
                 apply_speech(c, world, speech)
         elif valid:
 
-            if c.get("activity"):
-                # If this replaces what they are doing, the record says why.
-                c["_interrupt_reason"] = (f"they chose to {str(action.get('type')).replace('_', ' ')}"
-                                          + (f" ({action['reason']})" if action.get("reason") else ""))
-            route_action(
-                c,
-                world,
-                action,
-                speech,
-                definitions=world.get("definitions", {}),
-                available_actions=available_actions
-            )
-            c.pop("_interrupt_reason", None)
+            # A decision to do something else replaces what they are doing ON PURPOSE: the running activity is ended
+            # properly first (systems/occupancy.py::switching), never just written over.
+            reason = (f"they chose to {str(action.get('type')).replace('_', ' ')}"
+                      + (f" ({action['reason']})" if action.get("reason") else ""))
+            from systems.occupancy import switching
+            with switching(c, reason):
+                route_action(
+                    c,
+                    world,
+                    action,
+                    speech,
+                    definitions=world.get("definitions", {}),
+                    available_actions=available_actions
+                )
 
             # route_action() above scaffolds c["activity"] for activity-style
             # action types (eat, sleep, work, ...) via _scaffold()/start_activity().

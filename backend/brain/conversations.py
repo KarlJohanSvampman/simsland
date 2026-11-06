@@ -550,6 +550,15 @@ def add_message(
     from systems.guests import on_line as _guests_on_line
     _guests_on_line(world, conv, speaker_id, utterance)
 
+    # Said: anyone who follows conversations hears of it (core/flow.py), and a conversation nobody adds to for
+    # IDLE_TIMEOUT_SECONDS ends on its own timer -- re-armed by every line, instead of a sweep looking for quiet ones.
+    from core.event_bus import emit
+    emit("conversation.message", {"conv_id": conv.get("id"), "speaker_id": speaker_id,
+                                  "character_ids": list(conv.get("participants") or [])})
+    if conv.get("active"):
+        from core import scheduler
+        scheduler.schedule_in(world, "convidle", conv["id"], IDLE_TIMEOUT_SECONDS)
+
     # A line said is something happening: it pushes back the step timeout of everyone in it (systems/step_timeouts.py).
     from systems.step_timeouts import progress as _step_progress
     for pid in conv.get("participants") or []:
@@ -1185,11 +1194,29 @@ def _archive_conversation(world, conv):
     archive(world, conv)
 
 
+IDLE_TIMEOUT_SECONDS = 120     # a conversation nobody has added to for this long is over
+
+
+def _on_idle(world, entry):
+    """A conversation's idle timer ran out (add_message re-arms it on every line)."""
+    conv = (world.get("conversations") or {}).get(entry.get("key"))
+    if not conv or not conv.get("active"):
+        return
+    if world.get("tick", 0) - (conv.get("last_update") or 0) < IDLE_TIMEOUT_SECONDS:
+        return                              # a line came in through a path that did not re-arm the timer
+    from systems.conversation_floor import _end
+    _end(world, conv, "idle")
+
+
+from core import scheduler as _scheduler
+_scheduler.register("convidle", _on_idle)
+
+
 def cleanup_conversations(
 
     world,
 
-    timeout=120
+    timeout=IDLE_TIMEOUT_SECONDS
 ):
 
     now = world["tick"]

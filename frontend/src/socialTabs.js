@@ -130,12 +130,15 @@ export function openArgumentModal(c, issueId, ctx) {
     const infl = Object.entries(i.influences || {});
     if (infl.length) html += `<div class="viewerSectionTitle" style="margin-top:12px">Who's been shaping their view</div>` + infl.map(([obs, list]) =>
       list.map(x => `<div style="font-size:.9em">${ctx.esc(ctx.name(obs))} ← ${ctx.esc(ctx.name(x.source_id))} (${Math.round(x.influence_strength * 100)}%): ${ctx.esc(x.source_position)}</div>`).join("")).join("");
-    if ((i.evidence || []).length) html += `<div class="viewerSectionTitle" style="margin-top:12px">Evidence</div>` + i.evidence.map(e =>
-      `<div style="font-size:.9em"><span style="opacity:.6">${ctx.fmt(e.tick) || ""}</span> ${ctx.esc(pretty(e.kind))}: ${ctx.esc(e.text)}${e.by ? ` <span style="opacity:.6">(${ctx.esc(ctx.name(e.by))})</span>` : ""}</div>`).join("");
+    if ((i.evidence || []).length) html += `<div class="viewerSectionTitle" style="margin-top:12px">Evidence</div>` + evidenceGroups(i.evidence, ctx);
     const confs = (c.confrontation_log || []).filter(x => x.issue_id === i.id);
     if (confs.length) html += `<div class="viewerSectionTitle" style="margin-top:12px">Confrontations (${confs.length})</div>` + confs.map(x => confrontationBlock(x, ctx)).join("");
-    html += `<div class="viewerSectionTitle" style="margin-top:12px">What happened</div>` + ([...(i.events || [])].sort((a, b) => (a.tick || 0) - (b.tick || 0)).map(e =>
-      `<div style="margin-bottom:3px;font-size:.9em"><span style="opacity:.6">${ctx.fmt(e.tick) || ""}</span> <b>${ctx.esc(e.what)}</b> ${ctx.esc(e.detail || "")}</div>`).join("")
+    html += `<div class="viewerSectionTitle" style="margin-top:12px">What happened</div>` + (collapseRuns([...(i.events || [])].sort((a, b) => (a.tick || 0) - (b.tick || 0)),
+      e => `${e.what}|${e.detail || ""}`).map(r => {
+        const e = r.first;
+        const when = r.n > 1 ? `${ctx.fmt(r.first.tick) || ""} – ${ctx.fmt(r.last.tick) || ""}` : (ctx.fmt(e.tick) || "");
+        return `<div style="margin-bottom:3px;font-size:.9em"><span style="opacity:.6">${when}</span> <b>${ctx.esc(e.what)}</b> ${ctx.esc(e.detail || "")}${r.n > 1 ? ` <b>×${r.n}</b>` : ""}</div>`;
+      }).join("")
       || `<div style="opacity:.6">Nothing recorded yet.</div>`);
     const convs = (c.conversation_log || []).filter(e => (i.conversation_ids || []).includes(e.id || e.conv_id))
       .sort((x, y) => (x.ended_tick || 0) - (y.ended_tick || 0));
@@ -155,6 +158,66 @@ export function openArgumentModal(c, issueId, ctx) {
       if (entry) ctx.openConversation(entry);
     };
   });
+}
+
+// Identical lines in a row are one line with a count and a time range ("evidence: envy ... ×73"), not 73 lines.
+function collapseRuns(list, keyOf) {
+  const out = [];
+  for (const e of list) {
+    const last = out[out.length - 1];
+    if (last && last.key === keyOf(e)) { last.n++; last.last = e; }
+    else out.push({ key: keyOf(e), n: 1, first: e, last: e });
+  }
+  return out;
+}
+
+// The same thing coming up again and again is one row: how often, who brought it up, what brought it up each time
+// (systems/life_comparison.py records that -- "saw Robert (kitchen)", "Robert came up: Susan said ..."), and a chart of
+// how often it came up over time.
+function evidenceGroups(evidence, ctx) {
+  const groups = new Map();
+  for (const e of evidence) {
+    const text = String(e.text || "");
+    const cut = text.indexOf(": ");
+    const base = cut > 0 ? text.slice(0, cut) : text, trigger = cut > 0 ? text.slice(cut + 2) : "";
+    const key = `${e.kind}|${base}`;
+    if (!groups.has(key)) groups.set(key, { kind: e.kind, base, items: [] });
+    groups.get(key).items.push({ ...e, trigger });
+  }
+  return [...groups.values()].map(g => {
+    const items = g.items.sort((a, b) => (a.tick || 0) - (b.tick || 0));
+    const by = {};
+    for (const x of items) if (x.by) by[x.by] = (by[x.by] || 0) + 1;
+    const who = Object.entries(by).sort((a, b) => b[1] - a[1]).map(([id, n]) => `${ctx.esc(ctx.name(id))} ${n}`).join(", ");
+    const head = `<div style="font-size:.9em"><b>${ctx.esc(pretty(g.kind))}: ${ctx.esc(g.base)}</b>${items.length > 1 ? ` <b>×${items.length}</b>` : ""}
+      <span style="opacity:.6">${items.length > 1 ? `${ctx.fmt(items[0].tick) || ""} – ${ctx.fmt(items[items.length - 1].tick) || ""}` : (ctx.fmt(items[0].tick) || "")}${who ? ` · raised by ${who}` : ""}</span></div>`;
+    const triggers = items.filter(x => x.trigger).slice(-6).reverse();
+    const why = triggers.length ? `<div style="font-size:.85em;margin:2px 0 4px 10px">${triggers.map(x =>
+      `<div><span style="opacity:.6">${ctx.fmt(x.tick) || ""}</span> ${ctx.esc(x.trigger)}</div>`).join("")}</div>`
+      : (items.length > 1 ? `<div style="font-size:.8em;opacity:.6;margin-left:10px">Nothing recorded about what brought it up (logged before triggers were kept).</div>` : "");
+    return head + (items.length >= 3 ? frequencyChart(items.map(x => x.tick), ctx) : "") + why;
+  }).join("");
+}
+
+function frequencyChart(ticks, ctx) {
+  const ts = ticks.filter(t => t != null).sort((a, b) => a - b);
+  if (ts.length < 2) return "";
+  const span = ts[ts.length - 1] - ts[0];
+  const bucket = span > 2 * 86400 ? 86400 : 3600;                    // daily over more than two days, else hourly
+  const start = Math.floor(ts[0] / bucket) * bucket, n = Math.floor((ts[ts.length - 1] - start) / bucket) + 1;
+  const counts = new Array(n).fill(0);
+  for (const t of ts) counts[Math.floor((t - start) / bucket)]++;
+  const W = 560, H = 90, L = 28, R = 8, T = 8, B = 18, max = Math.max(...counts);
+  const x = i => L + (n === 1 ? 0.5 : i / (n - 1)) * (W - L - R), y = v => T + (1 - v / max) * (H - T - B);
+  const pts = counts.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`);
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;background:rgba(255,255,255,0.03);margin:2px 0">
+    <polygon points="${x(0).toFixed(1)},${y(0)} ${pts.join(" ")} ${x(n - 1).toFixed(1)},${y(0)}" fill="#d29922" opacity=".18"/>
+    <polyline points="${pts.join(" ")}" fill="none" stroke="#d29922" stroke-width="1.5"/>
+    <text x="${L - 4}" y="${y(max) + 8}" fill="#aaa" font-size="10" text-anchor="end">${max}</text>
+    <text x="${L - 4}" y="${y(0)}" fill="#aaa" font-size="10" text-anchor="end">0</text>
+    <text x="${L}" y="${H - 4}" fill="#aaa" font-size="10">${ctx.esc(ctx.fmt(start) || "")}</text>
+    <text x="${W - R}" y="${H - 4}" fill="#aaa" font-size="10" text-anchor="end">per ${bucket === 86400 ? "day" : "hour"}</text>
+  </svg>`;
 }
 
 // ---- Standing ----------------------------------------------------------------------------------------------------------

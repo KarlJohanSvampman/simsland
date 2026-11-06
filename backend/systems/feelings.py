@@ -46,4 +46,4 @@ def _daily(world, entry):
                 _note(c, oid, world, "")                # a plain point on the line: nothing in particular happened
 
 
-scheduler.register_recurring("feelingsday", _daily, DAY, offset=6 * 3600)
+# (scheduled from core/flow.py)

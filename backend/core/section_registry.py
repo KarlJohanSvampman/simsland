@@ -26,10 +26,6 @@ REGISTRY = {
     "clock_and_scheduler": ("housekeeping", "clock", "the clock emits boundary events, the scheduler fires due timers (core/clock.py, core/scheduler.py)"),
 
     # ---- scheduled jobs registered in systems/calendar_handlers.py ----
-    "every:popularity_decay": ("threshold", "social", "lazy decay; no per-minute work"),
-    "every:post_engagement": ("calendar", "social", "time.hour"),
-    "every:orphan_props": ("housekeeping", "world", "fixed at the source: release on interrupt (already done)"),
-    "every:background_services": ("timer", "character", "each background job schedules its own collection wake"),
 
     # ---- calendar boundaries ----
 
@@ -39,8 +35,6 @@ REGISTRY = {
 
     # ---- perception / attention ----
     "section:fast_perception_attention": ("event", "perception", "spatial index updated on movement events"),
-    "every:perception": ("event", "perception", "entered_view / audible events on position change"),
-    "every:attention": ("event", "character", "derived from perception events"),
 
     # ---- movement and agents ----
     "section:per_tick_movement": ("continuous", "movement", "own loop, only while an entity has a route"),
@@ -49,107 +43,61 @@ REGISTRY = {
 
     # ---- memory / relationships ----
     "section:medium_memory_beliefs_relationships": ("housekeeping", "character", "grouping header"),
-    "every:memory_decay": ("threshold", "character", "lazy salience; decay computed on read"),
-    "every:polarization": ("event", "character", "on opinion/belief change"),
-    "every:relationships": ("event", "social", "on proximity/interaction events"),
-    "every:neighbours": ("event", "social", "a character-created event seeds that character's neighbour ties once (systems/neighbours.py)"),
-    "every:cookware": ("timer", "household", "cooking vessels finish on their clock; served food whose 1-2 hour window has passed is flagged for the cook (systems/cookware.py)"),
-    "every:kids_play": ("timer", "social", "a free child with a free friend nearby gets a play_with_friend intention, per-friend cooldown (systems/kids_play.py)"),
-    "every:introductions": ("timer", "social", "a character who sees two strangers they both know well may introduce them (systems/introductions.py)"),
-    "every:exhaustion": ("timer", "character", "fatigue by day builds strain (anger, stress, mistakes); a helper may offer to take over a duty (systems/exhaustion.py)"),
-    "every:rumors": ("event", "social", "a believer coming into view of the subject (entered_view) rolls to tell them (systems/rumors.py)"),
-    "every:grudges": ("timer", "social", "a grudge's own timers: short-term end, fade, the nudge to the offender (systems/grudges.py)"),
-    "every:focus_check": ("timer", "character", "the 3-minute concentration roll becomes a timer set when a demanding activity starts (systems/worry_relief.py)"),
-    "every:worry_poll": ("calendar", "character", "time.hour per character (staggered); new memories/news are the input (systems/worry_cases.py)"),
-    "every:influence_exposure": ("calendar", "social", "time.hour"),
-    "every:value_influence": ("calendar", "social", "time.day"),
-    "every:persona_expectations": ("timer", "character", "expectation window start/end timers"),
 
     # ---- household ----
     "section:medium_household_systems": ("housekeeping", "household", "grouping header"),
-    "every:cooking": ("timer", "household", "household process timers (laundry, dishes, plants)"),
-    "every:reading": ("timer", "character", "reading-process timers"),
-    "every:health": ("threshold", "body", "lazy needs + threshold timers"),
-    "every:deliveries": ("timer", "world", "delivery due timers"),
-    "every:service_workers": ("timer", "world", "service shift timers"),
-    "every:household_monitoring": ("event", "household", "on household state change"),
-    "every:mentality_compilation": ("event", "character", "on character created / belief change (background job)"),
-    "every:daily_finance": ("calendar", "household", "time.day"),
-    "every:home_presence": ("event", "household", "arrived/departed events"),
-    "every:calendar_events": ("timer", "world", "event start timers"),
-    "every:character_wait": ("timer", "character", "wait-until timers"),
 
     # ---- market / economy / world services ----
     "section:medium_market": ("housekeeping", "economy", "grouping header"),
-    "every:market": ("calendar", "economy", "time.hour"),
     "section:slow_still_periodic_systems": ("housekeeping", "world", "grouping header"),
-    "every:job_market": ("calendar", "economy", "time.day"),
-    "every:traffic": ("continuous", "world", "own loop only while vehicles move"),
-    "every:postal": ("timer", "world", "mail due timers"),
-    "every:business_support": ("timer", "world", "callback due timers"),
-    "every:appliance_degradation": ("threshold", "household", "lazy wear + failure timer"),
-    "every:arrests": ("timer", "world", "event-driven from incidents"),
-    "every:fires": ("event", "world", "spread/extinguish timers from the fire event"),
-    "every:trials": ("timer", "world", "hearing date timers"),
-    "every:news": ("calendar", "world", "time.hour"),
-    "every:weather": ("calendar", "world", "time.hour"),
-    "every:evictions": ("timer", "household", "notice expiry timers"),
-    "every:migration": ("calendar", "world", "time.day"),
-    "every:social_projects": ("timer", "social", "proposal expiry + start timers"),
-    "every:social_availability": ("event", "social", "on sleep/off-grid change of a target"),
-    "every:conversation_cleanup": ("timer", "social", "conversation idle timer"),
-    "every:conversation_seating": ("event", "social", "on conversation start"),
-    "every:socioeconomics": ("calendar", "economy", "time.day"),
     "section:police_rss_feed": ("calendar", "world", "time.hour, in the background (network)"),
-    "every:police_feed": ("calendar", "world", "time.hour, in the background (network)"),
-    "every:crisis": ("event", "world", "stat threshold events"),
-    "every:election": ("calendar", "world", "time.week / election date timer"),
-    "every:faction": ("calendar", "world", "time.week"),
-    "every:hierarchy": ("calendar", "world", "time.week"),
     "section:very_slow": ("housekeeping", "world", "grouping header"),
 
     # ---- conflict / drama ----
     "section:conflict_social_drama": ("housekeeping", "social", "grouping header"),
-    "every:conflicts": ("event", "social", "driven by hostile/speech events + stage timers"),
-    "every:grapples": ("timer", "social", "grapple escape timers"),
-    "every:grievances": ("event", "social", "on grievance added / expiry timer"),
-    "every:contract_checks": ("timer", "social", "contract term due timers"),
     "section:daily_stats_drift": ("calendar", "world", "time.day"),
 
     # ---- body / needs ----
     "section:intimacy_arousal_decay": ("threshold", "body", "lazy decay"),
     "section:impulse_control_pressure_boilover": ("threshold", "body", "lazy pressure + boilover timer"),
     "section:body_lt_needs_systems": ("threshold", "body", "lazy needs"),
-    "every:lt_needs": ("threshold", "body", "lazy long-term needs + frustration timer"),
-    "every:social_odor": ("event", "perception", "recomputed on position/hygiene change"),
     "section:disease_contagion_proximity_sweep_grouped_by": ("event", "body", "on proximity change"),
-    "every:contagion": ("event", "body", "on proximity change"),
     "section:child_needs_oversight_baseline_accountabilit": ("event", "social", "on child need threshold"),
-    "every:child_care": ("event", "social", "on child need threshold"),
     "section:age_based_bedroom_ownership": ("event", "household", "on birthday / household change"),
-    "every:bedroom_assignment": ("event", "household", "on birthday / household change"),
     "section:plant_growth_moisture_weeds_character_reacti": ("threshold", "world", "lazy growth + needs-water timer"),
-    "every:plants": ("threshold", "world", "lazy growth + needs-water timer"),
     "section:food_freshness_decay": ("threshold", "world", "lazy freshness + spoil timer"),
-    "every:food_aging": ("threshold", "world", "lazy freshness + spoil timer"),
     "section:mobile_data_consumption_entertainment_subscr": ("calendar", "economy", "time.day"),
     "section:hourly_home_presence_sample": ("calendar", "household", "time.hour"),
     "section:body_weight_fitness_trait_sync": ("calendar", "body", "time.day"),
-    "every:body_composition": ("calendar", "body", "time.day"),
-    "every:cleanliness": ("threshold", "household", "lazy decay + threshold timer"),
     "section:autonomous_intercourse_scene_progression": ("timer", "social", "scene step timers"),
-    "every:intercourse_sessions": ("timer", "social", "scene step timers"),
     "section:detective_story_chapter_progression": ("timer", "character", "chapter timers"),
-    "every:detective_work": ("timer", "character", "chapter timers"),
-    "every:addictions": ("threshold", "body", "lazy craving + threshold timer"),
     "section:claustrophobia_panic_sweep": ("event", "body", "on enclosed-space change"),
-    "every:claustrophobia": ("event", "body", "on enclosed-space change"),
     "section:battery_drain_charging": ("threshold", "world", "lazy battery + empty timer"),
-    "every:phone_battery": ("threshold", "world", "lazy battery + empty timer"),
     "section:phone_carry_drop_forget_behavior": ("event", "character", "on departure / activity change"),
-    "every:phone_behavior": ("event", "character", "on departure / activity change"),
     "section:individual_wait_activities": ("timer", "character", "wait-until timers"),
 }
+
+
+
+# Every background job's entry comes from the job table itself (core/flow.py: what sets it off), so the two can't
+# disagree -- a job added to the table is classified by being added.
+def _from_flow():
+    from core import flow
+    kinds = {"event": "event", "clock": "calendar", "process": "continuous"}
+    out = {}
+    for job in flow.JOBS:
+        if job["kind"] == "event":
+            becomes = "on " + ", ".join(job["on"])
+        elif job["kind"] == "clock":
+            becomes = (f"daily at {job['daily'] // 3600:02d}:{job['daily'] % 3600 // 60:02d}" if job.get("daily") is not None
+                       else f"hourly at :{(job.get('hourly') or 0) // 60:02d}")
+        else:
+            becomes = f"every {job['every']} s of sim time"
+        out["every:" + job["name"]] = (kinds[job["kind"]], job["name"], f"{becomes} -- {job['why']}")
+    return out
+
+
+REGISTRY.update(_from_flow())
 
 
 def base_label(label):

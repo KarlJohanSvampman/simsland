@@ -40,17 +40,28 @@ else:
     world = copy.deepcopy(live)
     source = "live world"
 world["definitions"] = load_definitions("default")
-print(f"{len(scheduler._recurring)} recurring jobs; world: {source}, {len(world['characters'])} characters")
+from core import flow
+print(f"{len(flow.JOBS)} background jobs (core/flow.py); world: {source}, {len(world['characters'])} characters")
+someone = next(iter(world["characters"]), None)
 
 failures = []
 for round_no in range(3):
-    for owner, (every, offset) in sorted(scheduler._recurring.items()):
+    for job in flow.JOBS:
         ensure_world_defaults(world)
         world["tick"] += 7
-        try:
-            scheduler._handlers[owner](world, {"owner": owner, "key": "recurring", "payload": {}})
-        except Exception:
-            failures.append((owner, traceback.format_exc().strip().splitlines()[-1]))
+        owner = job["name"]
+        fn = flow._resolve(sim_loop, job["run"])
+        if job["kind"] == "event":
+            # every event it listens to, about someone real -- the handler must cope with each
+            entries = [{"event": ev, "data": {"character_id": someone, "observer_id": someone, "subject_id": someone},
+                        "ids": [someone] if someone else []} for ev in job["on"]]
+        else:
+            entries = [{"owner": owner, "key": "recurring", "payload": {}}]
+        for entry in entries:
+            try:
+                fn(world, entry)
+            except Exception:
+                failures.append((owner, traceback.format_exc().strip().splitlines()[-1]))
 
 seen = {}
 for owner, err in failures:

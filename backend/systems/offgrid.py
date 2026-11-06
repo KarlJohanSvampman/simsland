@@ -683,6 +683,8 @@ def _send_offgrid_immediate(c, world, reason, duration_minutes):
     c["off_grid"]      = True
     c["off_grid_reason"] = reason
     c["return_tick"]   = world["tick"] + _minutes_to_ticks(duration_minutes)
+    from core.event_bus import emit
+    emit("character.offgrid", {"character_id": c["id"], "reason": reason})
     # Stashed so process_return() can charge a real fatigue/energy cost
     # scaled by how long the trip actually took (see Confirmed Decision
     # #8) -- this is the single lowest-level function every off-grid
@@ -1472,6 +1474,8 @@ def process_return(c, world):
 
     c["off_grid"]        = False
     c.pop("off_grid_detail", None)
+    from core.event_bus import emit
+    emit("character.returned", {"character_id": c["id"], "reason": reason})
     c.setdefault("_offgrid_last", {})[reason] = world["tick"]
     c["_offgrid_last_trip"] = {"reason": reason, "day": _today(world), "tick": world["tick"]}
     c["off_grid_reason"] = None

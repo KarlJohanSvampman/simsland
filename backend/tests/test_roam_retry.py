@@ -26,6 +26,8 @@ from house_world import make_world
 from core import scheduler
 from brain.intentions import final_priority, set_current_tick
 from systems import step_timeouts, roam, movement_log
+from core import flow
+flow.install()                     # the movement log's sampling job (core/flow.py)
 from systems.idle_quirks import advance_idle_quirk
 from systems.movement import update_character_movement
 from systems.room_assignment import refresh_character_room

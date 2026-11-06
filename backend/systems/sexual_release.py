@@ -16,6 +16,8 @@ already tracked by intimacy.py/brain/relationships.py, per this
 feature's Confirmed Decisions.
 """
 
+from systems.occupancy import occupy as _occupy  # one activity at a time (systems/occupancy.py)
+
 import random
 
 from systems.libido import is_spiking, note_denied, note_released
@@ -222,7 +224,7 @@ def _try_masturbate(c, world):
     if aid:
         aid["location"] = "held"
         act["state"]["item_id"] = aid.get("id")
-    c["activity"] = act
+    c["activity"] = _occupy(c, world, act)
     prop["occupied_by"] = c["id"]
     note_released(c, world)
     return True

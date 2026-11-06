@@ -95,4 +95,4 @@ def _job(world, entry):
             print(f"[movelog] {c.get('id')}: {exc!r}")
 
 
-scheduler.register_recurring("movelog", _job, SAMPLE_TICKS)
+# (scheduled from core/flow.py)

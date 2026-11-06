@@ -50,9 +50,14 @@ def enable(flag=True):
     _enabled = bool(flag)
 
 
+# Emitted on every step someone takes: still delivered by the bus, but kept out of the durable log, where it would push
+# everything that matters out of the ring within seconds.
+QUIET = frozenset({"character.moved"})
+
+
 def record(event_type, data):
     global _seq
-    if not _enabled:
+    if not _enabled or event_type in QUIET:
         return
     with _lock:
         _seq += 1

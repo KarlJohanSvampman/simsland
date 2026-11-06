@@ -38,6 +38,8 @@ Negotiation state machine per relationship:
 Acts execute only when ACCEPTED.
 """
 
+from systems.occupancy import occupy as _occupy  # one activity at a time (systems/occupancy.py)
+
 import random
 import uuid
 
@@ -772,7 +774,7 @@ def _execute_touch(proposer, recipient, template_id, world):
     tick = world.get("tick", 0)
 
     def _set_touch_activity(char, anim, partner_id):
-        char["activity"] = {
+        char["activity"] = _occupy(char, world, {
             "type":               "touch_interaction",
             "interaction":        template_id,
             "phase":              "using",
@@ -780,7 +782,7 @@ def _execute_touch(proposer, recipient, template_id, world):
             "duration":           duration,
             "target_id":          partner_id,
             "state":              {},
-        }
+        })
         char["animation_state"] = anim
 
     _set_touch_activity(proposer, init_anim, recipient["id"])

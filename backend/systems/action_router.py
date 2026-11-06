@@ -1,3 +1,4 @@
+from systems.occupancy import occupy as _occupy  # one activity at a time (systems/occupancy.py)
 # =========================================================
 # ACTION ROUTER
 # Translates LLM action + speech output into world state
@@ -942,12 +943,12 @@ def _route_interact(c, world, action, definitions):
         if plan_character_route(world, c, wx, wy):
             c["animation_state"] = "walk"
             c["is_moving"] = True
-        c["activity"] = {
+        c["activity"] = _occupy(c, world, {
             "type": "interact", "phase": "walking",
             "phase_started_tick": world.get("tick", 0),
             "duration": _INTERACTION_DURATIONS.get(interaction, _FALLBACK_INTERACTION_DURATION),
             "target_id": target_id, "interaction": interaction, "state": {},
-        }
+        })
         prop["occupied_by"] = c["id"]
         return
 
@@ -967,11 +968,11 @@ def _route_interact(c, world, action, definitions):
     # for this LLM-driven interact path.
     c["building_id"] = prop.get("building_id")
 
-    c["activity"] = _scaffold(
+    c["activity"] = _occupy(c, world, _scaffold(
         c, world, "interact",
         target_id=target_id,
         interaction=interaction,
-    )
+    ))
 
     # Set per-interaction using-phase animation immediately
     if interaction:
@@ -1027,12 +1028,12 @@ def _route_eat(c, world, action):
             if plan_character_route(world, c, wx, wy):
                 c["animation_state"] = "walk"
                 c["is_moving"] = True
-            c["activity"] = {
+            c["activity"] = _occupy(c, world, {
                 "type": "eat", "phase": "walking",
                 "phase_started_tick": world.get("tick", 0),
                 "duration": _INTERACTION_DURATIONS.get("eat", _FALLBACK_INTERACTION_DURATION),
                 "target_id": prop["id"], "interaction": "eat", "state": dict(food),
-            }
+            })
             if seat:
                 from systems.occupancy import find_free_anchor, reserve_anchor
                 anchor = find_free_anchor(seat, "sit")
@@ -1047,12 +1048,12 @@ def _route_eat(c, world, action):
             set_posture(c, world, target_posture)
         if seat:
             _sit_in(c, world, seat)
-        c["activity"] = _scaffold(c, world, "eat", target_id=prop["id"], interaction="eat")
+        c["activity"] = _occupy(c, world, _scaffold(c, world, "eat", target_id=prop["id"], interaction="eat"))
     else:
         if c.get("posture") not in (None, "standing"):
             from systems.posture import set_posture
             set_posture(c, world, "standing")
-        c["activity"] = _scaffold(c, world, "eat", target_id=None, interaction="eat")
+        c["activity"] = _occupy(c, world, _scaffold(c, world, "eat", target_id=None, interaction="eat"))
     c["activity"].setdefault("state", {}).update(food)
     note(c["activity"], world, "chose food", food=food["food_name"], at=prop.get("template") if prop else None)
 
@@ -1082,12 +1083,12 @@ def _route_sleep(c, world, action):
     if not already_in_bed and start_activity(c, world, "sleep"):
         c["activity"]["duration"] = duration
         return
-    c["activity"] = _scaffold(
+    c["activity"] = _occupy(c, world, _scaffold(
         c, world, "sleep",
         target_id=target_id,
         interaction="sleep",
         duration=duration,
-    )
+    ))
     set_posture(c, world, "lying")
 
 
@@ -1104,20 +1105,20 @@ def _route_sleep(c, world, action):
 
 def _route_start_microwave(c, world, action):
     target_id = action.get("target")
-    c["activity"] = _scaffold(
+    c["activity"] = _occupy(c, world, _scaffold(
         c, world, "start_microwave",
         target_id=target_id,
         interaction="microwave",
-    )
+    ))
 
 
 def _route_take_out_of_microwave(c, world, action):
     target_id = action.get("target")
-    c["activity"] = _scaffold(
+    c["activity"] = _occupy(c, world, _scaffold(
         c, world, "take_out_of_microwave",
         target_id=target_id,
         interaction="microwave",
-    )
+    ))
 
 
 # =========================================================
@@ -1131,11 +1132,11 @@ def _route_take_out_of_microwave(c, world, action):
 
 def _route_do_laundry_fill(c, world, action):
     target_id = action.get("target")
-    c["activity"] = _scaffold(
+    c["activity"] = _occupy(c, world, _scaffold(
         c, world, "do_laundry_fill",
         target_id=target_id,
         interaction="do_laundry",
-    )
+    ))
 
 
 # =========================================================
@@ -1247,7 +1248,7 @@ def _route_search_documents(c, world, action):
                 if plan_character_route(world, c, pile["x"], pile["y"]):
                     c["animation_state"] = "walk"
                     c["is_moving"] = True
-        c["activity"] = _scaffold(c, world, "search_documents", interaction="search", duration=duration)
+        c["activity"] = _occupy(c, world, _scaffold(c, world, "search_documents", interaction="search", duration=duration))
         c["_last_found_document_id"] = result["item"]["id"]
         return
 
@@ -1255,7 +1256,7 @@ def _route_search_documents(c, world, action):
     if not has_computer(c, world):
         c["_last_found_document_id"] = None
         return
-    c["activity"] = _scaffold(c, world, "search_documents", interaction="computer", duration=duration)
+    c["activity"] = _occupy(c, world, _scaffold(c, world, "search_documents", interaction="computer", duration=duration))
     if random.random() < computer_search_chance(c):
         c["_last_found_document_id"] = result["item"]["id"]
     else:
@@ -1607,11 +1608,11 @@ def _route_wait(c, world, action):
     # waiting.py's own longest real ceiling (MAX_TOTAL_WAIT_TICKS), so
     # tick_waiting() is always what actually ends the wait.
     from systems.waiting import start_waiting_for, MAX_TOTAL_WAIT_TICKS
-    c["activity"] = _scaffold(
+    c["activity"] = _occupy(c, world, _scaffold(
         c, world, "wait",
         interaction="wait",
         duration=MAX_TOTAL_WAIT_TICKS,
-    )
+    ))
 
     # A real reason to wait (a person, a business, a delivery) arms the
     # patience timer + backlog-stress in systems/waiting.py.
@@ -1942,7 +1943,7 @@ def _route_look_around(c, world, action, available_actions):
         "text": text or "Nothing further stands out beyond what you can already see.",
         "tick": world.get("tick", 0),
     }
-    c["activity"] = _scaffold(c, world, "look_around", interaction="look_around", duration=30)
+    c["activity"] = _occupy(c, world, _scaffold(c, world, "look_around", interaction="look_around", duration=30))
 
 
 def _find_id_only_entry(available_actions, target_id):
@@ -2005,7 +2006,7 @@ def _route_list_available_actions(c, world, action, available_actions):
         "text": "\n".join(lines) if lines else "Nothing else available right now beyond what's already listed.",
         "tick": world.get("tick", 0),
     }
-    c["activity"] = _scaffold(c, world, "list_available_actions", interaction="list_available_actions", duration=10)
+    c["activity"] = _occupy(c, world, _scaffold(c, world, "list_available_actions", interaction="list_available_actions", duration=10))
 
 
 # =========================================================
@@ -2015,12 +2016,12 @@ def _route_list_available_actions(c, world, action, available_actions):
 def _route_search(c, world, action):
     target_id = action.get("target")
     query = (action.get("query") or "").strip()
-    c["activity"] = _scaffold(
+    c["activity"] = _occupy(c, world, _scaffold(
         c, world, "search",
         target_id=target_id,
         interaction="search",
         duration=600,
-    )
+    ))
     if query:
         c["activity"]["query"] = query
     c["animation_state"] = get_phase_animation("search", "using")
@@ -2049,12 +2050,12 @@ def _route_search(c, world, action):
 def _route_trash(c, world, action):
     target_id = action.get("target")
     interaction = "trash" if action.get("type") == "trash" else "destroy"
-    c["activity"] = _scaffold(
+    c["activity"] = _occupy(c, world, _scaffold(
         c, world, action.get("type", "trash"),
         target_id=target_id,
         interaction=interaction,
         duration=120,
-    )
+    ))
     c["animation_state"] = get_phase_animation(interaction, "using")
 
 
@@ -2107,7 +2108,7 @@ def _route_carry(c, world, action):
     # "walking" phase (activities.py) would wait on is_moving forever with
     # no route ever progressing to clear it.
     c["is_moving"] = plan_character_route(world, c, prop.get("x", 0), prop.get("y", 0))
-    c["activity"] = act
+    c["activity"] = _occupy(c, world, act)
     c["animation_state"] = "walk"
 
 
@@ -2212,12 +2213,12 @@ def _route_clean(c, world, action, definitions):
         (p for p in props if p.get("id") == target_id), None
     )
 
-    c["activity"] = _scaffold(
+    c["activity"] = _occupy(c, world, _scaffold(
         c, world, "clean",
         target_id=target_id,
         interaction="clean",
         duration=900,
-    )
+    ))
 
     # Use prop-aware animation immediately
     c["animation_state"] = get_clean_animation(prop, "using") if prop else "clean_generic"
@@ -2443,10 +2444,10 @@ def route_action(c, world, action, speech, definitions=None, available_actions=N
                 or target_char.get("off_grid")
             )
             if not target_unavailable:
-                c["activity"] = _scaffold(
+                c["activity"] = _occupy(c, world, _scaffold(
                     c, world, "socialize", target_id=target_id, interaction="talk",
                     duration=_INTERACTION_DURATIONS.get("socialize", 900),
-                )
+                ))
 
     elif action_type == "eat":
         _route_eat(c, world, action)
@@ -3547,12 +3548,12 @@ def _route_exercise_activity(c, world, action, activity_type):
         if not any(a.get("interaction") == required_interaction for a in tpl.get("anchors", [])):
             return
 
-    c["activity"] = _scaffold(
+    c["activity"] = _occupy(c, world, _scaffold(
         c, world, activity_type,
         target_id=target_id,
         interaction=activity_type,
         duration=_EXERCISE_DURATION_TICKS,
-    )
+    ))
 
 
 def _route_jog(c, world, action):
@@ -3607,12 +3608,12 @@ def _route_music_activity(c, world, action, activity_type):
         if not any(a.get("interaction") in required for a in tpl.get("anchors", [])):
             return
 
-    c["activity"] = _scaffold(
+    c["activity"] = _occupy(c, world, _scaffold(
         c, world, activity_type,
         target_id=target_id,
         interaction=activity_type,
         duration=_MUSIC_DURATION_TICKS[activity_type],
-    )
+    ))
 
 
 def _route_listen_to_music(c, world, action):
@@ -3650,29 +3651,29 @@ def _route_mimic_adult(c, world, action):
     if not adult or adult.get("age_group") not in ("adult", "elderly"):
         return
 
-    c["activity"] = _scaffold(
+    c["activity"] = _occupy(c, world, _scaffold(
         c, world, "mimic_adult",
         target_id=target_id,
         interaction="mimic_adult",
         duration=_CHILD_ACTIVITY_DURATION_TICKS["mimic_adult"],
-    )
+    ))
     c["activity"]["state"]["mimicked_activity"] = (adult.get("activity") or {}).get("type")
 
 
 def _route_play_alone(c, world, action):
-    c["activity"] = _scaffold(
+    c["activity"] = _occupy(c, world, _scaffold(
         c, world, "play_alone",
         interaction="play_alone",
         duration=_CHILD_ACTIVITY_DURATION_TICKS["play_alone"],
-    )
+    ))
 
 
 def _route_homework(c, world, action):
-    c["activity"] = _scaffold(
+    c["activity"] = _occupy(c, world, _scaffold(
         c, world, "homework",
         interaction="homework",
         duration=_CHILD_ACTIVITY_DURATION_TICKS["homework"],
-    )
+    ))
 
 
 def _route_jump_on_bed(c, world, action):
@@ -3687,12 +3688,12 @@ def _route_jump_on_bed(c, world, action):
     if "sleepable" not in tpl.get("tags", []):
         return
 
-    c["activity"] = _scaffold(
+    c["activity"] = _occupy(c, world, _scaffold(
         c, world, "jump_on_bed",
         target_id=target_id,
         interaction="jump_on_bed",
         duration=_CHILD_ACTIVITY_DURATION_TICKS["jump_on_bed"],
-    )
+    ))
 
 
 def _route_practice_juggling(c, world, action):
@@ -3733,7 +3734,7 @@ def _route_sing_karaoke(c, world, action):
     cap -- a crowded room shouldn't stampede everyone into reacting)
     independently rolls to react, scaled by how well the performance
     actually went (see resolve_skill_check's competitive path)."""
-    c["activity"] = _scaffold(c, world, "sing_karaoke", interaction="sing_karaoke", duration=600)
+    c["activity"] = _occupy(c, world, _scaffold(c, world, "sing_karaoke", interaction="sing_karaoke", duration=600))
 
     from systems.skill_checks import resolve_skill_check, MAX_SKILL_CHECK_AUDIENCE
     from systems.abilities import record_attempt, get_level_name
@@ -4393,10 +4394,10 @@ def _route_breastfeed(c, world, action):
     if bf.get("weaned"):
         return
 
-    c["activity"] = _scaffold(c, world, "breastfeed",
+    c["activity"] = _occupy(c, world, _scaffold(c, world, "breastfeed",
                                target_id=target_id,
                                interaction="breastfeed",
-                               duration=30)
+                               duration=30))
 
     # Immediately apply feed (interaction resolves at completion in activities.py,
     # but we also apply on initiation so needs don't stay critical)
@@ -4415,10 +4416,10 @@ def _route_bottle_feed(c, world, action):
     if not baby or baby.get("current_location") != c.get("current_location"):
         return
 
-    c["activity"] = _scaffold(c, world, "bottle_feed",
+    c["activity"] = _occupy(c, world, _scaffold(c, world, "bottle_feed",
                                target_id=target_id,
                                interaction="bottle_feed",
-                               duration=25)
+                               duration=25))
     # Apply feed
     needs = baby.setdefault("baby_needs", {})
     needs["hunger"]  = min(1.0, needs.get("hunger",  0) + 0.65)
@@ -4436,10 +4437,10 @@ def _route_hold_baby(c, world, action):
     if not baby or baby.get("current_location") != c.get("current_location"):
         return
 
-    c["activity"] = _scaffold(c, world, "hold_baby",
+    c["activity"] = _occupy(c, world, _scaffold(c, world, "hold_baby",
                                target_id=target_id,
                                interaction="hold_baby",
-                               duration=20)
+                               duration=20))
     needs = baby.setdefault("baby_needs", {})
     needs["comfort"] = min(1.0, needs.get("comfort", 0) + 0.55)
     if needs.get("comfort", 0) >= 0.30:
@@ -4469,10 +4470,10 @@ def _route_put_baby_in_carriage(c, world, action):
     baby["current_location"]   = c.get("current_location")  # follows parent
     # Parent starts pushing
     c["pushed_prop_id"] = prop_id
-    c["activity"] = _scaffold(c, world, "put_baby_in_carriage",
+    c["activity"] = _occupy(c, world, _scaffold(c, world, "put_baby_in_carriage",
                                target_id=target_id,
                                interaction="put_baby_in_carriage",
-                               duration=5)
+                               duration=5))
 
 
 # =========================================================
@@ -4569,8 +4570,8 @@ def _route_check_on_kids(c, world, action):
     if not child:
         return
 
-    c["activity"] = _scaffold(c, world, "check_on_kids", target_id=child["id"],
-                               interaction="check_on_kids")
+    c["activity"] = _occupy(c, world, _scaffold(c, world, "check_on_kids", target_id=child["id"],
+                               interaction="check_on_kids"))
 
     is_asleep = (child.get("activity") or {}).get("type") == "sleep"
     if not is_asleep and child.get("body", {}).get("fatigue", 0) >= 50:
@@ -4743,17 +4744,17 @@ def _route_watch_tv(c, world, action):
         if plan_character_route(world, c, wx, wy):
             c["animation_state"] = "walk"
             c["is_moving"] = True
-        c["activity"] = {
+        c["activity"] = _occupy(c, world, {
             "type": "watch_tv", "phase": "walking",
             "phase_started_tick": world.get("tick", 0),
             "duration": duration, "target_id": tv["id"], "interaction": "watch_tv", "state": {},
-        }
+        })
         return
 
     from systems.posture import set_posture
     set_posture(c, world, "sitting_seat")
-    c["activity"] = _scaffold(c, world, "watch_tv", target_id=tv["id"], interaction="watch_tv",
-                              duration=duration)
+    c["activity"] = _occupy(c, world, _scaffold(c, world, "watch_tv", target_id=tv["id"], interaction="watch_tv",
+                              duration=duration))
 
 
 def _route_door_signal(c, world, action, method):
@@ -4767,7 +4768,7 @@ def _route_door_signal(c, world, action, method):
     household = None
     if target and target.get("household_id"):
         household = world.get("households", {}).get(target["household_id"])
-    c["activity"] = _scaffold(c, world, method, target_id=target_id, interaction=method)
+    c["activity"] = _occupy(c, world, _scaffold(c, world, method, target_id=target_id, interaction=method))
     if not household:
         return
 
@@ -4784,8 +4785,8 @@ def _route_phone_call(c, world, action):
         return
     phone["location"] = "held"
     target_id = action.get("target_id") or action.get("target")
-    c["activity"] = _scaffold(c, world, "phone_call",
-                               target_id=target_id, interaction="phone_call")
+    c["activity"] = _occupy(c, world, _scaffold(c, world, "phone_call",
+                               target_id=target_id, interaction="phone_call"))
     _set_phone_animation(c, "phone_call")
 
     # Per the user's explicit ask: a phone call has a real intention
@@ -4835,7 +4836,7 @@ def _route_phone_answer(c, world, action):
     if not phone:
         return
     phone["location"] = "held"
-    c["activity"] = _scaffold(c, world, "phone_answer", interaction="phone_answer")
+    c["activity"] = _occupy(c, world, _scaffold(c, world, "phone_answer", interaction="phone_answer"))
     _set_phone_animation(c, "phone_answer")
 
 
@@ -4850,7 +4851,7 @@ def _route_order_taxi(c, world, action):
         "method":      action.get("method", "phone_app"),
         "destination": action.get("destination"),
     }
-    c["activity"] = act
+    c["activity"] = _occupy(c, world, act)
 
 
 def _route_order_taxi_by_phone_call(c, world, action):
@@ -4908,7 +4909,7 @@ def _route_phone_send_text(c, world, action):
             "medium":       "text",
         }
         apply_speech(c, world, speech)
-    c["activity"] = _scaffold(c, world, "phone_send_text", interaction="phone_send_text")
+    c["activity"] = _occupy(c, world, _scaffold(c, world, "phone_send_text", interaction="phone_send_text"))
     _set_phone_animation(c, "phone_send_text")
 
 
@@ -4917,7 +4918,7 @@ def _route_phone_check(c, world, action):
     if not phone:
         return
     phone["location"] = "held"
-    c["activity"] = _scaffold(c, world, "phone_check", interaction="phone_check")
+    c["activity"] = _occupy(c, world, _scaffold(c, world, "phone_check", interaction="phone_check"))
     # Expose missed calls/messages count in activity data -- reads the
     # real shared inbox (systems/inbox.py); world["messages"] and
     # c["social"]["missed_calls"] were both permanently empty (nothing
@@ -4963,7 +4964,7 @@ def _route_phone_read_text(c, world, action):
         for m in get_character_inbox(c):
             if m.get("id") == msg_id:
                 m["read"] = True
-    c["activity"] = _scaffold(c, world, "phone_read_text", interaction="phone_read_text")
+    c["activity"] = _occupy(c, world, _scaffold(c, world, "phone_read_text", interaction="phone_read_text"))
     _set_phone_animation(c, "phone_read_text")
 
 
@@ -5002,7 +5003,7 @@ def _route_contact_business(c, world, action):
     if (business.get("presence") == "online"
             and random.random() < _ONLINE_BUSINESS_EMAIL_SHORTCUT_CHANCE):
         add_inbox_message(inbox, "email", c["id"], business_key, reason, tick, metadata)
-        c["activity"] = _scaffold(c, world, "contact_business", interaction="contact_business", duration=60)
+        c["activity"] = _occupy(c, world, _scaffold(c, world, "contact_business", interaction="contact_business", duration=60))
         return
 
     phone = _require_phone(c)
@@ -5013,7 +5014,7 @@ def _route_contact_business(c, world, action):
     kind = "call" if is_open(business, world, "phone") else "voicemail"
     add_inbox_message(inbox, kind, c["id"], business_key, reason, tick, metadata)
 
-    c["activity"] = _scaffold(c, world, "contact_business", interaction="contact_business", duration=60)
+    c["activity"] = _occupy(c, world, _scaffold(c, world, "contact_business", interaction="contact_business", duration=60))
     _set_phone_animation(c, "phone_call")
 
 
@@ -5043,7 +5044,7 @@ def _route_book_appointment(c, world, action):
     if is_open(business, world, "phone"):
         from systems.appointments import book
         appt = book(c, world, business_key, business, reason)
-        c["activity"] = _scaffold(c, world, "book_appointment", interaction="book_appointment", duration=60)
+        c["activity"] = _occupy(c, world, _scaffold(c, world, "book_appointment", interaction="book_appointment", duration=60))
         c["activity"]["state"]["appointment"] = appt
     else:
         from systems.inbox import get_business_inbox, add_message as add_inbox_message
@@ -5052,7 +5053,7 @@ def _route_book_appointment(c, world, action):
             reason, tick,
             {"reason": reason, "wants_appointment": True, "caller_name": c.get("name") or c["id"]},
         )
-        c["activity"] = _scaffold(c, world, "book_appointment", interaction="book_appointment", duration=60)
+        c["activity"] = _occupy(c, world, _scaffold(c, world, "book_appointment", interaction="book_appointment", duration=60))
 
     _set_phone_animation(c, "phone_call")
 
@@ -5112,7 +5113,7 @@ def _route_check_device(c, world, action):
     except Exception:
         convs = []
 
-    c["activity"] = _scaffold(c, world, "check_device", interaction="check_device")
+    c["activity"] = _occupy(c, world, _scaffold(c, world, "check_device", interaction="check_device"))
     c["activity"]["snooped_conversations"] = convs[:3]
 
     item["_last_snooped_by"] = c["id"]
@@ -5167,7 +5168,7 @@ def _route_check_computer_history(c, world, action):
     if d > 3:
         return
 
-    c["activity"] = _scaffold(c, world, "check_computer_history", interaction="check_computer_history")
+    c["activity"] = _occupy(c, world, _scaffold(c, world, "check_computer_history", interaction="check_computer_history"))
     c["activity"]["computer_history"] = history[-5:]
 
     from systems.intimate_item_discovery import apply_creeped_out
@@ -5405,12 +5406,12 @@ def _route_retrieve_phone(c, world, action):
     loc = state.get("last_known_location")
     if not loc:
         return
-    c["activity"] = _scaffold(
+    c["activity"] = _occupy(c, world, _scaffold(
         c, world, "retrieve_phone",
         target_id=loc.get("prop_id"),
         interaction="retrieve_phone",
         duration=_INTERACTION_DURATIONS.get("retrieve_phone", 300),
-    )
+    ))
 
 
 # =========================================================
@@ -5450,9 +5451,9 @@ def _route_charge_device(c, world, action):
     tpl = world.get("definitions", {}).get("prop_templates", {}).get(prop.get("template"), {})
     if "wall_socket" not in tpl.get("tags", []):
         return
-    c["activity"] = _scaffold(c, world, "charge", target_id=target_prop_id,
+    c["activity"] = _occupy(c, world, _scaffold(c, world, "charge", target_id=target_prop_id,
                                interaction="charge",
-                               duration=_INTERACTION_DURATIONS.get("charge", 60))
+                               duration=_INTERACTION_DURATIONS.get("charge", 60)))
     c["activity"]["device_item_id"] = device["id"]
 
 
@@ -5474,9 +5475,9 @@ def _route_sit_down(c, world, action):
     from systems.occupancy import find_free_anchor, reserve_anchor
 
     target_id = action.get("target")
-    c["activity"] = _scaffold(c, world, "sit_down_seat",
+    c["activity"] = _occupy(c, world, _scaffold(c, world, "sit_down_seat",
                                target_id=target_id,
-                               interaction="sit_down_seat")
+                               interaction="sit_down_seat"))
     set_posture(c, world, "sitting_seat")
 
     # Anchor onto the seat prop (if any) so the frontend snaps the
@@ -5508,9 +5509,9 @@ def _route_stand_up(c, world, action):
 
 def _route_lie_down(c, world, action):
     from systems.posture import set_posture
-    c["activity"] = _scaffold(c, world, "lie_down",
+    c["activity"] = _occupy(c, world, _scaffold(c, world, "lie_down",
                                target_id=action.get("target"),
-                               interaction="lie_down")
+                               interaction="lie_down"))
     set_posture(c, world, "lying")
 
 
@@ -5546,10 +5547,10 @@ def _route_push_off_wall(c, world, action):
 
 def _route_drive_car_to(c, world, action):
     destination = action.get("destination") or action.get("target")
-    c["activity"] = _scaffold(c, world, "drive_car_to",
+    c["activity"] = _occupy(c, world, _scaffold(c, world, "drive_car_to",
                                target_id=action.get("target"),
                                interaction="drive_car_to",
-                               duration=_INTERACTION_DURATIONS.get("drive", 120))
+                               duration=_INTERACTION_DURATIONS.get("drive", 120)))
     c["activity"]["destination"] = destination
     # Mark as offgrid so sim_loop can skip position updates
     c["offgrid"] = True
@@ -5563,9 +5564,9 @@ def _route_drive_car_to(c, world, action):
 def _route_computer(c, world, action, interaction_id):
     if not _require_phone_or_computer(c, world):
         return
-    c["activity"] = _scaffold(c, world, interaction_id,
+    c["activity"] = _occupy(c, world, _scaffold(c, world, interaction_id,
                                target_id=action.get("target"),
-                               interaction=interaction_id)
+                               interaction=interaction_id))
     _set_computer_animation(c, world)
 
 
@@ -5575,8 +5576,8 @@ def _route_computer_wiki_research(c, world, action):
     if not _require_phone_or_computer(c, world):
         return
     keyword = action.get("keyword") or action.get("args", {}).get("keyword", "")
-    c["activity"] = _scaffold(c, world, "computer_wiki_research",
-                               interaction="computer_wiki_research")
+    c["activity"] = _occupy(c, world, _scaffold(c, world, "computer_wiki_research",
+                               interaction="computer_wiki_research"))
     c["activity"]["research_keyword"] = keyword
     _set_computer_animation(c, world)
 
@@ -5621,7 +5622,7 @@ def _route_computer_wiki_research(c, world, action):
 def _route_computer_news(c, world, action):
     if not _require_phone_or_computer(c, world):
         return
-    c["activity"] = _scaffold(c, world, "computer_news", interaction="computer_news")
+    c["activity"] = _occupy(c, world, _scaffold(c, world, "computer_news", interaction="computer_news"))
     _set_computer_animation(c, world)
 
     curiosity_scale = c.get("curiosity", 50) / 100.0
@@ -5646,7 +5647,7 @@ def _route_read_newspaper(c, world, action):
     from systems.personal_items import get_item_by_template
     if not get_item_by_template(c, "newspaper"):
         return
-    c["activity"] = _scaffold(c, world, "read_newspaper", interaction="read")
+    c["activity"] = _occupy(c, world, _scaffold(c, world, "read_newspaper", interaction="read"))
     from systems.reading_process import start_reading_news
     start_reading_news(c, world, medium="paper")
 
@@ -5654,7 +5655,7 @@ def _route_read_newspaper(c, world, action):
 def _route_browse_news(c, world, action):
     if not _require_phone(c):
         return
-    c["activity"] = _scaffold(c, world, "browse_news", interaction="phone")
+    c["activity"] = _occupy(c, world, _scaffold(c, world, "browse_news", interaction="phone"))
     from systems.reading_process import start_reading_news
     start_reading_news(c, world, medium="phone")
 
@@ -5698,7 +5699,7 @@ def _route_computer_job_search(c, world, action):
     if not _require_phone_or_computer(c, world):
         return
     listings = world.get("job_listings", [])
-    c["activity"] = _scaffold(c, world, "computer_job_search", interaction="computer_job_search")
+    c["activity"] = _occupy(c, world, _scaffold(c, world, "computer_job_search", interaction="computer_job_search"))
     c["activity"]["job_listings"] = listings[:10]
     _set_computer_animation(c, world)
 
@@ -5712,9 +5713,9 @@ def _route_write_refine_resume(c, world, action):
     stays better."""
     if not _require_phone_or_computer(c, world):
         return
-    c["activity"] = _scaffold(c, world, "write_refine_resume",
+    c["activity"] = _occupy(c, world, _scaffold(c, world, "write_refine_resume",
                                interaction="write_refine_resume",
-                               duration=random.randint(600, 1800))
+                               duration=random.randint(600, 1800)))
     _set_computer_animation(c, world)
     quality = c.get("resume_quality", 0.0)
     c["resume_quality"] = min(1.0, quality + (1.0 - quality) * 0.3)
@@ -5725,8 +5726,8 @@ def _route_computer_apply_for_job(c, world, action):
         return
     from systems.jobs import apply_for_job
     job_id = action.get("job_id") or action.get("target")
-    c["activity"] = _scaffold(c, world, "computer_apply_for_job",
-                               interaction="computer_apply_for_job")
+    c["activity"] = _occupy(c, world, _scaffold(c, world, "computer_apply_for_job",
+                               interaction="computer_apply_for_job"))
     _set_computer_animation(c, world)
     if job_id:
         # apply_for_job(c, world, job_id=None) -- this used to pass
@@ -5751,7 +5752,7 @@ def _route_computer_email(c, world, action):
     if not _require_phone_or_computer(c, world):
         return
     atype = action.get("type", "computer_check_email")
-    c["activity"] = _scaffold(c, world, atype, interaction=atype)
+    c["activity"] = _occupy(c, world, _scaffold(c, world, atype, interaction=atype))
     _set_computer_animation(c, world)
 
     if atype == "computer_send_email":
@@ -5792,8 +5793,8 @@ def _route_browse_second_hand_marketplace(c, world, action):
         return
     from systems.marketplace import browse_listings
     listings = browse_listings(world, exclude_household_id=c.get("household_id"))
-    c["activity"] = _scaffold(c, world, "browse_second_hand_marketplace",
-                               interaction="browse_second_hand_marketplace")
+    c["activity"] = _occupy(c, world, _scaffold(c, world, "browse_second_hand_marketplace",
+                               interaction="browse_second_hand_marketplace"))
     c["activity"]["marketplace_listings"] = listings
     _set_computer_animation(c, world)
 
@@ -5807,8 +5808,8 @@ def _route_sell_prop_item_second_hand(c, world, action):
     asking_price = action.get("asking_price")
     from systems.marketplace import list_prop_for_sale
     listing = list_prop_for_sale(c, world, prop_id, asking_price=asking_price)
-    c["activity"] = _scaffold(c, world, "sell_prop_item_second_hand",
-                               interaction="sell_prop_item_second_hand")
+    c["activity"] = _occupy(c, world, _scaffold(c, world, "sell_prop_item_second_hand",
+                               interaction="sell_prop_item_second_hand"))
     c["activity"]["listing"] = listing
     _set_computer_animation(c, world)
 
@@ -5821,8 +5822,8 @@ def _route_buy_prop_item_second_hand(c, world, action):
         return
     from systems.marketplace import buy_marketplace_listing
     result = buy_marketplace_listing(c, world, listing_id)
-    c["activity"] = _scaffold(c, world, "buy_prop_item_second_hand",
-                               interaction="buy_prop_item_second_hand")
+    c["activity"] = _occupy(c, world, _scaffold(c, world, "buy_prop_item_second_hand",
+                               interaction="buy_prop_item_second_hand"))
     c["activity"]["purchase_result"] = result
     _set_computer_animation(c, world)
 
@@ -5839,8 +5840,8 @@ def _route_estimate_avg_sell_value(c, world, action):
         return
     from systems.marketplace import estimate_avg_sell_value
     estimate = estimate_avg_sell_value(world, template_id)
-    c["activity"] = _scaffold(c, world, "estimate_avg_sell_value",
-                               interaction="estimate_avg_sell_value")
+    c["activity"] = _occupy(c, world, _scaffold(c, world, "estimate_avg_sell_value",
+                               interaction="estimate_avg_sell_value"))
     c["activity"]["estimated_value"] = estimate
     _set_computer_animation(c, world)
 
@@ -5854,8 +5855,8 @@ def _route_browse_darknet_market(c, world, action):
         return
     from systems.darknet import browse_darknet_listings
     listings = browse_darknet_listings(world, category=action.get("category"))
-    c["activity"] = _scaffold(c, world, "browse_darknet_market",
-                               interaction="browse_darknet_market")
+    c["activity"] = _occupy(c, world, _scaffold(c, world, "browse_darknet_market",
+                               interaction="browse_darknet_market"))
     c["activity"]["darknet_listings"] = listings
     _set_computer_animation(c, world)
 
@@ -5869,8 +5870,8 @@ def _route_order_darknet_listing(c, world, action):
     target_id = action.get("target_id")
     from systems.darknet import order_darknet_listing
     result = order_darknet_listing(c, world, listing_id, target_id=target_id)
-    c["activity"] = _scaffold(c, world, "order_darknet_listing",
-                               interaction="order_darknet_listing")
+    c["activity"] = _occupy(c, world, _scaffold(c, world, "order_darknet_listing",
+                               interaction="order_darknet_listing"))
     c["activity"]["order_result"] = result
     _set_computer_animation(c, world)
 
@@ -5884,7 +5885,7 @@ def _route_write_diary(c, world, action):
     from systems.personal_items import get_item_by_template
     if not get_item_by_template(c, "diary"):
         return
-    c["activity"] = _scaffold(c, world, "write_diary", interaction="write_diary")
+    c["activity"] = _occupy(c, world, _scaffold(c, world, "write_diary", interaction="write_diary"))
     from systems.diary import write_diary_entry
     entry = write_diary_entry(c, world)
     c["activity"]["diary_entry"] = entry
@@ -5907,8 +5908,8 @@ def _route_computer_list_stocks(c, world, action):
             "gain_pct": round((price - avg) / avg * 100, 1) if avg else 0,
             "value": round(shares * price, 2),
         }
-    c["activity"] = _scaffold(c, world, "computer_list_stocks",
-                               interaction="computer_list_stocks")
+    c["activity"] = _occupy(c, world, _scaffold(c, world, "computer_list_stocks",
+                               interaction="computer_list_stocks"))
     c["activity"]["portfolio"] = summary
 
 
@@ -5917,8 +5918,8 @@ def _route_computer_buy_stock(c, world, action):
     from systems.stock_market import get_stock_price
     ticker     = (action.get("ticker") or action.get("target", "")).upper()
     shares     = int(action.get("shares", 1))
-    c["activity"] = _scaffold(c, world, "computer_buy_stock",
-                               interaction="computer_buy_stock")
+    c["activity"] = _occupy(c, world, _scaffold(c, world, "computer_buy_stock",
+                               interaction="computer_buy_stock"))
     if ticker:
         price      = get_stock_price(world, ticker)
         cash_amount = shares * price
@@ -5930,8 +5931,8 @@ def _route_computer_sell_stock(c, world, action):
     from systems.investments import sell_stock
     ticker = (action.get("ticker") or action.get("target", "")).upper()
     shares = int(action.get("shares", 0)) or None
-    c["activity"] = _scaffold(c, world, "computer_sell_stock",
-                               interaction="computer_sell_stock")
+    c["activity"] = _occupy(c, world, _scaffold(c, world, "computer_sell_stock",
+                               interaction="computer_sell_stock"))
     if ticker:
         result = sell_stock(c, world, ticker, shares)
         c["activity"]["transaction_result"] = result
@@ -5940,8 +5941,8 @@ def _route_computer_sell_stock(c, world, action):
 def _route_computer_check_stock_value(c, world, action):
     from systems.stock_market import get_stock_price
     ticker = (action.get("ticker") or action.get("target", "")).upper()
-    c["activity"] = _scaffold(c, world, "computer_check_stock_value",
-                               interaction="computer_check_stock_value")
+    c["activity"] = _occupy(c, world, _scaffold(c, world, "computer_check_stock_value",
+                               interaction="computer_check_stock_value"))
     if ticker:
         price = get_stock_price(world, ticker)
         c["activity"]["stock_price"] = {"ticker": ticker, "price": price}
@@ -5952,8 +5953,8 @@ def _route_computer_check_stock_value(c, world, action):
 def _route_computer_order_item(c, world, action):
     template_id = action.get("template_id") or action.get("target", "")
     quantity    = int(action.get("quantity", 1))
-    c["activity"] = _scaffold(c, world, "computer_order_item",
-                               interaction="computer_order_item")
+    c["activity"] = _occupy(c, world, _scaffold(c, world, "computer_order_item",
+                               interaction="computer_order_item"))
     if template_id:
         # Use schedule_delivery_item via catalog_id lookup
         from systems.procurement import schedule_delivery_item
@@ -5969,8 +5970,8 @@ def _route_computer_order_item(c, world, action):
 def _route_computer_order_service(c, world, action):
     # service_id maps to service_type; use first subtype by default
     service_type = action.get("service_id") or action.get("service_type") or action.get("target", "")
-    c["activity"] = _scaffold(c, world, "computer_order_service",
-                               interaction="computer_order_service")
+    c["activity"] = _occupy(c, world, _scaffold(c, world, "computer_order_service",
+                               interaction="computer_order_service"))
     if service_type:
         from systems.services import request_service
         # request_service(c, world, service_type, subtype, details, quantity=1)
@@ -5986,8 +5987,8 @@ def _route_computer_order_service(c, world, action):
 def _route_computer_list_service_options(c, world, action):
     from data.services import SERVICE_CATALOG
     service_type = (action.get("service_type") or action.get("args", {}).get("service_type") or "").lower()
-    c["activity"] = _scaffold(c, world, "computer_list_service_options",
-                               interaction="computer_list_service_options")
+    c["activity"] = _occupy(c, world, _scaffold(c, world, "computer_list_service_options",
+                               interaction="computer_list_service_options"))
     options = {}
     for sid, svc in SERVICE_CATALOG.items():
         if not service_type or service_type in sid or service_type in svc.get("category","").lower():
