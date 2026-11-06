@@ -882,6 +882,9 @@ def update_agent(
 
     _prof.mark("agent:sort_intentions")
     sort_intentions(c)
+    # what became of the intentions that went away (brain/intention_history.py: the inspector lists them)
+    from brain.intention_history import track as _track_intentions
+    _track_intentions(c, world)
 
     # =====================================
     # SITUATION SELECTION (brain/situations/) -- deterministic, no LLM.

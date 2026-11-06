@@ -33,6 +33,7 @@ COLD_KEYS = frozenset({
     "opinions", "relationships", "schedule", "expectations", "social_model", "beliefs",
     "behavior_patterns", "worries", "_daily_observations", "story_arc", "off_grid_story_arc",
     "life_narrative", "relationship_narratives", "identity", "contacts", "offgrid_summaries",
+    "intention_history", "plan_log", "_intention_seen", "beliefs",
 })
 
 _memo = {}          # (kind, id) -> (tick, digests)

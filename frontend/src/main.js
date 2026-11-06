@@ -5207,6 +5207,58 @@ function _charName(id){
   return _worldState.characters?.[id]?.name || id;
 }
 
+// =========================================================
+// LIST <-> CHART for any timestamped list in the inspector: the same entries as cards, or as a line chart of how
+// many there were per hour (per day once they span more than two days), one line per group (the five biggest).
+// The choice is kept per list. _timeSection(key, title, items, {tick, group, list, rerender}).
+// =========================================================
+const _timeViewMode = (() => { try { return JSON.parse(localStorage.getItem("inspector.timeView") || "{}"); } catch(e){ return {}; } })();
+const _timeViewRerender = {};
+const _TIME_COLORS = ["#58a6ff", "#3fb950", "#d29922", "#f85149", "#bc8cff", "#8b949e"];
+
+function _timeSection(key, title, items, opts){
+  _timeViewRerender[key] = opts.rerender;
+  const mode = _timeViewMode[key] || "list";
+  const toggle = `<span class="timeViewToggle" style="float:right;font-weight:400">
+    <button data-timeview="${key}|list" class="${mode === "list" ? "on" : ""}">List</button><button data-timeview="${key}|chart" class="${mode === "chart" ? "on" : ""}">Chart</button></span>`;
+  const body = mode === "chart" ? _timeChart(items, opts) : opts.list();
+  return _section(`${title}${toggle}`, body);
+}
+
+function _timeChart(items, opts){
+  const pts = items.map(x => ({t: opts.tick(x), g: opts.group(x) || "other"})).filter(p => p.t != null).sort((a, b) => a.t - b.t);
+  if(pts.length < 2) return _empty("Not enough entries over time for a chart yet.");
+  const span = pts[pts.length - 1].t - pts[0].t;
+  const bucket = span > 2 * 86400 ? 86400 : 3600;
+  const start = Math.floor(pts[0].t / bucket) * bucket, n = Math.floor((pts[pts.length - 1].t - start) / bucket) + 1;
+  const totals = {};
+  pts.forEach(p => totals[p.g] = (totals[p.g] || 0) + 1);
+  let groups = Object.keys(totals).sort((a, b) => totals[b] - totals[a]);
+  if(groups.length > 6){ const keep = new Set(groups.slice(0, 5)); pts.forEach(p => { if(!keep.has(p.g)) p.g = "other"; }); groups = [...groups.slice(0, 5), "other"]; }
+  const series = Object.fromEntries(groups.map(g => [g, new Array(n).fill(0)]));
+  pts.forEach(p => series[p.g][Math.floor((p.t - start) / bucket)]++);
+  const max = Math.max(1, ...groups.flatMap(g => series[g]));
+  const W = 300, H = 120, L = 24, R = 6, T = 8, B = 18;
+  const x = i => L + (n === 1 ? (W - L - R) / 2 : i / (n - 1) * (W - L - R)), y = v => T + (1 - v / max) * (H - T - B);
+  const lines = groups.map((g, gi) => `<polyline points="${series[g].map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(" ")}" fill="none" stroke="${_TIME_COLORS[gi % 6]}" stroke-width="1.5"/>`).join("");
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;background:rgba(255,255,255,0.03)">
+    <line x1="${L}" x2="${W - R}" y1="${y(0)}" y2="${y(0)}" stroke="#444"/>
+    <text x="${L - 4}" y="${y(max) + 8}" fill="#aaa" font-size="9" text-anchor="end">${max}</text>
+    <text x="${L - 4}" y="${y(0)}" fill="#aaa" font-size="9" text-anchor="end">0</text>${lines}
+    <text x="${L}" y="${H - 4}" fill="#aaa" font-size="9">${_escapeHTML(_formatMemoryTimestamp(start) || "")}</text>
+    <text x="${W - R}" y="${H - 4}" fill="#aaa" font-size="9" text-anchor="end">per ${bucket === 86400 ? "day" : "hour"}</text></svg>
+    <div style="font-size:11px;margin-top:4px">${groups.map((g, gi) => `<span style="margin-right:10px;white-space:nowrap"><span style="color:${_TIME_COLORS[gi % 6]}">━</span> ${_escapeHTML(String(g).replace(/_/g, " "))} (${totals[g] ?? pts.filter(p => p.g === g).length})</span>`).join("")}</div>`;
+}
+
+document.addEventListener("click", (ev) => {
+  const b = ev.target.closest("[data-timeview]");
+  if(!b) return;
+  const [key, mode] = b.dataset.timeview.split("|");
+  _timeViewMode[key] = mode;
+  try { localStorage.setItem("inspector.timeView", JSON.stringify(_timeViewMode)); } catch(e){ /* storage unavailable */ }
+  if(_timeViewRerender[key]) _timeViewRerender[key]();
+});
+
 function _section(title, innerHTML){
   return `<div class="viewerSection"><div class="viewerSectionTitle">${title}</div>${innerHTML}</div>`;
 }
@@ -5739,11 +5791,20 @@ function renderMindTab(c){
   // clicked card's original object back up.
   const intentions = c.active_intentions || [];
   _lastRenderedIntentions = intentions;
-  if(intentions.length){
-    const lines = intentions.map((i, idx) => {
-      const outcome = _intentionOutcome(c, i);
-      return `
-      <div class="viewerCard viewerCardClickable" data-intent-index="${idx}">
+  // Finished ones stay in the list (brain/intention_history.py): done = green, ticked and struck through; blocked = red;
+  // dropped (went away without being done) = faded. All in the order they came, newest first.
+  const seen = c._intention_seen || {};
+  const sinceOf = (i) => (seen[`${i.type}|${i.target_id || i.child_id || ""}`] || {}).since ?? i.created_at ?? null;
+  const rows = [
+    ...intentions.map((i, idx) => ({active: true, i, idx, since: sinceOf(i)})),
+    ...(c.intention_history || []).map(h => ({active: false, h, since: h.since, ended: h.ended})),
+  ].sort((a, b) => (b.since ?? 0) - (a.since ?? 0));
+  if(rows.length){
+    const card = (r) => {
+      if(r.active){
+        const i = r.i, outcome = _intentionOutcome(c, i);
+        return `
+      <div class="viewerCard viewerCardClickable" data-intent-index="${r.idx}">
         <div class="viewerCardTitle">
           <span class="intentionStatusDot" style="background:${outcome.color};" title="${outcome.label}"></span>
           ${(i.type || "").replace(/_/g, " ")}
@@ -5751,8 +5812,24 @@ function renderMindTab(c){
         </div>
         ${i.reason ? `<div style="opacity:.7">${i.reason}</div>` : ""}
       </div>`;
-    });
-    sections.push(_section(`Intentions (${intentions.length}) — sorted by category, then priority`, lines.join("")));
+      }
+      const h = r.h;
+      const look = h.outcome === "done" ? {mark: "✓", color: "#3fb950", deco: "line-through", op: 1}
+        : h.outcome === "blocked" ? {mark: "✕", color: "#f85149", deco: "none", op: .85} : {mark: "–", color: "#8b949e", deco: "none", op: .55};
+      return `
+      <div class="viewerCard" style="opacity:${look.op}">
+        <div class="viewerCardTitle" style="color:${look.color}">
+          <span style="font-weight:700">${look.mark}</span>
+          <span style="text-decoration:${look.deco}">${_escapeHTML((h.type || "").replace(/_/g, " "))}</span>
+          <span style="opacity:.6; font-size:10px; float:right;">${h.outcome}${h.how ? " · " + _escapeHTML(h.how) : ""}</span>
+        </div>
+        <div style="opacity:.6;font-size:11px">${_escapeHTML(_formatMemoryTimestamp(h.since) || "")} → ${_escapeHTML(_formatMemoryTimestamp(h.ended) || "")}</div>
+      </div>`;
+    };
+    const done = (c.intention_history || []).filter(h => h.outcome === "done").length;
+    sections.push(_timeSection("intentions", `Intentions (${intentions.length} open, ${done} done)`, rows, {
+      tick: r => r.since, group: r => r.active ? "open" : r.h.outcome,
+      list: () => rows.map(card).join(""), rerender: () => renderMindTab(c)}));
   }
 
   // -- Persistent desires --
@@ -5768,7 +5845,8 @@ function renderMindTab(c){
       // importance/frustration read as two distinct real events, not an
       // unexplained duplicate.
       const targetMem = d.target ? memoriesById[d.target] : null;
-      const reason = targetMem?.text || d.reason;
+      const about = (d.about || []).map(id => memoriesById[id]).filter(Boolean);
+      const reason = targetMem?.text || (about.length ? about[about.length - 1].text + (about.length > 1 ? ` (and ${about.length - 1} more)` : "") : null) || d.reason;
       return `
       <div class="viewerCard">
         ${(d.type || "").replace(/_/g, " ")}
@@ -6331,11 +6409,20 @@ function renderMemoryTab(c){
   _lastRenderedMemories = [];
   const sections = [];
 
+  const memGroup = m => m.kind === "activity" ? "activity" : ((m.tags || []).find(t => t !== "thought") || m.kind || (m.tags || [])[0] || "memory");
   const shortTerm = [...(c.memories || [])].sort((a, b) => (b.tick || 0) - (a.tick || 0));
-  sections.push(_renderMemoryList("Short-Term Memory", shortTerm, _shortTermMemoryPage, SHORT_TERM_MEMORY_PAGE_SIZE, "short"));
+  const shortHtml = _renderMemoryList("Short-Term Memory", shortTerm, _shortTermMemoryPage, SHORT_TERM_MEMORY_PAGE_SIZE, "short");
+  sections.push((_timeViewMode["memory-short"] || "list") === "list"
+    ? shortHtml.replace('<div class="viewerSectionTitle">', `<div class="viewerSectionTitle"><span class="timeViewToggle" style="float:right;font-weight:400"><button data-timeview="memory-short|list" class="on">List</button><button data-timeview="memory-short|chart">Chart</button></span>`)
+    : _timeSection("memory-short", `Short-Term Memory (${shortTerm.length})`, shortTerm, {tick: m => m.tick, group: memGroup, list: () => "", rerender: () => renderMemoryTab(c)}));
+  _timeViewRerender["memory-short"] = () => renderMemoryTab(c);
 
   const longTerm = [...(c.long_term_memory || [])].sort((a, b) => (b.tick || 0) - (a.tick || 0));
-  sections.push(_renderMemoryList("Long-Term Memory", longTerm, _longTermMemoryPage, LONG_TERM_MEMORY_PAGE_SIZE, "long"));
+  const longHtml = _renderMemoryList("Long-Term Memory", longTerm, _longTermMemoryPage, LONG_TERM_MEMORY_PAGE_SIZE, "long");
+  sections.push((_timeViewMode["memory-long"] || "list") === "list"
+    ? longHtml.replace('<div class="viewerSectionTitle">', `<div class="viewerSectionTitle"><span class="timeViewToggle" style="float:right;font-weight:400"><button data-timeview="memory-long|list" class="on">List</button><button data-timeview="memory-long|chart">Chart</button></span>`)
+    : _timeSection("memory-long", `Long-Term Memory (${longTerm.length})`, longTerm, {tick: m => m.tick, group: memGroup, list: () => "", rerender: () => renderMemoryTab(c)}));
+  _timeViewRerender["memory-long"] = () => renderMemoryTab(c);
 
   // -- Notable stories --
   const stories = c.notable_stories || [];
@@ -6349,7 +6436,8 @@ function renderMemoryTab(c){
         <div style="opacity:.6">${s.category || ""}${s.value != null ? ` · value ${s.value.toFixed(1)}` : ""}</div>
       </div>`;
     });
-    sections.push(_section(`Events (${stories.length})`, lines.join("")));
+    sections.push(_timeSection("events", `Events (${stories.length})`, stories, {tick: x => x.created_tick, group: x => x.category,
+      list: () => lines.join(""), rerender: () => renderMemoryTab(c)}));
   }
 
   // -- Secrets --
