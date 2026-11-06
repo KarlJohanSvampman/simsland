@@ -69,8 +69,55 @@ def tag_dramatic_memory(c, world, text, importance=0.6, people=None, extra_tags=
         tick=world.get("tick", 0), people=people or [],
     )
     mem["confided"] = False
-    add_desire(c, "confide_in_someone", target=mem.get("id"), importance=0.5 + importance * 0.3)
+    d = _confide_desire(c, create=True, importance=0.5 + importance * 0.3)
+    if mem.get("id") and mem["id"] not in d["about"]:
+        d["about"].append(mem["id"])
+        del d["about"][:-ABOUT_KEPT]
     return mem
+
+
+# One wish to confide, not one per thing that happened (live 2026-11-06: 70+ identical "confide in someone" desires on
+# one character, each at frustration 1.0, and those whose memory had since been forgotten could never resolve). The
+# desire lists what they want to get off their chest; told or forgotten things drop off; with nothing left it is over.
+ABOUT_KEPT = 10
+
+
+def _confide_desire(c, create=False, importance=0.5):
+    """The character's single confide_in_someone desire (older saves' copies are merged into it), or None."""
+    desires = c.setdefault("persistent_desires", [])
+    mine = [d for d in desires if d.get("type") == "confide_in_someone" and d.get("active") and not d.get("resolved")]
+    if not mine and not create:
+        return None
+    if not mine:
+        d = add_desire(c, "confide_in_someone", target=None, importance=importance)
+        d.update(active=True, resolved=False)
+        d.setdefault("about", [])
+        return d
+    keep = mine[0]
+    about = list(keep.get("about") or [])
+    for d in mine:
+        for mid in ([d.get("target")] if d.get("target") else []) + list(d.get("about") or []):
+            if mid not in about:
+                about.append(mid)
+        keep["importance"] = max(keep.get("importance", 0), d.get("importance", 0))
+        keep["frustration"] = max(keep.get("frustration", 0), d.get("frustration", 0))
+    keep["about"], keep["target"] = about[-ABOUT_KEPT:], None
+    keep["importance"] = max(keep["importance"], importance if create else 0)
+    if len(mine) > 1:
+        drop = {id(d) for d in mine[1:]}
+        c["persistent_desires"] = [d for d in desires if id(d) not in drop]
+    return keep
+
+
+def _still_to_tell(c, d):
+    """The memories this desire is about that are still remembered and not yet told -- pruning the rest."""
+    memories = {m.get("id"): m for m in c.get("memories", [])}
+    d["about"] = [mid for mid in d.get("about") or [] if mid in memories and not memories[mid].get("confided")]
+    return [memories[mid] for mid in d["about"]]
+
+
+def _close(d):
+    d["resolved"], d["active"] = True, False
 
 
 def _find_confidant(c, world):
@@ -101,31 +148,24 @@ def resolve_confide_opportunities(c, world):
     memories, and if a trusted contact exists, resolves the confiding --
     LLM-judged validation-or-not for seek_validation, straightforward
     stress relief + closeness for seek_comfort."""
-    desires = c.get("persistent_desires", [])
-    pending = [
-        d for d in desires
-        if d.get("type") == "confide_in_someone" and d.get("active") and not d.get("resolved")
-    ]
-    if not pending:
+    desire = _confide_desire(c)
+    if not desire:
+        return
+    to_tell = _still_to_tell(c, desire)
+    if not to_tell:
+        _close(desire)                       # everything was told or has been forgotten
         return
 
     confidant = _find_confidant(c, world)
     if not confidant:
-        return
+        return                               # nobody they trust enough: the wish stays (once)
 
-    memories = {m.get("id"): m for m in c.get("memories", [])}
-
-    for desire in pending:
-        mem = memories.get(desire.get("target"))
-        if not mem or mem.get("confided"):
-            desire["resolved"] = True
-            desire["active"] = False
-            continue
+    for mem in to_tell:
         _do_confide(c, confidant, mem, world)
         mem["confided"] = True
         mem.setdefault("told_to", []).append(confidant["id"])
-        desire["resolved"] = True
-        desire["active"] = False
+    desire["about"] = []
+    _close(desire)
 
 
 def _do_confide(c, confidant, mem, world):
@@ -177,21 +217,13 @@ def get_confiding_context(c, world):
     up organically with a trusted contact rather than it only ever
     resolving silently through the daily resolve_confide_opportunities()
     sweep."""
-    desires = c.get("persistent_desires", [])
-    pending = [
-        d for d in desires
-        if d.get("type") == "confide_in_someone" and d.get("active") and not d.get("resolved")
-    ]
-    if not pending:
+    desire = _confide_desire(c)
+    if not desire:
         return []
-
-    memories = {m.get("id"): m for m in c.get("memories", [])}
-    lines = []
-    for desire in pending:
-        mem = memories.get(desire.get("target"))
-        if not mem or mem.get("confided"):
-            continue
-        text = mem.get("text", "something that happened")
-        lines.append(f"You've been wanting to talk to someone about this: \"{text}\"")
-
-    return lines
+    to_tell = _still_to_tell(c, desire)
+    if not to_tell:
+        _close(desire)
+        return []
+    first = to_tell[-1].get("text", "something that happened")
+    more = f" (and {len(to_tell) - 1} other thing{'s' if len(to_tell) > 2 else ''})" if len(to_tell) > 1 else ""
+    return [f"You've been wanting to talk to someone about this: \"{first}\"{more}"]

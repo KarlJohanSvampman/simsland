@@ -45,6 +45,7 @@ from api.view      import router as view_router
 from api.debug     import router as debug_router
 from api.household import router as household_router
 from api.admin     import router as admin_router
+from api.behaviour import router as behaviour_router
 from api.social_sandbox import router as social_sandbox_router
 from api.events    import router as events_router
 from api.overview  import router as overview_router
@@ -80,6 +81,7 @@ app.include_router(editor_router,   prefix="/api/editor")
 app.include_router(debug_router)
 app.include_router(household_router, prefix="/api")
 app.include_router(admin_router)
+app.include_router(behaviour_router)
 app.include_router(social_sandbox_router)
 app.include_router(events_router, prefix="/api")
 app.include_router(overview_router, prefix="/api")

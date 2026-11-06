@@ -1,0 +1,1934 @@
+{
+ "version": 1,
+ "variables": [
+  {
+   "id": "hour",
+   "name": "Hour of the day (0-23)",
+   "source": "calendar.hour"
+  },
+  {
+   "id": "minute_of_day",
+   "name": "Minutes since midnight",
+   "source": "calendar.minute_of_day"
+  },
+  {
+   "id": "weekday",
+   "name": "Day of the week",
+   "source": "calendar.weekday"
+  },
+  {
+   "id": "money",
+   "name": "Money on hand",
+   "source": "character.money"
+  },
+  {
+   "id": "drive_level",
+   "name": "How strong the drive is now",
+   "source": "drive"
+  },
+  {
+   "id": "energy",
+   "name": "Energy (0-100)",
+   "source": "body.energy"
+  },
+  {
+   "id": "age",
+   "name": "Age",
+   "source": "character.age"
+  }
+ ],
+ "drives": [
+  {
+   "id": "hunger",
+   "kind": "need",
+   "name": "Hunger",
+   "source": "body.hunger",
+   "threshold": 60,
+   "satisfied_below": 30,
+   "intention": "reduce_hunger",
+   "notes": ""
+  },
+  {
+   "id": "thirst",
+   "kind": "need",
+   "name": "Thirst",
+   "source": "body.hydration_deficit",
+   "threshold": 45,
+   "satisfied_below": 20,
+   "intention": "reduce_thirst",
+   "notes": ""
+  },
+  {
+   "id": "bladder",
+   "kind": "need",
+   "name": "Bladder",
+   "source": "body.bladder",
+   "threshold": 70,
+   "satisfied_below": 20,
+   "intention": "relieve_bladder",
+   "notes": ""
+  },
+  {
+   "id": "bowels",
+   "kind": "need",
+   "name": "Bowels",
+   "source": "body.bowels",
+   "threshold": 70,
+   "satisfied_below": 20,
+   "intention": "relieve_bowels",
+   "notes": ""
+  },
+  {
+   "id": "fatigue",
+   "kind": "need",
+   "name": "Tiredness",
+   "source": "body.fatigue",
+   "threshold": 55,
+   "satisfied_below": 25,
+   "intention": "restore_energy",
+   "notes": ""
+  },
+  {
+   "id": "hygiene",
+   "kind": "need",
+   "name": "Feeling dirty",
+   "source": "body.hygiene_deficit",
+   "threshold": 70,
+   "satisfied_below": 20,
+   "intention": "get_clean",
+   "notes": ""
+  },
+  {
+   "id": "mouth",
+   "kind": "need",
+   "name": "Unbrushed teeth",
+   "source": "body.mouth_hygiene_deficit",
+   "threshold": 60,
+   "satisfied_below": 20,
+   "intention": "clean_teeth",
+   "notes": ""
+  },
+  {
+   "id": "cold",
+   "kind": "need",
+   "name": "Cold and wet",
+   "source": "body.cold_exposure",
+   "threshold": 50,
+   "satisfied_below": 20,
+   "intention": "get_warm",
+   "notes": ""
+  },
+  {
+   "id": "sickness",
+   "kind": "need",
+   "name": "Feeling ill",
+   "source": "body.sickness",
+   "threshold": 50,
+   "satisfied_below": 20,
+   "intention": "get_well",
+   "notes": ""
+  },
+  {
+   "id": "worry",
+   "kind": "need",
+   "name": "Worry",
+   "source": "mind.worry",
+   "threshold": 50,
+   "satisfied_below": 25,
+   "intention": "relieve_worry",
+   "notes": ""
+  },
+  {
+   "id": "socialize",
+   "kind": "want",
+   "name": "Company",
+   "source": "lt_needs.socialize",
+   "threshold": 0.3,
+   "satisfied_below": null,
+   "intention": "spend_time_with_others",
+   "notes": "frustration 0-1 (systems/lt_needs.py)"
+  },
+  {
+   "id": "nature",
+   "kind": "want",
+   "name": "Time in nature",
+   "source": "lt_needs.nature",
+   "threshold": 0.3,
+   "satisfied_below": null,
+   "intention": "get_outdoors",
+   "notes": "frustration 0-1 (systems/lt_needs.py)"
+  },
+  {
+   "id": "exercise",
+   "kind": "want",
+   "name": "Exercise",
+   "source": "lt_needs.exercise",
+   "threshold": 0.3,
+   "satisfied_below": null,
+   "intention": "exercise",
+   "notes": "frustration 0-1 (systems/lt_needs.py)"
+  },
+  {
+   "id": "creative",
+   "kind": "want",
+   "name": "Creative outlet",
+   "source": "lt_needs.creative",
+   "threshold": 0.3,
+   "satisfied_below": null,
+   "intention": "be_creative",
+   "notes": "frustration 0-1 (systems/lt_needs.py)"
+  },
+  {
+   "id": "romance",
+   "kind": "want",
+   "name": "Romance",
+   "source": "lt_needs.romance",
+   "threshold": 0.3,
+   "satisfied_below": null,
+   "intention": "find_romance",
+   "notes": "frustration 0-1 (systems/lt_needs.py)"
+  },
+  {
+   "id": "intimacy",
+   "kind": "want",
+   "name": "Intimacy",
+   "source": "lt_needs.intimacy",
+   "threshold": 0.3,
+   "satisfied_below": null,
+   "intention": "be_close",
+   "notes": "frustration 0-1 (systems/lt_needs.py)"
+  },
+  {
+   "id": "learning",
+   "kind": "want",
+   "name": "Learning",
+   "source": "lt_needs.learning",
+   "threshold": 0.3,
+   "satisfied_below": null,
+   "intention": "learn_something",
+   "notes": "frustration 0-1 (systems/lt_needs.py)"
+  },
+  {
+   "id": "solitude",
+   "kind": "want",
+   "name": "Solitude",
+   "source": "lt_needs.solitude",
+   "threshold": 0.3,
+   "satisfied_below": null,
+   "intention": "time_alone",
+   "notes": "frustration 0-1 (systems/lt_needs.py)"
+  },
+  {
+   "id": "spirituality",
+   "kind": "want",
+   "name": "Spirituality",
+   "source": "lt_needs.spirituality",
+   "threshold": 0.3,
+   "satisfied_below": null,
+   "intention": "practice_spirituality",
+   "notes": "frustration 0-1 (systems/lt_needs.py)"
+  },
+  {
+   "id": "purpose",
+   "kind": "want",
+   "name": "Purpose",
+   "source": "lt_needs.purpose",
+   "threshold": 0.3,
+   "satisfied_below": null,
+   "intention": "do_something_meaningful",
+   "notes": "frustration 0-1 (systems/lt_needs.py)"
+  },
+  {
+   "id": "adventure",
+   "kind": "want",
+   "name": "Adventure",
+   "source": "lt_needs.adventure",
+   "threshold": 0.3,
+   "satisfied_below": null,
+   "intention": "seek_adventure",
+   "notes": "frustration 0-1 (systems/lt_needs.py)"
+  },
+  {
+   "id": "play",
+   "kind": "want",
+   "name": "Play",
+   "source": "lt_needs.play",
+   "threshold": 0.3,
+   "satisfied_below": null,
+   "intention": "play",
+   "notes": "frustration 0-1 (systems/lt_needs.py)"
+  },
+  {
+   "id": "go_to_work",
+   "kind": "expectation",
+   "name": "Go to Work",
+   "source": "expectations.go_to_work",
+   "threshold": "pending",
+   "satisfied_below": null,
+   "intention": "go_to_work",
+   "notes": "satisfied by systems/expectations.py::satisfy_expectation"
+  },
+  {
+   "id": "get_kids_to_school",
+   "kind": "expectation",
+   "name": "Get the Kids to School",
+   "source": "expectations.get_kids_to_school",
+   "threshold": "pending",
+   "satisfied_below": null,
+   "intention": "get_kids_to_school",
+   "notes": "satisfied by systems/expectations.py::satisfy_expectation"
+  },
+  {
+   "id": "make_dinner",
+   "kind": "expectation",
+   "name": "Make Dinner",
+   "source": "expectations.make_dinner",
+   "threshold": "pending",
+   "satisfied_below": null,
+   "intention": "make_dinner",
+   "notes": "satisfied by systems/expectations.py::satisfy_expectation"
+  },
+  {
+   "id": "family_dinner_together",
+   "kind": "expectation",
+   "name": "Have Dinner Together",
+   "source": "expectations.family_dinner_together",
+   "threshold": "pending",
+   "satisfied_below": null,
+   "intention": "dinner_together",
+   "notes": "satisfied by systems/expectations.py::satisfy_expectation"
+  },
+  {
+   "id": "keep_room_clean",
+   "kind": "expectation",
+   "name": "Keep My Room Clean",
+   "source": "expectations.keep_room_clean",
+   "threshold": "pending",
+   "satisfied_below": null,
+   "intention": "keep_room_clean",
+   "notes": "satisfied by systems/expectations.py::satisfy_expectation"
+  },
+  {
+   "id": "keep_a_promise",
+   "kind": "expectation",
+   "name": "Keep a Promise",
+   "source": "expectations.keep_a_promise",
+   "threshold": "pending",
+   "satisfied_below": null,
+   "intention": "keep_a_promise",
+   "notes": "satisfied by systems/expectations.py::satisfy_expectation"
+  },
+  {
+   "id": "acquire_driver_license",
+   "kind": "expectation",
+   "name": "Get a Driver's License",
+   "source": "expectations.acquire_driver_license",
+   "threshold": "pending",
+   "satisfied_below": null,
+   "intention": "get_drivers_license",
+   "notes": "satisfied by systems/expectations.py::satisfy_expectation"
+  },
+  {
+   "id": "file_taxes",
+   "kind": "expectation",
+   "name": "File Taxes",
+   "source": "expectations.file_taxes",
+   "threshold": "pending",
+   "satisfied_below": null,
+   "intention": "file_taxes",
+   "notes": "satisfied by systems/expectations.py::satisfy_expectation"
+  },
+  {
+   "id": "relax_with_someone",
+   "kind": "expectation",
+   "name": "Unwind with Someone",
+   "source": "expectations.relax_with_someone",
+   "threshold": "pending",
+   "satisfied_below": null,
+   "intention": "unwind_with_someone",
+   "notes": "satisfied by systems/expectations.py::satisfy_expectation"
+  },
+  {
+   "id": "spend_time_alone",
+   "kind": "expectation",
+   "name": "Spend Time Alone",
+   "source": "expectations.spend_time_alone",
+   "threshold": "pending",
+   "satisfied_below": null,
+   "intention": "spend_time_alone",
+   "notes": "satisfied by systems/expectations.py::satisfy_expectation"
+  },
+  {
+   "id": "child_bedtime_check",
+   "kind": "expectation",
+   "name": "Check the Kids at Bedtime",
+   "source": "expectations.child_bedtime_check",
+   "threshold": "pending",
+   "satisfied_below": null,
+   "intention": "check_kids_at_bedtime",
+   "notes": "satisfied by systems/expectations.py::satisfy_expectation"
+  },
+  {
+   "id": "child_hungry",
+   "kind": "expectation",
+   "name": "A child to feed",
+   "source": "world.child_hungry",
+   "threshold": 1,
+   "satisfied_below": null,
+   "intention": "feed_the_kids",
+   "notes": ""
+  },
+  {
+   "id": "house_dirty",
+   "kind": "expectation",
+   "name": "A dirty house",
+   "source": "world.house_dirty",
+   "threshold": 1,
+   "satisfied_below": null,
+   "intention": "keep_house_clean",
+   "notes": ""
+  },
+  {
+   "id": "plants_need_care",
+   "kind": "expectation",
+   "name": "Thirsty or weedy plants",
+   "source": "world.plants_need_care",
+   "threshold": 1,
+   "satisfied_below": null,
+   "intention": "look_after_plants",
+   "notes": ""
+  },
+  {
+   "id": "upcoming_event",
+   "kind": "expectation",
+   "name": "An event coming up",
+   "source": "world.upcoming_event",
+   "threshold": 1,
+   "satisfied_below": null,
+   "intention": "prepare_for_event",
+   "notes": ""
+  },
+  {
+   "id": "grievance",
+   "kind": "want",
+   "name": "A grievance",
+   "source": "world.grievance",
+   "threshold": 1,
+   "satisfied_below": null,
+   "intention": "make_things_right",
+   "notes": ""
+  },
+  {
+   "id": "envy",
+   "kind": "want",
+   "name": "Envy",
+   "source": "world.envy",
+   "threshold": 1,
+   "satisfied_below": null,
+   "intention": "keep_up_with_someone",
+   "notes": ""
+  },
+  {
+   "id": "concern",
+   "kind": "want",
+   "name": "Worried about someone",
+   "source": "world.concern",
+   "threshold": 1,
+   "satisfied_below": null,
+   "intention": "check_on_someone",
+   "notes": ""
+  }
+ ],
+ "intentions": [
+  {
+   "id": "reduce_hunger",
+   "name": "Reduce Hunger",
+   "drive": "hunger",
+   "status": "live",
+   "plans": [
+    "light_meal",
+    "cook_meal",
+    "order_takeout",
+    "ask_for_food",
+    "eat_out"
+   ],
+   "scout_plan": "scout_food",
+   "satisfied_when": {
+    "drive_below": 30
+   },
+   "replaces": [
+    "eat_food"
+   ],
+   "notes": ""
+  },
+  {
+   "id": "reduce_thirst",
+   "name": "Reduce Thirst",
+   "drive": "thirst",
+   "status": "planned",
+   "plans": [],
+   "scout_plan": null,
+   "satisfied_when": null,
+   "replaces": [
+    "drink"
+   ],
+   "notes": ""
+  },
+  {
+   "id": "relieve_bladder",
+   "name": "Relieve Bladder",
+   "drive": "bladder",
+   "status": "planned",
+   "plans": [],
+   "scout_plan": null,
+   "satisfied_when": null,
+   "replaces": [
+    "use_toilet"
+   ],
+   "notes": ""
+  },
+  {
+   "id": "relieve_bowels",
+   "name": "Relieve Bowels",
+   "drive": "bowels",
+   "status": "planned",
+   "plans": [],
+   "scout_plan": null,
+   "satisfied_when": null,
+   "replaces": [
+    "use_toilet_bowels"
+   ],
+   "notes": ""
+  },
+  {
+   "id": "restore_energy",
+   "name": "Restore Energy",
+   "drive": "fatigue",
+   "status": "planned",
+   "plans": [],
+   "scout_plan": null,
+   "satisfied_when": null,
+   "replaces": [
+    "sleep",
+    "take_nap",
+    "seek_caffeine_or_rest"
+   ],
+   "notes": "plans: sleep at night, nap by day, coffee"
+  },
+  {
+   "id": "get_clean",
+   "name": "Get Clean",
+   "drive": "hygiene",
+   "status": "planned",
+   "plans": [],
+   "scout_plan": null,
+   "satisfied_when": null,
+   "replaces": [
+    "take_shower"
+   ],
+   "notes": "plans: shower, bath, wash up"
+  },
+  {
+   "id": "clean_teeth",
+   "name": "Clean Teeth",
+   "drive": "mouth",
+   "status": "planned",
+   "plans": [],
+   "scout_plan": null,
+   "satisfied_when": null,
+   "replaces": [
+    "brush_teeth"
+   ],
+   "notes": ""
+  },
+  {
+   "id": "get_warm",
+   "name": "Get Warm and Dry",
+   "drive": "cold",
+   "status": "planned",
+   "plans": [],
+   "scout_plan": null,
+   "satisfied_when": null,
+   "replaces": [
+    "seek_warmer_clothes",
+    "seek_shelter"
+   ],
+   "notes": ""
+  },
+  {
+   "id": "get_well",
+   "name": "Get Well",
+   "drive": "sickness",
+   "status": "planned",
+   "plans": [],
+   "scout_plan": null,
+   "satisfied_when": null,
+   "replaces": [],
+   "notes": "plans: rest, medicine, doctor"
+  },
+  {
+   "id": "relieve_worry",
+   "name": "Relieve Worry",
+   "drive": "worry",
+   "status": "planned",
+   "plans": [],
+   "scout_plan": null,
+   "satisfied_when": null,
+   "replaces": [
+    "relieve_worry"
+   ],
+   "notes": ""
+  },
+  {
+   "id": "spend_time_with_others",
+   "name": "Spend Time with Others",
+   "drive": "socialize",
+   "status": "planned",
+   "plans": [],
+   "scout_plan": null,
+   "satisfied_when": null,
+   "replaces": [
+    "visit_person",
+    "hangout",
+    "call_person",
+    "contact_person"
+   ],
+   "notes": ""
+  },
+  {
+   "id": "get_outdoors",
+   "name": "Get Outdoors",
+   "drive": "nature",
+   "status": "planned",
+   "plans": [],
+   "scout_plan": null,
+   "satisfied_when": null,
+   "replaces": [
+    "outdoor_time"
+   ],
+   "notes": ""
+  },
+  {
+   "id": "exercise",
+   "name": "Exercise",
+   "drive": "exercise",
+   "status": "planned",
+   "plans": [],
+   "scout_plan": null,
+   "satisfied_when": null,
+   "replaces": [
+    "exercise"
+   ],
+   "notes": ""
+  },
+  {
+   "id": "be_creative",
+   "name": "Be Creative",
+   "drive": "creative",
+   "status": "planned",
+   "plans": [],
+   "scout_plan": null,
+   "satisfied_when": null,
+   "replaces": [
+    "creative_outlet"
+   ],
+   "notes": ""
+  },
+  {
+   "id": "find_romance",
+   "name": "Find or Keep Romance",
+   "drive": "romance",
+   "status": "planned",
+   "plans": [],
+   "scout_plan": null,
+   "satisfied_when": null,
+   "replaces": [
+    "seek_romance"
+   ],
+   "notes": ""
+  },
+  {
+   "id": "be_close",
+   "name": "Be Close to Someone",
+   "drive": "intimacy",
+   "status": "planned",
+   "plans": [],
+   "scout_plan": null,
+   "satisfied_when": null,
+   "replaces": [
+    "seek_intimacy"
+   ],
+   "notes": ""
+  },
+  {
+   "id": "learn_something",
+   "name": "Learn Something",
+   "drive": "learning",
+   "status": "planned",
+   "plans": [],
+   "scout_plan": null,
+   "satisfied_when": null,
+   "replaces": [
+    "learn_something"
+   ],
+   "notes": ""
+  },
+  {
+   "id": "time_alone",
+   "name": "Have Time Alone",
+   "drive": "solitude",
+   "status": "planned",
+   "plans": [],
+   "scout_plan": null,
+   "satisfied_when": null,
+   "replaces": [
+    "seek_solitude"
+   ],
+   "notes": ""
+  },
+  {
+   "id": "practice_spirituality",
+   "name": "Practice Spirituality",
+   "drive": "spirituality",
+   "status": "planned",
+   "plans": [],
+   "scout_plan": null,
+   "satisfied_when": null,
+   "replaces": [
+    "spiritual_practice"
+   ],
+   "notes": ""
+  },
+  {
+   "id": "do_something_meaningful",
+   "name": "Do Something Meaningful",
+   "drive": "purpose",
+   "status": "planned",
+   "plans": [],
+   "scout_plan": null,
+   "satisfied_when": null,
+   "replaces": [
+    "pursue_purpose"
+   ],
+   "notes": ""
+  },
+  {
+   "id": "seek_adventure",
+   "name": "Seek Adventure",
+   "drive": "adventure",
+   "status": "planned",
+   "plans": [],
+   "scout_plan": null,
+   "satisfied_when": null,
+   "replaces": [
+    "seek_adventure"
+   ],
+   "notes": ""
+  },
+  {
+   "id": "play",
+   "name": "Play",
+   "drive": "play",
+   "status": "planned",
+   "plans": [],
+   "scout_plan": null,
+   "satisfied_when": null,
+   "replaces": [
+    "play",
+    "play_with_friend"
+   ],
+   "notes": ""
+  },
+  {
+   "id": "go_to_work",
+   "name": "Go to Work",
+   "drive": "go_to_work",
+   "status": "planned",
+   "plans": [],
+   "scout_plan": null,
+   "satisfied_when": null,
+   "replaces": [
+    "expectation:go_to_work"
+   ],
+   "notes": ""
+  },
+  {
+   "id": "get_kids_to_school",
+   "name": "Get the Kids to School",
+   "drive": "get_kids_to_school",
+   "status": "planned",
+   "plans": [],
+   "scout_plan": null,
+   "satisfied_when": null,
+   "replaces": [
+    "expectation:get_kids_to_school"
+   ],
+   "notes": ""
+  },
+  {
+   "id": "make_dinner",
+   "name": "Make Dinner",
+   "drive": "make_dinner",
+   "status": "planned",
+   "plans": [],
+   "scout_plan": null,
+   "satisfied_when": null,
+   "replaces": [
+    "expectation:make_dinner",
+    "cook_dinner"
+   ],
+   "notes": ""
+  },
+  {
+   "id": "dinner_together",
+   "name": "Have Dinner Together",
+   "drive": "family_dinner_together",
+   "status": "planned",
+   "plans": [],
+   "scout_plan": null,
+   "satisfied_when": null,
+   "replaces": [
+    "expectation:family_dinner_together"
+   ],
+   "notes": ""
+  },
+  {
+   "id": "keep_room_clean",
+   "name": "Keep My Room Clean",
+   "drive": "keep_room_clean",
+   "status": "planned",
+   "plans": [],
+   "scout_plan": null,
+   "satisfied_when": null,
+   "replaces": [
+    "expectation:keep_room_clean",
+    "clean_zone"
+   ],
+   "notes": ""
+  },
+  {
+   "id": "keep_a_promise",
+   "name": "Keep a Promise",
+   "drive": "keep_a_promise",
+   "status": "planned",
+   "plans": [],
+   "scout_plan": null,
+   "satisfied_when": null,
+   "replaces": [
+    "expectation:keep_a_promise"
+   ],
+   "notes": ""
+  },
+  {
+   "id": "get_drivers_license",
+   "name": "Get a Driver's License",
+   "drive": "acquire_driver_license",
+   "status": "planned",
+   "plans": [],
+   "scout_plan": null,
+   "satisfied_when": null,
+   "replaces": [
+    "expectation:acquire_driver_license"
+   ],
+   "notes": ""
+  },
+  {
+   "id": "file_taxes",
+   "name": "File Taxes",
+   "drive": "file_taxes",
+   "status": "planned",
+   "plans": [],
+   "scout_plan": null,
+   "satisfied_when": null,
+   "replaces": [
+    "expectation:file_taxes"
+   ],
+   "notes": ""
+  },
+  {
+   "id": "unwind_with_someone",
+   "name": "Unwind with Someone",
+   "drive": "relax_with_someone",
+   "status": "planned",
+   "plans": [],
+   "scout_plan": null,
+   "satisfied_when": null,
+   "replaces": [
+    "expectation:relax_with_someone"
+   ],
+   "notes": ""
+  },
+  {
+   "id": "spend_time_alone",
+   "name": "Spend Time Alone",
+   "drive": "spend_time_alone",
+   "status": "planned",
+   "plans": [],
+   "scout_plan": null,
+   "satisfied_when": null,
+   "replaces": [
+    "expectation:spend_time_alone"
+   ],
+   "notes": ""
+  },
+  {
+   "id": "check_kids_at_bedtime",
+   "name": "Check the Kids at Bedtime",
+   "drive": "child_bedtime_check",
+   "status": "planned",
+   "plans": [],
+   "scout_plan": null,
+   "satisfied_when": null,
+   "replaces": [
+    "expectation:child_bedtime_check"
+   ],
+   "notes": ""
+  },
+  {
+   "id": "feed_the_kids",
+   "name": "Feed the Kids",
+   "drive": "child_hungry",
+   "status": "planned",
+   "plans": [],
+   "scout_plan": null,
+   "satisfied_when": null,
+   "replaces": [
+    "feed_child"
+   ],
+   "notes": ""
+  },
+  {
+   "id": "keep_house_clean",
+   "name": "Keep the House Clean",
+   "drive": "house_dirty",
+   "status": "planned",
+   "plans": [],
+   "scout_plan": null,
+   "satisfied_when": null,
+   "replaces": [
+    "clean_zone"
+   ],
+   "notes": ""
+  },
+  {
+   "id": "look_after_plants",
+   "name": "Look After the Plants",
+   "drive": "plants_need_care",
+   "status": "planned",
+   "plans": [],
+   "scout_plan": null,
+   "satisfied_when": null,
+   "replaces": [
+    "water_plants",
+    "weed_plants",
+    "harvest_plants"
+   ],
+   "notes": ""
+  },
+  {
+   "id": "prepare_for_event",
+   "name": "Prepare for an Event",
+   "drive": "upcoming_event",
+   "status": "planned",
+   "plans": [],
+   "scout_plan": null,
+   "satisfied_when": null,
+   "replaces": [
+    "prepare_for_event",
+    "buy_gift",
+    "get_outfit"
+   ],
+   "notes": ""
+  },
+  {
+   "id": "make_things_right",
+   "name": "Make Things Right",
+   "drive": "grievance",
+   "status": "planned",
+   "plans": [],
+   "scout_plan": null,
+   "satisfied_when": null,
+   "replaces": [
+    "apologize",
+    "apologize_to",
+    "confront"
+   ],
+   "notes": ""
+  },
+  {
+   "id": "keep_up_with_someone",
+   "name": "Keep Up with Someone",
+   "drive": "envy",
+   "status": "planned",
+   "plans": [],
+   "scout_plan": null,
+   "satisfied_when": null,
+   "replaces": [
+    "keep_up_with:*"
+   ],
+   "notes": ""
+  },
+  {
+   "id": "check_on_someone",
+   "name": "Check On Someone",
+   "drive": "concern",
+   "status": "planned",
+   "plans": [],
+   "scout_plan": null,
+   "satisfied_when": null,
+   "replaces": [
+    "check_in_on",
+    "suggest_doctor",
+    "suggest_hygiene"
+   ],
+   "notes": ""
+  }
+ ],
+ "requirements": [
+  {
+   "id": "food_served",
+   "name": "Food is served or there are leftovers",
+   "resolver": "food_served",
+   "scope": "household",
+   "ttl_seconds": 1800,
+   "learn_by": "look in the kitchen"
+  },
+  {
+   "id": "has_warm_ready_meal",
+   "name": "A warm ready meal (takeout that just came)",
+   "resolver": "has_warm_ready_meal",
+   "scope": "household",
+   "ttl_seconds": 600,
+   "learn_by": "look in the kitchen"
+  },
+  {
+   "id": "has_ready_meal",
+   "name": "A ready meal to heat up",
+   "resolver": "has_ready_meal",
+   "scope": "household",
+   "ttl_seconds": 172800,
+   "learn_by": "open the freezer"
+  },
+  {
+   "id": "has_stored_meal",
+   "name": "A stored meal in the fridge",
+   "resolver": "has_stored_meal",
+   "scope": "household",
+   "ttl_seconds": 86400,
+   "learn_by": "open the fridge"
+  },
+  {
+   "id": "has_snack",
+   "name": "Fruit, bread or a snack",
+   "resolver": "has_snack",
+   "scope": "household",
+   "ttl_seconds": 86400,
+   "learn_by": "look in the kitchen"
+  },
+  {
+   "id": "has_ingredients",
+   "name": "Ingredients for a recipe",
+   "resolver": "has_ingredients",
+   "scope": "household",
+   "ttl_seconds": 86400,
+   "learn_by": "open the fridge and cupboards"
+  },
+  {
+   "id": "can_cook",
+   "name": "Old enough to cook (13+)",
+   "resolver": "can_cook",
+   "scope": "character",
+   "ttl_seconds": 0,
+   "learn_by": "always known"
+  },
+  {
+   "id": "cookware_free",
+   "name": "A clean pot, pan or oven free",
+   "resolver": "cookware_free",
+   "scope": "household",
+   "ttl_seconds": 0,
+   "learn_by": "look at the stove"
+  },
+  {
+   "id": "phone_usable",
+   "name": "A phone that works",
+   "resolver": "phone_usable",
+   "scope": "character",
+   "ttl_seconds": 0,
+   "learn_by": "always known while carried"
+  },
+  {
+   "id": "money_for_takeout",
+   "name": "Money for takeout (25+)",
+   "resolver": "money_for_takeout",
+   "scope": "character",
+   "ttl_seconds": 3600,
+   "learn_by": "check wallet or phone"
+  },
+  {
+   "id": "takeout_on_its_way",
+   "name": "A takeout order is on its way",
+   "resolver": "takeout_on_its_way",
+   "scope": "household",
+   "ttl_seconds": 0,
+   "learn_by": "ordered it"
+  },
+  {
+   "id": "store_reachable",
+   "name": "A food shop to go to",
+   "resolver": "store_reachable",
+   "scope": "world",
+   "ttl_seconds": 86400,
+   "learn_by": "knows the area"
+  },
+  {
+   "id": "money_for_groceries",
+   "name": "Money for groceries (20+)",
+   "resolver": "money_for_groceries",
+   "scope": "character",
+   "ttl_seconds": 3600,
+   "learn_by": "check wallet or phone"
+  },
+  {
+   "id": "caretaker_home",
+   "name": "A grown-up at home to ask",
+   "resolver": "caretaker_home",
+   "scope": "household",
+   "ttl_seconds": 0,
+   "learn_by": "look around"
+  },
+  {
+   "id": "restaurant_reachable",
+   "name": "A place to eat out",
+   "resolver": "restaurant_reachable",
+   "scope": "world",
+   "ttl_seconds": 86400,
+   "learn_by": "knows the area"
+  }
+ ],
+ "plans": [
+  {
+   "id": "light_meal",
+   "name": "Light meal",
+   "intention": "reduce_hunger",
+   "requires": [],
+   "cost": {
+    "minutes": 10,
+    "money": 0,
+    "effort": 1
+   },
+   "time_budget_seconds": 1800,
+   "start": "served",
+   "nodes": [
+    {
+     "id": "served",
+     "kind": "gate",
+     "requirement": "food_served",
+     "x": 40,
+     "y": 40
+    },
+    {
+     "id": "eat",
+     "kind": "step",
+     "activity": "eat_meal",
+     "x": 640,
+     "y": 40
+    },
+    {
+     "id": "ok",
+     "kind": "end",
+     "outcome": "satisfied",
+     "x": 880,
+     "y": 40
+    },
+    {
+     "id": "warm",
+     "kind": "gate",
+     "requirement": "has_warm_ready_meal",
+     "x": 40,
+     "y": 160
+    },
+    {
+     "id": "ready",
+     "kind": "gate",
+     "requirement": "has_ready_meal",
+     "x": 40,
+     "y": 280
+    },
+    {
+     "id": "heat",
+     "kind": "step",
+     "activity": "heat_meal",
+     "x": 340,
+     "y": 280
+    },
+    {
+     "id": "stored",
+     "kind": "gate",
+     "requirement": "has_stored_meal",
+     "x": 40,
+     "y": 400
+    },
+    {
+     "id": "snack",
+     "kind": "gate",
+     "requirement": "has_snack",
+     "x": 40,
+     "y": 520
+    },
+    {
+     "id": "snackeat",
+     "kind": "step",
+     "activity": "eat_snack",
+     "x": 340,
+     "y": 520
+    },
+    {
+     "id": "next",
+     "kind": "end",
+     "outcome": "fallback",
+     "x": 340,
+     "y": 640
+    }
+   ],
+   "edges": [
+    {
+     "from": "served",
+     "output": "yes",
+     "to": "eat"
+    },
+    {
+     "from": "served",
+     "output": "no",
+     "to": "warm"
+    },
+    {
+     "from": "warm",
+     "output": "yes",
+     "to": "eat"
+    },
+    {
+     "from": "warm",
+     "output": "no",
+     "to": "ready"
+    },
+    {
+     "from": "ready",
+     "output": "yes",
+     "to": "heat"
+    },
+    {
+     "from": "ready",
+     "output": "no",
+     "to": "stored"
+    },
+    {
+     "from": "heat",
+     "output": "done",
+     "to": "eat"
+    },
+    {
+     "from": "heat",
+     "output": "failed",
+     "to": "next"
+    },
+    {
+     "from": "stored",
+     "output": "yes",
+     "to": "eat"
+    },
+    {
+     "from": "stored",
+     "output": "no",
+     "to": "snack"
+    },
+    {
+     "from": "snack",
+     "output": "yes",
+     "to": "snackeat"
+    },
+    {
+     "from": "snack",
+     "output": "no",
+     "to": "next"
+    },
+    {
+     "from": "snackeat",
+     "output": "done",
+     "to": "ok"
+    },
+    {
+     "from": "snackeat",
+     "output": "failed",
+     "to": "next"
+    },
+    {
+     "from": "eat",
+     "output": "done",
+     "to": "ok"
+    },
+    {
+     "from": "eat",
+     "output": "failed",
+     "to": "next"
+    }
+   ],
+   "entries": [
+    {
+     "id": "start",
+     "node": "served",
+     "vars": []
+    }
+   ]
+  },
+  {
+   "id": "cook_meal",
+   "name": "Cook a meal",
+   "intention": "reduce_hunger",
+   "requires": [
+    "can_cook"
+   ],
+   "cost": {
+    "minutes": 45,
+    "money": 0,
+    "effort": 3
+   },
+   "time_budget_seconds": 7200,
+   "start": "cancook",
+   "nodes": [
+    {
+     "id": "cancook",
+     "kind": "gate",
+     "requirement": "can_cook",
+     "x": 40,
+     "y": 40
+    },
+    {
+     "id": "ingr",
+     "kind": "gate",
+     "requirement": "has_ingredients",
+     "x": 280,
+     "y": 40
+    },
+    {
+     "id": "pot",
+     "kind": "gate",
+     "requirement": "cookware_free",
+     "x": 520,
+     "y": 40
+    },
+    {
+     "id": "cook",
+     "kind": "step",
+     "activity": "cook_recipe",
+     "x": 760,
+     "y": 40
+    },
+    {
+     "id": "wait",
+     "kind": "wait",
+     "requirement": "food_served",
+     "timeout_seconds": 3600,
+     "x": 760,
+     "y": 160
+    },
+    {
+     "id": "eat",
+     "kind": "step",
+     "activity": "eat_meal",
+     "x": 1000,
+     "y": 160
+    },
+    {
+     "id": "ok",
+     "kind": "end",
+     "outcome": "satisfied",
+     "x": 1000,
+     "y": 280
+    },
+    {
+     "id": "shop",
+     "kind": "plan",
+     "plan": "buy_groceries",
+     "x": 280,
+     "y": 200
+    },
+    {
+     "id": "next",
+     "kind": "end",
+     "outcome": "fallback",
+     "x": 520,
+     "y": 320
+    }
+   ],
+   "edges": [
+    {
+     "from": "cancook",
+     "output": "yes",
+     "to": "ingr"
+    },
+    {
+     "from": "cancook",
+     "output": "no",
+     "to": "next"
+    },
+    {
+     "from": "ingr",
+     "output": "yes",
+     "to": "pot"
+    },
+    {
+     "from": "ingr",
+     "output": "no",
+     "to": "shop",
+     "set": {
+      "missing": "has_ingredients"
+     }
+    },
+    {
+     "from": "shop",
+     "output": "done",
+     "to": "ingr"
+    },
+    {
+     "from": "shop",
+     "output": "blocked",
+     "to": "next"
+    },
+    {
+     "from": "pot",
+     "output": "yes",
+     "to": "cook"
+    },
+    {
+     "from": "pot",
+     "output": "no",
+     "to": "next"
+    },
+    {
+     "from": "cook",
+     "output": "done",
+     "to": "wait"
+    },
+    {
+     "from": "cook",
+     "output": "failed",
+     "to": "next"
+    },
+    {
+     "from": "wait",
+     "output": "ready",
+     "to": "eat"
+    },
+    {
+     "from": "wait",
+     "output": "timed_out",
+     "to": "next"
+    },
+    {
+     "from": "eat",
+     "output": "done",
+     "to": "ok"
+    },
+    {
+     "from": "eat",
+     "output": "failed",
+     "to": "next"
+    }
+   ],
+   "entries": [
+    {
+     "id": "start",
+     "node": "cancook",
+     "vars": []
+    },
+    {
+     "id": "after_shopping",
+     "node": "ingr",
+     "vars": [
+      "missing"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "order_takeout",
+   "name": "Order takeout",
+   "intention": "reduce_hunger",
+   "requires": [
+    "phone_usable",
+    "money_for_takeout"
+   ],
+   "cost": {
+    "minutes": 40,
+    "money": 25,
+    "effort": 1
+   },
+   "time_budget_seconds": 7200,
+   "start": "hours",
+   "nodes": [
+    {
+     "id": "hours",
+     "kind": "decision",
+     "rules": [
+      {
+       "when": [
+        {
+         "var": "hour",
+         "op": ">=",
+         "value": 10
+        },
+        {
+         "var": "hour",
+         "op": "<",
+         "value": 23
+        }
+       ],
+       "output": "open"
+      }
+     ],
+     "default": "closed",
+     "x": 40,
+     "y": 40
+    },
+    {
+     "id": "phone",
+     "kind": "gate",
+     "requirement": "phone_usable",
+     "x": 280,
+     "y": 40
+    },
+    {
+     "id": "money",
+     "kind": "gate",
+     "requirement": "money_for_takeout",
+     "x": 520,
+     "y": 40
+    },
+    {
+     "id": "order",
+     "kind": "action",
+     "action": "order_takeout",
+     "x": 760,
+     "y": 40
+    },
+    {
+     "id": "wait",
+     "kind": "wait",
+     "requirement": "has_warm_ready_meal",
+     "timeout_seconds": 5400,
+     "x": 1000,
+     "y": 40
+    },
+    {
+     "id": "eat",
+     "kind": "step",
+     "activity": "eat_meal",
+     "x": 1240,
+     "y": 40
+    },
+    {
+     "id": "ok",
+     "kind": "end",
+     "outcome": "satisfied",
+     "x": 1240,
+     "y": 160
+    },
+    {
+     "id": "next",
+     "kind": "end",
+     "outcome": "fallback",
+     "x": 520,
+     "y": 200
+    }
+   ],
+   "edges": [
+    {
+     "from": "hours",
+     "output": "open",
+     "to": "phone"
+    },
+    {
+     "from": "hours",
+     "output": "closed",
+     "to": "next",
+     "set": {
+      "why": "takeout is closed at this hour"
+     }
+    },
+    {
+     "from": "phone",
+     "output": "yes",
+     "to": "money"
+    },
+    {
+     "from": "phone",
+     "output": "no",
+     "to": "next"
+    },
+    {
+     "from": "money",
+     "output": "yes",
+     "to": "order"
+    },
+    {
+     "from": "money",
+     "output": "no",
+     "to": "next"
+    },
+    {
+     "from": "order",
+     "output": "done",
+     "to": "wait"
+    },
+    {
+     "from": "order",
+     "output": "failed",
+     "to": "next"
+    },
+    {
+     "from": "wait",
+     "output": "ready",
+     "to": "eat"
+    },
+    {
+     "from": "wait",
+     "output": "timed_out",
+     "to": "next"
+    },
+    {
+     "from": "eat",
+     "output": "done",
+     "to": "ok"
+    },
+    {
+     "from": "eat",
+     "output": "failed",
+     "to": "next"
+    }
+   ],
+   "entries": [
+    {
+     "id": "start",
+     "node": "hours",
+     "vars": []
+    }
+   ]
+  },
+  {
+   "id": "ask_for_food",
+   "name": "Ask a grown-up for food",
+   "intention": "reduce_hunger",
+   "requires": [
+    "caretaker_home"
+   ],
+   "cost": {
+    "minutes": 30,
+    "money": 0,
+    "effort": 1
+   },
+   "time_budget_seconds": 5400,
+   "start": "home",
+   "nodes": [
+    {
+     "id": "home",
+     "kind": "gate",
+     "requirement": "caretaker_home",
+     "x": 40,
+     "y": 40
+    },
+    {
+     "id": "ask",
+     "kind": "action",
+     "action": "ask_caretaker_for_food",
+     "x": 280,
+     "y": 40
+    },
+    {
+     "id": "wait",
+     "kind": "wait",
+     "requirement": "food_served",
+     "timeout_seconds": 3600,
+     "x": 520,
+     "y": 40
+    },
+    {
+     "id": "eat",
+     "kind": "step",
+     "activity": "eat_meal",
+     "x": 760,
+     "y": 40
+    },
+    {
+     "id": "ok",
+     "kind": "end",
+     "outcome": "satisfied",
+     "x": 1000,
+     "y": 40
+    },
+    {
+     "id": "stuck",
+     "kind": "end",
+     "outcome": "blocked",
+     "x": 520,
+     "y": 200
+    }
+   ],
+   "edges": [
+    {
+     "from": "home",
+     "output": "yes",
+     "to": "ask"
+    },
+    {
+     "from": "home",
+     "output": "no",
+     "to": "stuck"
+    },
+    {
+     "from": "ask",
+     "output": "done",
+     "to": "wait"
+    },
+    {
+     "from": "ask",
+     "output": "failed",
+     "to": "stuck"
+    },
+    {
+     "from": "wait",
+     "output": "ready",
+     "to": "eat"
+    },
+    {
+     "from": "wait",
+     "output": "timed_out",
+     "to": "stuck"
+    },
+    {
+     "from": "eat",
+     "output": "done",
+     "to": "ok"
+    },
+    {
+     "from": "eat",
+     "output": "failed",
+     "to": "stuck"
+    }
+   ],
+   "entries": [
+    {
+     "id": "start",
+     "node": "home",
+     "vars": []
+    }
+   ]
+  },
+  {
+   "id": "eat_out",
+   "name": "Eat out",
+   "intention": "reduce_hunger",
+   "status": "planned",
+   "requires": [
+    "restaurant_reachable"
+   ],
+   "cost": {
+    "minutes": 90,
+    "money": 20,
+    "effort": 2
+   },
+   "time_budget_seconds": 10800,
+   "start": "place",
+   "nodes": [
+    {
+     "id": "place",
+     "kind": "gate",
+     "requirement": "restaurant_reachable",
+     "x": 40,
+     "y": 40
+    },
+    {
+     "id": "stuck",
+     "kind": "end",
+     "outcome": "blocked",
+     "x": 280,
+     "y": 120
+    }
+   ],
+   "edges": [
+    {
+     "from": "place",
+     "output": "yes",
+     "to": "stuck"
+    },
+    {
+     "from": "place",
+     "output": "no",
+     "to": "stuck"
+    }
+   ],
+   "notes": "needs a restaurant-visit activity (none exists yet), so it is not used",
+   "entries": [
+    {
+     "id": "start",
+     "node": "place",
+     "vars": []
+    }
+   ]
+  },
+  {
+   "id": "buy_groceries",
+   "name": "Buy groceries",
+   "kind": "sidetrack",
+   "status": "planned",
+   "notes": "needs a food shop: no prop offers the shop_food interaction yet, so cooking without ingredients falls back",
+   "produces": [
+    "has_ingredients"
+   ],
+   "requires": [
+    "store_reachable",
+    "money_for_groceries"
+   ],
+   "cost": {
+    "minutes": 60,
+    "money": 20,
+    "effort": 2
+   },
+   "time_budget_seconds": 7200,
+   "start": "store",
+   "nodes": [
+    {
+     "id": "store",
+     "kind": "gate",
+     "requirement": "store_reachable",
+     "x": 40,
+     "y": 40
+    },
+    {
+     "id": "money",
+     "kind": "gate",
+     "requirement": "money_for_groceries",
+     "x": 280,
+     "y": 40
+    },
+    {
+     "id": "shop",
+     "kind": "step",
+     "activity": "buy_food",
+     "x": 520,
+     "y": 40
+    },
+    {
+     "id": "ok",
+     "kind": "end",
+     "outcome": "done",
+     "x": 760,
+     "y": 40
+    },
+    {
+     "id": "stuck",
+     "kind": "end",
+     "outcome": "blocked",
+     "x": 520,
+     "y": 200
+    }
+   ],
+   "edges": [
+    {
+     "from": "store",
+     "output": "yes",
+     "to": "money"
+    },
+    {
+     "from": "store",
+     "output": "no",
+     "to": "stuck"
+    },
+    {
+     "from": "money",
+     "output": "yes",
+     "to": "shop"
+    },
+    {
+     "from": "money",
+     "output": "no",
+     "to": "stuck"
+    },
+    {
+     "from": "shop",
+     "output": "done",
+     "to": "ok"
+    },
+    {
+     "from": "shop",
+     "output": "failed",
+     "to": "stuck"
+    }
+   ],
+   "entries": [
+    {
+     "id": "start",
+     "node": "store",
+     "vars": [
+      "missing"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "scout_food",
+   "name": "Find out what there is to eat",
+   "kind": "scout",
+   "requires": [],
+   "cost": {
+    "minutes": 3,
+    "money": 0,
+    "effort": 0
+   },
+   "time_budget_seconds": 600,
+   "start": "look",
+   "nodes": [
+    {
+     "id": "look",
+     "kind": "action",
+     "action": "check_kitchen",
+     "x": 40,
+     "y": 40
+    },
+    {
+     "id": "ok",
+     "kind": "end",
+     "outcome": "done",
+     "x": 280,
+     "y": 40
+    },
+    {
+     "id": "stuck",
+     "kind": "end",
+     "outcome": "done",
+     "x": 280,
+     "y": 160
+    }
+   ],
+   "edges": [
+    {
+     "from": "look",
+     "output": "done",
+     "to": "ok"
+    },
+    {
+     "from": "look",
+     "output": "failed",
+     "to": "stuck"
+    }
+   ],
+   "entries": [
+    {
+     "id": "start",
+     "node": "look",
+     "vars": []
+    }
+   ]
+  }
+ ]
+}

@@ -1108,7 +1108,7 @@ def _route_start_microwave(c, world, action):
     c["activity"] = _occupy(c, world, _scaffold(
         c, world, "start_microwave",
         target_id=target_id,
-        interaction="microwave",
+        interaction="use_microwave",
     ))
 
 
@@ -1117,7 +1117,7 @@ def _route_take_out_of_microwave(c, world, action):
     c["activity"] = _occupy(c, world, _scaffold(
         c, world, "take_out_of_microwave",
         target_id=target_id,
-        interaction="microwave",
+        interaction="use_microwave",
     ))
 
 

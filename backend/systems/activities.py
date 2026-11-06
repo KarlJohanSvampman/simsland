@@ -70,6 +70,7 @@ INTERACTION_ANIMATIONS = {
     "cook":         {"walking": "walk", "using": "cook",       "finishing": "idle"},
     "stove":        {"walking": "walk", "using": "cook",       "finishing": "idle"},
     "microwave":    {"walking": "walk", "using": "cook",       "finishing": "idle"},
+    "use_microwave": {"walking": "walk", "using": "cook",      "finishing": "idle"},
     "fridge":       {"walking": "walk", "using": "interact",   "finishing": "idle"},
 
     # --- hygiene ---
@@ -328,7 +329,7 @@ ACTIVITIES = {
     # =====================================================
     "heat_meal": {
 
-        "interaction": "microwave",
+        "interaction": "use_microwave",   # the anchor the microwave prop offers
 
         "base_duration_minutes": 4,
 
@@ -360,7 +361,7 @@ ACTIVITIES = {
     # below and sim_loop.py's character_wait cadence block.
     "start_microwave": {
 
-        "interaction": "microwave",
+        "interaction": "use_microwave",   # the anchor the microwave prop offers
 
         "base_duration_minutes": 1,
 
@@ -371,7 +372,7 @@ ACTIVITIES = {
 
     "take_out_of_microwave": {
 
-        "interaction": "microwave",
+        "interaction": "use_microwave",   # the anchor the microwave prop offers
 
         "base_duration_minutes": 1,
 
