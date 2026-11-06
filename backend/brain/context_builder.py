@@ -1887,6 +1887,7 @@ _INTENTION_PHRASES = {
     "sleep": ("go to bed", "going to bed"),
     "take_nap": ("take a nap", "napping"),
     "use_toilet": ("use the bathroom", "using the bathroom"),
+    "use_toilet_bowels": ("use the bathroom", "using the bathroom"),
     "take_shower": ("take a shower", "showering"),
     "brush_teeth": ("brush your teeth", "brushing your teeth"),
 }

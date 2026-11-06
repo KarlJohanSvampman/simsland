@@ -472,7 +472,8 @@ ACTIVITIES = {
 
     "take_shower": {
 
-        "interaction": "take_shower",
+        # the shower prop's anchor offers "shower" (no prop offers "take_shower"): with the old name a shower never started
+        "interaction": "shower",
 
         "base_duration_minutes": 12,
 
@@ -1302,8 +1303,19 @@ ACTIVITIES = {
 
             "TRASH_PLASTIC": 2
         }
-    }
+    },
 
+    # ── Reduce Pressure: Bladder / Bowels, Relieve Sexual Tension (brain/actionplans, simulations/default/behaviour.json) ──
+    # use_toilet_bowels: the bowels intention's own toilet visit (complete_activity already handled it; nothing defined it)
+    "use_toilet_bowels": {"interaction": "use_toilet", "base_duration_minutes": 7, "interruptible": False, "category": "survival"},
+    # outdoors, nobody in view, too far from a toilet: behind a bush, where they stand
+    "relieve_outdoors": {"no_target": True, "base_duration_minutes": 2, "interruptible": False, "category": "survival"},
+    "relieve_outdoors_bowels": {"no_target": True, "base_duration_minutes": 5, "interruptible": False, "category": "survival"},
+    # alone in a private room already: where they are
+    "masturbate_private": {"no_target": True, "base_duration_minutes": 10, "interruptible": True, "category": "private"},
+    "masturbate_in_bed": {"interaction": "sleep", "base_duration_minutes": 10, "interruptible": True, "category": "private"},
+    "masturbate_on_toilet": {"interaction": "use_toilet", "base_duration_minutes": 8, "interruptible": True, "category": "private"},
+    "masturbate_in_shower": {"interaction": "shower", "base_duration_minutes": 12, "interruptible": True, "category": "private"},
 }
 # =========================================================
 # DURATION
@@ -1356,6 +1368,8 @@ _ACTIVITY_POSTURE = {
     "sleep": "lying",
     "use_toilet": "sitting_seat",
     "use_toilet_bowels": "sitting_seat",
+    "masturbate_on_toilet": "sitting_seat",
+    "masturbate_in_bed": "lying",
     "watch_tv": "sitting_seat",
 }
 
@@ -2198,6 +2212,41 @@ def complete_activity(
         # mostly satisfied) fatigue, not a fresh full night from scratch.
         if c.pop("_resume_sleep_after_bathroom", None):
             start_activity(c, world, "sleep")
+
+    # =====================================
+    # OUTDOORS (Reduce Pressure: no toilet near, nobody in view -- a bush)
+    # =====================================
+
+    elif activity_type in ("relieve_outdoors", "relieve_outdoors_bowels"):
+        from systems.posture import set_posture
+        set_posture(c, world, "standing")
+        b = c.setdefault("body", {})
+        if activity_type == "relieve_outdoors":
+            b["bladder"] = random.uniform(2, 8)
+        else:
+            b["bowels"] = max(0, b.get("bowels", 0) - random.uniform(50, 65))
+            b["hygiene"] = max(0, b.get("hygiene", 100) - 15)      # no toilet paper, no sink
+        from systems.body import touch
+        touch(c)
+        try:
+            from brain.memory import store_memory
+            store_memory(c, "I had to go behind a bush -- there was no toilet anywhere near.", importance=0.25,
+                         tags=["body", "outdoors"], tick=world.get("tick", 0), source="internal")
+        except Exception:
+            pass
+
+    # =====================================
+    # PRIVATE (Relieve Sexual Tension: nobody available, somewhere private)
+    # =====================================
+
+    elif activity_type in ("masturbate_private", "masturbate_in_bed", "masturbate_on_toilet", "masturbate_in_shower"):
+        from systems.posture import set_posture
+        set_posture(c, world, "standing")
+        from systems.libido import note_released
+        note_released(c, world)
+        if activity_type == "masturbate_in_shower":
+            from systems.body import on_shower_complete
+            on_shower_complete(c)
 
     elif activity_type == "make_drawing":
         import random as _random

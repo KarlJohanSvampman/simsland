@@ -35,6 +35,36 @@
    "id": "age",
    "name": "Age",
    "source": "character.age"
+  },
+  {
+   "id": "urgency",
+   "name": "How strong the drive is right now",
+   "source": "drive (now)"
+  },
+  {
+   "id": "hygiene",
+   "name": "Hygiene (0-100)",
+   "source": "body.hygiene"
+  },
+  {
+   "id": "distance_home",
+   "name": "Tiles to the nearest toilet at home (0 at home)",
+   "source": "computed"
+  },
+  {
+   "id": "bed_distance",
+   "name": "Tiles to their own bed",
+   "source": "computed"
+  },
+  {
+   "id": "bathroom_distance",
+   "name": "Tiles to the nearest bathroom at home",
+   "source": "computed"
+  },
+  {
+   "id": "closest_private_place",
+   "name": "Nearer of their own bed and a bathroom: bed / bathroom",
+   "source": "computed"
   }
  ],
  "drives": [
@@ -65,7 +95,7 @@
    "source": "body.bladder",
    "threshold": 70,
    "satisfied_below": 20,
-   "intention": "relieve_bladder",
+   "intention": "reduce_pressure_bladder",
    "notes": ""
   },
   {
@@ -73,10 +103,20 @@
    "kind": "need",
    "name": "Bowels",
    "source": "body.bowels",
-   "threshold": 70,
-   "satisfied_below": 20,
-   "intention": "relieve_bowels",
+   "threshold": 80,
+   "satisfied_below": 40,
+   "intention": "reduce_pressure_bowels",
    "notes": ""
+  },
+  {
+   "id": "sexual_tension",
+   "kind": "need",
+   "name": "Sexual tension",
+   "source": "libido.tension",
+   "threshold": 55,
+   "satisfied_below": 40,
+   "intention": "relieve_sexual_tension",
+   "notes": "systems/libido.py: today's libido while it is running high (a spike), else 0"
   },
   {
    "id": "fatigue",
@@ -475,30 +515,59 @@
    "notes": ""
   },
   {
-   "id": "relieve_bladder",
-   "name": "Relieve Bladder",
+   "id": "reduce_pressure_bladder",
+   "name": "Reduce Pressure: Bladder",
    "drive": "bladder",
-   "status": "planned",
-   "plans": [],
+   "status": "live",
+   "plans": [
+    "relieve_outdoors_bladder",
+    "use_toilet_bladder"
+   ],
    "scout_plan": null,
-   "satisfied_when": null,
+   "satisfied_when": {
+    "drive_below": 20
+   },
    "replaces": [
     "use_toilet"
    ],
-   "notes": ""
+   "notes": "out in the open, far from a toilet or unable to wait, and nobody in view: a bush; otherwise a toilet"
   },
   {
-   "id": "relieve_bowels",
-   "name": "Relieve Bowels",
+   "id": "reduce_pressure_bowels",
+   "name": "Reduce Pressure: Bowels",
    "drive": "bowels",
-   "status": "planned",
-   "plans": [],
+   "status": "live",
+   "plans": [
+    "relieve_outdoors_bowels",
+    "use_toilet_bowels"
+   ],
    "scout_plan": null,
-   "satisfied_when": null,
+   "satisfied_when": {
+    "drive_below": 40
+   },
    "replaces": [
     "use_toilet_bowels"
    ],
-   "notes": ""
+   "notes": "a toilet visit takes off 50-65, so 'met' is below 40; outdoors only when it really can't wait"
+  },
+  {
+   "id": "relieve_sexual_tension",
+   "name": "Relieve Sexual Tension",
+   "drive": "sexual_tension",
+   "status": "live",
+   "plans": [
+    "with_partner",
+    "booty_call",
+    "masturbate_privately"
+   ],
+   "scout_plan": null,
+   "satisfied_when": {
+    "drive_below": 40
+   },
+   "replaces": [
+    "seek_sexual_release"
+   ],
+   "notes": "adults only: a partner if one is here and willing, then someone from before, else alone somewhere private"
   },
   {
    "id": "restore_energy",
@@ -1104,6 +1173,86 @@
    "scope": "world",
    "ttl_seconds": 86400,
    "learn_by": "knows the area"
+  },
+  {
+   "id": "is_adult",
+   "name": "An adult (18+)",
+   "resolver": "is_adult",
+   "scope": "character",
+   "ttl_seconds": 0,
+   "learn_by": "always known"
+  },
+  {
+   "id": "is_outdoors",
+   "name": "Out in the open",
+   "resolver": "is_outdoors",
+   "scope": "character",
+   "ttl_seconds": 0,
+   "learn_by": "look around"
+  },
+  {
+   "id": "nobody_in_view",
+   "name": "Nobody near who could see",
+   "resolver": "nobody_in_view",
+   "scope": "character",
+   "ttl_seconds": 0,
+   "learn_by": "look around"
+  },
+  {
+   "id": "toilet_reachable",
+   "name": "A toilet at home or in this building",
+   "resolver": "toilet_reachable",
+   "scope": "character",
+   "ttl_seconds": 3600,
+   "learn_by": "knows the place"
+  },
+  {
+   "id": "private_here",
+   "name": "Alone in their own room or a bathroom",
+   "resolver": "private_here",
+   "scope": "character",
+   "ttl_seconds": 0,
+   "learn_by": "look around"
+  },
+  {
+   "id": "own_bed_private",
+   "name": "Their own bedroom, nobody in it",
+   "resolver": "own_bed_private",
+   "scope": "household",
+   "ttl_seconds": 0,
+   "learn_by": "look in"
+  },
+  {
+   "id": "bathroom_private",
+   "name": "A bathroom with nobody in it",
+   "resolver": "bathroom_private",
+   "scope": "household",
+   "ttl_seconds": 0,
+   "learn_by": "try the door"
+  },
+  {
+   "id": "partner_available",
+   "name": "Their partner is here and free",
+   "resolver": "partner_available",
+   "scope": "character",
+   "ttl_seconds": 0,
+   "learn_by": "look around"
+  },
+  {
+   "id": "past_partner_reachable",
+   "name": "Someone from before to text",
+   "resolver": "past_partner_reachable",
+   "scope": "character",
+   "ttl_seconds": 86400,
+   "learn_by": "knows their contacts"
+  },
+  {
+   "id": "tension_released",
+   "name": "The tension is gone",
+   "resolver": "tension_released",
+   "scope": "character",
+   "ttl_seconds": 0,
+   "learn_by": "feels it"
   }
  ],
  "plans": [
@@ -1926,6 +2075,922 @@
     {
      "id": "start",
      "node": "look",
+     "vars": []
+    }
+   ]
+  },
+  {
+   "id": "relieve_outdoors_bladder",
+   "name": "Behind a bush",
+   "intention": "reduce_pressure_bladder",
+   "requires": [],
+   "cost": {
+    "minutes": 3,
+    "money": 0,
+    "effort": 1
+   },
+   "time_budget_seconds": 900,
+   "start": "out",
+   "nodes": [
+    {
+     "id": "out",
+     "kind": "gate",
+     "requirement": "is_outdoors",
+     "x": 40,
+     "y": 40
+    },
+    {
+     "id": "far",
+     "kind": "decision",
+     "rules": [
+      {
+       "when": [
+        {
+         "var": "urgency",
+         "op": ">=",
+         "value": 90
+        }
+       ],
+       "output": "can't wait"
+      },
+      {
+       "when": [
+        {
+         "var": "distance_home",
+         "op": ">=",
+         "value": 40
+        }
+       ],
+       "output": "too far"
+      }
+     ],
+     "default": "can wait",
+     "x": 280,
+     "y": 40
+    },
+    {
+     "id": "seen",
+     "kind": "gate",
+     "requirement": "nobody_in_view",
+     "x": 520,
+     "y": 40
+    },
+    {
+     "id": "go",
+     "kind": "step",
+     "activity": "relieve_outdoors",
+     "x": 760,
+     "y": 40
+    },
+    {
+     "id": "ok",
+     "kind": "end",
+     "outcome": "satisfied",
+     "x": 1000,
+     "y": 40
+    },
+    {
+     "id": "next",
+     "kind": "end",
+     "outcome": "fallback",
+     "x": 520,
+     "y": 220
+    }
+   ],
+   "edges": [
+    {
+     "from": "out",
+     "output": "yes",
+     "to": "far"
+    },
+    {
+     "from": "out",
+     "output": "no",
+     "to": "next",
+     "set": {
+      "why": "indoors: use a toilet"
+     }
+    },
+    {
+     "from": "far",
+     "output": "can't wait",
+     "to": "seen"
+    },
+    {
+     "from": "far",
+     "output": "too far",
+     "to": "seen"
+    },
+    {
+     "from": "far",
+     "output": "can wait",
+     "to": "next",
+     "set": {
+      "why": "a toilet isn't far, it can wait"
+     }
+    },
+    {
+     "from": "seen",
+     "output": "yes",
+     "to": "go"
+    },
+    {
+     "from": "seen",
+     "output": "no",
+     "to": "next",
+     "set": {
+      "why": "someone could see"
+     }
+    },
+    {
+     "from": "go",
+     "output": "done",
+     "to": "ok"
+    },
+    {
+     "from": "go",
+     "output": "failed",
+     "to": "next"
+    }
+   ],
+   "entries": [
+    {
+     "id": "start",
+     "node": "out",
+     "vars": []
+    }
+   ]
+  },
+  {
+   "id": "use_toilet_bladder",
+   "name": "Use the toilet",
+   "intention": "reduce_pressure_bladder",
+   "requires": [
+    "toilet_reachable"
+   ],
+   "cost": {
+    "minutes": 5,
+    "money": 0,
+    "effort": 1
+   },
+   "time_budget_seconds": 1800,
+   "start": "toilet",
+   "nodes": [
+    {
+     "id": "toilet",
+     "kind": "gate",
+     "requirement": "toilet_reachable",
+     "x": 40,
+     "y": 40
+    },
+    {
+     "id": "go",
+     "kind": "step",
+     "activity": "use_toilet",
+     "x": 280,
+     "y": 40
+    },
+    {
+     "id": "ok",
+     "kind": "end",
+     "outcome": "satisfied",
+     "x": 520,
+     "y": 40
+    },
+    {
+     "id": "stuck",
+     "kind": "end",
+     "outcome": "blocked",
+     "x": 280,
+     "y": 200
+    }
+   ],
+   "edges": [
+    {
+     "from": "toilet",
+     "output": "yes",
+     "to": "go"
+    },
+    {
+     "from": "toilet",
+     "output": "no",
+     "to": "stuck",
+     "set": {
+      "why": "no toilet anywhere near"
+     }
+    },
+    {
+     "from": "go",
+     "output": "done",
+     "to": "ok"
+    },
+    {
+     "from": "go",
+     "output": "failed",
+     "to": "stuck",
+     "set": {
+      "why": "couldn't get to the toilet"
+     }
+    }
+   ],
+   "entries": [
+    {
+     "id": "start",
+     "node": "toilet",
+     "vars": []
+    }
+   ]
+  },
+  {
+   "id": "relieve_outdoors_bowels",
+   "name": "Behind a bush (bowels)",
+   "intention": "reduce_pressure_bowels",
+   "requires": [],
+   "cost": {
+    "minutes": 3,
+    "money": 0,
+    "effort": 1
+   },
+   "time_budget_seconds": 900,
+   "start": "out",
+   "nodes": [
+    {
+     "id": "out",
+     "kind": "gate",
+     "requirement": "is_outdoors",
+     "x": 40,
+     "y": 40
+    },
+    {
+     "id": "far",
+     "kind": "decision",
+     "rules": [
+      {
+       "when": [
+        {
+         "var": "urgency",
+         "op": ">=",
+         "value": 95
+        }
+       ],
+       "output": "can't wait"
+      },
+      {
+       "when": [
+        {
+         "var": "distance_home",
+         "op": ">=",
+         "value": 40
+        }
+       ],
+       "output": "too far"
+      }
+     ],
+     "default": "can wait",
+     "x": 280,
+     "y": 40
+    },
+    {
+     "id": "seen",
+     "kind": "gate",
+     "requirement": "nobody_in_view",
+     "x": 520,
+     "y": 40
+    },
+    {
+     "id": "go",
+     "kind": "step",
+     "activity": "relieve_outdoors_bowels",
+     "x": 760,
+     "y": 40
+    },
+    {
+     "id": "ok",
+     "kind": "end",
+     "outcome": "satisfied",
+     "x": 1000,
+     "y": 40
+    },
+    {
+     "id": "next",
+     "kind": "end",
+     "outcome": "fallback",
+     "x": 520,
+     "y": 220
+    }
+   ],
+   "edges": [
+    {
+     "from": "out",
+     "output": "yes",
+     "to": "far"
+    },
+    {
+     "from": "out",
+     "output": "no",
+     "to": "next",
+     "set": {
+      "why": "indoors: use a toilet"
+     }
+    },
+    {
+     "from": "far",
+     "output": "can't wait",
+     "to": "seen"
+    },
+    {
+     "from": "far",
+     "output": "too far",
+     "to": "seen"
+    },
+    {
+     "from": "far",
+     "output": "can wait",
+     "to": "next",
+     "set": {
+      "why": "a toilet isn't far, it can wait"
+     }
+    },
+    {
+     "from": "seen",
+     "output": "yes",
+     "to": "go"
+    },
+    {
+     "from": "seen",
+     "output": "no",
+     "to": "next",
+     "set": {
+      "why": "someone could see"
+     }
+    },
+    {
+     "from": "go",
+     "output": "done",
+     "to": "ok"
+    },
+    {
+     "from": "go",
+     "output": "failed",
+     "to": "next"
+    }
+   ],
+   "entries": [
+    {
+     "id": "start",
+     "node": "out",
+     "vars": []
+    }
+   ]
+  },
+  {
+   "id": "use_toilet_bowels",
+   "name": "Use the toilet (bowels)",
+   "intention": "reduce_pressure_bowels",
+   "requires": [
+    "toilet_reachable"
+   ],
+   "cost": {
+    "minutes": 5,
+    "money": 0,
+    "effort": 1
+   },
+   "time_budget_seconds": 1800,
+   "start": "toilet",
+   "nodes": [
+    {
+     "id": "toilet",
+     "kind": "gate",
+     "requirement": "toilet_reachable",
+     "x": 40,
+     "y": 40
+    },
+    {
+     "id": "go",
+     "kind": "step",
+     "activity": "use_toilet_bowels",
+     "x": 280,
+     "y": 40
+    },
+    {
+     "id": "ok",
+     "kind": "end",
+     "outcome": "satisfied",
+     "x": 520,
+     "y": 40
+    },
+    {
+     "id": "stuck",
+     "kind": "end",
+     "outcome": "blocked",
+     "x": 280,
+     "y": 200
+    }
+   ],
+   "edges": [
+    {
+     "from": "toilet",
+     "output": "yes",
+     "to": "go"
+    },
+    {
+     "from": "toilet",
+     "output": "no",
+     "to": "stuck",
+     "set": {
+      "why": "no toilet anywhere near"
+     }
+    },
+    {
+     "from": "go",
+     "output": "done",
+     "to": "ok"
+    },
+    {
+     "from": "go",
+     "output": "failed",
+     "to": "stuck",
+     "set": {
+      "why": "couldn't get to the toilet"
+     }
+    }
+   ],
+   "entries": [
+    {
+     "id": "start",
+     "node": "toilet",
+     "vars": []
+    }
+   ]
+  },
+  {
+   "id": "with_partner",
+   "name": "With their partner",
+   "intention": "relieve_sexual_tension",
+   "requires": [
+    "is_adult",
+    "partner_available"
+   ],
+   "cost": {
+    "minutes": 30,
+    "money": 0,
+    "effort": 2
+   },
+   "time_budget_seconds": 10800,
+   "start": "adult",
+   "nodes": [
+    {
+     "id": "adult",
+     "kind": "gate",
+     "requirement": "is_adult",
+     "x": 40,
+     "y": 40
+    },
+    {
+     "id": "who",
+     "kind": "gate",
+     "requirement": "partner_available",
+     "x": 280,
+     "y": 40
+    },
+    {
+     "id": "ask",
+     "kind": "action",
+     "action": "ask_partner",
+     "x": 520,
+     "y": 40
+    },
+    {
+     "id": "wait",
+     "kind": "wait",
+     "requirement": "tension_released",
+     "timeout_seconds": 7200,
+     "x": 760,
+     "y": 40
+    },
+    {
+     "id": "ok",
+     "kind": "end",
+     "outcome": "satisfied",
+     "x": 1000,
+     "y": 40
+    },
+    {
+     "id": "next",
+     "kind": "end",
+     "outcome": "fallback",
+     "x": 520,
+     "y": 200
+    }
+   ],
+   "edges": [
+    {
+     "from": "adult",
+     "output": "yes",
+     "to": "who"
+    },
+    {
+     "from": "adult",
+     "output": "no",
+     "to": "next"
+    },
+    {
+     "from": "who",
+     "output": "yes",
+     "to": "ask"
+    },
+    {
+     "from": "who",
+     "output": "no",
+     "to": "next",
+     "set": {
+      "why": "nobody available"
+     }
+    },
+    {
+     "from": "ask",
+     "output": "done",
+     "to": "wait"
+    },
+    {
+     "from": "ask",
+     "output": "failed",
+     "to": "next",
+     "set": {
+      "why": "they said no"
+     }
+    },
+    {
+     "from": "wait",
+     "output": "ready",
+     "to": "ok"
+    },
+    {
+     "from": "wait",
+     "output": "timed_out",
+     "to": "next"
+    }
+   ],
+   "entries": [
+    {
+     "id": "start",
+     "node": "adult",
+     "vars": []
+    }
+   ]
+  },
+  {
+   "id": "booty_call",
+   "name": "Booty call",
+   "intention": "relieve_sexual_tension",
+   "requires": [
+    "is_adult",
+    "past_partner_reachable"
+   ],
+   "cost": {
+    "minutes": 30,
+    "money": 0,
+    "effort": 2
+   },
+   "time_budget_seconds": 10800,
+   "start": "adult",
+   "nodes": [
+    {
+     "id": "adult",
+     "kind": "gate",
+     "requirement": "is_adult",
+     "x": 40,
+     "y": 40
+    },
+    {
+     "id": "who",
+     "kind": "gate",
+     "requirement": "past_partner_reachable",
+     "x": 280,
+     "y": 40
+    },
+    {
+     "id": "ask",
+     "kind": "action",
+     "action": "booty_call",
+     "x": 520,
+     "y": 40
+    },
+    {
+     "id": "wait",
+     "kind": "wait",
+     "requirement": "tension_released",
+     "timeout_seconds": 7200,
+     "x": 760,
+     "y": 40
+    },
+    {
+     "id": "ok",
+     "kind": "end",
+     "outcome": "satisfied",
+     "x": 1000,
+     "y": 40
+    },
+    {
+     "id": "next",
+     "kind": "end",
+     "outcome": "fallback",
+     "x": 520,
+     "y": 200
+    }
+   ],
+   "edges": [
+    {
+     "from": "adult",
+     "output": "yes",
+     "to": "who"
+    },
+    {
+     "from": "adult",
+     "output": "no",
+     "to": "next"
+    },
+    {
+     "from": "who",
+     "output": "yes",
+     "to": "ask"
+    },
+    {
+     "from": "who",
+     "output": "no",
+     "to": "next",
+     "set": {
+      "why": "nobody available"
+     }
+    },
+    {
+     "from": "ask",
+     "output": "done",
+     "to": "wait"
+    },
+    {
+     "from": "ask",
+     "output": "failed",
+     "to": "next",
+     "set": {
+      "why": "they said no"
+     }
+    },
+    {
+     "from": "wait",
+     "output": "ready",
+     "to": "ok"
+    },
+    {
+     "from": "wait",
+     "output": "timed_out",
+     "to": "next"
+    }
+   ],
+   "entries": [
+    {
+     "id": "start",
+     "node": "adult",
+     "vars": []
+    }
+   ]
+  },
+  {
+   "id": "masturbate_privately",
+   "name": "Alone, somewhere private",
+   "intention": "relieve_sexual_tension",
+   "requires": [
+    "is_adult"
+   ],
+   "cost": {
+    "minutes": 15,
+    "money": 0,
+    "effort": 1
+   },
+   "time_budget_seconds": 3600,
+   "start": "adult",
+   "nodes": [
+    {
+     "id": "adult",
+     "kind": "gate",
+     "requirement": "is_adult",
+     "x": 40,
+     "y": 40
+    },
+    {
+     "id": "here",
+     "kind": "gate",
+     "requirement": "private_here",
+     "x": 280,
+     "y": 40
+    },
+    {
+     "id": "now",
+     "kind": "step",
+     "activity": "masturbate_private",
+     "x": 520,
+     "y": 40
+    },
+    {
+     "id": "ok",
+     "kind": "end",
+     "outcome": "satisfied",
+     "x": 1240,
+     "y": 40
+    },
+    {
+     "id": "where",
+     "kind": "decision",
+     "rules": [
+      {
+       "when": [
+        {
+         "var": "closest_private_place",
+         "op": "==",
+         "value": "bed"
+        }
+       ],
+       "output": "bed is closer"
+      }
+     ],
+     "default": "bathroom",
+     "x": 280,
+     "y": 200
+    },
+    {
+     "id": "bed",
+     "kind": "gate",
+     "requirement": "own_bed_private",
+     "x": 520,
+     "y": 200
+    },
+    {
+     "id": "inbed",
+     "kind": "step",
+     "activity": "masturbate_in_bed",
+     "x": 760,
+     "y": 200
+    },
+    {
+     "id": "bath",
+     "kind": "gate",
+     "requirement": "bathroom_private",
+     "x": 520,
+     "y": 360
+    },
+    {
+     "id": "which",
+     "kind": "decision",
+     "rules": [
+      {
+       "when": [
+        {
+         "var": "hygiene",
+         "op": "<",
+         "value": 40
+        }
+       ],
+       "output": "needs a wash"
+      }
+     ],
+     "default": "toilet",
+     "x": 760,
+     "y": 360
+    },
+    {
+     "id": "shower",
+     "kind": "step",
+     "activity": "masturbate_in_shower",
+     "x": 1000,
+     "y": 300
+    },
+    {
+     "id": "toilet",
+     "kind": "step",
+     "activity": "masturbate_on_toilet",
+     "x": 1000,
+     "y": 420
+    },
+    {
+     "id": "stuck",
+     "kind": "end",
+     "outcome": "blocked",
+     "x": 760,
+     "y": 520
+    }
+   ],
+   "edges": [
+    {
+     "from": "adult",
+     "output": "yes",
+     "to": "here"
+    },
+    {
+     "from": "adult",
+     "output": "no",
+     "to": "stuck",
+     "set": {
+      "why": "too young"
+     }
+    },
+    {
+     "from": "here",
+     "output": "yes",
+     "to": "now"
+    },
+    {
+     "from": "here",
+     "output": "no",
+     "to": "where"
+    },
+    {
+     "from": "now",
+     "output": "done",
+     "to": "ok"
+    },
+    {
+     "from": "now",
+     "output": "failed",
+     "to": "where"
+    },
+    {
+     "from": "where",
+     "output": "bed is closer",
+     "to": "bed"
+    },
+    {
+     "from": "where",
+     "output": "bathroom",
+     "to": "bath"
+    },
+    {
+     "from": "bed",
+     "output": "yes",
+     "to": "inbed"
+    },
+    {
+     "from": "bed",
+     "output": "no",
+     "to": "bath"
+    },
+    {
+     "from": "inbed",
+     "output": "done",
+     "to": "ok"
+    },
+    {
+     "from": "inbed",
+     "output": "failed",
+     "to": "bath"
+    },
+    {
+     "from": "bath",
+     "output": "yes",
+     "to": "which"
+    },
+    {
+     "from": "bath",
+     "output": "no",
+     "to": "stuck",
+     "set": {
+      "why": "nowhere private"
+     }
+    },
+    {
+     "from": "which",
+     "output": "needs a wash",
+     "to": "shower"
+    },
+    {
+     "from": "which",
+     "output": "toilet",
+     "to": "toilet"
+    },
+    {
+     "from": "shower",
+     "output": "done",
+     "to": "ok"
+    },
+    {
+     "from": "shower",
+     "output": "failed",
+     "to": "stuck"
+    },
+    {
+     "from": "toilet",
+     "output": "done",
+     "to": "ok"
+    },
+    {
+     "from": "toilet",
+     "output": "failed",
+     "to": "stuck"
+    }
+   ],
+   "entries": [
+    {
+     "id": "start",
+     "node": "adult",
      "vars": []
     }
    ]

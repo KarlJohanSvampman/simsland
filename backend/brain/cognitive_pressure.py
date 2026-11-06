@@ -46,7 +46,7 @@ def build_cognitive_pressure(c):
                     "and physically uncomfortable."
                 )
 
-            elif intention_type == "use_toilet":
+            elif intention_type in ("use_toilet", "use_toilet_bowels"):
 
                 pressures.append(
                     "You urgently need "

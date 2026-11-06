@@ -112,7 +112,7 @@ URGENCY_WINDOW_TICKS = 2 * 3600
 INTENTION_EFFORT = {
     "exercise": 0.9, "work": 0.8, "chore": 0.6,
     "clean_floors": 0.6, "dust_and_wipe": 0.5, "outdoor_time": 0.4,
-    "sleep": 0.0, "take_nap": 0.0, "use_toilet": 0.05,
+    "sleep": 0.0, "take_nap": 0.0, "use_toilet": 0.05, "use_toilet_bowels": 0.05,
     "eat_food": 0.1, "drink": 0.05, "wait": 0.0,
     "seek_solitude": 0.1, "seek_caffeine_or_rest": 0.0,
     "socialize": 0.3, "seek_romance": 0.4, "seek_intimacy": 0.5,

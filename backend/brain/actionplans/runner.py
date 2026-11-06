@@ -18,6 +18,7 @@ from brain.actionplans import store
 from brain.actionplans.checker import outputs_for
 from brain.actionplans.resolvers import RESOLVERS
 from brain.actionplans.actions import ACTIONS
+from brain.actionplans.resolvers import DISTANCES
 
 MAX_HOPS = 60                 # node transitions per call: a path the checker allowed can't need more
 WAIT_RECHECK_SECONDS = 60
@@ -44,6 +45,10 @@ def drive_level(c, world, drive):
     src = str((drive or {}).get("source") or "")
     if src.startswith("body."):
         return ((c.get("body") or {}).get(src[5:]))
+    if src == "libido.tension":
+        # 0-100: today's libido while it is running high (systems/libido.py's spike), else nothing pressing
+        st = c.get("libido_state") or {}
+        return round(100 * (st.get("current") or 0)) if st.get("spike_until_tick") else 0
     return None
 
 
@@ -87,6 +92,13 @@ def _var(c, world, att, name):
         return c.get("age")
     if name == "drive_level":
         return att.get("drive_level")
+    if name == "urgency":                                    # the drive as it is now, not when the attempt began
+        intention = store.get(_data(world), "intentions", att.get("intention"))
+        return drive_level(c, world, store.get(_data(world), "drives", (intention or {}).get("drive")))
+    if name == "hygiene":
+        return (c.get("body") or {}).get("hygiene")
+    if name in DISTANCES:
+        return DISTANCES[name](c, world)
     return None
 
 

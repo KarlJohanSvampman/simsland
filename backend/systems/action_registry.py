@@ -366,6 +366,11 @@ ACTION_SPECS = {
 # e.g. a child can still use a kitchen counter as a surface even though
 # "prepare_food" specifically is filtered off it.
 ACTION_TYPE_MIN_AGE = {
+    # Relieve Sexual Tension's private activities (simulations/default/behaviour.json): adults only
+    "masturbate_private":   18,
+    "masturbate_in_bed":    18,
+    "masturbate_on_toilet": 18,
+    "masturbate_in_shower": 18,
     "jog":            13,
     "sit_ups":        13,
     "chin_ups":       13,

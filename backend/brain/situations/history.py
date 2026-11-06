@@ -36,6 +36,7 @@ DEFAULT_COOLDOWN_TICKS = 30 * TICKS_PER_MINUTE
 # pushy or repetitive if re-selected every few minutes.
 COOLDOWN_TICKS_BY_TYPE = {
     "use_toilet":            5  * TICKS_PER_MINUTE,
+    "use_toilet_bowels":     5  * TICKS_PER_MINUTE,
     "sleep":                 60 * TICKS_PER_MINUTE,
     "eat_food":               10 * TICKS_PER_MINUTE,
     "drink":                  10 * TICKS_PER_MINUTE,

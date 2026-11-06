@@ -51,3 +51,19 @@ def check_kitchen(c, world, attempt):
                 "money_for_takeout", "phone_usable"):
         runner.observe(c, world, rid, how="looked")
     return True
+
+
+@action("ask_partner")
+def ask_partner(c, world, attempt):
+    """Suggest it to their partner (systems/sexual_release.py: the partner decides, and the scene starts if they say yes)."""
+    from systems.sexual_release import _try_partner
+    ok = bool(_try_partner(c, world))
+    attempt["vars"]["partner_said"] = "yes" if ok else "no"
+    return ok
+
+
+@action("booty_call")
+def booty_call(c, world, attempt):
+    """Text someone they have been with before; if they come over and are willing, the scene starts."""
+    from systems.sexual_release import _try_booty_call
+    return bool(_try_booty_call(c, world))

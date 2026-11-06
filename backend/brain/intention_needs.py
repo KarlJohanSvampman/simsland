@@ -21,6 +21,7 @@ SATISFIED_BY = {
     "drink":                 ["drink", "use_tap", "open_fridge", "grab_drink", "make_coffee"],
     "seek_caffeine_or_rest": ["make_coffee", "lie_down", "lie", "sit_down_seat"],
     "use_toilet":            ["use_toilet"],
+    "use_toilet_bowels":     ["use_toilet"],
     "take_shower":           ["shower", "bathe"],
     "brush_teeth":           ["brush_teeth"],
     "wash_hands":            ["wash_hands", "use_tap"],
