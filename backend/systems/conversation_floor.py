@@ -313,6 +313,12 @@ def tick(world):
             if state == "waiting":
                 if aware:
                     f["state"] = state = "thinking" if thinking else "declined"
+                elif _is_thinking(hid) and t - f["said_tick"] <= THINK_CAP:
+                    # Spoken to in the middle of a decision that began before the line: they can't start answering until
+                    # it lands (they then think again about what was said -- cognition_scheduler.note_think keeps the
+                    # wake). The notice window starts when it does; before, two slow decisions crossing ended the
+                    # conversation as "ignored".
+                    f["aware_by"] = max(f["aware_by"], t + FLUSH_LAG + AWARE_TICKS)
                 elif t >= f["aware_by"]:
                     f["state"] = state = "unnoticed"
                     f["retry_until"] = t + RETRY_TICKS

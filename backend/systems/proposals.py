@@ -81,6 +81,15 @@ MAX_ROUNDS = 3
 # PROPOSE
 # =========================================================
 
+def _topic_text(chore_id, params=None):
+    """What the proposal is about, as the recipient's wake line says it: the asker's own words when there are any
+    (a social_ask's params.text -- "What do you think of the new job?"), never a bare slug like "opinion_on_workplace"."""
+    text = (params or {}).get("text")
+    if text:
+        return str(text)
+    return str(chore_id).replace("_", " ")
+
+
 def propose(proposer, recipients, kind, chore_id, params, world):
     """recipients: list of character dicts (not ids) already filtered to
     who should be asked — see propose_chore_to_household() below for the
@@ -139,7 +148,7 @@ def propose(proposer, recipients, kind, chore_id, params, world):
             "from_name":   proposer.get("name", "someone"),
             "from_id":     proposer["id"],
             "kind":        kind,
-            "topic":       str(chore_id),
+            "topic":       _topic_text(chore_id, params),
             "proposal_id": proposal["id"],
         })
 
@@ -216,7 +225,7 @@ def respond(recipient, world, proposal_id, response, counter_params=None):
                 "from_name":   recipient.get("name", "someone"),
                 "from_id":     rid,
                 "kind":        proposal["kind"],
-                "topic":       str(proposal["chore_id"]),
+                "topic":       _topic_text(proposal["chore_id"], proposal.get("params")),
                 "proposal_id": proposal["id"],
             })
     elif response in ("accept", "decline"):
@@ -267,7 +276,7 @@ def proposer_advance_round(proposer, world, proposal_id, new_params=None):
                     "from_name":   proposer.get("name", "someone"),
                     "from_id":     proposer["id"],
                     "kind":        proposal["kind"],
-                    "topic":       str(proposal["chore_id"]),
+                    "topic":       _topic_text(proposal["chore_id"], proposal.get("params")),
                     "proposal_id": proposal["id"],
                 })
 
@@ -318,7 +327,7 @@ def _maybe_resolve(proposal, world):
         from brain.cognition_scheduler import wake_character
         wake_character(proposer, world, "proposal_resolved", {
             "kind":            proposal["kind"],
-            "topic":           str(proposal["chore_id"]),
+            "topic":           _topic_text(proposal["chore_id"], proposal.get("params")),
             "outcome_summary": outcome_summary,
             "proposal_id":     proposal["id"],
             "other_id":        other_id,

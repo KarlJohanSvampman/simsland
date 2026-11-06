@@ -65,11 +65,33 @@ def _named_person(c, world, step):
     return None
 
 
+# "ask Brenda for permission to make food", "ask Mom if I can make a sandwich": asking leave to feed yourself.
+_ASK_LEAVE = re.compile(r"\b(?:ask|permission|allowed|okay|ok)\b|\bif i (?:can|could|may)\b|\bwhether i (?:can|could|may)\b")
+_FOOD = re.compile(r"\b(?:food|eat|eating|cook|cooking|make (?:something|a|some|me|myself)|fix (?:something|a|me|myself)|"
+                   r"snack|sandwich|meal|dinner|lunch|breakfast|kitchen|stove|oven|microwave|fridge|toast|noodles|pasta|"
+                   r"cereal|soup|eggs?)\b")
+
+
+def _asks_leave_to_eat(c, step):
+    """Someone old enough to cook (systems/food_habits.can_cook: 13+) planning to ask leave to make themselves food. Live
+    (2026-11): Carol (14) kept meaning to "ask Brenda for permission to make food"; the plan became a visit to Brenda, who
+    didn't answer, and Carol stayed hungry. She doesn't need anyone's say-so: the plan is to eat."""
+    from systems.food_habits import can_cook
+    low = step.lower()
+    return can_cook(c) and bool(_ASK_LEAVE.search(low)) and bool(_FOOD.search(low))
+
+
 def intentions_from_plan(c, world, steps):
     """[intention, ...] for a THEN line's steps, in order (see the module docstring)."""
     from brain.llm_brain import _match_intention_type
     out, seen = [], set()
     for step in steps:
+        if _asks_leave_to_eat(c, step):
+            if "eat_food" not in seen and not any(i.get("type") == "eat_food" for i in c.get("active_intentions") or []):
+                seen.add("eat_food")
+                out.append({"type": "eat_food", "reason": "make myself something to eat", "source": "own_plan",
+                            "priority": FIRST_PRIORITY if not out else LATER_PRIORITY})
+            continue
         person = _named_person(c, world, step)
         kind = None
         if person:
