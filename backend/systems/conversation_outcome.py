@@ -140,13 +140,20 @@ def on_message(world, conv, speaker_id, utterance, speech_act, tick):
     """After each line (brain/conversations.py::add_message)."""
     from systems.conversation_floor import classify, expects_reply
     purpose = conv.get("purpose")
+    kind, _ = classify(utterance, speech_act)
     if conv.get("outcome"):
-        # the closing line after the answer: that's the conversation done
         if purpose and speaker_id == purpose.get("by"):
-            end(world, conv, "resolved")
-        return
+            if not expects_reply(utterance, speech_act, kind):
+                end(world, conv, "resolved")       # the closing line after the answer: that's the conversation done
+                return
+            # "Great! What game?" -- not a closing line but the next question. Ending here left it hanging: the answer to
+            # it opened a new conversation, with that answer as its purpose. It becomes this conversation's purpose.
+            conv.pop("outcome", None)
+            conv.pop("resolved_tick", None)
+            purpose = conv["purpose"] = None
+        else:
+            return
     if purpose is None:
-        kind, _ = classify(utterance, speech_act)
         if expects_reply(utterance, speech_act, kind):
             asker = (world.get("characters") or {}).get(speaker_id) or {}
             other = next((p for p in conv.get("participants") or [] if p != speaker_id), None)
