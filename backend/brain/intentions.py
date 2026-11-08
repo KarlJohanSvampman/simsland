@@ -48,6 +48,7 @@ INTENTION_DEADLINE_TICKS_BY_CATEGORY = {
     "chores":   5400,    # 1.5h
     "identity": 7200,    # 2h
     "leisure":  7200,
+    "private":  7200,    # Relieve Sexual Tension: when there is time, pressing once it has waited past this
 }
 INTENTION_DEFAULT_DEADLINE_TICKS = 3600
 INTENTION_STAGE_COLORS = ("yellow", "orange", "red")   # index 0 = brand new
@@ -86,6 +87,7 @@ CATEGORY_PRIORITY = {
     "health":   90,
     "schedule": 75,
     "social":   60,
+    "private":  45,
     "identity": 40,
     "chores":   35,
     "leisure":  20,

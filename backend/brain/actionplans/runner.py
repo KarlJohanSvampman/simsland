@@ -166,6 +166,8 @@ def _choose(c, world, att, intention):
 
 def _start_plan(c, world, att, pid, entry=None, return_to=None):
     plan = _plans(world)[pid]
+    if return_to is None:
+        att.setdefault("vars", {}).pop("why", None)      # the last plan's reason is not this one's
     if return_to is None and plan.get("kind") != "scout":
         att["tried"].append(pid)
     att["stack"].append({"plan": pid, "node": _entry_node(plan, entry), "return_to": return_to})
@@ -281,6 +283,8 @@ def _run(c, world, iid, att, intention, came_out=None, at=None):
                 from systems.activities import start_activity
                 started = start_activity(c, world, node["activity"])
                 _trace(att, world, plan=frame["plan"], node=node["id"], what="step", activity=node["activity"], started=bool(started))
+                if not started:
+                    att.setdefault("vars", {})["why"] = f"couldn't start {node['activity']}"
                 if started:
                     att["waiting_activity"] = node["id"]
                     att["activity_type"] = node["activity"]
@@ -363,6 +367,9 @@ def on_activity_end(data, world, out):
         if data.get("activity_type") and att.get("activity_type") and data["activity_type"] != att["activity_type"]:
             continue
         att.pop("waiting_activity", None)
+        if out == "failed":
+            att.setdefault("vars", {})["why"] = (f"{att.get('activity_type')} was interrupted"
+                                                 + (f": {data['reason']}" if data.get("reason") else ""))
         intention = store.get(_data(world), "intentions", iid)
         if intention:
             _run(c, world, iid, att, intention, came_out=out, at=node)

@@ -19,12 +19,21 @@ brain/intentions.py::final_priority.
 from brain.intentions import final_priority
 
 PRESSING_CATEGORIES = {"survival", "health", "schedule"}
-CONDITIONAL_CATEGORIES = {"household", "chores", "social"}
+CONDITIONAL_CATEGORIES = {"household", "chores", "social", "private"}
 PRESSING_PRIORITY = 70
 PRESSING_TYPES = {"relieve_worry"}          # a worry that is crowding out their focus is seen to as a need, whatever its category
 
 
+NOT_YET_OPEN_LEAD = 30 * 60   # an expectation whose window opens further off than this is not pressing yet
+
+
 def tier(i):
+    # make_dinner for tomorrow evening, pending all day today: nothing to do about it yet (2026-11-08: two parents'
+    # whole day was "pressing", so nothing they wanted for themselves ever ran)
+    from brain import intentions as _ints
+    start = i.get("window_start_tick")
+    if start is not None and _ints._CURRENT_TICK and start - _ints._CURRENT_TICK > NOT_YET_OPEN_LEAD:
+        return "when_free"
     if i.get("type") in PRESSING_TYPES:
         return "pressing"
     category = i.get("category")

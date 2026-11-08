@@ -95,7 +95,7 @@ def interrupt_activity(c, world, reason=None, outcome="interrupted"):
         emit("activity_interrupted", {
             "character_id": c["id"], "activity_type": act_type,
             "target_id": act.get("target_id"), "anchor_name": act.get("anchor_name"),
-            "x": c.get("x"), "y": c.get("y"), "building_id": c.get("building_id"),
+            "x": c.get("x"), "y": c.get("y"), "building_id": c.get("building_id"), "reason": reason,
         })
 
     release_anchor(c, world)

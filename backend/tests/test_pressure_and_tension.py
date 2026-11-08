@@ -259,6 +259,17 @@ check("a child never gets past the first gate", log.get("status") == "blocked" a
 from systems.activities import start_activity
 check("... and the activity itself refuses anyone under 18", start_activity(k, w, "masturbate_private") is False)
 
+# ---- an expectation whose window opens tomorrow is not pressing today (so wants like this one can run) --------------
+from brain import intentions as _ints
+from systems.todo import tier
+_ints.set_current_tick(20000)
+check("make_dinner for tomorrow evening is not pressing now; inside its window it is",
+      tier({"type": "expectation:make_dinner", "category": "schedule", "window_start_tick": 149600}) == "when_free"
+      and tier({"type": "expectation:make_dinner", "category": "schedule", "window_start_tick": 20500}) == "pressing")
+check("Relieve Sexual Tension waits for a free moment, until it has waited too long",
+      tier({"type": "seek_sexual_release", "category": "private", "priority": 60}) == "when_free"
+      and tier({"type": "seek_sexual_release", "category": "private", "priority": 60, "stage": 1}) == "pressing")
+
 print()
 if failures:
     print(f"FAILED: {len(failures)}")
