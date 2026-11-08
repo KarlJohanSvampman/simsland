@@ -44,7 +44,10 @@ def live_intention_for(world, intention_type):
 def drive_level(c, world, drive):
     src = str((drive or {}).get("source") or "")
     if src.startswith("body."):
-        return ((c.get("body") or {}).get(src[5:]))
+        body, key = c.get("body") or {}, src[5:]
+        if key not in body and key.endswith("_deficit") and body.get(key[:-8]) is not None:
+            return 100 - body[key[:-8]]                     # hygiene_deficit = 100 - hygiene, ...
+        return body.get(key)
     if src == "libido.tension":
         # 0-100: today's libido while it is running high (systems/libido.py's spike), else nothing pressing
         st = c.get("libido_state") or {}
@@ -97,6 +100,8 @@ def _var(c, world, att, name):
         return drive_level(c, world, store.get(_data(world), "drives", (intention or {}).get("drive")))
     if name == "hygiene":
         return (c.get("body") or {}).get("hygiene")
+    if name == "raised_as":
+        return (att.get("vars") or {}).get("raised_as")
     if name in DISTANCES:
         return DISTANCES[name](c, world)
     return None
@@ -211,7 +216,15 @@ def _satisfied(c, world, intention):
     below = ((intention.get("satisfied_when") or {}).get("drive_below")
              if intention.get("satisfied_when") else (drive or {}).get("satisfied_below"))
     lvl = drive_level(c, world, drive)
-    return below is not None and lvl is not None and lvl < below
+    if below is None or lvl is None or lvl >= below:
+        return False
+    # "unless": a requirement that keeps the need open however low the drive is (bedtime: off to bed, rested or not)
+    unless = (intention.get("satisfied_when") or {}).get("unless")
+    if unless:
+        fn = RESOLVERS.get((store.get(data, "requirements", unless) or {}).get("resolver") or unless)
+        if fn and fn(c, world):
+            return False
+    return True
 
 
 def autopilot(c, world, intention_entry):
@@ -233,6 +246,7 @@ def autopilot(c, world, intention_entry):
                                          "started": world.get("tick", 0), "stack": [], "tried": [], "vars": {},
                                          "status": "running"}
         att["drive_level"] = drive_level(c, world, store.get(_data(world), "drives", intention.get("drive")))
+        att["vars"]["raised_as"] = intention_entry.get("type")       # take_nap vs sleep: a plan may weigh which it was
         _trace(att, world, what="raised", why=f"{intention_entry.get('type')} ({intention_entry.get('reason')})")
     if att.get("waiting_activity"):
         # autopilot only runs when they are doing nothing: the step's activity is gone without its end being
@@ -334,7 +348,8 @@ def _run(c, world, iid, att, intention, came_out=None, at=None):
                 if plan_kind == "scout":
                     continue                                                 # scouting done: now choose a plan
                 if outcome == "satisfied":
-                    if _satisfied(c, world, intention):
+                    # a plan marked "satisfies" has done what it can when it gets here (a nap is a nap, not a night's sleep)
+                    if _satisfied(c, world, intention) or (plan or {}).get("satisfies"):
                         _finish(c, world, iid, att, "satisfied", f"{plan.get('name', frame['plan'])} worked")
                         return "busy"
                     _trace(att, world, plan=frame["plan"], what="fallback", why="the plan ended but the need is still there")

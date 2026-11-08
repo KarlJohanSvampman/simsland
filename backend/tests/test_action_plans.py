@@ -129,11 +129,14 @@ check("... and the child waits for the food", (k["plan_attempts"]["reduce_hunger
 w = world()
 j = w["characters"]["joseph"]
 j.update(age=35, age_group="adult", money=0)
+real_open = R.RESOLVERS["grocery_open"]
+R.RESOLVERS["grocery_open"] = lambda c, w_: False          # the shops are shut (open, they would go -- groceries come on credit)
 res = runner.autopilot(j, w, EAT)
 log = (j.get("plan_log") or [{}])[-1]
-check("no food, no money, nobody to ask: blocked, and says why", log.get("status") == "blocked" and log.get("why"), str(log))
+check("no food, no money, the shops shut, nobody to ask: blocked, and says why", log.get("status") == "blocked" and log.get("why"), str(log))
 check("... remembered", any("blocked" in (m.get("tags") or []) for m in j.get("memories") or []))
 check("... and not retried straight away", runner.autopilot(j, w, EAT) == "busy" and not j.get("plan_attempts", {}).get("reduce_hunger"))
+R.RESOLVERS["grocery_open"] = real_open
 
 # ---- takeout late at night: the delivery-hours decision ------------------------------------------------------------
 w = world(hour=23, minute=30)

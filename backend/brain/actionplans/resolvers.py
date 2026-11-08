@@ -302,3 +302,46 @@ def closest_private_place(c, world):
 
 
 DISTANCES["closest_private_place"] = closest_private_place
+
+
+# ── Restore Energy, Get Clean, groceries ─────────────────────────────────────────────────────────────────────────
+
+@resolver("grocery_open")
+def grocery_open(c, world):
+    """A food shop is open now (the off-grid grocery trip: systems/offgrid.py's shopping hours)."""
+    from systems.offgrid import _errand_hours_ok
+    return _errand_hours_ok("shopping", world)
+
+
+@resolver("not_out_shopping")
+def not_out_shopping(c, world):
+    """Nobody from the household is already out buying food."""
+    return (( _household(c, world) or {}).get("_shopping_until") or 0) <= world.get("tick", 0)
+
+
+@resolver("bed_available")
+def bed_available(c, world):
+    """A bed at home (or in the building they are in) that someone can sleep in."""
+    here = (_building_at(world, c["x"], c["y"]) or {}).get("id") if c.get("x") is not None else None
+    return any(p.get("building_id") in (_home_ids(c, world) | {here}) and
+               any(a.get("interaction") == "sleep" for a in p.get("anchors") or []) for p in world.get("props") or [])
+
+
+@resolver("wants_bed")
+def wants_bed_now(c, world):
+    """It is their bedtime before a work or school day (systems/bedtime.py)."""
+    from systems.bedtime import wants_bed
+    return bool(wants_bed(c, world))
+
+
+@resolver("rested")
+def rested(c, world):
+    """Not tired any more (fatigue under 25), or back asleep (a bathroom break in the night, then back to bed)."""
+    if (c.get("activity") or {}).get("type") in ("sleep", "nap"):
+        return True
+    return ((c.get("body") or {}).get("fatigue") or 0) < 25
+
+
+@resolver("shower_available")
+def shower_available(c, world):
+    return bool(_home_props(c, world, ("shower",)))

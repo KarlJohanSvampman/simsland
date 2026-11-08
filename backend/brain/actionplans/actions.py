@@ -67,3 +67,18 @@ def booty_call(c, world, attempt):
     """Text someone they have been with before; if they come over and are willing, the scene starts."""
     from systems.sexual_release import _try_booty_call
     return bool(_try_booty_call(c, world))
+
+
+@action("go_grocery_shopping")
+def go_grocery_shopping(c, world, attempt):
+    """Out to the shops (systems/offgrid.py's grocery errand): the shopper decides the coming dinners before leaving
+    (systems/grocery.py::make_plan) and comes home with them. The plan waits for the ingredients."""
+    hh = (world.get("households") or {}).get(c.get("household_id"))
+    if not hh or (c.get("age") or 0) < 18:
+        return False
+    from systems import offgrid, grocery
+    if not offgrid.send_offgrid(c, world, "shopping", offgrid.GROCERY_TRIP_MINUTES):
+        return False
+    hh["_shopping_until"] = c.get("return_tick")
+    grocery.make_plan(world, hh, c)
+    return True

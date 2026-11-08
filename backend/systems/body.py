@@ -564,7 +564,7 @@ def on_shower_complete(c):
     b["hygiene"]   = 98
     b["odor"]      = 2
     # Partial mouth hygiene improvement (steam/rinsing)
-    b["mouth_hygiene"] = min(100, b["mouth_hygiene"] + 15)
+    b["mouth_hygiene"] = min(100, b.get("mouth_hygiene", 70) + 15)
     touch(c)
 
 
