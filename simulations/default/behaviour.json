@@ -324,16 +324,6 @@
    "notes": "satisfied by systems/expectations.py::satisfy_expectation"
   },
   {
-   "id": "family_dinner_together",
-   "kind": "expectation",
-   "name": "Have Dinner Together",
-   "source": "expectations.family_dinner_together",
-   "threshold": "pending",
-   "satisfied_below": null,
-   "intention": "dinner_together",
-   "notes": "satisfied by systems/expectations.py::satisfy_expectation"
-  },
-  {
    "id": "keep_room_clean",
    "kind": "expectation",
    "name": "Keep My Room Clean",
@@ -394,16 +384,6 @@
    "notes": "satisfied by systems/expectations.py::satisfy_expectation"
   },
   {
-   "id": "child_bedtime_check",
-   "kind": "expectation",
-   "name": "Check the Kids at Bedtime",
-   "source": "expectations.child_bedtime_check",
-   "threshold": "pending",
-   "satisfied_below": null,
-   "intention": "check_kids_at_bedtime",
-   "notes": "satisfied by systems/expectations.py::satisfy_expectation"
-  },
-  {
    "id": "child_hungry",
    "kind": "expectation",
    "name": "A child to feed",
@@ -422,6 +402,26 @@
    "satisfied_below": 1,
    "intention": "make_dinner",
    "notes": "100 until systems/expectations.py says it is satisfied this period"
+  },
+  {
+   "id": "family_dinner_together",
+   "kind": "expectation",
+   "name": "Have Dinner Together",
+   "source": "expectations.family_dinner_together",
+   "threshold": 1,
+   "satisfied_below": 1,
+   "intention": "dinner_together",
+   "notes": ""
+  },
+  {
+   "id": "child_bedtime_check",
+   "kind": "expectation",
+   "name": "Check the Kids at Bedtime",
+   "source": "expectations.child_bedtime_check",
+   "threshold": 1,
+   "satisfied_below": 1,
+   "intention": "check_kids_at_bedtime",
+   "notes": ""
   },
   {
    "id": "house_dirty",
@@ -855,19 +855,6 @@
    "notes": ""
   },
   {
-   "id": "dinner_together",
-   "name": "Have Dinner Together",
-   "drive": "family_dinner_together",
-   "status": "planned",
-   "plans": [],
-   "scout_plan": null,
-   "satisfied_when": null,
-   "replaces": [
-    "expectation:family_dinner_together"
-   ],
-   "notes": ""
-  },
-  {
    "id": "keep_room_clean",
    "name": "Keep My Room Clean",
    "drive": "keep_room_clean",
@@ -947,19 +934,6 @@
    "notes": ""
   },
   {
-   "id": "check_kids_at_bedtime",
-   "name": "Check the Kids at Bedtime",
-   "drive": "child_bedtime_check",
-   "status": "planned",
-   "plans": [],
-   "scout_plan": null,
-   "satisfied_when": null,
-   "replaces": [
-    "expectation:child_bedtime_check"
-   ],
-   "notes": ""
-  },
-  {
    "id": "feed_the_kids",
    "name": "Feed the Kids",
    "drive": "child_hungry",
@@ -1001,6 +975,42 @@
    ],
    "notes": "acted on from half an hour before the dinner window; met for the household's grown-ups once dinner is made",
    "act_when": "dinner_time"
+  },
+  {
+   "id": "dinner_together",
+   "name": "Have Dinner Together",
+   "drive": "family_dinner_together",
+   "status": "live",
+   "plans": [
+    "dinner_together"
+   ],
+   "scout_plan": null,
+   "satisfied_when": {
+    "drive_below": 1
+   },
+   "replaces": [
+    "expectation:family_dinner_together"
+   ],
+   "notes": "everyone home, dinner on the table, call them, eat; met only if the whole household was there",
+   "act_when": "family_dinner_time"
+  },
+  {
+   "id": "check_kids_at_bedtime",
+   "name": "Check the Kids at Bedtime",
+   "drive": "child_bedtime_check",
+   "status": "live",
+   "plans": [
+    "bedtime_check"
+   ],
+   "scout_plan": null,
+   "satisfied_when": {
+    "drive_below": 1
+   },
+   "replaces": [
+    "expectation:child_bedtime_check"
+   ],
+   "notes": "",
+   "act_when": "bedtime_check_time"
   },
   {
    "id": "keep_house_clean",
@@ -1361,6 +1371,38 @@
    "scope": "character",
    "ttl_seconds": 0,
    "learn_by": "knows the time"
+  },
+  {
+   "id": "family_dinner_time",
+   "name": "Family dinner time",
+   "resolver": "family_dinner_time",
+   "scope": "character",
+   "ttl_seconds": 0,
+   "learn_by": "knows the time"
+  },
+  {
+   "id": "bedtime_check_time",
+   "name": "Time for the kids' bedtime check",
+   "resolver": "bedtime_check_time",
+   "scope": "character",
+   "ttl_seconds": 0,
+   "learn_by": "knows the time"
+  },
+  {
+   "id": "family_home",
+   "name": "Everyone is home",
+   "resolver": "family_home",
+   "scope": "household",
+   "ttl_seconds": 0,
+   "learn_by": "look around"
+  },
+  {
+   "id": "kids_home",
+   "name": "The kids are home",
+   "resolver": "kids_home",
+   "scope": "household",
+   "ttl_seconds": 0,
+   "learn_by": "look around"
   },
   {
    "id": "tension_released",
@@ -3309,6 +3351,273 @@
     {
      "id": "start",
      "node": "phone",
+     "vars": []
+    }
+   ]
+  },
+  {
+   "id": "dinner_together",
+   "name": "Dinner together",
+   "intention": "dinner_together",
+   "requires": [],
+   "cost": {
+    "minutes": 40,
+    "money": 0,
+    "effort": 1
+   },
+   "time_budget_seconds": 10800,
+   "start": "home",
+   "nodes": [
+    {
+     "id": "home",
+     "kind": "gate",
+     "requirement": "family_home",
+     "x": 40,
+     "y": 40
+    },
+    {
+     "id": "wait_home",
+     "kind": "wait",
+     "requirement": "family_home",
+     "timeout_seconds": 2700,
+     "x": 40,
+     "y": 180
+    },
+    {
+     "id": "served",
+     "kind": "gate",
+     "requirement": "food_served",
+     "x": 280,
+     "y": 40
+    },
+    {
+     "id": "wait_food",
+     "kind": "wait",
+     "requirement": "food_ready",
+     "timeout_seconds": 3600,
+     "x": 280,
+     "y": 180
+    },
+    {
+     "id": "call",
+     "kind": "action",
+     "action": "call_family_to_table",
+     "x": 520,
+     "y": 40
+    },
+    {
+     "id": "eat",
+     "kind": "step",
+     "activity": "eat_meal",
+     "x": 760,
+     "y": 40
+    },
+    {
+     "id": "done",
+     "kind": "action",
+     "action": "dinner_together_done",
+     "x": 1000,
+     "y": 40
+    },
+    {
+     "id": "ok",
+     "kind": "end",
+     "outcome": "satisfied",
+     "x": 1240,
+     "y": 40
+    },
+    {
+     "id": "stuck",
+     "kind": "end",
+     "outcome": "blocked",
+     "x": 520,
+     "y": 320
+    }
+   ],
+   "edges": [
+    {
+     "from": "home",
+     "output": "yes",
+     "to": "served"
+    },
+    {
+     "from": "home",
+     "output": "no",
+     "to": "wait_home"
+    },
+    {
+     "from": "wait_home",
+     "output": "ready",
+     "to": "served"
+    },
+    {
+     "from": "wait_home",
+     "output": "timed_out",
+     "to": "stuck",
+     "set": {
+      "why": "not everyone came home for dinner"
+     }
+    },
+    {
+     "from": "served",
+     "output": "yes",
+     "to": "call"
+    },
+    {
+     "from": "served",
+     "output": "no",
+     "to": "wait_food"
+    },
+    {
+     "from": "wait_food",
+     "output": "ready",
+     "to": "call"
+    },
+    {
+     "from": "wait_food",
+     "output": "timed_out",
+     "to": "stuck",
+     "set": {
+      "why": "no dinner was made"
+     }
+    },
+    {
+     "from": "call",
+     "output": "done",
+     "to": "eat"
+    },
+    {
+     "from": "call",
+     "output": "failed",
+     "to": "stuck",
+     "set": {
+      "why": "nobody to eat with"
+     }
+    },
+    {
+     "from": "eat",
+     "output": "done",
+     "to": "done"
+    },
+    {
+     "from": "eat",
+     "output": "failed",
+     "to": "stuck",
+     "set": {
+      "why": "couldn't sit down to eat"
+     }
+    },
+    {
+     "from": "done",
+     "output": "done",
+     "to": "ok"
+    },
+    {
+     "from": "done",
+     "output": "failed",
+     "to": "stuck"
+    }
+   ],
+   "entries": [
+    {
+     "id": "start",
+     "node": "home",
+     "vars": []
+    }
+   ]
+  },
+  {
+   "id": "bedtime_check",
+   "name": "Look in on the kids",
+   "intention": "check_kids_at_bedtime",
+   "requires": [],
+   "cost": {
+    "minutes": 5,
+    "money": 0,
+    "effort": 1
+   },
+   "time_budget_seconds": 5400,
+   "start": "home",
+   "nodes": [
+    {
+     "id": "home",
+     "kind": "gate",
+     "requirement": "kids_home",
+     "x": 40,
+     "y": 40
+    },
+    {
+     "id": "wait",
+     "kind": "wait",
+     "requirement": "kids_home",
+     "timeout_seconds": 3600,
+     "x": 40,
+     "y": 180
+    },
+    {
+     "id": "check",
+     "kind": "action",
+     "action": "check_on_kids",
+     "x": 280,
+     "y": 40
+    },
+    {
+     "id": "ok",
+     "kind": "end",
+     "outcome": "satisfied",
+     "x": 520,
+     "y": 40
+    },
+    {
+     "id": "stuck",
+     "kind": "end",
+     "outcome": "blocked",
+     "x": 280,
+     "y": 320
+    }
+   ],
+   "edges": [
+    {
+     "from": "home",
+     "output": "yes",
+     "to": "check"
+    },
+    {
+     "from": "home",
+     "output": "no",
+     "to": "wait"
+    },
+    {
+     "from": "wait",
+     "output": "ready",
+     "to": "check"
+    },
+    {
+     "from": "wait",
+     "output": "timed_out",
+     "to": "stuck",
+     "set": {
+      "why": "the kids weren't home"
+     }
+    },
+    {
+     "from": "check",
+     "output": "done",
+     "to": "ok"
+    },
+    {
+     "from": "check",
+     "output": "failed",
+     "to": "stuck",
+     "set": {
+      "why": "couldn't find the kids"
+     }
+    }
+   ],
+   "entries": [
+    {
+     "id": "start",
+     "node": "home",
      "vars": []
     }
    ]

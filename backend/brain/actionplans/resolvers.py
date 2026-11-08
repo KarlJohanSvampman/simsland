@@ -371,11 +371,47 @@ def child_waiting_here(c, world):
 DINNER_LEAD_SECONDS = 30 * 60      # start cooking a little before the dinner window opens
 
 
-@resolver("dinner_time")
-def dinner_time(c, world):
-    """Make Dinner's window is open (or opens within half an hour) and dinner is still to be made."""
-    nd = (c.get("expectations") or {}).get("make_dinner") or {}
+def _window_open(c, world, eid, lead):
+    nd = (c.get("expectations") or {}).get(eid) or {}
     start, end, tick = nd.get("window_start_tick"), nd.get("window_end_tick"), world.get("tick", 0)
     if nd.get("status") == "satisfied" or start is None or end is None:
         return False
-    return start - DINNER_LEAD_SECONDS <= tick < end
+    return start - lead <= tick < end
+
+
+@resolver("dinner_time")
+def dinner_time(c, world):
+    """Make Dinner's window is open (or opens within half an hour) and dinner is still to be made."""
+    return _window_open(c, world, "make_dinner", DINNER_LEAD_SECONDS)
+
+
+@resolver("family_dinner_time")
+def family_dinner_time(c, world):
+    """Family dinner's window is open (or opens within ten minutes) and it has not happened yet."""
+    return _window_open(c, world, "family_dinner_together", 10 * 60)
+
+
+@resolver("bedtime_check_time")
+def bedtime_check_time(c, world):
+    """The kids' bedtime check is due (its window is open, or opens within ten minutes)."""
+    return _window_open(c, world, "child_bedtime_check", 10 * 60)
+
+
+def _household_others(c, world):
+    chars = world.get("characters") or {}
+    hh = _household(c, world) or {}
+    return [chars[m] for m in hh.get("members") or [] if m in chars and m != c.get("id") and chars[m].get("alive") is not False]
+
+
+@resolver("family_home")
+def family_home(c, world):
+    """Everyone of the household is home (in this building, not away)."""
+    return all(o.get("building_id") == c.get("building_id") and not o.get("off_grid") for o in _household_others(c, world))
+
+
+@resolver("kids_home")
+def kids_home(c, world):
+    """A child they look after is home (in this building)."""
+    chars = world.get("characters") or {}
+    kids = [chars[k] for k in c.get("dependents") or [] if k in chars] or [o for o in _household_others(c, world) if (o.get("age") or 99) < 13]
+    return any(k.get("building_id") == c.get("building_id") and not k.get("off_grid") for k in kids)

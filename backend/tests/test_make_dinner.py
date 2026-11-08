@@ -125,6 +125,66 @@ og._school_block = lambda c, w_: None
 check("enrolled, but no school today (the weekend): not expected", _has_school_run_today(rob, w) is False)
 og._school_block = real_block
 
+# ---- Have Dinner Together ----------------------------------------------------------------------------------------------
+def together_world():
+    w, rob, hh = world(0)
+    k = w["characters"]["kathleen"]
+    k.update(building_id="starter_house_2", x=60, y=6)
+    rob.update(building_id="starter_house_2", x=60, y=8)
+    for c in (rob, k):
+        c["room_id"] = "starter_house_2:dining_room_1"
+    rob["expectations"]["family_dinner_together"] = {"template_id": "family_dinner_together", "status": "pending", "streak": 0,
+                                                     "frustration": 0, "missed_count": 0, "requires_others": True,
+                                                     "window_start_tick": w["tick"], "window_end_tick": w["tick"] + 3600}
+    return w, rob, k
+
+
+TOGETHER = {"type": "expectation:family_dinner_together", "category": "social", "priority": 55, "reason": "dinner together"}
+
+
+def tsteps(c):
+    att = (c.get("plan_attempts") or {}).get("dinner_together") or ((c.get("plan_log") or [{}])[-1])
+    return [(t.get("plan"), t.get("node"), t.get("what"), t.get("out")) for t in att.get("trace") or []]
+
+
+w, rob, k = together_world()
+cw.ready_vessel = lambda h, tick: {"kind": "pot"} if h.get("id") == "oka" else None
+res = runner.autopilot(rob, w, dict(TOGETHER))
+check("dinner together: everyone home, food on the table -- called to the table, and they sit down to eat",
+      ("dinner_together", "call", "action", "done") in tsteps(rob) and res == "started" and rob["activity"]["type"] == "eat_meal"
+      and any(i.get("type") == "eat_food" for i in k.get("active_intentions") or []), f"{res} {tsteps(rob)}")
+rob["activity"] = None
+runner.on_activity_end({"character_id": "robert", "activity_type": "eat_meal"}, w, "done")
+check("... the whole household was there: met", rob["expectations"]["family_dinner_together"]["status"] == "satisfied"
+      and rob["plan_log"][-1]["status"] == "satisfied", str(tsteps(rob)[-3:]))
+
+w, rob, k = together_world()
+k["room_id"] = "starter_house_2:bedroom_5"                # at home, but upstairs
+runner.autopilot(rob, w, dict(TOGETHER))
+rob["activity"] = None
+runner.on_activity_end({"character_id": "robert", "activity_type": "eat_meal"}, w, "done")
+check("... Kathleen stayed in her room: not met, and it says who wasn't there",
+      rob["expectations"]["family_dinner_together"]["status"] != "satisfied" and "Kathleen" in str(rob["plan_log"][-1].get("why"))
+      and rob["expectations"]["family_dinner_together"].get("last_missed_blame") == ["kathleen"], str(rob["plan_log"][-1]))
+
+w, rob, k = together_world()
+k.update(off_grid=True)
+res = runner.autopilot(rob, w, dict(TOGETHER))
+check("someone is out: they wait for everyone to come home", res == "busy"
+      and ((rob["plan_attempts"].get("dinner_together") or {}).get("wait") or {}).get("node") == "wait_home", str(tsteps(rob)))
+cw.ready_vessel = real_ready
+
+# ---- Check the Kids at Bedtime -----------------------------------------------------------------------------------------
+w, rob, k = together_world()
+rob["dependents"] = ["kathleen"]
+rob["expectations"]["child_bedtime_check"] = {"template_id": "child_bedtime_check", "status": "pending", "streak": 0, "frustration": 0,
+                                              "missed_count": 0, "window_start_tick": w["tick"], "window_end_tick": w["tick"] + 3600}
+k["body"]["fatigue"] = 70
+runner.autopilot(rob, w, {"type": "expectation:child_bedtime_check", "category": "household", "priority": 60, "reason": "bedtime"})
+check("bedtime: they look in on the kids, send the one still up to bed, and it is met",
+      rob["expectations"]["child_bedtime_check"]["status"] == "satisfied"
+      and any(i.get("type") == "go_to_sleep" for i in k.get("active_intentions") or []), str(rob.get("plan_log", [])[-1:]))
+
 print()
 if failures:
     print(f"FAILED: {len(failures)}")

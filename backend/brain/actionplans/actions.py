@@ -163,3 +163,60 @@ def dinner_is_made(c, world, attempt):
             done.append(m)
     attempt["vars"]["dinner_for"] = done
     return bool(done)
+
+
+@action("call_family_to_table")
+def call_family_to_table(c, world, attempt):
+    """Dinner's on the table: everyone at home is called to come and eat (each one's own hunger plan does the eating)."""
+    chars = world.get("characters") or {}
+    hh = (world.get("households") or {}).get(c.get("household_id")) or {}
+    here = [chars[m] for m in hh.get("members") or [] if m in chars and m != c.get("id")
+            and chars[m].get("building_id") == c.get("building_id") and not chars[m].get("off_grid")]
+    if not here:
+        return False
+    from brain.actionplans import runner
+    from brain.intentions import add_intention
+    for o in here:
+        runner.observe(o, world, "food_served", how="told")
+        runner.observe(o, world, "food_ready", how="told")
+        add_intention(o, {"type": "eat_food", "category": "survival", "priority": 80, "reason": "dinner is on the table -- the family is eating together"})
+    try:
+        from systems.action_router import apply_speech
+        apply_speech(c, world, {"target": here[0]["id"], "utterance": "Dinner's ready, everyone -- come and sit down!", "speech_act": "statement"})
+    except Exception:                                  # noqa: BLE001
+        pass
+    attempt["vars"]["called"] = [o["id"] for o in here]
+    return True
+
+
+@action("dinner_together_done")
+def dinner_together_done(c, world, attempt):
+    """After eating: if the whole household was there, Family Dinner Together is met for every grown-up who had it;
+    if not, who was missing is noted (systems/expectations.py's miss blames them) and it is not met."""
+    from systems.expectation_planner import _missing_household_members
+    missing = _missing_household_members(c, world)
+    chars = world.get("characters") or {}
+    if missing:
+        nd = (c.get("expectations") or {}).get("family_dinner_together")
+        if nd is not None:
+            nd["last_missed_blame"] = missing
+        attempt["vars"]["why"] = " and ".join((chars.get(m) or {}).get("first_name") or m for m in missing) + " wasn't at the table"
+        return False
+    from systems.expectations import satisfy_expectation
+    hh = (world.get("households") or {}).get(c.get("household_id")) or {}
+    for m in hh.get("members") or []:
+        nd = ((chars.get(m) or {}).get("expectations") or {}).get("family_dinner_together")
+        if nd and nd.get("status") != "satisfied":
+            satisfy_expectation(chars[m], "family_dinner_together", world)
+    return True
+
+
+@action("check_on_kids")
+def check_on_kids(c, world, attempt):
+    """The bedtime check (systems/action_router.py): look in on the kids, send one who is still up to bed. Meets the
+    expectation."""
+    from systems.action_router import _route_check_on_kids
+    before = ((c.get("expectations") or {}).get("child_bedtime_check") or {}).get("status")
+    _route_check_on_kids(c, world, {"type": "check_on_kids"})
+    after = ((c.get("expectations") or {}).get("child_bedtime_check") or {}).get("status")
+    return after == "satisfied" or (before is None and bool(c.get("activity")))
