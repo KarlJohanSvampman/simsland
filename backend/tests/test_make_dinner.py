@@ -168,6 +168,15 @@ check("... Kathleen stayed in her room: not met, and it says who wasn't there",
       and rob["expectations"]["family_dinner_together"].get("last_missed_blame") == ["kathleen"], str(rob["plan_log"][-1]))
 
 w, rob, k = together_world()
+for e in ("family_dinner_together",):
+    rob["expectations"][e].update(window_start_tick=w["tick"] + 40 * 60, window_end_tick=w["tick"] + 100 * 60)
+rob["expectations"]["make_dinner"]["status"] = "satisfied"
+cw.ready_vessel = real_ready
+check("forty minutes early, dinner not cooked: not yet", R.RESOLVERS["family_dinner_time"](rob, w) is False)
+cw.ready_vessel = lambda h, tick: {"kind": "pot"} if h.get("id") == "oka" else None
+check("forty minutes early, but dinner was just made and is on the table: sit down to it now", R.RESOLVERS["family_dinner_time"](rob, w) is True)
+
+w, rob, k = together_world()
 k.update(off_grid=True)
 res = runner.autopilot(rob, w, dict(TOGETHER))
 check("someone is out: they wait for everyone to come home", res == "busy"

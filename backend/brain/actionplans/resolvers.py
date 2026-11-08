@@ -387,8 +387,14 @@ def dinner_time(c, world):
 
 @resolver("family_dinner_time")
 def family_dinner_time(c, world):
-    """Family dinner's window is open (or opens within ten minutes) and it has not happened yet."""
-    return _window_open(c, world, "family_dinner_together", 10 * 60)
+    """Family dinner's window is open (or opens within ten minutes) and it has not happened yet -- or dinner has just been
+    made and is on the table, up to an hour early: sit down to it then, before the hungry ones have eaten it all."""
+    if _window_open(c, world, "family_dinner_together", 10 * 60):
+        return True
+    if not _window_open(c, world, "family_dinner_together", 60 * 60):
+        return False
+    made = ((c.get("expectations") or {}).get("make_dinner") or {}).get("status") == "satisfied"
+    return made and food_served(c, world)
 
 
 @resolver("bedtime_check_time")
