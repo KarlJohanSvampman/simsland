@@ -111,6 +111,20 @@ w, rob, hh = world(0)
 rob["expectations"]["make_dinner"]["status"] = "satisfied"
 check("already met this evening: nothing to do", runner.autopilot(rob, w, rob["active_intentions"][0]) == "busy")
 
+# ---- the school run: nothing expected on a day without school ---------------------------------------------------------
+from systems.expectations import _has_school_run_today
+import systems.offgrid as og
+w, rob, hh = world(0)
+k = w["characters"]["kathleen"]
+check("a child not enrolled anywhere: no school run expected today", _has_school_run_today(rob, w) is False)
+k["current_school"] = "school_1"
+real_block = og._school_block
+og._school_block = lambda c, w_: {"activity": "school", "start": "08:30", "end": "15:00"}
+check("enrolled, with school today: the school run is expected", _has_school_run_today(rob, w) is True)
+og._school_block = lambda c, w_: None
+check("enrolled, but no school today (the weekend): not expected", _has_school_run_today(rob, w) is False)
+og._school_block = real_block
+
 print()
 if failures:
     print(f"FAILED: {len(failures)}")
