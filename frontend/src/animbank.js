@@ -1,3 +1,4 @@
+import { uuid } from "./uuid.js";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { GLTFLoader }         from "three/examples/jsm/loaders/GLTFLoader.js";
@@ -803,7 +804,7 @@ function createTemplate() {
         return;
     }
 
-    const id = crypto.randomUUID();
+    const id = uuid();
     const tmpl = {
         id,
         name: "new_template",
@@ -1125,7 +1126,7 @@ function extractClips() {
         const cat = classifyClip(clip.name);
         src.clips = src.clips || [];
         src.clips.push({
-            id:            crypto.randomUUID(),
+            id:            uuid(),
             name:          clip.name,
             original_name: clip.name,
             category:      cat,
@@ -1434,10 +1435,10 @@ function templateForChoice(value) {
     const same = Object.values(templates).filter(t =>
         t.source_key === currentSourceKey && (t.chain || []).length === 1 && t.chain[0].clip === clipName);
     if (same.length) return (same.find(t => t.name === clipName) || same[0]).id;
-    const id = crypto.randomUUID();
+    const id = uuid();
     templates[id] = {
         id, name: clipName, source_key: currentSourceKey || "",
-        chain: [{ id: crypto.randomUUID(), clip: clipName, start_frame: 0, end_frame: null, speed: 1, loop: "repeat", loop_count: -1 }],
+        chain: [{ id: uuid(), clip: clipName, start_frame: 0, end_frame: null, speed: 1, loop: "repeat", loop_count: -1 }],
         alternatives: [], notifies: [], ik_targets: [],
     };
     return id;
@@ -1921,7 +1922,7 @@ function wireEvents() {
         if (!currentClipMeta) return;
         currentClipMeta.notifies = currentClipMeta.notifies || [];
         currentClipMeta.notifies.push({
-            id:      crypto.randomUUID(),
+            id:      uuid(),
             frame:   0,
             fps:     clipFPS,
             event:   "footstep",
@@ -1942,7 +1943,7 @@ function wireEvents() {
         if (!src) return;
         migrateLocomotionToStances(src);
         src.transitions = src.transitions || [];
-        src.transitions.push({ id: crypto.randomUUID(), from: "standing", to: "standing", template: "" });
+        src.transitions.push({ id: uuid(), from: "standing", to: "standing", template: "" });
         renderTransitionsPanel();
     });
 
@@ -1954,7 +1955,7 @@ function wireEvents() {
         if (!currentTemplate) return;
         currentTemplate.chain = currentTemplate.chain || [];
         currentTemplate.chain.push({
-            id: crypto.randomUUID(), clip: "", start_frame: 0,
+            id: uuid(), clip: "", start_frame: 0,
             end_frame: null, speed: 1.0, loop: "repeat", loop_count: -1,
         });
         renderChainList(currentTemplate);
@@ -1965,7 +1966,7 @@ function wireEvents() {
     document.getElementById("addTemplateNotifyBtn").addEventListener("click", () => {
         if (!currentTemplate) return;
         currentTemplate.notifies = currentTemplate.notifies || [];
-        currentTemplate.notifies.push({ id: crypto.randomUUID(), frame: 0, fps: clipFPS, event: "", payload: {} });
+        currentTemplate.notifies.push({ id: uuid(), frame: 0, fps: clipFPS, event: "", payload: {} });
         renderTemplateNotifyList(currentTemplate);
     });
 

@@ -1,3 +1,4 @@
+import { uuid } from "./uuid.js";
 import * as THREE from "three";
 import { OrbitControls }
 from "three/examples/jsm/controls/OrbitControls.js";
@@ -737,7 +738,7 @@ function commitPlacement(tile) {
     }
 
     const entry = {
-      id:       crypto.randomUUID(),
+      id:       uuid(),
       template: placementState.templateId,
       x:        tile.x,
       y:        tile.y,
@@ -757,7 +758,7 @@ function commitPlacement(tile) {
 
   if (placementState.mode === "floorplan") {
     const entry = {
-      id:       crypto.randomUUID(),
+      id:       uuid(),
       template: placementState.templateId,
       x:        tile.x,
       y:        tile.y,

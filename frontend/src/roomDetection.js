@@ -1,3 +1,5 @@
+import { uuid } from "./uuid.js";
+
 // =========================================================
 // ROOM DETECTION
 // Flood-fills over tiles that have floors, treating solid
@@ -89,7 +91,7 @@ export function detectRooms(floorplan) {
     if (roomTiles.length < 2) continue;
 
     rooms.push({
-      id:    crypto.randomUUID(),
+      id:    uuid(),
       type:  "room",
       tiles: roomTiles,
       tags:  [],
