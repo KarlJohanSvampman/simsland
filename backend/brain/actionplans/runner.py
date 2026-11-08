@@ -52,6 +52,10 @@ def drive_level(c, world, drive):
         if key not in body and key.endswith("_deficit") and body.get(key[:-8]) is not None:
             return 100 - body[key[:-8]]                     # hygiene_deficit = 100 - hygiene, ...
         return body.get(key)
+    if src.startswith("expectations."):
+        # 100 while the expectation is still to be met this period (pending or missed), 0 once it is satisfied
+        nd = (c.get("expectations") or {}).get(src.split(".", 1)[1])
+        return 0 if not nd or nd.get("status") == "satisfied" else 100
     if src == "world.child_hungry":
         # 100 while a child of their household is waiting for a grown-up to feed them (systems/child_care.py), else 0
         chars = world.get("characters") or {}
@@ -248,6 +252,12 @@ def autopilot(c, world, intention_entry):
     if world.get("tick", 0) < (c.get("_plan_cooldown") or {}).get(iid, -1):
         return "busy"
     att = (c.setdefault("plan_attempts", {})).get(iid)
+    act_when = intention.get("act_when")
+    if att is None and act_when:
+        # not yet: dinner for this evening, at lunchtime -- nothing to do yet, and nothing to clear either
+        fn = RESOLVERS.get((store.get(_data(world), "requirements", act_when) or {}).get("resolver") or act_when)
+        if fn and not fn(c, world):
+            return "busy"
     if att is None and _satisfied(c, world, intention):
         # a leftover old-style intention (heat_meal's "eat it, it's hot") while the need is already met: nothing to do,
         # and it goes -- not a new "satisfied" attempt every tick

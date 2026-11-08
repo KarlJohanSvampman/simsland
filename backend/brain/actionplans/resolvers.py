@@ -366,3 +366,16 @@ def child_waiting_here(c, world):
     """A child of the household, in this building, is waiting for a grown-up to feed them."""
     from brain.actionplans.actions import _waiting_children
     return bool(_waiting_children(c, world))
+
+
+DINNER_LEAD_SECONDS = 30 * 60      # start cooking a little before the dinner window opens
+
+
+@resolver("dinner_time")
+def dinner_time(c, world):
+    """Make Dinner's window is open (or opens within half an hour) and dinner is still to be made."""
+    nd = (c.get("expectations") or {}).get("make_dinner") or {}
+    start, end, tick = nd.get("window_start_tick"), nd.get("window_end_tick"), world.get("tick", 0)
+    if nd.get("status") == "satisfied" or start is None or end is None:
+        return False
+    return start - DINNER_LEAD_SECONDS <= tick < end

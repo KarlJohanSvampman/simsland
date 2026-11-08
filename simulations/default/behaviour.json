@@ -324,16 +324,6 @@
    "notes": "satisfied by systems/expectations.py::satisfy_expectation"
   },
   {
-   "id": "make_dinner",
-   "kind": "expectation",
-   "name": "Make Dinner",
-   "source": "expectations.make_dinner",
-   "threshold": "pending",
-   "satisfied_below": null,
-   "intention": "make_dinner",
-   "notes": "satisfied by systems/expectations.py::satisfy_expectation"
-  },
-  {
    "id": "family_dinner_together",
    "kind": "expectation",
    "name": "Have Dinner Together",
@@ -422,6 +412,16 @@
    "satisfied_below": 1,
    "intention": "feed_the_kids",
    "notes": "100 while a child of the household waits for a grown-up to feed them (systems/child_care.py), else 0"
+  },
+  {
+   "id": "make_dinner",
+   "kind": "expectation",
+   "name": "Make Dinner",
+   "source": "expectations.make_dinner",
+   "threshold": 1,
+   "satisfied_below": 1,
+   "intention": "make_dinner",
+   "notes": "100 until systems/expectations.py says it is satisfied this period"
   },
   {
    "id": "house_dirty",
@@ -855,20 +855,6 @@
    "notes": ""
   },
   {
-   "id": "make_dinner",
-   "name": "Make Dinner",
-   "drive": "make_dinner",
-   "status": "planned",
-   "plans": [],
-   "scout_plan": null,
-   "satisfied_when": null,
-   "replaces": [
-    "expectation:make_dinner",
-    "cook_dinner"
-   ],
-   "notes": ""
-  },
-  {
    "id": "dinner_together",
    "name": "Have Dinner Together",
    "drive": "family_dinner_together",
@@ -993,6 +979,28 @@
     "feed_child_*"
    ],
    "notes": "get food ready and call them; the instant feed is only the last resort"
+  },
+  {
+   "id": "make_dinner",
+   "name": "Make Dinner",
+   "drive": "make_dinner",
+   "status": "live",
+   "plans": [
+    "dinner_on_the_table",
+    "cook_dinner",
+    "heat_dinner",
+    "takeout_dinner"
+   ],
+   "scout_plan": null,
+   "satisfied_when": {
+    "drive_below": 1
+   },
+   "replaces": [
+    "expectation:make_dinner",
+    "cook_dinner"
+   ],
+   "notes": "acted on from half an hour before the dinner window; met for the household's grown-ups once dinner is made",
+   "act_when": "dinner_time"
   },
   {
    "id": "keep_house_clean",
@@ -1345,6 +1353,14 @@
    "scope": "household",
    "ttl_seconds": 0,
    "learn_by": "look around"
+  },
+  {
+   "id": "dinner_time",
+   "name": "Dinner time (the window opens within half an hour)",
+   "resolver": "dinner_time",
+   "scope": "character",
+   "ttl_seconds": 0,
+   "learn_by": "knows the time"
   },
   {
    "id": "tension_released",
@@ -2854,6 +2870,445 @@
     {
      "id": "start",
      "node": "toilet",
+     "vars": []
+    }
+   ]
+  },
+  {
+   "id": "dinner_on_the_table",
+   "name": "Dinner is already on the table",
+   "intention": "make_dinner",
+   "requires": [],
+   "cost": {
+    "minutes": 45,
+    "money": 0,
+    "effort": 2
+   },
+   "time_budget_seconds": 7200,
+   "start": "served",
+   "nodes": [
+    {
+     "id": "served",
+     "kind": "gate",
+     "requirement": "food_served",
+     "x": 40,
+     "y": 40
+    },
+    {
+     "id": "made",
+     "kind": "action",
+     "action": "dinner_is_made",
+     "x": 1240,
+     "y": 40
+    },
+    {
+     "id": "ok",
+     "kind": "end",
+     "outcome": "satisfied",
+     "x": 1480,
+     "y": 40
+    },
+    {
+     "id": "next",
+     "kind": "end",
+     "outcome": "fallback",
+     "x": 520,
+     "y": 260
+    }
+   ],
+   "edges": [
+    {
+     "from": "made",
+     "output": "done",
+     "to": "ok"
+    },
+    {
+     "from": "made",
+     "output": "failed",
+     "to": "next"
+    },
+    {
+     "from": "served",
+     "output": "yes",
+     "to": "made"
+    },
+    {
+     "from": "served",
+     "output": "no",
+     "to": "next"
+    }
+   ],
+   "entries": [
+    {
+     "id": "start",
+     "node": "served",
+     "vars": []
+    }
+   ]
+  },
+  {
+   "id": "cook_dinner",
+   "name": "Cook dinner",
+   "intention": "make_dinner",
+   "requires": [
+    "can_cook"
+   ],
+   "cost": {
+    "minutes": 45,
+    "money": 0,
+    "effort": 2
+   },
+   "time_budget_seconds": 7200,
+   "start": "cancook",
+   "nodes": [
+    {
+     "id": "cancook",
+     "kind": "gate",
+     "requirement": "can_cook",
+     "x": 40,
+     "y": 40
+    },
+    {
+     "id": "ingr",
+     "kind": "gate",
+     "requirement": "has_ingredients",
+     "x": 280,
+     "y": 40
+    },
+    {
+     "id": "shop",
+     "kind": "plan",
+     "plan": "buy_groceries",
+     "x": 280,
+     "y": 180
+    },
+    {
+     "id": "pot",
+     "kind": "gate",
+     "requirement": "cookware_free",
+     "x": 520,
+     "y": 40
+    },
+    {
+     "id": "cook",
+     "kind": "step",
+     "activity": "cook_recipe",
+     "x": 760,
+     "y": 40
+    },
+    {
+     "id": "made",
+     "kind": "action",
+     "action": "dinner_is_made",
+     "x": 1240,
+     "y": 40
+    },
+    {
+     "id": "ok",
+     "kind": "end",
+     "outcome": "satisfied",
+     "x": 1480,
+     "y": 40
+    },
+    {
+     "id": "next",
+     "kind": "end",
+     "outcome": "fallback",
+     "x": 520,
+     "y": 260
+    }
+   ],
+   "edges": [
+    {
+     "from": "made",
+     "output": "done",
+     "to": "ok"
+    },
+    {
+     "from": "made",
+     "output": "failed",
+     "to": "next"
+    },
+    {
+     "from": "cancook",
+     "output": "yes",
+     "to": "ingr"
+    },
+    {
+     "from": "cancook",
+     "output": "no",
+     "to": "next"
+    },
+    {
+     "from": "ingr",
+     "output": "yes",
+     "to": "pot"
+    },
+    {
+     "from": "ingr",
+     "output": "no",
+     "to": "shop",
+     "set": {
+      "missing": "has_ingredients"
+     }
+    },
+    {
+     "from": "shop",
+     "output": "done",
+     "to": "pot"
+    },
+    {
+     "from": "shop",
+     "output": "blocked",
+     "to": "next"
+    },
+    {
+     "from": "pot",
+     "output": "yes",
+     "to": "cook"
+    },
+    {
+     "from": "pot",
+     "output": "no",
+     "to": "next",
+     "set": {
+      "why": "no clean pot or pan"
+     }
+    },
+    {
+     "from": "cook",
+     "output": "done",
+     "to": "made"
+    },
+    {
+     "from": "cook",
+     "output": "failed",
+     "to": "next"
+    }
+   ],
+   "entries": [
+    {
+     "id": "start",
+     "node": "cancook",
+     "vars": []
+    }
+   ]
+  },
+  {
+   "id": "heat_dinner",
+   "name": "Heat up ready meals",
+   "intention": "make_dinner",
+   "requires": [],
+   "cost": {
+    "minutes": 45,
+    "money": 0,
+    "effort": 2
+   },
+   "time_budget_seconds": 7200,
+   "start": "ready",
+   "nodes": [
+    {
+     "id": "ready",
+     "kind": "gate",
+     "requirement": "has_ready_meal",
+     "x": 40,
+     "y": 40
+    },
+    {
+     "id": "heat",
+     "kind": "step",
+     "activity": "heat_meal",
+     "x": 280,
+     "y": 40
+    },
+    {
+     "id": "made",
+     "kind": "action",
+     "action": "dinner_is_made",
+     "x": 1240,
+     "y": 40
+    },
+    {
+     "id": "ok",
+     "kind": "end",
+     "outcome": "satisfied",
+     "x": 1480,
+     "y": 40
+    },
+    {
+     "id": "next",
+     "kind": "end",
+     "outcome": "fallback",
+     "x": 520,
+     "y": 260
+    }
+   ],
+   "edges": [
+    {
+     "from": "made",
+     "output": "done",
+     "to": "ok"
+    },
+    {
+     "from": "made",
+     "output": "failed",
+     "to": "next"
+    },
+    {
+     "from": "ready",
+     "output": "yes",
+     "to": "heat"
+    },
+    {
+     "from": "ready",
+     "output": "no",
+     "to": "next"
+    },
+    {
+     "from": "heat",
+     "output": "done",
+     "to": "made"
+    },
+    {
+     "from": "heat",
+     "output": "failed",
+     "to": "next"
+    }
+   ],
+   "entries": [
+    {
+     "id": "start",
+     "node": "ready",
+     "vars": []
+    }
+   ]
+  },
+  {
+   "id": "takeout_dinner",
+   "name": "Order takeout for dinner",
+   "intention": "make_dinner",
+   "requires": [
+    "phone_usable",
+    "money_for_takeout"
+   ],
+   "cost": {
+    "minutes": 45,
+    "money": 0,
+    "effort": 2
+   },
+   "time_budget_seconds": 7200,
+   "start": "phone",
+   "nodes": [
+    {
+     "id": "phone",
+     "kind": "gate",
+     "requirement": "phone_usable",
+     "x": 40,
+     "y": 40
+    },
+    {
+     "id": "money",
+     "kind": "gate",
+     "requirement": "money_for_takeout",
+     "x": 280,
+     "y": 40
+    },
+    {
+     "id": "order",
+     "kind": "action",
+     "action": "order_takeout",
+     "x": 520,
+     "y": 40
+    },
+    {
+     "id": "wait",
+     "kind": "wait",
+     "requirement": "has_warm_ready_meal",
+     "timeout_seconds": 5400,
+     "x": 760,
+     "y": 40
+    },
+    {
+     "id": "made",
+     "kind": "action",
+     "action": "dinner_is_made",
+     "x": 1240,
+     "y": 40
+    },
+    {
+     "id": "ok",
+     "kind": "end",
+     "outcome": "satisfied",
+     "x": 1480,
+     "y": 40
+    },
+    {
+     "id": "next",
+     "kind": "end",
+     "outcome": "fallback",
+     "x": 520,
+     "y": 260
+    }
+   ],
+   "edges": [
+    {
+     "from": "made",
+     "output": "done",
+     "to": "ok"
+    },
+    {
+     "from": "made",
+     "output": "failed",
+     "to": "next"
+    },
+    {
+     "from": "phone",
+     "output": "yes",
+     "to": "money"
+    },
+    {
+     "from": "phone",
+     "output": "no",
+     "to": "next"
+    },
+    {
+     "from": "money",
+     "output": "yes",
+     "to": "order"
+    },
+    {
+     "from": "money",
+     "output": "no",
+     "to": "next",
+     "set": {
+      "why": "no money for takeout"
+     }
+    },
+    {
+     "from": "order",
+     "output": "done",
+     "to": "wait"
+    },
+    {
+     "from": "order",
+     "output": "failed",
+     "to": "next"
+    },
+    {
+     "from": "wait",
+     "output": "ready",
+     "to": "made"
+    },
+    {
+     "from": "wait",
+     "output": "timed_out",
+     "to": "next"
+    }
+   ],
+   "entries": [
+    {
+     "id": "start",
+     "node": "phone",
      "vars": []
     }
    ]

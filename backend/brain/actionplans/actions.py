@@ -145,3 +145,21 @@ def feed_children_quickly(c, world, attempt):
         _drop_for_parents(world, k, f"feed_child_{k['id']}")
     attempt["vars"]["fed"] = [k["id"] for k in kids]
     return True
+
+
+@action("dinner_is_made")
+def dinner_is_made(c, world, attempt):
+    """Dinner is made (cooked, heated, ordered, or someone else got there first): Make Dinner is met -- for every grown-up
+    of the household who had it to do, not only the one who cooked."""
+    from systems.expectations import satisfy_expectation
+    chars = world.get("characters") or {}
+    hh = (world.get("households") or {}).get(c.get("household_id")) or {}
+    done = []
+    for m in [c.get("id")] + [x for x in hh.get("members") or [] if x != c.get("id")]:
+        p = chars.get(m)
+        nd = ((p or {}).get("expectations") or {}).get("make_dinner")
+        if nd and nd.get("status") != "satisfied":
+            satisfy_expectation(p, "make_dinner", world)
+            done.append(m)
+    attempt["vars"]["dinner_for"] = done
+    return bool(done)
