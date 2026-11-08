@@ -34,6 +34,9 @@ def ask_caretaker_for_food(c, world, attempt):
     if not adults:
         return False
     who = adults[0]
+    # the grown-up's feed_child duty is only acted on while the child is marked as waiting (systems/child_care.py::tend_child,
+    # the Feed the Kids plans): without this mark the request was dropped as "already seen to", and every ask timed out
+    c.setdefault("_awaiting_caregiver", {"need": "hunger", "tick": world.get("tick", 0), "asked": who["id"]})
     from brain.intentions import add_intention
     add_intention(who, {"type": f"feed_child_{c['id']}", "category": "survival", "priority": 80, "child_id": c["id"],
                         "reason": f"{c.get('name', 'A child')} is hungry and asked for food"})
@@ -91,4 +94,54 @@ def go_grocery_shopping(c, world, attempt):
         return False
     hh["_shopping_until"] = c.get("return_tick")
     grocery.make_plan(world, hh, c)
+    return True
+
+
+def _waiting_children(c, world):
+    chars = world.get("characters") or {}
+    hh = (world.get("households") or {}).get(c.get("household_id")) or {}
+    return [chars[m] for m in hh.get("members") or [] if m in chars and m != c.get("id") and chars[m].get("_awaiting_caregiver")
+            and not chars[m].get("off_grid") and chars[m].get("building_id") == c.get("building_id")]
+
+
+@action("call_children_to_eat")
+def call_children_to_eat(c, world, attempt):
+    """Food is ready: call the hungry children to come and eat. Their own Reduce Hunger takes it from there (they know the
+    food is there now); the grown-up's duty is done."""
+    kids = _waiting_children(c, world)
+    if not kids:
+        return False
+    from brain.actionplans import runner
+    from brain.intentions import add_intention
+    from systems.child_care import _drop_for_parents
+    for k in kids:
+        k.pop("_awaiting_caregiver", None)
+        for rid in ("food_served", "has_warm_ready_meal", "food_ready"):
+            runner.observe(k, world, rid, how="told")
+        add_intention(k, {"type": "eat_food", "category": "survival", "priority": 85, "reason": f"{c.get('first_name') or c.get('name', 'a grown-up')} called them to eat"})
+        _drop_for_parents(world, k, f"feed_child_{k['id']}")
+    try:
+        from systems.action_router import apply_speech
+        names = " and ".join(k.get("first_name") or k.get("name", "") for k in kids)
+        apply_speech(c, world, {"target": kids[0]["id"], "utterance": f"{names}, food's ready -- come and eat!", "speech_act": "statement"})
+    except Exception:                                  # noqa: BLE001 -- the call is said or not; the food is there either way
+        pass
+    attempt["vars"]["fed"] = [k["id"] for k in kids]
+    return True
+
+
+@action("feed_children_quickly")
+def feed_children_quickly(c, world, attempt):
+    """The last resort: nothing ready, nothing to cook, no takeout -- they rustle something up (systems/action_router.py's
+    feed_child: the child is fed at once) so no child goes hungry for want of a plan."""
+    kids = _waiting_children(c, world)
+    if not kids:
+        return False
+    from systems.action_router import _route_feed_child
+    for k in kids:
+        _route_feed_child(c, world, {"type": "feed_child", "target_id": k["id"]})
+    from systems.child_care import _drop_for_parents
+    for k in kids:
+        _drop_for_parents(world, k, f"feed_child_{k['id']}")
+    attempt["vars"]["fed"] = [k["id"] for k in kids]
     return True

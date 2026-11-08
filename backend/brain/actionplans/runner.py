@@ -35,9 +35,13 @@ def _data(world):
 
 def live_intention_for(world, intention_type):
     """The live intention that has taken over this old intention type (eat_food -> reduce_hunger), or None."""
+    t = str(intention_type or "")
     for i in _data(world).get("intentions") or []:
-        if i.get("status") == "live" and intention_type in (i.get("replaces") or []):
-            return i
+        if i.get("status") != "live":
+            continue
+        for r in i.get("replaces") or []:
+            if t == r or (r.endswith("*") and t.startswith(r[:-1])):       # "feed_child_*": one per child
+                return i
     return None
 
 
@@ -48,6 +52,11 @@ def drive_level(c, world, drive):
         if key not in body and key.endswith("_deficit") and body.get(key[:-8]) is not None:
             return 100 - body[key[:-8]]                     # hygiene_deficit = 100 - hygiene, ...
         return body.get(key)
+    if src == "world.child_hungry":
+        # 100 while a child of their household is waiting for a grown-up to feed them (systems/child_care.py), else 0
+        chars = world.get("characters") or {}
+        hh = (world.get("households") or {}).get(c.get("household_id")) or {}
+        return 100 if any((chars.get(m) or {}).get("_awaiting_caregiver") for m in hh.get("members") or [] if m != c.get("id")) else 0
     if src == "libido.tension":
         # 0-100: today's libido while it is running high (systems/libido.py's spike), else nothing pressing
         st = c.get("libido_state") or {}
@@ -181,8 +190,11 @@ def _start_plan(c, world, att, pid, entry=None, return_to=None):
 
 def _clear_replaced(c, intention):
     """Remove the old intention types this intention took over (eat_food for Reduce Hunger) from the list."""
-    old = set(intention.get("replaces") or [])
-    c["active_intentions"] = [i for i in c.get("active_intentions") or [] if i.get("type") not in old]
+    old = intention.get("replaces") or []
+    def replaced(t):
+        t = str(t or "")
+        return any(t == r or (r.endswith("*") and t.startswith(r[:-1])) for r in old)
+    c["active_intentions"] = [i for i in c.get("active_intentions") or [] if not replaced(i.get("type"))]
 
 
 def _finish(c, world, iid, att, status, why):

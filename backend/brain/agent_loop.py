@@ -1160,7 +1160,9 @@ def update_agent(
             continue                       # for when there is time: not while something pressing is still open
 
         # Feeding or reminding a child: done directly (systems/child_care.py::tend_child), not left to the model's choice
-        if intention.get("child_id") and str(intention.get("type", "")).startswith(("feed_child_", "remind_child_")):
+        from brain.actionplans.runner import live_intention_for as _live_for
+        if (intention.get("child_id") and str(intention.get("type", "")).startswith(("feed_child_", "remind_child_"))
+                and not _live_for(world, intention.get("type"))):          # Feed the Kids live: its plans get food ready
             from systems.child_care import tend_child
             if tend_child(c, world, intention):
                 return

@@ -353,3 +353,16 @@ def sink_reachable(c, world):
     here = (_building_at(world, c["x"], c["y"]) or {}).get("id") if c.get("x") is not None else None
     return any(p.get("building_id") in (_home_ids(c, world) | {here}) and
                any(a.get("interaction") in ("drink", "wash_hands") for a in p.get("anchors") or []) for p in world.get("props") or [])
+
+
+@resolver("food_ready")
+def food_ready(c, world):
+    """Something to eat is ready now: served, leftovers, or a warm takeout or heated meal."""
+    return bool(food_served(c, world) or has_warm_ready_meal(c, world))
+
+
+@resolver("child_waiting_here")
+def child_waiting_here(c, world):
+    """A child of the household, in this building, is waiting for a grown-up to feed them."""
+    from brain.actionplans.actions import _waiting_children
+    return bool(_waiting_children(c, world))

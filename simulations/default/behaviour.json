@@ -419,9 +419,9 @@
    "name": "A child to feed",
    "source": "world.child_hungry",
    "threshold": 1,
-   "satisfied_below": null,
+   "satisfied_below": 1,
    "intention": "feed_the_kids",
-   "notes": ""
+   "notes": "100 while a child of the household waits for a grown-up to feed them (systems/child_care.py), else 0"
   },
   {
    "id": "house_dirty",
@@ -977,14 +977,22 @@
    "id": "feed_the_kids",
    "name": "Feed the Kids",
    "drive": "child_hungry",
-   "status": "planned",
-   "plans": [],
-   "scout_plan": null,
-   "satisfied_when": null,
-   "replaces": [
-    "feed_child"
+   "status": "live",
+   "plans": [
+    "kids_food_is_ready",
+    "kids_heat_a_meal",
+    "kids_cook",
+    "kids_takeout",
+    "kids_something_quick"
    ],
-   "notes": ""
+   "scout_plan": null,
+   "satisfied_when": {
+    "drive_below": 1
+   },
+   "replaces": [
+    "feed_child_*"
+   ],
+   "notes": "get food ready and call them; the instant feed is only the last resort"
   },
   {
    "id": "keep_house_clean",
@@ -1321,6 +1329,22 @@
    "scope": "character",
    "ttl_seconds": 3600,
    "learn_by": "knows the place"
+  },
+  {
+   "id": "food_ready",
+   "name": "Something to eat is ready (served, or a warm meal)",
+   "resolver": "food_ready",
+   "scope": "household",
+   "ttl_seconds": 600,
+   "learn_by": "look in the kitchen"
+  },
+  {
+   "id": "child_waiting_here",
+   "name": "A hungry child here waiting to be fed",
+   "resolver": "child_waiting_here",
+   "scope": "household",
+   "ttl_seconds": 0,
+   "learn_by": "look around"
   },
   {
    "id": "tension_released",
@@ -1904,7 +1928,7 @@
     {
      "id": "wait",
      "kind": "wait",
-     "requirement": "food_served",
+     "requirement": "food_ready",
      "timeout_seconds": 3600,
      "x": 520,
      "y": 40
@@ -2830,6 +2854,630 @@
     {
      "id": "start",
      "node": "toilet",
+     "vars": []
+    }
+   ]
+  },
+  {
+   "id": "kids_food_is_ready",
+   "name": "Food is ready: call them",
+   "intention": "feed_the_kids",
+   "requires": [],
+   "cost": {
+    "minutes": 20,
+    "money": 0,
+    "effort": 1
+   },
+   "time_budget_seconds": 7200,
+   "start": "here",
+   "nodes": [
+    {
+     "id": "here",
+     "kind": "gate",
+     "requirement": "child_waiting_here",
+     "x": 40,
+     "y": 40
+    },
+    {
+     "id": "call",
+     "kind": "action",
+     "action": "call_children_to_eat",
+     "x": 1240,
+     "y": 40
+    },
+    {
+     "id": "ok",
+     "kind": "end",
+     "outcome": "satisfied",
+     "x": 1480,
+     "y": 40
+    },
+    {
+     "id": "next",
+     "kind": "end",
+     "outcome": "fallback",
+     "x": 520,
+     "y": 260
+    },
+    {
+     "id": "food",
+     "kind": "gate",
+     "requirement": "food_ready",
+     "x": 280,
+     "y": 40
+    }
+   ],
+   "edges": [
+    {
+     "from": "here",
+     "output": "yes",
+     "to": "food"
+    },
+    {
+     "from": "here",
+     "output": "no",
+     "to": "next",
+     "set": {
+      "why": "the children aren't here"
+     }
+    },
+    {
+     "from": "call",
+     "output": "done",
+     "to": "ok"
+    },
+    {
+     "from": "call",
+     "output": "failed",
+     "to": "next"
+    },
+    {
+     "from": "food",
+     "output": "yes",
+     "to": "call"
+    },
+    {
+     "from": "food",
+     "output": "no",
+     "to": "next"
+    }
+   ],
+   "entries": [
+    {
+     "id": "start",
+     "node": "here",
+     "vars": []
+    }
+   ]
+  },
+  {
+   "id": "kids_heat_a_meal",
+   "name": "Heat up a ready meal",
+   "intention": "feed_the_kids",
+   "requires": [],
+   "cost": {
+    "minutes": 20,
+    "money": 0,
+    "effort": 1
+   },
+   "time_budget_seconds": 7200,
+   "start": "here",
+   "nodes": [
+    {
+     "id": "here",
+     "kind": "gate",
+     "requirement": "child_waiting_here",
+     "x": 40,
+     "y": 40
+    },
+    {
+     "id": "call",
+     "kind": "action",
+     "action": "call_children_to_eat",
+     "x": 1240,
+     "y": 40
+    },
+    {
+     "id": "ok",
+     "kind": "end",
+     "outcome": "satisfied",
+     "x": 1480,
+     "y": 40
+    },
+    {
+     "id": "next",
+     "kind": "end",
+     "outcome": "fallback",
+     "x": 520,
+     "y": 260
+    },
+    {
+     "id": "ready",
+     "kind": "gate",
+     "requirement": "has_ready_meal",
+     "x": 280,
+     "y": 40
+    },
+    {
+     "id": "heat",
+     "kind": "step",
+     "activity": "heat_meal",
+     "x": 520,
+     "y": 40
+    }
+   ],
+   "edges": [
+    {
+     "from": "here",
+     "output": "yes",
+     "to": "ready"
+    },
+    {
+     "from": "here",
+     "output": "no",
+     "to": "next",
+     "set": {
+      "why": "the children aren't here"
+     }
+    },
+    {
+     "from": "call",
+     "output": "done",
+     "to": "ok"
+    },
+    {
+     "from": "call",
+     "output": "failed",
+     "to": "next"
+    },
+    {
+     "from": "ready",
+     "output": "yes",
+     "to": "heat"
+    },
+    {
+     "from": "ready",
+     "output": "no",
+     "to": "next"
+    },
+    {
+     "from": "heat",
+     "output": "done",
+     "to": "call"
+    },
+    {
+     "from": "heat",
+     "output": "failed",
+     "to": "next"
+    }
+   ],
+   "entries": [
+    {
+     "id": "start",
+     "node": "here",
+     "vars": []
+    }
+   ]
+  },
+  {
+   "id": "kids_cook",
+   "name": "Cook for the family",
+   "intention": "feed_the_kids",
+   "requires": [
+    "can_cook"
+   ],
+   "cost": {
+    "minutes": 20,
+    "money": 0,
+    "effort": 1
+   },
+   "time_budget_seconds": 7200,
+   "start": "here",
+   "nodes": [
+    {
+     "id": "here",
+     "kind": "gate",
+     "requirement": "child_waiting_here",
+     "x": 40,
+     "y": 40
+    },
+    {
+     "id": "call",
+     "kind": "action",
+     "action": "call_children_to_eat",
+     "x": 1240,
+     "y": 40
+    },
+    {
+     "id": "ok",
+     "kind": "end",
+     "outcome": "satisfied",
+     "x": 1480,
+     "y": 40
+    },
+    {
+     "id": "next",
+     "kind": "end",
+     "outcome": "fallback",
+     "x": 520,
+     "y": 260
+    },
+    {
+     "id": "cancook",
+     "kind": "gate",
+     "requirement": "can_cook",
+     "x": 280,
+     "y": 40
+    },
+    {
+     "id": "ingr",
+     "kind": "gate",
+     "requirement": "has_ingredients",
+     "x": 520,
+     "y": 40
+    },
+    {
+     "id": "pot",
+     "kind": "gate",
+     "requirement": "cookware_free",
+     "x": 760,
+     "y": 40
+    },
+    {
+     "id": "cook",
+     "kind": "step",
+     "activity": "cook_recipe",
+     "x": 1000,
+     "y": 40
+    },
+    {
+     "id": "wait",
+     "kind": "wait",
+     "requirement": "food_ready",
+     "timeout_seconds": 3600,
+     "x": 1000,
+     "y": 160
+    }
+   ],
+   "edges": [
+    {
+     "from": "here",
+     "output": "yes",
+     "to": "cancook"
+    },
+    {
+     "from": "here",
+     "output": "no",
+     "to": "next",
+     "set": {
+      "why": "the children aren't here"
+     }
+    },
+    {
+     "from": "call",
+     "output": "done",
+     "to": "ok"
+    },
+    {
+     "from": "call",
+     "output": "failed",
+     "to": "next"
+    },
+    {
+     "from": "cancook",
+     "output": "yes",
+     "to": "ingr"
+    },
+    {
+     "from": "cancook",
+     "output": "no",
+     "to": "next"
+    },
+    {
+     "from": "ingr",
+     "output": "yes",
+     "to": "pot"
+    },
+    {
+     "from": "ingr",
+     "output": "no",
+     "to": "next",
+     "set": {
+      "why": "nothing to cook with"
+     }
+    },
+    {
+     "from": "pot",
+     "output": "yes",
+     "to": "cook"
+    },
+    {
+     "from": "pot",
+     "output": "no",
+     "to": "next"
+    },
+    {
+     "from": "cook",
+     "output": "done",
+     "to": "wait"
+    },
+    {
+     "from": "cook",
+     "output": "failed",
+     "to": "next"
+    },
+    {
+     "from": "wait",
+     "output": "ready",
+     "to": "call"
+    },
+    {
+     "from": "wait",
+     "output": "timed_out",
+     "to": "next"
+    }
+   ],
+   "entries": [
+    {
+     "id": "start",
+     "node": "here",
+     "vars": []
+    }
+   ]
+  },
+  {
+   "id": "kids_takeout",
+   "name": "Order takeout for them",
+   "intention": "feed_the_kids",
+   "requires": [
+    "phone_usable",
+    "money_for_takeout"
+   ],
+   "cost": {
+    "minutes": 20,
+    "money": 0,
+    "effort": 1
+   },
+   "time_budget_seconds": 7200,
+   "start": "here",
+   "nodes": [
+    {
+     "id": "here",
+     "kind": "gate",
+     "requirement": "child_waiting_here",
+     "x": 40,
+     "y": 40
+    },
+    {
+     "id": "call",
+     "kind": "action",
+     "action": "call_children_to_eat",
+     "x": 1240,
+     "y": 40
+    },
+    {
+     "id": "ok",
+     "kind": "end",
+     "outcome": "satisfied",
+     "x": 1480,
+     "y": 40
+    },
+    {
+     "id": "next",
+     "kind": "end",
+     "outcome": "fallback",
+     "x": 520,
+     "y": 260
+    },
+    {
+     "id": "hours",
+     "kind": "decision",
+     "rules": [
+      {
+       "when": [
+        {
+         "var": "hour",
+         "op": ">=",
+         "value": 10
+        },
+        {
+         "var": "hour",
+         "op": "<",
+         "value": 23
+        }
+       ],
+       "output": "open"
+      }
+     ],
+     "default": "closed",
+     "x": 280,
+     "y": 40
+    },
+    {
+     "id": "phone",
+     "kind": "gate",
+     "requirement": "phone_usable",
+     "x": 520,
+     "y": 40
+    },
+    {
+     "id": "money",
+     "kind": "gate",
+     "requirement": "money_for_takeout",
+     "x": 760,
+     "y": 40
+    },
+    {
+     "id": "order",
+     "kind": "action",
+     "action": "order_takeout",
+     "x": 1000,
+     "y": 40
+    },
+    {
+     "id": "wait",
+     "kind": "wait",
+     "requirement": "has_warm_ready_meal",
+     "timeout_seconds": 5400,
+     "x": 1000,
+     "y": 160
+    }
+   ],
+   "edges": [
+    {
+     "from": "here",
+     "output": "yes",
+     "to": "hours"
+    },
+    {
+     "from": "here",
+     "output": "no",
+     "to": "next",
+     "set": {
+      "why": "the children aren't here"
+     }
+    },
+    {
+     "from": "call",
+     "output": "done",
+     "to": "ok"
+    },
+    {
+     "from": "call",
+     "output": "failed",
+     "to": "next"
+    },
+    {
+     "from": "hours",
+     "output": "open",
+     "to": "phone"
+    },
+    {
+     "from": "hours",
+     "output": "closed",
+     "to": "next"
+    },
+    {
+     "from": "phone",
+     "output": "yes",
+     "to": "money"
+    },
+    {
+     "from": "phone",
+     "output": "no",
+     "to": "next"
+    },
+    {
+     "from": "money",
+     "output": "yes",
+     "to": "order"
+    },
+    {
+     "from": "money",
+     "output": "no",
+     "to": "next"
+    },
+    {
+     "from": "order",
+     "output": "done",
+     "to": "wait"
+    },
+    {
+     "from": "order",
+     "output": "failed",
+     "to": "next"
+    },
+    {
+     "from": "wait",
+     "output": "ready",
+     "to": "call"
+    },
+    {
+     "from": "wait",
+     "output": "timed_out",
+     "to": "next"
+    }
+   ],
+   "entries": [
+    {
+     "id": "start",
+     "node": "here",
+     "vars": []
+    }
+   ]
+  },
+  {
+   "id": "kids_something_quick",
+   "name": "Rustle something up",
+   "intention": "feed_the_kids",
+   "requires": [],
+   "cost": {
+    "minutes": 5,
+    "money": 0,
+    "effort": 1
+   },
+   "time_budget_seconds": 1800,
+   "start": "here",
+   "notes": "the last resort (the old instant feed): nothing ready, nothing to cook, no takeout",
+   "nodes": [
+    {
+     "id": "here",
+     "kind": "gate",
+     "requirement": "child_waiting_here",
+     "x": 40,
+     "y": 40
+    },
+    {
+     "id": "feed",
+     "kind": "action",
+     "action": "feed_children_quickly",
+     "x": 280,
+     "y": 40
+    },
+    {
+     "id": "ok",
+     "kind": "end",
+     "outcome": "satisfied",
+     "x": 520,
+     "y": 40
+    },
+    {
+     "id": "stuck",
+     "kind": "end",
+     "outcome": "blocked",
+     "x": 280,
+     "y": 200
+    }
+   ],
+   "edges": [
+    {
+     "from": "here",
+     "output": "yes",
+     "to": "feed"
+    },
+    {
+     "from": "here",
+     "output": "no",
+     "to": "stuck",
+     "set": {
+      "why": "the children aren't here"
+     }
+    },
+    {
+     "from": "feed",
+     "output": "done",
+     "to": "ok"
+    },
+    {
+     "from": "feed",
+     "output": "failed",
+     "to": "stuck"
+    }
+   ],
+   "entries": [
+    {
+     "id": "start",
+     "node": "here",
      "vars": []
     }
    ]
