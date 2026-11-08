@@ -1,3 +1,4 @@
+import { uuid } from "./uuid.js";
 import { detectRooms }            from "./roomDetection.js";
 import { generateRoomGraph }       from "./roomGraph.js";
 import { generateNavigationGrid }  from "./navigation.js";
@@ -200,7 +201,7 @@ function placeOrEraseProp(x, y, erase = false) {
     p => !(p.x === x && p.y === y)
   );
   floorplan.prop_spawns.push({
-    id:       crypto.randomUUID(),
+    id:       uuid(),
     template: currentPropTemplate,
     x, y,
     rotation: currentPropRotation,
