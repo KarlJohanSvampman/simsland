@@ -248,6 +248,9 @@ def autopilot(c, world, intention_entry):
         att["drive_level"] = drive_level(c, world, store.get(_data(world), "drives", intention.get("drive")))
         att["vars"]["raised_as"] = intention_entry.get("type")       # take_nap vs sleep: a plan may weigh which it was
         _trace(att, world, what="raised", why=f"{intention_entry.get('type')} ({intention_entry.get('reason')})")
+    if att.get("resume"):
+        r = att.pop("resume")
+        return _run(c, world, iid, att, intention, came_out=r["out"], at=r["node"])
     if att.get("waiting_activity"):
         # autopilot only runs when they are doing nothing: the step's activity is gone without its end being
         # reported (it never really started) -- the step failed
@@ -386,8 +389,14 @@ def on_activity_end(data, world, out):
             att.setdefault("vars", {})["why"] = (f"{att.get('activity_type')} was interrupted"
                                                  + (f": {data['reason']}" if data.get("reason") else ""))
         intention = store.get(_data(world), "intentions", iid)
-        if intention:
-            _run(c, world, iid, att, intention, came_out=out, at=node)
+        if not intention:
+            continue
+        if c.get("activity"):
+            # events arrive after the fact: something else (an urgent toilet visit that interrupted this step) has started
+            # since -- the plan picks up with this outcome once they are free, not on top of it (systems/occupancy.py)
+            att["resume"] = {"node": node, "out": out}
+            continue
+        _run(c, world, iid, att, intention, came_out=out, at=node)
 
 
 def _on_wait_timer(world, entry):

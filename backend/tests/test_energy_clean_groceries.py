@@ -181,6 +181,21 @@ check("a second grocery trip the same day is refused, saying so",
 check("at three in the morning the shops are shut: no trip", not j.get("off_grid")
       and ("buy_groceries", "store", "gate", "no") in steps(j, "reduce_hunger"), str(steps(j, "reduce_hunger")[-5:]))
 
+# ---- a step's end reported after something else has already started: no clash, it resumes when free --------------
+w = world()
+j = w["characters"]["joseph"]
+j["body"]["hygiene"] = 25
+runner.autopilot(j, w, {"type": "take_shower", "category": "health", "priority": 65, "reason": "hygiene_low"})
+j["activity"] = {"type": "use_toilet", "phase": "using"}       # the bladder took over before the event came in
+runner.on_activity_end({"character_id": "joseph", "activity_type": "take_shower"}, w, "failed")
+att = j["plan_attempts"].get("get_clean") or {}
+check("an interrupted step heard about while on the toilet: nothing new starts on top", j["activity"]["type"] == "use_toilet"
+      and att.get("resume"), str(att))
+j["activity"] = None
+runner.autopilot(j, w, {"type": "take_shower", "category": "health", "priority": 65, "reason": "hygiene_low"})
+check("... and once free the plan carries on from that outcome", not j.get("plan_attempts", {}).get("get_clean")
+      and j["plan_log"][-1]["status"] == "blocked", str(j.get("plan_log", [])[-1:]))
+
 R.RESOLVERS["wants_bed"] = real_wants_bed
 print()
 if failures:
