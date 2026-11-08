@@ -217,6 +217,13 @@ def check_on_kids(c, world, attempt):
     expectation."""
     from systems.action_router import _route_check_on_kids
     before = ((c.get("expectations") or {}).get("child_bedtime_check") or {}).get("status")
-    _route_check_on_kids(c, world, {"type": "check_on_kids"})
+    # name the child: the check's own fallback only looks at c["dependents"], which a household's children are not always in
+    chars = world.get("characters") or {}
+    hh = (world.get("households") or {}).get(c.get("household_id")) or {}
+    kids = [chars[k] for k in (c.get("dependents") or []) + (hh.get("members") or []) if k in chars and k != c.get("id")
+            and (chars[k].get("age") or 99) < 13 and chars[k].get("building_id") == c.get("building_id") and not chars[k].get("off_grid")]
+    if not kids:
+        return False
+    _route_check_on_kids(c, world, {"type": "check_on_kids", "target_id": kids[0]["id"]})
     after = ((c.get("expectations") or {}).get("child_bedtime_check") or {}).get("status")
     return after == "satisfied" or (before is None and bool(c.get("activity")))

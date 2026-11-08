@@ -368,7 +368,7 @@ def child_waiting_here(c, world):
     return bool(_waiting_children(c, world))
 
 
-DINNER_LEAD_SECONDS = 30 * 60      # start cooking a little before the dinner window opens
+DINNER_LEAD_SECONDS = 60 * 60      # start cooking an hour before the dinner window opens (it was ready half an hour late)
 
 
 def _window_open(c, world, eid, lead):

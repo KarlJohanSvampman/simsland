@@ -34,6 +34,11 @@ def tier(i):
     start = i.get("window_start_tick")
     if start is not None and _ints._CURRENT_TICK and start - _ints._CURRENT_TICK > NOT_YET_OPEN_LEAD:
         return "when_free"
+    # ...and one whose window is open right now is due now, whatever its category (dinner together, "social": it was
+    # always behind something pressing and never happened)
+    end = i.get("window_end_tick")
+    if start is not None and end is not None and _ints._CURRENT_TICK and start - NOT_YET_OPEN_LEAD <= _ints._CURRENT_TICK < end:
+        return "pressing"
     if i.get("type") in PRESSING_TYPES:
         return "pressing"
     category = i.get("category")
