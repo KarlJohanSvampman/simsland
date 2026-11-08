@@ -1316,6 +1316,8 @@ ACTIVITIES = {
     "masturbate_in_bed": {"interaction": "sleep", "base_duration_minutes": 10, "interruptible": True, "category": "private"},
     "masturbate_on_toilet": {"interaction": "use_toilet", "base_duration_minutes": 8, "interruptible": True, "category": "private"},
     "masturbate_in_shower": {"interaction": "shower", "base_duration_minutes": 12, "interruptible": True, "category": "private"},
+    # Get Clean's fallback when the shower can't be had: a proper wash at the sink (face, armpits, a flannel)
+    "wash_up": {"interaction": "wash_hands", "base_duration_minutes": 6, "interruptible": True, "category": "survival"},
 }
 # =========================================================
 # DURATION
@@ -2285,6 +2287,13 @@ def complete_activity(
     # =====================================
     # DRINK
     # =====================================
+
+    elif activity_type == "wash_up":
+        b = c.setdefault("body", {})
+        b["hygiene"] = min(100, b.get("hygiene", 50) + 25)
+        b["odor"] = max(0, b.get("odor", 0) - 20)
+        from systems.body import touch
+        touch(c)
 
     elif activity_type in ("drink", "drink_water"):
         # Tap water at a sink -- see strategy.py::resolve_thirst_strategy

@@ -511,14 +511,18 @@
    "id": "reduce_thirst",
    "name": "Reduce Thirst",
    "drive": "thirst",
-   "status": "planned",
-   "plans": [],
+   "status": "live",
+   "plans": [
+    "glass_of_water"
+   ],
    "scout_plan": null,
-   "satisfied_when": null,
+   "satisfied_when": {
+    "drive_below": 20
+   },
    "replaces": [
     "drink"
    ],
-   "notes": ""
+   "notes": "tap water at a sink; a drink from the fridge or a shop waits for activities of their own"
   },
   {
    "id": "reduce_pressure_bladder",
@@ -601,7 +605,8 @@
    "drive": "hygiene",
    "status": "live",
    "plans": [
-    "shower"
+    "shower",
+    "wash_up"
    ],
    "scout_plan": null,
    "satisfied_when": {
@@ -610,7 +615,7 @@
    "replaces": [
     "take_shower"
    ],
-   "notes": "a shower at home; a bath and a quick wash wait for activities of their own"
+   "notes": "a shower at home; failing that a wash at the sink; a bath waits for an activity of its own"
   },
   {
    "id": "clean_teeth",
@@ -1307,6 +1312,14 @@
    "resolver": "shower_available",
    "scope": "household",
    "ttl_seconds": 86400,
+   "learn_by": "knows the place"
+  },
+  {
+   "id": "sink_reachable",
+   "name": "A sink with running water here or at home",
+   "resolver": "sink_reachable",
+   "scope": "character",
+   "ttl_seconds": 3600,
    "learn_by": "knows the place"
   },
   {
@@ -3101,9 +3114,9 @@
      "y": 40
     },
     {
-     "id": "stuck",
+     "id": "next",
      "kind": "end",
-     "outcome": "blocked",
+     "outcome": "fallback",
      "x": 280,
      "y": 200
     }
@@ -3117,7 +3130,7 @@
     {
      "from": "have",
      "output": "no",
-     "to": "stuck",
+     "to": "next",
      "set": {
       "why": "no shower at home"
      }
@@ -3130,13 +3143,215 @@
     {
      "from": "shower",
      "output": "failed",
-     "to": "stuck"
+     "to": "next"
     }
    ],
    "entries": [
     {
      "id": "start",
      "node": "have",
+     "vars": []
+    }
+   ]
+  },
+  {
+   "id": "wash_up",
+   "name": "A wash at the sink",
+   "intention": "get_clean",
+   "satisfies": true,
+   "requires": [
+    "sink_reachable"
+   ],
+   "cost": {
+    "minutes": 6,
+    "money": 0,
+    "effort": 1
+   },
+   "time_budget_seconds": 1800,
+   "start": "sink",
+   "nodes": [
+    {
+     "id": "sink",
+     "kind": "gate",
+     "requirement": "sink_reachable",
+     "x": 40,
+     "y": 40
+    },
+    {
+     "id": "wash",
+     "kind": "step",
+     "activity": "wash_up",
+     "x": 280,
+     "y": 40
+    },
+    {
+     "id": "ok",
+     "kind": "end",
+     "outcome": "satisfied",
+     "x": 520,
+     "y": 40
+    },
+    {
+     "id": "stuck",
+     "kind": "end",
+     "outcome": "blocked",
+     "x": 280,
+     "y": 200
+    }
+   ],
+   "edges": [
+    {
+     "from": "sink",
+     "output": "yes",
+     "to": "wash"
+    },
+    {
+     "from": "sink",
+     "output": "no",
+     "to": "stuck",
+     "set": {
+      "why": "nowhere to wash"
+     }
+    },
+    {
+     "from": "wash",
+     "output": "done",
+     "to": "ok"
+    },
+    {
+     "from": "wash",
+     "output": "failed",
+     "to": "stuck"
+    }
+   ],
+   "entries": [
+    {
+     "id": "start",
+     "node": "sink",
+     "vars": []
+    }
+   ]
+  },
+  {
+   "id": "glass_of_water",
+   "name": "A glass of water",
+   "intention": "reduce_thirst",
+   "satisfies": true,
+   "requires": [
+    "sink_reachable"
+   ],
+   "cost": {
+    "minutes": 3,
+    "money": 0,
+    "effort": 0
+   },
+   "time_budget_seconds": 1200,
+   "start": "sink",
+   "nodes": [
+    {
+     "id": "sink",
+     "kind": "gate",
+     "requirement": "sink_reachable",
+     "x": 40,
+     "y": 40
+    },
+    {
+     "id": "drink",
+     "kind": "step",
+     "activity": "drink_water",
+     "x": 280,
+     "y": 40
+    },
+    {
+     "id": "enough",
+     "kind": "decision",
+     "rules": [
+      {
+       "when": [
+        {
+         "var": "urgency",
+         "op": ">=",
+         "value": 45
+        }
+       ],
+       "output": "still thirsty"
+      }
+     ],
+     "default": "enough",
+     "x": 520,
+     "y": 40
+    },
+    {
+     "id": "again",
+     "kind": "step",
+     "activity": "drink_water",
+     "x": 760,
+     "y": 160
+    },
+    {
+     "id": "ok",
+     "kind": "end",
+     "outcome": "satisfied",
+     "x": 1000,
+     "y": 40
+    },
+    {
+     "id": "stuck",
+     "kind": "end",
+     "outcome": "blocked",
+     "x": 280,
+     "y": 200
+    }
+   ],
+   "edges": [
+    {
+     "from": "sink",
+     "output": "yes",
+     "to": "drink"
+    },
+    {
+     "from": "sink",
+     "output": "no",
+     "to": "stuck",
+     "set": {
+      "why": "nothing to drink nearby"
+     }
+    },
+    {
+     "from": "drink",
+     "output": "done",
+     "to": "enough"
+    },
+    {
+     "from": "drink",
+     "output": "failed",
+     "to": "stuck"
+    },
+    {
+     "from": "enough",
+     "output": "enough",
+     "to": "ok"
+    },
+    {
+     "from": "enough",
+     "output": "still thirsty",
+     "to": "again"
+    },
+    {
+     "from": "again",
+     "output": "done",
+     "to": "ok"
+    },
+    {
+     "from": "again",
+     "output": "failed",
+     "to": "ok"
+    }
+   ],
+   "entries": [
+    {
+     "id": "start",
+     "node": "sink",
      "vars": []
     }
    ]

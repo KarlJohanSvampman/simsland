@@ -345,3 +345,11 @@ def rested(c, world):
 @resolver("shower_available")
 def shower_available(c, world):
     return bool(_home_props(c, world, ("shower",)))
+
+
+@resolver("sink_reachable")
+def sink_reachable(c, world):
+    """A sink with running water at home or in the building they are in (the "drink" / "wash_hands" anchors)."""
+    here = (_building_at(world, c["x"], c["y"]) or {}).get("id") if c.get("x") is not None else None
+    return any(p.get("building_id") in (_home_ids(c, world) | {here}) and
+               any(a.get("interaction") in ("drink", "wash_hands") for a in p.get("anchors") or []) for p in world.get("props") or [])

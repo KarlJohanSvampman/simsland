@@ -193,8 +193,37 @@ check("an interrupted step heard about while on the toilet: nothing new starts o
       and att.get("resume"), str(att))
 j["activity"] = None
 runner.autopilot(j, w, {"type": "take_shower", "category": "health", "priority": 65, "reason": "hygiene_low"})
-check("... and once free the plan carries on from that outcome", not j.get("plan_attempts", {}).get("get_clean")
-      and j["plan_log"][-1]["status"] == "blocked", str(j.get("plan_log", [])[-1:]))
+check("... and once free the plan carries on from that outcome: no shower, so a wash at the sink",
+      (j.get("activity") or {}).get("type") == "wash_up" and ("shower", None, "fallback", None) in steps(j, "get_clean"),
+      str(steps(j, "get_clean")))
+j["activity"] = None
+j["body"]["hygiene"] = 50
+runner.on_activity_end({"character_id": "joseph", "activity_type": "wash_up"}, w, "done")
+check("... the wash counts: satisfied", j["plan_log"][-1]["status"] == "satisfied", str(j["plan_log"][-1:]))
+
+# ---- thirst: a glass of water, a second one if the first wasn't enough ----------------------------------------------
+w = world()
+j = w["characters"]["joseph"]
+j["body"]["hydration"] = 40
+res = runner.autopilot(j, w, {"type": "drink", "category": "survival", "priority": 60, "reason": "thirsty"})
+check("thirsty: a glass of water at the sink", res == "started" and j["activity"]["type"] == "drink_water",
+      f"{res} {steps(j, 'reduce_thirst')}")
+j["activity"] = None
+j["body"]["hydration"] = 55                      # no clean glass: cupped hands, only +15
+runner.on_activity_end({"character_id": "joseph", "activity_type": "drink_water"}, w, "done")
+check("... still thirsty after it: a second drink", (j.get("activity") or {}).get("type") == "drink_water"
+      and ("glass_of_water", "enough", "decision", "still thirsty") in steps(j, "reduce_thirst"), str(steps(j, "reduce_thirst")))
+j["activity"] = None
+j["body"]["hydration"] = 70
+runner.on_activity_end({"character_id": "joseph", "activity_type": "drink_water"}, w, "done")
+check("... and that will do: satisfied", j["plan_log"][-1]["status"] == "satisfied", str(j["plan_log"][-1:]))
+w = world()
+j = w["characters"]["joseph"]
+j.update(x=50, y=80)
+j["body"]["hydration"] = 40
+runner.autopilot(j, w, {"type": "drink", "category": "survival", "priority": 60, "reason": "thirsty"})
+check("out in the open, home far away... a sink at home still counts as reachable: they go home for it",
+      (j.get("activity") or {}).get("type") == "drink_water", str(steps(j, "reduce_thirst")))
 
 R.RESOLVERS["wants_bed"] = real_wants_bed
 print()

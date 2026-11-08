@@ -169,7 +169,7 @@ check("a leftover eat_food with hunger already met starts nothing, logs nothing,
 
 # ---- an intention that is not live leaves the old path alone -----------------------------------------------------------
 check("an intention type no live intention replaces is not handled here",
-      runner.autopilot(j, w, {"type": "drink", "reason": "thirsty"}) is None)
+      runner.autopilot(j, w, {"type": "visit_person", "reason": "miss her"}) is None)
 
 print()
 if failures:
