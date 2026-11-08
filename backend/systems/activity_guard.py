@@ -56,9 +56,37 @@ def has_urgent_need(c):
     return any(i.get("interrupts") and (i.get("strength", 1) or 0) > 0 for i in c.get("active_intentions", []))
 
 
+def _in_accepted_conversation(c, world):
+    try:
+        from brain.conversations import find_active_conversation_for
+        conv = find_active_conversation_for(world, c["id"])
+    except Exception:
+        return False, None
+    if not conv:
+        return False, None
+    return bool(conv.get("accepted")), conv
+
+
 def defer_reason(c, world, action):
+    if not action:
+        return None
+    # A character who is engaged in an active conversation (the listener has
+    # answered, so both parties are in it) may not start any other activity
+    # unless they end the conversation first.
+    engaged, conv = _in_accepted_conversation(c, world)
+    if engaged and _starts_an_activity(action):
+        atype = str(action.get("type") or "")
+        if atype not in ("leave_conversation", "dismiss_conversation"):
+            partner = None
+            try:
+                partner = [p for p in (conv.get("participants") or []) if p != c["id"]][0]
+            except Exception:
+                partner = None
+            who = partner or "the other person"
+            return (f"Engaged in conversation with {who}; end the conversation first "
+                    f"before starting {atype.replace('_', ' ')}")
     held = committed_remaining(c, world)
-    if not held or not action or not _starts_an_activity(action):
+    if not held or not _starts_an_activity(action):
         return None
     if has_urgent_need(c):
         return None

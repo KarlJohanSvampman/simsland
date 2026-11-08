@@ -270,8 +270,39 @@ def rule_wait(dc: DecisionContext) -> List[Option]:
                    None, priority=1, kind="idle")]
 
 
+def rule_dismiss_conversation(dc: DecisionContext) -> List[Option]:
+    if not (dc.allowed("leave_conversation") or dc.allowed("dismiss_conversation")):
+        return []
+    out: List[Option] = []
+    out.append(Option("dismiss_without_explanation",
+                      "Say you simply can't talk right now and leave.",
+                      {"type": "dismiss_conversation", "mode": "without_explanation"},
+                      speech={"utterance": "I can't talk right now, sorry.", "speech_act": "farewell", "target": None},
+                      priority=40, kind="social", speaks=True))
+    out.append(Option("dismiss_with_elaborate_excuse",
+                      "Make a fuller excuse for why you can't talk right now and leave.",
+                      {"type": "dismiss_conversation", "mode": "elaborate_excuse"},
+                      speech={"utterance": "I'm really sorry, I'm in the middle of something and can't stop right now.",
+                              "speech_act": "apologize", "target": None},
+                      priority=39, kind="social", speaks=True))
+    out.append(Option("dismiss_suggest_meet_later",
+                      "End it now but suggest talking in person later when you have more time.",
+                      {"type": "dismiss_conversation", "mode": "suggest_meet_later"},
+                      speech={"utterance": "Can we talk about this in person later? I'll have more time then.",
+                              "speech_act": "suggest", "target": None},
+                      priority=38, kind="social", speaks=True))
+    out.append(Option("dismiss_suggest_alternative_communication",
+                      "End it now but suggest continuing by message or a call at an approximate later time.",
+                      {"type": "dismiss_conversation", "mode": "suggest_alternative_communication"},
+                      speech={"utterance": "Let's continue this over message or a call later.",
+                              "speech_act": "suggest", "target": None},
+                      priority=37, kind="social", speaks=True))
+    return out
+
+
 DEFAULT_RULES: List[Rule] = [rule_eat, rule_bathroom, rule_drink, rule_rest,
-                             rule_raise_issue, rule_socialize, rule_wait]
+                             rule_raise_issue, rule_socialize, rule_wait,
+                             rule_dismiss_conversation]
 
 
 def _already_doing(dc: DecisionContext, opt: Option) -> bool:

@@ -219,6 +219,7 @@ ACTION_SPECS = {
     "form_theory":         {"group": "social", "target": "any", "doc": "Voice a theory about what's going on."},
     "make_argument":       {"group": "social", "target": "character", "detail": "topic", "doc": "Argue your side of a topic you disagree with someone about -- counters their last point, or raises a new one for your own stance. Only offered when there's a real disagreement live (see the values/opinions section of your context). Whoever's listening forms their own reaction based on their own values, not yours."},
     "leave_conversation":  {"group": "social", "target": "none", "doc": "Deliberately end the conversation you're currently in and disengage -- for walking away from an argument or an accusation instead of continuing it. Only offered while you're actually in an active conversation."},
+  "dismiss_conversation": {"group": "social", "target": "none", "doc": "Dismiss/end the conversation you're currently in, optionally with an excuse or a suggestion to talk later or via another medium. Only offered while you're actually in an active conversation."},
 
     # ---- touch --------------------------------------------------------
     "hug":            {"group": "touch", "target": "character", "doc": "Propose a hug."},

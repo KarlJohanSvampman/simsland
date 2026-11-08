@@ -927,6 +927,7 @@ def build_available_actions(c, world):
     from brain.conversations import find_active_conversation_for
     if find_active_conversation_for(world, c["id"]):
         action_types.append("leave_conversation")
+        action_types.append("dismiss_conversation")
 
     # Social projects (see systems/social_projects.py) — propose_project is
     # always offered (same "route handler validates the rest" shape as

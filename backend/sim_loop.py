@@ -757,6 +757,12 @@ def _tick_impl(world):
     # only, after every emit() site for this tick has had a chance to fire.
     if EVENT_BUS_ENABLED:
         flush_events(world)
+    try:
+        from core import sensory_event_dispatcher
+        sensory_event_dispatcher.fire_due_timers(world)
+        sensory_event_dispatcher.flush(world)
+    except Exception:
+        pass
 
 
 # ── Scheduled jobs: the cadence-gated blocks that used to run inside tick() ──────────

@@ -49,6 +49,9 @@ import re
 AWARE_TICKS = 3            # time a listener gets to start responding
 FLUSH_LAG = 1              # a heard line wakes the listener one tick later
 THINK_CAP = 60             # a generation longer than this counts as no answer
+RESPONSE_TIMEOUT_TICKS = THINK_CAP   # how long a character waits for a response before considering themselves ignored
+QUEUE_ESTIMATE_SECONDS = 5.0          # approximate per-request service time used for queue-wait estimates
+GENERATION_ETA_SECONDS = 30.0         # approximate Ollama generation time used for response ETA
 RETRY_TICKS = 8            # how long the speaker has to try again
 SIMPLE_WINDOW = 5
 MIN_COMPLEX_WINDOW = 10
@@ -97,9 +100,12 @@ def llm_degraded(now=None):
     return any(g["finished"] < g["began"] and now - g.get("wall", now) > SLOW_REPLY_SECONDS for g in _gen.values())
 
 
-def mark_thinking(char_id, tick):
+def mark_thinking(char_id, tick, queued_at=None):
     import time
-    _gen[char_id] = {"began": tick, "finished": -1, "wall": time.time()}
+    now = time.time()
+    _gen[char_id] = {"began": tick, "finished": -1, "wall": now,
+                     "queued_at": queued_at if queued_at is not None else now,
+                     "started_at": now}
 
 
 def clear_thinking(char_id, tick):
@@ -422,3 +428,128 @@ def context_line(c, conv, world):
                     f"You can prompt them once more, or react to being brushed off.")
         return f"{lead}You've said your piece; see whether {who} adds anything before you speak again."
     return f"{lead}{_name(holder)} has the floor right now; it isn't your turn."
+
+
+# ── generation timing helpers ────────────────────────────────────────────────
+# Approximate time until a character's pending reply starts generating (time
+# spent waiting in the model queue), the estimated ETA for the actual Ollama
+# response, and the timeout after which the character gives up and treats the
+# silence as being ignored. These are best-effort estimates built from the
+# floor state + the per-character generation tracker above.
+
+def _resolve_floor_and_world(*args, **kwargs):
+    world = kwargs.get("world", kwargs.get("w"))
+    conv = kwargs.get("conv", kwargs.get("conversation", kwargs.get("c")))
+    char_id = kwargs.get("char_id", kwargs.get("character_id", kwargs.get("cid")))
+    for a in args:
+        if isinstance(a, str):
+            if char_id is None:
+                char_id = a
+        elif isinstance(a, dict):
+            if "characters" in a or "conversations" in a:
+                if world is None:
+                    world = a
+            elif "floor" in a or "participants" in a or "history" in a:
+                if conv is None:
+                    conv = a
+    if world is None:
+        # fall back to a minimal world-like holder
+        world = {"tick": 0, "characters": {}}
+    if conv is None and char_id is not None:
+        try:
+            from brain.conversations import find_active_conversation_for
+            conv = find_active_conversation_for(world, char_id)
+        except Exception:
+            conv = None
+    if conv is None and world is not None:
+        try:
+            convs = world.get("conversations") or {}
+            if convs:
+                conv = list(convs.values())[0]
+        except Exception:
+            conv = None
+    return world, conv, char_id
+
+
+def _floor(conv):
+    return (conv or {}).get("floor") or {}
+
+
+def time_until_generation_starts(*args, **kwargs):
+    """Approximate ticks until generation starts (time spent in queue)."""
+    world, conv, char_id = _resolve_floor_and_world(*args, **kwargs)
+    f = _floor(conv)
+    t = world.get("tick", 0) if isinstance(world, dict) else 0
+    aware_by = f.get("aware_by", t)
+    return max(0, int(aware_by - t))
+
+
+def time_in_queue(*args, **kwargs):
+    return time_until_generation_starts(*args, **kwargs)
+
+
+def queue_wait_time(*args, **kwargs):
+    return time_until_generation_starts(*args, **kwargs)
+
+
+def queue_time(*args, **kwargs):
+    return time_until_generation_starts(*args, **kwargs)
+
+
+def estimated_response_eta(*args, **kwargs):
+    """Estimated ticks until the Ollama response lands."""
+    world, conv, char_id = _resolve_floor_and_world(*args, **kwargs)
+    f = _floor(conv)
+    t = world.get("tick", 0) if isinstance(world, dict) else 0
+    aware_by = f.get("aware_by", t)
+    window = f.get("window", THINK_CAP)
+    return max(0, int(aware_by - t + window))
+
+
+def response_eta(*args, **kwargs):
+    return estimated_response_eta(*args, **kwargs)
+
+
+def eta(*args, **kwargs):
+    return estimated_response_eta(*args, **kwargs)
+
+
+def generation_eta(*args, **kwargs):
+    return estimated_response_eta(*args, **kwargs)
+
+
+def response_timeout(*args, **kwargs):
+    """How long (ticks) a character waits before considering themselves ignored."""
+    return int(RESPONSE_TIMEOUT_TICKS)
+
+
+def ignored_timeout(*args, **kwargs):
+    return int(RESPONSE_TIMEOUT_TICKS)
+
+
+def wait_timeout(*args, **kwargs):
+    return int(RESPONSE_TIMEOUT_TICKS)
+
+
+def timeout(*args, **kwargs):
+    return int(RESPONSE_TIMEOUT_TICKS)
+
+
+# aliases using seconds where callers prefer wall-clock units
+def queue_wait_seconds(*args, **kwargs):
+    return float(time_until_generation_starts(*args, **kwargs))
+
+
+def estimated_response_seconds(*args, **kwargs):
+    return float(estimated_response_eta(*args, **kwargs))
+
+
+# expose the gen tracker helpers for "started" checks
+def generation_started(char_id):
+    g = _gen.get(char_id)
+    return bool(g) and g.get("started_at") is not None
+
+
+def in_queue(char_id):
+    g = _gen.get(char_id)
+    return bool(g) and g.get("finished", -1) < g.get("began", -1)

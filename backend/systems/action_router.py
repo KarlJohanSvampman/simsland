@@ -2636,6 +2636,8 @@ def route_action(c, world, action, speech, definitions=None, available_actions=N
         _route_make_argument(c, world, action)
     elif action_type == "leave_conversation":
         _route_leave_conversation(c, world, action)
+    elif action_type == "dismiss_conversation":
+        _route_dismiss_conversation(c, world, action)
     elif action_type == "contact_business":
         _route_contact_business(c, world, action)
     elif action_type == "book_appointment":
@@ -5392,6 +5394,31 @@ def _route_leave_conversation(c, world, action):
     c["current_speech"] = None
     if (c.get("activity") or {}).get("type") == "socialize":
         c["activity"] = None
+
+
+def _route_dismiss_conversation(c, world, action):
+    """Dismiss/end the current conversation, optionally with an excuse or a
+    suggestion to talk later / via another medium. Ends the conversation the
+    same way leave_conversation does, and records the dismissal mode."""
+    from brain.conversations import find_active_conversation_for, _archive_conversation
+    mode = (action or {}).get("mode") or "without_explanation"
+    conv = find_active_conversation_for(world, c["id"])
+    if conv:
+        conv["active"] = False
+        conv["dismiss_mode"] = mode
+        conv["dismiss_suggested_time"] = (action or {}).get("suggested_time")
+        conv["dismiss_medium"] = (action or {}).get("medium")
+        _archive_conversation(world, conv)
+    c["current_speech"] = None
+    if (c.get("activity") or {}).get("type") == "socialize":
+        c["activity"] = None
+    try:
+        from brain.memory import store_memory
+        store_memory(c, f"Dismissed a conversation ({mode}).", importance=0.3,
+                     tags=["conversation", "dismissed"], source="conversation",
+                     tick=world.get("tick", 0))
+    except Exception:
+        pass
 
 
 def _route_retrieve_phone(c, world, action):
