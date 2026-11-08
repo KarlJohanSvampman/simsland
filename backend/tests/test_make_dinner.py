@@ -152,18 +152,20 @@ cw.ready_vessel = lambda h, tick: {"kind": "pot"} if h.get("id") == "oka" else N
 res = runner.autopilot(rob, w, dict(TOGETHER))
 check("dinner together: everyone home, food on the table -- called to the table, and they sit down to eat",
       ("dinner_together", "call", "action", "done") in tsteps(rob) and res == "started" and rob["activity"]["type"] == "eat_meal"
-      and any(i.get("type") == "eat_food" for i in k.get("active_intentions") or []), f"{res} {tsteps(rob)}")
+      and (k.get("activity") or {}).get("type") == "eat_meal", f"{res} {tsteps(rob)} kathleen={k.get('activity')}")
+k["activity"] = None
 rob["activity"] = None
 runner.on_activity_end({"character_id": "robert", "activity_type": "eat_meal"}, w, "done")
 check("... the whole household was there: met", rob["expectations"]["family_dinner_together"]["status"] == "satisfied"
       and rob["plan_log"][-1]["status"] == "satisfied", str(tsteps(rob)[-3:]))
 
 w, rob, k = together_world()
-k["room_id"] = "starter_house_2:bedroom_5"                # at home, but upstairs
+k["conversation"] = "conv_1"                               # on the phone, can't come
 runner.autopilot(rob, w, dict(TOGETHER))
+k["room_id"] = "starter_house_2:bedroom_5"                # ... and stayed upstairs
 rob["activity"] = None
 runner.on_activity_end({"character_id": "robert", "activity_type": "eat_meal"}, w, "done")
-check("... Kathleen stayed in her room: not met, and it says who wasn't there",
+check("... Kathleen, busy on the phone, stayed in her room: not met, and it says who wasn't there",
       rob["expectations"]["family_dinner_together"]["status"] != "satisfied" and "Kathleen" in str(rob["plan_log"][-1].get("why"))
       and rob["expectations"]["family_dinner_together"].get("last_missed_blame") == ["kathleen"], str(rob["plan_log"][-1]))
 

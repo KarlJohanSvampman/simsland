@@ -176,10 +176,27 @@ def call_family_to_table(c, world, attempt):
         return False
     from brain.actionplans import runner
     from brain.intentions import add_intention
+    from systems.activities import ACTIVITIES, start_activity
+    from systems.occupancy import interrupt_activity
+    seated = []
     for o in here:
         runner.observe(o, world, "food_served", how="told")
         runner.observe(o, world, "food_ready", how="told")
-        add_intention(o, {"type": "eat_food", "category": "survival", "priority": 80, "reason": "dinner is on the table -- the family is eating together"})
+        # called to the table means coming to sit down with the family, hungry or not (2026-11-08: a child who wasn't
+        # hungry stayed in their room, and dinner together was never met). Whatever they are doing gives way if it can.
+        act = o.get("activity") or {}
+        if act.get("type") == "eat_meal":
+            seated.append(o["id"])
+            continue
+        if act and not (ACTIVITIES.get(act.get("type")) or {}).get("interruptible") or o.get("conversation"):
+            add_intention(o, {"type": "eat_food", "category": "survival", "priority": 80,
+                              "reason": "dinner is on the table -- the family is eating together"})
+            continue
+        if act:
+            interrupt_activity(o, world, reason="called to dinner")
+        if start_activity(o, world, "eat_meal"):
+            seated.append(o["id"])
+    attempt["vars"]["seated"] = seated
     try:
         from systems.action_router import apply_speech
         apply_speech(c, world, {"target": here[0]["id"], "utterance": "Dinner's ready, everyone -- come and sit down!", "speech_act": "statement"})
