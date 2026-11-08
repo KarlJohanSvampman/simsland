@@ -21,6 +21,8 @@ answer is taken. If the model gives nothing usable three times, or the people ca
 phone), the exchange simply doesn't happen -- no stock lines pretending it did.
 """
 
+from systems.occupancy import occupy as _occupy  # one activity at a time (systems/occupancy.py)
+
 import random
 
 # Real, live-feeling pauses between spoken lines in a call.
@@ -111,10 +113,10 @@ def begin_scripted_call(world, a, b, script, tier, severity=None, subcategory=No
     from systems.action_router import _scaffold
     conv = get_or_create_conversation(world, [a["id"], b["id"]], medium="call")
     duration = max(60, len(script) * CALL_LINE_DELAY_RANGE[1])
-    a["activity"] = _scaffold(a, world, "phone_call", target_id=b["id"],
-                               interaction="phone_call", duration=duration)
-    b["activity"] = _scaffold(b, world, "phone_call", target_id=a["id"],
-                               interaction="phone_call", duration=duration)
+    a["activity"] = _occupy(a, world, _scaffold(a, world, "phone_call", target_id=b["id"],
+                               interaction="phone_call", duration=duration))
+    b["activity"] = _occupy(b, world, _scaffold(b, world, "phone_call", target_id=a["id"],
+                               interaction="phone_call", duration=duration))
     _register(world, conv["id"], "call", a["id"], b["id"], script, tier, severity, subcategory)
     return conv
 
@@ -185,7 +187,7 @@ def _end_conversation(world, entry):
             # (main.py::_run_tick_and_persist calls tick() before either),
             # so the whole simulation silently stopped persisting/advancing.
             if c and (c.get("activity") or {}).get("interaction") == "phone_call":
-                c["activity"] = {}
+                c["activity"] = _occupy(c, world, {})
 
     tier = entry["tier"]
     subcategory = entry.get("subcategory")

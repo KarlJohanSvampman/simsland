@@ -1,0 +1,245 @@
+<title>Simsland Event Flow</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: a long engineering sheet -- a fixed contents rail on wide screens, wide diagrams scroll inside their own frames. */
+:root {
+  --bg: #f6f7f4; --panel: #ffffff; --ink: #17201b; --muted: #5d6a62; --rule: #d9ded8;
+  --accent: #2e6b4f; --accent-soft: #e3efe8; --poll: #b4432e; --poll-soft: #fbe9e4; --new: #9a6a00; --new-soft: #fff3d6;
+  --event: #3b5b9a; --event-soft: #e9eef8;
+  --display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --body: "Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #111713; --panel: #18201b; --ink: #e5ece7; --muted: #9aa8a0; --rule: #2c3830;
+  --accent: #7fc8a2; --accent-soft: #1d3127; --poll: #f08b72; --poll-soft: #3a1f19; --new: #e8b84a; --new-soft: #3a2e12;
+  --event: #9db7ec; --event-soft: #1c2638; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #111713; --panel: #18201b; --ink: #e5ece7; --muted: #9aa8a0; --rule: #2c3830;
+  --accent: #7fc8a2; --accent-soft: #1d3127; --poll: #f08b72; --poll-soft: #3a1f19; --new: #e8b84a; --new-soft: #3a2e12;
+  --event: #9db7ec; --event-soft: #1c2638; color-scheme: dark }
+* { box-sizing: border-box }
+body { background: var(--bg); color: var(--ink); font: 16px/1.55 var(--body); margin: 0 }
+.wrap { max-width: 1240px; margin: 0 auto; padding-block: 32px 80px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 40px }
+nav { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 24px); align-self: start; font-size: 14px }
+nav a { display: block; color: var(--muted); text-decoration: none; padding: 4px 0; border-left: 2px solid transparent; padding-left: 10px }
+nav a:hover, nav a:focus-visible { color: var(--ink); border-left-color: var(--accent); outline: none }
+main { min-width: 0 }
+h1 { font: 700 clamp(30px, 4vw, 44px)/1.1 var(--display); margin: 0 0 12px; text-wrap: balance; letter-spacing: -0.01em }
+h2 { font: 700 26px/1.2 var(--display); margin: 56px 0 8px; text-wrap: balance }
+h3 { font: 600 18px/1.3 var(--display); margin: 28px 0 8px }
+p, li { max-width: 72ch }
+.lede { font-size: 18px; color: var(--muted); max-width: 70ch }
+.eyebrow { font: 600 12px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--accent) }
+code { font: 13px var(--mono); background: var(--accent-soft); padding: 1px 5px; border-radius: 4px }
+.chip { display: inline-block; margin: 1px 2px; white-space: nowrap }
+.muted { color: var(--muted) }
+.legend { display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: 14px; margin: 12px 0 }
+.legend span::before { content: ""; display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; background: var(--c) }
+.frame { overflow-x: auto; background: var(--panel); border: 1px solid var(--rule); border-radius: 8px; padding: 16px; margin: 12px 0 }
+.frame pre.mermaid { margin: 0; min-width: 760px; background: transparent }
+.frame.tall pre.mermaid { min-width: 1100px }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin: 20px 0 }
+.stat { background: var(--panel); border: 1px solid var(--rule); border-radius: 8px; padding: 14px 16px }
+.stat b { display: block; font: 700 30px/1 var(--display); font-variant-numeric: tabular-nums }
+.stat.poll b { color: var(--poll) }
+.stat span { font-size: 14px; color: var(--muted) }
+table { border-collapse: collapse; width: 100%; font-size: 14px; background: var(--panel) }
+th, td { text-align: left; vertical-align: top; padding: 8px 10px; border-bottom: 1px solid var(--rule) }
+th { font: 600 12px var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); position: sticky; top: 0; background: var(--panel) }
+td.nm { font: 600 13px var(--mono); white-space: nowrap }
+td.num { font-variant-numeric: tabular-nums; white-space: nowrap }
+td.fns { font-size: 12px; min-width: 260px }
+td.fns code { font-size: 12px }
+.tablewrap { overflow-x: auto; border: 1px solid var(--rule); border-radius: 8px; max-height: 70vh }
+.tablewrap table { min-width: 980px }
+.barcell { width: 120px }
+.bar { display: block; height: 8px; width: var(--w); background: var(--accent); border-radius: 4px; opacity: .8; margin-top: 6px }
+.pill-new, .pill-old { font: 600 11px var(--mono); padding: 2px 7px; border-radius: 999px; text-transform: uppercase; letter-spacing: .05em }
+.pill-new { background: var(--new-soft); color: var(--new) }
+.pill-old { background: var(--event-soft); color: var(--event) }
+.cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px }
+.card { background: var(--panel); border: 1px solid var(--rule); border-radius: 8px; padding: 16px 18px }
+.card h3 { margin-top: 0 }
+.card.poll { border-left: 4px solid var(--poll) }
+.card.goal { border-left: 4px solid var(--accent) }
+ol.steps li { margin: 8px 0 }
+.done { color: var(--accent); font-weight: 700 }
+.todo { color: var(--muted); font-weight: 700 }
+@media (max-width: 860px) { .wrap { grid-template-columns: minmax(0, 1fr) } nav { display: none } }
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important } }
+</style>
+
+<div class="wrap">
+<nav aria-label="Contents">
+  <a href="#overview">The system today</a>
+  <a href="#tick">One tick</a>
+  <a href="#clients">A change reaching a browser</a>
+  <a href="#polling">Where it polls</a>
+  <a href="#target">The dispatcher</a>
+  <a href="#jobs-event">Jobs: on an event</a>
+  <a href="#jobs-clock">Jobs: on the clock</a>
+  <a href="#jobs-process">Jobs: time passing</a>
+  <a href="#sources">Where events come from</a>
+  <a href="#plan">Migration steps</a>
+</nav>
+<main>
+<div class="eyebrow">Backend architecture · branch claude/determined-rubin-dae15g (from move-to-a-thing)</div>
+<h1>Simsland event flow</h1>
+<p class="lede">How the persistent world is ticked, how a change travels from the system that made it to the screens that show it, and what sets off each of the @@TOTAL@@ background jobs. Today first, then the change dispatcher we are moving to: components say what changed, listeners subscribe, and a browser only hears about what is on the part of the map it is looking at.</p>
+
+<div class="stats">
+  <div class="stat"><b>@@TOTAL@@</b><span>background jobs, all in one table (core/flow.py)</span></div>
+  <div class="stat"><b>@@EVENTS@@</b><span>started by an event</span></div>
+  <div class="stat"><b>@@CLOCKS@@</b><span>on calendar time</span></div>
+  <div class="stat"><b>@@PROCS@@</b><span>time passing, in sim seconds</span></div>
+  <div class="stat poll"><b>3600×</b><span>how often the three "daily" jobs actually ran</span></div>
+</div>
+
+<h2 id="overview">The system today</h2>
+<p>One process owns the world and ticks it. Everything else reads a copy or asks the owner to change something.</p>
+<div class="frame"><pre class="mermaid">
+flowchart LR
+  B["Browser<br/>three.js map, inspector tabs"] -- "ws /ws: viewport, selection" --> N["nginx :8000"]
+  B -- "REST: panels, polls" --> N
+  N --> G1["api gateway ×2<br/>read replica of the world"]
+  G1 -- "mutations as commands<br/>(Redis stream cmd:req)" --> C
+  G1 -- "@core_only routes, HTTP" --> C
+  C["Simulation core<br/>owns the world, ticks it<br/>(asyncio loop → tick thread)"] -- "frames per tick + snapshots<br/>(Redis :frames / :snap)" --> G1
+  C -- "write-behind every N ticks" --> PG[("Postgres<br/>world JSON")]
+  C -- "world cache" --> R[("Redis")]
+  C -- "decision requests (stream)" --> CW["cognition workers"]
+  CW -- "decision_ready" --> C
+  C -- "one-off model calls" --> BG["bg_llm workers"]
+  CW --> O["Ollama (LAN)"]
+  BG --> O
+</pre></div>
+
+<h2 id="tick">One tick, step by step</h2>
+<p>A tick is one step of the loop and advances the clock by one sim second; at higher speeds the loop just runs more often. Red steps look at everything to find what changed.</p>
+<div class="legend"><span style="--c:var(--poll)">looks at everything (polling)</span><span style="--c:var(--event)">driven by what happened</span><span style="--c:var(--accent)">bookkeeping</span></div>
+<div class="frame tall"><pre class="mermaid">
+flowchart TD
+  classDef poll fill:#fbe9e4,stroke:#b4432e,color:#3a120a
+  classDef ev fill:#e9eef8,stroke:#3b5b9a,color:#0f1d33
+  classDef ok fill:#e3efe8,stroke:#2e6b4f,color:#0d2a19
+  A["ensure_world_defaults + schema passes<br/>(prop fields, outlets, vehicles, market) on the whole world"]:::poll
+  A --> B["advance calendar: tick += 1, sim_time += 1 s"]:::ok
+  B --> C["clock.advance → time.hour / time.day / time.week / time.month"]:::ev
+  C --> D["scheduler.fire_due → recurring jobs whose time came"]:::ok
+  D --> E["movement for everyone walking"]:::ok
+  E --> F["conversation floor + outcome: every conversation"]:::poll
+  F --> G["update_agent for every character<br/>~32 sweeps each: body, desires, deadlines,<br/>expectations, social intentions, schedule, item knowledge…"]:::poll
+  G --> H["autopilot: first intention that can start an activity"]:::ok
+  G --> I["should_think? → request_decision (to a worker)"]:::ev
+  H --> J["inline every-tick systems<br/>departure flags, ambient sounds"]:::poll
+  J --> K["event bus flush: every handler for every queued event<br/>(decision_ready, speech, activity_*, time.*)"]:::ev
+  K --> L["collect_dirty: agents are all marked dirty every tick"]:::poll
+  L --> M["entity_versions: hash every key of every dirty character<br/>(cold keys every 15 ticks) to find what changed"]:::poll
+  M --> P["replication frame → Redis (when a gateway listens)"]:::ok
+  P --> Q["write-behind persistence (every N ticks)"]:::ok
+  Q --> W["websocket broadcast: per client, filter by viewport radius, send patches"]:::ev
+</pre></div>
+
+<h2 id="clients">A change reaching a browser today</h2>
+<div class="frame"><pre class="mermaid">
+sequenceDiagram
+  autonumber
+  participant S as A system (e.g. activities.py)
+  participant W as World dict
+  participant T as Tick
+  participant V as entity_versions
+  participant GW as Gateway / ws
+  participant BR as Browser
+  S->>W: writes c["activity"] = …  (no notice to anyone)
+  T->>T: marks every agent character dirty (coarse)
+  T->>V: hash every top-level key of each dirty character
+  V-->>T: these keys differ from last tick
+  T->>GW: frame: changed keys + dirty ids
+  GW->>GW: each client: is x,y within radius(zoom) of its camera?
+  GW-->>BR: delta (patches) if anything visible changed
+  BR->>GW: every 5 s: GET /api/events, outliner lists
+  BR->>GW: every 45 s: perception ranges; every 3 s: clock
+  BR->>GW: definitions fetched separately by ~9 modules
+</pre></div>
+
+<h2 id="polling">Where it polls</h2>
+<div class="cols">
+  <div class="card poll"><h3>Jobs on fixed intervals</h3><p>91 background jobs ran on tick counts. Three meant "daily" ran every 24 s, 3,600 times a day: community stats drift, the whole daily-life bundle (diaries, crime careers, gang wars, life comparison), and daily finance. Envy re-fired every few minutes because of it.</p></div>
+  <div class="card poll"><h3>Finding what changed by hashing</h3><p>No system says what it changed. Each tick every agent character is marked dirty and every one of its keys is hashed to find out; big keys every 15 ticks, so a change there is up to 15 s late.</p></div>
+  <div class="card poll"><h3>Per-character sweeps every tick</h3><p>update_agent re-derives desires, deadlines, expectations, body intentions and more for every character every second, whether anything about them changed or not.</p></div>
+  <div class="card poll"><h3>The browser polls too</h3><p>Events and the outliner every 5 s, perception ranges every 45 s, the clock every 3 s, Ollama status. Definitions are fetched by about nine modules on their own. <code>/api/state</code> returns the whole world.</p></div>
+</div>
+
+<h2 id="target">Where we are going: the change dispatcher</h2>
+<p>A component that changes an entity tells the dispatcher what changed. The dispatcher is the one place that knows who cares: background jobs subscribe by event, the replica takes only the changed keys, and each browser subscribes to the map cells in its viewport plus the things it has open. Nothing is looked at again unless it changed, and nothing static is loaded twice.</p>
+<div class="frame tall"><pre class="mermaid">
+flowchart LR
+  classDef src fill:#e3efe8,stroke:#2e6b4f,color:#0d2a19
+  classDef hub fill:#fff3d6,stroke:#9a6a00,color:#2b1d00
+  classDef sub fill:#e9eef8,stroke:#3b5b9a,color:#0f1d33
+  classDef cli fill:#f3e9f7,stroke:#7a3f99,color:#2a1036
+  subgraph Producers["Components that change things"]
+    M1["movement: position / room / building"]:::src
+    M2["activities: started / finished / phase"]:::src
+    M3["speech, conversations, memories"]:::src
+    M4["needs, money, relationships, items"]:::src
+    CLK["clock: time.hour / time.day"]:::src
+  end
+  M1 & M2 & M3 & M4 & CLK -- "changed(entity, keys, where)" --> DSP{{"Change dispatcher<br/>one record per change:<br/>kind, id, keys, cell, event name"}}:::hub
+  DSP -- "domain events" --> JOBS["Background jobs<br/>subscribed by event (core/flow.py)<br/>settle windows coalesce bursts"]:::sub
+  DSP -- "changed keys only" --> REP["Replica stream to gateways<br/>(no hashing, no full re-check)"]:::sub
+  DSP -- "cell of the change" --> IDX["Spatial interest index<br/>map cell → subscribed clients"]:::sub
+  IDX --> C1["Browser A<br/>cells in its viewport + selected character + open panels"]:::cli
+  IDX --> C2["Browser B<br/>another part of the map"]:::cli
+  C1 -- "viewport moved: subscribe new cells, drop old" --> IDX
+  C1 -- "open panel: subscribe topic (issues, events, outliner)" --> DSP
+  ST[("Static data: map, definitions<br/>versioned, loaded once, cached in the browser")]:::sub -. "etag / version" .-> C1
+</pre></div>
+<div class="cols">
+  <div class="card goal"><h3>Rule 1: say what changed</h3><p>Writes to an entity go through the dispatcher (<code>changed(kind, id, keys)</code>), not straight into the world dict. That replaces hashing and coarse dirty marks.</p></div>
+  <div class="card goal"><h3>Rule 2: only visible changes travel</h3><p>A client subscribes to map cells, not a radius recomputed per tick. A change outside its cells is never serialised for it. The selected character and open panels are explicit topic subscriptions.</p></div>
+  <div class="card goal"><h3>Rule 3: load once</h3><p>Definitions and the map carry a version. The browser fetches them once and keeps them until the version changes; modules share one copy.</p></div>
+  <div class="card goal"><h3>Rule 4: jobs start on events</h3><p>A job runs because something it cares about changed (or the clock struck), never because N ticks went by. Time passing is explicit and in sim seconds.</p></div>
+</div>
+
+<h2 id="jobs-event">Jobs that start on an event (@@EVENTS@@)</h2>
+<p>Blue: events that already existed. Yellow: events added for this table. Purple: what the jobs emit, with how many listeners each has.</p>
+<div class="frame tall"><pre class="mermaid">
+@@EVENT_GRAPH@@
+</pre></div>
+<div class="tablewrap"><table>
+<thead><tr><th>Job</th><th>Started by</th><th>Why</th><th>Emits</th><th>Calls</th></tr></thead>
+<tbody>@@EV_ROWS@@</tbody></table></div>
+
+<h2 id="jobs-clock">Jobs on the clock (@@CLOCKS@@)</h2>
+<p>Due at a time of day or minute past the hour, as a sim timestamp. The three that were running every 24 s are here now.</p>
+<div class="tablewrap"><table>
+<thead><tr><th>Job</th><th>When</th><th>What</th><th>Emits</th><th>Calls</th></tr></thead>
+<tbody>@@CLOCK_ROWS@@</tbody></table></div>
+
+<h2 id="jobs-process">Jobs that run because time passes (@@PROCS@@)</h2>
+<p>Decay, drain, growth, things in progress. Each keeps the interval it always had (now in sim seconds), so its tuning is unchanged. Bar length is the interval on a log scale, 1 s to 1 h. These are the next candidates to become "start when the condition begins, stop when it ends".</p>
+<div class="tablewrap"><table>
+<thead><tr><th>Job</th><th>Every</th><th></th><th>What</th><th>Emits</th><th>Calls</th></tr></thead>
+<tbody>@@PROC_ROWS@@</tbody></table></div>
+
+<h2 id="sources">Where the events come from</h2>
+<div class="tablewrap"><table>
+<thead><tr><th>Event</th><th></th><th>Emitted at</th><th>Listeners</th></tr></thead>
+<tbody>@@SRC_ROWS@@</tbody></table></div>
+
+<h2 id="plan">Migration steps</h2>
+<ol class="steps">
+  <li><span class="done">In progress.</span> Timers are due at sim timestamps; every interval is written in clock units; calendar jobs run on the clock; one job table (this page is drawn from it).</li>
+  <li><span class="done">In progress.</span> Jobs that only checked whether something happened subscribe to events instead (perception, introductions, envy, phone, goodbyes, availability, evictions, archiving).</li>
+  <li><span class="todo">Next.</span> The change dispatcher: <code>changed(kind, id, keys, cell)</code> at the write sites for position, room, activity, speech, needs; replaces the per-tick dirty marks and the key hashing.</li>
+  <li><span class="todo">Next.</span> Cell subscriptions for websocket clients; panels subscribe to topics instead of polling; definitions and map versioned and loaded once.</li>
+  <li><span class="todo">Then.</span> The per-character sweeps in update_agent move behind the events that change their inputs; "time passing" jobs start and stop with their condition.</li>
+</ol>
+</main>
+</div>

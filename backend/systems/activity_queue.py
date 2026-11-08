@@ -1,3 +1,4 @@
+from systems.occupancy import occupy as _occupy  # one activity at a time (systems/occupancy.py)
 # =========================================================
 # ACTIVITY QUEUE
 # An ordered list of tasks a character will execute in
@@ -262,10 +263,10 @@ def _dispatch_task(c, world, task):
         from systems.action_router import _not_in_sight
         if _not_in_sight(c, world, target_id) is not None:
             return False
-        c["activity"]        = _scaffold(c, world, "examine",
+        c["activity"]        = _occupy(c, world, _scaffold(c, world, "examine",
                                          target_id=target_id,
                                          interaction="examine",
-                                         duration=180)
+                                         duration=180))
         c["animation_state"] = "examine"
         c["_queue_task_id"]  = task["id"]
         return True
@@ -281,10 +282,10 @@ def _dispatch_task(c, world, task):
         prop      = get_prop_by_id(world, target_id)
         if prop:
             prop["state"] = "setup"
-        c["activity"]       = _scaffold(c, world, "interact",
+        c["activity"]       = _occupy(c, world, _scaffold(c, world, "interact",
                                          target_id=target_id,
                                          interaction="interact",
-                                         duration=120)
+                                         duration=120))
         c["_queue_task_id"] = task["id"]
         return True
 
@@ -303,7 +304,7 @@ def _dispatch_task(c, world, task):
         if act_type in ACTIVITIES:
             ok = start_activity(c, world, act_type)
         else:
-            c["activity"] = _scaffold(c, world, act_type, duration=5400)
+            c["activity"] = _occupy(c, world, _scaffold(c, world, act_type, duration=5400))
             ok = True
         if ok:
             c["_queue_task_id"] = task["id"]
@@ -323,9 +324,9 @@ def _dispatch_hobby(c, world, task):
     if activity_type in ACTIVITIES:
         ok = start_activity(c, world, activity_type)
     else:
-        c["activity"] = _scaffold(c, world, activity_type,
+        c["activity"] = _occupy(c, world, _scaffold(c, world, activity_type,
                                    target_id=target_id,
-                                   duration=5400)
+                                   duration=5400))
         ok = True
 
     if ok:
@@ -349,7 +350,7 @@ def _dispatch_retrieve(c, world, task):
     act["item_type"]   = p.get("item_type")
     act["dest_prop_id"]= p.get("dest_prop_id")
     act["is_retrieve"] = True
-    c["activity"]      = act
+    c["activity"]      = _occupy(c, world, act)
     c["_queue_task_id"]= task["id"]
     c["animation_state"] = "walk"
     return True
@@ -367,7 +368,7 @@ def _dispatch_search(c, world, task):
     act["dest_prop_id"]   = p.get("dest_prop_id")
     act["search_phase"]   = "starting"
     act["containers_left"]= []
-    c["activity"]         = act
+    c["activity"]         = _occupy(c, world, act)
     c["_queue_task_id"]   = task["id"]
     c["animation_state"]  = "walk"
     return True
@@ -387,7 +388,7 @@ def _dispatch_return(c, world, task):
                                    duration=180)
     act["item_type"]  = p.get("item_type")
     act["is_return"]  = True
-    c["activity"]     = act
+    c["activity"]     = _occupy(c, world, act)
     c["_queue_task_id"]= task["id"]
     return True
 
@@ -427,7 +428,7 @@ def _dispatch_carry_seat(c, world, task):
     c["move_target"]     = {"x": seat_prop["x"], "y": seat_prop["y"],
                              "target_id": seat_prop_id, "target_type": "prop"}
     c["is_moving"]       = True
-    c["activity"]        = act
+    c["activity"]        = _occupy(c, world, act)
     c["animation_state"] = "walk"
     c["_queue_task_id"]  = task["id"]
     return True
@@ -469,7 +470,7 @@ def _dispatch_use_seat(c, world, task):
     c["move_target"]       = {"x": seat_prop["x"], "y": seat_prop["y"],
                                "target_id": seat_prop_id, "target_type": "prop"}
     c["is_moving"]         = True
-    c["activity"]          = act
+    c["activity"]          = _occupy(c, world, act)
     c["animation_state"]   = "walk"
     c["_queue_task_id"]    = task["id"]
     return True

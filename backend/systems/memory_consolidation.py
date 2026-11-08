@@ -27,6 +27,7 @@ import random
 
 CONSOLIDATION_INTERVAL_TICKS = 3600    # once per real hour
 FORGET_INTERVAL_TICKS        = 10800   # every ~3 real hours
+RETRY_TICKS                  = 300     # the AI couldn't summarise the hour: try again this soon
 # Per the user's explicit ask ("remember somewhat longer... don't drop
 # before X"): a memory is never even considered for forgetting until
 # it's at least this old, regardless of its own drop_probability.
@@ -68,7 +69,8 @@ def maybe_consolidate_memories(c, world):
     c["_last_memory_consolidation_tick"] = tick
 
     memories = c.get("memories", [])
-    window_start = tick - CONSOLIDATION_INTERVAL_TICKS
+    # An hour the AI couldn't summarise last time is still waiting: widen the window back to it.
+    window_start = min(tick - CONSOLIDATION_INTERVAL_TICKS, c.get("_ltm_pending_since", tick))
     in_window = [m for m in memories if m.get("tick", 0) >= window_start]
     if not in_window:
         return
@@ -108,6 +110,12 @@ def maybe_consolidate_memories(c, world):
                 "tags": ["highlights"],
             })
             processed_ids.update(m["id"] for m in to_aggregate if m.get("id"))
+            c.pop("_ltm_pending_since", None)
+        else:
+            # Always the AI's summary, never a canned "first thing (+26 other things)": if the model was busy or
+            # failed, keep the hour's memories where they are and try again in a few minutes.
+            c["_ltm_pending_since"] = window_start
+            c["_last_memory_consolidation_tick"] = tick - CONSOLIDATION_INTERVAL_TICKS + RETRY_TICKS
     # to_aggregate entries that DIDN'T end up in a summary (too few of
     # them this hour) stay in short-term untouched -- nothing to show
     # for removing them yet, so they simply wait for the next pass.
@@ -214,7 +222,7 @@ def _summarize(c, memories):
                     "routine entries that don't add anything."
                 ),
             },
-            {"role": "user", "content": "\n".join(lines[:40])},
+            {"role": "user", "content": "\n".join(lines[:60])},
         ]
         raw = run_llm_call(call_llm_safe(messages, char_id=c.get("id")), priority=PRIORITY_BACKGROUND)
         if isinstance(raw, str) and raw.strip():
@@ -222,9 +230,7 @@ def _summarize(c, memories):
     except Exception:
         pass
 
-    best = max(memories, key=lambda m: m.get("importance", 0))
-    extra = len(memories) - 1
-    return f"{best.get('text', '')}" + (f" (+{extra} other things that hour)" if extra > 0 else "")
+    return None
 
 
 def maybe_forget_short_term(c, world):

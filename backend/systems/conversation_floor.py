@@ -231,6 +231,17 @@ def _end(world, conv, reason):
         f["state"] = "closed"
     conv["end_reason"] = reason
     conv["active"] = False
+    conv["status"] = "completed"
+    from core.event_bus import emit
+    emit("conversation.ended", {"conv_id": conv.get("id"), "reason": reason,
+                                "character_ids": list(conv.get("participants") or [])})
+    from core import scheduler
+    scheduler.cancel(world, "convidle", conv.get("id"))
+    try:
+        from social.discourse import on_ended
+        on_ended(world, conv)
+    except Exception as exc:
+        print(f"[conversation_floor] social on_ended failed: {exc!r}")
     _archive_conversation(world, conv)
     for pid in conv.get("participants", []):
         p = world.get("characters", {}).get(pid)

@@ -20,6 +20,8 @@ height/masked populated yet) as "condition not satisfied" rather than
 raising.
 """
 
+from systems.occupancy import occupy as _occupy  # one activity at a time (systems/occupancy.py)
+
 import random
 import re
 import uuid
@@ -201,18 +203,18 @@ def _fumble_chance(effectiveness):
 # intimacy.py::_execute_touch, driven by the template's authored clips
 # instead of a hardcoded dict) ──────────────────────────────────────────────
 
-def _write_hostile_activity(char, tpl_side, action_id, partner_id, tick):
+def _write_hostile_activity(world, char, tpl_side, action_id, partner_id, tick):
     clips = tpl_side.get("start") or []
     if not clips:
         return
-    char["activity"] = {
+    char["activity"] = _occupy(char, world, {
         "type":               "hostile_interaction",
         "interaction":        action_id,
         "phase":              "using",
         "phase_started_tick": tick,
         "target_id":          partner_id,
         "state":              {},
-    }
+    })
     char["animation_state"] = clips[0]
 
 
@@ -316,11 +318,11 @@ def resolve_hostile_action(actor, target, action_id, world):
     stance_type = stance.get("type", "dodge") if stance else "dodge"
 
     # Attacker's own swing/grab animation plays no matter what happened.
-    _write_hostile_activity(actor, tpl.get("animations", {}), action_id, target["id"], tick)
+    _write_hostile_activity(world, actor, tpl.get("animations", {}), action_id, target["id"], tick)
     drain_stamina(actor, _STAMINA_COST.get(template_id, 0.03))
 
     if outcome == "hit":
-        _write_hostile_activity(target, tpl.get("target_animations", {}), action_id, actor["id"], tick)
+        _write_hostile_activity(world, target, tpl.get("target_animations", {}), action_id, actor["id"], tick)
         _apply_relationship_impact(actor, target, outcome)
         drain_stamina(target, 0.02)
 

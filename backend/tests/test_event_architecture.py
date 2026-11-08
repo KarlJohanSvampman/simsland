@@ -33,7 +33,8 @@ src = open("/app/sim_loop.py", encoding="utf-8").read()
 labels = {section_registry.base_label(m) for m in re.findall(r'_prof\.mark\("([^"]+)"\)', src)}
 missing = sorted(l for l in labels if section_registry.classify(l) is None)
 check("every tick() section is in the registry", not missing, str(missing))
-job_labels = {"every:" + section_registry.base_label(o) for o in scheduler._recurring}
+from core import flow
+job_labels = {"every:" + section_registry.base_label(o) for o in scheduler._recurring} | {"every:" + j["name"] for j in flow.JOBS}
 missing_jobs = sorted(l for l in job_labels if l not in section_registry.REGISTRY)
 check("every scheduled job is classified", not missing_jobs, str(missing_jobs))
 stale = sorted(l for l in section_registry.REGISTRY if l not in labels and l not in job_labels)

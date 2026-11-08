@@ -172,7 +172,7 @@ def compare_lives(c, other, world):
     return dims
 
 
-def _apply_comparison(c, other, world):
+def _apply_comparison(c, other, world, trigger=None):
     rel = c.setdefault("relationships", {}).setdefault(other["id"], {})
     dims = compare_lives(c, other, world)
     favorable = {k: d for k, d in dims.items() if d["favors_other"]}
@@ -199,7 +199,8 @@ def _apply_comparison(c, other, world):
         from systems.grievances import add_grievance
         if not at_envy_cap(c, other["id"]):
             add_grievance(c, other["id"], "life_envy", world,
-                          details={"favorable_dimensions": list(favorable.keys())})
+                          details={"favorable_dimensions": list(favorable.keys()),
+                                   **({"trigger": trigger["detail"], "trigger_kind": trigger["kind"]} if trigger else {})})
 
         # Losing a comparison doesn't just breed resentment -- it creates a
         # real, acted-on urge to keep up with the single most-unfavorable
@@ -245,9 +246,8 @@ def trim_envy_grievances(c):
 
 
 def tick_life_comparison(world):
-    """Daily cadence (see sim_loop.py). Bounded per-character contact
-    sample, same spirit as attraction.py::check_envy_events()'s own
-    contact-scoped scan -- not a full world-wide comparison every day."""
+    """A sweep over a sample of every character's contacts. NOT scheduled any more: comparing lives happens when
+    something brings the other person to mind (on_reminded_event below). Kept for tools and tests that want one pass."""
     characters = world.get("characters", {})
     for c in characters.values():
         # Confirmed live bug (froze the whole simulation): the workplace-NPC
@@ -274,3 +274,91 @@ def tick_life_comparison(world):
             if not other or other.get("id") == c.get("id") or other.get("is_workplace_npc"):
                 continue
             _apply_comparison(c, other, world)
+
+
+# =========================================================
+# BROUGHT TO MIND -- the only way a comparison happens now
+# =========================================================
+# Live (2026-11-06): "envy over how the other one lives" was logged against the same person every 10-30 sim-minutes,
+# day and night: the comparison ran in a job meant to be daily that ran every 24 s, against a random sample of
+# contacts nobody had seen. Now it runs when the other person is actually brought to mind -- seen, mentioned, or a
+# visit -- at most once per pair per REMINDER_COOLDOWN_SECONDS, and what brought it up is recorded with it.
+
+from core.clock import HOUR
+
+REMINDER_COOLDOWN_SECONDS = 2 * HOUR
+REMINDERS_KEPT = 20
+
+
+def _can_compare(c):
+    return not (c.get("is_offscreen") or c.get("is_workplace_npc") or c.get("is_service_worker")
+                or c.get("age_group") in ("child", "teen") or c.get("alive") is False)
+
+
+def _place(world, c):
+    """Where c is, in words, for the record: their room's name, else the building, else 'outside'."""
+    room = c.get("room_id")
+    if room:
+        return str(room).split(":")[-1].rstrip("_0123456789").replace("_", " ").strip() or "inside"
+    return "outside" if not c.get("_in_building", c.get("building_id")) else "indoors"
+
+
+def on_reminded(c, other, world, kind, detail):
+    """Something brought `other` to `c`'s mind. Compares their lives unless the pair compared within the cooldown.
+    Returns True when a comparison happened."""
+    if not c or not other or c is other or not _can_compare(c) or other.get("is_workplace_npc"):
+        return False
+    if other.get("id") not in (c.get("relationships") or {}):
+        return False                                  # a stranger's life is not one they measure themselves against
+    tick = world.get("tick", 0)
+    last = (c.setdefault("_envy_reminded", {})).get(other["id"])
+    if last is not None and tick - last < REMINDER_COOLDOWN_SECONDS:
+        return False
+    c["_envy_reminded"][other["id"]] = tick
+    trigger = {"kind": kind, "detail": detail, "tick": tick}
+    rel = c["relationships"][other["id"]]
+    rel.setdefault("envy_reminders", []).append(trigger)
+    del rel["envy_reminders"][:-REMINDERS_KEPT]
+    trim_envy_grievances(c)
+    _apply_comparison(c, other, world, trigger=trigger)
+    return True
+
+
+def _mentions(world, text, exclude):
+    """Characters named in `text` (full name or first name, whole words), except those in `exclude`."""
+    import re
+    low = f" {str(text or '').lower()} "
+    found = []
+    for oid, o in (world.get("characters") or {}).items():
+        if oid in exclude or o.get("is_workplace_npc"):
+            continue
+        for n in (o.get("name"), o.get("first_name")):
+            if n and re.search(rf"(?<![a-z]){re.escape(n.lower())}(?![a-z])", low):
+                found.append(o)
+                break
+    return found
+
+
+def on_reminded_event(world, event, data):
+    """core/flow.py: person_entered_view, speech_spoken, guest.visit_started."""
+    chars = world.get("characters") or {}
+    if event == "person_entered_view":
+        c, other = chars.get(data.get("observer_id")), chars.get(data.get("subject_id"))
+        if c and other:
+            on_reminded(c, other, world, "saw", f"saw {other.get('name', 'them')} ({_place(world, c)})")
+    elif event == "speech_spoken":
+        speaker, listener = chars.get(data.get("character_id")), chars.get(data.get("target_id"))
+        line = str(data.get("utterance") or "")
+        quote = line if len(line) <= 90 else line[:87] + "..."
+        for m in _mentions(world, line, {data.get("character_id"), data.get("target_id")}):
+            for c in (speaker, listener):
+                if c:
+                    who = "they" if c is speaker else speaker.get("name", "someone") if speaker else "someone"
+                    on_reminded(c, m, world, "mentioned", f'{m.get("name")} came up: {who} said "{quote}"')
+    elif event == "guest.visit_started":
+        guest = chars.get(data.get("guest_id"))
+        hosts = [chars[h] for h in data.get("host_ids") or [] if h in chars]
+        for h in hosts:
+            if guest:
+                on_reminded(guest, h, world, "visiting", f"visiting {h.get('name', 'them')}'s home")
+                on_reminded(h, guest, world, "visited", f"{guest.get('name', 'someone')} came over")

@@ -48,6 +48,7 @@ INTENTION_DEADLINE_TICKS_BY_CATEGORY = {
     "chores":   5400,    # 1.5h
     "identity": 7200,    # 2h
     "leisure":  7200,
+    "private":  7200,    # Relieve Sexual Tension: when there is time, pressing once it has waited past this
 }
 INTENTION_DEFAULT_DEADLINE_TICKS = 3600
 INTENTION_STAGE_COLORS = ("yellow", "orange", "red")   # index 0 = brand new
@@ -86,6 +87,7 @@ CATEGORY_PRIORITY = {
     "health":   90,
     "schedule": 75,
     "social":   60,
+    "private":  45,
     "identity": 40,
     "chores":   35,
     "leisure":  20,
@@ -112,7 +114,7 @@ URGENCY_WINDOW_TICKS = 2 * 3600
 INTENTION_EFFORT = {
     "exercise": 0.9, "work": 0.8, "chore": 0.6,
     "clean_floors": 0.6, "dust_and_wipe": 0.5, "outdoor_time": 0.4,
-    "sleep": 0.0, "take_nap": 0.0, "use_toilet": 0.05,
+    "sleep": 0.0, "take_nap": 0.0, "use_toilet": 0.05, "use_toilet_bowels": 0.05,
     "eat_food": 0.1, "drink": 0.05, "wait": 0.0,
     "seek_solitude": 0.1, "seek_caffeine_or_rest": 0.0,
     "socialize": 0.3, "seek_romance": 0.4, "seek_intimacy": 0.5,
@@ -173,6 +175,15 @@ def final_priority(i, c=None):
     # never crosses into the next category's band.
     if i.get("fixation_boost"):
         base = min(100, base + i["fixation_boost"])
+
+    # Stuck on it (systems/roam.py): what led to a timed-out activity is set back for a while, and the next most
+    # urgent intention lifted, so the next choice is a different one.
+    if c is not None and (c.get("_setbacks") or c.get("_lifts")):
+        from systems.roam import setback_active, lift_active, SETBACK_PENALTY, LIFT_POINTS
+        if lift_active(c, i.get("type"), _CURRENT_TICK):
+            base = min(100, base + LIFT_POINTS)
+        if setback_active(c, i.get("type"), _CURRENT_TICK):
+            return category_score * 1000 + base - SETBACK_PENALTY
 
     return category_score * 1000 + base
 # =========================================================

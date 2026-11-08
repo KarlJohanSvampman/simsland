@@ -189,11 +189,39 @@ def unstick(c, world, st):
     elif kind == "activity":
         _unstick_activity(c, world, st)
     else:
+        target = c.get("move_target") or {}
         _report(c, world, st, "walking somewhere", "stopped trying to get there")
         _stop_moving(c)
-        from brain.cognition_scheduler import wake_character
-        wake_character(c, world, "activity_aborted", {"activity": "move", "target_id": None, "phase": "walking"})
+        if not _step_back_and_roam(c, world, {"type": "move", "target_id": target.get("target_id"), "phase": "walking",
+                                              "started": st.get("start")}):
+            from brain.cognition_scheduler import wake_character
+            wake_character(c, world, "activity_aborted", {"activity": "move", "target_id": None, "phase": "walking"})
     note_step(c, world)
+
+
+def _step_back_and_roam(c, world, retry):
+    """systems/roam.py: set back the intention behind it, lift the next one, and wander somewhere else nearby before
+    trying again. Returns True if they set off roaming."""
+    from systems import roam
+    from systems.movement_log import note_event
+    current = c.get("current_intention") or {}
+    intention = current.get("type")
+    # "Wait -- where was I going?": said out loud, then what it was, why, and how long ago is pieced back together
+    roam.wonder_aloud(c, world, retry, current)
+    lifted = roam.set_back(c, world, intention) if intention else None
+    if retry.get("type") == "move":               # an activity's timeout is logged as it closes (activity_trace)
+        note_event(c, world, "timeout", "move")
+    if intention:
+        from brain.memory import store_memory
+        store_memory(c, f"I keep failing at this, so I'll put \"{intention.replace('_', ' ')}\" aside for a bit"
+                        + (f" and see to \"{lifted.replace('_', ' ')}\" first." if lifted else "."),
+                     importance=0.3, tags=["stuck", "setback"], tick=world.get("tick", 0), source="internal")
+    c["current_intention"] = None
+    if retry.get("type") == "roam":
+        return False                                     # stuck while roaming: don't roam again
+    if intention:
+        retry = dict(retry, intention=intention)
+    return roam.start_roam(c, world, retry=retry)
 
 
 def _stop_moving(c):
@@ -215,6 +243,11 @@ def _unstick_activity(c, world, st):
     else:
         _report(c, world, st, f"{'getting to ' if phase == 'walking' else ''}{label}", "gave up on it for now")
         interrupt_activity(c, world, reason=f"stuck in the {phase} phase", outcome="timed_out")
+        _stop_moving(c)
+        retry = {"type": act_type, "target_id": target, "interaction": act.get("interaction"), "phase": phase,
+                 "started": act.get("started_tick", act.get("phase_started_tick"))}
+        if _step_back_and_roam(c, world, retry):
+            return
     _stop_moving(c)
     wake_character(c, world, "activity_aborted", {"activity": act_type, "target_id": target, "phase": phase})
 

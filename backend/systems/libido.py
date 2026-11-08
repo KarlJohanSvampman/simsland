@@ -105,6 +105,16 @@ def tick_libido(world):
             # attraction.py::recipient_decision(), tick_domestic_control())
             # rather than requiring a dedicated LLM action every roll.
             # See systems/sexual_release.py for the actual cascade.
+            # With "Relieve Sexual Tension" live (simulations/default/behaviour.json) the autopilot's ActionPlans
+            # decide what to do -- partner, booty call, or somewhere private -- and walk there, one activity at a
+            # time; the old in-place cascade below only runs while that intention is not live.
+            from brain.actionplans.runner import live_intention_for
+            if is_spiking(c) and live_intention_for(world, "seek_sexual_release"):
+                if not any(i.get("type") == "seek_sexual_release" for i in c.get("active_intentions") or []):
+                    from brain.intentions import add_intention
+                    add_intention(c, {"type": "seek_sexual_release", "category": "private",
+                                      "priority": int(40 + 30 * state["current"]), "reason": "feeling horny"})
+                continue
             try:
                 from systems.sexual_release import attempt_release
                 attempt_release(c, world)

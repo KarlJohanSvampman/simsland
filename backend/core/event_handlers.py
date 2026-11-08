@@ -175,17 +175,18 @@ subscribe("household_wants_to_move", _on_wants_to_move)
 # ── Conflict pipeline ─────────────────────────────────────
 
 def _on_confrontation_desired(data, world):
-    """Start a conflict when a character's grievances hit threshold."""
-    from systems.conflict_pipeline import start_conflict
+    """Their grievances against someone have built up: they want to take it up with them. Nothing is started for
+    them -- the wish goes into their prompt (social/context.py) and they're woken to decide whether, when and how to
+    raise it, or to let it go and avoid the person (low standing doesn't have to mean a confrontation)."""
     initiator = world.get("characters", {}).get(data["initiator_id"])
     target    = world.get("characters", {}).get(data["target_id"])
     if not initiator or not target:
         return
-    # Only start if they're in the same room or building
-    same_room     = initiator.get("room_id")     and initiator.get("room_id")     == target.get("room_id")
-    same_building = initiator.get("building_id") and initiator.get("building_id") == target.get("building_id")
-    if same_room or same_building:
-        start_conflict(data["initiator_id"], data["target_id"], world)
+    wants = initiator.setdefault("wants_to_raise", {})
+    wants[data["target_id"]] = {"since": world.get("tick", 0), "score": round(data.get("score", 0), 1)}
+    from brain.cognition_scheduler import wake_character
+    wake_character(initiator, world, "wants_to_raise", {"target_id": data["target_id"],
+                                                        "target_name": target.get("name")})
 
 subscribe("confrontation_desired", _on_confrontation_desired)
 
@@ -200,8 +201,6 @@ def _on_conflict_resolved(data, world):
     tag their own. A bad-enough outcome also gives each party a real
     chance of moving out for a while (systems/temporary_separation.py)."""
     from systems.confiding import tag_dramatic_memory
-    from systems.temporary_separation import begin_temporary_separation
-
     from systems import fights
 
     chars = world.get("characters", {})
@@ -210,18 +209,25 @@ def _on_conflict_resolved(data, world):
         return
 
     outcome = data.get("outcome")
-    conflict = (world.get("conflicts") or {}).get(data.get("conflict_id")) or {}
+    from social.confrontations import lookup, STAGES
+    conflict = lookup(world, data.get("conflict_id")) or {}
     topic = conflict.get("topic") or fights.topic_of(conflict.get("issues"))
     aggressor = conflict.get("aggressor")
+    # a confrontation (social/confrontations.py) is a fight only once it got to a verbal confrontation or worse
+    was_fight = outcome == "physical_resolved" or "stage_idx" not in conflict or \
+        STAGES.index(conflict.get("peak_stage") or STAGES[0]) >= 2
 
     # what the fight was about and who was in it goes on the record (a suppressed one never got said, an agreement was no fight)
     entry = None
-    if outcome not in ("agreement", "suppressed"):
+    if outcome not in ("agreement", "suppressed") and was_fight:
         inc = next((i for i in world.get("incidents", []) if data.get("conflict_id") and i.get("conflict_id") == data.get("conflict_id")), None)
         entry = fights.log_fight(world, [p["id"] for p in parties], topic, outcome, aggressor=aggressor, conflict=conflict,
                                  incident_id=inc["id"] if inc else None)
         if inc:
             inc["fight_id"] = entry["id"]
+        # filed under the issue between them (social/issues.py)
+        from social.issues import file_fight
+        file_fight(world, entry)
 
     for c in parties:
         others = [p["id"] for p in parties if p["id"] != c["id"]]
@@ -230,6 +236,11 @@ def _on_conflict_resolved(data, world):
                 text = f"Wanted to take up {topic} with {fights.names(world, others)} but backed down and kept it in."
             else:
                 text = f"Sensed that {fights.names(world, others)} was upset, but nothing was said."
+            importance = 0.45
+        elif not was_fight:
+            res = (conflict.get("resolution") or {})
+            text = f"Took up {topic} with {fights.names(world, others)}: {str(res.get('outcome', outcome)).replace('_', ' ')}" \
+                + (f" -- {res['summary']}" if res.get("summary") else ".")
             importance = 0.45
         else:
             text = fights.memory_line(world, c, others, topic, outcome, conflict=conflict, aggressor=aggressor)
@@ -241,11 +252,11 @@ def _on_conflict_resolved(data, world):
             if entry:
                 mem["fight_id"] = entry["id"]
 
-    if outcome in _BAD_CONFLICT_OUTCOMES:
-        for c in parties:
-            if random.random() < 0.35:
-                begin_temporary_separation(c, world, reason="conflict",
-                                           cause={"with_ids": [p["id"] for p in parties if p["id"] != c["id"]], "outcome": outcome, "topic": topic})
+    # A bad ending between people who live together no longer has a chance of sending someone off to stay elsewhere
+    # on the spot: it opens a rift, which they try to resolve first -- leaving comes later, and for a reason
+    # (systems/rifts.py).
+    from systems.rifts import on_conflict_resolved as _rift_on_conflict
+    _rift_on_conflict(world, data)
 
 subscribe("conflict_resolved", _on_conflict_resolved)
 
@@ -255,8 +266,17 @@ def _on_contract_violated(data, world):
     from systems.grievances import add_grievance
     victim = world.get("characters", {}).get(data["victim_id"])
     if victim:
+        k = (world.get("social_contracts") or {}).get(data.get("contract_id")) or {}
+        last = (k.get("violation_records") or [{}])[-1]
+        disputed = bool(last.get("disputed"))
+        from systems.grievances import SEVERITY
         add_grievance(victim, data["violator_id"], "contract_violated", world,
-                      details={"commitment": data.get("commitment")})
+                      severity=SEVERITY["contract_violated"] * (0.5 if disputed else 1.0),
+                      details={"commitment": data.get("commitment"), "contract_id": data.get("contract_id"),
+                               "disputed": disputed})
+        from social import standing
+        standing.change(victim, data["violator_id"], world, "contract_violated", delta=-4 if disputed else None,
+                        cause=f"didn't keep to: {data.get('commitment')}" + (" (they deny it)" if disputed else ""))
 
 subscribe("contract_violated", _on_contract_violated)
 

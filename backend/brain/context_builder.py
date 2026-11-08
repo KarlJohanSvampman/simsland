@@ -333,7 +333,7 @@ def build_active_conversations(c, world):
             "with_id":            other_ids[0] if other_ids else None,
             "with_ids":           other_ids,
             "with_names":         with_names,
-            "topic":              conv.get("topic"),
+            "topic":              conv.get("subject") or conv.get("topic"),
             "tone":               conv.get("tone"),
             "conversation_type":  conv.get("conversation_type"),
             "medium":             conv.get("medium", "in_person"),
@@ -377,6 +377,12 @@ def _remembered_props(c, world, in_view):
     except Exception as exc:                       # noqa: BLE001
         print(f"[spotted] remembered pool for {c.get('id')}: {exc!r}")
         return []
+
+
+def _sec_rifts(c, world):
+    """Bad blood with someone they live with, and where it stands (systems/rifts.py)."""
+    from systems.rifts import context_lines
+    return context_lines(c, world) or None
 
 
 def _sec_known_places(c, world):
@@ -983,6 +989,14 @@ def build_available_actions(c, world):
     # build_narrative() so the two never disagree about what's live.
     if nearby_people and not build_conflict_context(c, world):
         action_types.append("confront")
+
+    # Leaving home over a rift is the character's own decision (systems/rifts.py): offered once it has come to that,
+    # and calling it off while they're on notice.
+    _rifts = [r for r in (c.get("rifts") or {}).values() if r.get("status") == "open"]
+    if any(r.get("may_leave") and not r.get("notice") for r in _rifts):
+        action_types.append("announce_leaving")
+    if any(r.get("notice") for r in _rifts):
+        action_types.append("call_off_leaving")
 
     active_incidents = [
         inc for inc in _build_incident_context(c, world)
@@ -1873,6 +1887,7 @@ _INTENTION_PHRASES = {
     "sleep": ("go to bed", "going to bed"),
     "take_nap": ("take a nap", "napping"),
     "use_toilet": ("use the bathroom", "using the bathroom"),
+    "use_toilet_bowels": ("use the bathroom", "using the bathroom"),
     "take_shower": ("take a shower", "showering"),
     "brush_teeth": ("brush your teeth", "brushing your teeth"),
 }
@@ -1998,28 +2013,16 @@ def _sec_grievances(c, world):
     return f"You're still bothered by {top['with']} over {', '.join(top['top_issues'])}."
 
 
+def _sec_ai_blackout(c, world):
+    """Someone nearby who can't think straight (systems/ai_blackout.py)."""
+    from systems.ai_blackout import context_lines
+    return context_lines(c, world) or None
+
+
 def _sec_conflict(c, world):
-    # restores build_conflict_context, previously unused. Purely reflects
-    # the trait/dice-driven conflict_pipeline.py state machine; the LLM
-    # cannot alter this resolution, only decide whether to have entered it
-    # (via "confront") and how to react.
-    conflict = build_conflict_context(c, world)
-    if not conflict:
-        return None
-    other = conflict["with"]
-    phase = conflict["phase"]
-    if phase == "deliberation":
-        return (
-            f"You're privately weighing whether to work things out with {other} "
-            f"or let it turn into a fight."
-        )
-    if phase == "negotiation":
-        issues = ", ".join(conflict.get("issues", [])) or "what's been bothering you"
-        return f"You're negotiating with {other} about {issues}."
-    if phase == "fight":
-        stage = (conflict.get("fight_stage") or "verbal_dispute").replace("_", " ")
-        return f"You're in a {stage} with {other}."
-    return None
+    """Standing, frustration, issues, confrontations, agreements, what's been heard (social/context.py)."""
+    from social.context import lines
+    return lines(c, world) or None
 
 
 def _sec_memories(c, world):
@@ -2466,6 +2469,7 @@ NARRATIVE_SECTIONS = [
     ("intentions",            "core", _sec_intentions),
     ("todo",                  "core", _sec_todo),
     ("known_places",          "core", _sec_known_places),
+    ("rifts",                 "core", _sec_rifts),
     ("pressing_intentions",   "core", _sec_pressing_intentions),
     ("exhaustion",            "core", _sec_exhaustion),
     ("glimpsed",              "full", _sec_glimpsed),
@@ -2473,7 +2477,8 @@ NARRATIVE_SECTIONS = [
     ("examine_reminder",      "core", _sec_examine_reminder),
     ("relationships",         "full", _sec_relationships),
     ("grievances",            "full", _sec_grievances),
-    ("conflict",              "full", _sec_conflict),
+    ("conflict",              "core", _sec_conflict),
+    ("ai_blackout",           "core", _sec_ai_blackout),
     ("memories",              "full", _sec_memories),
     ("remembered_about",      "full", _sec_remembered_about),
     ("sighting_recall",       "full", _sec_sighting_recall),
@@ -3632,43 +3637,14 @@ def build_memory_context(
 # =========================================================
 
 def build_conflict_context(c, world):
-    chars = world.get("characters", {})
-    for conflict in world.get("conflicts", {}).values():
-        if conflict["outcome"] is not None:
-            continue
-        if c["id"] not in conflict["parties"]:
-            continue
-
-        other_id   = None
-        for pid in conflict["parties"]:
-            if pid != c["id"]:
-                other_id = pid
-                break
-        other      = chars.get(other_id)
-        other_name = other["name"] if other else other_id
-
-        phase = conflict["phase"]
-        result = {
-            "conflict_id":  conflict["id"],
-            "phase":        phase,
-            "with":         other_name,
-            "with_id":      other_id,
-            "issues":       conflict.get("issues", []),
-            "my_willingness": round(conflict["willingness"].get(c["id"], 0), 2),
-            "their_willingness": round(conflict["willingness"].get(other_id, 0), 2),
-            "exchanges":    conflict["exchanges"],
-        }
-
-        if phase == "fight":
-            result["fight_stage"] = conflict.get("fight_stage")
-            result["escalation_score"] = round(conflict.get("escalation_score", 0), 1)
-
-        if phase == "negotiation":
-            result["proposed_terms"]  = conflict.get("proposed_terms",  [])
-            result["accepted_terms"]  = conflict.get("accepted_terms",  [])
-
-        return result
-
+    """The confrontation this character is in, if any (social/confrontations.py)."""
+    from social.confrontations import active_for
+    for conf in active_for(world, c["id"]):
+        other_id = conf["primary_target_id"] if conf["initiator_id"] == c["id"] else conf["initiator_id"]
+        other = (world.get("characters") or {}).get(other_id) or {}
+        return {"conflict_id": conf["id"], "phase": "confrontation", "with": other.get("name", other_id),
+                "with_id": other_id, "issues": [conf["problem_statement"]], "type": conf["confrontation_type"],
+                "fight_stage": conf["stage"], "my_role": conf["participants"].get(c["id"], {}).get("role")}
     return None
 
 

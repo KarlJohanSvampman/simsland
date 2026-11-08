@@ -23,7 +23,7 @@ from systems.body import get_odor_label, get_breath_label
 # true keeps this list a live reflection of body state instead of a
 # historical log of every threshold ever crossed.
 _MANAGED_INTENTION_TYPES = {
-    "use_toilet", "sleep", "take_nap", "take_shower",
+    "use_toilet", "use_toilet_bowels", "sleep", "take_nap", "take_shower",
     "brush_teeth", "drink", "eat_food", "seek_caffeine_or_rest",
     "seek_shelter", "seek_warmer_clothes",
 }
@@ -95,9 +95,11 @@ def generate_body_intentions(c, world=None):
         })
 
     # ── BOWELS ───────────────────────────────────────────────────────────────
+    # Its own type (Reduce Pressure: Bowels replaces it): as "use_toilet" it was the bladder's intention, and the
+    # visit only ever emptied the bladder's share of the need.
     if b.get("bowels", 0) > 80:
         add_intention(c, {
-            "type":       "use_toilet",
+            "type":       "use_toilet_bowels",
             "category":   "survival",
             "priority":   95,
             "interrupts": True,

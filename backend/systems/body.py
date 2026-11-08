@@ -509,7 +509,7 @@ def _settle_daily_sleep_debt(c):
     b["_sleep_hours_today"] = 0.0
 
 
-def compute_needed_sleep_ticks(c):
+def compute_needed_sleep_ticks(c, floor=True):
     """Real, fatigue/energy/sleep_debt-aware sleep duration -- ticks
     needed to fully clear whichever of the three is furthest from its
     rested target, using the SAME per-tick recovery rates sleep already
@@ -529,6 +529,8 @@ def compute_needed_sleep_ticks(c):
     energy_ticks = (100 - b.get("energy", 70)) / SLEEP_ENERGY_RECOVERY_PER_TICK
     debt_ticks = b.get("sleep_debt", 0) / SLEEP_DEBT_RECOVERY_PER_TICK_ASLEEP
     needed = max(fatigue_ticks, energy_ticks, debt_ticks)
+    if not floor:
+        return int(min(SLEEP_MAX_DURATION_TICKS, needed))
     return int(max(SLEEP_MIN_DURATION_TICKS, min(SLEEP_MAX_DURATION_TICKS, needed)))
 
 
@@ -562,7 +564,7 @@ def on_shower_complete(c):
     b["hygiene"]   = 98
     b["odor"]      = 2
     # Partial mouth hygiene improvement (steam/rinsing)
-    b["mouth_hygiene"] = min(100, b["mouth_hygiene"] + 15)
+    b["mouth_hygiene"] = min(100, b.get("mouth_hygiene", 70) + 15)
     touch(c)
 
 

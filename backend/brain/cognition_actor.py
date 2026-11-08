@@ -89,6 +89,14 @@ def is_waiting(c, world=None):
                     f"{REQUEST_TIMEOUT_SECONDS:.0f} s, so it is being asked again."))
             except Exception as exc:                   # noqa: BLE001 -- logging must never stall a character
                 print(f"[cognition] could not log the timeout for {c.get('id')}: {exc!r}")
+            try:
+                # no answer: they can't think straight (systems/ai_blackout.py) -- and it counts toward an episode
+                if c.get("alive") is not False and not c.get("off_grid") and c.get("posture") != "incapacitated":
+                    from brain.agent_loop import process_decision
+                    process_decision(c, world, {"action": {"type": "wait", "fallback": True,
+                                                           "reason": f"No answer from the model in {REQUEST_TIMEOUT_SECONDS:.0f} s."}})
+            except Exception as exc:                   # noqa: BLE001
+                print(f"[cognition] blackout for {c.get('id')} failed: {exc!r}")
         return False
     return True
 
@@ -256,7 +264,8 @@ def on_decision_ready(data, world):
     decision = data.get("decision")
     note_think(c, world, decision, wake_reason=data.get("wake_reason"), asked_at_seq=p.get("wake_seq"))
     if not decision:
-        return
+        # the model failed outright: no stand-in -- they can't think straight (systems/ai_blackout.py)
+        decision = {"action": {"type": "wait", "fallback": True, "reason": "The model call failed."}}
     from systems.worry_breakdown import in_breakdown
     if in_breakdown(c):
         return                              # they are not themselves right now: a plan made before it does not apply

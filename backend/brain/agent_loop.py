@@ -455,6 +455,13 @@ def process_decision(
     # THOUGHT
     # =====================================
 
+    # The AI couldn't answer for them (systems/ai_blackout.py): no stand-in decision -- they can't think straight.
+    from systems import ai_blackout
+    if ((decision or {}).get("action") or {}).get("fallback") and not decision["action"].get("blackout"):
+        decision = ai_blackout.decision(c, world, why=decision["action"].get("reason"))
+    elif not ((decision or {}).get("action") or {}).get("fallback"):
+        ai_blackout.on_success(c, world)
+
     c["last_thought"] = (
         decision.get(
             "thought"
@@ -562,8 +569,14 @@ def process_decision(
         # swallow a real utterance).
         if available_actions is not None:
             from brain.action_resolver import resolve_and_apply
+            was = action.get("type")
             if not resolve_and_apply(c, world, action, available_actions):
                 action = None
+            elif was == "interact" and action.get("type") == "socialize":
+                # "use" a person became talking to them: the stand-in thought said "I use <name>."
+                if str(c.get("last_thought") or "").startswith("I use "):
+                    who = ((world.get("characters") or {}).get(action.get("target")) or {}).get("name") or "them"
+                    c["last_thought"] = f"I go over to talk to {who}."
 
         # brain/llm_brain.py::_to_legacy_decision() gives speech the same
         # target_description as the action when they're plausibly the
@@ -612,19 +625,20 @@ def process_decision(
                 apply_speech(c, world, speech)
         elif valid:
 
-            if c.get("activity"):
-                # If this replaces what they are doing, the record says why.
-                c["_interrupt_reason"] = (f"they chose to {str(action.get('type')).replace('_', ' ')}"
-                                          + (f" ({action['reason']})" if action.get("reason") else ""))
-            route_action(
-                c,
-                world,
-                action,
-                speech,
-                definitions=world.get("definitions", {}),
-                available_actions=available_actions
-            )
-            c.pop("_interrupt_reason", None)
+            # A decision to do something else replaces what they are doing ON PURPOSE: the running activity is ended
+            # properly first (systems/occupancy.py::switching), never just written over.
+            reason = (f"they chose to {str(action.get('type')).replace('_', ' ')}"
+                      + (f" ({action['reason']})" if action.get("reason") else ""))
+            from systems.occupancy import switching
+            with switching(c, reason):
+                route_action(
+                    c,
+                    world,
+                    action,
+                    speech,
+                    definitions=world.get("definitions", {}),
+                    available_actions=available_actions
+                )
 
             # route_action() above scaffolds c["activity"] for activity-style
             # action types (eat, sleep, work, ...) via _scaffold()/start_activity().
@@ -724,6 +738,9 @@ def update_agent(
     # ... and whether that makes them a guest in someone else's home (systems/guests.py).
     from systems.guests import track as track_guest
     track_guest(c, world)
+    # A walk to a thing that has just ended: do what they went there for, or say they got there (systems/move_purpose.py).
+    from systems.move_purpose import check_arrival
+    check_arrival(c, world)
 
     _prof.mark("agent:if_L656")
     if c.get(
@@ -865,6 +882,9 @@ def update_agent(
 
     _prof.mark("agent:sort_intentions")
     sort_intentions(c)
+    # what became of the intentions that went away (brain/intention_history.py: the inspector lists them)
+    from brain.intention_history import track as _track_intentions
+    _track_intentions(c, world)
 
     # =====================================
     # SITUATION SELECTION (brain/situations/) -- deterministic, no LLM.
@@ -1140,10 +1160,22 @@ def update_agent(
             continue                       # for when there is time: not while something pressing is still open
 
         # Feeding or reminding a child: done directly (systems/child_care.py::tend_child), not left to the model's choice
-        if intention.get("child_id") and str(intention.get("type", "")).startswith(("feed_child_", "remind_child_")):
+        from brain.actionplans.runner import live_intention_for as _live_for
+        if (intention.get("child_id") and str(intention.get("type", "")).startswith(("feed_child_", "remind_child_"))
+                and not _live_for(world, intention.get("type"))):          # Feed the Kids live: its plans get food ready
             from systems.child_care import tend_child
             if tend_child(c, world, intention):
                 return
+            continue
+
+        # A LIVE intention (brain/actionplans: Reduce Hunger, ...) has taken over this intention type: its ActionPlans decide,
+        # step by step, with gates and fallbacks -- not resolve_strategy's if-chain.
+        from brain.actionplans.runner import autopilot as _plans_autopilot
+        _plan = _plans_autopilot(c, world, intention)
+        if _plan == "started":
+            c["current_intention"] = intention
+            return
+        if _plan == "busy":
             continue
 
         activity_type = resolve_strategy(

@@ -90,6 +90,12 @@ def resolve_strategy(
 
         return strategy_for(c, world, intention)
 
+    # body_intentions.py raises "take_shower" / "brush_teeth" (the "restore_hygiene" branch below is for an older
+    # intention name nobody raises any more): with no branch here the autopilot never started them, and a shower only
+    # ever happened if the model chose one (2026-11-06: never, in a whole simulated day).
+    if t in ("take_shower", "brush_teeth"):
+        return t
+
     if t in ("sleep", "take_nap"):
         return "sleep"
 

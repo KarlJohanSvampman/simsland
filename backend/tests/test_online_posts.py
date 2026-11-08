@@ -72,17 +72,19 @@ p = post(sam, w, "Zed Smith is a fraud", tags=["rumor"])
 random.seed(1)
 sm.view_post(lia, w, p["id"])
 event_bus.flush(w)
-check("reading it emits a remark that makes it a rumor about the subject", any(r["subject"] == "zed" and r["source"] == "sam" for r in (w.get("rumors") or {}).values()), str(w.get("rumors")))
+check("reading it emits a remark that makes it a rumor about the subject",
+      any(r["subject_id"] == "zed" and r["originator_id"] == "sam" for r in (w.get("rumors") or {}).values()), str(w.get("rumors")))
 check("the reader remembers having read it", any("I read that Sam Smith posted about Zed Smith" in m["text"] for m in lia["memories"]), str([m["text"] for m in lia["memories"]]))
 rumor = next(iter(w["rumors"].values()))
-check("a trusting reader believes it and becomes a carrier", "lia" in rumor["believers"], str(rumor))
+check("the reader now knows it, with her own confidence in it", "lia" in [t["receiver_id"] for t in rumor["transmissions"]]
+      and rumor["id"] in lia.get("known_rumours", {}), str(rumor))
 check("nothing is written on (author, subject) yet: the subject has not read it", rl.get_ledger(w, "sam", "zed", create=False) is None)
 sm.view_post(lia, w, p["id"])
 event_bus.flush(w)
-check("reading it again doesn't count twice", len(w["rumors"]) == 1 and len(rumor["believers"]) == 1)
+check("reading it again doesn't count twice", len(w["rumors"]) == 1 and len(rumor["transmissions"]) == 1)
 sm.view_post(sam, w, p["id"])
 event_bus.flush(w)
-check("the author reading their own post changes nothing", len(rumor["believers"]) == 1)
+check("the author reading their own post changes nothing", len(rumor["transmissions"]) == 1)
 
 # ---- the subject reads it ---------------------------------------------------------------------------------------------------------
 sm.view_post(zed, w, p["id"])

@@ -135,8 +135,9 @@ def add_grievance(c, caused_by_id, event_type, world, severity=None, details=Non
         if stance and stance.get("op") == ">":
             base_severity *= 1.5 if stance["sentiment"] == "unfavorable" else 0.7
 
+    gid = f"griev_{uuid.uuid4().hex[:8]}"
     c["grievances"].append({
-        "id":          f"griev_{uuid.uuid4().hex[:8]}",
+        "id":          gid,
         "caused_by":   caused_by_id,
         "event_type":  event_type,
         "severity":    base_severity,
@@ -144,6 +145,32 @@ def add_grievance(c, caused_by_id, event_type, world, severity=None, details=Non
         "tick":        world["tick"],
         "details":     details or {},
     })
+    # The incident is evidence on the issue between them (social/issues.py: the persistent problem, which a
+    # later conversation picks up), and it feeds c's frustration about that issue -- not their standing directly.
+    _to_issue(c, caused_by_id, event_type, base_severity, gid, details or {}, world)
+
+
+def _to_issue(c, caused_by_id, event_type, severity, gid, details, world):
+    chars = world.get("characters", {})
+    if caused_by_id not in chars or caused_by_id == c.get("id"):
+        return
+    from social import issues as I, frustration
+    try:
+        from systems.fights import ISSUE_PHRASES
+        subject = ISSUE_PHRASES.get(event_type) or str(event_type).replace("_", " ")
+    except Exception:
+        subject = str(event_type).replace("_", " ")
+    issue, created = I.find_or_open(world, [c["id"], caused_by_id], subject, I.category_for(event_type),
+                                    created_by=c["id"], affected=[c["id"]])
+    text = subject + (f" ({details.get('commitment')})" if details.get("commitment") else "")
+    if details.get("trigger"):
+        text += f": {details['trigger']}"            # what brought it up (systems/life_comparison.py::on_reminded)
+    I.add_evidence(world, issue, "incident", text, by=c["id"], ref=gid)
+    if not I.position(issue, c["id"]):
+        I.set_position(world, issue, c["id"], f"{chars[caused_by_id].get('name', 'they')}: {subject}",
+                       stance="opposed", confidence=0.6, investment=min(1.0, severity / 15), basis="observed")
+    frustration.raise_(c, caused_by_id, world, min(40.0, severity * 2), issue_id=issue["id"],
+                       kind="repeat" if not created else None, cause=f"{subject}")
 
 
 def get_grievance_score(c, against_id):

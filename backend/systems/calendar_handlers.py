@@ -140,7 +140,4 @@ def _background_services(world, entry):
     service_narrations(world)
 
 
-scheduler.register_recurring("popularity_decay", _popularity_decay, every=60)
-scheduler.register_recurring("post_engagement", _post_engagement, every=3600)
-scheduler.register_recurring("orphan_props", _orphan_props, every=30, offset=5)
-scheduler.register_recurring("background_services", _background_services, every=5, offset=2)
+# (scheduled from core/flow.py)

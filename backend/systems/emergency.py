@@ -370,6 +370,20 @@ def resolve(world):
                     patient = world["characters"].get(cid)
                     if not patient or patient.get("alive") is False:
                         continue
+                    # a mental-health crisis (systems/ai_blackout.py): a night in a hospital bed, under supervision
+                    from systems import ai_blackout
+                    if ai_blackout.in_episode(patient) and not patient.get("off_grid"):
+                        from systems.offgrid import send_offgrid
+                        cal = world.get("calendar") or {}
+                        now_min = cal.get("minute_of_day", 12 * 60)
+                        until_morning = ((24 * 60 - now_min) + 8 * 60) if now_min >= 8 * 60 else (8 * 60 - now_min)
+                        if send_offgrid(patient, world, "hospital", max(8 * 60, until_morning)):
+                            patient["psychosis_state"]["hospital"] = True
+                            store_memory(patient, "The ambulance took me to the hospital. They're keeping me in "
+                                                  "overnight, watching me.", 0.8,
+                                         ["medical", "emergency", "hospital", "ai_blackout"], "medical_emergency",
+                                         world.get("tick", 0))
+                        continue
                     from systems.health import compute_severity, treat_all_by_method
                     # On-scene ambulance clearance (decision #13's new
                     # "ambulance" treatable_by value) -- an indefinite hazard

@@ -164,8 +164,21 @@ def refresh_character_room(c, world):
     tile = [int(round(c["x"])), int(round(c["y"]))]
     if c.get("_room_tile") == tile and "room_id" in c and "_in_building" in c:
         return
+    first = "_in_building" not in c                 # first look at this character: nothing "changed"
+    old_room, old_building = c.get("room_id"), c.get("_in_building")
     c["_room_tile"] = tile
     c["room_id"] = room_at(world, tile[0], tile[1])
     from systems.navigation import find_building_at
     building, _ = find_building_at(world, tile[0], tile[1])
     c["_in_building"] = building["id"] if building else None
+    if first:
+        return
+    # What changed, said once, where it changed (core/flow.py: perception, phone, goodbyes, ... start on these).
+    from core.event_bus import emit
+    where = {"character_id": c["id"], "x": tile[0], "y": tile[1], "room_id": c["room_id"],
+             "building_id": c["_in_building"]}
+    emit("character.moved", where)
+    if c["room_id"] != old_room or c["_in_building"] != old_building:
+        emit("character.room_changed", dict(where, from_room=old_room))
+    if c["_in_building"] != old_building:
+        emit("character.building_changed", dict(where, from_building=old_building))

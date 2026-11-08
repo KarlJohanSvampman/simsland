@@ -313,6 +313,21 @@ def _compute_window(c, world, template_id, calendar, cadence=None):
     return _fallback_window(cadence, calendar, world)
 
 
+def _has_school_run_today(c, world):
+    """A child of their household is enrolled and has a school day today (systems/offgrid.py's school block)."""
+    try:
+        from systems.offgrid import _school_block
+    except Exception:                                  # noqa: BLE001
+        return True
+    chars = world.get("characters") or {}
+    hh = (world.get("households") or {}).get(c.get("household_id")) or {}
+    for m in hh.get("members") or []:
+        kid = chars.get(m)
+        if kid and m != c.get("id") and (kid.get("age") or 99) < 18 and kid.get("current_school") and _school_block(kid, world):
+            return True
+    return False
+
+
 def _has_scheduled_work_today(c, world):
     """Per the user's explicit ask: "go_to_work" should never come up
     missed on a day the character wasn't even scheduled to work in the
@@ -405,6 +420,12 @@ def update_expectations(c, world):
             # doesn't touch how a real missed work day (one that DID have
             # a scheduled block) gets detected, which still runs through
             # the normal path above.
+            # The same for the school run (2026-11-08, 24h runs): parents of children who have no school today -- a
+            # weekend, or not enrolled anywhere -- "missed" it every single day.
+            if nd["template_id"] == "get_kids_to_school" and not _has_school_run_today(c, world):
+                nd["satisfied_this_period"] = True
+                nd["status"] = "satisfied"
+                nd["not_applicable"] = True
             if nd["template_id"] == "go_to_work" and not _has_scheduled_work_today(c, world):
                 nd["satisfied_this_period"] = True
                 nd["status"] = "satisfied"
@@ -588,6 +609,8 @@ def satisfy_expectation(c, expectation_id, world):
     nd["satisfied_this_period"] = True
     nd["status"] = "satisfied"
     nd["last_satisfied_tick"] = world.get("tick", 0)
+    from brain.intention_history import mark
+    mark(c, world, f"expectation:{expectation_id}", "done", "expectation met")
     nd["streak"] = nd.get("streak", 0) + 1
     nd["frustration"] = max(0.0, nd.get("frustration", 0.0) - FRUSTRATION_DELTA)
     c["stress"] = max(0.0, c.get("stress", 0.0) - SATISFY_STRESS_DELTA)

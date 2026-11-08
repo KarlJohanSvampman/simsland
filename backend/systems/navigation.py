@@ -656,11 +656,15 @@ def build_building_path(
 
             blocked.add(tuple(b))
 
-    local_path = astar(
-        local_start,
-        local_target,
-        blocked
-    )
+    # Through doors, never through walls (systems/building_grid.py). If the floorplan leaves no way at all (a room
+    # authored without a door), fall back to the old wall-blind path, and say so in the path log.
+    from systems.building_grid import path as walled_path
+    local_path = walled_path(floorplan, local_start, local_target, blocked)
+    if not local_path and tuple(local_start) != tuple(local_target):
+        local_path = astar(local_start, local_target, blocked)
+        if local_path:
+            print(f"[path] {building.get('id')}: no way from {tuple(local_start)} to {tuple(local_target)} "
+                  f"without going through a wall -- check the floorplan's doors; walked through it")
 
     world_path = []
 
@@ -817,6 +821,12 @@ _DOOR_SIDE_OFFSETS = {
 }
 
 
+def _inside(floorplan, lx, ly):
+    """Enclosed by the building's walls (systems/building_grid.py) -- not merely "has a floor"."""
+    from systems.building_grid import is_inside
+    return is_inside(floorplan, lx, ly)
+
+
 def _tile_has_floor(tiles, key):
     """A floorplan tile is indoors if it has a floor. Tiles with "floor": null are
     the yard/doorstep inside a building's plot; a tile with no "floor" key at all
@@ -828,53 +838,23 @@ def _tile_has_floor(tiles, key):
 
 
 def find_building_entrances(building, floorplan):
-    """The doors that lead OUT of the building: "inside" is the floor tile, "outside"
-    the tile beyond the door.
-
-    Only doors between an indoor (floor) tile and an outdoor one count -- a door
-    between two rooms is not a way out. Before multi-room floorplans this returned
-    every door, so the nearest "entrance" could be a bedroom door whose "outside"
-    tile was still indoors, and a door authored from its outdoor side came out
-    inside-out; every route between two starter_houses failed (2026-11-01). A
-    floorplan with no such door at all keeps the old every-door behaviour."""
-
-    tiles = floorplan.get("tiles", {})
-    exterior, every_door, seen = [], [], set()
-
-    for key, tile in tiles.items():
-
-        walls = tile.get("walls") or {}
-
+    """The doors that lead OUT of the building: "inside" is the enclosed tile, "outside" the one beyond the door
+    (systems/building_grid.py works out which tiles the walls enclose). A floorplan with no such door keeps the old
+    every-door behaviour."""
+    from systems.building_grid import analyse
+    out = [{"inside": local_to_world(building, *e["inside"]), "outside": local_to_world(building, *e["outside"]),
+            "side": e["side"]} for e in analyse(floorplan)["entrances"]]
+    if out:
+        return out
+    every_door = []
+    for key, tile in (floorplan.get("tiles") or {}).items():
         tx, ty = (int(v) for v in key.split(","))
-
-        for side, wall in walls.items():
-
-            if not wall or wall.get("type") != "door":
-                continue
-
-            dx, dy = _DOOR_SIDE_OFFSETS.get(side, (0, 0))
-            other = f"{tx + dx},{ty + dy}"
-
-            every_door.append({
-                "inside":  local_to_world(building, tx, ty),
-                "outside": local_to_world(building, tx + dx, ty + dy),
-                "side":    side,
-            })
-
-            here_in, other_in = _tile_has_floor(tiles, key), _tile_has_floor(tiles, other)
-            if here_in == other_in:
-                continue                                    # between two rooms (or two yard tiles)
-            inside, outside = ((tx, ty), (tx + dx, ty + dy)) if here_in else ((tx + dx, ty + dy), (tx, ty))
-            if (inside, outside) in seen:
-                continue                                    # the same door, authored on both of its tiles
-            seen.add((inside, outside))
-            exterior.append({
-                "inside":  local_to_world(building, *inside),
-                "outside": local_to_world(building, *outside),
-                "side":    side,
-            })
-
-    return exterior or every_door
+        for side, wall in ((tile or {}).get("walls") or {}).items():
+            if wall and wall.get("type") == "door":
+                dx, dy = _DOOR_SIDE_OFFSETS.get(side, (0, 0))
+                every_door.append({"inside": local_to_world(building, tx, ty),
+                                   "outside": local_to_world(building, tx + dx, ty + dy), "side": side})
+    return every_door
 
 
 def find_building_at(world, x, y):
@@ -888,25 +868,29 @@ def find_building_at(world, x, y):
 
         lx, ly = world_to_local(building, x, y)
 
-        # On a floor tile = in the building; the plot's yard/doorstep tiles are outdoors.
-        if _tile_has_floor(floorplan.get("tiles", {}), f"{lx},{ly}"):
+        # Inside the walls = in the building; the plot's yard/doorstep tiles are outdoors.
+        if _inside(floorplan, lx, ly):
             return building, floorplan
 
     return None, None
 
 
-def _bridge_to_outdoor_graph(world, point, max_steps=6):
+def _bridge_to_outdoor_graph(world, point, max_steps=40):
     """Tiles from `point` (exclusive) to the nearest node of the outdoor walking
     graph (inclusive): [] if `point` already is one, None if none is within reach.
 
     The outdoor graph leaves out every tile of a building's plot, including the
     doorstep just outside a front door, so a route leaving through a door had
-    nowhere to join the street. Steps over walkable world tiles only."""
+    nowhere to join the street. Steps over walkable world tiles only. Reaches far
+    enough to get round a house: a back-yard tile is a dozen or more steps from the
+    street (6 was enough for a doorstep, not for the back of the house, where
+    characters were left looking for "a way in")."""
     graph = world.get("outdoor_navigation", {})
     lookup = world.get("world_tile_lookup", {})
     start = (int(point[0]), int(point[1]))
     if spatial_key(*start) in graph:
         return []
+    plots = _plots(world)
     came_from = {start: None}
     queue = deque([(start, 0)])
     while queue:
@@ -920,6 +904,8 @@ def _bridge_to_outdoor_graph(world, point, max_steps=6):
             tile = lookup.get(spatial_key(*nxt))
             if not tile or not tile.get("walkable", False):
                 continue
+            if _blocked_outdoors(world, (x, y), nxt, plots):
+                continue
             came_from[nxt] = (x, y)
             if spatial_key(*nxt) in graph:
                 path = [nxt]
@@ -930,6 +916,77 @@ def _bridge_to_outdoor_graph(world, point, max_steps=6):
     return None
 
 
+_PLOT_CACHE = {}
+
+
+def _plots(world):
+    """world tile -> [(floorplan, local tile, inside?)] for every building plot (and a tile's ring round it). Cached
+    per buildings list."""
+    from systems.building_grid import analyse
+    buildings = world.get("buildings", [])
+    key = (id(buildings), len(buildings),
+           tuple((b.get("id"), id((resolve_floorplan(world, b) or {}).get("tiles")),
+                  len((resolve_floorplan(world, b) or {}).get("tiles") or {})) for b in buildings))
+    hit = _PLOT_CACHE.get("key")
+    if hit == key:
+        return _PLOT_CACHE["map"]
+    out = {}
+    for building in buildings:
+        floorplan = resolve_floorplan(world, building)
+        if not floorplan:
+            continue
+        g = analyse(floorplan)
+        for lx in range(-1, g["width"] + 1):
+            for ly in range(-1, g["height"] + 1):
+                wx, wy = local_to_world(building, lx, ly)
+                out.setdefault((int(wx), int(wy)), []).append((floorplan, (lx, ly), (lx, ly) in g["inside"]))
+    _PLOT_CACHE.clear()
+    _PLOT_CACHE.update(key=key, map=out)
+    return out
+
+
+def _blocked_outdoors(world, a, b, plots=None):
+    """A step outside that would go into a building or through one of its walls (a fence, the back wall)."""
+    from systems.building_grid import edge
+    plots = plots if plots is not None else _plots(world)
+    pa = {id(fp): (la, ins) for fp, la, ins in plots.get((int(a[0]), int(a[1])), [])}
+    for fp, lb, inside_b in plots.get((int(b[0]), int(b[1])), []):
+        la, inside_a = pa.get(id(fp), (None, False))
+        if inside_b and not inside_a:
+            return True
+        if la is not None and edge(fp.get("tiles") or {}, la, lb) in ("wall", "window"):
+            return True
+    return False
+
+
+def _walk_tiles(world, a, b, margin=25, limit=30000):
+    """Outside, tile by tile over walkable ground, never into a building or through a wall: [a, ..., b] or None."""
+    lookup = world.get("world_tile_lookup", {})
+    a, b = (int(a[0]), int(a[1])), (int(b[0]), int(b[1]))
+    lo_x, hi_x = min(a[0], b[0]) - margin, max(a[0], b[0]) + margin
+    lo_y, hi_y = min(a[1], b[1]) - margin, max(a[1], b[1]) + margin
+    plots = _plots(world)
+    came = {a: None}
+    queue = deque([a])
+    while queue and len(came) < limit:
+        cur = queue.popleft()
+        if cur == b:
+            out = [cur]
+            while came[out[-1]] is not None:
+                out.append(came[out[-1]])
+            return list(reversed(out))
+        for dx, dy in ((0, 1), (0, -1), (1, 0), (-1, 0)):
+            nxt = (cur[0] + dx, cur[1] + dy)
+            if nxt in came or not (lo_x <= nxt[0] <= hi_x and lo_y <= nxt[1] <= hi_y):
+                continue
+            tile = lookup.get(spatial_key(*nxt))
+            if not tile or not tile.get("walkable", False) or _blocked_outdoors(world, cur, nxt, plots):
+                continue
+            came[nxt] = cur
+            queue.append(nxt)
+    return None
+
+
 def _outdoor_tiles(world, exit_point, entry_point):
     """The outdoor leg from a building's door (or anywhere outside) to another door
     (or anywhere outside), bridging doorsteps the outdoor graph doesn't contain.
@@ -937,14 +994,16 @@ def _outdoor_tiles(world, exit_point, entry_point):
     leaving = _bridge_to_outdoor_graph(world, exit_point)
     arriving = _bridge_to_outdoor_graph(world, entry_point)
     if leaving is None or arriving is None:
-        return None
+        return _walk_tiles(world, exit_point, entry_point)
     start = leaving[-1] if leaving else tuple(exit_point)
     goal = arriving[-1] if arriving else tuple(entry_point)
     middle = []
     if start != goal:
         middle = find_outdoor_path(world, start, goal)
         if not middle:
-            return None
+            # the nearest graph node can be a little island (a strip of yard behind a house the street graph
+            # doesn't join up): walk the ground itself instead
+            return _walk_tiles(world, exit_point, entry_point)
     # arriving runs entry_point -> graph node; walk it the other way, ending ON entry_point
     back_in = (list(reversed(arriving[:-1])) + [tuple(entry_point)]) if arriving else []
     # step onto the doorstep itself first, rather than cutting across it
@@ -961,6 +1020,20 @@ def _nearest_entrance(entrances, key, x, y):
 
 
 def plan_character_route(world, c, target_x, target_y):
+    """Plan c's route to (target_x, target_y) into c["route"]. True if there is one. Every plan is recorded for
+    debugging (systems/path_debug.py: c["path_plans"], drawn in the Inspector), and a real failure to find a way is
+    made impossible to miss."""
+    ok, reason = _plan_route(world, c, target_x, target_y)
+    try:
+        from systems.path_debug import record
+        record(c, world, (target_x, target_y), ok, reason)
+    except Exception as exc:                       # noqa: BLE001 -- debugging must never break movement
+        print(f"[path_debug] {c.get('id')}: {exc!r}")
+    return ok
+
+
+def _plan_route(world, c, target_x, target_y):
+    """plan_character_route()'s planning: (ok, reason)."""
 
     sx = int(round(c.get("x", 0)))
     sy = int(round(c.get("y", 0)))
@@ -1006,7 +1079,7 @@ def plan_character_route(world, c, target_x, target_y):
         )
 
         if not tiles:
-            return False
+            return False, ("already_there" if (sx, sy) == (tx, ty) else "no_indoor_path")
 
         segments.append({
             "type": "indoor", "tiles": tiles, "building_id": start_building["id"]
@@ -1014,75 +1087,75 @@ def plan_character_route(world, c, target_x, target_y):
 
     else:
 
-        exit_point = (sx, sy)
-
+        # Every way out of the start building and every way into the target one is a candidate (a house has a front
+        # and a back door): the shortest combination whose outdoor leg exists wins. Only the nearest door used to be
+        # tried, so the back yard was unreachable from a house whose nearest door is the front one.
+        starts = [None]
         if start_building:
-
-            entrances = find_building_entrances(start_building, start_floorplan)
-
-            if not entrances:
-                return False
-
-            entrance = _nearest_entrance(entrances, "inside", sx, sy)
-
-            indoor_tiles = build_building_path(
-                start_building, start_floorplan, (sx, sy), entrance["inside"]
-            )
-
-            if indoor_tiles:
-                segments.append({
-                    "type": "indoor",
-                    "tiles": indoor_tiles,
-                    "building_id": start_building["id"],
-                })
-
-            exit_point = entrance["outside"]
-
-        entry_point = (tx, ty)
-
+            starts = find_building_entrances(start_building, start_floorplan)
+            if not starts:
+                return False, "start_building_has_no_entrance"
+        ends = [None]
         if target_building:
+            ends = find_building_entrances(target_building, target_floorplan)
+            if not ends:
+                return False, "target_building_has_no_entrance"
 
-            target_entrances = find_building_entrances(target_building, target_floorplan)
+        def _guess(pair):
+            e, t = pair
+            ex = e["outside"] if e else (sx, sy)
+            en = t["outside"] if t else (tx, ty)
+            return ((abs(e["inside"][0] - sx) + abs(e["inside"][1] - sy) if e else 0)
+                    + abs(ex[0] - en[0]) + abs(ex[1] - en[1])
+                    + (abs(t["inside"][0] - tx) + abs(t["inside"][1] - ty) if t else 0))
 
-            if not target_entrances:
-                return False
-
-            target_entrance = _nearest_entrance(target_entrances, "outside", *exit_point)
-
-            entry_point = target_entrance["outside"]
-
-        if exit_point != entry_point:
-
-            outdoor_tiles = _outdoor_tiles(world, exit_point, entry_point)
-
-            if not outdoor_tiles:
-                return False
-
-            segments.append({"type": "outdoor", "tiles": outdoor_tiles})
-
-        if target_building:
-
-            indoor_tiles = build_building_path(
-                target_building, target_floorplan, target_entrance["inside"], (tx, ty)
-            )
-
-            # The target is the tile just inside the door itself (the walk home goes there): there is no indoor
-            # path to plan, but they still have to step in off the doorstep.
-            if not indoor_tiles and tuple(target_entrance["inside"]) == (tx, ty):
-                indoor_tiles = [(tx, ty)]
-
-            if indoor_tiles:
-                segments.append({
-                    "type": "indoor",
-                    "tiles": indoor_tiles,
-                    "building_id": target_building["id"],
-                })
+        best, failed = None, "no_outdoor_path"
+        for entrance, target_entrance in sorted(((e, t) for e in starts for t in ends), key=_guess)[:9]:
+            segs = []
+            exit_point = (sx, sy)
+            if entrance:
+                indoor_tiles = build_building_path(start_building, start_floorplan, (sx, sy), entrance["inside"])
+                if not indoor_tiles and (sx, sy) != tuple(entrance["inside"]):
+                    failed = "no_indoor_path"
+                    continue
+                if indoor_tiles:
+                    segs.append({"type": "indoor", "tiles": indoor_tiles, "building_id": start_building["id"]})
+                exit_point = entrance["outside"]
+            entry_point = target_entrance["outside"] if target_entrance else (tx, ty)
+            if exit_point != entry_point:
+                outdoor_tiles = _outdoor_tiles(world, exit_point, entry_point)
+                if not outdoor_tiles:
+                    failed = "no_outdoor_path"
+                    continue
+                segs.append({"type": "outdoor", "tiles": outdoor_tiles})
+            elif entrance and (sx, sy) != tuple(exit_point):
+                # Standing on the tile just inside the door, headed for the doorstep beyond it: no indoor leg and no
+                # outdoor leg, but they still have to step out. This came back as "no_route" and sent the
+                # character into a no-path episode one step from the door (Robert, 2026-11-04).
+                segs.append({"type": "outdoor", "tiles": [tuple(exit_point)]})
+            if target_entrance:
+                indoor_tiles = build_building_path(target_building, target_floorplan, target_entrance["inside"], (tx, ty))
+                # The target is the tile just inside the door itself (the walk home goes there): no indoor path to
+                # plan, but they still have to step in off the doorstep.
+                if not indoor_tiles and tuple(target_entrance["inside"]) == (tx, ty):
+                    indoor_tiles = [(tx, ty)]
+                if not indoor_tiles:
+                    failed = "no_indoor_path"
+                    continue
+                segs.append({"type": "indoor", "tiles": indoor_tiles, "building_id": target_building["id"]})
+            length = sum(len(sg["tiles"]) for sg in segs)
+            if best is None or length < best[0]:
+                best = (length, segs)
+        if best is None:
+            return False, failed
+        segments = best[1]
 
     if not segments:
-        return False
+        return False, "already_there" if (sx, sy) == (tx, ty) else "no_route"
 
     c["route"] = segments
     c["route_segment_index"] = 0
     c["path_index"] = 0
 
-    return True
+    partial = target_building and not any(seg.get("building_id") == target_building["id"] for seg in segments)
+    return True, "partial_stops_outside" if partial else "ok"

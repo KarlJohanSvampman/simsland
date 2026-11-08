@@ -221,6 +221,18 @@ SPEECH
   target gets an actual reaction to it, not just a neutral reply.
   compliment, flirt, joke, and guilt_trip are real attempts that can succeed or visibly flop
   depending on how stressed/prepared you are, and who you're targeting (systems/contested_checks.py) — don't assume it always lands.
+- "subject": what the conversation is about. Keep it the same while you're still on it (if you
+  started talking about cleaning your room, it's still about cleaning your room) -- the CURRENT
+  CONVERSATION block shows the subject so far. One conversation is one sitting: wait for the other
+  person's reply before saying more, and don't start talking to someone else while they still owe
+  you an answer.
+- "social" says what your line DOES between you (fill it whenever you speak to someone):
+  intent -- what you're doing with the line; issue -- the problem, if there is one (reuse the wording
+  of an issue you already have with them); position -- your honest view of it (it can differ from
+  theirs, and can be wrong); escalation -- are you pushing it further, holding, or calming it down
+  (low regard for someone makes you shorter and less patient with them, but you can just as well
+  avoid a fight); side -- only when you step into an argument between others; continue -- false
+  when you're done talking and want to end the conversation.
 - "conversation_type" is optional — set it when you're starting a conversation or deliberately
   steering its shape: smalltalk, argument, negotiation, persuasion, competition, gossip. Leave it
   out to just continue naturally. It's yours to set or change any time, not locked in once picked.
@@ -296,7 +308,17 @@ OUTPUT FORMAT  (strict JSON, no other text)
     "speech_act":        "greet | ask | declare | joke | comfort | argue | whisper | ...",
     "topic":             "topic keyword",
     "utterance":         "exact words you say aloud — shown as speech bubble",
-    "conversation_type": "smalltalk | argument | negotiation | persuasion | competition | gossip | null"
+    "conversation_type": "smalltalk | argument | negotiation | persuasion | competition | gossip | null",
+    "subject":           "what this conversation is about, a few words (keep it while it's still about that)",
+    "social": {
+      "intent":          "chat | inform | ask | suggest | request_change | remind_obligation | criticise | complain | accuse | provoke | ridicule | bully | power_play | negotiate | propose_agreement | accept | refuse | apologise | forgive | defend | mediate | reconcile | gossip | threaten | end",
+      "issue":           "the problem you're raising or answering, a few words, or null",
+      "position":        "how YOU see that issue, one sentence, or null",
+      "desired_outcome": "what you want from them, or null",
+      "escalation":      "escalate | hold | de-escalate",
+      "side":            "only when joining someone else's disagreement: 'initiator' or 'target' (whose side you take), 'mediator' or 'neutral'",
+      "continue":        true
+    }
   },
   "reflection": "brief reflection on recent events",
   "confidence": 0.0
@@ -486,11 +508,33 @@ _LABEL_ONLY_LINE_RE = re.compile(r'^[ \t>*_#-]*[A-Za-z][A-Za-z _]{0,24}[ \t]*:[ 
 _NARRATION_LABEL_RE = re.compile(r'(?i)^[ \t>*_#-]*(?:narration|thought|thoughts|inner monologue)[ \t]*:[ \t*_]*')
 
 
+# The model copying the reply template's own instructions as its "thought" ("<what you do, ONLY if it's worth
+# describing -- skip this line ...>"), or filling the line with a non-thought ("says nothing", "(none)", "...").
+_TEMPLATE_ECHO_RE = re.compile(r"(?i)worth describing|skip this line|don't narrate|REQUIRED whenever|"
+                               r"in your own words>|<exact words|<short next intention|<type>|<target")
+_EMPTY_LINE_RE = re.compile(r"(?i)^[\s(\[*_\"'-]*(?:(?:he|she|they|i)\s+)?(?:says?|said|thinks?|do(?:es)?)?\s*"
+                            r"(?:nothing|none|no(?:thing)?\s+(?:to\s+say|thought|narration|comment)|n/?a|null|silence|"
+                            r"silent|empty|blank|no\s+thoughts?|-+|\.{2,}|…)[\s)\].*_\"'!.]*$")
+
+
+def _meaningless(line):
+    line = (line or "").strip()
+    if not line:
+        return True
+    if line.startswith("<") and line.endswith(">"):
+        return True
+    if _TEMPLATE_ECHO_RE.search(line):
+        return True
+    return bool(_EMPTY_LINE_RE.match(line))
+
+
 def _clean_narration(text):
     """The words before the ACTION line, minus stray headings the model puts there ("MOVE:" on a line by itself was being stored as
-    the character's thought). Empty is fine: think() writes a short canned line from the action instead."""
+    the character's thought), template lines it copied back, and non-thoughts like "says nothing". Empty is fine: think() writes a
+    short canned line from the action instead."""
     lines = [ln for ln in (text or "").strip().split("\n") if not _LABEL_ONLY_LINE_RE.match(ln)]
-    return _NARRATION_LABEL_RE.sub("", "\n".join(lines).strip(), count=1).strip()
+    lines = [_NARRATION_LABEL_RE.sub("", ln, count=1).strip() for ln in lines]
+    return "\n".join(ln for ln in lines if not _meaningless(ln)).strip()
 
 
 # ---- a forgiving reading of a slightly-off ACTION line -------------------------------------------------------
@@ -614,8 +658,8 @@ def _parse_compact_envelope(raw):
             "target_description": parts[1] if len(parts) > 1 and parts[1] else "",
             "detail": parts[2] if len(parts) > 2 and parts[2] else "",
         },
-        "say": say_match.group(1).strip() if say_match else "",
-        "remark": remark_match.group(1).strip() if remark_match else "",
+        "say": "" if not say_match or _meaningless(say_match.group(1)) else say_match.group(1).strip(),
+        "remark": "" if not remark_match or _meaningless(remark_match.group(1)) else remark_match.group(1).strip(),
         "intent": _parse_intent_line(intent_match.group(1)) if intent_match else None,
         "uses": _parse_uses_line(uses_match.group(1)) if uses_match else [],
         "then": then_match.group(1).strip() if then_match else "",

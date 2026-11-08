@@ -96,6 +96,14 @@ check("only one intention: the first step that is a real activity", d["intention
 d = lb._to_legacy_decision(lb._parse_compact_envelope("ACTION: wait\nTHEN: ponder life"), char_id=None)
 check("a step that is no activity gives no intention", not d.get("intention"))
 
+# ---- template lines copied back, and non-thoughts -----------------------------------------------------------------------
+from brain.llm_brain import _clean_narration as _cn, _parse_compact_envelope as _pce
+check("the template's own narration instruction copied back is not a thought",
+      _cn("<what you do, ONLY if it's worth describing -- skip this line for a routine action, don't narrate every single move>") == "")
+check("'says nothing' / '(none)' / '...' are not thoughts", all(_cn(t) == "" for t in ("says nothing", "(Says nothing.)", "None", "...")))
+check("a real thought that mentions nothing stays", _cn("I say nothing and just nod.") == "I say nothing and just nod.")
+check("SAY: (says nothing) is no speech", _pce("ACTION: wait | |\nSAY: (says nothing)")["say"] == "")
+
 print()
 if failures:
     print(f"FAILED: {len(failures)}")

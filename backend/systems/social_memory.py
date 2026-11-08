@@ -204,6 +204,10 @@ def _is_violent_or_illegal(other, world):
                 and conflict.get("outcome") is None
                 and conflict.get("fight_stage") in _HOSTILE_FIGHT_STAGES):
             return True
+    from social.confrontations import active_for
+    for conf in active_for(world, other_id):                      # social/confrontations.py: threats or worse
+        if conf.get("stage_idx", 0) >= 4:
+            return True
     return False
 
 
