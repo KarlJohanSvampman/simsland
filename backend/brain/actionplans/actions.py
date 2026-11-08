@@ -211,8 +211,11 @@ def dinner_together_done(c, world, attempt):
     """After eating: if the whole household was there, Family Dinner Together is met for every grown-up who had it;
     if not, who was missing is noted (systems/expectations.py's miss blames them) and it is not met."""
     from systems.expectation_planner import _missing_household_members
-    missing = _missing_household_members(c, world)
     chars = world.get("characters") or {}
+    seated = set((attempt.get("vars") or {}).get("seated") or [])
+    # someone who sat down to the meal and finished first (off for a glass of water) was still at dinner
+    missing = [m for m in _missing_household_members(c, world)
+               if not (m in seated and (chars.get(m) or {}).get("building_id") == c.get("building_id"))]
     if missing:
         nd = (c.get("expectations") or {}).get("family_dinner_together")
         if nd is not None:

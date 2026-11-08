@@ -156,7 +156,8 @@ check("dinner together: everyone home, food on the table -- called to the table,
 k["activity"] = None
 rob["activity"] = None
 runner.on_activity_end({"character_id": "robert", "activity_type": "eat_meal"}, w, "done")
-check("... the whole household was there: met", rob["expectations"]["family_dinner_together"]["status"] == "satisfied"
+k["room_id"] = "starter_house_2:kitchen_0"                # finished first, went for a glass of water
+check("... the whole household was there (one finished first and went for water): met", rob["expectations"]["family_dinner_together"]["status"] == "satisfied"
       and rob["plan_log"][-1]["status"] == "satisfied", str(tsteps(rob)[-3:]))
 
 w, rob, k = together_world()
@@ -195,6 +196,10 @@ runner.autopilot(rob, w, {"type": "expectation:child_bedtime_check", "category":
 check("bedtime: they look in on the kids, send the one still up to bed, and it is met",
       rob["expectations"]["child_bedtime_check"]["status"] == "satisfied"
       and any(i.get("type") == "go_to_sleep" for i in k.get("active_intentions") or []), str(rob.get("plan_log", [])[-1:]))
+
+from core.definitions import load_definitions as _ld
+check("a household dining table seats four", sum(1 for a in _ld("default")["prop_templates"]["dining_table_a"]["anchors"]
+                                                if a.get("interaction") == "eat") >= 4)
 
 print()
 if failures:

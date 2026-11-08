@@ -449,6 +449,18 @@
         {
           "name": "anchor_eat",
           "interaction": "eat"
+        },
+        {
+          "name": "anchor_eat_2",
+          "interaction": "eat"
+        },
+        {
+          "name": "anchor_eat_3",
+          "interaction": "eat"
+        },
+        {
+          "name": "anchor_eat_4",
+          "interaction": "eat"
         }
       ],
       "tags": [
