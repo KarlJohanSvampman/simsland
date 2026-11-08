@@ -74,6 +74,16 @@ j["body"]["fatigue"] = 45
 j["activity"] = None
 runner.on_activity_end({"character_id": "joseph", "activity_type": "nap"}, w, "done")
 check("... still a bit tired after it, but the nap is done: satisfied", j["plan_log"][-1]["status"] == "satisfied", str(j["plan_log"][-1]))
+w = world()
+j = w["characters"]["joseph"]
+j["body"]["fatigue"] = 90
+runner.autopilot(j, w, {"type": "take_nap", "category": "health", "priority": 65, "reason": "tired"})
+j["body"]["fatigue"] = 80
+j["activity"] = None
+runner.on_activity_end({"character_id": "joseph", "activity_type": "nap"}, w, "done")
+check("a nap that leaves them still exhausted: a proper sleep after it, not nap after nap",
+      (j.get("activity") or {}).get("type") == "sleep" and ("nap_by_day", "enough", "decision", "still exhausted") in steps(j, "restore_energy"),
+      str(steps(j, "restore_energy")))
 
 # ---- a night's sleep, a bathroom break, back to bed ------------------------------------------------------------------
 w = world(hour=23)
@@ -161,6 +171,13 @@ hh = w["households"]["lind"]
 hh["leftovers"], hh["ready_meals"], hh["deliveries"] = [], [], []
 hh.setdefault("storage", {})["resources"] = []
 runner.autopilot(j, w, {"type": "eat_food", "category": "survival", "priority": 80, "reason": "very_hungry"})
+w2 = world()
+j2 = w2["characters"]["joseph"]
+j2["_offgrid_last_trip"] = {"reason": "shopping", "day": __import__("systems.offgrid", fromlist=["_today"])._today(w2)}
+att2 = {"vars": {}}
+from brain.actionplans.actions import ACTIONS
+check("a second grocery trip the same day is refused, saying so",
+      ACTIONS["go_grocery_shopping"](j2, w2, att2) is False and att2["vars"].get("why") == "already went shopping today", str(att2))
 check("at three in the morning the shops are shut: no trip", not j.get("off_grid")
       and ("buy_groceries", "store", "gate", "no") in steps(j, "reduce_hunger"), str(steps(j, "reduce_hunger")[-5:]))
 

@@ -2296,10 +2296,7 @@
     {
      "from": "shop",
      "output": "failed",
-     "to": "stuck",
-     "set": {
-      "why": "couldn't get out to the shops"
-     }
+     "to": "stuck"
     },
     {
      "from": "back",
@@ -2877,7 +2874,7 @@
      "id": "ok",
      "kind": "end",
      "outcome": "satisfied",
-     "x": 760,
+     "x": 1000,
      "y": 40
     },
     {
@@ -2886,6 +2883,25 @@
      "outcome": "fallback",
      "x": 280,
      "y": 200
+    },
+    {
+     "id": "enough",
+     "kind": "decision",
+     "rules": [
+      {
+       "when": [
+        {
+         "var": "urgency",
+         "op": ">=",
+         "value": 70
+        }
+       ],
+       "output": "still exhausted"
+      }
+     ],
+     "default": "refreshed",
+     "x": 760,
+     "y": 40
     }
    ],
    "edges": [
@@ -2915,12 +2931,25 @@
     {
      "from": "nap",
      "output": "done",
-     "to": "ok"
+     "to": "enough"
     },
     {
      "from": "nap",
      "output": "failed",
      "to": "next"
+    },
+    {
+     "from": "enough",
+     "output": "refreshed",
+     "to": "ok"
+    },
+    {
+     "from": "enough",
+     "output": "still exhausted",
+     "to": "next",
+     "set": {
+      "why": "a nap wasn't enough: a proper sleep"
+     }
     }
    ],
    "entries": [

@@ -77,7 +77,17 @@ def go_grocery_shopping(c, world, attempt):
     if not hh or (c.get("age") or 0) < 18:
         return False
     from systems import offgrid, grocery
+    if offgrid.same_as_last_trip_today(c, world, "shopping"):
+        attempt["vars"]["why"] = "already went shopping today"
+        return False
+    if offgrid.repeat_blocked(c, world, "shopping"):
+        attempt["vars"]["why"] = "only just got back from the shops"
+        return False
+    if c.get("travel_state") or c.get("off_grid"):
+        attempt["vars"]["why"] = "out already"
+        return False
     if not offgrid.send_offgrid(c, world, "shopping", offgrid.GROCERY_TRIP_MINUTES):
+        attempt["vars"]["why"] = "couldn't get out to the shops"
         return False
     hh["_shopping_until"] = c.get("return_tick")
     grocery.make_plan(world, hh, c)
