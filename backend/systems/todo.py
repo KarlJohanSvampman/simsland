@@ -25,6 +25,7 @@ PRESSING_TYPES = {"relieve_worry"}          # a worry that is crowding out their
 
 
 NOT_YET_OPEN_LEAD = 30 * 60   # an expectation whose window opens further off than this is not pressing yet
+SHORT_WINDOW = 3 * 60 * 60     # a window this short (a schedule block) is "due now" while open; a whole day or week is not
 
 
 def tier(i):
@@ -36,8 +37,12 @@ def tier(i):
         return "when_free"
     # ...and one whose window is open right now is due now, whatever its category (dinner together, "social": it was
     # always behind something pressing and never happened)
+    # -- only a real, short window (dinner's hour): a weekly or daily expectation with no schedule block gets the whole
+    # period as its window, and counting that as "due now" made it pressing all day (2026-11-09: nothing "when free"
+    # ever ran, not even an event reminder)
     end = i.get("window_end_tick")
-    if start is not None and end is not None and _ints._CURRENT_TICK and start - NOT_YET_OPEN_LEAD <= _ints._CURRENT_TICK < end:
+    if (start is not None and end is not None and _ints._CURRENT_TICK and end - start <= SHORT_WINDOW
+            and start - NOT_YET_OPEN_LEAD <= _ints._CURRENT_TICK < end):
         return "pressing"
     if i.get("type") in PRESSING_TYPES:
         return "pressing"

@@ -1318,6 +1318,9 @@ ACTIVITIES = {
     "masturbate_in_shower": {"interaction": "shower", "base_duration_minutes": 12, "interruptible": True, "category": "private"},
     # Spend Time Alone: alone in a room, a while to themselves (sitting quietly, thinking, scrolling) -- where they are
     "time_to_myself": {"no_target": True, "base_duration_minutes": 30, "interruptible": True, "category": "leisure"},
+    # Unwind with Someone at a friend's: time together where they are (sitting means a seat, and seats are chosen from the
+    # visitor's OWN household first -- they walked home to sit down)
+    "hang_out": {"no_target": True, "base_duration_minutes": 30, "interruptible": True, "category": "leisure"},
     # Get Clean's fallback when the shower can't be had: a proper wash at the sink (face, armpits, a flannel)
     "wash_up": {"interaction": "wash_hands", "base_duration_minutes": 6, "interruptible": True, "category": "survival"},
 }

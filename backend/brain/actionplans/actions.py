@@ -363,7 +363,9 @@ def invite_to_unwind(c, world, attempt):
         pass
     if act:
         interrupt_activity(o, world, reason="sat down to unwind together")
-    if not start_activity(o, world, "sit_and_relax"):
+    # at home, a seat each; at a friend's, time together where they are (see "hang_out" in systems/activities.py)
+    what = (attempt.get("vars") or {}).get("unwind_activity") or "sit_and_relax"
+    if not start_activity(o, world, what):
         return False
     attempt["vars"]["unwind_with"] = o["id"]
     return True
@@ -390,5 +392,6 @@ def pick_friend(c, world, attempt):
     if not f:
         return False
     attempt["vars"]["unwind_with"] = f["id"]
+    attempt["vars"]["unwind_activity"] = "hang_out"
     c["_social_purpose"] = {"target": f["id"], "since": world.get("tick", 0), "type": "unwind"}
     return True
