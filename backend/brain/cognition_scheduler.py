@@ -50,6 +50,7 @@ WAKE_PRIORITY = {
                                  # _on_hostile_action_resolved -- dramatic,
                                  # but ranked below being the direct target
     "heard_speech": 100,
+    "social_purpose": 85,      # brain/actionplans: they went to find someone to apologise to / check on -- now say it
     "self_assessment": 99,     # systems/loop_guard.py -- caught themselves in a loop
     "worry_overload": 97,      # systems/worry_relief.py -- couldn't concentrate and gave up on what they were doing
     "floor_unnoticed": 98,     # systems/conversation_floor.py -- spoke, got no reaction
@@ -221,6 +222,7 @@ _WAKE_LINE_TEMPLATES = {
     "proposal_received": "{from_name} has proposed something -- {topic}.",
     "proposal_countered": "{from_name} came back with a different offer on {topic}.",
     "proposal_resolved": "Your proposal about {topic} has an answer: {outcome_summary}.",
+    "social_purpose": "{line}",
     "director_attention": "Something makes you stop and look up -- you have the odd feeling someone unseen is watching you, waiting for you to notice.",
 }
 

@@ -192,13 +192,15 @@ def _start_plan(c, world, att, pid, entry=None, return_to=None):
     _trace(att, world, plan=pid, what="plan", why=("sidetrack" if return_to else "chosen") + (f" via entry {entry}" if entry else ""))
 
 
-def _clear_replaced(c, intention):
-    """Remove the old intention types this intention took over (eat_food for Reduce Hunger) from the list."""
+def _clear_replaced(c, intention, target=None):
+    """Remove the old intention types this intention took over (eat_food for Reduce Hunger) from the list -- only the
+    ones about `target`, when the attempt was about one person (an apology to Susan is not one to Robert)."""
     old = intention.get("replaces") or []
     def replaced(t):
         t = str(t or "")
         return any(t == r or (r.endswith("*") and t.startswith(r[:-1])) for r in old)
-    c["active_intentions"] = [i for i in c.get("active_intentions") or [] if not replaced(i.get("type"))]
+    c["active_intentions"] = [i for i in c.get("active_intentions") or []
+                              if not (replaced(i.get("type")) and (target is None or i.get("target_id") == target))]
 
 
 def _finish(c, world, iid, att, status, why):
@@ -206,7 +208,8 @@ def _finish(c, world, iid, att, status, why):
     if status == "satisfied":
         intention = store.get(_data(world), "intentions", iid)
         if intention:
-            _clear_replaced(c, intention)
+            _clear_replaced(c, intention, (att.get("vars") or {}).get("target_id"))
+    c.pop("_social_purpose", None)
     _trace(att, world, what=status, why=why)
     c.setdefault("plan_log", []).append({k: att[k] for k in ("id", "intention", "started", "ended", "status", "why",
                                                              "tried", "trace", "vars") if k in att})
@@ -269,6 +272,8 @@ def autopilot(c, world, intention_entry):
                                          "status": "running"}
         att["drive_level"] = drive_level(c, world, store.get(_data(world), "drives", intention.get("drive")))
         att["vars"]["raised_as"] = intention_entry.get("type")       # take_nap vs sleep: a plan may weigh which it was
+        if intention_entry.get("target_id"):
+            att["vars"]["target_id"] = intention_entry["target_id"]  # whom it is about (apologise to, check on, ...)
         _trace(att, world, what="raised", why=f"{intention_entry.get('type')} ({intention_entry.get('reason')})")
     if att.get("resume"):
         r = att.pop("resume")

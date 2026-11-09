@@ -421,3 +421,44 @@ def kids_home(c, world):
     chars = world.get("characters") or {}
     kids = [chars[k] for k in c.get("dependents") or [] if k in chars] or [o for o in _household_others(c, world) if (o.get("age") or 99) < 13]
     return any(k.get("building_id") == c.get("building_id") and not k.get("off_grid") for k in kids)
+
+
+
+# ── saying something to someone (Make Things Right, Check On Someone) ───────────────────────────────────────────────
+
+def _purpose_target(c, world):
+    sp = c.get("_social_purpose") or {}
+    return (world.get("characters") or {}).get(sp.get("target")), sp
+
+
+@resolver("target_here")
+def target_here(c, world):
+    """The person they mean to talk to is right here: the same room, or close by outdoors."""
+    t, _ = _purpose_target(c, world)
+    if not t or t.get("off_grid") or t.get("alive") is False or t.get("x") is None or c.get("x") is None:
+        return False
+    if c.get("room_id") and t.get("room_id"):
+        return c["room_id"] == t["room_id"]
+    return c.get("building_id") == t.get("building_id") and _dist(c, t) <= 6
+
+
+@resolver("target_around")
+def target_around(c, world):
+    """The person is somewhere they can be walked to (on the map, not away)."""
+    t, _ = _purpose_target(c, world)
+    return bool(t) and not t.get("off_grid") and t.get("alive") is not False and t.get("x") is not None
+
+
+@resolver("said_it")
+def said_it(c, world):
+    """They have spoken to that person since setting out to (a line of theirs in a conversation with them)."""
+    t, sp = _purpose_target(c, world)
+    if not t:
+        return False
+    since = sp.get("since", 0)
+    for conv in (world.get("conversations") or {}).values():
+        if t["id"] not in (conv.get("participants") or []) or c["id"] not in (conv.get("participants") or []):
+            continue
+        if any(h.get("speaker") == c["id"] and (h.get("tick") or 0) >= since for h in conv.get("history") or []):
+            return True
+    return False

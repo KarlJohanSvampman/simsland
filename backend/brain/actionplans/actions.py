@@ -247,3 +247,51 @@ def check_on_kids(c, world, attempt):
     _route_check_on_kids(c, world, {"type": "check_on_kids", "target_id": kids[0]["id"]})
     after = ((c.get("expectations") or {}).get("child_bedtime_check") or {}).get("status")
     return after == "satisfied" or (before is None and bool(c.get("activity")))
+
+
+# what each old intention type means to say, in the words the model is woken with
+_PURPOSES = {
+    "apologize_to": "apologise to {name} and make it right",
+    "apologize": "apologise to {name} and make it right",
+    "check_in_on": "check in on {name} -- ask how they are doing",
+    "suggest_doctor": "suggest that {name} sees a doctor",
+    "suggest_hygiene": "tactfully let {name} know they could do with a shower",
+    "confront": "have it out with {name}",
+}
+
+
+@action("pick_who")
+def pick_who(c, world, attempt):
+    """Whom this is about (the old intention's target) -- remembered on the character while the plan runs."""
+    who = (attempt.get("vars") or {}).get("target_id")
+    if not who or who not in (world.get("characters") or {}):
+        return False
+    c["_social_purpose"] = {"target": who, "since": world.get("tick", 0),
+                            "type": (attempt.get("vars") or {}).get("raised_as")}
+    return True
+
+
+@action("go_to_them")
+def go_to_them(c, world, attempt):
+    """Walk over to them (systems/action_router.py's move to a character)."""
+    t = (world.get("characters") or {}).get((c.get("_social_purpose") or {}).get("target"))
+    if not t:
+        return False
+    from systems.action_router import _route_move
+    _route_move(c, world, {"type": "move", "target": t["id"]})
+    return bool(c.get("is_moving") or c.get("move_target"))
+
+
+@action("say_it")
+def say_it(c, world, attempt):
+    """They are face to face: wake their model with what they came to say. The words are theirs (the model's); the plan
+    waits until they have actually said something to the person."""
+    sp = c.get("_social_purpose") or {}
+    t = (world.get("characters") or {}).get(sp.get("target"))
+    if not t:
+        return False
+    sp["since"] = world.get("tick", 0)
+    what = _PURPOSES.get(sp.get("type") or "", "talk to {name}").format(name=t.get("first_name") or t.get("name", "them"))
+    from brain.cognition_scheduler import wake_character
+    wake_character(c, world, "social_purpose", {"line": f"You came to {what} -- {t.get('first_name') or t.get('name')} is right here. Say it now."})
+    return True
