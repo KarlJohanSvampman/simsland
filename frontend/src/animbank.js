@@ -303,6 +303,8 @@ let rawClipsA  = [];            // AnimationClip[] from loaded GLB
 
 // Playback state
 let activeAction   = null;
+let activeStartT   = 0;
+let activeEndT     = Infinity;
 let activeActionB  = null;
 let isPlaying      = false;
 let loopMode       = THREE.LoopRepeat;  // current loop mode
@@ -413,19 +415,25 @@ function render() {
 
     // Enforce start/end frame range
     if (activeAction && isPlaying) {
-        const startT = startFrameToTime();
-        const endT   = endFrameToTime();
+        const startT = activeStartT;
+        const endT   = activeEndT;
         const t = activeAction.time;
         if (t >= endT) {
-            if (loopMode === THREE.LoopOnce) {
+            const chainEntry = (chainTemplate && (chainTemplate.chain || [])[chainIndex]) || null;
+            const isChain = !!chainTemplate;
+            const isRepeat = isChain ? (!chainEntry || chainEntry.loop === "repeat")
+                                     : (loopMode === THREE.LoopRepeat || loopMode === THREE.LoopPingPong);
+            if (isChain && chainIndex + 1 < (chainTemplate.chain || []).length && !isRepeat) {
+                playChainStep(chainIndex + 1);
+            } else if (isRepeat) {
+                // jump back to start
+                activeAction.time = startT;
+                if (activeActionB) activeActionB.time = startT;
+            } else {
                 activeAction.paused = true;
                 if (activeActionLower) activeActionLower.paused = true;
                 isPlaying = false;
                 document.getElementById("playBtn").textContent = "▶";
-            } else {
-                // jump back to start
-                activeAction.time = startT;
-                if (activeActionB) activeActionB.time = startT;
             }
         }
         if (t < startT) activeAction.time = startT;
@@ -678,7 +686,10 @@ async function playClip(clipMeta) {
         .play();
 
     // Jump to the requested start frame; render loop clamps the end.
-    activeAction.time = startFrameToTime();
+    activeStartT = startFrameToTime();
+    activeEndT   = endFrameToTime();
+    if (!isFinite(activeEndT)) activeEndT = Infinity;
+    activeAction.time = activeStartT;
     mixerA.update(0);   // force first frame immediately (kills T-pose flicker)
 
     // Paired side
@@ -1044,6 +1055,11 @@ function playChainStep(idx) {
     if (entry.loop_count > 0) action.repetitions = entry.loop_count;
 
     const startT = (entry.start_frame || 0) / clipFPS;
+    const endT   = (entry.end_frame != null && entry.end_frame !== "")
+        ? (parseInt(entry.end_frame) / clipFPS)
+        : (raw.duration || Infinity);
+    activeStartT = startT;
+    activeEndT   = endT;
     action.time = startT;
     mixerA.update(0);
 
