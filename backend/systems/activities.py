@@ -1316,6 +1316,8 @@ ACTIVITIES = {
     "masturbate_in_bed": {"interaction": "sleep", "base_duration_minutes": 10, "interruptible": True, "category": "private"},
     "masturbate_on_toilet": {"interaction": "use_toilet", "base_duration_minutes": 8, "interruptible": True, "category": "private"},
     "masturbate_in_shower": {"interaction": "shower", "base_duration_minutes": 12, "interruptible": True, "category": "private"},
+    # Spend Time Alone: alone in a room, a while to themselves (sitting quietly, thinking, scrolling) -- where they are
+    "time_to_myself": {"no_target": True, "base_duration_minutes": 30, "interruptible": True, "category": "leisure"},
     # Get Clean's fallback when the shower can't be had: a proper wash at the sink (face, armpits, a flannel)
     "wash_up": {"interaction": "wash_hands", "base_duration_minutes": 6, "interruptible": True, "category": "survival"},
 }
@@ -2287,6 +2289,9 @@ def complete_activity(
     # =====================================
     # DRINK
     # =====================================
+
+    elif activity_type == "time_to_myself":
+        c["stress"] = max(0.0, (c.get("stress") or 0) - 10)
 
     elif activity_type == "wash_up":
         b = c.setdefault("body", {})

@@ -274,6 +274,9 @@ def autopilot(c, world, intention_entry):
         att["vars"]["raised_as"] = intention_entry.get("type")       # take_nap vs sleep: a plan may weigh which it was
         if intention_entry.get("target_id"):
             att["vars"]["target_id"] = intention_entry["target_id"]  # whom it is about (apologise to, check on, ...)
+        for k in ("event_id", "event_name", "occasion", "days_until", "band_days", "prep_requirements", "for_char_id"):
+            if intention_entry.get(k) is not None:
+                att["vars"][k] = intention_entry[k]                  # what it is about (an event coming up, ...)
         _trace(att, world, what="raised", why=f"{intention_entry.get('type')} ({intention_entry.get('reason')})")
     if att.get("resume"):
         r = att.pop("resume")

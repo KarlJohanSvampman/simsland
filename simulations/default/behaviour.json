@@ -364,26 +364,6 @@
    "notes": "satisfied by systems/expectations.py::satisfy_expectation"
   },
   {
-   "id": "relax_with_someone",
-   "kind": "expectation",
-   "name": "Unwind with Someone",
-   "source": "expectations.relax_with_someone",
-   "threshold": "pending",
-   "satisfied_below": null,
-   "intention": "unwind_with_someone",
-   "notes": "satisfied by systems/expectations.py::satisfy_expectation"
-  },
-  {
-   "id": "spend_time_alone",
-   "kind": "expectation",
-   "name": "Spend Time Alone",
-   "source": "expectations.spend_time_alone",
-   "threshold": "pending",
-   "satisfied_below": null,
-   "intention": "spend_time_alone",
-   "notes": "satisfied by systems/expectations.py::satisfy_expectation"
-  },
-  {
    "id": "child_hungry",
    "kind": "expectation",
    "name": "A child to feed",
@@ -444,6 +424,36 @@
    "notes": ""
   },
   {
+   "id": "upcoming_event",
+   "kind": "expectation",
+   "name": "An event coming up",
+   "source": "world.upcoming_event",
+   "threshold": 1,
+   "satisfied_below": null,
+   "intention": "prepare_for_event",
+   "notes": ""
+  },
+  {
+   "id": "spend_time_alone",
+   "kind": "expectation",
+   "name": "Spend Time Alone",
+   "source": "expectations.spend_time_alone",
+   "threshold": 1,
+   "satisfied_below": 1,
+   "intention": "spend_time_alone",
+   "notes": ""
+  },
+  {
+   "id": "relax_with_someone",
+   "kind": "expectation",
+   "name": "Unwind with Someone",
+   "source": "expectations.relax_with_someone",
+   "threshold": 1,
+   "satisfied_below": 1,
+   "intention": "unwind_with_someone",
+   "notes": ""
+  },
+  {
    "id": "house_dirty",
    "kind": "expectation",
    "name": "A dirty house",
@@ -461,16 +471,6 @@
    "threshold": 1,
    "satisfied_below": null,
    "intention": "look_after_plants",
-   "notes": ""
-  },
-  {
-   "id": "upcoming_event",
-   "kind": "expectation",
-   "name": "An event coming up",
-   "source": "world.upcoming_event",
-   "threshold": 1,
-   "satisfied_below": null,
-   "intention": "prepare_for_event",
    "notes": ""
   },
   {
@@ -910,32 +910,6 @@
    "notes": ""
   },
   {
-   "id": "unwind_with_someone",
-   "name": "Unwind with Someone",
-   "drive": "relax_with_someone",
-   "status": "planned",
-   "plans": [],
-   "scout_plan": null,
-   "satisfied_when": null,
-   "replaces": [
-    "expectation:relax_with_someone"
-   ],
-   "notes": ""
-  },
-  {
-   "id": "spend_time_alone",
-   "name": "Spend Time Alone",
-   "drive": "spend_time_alone",
-   "status": "planned",
-   "plans": [],
-   "scout_plan": null,
-   "satisfied_when": null,
-   "replaces": [
-    "expectation:spend_time_alone"
-   ],
-   "notes": ""
-  },
-  {
    "id": "feed_the_kids",
    "name": "Feed the Kids",
    "drive": "child_hungry",
@@ -1049,6 +1023,56 @@
    "notes": ""
   },
   {
+   "id": "prepare_for_event",
+   "name": "Prepare for an Event",
+   "drive": "upcoming_event",
+   "status": "live",
+   "plans": [
+    "note_the_event"
+   ],
+   "scout_plan": null,
+   "satisfied_when": null,
+   "replaces": [
+    "prepare_for_event"
+   ],
+   "notes": "take note of it and what it needs, once per reminder band; the gift, outfit, card are intentions of their own"
+  },
+  {
+   "id": "spend_time_alone",
+   "name": "Spend Time Alone",
+   "drive": "spend_time_alone",
+   "status": "live",
+   "plans": [
+    "time_to_myself"
+   ],
+   "scout_plan": null,
+   "satisfied_when": {
+    "drive_below": 1
+   },
+   "replaces": [
+    "expectation:spend_time_alone"
+   ],
+   "notes": ""
+  },
+  {
+   "id": "unwind_with_someone",
+   "name": "Unwind with Someone",
+   "drive": "relax_with_someone",
+   "status": "live",
+   "plans": [
+    "unwind_together"
+   ],
+   "scout_plan": null,
+   "satisfied_when": {
+    "drive_below": 1
+   },
+   "replaces": [
+    "expectation:relax_with_someone"
+   ],
+   "notes": "",
+   "act_when": "evening"
+  },
+  {
    "id": "keep_house_clean",
    "name": "Keep the House Clean",
    "drive": "house_dirty",
@@ -1073,21 +1097,6 @@
     "water_plants",
     "weed_plants",
     "harvest_plants"
-   ],
-   "notes": ""
-  },
-  {
-   "id": "prepare_for_event",
-   "name": "Prepare for an Event",
-   "drive": "upcoming_event",
-   "status": "planned",
-   "plans": [],
-   "scout_plan": null,
-   "satisfied_when": null,
-   "replaces": [
-    "prepare_for_event",
-    "buy_gift",
-    "get_outfit"
    ],
    "notes": ""
   },
@@ -1433,6 +1442,30 @@
    "scope": "character",
    "ttl_seconds": 0,
    "learn_by": "remembers"
+  },
+  {
+   "id": "alone_here",
+   "name": "Nobody else in the room",
+   "resolver": "alone_here",
+   "scope": "character",
+   "ttl_seconds": 0,
+   "learn_by": "look around"
+  },
+  {
+   "id": "evening",
+   "name": "It is the evening (17-23)",
+   "resolver": "evening",
+   "scope": "world",
+   "ttl_seconds": 0,
+   "learn_by": "knows the time"
+  },
+  {
+   "id": "companion_free",
+   "name": "Their partner (or another grown-up) is home and free",
+   "resolver": "companion_free",
+   "scope": "household",
+   "ttl_seconds": 0,
+   "learn_by": "look around"
   },
   {
    "id": "tension_released",
@@ -3300,6 +3333,315 @@
      "set": {
       "why": "couldn't catch up with them"
      }
+    }
+   ],
+   "entries": [
+    {
+     "id": "start",
+     "node": "who",
+     "vars": []
+    }
+   ]
+  },
+  {
+   "id": "note_the_event",
+   "name": "Take note and plan for it",
+   "intention": "prepare_for_event",
+   "satisfies": true,
+   "requires": [],
+   "cost": {
+    "minutes": 2,
+    "money": 0,
+    "effort": 0
+   },
+   "time_budget_seconds": 600,
+   "start": "note",
+   "nodes": [
+    {
+     "id": "note",
+     "kind": "action",
+     "action": "note_event",
+     "x": 40,
+     "y": 40
+    },
+    {
+     "id": "ok",
+     "kind": "end",
+     "outcome": "satisfied",
+     "x": 280,
+     "y": 40
+    },
+    {
+     "id": "stuck",
+     "kind": "end",
+     "outcome": "blocked",
+     "x": 280,
+     "y": 180
+    }
+   ],
+   "edges": [
+    {
+     "from": "note",
+     "output": "done",
+     "to": "ok"
+    },
+    {
+     "from": "note",
+     "output": "failed",
+     "to": "stuck",
+     "set": {
+      "why": "not sure what it was about"
+     }
+    }
+   ],
+   "entries": [
+    {
+     "id": "start",
+     "node": "note",
+     "vars": []
+    }
+   ]
+  },
+  {
+   "id": "time_to_myself",
+   "name": "Some time to myself",
+   "intention": "spend_time_alone",
+   "satisfies": true,
+   "requires": [],
+   "cost": {
+    "minutes": 30,
+    "money": 0,
+    "effort": 0
+   },
+   "time_budget_seconds": 5400,
+   "start": "alone",
+   "nodes": [
+    {
+     "id": "alone",
+     "kind": "gate",
+     "requirement": "alone_here",
+     "x": 40,
+     "y": 40
+    },
+    {
+     "id": "rest",
+     "kind": "step",
+     "activity": "time_to_myself",
+     "x": 280,
+     "y": 40
+    },
+    {
+     "id": "done",
+     "kind": "action",
+     "action": "me_time_done",
+     "x": 520,
+     "y": 40
+    },
+    {
+     "id": "ok",
+     "kind": "end",
+     "outcome": "satisfied",
+     "x": 760,
+     "y": 40
+    },
+    {
+     "id": "go",
+     "kind": "action",
+     "action": "go_to_own_room",
+     "x": 40,
+     "y": 200
+    },
+    {
+     "id": "wait",
+     "kind": "wait",
+     "requirement": "alone_here",
+     "timeout_seconds": 900,
+     "x": 280,
+     "y": 200
+    },
+    {
+     "id": "stuck",
+     "kind": "end",
+     "outcome": "blocked",
+     "x": 520,
+     "y": 320
+    }
+   ],
+   "edges": [
+    {
+     "from": "alone",
+     "output": "yes",
+     "to": "rest"
+    },
+    {
+     "from": "alone",
+     "output": "no",
+     "to": "go"
+    },
+    {
+     "from": "rest",
+     "output": "done",
+     "to": "done"
+    },
+    {
+     "from": "rest",
+     "output": "failed",
+     "to": "stuck",
+     "set": {
+      "why": "kept being interrupted"
+     }
+    },
+    {
+     "from": "done",
+     "output": "done",
+     "to": "ok"
+    },
+    {
+     "from": "done",
+     "output": "failed",
+     "to": "stuck"
+    },
+    {
+     "from": "go",
+     "output": "done",
+     "to": "wait"
+    },
+    {
+     "from": "go",
+     "output": "failed",
+     "to": "stuck",
+     "set": {
+      "why": "nowhere to be alone"
+     }
+    },
+    {
+     "from": "wait",
+     "output": "ready",
+     "to": "rest"
+    },
+    {
+     "from": "wait",
+     "output": "timed_out",
+     "to": "stuck",
+     "set": {
+      "why": "couldn't get a moment alone"
+     }
+    }
+   ],
+   "entries": [
+    {
+     "id": "start",
+     "node": "alone",
+     "vars": []
+    }
+   ]
+  },
+  {
+   "id": "unwind_together",
+   "name": "Sit down together",
+   "intention": "unwind_with_someone",
+   "satisfies": true,
+   "requires": [],
+   "cost": {
+    "minutes": 30,
+    "money": 0,
+    "effort": 0
+   },
+   "time_budget_seconds": 5400,
+   "start": "who",
+   "nodes": [
+    {
+     "id": "who",
+     "kind": "gate",
+     "requirement": "companion_free",
+     "x": 40,
+     "y": 40
+    },
+    {
+     "id": "invite",
+     "kind": "action",
+     "action": "invite_to_unwind",
+     "x": 280,
+     "y": 40
+    },
+    {
+     "id": "sit",
+     "kind": "step",
+     "activity": "sit_and_relax",
+     "x": 520,
+     "y": 40
+    },
+    {
+     "id": "done",
+     "kind": "action",
+     "action": "unwound_together",
+     "x": 760,
+     "y": 40
+    },
+    {
+     "id": "ok",
+     "kind": "end",
+     "outcome": "satisfied",
+     "x": 1000,
+     "y": 40
+    },
+    {
+     "id": "stuck",
+     "kind": "end",
+     "outcome": "blocked",
+     "x": 520,
+     "y": 220
+    }
+   ],
+   "edges": [
+    {
+     "from": "who",
+     "output": "yes",
+     "to": "invite"
+    },
+    {
+     "from": "who",
+     "output": "no",
+     "to": "stuck",
+     "set": {
+      "why": "nobody to unwind with"
+     }
+    },
+    {
+     "from": "invite",
+     "output": "done",
+     "to": "sit"
+    },
+    {
+     "from": "invite",
+     "output": "failed",
+     "to": "stuck",
+     "set": {
+      "why": "they were busy"
+     }
+    },
+    {
+     "from": "sit",
+     "output": "done",
+     "to": "done"
+    },
+    {
+     "from": "sit",
+     "output": "failed",
+     "to": "stuck",
+     "set": {
+      "why": "couldn't sit down together"
+     }
+    },
+    {
+     "from": "done",
+     "output": "done",
+     "to": "ok"
+    },
+    {
+     "from": "done",
+     "output": "failed",
+     "to": "stuck"
     }
    ],
    "entries": [

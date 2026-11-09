@@ -462,3 +462,44 @@ def said_it(c, world):
         if any(h.get("speaker") == c["id"] and (h.get("tick") or 0) >= since for h in conv.get("history") or []):
             return True
     return False
+
+
+
+# ── Spend Time Alone / Unwind with Someone ──────────────────────────────────────────────────────────────────────
+
+@resolver("alone_here")
+def alone_here(c, world):
+    """Nobody else in the room with them (indoors)."""
+    if c.get("x") is None:
+        return False
+    rid = _room(world, c["x"], c["y"])
+    return bool(rid) and _alone_in(c, world, rid)
+
+
+@resolver("evening")
+def evening(c, world):
+    """The evening (17:00-23:00): when people unwind."""
+    h = (world.get("calendar") or {}).get("hour")
+    return h is not None and 17 <= h < 23
+
+
+def unwind_companion(c, world):
+    """Whom to unwind with: their partner if home and free, else another grown-up at home who is free."""
+    def free(o):
+        act = (o.get("activity") or {}).get("type")
+        return (not o.get("off_grid") and o.get("alive") is not False and o.get("building_id") == c.get("building_id")
+                and act not in ("sleep", "nap", "work", "use_toilet", "use_toilet_bowels", "take_shower", "cook_recipe"))
+    from systems.sexual_release import _find_partner
+    p = _find_partner(c, world)
+    if p and free(p):
+        return p
+    for o in _household_others(c, world):
+        if (o.get("age") or 0) >= 18 and free(o):
+            return o
+    return None
+
+
+@resolver("companion_free")
+def companion_free(c, world):
+    """Someone to unwind with is home and free."""
+    return unwind_companion(c, world) is not None

@@ -7,7 +7,7 @@ doing at that moment (brain/intentions.py::check_intention_deadlines), and the p
 """
 
 VERBS = {
-    "sleep": "asleep", "nap": "napping", "work": "working", "eat": "eating", "drink_water": "getting a drink of water", "wash_up": "having a wash at the sink",
+    "sleep": "asleep", "nap": "napping", "work": "working", "eat": "eating", "drink_water": "getting a drink of water", "wash_up": "having a wash at the sink", "time_to_myself": "taking some time to themselves",
     "use_toilet": "in the bathroom", "use_toilet_bowels": "in the bathroom", "take_shower": "taking a shower",
     "brush_teeth": "brushing their teeth", "cook_recipe": "cooking", "roam": "wandering about", "jog": "out for a jog",
     "reflect": "lost in thought", "dust_and_wipe": "cleaning", "wait": "waiting around", "relax": "relaxing",

@@ -295,3 +295,88 @@ def say_it(c, world, attempt):
     from brain.cognition_scheduler import wake_character
     wake_character(c, world, "social_purpose", {"line": f"You came to {what} -- {t.get('first_name') or t.get('name')} is right here. Say it now."})
     return True
+
+
+@action("note_event")
+def note_event(c, world, attempt):
+    """Prepare for an Event: take note of it and of what it needs -- remembered, and not raised again until it moves into
+    the next reminder band (systems/calendar_events.py). The concrete tasks (a gift, an outfit, a card) are intentions of
+    their own."""
+    v = attempt.get("vars") or {}
+    eid = v.get("event_id")
+    if not eid:
+        return False
+    c.setdefault("event_prep_noted", {})[eid] = v.get("band_days")
+    days = v.get("days_until")
+    when = "tomorrow" if days == 1 else f"in {days} days" if days else "soon"
+    needs = [str(x).replace("_", " ") for x in (v.get("prep_requirements") or [])]
+    line = f"{v.get('event_name') or 'An event'} is {when}." + (f" I'll need to: {', '.join(needs)}." if needs else " Nothing to get ready yet.")
+    try:
+        from brain.memory import store_memory
+        store_memory(c, line, importance=0.3, tags=["calendar", "plan"], tick=world.get("tick", 0), source="internal")
+    except Exception:                                  # noqa: BLE001
+        pass
+    attempt["vars"]["noted"] = line
+    return True
+
+
+@action("go_to_own_room")
+def go_to_own_room(c, world, attempt):
+    """Off to their own bedroom (systems/action_router.py's move to a room)."""
+    from brain.actionplans.resolvers import _home_props, _room, _own_bedroom
+    for p in _home_props(c, world, ("sleep",)):
+        rid = _room(world, p["x"], p["y"])
+        if rid and _own_bedroom(c, rid):
+            from systems.action_router import _route_move
+            _route_move(c, world, {"type": "move", "target": f"room:{rid}"})
+            return bool(c.get("is_moving") or c.get("move_target"))
+    return False
+
+
+@action("me_time_done")
+def me_time_done(c, world, attempt):
+    """Spend Time Alone is met."""
+    from systems.expectations import satisfy_expectation
+    if (c.get("expectations") or {}).get("spend_time_alone") is None:
+        return True
+    satisfy_expectation(c, "spend_time_alone", world)
+    return True
+
+
+@action("invite_to_unwind")
+def invite_to_unwind(c, world, attempt):
+    """Ask their partner (or another grown-up at home) to come and sit down for a while: they sit down to relax too, if
+    what they are doing can wait."""
+    from brain.actionplans.resolvers import unwind_companion
+    o = unwind_companion(c, world)
+    if not o:
+        return False
+    from systems.activities import ACTIVITIES, start_activity
+    from systems.occupancy import interrupt_activity
+    act = o.get("activity") or {}
+    if act and not (ACTIVITIES.get(act.get("type")) or {}).get("interruptible"):
+        return False
+    try:
+        from systems.action_router import apply_speech
+        apply_speech(c, world, {"target": o["id"], "utterance": "Come and sit with me for a bit?", "speech_act": "invite"})
+    except Exception:                                  # noqa: BLE001
+        pass
+    if act:
+        interrupt_activity(o, world, reason="sat down to unwind together")
+    if not start_activity(o, world, "sit_and_relax"):
+        return False
+    attempt["vars"]["unwind_with"] = o["id"]
+    return True
+
+
+@action("unwound_together")
+def unwound_together(c, world, attempt):
+    """They sat down together and the other is still home: Unwind with Someone is met."""
+    o = (world.get("characters") or {}).get((attempt.get("vars") or {}).get("unwind_with"))
+    if not o or o.get("building_id") != c.get("building_id") or o.get("off_grid"):
+        attempt["vars"]["why"] = "they went off before we could sit together"
+        return False
+    from systems.expectations import satisfy_expectation
+    if (c.get("expectations") or {}).get("relax_with_someone") is not None:
+        satisfy_expectation(c, "relax_with_someone", world)
+    return True
