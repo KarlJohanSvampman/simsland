@@ -136,6 +136,9 @@ def _maybe_trigger_mood(c, world):
     templates = world.get("definitions", {}).get("mood_templates", {})
     if not templates:
         return
+    # Avoid immediately re-triggering a mood that just expired.
+    if (world.get("tick", 0) or 0) < (c.get("_mood_cooldown_until", 0) or 0):
+        return
 
     body       = c.get("body", {})
     stress     = float(c.get("stress", 0))
@@ -172,6 +175,8 @@ def _maybe_trigger_mood(c, world):
 
     # Apply need modifiers immediately
     _apply_mood_need_modifiers(c)
+    # Cooldown before another mood can trigger.
+    c["_mood_cooldown_until"] = (world.get("tick", 0) or 0) + chosen.get("duration_ticks", 3600)
 
 
 def _check_triggers(triggers, stress, temp, body, lt_needs, c):
@@ -209,6 +214,9 @@ def _check_triggers(triggers, stress, temp, body, lt_needs, c):
         if key == "social_failure"        and not c.get("_social_failure"):         return False
         if key == "grievance_active":
             if not c.get("grievances"):                                 return False
+            # A single minor grievance shouldn't keep someone furious forever:
+            # only a genuinely heavy one (or several compounding) qualifies.
+            if not any((g.get("weight", 0) or 0) >= 10 for g in c.get("grievances", [])): return False
     return True
 
 
