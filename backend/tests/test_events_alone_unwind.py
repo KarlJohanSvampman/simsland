@@ -133,8 +133,28 @@ rob, k = w["characters"]["robert"], w["characters"]["kathleen"]
 k["off_grid"] = True
 with_expectation(rob, "relax_with_someone")
 runner.autopilot(rob, w, dict(UNWIND))
-check("nobody home to unwind with: blocked, says so", rob["plan_log"][-1]["status"] == "blocked"
+check("nobody home to unwind with, and no friend to visit: blocked, says so", rob["plan_log"][-1]["status"] == "blocked"
       and "nobody" in rob["plan_log"][-1]["why"], str(rob["plan_log"][-1]))
+
+# nobody at home, but a friend next door is home and free: go round
+w = world(hour=20)
+rob, k, j = w["characters"]["robert"], w["characters"]["kathleen"], w["characters"]["joseph"]
+k["off_grid"] = True
+rob["relationships"] = {"joseph": {"labels": ["friend"], "affection": 40}}
+with_expectation(rob, "relax_with_someone")
+runner.autopilot(rob, w, dict(UNWIND))
+check("nobody at home, his friend Joseph is home next door: he goes round",
+      (rob.get("move_target") or {}).get("target_id") == "joseph" and ("visit_a_friend", "go", "action", "done") in steps(rob, "unwind_with_someone"),
+      f"{rob.get('move_target')} {steps(rob, 'unwind_with_someone')}")
+
+# an event reminder now has a category: pressing once it has waited (systems/todo.py)
+j = world()["characters"]["joseph"]
+j["active_intentions"] = []
+ce._inject_intentions_for_event(j, dict(e2, days_until=20))
+pi = next(i for i in j["active_intentions"] if i["type"] == "prepare_for_event")
+from systems.todo import tier
+check("an event reminder is 'household': when there is time at first, pressing once it has waited",
+      pi.get("category") == "household" and tier(pi) == "when_free" and tier(dict(pi, stage=1)) == "pressing", str(pi))
 
 print()
 if failures:

@@ -503,3 +503,30 @@ def unwind_companion(c, world):
 def companion_free(c, world):
     """Someone to unwind with is home and free."""
     return unwind_companion(c, world) is not None
+
+
+
+def friend_to_visit(c, world):
+    """A grown-up outside the household they know (a relationship on record, not hostile), home and free -- best liked first."""
+    chars = world.get("characters") or {}
+    hh = set((_household(c, world) or {}).get("members") or [])
+    best = []
+    for oid, rel in (c.get("relationships") or {}).items():
+        o = chars.get(oid)
+        if not o or oid in hh or (o.get("age") or 0) < 18 or o.get("off_grid") or o.get("alive") is False:
+            continue
+        if (rel.get("affection") or rel.get("trust") or 0) < 0 or "enemy" in (rel.get("labels") or []):
+            continue
+        home = set(((world.get("households") or {}).get(o.get("household_id")) or {}).get("building_ids") or [])
+        act = (o.get("activity") or {}).get("type")
+        if o.get("building_id") not in home or act in ("sleep", "nap", "work", "use_toilet", "use_toilet_bowels", "take_shower"):
+            continue
+        best.append((rel.get("affection") or rel.get("trust") or 0, oid))
+    best.sort(reverse=True)
+    return chars[best[0][1]] if best else None
+
+
+@resolver("friend_free")
+def friend_free(c, world):
+    """A friend nearby is home and free to unwind with."""
+    return friend_to_visit(c, world) is not None

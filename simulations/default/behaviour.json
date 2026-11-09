@@ -1060,7 +1060,8 @@
    "drive": "relax_with_someone",
    "status": "live",
    "plans": [
-    "unwind_together"
+    "unwind_together",
+    "visit_a_friend"
    ],
    "scout_plan": null,
    "satisfied_when": {
@@ -1466,6 +1467,14 @@
    "scope": "household",
    "ttl_seconds": 0,
    "learn_by": "look around"
+  },
+  {
+   "id": "friend_free",
+   "name": "A friend nearby is home and free",
+   "resolver": "friend_free",
+   "scope": "character",
+   "ttl_seconds": 0,
+   "learn_by": "knows the neighbours"
   },
   {
    "id": "tension_released",
@@ -3591,6 +3600,13 @@
      "outcome": "blocked",
      "x": 520,
      "y": 220
+    },
+    {
+     "id": "next",
+     "kind": "end",
+     "outcome": "fallback",
+     "x": 280,
+     "y": 220
     }
    ],
    "edges": [
@@ -3602,9 +3618,183 @@
     {
      "from": "who",
      "output": "no",
+     "to": "next",
+     "set": {
+      "why": "nobody at home to unwind with"
+     }
+    },
+    {
+     "from": "invite",
+     "output": "done",
+     "to": "sit"
+    },
+    {
+     "from": "invite",
+     "output": "failed",
+     "to": "next",
+     "set": {
+      "why": "they were busy"
+     }
+    },
+    {
+     "from": "sit",
+     "output": "done",
+     "to": "done"
+    },
+    {
+     "from": "sit",
+     "output": "failed",
+     "to": "stuck",
+     "set": {
+      "why": "couldn't sit down together"
+     }
+    },
+    {
+     "from": "done",
+     "output": "done",
+     "to": "ok"
+    },
+    {
+     "from": "done",
+     "output": "failed",
+     "to": "stuck"
+    }
+   ],
+   "entries": [
+    {
+     "id": "start",
+     "node": "who",
+     "vars": []
+    }
+   ]
+  },
+  {
+   "id": "visit_a_friend",
+   "name": "Go round to a friend's",
+   "intention": "unwind_with_someone",
+   "satisfies": true,
+   "requires": [],
+   "cost": {
+    "minutes": 60,
+    "money": 0,
+    "effort": 1
+   },
+   "time_budget_seconds": 7200,
+   "start": "who",
+   "nodes": [
+    {
+     "id": "who",
+     "kind": "gate",
+     "requirement": "friend_free",
+     "x": 40,
+     "y": 40
+    },
+    {
+     "id": "pick",
+     "kind": "action",
+     "action": "pick_friend",
+     "x": 280,
+     "y": 40
+    },
+    {
+     "id": "go",
+     "kind": "action",
+     "action": "go_to_them",
+     "x": 520,
+     "y": 40
+    },
+    {
+     "id": "arrive",
+     "kind": "wait",
+     "requirement": "target_here",
+     "timeout_seconds": 900,
+     "x": 760,
+     "y": 40
+    },
+    {
+     "id": "invite",
+     "kind": "action",
+     "action": "invite_to_unwind",
+     "x": 1000,
+     "y": 40
+    },
+    {
+     "id": "sit",
+     "kind": "step",
+     "activity": "sit_and_relax",
+     "x": 1240,
+     "y": 40
+    },
+    {
+     "id": "done",
+     "kind": "action",
+     "action": "unwound_together",
+     "x": 1480,
+     "y": 40
+    },
+    {
+     "id": "ok",
+     "kind": "end",
+     "outcome": "satisfied",
+     "x": 1720,
+     "y": 40
+    },
+    {
+     "id": "stuck",
+     "kind": "end",
+     "outcome": "blocked",
+     "x": 760,
+     "y": 220
+    }
+   ],
+   "edges": [
+    {
+     "from": "who",
+     "output": "yes",
+     "to": "pick"
+    },
+    {
+     "from": "who",
+     "output": "no",
      "to": "stuck",
      "set": {
       "why": "nobody to unwind with"
+     }
+    },
+    {
+     "from": "pick",
+     "output": "done",
+     "to": "go"
+    },
+    {
+     "from": "pick",
+     "output": "failed",
+     "to": "stuck"
+    },
+    {
+     "from": "go",
+     "output": "done",
+     "to": "arrive"
+    },
+    {
+     "from": "go",
+     "output": "failed",
+     "to": "stuck",
+     "set": {
+      "why": "no way to get there"
+     }
+    },
+    {
+     "from": "arrive",
+     "output": "ready",
+     "to": "invite"
+    },
+    {
+     "from": "arrive",
+     "output": "timed_out",
+     "to": "stuck",
+     "set": {
+      "why": "couldn't find them"
      }
     },
     {

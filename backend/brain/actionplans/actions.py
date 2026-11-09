@@ -348,7 +348,7 @@ def invite_to_unwind(c, world, attempt):
     """Ask their partner (or another grown-up at home) to come and sit down for a while: they sit down to relax too, if
     what they are doing can wait."""
     from brain.actionplans.resolvers import unwind_companion
-    o = unwind_companion(c, world)
+    o = (world.get("characters") or {}).get((attempt.get("vars") or {}).get("unwind_with")) or unwind_companion(c, world)
     if not o:
         return False
     from systems.activities import ACTIVITIES, start_activity
@@ -379,4 +379,16 @@ def unwound_together(c, world, attempt):
     from systems.expectations import satisfy_expectation
     if (c.get("expectations") or {}).get("relax_with_someone") is not None:
         satisfy_expectation(c, "relax_with_someone", world)
+    return True
+
+
+@action("pick_friend")
+def pick_friend(c, world, attempt):
+    """Nobody to unwind with at home: a friend nearby who is home and free -- the one they get on with best."""
+    from brain.actionplans.resolvers import friend_to_visit
+    f = friend_to_visit(c, world)
+    if not f:
+        return False
+    attempt["vars"]["unwind_with"] = f["id"]
+    c["_social_purpose"] = {"target": f["id"], "since": world.get("tick", 0), "type": "unwind"}
     return True
