@@ -261,9 +261,14 @@ def _inject_intentions_for_event(c, event):
     if priority is None:
         return
 
-    _inject_intention(c, "prepare_for_event", priority, event, {
-        "prep_requirements": prep,
-    })
+    # one "prepare for it" per reminder band (a month, two weeks, a week, ...): once they have taken note of it at this
+    # band (brain/actionplans' note_event), it is not raised again until the event moves into the next one
+    if (c.get("event_prep_noted") or {}).get(event["id"]) != t:
+        # "household": a reminder is for when there is time, but once it has waited past its deadline (or the event is
+        # days away) it is pressing (systems/todo.py) -- with no category it was never seen to at all
+        _inject_intention(c, "prepare_for_event", priority, event, {
+            "prep_requirements": prep, "band_days": t, "category": "household",
+        })
 
     if "buy_gift" in prep and n <= 14:
         _inject_intention(c, "buy_gift", min(priority + 5, 95), event, {

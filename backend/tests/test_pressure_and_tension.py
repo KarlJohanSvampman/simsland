@@ -266,6 +266,9 @@ _ints.set_current_tick(20000)
 check("make_dinner for tomorrow evening is not pressing now; inside its window it is",
       tier({"type": "expectation:make_dinner", "category": "schedule", "window_start_tick": 149600}) == "when_free"
       and tier({"type": "expectation:make_dinner", "category": "schedule", "window_start_tick": 20500}) == "pressing")
+check("a whole-week window (no schedule block) is not 'due now'",
+      tier({"type": "expectation:spend_time_alone", "category": "leisure", "priority": 25,
+            "window_start_tick": 19000, "window_end_tick": 19000 + 7 * 86400}) == "when_free")
 check("dinner together ('social') inside its window is pressing too",
       tier({"type": "expectation:family_dinner_together", "category": "social", "priority": 55,
             "window_start_tick": 19900, "window_end_tick": 23500}) == "pressing")

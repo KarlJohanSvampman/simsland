@@ -421,3 +421,112 @@ def kids_home(c, world):
     chars = world.get("characters") or {}
     kids = [chars[k] for k in c.get("dependents") or [] if k in chars] or [o for o in _household_others(c, world) if (o.get("age") or 99) < 13]
     return any(k.get("building_id") == c.get("building_id") and not k.get("off_grid") for k in kids)
+
+
+
+# ── saying something to someone (Make Things Right, Check On Someone) ───────────────────────────────────────────────
+
+def _purpose_target(c, world):
+    sp = c.get("_social_purpose") or {}
+    return (world.get("characters") or {}).get(sp.get("target")), sp
+
+
+@resolver("target_here")
+def target_here(c, world):
+    """The person they mean to talk to is right here: the same room, or close by outdoors."""
+    t, _ = _purpose_target(c, world)
+    if not t or t.get("off_grid") or t.get("alive") is False or t.get("x") is None or c.get("x") is None:
+        return False
+    if c.get("room_id") and t.get("room_id"):
+        return c["room_id"] == t["room_id"]
+    return c.get("building_id") == t.get("building_id") and _dist(c, t) <= 6
+
+
+@resolver("target_around")
+def target_around(c, world):
+    """The person is somewhere they can be walked to (on the map, not away)."""
+    t, _ = _purpose_target(c, world)
+    return bool(t) and not t.get("off_grid") and t.get("alive") is not False and t.get("x") is not None
+
+
+@resolver("said_it")
+def said_it(c, world):
+    """They have spoken to that person since setting out to (a line of theirs in a conversation with them)."""
+    t, sp = _purpose_target(c, world)
+    if not t:
+        return False
+    since = sp.get("since", 0)
+    for conv in (world.get("conversations") or {}).values():
+        if t["id"] not in (conv.get("participants") or []) or c["id"] not in (conv.get("participants") or []):
+            continue
+        if any(h.get("speaker") == c["id"] and (h.get("tick") or 0) >= since for h in conv.get("history") or []):
+            return True
+    return False
+
+
+
+# ── Spend Time Alone / Unwind with Someone ──────────────────────────────────────────────────────────────────────
+
+@resolver("alone_here")
+def alone_here(c, world):
+    """Nobody else in the room with them (indoors)."""
+    if c.get("x") is None:
+        return False
+    rid = _room(world, c["x"], c["y"])
+    return bool(rid) and _alone_in(c, world, rid)
+
+
+@resolver("evening")
+def evening(c, world):
+    """The evening (17:00-23:00): when people unwind."""
+    h = (world.get("calendar") or {}).get("hour")
+    return h is not None and 17 <= h < 23
+
+
+def unwind_companion(c, world):
+    """Whom to unwind with: their partner if home and free, else another grown-up at home who is free."""
+    def free(o):
+        act = (o.get("activity") or {}).get("type")
+        return (not o.get("off_grid") and o.get("alive") is not False and o.get("building_id") == c.get("building_id")
+                and act not in ("sleep", "nap", "work", "use_toilet", "use_toilet_bowels", "take_shower", "cook_recipe"))
+    from systems.sexual_release import _find_partner
+    p = _find_partner(c, world)
+    if p and free(p):
+        return p
+    for o in _household_others(c, world):
+        if (o.get("age") or 0) >= 18 and free(o):
+            return o
+    return None
+
+
+@resolver("companion_free")
+def companion_free(c, world):
+    """Someone to unwind with is home and free."""
+    return unwind_companion(c, world) is not None
+
+
+
+def friend_to_visit(c, world):
+    """A grown-up outside the household they know (a relationship on record, not hostile), home and free -- best liked first."""
+    chars = world.get("characters") or {}
+    hh = set((_household(c, world) or {}).get("members") or [])
+    best = []
+    for oid, rel in (c.get("relationships") or {}).items():
+        o = chars.get(oid)
+        if not o or oid in hh or (o.get("age") or 0) < 18 or o.get("off_grid") or o.get("alive") is False:
+            continue
+        if (rel.get("affection") or rel.get("trust") or 0) < 0 or "enemy" in (rel.get("labels") or []):
+            continue
+        home = set(((world.get("households") or {}).get(o.get("household_id")) or {}).get("building_ids") or [])
+        act = (o.get("activity") or {}).get("type")
+        if o.get("building_id") not in home or act in ("sleep", "nap", "work", "use_toilet", "use_toilet_bowels", "take_shower"):
+            continue
+        best.append((rel.get("affection") or rel.get("trust") or 0, oid))
+    best.sort(reverse=True)
+    return chars[best[0][1]] if best else None
+
+
+@resolver("friend_free")
+def friend_free(c, world):
+    """A friend nearby is home and free to unwind with."""
+    return friend_to_visit(c, world) is not None
