@@ -128,6 +128,7 @@ services:
     ports:
       - "3000:80"                    # the game
       - "8000:80"                    # the API and websocket at the address the page's scripts use (location.hostname:8000)
+      - "3443:443"                   # the game over https (self-signed) -- needed for VR: open https://<pc-ip>:3443/vr_test.html on the headset
     depends_on:
       - api
   db:
