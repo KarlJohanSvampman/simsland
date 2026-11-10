@@ -537,6 +537,7 @@ button:hover { background: #556170; }
     <button class="sideTab active" data-tab="basic">Basic Properties</button>
     <button class="sideTab" data-tab="personality">Personality Traits</button>
     <button class="sideTab" data-tab="physical">Physical Traits</button>
+    <button class="sideTab" data-tab="persona">Persona</button>
     <button class="sideTab" data-tab="outfit">Outfit / Equipment</button>
     <button class="sideTab" data-tab="animations">Animation Mapping</button>
     <button class="sideTab" data-tab="jobs">Jobs / Education</button>
@@ -628,6 +629,13 @@ button:hover { background: #556170; }
     <div id="tab-personality" class="hidden">
       <h3 class="tabTitle">Personality Traits</h3>
       <div id="personalityPicker"></div>
+    </div>
+
+    <!-- PERSONA: speech quirks, insecurities, confidence sources, traits per mood (systems/personality_profile.py) -->
+    <div id="tab-persona" class="hidden">
+      <h3 class="tabTitle">Persona</h3>
+      <p style="opacity:.7;font-size:12px;margin-top:-4px">All optional. Separate tags with commas. A character made from this template starts with these.</p>
+      <div id="personaTemplateEditor"></div>
     </div>
 
     <!-- PHYSICAL TRAITS -->

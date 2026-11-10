@@ -1765,6 +1765,10 @@ def _sec_identity(c, world):
     traits = c.get("traits", [])
     if traits:
         bits.append(f"Your personality: {', '.join(traits)}.")
+    # what their current mood brings out, how they talk, what they're insecure about, what their confidence rests on
+    # (systems/personality_profile.py -- set per character in the inspector's Persona tab)
+    from systems.personality_profile import prompt_lines
+    bits.extend(prompt_lines(c))
     style_id = c.get("speech_style")
     if style_id:
         style = world.get("definitions", {}).get("speech_style_registry", {}).get(style_id)
