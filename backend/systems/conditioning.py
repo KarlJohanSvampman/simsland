@@ -239,6 +239,9 @@ def _convert_to_trait(char, entry, world):
     traits = char.setdefault("personality_traits", [])
     if trait not in traits:
         traits.append(trait)
+        from systems.personality_profile import note_trait_change
+        note_trait_change(char, world, added=[trait], field="personality_traits",
+                          why=f"conditioned: repeated {str(entry.get('response_type') or 'experience').replace('_', ' ')}")
         # Also note it as conditioned (not innate)
         char.setdefault("conditioned_traits", []).append({
             "trait":               trait,

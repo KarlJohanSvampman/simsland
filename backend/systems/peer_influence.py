@@ -62,6 +62,9 @@ def _make_room_for_trait(observer, new_trait_id, world):
         victim = min(learned, key=lambda t: by_tick.get(t, 0))
 
     learned.remove(victim)
+    from systems.personality_profile import note_trait_change
+    note_trait_change(observer, world, removed=[victim], field="personality_traits",
+                      why=f"pushed out by {str(new_trait_id).replace('_', ' ')} (room for only so many)")
     observer.setdefault("absorbed_traits", []).append({
         "trait": victim, "source": "cap_eviction",
         "acquired_tick": world.get("tick", 0), "removed": True,
@@ -221,6 +224,9 @@ def _finalize_trait_promotion(observer, entry, world):
 
     traits = observer.setdefault("personality_traits", [])
     traits.append(trait)
+    from systems.personality_profile import note_trait_change
+    note_trait_change(observer, world, added=[trait], field="personality_traits",
+                      why=f"picked it up from {((world.get('characters') or {}).get(entry.get('source_person_id')) or {}).get('name') or 'someone they spend time with'}")
     observer.setdefault("absorbed_traits", []).append({
         "trait":             trait,
         "source":            "peer_influence",
@@ -357,6 +363,9 @@ def _promote_value_trait(observer, entry, world):
     traits = observer.setdefault("personality_traits", [])
     if trait not in traits:
         traits.append(trait)
+        from systems.personality_profile import note_trait_change
+        note_trait_change(observer, world, added=[trait], field="personality_traits",
+                          why="took it on from the values of people around them")
         observer.setdefault("absorbed_traits", []).append({
             "trait":            trait,
             "source":           "value_influence",

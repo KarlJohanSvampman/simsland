@@ -279,6 +279,10 @@ function openTemplate(id) {
     instance: { ...(raw.instance || {}) },
     traits: [...(raw.traits || [])],
     physical_traits: [...(raw.physical_traits || [])],
+    speech_quirks: [...(raw.speech_quirks || [])],
+    insecurities: [...(raw.insecurities || [])],
+    confidence_sources: [...(raw.confidence_sources || [])],
+    mood_traits: Object.fromEntries(Object.entries(raw.mood_traits || {}).map(([m, v]) => [m, [...(v || [])]])),
     hobbies: [...(raw.hobbies || [])],
     worn: { ...(raw.worn || {}) },
     starting_inventory: [...(raw.starting_inventory || [])],
@@ -304,6 +308,7 @@ function openTemplate(id) {
   renderTemplateList();
   renderBasicTab();
   renderPersonalityTab();
+  renderPersonaTemplateTab();
   renderPhysicalTab();
   renderOutfitTab();
   renderAnimMappingTab();
@@ -372,6 +377,7 @@ document.querySelectorAll('.sideTab').forEach(btn => {
     btn.classList.add('active');
     document.getElementById('tab-basic').classList.toggle('hidden', tab !== 'basic');
     document.getElementById('tab-personality').classList.toggle('hidden', tab !== 'personality');
+    document.getElementById('tab-persona').classList.toggle('hidden', tab !== 'persona');
     document.getElementById('tab-physical').classList.toggle('hidden', tab !== 'physical');
     document.getElementById('tab-outfit').classList.toggle('hidden', tab !== 'outfit');
     document.getElementById('tab-animations').classList.toggle('hidden', tab !== 'animations');
@@ -1012,6 +1018,47 @@ function renderPersonalityTab() {
     () => working.traits,
     (ids) => { working.traits = ids; },
   );
+}
+
+// =====================================================
+// TAB: PERSONA (speech quirks, insecurities, confidence sources, traits per mood)
+// =====================================================
+// Free-text tags, not picked from a pool: these are a director's own words. Comma-separated in the form, lists in the
+// template. The mood rows come from definitions.mood_templates (brain/emotion.py).
+
+function _tagsToText(list) { return (list || []).join(', '); }
+function _textToTags(text) {
+  const out = [];
+  for (const t of String(text || '').split(',').map(s => s.trim()).filter(Boolean)) if (!out.includes(t)) out.push(t);
+  return out;
+}
+
+function renderPersonaTemplateTab() {
+  const el = document.getElementById('personaTemplateEditor');
+  if (!el || !working) return;
+  const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
+  const fields = [
+    ['speech_quirks', 'Speech quirks', "says 'like' a lot, never swears, trails off"],
+    ['insecurities', 'Insecurities', 'their weight, not being smart enough'],
+    ['confidence_sources', 'Self-confidence rests on', 'their looks, being a good parent'],
+  ];
+  const moods = Object.entries(definitions.mood_templates || {});
+  el.innerHTML = fields.map(([k, label, ph]) => `
+      <div class="formRow"><label>${label}</label>
+        <input type="text" data-persona-field="${k}" value="${esc(_tagsToText(working[k]))}" placeholder="${esc(ph)}" /></div>`).join('')
+    + `<h4 style="margin:14px 0 6px">Traits that show in a mood</h4>`
+    + moods.map(([id, m]) => `
+      <div class="formRow" title="${esc(m.description || '')}"><label>${esc(m.name || id)}</label>
+        <input type="text" data-persona-mood="${esc(id)}" value="${esc(_tagsToText((working.mood_traits || {})[id]))}" placeholder="traits this mood brings out" /></div>`).join('');
+  el.oninput = (e) => {
+    const f = e.target.dataset.personaField, m = e.target.dataset.personaMood;
+    if (f) working[f] = _textToTags(e.target.value);
+    if (m) {
+      working.mood_traits ||= {};
+      const tags = _textToTags(e.target.value);
+      if (tags.length) working.mood_traits[m] = tags; else delete working.mood_traits[m];
+    }
+  };
 }
 
 // =====================================================

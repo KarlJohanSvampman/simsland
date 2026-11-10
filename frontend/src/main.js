@@ -1,3 +1,4 @@
+import { showPersona } from "./personaTab.js";
 import * as THREE from "three";
 import { renderMovementTab, updateRouteOverlay } from "./movementLog.js";
 import { renderArgumentsTab, openArgumentModal, renderStandingTab, openStandingModal } from "./socialTabs.js";
@@ -5159,6 +5160,10 @@ function renderCharacterInspector(id){
   renderMovementTab(c, _worldState && _worldState.tick);
   renderArgumentsTab(c, _socialCtx());
   renderStandingTab(c, _socialCtx());
+  // Persona (src/personaTab.js): fetched when shown or when another character is selected -- not re-rendered on every
+  // update, so what is being typed stays
+  const personaEl = document.getElementById("viewerPersonaTab");
+  if(personaEl && !personaEl.classList.contains("hidden")) showPersona(personaEl, c.id);
 }
 
 // What the Arguments / Standing tabs (socialTabs.js) need from here.
@@ -7556,6 +7561,7 @@ const VIEWER_TAB_PANELS = {
   movement:      "viewerMovementTab",
   arguments:     "viewerArgumentsTab",
   standing:      "viewerStandingTab",
+  persona:       "viewerPersonaTab",
 };
 
 document.getElementById("viewerTabs")?.addEventListener("click", (e) => {
@@ -7566,6 +7572,7 @@ document.getElementById("viewerTabs")?.addEventListener("click", (e) => {
   for(const [name, panelId] of Object.entries(VIEWER_TAB_PANELS)){
     document.getElementById(panelId)?.classList.toggle("hidden", name !== tab);
   }
+  if(tab === "persona") showPersona(document.getElementById("viewerPersonaTab"), selectedCharacterId);
 });
 
 // =========================================================

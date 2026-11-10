@@ -160,6 +160,10 @@ def _spawn_character_locked(sim_id, template_id, x, y, body):
             if tmpl.get("ssn"):          overrides["ssn"]         = tmpl["ssn"]
             if tmpl.get("traits"):   overrides["traits"] = tmpl["traits"]
             if tmpl.get("physical_traits"): overrides["physical_traits"] = tmpl["physical_traits"]
+            # persona (systems/personality_profile.py): speech quirks, insecurities, confidence sources, mood traits
+            for _f in ("speech_quirks", "insecurities", "confidence_sources", "mood_traits"):
+                if tmpl.get(_f):
+                    overrides[_f] = tmpl[_f]
             if tmpl.get("hobbies"):         overrides["hobbies"] = tmpl["hobbies"]
             if tmpl.get("worn"):               overrides["worn"] = tmpl["worn"]
             if tmpl.get("starting_inventory"): overrides["starting_inventory"] = tmpl["starting_inventory"]

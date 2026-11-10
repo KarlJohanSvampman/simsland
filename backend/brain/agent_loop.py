@@ -885,6 +885,9 @@ def update_agent(
     # what became of the intentions that went away (brain/intention_history.py: the inspector lists them)
     from brain.intention_history import track as _track_intentions
     _track_intentions(c, world)
+    # any change to their personality traits, whoever made it (systems/personality_profile.py: the trait log)
+    from systems.personality_profile import track as _track_traits
+    _track_traits(c, world)
 
     # =====================================
     # SITUATION SELECTION (brain/situations/) -- deterministic, no LLM.

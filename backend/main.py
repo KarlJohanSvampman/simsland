@@ -50,6 +50,7 @@ from api.social_sandbox import router as social_sandbox_router
 from api.events    import router as events_router
 from api.overview  import router as overview_router
 from api.finances  import router as finances_router
+from api.persona   import router as persona_router
 from api.dependents import router as dependents_router
 from api.director  import router as director_router
 from api.middleware_bridge import router as middleware_bridge_router
@@ -86,6 +87,7 @@ app.include_router(social_sandbox_router)
 app.include_router(events_router, prefix="/api")
 app.include_router(overview_router, prefix="/api")
 app.include_router(finances_router, prefix="/api")
+app.include_router(persona_router, prefix="/api")
 app.include_router(dependents_router, prefix="/api")
 app.include_router(director_router)
 app.include_router(middleware_bridge_router)
