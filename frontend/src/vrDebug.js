@@ -119,6 +119,8 @@ class VRPanel {
       c.textBaseline = "top";
       y += BTN_H + GAP;
     }
+    if (this._size && this._size !== `${W}x${H}`) this.texture.dispose();   // a new size needs new GPU storage (see vrBuilder.js)
+    this._size = `${W}x${H}`;
     this.texture.needsUpdate = true;
     this.baseW = PANEL_W_M;                          // metres at human scale; placeMenu grows it with the viewer
     this.baseH = PANEL_W_M * H / W;
@@ -185,6 +187,7 @@ function setup(ctx) {
     widgetHover: [null, null],   // per hand: {key, hit} while pointing at a panel widget
     feed: new panelApi.PanelFeed(),
   };
+  window.vrDebugShowPanels = (charId) => { state.shown.add(charId); state.entityPanels.delete(charId); };   // vrBuilder: just saved one
   window.xrWasDragged = (i) => !!state.dragged[i];   // operator_view.js: a grip that moved is a drag, not "director mode"
   // read-only, for tests (and a future in-headset debug overlay): what's open, and where a panel button is in the world
   window.getVRDebugState = () => ({
@@ -230,6 +233,7 @@ function setup(ctx) {
         { id: "follow", label: state.follow?.charId === id ? "Stop following" : "Follow" },
         { id: "panels", label: state.shown.has(id) ? "Hide panels" : "Show panels" },
         { id: "manage", label: "Manage panels" },
+        { id: "design", label: "Design a panel" },
         { id: "desktop", label: "Show in desktop inspector" }, { id: "close", label: "Close" },
       ],
     };
@@ -287,6 +291,12 @@ function setup(ctx) {
     if (mg.sub === "layouts") return {
       title: "Switch layout", subtitle: `${name(c, id)} · pick the active one, then Save`, lines: [],
       buttons: [...names.map((n) => ({ id: `lay:${n}`, label: `${n === dr.active ? "● " : "○ "}${n}` })), { id: "manage_back", label: "Back" }] };
+    if (mg.sub === "edit") {
+      const byId = new Map(mg.all.map((t) => [t.id, t]));
+      return { title: "Edit a panel", subtitle: "opens it on the workbench", lines: [],
+               buttons: [...mg.panelIds().filter((tid) => byId.has(tid)).map((tid) => ({ id: `edit:${tid}`, label: `${byId.get(tid).name || tid} (${byId.get(tid).type})` })),
+                         { id: "manage_back", label: "Back" }] };
+    }
     if (mg.sub === "add") {
       const others = mg.all.filter((t) => !mg.panelIds().includes(t.id));
       return { title: "Add a panel", subtitle: `just for ${name(c, id)}`, lines: others.length ? [] : ["Every panel is here already."],
@@ -300,6 +310,7 @@ function setup(ctx) {
         { id: "layouts", label: `Layout: ${dr.active}  ▾` },
         ...mg.panelIds().map((tid) => ({ id: `st:${tid}`, label: `${(byId.get(tid) || {}).name || tid}: ${STATE_NAME[mg.stateOf(tid)]}` })),
         { id: "add", label: "Add a panel…" },
+        { id: "edit", label: "Edit a panel…" },
         { id: "save", label: mg.dirty ? "Save  •" : "Save" },
         ...(names.length < 6 ? [{ id: "saveas", label: "Save as a new layout" }] : []),
         { id: "back", label: "Back" },
@@ -391,10 +402,17 @@ function setup(ctx) {
       return redraw();
     }
     if (button === "manage") return openManage(m.charId);
+    if (button === "design") { const id = m.charId; closeMenu(); window.vrBuilder?.open(id); return; }
     const mg = m.manage;
     if (mg && !mg.loading && !mg.error) {
       if (button === "layouts") { mg.sub = "layouts"; return redraw(); }
       if (button === "add") { mg.sub = "add"; return redraw(); }
+      if (button === "edit") { mg.sub = "edit"; return redraw(); }
+      if (button.startsWith("edit:")) {
+        const t = mg.all.find((x) => x.id === button.slice(5)), id = m.charId;
+        if (t) { closeMenu(); window.vrBuilder?.open(id, t); }
+        return;
+      }
       if (button === "manage_back") { mg.sub = null; return redraw(); }
       if (button.startsWith("lay:")) { mg.draft.active = button.slice(4); mg.sub = null; mg.dirty = true; return redraw(); }
       if (button.startsWith("add:")) {
@@ -423,6 +441,7 @@ function setup(ctx) {
   controllers.forEach((controller, i) => {
     controller.addEventListener("selectstart", () => {
       if (!renderer.xr.isPresenting) return;
+      if (window.vrBuilder?.isOpen() && window.vrBuilder.hovering(controller)) return;   // the workbench (vrBuilder.js) has it
       if (state.panelHover[i]) return choose(state.panelHover[i]);
       const wh = state.widgetHover[i];
       if (wh) {
@@ -545,7 +564,7 @@ function setup(ctx) {
 
   function pointAtCharacters() {
     controllers.forEach((controller, i) => {
-      if (state.panelHover[i]) return;                          // the panel is in front
+      if (state.panelHover[i]) return;                          // the panel (or the workbench) is in front
       const id = pickCharacter(controller);
       hover[i] = id;                                            // main.js / operator_view.js read this too
       if (id) controller.getObjectByName("ray")?.material.color.set(0x66ff99);
@@ -556,6 +575,7 @@ function setup(ctx) {
     controllers.forEach((controller, i) => {
       state.panelHover[i] = null;
       state.widgetHover[i] = null;
+      if (window.vrBuilder?.isOpen() && window.vrBuilder.hovering(controller)) { hover[i] = null; state.panelHover[i] = "builder"; return; }
       tmpM.identity().extractRotation(controller.matrixWorld);
       raycaster.ray.origin.setFromMatrixPosition(controller.matrixWorld);
       raycaster.ray.direction.set(0, 0, -1).applyMatrix4(tmpM);
@@ -581,7 +601,7 @@ function setup(ctx) {
       hover[i] = null;                                          // the panel is in front: not pointing at a character
       controller.getObjectByName("ray")?.material.color.set(state.panelHover[i] === "panel" ? 0x78aaff : 0x58a6ff);
     });
-    const onButton = state.panelHover.find((h) => h && h !== "panel") || null;
+    const onButton = state.panelHover.find((h) => h && h !== "panel" && h !== "builder") || null;
     panel.setHover(onButton);
   }
 
@@ -659,6 +679,8 @@ function setup(ctx) {
         if (state.clock - w.drawn > WIDGET_REDRAW_S) {
           const sub = e.error ? `couldn't read: ${e.error}` : `${(window.getWorldCharacter(charId) || {}).name || charId} · ${t.source?.path || "(all)"}`;
           const out = renderPanel(w.ctx, WIDGET_PX, t, e.value, w.view, sub);
+          if (w.uploadedH && w.uploadedH !== out.height) w.texture.dispose();   // a new size needs new GPU storage
+          w.uploadedH = out.height;
           w.hits = out.hits; w.height = out.height; w.texture.needsUpdate = true; w.drawn = state.clock;
         }
         const wm = WIDGET_W_M * s, hm = wm * w.height / WIDGET_PX;
