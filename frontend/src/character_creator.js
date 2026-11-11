@@ -1037,8 +1037,7 @@ function renderPersonaTemplateTab() {
   const el = document.getElementById('personaTemplateEditor');
   if (!el || !working) return;
   const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
-  const fields = [
-    ['speech_quirks', 'Speech quirks', "says 'like' a lot, never swears, trails off"],
+  const fields = [                                   // (speech quirks: on the Physical Traits tab)
     ['insecurities', 'Insecurities', 'their weight, not being smart enough'],
     ['confidence_sources', 'Self-confidence rests on', 'their looks, being a good parent'],
   ];
@@ -1074,6 +1073,13 @@ function renderPhysicalTab() {
     () => working.physical_traits,
     (ids) => { working.physical_traits = ids; },
   );
+  // Speech quirks -- part of how the character comes across, with their appearance (free-text tags, comma-separated;
+  // systems/personality_profile.py tells the model to let them show in what the character says)
+  const q = document.getElementById('fldSpeechQuirks');
+  if (q) {
+    q.value = _tagsToText(working.speech_quirks);
+    q.oninput = () => { working.speech_quirks = _textToTags(q.value); };
+  }
 }
 
 // =====================================================
