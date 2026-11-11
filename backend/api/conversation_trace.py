@@ -14,14 +14,19 @@ from db import load_world
 router = APIRouter(prefix="/admin/convtrace", tags=["convtrace"])
 
 
-def _lines(raw, names):
+def _lines(raw, names, chars=None, conv_id=None):
+    from systems.dialogue_feedback import find
     out = []
     for h in raw or []:
         if not h.get("utterance"):
             continue
         sp = h.get("speaker")
-        out.append({"tick": h.get("tick"), "speaker": sp, "speaker_name": names.get(sp, sp), "utterance": h.get("utterance"),
-                    "speech_act": h.get("speech_act")})
+        row = {"tick": h.get("tick"), "speaker": sp, "speaker_name": names.get(sp, sp), "utterance": h.get("utterance"),
+               "speech_act": h.get("speech_act")}
+        note = find((chars or {}).get(sp) or {}, conv_id, h.get("tick"), h.get("utterance")) if conv_id else None
+        if note:                                  # the director's note on it (systems/dialogue_feedback.py)
+            row["feedback"] = {k: note.get(k) for k in ("id", "verdict", "comment", "suggestion")}
+        out.append(row)
     return out
 
 
@@ -37,7 +42,7 @@ def convtrace(char_id: str, sim_id: str = "default", limit: int = 40):
     for conv in (world.get("conversations") or {}).values():
         if not conv.get("active") or char_id not in (conv.get("participants") or []) or conv.get("_archived"):
             continue
-        lines = _lines(conv.get("history"), names)
+        lines = _lines(conv.get("history"), names, chars, conv["id"])
         if not lines:
             continue
         reach = None
@@ -67,6 +72,6 @@ def convtrace(char_id: str, sim_id: str = "default", limit: int = 40):
                      "started_tick": e.get("started_tick"), "ended_tick": e.get("ended_tick"), "end_reason": e.get("end_reason"),
                      "subject": e.get("subject") or (tags.get("subject") if isinstance(tags, dict) else None),
                      "topic": e.get("topic"), "tone": e.get("tone") or (tags.get("tone") if isinstance(tags, dict) else None),
-                     "lines": _lines(e.get("lines"), nm)})
+                     "lines": _lines(e.get("lines"), nm, chars, cid)})
     rows.sort(key=lambda r: (r["ended_tick"] is None, r["ended_tick"] or (r["lines"][-1]["tick"] if r["lines"] else 0)), reverse=True)
     return {"tick": world.get("tick", 0), "name": c.get("name"), "conversations": rows[:max(1, min(60, limit))]}

@@ -171,7 +171,7 @@ function setup(ctx) {
   function pointAt() {
     controllers.forEach((controller, i) => {
       hoverMine[i] = null;
-      if (!renderer.xr.isPresenting || window.vrFloat?.hovering(i)) return;
+      if (!renderer.xr.isPresenting || window.vrFloat?.hovering(i) || window.vrKeyboard?.isOpen()) return;
       tmpM.identity().extractRotation(controller.matrixWorld);
       raycaster.ray.origin.setFromMatrixPosition(controller.matrixWorld);
       raycaster.ray.direction.set(0, 0, -1).applyMatrix4(tmpM);
