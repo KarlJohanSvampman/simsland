@@ -16,11 +16,20 @@
 //   trigger on a character    a context menu, about a metre in front of you towards them (readable at any distance),
 //                             with a line to them: Inspect, Persona, Follow, Show on desktop, Close
 //   trigger on a menu button  that option; trigger on empty space closes the menu
+//
+// Debug panels (widgets made in the panel designer, panels.html; src/panels/):
+//   Show panels               a character's enabled panels (and on-demand ones with something to show) float beside them
+//   pointing at a panel       trigger clicks rows, data points and page buttons; right stick ←/→ pans its timeline,
+//                             ↑/↓ zooms it (instead of turning / flying)
+//   Manage panels             each panel's state (enabled / on demand / disabled), add a panel to just this one, switch
+//                             the active layout (a list, like a dropdown), save, save as a new layout (up to 6)
 // While director mode is on (operator_view.js: hold a grip still for a second), the trigger is director mode's.
 //
 // HTML doesn't render inside a headset, so the panels are drawn on a canvas and shown as a texture on a plane.
 
 import * as THREE from "three";
+import * as panelApi from "./panels/api.js";
+import { renderPanel, clickPanel, hitAt, panTimeline, zoomTimeline, hasContent } from "./panels/render.js";
 
 // ---- a panel: a canvas texture on a plane, with buttons you can point at --------------------------------------------
 
@@ -137,6 +146,12 @@ const PICK_CONE = Math.tan(THREE.MathUtils.degToRad(2.5));   // ...or within 2.5
 const MIN_SCALE = 1, MAX_SCALE = 60;
 const SNAP_TURN = Math.PI / 6;
 const REFRESH_SECONDS = 0.5;
+const WIDGET_PX = 900;            // panel canvas width
+const WIDGET_W_M = 0.6;           // panel width in the world (times your scale)
+const WIDGET_REDRAW_S = 0.5;
+const LAYOUT_REFRESH_S = 10;      // re-read an entity's panels and layout this often
+const STATE_NAME = { enabled: "Enabled", on_demand: "On demand", disabled: "Disabled" };
+const NEXT_STATE = { enabled: "on_demand", on_demand: "disabled", disabled: "enabled" };
 
 function setup(ctx) {
   const { renderer, scene, dolly, camera, controllers, hover, sims } = ctx;
@@ -164,6 +179,11 @@ function setup(ctx) {
     turnLatched: [false, false],
     resetLatched: [false, false],
     clock: 0,
+    shown: new Set(),      // characters whose panels float beside them
+    entityPanels: new Map(),   // charId -> {data: /admin/panels/for result, at}
+    widgets: new Map(),    // "charId|templateId" -> {canvas, ctx, texture, mesh, view, hits, height, drawn}
+    widgetHover: [null, null],   // per hand: {key, hit} while pointing at a panel widget
+    feed: new panelApi.PanelFeed(),
   };
   window.xrWasDragged = (i) => !!state.dragged[i];   // operator_view.js: a grip that moved is a drag, not "director mode"
   // read-only, for tests (and a future in-headset debug overlay): what's open, and where a panel button is in the world
@@ -173,6 +193,14 @@ function setup(ctx) {
     title: panel.spec?.title || null, lines: (panel.spec?.lines || []).map((l) => (typeof l === "string" ? l : l.text)),
     buttons: panel.buttons.map((b) => b.id),
     pick: (i) => pickCharacter(controllers[i]),     // whom controller i is pointing at
+    shown: [...state.shown],
+    widgets: [...state.widgets.entries()].map(([k, w]) => ({ key: k, visible: w.mesh.visible, page: w.view.page || 0, selected: w.view.selected ?? null,
+      timeline: w.view.timeline ? { t0: w.view.timeline.t0, t1: w.view.timeline.t1, user: !!w.view.timeline.user } : null,
+      regions: w.hits.map((h) => ({ type: h.action?.type, key: h.action?.key, delta: h.action?.delta, size: h.action?.size, timeline: !!h.timeline,
+                                    world: widgetWorld(w, h.x + h.w / 2, h.y + h.h / 2) })) })),
+    widgetHover: state.widgetHover.map((h) => h && { key: h.key, type: h.hit?.action?.type }),
+    manage: state.menu?.manage ? { active: state.menu.manage.draft.active, layouts: Object.keys(state.menu.manage.draft.layouts),
+                                   sub: state.menu.manage.sub || null } : null,
     buttonWorld: (id) => {
       const b = panel.buttons.find((r) => r.id === id);
       if (!b) return null;
@@ -200,6 +228,8 @@ function setup(ctx) {
       lines: [], buttons: [
         { id: "inspect", label: "Inspect" }, { id: "persona", label: "Persona" },
         { id: "follow", label: state.follow?.charId === id ? "Stop following" : "Follow" },
+        { id: "panels", label: state.shown.has(id) ? "Hide panels" : "Show panels" },
+        { id: "manage", label: "Manage panels" },
         { id: "desktop", label: "Show in desktop inspector" }, { id: "close", label: "Close" },
       ],
     };
@@ -246,10 +276,85 @@ function setup(ctx) {
       buttons: [{ id: "back", label: "Back" }, { id: "close", label: "Close" }],
     };
   }
+  // Manage panels: the active layout's panels and their states, adding one, switching layouts, saving
+  function manageSpec(id) {
+    const c = window.getWorldCharacter(id) || {};
+    const mg = state.menu.manage;
+    if (!mg || mg.loading) return { title: name(c, id), subtitle: "Panels", lines: ["Loading…"], buttons: [{ id: "back", label: "Back" }] };
+    if (mg.error) return { title: name(c, id), subtitle: "Panels", lines: [mg.error], buttons: [{ id: "back", label: "Back" }] };
+    const dr = mg.draft, lay = dr.layouts[dr.active] ||= { panels: {} };
+    const names = Object.keys(dr.layouts);
+    if (mg.sub === "layouts") return {
+      title: "Switch layout", subtitle: `${name(c, id)} · pick the active one, then Save`, lines: [],
+      buttons: [...names.map((n) => ({ id: `lay:${n}`, label: `${n === dr.active ? "● " : "○ "}${n}` })), { id: "manage_back", label: "Back" }] };
+    if (mg.sub === "add") {
+      const others = mg.all.filter((t) => !mg.panelIds().includes(t.id));
+      return { title: "Add a panel", subtitle: `just for ${name(c, id)}`, lines: others.length ? [] : ["Every panel is here already."],
+               buttons: [...others.map((t) => ({ id: `add:${t.id}`, label: `${t.name || t.id} (${t.type})` })), { id: "manage_back", label: "Back" }] };
+    }
+    const byId = new Map(mg.all.map((t) => [t.id, t]));
+    return {
+      title: `Panels: ${name(c, id)}`, subtitle: `Layout “${dr.active}” · ${names.length} of ${1 + 5}${mg.dirty ? " · unsaved" : ""}`,
+      lines: mg.panelIds().length ? [{ text: "Trigger a panel to change its state", color: "#8b98ad" }] : ["No panels yet -- add one, or make some in the panel designer."],
+      buttons: [
+        { id: "layouts", label: `Layout: ${dr.active}  ▾` },
+        ...mg.panelIds().map((tid) => ({ id: `st:${tid}`, label: `${(byId.get(tid) || {}).name || tid}: ${STATE_NAME[mg.stateOf(tid)]}` })),
+        { id: "add", label: "Add a panel…" },
+        { id: "save", label: mg.dirty ? "Save  •" : "Save" },
+        ...(names.length < 6 ? [{ id: "saveas", label: "Save as a new layout" }] : []),
+        { id: "back", label: "Back" },
+      ],
+    };
+  }
+
+  async function openManage(id) {
+    const m = state.menu;
+    m.view = "manage";
+    m.manage = { loading: true };
+    redraw();
+    try {
+      const [all, data] = await Promise.all([panelApi.listTemplates(), panelApi.panelsFor("character", id)]);
+      if (state.menu !== m) return;
+      const draft = { active: data.active, layouts: JSON.parse(JSON.stringify(data.layouts)) };
+      const mg = m.manage = { all: all.templates, data, draft, sub: null, dirty: false };
+      mg.panelIds = () => {
+        const ids = data.templates.map((t) => t.id);
+        for (const tid of Object.keys(draft.layouts[draft.active]?.panels || {})) if (!ids.includes(tid)) ids.push(tid);
+        return ids;
+      };
+      mg.stateOf = (tid) => (draft.layouts[draft.active]?.panels || {})[tid]
+        || (all.templates.find((t) => t.id === tid) || {}).default_state || "enabled";
+    } catch (err) {
+      if (state.menu === m) m.manage = { error: `couldn't load the panels: ${err.message}` };
+    }
+    redraw();
+  }
+
+  async function saveManage(asNew) {
+    const m = state.menu, mg = m.manage;
+    const dr = mg.draft;
+    if (asNew) {
+      let n = Object.keys(dr.layouts).length + 1, nm = `Layout ${n}`;
+      while (dr.layouts[nm]) nm = `Layout ${++n}`;
+      dr.layouts[nm] = JSON.parse(JSON.stringify(dr.layouts[dr.active] || { panels: {} }));
+      dr.active = nm;
+    }
+    for (const l of Object.values(dr.layouts)) for (const tid of mg.panelIds()) l.panels[tid] ||= mg.stateOf(tid);
+    try {
+      mg.data = await panelApi.saveLayouts("character", m.charId, dr);
+      mg.dirty = false;
+      state.entityPanels.delete(m.charId);                   // shown panels pick up the new layout now
+    } catch (err) {
+      mg.error = `couldn't save: ${err.message}`;
+    }
+    redraw();
+  }
+
   function redraw() {
     const m = state.menu;
     if (!m) return;
-    panel.draw(m.view === "inspect" ? inspectSpec(m.charId) : m.view === "persona" ? personaSpec(m.charId) : menuSpec(m.charId));
+    panel.draw(m.view === "inspect" ? inspectSpec(m.charId) : m.view === "persona" ? personaSpec(m.charId)
+      : m.view === "manage" ? manageSpec(m.charId) : menuSpec(m.charId));
   }
 
   function openMenu(id) {
@@ -281,6 +386,29 @@ function setup(ctx) {
     if (button === "inspect") { m.view = "inspect"; return redraw(); }
     if (button === "persona") { m.view = "persona"; m.persona = null; redraw(); return loadPersona(m.charId); }
     if (button === "desktop") { window.setSelectedCharacterId?.(m.charId); return; }
+    if (button === "panels") {
+      if (state.shown.has(m.charId)) state.shown.delete(m.charId); else state.shown.add(m.charId);
+      return redraw();
+    }
+    if (button === "manage") return openManage(m.charId);
+    const mg = m.manage;
+    if (mg && !mg.loading && !mg.error) {
+      if (button === "layouts") { mg.sub = "layouts"; return redraw(); }
+      if (button === "add") { mg.sub = "add"; return redraw(); }
+      if (button === "manage_back") { mg.sub = null; return redraw(); }
+      if (button.startsWith("lay:")) { mg.draft.active = button.slice(4); mg.sub = null; mg.dirty = true; return redraw(); }
+      if (button.startsWith("add:")) {
+        (mg.draft.layouts[mg.draft.active] ||= { panels: {} }).panels[button.slice(4)] = "enabled";
+        mg.sub = null; mg.dirty = true; return redraw();
+      }
+      if (button.startsWith("st:")) {
+        const tid = button.slice(3);
+        (mg.draft.layouts[mg.draft.active] ||= { panels: {} }).panels[tid] = NEXT_STATE[mg.stateOf(tid)];
+        mg.dirty = true; return redraw();
+      }
+      if (button === "save") return saveManage(false);
+      if (button === "saveas") return saveManage(true);
+    }
     if (button === "follow") {
       if (state.follow?.charId === m.charId) state.follow = null;
       else {
@@ -296,6 +424,12 @@ function setup(ctx) {
     controller.addEventListener("selectstart", () => {
       if (!renderer.xr.isPresenting) return;
       if (state.panelHover[i]) return choose(state.panelHover[i]);
+      const wh = state.widgetHover[i];
+      if (wh) {
+        const w = state.widgets.get(wh.key);
+        if (w && wh.hit && clickPanel(w.view, wh.hit.action)) w.drawn = -1;   // redraw it now
+        return;
+      }
       if (window.getDirectorModeActive?.()) return;            // director mode owns the trigger
       if (hover[i]) return openMenu(hover[i]);
       if (state.menu) closeMenu();
@@ -354,7 +488,16 @@ function setup(ctx) {
       const g = pads[i];
       if (!g) return;
       const isRight = hands[i] === "right";
-      if (isRight && g.axes.length >= 4) {
+      const onWidget = state.widgetHover[i];
+      if (isRight && g.axes.length >= 4 && onWidget) {
+        const [, , x, y] = g.axes;
+        const w = state.widgets.get(onWidget.key);
+        if (w && (Math.abs(x) > 0.2 || Math.abs(y) > 0.2)) {
+          if (Math.abs(x) > 0.2) panTimeline(w.view, x * 0.03);
+          if (Math.abs(y) > 0.2) zoomTimeline(w.view, 1 + y * 0.04, onWidget.frac ?? 0.5);
+          w.drawn = -1;
+        }
+      } else if (isRight && g.axes.length >= 4) {
         const [, , x, y] = g.axes;
         if (Math.abs(x) > 0.7 && !state.turnLatched[i]) {
           rotateDollyAround(headWorld(), x > 0 ? -SNAP_TURN : SNAP_TURN);
@@ -412,11 +555,27 @@ function setup(ctx) {
   function pointAtPanel() {
     controllers.forEach((controller, i) => {
       state.panelHover[i] = null;
-      if (!panel.mesh.visible) return;
+      state.widgetHover[i] = null;
       tmpM.identity().extractRotation(controller.matrixWorld);
       raycaster.ray.origin.setFromMatrixPosition(controller.matrixWorld);
       raycaster.ray.direction.set(0, 0, -1).applyMatrix4(tmpM);
-      const hit = raycaster.intersectObject(panel.mesh, false)[0];
+      const menuHit = panel.mesh.visible ? raycaster.intersectObject(panel.mesh, false)[0] : null;
+      // the panel widgets beside characters (behind the menu if both are in line)
+      let best = null;
+      for (const [key, w] of state.widgets) {
+        if (!w.mesh.visible) continue;
+        const h = raycaster.intersectObject(w.mesh, false)[0];
+        if (h && (!best || h.distance < best.h.distance)) best = { key, w, h };
+      }
+      if (best && (!menuHit || best.h.distance < menuHit.distance)) {
+        const x = best.h.uv.x * best.w.canvas.width, y = (1 - best.h.uv.y) * best.w.canvas.height;
+        const region = hitAt(best.w.hits, x, y);
+        state.widgetHover[i] = { key: best.key, hit: region, frac: region?.timeline ? (x - region.x) / region.w : 0.5 };
+        hover[i] = null;
+        controller.getObjectByName("ray")?.material.color.set(region ? 0x58a6ff : 0x78aaff);
+        return;
+      }
+      const hit = menuHit;
       if (!hit) return;
       state.panelHover[i] = panel.buttonAt(hit.uv) || "panel";   // "panel": on it, not on a button -- swallow the trigger
       hover[i] = null;                                          // the panel is in front: not pointing at a character
@@ -448,6 +607,79 @@ function setup(ctx) {
     tether.geometry.computeBoundingSphere();
   }
 
+  // ---- panels beside characters --------------------------------------------------------------------------------------
+  function widgetWorld(w, px, py) {                      // a canvas point on a widget -> world coordinates
+    const p = w.mesh.localToWorld(new THREE.Vector3(px / w.canvas.width - 0.5, 0.5 - py / w.canvas.height, 0));
+    return [p.x, p.y, p.z];
+  }
+  function makeWidget() {
+    const canvas = document.createElement("canvas");
+    canvas.width = WIDGET_PX; canvas.height = 200;
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: texture, transparent: true, depthTest: false }));
+    mesh.renderOrder = 997;
+    mesh.userData.ignoreRaycast = true;
+    scene.add(mesh);
+    return { canvas, ctx: canvas.getContext("2d"), texture, mesh, view: {}, hits: [], height: 200, drawn: -1 };
+  }
+  function entityPanels(charId) {
+    let e = state.entityPanels.get(charId);
+    if (!e) { e = { data: null, at: -1e9, busy: false }; state.entityPanels.set(charId, e); }
+    if (!e.busy && state.clock - e.at > LAYOUT_REFRESH_S) {
+      e.busy = true;
+      panelApi.panelsFor("character", charId).then((d) => { e.data = d; }).catch(() => {}).finally(() => { e.busy = false; e.at = state.clock; });
+    }
+    return e.data;
+  }
+  function updateWidgets() {
+    const keep = new Set();
+    const head = headWorld();
+    for (const charId of state.shown) {
+      const target = charHead(charId);
+      const d = entityPanels(charId);
+      if (!target || !d) continue;
+      // what shows: enabled panels, and on-demand ones while their data has something in it
+      const visible = d.templates.filter((t) => {
+        const st = d.states[t.id];
+        if (st === "enabled") return true;
+        if (st === "on_demand") return hasContent(state.feed.get("character", charId, t).value);
+        return false;
+      });
+      const toViewer = head.clone().sub(target).setY(0).normalize();
+      const right = new THREE.Vector3().crossVectors(new THREE.Vector3(0, 1, 0), toViewer).normalize();
+      const s = dolly.scale.x;
+      const colY = [target.y + 0.35 * s, target.y + 0.35 * s];       // the top of each of two columns
+      visible.forEach((t, idx) => {
+        const key = `${charId}|${t.id}`;
+        keep.add(key);
+        let w = state.widgets.get(key);
+        if (!w) { w = makeWidget(); state.widgets.set(key, w); }
+        const e = state.feed.get("character", charId, t);
+        if (state.clock - w.drawn > WIDGET_REDRAW_S) {
+          const sub = e.error ? `couldn't read: ${e.error}` : `${(window.getWorldCharacter(charId) || {}).name || charId} · ${t.source?.path || "(all)"}`;
+          const out = renderPanel(w.ctx, WIDGET_PX, t, e.value, w.view, sub);
+          w.hits = out.hits; w.height = out.height; w.texture.needsUpdate = true; w.drawn = state.clock;
+        }
+        const wm = WIDGET_W_M * s, hm = wm * w.height / WIDGET_PX;
+        const col = idx % 2;
+        const x = (0.55 + col * (WIDGET_W_M + 0.05)) * s;
+        const pos = target.clone().addScaledVector(right, x + wm / 2);
+        pos.y = colY[col] - hm / 2;
+        colY[col] -= hm + 0.04 * s;
+        w.mesh.position.copy(pos);
+        w.mesh.lookAt(head);
+        w.mesh.scale.set(wm, hm, 1);
+        w.mesh.visible = true;
+      });
+    }
+    for (const [key, w] of state.widgets) {
+      if (keep.has(key)) continue;
+      scene.remove(w.mesh); w.texture.dispose(); w.mesh.geometry.dispose(); w.mesh.material.dispose();
+      state.widgets.delete(key);
+    }
+  }
+
   function followCharacter() {
     if (!state.follow) return;
     const head = charHead(state.follow.charId);
@@ -462,6 +694,7 @@ function setup(ctx) {
     last = now;
     navigate();
     followCharacter();
+    updateWidgets();
     placeMenu();
     pointAtPanel();
     pointAtCharacters();
