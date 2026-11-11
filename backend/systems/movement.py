@@ -115,6 +115,13 @@ SPEED_TO_TILES_PER_SECOND = 28.0
 _MAX_STEPS_PER_TICK = 64
 
 
+def tiles_per_tick(c, world):
+    """How far c walks in one tick right now (the same speed _advance moves them at) -- for estimates."""
+    time_scale = max(1, min(50, world.get("time_scale", 1)))
+    speed_multiplier = max(1, min(200, world.get("movement_speed_multiplier", 1)))
+    return _current_move_speed(c) * SPEED_TO_TILES_PER_SECOND / time_scale * speed_multiplier
+
+
 def update_character_movement(c, world):
     """Advance c along its route by one tick's worth of distance.
 
@@ -153,6 +160,8 @@ def _advance(c, world, state):
     if c.get("alive") is False or c.get("posture") == "incapacitated":
         c["route"] = []
         c["is_moving"] = False
+        from systems.path_debug import finish
+        finish(c, world, "stopped")
         return "stop"
 
     # A pusher has no route/move_target of their own — they're attached to
@@ -212,6 +221,9 @@ def _advance(c, world, state):
         c["is_moving"] = False
 
         c["animation_state"] = "idle"
+
+        from systems.path_debug import finish
+        finish(c, world, "arrived")                # how long the walk really took (systems/path_debug.py)
 
         return "stop"
 
@@ -317,6 +329,8 @@ def _advance(c, world, state):
             c["path_index"] = 0
             c["is_moving"] = False
             c["animation_state"] = "idle"
+            from systems.path_debug import finish
+            finish(c, world, "stuck")
             c["_stuck_ticks"] = 0
             c["_stuck_last_pos"] = None
             return "stop"

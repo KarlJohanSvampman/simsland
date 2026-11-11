@@ -21,6 +21,8 @@
 //   Show panels               a character's enabled panels (and on-demand ones with something to show) float beside them
 //   pointing at a panel       trigger clicks rows, data points and page buttons; right stick ←/→ pans its timeline,
 //                             ↑/↓ zooms it (instead of turning / flying)
+//   Debug Draw                a list of things to draw into the world for them (routes, targets, senses...):
+//                             src/vrDebugDraw.js
 //   Manage panels             each panel's state (enabled / on demand / disabled), add a panel to just this one, switch
 //                             the active layout (a list, like a dropdown), save, save as a new layout (up to 6)
 // While director mode is on (operator_view.js: hold a grip still for a second), the trigger is director mode's.
@@ -234,6 +236,7 @@ function setup(ctx) {
         { id: "panels", label: state.shown.has(id) ? "Hide panels" : "Show panels" },
         { id: "manage", label: "Manage panels" },
         { id: "design", label: "Design a panel" },
+        { id: "debugdraw", label: window.vrDebugDraw?.activeFor().includes(id) ? "Debug Draw  •" : "Debug Draw" },
         { id: "desktop", label: "Show in desktop inspector" }, { id: "close", label: "Close" },
       ],
     };
@@ -281,6 +284,18 @@ function setup(ctx) {
     };
   }
   // Manage panels: the active layout's panels and their states, adding one, switching layouts, saving
+  function drawSpec(id) {                                   // the Debug Draw list (src/vrDebugDraw.js does the drawing)
+    const c = window.getWorldCharacter(id) || {};
+    const dd = window.vrDebugDraw;
+    if (!dd) return { title: name(c, id), subtitle: "Debug Draw", lines: ["Debug Draw isn't loaded."], buttons: [{ id: "back", label: "Back" }] };
+    const box = (on) => (on === true ? "☑" : on === "some" ? "◩" : "☐");
+    return {
+      title: name(c, id), subtitle: "Debug Draw — point and pull the trigger to switch on / off",
+      lines: dd.summary(id),
+      buttons: [...dd.options(id).map((o) => ({ id: `dd:${o.id}`, label: `${o.parent ? "" : "      "}${box(o.on)}  ${o.label}` })),
+                { id: "back", label: "Back" }, { id: "close", label: "Close" }],
+    };
+  }
   function manageSpec(id) {
     const c = window.getWorldCharacter(id) || {};
     const mg = state.menu.manage;
@@ -365,7 +380,7 @@ function setup(ctx) {
     const m = state.menu;
     if (!m) return;
     panel.draw(m.view === "inspect" ? inspectSpec(m.charId) : m.view === "persona" ? personaSpec(m.charId)
-      : m.view === "manage" ? manageSpec(m.charId) : menuSpec(m.charId));
+      : m.view === "manage" ? manageSpec(m.charId) : m.view === "draw" ? drawSpec(m.charId) : menuSpec(m.charId));
   }
 
   function openMenu(id) {
@@ -402,6 +417,8 @@ function setup(ctx) {
       return redraw();
     }
     if (button === "manage") return openManage(m.charId);
+    if (button === "debugdraw") { m.view = "draw"; return redraw(); }
+    if (button.startsWith("dd:")) { window.vrDebugDraw?.toggle(m.charId, button.slice(3)); return redraw(); }
     if (button === "design") { const id = m.charId; closeMenu(); window.vrBuilder?.open(id); return; }
     const mg = m.manage;
     if (mg && !mg.loading && !mg.error) {
@@ -720,7 +737,7 @@ function setup(ctx) {
     placeMenu();
     pointAtPanel();
     pointAtCharacters();
-    if (state.menu?.view === "inspect" && state.clock - state.menu.refreshed > REFRESH_SECONDS) {
+    if ((state.menu?.view === "inspect" || state.menu?.view === "draw") && state.clock - state.menu.refreshed > REFRESH_SECONDS) {
       state.menu.refreshed = state.clock;
       redraw();
     }

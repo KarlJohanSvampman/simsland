@@ -877,6 +877,10 @@ def perceive_audio(
             "source_id":
                 source_id,
 
+            # who really spoke, even when they couldn't tell -- only for VR Debug Draw (api/debug_draw.py)
+            "debug_from":
+                other["id"],
+
             "topic":
                 heard_topic,
 
