@@ -142,7 +142,9 @@ Schema:
 
         messages,
 
-        session=session
+        session=session,
+
+        char_id=observer.get("id")
     )
 
     if result.get("error"):

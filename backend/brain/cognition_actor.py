@@ -263,6 +263,11 @@ def on_decision_ready(data, world):
     from brain.cognition_scheduler import note_think
     decision = data.get("decision")
     note_think(c, world, decision, wake_reason=data.get("wake_reason"), asked_at_seq=p.get("wake_seq"))
+    try:                                         # which of their tags decided it (systems/choice_tags.py)
+        from systems.choice_tags import record as record_choice_tags
+        record_choice_tags(c, world, decision, data.get("available_actions"))
+    except Exception as exc:
+        print(f"[choice-tags] {cid}: {exc!r}")
     if not decision:
         # the model failed outright: no stand-in -- they can't think straight (systems/ai_blackout.py)
         decision = {"action": {"type": "wait", "fallback": True, "reason": "The model call failed."}}

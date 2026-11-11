@@ -21,6 +21,8 @@
 //   Show panels               a character's enabled panels (and on-demand ones with something to show) float beside them
 //   pointing at a panel       trigger clicks rows, data points and page buttons; right stick ←/→ pans its timeline,
 //                             ↑/↓ zooms it (instead of turning / flying)
+//   LLM log                   every prompt sent to the model for them and the reply; Choices & tags: which of their
+//                             tags decided each choice (src/vrLLM.js)
 //   Watch values              comic-book boxes above them with values you pick (mood, intention, stress, any field),
 //                             previous value, colours, warning flashes: src/vrWatch.js
 //   Debug Draw                a list of things to draw into the world for them (routes, targets, senses...):
@@ -239,6 +241,8 @@ function setup(ctx) {
         { id: "panels", label: state.shown.has(id) ? "Hide panels" : "Show panels" },
         { id: "manage", label: "Manage panels" },
         { id: "design", label: "Design a panel" },
+        { id: "llmlog", label: "LLM log" },
+        { id: "choicetags", label: "Choices & tags" },
         { id: "watch", label: window.vrWatch?.watching(id) ? `Watch values  (${window.vrWatch.watching(id)})` : "Watch values" },
         { id: "debugdraw", label: window.vrDebugDraw?.activeFor().includes(id) ? "Debug Draw  •" : "Debug Draw" },
         { id: "desktop", label: "Show in desktop inspector" }, { id: "close", label: "Close" },
@@ -385,7 +389,8 @@ function setup(ctx) {
     if (!m) return;
     panel.draw(m.view === "inspect" ? inspectSpec(m.charId) : m.view === "persona" ? personaSpec(m.charId)
       : m.view === "manage" ? manageSpec(m.charId) : m.view === "draw" ? drawSpec(m.charId)
-      : m.view === "watch" && window.vrWatch ? window.vrWatch.spec(m.charId) : menuSpec(m.charId));
+      : m.view === "watch" && window.vrWatch ? window.vrWatch.spec(m.charId)
+      : m.view === "llm" && window.vrLLM ? window.vrLLM.spec(m.charId) : menuSpec(m.charId));
   }
 
   function openMenu(id) {
@@ -424,6 +429,8 @@ function setup(ctx) {
     if (button === "manage") return openManage(m.charId);
     if (button === "debugdraw") { m.view = "draw"; return redraw(); }
     if (button === "watch") { m.view = "watch"; return redraw(); }
+    if (button === "llmlog" || button === "choicetags") { m.view = "llm"; window.vrLLM?.open(m.charId, button === "llmlog" ? "log" : "choices"); return redraw(); }
+    if (button.startsWith("l:")) { if (window.vrLLM?.choose(m.charId, button) === "menu") m.view = "menu"; return redraw(); }
     if (button.startsWith("w:")) { if (window.vrWatch?.choose(m.charId, button) === "menu") m.view = "menu"; return redraw(); }
     if (button.startsWith("dd:")) { window.vrDebugDraw?.toggle(m.charId, button.slice(3)); return redraw(); }
     if (button === "design") { const id = m.charId; closeMenu(); window.vrBuilder?.open(id); return; }

@@ -90,6 +90,7 @@ REMARK: <words said aloud when you are NOT talking with anyone -- an exclaim, mu
 INTENT: <hurt | help | deceive | neutral> | <who it is aimed at, in your own words, if anyone> | <how covert 0-10, optional> -- ONLY when you mean to hurt, help or deceive someone with your words or action
 USES: <the [ids] of remembered things about the person you are talking with that your words actually bring up -- ONLY if your SAY draws on one of the memories listed in your context>
 THEN: <short next intention>
+TAGS: <the ONE trait from your personality above that most decided this choice -- up to 3 only if several clearly did; just the trait words, comma-separated, no explanation; "none" if no trait mattered>
 """
 
 
@@ -479,6 +480,18 @@ _THEN_LINE_RE   = re.compile(r'(?im)^[ \t>*_-]*THEN[ \t]*:[ \t]*(.*)$')
 _REMARK_LINE_RE = re.compile(r'(?im)^[ \t>*_-]*REMARK[ \t]*:[ \t]*(.*)$')
 _INTENT_LINE_RE = re.compile(r'(?im)^[ \t>*_-]*INTENT[ \t]*:[ \t]*(.*)$')
 _USES_LINE_RE   = re.compile(r'(?im)^[ 	>*_-]*USES[ 	]*:[ 	]*(.*)$')
+_TAGS_LINE_RE   = re.compile(r'(?im)^[ \t>*_-]*TAGS[ \t]*:[ \t]*(.*)$')
+
+
+def _parse_tags_line(line):
+    """'curious, impulsive' -> ["curious", "impulsive"] (as written; checked against the character's own tags later,
+    systems/choice_tags.py). "none" -> []."""
+    out = []
+    for t in re.split(r"[,;|/]", line or ""):
+        t = t.strip().strip("[]<>\"'.*").strip()
+        if t and t.lower() not in ("none", "n/a", "-") and t not in out:
+            out.append(t)
+    return out[:5]
 _INTENT_VALENCES = {"hurt", "help", "deceive", "neutral"}
 
 
@@ -544,7 +557,7 @@ def _clean_narration(text):
 # lost turn spent waiting (live, 2026-11-01). Only real action types count, so narration that just
 # happens to contain a "|" is not mistaken for an action.
 
-_INLINE_LABEL_RE = re.compile(r"(?i)\s*\b(?:SAY|REMARK|INTENT|USES|THEN)[ \t]*:.*$")
+_INLINE_LABEL_RE = re.compile(r"(?i)\s*\b(?:SAY|REMARK|INTENT|USES|THEN|TAGS)[ \t]*:.*$")
 _OTHER_LABEL_LINE_RE = re.compile(r"(?i)^[ \t>*_-]*(?:SAY|REMARK|INTENT|USES|THEN)[ \t]*:")
 
 # Words a model uses for an action -> the action type (only used when the type itself is missing
@@ -644,6 +657,7 @@ def _parse_compact_envelope(raw):
     remark_match = _REMARK_LINE_RE.search(text)
     intent_match = _INTENT_LINE_RE.search(text)
     uses_match = _USES_LINE_RE.search(text)
+    tags_match = _TAGS_LINE_RE.search(text)
 
     parts = [p.strip() for p in action_line.split("|")]
     action_type = _clean_action_type(parts[0] if parts else "")
@@ -663,6 +677,7 @@ def _parse_compact_envelope(raw):
         "intent": _parse_intent_line(intent_match.group(1)) if intent_match else None,
         "uses": _parse_uses_line(uses_match.group(1)) if uses_match else [],
         "then": then_match.group(1).strip() if then_match else "",
+        "tags": _parse_tags_line(tags_match.group(1)) if tags_match else None,
     }
 
 
@@ -1164,6 +1179,9 @@ def _to_legacy_decision(envelope, char_id=None):
     # the relationship-impact system. Where the speech act was left at the neutral
     # default, the intent also picks the matching act so the older tone and
     # relationship analysis reacts to it too.
+    # the traits the model says decided this (checked against the character's own tags: systems/choice_tags.py)
+    if envelope.get("tags") is not None:
+        decision["choice_tags"] = list(envelope["tags"])
     uses = envelope.get("uses")
     if uses and decision.get("speech"):
         decision["speech"]["uses_memories"] = list(uses)
