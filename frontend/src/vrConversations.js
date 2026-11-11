@@ -6,10 +6,14 @@
 // the same symbol. One still going on runs on to "now". Point at a mark to read it (who said what, the speech act,
 // when; for the begin / end marks: with whom, how, the subject, why it ended); trigger pins it. Right stick while
 // pointing: ←/→ pan back in time, ↑/↓ zoom. ▲ / ▼ page through older conversations; LIVE follows now.
+//
+// The director's notes (backend/systems/dialogue_feedback.py): pin a line and 👍 Like / 👎 Dislike it, say why, or
+// suggest a line that would have fit the character better -- by dictation or the pointer keyboard (vrKeyboard.js).
+// A line with a note gets a 👍 / 👎 badge on the timeline.
 
 import * as THREE from "three";
 
-const PX_W = 1100, PX_H = 660;
+const PX_W = 1100, PX_H = 760;
 const W_M = 1.05;
 const POLL_S = 3;
 const ROWS = 8;
@@ -148,7 +152,20 @@ function setup(ctx) {
         c.strokeStyle = on ? "#ffffff" : "rgba(0,0,0,0.6)"; c.lineWidth = on ? 3 : 1.5; c.stroke();
         p.marks.push({ conv: cv, kind, line, x, y, r: r + 6 });
       };
-      for (const ln of cv.lines) mark("line", ln.tick, ln, 7, st.bright);
+      for (const ln of cv.lines) {
+        mark("line", ln.tick, ln, 7, st.bright);
+        const fb = ln.feedback;
+        if (fb && ln.tick >= start && ln.tick <= end) {           // the director's note on it: a badge above the mark
+          const x = xOf(p, ln.tick), yy = y - 26;
+          c.fillStyle = fb.verdict === "like" ? "#2ea043" : fb.verdict === "dislike" ? "#da3633" : "#8b98ad";
+          c.beginPath();
+          if (fb.verdict === "dislike") { c.moveTo(x - 6, yy - 4); c.lineTo(x + 6, yy - 4); c.lineTo(x, yy + 5); }
+          else if (fb.verdict === "like") { c.moveTo(x - 6, yy + 4); c.lineTo(x + 6, yy + 4); c.lineTo(x, yy - 5); }
+          else c.arc(x, yy, 4, 0, Math.PI * 2);
+          c.fill();
+          if (fb.comment || fb.suggestion) { c.fillStyle = "#ffd33d"; c.beginPath(); c.arc(x + 9, yy - 3, 3, 0, Math.PI * 2); c.fill(); }
+        }
+      }
       mark("start", s, null, 10, st.base);
       if (!cv.active && cv.ended_tick != null) mark("end", cv.ended_tick, null, 10, st.base);
     });
@@ -173,6 +190,13 @@ function setup(ctx) {
         out.push([`${d.line.speaker_name} · ${d.line.speech_act || "?"} · ${fmtSpan(Math.max(0, p.tick - d.line.tick))} ago${pin}`, st.bright, "bold 22px"]);
         out.push([`“${d.line.utterance}”`, "#ffffff", "23px"]);
         out.push([`in the conversation with ${(cv.with || []).join(", ")}${cv.subject ? ` about ${cv.subject}` : ""}`, "#8b98ad", "19px"]);
+        const fb = d.line.feedback;
+        if (fb) {
+          out.push([`${fb.verdict === "like" ? "👍 liked" : fb.verdict === "dislike" ? "👎 disliked" : "note"}${fb.comment ? ` — ${fb.comment}` : ""}`,
+                    fb.verdict === "dislike" ? "#ff8a7a" : fb.verdict === "like" ? "#7ee787" : "#c9d1d9", "20px"]);
+          if (fb.suggestion) out.push([`💡 would fit better: “${fb.suggestion}”`, "#ffd33d", "20px"]);
+        }
+        if (!pin) out.push(["Pull the trigger on it to pin it -- then like / dislike it, say why, or suggest a better line.", "#8b98ad", "18px"]);
       } else {
         const when = d.kind === "start" ? cv.started_tick : cv.ended_tick;
         out.push([`${d.kind === "start" ? "BEGAN" : "ENDED"} · ${fmtSpan(Math.max(0, p.tick - (when ?? p.tick)))} ago · with ${(cv.with || []).join(", ")} · ${cv.medium || "in person"}${pin}`, st.base, "bold 22px"]);
@@ -187,10 +211,29 @@ function setup(ctx) {
         if (first) out.push([`first line: ${first.speaker_name}: “${first.utterance}”`, "#c9d1d9", "19px"]);
       }
     }
+    const pinnedLine = p.pinned?.kind === "line" && (!p.hotMark || (p.hotMark.kind === "line" && p.hotMark.line === p.pinned.line)) ? p.pinned : null;
+    const textBottom = pinnedLine ? PX_H - 80 : PX_H - 22;
     let y = L.detailTop + 24;
     for (const [text, col, font] of out) {
       c.fillStyle = col; c.font = `${font} system-ui, sans-serif`;
-      for (const piece of wrap(c, text, PX_W - 60)) { if (y > PX_H - 22) break; c.fillText(piece, 26, y); y += 28; }
+      for (const piece of wrap(c, text, PX_W - 60)) { if (y > textBottom) break; c.fillText(piece, 26, y); y += 28; }
+    }
+    if (pinnedLine) {                                   // the director's note on the pinned line
+      const fb = pinnedLine.line.feedback || {};
+      const by = PX_H - 68, defs = [["fb:like", fb.verdict === "like" ? "👍 Liked" : "👍 Like", fb.verdict === "like"],
+        ["fb:dislike", fb.verdict === "dislike" ? "👎 Disliked" : "👎 Dislike", fb.verdict === "dislike"],
+        ["fb:comment", fb.comment ? "✎ Edit why" : "✎ Why…", false], ["fb:suggest", fb.suggestion ? "💡 Edit line" : "💡 Suggest a line…", false],
+        ["fb:clear", "Clear note", false]];
+      const bw = (PX_W - 24 - 4 * 10) / 5;
+      defs.forEach(([id, label, on], i) => {
+        const b = { id, x: 12 + i * (bw + 10), y: by, w: bw, h: 52 };
+        c.fillStyle = on ? (id === "fb:like" ? "#238636" : "#a40e26") : (p.hot === id ? "#1f6feb" : "rgba(255,255,255,0.12)");
+        c.beginPath(); c.roundRect(b.x, b.y, b.w, b.h, 10); c.fill();
+        c.fillStyle = "#fff"; c.font = "bold 22px system-ui, sans-serif"; c.textAlign = "center"; c.textBaseline = "middle";
+        c.fillText(label, b.x + b.w / 2, b.y + b.h / 2); c.textAlign = "left";
+        p.btns.push(b);
+      });
+      if (p.saving) { c.fillStyle = "#8b98ad"; c.font = "18px system-ui, sans-serif"; c.fillText(p.saving, 26, by - 14); }
     }
     p.tex.needsUpdate = true;
     p.dirty = false;
@@ -202,10 +245,37 @@ function setup(ctx) {
     return out;
   }
 
+  // ---- the director's notes (backend/systems/dialogue_feedback.py) ----
+  async function send(p, line, conv, change) {
+    p.saving = "saving…"; p.dirty = true;
+    try {
+      const r = await fetch(`/admin/feedback/${encodeURIComponent(line.speaker)}`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ conv_id: conv.id, tick: line.tick, utterance: line.utterance, ...change }) });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.detail || r.statusText);
+      line.feedback = j.note ? { id: j.note.id, verdict: j.note.verdict, comment: j.note.comment, suggestion: j.note.suggestion } : undefined;
+      p.saving = null;
+    } catch (err) { p.saving = `couldn't save: ${err.message}`; }
+    p.dirty = true;
+  }
+  function feedback(p, what) {
+    const { line, conv } = p.pinned;
+    const fb = line.feedback || {};
+    if (what === "like" || what === "dislike") return send(p, line, conv, { verdict: fb.verdict === what ? null : what });
+    if (what === "clear") return send(p, line, conv, { verdict: null, comment: "", suggestion: "" });
+    const who = line.speaker_name || "them";
+    window.vrKeyboard?.open(what === "comment"
+      ? { title: "Why?", prompt: `${who}: “${line.utterance}” — what's right or wrong about it for ${who}?`, text: fb.comment || "",
+          onDone: (text) => send(p, line, conv, { comment: text }) }
+      : { title: "A line that would fit better", prompt: `Instead of “${line.utterance}”, what would ${who} have said?`, text: fb.suggestion || "",
+          onDone: (text) => send(p, line, conv, { suggestion: text }) });
+  }
+
   function pointAt() {
     controllers.forEach((controller, i) => {
       hoverMine[i] = null;
-      if (!renderer.xr.isPresenting || window.vrFloat?.hovering(i)) return;
+      if (!renderer.xr.isPresenting || window.vrFloat?.hovering(i) || window.vrKeyboard?.isOpen()) return;
       tmpM.identity().extractRotation(controller.matrixWorld);
       raycaster.ray.origin.setFromMatrixPosition(controller.matrixWorld);
       raycaster.ray.direction.set(0, 0, -1).applyMatrix4(tmpM);
@@ -269,6 +339,7 @@ function setup(ctx) {
       if (!p) return;
       const pages = Math.max(1, Math.ceil(p.convs.length / ROWS));
       if (p.hot === "live") { p.live = true; p.dirty = true; return; }
+      if (p.hot?.startsWith("fb:") && p.pinned?.kind === "line") return feedback(p, p.hot.slice(3));
       if (p.hot === "newer") { p.page = Math.max(0, p.page - 1); p.dirty = true; return; }
       if (p.hot === "older") { p.page = Math.min(pages - 1, p.page + 1); p.dirty = true; return; }
       const m = p.hotMark;
