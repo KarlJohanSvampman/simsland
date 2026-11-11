@@ -135,7 +135,7 @@ Schema:
         {"role": "user", "content": prompt},
     ]
 
-    result = await call_llm_safe(messages, session=session)
+    result = await call_llm_safe(messages, session=session, char_id=c.get("id"))
 
     if isinstance(result, dict) and result.get("error"):
         return None

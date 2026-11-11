@@ -11,9 +11,23 @@ from collections import deque
 # Per-character prompt log (in-memory ring buffer, max 50 entries per char)
 # ---------------------------------------------------------------------------
 _PROMPT_LOG: dict[str, deque] = {}
-_PROMPT_LOG_MAX = 50
+_PROMPT_LOG_MAX = 100
 
-def log_prompt_entry(char_id: str, messages: list, response: str, elapsed: float, cached: bool):
+
+def _purpose():
+    """Which prompt this is: the first caller outside this module and the LLM gate, as "module.function"
+    (e.g. "brain.llm_brain.think", "llm.diary_narration._generate_diary_text") -- for the VR LLM log."""
+    import sys
+    f = sys._getframe(2)
+    while f is not None:
+        mod = f.f_globals.get("__name__", "")
+        if mod not in (__name__, "llm.llm_gate", "asyncio.tasks", "asyncio.events") and not mod.startswith("asyncio"):
+            return f"{mod}.{f.f_code.co_name}"
+        f = f.f_back
+    return "?"
+
+
+def log_prompt_entry(char_id: str, messages: list, response: str, elapsed: float, cached: bool, purpose=None, error=None):
     """Store a prompt/response pair for a character. Thread-safe for asyncio."""
     if char_id not in _PROMPT_LOG:
         _PROMPT_LOG[char_id] = deque(maxlen=_PROMPT_LOG_MAX)
@@ -23,6 +37,8 @@ def log_prompt_entry(char_id: str, messages: list, response: str, elapsed: float
         "response": response,
         "elapsed_s": round(elapsed, 3),
         "cached": cached,
+        "purpose": purpose or "?",
+        **({"error": error} if error else {}),
     })
 
 def add_prompt_entry(char_id: str, entry: dict):
@@ -316,15 +332,19 @@ async def call_llm(
         char_id=char_id
     )
 
+    purpose = _purpose() if char_id else None
+
     if use_cache:
 
         cached = r.get(key)
 
         if cached:
 
-            return json.loads(
-                cached
-            )
+            result = json.loads(cached)
+            if char_id:                                # a cached reply is still what the character got
+                log_prompt_entry(char_id, full_messages, result if isinstance(result, str) else json.dumps(result),
+                                 elapsed=0.0, cached=True, purpose=purpose)
+            return result
 
     # =====================================================
     # REAL CALL
@@ -332,14 +352,20 @@ async def call_llm(
 
     _t0 = time.time()
 
-    result = await _call_llm(
+    try:
+        result = await _call_llm(
 
-        full_messages,
+            full_messages,
 
-        timeout,
+            timeout,
 
-        max_tokens
-    )
+            max_tokens
+        )
+    except Exception as e:
+        if char_id:                                    # a failed call is logged too, with why
+            log_prompt_entry(char_id, full_messages, "", elapsed=time.time() - _t0, cached=False, purpose=purpose,
+                             error=describe_llm_error(e))
+        raise
 
     _elapsed = time.time() - _t0
 
@@ -394,6 +420,7 @@ async def call_llm(
             result if isinstance(result, str) else json.dumps(result),
             elapsed=_elapsed,
             cached=False,
+            purpose=purpose,
         )
 
     return result

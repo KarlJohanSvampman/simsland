@@ -635,3 +635,32 @@ def find_preferred_surface(c, world, activity_tag, fallback_interaction=None):
         return find_nearest_free_anchor(c, world, fallback_interaction)
 
     return None
+
+
+# ============================================
+# DEBUG: what was considered (systems/path_debug.py, drawn by VR Debug Draw)
+# ============================================
+# Each search above returns only the winner; for debugging, which anchors were in the running, their score (walking
+# distance, lower wins) and why any were passed over is recorded on the character after the search. Wrapping keeps the
+# searches themselves untouched; callers import these names inside their functions, so they get the wrapped ones.
+
+def _with_candidates(fn, mode):
+    import functools
+
+    @functools.wraps(fn)
+    def wrapped(c, world, interaction_name, *args, **kwargs):
+        out = fn(c, world, interaction_name, *args, **kwargs)
+        try:
+            from systems.path_debug import note_candidates
+            household = args[0] if mode == "household" and args else kwargs.get("household_id")
+            exclude = args[0] if mode == "free" and args else kwargs.get("exclude_anchor")
+            note_candidates(c, world, interaction_name, out, mode, household_id=household, exclude_anchor=exclude)
+        except Exception:                              # noqa: BLE001 -- debugging must never change the search
+            pass
+        return out
+    return wrapped
+
+
+find_nearest_anchor = _with_candidates(find_nearest_anchor, "any")
+find_nearest_free_anchor = _with_candidates(find_nearest_free_anchor, "free")
+find_nearest_household_anchor = _with_candidates(find_nearest_household_anchor, "household")

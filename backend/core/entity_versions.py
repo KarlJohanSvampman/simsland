@@ -34,7 +34,7 @@ COLD_KEYS = frozenset({
     "behavior_patterns", "worries", "_daily_observations", "story_arc", "off_grid_story_arc",
     "life_narrative", "relationship_narratives", "identity", "contacts", "offgrid_summaries",
     "intention_history", "plan_log", "_intention_seen", "beliefs",
-    "trait_log", "_traits_seen",                     # systems/personality_profile.py: read on demand (api/persona.py)
+    "trait_log", "_traits_seen", "_nav_candidates", "_los_checks", "choice_log", "memory_trace",                     # systems/personality_profile.py: read on demand (api/persona.py)
 })
 
 _memo = {}          # (kind, id) -> (tick, digests)

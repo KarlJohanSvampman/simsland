@@ -160,7 +160,7 @@ with mock.patch.object(pc, "line_of_sight", return_value=True):
     other = at(25)
     other["off_grid"] = True
     check("someone away is not seen", pc.perceive_glimpsed(me_n, w) == [])
-check("without a line of sight, not even a shape", (lambda: (at(25), mock.patch.object(pc, "line_of_sight", return_value=False).start(), pc.perceive_glimpsed(me, w))[2] == [])())
+check("without a line of sight, not even a shape", (lambda: (at(25), mock.patch.object(pc, "los_trace", return_value={"ok": False, "hit": None, "by": "wall"}).start(), pc.perceive_glimpsed(me, w))[2] == [])())
 mock.patch.stopall()
 
 # the context lines

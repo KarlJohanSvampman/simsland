@@ -6,7 +6,13 @@ What path a character planned, and making a failure to find one impossible to mi
 Every route plan (systems/navigation.py::plan_character_route) is recorded on the character:
 
     c["path_plans"] = [ {"tick", "from": [x, y], "to": [x, y], "ok", "reason", "tiles", "segments": [...],
-                         "target_id"}, ... ]                                   # the last MAX_PLANS
+                         "target_id",
+                         "target": {"kind", "id", "label", "x", "y"},          # what the walk is for, resolved
+                         "path": [[x, y], ...],                                # the planned route, simplified
+                         "eta_s",                                              # tiles / walking speed (sim seconds)
+                         "candidates": [{"prop_id", "label", "x", "y", "score", "skipped"}],   # if a place was chosen
+                         "ended", "actual_s"}, ... ]                           # arrived | stuck | replanned | stopped
+                                                                               # -- the last MAX_PLANS
 
     reason: ok | partial_stops_outside (the walk ends at the door of the target building) | already_there |
             no_indoor_path | no_outdoor_path | start_building_has_no_entrance | target_building_has_no_entrance |
@@ -46,10 +52,82 @@ def probing():
         _probing -= 1
 
 
+CANDIDATES_KEPT = 8
+PATH_POINTS = 80
+
+
+def note_candidates(c, world, interaction, chosen, mode, household_id=None, exclude_anchor=None):
+    """After an anchor search (systems/props.py): every anchor for `interaction`, its score (walking distance, lower
+    wins) and why it was passed over, if it was -- kept on the character for the next route plan."""
+    from systems.anchors import get_world_anchor
+    chosen_prop = chosen[0] if chosen else None
+    rows = []
+    for prop in world.get("props") or []:
+        for anchor in prop.get("anchors") or []:
+            if anchor.get("interaction") != interaction:
+                continue
+            skipped = None
+            if mode == "household" and prop.get("household_id") and prop.get("household_id") != household_id:
+                skipped = "another household's"
+            elif mode in ("free", "household") and anchor.get("occupied_by") and anchor["occupied_by"] != c.get("id"):
+                skipped = "in use"
+            elif mode == "free" and anchor is exclude_anchor:
+                skipped = "the one already tried"
+            wa = get_world_anchor(prop, anchor)
+            rows.append({"prop_id": prop.get("id"), "label": str(prop.get("template") or "prop").replace("_", " "),
+                         "x": round(wa["x"], 1), "y": round(wa["y"], 1),
+                         "score": round(abs(wa["x"] - c.get("x", 0)) + abs(wa["y"] - c.get("y", 0)), 1),
+                         "skipped": skipped, "chosen": prop is chosen_prop and not skipped})
+    rows.sort(key=lambda r: (not r["chosen"], r["skipped"] is not None, r["score"]))
+    c["_nav_candidates"] = {"tick": world.get("tick", 0), "interaction": interaction, "rows": rows[:CANDIDATES_KEPT]}
+
+
+def _target(c, world, target):
+    """What the walk is for: a person, a prop, a room, a building -- with a label -- or just a spot."""
+    mt = c.get("move_target") or {}
+    tid = mt.get("target_id") or (c.get("activity") or {}).get("target_id")
+    kind = mt.get("target_type")
+    label = None
+    chars = world.get("characters") or {}
+    if tid in chars:
+        kind, label = "person", chars[tid].get("name") or tid
+    elif isinstance(tid, str) and tid.startswith("room:"):
+        kind, label = "room", tid.split(":")[-1].replace("_", " ")
+    elif kind == "building" or (isinstance(tid, str) and tid.startswith(("building:", "home:"))):
+        kind, label = "building", tid
+    elif tid:
+        prop = next((p for p in world.get("props") or [] if p.get("id") == tid), None)
+        if prop:
+            kind, label = "prop", str(prop.get("template") or tid).replace("_", " ")
+    return {"kind": kind or ("spot" if not tid else "thing"), "id": tid, "label": label or (tid or "a spot"),
+            "x": round(target[0], 1), "y": round(target[1], 1)}
+
+
+def _simplified_path(c):
+    pts = [[round(c.get("x", 0), 1), round(c.get("y", 0), 1)]]
+    for seg in c.get("route") or []:
+        pts.extend([[t[0], t[1]] for t in (seg.get("tiles") or [])])
+    if len(pts) > PATH_POINTS:                        # keep the shape: every n-th point, and the last
+        step = len(pts) / PATH_POINTS
+        pts = [pts[int(i * step)] for i in range(PATH_POINTS)] + [pts[-1]]
+    return pts
+
+
+def finish(c, world, how):
+    """The walk the last plan was for has ended: arrived | stuck | replanned | stopped (how long it actually took)."""
+    plans = c.get("path_plans") or []
+    p = plans[-1] if plans else None
+    if not p or p.get("ended") or not p.get("ok"):
+        return
+    p["ended"] = how
+    p["actual_s"] = world.get("tick", 0) - p.get("tick", 0)
+
+
 def record(c, world, target, ok, reason):
     if c.get("is_workplace_npc"):
         return
     tick = world.get("tick", 0)
+    finish(c, world, "replanned")                     # a new plan while the last one was still being walked
     route = (c.get("route") or []) if ok else []
     entry = {
         "tick": tick,
@@ -60,7 +138,20 @@ def record(c, world, target, ok, reason):
         "segments": [seg.get("type") for seg in route],
         "target_id": (c.get("move_target") or {}).get("target_id") or (c.get("activity") or {}).get("target_id"),
         "probe": bool(_probing),
+        "target": _target(c, world, target),
     }
+    if ok:
+        entry["path"] = _simplified_path(c)
+        try:
+            from systems.movement import tiles_per_tick
+            speed = max(1e-3, float(tiles_per_tick(c, world) or 1))      # tiles per tick (a tick is a sim second)
+            entry["eta_s"] = max(1, round(entry["tiles"] / speed))
+        except Exception:                             # noqa: BLE001
+            pass
+    nc = c.get("_nav_candidates")
+    if nc and tick - nc.get("tick", -10) <= 2:        # chosen just now: what was in the running
+        entry["candidates"] = nc["rows"]
+        entry["interaction"] = nc.get("interaction")
     if _probing and not ok:
         return                                        # a probe that found nothing isn't worth keeping
     plans = c.setdefault("path_plans", [])

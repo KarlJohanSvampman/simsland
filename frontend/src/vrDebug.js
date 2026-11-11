@@ -21,6 +21,14 @@
 //   Show panels               a character's enabled panels (and on-demand ones with something to show) float beside them
 //   pointing at a panel       trigger clicks rows, data points and page buttons; right stick ←/→ pans its timeline,
 //                             ↑/↓ zooms it (instead of turning / flying)
+//   Conversations             a floating timeline of their conversations and every line said (src/vrConversations.js)
+//   Memory debug              a floating timeline of every memory access (src/vrMemory.js)
+//   LLM log                   every prompt sent to the model for them and the reply; Choices & tags: which of their
+//                             tags decided each choice (src/vrLLM.js)
+//   Watch values              comic-book boxes above them with values you pick (mood, intention, stress, any field),
+//                             previous value, colours, warning flashes: src/vrWatch.js
+//   Debug Draw                a list of things to draw into the world for them (routes, targets, senses...):
+//                             src/vrDebugDraw.js
 //   Manage panels             each panel's state (enabled / on demand / disabled), add a panel to just this one, switch
 //                             the active layout (a list, like a dropdown), save, save as a new layout (up to 6)
 // While director mode is on (operator_view.js: hold a grip still for a second), the trigger is director mode's.
@@ -183,10 +191,12 @@ function setup(ctx) {
     clock: 0,
     shown: new Set(),      // characters whose panels float beside them
     entityPanels: new Map(),   // charId -> {data: /admin/panels/for result, at}
-    widgets: new Map(),    // "charId|templateId" -> {canvas, ctx, texture, mesh, view, hits, height, drawn}
+    widgets: new Map(),
+    closedWidgets: new Set(),  // "charId|templateId" closed with × (until "Show panels" again)    // "charId|templateId" -> {canvas, ctx, texture, mesh, view, hits, height, drawn}
     widgetHover: [null, null],   // per hand: {key, hit} while pointing at a panel widget
     feed: new panelApi.PanelFeed(),
   };
+  window.vrDebugRedraw = () => redraw();             // vrWatch.js: its list finished loading
   window.vrDebugShowPanels = (charId) => { state.shown.add(charId); state.entityPanels.delete(charId); };   // vrBuilder: just saved one
   window.xrWasDragged = (i) => !!state.dragged[i];   // operator_view.js: a grip that moved is a drag, not "director mode"
   // read-only, for tests (and a future in-headset debug overlay): what's open, and where a panel button is in the world
@@ -214,6 +224,9 @@ function setup(ctx) {
   });
 
   const headWorld = () => camera.getWorldPosition(new THREE.Vector3());
+  // controller i is on something another module owns: a floating panel's frame (vrFloat.js) or a panel that handles
+  // its own pointing (window.vrHoverOwners: e.g. vrMemory.js's timeline)
+  const claimed = (i) => !!window.vrFloat?.hovering(i) || (window.vrHoverOwners || []).some((f) => f(i));
   const charHead = (id) => {
     const m = sims[id];
     if (!m) return null;
@@ -234,6 +247,12 @@ function setup(ctx) {
         { id: "panels", label: state.shown.has(id) ? "Hide panels" : "Show panels" },
         { id: "manage", label: "Manage panels" },
         { id: "design", label: "Design a panel" },
+        { id: "conversations", label: window.vrConversations?.isOpen(id) ? "Conversations  •" : "Conversations" },
+        { id: "memory", label: window.vrMemory?.isOpen(id) ? "Memory debug  •" : "Memory debug" },
+        { id: "llmlog", label: "LLM log" },
+        { id: "choicetags", label: "Choices & tags" },
+        { id: "watch", label: window.vrWatch?.watching(id) ? `Watch values  (${window.vrWatch.watching(id)})` : "Watch values" },
+        { id: "debugdraw", label: window.vrDebugDraw?.activeFor().includes(id) ? "Debug Draw  •" : "Debug Draw" },
         { id: "desktop", label: "Show in desktop inspector" }, { id: "close", label: "Close" },
       ],
     };
@@ -281,6 +300,18 @@ function setup(ctx) {
     };
   }
   // Manage panels: the active layout's panels and their states, adding one, switching layouts, saving
+  function drawSpec(id) {                                   // the Debug Draw list (src/vrDebugDraw.js does the drawing)
+    const c = window.getWorldCharacter(id) || {};
+    const dd = window.vrDebugDraw;
+    if (!dd) return { title: name(c, id), subtitle: "Debug Draw", lines: ["Debug Draw isn't loaded."], buttons: [{ id: "back", label: "Back" }] };
+    const box = (on) => (on === true ? "☑" : on === "some" ? "◩" : "☐");
+    return {
+      title: name(c, id), subtitle: "Debug Draw — point and pull the trigger to switch on / off",
+      lines: dd.summary(id),
+      buttons: [...dd.options(id).map((o) => ({ id: `dd:${o.id}`, label: `${o.parent ? "" : "      "}${box(o.on)}  ${o.label}` })),
+                { id: "back", label: "Back" }, { id: "close", label: "Close" }],
+    };
+  }
   function manageSpec(id) {
     const c = window.getWorldCharacter(id) || {};
     const mg = state.menu.manage;
@@ -365,7 +396,9 @@ function setup(ctx) {
     const m = state.menu;
     if (!m) return;
     panel.draw(m.view === "inspect" ? inspectSpec(m.charId) : m.view === "persona" ? personaSpec(m.charId)
-      : m.view === "manage" ? manageSpec(m.charId) : menuSpec(m.charId));
+      : m.view === "manage" ? manageSpec(m.charId) : m.view === "draw" ? drawSpec(m.charId)
+      : m.view === "watch" && window.vrWatch ? window.vrWatch.spec(m.charId)
+      : m.view === "llm" && window.vrLLM ? window.vrLLM.spec(m.charId) : menuSpec(m.charId));
   }
 
   function openMenu(id) {
@@ -399,9 +432,18 @@ function setup(ctx) {
     if (button === "desktop") { window.setSelectedCharacterId?.(m.charId); return; }
     if (button === "panels") {
       if (state.shown.has(m.charId)) state.shown.delete(m.charId); else state.shown.add(m.charId);
+      for (const k of [...state.closedWidgets]) if (k.startsWith(m.charId + "|")) state.closedWidgets.delete(k);
       return redraw();
     }
     if (button === "manage") return openManage(m.charId);
+    if (button === "debugdraw") { m.view = "draw"; return redraw(); }
+    if (button === "watch") { m.view = "watch"; return redraw(); }
+    if (button === "memory") { window.vrMemory?.toggle(m.charId); return redraw(); }
+    if (button === "conversations") { window.vrConversations?.toggle(m.charId); return redraw(); }
+    if (button === "llmlog" || button === "choicetags") { m.view = "llm"; window.vrLLM?.open(m.charId, button === "llmlog" ? "log" : "choices"); return redraw(); }
+    if (button.startsWith("l:")) { if (window.vrLLM?.choose(m.charId, button) === "menu") m.view = "menu"; return redraw(); }
+    if (button.startsWith("w:")) { if (window.vrWatch?.choose(m.charId, button) === "menu") m.view = "menu"; return redraw(); }
+    if (button.startsWith("dd:")) { window.vrDebugDraw?.toggle(m.charId, button.slice(3)); return redraw(); }
     if (button === "design") { const id = m.charId; closeMenu(); window.vrBuilder?.open(id); return; }
     const mg = m.manage;
     if (mg && !mg.loading && !mg.error) {
@@ -442,6 +484,7 @@ function setup(ctx) {
     controller.addEventListener("selectstart", () => {
       if (!renderer.xr.isPresenting) return;
       if (window.vrBuilder?.isOpen() && window.vrBuilder.hovering(controller)) return;   // the workbench (vrBuilder.js) has it
+      if (claimed(i)) return;                                  // a floating panel's frame (vrFloat.js) or its own content has it
       if (state.panelHover[i]) return choose(state.panelHover[i]);
       const wh = state.widgetHover[i];
       if (wh) {
@@ -516,6 +559,8 @@ function setup(ctx) {
           if (Math.abs(y) > 0.2) zoomTimeline(w.view, 1 + y * 0.04, onWidget.frac ?? 0.5);
           w.drawn = -1;
         }
+      } else if (isRight && g.axes.length >= 4 && claimed(i)) {
+        // a floating panel being pointed at takes the stick (e.g. the memory timeline pans / zooms with it)
       } else if (isRight && g.axes.length >= 4) {
         const [, , x, y] = g.axes;
         if (Math.abs(x) > 0.7 && !state.turnLatched[i]) {
@@ -576,6 +621,7 @@ function setup(ctx) {
       state.panelHover[i] = null;
       state.widgetHover[i] = null;
       if (window.vrBuilder?.isOpen() && window.vrBuilder.hovering(controller)) { hover[i] = null; state.panelHover[i] = "builder"; return; }
+      if (claimed(i)) { hover[i] = null; return; }
       tmpM.identity().extractRotation(controller.matrixWorld);
       raycaster.ray.origin.setFromMatrixPosition(controller.matrixWorld);
       raycaster.ray.direction.set(0, 0, -1).applyMatrix4(tmpM);
@@ -666,12 +712,9 @@ function setup(ctx) {
         if (st === "on_demand") return hasContent(state.feed.get("character", charId, t).value);
         return false;
       });
-      const toViewer = head.clone().sub(target).setY(0).normalize();
-      const right = new THREE.Vector3().crossVectors(new THREE.Vector3(0, 1, 0), toViewer).normalize();
-      const s = dolly.scale.x;
-      const colY = [target.y + 0.35 * s, target.y + 0.35 * s];       // the top of each of two columns
-      visible.forEach((t, idx) => {
+      visible.forEach((t) => {
         const key = `${charId}|${t.id}`;
+        if (state.closedWidgets.has(key)) return;
         keep.add(key);
         let w = state.widgets.get(key);
         if (!w) { w = makeWidget(); state.widgets.set(key, w); }
@@ -683,16 +726,11 @@ function setup(ctx) {
           w.uploadedH = out.height;
           w.hits = out.hits; w.height = out.height; w.texture.needsUpdate = true; w.drawn = state.clock;
         }
-        const wm = WIDGET_W_M * s, hm = wm * w.height / WIDGET_PX;
-        const col = idx % 2;
-        const x = (0.55 + col * (WIDGET_W_M + 0.05)) * s;
-        const pos = target.clone().addScaledVector(right, x + wm / 2);
-        pos.y = colY[col] - hm / 2;
-        colY[col] -= hm + 0.04 * s;
-        w.mesh.position.copy(pos);
-        w.mesh.lookAt(head);
-        w.mesh.scale.set(wm, hm, 1);
-        w.mesh.visible = true;
+        // a floating panel (vrFloat.js): movable, resizable, lockable to them, minimisable to an icon over their head
+        const name = (window.getWorldCharacter(charId) || {}).name || charId;
+        window.vrFloat.show(key, { charId, title: `${t.name || t.id} — ${name}`, icon: (t.name || t.id || "?")[0].toUpperCase(),
+                                   mesh: w.mesh, widthM: WIDGET_W_M, heightM: WIDGET_W_M * w.height / WIDGET_PX,
+                                   onClose: () => state.closedWidgets.add(key) });
       });
     }
     for (const [key, w] of state.widgets) {
@@ -720,7 +758,7 @@ function setup(ctx) {
     placeMenu();
     pointAtPanel();
     pointAtCharacters();
-    if (state.menu?.view === "inspect" && state.clock - state.menu.refreshed > REFRESH_SECONDS) {
+    if ((state.menu?.view === "inspect" || state.menu?.view === "draw") && state.clock - state.menu.refreshed > REFRESH_SECONDS) {
       state.menu.refreshed = state.clock;
       redraw();
     }

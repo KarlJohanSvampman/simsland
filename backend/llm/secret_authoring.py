@@ -82,7 +82,7 @@ Schema:
     ]
 
     try:
-        result = await call_llm_safe(messages, session=session)
+        result = await call_llm_safe(messages, session=session, char_id=c.get("id"))
         if isinstance(result, dict) and result.get("error"):
             raise ValueError("llm_error")
         text = result.get("text", "") if isinstance(result, dict) else result
