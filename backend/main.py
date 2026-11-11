@@ -55,6 +55,7 @@ from api.debug_panels import router as debug_panels_router
 from api.debug_draw import router as debug_draw_router
 from api.watch_values import router as watch_values_router
 from api.llm_debug import router as llm_debug_router
+from api.memory_trace import router as memory_trace_router
 from api.dependents import router as dependents_router
 from api.director  import router as director_router
 from api.middleware_bridge import router as middleware_bridge_router
@@ -96,6 +97,7 @@ app.include_router(debug_panels_router)
 app.include_router(debug_draw_router)
 app.include_router(watch_values_router)
 app.include_router(llm_debug_router)
+app.include_router(memory_trace_router)
 app.include_router(dependents_router, prefix="/api")
 app.include_router(director_router)
 app.include_router(middleware_bridge_router)

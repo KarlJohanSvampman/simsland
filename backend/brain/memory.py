@@ -780,3 +780,13 @@ def rewrite_memory_salience(c, memory, delta):
         return
     current = memory.get("importance", 0.5)
     memory["importance"] = max(0.0, min(1.0, current + delta))
+
+
+# ---- memory debugging: every access is noted (systems/memory_trace.py, VR "Memory debug") ----
+from systems.memory_trace import traced_store as _ts, traced_recall as _tr, traced_prune as _tp
+store_memory = _ts(store_memory)
+recall = _tr(recall)
+recall_relevant = _tr(recall_relevant)
+recall_with_filters = _tr(recall_with_filters)
+biased_recall = _tr(biased_recall)
+prune_memories = _tp(prune_memories)

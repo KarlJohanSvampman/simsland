@@ -97,9 +97,14 @@ def maybe_consolidate_memories(c, world):
 
     long_term = c.setdefault("long_term_memory", [])
     processed_ids = {m["id"] for m in to_preserve if m.get("id")}
+    from systems.memory_trace import note
     for m in to_preserve:
         long_term.append(dict(m))
+        note(c, "ltm_commit", [m], world=world, caller="memory_consolidation", how="kept as it was")
 
+    if len(to_aggregate) < 3 and to_preserve:
+        note(c, "aggregation", [], world=world, caller="memory_consolidation",
+             detail=f"{len(to_preserve)} kept as they were; {len(to_aggregate)} too few to summarise yet")
     if len(to_aggregate) >= 3:
         summary_text = _summarize(c, to_aggregate)
         if summary_text:
@@ -109,12 +114,18 @@ def maybe_consolidate_memories(c, world):
                 "tick": tick,
                 "tags": ["highlights"],
             })
+            note(c, "ltm_commit", [long_term[-1]], world=world, caller="memory_consolidation", how="the hour's summary")
+            note(c, "aggregation", to_aggregate, world=world, caller="memory_consolidation",
+                 detail=f"{len(to_aggregate)} memories folded into a summary, {len(to_preserve)} kept as they were",
+                 summary=summary_text[:300], window_s=tick - window_start)
             processed_ids.update(m["id"] for m in to_aggregate if m.get("id"))
             c.pop("_ltm_pending_since", None)
         else:
             # Always the AI's summary, never a canned "first thing (+26 other things)": if the model was busy or
             # failed, keep the hour's memories where they are and try again in a few minutes.
             c["_ltm_pending_since"] = window_start
+            note(c, "aggregation", to_aggregate, world=world, caller="memory_consolidation", failed=True,
+                 detail=f"couldn't summarise {len(to_aggregate)} memories (the AI didn't answer) -- trying again in {RETRY_TICKS // 60} min")
             c["_last_memory_consolidation_tick"] = tick - CONSOLIDATION_INTERVAL_TICKS + RETRY_TICKS
     # to_aggregate entries that DIDN'T end up in a summary (too few of
     # them this hour) stay in short-term untouched -- nothing to show
@@ -274,7 +285,7 @@ def maybe_forget_short_term(c, world):
     if not memories:
         return
 
-    survivors = []
+    survivors, dropped = [], []
     for m in memories:
         age = tick - m.get("tick", tick)
         if age < MIN_AGE_BEFORE_FORGETTING_TICKS:
@@ -282,6 +293,10 @@ def maybe_forget_short_term(c, world):
             continue
         drop_pct = m.get("drop_probability", DEFAULT_DROP_PROBABILITY_PCT)
         if random.random() * 100 < drop_pct:
+            dropped.append(m)
             continue   # forgotten -- not necessarily in age/insertion order
         survivors.append(m)
     c["memories"] = survivors
+    if dropped:
+        from systems.memory_trace import note
+        note(c, "forget", dropped, world=world, caller="memory_consolidation", why="random forgetting")
