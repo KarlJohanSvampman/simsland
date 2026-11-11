@@ -348,6 +348,7 @@ const xrHover = { 0: null, 1: null };
 // its own; operator_view.js owns the actual state and gesture logic.
 let _xrDirectorModeActive = false;
 window.setDirectorModeActive = (active) => { _xrDirectorModeActive = !!active; };
+window.getDirectorModeActive = () => _xrDirectorModeActive;
 
 function updateXRFrame(){
   if (!renderer.xr.isPresenting) return;
@@ -367,10 +368,13 @@ function updateXRFrame(){
 
   xrControllers.forEach((controller, i) => {
     const gamepad = controller.userData.inputSource?.gamepad;
-    if (gamepad && gamepad.axes.length >= 4) {
+    // the LEFT stick glides (the right one turns and flies -- src/vrDebug.js); faster the bigger the viewer has scaled
+    // themselves (a giant over a tabletop map covers it in a few strides)
+    const isLeft = controller.userData.inputSource?.handedness !== "right";
+    if (isLeft && gamepad && gamepad.axes.length >= 4) {
       const [, , stickX, stickY] = gamepad.axes;
       const DEAD_ZONE = 0.15;
-      const SPEED = 0.06;
+      const SPEED = 0.06 * xrDolly.scale.x;
       if (Math.abs(stickX) > DEAD_ZONE || Math.abs(stickY) > DEAD_ZONE) {
         xrDolly.position.addScaledVector(right, stickX * SPEED);
         xrDolly.position.addScaledVector(forward, -stickY * SPEED);
@@ -403,8 +407,13 @@ function updateXRFrame(){
 // state (this file's established convention is window.* getters, not ES
 // exports -- see window.getSelectedCharacterId above this session).
 window.getXRContext = () => ({
-  renderer, dolly: xrDolly, controllers: xrControllers, hover: xrHover, sims,
+  renderer, scene, dolly: xrDolly, camera: xrCamera, controllers: xrControllers, hover: xrHover, sims,
 });
+// src/vrDebug.js's per-frame work (menus, grab-to-move) runs from animate(), after updateXRFrame()
+window.xrFrameHooks = window.xrFrameHooks || [];
+// a character as the latest world snapshot has them (for the in-headset panels)
+window.getWorldCharacter = (id) => _worldState?.characters?.[id] || null;
+window.getWorldTick = () => _worldState?.tick || 0;
 window.setSelectedCharacterId = (id) => {
   selectedCharacterId = id;
   if (id) renderCharacterInspector(id);
@@ -9217,6 +9226,7 @@ function animate() {
   _animClockSeconds += delta;
   updateSelectionOverlay(_animClockSeconds);
   updateXRFrame();
+  if (presenting) for (const hook of window.xrFrameHooks) { try { hook(); } catch (err) { console.error(err); } }
 
   _glideCharacters();
 
