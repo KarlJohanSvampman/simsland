@@ -21,6 +21,7 @@
 //   Show panels               a character's enabled panels (and on-demand ones with something to show) float beside them
 //   pointing at a panel       trigger clicks rows, data points and page buttons; right stick ←/→ pans its timeline,
 //                             ↑/↓ zooms it (instead of turning / flying)
+//   Conversations             a floating timeline of their conversations and every line said (src/vrConversations.js)
 //   Memory debug              a floating timeline of every memory access (src/vrMemory.js)
 //   LLM log                   every prompt sent to the model for them and the reply; Choices & tags: which of their
 //                             tags decided each choice (src/vrLLM.js)
@@ -246,6 +247,7 @@ function setup(ctx) {
         { id: "panels", label: state.shown.has(id) ? "Hide panels" : "Show panels" },
         { id: "manage", label: "Manage panels" },
         { id: "design", label: "Design a panel" },
+        { id: "conversations", label: window.vrConversations?.isOpen(id) ? "Conversations  •" : "Conversations" },
         { id: "memory", label: window.vrMemory?.isOpen(id) ? "Memory debug  •" : "Memory debug" },
         { id: "llmlog", label: "LLM log" },
         { id: "choicetags", label: "Choices & tags" },
@@ -437,6 +439,7 @@ function setup(ctx) {
     if (button === "debugdraw") { m.view = "draw"; return redraw(); }
     if (button === "watch") { m.view = "watch"; return redraw(); }
     if (button === "memory") { window.vrMemory?.toggle(m.charId); return redraw(); }
+    if (button === "conversations") { window.vrConversations?.toggle(m.charId); return redraw(); }
     if (button === "llmlog" || button === "choicetags") { m.view = "llm"; window.vrLLM?.open(m.charId, button === "llmlog" ? "log" : "choices"); return redraw(); }
     if (button.startsWith("l:")) { if (window.vrLLM?.choose(m.charId, button) === "menu") m.view = "menu"; return redraw(); }
     if (button.startsWith("w:")) { if (window.vrWatch?.choose(m.charId, button) === "menu") m.view = "menu"; return redraw(); }

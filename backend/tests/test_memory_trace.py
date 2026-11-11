@@ -86,6 +86,25 @@ check("GET memtrace: events oldest first, sizes, kind names", out["events"][0]["
       and "ltm_commit" in out["kinds"])
 check("... ?since only newer", all(e["tick"] > 99999 for e in mt.memtrace("x", since=99999)["events"]))
 
+# ---- conversations for VR (api/conversation_trace.py) ----
+import api.conversation_trace as ct
+from brain.conversations import create_conversation, add_message
+y = {"id": "y", "name": "Y", "x": 1, "y": 1}
+c.update(x=1, y=1, conversation_log=[{"id": "old1", "participants": ["x", "y"], "names": {"x": "X", "y": "Y"}, "medium": "call",
+                                      "started_tick": 100, "ended_tick": 200, "end_reason": "settled", "with": [{"id": "y", "name": "Y"}],
+                                      "lines": [{"tick": 120, "speaker": "x", "utterance": "Hi", "speech_act": "greet"},
+                                                {"tick": 150, "speaker": "y", "utterance": "Hello", "speech_act": "greet"}]}])
+w2 = {"tick": 5000, "characters": {"x": c, "y": y}, "conversations": {}, "buildings": [], "props": []}
+conv = create_conversation(w2, ["x", "y"])
+add_message(w2, conv, "x", "Nice weather", "smalltalk", "general", 4990)
+ct.load_world = lambda sim_id="default": w2
+out = ct.convtrace("x")
+rows = out["conversations"]
+check("conversations: the one going on first, then finished ones, newest first",
+      rows[0]["active"] and rows[0]["ended_tick"] is None and rows[1]["id"] == "old1" and rows[1]["end_reason"] == "settled", str(rows)[:300])
+check("... each line with who said it (by name), the words and when", rows[1]["lines"][1] == {"tick": 150, "speaker": "y", "speaker_name": "Y", "utterance": "Hello", "speech_act": "greet"})
+check("... and for one going on in person, whether they're within sight and earshot now", rows[0]["reach_now"] and rows[0]["reach_now"]["Y"]["ok"] in (True, False))
+
 print()
 if failures:
     print(f"FAILED: {len(failures)}")
