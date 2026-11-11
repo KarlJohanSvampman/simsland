@@ -204,7 +204,8 @@ function setupXRControllerInput() {
     // ---- Squeeze: hold to toggle director mode on/off ----
     controller.addEventListener("squeezestart", () => {
       clearTimeout(modeHoldTimer);
-      modeHoldTimer = setTimeout(() => _toggleDirectorMode(ctx), MODE_TOGGLE_HOLD_MS);
+      // ...held STILL: a grip that moves is grabbing the world to move around (src/vrDebug.js), not this
+      modeHoldTimer = setTimeout(() => { if (!window.xrWasDragged?.(i)) _toggleDirectorMode(ctx); }, MODE_TOGGLE_HOLD_MS);
     });
     controller.addEventListener("squeezeend", () => {
       clearTimeout(modeHoldTimer);

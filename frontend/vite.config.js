@@ -58,7 +58,10 @@ export default defineConfig({
           resolve(__dirname, "vr_test.html"),
 
         behaviour:
-          resolve(__dirname, "behaviour.html")
+          resolve(__dirname, "behaviour.html"),
+
+        panels:
+          resolve(__dirname, "panels.html")
       }
     }
   }

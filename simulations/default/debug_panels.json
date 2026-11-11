@@ -1,0 +1,113 @@
+{
+ "templates": [
+  {
+   "id": "memories",
+   "name": "Memories",
+   "type": "table",
+   "source": {
+    "path": "memories",
+    "refresh_s": 2
+   },
+   "options": {
+    "page_size": 5,
+    "order": "newest",
+    "timeline": true,
+    "columns": []
+   },
+   "assign": {
+    "scope": "kinds",
+    "kinds": [
+     "character"
+    ],
+    "entities": []
+   },
+   "default_state": "enabled"
+  },
+  {
+   "id": "body_live",
+   "name": "Body (live)",
+   "type": "line",
+   "source": {
+    "path": "body",
+    "refresh_s": 2
+   },
+   "options": {
+    "series": [
+     "hunger",
+     "fatigue",
+     "bladder"
+    ]
+   },
+   "assign": {
+    "scope": "kinds",
+    "kinds": [
+     "character"
+    ],
+    "entities": []
+   },
+   "default_state": "enabled"
+  },
+  {
+   "id": "memory_kinds",
+   "name": "Memory kinds",
+   "type": "pie",
+   "source": {
+    "path": "memories",
+    "refresh_s": 2
+   },
+   "options": {
+    "label_key": "kind"
+   },
+   "assign": {
+    "scope": "kinds",
+    "kinds": [
+     "character"
+    ],
+    "entities": []
+   },
+   "default_state": "enabled"
+  },
+  {
+   "id": "body_tree",
+   "name": "Body tree",
+   "type": "tree",
+   "source": {
+    "path": "body",
+    "refresh_s": 2
+   },
+   "options": {
+    "max_rows": 40
+   },
+   "assign": {
+    "scope": "kinds",
+    "kinds": [
+     "character"
+    ],
+    "entities": []
+   },
+   "default_state": "disabled"
+  },
+  {
+   "id": "status",
+   "name": "Status",
+   "type": "text",
+   "source": {
+    "path": "",
+    "refresh_s": 2
+   },
+   "options": {
+    "html": "<h1>{{name}}</h1><p>Hunger <b style=\"color:#f85149\">{{body.hunger}}</b> \u00b7 mood <i>{{mood.name}}</i></p><p><span style=\"font-size:14px\">bio: {{bio}}</span></p>",
+    "font_size": 26
+   },
+   "assign": {
+    "scope": "kinds",
+    "kinds": [
+     "character"
+    ],
+    "entities": []
+   },
+   "default_state": "enabled"
+  }
+ ],
+ "entities": {}
+}
