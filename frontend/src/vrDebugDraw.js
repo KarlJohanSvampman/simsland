@@ -20,6 +20,17 @@
 //   Fade the unnoticed        people inside an enabled sense's range whom they neither see nor hear turn half
 //                             transparent (for the last character this was switched on for)
 //   Last seen                 where they last saw people who are out of sight now, fading the longer ago it was
+//   (Line of sight draws the sight-line tests the last look REALLY made -- green to whoever was seen, red to the wall /
+//    door / prop it stopped at, both with distances; nothing tested = nobody in range. Vision and Hearing show their
+//    range as bands fading with distance: recognise -> a figure -> a shape; whisper / talking / yelling.)
+// Conversations
+//   Within sight + earshot?   a line to everyone they're talking with in person: green face to face, red when they're
+//                             in different rooms, a wall is between them or they're out of earshot (says which)
+//   Incidents (everyone)      the latest in-person lines said to someone who couldn't have heard / seen it (arcs,
+//                             backend/systems/conversation_reach.py logs them all the time)
+// Social
+//   Reputation of people nearby   above everyone within their detection range: public score and standing,
+//                             community standing, notoriety, and how this character regards them
 //
 // Coordinates: world tile (x, y) is scene (x - 10, y - 7), as everywhere in main.js.
 
@@ -39,8 +50,15 @@ const OPTIONS = [
   { id: "per.hearing", label: "Hearing" },
   { id: "per.fade", label: "Fade the unnoticed" },
   { id: "per.lastseen", label: "Last seen" },
+  { id: "talk", label: "Conversations", parent: true },
+  { id: "talk.reach", label: "Within sight + earshot?" },
+  { id: "talk.incidents", label: "Incidents (everyone)" },
+  { id: "social", label: "Social", parent: true },
+  { id: "social.reputation", label: "Reputation of people nearby" },
 ];
-const VOLUME_SHADE = { low: 0.25, medium: 0.5, high: 0.75, shout: 1.0, loud: 0.75, scream: 1.0 };
+const VOLUME_SHADE = { low: 0.2, medium: 0.45, high: 0.7, loud: 0.85, intense: 1.0 };
+const VOICE_NAME = { low: "whisper", medium: "talking", high: "yelling" };
+const INCIDENTS_POLL_S = 2;
 const C = {
   route: 0x33e0ff, target: 0xff66cc, chosen: 0xffd84a, passed: 0x8a8f99, past: 0x5fa8ff, late: 0xff5a4a,
   vision: 0x48e06a, detect: 0x2a7a3c, hearing: 0x4a8cff, blocked: 0xff4040, unseen: 0xffa040,
@@ -90,6 +108,30 @@ function ring(cx, cz, r, color, opacity = 0.8, h = Y, segs = 64) {
   return line(pts, color, opacity);
 }
 
+function dashed(points, color, opacity = 0.6) {
+  const l = new THREE.Line(new THREE.BufferGeometry().setFromPoints(points),
+    new THREE.LineDashedMaterial({ color, transparent: true, opacity, depthTest: false, dashSize: 0.25, gapSize: 0.18 }));
+  l.computeLineDistances();
+  l.renderOrder = 996;
+  return l;
+}
+
+// a flat band from r0 to r1 around the origin, fading from opacity a0 (inside) to a1 (outside)
+function band(r0, r1, color, a0, a1, h = Y - 0.02, steps = 6) {
+  const g = new THREE.Group();
+  for (let i = 0; i < steps; i++) {
+    const ra = r0 + (r1 - r0) * (i / steps), rb = r0 + (r1 - r0) * ((i + 1) / steps);
+    const m = new THREE.Mesh(new THREE.RingGeometry(Math.max(0.001, ra), rb, 64, 1),
+      new THREE.MeshBasicMaterial({ color, transparent: true, opacity: a0 + (a1 - a0) * ((i + 0.5) / steps), depthTest: false,
+                                    depthWrite: false, side: THREE.DoubleSide }));
+    m.rotation.x = -Math.PI / 2;
+    m.position.y = h;
+    m.renderOrder = 990;
+    g.add(m);
+  }
+  return g;
+}
+
 function disposeTree(obj) {
   obj.traverse((o) => {
     o.geometry?.dispose();
@@ -107,14 +149,43 @@ function setup(ctx) {
   overlay.userData.ignoreRaycast = true;
   scene.add(overlay);
   let clock = 0, last = performance.now();
+  const incidents = { list: [], tick: 0, polled: -1e9, fetching: false, group: new THREE.Group() };
+  overlay.add(incidents.group);
+  async function pollIncidents() {
+    if (incidents.fetching) return;
+    incidents.fetching = true;
+    try {
+      const r = await fetch("/admin/debugdraw/talk-reach/log?limit=20");
+      if (r.ok) { const j = await r.json(); incidents.list = j.incidents || []; incidents.tick = j.tick; drawIncidents(); }
+    } catch (_) { /* next time */ }
+    incidents.fetching = false;
+  }
+  function drawIncidents() {
+    for (const ch of [...incidents.group.children]) { incidents.group.remove(ch); disposeTree(ch); }
+    if (![...active.values()].some((e) => e.on.has("talk.incidents"))) return;
+    for (const inc of incidents.list) {
+      const age = Math.max(0, incidents.tick - inc.tick);
+      const fade = Math.max(0.25, 1 - age / 1800);
+      const a = toScene(inc.from[0], inc.from[1], 1.5), b = toScene(inc.to[0], inc.to[1], 1.5);
+      const mid = a.clone().lerp(b, 0.5); mid.y += 0.6 + a.distanceTo(b) * 0.15;
+      const curve = new THREE.QuadraticBezierCurve3(a, mid, b);
+      incidents.group.add(line(curve.getPoints(16), C.blocked, 0.85 * fade));
+      if (inc.hit) { const h = toScene(inc.hit[0], inc.hit[1], 0.2); incidents.group.add(ring(h.x, h.z, 0.2, C.blocked, fade, 0.2)); }
+      const l = label(`✘ ${inc.speaker_name} → ${inc.listener_name}, ${fmtS(age)} ago\n${inc.issues.join(" · ")}\n“${String(inc.line || "").slice(0, 48)}”`, "#ff9c90", 0.2);
+      l.material.opacity = fade;
+      l.position.copy(mid.clone().setY(mid.y + 0.25));
+      incidents.group.add(l);
+    }
+  }
 
   const entry = (id) => {
     if (!active.has(id)) {
       const group = new THREE.Group();
       group.userData.ignoreRaycast = true;
       const live = new THREE.Group();              // halos that follow characters, rebuilt every frame
-      overlay.add(group, live);
-      active.set(id, { on: new Set(), data: null, group, live, flashes: new Map(), fetching: false, polled: -1e9, seenBefore: new Set() });
+      const bands = new THREE.Group();             // range rings and fading bands, built round 0,0 and moved with them
+      overlay.add(group, live, bands);
+      active.set(id, { on: new Set(), data: null, group, live, bands, flashes: new Map(), fetching: false, polled: -1e9, seenBefore: new Set() });
     }
     return active.get(id);
   };
@@ -132,8 +203,10 @@ function setup(ctx) {
     else e.on.add(opt);
     if ([...e.on].some((k) => k.startsWith("per."))) fadeFor = id;
     else if (fadeFor === id) fadeFor = null;
-    if (!e.on.size) { disposeTree(e.group); disposeTree(e.live); overlay.remove(e.group, e.live); active.delete(id); }
+    if (!e.on.size) { disposeTree(e.group); disposeTree(e.live); disposeTree(e.bands); overlay.remove(e.group, e.live, e.bands); active.delete(id); }
     else { e.polled = -1e9; rebuild(id); }
+    incidents.polled = -1e9;
+    drawIncidents();
     if (!fadeFor) for (const [cid, e2] of active) if ([...e2.on].some((k) => k.startsWith("per."))) fadeFor = cid;
   }
 
@@ -161,6 +234,12 @@ function setup(ctx) {
     const unnoticed = new Set([...(p.in_range_unseen || []), ...(p.in_range_unheard || [])].map((x) => x.id).filter((x) => !noticed.has(x)));
     out.push(`Sees ${p.seen?.length || 0} · hears ${p.heard?.length || 0} · in range but unnoticed: ${unnoticed.size}`);
     out.push(`Ranges (tiles): vision ${p.visual_range ?? "?"}, detection ${p.detection_range ?? "?"}, hearing ${p.hearing_range ?? "?"}`);
+    const checks = p.los?.checks || [];
+    out.push(checks.length ? `Sight tests last look: ${checks.filter((c) => c.ok).length} seen, ${checks.filter((c) => !c.ok).length} failed`
+                           : "No sight test last look (nobody in range)");
+    const bad = (d.conversations || []).filter((t) => !t.now?.ok);
+    if (d.conversations?.length) out.push(`Talking with ${d.conversations.map((t) => t.name).join(", ")}` + (bad.length ? ` — ✘ ${bad[0].now.issues.join(", ")}` : " — face to face"));
+    if (incidents.list.length) out.push(`Talk-reach incidents (everyone): ${incidents.list.length}, latest: ${incidents.list[0].speaker_name} → ${incidents.list[0].listener_name}`);
     return out;
   }
 
@@ -264,6 +343,97 @@ function setup(ctx) {
         g.add(l);
       }
     }
+    // range bands: how well they make people out / hear a voice, fading with distance (moved with them every frame)
+    for (const ch of [...e.bands.children]) { e.bands.remove(ch); disposeTree(ch); }
+    if (isOn(id, "per.vision") && per.vision_bands) {
+      const vb = per.vision_bands;
+      e.bands.add(band(0, vb.recognized, C.vision, 0.2, 0.06));                        // recognise: well, then less so
+      if (vb.figure > vb.recognized) e.bands.add(band(vb.recognized, vb.figure, C.detect, 0.08, 0.04, Y - 0.02, 3));   // a figure
+      if (vb.silhouette > vb.figure) e.bands.add(band(vb.figure, vb.silhouette, C.detect, 0.04, 0.01, Y - 0.02, 3));   // a shape
+      e.bands.add(ring(0, 0, vb.recognized, C.vision, 0.8), ring(0, 0, vb.silhouette, C.detect, 0.6));
+      const lv = label(`recognise ≤ ${Math.round(vb.recognized)} · a figure ≤ ${Math.round(vb.figure)} · a shape ≤ ${Math.round(vb.silhouette)} tiles`, "#9ff0b0", 0.22);
+      lv.position.set(0, 0.4, -vb.recognized);
+      e.bands.add(lv);
+    }
+    if (isOn(id, "per.hearing") && per.voice_ranges) {
+      const vr = per.voice_ranges;
+      e.bands.add(band(0, vr.medium, C.hearing, 0.18, 0.02));                           // a talking voice, clearer when close
+      for (const v of ["low", "medium", "high"]) {
+        if (!vr[v]) continue;
+        e.bands.add(ring(0, 0, vr[v], C.hearing, v === "medium" ? 0.85 : 0.45));
+        const lh = label(`${VOICE_NAME[v]} ≤ ${vr[v]}`, "#a9c8ff", 0.18);
+        lh.position.set(vr[v] * 0.707, 0.3, vr[v] * 0.707);
+        e.bands.add(lh);
+      }
+    }
+    if (isOn(id, "per.los")) {
+      // the sight-line tests the last look really made: green = seen (to them), red = not (to where it stopped)
+      const checks = per.los?.checks || [];
+      const eye = me.clone().setY(1.5);
+      for (const c of checks) {
+        const to = toScene(c.to[0], c.to[1], 1.5);
+        if (c.ok) {
+          g.add(line([eye, to], C.vision, 0.95));
+          const l = label(`✔ SAW ${c.name}${c.purpose === "glimpse" ? " (a shape)" : ""} · ${c.distance} tiles` +
+                          (c.believed ? `\nthinks it's ${c.believed}` : ""), c.believed ? "#ffc070" : "#8cff9e", 0.22);
+          l.position.copy(to.clone().setY(2.0));
+          g.add(l);
+        } else {
+          const hit = c.hit ? toScene(c.hit[0], c.hit[1], 1.5) : to;
+          g.add(line([eye, hit], C.blocked, 0.95));
+          g.add(dashed([hit, to], 0x888888, 0.45));
+          g.add(ring(hit.x, hit.z, 0.15, C.blocked, 1, 1.5));
+          const l = label(`✘ DIDN'T SEE ${c.name} — ${c.by || "blocked"}\nstopped at ${c.hit_distance ?? "?"} tiles (they're ${c.distance} away)`, "#ff8a7a", 0.22);
+          l.position.copy(hit.clone().setY(2.0));
+          g.add(l);
+        }
+      }
+      if (!checks.length) {
+        const l = label("no sight test this look — nobody in range", "#bbbbbb", 0.2);
+        l.position.copy(me.clone().setY(2.4));
+        g.add(l);
+      }
+    }
+    if (isOn(id, "per.vision")) for (const s of per.seen || []) if (s.thinks) {
+      const l = label(`takes ${s.name} for ${s.thinks}`, "#ffc070", 0.22);
+      l.position.copy(toScene(s.x, s.y, 2.5)); g.add(l);
+    }
+    if (isOn(id, "per.hearing")) for (const h of per.heard || []) if (h.x != null) {
+      const l = label(`hears ${h.what}` + (h.thinks ? ` — thinks it's ${h.thinks}` : "") + ` (${h.volume}, ${Math.round((h.clarity || 0) * 100)}% clear)`,
+                      h.thinks ? "#ffc070" : "#a9c8ff", 0.18);
+      l.position.copy(toScene(h.x, h.y, 2.15)); g.add(l);
+    }
+    if (isOn(id, "talk.reach")) {
+      for (const t of d.conversations || []) {
+        const r = t.now || {};
+        const a = me.clone().setY(1.3), b = toScene(t.x, t.y, 1.3);
+        if (r.ok) g.add(line([a, b], C.vision, 0.95));
+        else {
+          const hit = r.hit ? toScene(r.hit[0], r.hit[1], 1.3) : b;
+          g.add(line([a, hit], C.blocked, 0.95));
+          if (r.hit) { g.add(dashed([hit, b], C.blocked, 0.5)); g.add(ring(hit.x, hit.z, 0.15, C.blocked, 1, 1.3)); }
+        }
+        const lastBad = t.last_line && !t.last_line.ok ? `\nlast line: ✘ ${t.last_line.issues.join(", ")}` : "";
+        const l = label((r.ok ? `✔ talking with ${t.name} face to face · ${r.distance} tiles`
+                              : `✘ talking with ${t.name}: ${(r.issues || []).join(", ")}\n${r.distance} tiles apart`) + lastBad,
+                        r.ok && !lastBad ? "#8cff9e" : "#ff8a7a", 0.22);
+        l.position.copy(a.clone().lerp(b, 0.5).setY(1.9));
+        g.add(l);
+      }
+    }
+    if (isOn(id, "social.reputation")) {
+      for (const r of d.social?.reputation || []) {
+        const col = r.global >= 0.55 ? "#8cff9e" : r.global >= 0.45 ? "#e6e6e6" : r.global >= 0.2 ? "#ffb070" : "#ff7a6a";
+        const view = r.their_view && Object.keys(r.their_view).length
+          ? `\n${d.name}'s view: ` + Object.entries(r.their_view).map(([k, v]) => `${k} ${v}`).join(" · ") : "";
+        const l = label(`${r.name}: ${r.global.toFixed(2)} ${r.standing.toUpperCase()}\ncommunity ${r.community.toFixed(2)} ${r.community_standing}` +
+                        (r.notoriety > 0.05 ? ` · notoriety ${r.notoriety_label}` : "") + view, col, 0.2);
+        l.userData.follow = r.id;                 // kept above their head as they move
+        l.userData.followY = 2.75;
+        l.position.copy(toScene(r.x, r.y, 2.75));
+        g.add(l);
+      }
+    }
     if (isOn(id, "per.lastseen")) {
       for (const s of per.last_seen || []) {
         if (s.x == null) continue;
@@ -296,11 +466,12 @@ function setup(ctx) {
       const per = d.perception || {};
       const me = charPos(id, toScene(d.x, d.y));
       const eye = me.clone().setY(me.y + 1.6);
-      if (isOn(id, "per.vision")) {                             // range rings, centred on them as they walk
-        if (per.visual_range) e.live.add(ring(me.x, me.z, per.visual_range, C.vision, 0.7));
-        if (per.detection_range > 0) e.live.add(ring(me.x, me.z, per.detection_range, C.detect, 0.6));
+      e.bands.position.set(me.x, 0, me.z);                       // range bands follow them as they walk
+      for (const o of e.group.children) {
+        if (!o.userData.follow) continue;
+        const p = charPos(o.userData.follow, null);
+        if (p) o.position.set(p.x, p.y + o.userData.followY, p.z);
       }
-      if (isOn(id, "per.hearing") && per.hearing_range) e.live.add(ring(me.x, me.z, per.hearing_range, C.hearing, 0.7));
       for (const f of e.flashes.values()) {
         if (f.kind === "vision" ? !isOn(id, "per.vision") : !isOn(id, "per.hearing")) continue;
         const at = f.id ? charPos(f.id, toScene(f.x, f.y)) : toScene(f.x, f.y);
@@ -317,16 +488,9 @@ function setup(ctx) {
           e.live.add(ring(at.x, at.z, 0.3 + flash * 1.5, col, Math.max(flash, 0.35), at.y + 0.07));
         }
       }
-      if (isOn(id, "per.los")) {
-        for (const s of per.seen || []) {
-          const p = charPos(s.id, toScene(s.x, s.y));
-          e.live.add(line([eye, p.clone().setY(p.y + 1.5)], C.vision, 0.85));
-        }
-        for (const h of per.in_range_unseen || []) {
-          const p = charPos(h.id, toScene(h.x, h.y));
-          e.live.add(line([eye, p.clone().setY(p.y + 1.5)], h.blocked ? C.blocked : C.unseen, 0.6));
-        }
-      }
+    }
+    if ([...active.values()].some((e) => e.on.has("talk.incidents")) && clock - incidents.polled > INCIDENTS_POLL_S) {
+      incidents.polled = clock; pollIncidents();
     }
     applyFade();
     const s = Math.max(1, dolly.scale.x);                       // labels stay readable when you are a giant

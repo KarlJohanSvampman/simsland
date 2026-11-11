@@ -30,6 +30,14 @@ def _remaining_route(c):
     return pts
 
 
+@router.get("/talk-reach/log")
+def talk_reach_log(sim_id: str = "default", limit: int = 50):
+    """The latest in-person lines said to someone out of sight, out of earshot or in another room, newest first."""
+    world = load_world(sim_id)
+    log = world.get("conversation_reach_log") or []
+    return {"tick": world.get("tick", 0), "incidents": list(reversed(log[-max(1, min(100, limit)):]))}
+
+
 @router.get("/{char_id}")
 def debug_draw(char_id: str, sim_id: str = "default"):
     world = load_world(sim_id)
@@ -58,8 +66,9 @@ def debug_draw(char_id: str, sim_id: str = "default"):
     for v in per.get("visible_people") or []:
         o = chars.get(v.get("id"))
         if o and o.get("x") is not None:
-            seen.append({"id": v["id"], "name": v.get("name"), "x": o["x"], "y": o["y"], "distance": v.get("distance"),
-                         "visibility": v.get("visibility")})
+            seen.append({"id": v["id"], "name": o.get("name"), "x": o["x"], "y": o["y"], "distance": v.get("distance"),
+                         "visibility": v.get("visibility"),
+                         "thinks": v.get("name") if v.get("mistaken_for") else None})
     heard = []
     for a in per.get("audible_events") or []:
         x, y, who = a.get("x"), a.get("y"), a.get("debug_from") or a.get("source_id")
@@ -70,6 +79,7 @@ def debug_draw(char_id: str, sim_id: str = "default"):
         what = a.get("sound") or (f"{a.get('speaker') or 'someone'} talking" if a.get("type") == "speech" else "a sound")
         heard.append({"x": x, "y": y, "volume": a.get("volume"), "clarity": a.get("clarity"),
                       "distance": a.get("distance"), "what": what, "id": who if who in chars else None,
+                      "thinks": a.get("speaker") if a.get("mistaken_for") else None,
                       "knows_who": bool(a.get("source_id") or a.get("speaker"))})
     heard_ids = {h["id"] for h in heard if h["id"]}
     vr, hr = pc.visual_range(c, world), pc.hearing_range(c)
@@ -89,10 +99,56 @@ def debug_draw(char_id: str, sim_id: str = "default"):
         if oid in chars and oid not in seen_ids:
             aware.append({"id": oid, "name": chars[oid].get("name"), "x": s.get("x"), "y": s.get("y"),
                           "ago_s": tick - (s.get("tick") or 0)})
+    # the sight-line tests the last look really made (brain/perception.py::_record_los)
+    lc = c.get("_los_checks") or {}
+    los = {"age_s": tick - lc["tick"] if lc.get("tick") is not None else None, "checks": lc.get("checks") or []}
+    # how sight fades with distance (systems/vision.py detail tiers) and how far each voice carries
+    det = pc.detection_range(c, world)
+    bands = {"recognized": vr, "figure": vr + (det - vr) / 2.0 if det > vr else vr, "silhouette": det}
+    voices = {v: round(pc.volume_range(c, v), 1) for v in pc.VOLUME_TIERS}
+
+    # in-person conversations they're in: are the others really within sight and earshot? (systems/conversation_reach.py)
+    from systems.conversation_reach import check_pair
+    talks = []
+    for conv in (world.get("conversations") or {}).values():
+        if not conv.get("active") or char_id not in (conv.get("participants") or []):
+            continue
+        if (conv.get("medium") or "in_person") != "in_person":
+            continue
+        for oid in conv["participants"]:
+            o = chars.get(oid)
+            if oid == char_id or not o or o.get("x") is None:
+                continue
+            now_r = check_pair(world, c, o)
+            last_r = (conv.get("reach") or {}).get(f"{char_id}>{oid}") or (conv.get("reach") or {}).get(f"{oid}>{char_id}")
+            talks.append({"conv_id": conv["id"], "id": oid, "name": o.get("name"), "x": o["x"], "y": o["y"],
+                          "now": now_r, "last_line": last_r, "lines": len(conv.get("history") or [])})
+
+    # reputation of everyone around them: the public score and standing, and how they themselves regard that person
+    from systems.reputation import _label, _notoriety_label
+    rep_near = []
+    for oid, o in chars.items():
+        if oid == char_id or o.get("alive") is False or o.get("off_grid") or o.get("x") is None:
+            continue
+        dist = ((o["x"] - c["x"]) ** 2 + (o["y"] - c["y"]) ** 2) ** 0.5
+        if dist > det:
+            continue
+        r = o.get("reputation") or {}
+        g, cm, n = float(r.get("global", 0.5)), float(r.get("community", 0.5)), float(r.get("notoriety", 0.0))
+        rel = (c.get("relationships") or {}).get(oid) or {}
+        rep_near.append({"id": oid, "name": o.get("name"), "x": o["x"], "y": o["y"], "distance": round(dist, 1),
+                         "global": round(g, 2), "standing": _label(g), "community": round(cm, 2), "community_standing": _label(cm),
+                         "notoriety": round(n, 2), "notoriety_label": _notoriety_label(n), "last_event": r.get("last_event"),
+                         "their_view": {k: round(float(rel[k]), 2) for k in ("trust", "respect", "friendship") if isinstance(rel.get(k), (int, float))}})
+    rep_near.sort(key=lambda e: e["distance"])
+
     return {
         "tick": tick, "id": char_id, "name": c.get("name"), "x": c.get("x"), "y": c.get("y"),
         "navigation": {"now": now, "plans": plans[-6:], "speed": speed},
         "perception": {"visual_range": vr, "detection_range": pc.detection_range(c, world), "hearing_range": pc.hearing_range(c),
                        "seen": seen, "heard": heard, "in_range_unseen": hidden, "in_range_unheard": unheard,
-                       "last_seen": sorted(aware, key=lambda a: a["ago_s"])[:12]},
+                       "last_seen": sorted(aware, key=lambda a: a["ago_s"])[:12],
+                       "los": los, "vision_bands": bands, "voice_ranges": voices},
+        "conversations": talks,
+        "social": {"reputation": rep_near[:16]},
     }

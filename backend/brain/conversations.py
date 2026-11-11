@@ -421,6 +421,13 @@ def add_message(
         conv["history"][-30:]
     )
 
+    # face to face at all? (different rooms / no line of sight / out of earshot -> logged: systems/conversation_reach.py)
+    try:
+        from systems.conversation_reach import on_line
+        on_line(world, conv, speaker_id)
+    except Exception as e:
+        print(f"[talk-reach] check failed: {e}", flush=True)
+
     conv["last_update"] = tick
     conv["turn_count"] = conv.get("turn_count", 0) + 1
 

@@ -275,12 +275,18 @@ def can_see(c, target, world):
 
 def walls_between(a, b, world):
     """True if a wall (or a closed door) of any building stands between a and b."""
+    return wall_hit(a, b, world) is not None
+
+
+def wall_hit(a, b, world):
+    """Where, in world tiles, the first wall (or closed door) between a and b is -- the middle of the blocking tile
+    edge -- or None when nothing stands between them."""
     from systems.templates import resolve_floorplan
-    from systems.transforms import world_to_local
+    from systems.transforms import world_to_local, local_to_world
     ax, ay = int(round(a["x"])), int(round(a["y"]))
     bx, by = int(round(b["x"])), int(round(b["y"]))
     if (ax, ay) == (bx, by):
-        return False
+        return None
     for bld in world.get("buildings", []):
         floorplan = resolve_floorplan(world, bld)
         tiles = (floorplan or {}).get("tiles") or {}
@@ -295,11 +301,46 @@ def walls_between(a, b, world):
         steps = _grid_steps(la[0], la[1], lb[0], lb[1])
         for here, nxt in zip(steps, steps[1:]):
             if _edge_blocks(tiles, here, nxt, closed):
-                return True
-    return False
+                h, n = local_to_world(bld, *here), local_to_world(bld, *nxt)
+                return ((h[0] + n[0]) / 2.0, (h[1] + n[1]) / 2.0)
+    return None
 
 
 def line_of_sight(a, b, world):
+    return los_trace(a, b, world)["ok"]
+
+
+# =========================================================
+# LINE-OF-SIGHT CHECKS, RECORDED (for VR Debug Draw -- api/debug_draw.py)
+# =========================================================
+# Each look around (perceive) records the sight-line tests it really made: whom it tested, whether they were seen,
+# where the line stopped (the wall edge / closed door / blocking prop) and how far. c["_los_checks"], replaced on the
+# next look; only people within range are ever tested, so an empty list means nobody was in range.
+
+LOS_CHECKS_KEPT = 16
+
+
+def _record_los(c, world, other, trace, distance, purpose, believed=None):
+    rec = c.get("_los_checks")
+    tick = world.get("tick", 0)
+    if not rec or rec.get("tick") != tick:
+        rec = c["_los_checks"] = {"tick": tick, "checks": []}
+    if len(rec["checks"]) >= LOS_CHECKS_KEPT:
+        return
+    hit = trace.get("hit")
+    rec["checks"].append({
+        "id": other.get("id"), "name": other.get("name"), "purpose": purpose, "ok": bool(trace["ok"]),
+        "to": [round(other.get("x", 0), 2), round(other.get("y", 0), 2)],
+        "hit": [round(hit[0], 2), round(hit[1], 2)] if hit else None, "by": trace.get("by"),
+        "distance": round(distance, 2),
+        "hit_distance": round(math.hypot(hit[0] - c.get("x", 0), hit[1] - c.get("y", 0)), 2) if hit else None,
+        "believed": believed,
+    })
+
+
+def los_trace(a, b, world):
+    """line_of_sight with the details: {"ok", "hit": (x, y) where it was blocked or None, "by": "wall" | "door" |
+    "prop" | None}."""
 
     x0, y0 = a["x"], a["y"]
     x1, y1 = b["x"], b["y"]
@@ -320,6 +361,7 @@ def line_of_sight(a, b, world):
     dy *= 2
 
     blockers = set()
+    door_tiles = set()
 
     # =====================================
     # PROP BLOCKERS
@@ -378,14 +420,16 @@ def line_of_sight(a, b, world):
                         d["y"]
                     )
                 )
+                door_tiles.add((d["x"], d["y"]))
 
-    if walls_between(a, b, world):
-        return False
+    hit = wall_hit(a, b, world)
+    if hit is not None:
+        return {"ok": False, "hit": hit, "by": "wall"}
 
     for _ in range(n):
 
         if (x, y) in blockers:
-            return False
+            return {"ok": False, "hit": (x, y), "by": "door" if (x, y) in door_tiles else "prop"}
 
         if error > 0:
 
@@ -397,7 +441,7 @@ def line_of_sight(a, b, world):
             y += y_inc
             error += dx
 
-    return True
+    return {"ok": True, "hit": None, "by": None}
 
 
 # =========================================================
@@ -672,11 +716,9 @@ def perceive_people(
         if d > vrange:
             continue
 
-        if not line_of_sight(
-            c,
-            other,
-            world
-        ):
+        trace = los_trace(c, other, world)
+        if not trace["ok"]:
+            _record_los(c, world, other, trace, d, "see")
             continue
 
         vis = visibility_score(
@@ -687,6 +729,12 @@ def perceive_people(
 
             world
         )
+
+        # far off or hard to see: they may take them for someone else they know (systems/misrecognition.py)
+        from systems.misrecognition import seen_as
+        believed = seen_as(c, other, world, d, vrange, vis)
+        _record_los(c, world, other, trace, d, "see",
+                    believed=believed.get("name") if believed is not other else None)
 
         # =====================================
         # EXPOSURE TRACKING (systems/influence.py) — cumulative proximity,
@@ -739,9 +787,12 @@ def perceive_people(
                 other["id"],
 
             "name":
-                other.get(
+                believed.get(
                     "name"
                 ),
+
+            # who they took them for, when it's someone else (the name above is that person's)
+            **({"mistaken_for": believed["id"]} if believed is not other else {}),
 
             "distance":
                 d,
@@ -859,7 +910,10 @@ def perceive_audio(
 
         # Below the mishearing band entirely, the character can't even
         # tell who's talking — distinct from mishearing *what* was said.
-        heard_speaker = other.get("name") if clarity >= 0.3 else None
+        # a voice only just made out may be taken for someone else's (systems/misrecognition.py)
+        from systems.misrecognition import heard_as
+        voice = heard_as(c, other, world, clarity) if clarity >= 0.3 else other
+        heard_speaker = voice.get("name") if clarity >= 0.3 else None
         direction = sound_direction(c, other) if clarity >= 0.3 else None
         # Localizable enough to know who -> localizable enough to know
         # where, for systems/curiosity.py to path toward if it wants to
@@ -880,6 +934,8 @@ def perceive_audio(
             # who really spoke, even when they couldn't tell -- only for VR Debug Draw (api/debug_draw.py)
             "debug_from":
                 other["id"],
+
+            **({"mistaken_for": voice["id"]} if voice is not other else {}),
 
             "topic":
                 heard_topic,
@@ -1466,7 +1522,9 @@ def perceive_glimpsed(c, world, max_people=5):
         tier = detail_tier(d, recognize, detect)
         if tier not in ("figure", "silhouette"):
             continue
-        if not line_of_sight(c, other, world):
+        trace = los_trace(c, other, world)
+        _record_los(c, world, other, trace, d, "glimpse")
+        if not trace["ok"]:
             continue
         angle = math.atan2(other.get("y", 0) - c.get("y", 0), other.get("x", 0) - c.get("x", 0))
         direction = _COMPASS[int(round(angle / (math.pi / 4))) % 8]
@@ -1495,6 +1553,7 @@ def perceive(
     # be reached by a loud-enough SOUND (see perceive_audio()'s own
     # is_asleep gate, SLEEP_HEARING_MIN_VOLUME) -- this only blocks sight.
     is_asleep = (c.get("activity") or {}).get("type") == "sleep"
+    c["_los_checks"] = {"tick": world.get("tick", 0), "checks": []}      # this look's sight-line tests (_record_los)
 
     perception_people = [] if is_asleep else perceive_people(
         c,
