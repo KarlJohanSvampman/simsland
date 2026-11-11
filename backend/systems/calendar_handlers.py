@@ -138,6 +138,8 @@ def _background_services(world, entry):
     service_theories(world)
     from systems.household_summary import service_narrations
     service_narrations(world)
+    from systems.personal_rules import service_all as personal_rules_service    # rules from the director's notes
+    personal_rules_service(world)
 
 
 # (scheduled from core/flow.py)

@@ -23,6 +23,7 @@
 //                             ↑/↓ zooms it (instead of turning / flying)
 //   Conversations             a floating timeline of their conversations and every line said (src/vrConversations.js)
 //   Memory debug              a floating timeline of every memory access (src/vrMemory.js)
+//   Personal rules            rules learned from your notes on their lines -- approve, reject, edit, write (src/vrRules.js)
 //   LLM log                   every prompt sent to the model for them and the reply; Choices & tags: which of their
 //                             tags decided each choice (src/vrLLM.js)
 //   Watch values              comic-book boxes above them with values you pick (mood, intention, stress, any field),
@@ -249,6 +250,7 @@ function setup(ctx) {
         { id: "design", label: "Design a panel" },
         { id: "conversations", label: window.vrConversations?.isOpen(id) ? "Conversations  •" : "Conversations" },
         { id: "memory", label: window.vrMemory?.isOpen(id) ? "Memory debug  •" : "Memory debug" },
+        { id: "rules", label: "Personal rules" },
         { id: "llmlog", label: "LLM log" },
         { id: "choicetags", label: "Choices & tags" },
         { id: "watch", label: window.vrWatch?.watching(id) ? `Watch values  (${window.vrWatch.watching(id)})` : "Watch values" },
@@ -398,7 +400,8 @@ function setup(ctx) {
     panel.draw(m.view === "inspect" ? inspectSpec(m.charId) : m.view === "persona" ? personaSpec(m.charId)
       : m.view === "manage" ? manageSpec(m.charId) : m.view === "draw" ? drawSpec(m.charId)
       : m.view === "watch" && window.vrWatch ? window.vrWatch.spec(m.charId)
-      : m.view === "llm" && window.vrLLM ? window.vrLLM.spec(m.charId) : menuSpec(m.charId));
+      : m.view === "llm" && window.vrLLM ? window.vrLLM.spec(m.charId)
+      : m.view === "rules" && window.vrRules ? window.vrRules.spec(m.charId) : menuSpec(m.charId));
   }
 
   function openMenu(id) {
@@ -440,6 +443,8 @@ function setup(ctx) {
     if (button === "watch") { m.view = "watch"; return redraw(); }
     if (button === "memory") { window.vrMemory?.toggle(m.charId); return redraw(); }
     if (button === "conversations") { window.vrConversations?.toggle(m.charId); return redraw(); }
+    if (button === "rules") { m.view = "rules"; window.vrRules?.open(m.charId); return redraw(); }
+    if (button.startsWith("r:")) { if (window.vrRules?.choose(m.charId, button) === "menu") m.view = "menu"; return redraw(); }
     if (button === "llmlog" || button === "choicetags") { m.view = "llm"; window.vrLLM?.open(m.charId, button === "llmlog" ? "log" : "choices"); return redraw(); }
     if (button.startsWith("l:")) { if (window.vrLLM?.choose(m.charId, button) === "menu") m.view = "menu"; return redraw(); }
     if (button.startsWith("w:")) { if (window.vrWatch?.choose(m.charId, button) === "menu") m.view = "menu"; return redraw(); }

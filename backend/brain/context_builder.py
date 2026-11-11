@@ -1769,6 +1769,9 @@ def _sec_identity(c, world):
     # (systems/personality_profile.py -- set per character in the inspector's Persona tab)
     from systems.personality_profile import prompt_lines
     bits.extend(prompt_lines(c))
+    # rules they keep, learned from the director's notes and approved (systems/personal_rules.py)
+    from systems.personal_rules import prompt_lines as rule_lines
+    bits.extend(rule_lines(c))
     style_id = c.get("speech_style")
     if style_id:
         style = world.get("definitions", {}).get("speech_style_registry", {}).get(style_id)

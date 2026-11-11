@@ -63,6 +63,7 @@ REMOTE_TASKS = {
     "llm.self_assessment:assess": None,
     "llm.scripted_conversation:write_script": None,
     "llm.conversation_tags:tag": None,
+    "llm.personal_rules:propose": 2,
 }
 
 
