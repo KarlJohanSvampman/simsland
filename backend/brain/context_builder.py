@@ -1772,6 +1772,9 @@ def _sec_identity(c, world):
     # rules they keep, learned from the director's notes and approved (systems/personal_rules.py)
     from systems.personal_rules import prompt_lines as rule_lines
     bits.extend(rule_lines(c))
+    # facts about them set in Director's Cuts (systems/directors_cut.py): preferences, ideals, what they expect...
+    from systems.directors_cut import prompt_lines as cut_lines
+    bits.extend(cut_lines(c))
     style_id = c.get("speech_style")
     if style_id:
         style = world.get("definitions", {}).get("speech_style_registry", {}).get(style_id)
@@ -2595,7 +2598,7 @@ def build_narrative(c, world, mode="full", wake_line=None, staged=()):
 # periodic re-orientation (every FULL_CONTEXT_REORIENT_TICKS, or for a
 # genuinely major interrupt) rather than the default -- "brief" (the
 # existing 8-section "core" tier) is the default for everything else.
-_ALWAYS_FULL_REASONS = {"provoked", "director_attention", "activity_aborted"}
+_ALWAYS_FULL_REASONS = {"provoked", "director_attention", "activity_aborted", "directors_cut"}
 FULL_CONTEXT_REORIENT_TICKS = 6 * 3600  # ~6 real hours between forced full re-orientations
 
 

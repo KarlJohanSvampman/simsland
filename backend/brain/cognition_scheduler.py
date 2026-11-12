@@ -41,6 +41,7 @@ TURN_BUDGET_DEFAULT = int(os.getenv("COGNITION_TURN_BUDGET", "2"))
 # before its next think() — e.g. a schedule_block wake pending and then
 # heard_speech arrives first; heard_speech should win and fire immediately.
 WAKE_PRIORITY = {
+    "directors_cut": 111,       # systems/directors_cut.py -- the director changed what they chose
     "director_attention": 110,  # systems/director_mode.py -- an external
                                  # director interrupt always wins
     "provoked": 105,           # systems/target_reactions.py -- being hit/
@@ -223,6 +224,7 @@ _WAKE_LINE_TEMPLATES = {
     "proposal_countered": "{from_name} came back with a different offer on {topic}.",
     "proposal_resolved": "Your proposal about {topic} has an answer: {outcome_summary}.",
     "social_purpose": "{line}",
+    "directors_cut": "On second thought, you'll {instead} instead -- that's more like you: {why}",
     "director_attention": "Something makes you stop and look up -- you have the odd feeling someone unseen is watching you, waiting for you to notice.",
 }
 
