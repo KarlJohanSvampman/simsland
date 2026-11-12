@@ -366,11 +366,17 @@ def check_intention_deadlines(c, world):
     from update_agent(), same cadence as update_desires()/update_expectations().
     """
     tick = world.get("tick", 0)
+    asleep = (c.get("activity") or {}).get("type") == "sleep"
     for i in c.get("active_intentions", []):
         if str(i.get("type", "")).startswith("expectation:"):
             continue
         deadline = i.get("deadline_tick")
         if deadline is None or tick < deadline:
+            continue
+        if asleep:
+            # asleep, nobody can see to anything: the clock on an unanswered intention doesn't run (in a 24-hour run
+            # "feed the child" and "suggest a shower" went red overnight while everyone slept) -- re-armed, not escalated
+            i["deadline_tick"] = tick + _deadline_window(i, c)
             continue
         i["stage"] = min(INTENTION_MAX_STAGE, i.get("stage", 0) + 1)
         i["priority"] = min(100, i.get("priority", 0) + INTENTION_PRIORITY_ESCALATION)

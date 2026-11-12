@@ -455,6 +455,7 @@ subscribe("social_transgression_gossip", _on_social_transgression_gossip)
 
 subscribe("person_entered_view", _wake("observer_id", "person_entered_view"))
 subscribe("heard_speech", _wake("listener_id", "heard_speech"))
+subscribe("speech_unheard", _wake("speaker_id", "not_heard"))      # systems/conversation_reach.py::note_unheard
 
 
 # ── Debug-event bubbles + execution-trace memory (systems/debug_log.py) ────

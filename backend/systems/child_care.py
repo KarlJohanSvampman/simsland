@@ -244,11 +244,19 @@ def tick_child_needs(world):
             if value < cfg["threshold"]:
                 continue
 
+            # asleep, a child isn't asking for anything (they will be when they wake); and a sleeping parent can't see to
+            # it -- the duty goes to a parent who is up (in a 24-hour run "feed the child" went red at 4 am)
+            if (c.get("activity") or {}).get("type") == "sleep":
+                continue
+            awake = [p for p in parents if (p.get("activity") or {}).get("type") != "sleep"]
+            if not awake:
+                continue
+            parents_now = awake
             if cfg["mode"] == "parent_serves":
                 if c.get("_awaiting_caregiver", {}).get("need") == need:
                     continue
                 c["_awaiting_caregiver"] = {"need": need, "tick": world.get("tick", 0)}
-                for parent in parents:
+                for parent in parents_now:
                     add_intention(parent, {
                         "type":     f"feed_child_{c['id']}",
                         "category": "health",
@@ -260,7 +268,7 @@ def tick_child_needs(world):
                 if c.get("_awaiting_reminder", {}).get("need") == need:
                     continue
                 c["_awaiting_reminder"] = {"need": need, "tick": world.get("tick", 0)}
-                for parent in parents:
+                for parent in parents_now:
                     add_intention(parent, {
                         "type":     f"remind_child_{c['id']}",
                         "category": "health",

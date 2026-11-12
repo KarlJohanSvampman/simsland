@@ -71,8 +71,16 @@ def apply_odor_social_pressure(smelly_c, world):
         return
 
     cid = smelly_c["id"]
+    from brain.perception import walls_between
+    if (smelly_c.get("activity") or {}).get("type") == "sleep" or smelly_c.get("off_grid"):
+        return
     for other_c in world.get("characters", {}).values():
         if other_c["id"] == cid:
+            continue
+        # awake, on the map, and in the same space (not through a wall): asleep nobody notices or says anything
+        if (other_c.get("activity") or {}).get("type") == "sleep" or other_c.get("off_grid") or other_c.get("x") is None:
+            continue
+        if walls_between(other_c, smelly_c, world):
             continue
         # Rough distance check
         dx = abs(other_c.get("x", 0) - smelly_c.get("x", 0))
