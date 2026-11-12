@@ -59,6 +59,7 @@ from api.memory_trace import router as memory_trace_router
 from api.conversation_trace import router as conversation_trace_router
 from api.dialogue_feedback import router as dialogue_feedback_router
 from api.personal_rules import router as personal_rules_router
+from api.directors_cut import router as directors_cut_router
 from api.dependents import router as dependents_router
 from api.director  import router as director_router
 from api.middleware_bridge import router as middleware_bridge_router
@@ -104,6 +105,7 @@ app.include_router(memory_trace_router)
 app.include_router(conversation_trace_router)
 app.include_router(dialogue_feedback_router)
 app.include_router(personal_rules_router)
+app.include_router(directors_cut_router)
 app.include_router(dependents_router, prefix="/api")
 app.include_router(director_router)
 app.include_router(middleware_bridge_router)
@@ -429,11 +431,13 @@ def _run_tick_and_persist(sim_id: str) -> tuple[dict, dict]:
         _maybe_resync_clock_to_real_time(world)
 
         from core import tick_state
-        tick_state.enter()
-        try:
-            tick(world)
-        finally:
-            tick_state.leave()
+        from systems.directors_cut import is_stopped
+        if not is_stopped(world):          # "STOP!" (Director Mode): time stands still until "Action!"
+            tick_state.enter()
+            try:
+                tick(world)
+            finally:
+                tick_state.leave()
 
         # Collect what changed this tick -- must happen before anything serialises the world,
         # since it pops world["_dirty"] (raw Python sets, not JSON-serialisable) out of the tree.
