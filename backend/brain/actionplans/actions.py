@@ -41,7 +41,8 @@ def ask_caretaker_for_food(c, world, attempt):
     add_intention(who, {"type": f"feed_child_{c['id']}", "category": "survival", "priority": 80, "child_id": c["id"],
                         "reason": f"{c.get('name', 'A child')} is hungry and asked for food"})
     from systems.action_router import apply_speech
-    apply_speech(c, world, {"target": who["id"], "utterance": "I'm hungry. Can I have something to eat?", "speech_act": "request"})
+    apply_speech(c, world, {"target": who["id"], "utterance": "I'm hungry. Can I have something to eat?", "speech_act": "request",
+                            "scripted": True})
     attempt["vars"]["asked"] = who["id"]
     return True
 
@@ -123,7 +124,8 @@ def call_children_to_eat(c, world, attempt):
     try:
         from systems.action_router import apply_speech
         names = " and ".join(k.get("first_name") or k.get("name", "") for k in kids)
-        apply_speech(c, world, {"target": kids[0]["id"], "utterance": f"{names}, food's ready -- come and eat!", "speech_act": "statement"})
+        apply_speech(c, world, {"target": kids[0]["id"], "utterance": f"{names}, food's ready -- come and eat!", "speech_act": "statement",
+                                "volume": "high", "scripted": True})      # called out through the house
     except Exception:                                  # noqa: BLE001 -- the call is said or not; the food is there either way
         pass
     attempt["vars"]["fed"] = [k["id"] for k in kids]
@@ -199,7 +201,8 @@ def call_family_to_table(c, world, attempt):
     attempt["vars"]["seated"] = seated
     try:
         from systems.action_router import apply_speech
-        apply_speech(c, world, {"target": here[0]["id"], "utterance": "Dinner's ready, everyone -- come and sit down!", "speech_act": "statement"})
+        apply_speech(c, world, {"target": here[0]["id"], "utterance": "Dinner's ready, everyone -- come and sit down!", "speech_act": "statement",
+                                "volume": "high", "scripted": True})
     except Exception:                                  # noqa: BLE001
         pass
     attempt["vars"]["called"] = [o["id"] for o in here]
@@ -354,11 +357,12 @@ def invite_to_unwind(c, world, attempt):
     from systems.activities import ACTIVITIES, start_activity
     from systems.occupancy import interrupt_activity
     act = o.get("activity") or {}
-    if act and not (ACTIVITIES.get(act.get("type")) or {}).get("interruptible"):
-        return False
+    from brain.actionplans.resolvers import NOT_FREE_TO_UNWIND
+    if act and (not (ACTIVITIES.get(act.get("type")) or {}).get("interruptible") or act.get("type") in NOT_FREE_TO_UNWIND):
+        return False                                   # interruptible or not, a meal isn't broken off to sit and chat
     try:
         from systems.action_router import apply_speech
-        apply_speech(c, world, {"target": o["id"], "utterance": "Come and sit with me for a bit?", "speech_act": "invite"})
+        apply_speech(c, world, {"target": o["id"], "utterance": "Come and sit with me for a bit?", "speech_act": "invite", "scripted": True})
     except Exception:                                  # noqa: BLE001
         pass
     if act:

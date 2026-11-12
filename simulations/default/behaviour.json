@@ -505,7 +505,8 @@
    "replaces": [
     "eat_food"
    ],
-   "notes": ""
+   "notes": "waits for family dinner when it's due soon, unless very hungry",
+   "act_when": "not_waiting_for_dinner"
   },
   {
    "id": "reduce_thirst",
@@ -1483,6 +1484,14 @@
    "scope": "character",
    "ttl_seconds": 0,
    "learn_by": "feels it"
+  },
+  {
+   "id": "not_waiting_for_dinner",
+   "name": "Not waiting for family dinner",
+   "resolver": "not_waiting_for_dinner",
+   "scope": "character",
+   "ttl_seconds": 0,
+   "learn_by": "knows the time"
   }
  ],
  "plans": [

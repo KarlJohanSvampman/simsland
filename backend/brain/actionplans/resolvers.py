@@ -397,6 +397,23 @@ def family_dinner_time(c, world):
     return made and food_served(c, world)
 
 
+DINNER_WAIT_SECONDS = 90 * 60     # family dinner this close: no meal of one's own first...
+DINNER_WAIT_UNLESS_HUNGER = 80    # ...unless they're this hungry
+
+
+@resolver("not_waiting_for_dinner")
+def not_waiting_for_dinner(c, world):
+    """Reduce Hunger may go ahead -- unless the household's family dinner is due within an hour and a half (or on now)
+    and they aren't badly hungry: then they wait for it (24-hour run, 2026-11-12: a parent got peckish at five, ate
+    on his own, and was "busy eating" when dinner together came round -- every day)."""
+    if ((c.get("body") or {}).get("hunger") or 0) >= DINNER_WAIT_UNLESS_HUNGER:
+        return True
+    people = [c] + _household_others(c, world)
+    if any(_window_open(p, world, "family_dinner_together", DINNER_WAIT_SECONDS) for p in people):
+        return False
+    return True
+
+
 @resolver("bedtime_check_time")
 def bedtime_check_time(c, world):
     """The kids' bedtime check is due (its window is open, or opens within ten minutes)."""
@@ -483,12 +500,17 @@ def evening(c, world):
     return h is not None and 17 <= h < 23
 
 
+# busy -- not to be asked to come and sit down: eating (dinner together was broken up by a friend calling round to
+# unwind, 24-hour run 2026-11-12), cooking, asleep, at work, in the bathroom
+NOT_FREE_TO_UNWIND = ("sleep", "nap", "work", "use_toilet", "use_toilet_bowels", "take_shower", "cook_recipe", "eat_meal", "eat_snack")
+
+
 def unwind_companion(c, world):
     """Whom to unwind with: their partner if home and free, else another grown-up at home who is free."""
     def free(o):
         act = (o.get("activity") or {}).get("type")
         return (not o.get("off_grid") and o.get("alive") is not False and o.get("building_id") == c.get("building_id")
-                and act not in ("sleep", "nap", "work", "use_toilet", "use_toilet_bowels", "take_shower", "cook_recipe"))
+                and act not in NOT_FREE_TO_UNWIND)
     from systems.sexual_release import _find_partner
     p = _find_partner(c, world)
     if p and free(p):
@@ -519,7 +541,7 @@ def friend_to_visit(c, world):
             continue
         home = set(((world.get("households") or {}).get(o.get("household_id")) or {}).get("building_ids") or [])
         act = (o.get("activity") or {}).get("type")
-        if o.get("building_id") not in home or act in ("sleep", "nap", "work", "use_toilet", "use_toilet_bowels", "take_shower"):
+        if o.get("building_id") not in home or act in NOT_FREE_TO_UNWIND:
             continue
         best.append((rel.get("affection") or rel.get("trust") or 0, oid))
     best.sort(reverse=True)

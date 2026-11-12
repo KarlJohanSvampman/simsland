@@ -56,6 +56,9 @@ def _answering(c, world, target_id):
                 and f.get("from") == target_id)
 
 
+UNHEARD_RAISE_TICKS = 60        # not heard by someone this recently: the next line to them is called out (volume "high")
+
+
 def apply_speech(c, world, speech):
     """
     speech = {
@@ -136,6 +139,11 @@ def apply_speech(c, world, speech):
     if not volume and target_id:
         from systems.conversation_floor import repeat_volume
         volume = repeat_volume(world, c["id"], target_id)
+    if not volume and target_id:
+        # they weren't heard a moment ago (systems/conversation_reach.py::note_unheard): this time they call out
+        un = c.get("_unheard") or {}
+        if un.get("target") == target_id and tick - (un.get("tick") or 0) <= UNHEARD_RAISE_TICKS:
+            volume = "high"
     if not volume:
         if speech.get("conversation_type") == "argument":
             volume = "high"
@@ -186,6 +194,19 @@ def apply_speech(c, world, speech):
     # activity path. See the LLM-conversations plan for the full trace.
     # =====================================================
     listener = world.get("characters", {}).get(target_id) if target_id else None
+
+    # Said aloud to someone who can't hear it (too far away / through walls -- the same test perception uses): it is
+    # still said (the bubble shows, people nearby hear it), but it doesn't reach them -- no line in a conversation, no
+    # "X just said to you". The speaker notices they weren't heard (go over, or call out louder: repeat_volume above
+    # raises the voice on a repeat). Conversations used to carry on between rooms like this, line after line.
+    if listener and speech.get("medium", "in_person") == "in_person":
+        from systems.conversation_reach import check_pair, note_unheard
+        _reach = check_pair(world, c, listener, volume)
+        if any(i.startswith("too far") for i in _reach["issues"]):
+            # a plan's own line (brain/actionplans: "Dinner's ready!") has already done its work -- the plan doesn't
+            # stop to wonder whether it was heard; anything else, the speaker notices
+            note_unheard(world, c, listener, utterance, _reach, tell_speaker=not speech.get("scripted"))
+            return
 
     # Reachability -- only meaningful for a live call: a text/email always
     # "sends" and just sits unread, matching how those mediums really work,

@@ -45,6 +45,29 @@ def check_pair(world, speaker, listener, volume=None):
             "rooms": [ra, rb], "carries": round(carries, 1)}
 
 
+def note_unheard(world, speaker, listener, utterance, reach, tell_speaker=True):
+    """A line said to someone who couldn't hear it: logged (delivered False) and the speaker is told (wake
+    "not_heard", through the event bus -- this runs on the speaker's own worker thread)."""
+    entry = dict(reach, tick=world.get("tick", 0), speaker=speaker["id"], listener=listener["id"],
+                 speaker_name=speaker.get("name"), listener_name=listener.get("name"), line=str(utterance or "")[:140],
+                 delivered=False, conv_id=None,
+                 **{"from": [round(speaker.get("x", 0), 2), round(speaker.get("y", 0), 2)],
+                    "to": [round(listener.get("x", 0), 2), round(listener.get("y", 0), 2)]})
+    log = world.setdefault("conversation_reach_log", [])
+    log.append(entry)
+    del log[:-INCIDENTS_KEPT]
+    speaker["_unheard"] = {"target": listener["id"], "tick": entry["tick"], "volume": reach.get("volume")}   # call out next time
+    where = "in another room" if reach["rooms"][0] != reach["rooms"][1] else "too far away"
+    print(f"[talk-reach] tick {entry['tick']}: {speaker.get('name')} -> {listener.get('name')}: not heard "
+          f"({', '.join(reach['issues'])})", flush=True)
+    if not tell_speaker:
+        return
+    from core.event_bus import emit
+    emit("speech_unheard", {"speaker_id": speaker["id"], "listener_name": listener.get("name") or listener["id"],
+                            "where": where, "utterance": str(utterance or "")[:120]})
+
+
+
 def on_line(world, conv, speaker_id):
     """After a line is said in conv: check it against every listener; log any incident."""
     if (conv.get("medium") or "in_person") != "in_person":

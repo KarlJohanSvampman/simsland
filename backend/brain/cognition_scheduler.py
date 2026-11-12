@@ -51,6 +51,7 @@ WAKE_PRIORITY = {
                                  # _on_hostile_action_resolved -- dramatic,
                                  # but ranked below being the direct target
     "heard_speech": 100,
+    "not_heard": 96,           # systems/conversation_reach.py -- spoke to someone out of earshot
     "social_purpose": 85,      # brain/actionplans: they went to find someone to apologise to / check on -- now say it
     "self_assessment": 99,     # systems/loop_guard.py -- caught themselves in a loop
     "worry_overload": 97,      # systems/worry_relief.py -- couldn't concentrate and gave up on what they were doing
@@ -204,6 +205,7 @@ def wake_character(c, world, reason, payload=None, delay=0):
 _WAKE_LINE_TEMPLATES = {
     "person_entered_view": "{subject_name} has just come into view.",
     "heard_speech": '{speaker_name} just said to you: "{utterance}"',
+    "not_heard": "{listener_name} didn't hear you -- they're {where}. Go over to them first, or call out louder.",
     "self_assessment": "You just caught yourself repeating the same thing over and over, so you stopped. {thought}",
     "worry_overload": "You tried to {activity} but couldn't concentrate -- your worries keep pulling your mind away. Do something about it first.",
     "floor_unnoticed": "{holder_name} hasn't reacted to what you said -- they're {doing}. Say it again louder, call their attention, or let it go.",
