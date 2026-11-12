@@ -357,8 +357,9 @@ def invite_to_unwind(c, world, attempt):
     from systems.activities import ACTIVITIES, start_activity
     from systems.occupancy import interrupt_activity
     act = o.get("activity") or {}
-    if act and not (ACTIVITIES.get(act.get("type")) or {}).get("interruptible"):
-        return False
+    from brain.actionplans.resolvers import NOT_FREE_TO_UNWIND
+    if act and (not (ACTIVITIES.get(act.get("type")) or {}).get("interruptible") or act.get("type") in NOT_FREE_TO_UNWIND):
+        return False                                   # interruptible or not, a meal isn't broken off to sit and chat
     try:
         from systems.action_router import apply_speech
         apply_speech(c, world, {"target": o["id"], "utterance": "Come and sit with me for a bit?", "speech_act": "invite", "scripted": True})

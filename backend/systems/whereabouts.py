@@ -75,11 +75,19 @@ def _reason_for_seeking(c, target, world):
     return None
 
 
+DONT_INTERRUPT_TO_ASK = {"eat_meal", "eat_snack", "cook_recipe", "sleep", "nap", "work", "use_toilet", "use_toilet_bowels",
+                         "take_shower"}
+
+
 def check_ask_whereabouts(c, world):
     """Perception-tick hook (see agent_loop.py). Returns True if it
     fired (and paused c's current activity to do so)."""
     target_id = _pending_target(c, world)
     if not target_id:
+        return False
+    # not in the middle of a meal, cooking, sleep, work, the toilet or the shower -- they ask later (24-hour run,
+    # 2026-11-12: a father stood up from family dinner the moment it started to ask where someone was)
+    if (c.get("activity") or {}).get("type") in DONT_INTERRUPT_TO_ASK:
         return False
 
     visible_ids = {p["id"] for p in (c.get("perception") or {}).get("visible_people", [])}

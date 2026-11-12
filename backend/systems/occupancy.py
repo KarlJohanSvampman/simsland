@@ -27,7 +27,7 @@ CALLER_REASONS = {
     "systems.loop_guard": "they were stuck repeating the same thing",
     "systems.social": "a conversation started",
     "systems.travel": "they set off on a trip",
-    "systems.whereabouts": "they left home",
+    "systems.whereabouts": "they stopped to ask where someone was",
     "systems.psychosis": "a psychotic episode",
     "systems.claustrophobia": "a wave of claustrophobia",
     "systems.worry_breakdown": "they broke down under their worries",

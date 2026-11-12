@@ -24,8 +24,11 @@ PRESSING_PRIORITY = 70
 PRESSING_TYPES = {"relieve_worry"}          # a worry that is crowding out their focus is seen to as a need, whatever its category
 
 
+DAY = 24 * 60 * 60
 NOT_YET_OPEN_LEAD = 30 * 60   # an expectation whose window opens further off than this is not pressing yet
 SHORT_WINDOW = 3 * 60 * 60     # a window this short (a schedule block) is "due now" while open; a whole day or week is not
+CLOSING_LEAD = 2 * 60 * 60     # a daily expectation still unmet this close to the end of the day becomes pressing...
+DAY_ENDS_EARLY = 90 * 60       # ...where the day, for doing things with people, ends at 22:30, not midnight
 
 
 def tier(i):
@@ -43,6 +46,11 @@ def tier(i):
     end = i.get("window_end_tick")
     if (start is not None and end is not None and _ints._CURRENT_TICK and end - start <= SHORT_WINDOW
             and start - NOT_YET_OPEN_LEAD <= _ints._CURRENT_TICK < end):
+        return "pressing"
+    # a daily one still not done as the day runs out (relax with someone, a whole-day window: always behind something
+    # pressing, so "caught up with other things" every evening -- 24-hour run, 2026-11-12): from 20:30 it's due now
+    if (start is not None and end is not None and _ints._CURRENT_TICK and SHORT_WINDOW < end - start <= DAY
+            and start <= _ints._CURRENT_TICK and end - DAY_ENDS_EARLY - CLOSING_LEAD <= _ints._CURRENT_TICK < end - DAY_ENDS_EARLY):
         return "pressing"
     if i.get("type") in PRESSING_TYPES:
         return "pressing"
