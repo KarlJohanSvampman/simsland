@@ -175,6 +175,8 @@ def _apply_method_relationship_effects(char, authority, method, world):
     if trust_d:
         rel["trust"] = min(100, rel.get("trust", 50) + trust_d)
     if shame_d:
+        from systems.crushes import sync_blush
+        sync_blush(char, world)
         char["blush_score"] = min(1.0, char.get("blush_score", 0.0) + shame_d)
 
     # Mood effect on character

@@ -367,6 +367,9 @@ def queue_micro_request(requester, target_id, request_text, world):
     })
     fire_incidental(requester, "micro_request", request_text, world,
                     target_id=target_id)
+    # answered on the next tick (_tick_micro_requests), by a timer rather than a per-tick sweep
+    from core import scheduler
+    scheduler.schedule(world, "microreq", "answer", world.get("tick", 0) + 1)
 
 
 def _tick_micro_requests(chars, world):
@@ -432,3 +435,11 @@ def clear_departure_flags(world):
         c.pop("_departed_this_tick",  None)
         c.pop("_announced_departure", None)
         c.pop("_previous_location",   None)
+
+
+def _on_micro_request_timer(world, entry):
+    _tick_micro_requests(world.get("characters", {}), world)
+
+
+from core import scheduler as _scheduler      # noqa: E402
+_scheduler.register("microreq", _on_micro_request_timer)

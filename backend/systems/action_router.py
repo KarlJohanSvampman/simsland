@@ -4461,13 +4461,16 @@ def _route_bottle_feed(c, world, action):
                                target_id=target_id,
                                interaction="bottle_feed",
                                duration=25))
-    # Apply feed
+    # Apply feed (needs brought up to date first: systems/baby.py)
+    from systems.baby import sync_baby_needs
+    sync_baby_needs(baby, world)
     needs = baby.setdefault("baby_needs", {})
     needs["hunger"]  = min(1.0, needs.get("hunger",  0) + 0.65)
     needs["comfort"] = min(1.0, needs.get("comfort", 0) + 0.15)
     # Clear cry if needs are met
     if min(needs.values()) >= 0.30:
         baby["is_crying"] = False
+    sync_baby_needs(baby, world)       # the next cry timer from the fed state
 
 
 def _route_hold_baby(c, world, action):

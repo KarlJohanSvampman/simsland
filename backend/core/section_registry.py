@@ -59,7 +59,6 @@ REGISTRY = {
 
     # ---- body / needs ----
     "section:intimacy_arousal_decay": ("threshold", "body", "lazy decay"),
-    "section:impulse_control_pressure_boilover": ("threshold", "body", "lazy pressure + boilover timer"),
     "section:body_lt_needs_systems": ("threshold", "body", "lazy needs"),
     "section:disease_contagion_proximity_sweep_grouped_by": ("event", "body", "on proximity change"),
     "section:child_needs_oversight_baseline_accountabilit": ("event", "social", "on child need threshold"),

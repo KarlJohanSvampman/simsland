@@ -244,6 +244,19 @@ def update_internal_state(
         world
     )
 
+    # Intoxication wears off lazily, and a harassment act may follow (systems/harassment.py) -- here, when the
+    # character is due, rather than in a sweep over everyone every second.
+    from systems.harassment import tick_harassment_for
+    _prof.mark("internal:tick_harassment")
+    tick_harassment_for(c, world)
+    from systems.crushes import tick_crushes_for          # a blush fades, a thought bubble ends, a daydream may come
+    tick_crushes_for(c, world)
+    from systems.intimacy import tick_intimacy_for        # arousal fades lazily; a lapsed touch proposal is settled
+    tick_intimacy_for(c, world)
+    from systems.impulse import tick_impulse_for          # anger cools lazily; a boilover when it is over the top
+    _prof.mark("internal:tick_impulse")
+    tick_impulse_for(c, world)
+
     from systems.waiting import tick_waiting
     _prof.mark("internal:tick_waiting")
     tick_waiting(c, world)

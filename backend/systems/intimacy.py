@@ -459,6 +459,8 @@ def execute_act(initiator, recipient, act_id, world):
     arousal_gain = {"foreplay": 0.08, "main": 0.20, "afterglow": 0.02}.get(phase, 0.05)
     comfort_gain = {"foreplay": 5,    "main": 10,   "afterglow": 8}.get(phase, 4)
 
+    sync_arousal(initiator, world)
+    sync_arousal(recipient, world)
     p_rel["arousal_level"] = min(1.0, p_rel.get("arousal_level", 0) + arousal_gain)
     r_rel["arousal_level"] = min(1.0, r_rel.get("arousal_level", 0) + arousal_gain)
     p_rel["comfort"] = min(100, p_rel.get("comfort", 0) + comfort_gain)
@@ -645,6 +647,9 @@ def propose_touch(proposer, recipient, template_id, world):
     }
     p_rel["touch_negotiation"] = dict(neg)
     r_rel["touch_negotiation"] = dict(neg)
+    # settled when the response window is over, if the recipient hasn't answered (_on_touch_timer)
+    from core import scheduler
+    scheduler.schedule(world, f"touchprop:{rid}", pid, tick + TOUCH_PROPOSAL_TIMEOUT)
 
     # Set proposer to waiting animation
     proposer["animation_state"] = "waiting_touch"
@@ -796,6 +801,7 @@ def _execute_touch(proposer, recipient, template_id, world):
     arousal_gain = AROUSAL_GAIN.get(stage, 0.02)
 
     for (c_a, c_b) in ((proposer, recipient), (recipient, proposer)):
+        sync_arousal(c_a, world)
         rel = c_a.setdefault("relationships", {}).setdefault(c_b["id"], {})
         ensure_intimacy_state(rel)
         rel["comfort"]      = min(100, rel.get("comfort", 0) + comfort_gain)
@@ -891,6 +897,22 @@ def tick_touch_proposals(world):
             respond_to_touch_proposal(recipient, proposer, decision, world)
 
 
+def _settle_lapsed_proposal(recipient, proposer_id, world):
+    """The recipient never answered within TOUCH_PROPOSAL_TIMEOUT: lapses if they've drifted apart, else the heuristic
+    decides (the same as tick_touch_proposals does for a timed-out one)."""
+    tick = world.get("tick", 0)
+    proposer = (world.get("characters") or {}).get(proposer_id)
+    if not proposer:
+        _clear_touch_neg(recipient, proposer_id, tick)
+        return
+    if proposer.get("building_id") != recipient.get("building_id"):
+        _clear_touch_neg(proposer, recipient["id"], tick)
+        _clear_touch_neg(recipient, proposer_id, tick)
+        return
+    decision = recipient_touch_decision(recipient, proposer, world)
+    respond_to_touch_proposal(recipient, proposer, decision, world)
+
+
 def _clear_touch_neg(c, other_id, tick):
     """Reset touch_negotiation to idle on c's relationship toward other_id."""
     rel = c.get("relationships", {}).get(other_id)
@@ -908,16 +930,41 @@ def _clear_touch_neg(c, other_id, tick):
 # ── Tick ──────────────────────────────────────────────────────────────────
 
 def tick_intimacy(world):
-    """
-    Per-tick: decay arousal slowly on all relationships + resolve touch proposals.
-    Called from sim_loop.
-    """
+    """Every character at once (older callers and tests). The sim runs tick_intimacy_for() in each character's own update
+    (brain/agent_loop.py) and settles a lapsed touch proposal on its own timer."""
     for c in world.get("characters", {}).values():
-        for oid, rel in c.get("relationships", {}).items():
-            if "arousal_level" in rel:
-                rel["arousal_level"] = max(0.0, rel["arousal_level"] - AROUSAL_DECAY)
-    # Resolve pending hug/kiss/cuddle proposals
-    tick_touch_proposals(world)
+        tick_intimacy_for(c, world)
+
+
+def sync_arousal(c, world):
+    """Arousal on each of c's relationships fades as a lazy value of sim time (core/lazy.py), at the old per-tick rate."""
+    from core.lazy import elapsed_ticks, decayed
+    ticks = elapsed_ticks(c.setdefault("_intimacy", {}), "arousal", world)
+    if not ticks:
+        return
+    for rel in (c.get("relationships") or {}).values():
+        if rel.get("arousal_level"):
+            rel["arousal_level"] = decayed(rel["arousal_level"], AROUSAL_DECAY, ticks)
+
+
+def tick_intimacy_for(c, world):
+    """Arousal brought up to date; a touch proposal to c that has waited past its window is settled."""
+    sync_arousal(c, world)
+    tick = world.get("tick", 0)
+    for oid, rel in list((c.get("relationships") or {}).items()):
+        tneg = rel.get("touch_negotiation") or {}
+        if tneg.get("state") == TNEG_PROPOSED and tneg.get("proposed_by") not in (None, c.get("id")) \
+                and tick - tneg.get("last_tick", 0) >= TOUCH_PROPOSAL_TIMEOUT:
+            _settle_lapsed_proposal(c, tneg["proposed_by"], world)
+
+
+def _on_touch_timer(world, entry):
+    """A touch proposal's response window is over (timer set by propose_touch)."""
+    recipient = (world.get("characters") or {}).get(entry["owner"].split(":", 1)[1])
+    if recipient:
+        tneg = ((recipient.get("relationships") or {}).get(entry["key"]) or {}).get("touch_negotiation") or {}
+        if tneg.get("state") == TNEG_PROPOSED and tneg.get("proposed_by") == entry["key"]:
+            _settle_lapsed_proposal(recipient, entry["key"], world)
 
 
 # ── Rejection fallout ─────────────────────────────────────────────────────
@@ -1052,3 +1099,7 @@ def get_intimacy_context(c, world):
         lines.append(line)
 
     return {"intimacy": lines} if lines else {}
+
+
+from core import scheduler as _scheduler      # noqa: E402
+_scheduler.register("touchprop", _on_touch_timer)

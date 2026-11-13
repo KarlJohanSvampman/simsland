@@ -178,27 +178,65 @@ def spawn_child(mother, father_id, world):
     return child
 
 
+def _is_baby(c):
+    return c.get("age", 99) <= 3 and c.get("development_stage", "child") in ("newborn", "infant", "crawler", "toddler")
+
+
+# The needs fall at these rates PER TICK (the names say per hour; they have always been applied every tick).
+_NEED_RATES = (("hunger", "HUNGER_DECAY_PER_HOUR"), ("sleep", "SLEEP_DECAY_PER_HOUR"),
+               ("comfort", "COMFORT_DECAY_PER_HOUR"), ("stimulation", "STIMULATION_DECAY_PER_HOUR"))
+
+
+def sync_baby_needs(c, world):
+    """A baby's needs fall as lazy values of sim time (core/lazy.py): brought up to date here, crying starts or stops,
+    and a timer is set for the moment the next need falls under CRY_THRESHOLD."""
+    if not _is_baby(c):
+        return
+    from core.lazy import elapsed_ticks, decayed
+    needs = c.setdefault("baby_needs", {
+        "hunger": 0.80, "sleep": 0.80, "comfort": 0.80, "stimulation": 0.80,
+    })
+    ticks = elapsed_ticks(c.setdefault("_baby", {}), "needs", world)
+    if ticks:
+        for key, rate_name in _NEED_RATES:
+            needs[key] = decayed(needs.get(key, 0.8), globals()[rate_name], ticks)
+    was_crying = c.get("is_crying", False)
+    c["is_crying"] = min(needs.values()) < CRY_THRESHOLD
+    if c["is_crying"] and not was_crying:
+        _notify_nearby_parents(c, world)
+    _arm_baby_timer(c, world)
+
+
+def _arm_baby_timer(c, world):
+    from core import scheduler
+    from core.clock import now_ts
+    from core.tick_schedule import TICK_RATE_SECONDS
+    needs = c.get("baby_needs") or {}
+    owner = f"babyneeds:{c['id']}"
+    if c.get("is_crying"):
+        scheduler.cancel(world, owner, "cry")            # crying until someone sees to them
+        return
+    waits = [(needs.get(k, 0.8) - CRY_THRESHOLD) / globals()[r] for k, r in _NEED_RATES if globals()[r] > 0]
+    if waits:
+        scheduler.schedule_at(world, owner, "cry", now_ts(world) + max(0.0, min(waits)) * TICK_RATE_SECONDS + 1e-6)
+
+
+def _on_baby_timer(world, entry):
+    c = (world.get("characters") or {}).get(entry["owner"].split(":", 1)[1])
+    if c:
+        sync_baby_needs(c, world)
+
+
+def _on_babies_appear(world, entry=None):
+    """A world was loaded, or someone was added (born): every baby's needs are brought up to date and timed."""
+    tick_baby_hourly(world)
+
+
 def tick_baby_hourly(world):
-    """Decay baby needs + trigger/clear crying. Call every tick."""
+    """Every baby at once (older callers, tests, a world loaded from an older save). The sim keeps each baby's needs on
+    its own timer (sync_baby_needs)."""
     for c in world.get("characters", {}).values():
-        if c.get("age", 99) > 3:
-            continue
-        stage = c.get("development_stage", "child")
-        if stage not in ("newborn", "infant", "crawler", "toddler"):
-            continue
-
-        needs = c.setdefault("baby_needs", {
-            "hunger": 0.80, "sleep": 0.80, "comfort": 0.80, "stimulation": 0.80,
-        })
-        needs["hunger"]      = max(0.0, needs["hunger"]      - HUNGER_DECAY_PER_HOUR)
-        needs["sleep"]       = max(0.0, needs["sleep"]       - SLEEP_DECAY_PER_HOUR)
-        needs["comfort"]     = max(0.0, needs["comfort"]     - COMFORT_DECAY_PER_HOUR)
-        needs["stimulation"] = max(0.0, needs["stimulation"] - STIMULATION_DECAY_PER_HOUR)
-
-        was_crying = c.get("is_crying", False)
-        c["is_crying"] = min(needs.values()) < CRY_THRESHOLD
-        if c["is_crying"] and not was_crying:
-            _notify_nearby_parents(c, world)
+        sync_baby_needs(c, world)
 
 
 def tick_baby_daily(world):
@@ -226,11 +264,13 @@ def tick_baby_daily(world):
             # NOTE: actual breastfeeding is an active interaction the mother
             # must choose to perform — see action_router "breastfeed" handler.
             # We only do a passive comfort hold here if mother is co-located.
+            sync_baby_needs(c, world)
             needs = c.setdefault("baby_needs", {})
             if c.get("is_crying") and needs.get("comfort", 1.0) < CRY_THRESHOLD:
                 same_loc = (mother.get("current_location") == c.get("current_location"))
                 if same_loc:
                     needs["comfort"] = min(1.0, needs.get("comfort", 0) + 0.35)
+                    sync_baby_needs(c, world)
 
 
 def tick_baby_weekly(world):
@@ -376,9 +416,11 @@ def _do_breastfeed_impl(child, mother, world):
     bf = child["breastfeeding_state"]
     if bf.get("weaned") or bf["sessions_today"] >= MAX_BF_SESSIONS_DAY:
         return
+    sync_baby_needs(child, world)                  # what they had come down to, before feeding
     needs = child.setdefault("baby_needs", {})
     needs["hunger"]  = min(1.0, needs.get("hunger",  0) + BREASTFEED_HUNGER_RESTORE)
     needs["comfort"] = min(1.0, needs.get("comfort", 0) + BREASTFEED_COMFORT_RESTORE)
+    sync_baby_needs(child, world)                  # crying recomputed, the next timer set
     bf["sessions_today"] = bf.get("sessions_today", 0) + 1
     try:
         from core.events import emit
@@ -577,3 +619,7 @@ def _prompt_kindergarten_choice(c, prep, world):
         }, world)
     except Exception:
         pass
+
+
+from core import scheduler as _scheduler      # noqa: E402
+_scheduler.register("babyneeds", _on_baby_timer)

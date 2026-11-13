@@ -124,10 +124,12 @@ def consume_alcohol(c, units, world):
     except Exception:
         pass
     init_intoxication_state(c)
+    sync_intoxication(c, world)                  # wear off what was there before adding to it
     state = c["intoxication_state"]
     # Each unit raises level by ~0.08 (capped at 1.0)
     state["alcohol_level"] = min(1.0, state["alcohol_level"] + units * 0.08)
     _recompute_libido_boost(c)
+    _arm_intoxication_wakes(c, world)
 
 
 def consume_drug(c, drug_id, world):
@@ -138,10 +140,12 @@ def consume_drug(c, drug_id, world):
     except Exception:
         pass
     init_intoxication_state(c)
+    sync_intoxication(c, world)
     state = c["intoxication_state"]
     # Generic drug effect — can be tuned by drug_id later
     state["drug_level"] = min(1.0, state["drug_level"] + 0.30)
     _recompute_libido_boost(c)
+    _arm_intoxication_wakes(c, world)
 
 
 def on_porn_session(c, world):
@@ -171,52 +175,100 @@ def on_porn_session(c, world):
         imp["sexism_level"] = min(1.0, current_sexism + PORN_SEXISM_DRIFT)
 
 
-def tick_harassment(world):
-    """
-    Per-tick: decay intoxication, recompute libido boost, check for harassment acts.
-    Called every sim tick from sim_loop.
-    """
-    characters = world.get("characters", {})
-    tick       = world.get("tick", 0)
-
-    for c in characters.values():
-        init_intoxication_state(c)
-        state = c["intoxication_state"]
-
-        # Decay substances
+def sync_intoxication(c, world):
+    """Alcohol and drugs wear off as lazy values of sim time (core/lazy.py): brought up to date here, at the old per-tick
+    rates integrated over the elapsed ticks."""
+    from core.lazy import elapsed_ticks, decayed
+    init_intoxication_state(c)
+    state = c["intoxication_state"]
+    ticks = elapsed_ticks(state, "intox", world)
+    if ticks:
         if state["alcohol_level"] > 0:
-            state["alcohol_level"] = max(0.0, state["alcohol_level"] - ALCOHOL_DECAY_PER_TICK)
+            state["alcohol_level"] = decayed(state["alcohol_level"], ALCOHOL_DECAY_PER_TICK, ticks)
         if state["drug_level"] > 0:
-            state["drug_level"]    = max(0.0, state["drug_level"]    - DRUG_DECAY_PER_TICK)
+            state["drug_level"] = decayed(state["drug_level"], DRUG_DECAY_PER_TICK, ticks)
+    _recompute_libido_boost(c)
 
-        _recompute_libido_boost(c)
-        _apply_intoxication_posture(c, world)
-        _check_hangover_expiry(c, world)
 
-        # Only evaluate harassment for adults
-        if c.get("age", 0) < 18:
-            continue
+def _arm_intoxication_wakes(c, world):
+    """When intoxication has to be looked at again: the moment the level falls under the next posture threshold (sobering
+    up, getting back up) and when a hangover ends. A scheduler timer (not the agent's own wake): someone incapacitated
+    is not updated by the agent loop at all, and still has to come round."""
+    from core import scheduler
+    from core.lazy import time_until_below
+    from core.clock import now_ts
+    state = c.get("intoxication_state") or {}
+    parts = [(state.get("alcohol_level", 0.0), ALCOHOL_DECAY_PER_TICK), (state.get("drug_level", 0.0), DRUG_DECAY_PER_TICK)]
+    level = min(1.0, sum(v for v, _ in parts))
+    now = now_ts(world)
+    due = []
+    for thr in sorted((INTOX_POSTURE_THRESHOLD, INTOX_CRAWL_THRESHOLD, INTOX_INCAPACITATED_THRESHOLD), reverse=True):
+        if level >= thr:
+            secs = time_until_below(parts, thr)
+            if secs is not None:
+                due.append(now + secs)
+            break
+    expires = ((c.get("condition_state") or {}).get("hangover") or {}).get("hangover_expires_sim_time")
+    if expires is not None:
+        due.append(expires)
+    owner = f"intox:{c.get('id')}"
+    if due:
+        scheduler.schedule_at(world, owner, "next", min(due))
+    else:
+        scheduler.cancel(world, owner, "next")
 
-        drive = _compute_harassment_drive(c)
-        if drive < DRIVE_LEWD_STARE:
-            continue
 
-        # Pick a target in the same location
-        target = _pick_target(c, world)
-        if not target:
-            continue
+def _on_intox_timer(world, entry):
+    c = (world.get("characters") or {}).get(entry["owner"].split(":", 1)[1])
+    if not c:
+        return
+    sync_intoxication(c, world)
+    _apply_intoxication_posture(c, world)
+    _check_hangover_expiry(c, world)
+    _arm_intoxication_wakes(c, world)
+    from brain import agent_wake
+    agent_wake.wake(c, world, "intoxication")
 
-        # Cooldown check
-        t_id = target.get("id", "")
-        last = state["last_harass_tick"].get(t_id, 0)
-        if tick - last < HARASSMENT_COOLDOWN:
-            continue
 
-        act_type = _drive_to_act(drive)
-        concealment = _compute_concealment(c)
+def tick_harassment(world):
+    """Every character at once (older callers and tests). The sim runs tick_harassment_for() in each character's own
+    update (brain/agent_loop.py), which runs when they are due (brain/agent_wake.py)."""
+    for c in world.get("characters", {}).values():
+        tick_harassment_for(c, world)
 
-        _execute_harassment(c, target, act_type, concealment, world)
-        state["last_harass_tick"][t_id] = tick
+
+def tick_harassment_for(c, world):
+    """Intoxication brought up to date and its effects (posture, hangover), then the chance of a harassment act."""
+    tick = world.get("tick", 0)
+    sync_intoxication(c, world)
+    state = c["intoxication_state"]
+    _apply_intoxication_posture(c, world)
+    _check_hangover_expiry(c, world)
+    _arm_intoxication_wakes(c, world)
+    # Only evaluate harassment for adults
+    if c.get("age", 0) < 18:
+        return
+
+    drive = _compute_harassment_drive(c)
+    if drive < DRIVE_LEWD_STARE:
+        return
+    # Pick a target in the same location (someone coming near wakes them: brain/agent_wake.py)
+    target = _pick_target(c, world)
+    if not target:
+        return
+    # Cooldown check
+    t_id = target.get("id", "")
+    last = state["last_harass_tick"].get(t_id, 0)
+    if tick - last < HARASSMENT_COOLDOWN:
+        from brain import agent_wake
+        agent_wake.wake_at(c, world, agent_wake.at_tick(world, last + HARASSMENT_COOLDOWN), "harass_cooldown")
+        return
+
+    act_type = _drive_to_act(drive)
+    concealment = _compute_concealment(c)
+
+    _execute_harassment(c, target, act_type, concealment, world)
+    state["last_harass_tick"][t_id] = tick
 
 
 def tick_harassment_daily(world):
@@ -358,10 +410,11 @@ def _apply_intoxication_posture(c, world):
         set_posture(c, world, "intoxicated")
 
     band_frac = (intox - INTOX_POSTURE_THRESHOLD) / (INTOX_CRAWL_THRESHOLD - INTOX_POSTURE_THRESHOLD)
-    if random.random() < _INTOX_FALL_CHANCE_PER_TICK * (1 + band_frac):
+    from brain import agent_wake              # per-tick chances, drawn ahead (the update need not run every tick)
+    if agent_wake.chance(c, world, "intox_fall", _INTOX_FALL_CHANCE_PER_TICK * (1 + band_frac)):
         from systems.reactions import push_reaction
         push_reaction(c, "wince", world.get("tick", 0))
-    if random.random() < _INTOX_VOMIT_CHANCE_PER_TICK * (1 + band_frac):
+    if agent_wake.chance(c, world, "intox_vomit", _INTOX_VOMIT_CHANCE_PER_TICK * (1 + band_frac)):
         from systems.reactions import push_reaction
         push_reaction(c, "vomit", world.get("tick", 0))
 
@@ -555,10 +608,12 @@ def _notify_partner(target, harasser_id, act_type, world):
                     from systems.grievances import add_grievance
                     add_grievance(partner, harasser_id, "partner_harassed", world)
                     # Anger pressure spike
-                    imp = partner.setdefault("impulse_state", {})
-                    imp["anger_pressure"] = min(
-                        1.0, imp.get("anger_pressure", 0) + 0.20
-                    )
+                    from systems.impulse import bump_anger
+                    bump_anger(partner, world, 0.20)
                 except Exception:
                     pass
             break
+
+
+from core import scheduler as _scheduler      # noqa: E402
+_scheduler.register("intox", _on_intox_timer)

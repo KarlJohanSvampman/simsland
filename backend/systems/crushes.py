@@ -207,11 +207,8 @@ def tick_crushes(world):
     """
     Per-tick: decay blush, expire thought bubbles, randomly trigger daydreams.
     """
-    tick = world.get("tick", 0)
-    for c in world.get("characters", {}).values():
-        _tick_blush(c, tick)
-        _tick_thought_bubble(c, tick)
-        _maybe_daydream(c, tick, world)
+    for c in world.get("characters", {}).values():          # older callers / tests; the sim: tick_crushes_for
+        tick_crushes_for(c, world)
 
 
 def apply_topic_blush(c, topic, world, tick=None):
@@ -229,8 +226,9 @@ def apply_topic_blush(c, topic, world, tick=None):
     if raise_amount < 0.05:
         return
 
+    sync_blush(c, world)                              # what was left of the last blush, before adding to it
     c["blush_score"] = min(1.0, c.get("blush_score", 0.0) + raise_amount)
-
+    _arm_crush_wakes(c, world)
     if c["blush_score"] >= BLUSH_THRESHOLD and not c.get("is_blushing"):
         c["is_blushing"] = True
         _push_blush_reaction(c, tick)
@@ -271,6 +269,7 @@ def trigger_crush_thought(c, crush, world):
         "caption":      caption,
         "tick_expires": tick + BUBBLE_DURATION,
     })
+    _arm_crush_wakes(c, world)
 
     _emit("crush_fantasy", {
         "character_id":  c.get("id"),
@@ -299,6 +298,8 @@ def set_intention_bubble(c, caption, subject_id=None, subject_name=None, world=N
         "caption":      caption,
         "tick_expires": tick + BUBBLE_DURATION // 3,
     })
+    if world is not None:
+        _arm_crush_wakes(c, world)
 
 
 def get_crush_context(c, world):
@@ -366,6 +367,42 @@ def _tick_blush(c, tick):
     c["is_blushing"] = c["blush_score"] >= BLUSH_THRESHOLD
 
 
+def sync_blush(c, world):
+    """A blush fades as a lazy value of sim time (core/lazy.py), at the old per-tick rate."""
+    from core.lazy import elapsed_ticks, decayed
+    ticks = elapsed_ticks(c.setdefault("_crush", {}), "blush", world)
+    if ticks and c.get("blush_score", 0.0) > 0:
+        c["blush_score"] = decayed(c["blush_score"], BLUSH_DECAY_PER_TICK, ticks)
+        c["is_blushing"] = c["blush_score"] >= BLUSH_THRESHOLD
+
+
+def _arm_crush_wakes(c, world):
+    """The character's update runs again when the blush stops showing and when a thought bubble ends (agent_wake)."""
+    from brain import agent_wake
+    if c.get("is_blushing") and c.get("blush_score", 0.0) > 0:
+        ticks = (c["blush_score"] - BLUSH_THRESHOLD) / BLUSH_DECAY_PER_TICK
+        agent_wake.wake_at(c, world, agent_wake.at_tick(world, world.get("tick", 0)) + ticks * _tick_seconds() + 1e-6,
+                           "blush_fades")
+    tb = c.get("thought_bubble") or {}
+    if tb.get("active") and tb.get("tick_expires") is not None:
+        agent_wake.wake_at(c, world, agent_wake.at_tick(world, tb["tick_expires"]), "bubble_ends")
+
+
+def _tick_seconds():
+    from core.tick_schedule import TICK_RATE_SECONDS
+    return TICK_RATE_SECONDS
+
+
+def tick_crushes_for(c, world):
+    """Blush and thought bubble brought up to date, and the chance of a daydream -- in the character's own update
+    (brain/agent_loop.py), when they are due."""
+    tick = world.get("tick", 0)
+    sync_blush(c, world)
+    _tick_thought_bubble(c, tick)
+    _maybe_daydream(c, tick, world)
+    _arm_crush_wakes(c, world)
+
+
 def _tick_thought_bubble(c, tick):
     tb = c.get("thought_bubble", {})
     if not tb.get("active"):
@@ -388,7 +425,8 @@ def _maybe_daydream(c, tick, world):
     if "daydreamer"         in traits: chance *= 3.0
     if "infatuation_prone"  in traits: chance *= 2.0
 
-    if random.random() > chance:
+    from brain import agent_wake          # the same per-tick chance, drawn ahead
+    if not agent_wake.chance(c, world, "daydream", chance):
         return
 
     # Pick a crush weighted by intensity

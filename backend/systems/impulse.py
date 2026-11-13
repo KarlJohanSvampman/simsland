@@ -85,12 +85,43 @@ def init_impulse_state(c):
     return imp
 
 
+def sync_anger(c, world):
+    """Anger pressure cools as a lazy value of sim time (core/lazy.py): at the old per-tick rate, only while it is at
+    least 0.05 (it stops just under that, as the per-tick decay did), and not while they are away (off-grid)."""
+    from core.lazy import elapsed_ticks
+    imp = c.get("impulse_state")
+    if not imp:
+        return
+    ticks = elapsed_ticks(imp, "anger", world)
+    if not ticks or c.get("is_offscreen") or c.get("off_grid"):
+        return
+    p = imp.get("anger_pressure", 0.0)
+    if p < 0.05:
+        return
+    traits = set(c.get("traits", []) + c.get("personality_traits", []))
+    decay = ANGER_DECAY_FAST if "hot_tempered" in traits else ANGER_DECAY_PER_TICK
+    # the per-tick loop stepped while p >= 0.05: the first step that takes it under (an epsilon for float division)
+    steps = min(int(ticks), int((p - 0.05) / decay + 1e-9) + 1)
+    imp["anger_pressure"] = round(max(0.0, p - steps * decay), 5)
+
+
+def bump_anger(c, world, amount):
+    """Add raw anger pressure (no trait scaling) -- brought up to date first, and the character's update runs next so a
+    boilover is checked at once (brain/agent_wake.py)."""
+    imp = c.setdefault("impulse_state", {})
+    sync_anger(c, world)
+    imp["anger_pressure"] = min(1.0, imp.get("anger_pressure", 0) + amount)
+    from brain import agent_wake
+    agent_wake.wake(c, world, "anger")
+
+
 def add_anger_pressure(c, amount, source, world):
     """
     Increase anger pressure on character c.
     amount: 0-1 raw addition (will be scaled by trait modifiers).
     source: string label for the cause (used in event/context).
     """
+    sync_anger(c, world)
     traits = set(c.get("traits", []) + c.get("personality_traits", []))
     imp = c.setdefault("impulse_state", {
         "anger_pressure": 0.0, "self_control": SELF_CONTROL_BASE,
@@ -111,6 +142,8 @@ def add_anger_pressure(c, amount, source, world):
         gain *= 1.20
 
     imp["anger_pressure"] = round(min(1.0, imp.get("anger_pressure", 0.0) + gain), 4)
+    from brain import agent_wake          # a boilover is checked in their own update, which runs next
+    agent_wake.wake(c, world, "anger")
 
 
 def tick_impulse(world):
@@ -122,30 +155,34 @@ def tick_impulse(world):
     if isinstance(chars, list):
         chars = {c["id"]: c for c in chars}
 
-    tick = world.get("tick", 0)
-
     for c in chars.values():
-        if c.get("is_offscreen") or c.get("off_grid"):         # nothing happens to someone who is away (see offgrid summaries)
-            continue
-        imp = c.get("impulse_state")
-        if not imp or imp.get("anger_pressure", 0) < 0.05:
-            continue
+        tick_impulse_for(c, world)
 
-        traits = set(c.get("traits", []) + c.get("personality_traits", []))
-        decay = ANGER_DECAY_FAST if "hot_tempered" in traits else ANGER_DECAY_PER_TICK
-        imp["anger_pressure"] = round(max(0.0, imp["anger_pressure"] - decay), 5)
 
-        # Boilover check
-        sc = imp.get("self_control", SELF_CONTROL_BASE)
-        threshold = OUTBURST_THRESHOLD * (0.5 + sc)   # range ~0.53 (low SC) to ~0.95 (high SC)
-
-        if imp["anger_pressure"] < threshold:
-            continue
-        cooldown_ok = (tick - imp.get("last_outburst_tick", 0)) >= OUTBURST_COOLDOWN
-        if not cooldown_ok:
-            continue
-
-        _trigger_outburst(c, imp, threshold, world)
+def tick_impulse_for(c, world):
+    """Anger brought up to date, and a boilover if it is over the character's threshold and the cooldown is over. Runs in
+    the character's own update (brain/agent_loop.py) -- when they are due; anger only rises through add_anger_pressure /
+    bump_anger, which wake them."""
+    if c.get("is_offscreen") or c.get("off_grid"):         # nothing happens to someone who is away (see offgrid summaries)
+        return
+    imp = c.get("impulse_state")
+    if not imp:
+        return
+    sync_anger(c, world)
+    if imp.get("anger_pressure", 0) < 0.05:
+        return
+    tick = world.get("tick", 0)
+    # Boilover check
+    sc = imp.get("self_control", SELF_CONTROL_BASE)
+    threshold = OUTBURST_THRESHOLD * (0.5 + sc)   # range ~0.53 (low SC) to ~0.95 (high SC)
+    if imp["anger_pressure"] < threshold:
+        return
+    cooldown_end = imp.get("last_outburst_tick", 0) + OUTBURST_COOLDOWN
+    if tick < cooldown_end:
+        from brain import agent_wake          # still that angry when the cooldown is over? looked at then
+        agent_wake.wake_at(c, world, agent_wake.at_tick(world, cooldown_end), "outburst_cooldown")
+        return
+    _trigger_outburst(c, imp, threshold, world)
 
 
 def within_reach(actor, other, world):
@@ -344,6 +381,7 @@ def sync_anger_from_grievances(c, world):
         "last_outburst_tick": 0,
     })
     # Nudge anger pressure toward the grievance floor (don't snap — drift)
+    sync_anger(c, world)
     current = imp.get("anger_pressure", 0.0)
     if pressure_from_grievances > current:
         imp["anger_pressure"] = round(

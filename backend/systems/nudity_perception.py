@@ -272,8 +272,8 @@ def _react_to_walking_in(observer, participant_ids, world, tick):
             "participant_ids": participant_ids,
             "tick":            tick,
         }, world)
-        imp = observer.setdefault("impulse_state", {})
-        imp["anger_pressure"] = min(1.0, imp.get("anger_pressure", 0) + 0.50)
+        from systems.impulse import bump_anger
+        bump_anger(observer, world, 0.50)
     else:
         _push_reaction(observer, "embarrassed", tick, world)
 
@@ -370,8 +370,8 @@ def _react_to_sex_sounds(observer, source_loc_id, world, tick):
             "participant_ids": participants,
             "tick":            tick,
         }, world)
-        imp = observer.setdefault("impulse_state", {})
-        imp["anger_pressure"] = min(1.0, imp.get("anger_pressure", 0) + 0.30)
+        from systems.impulse import bump_anger
+        bump_anger(observer, world, 0.30)
 
     _emit("heard_sex_sounds", {
         "observer_id":  o_id,
@@ -484,8 +484,8 @@ def _check_partner_nudity_jealousy(observer, target, world, tick):
             trust = obs_rel.get("trust", 0.5)
             # Low trust → anger
             if trust < 0.60:
-                imp = observer.setdefault("impulse_state", {})
-                imp["anger_pressure"] = min(1.0, imp.get("anger_pressure", 0) + 0.25)
+                from systems.impulse import bump_anger
+                bump_anger(observer, world, 0.25)
             break
 
 
@@ -511,3 +511,41 @@ def _emit(event_type, data, world):
         emit(event_type, data, world)
     except Exception:
         pass
+
+
+# ── as an active loop (core/active_loops.py) ──────────────────────────────────────────────────────────────────────────
+# There is something to perceive only while someone is nude or exposed, or in an intimate session: those characters
+# are the loop's members (added from their own update, brain/agent_loop.py, where such a state begins), and while any
+# is, the full pass above runs every step exactly as before (its per-step sound chances included). With nobody exposed
+# it does not run at all.
+
+def _exposed(c):
+    if c.get("is_nude") or c.get("exposed_chest"):
+        return True
+    act = c.get("activity") or {}
+    if act.get("interaction") in ("masturbate", "watch_porn"):
+        return SOLO_SESSION_STAGE >= 4
+    return (act.get("act_stage") or 0) >= 4
+
+
+def note_exposure(c, world):
+    if _exposed(c):
+        from core import active_loops
+        active_loops.add(world, "nudity", c.get("id"))
+
+
+def ensure_nudity_members(world):
+    from core import active_loops
+    if "nudity" in (world.get("_active_loops") or {}):
+        return
+    active_loops.rebuild(world, "nudity", [cid for cid, c in (world.get("characters") or {}).items() if _exposed(c)])
+
+
+def nudity_step(world, ids):
+    tick_nudity_perception(world)
+    chars = world.get("characters") or {}
+    return [i for i in ids if i not in chars or not _exposed(chars[i])]
+
+
+from core import active_loops as _active_loops      # noqa: E402
+_active_loops.register("nudity", nudity_step, order=50)

@@ -207,6 +207,9 @@ def _run_agent(c, world, t):
     _prof.mark("agent:reaction_queue")
     process_reaction_queue(c, t)
     update_agent(c, world)
+    # after the update (an activity that undresses them may just have started): exposed people join the "nudity" loop
+    from systems.nudity_perception import note_exposure
+    note_exposure(c, world)
     return c["id"]
 
 
@@ -709,6 +712,11 @@ def _tick_impl(world):
     ensure_ambient_member(world)
     active_loops.run_one(world, "ambient_sounds")
 
+    # walking in on someone undressed, overhearing a scene: only while someone is exposed (systems/nudity_perception.py)
+    from systems.nudity_perception import ensure_nudity_members
+    ensure_nudity_members(world)
+    active_loops.run_one(world, "nudity")
+
     _prof.mark("section:intimacy_arousal_decay")
     # -- Intimacy arousal decay (every tick) ───────────────
 
@@ -936,21 +944,6 @@ def _job_arrests(world, entry):
         if c.get("alive") is not False and c["id"] not in _has_agent_thread:
             apply_severity_consequences(c, world)
             process_return(c, world)
-
-
-def _job_body_moment(world, entry):
-    """Every second: arousal, anger pressure, intoxication, baby needs, blushes and daydreams; walking in on someone
-    undressed; small spoken requests answered."""
-    tick_intimacy(world)
-
-    _prof.mark("section:impulse_control_pressure_boilover")
-    # -- Impulse control pressure + boilover (every tick) ───
-    tick_impulse(world)
-    tick_harassment(world)
-    tick_baby_hourly(world)
-    tick_nudity_perception(world)
-    tick_crushes(world)
-    tick_incidental_speech(world)
 
 
 def _job_domestic_control(world, entry):

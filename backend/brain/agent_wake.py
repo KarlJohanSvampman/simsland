@@ -264,8 +264,22 @@ def _real_view(c):
             v = [{kk: vv for kk, vv in (d or {}).items() if kk not in ("frustration", "importance")} for d in v or []]
         elif k == "habits":
             v = sorted((v or {}).keys())
+        elif k in _LAZY_FIELDS:
+            v = {kk: vv for kk, vv in (v or {}).items() if kk not in _LAZY_FIELDS[k] and kk != "_lazy_ts"}
+        elif k == "relationships":
+            v = {oid: {kk: vv for kk, vv in (r or {}).items() if kk != "arousal_level"} for oid, r in (v or {}).items()}
         out[k] = _digest(v)
     return out
+
+
+# Values inside these holders fall lazily (core/lazy.py): compared without them and their stamps. A real rise goes
+# through a function that wakes the character (add_anger_pressure, consume_alcohol, apply_topic_blush, ...).
+_LAZY_FIELDS = {
+    "impulse_state": ("anger_pressure",),
+    "intoxication_state": ("alcohol_level", "drug_level", "libido_boost"),
+    "baby_needs": ("hunger", "sleep", "comfort", "stimulation"),
+}
+_LAZY_STAMPS.update({"_crush", "_intimacy", "_baby", "blush_score", "is_blushing"})
 
 
 def shadow_before(c):

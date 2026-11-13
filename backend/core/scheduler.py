@@ -211,6 +211,9 @@ def install(world):
     if world.get("_sched_sig") == _recurring_sig and len(_timers(world)) >= len(_recurring):
         return                       # nothing registered since last time and nothing was wiped
     world["_sched_sig"] = _recurring_sig
+    # a recurring job that no longer exists (removed from core/flow.py) leaves its timer behind in older saves: dropped
+    for t in [t for t in _timers(world) if t.get("key") == "recurring" and t.get("owner") not in _recurring]:
+        _remove(world, t["owner"], "recurring")
     have = {(t["owner"], t["key"]): t for t in _timers(world)}
     now = now_ts(world)
     for owner, (kind, value, offset) in _recurring.items():
