@@ -122,6 +122,67 @@ def tiles_per_tick(c, world):
     return _current_move_speed(c) * SPEED_TO_TILES_PER_SECOND / time_scale * speed_multiplier
 
 
+def start_moving(c, world):
+    """Set c walking along the route it has been given: is_moving, and a member of the movement loop
+    (core/active_loops.py), which advances only the people who are moving. Every place that starts a walk goes through
+    here (tests/test_movement_loop.py checks); safety_sweep() picks up -- and reports -- any that doesn't."""
+    c["is_moving"] = True
+    from core import active_loops
+    active_loops.add(world, "movement", c.get("id"))
+
+
+def movement_step(world, ids):
+    """One step of the movement loop: advance each member who is still moving (in the characters' own order, as the
+    sweep over everyone did); a member who has stopped, or is gone, leaves the loop."""
+    chars = world.get("characters", {})
+    order = {cid: i for i, cid in enumerate(chars)}
+    done, moved = [], set()
+    for cid in sorted(ids, key=lambda i: order.get(i, 1 << 30)):
+        c = chars.get(cid)
+        if not c or c.get("is_workplace_npc") or not c.get("is_moving"):
+            done.append(cid)
+            continue
+        try:
+            update_character_movement(c, world)
+            moved.add(cid)
+        except Exception as exc:
+            print(f"[sim_loop] movement error for {cid}: {exc}")
+        if not c.get("is_moving"):
+            done.append(cid)
+    if moved:
+        from sim_loop import _mark_dirty
+        _mark_dirty(world, char_ids=moved)
+    return done
+
+
+def ensure_movement_members(world):
+    """A world that has never had a movement loop (an older save, a fixture): its movers become members once."""
+    from core import active_loops
+    if "movement" in (world.get("_active_loops") or {}):
+        return
+    active_loops.rebuild(world, "movement", _movers(world))
+
+
+def _movers(world):
+    return [cid for cid, c in world.get("characters", {}).items() if c.get("is_moving") and not c.get("is_workplace_npc")]
+
+
+def safety_sweep(world, entry=None):
+    """Slow safety net: someone set walking without start_moving() joins the loop here, and is reported."""
+    from core import active_loops
+    have = set(active_loops.members(world, "movement"))
+    missing = [cid for cid in _movers(world) if cid not in have]
+    for cid in missing:
+        active_loops.add(world, "movement", cid)
+    if missing:
+        print(f"[movement] {len(missing)} walking without start_moving(), picked up by the safety sweep: {missing}")
+    return missing
+
+
+from core import active_loops as _active_loops      # noqa: E402
+_active_loops.register("movement", movement_step, order=10)
+
+
 def update_character_movement(c, world):
     """Advance c along its route by one tick's worth of distance.
 

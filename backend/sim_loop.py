@@ -482,8 +482,7 @@ def _tick_impl(world):
     # restored between two Mondays (a character brought back into the sim,
     # a new NPC, ...) got no schedule at all and stayed that way for up to a
     # full week: no work/sleep blocks, no schedule-derived expectation
-    # windows, no "it's bedtime" wake regardless of how late it got. Self-
-    # heals every tick instead of waiting for the next weekly reset.
+    # windows, no "it's bedtime" wake regardless of how late it got.
     # Only whoever is new to this process (first look after a load, or just arrived) is looked at here; a schedule
     # cleared later (the admin "reset" route) is regenerated right where it is cleared.
     _chars = world.get("characters", {})
@@ -523,15 +522,13 @@ def _tick_impl(world):
     # no longer calls this itself (see its own matching comments) --
     # is_moving/position are already this tick's final values by the time
     # it runs.
-    from systems.movement import update_character_movement
+    # Only the people who are walking are advanced: they are members of the movement loop (core/active_loops.py)
+    # from the moment something sets them off (systems/movement.py::start_moving) until they stop.
+    from systems.movement import ensure_movement_members
+    from core import active_loops
+    ensure_movement_members(world)
+    active_loops.run_one(world, "movement")
     dirty_char_ids = set()
-    for c in characters:
-        if c.get("is_moving"):
-            try:
-                update_character_movement(c, world)
-                dirty_char_ids.add(c["id"])
-            except Exception as exc:
-                print(f"[sim_loop] movement error for {c.get('id')}: {exc}")
 
     _prof.mark("section:per_tick_conversation_floor")
     # -- Per-tick: conversation floor (who has the ball, notice/ignore timers) --

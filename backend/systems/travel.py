@@ -72,12 +72,13 @@ def _at_position(c, target, tolerance=0.6):
     )
 
 
-def _set_off(c):
+def _set_off(c, world):
     """Start walking the route just planned. Movement (sim_loop.py -> movement.update_character_movement) only
     advances characters with is_moving set; the trip walks never set it, so a character "walking to the bus stop"
     stood still for good (live, 2026-11-01: Robert and Stephanie Okafor, for hours)."""
     if c.get("route"):
-        c["is_moving"] = True
+        from systems.movement import start_moving
+        start_moving(c, world)
         c["animation_state"] = "walk"
 
 
@@ -143,7 +144,7 @@ def begin_travel(c, world, reason, duration):
             car["state"]["in_use"] = True
             c["travel_mode"] = "car"
             c["travel_state"] = "to_garage"
-            _set_off(c)
+            _set_off(c, world)
             # Every other movement-initiating call site (activity_queue.py,
             # curiosity.py, interactions.py, action_router.py) sets this the
             # moment it starts a route -- this one didn't, so a character
@@ -157,7 +158,7 @@ def begin_travel(c, world, reason, duration):
         if stop and _route_or_already_there(c, world, stop):
             c["travel_mode"] = "bus"
             c["travel_state"] = "to_bus_stop"
-            _set_off(c)
+            _set_off(c, world)
             c["animation_state"] = "walk"
             return True
 
@@ -460,7 +461,7 @@ def _begin_walking_home(c, world):
     entrance = household_home_entrance(world, c.get("household_id"))
     if entrance and plan_character_route(world, c, entrance[0], entrance[1]):
         c["travel_state"] = "walking_home"
-        _set_off(c)
+        _set_off(c, world)
     else:
         _finish_travel(c, world)
 

@@ -117,6 +117,8 @@ JOBS = [
     PROCESS("grapples", "_job_grapples", 5 * SECOND, "a grapple in progress moves on"),
     PROCESS("reading", "_job_reading", 5 * SECOND, "reading in progress"),
     PROCESS("sports_watching", "_job_reading_2", 5 * SECOND, "games kick off and are broadcast"),
+    PROCESS("movement_sweep", "systems.movement:safety_sweep", 30 * SECOND,
+            "safety net: anyone set walking without start_moving() joins the movement loop (and is reported)"),
     PROCESS("scripted_conversations", "_job_reading_3", 5 * SECOND, "scripted scenes play out"),
     PROCESS("household_processes", "_job_cooking_2", 10 * SECOND, "laundry, dishes, cooking stages advance"),
     PROCESS("deliveries", "_job_deliveries", 10 * SECOND, "messages and parcels travel"),

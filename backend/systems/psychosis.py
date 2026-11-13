@@ -261,7 +261,8 @@ def _erratic_wander(c, world):
     ty = c.get("y", 0) + random.randint(-_ERRATIC_WANDER_RADIUS, _ERRATIC_WANDER_RADIUS)
     if plan_character_route(world, c, tx, ty):
         c["animation_state"] = "walk"
-        c["is_moving"] = True
+        from systems.movement import start_moving
+        start_moving(c, world)
     try:
         from systems.reactions import trigger_reaction
         trigger_reaction(c, world, "hallucinating")

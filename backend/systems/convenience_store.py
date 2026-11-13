@@ -81,7 +81,8 @@ def update_convenience_store_staffing(world):
 
         from systems.navigation import plan_character_route
         if plan_character_route(world, cashier, ax, ay):
-            cashier["is_moving"] = True
+            from systems.movement import start_moving
+            start_moving(cashier, world)
             cashier["animation_state"] = "walk"
 
 

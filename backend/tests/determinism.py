@@ -62,9 +62,43 @@ def _install():
             fn(*a, **k)
     ca._pool = _Inline()
     import brain.llm_brain as lb
-    lb.think = lambda context, char_id=None, session=None, priority=None: {"thought": "ok", "action": {"type": "wait", "reason": "x"}}
+    if os.environ.get("DET_POLICY") == "varied":
+        lb.think = _varied_think
+    else:
+        lb.think = lambda context, char_id=None, session=None, priority=None: {"thought": "ok", "action": {"type": "wait", "reason": "x"}}
     from systems import bg_llm
     bg_llm.submit = lambda key, fn, *a: (bg_llm._done.__setitem__(key, None), True)[1]
+
+
+_LINES = [("Hi! How are you doing?", "greet"), ("Did you sleep well?", "question"), ("That's a great idea.", "compliment"),
+          ("Can you help me with something later?", "request"), ("Ha, you're funny.", "joke"), ("I'm a bit tired today.", "vulnerable"),
+          ("Okay, see you later.", "farewell"), ("Sure, sounds good.", "agree")]
+_think_calls = itertools.count(1)
+
+
+def _varied_think(context, char_id=None, session=None, priority=None):
+    """DET_POLICY=varied: a stand-in model that does things -- uses what is in reach, walks to things, talks to whoever is
+    near -- chosen by a RNG seeded from the character and the call number, so a run is still exactly repeatable (inline
+    workers make the call order deterministic). Wider coverage for differential runs than "always wait"."""
+    rng = random.Random(f"{char_id}:{next(_think_calls)}")
+    aa = context.get("available_actions") or {}
+    props = [p for p in aa.get("interactable_props") or [] if p.get("interactions")]
+    people = [p for p in aa.get("nearby_characters") or [] if p.get("id")]
+    roll = rng.random()
+    if roll < 0.35 and props:
+        p = rng.choice(props)
+        return {"thought": "ok", "action": {"type": "interact", "target": p["id"],
+                                            "interaction": rng.choice(p["interactions"]), "reason": "x"}}
+    remembered = [p for p in aa.get("remembered_props") or [] if p.get("id")]
+    if roll < 0.6 and (props or remembered):
+        p = rng.choice(props + remembered)
+        return {"thought": "ok", "action": {"type": "move", "target": p["id"], "reason": "x"}}
+    if roll < 0.85 and people:
+        who = rng.choice(people)
+        line, act = rng.choice(_LINES)
+        return {"thought": "ok", "action": {"type": "speak", "target": who["id"], "reason": "x"},
+                "speech": {"target": who["id"], "utterance": line, "speech_act": act, "topic": "general"}}
+    return {"thought": "ok", "action": {"type": "wait", "reason": "x"}}
 
 
 def _fixture_path():
@@ -114,6 +148,8 @@ def run_sim(ticks, start="2026-11-01T23:50:00", seed=1234, setup=None, checkpoin
     from systems.schema_defaults import ensure_world_defaults
     _Clock.t = 1.7e9
     _Clock.counter = itertools.count(1)
+    global _think_calls
+    _think_calls = itertools.count(1)
     random.seed(seed)
     _bi._intention_seq = 0
     w = fixture(start)

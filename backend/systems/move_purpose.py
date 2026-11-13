@@ -129,7 +129,8 @@ def move_to_prop(c, world, prop, action, mode="walk"):
     c["move_target"] = {"x": point[0], "y": point[1], "target_id": prop["id"], "target_type": "prop"}
     if plan_character_route(world, c, point[0], point[1]):
         c["animation_state"] = mode
-        c["is_moving"] = True
+        from systems.movement import start_moving
+        start_moving(c, world)
         c["_move_purpose"] = {"prop_id": prop["id"], "purpose": purpose, "point": list(point),
                               "tick": world.get("tick", 0)}
         return

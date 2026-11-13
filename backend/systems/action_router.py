@@ -639,7 +639,8 @@ def _route_move(c, world, action, mode="walk"):
         }
         if plan_character_route(world, c, x, y):
             c["animation_state"] = mode
-            c["is_moving"]       = True
+            from systems.movement import start_moving
+            start_moving(c, world)
         return
 
     if is_room_target(target_id):
@@ -668,7 +669,8 @@ def _route_move(c, world, action, mode="walk"):
         }
         if plan_character_route(world, c, x, y):
             c["animation_state"] = mode
-            c["is_moving"]       = True
+            from systems.movement import start_moving
+            start_moving(c, world)
         return
 
     # Find target position from characters or props
@@ -683,7 +685,8 @@ def _route_move(c, world, action, mode="walk"):
         }
         if plan_character_route(world, c, t.get("x", 0), t.get("y", 0)):
             c["animation_state"] = mode
-            c["is_moving"]       = True
+            from systems.movement import start_moving
+            start_moving(c, world)
         return
 
     # world["props"] is a list, not a dict keyed by id -- see
@@ -963,7 +966,8 @@ def _route_interact(c, world, action, definitions):
         wx, wy = _walk_target_for(seat, "sit") if seat else _walk_target_for(prop, interaction)
         if plan_character_route(world, c, wx, wy):
             c["animation_state"] = "walk"
-            c["is_moving"] = True
+            from systems.movement import start_moving
+            start_moving(c, world)
         c["activity"] = _occupy(c, world, {
             "type": "interact", "phase": "walking",
             "phase_started_tick": world.get("tick", 0),
@@ -1048,7 +1052,8 @@ def _route_eat(c, world, action):
             wx, wy = _walk_target_for(seat, "sit") if seat else _walk_target_for(prop, "eat")
             if plan_character_route(world, c, wx, wy):
                 c["animation_state"] = "walk"
-                c["is_moving"] = True
+                from systems.movement import start_moving
+                start_moving(c, world)
             c["activity"] = _occupy(c, world, {
                 "type": "eat", "phase": "walking",
                 "phase_started_tick": world.get("tick", 0),
@@ -1268,7 +1273,8 @@ def _route_search_documents(c, world, action):
                 c["move_target"] = {"x": pile["x"], "y": pile["y"], "target_type": "tile"}
                 if plan_character_route(world, c, pile["x"], pile["y"]):
                     c["animation_state"] = "walk"
-                    c["is_moving"] = True
+                    from systems.movement import start_moving
+                    start_moving(c, world)
         c["activity"] = _occupy(c, world, _scaffold(c, world, "search_documents", interaction="search", duration=duration))
         c["_last_found_document_id"] = result["item"]["id"]
         return
@@ -2129,6 +2135,9 @@ def _route_carry(c, world, action):
     # "walking" phase (activities.py) would wait on is_moving forever with
     # no route ever progressing to clear it.
     c["is_moving"] = plan_character_route(world, c, prop.get("x", 0), prop.get("y", 0))
+    if c["is_moving"]:
+        from systems.movement import start_moving
+        start_moving(c, world)
     c["activity"] = _occupy(c, world, act)
     c["animation_state"] = "walk"
 
@@ -3894,7 +3903,8 @@ def _route_turn_and_run(c, world, action):
     c["_panic_fleeing"] = {"from_id": aggressor_id, "tick": world.get("tick", 0)}
     if plan_character_route(world, c, flee_x, flee_y):
         c["animation_state"] = "run"
-        c["is_moving"] = True
+        from systems.movement import start_moving
+        start_moving(c, world)
 
 
 # =========================================================
@@ -4768,7 +4778,8 @@ def _route_watch_tv(c, world, action):
         wx, wy = _walk_target_for(seat, "sit")
         if plan_character_route(world, c, wx, wy):
             c["animation_state"] = "walk"
-            c["is_moving"] = True
+            from systems.movement import start_moving
+            start_moving(c, world)
         c["activity"] = _occupy(c, world, {
             "type": "watch_tv", "phase": "walking",
             "phase_started_tick": world.get("tick", 0),

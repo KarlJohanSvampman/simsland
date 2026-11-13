@@ -202,7 +202,8 @@ def _start_investigation(c, world, target):
 
     if (ax, ay) != (c.get("x", 0), c.get("y", 0)) and plan_character_route(world, c, ax, ay):
         c["animation_state"] = "walk"
-        c["is_moving"] = True
+        from systems.movement import start_moving
+        start_moving(c, world)
 
     c["_investigating"] = {
         "kind": target["kind"], "target_x": tx, "target_y": ty,

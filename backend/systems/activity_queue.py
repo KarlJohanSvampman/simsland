@@ -427,7 +427,8 @@ def _dispatch_carry_seat(c, world, task):
     # Route character to the seat's current position
     c["move_target"]     = {"x": seat_prop["x"], "y": seat_prop["y"],
                              "target_id": seat_prop_id, "target_type": "prop"}
-    c["is_moving"]       = True
+    from systems.movement import start_moving
+    start_moving(c, world)
     c["activity"]        = _occupy(c, world, act)
     c["animation_state"] = "walk"
     c["_queue_task_id"]  = task["id"]
@@ -469,7 +470,8 @@ def _dispatch_use_seat(c, world, task):
 
     c["move_target"]       = {"x": seat_prop["x"], "y": seat_prop["y"],
                                "target_id": seat_prop_id, "target_type": "prop"}
-    c["is_moving"]         = True
+    from systems.movement import start_moving
+    start_moving(c, world)
     c["activity"]          = _occupy(c, world, act)
     c["animation_state"]   = "walk"
     c["_queue_task_id"]    = task["id"]

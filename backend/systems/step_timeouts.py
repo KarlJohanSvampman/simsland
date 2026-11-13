@@ -266,7 +266,7 @@ def _unstick_trip(c, world, st):
     if state in travel.TRAVEL_WALKING_STATES:
         target = travel._walk_target(c, world, state)
         if st["tries"] == 0 and target and travel.plan_character_route(world, c, target[0], target[1]):
-            travel._set_off(c)
+            travel._set_off(c, world)
             _report(c, world, st, where, "set off again on a fresh route")
             tick = world.get("tick", 0)
             c["_step"] = new = dict(st, progress=tick, start=tick, tries=1, pos=[c.get("x", 0), c.get("y", 0)])
