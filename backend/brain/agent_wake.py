@@ -66,7 +66,7 @@ def wake_now(c, reason="event"):
     if c is None:
         return
     w = _rec(c)
-    w["at"], w["why"] = float("-inf"), reason
+    w["at"], w["why"] = 0.0, reason      # any time in the past is due (and, unlike -inf, it is valid JSON)
 
 
 def wake_at(c, world, ts, reason="timer"):

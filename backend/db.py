@@ -374,35 +374,31 @@ def _load_world_cold(sim_id):
     # LOAD DB
     # =====================================
 
-    with _conn_lock, conn.cursor() as cur:
-
-        cur.execute(
-
-            """
-            SELECT data
-            FROM world
-            WHERE simulation_id=%s
-            """,
-
-            (sim_id,)
-        )
-
-        row = cur.fetchone()
-
-        world = (
-
-            row[0]
-
-            if row else {
-
-                "tick": 0,
-
-                "characters": {},
-
-                "props": []
-            }
-            
-        )
+    # Per-entity records first (core/entity_store.py): they are written every flush; the blob only now and then.
+    world = None
+    from core import world_state as _ws
+    if _ws.WORLD_STORE == "entities":
+        from core import entity_store
+        world = entity_store.load(sim_id)
+    if world is None:
+        with _conn_lock, conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT data
+                FROM world
+                WHERE simulation_id=%s
+                """,
+                (sim_id,)
+            )
+            row = cur.fetchone()
+            world = (
+                row[0]
+                if row else {
+                    "tick": 0,
+                    "characters": {},
+                    "props": []
+                }
+            )
 
     # =====================================
     # WORLD DEFAULTS

@@ -37,11 +37,17 @@ guard that compared a tuple with the list it had become and therefore never matc
 
 import json
 import queue
+import os
 import threading
 import time
 from contextlib import contextmanager
 
 PERSIST_EVERY_TICKS = 15
+# How the world is made durable (core/entity_store.py): "entities" -- per-entity rows, only what changed, one
+# transaction per flush -- or "blob" (the whole world as one JSON value, the old way). With entities the blob is still
+# written every BLOB_EVERY_TICKS (and at shutdown) as a backup and for tools that read it.
+WORLD_STORE = os.getenv("WORLD_STORE", "entities").lower()
+BLOB_EVERY_TICKS = int(os.getenv("WORLD_BLOB_EVERY_TICKS", "300"))
 
 _lock = threading.Lock()              # protects _residents / the snapshot cache bookkeeping
 _residents = {}
@@ -53,7 +59,7 @@ _stats = {"snapshots": 0, "persists": 0, "persist_ms": 0.0, "last_persist_tick":
 
 
 class _Resident:
-    __slots__ = ("world", "version", "snap_key", "snap_json", "persisted_tick", "persisted_version")
+    __slots__ = ("world", "version", "snap_key", "snap_json", "persisted_tick", "persisted_version", "blob_tick")
 
     def __init__(self, world):
         self.world = world
@@ -62,6 +68,7 @@ class _Resident:
         self.snap_json = None
         self.persisted_tick = world.get("tick", 0)
         self.persisted_version = 0
+        self.blob_tick = world.get("tick", 0)
 
 
 # ── who holds the world lock ──────────────────────────────────────────────────
@@ -242,14 +249,27 @@ def persist_async(sim_id, reason="interval"):
 
     def go():
         t0 = time.perf_counter()
-        text = entry.snap_json if entry.snap_key == (entry.world.get("tick"), entry.version) and entry.snap_json else _render(entry)
-        entry.persisted_tick = entry.world.get("tick", 0)
+        tick = entry.world.get("tick", 0)
+        if WORLD_STORE == "entities":
+            from core import entity_store
+            only = _touched_since_flush(sim_id)
+            upserts, deletes, _m = entity_store.diff(sim_id, entry.world, only=only)
+            entity_store.note_written(sim_id, upserts, deletes)
+            payload = ("entities", upserts, deletes)
+            _stats["last_persist_bytes"] = sum(len(t) for t in upserts.values())
+            if tick - entry.blob_tick >= BLOB_EVERY_TICKS or reason in ("save", "shutdown"):
+                entry.blob_tick = tick
+                _ensure_writer()
+                _writer_q.put((sim_id, _render(entry), tick, reason + "+blob"))
+        else:
+            payload = entry.snap_json if entry.snap_key == (entry.world.get("tick"), entry.version) and entry.snap_json else _render(entry)
+            _stats["last_persist_bytes"] = len(payload)
+        entry.persisted_tick = tick
         entry.persisted_version = entry.version
         _stats["persist_ms"] += (time.perf_counter() - t0) * 1000
-        _stats["last_persist_bytes"] = len(text)
         _stats["queued"] += 1
         _ensure_writer()
-        _writer_q.put((sim_id, text, entry.world.get("tick", 0), reason))
+        _writer_q.put((sim_id, payload, tick, reason))
 
     if holding():
         go()
@@ -266,14 +286,39 @@ def persist_now(sim_id):
         return False
     with db._world_lock:
         text = _render(entry)
+        payload = None
+        if WORLD_STORE == "entities":
+            from core import entity_store
+            upserts, deletes, _m = entity_store.diff(sim_id, entry.world)
+            entity_store.note_written(sim_id, upserts, deletes)
+            payload = ("entities", upserts, deletes)
         entry.persisted_tick = entry.world.get("tick", 0)
     _writer_q.join()
     _write(sim_id, text, entry.world.get("tick", 0), "shutdown")
+    if payload is not None:
+        _write(sim_id, payload, entry.world.get("tick", 0), "shutdown")
     return True
+
+
+def _touched_since_flush(sim_id):
+    """The entities the WorldView façade saw touched since the last flush (core/world_view.py), or None (compare all)."""
+    try:
+        from core import world_view
+        return world_view.take_touched(sim_id)
+    except Exception:
+        return None
 
 
 def _write(sim_id, text, tick, reason):
     import db
+    if isinstance(text, tuple) and text and text[0] == "entities":
+        from core import entity_store
+        entity_store.write(sim_id, text[1], text[2], tick)
+        _stats["persists"] += 1
+        _stats["last_persist_tick"] = tick
+        return
+    if reason == "initial" and WORLD_STORE == "entities":
+        _replace_entities(sim_id, json.loads(text), tick)
     t0 = time.perf_counter()
     with db._conn_lock, db.conn:
         with db.conn.cursor() as cur:
@@ -291,6 +336,33 @@ def _write(sim_id, text, tick, reason):
     _stats["write_ms"] = round((time.perf_counter() - t0) * 1000, 1)
 
 
+def _replace_entities(sim_id, world, tick):
+    """A whole new world saved outside the resident one (a generated world, the fixture builder): its entity rows
+    replace whatever this sim had, so an older set can never be loaded instead of it."""
+    import db
+    from core import entity_store
+    with db._conn_lock, db.conn:
+        with db.conn.cursor() as cur:
+            entity_store.ensure_tables(cur)
+            cur.execute("DELETE FROM entities WHERE sim_id=%s", (sim_id,))
+    entity_store.forget(sim_id)
+    upserts, deletes, _m = entity_store.diff(sim_id, world)
+    entity_store.note_written(sim_id, upserts, deletes)
+    entity_store.write(sim_id, upserts, [], tick)
+
+
+def _merge_payloads(a, b):
+    """Two queued entity diffs as one (b is newer)."""
+    ups, dels = dict(a[1]), set(a[2])
+    for k, v in b[1].items():
+        ups[k] = v
+        dels.discard(k)
+    for k in b[2]:
+        ups.pop(k, None)
+        dels.add(k)
+    return ("entities", ups, sorted(dels))
+
+
 def _ensure_writer():
     global _writer_started
     if _writer_started:
@@ -306,15 +378,26 @@ def _writer_loop():
     while True:
         sim_id, text, tick, reason = _writer_q.get()
         try:
-            # only the newest queued snapshot matters: drop older ones waiting behind it
+            # Whole snapshots: only the newest queued one matters. Entity diffs are increments: merged, never dropped.
+            pending = [(sim_id, text, tick, reason)]
             while True:
                 try:
-                    nxt = _writer_q.get_nowait()
+                    pending.append(_writer_q.get_nowait())
                     _writer_q.task_done()
-                    sim_id, text, tick, reason = nxt
                 except queue.Empty:
                     break
-            _write(sim_id, text, tick, reason)
+            blob = None
+            diffs = {}
+            for s_id, payload, t, why in pending:
+                if isinstance(payload, tuple):
+                    prev = diffs.get(s_id)
+                    diffs[s_id] = (_merge_payloads(prev[0], payload) if prev else payload, t, why)
+                else:
+                    blob = (s_id, payload, t, why)
+            for s_id, (payload, t, why) in diffs.items():
+                _write(s_id, payload, t, why)
+            if blob:
+                _write(*blob)
         except Exception as exc:
             _stats["write_errors"] += 1
             print(f"[world_state] durable write failed: {exc!r}")
