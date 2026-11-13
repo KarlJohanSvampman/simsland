@@ -29,17 +29,21 @@ def _notes_waiting(c):
             if not n.get("used") and (n.get("verdict") == "dislike" or n.get("comment") or n.get("suggestion"))]
 
 
-def note_given(c):
+def note_given(c, world=None):
     """A note was made or changed (api/dialogue_feedback.py)."""
     if _notes_waiting(c):
         c["_rules_due"] = c.get("_rules_due") or "notes"
+        from systems import bg_work
+        bg_work.note(world, "rules", c.get("id"))
 
 
-def ask_now(c):
+def ask_now(c, world=None):
     """The director asked for rules from the notes so far."""
     if not _notes_waiting(c):
         return False
     c["_rules_due"] = "asked"
+    from systems import bg_work
+    bg_work.note(world, "rules", c.get("id"))
     return True
 
 
@@ -138,9 +142,15 @@ def service(c, world):
 
 
 def service_all(world):
-    for c in (world.get("characters") or {}).values():
-        if c.get("_rules_due") or c.get("_rules_ask"):
+    """The characters with rules work waiting (systems/bg_work.py), not everyone."""
+    from systems import bg_work
+    chars = world.get("characters") or {}
+    for cid in bg_work.targets(world, "rules"):
+        c = chars.get(cid)
+        if c and (c.get("_rules_due") or c.get("_rules_ask")):
             try:
                 service(c, world)
             except Exception as exc:
                 print(f"[personal_rules] {c.get('id')}: {exc!r}")
+        if not c or not (c.get("_rules_due") or c.get("_rules_ask")):
+            bg_work.done(world, "rules", cid)

@@ -57,6 +57,19 @@ check("... and the timer arms the sports_watching duty", scheduler.pending(w, "d
 w["sports_leagues"]["football"]["pro"]["schedule"][0]["attendees"]["a"]["started"] = True
 check("once everyone has set off, nothing is pending", not S.kickoff_pending(w))
 
+# ── background-LLM work: only the entities that have some are looked at ─────────────────────────────────────────────
+from systems import bg_work
+w = W(0)
+w["characters"] = {"a": {"id": "a", "_loop_assessment": {"x": 1}}, "b": {"id": "b"}}
+w["households"] = {"h": {"id": "h", "daily_summaries": [{"id": "d", "pending": {"kind": "daily", "lines": []}}]}}
+check("a world never seen before is scanned once for waiting work",
+      bg_work.targets(w, "loop") == ["a"] and bg_work.targets(w, "hhsum") == ["h"], w.get("_bg_work"))
+bg_work.note(w, "rules", "b")
+check("noted work makes the duty active and arms it", bg_work.active(w) and scheduler.pending(w, "duty:background_services"))
+for k, i in (("loop", "a"), ("hhsum", "h"), ("rules", "b")):
+    bg_work.done(w, k, i)
+check("nothing waiting: the duty has no work", not bg_work.active(w))
+
 print()
 print("all passed" if not failures else f"FAILED: {', '.join(failures)}")
 sys.exit(1 if failures else 0)

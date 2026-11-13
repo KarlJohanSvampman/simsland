@@ -127,6 +127,8 @@ def _generate_theory_for(c, other_id, pattern, world):
         return
     pattern["theory"] = {"text": f"Probably just {pattern['activity']}.", "valence": "optimistic"}
     pattern["theory_pending"] = True
+    from systems import bg_work
+    bg_work.note(world, "theory", c["id"])
 
 
 def _apply_pessimistic_followup(c, other_id, other, pattern, world):
@@ -153,8 +155,13 @@ def _apply_pessimistic_followup(c, other_id, other, pattern, world):
 def service_theories(world):
     """Submit and collect the background theory calls. The request lives on the
     pattern (theory_pending), so a restart simply re-submits it."""
-    from systems import bg_llm
-    for c in world.get("characters", {}).values():
+    from systems import bg_llm, bg_work
+    chars = world.get("characters", {})
+    for cid in bg_work.targets(world, "theory"):
+        c = chars.get(cid)
+        if not c or not any(p.get("theory_pending") for ps in (c.get("behavior_patterns") or {}).values() for p in ps):
+            bg_work.done(world, "theory", cid)
+            continue
         for other_id, patterns in (c.get("behavior_patterns") or {}).items():
             for pattern in patterns:
                 if not pattern.get("theory_pending"):

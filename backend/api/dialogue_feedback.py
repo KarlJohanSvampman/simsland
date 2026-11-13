@@ -53,7 +53,7 @@ def give_note(speaker_id: str, body: NoteIn, sim_id: str = "default"):
         except ValueError as e:
             raise HTTPException(400, str(e))
         from systems.personal_rules import note_given
-        note_given(c)
+        note_given(c, world)
         _save(sim_id, world, speaker_id)
     return {"ok": True, "note": note}
 

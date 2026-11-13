@@ -66,7 +66,7 @@ def ask(char_id: str, sim_id: str = "default"):
     with world_lock():
         world = load_world(sim_id)
         c = _char(world, char_id)
-        if not ask_now(c):
+        if not ask_now(c, world):
             raise HTTPException(400, "no notes waiting -- like / dislike a line, say why or suggest a better one first")
         _save(sim_id, world, char_id)
         return _view(c, world)
