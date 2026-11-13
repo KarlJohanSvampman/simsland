@@ -553,3 +553,26 @@ component; a replayable event log.
   per step; a separate rate only matters once movement is its own process, step 5), and a spatial index for perception
   (the perception job is already event-driven with a 5 s settle; finding who is affected is an O(n) scan, negligible
   at this population -- worth doing at a few hundred characters).
+- **No-tick, part B: periodic jobs (partly done; stopped here by decision)** — measured first (every PROCESS job's
+  runs, cost and whether a run changed anything, 1 h of varied play): all of them together cost well under 1 ms per
+  sim-second, so what is left is architecture, not speed. Done: the two every-second jobs are gone -- `body_moment`
+  (anger, intoxication, arousal, baby needs, blushes/daydreams become lazy values of sim time, `core/lazy.py`, at the
+  old per-tick rates, brought up to date in the character's own update, with timers at the thresholds that matter;
+  walking in on someone undressed is the `nudity` active loop; micro-requests a one-tick timer) and `phone_battery`
+  (batteries lazy under the owner's regime -- idle / in use / charging -- with a timer at off / usable / full).
+  Plants run on their own timers (thresholds, growth stages; every 30 s only while they need attention).
+  `memory_decay` is gone (the lazy fade runs in every character update). A new kind of job, **DUTY** (`core/flow.py`):
+  continuous only while there is work -- armed by whatever starts it (`wake_duty`), its old cadence while its cheap
+  world-level check holds, no timer at all otherwise; an hourly safety check reports a start site that forgot
+  `wake_duty`. Converted: grapples, scripted conversations, household processes, messages, service vans, rideshare,
+  fires, intercourse sessions, conversation tagging; parcels are timed for their arrival tick.
+  **Left as PROCESS jobs (57):** ~15 are genuine world processes that change something every run -- market, job market,
+  weather, news, elections, faction/hierarchy/migration, traffic, crises, the movement-log sampler, the movement safety
+  sweep, riftscan (the plan's "calendar" kind, already clock-anchored); ~10 are "while active" and would be quick DUTY
+  conversions (reading, sports broadcasts, emergencies, trials/jail, social projects, detective stories, kids' play,
+  business inboxes, background-LLM mailboxes, services/staffing); ~30 are per-character sweeps that change nothing in
+  most runs (grudges, grievances/goodwill, libido, polarization, stress/psychosis, cravings, long-term needs,
+  cleanliness/clothing, relationships while together, contagion, social odor, claustrophobia, worries/focus,
+  exhaustion, influence, popularity, household monitoring, child care, domestic control, cookware, calendar
+  reminders, contract checks, persona expectations, mentality compilation, appliance wear, orphan props) -- each
+  wants the part-C treatment (lazy value + timers at its own thresholds, or an event).
