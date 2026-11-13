@@ -126,7 +126,6 @@ JOBS = [
     CLOCK("home_presence", "_job_home_presence", "the hourly 'are they home' sample", hourly=46),
 
     # ── processes: time passing ────────────────────────────────────────────────────────────────────────────────────
-    PROCESS("memory_decay", "_job_memory_decay", 15 * SECOND, "memories fade"),
     PROCESS("polarization", "_job_polarization", 15 * SECOND, "opinions drift"),
     PROCESS("relationships", "_job_relationships", 15 * SECOND, "time spent near each other builds familiarity"),
     PROCESS("grievances", "_job_grievances", 15 * SECOND, "grievances, goodwill, guilt fade or grow"),

@@ -1028,13 +1028,6 @@ def _job_attention(world, entry):
             update_attention(c, world)
 
 
-def _job_memory_decay(world, entry):
-    """Scheduled job `memory_decay` (was an every() block in tick()); see core/scheduler.py."""
-    characters = [c for c in world.get("characters", {}).values() if not c.get("is_workplace_npc")]
-    for c in characters:
-        decay_memories(c, world)      # the lazy fade: forgets what has fallen under the threshold
-
-
 def _job_polarization(world, entry):
     """Scheduled job `polarization` (was an every() block in tick()); see core/scheduler.py."""
     characters = [c for c in world.get("characters", {}).values() if not c.get("is_workplace_npc")]
