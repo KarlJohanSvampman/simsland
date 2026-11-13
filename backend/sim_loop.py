@@ -42,6 +42,7 @@ from brain.intentions   import set_current_tick
 from systems.reactions  import process_reaction_queue
 import systems.step_timeouts  # noqa: F401 -- registers the "stuck" timeout handler before any timer fires
 import systems.path_debug     # noqa: F401 -- registers the "pathalarm" handler (the end of a lost episode)
+import systems.transit        # noqa: F401 -- registers the bus loop and its 15-minute slots
 import systems.movement_log   # noqa: F401 -- registers the 15-second movement sampling job
 import systems.feelings       # noqa: F401 -- registers the daily standing snapshot
 import systems.conversation_archive  # noqa: F401 -- registers the conversation-tagging job
@@ -90,7 +91,6 @@ from systems.newspaper_delivery import update_newspaper_delivery
 from systems.business_support   import process_business_inboxes
 from systems.service_vehicles   import update_service_vehicles
 from systems.rideshare          import update_rideshare_vehicles
-from systems.transit            import update_bus
 from systems.appliance_degradation import update_appliance_degradation
 from systems.messaging  import deliver_messages
 from systems.migration  import check_migration_desires
@@ -165,7 +165,6 @@ from systems.baby     import tick_baby_hourly, tick_baby_daily, tick_baby_weekly
 from systems.nudity_perception import tick_nudity_perception
 from systems.crushes import tick_crushes
 from systems.incidental_speech import tick_incidental_speech, clear_departure_flags
-from brain.perception import cleanup_ambient_sounds
 from systems.conditioning import tick_conditioning_weekly
 
 # -- Weekly ───────────────────────────────────────────────────────
@@ -613,9 +612,11 @@ def _tick_impl(world):
         generate_job_listings(world)
 
 
-    # Not every()-gated -- the 15-sim-minute bus schedule (see transit.py)
-    # needs single-tick precision to catch the boundary reliably.
-    update_bus(world)
+    # The bus runs only while a departure is due or a trip is under way (systems/transit.py: the clock marks each
+    # 15-minute slot; core/active_loops.py runs it).
+    from systems.transit import ensure_bus_member
+    ensure_bus_member(world)
+    active_loops.run_one(world, "bus")
 
 
 
@@ -677,7 +678,9 @@ def _tick_impl(world):
     _prof.mark("section:prune_expired_transient_ambient_sounds")
     # -- Prune expired transient ambient sounds (see brain/perception.py's
     # emit_ambient_sound/VOLUME_TIERS) ──────────────────────
-    cleanup_ambient_sounds(world)
+    from brain.perception import ensure_ambient_member
+    ensure_ambient_member(world)
+    active_loops.run_one(world, "ambient_sounds")
 
     _prof.mark("section:intimacy_arousal_decay")
     # -- Intimacy arousal decay (every tick) ───────────────

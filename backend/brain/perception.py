@@ -186,6 +186,8 @@ def emit_ambient_sound(world, x, y, sound, volume=DEFAULT_VOLUME, duration=AMBIE
         "x": x, "y": y, "sound": sound, "volume": volume,
         "tick": tick, "expires_at_tick": tick + duration,
     })
+    from core import active_loops
+    active_loops.add(world, "ambient_sounds", "sounds")
 
 
 def cleanup_ambient_sounds(world):
@@ -194,6 +196,23 @@ def cleanup_ambient_sounds(world):
     if not sounds:
         return
     world["ambient_sounds"] = [e for e in sounds if e.get("expires_at_tick", 0) >= tick]
+
+
+def ambient_sounds_step(world, ids):
+    """The "ambient_sounds" active loop: runs while a one-off sound is still playing, and drops out once none is."""
+    cleanup_ambient_sounds(world)
+    return [] if world.get("ambient_sounds") else ["sounds"]
+
+
+def ensure_ambient_member(world):
+    from core import active_loops
+    if "ambient_sounds" in (world.get("_active_loops") or {}):
+        return
+    active_loops.rebuild(world, "ambient_sounds", ["sounds"] if world.get("ambient_sounds") else [])
+
+
+from core import active_loops as _active_loops      # noqa: E402
+_active_loops.register("ambient_sounds", ambient_sounds_step, order=40)
 
 
 # =========================================================
