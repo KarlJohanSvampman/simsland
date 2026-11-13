@@ -132,6 +132,9 @@ def update_emotion(c, world=None):
             active_mood["expires_ts"] = now + (active_mood.get("remaining_ticks", 0) - 1) * TICK_RATE_SECONDS
         if now >= active_mood["expires_ts"]:
             c["mood"] = None
+        elif world is not None:
+            from brain import agent_wake
+            agent_wake.wake_at(c, world, active_mood["expires_ts"], "mood_ends")
 
     # Check if a new mood should be triggered
     if world and not c.get("mood"):
@@ -153,6 +156,8 @@ def _maybe_trigger_mood(c, world):
         c["_mood_cooldown_until_ts"] = _now_ts(c, world) + ((c.pop("_mood_cooldown_until") or 0)
                                                              - (world.get("tick", 0) or 0)) * TICK_RATE_SECONDS
     if _now_ts(c, world) < (c.get("_mood_cooldown_until_ts") or float("-inf")):
+        from brain import agent_wake          # a new mood can come once the cooldown is over
+        agent_wake.wake_at(c, world, c["_mood_cooldown_until_ts"], "mood_cooldown")
         return
 
     body       = c.get("body", {})

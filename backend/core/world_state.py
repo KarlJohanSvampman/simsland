@@ -208,6 +208,14 @@ def save(sim_id, world):
                 replace()
     entry.version += 1
     entry.snap_key = None
+    # A route changed the world (the editor, an admin or director action): whatever it changed about anyone, their
+    # update sees it on the next step (brain/agent_wake.py) rather than at their next heartbeat.
+    try:
+        from brain import agent_wake
+        for _c in (entry.world.get("characters") or {}).values():
+            agent_wake.wake_now(_c, "route")
+    except Exception as exc:
+        print(f"[world_state] could not wake characters after a save: {exc!r}")
     try:
         from core import replication
         replication.publisher.force_full()

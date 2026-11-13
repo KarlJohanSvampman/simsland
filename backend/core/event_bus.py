@@ -35,6 +35,15 @@ _queue_overflow_warned = False
 _depth_exceeded_count = 0
 
 
+_after_dispatch = []          # hook(event_type, data, world) after every event's handlers (brain/agent_wake.py)
+
+
+def after_dispatch(hook):
+    """Run hook(event_type, data, world) after the handlers of every event (not per type)."""
+    if hook not in _after_dispatch:
+        _after_dispatch.append(hook)
+
+
 def subscribe(event_type: str, handler):
     """Register a handler for an event type. Called at import time."""
     _subscribers[event_type].append(handler)
@@ -109,6 +118,11 @@ def flush(world, _depth=0):
 
     for event_type, data in pending:
         dispatch(event_type, data, world)
+        for hook in _after_dispatch:
+            try:
+                hook(event_type, data, world)
+            except Exception:
+                traceback.print_exc()
 
     # If handlers emitted new events, process those too, up to the depth cap.
     with _lock:

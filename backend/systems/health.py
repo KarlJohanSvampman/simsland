@@ -1747,10 +1747,12 @@ def _maybe_dehydration_cough(char, world):
     if hydration >= DEHYDRATION_COUGH_THRESHOLD:
         return
     tick = world.get("tick", 0)
+    from brain import agent_wake
     last = char.get("_last_dehydration_cough_tick")
     if last is not None and tick - last < DEHYDRATION_COUGH_COOLDOWN_TICKS:
+        agent_wake.wake_at(char, world, agent_wake.at_tick(world, last + DEHYDRATION_COUGH_COOLDOWN_TICKS), "cough_cooldown")
         return
-    if random.random() >= DEHYDRATION_COUGH_CHANCE:
+    if not agent_wake.chance(char, world, "cough", DEHYDRATION_COUGH_CHANCE):
         return
     char["_last_dehydration_cough_tick"] = tick
     try:
@@ -1776,10 +1778,11 @@ def _maybe_snore(char, world):
         return
 
     tick = world.get("tick", 0)
+    from brain import agent_wake
     if char.get("_snoring_until_tick", 0) > tick:
+        agent_wake.wake_at(char, world, agent_wake.at_tick(world, char["_snoring_until_tick"]), "snore_ends")
         return   # already mid-snore
-
-    if random.random() >= SNORE_CHANCE_PER_CHECK:
+    if not agent_wake.chance(char, world, "snore", SNORE_CHANCE_PER_CHECK):     # the same per-tick chance, drawn ahead
         return
 
     remaining_sleep = act.get("duration", 0) - (tick - act.get("phase_started_tick", tick))
@@ -1814,6 +1817,16 @@ def process_health(char, world):
         tick_coma(char, world)
 
     em = char.get("health_state", {}).get("active_emergencies", {})
+
+    # When this has to run again (brain/agent_wake.py): at the next daily boundary (the weekly one is one of them), and
+    # on every step while something moves step by step (an emergency, a ticking hazard or symptom, dehydration).
+    from brain import agent_wake
+    agent_wake.wake_at(char, world, agent_wake.at_tick(world, (tick // TICKS_PER_DAY + 1) * TICKS_PER_DAY), "health_day")
+    hs = char.get("health_state") or {}
+    if (em or any(bp.get("hazards") for bp in (hs.get("body_parts") or {}).values())
+            or any((st or {}).get("current_symptom") for st in (char.get("condition_state") or {}).values())
+            or (char.get("body") or {}).get("hydration", 100.0) < DEHYDRATION_COUGH_THRESHOLD):
+        agent_wake.wake_at(char, world, agent_wake.at_tick(world, tick + 1), "health_ongoing")
 
     if "heart_attack" in em:
         tick_heart_attack(char, world)

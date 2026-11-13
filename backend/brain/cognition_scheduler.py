@@ -195,6 +195,10 @@ def wake_character(c, world, reason, payload=None, delay=0):
     cog["wake_seq"] = cog.get("wake_seq", 0) + 1      # note_think() keeps a wake that came after the decision was asked for
 
     cog["next_think_tick"] = min(cog.get("next_think_tick", tick), target_tick)
+    # ... and their update runs then (brain/agent_wake.py)
+    from brain import agent_wake
+    from core.clock import now_ts
+    agent_wake.wake_at(c, world, now_ts(world) + max(0, delay), reason)
 
 
 # Plain-format wake-reason templates rendered against cog["wake_payload"] —

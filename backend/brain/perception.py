@@ -188,6 +188,8 @@ def emit_ambient_sound(world, x, y, sound, volume=DEFAULT_VOLUME, duration=AMBIE
     })
     from core import active_loops
     active_loops.add(world, "ambient_sounds", "sounds")
+    from brain import agent_wake
+    agent_wake.wake_near(world, x, y, reason="ambient_sound")
 
 
 def cleanup_ambient_sounds(world):

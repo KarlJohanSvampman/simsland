@@ -117,6 +117,8 @@ JOBS = [
     PROCESS("grapples", "_job_grapples", 5 * SECOND, "a grapple in progress moves on"),
     PROCESS("reading", "_job_reading", 5 * SECOND, "reading in progress"),
     PROCESS("sports_watching", "_job_reading_2", 5 * SECOND, "games kick off and are broadcast"),
+    CLOCK("agent_hourly_wake", "brain.agent_wake:_hourly",
+          "top of the hour: every character's update runs (hour-grained plans, habits, daily checks)", hourly=0),
     *[CLOCK(f"bus_slot_{m:02d}", "systems.transit:_bus_slot",
             "a bus departure is due: the bus joins its active loop (core/active_loops.py) until the trip is over",
             hourly=m * MINUTE) for m in (0, 15, 30, 45)],

@@ -42,6 +42,7 @@ from brain.intentions   import set_current_tick
 from systems.reactions  import process_reaction_queue
 import systems.step_timeouts  # noqa: F401 -- registers the "stuck" timeout handler before any timer fires
 import systems.path_debug     # noqa: F401 -- registers the "pathalarm" handler (the end of a lost episode)
+import brain.agent_wake       # noqa: F401 -- events wake the characters they are about
 import systems.transit        # noqa: F401 -- registers the bus loop and its 15-minute slots
 import systems.movement_log   # noqa: F401 -- registers the 15-second movement sampling job
 import systems.feelings       # noqa: F401 -- registers the daily standing snapshot
@@ -549,9 +550,35 @@ def _tick_impl(world):
         and c.get("alive") is not False
         and c.get("posture") != "incapacitated"
     ]
+    # Only characters who are due run (brain/agent_wake.py): woken by an event, a timer of their own, their decision
+    # cycle, or the heartbeat. AGENT_GATING=off runs everyone; =shadow runs everyone and records what skipping would
+    # have missed.
+    from brain import agent_wake
+    gating = agent_wake.MODE
     for c in agent_chars:
         try:
-            _run_agent(c, world, t)
+            if gating == "off":
+                _run_agent(c, world, t)
+            else:
+                would_run, why = agent_wake.due(c, world)
+                if would_run:
+                    agent_wake.begin_run(c, world)
+                if gating == "shadow":
+                    before = agent_wake.shadow_before(c)
+                    agent_wake.IN_SKIPPABLE = not would_run
+                    try:
+                        _run_agent(c, world, t)
+                    finally:
+                        agent_wake.IN_SKIPPABLE = False
+                    agent_wake.shadow_after(c, world, before, would_run, why)
+                    if not would_run:          # as if skipped: the gate's own clock does not move
+                        dirty_char_ids.add(c["id"])
+                        continue
+                elif would_run:
+                    _run_agent(c, world, t)
+                else:
+                    continue
+            agent_wake.note_run(c, world)
             dirty_char_ids.add(c["id"])
         except Exception as exc:
             import traceback as _tb

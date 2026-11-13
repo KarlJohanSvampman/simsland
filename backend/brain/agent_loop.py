@@ -322,6 +322,13 @@ def update_economy(
     maybe_consolidate_memories(c, world)
     _prof.mark("economy:maybe_forget_short_term")
     maybe_forget_short_term(c, world)
+    # ... and run again when the interval is up (brain/agent_wake.py), not on every look
+    from systems.memory_consolidation import CONSOLIDATION_INTERVAL_TICKS, FORGET_INTERVAL_TICKS
+    from brain import agent_wake
+    for key, every in (("_last_memory_consolidation_tick", CONSOLIDATION_INTERVAL_TICKS),
+                       ("_last_memory_forget_tick", FORGET_INTERVAL_TICKS)):
+        if c.get(key) is not None:
+            agent_wake.wake_at(c, world, agent_wake.at_tick(world, c[key] + every), "memory_upkeep")
 
 
 # =========================================================
@@ -1013,6 +1020,17 @@ def update_agent(
         alarm = c.get("phone_alarm")
         now_minute = world.get("calendar", {}).get("minute_of_day", -1)
         snooze = c.get("_alarm_snooze")
+        # The minutes that matter while asleep are known: the alarm's and a snooze's recheck (brain/agent_wake.py).
+        if act_type == "sleep":
+            from brain import agent_wake
+            if alarm and alarm.get("minute_of_day") is not None and not snooze:
+                agent_wake.wake_at_minute(c, world, alarm["minute_of_day"], "alarm")
+            if snooze and snooze.get("next_check_minute") is not None:
+                agent_wake.wake_at_minute(c, world, snooze["next_check_minute"], "alarm_snooze")
+        _bed_cooldown_end = c.get("_bedtime_interrupt_tick", -10 ** 9) + 600
+        if world.get("tick", 0) < _bed_cooldown_end:
+            from brain import agent_wake
+            agent_wake.wake_at(c, world, agent_wake.at_tick(world, _bed_cooldown_end), "bedtime_cooldown")
         alarm_ringing = act_type == "sleep" and alarm and alarm.get("minute_of_day") == now_minute and not snooze
         alarm_rechecking = act_type == "sleep" and snooze and snooze.get("next_check_minute") == now_minute
 

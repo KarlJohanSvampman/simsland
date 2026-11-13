@@ -85,6 +85,13 @@ def process_reflections(
         "pending_reflections"
     ] = remaining
 
+    if remaining:                       # the next one is handled when it is due (brain/agent_wake.py)
+        from brain import agent_wake
+        from core.clock import now_ts
+        from core.tick_schedule import TICK_RATE_SECONDS
+        agent_wake.wake_at(c, world, now_ts(world) + (min(r["scheduled_tick"] for r in remaining) - now) * TICK_RATE_SECONDS,
+                           "reflection")
+
 # =========================================================
 # HANDLE REFLECTION
 # =========================================================

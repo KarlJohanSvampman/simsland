@@ -271,6 +271,11 @@ def add_intention(
         None
     )
 
+    # something new to want: their update runs next (brain/agent_wake.py), whoever added it
+    if existing is None:
+        from brain import agent_wake
+        agent_wake.wake_now(c, "intention_added")
+
     if "created_at" not in intention:
         if existing and "created_at" in existing:
             intention["created_at"] = existing["created_at"]
@@ -382,6 +387,12 @@ def check_intention_deadlines(c, world):
         i["priority"] = min(100, i.get("priority", 0) + INTENTION_PRIORITY_ESCALATION)
         i["deadline_tick"] = tick + _deadline_window(i, c)
         record_checkin(c, world, i)
+    # the next deadline is checked when it comes, not on every look (brain/agent_wake.py)
+    upcoming = [i["deadline_tick"] for i in c.get("active_intentions", [])
+                if i.get("deadline_tick") is not None and not str(i.get("type", "")).startswith("expectation:")]
+    if upcoming:
+        from brain import agent_wake
+        agent_wake.wake_at(c, world, agent_wake.at_tick(world, min(upcoming)), "intention_deadline")
 
 
 CHECKINS_KEPT = 5

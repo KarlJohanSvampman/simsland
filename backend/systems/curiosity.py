@@ -71,11 +71,17 @@ def tick_curiosity(c, world):
 
     if c.get("_investigating"):
         _resolve_investigation(c, world)
+        if c.get("_investigating"):        # still on the way / looking: followed step by step (brain/agent_wake.py)
+            from brain import agent_wake
+            agent_wake.wake_at(c, world, agent_wake.at_tick(world, world.get("tick", 0) + 1), "investigating")
         return
 
     tick = world.get("tick", 0)
     last_check = c.get("_curiosity_last_check", -999999)
     if tick - last_check < CURIOSITY_CHECK_INTERVAL:
+        if c.get("_curiosity_target"):      # something notable was around at the last look: look again on time
+            from brain import agent_wake
+            agent_wake.wake_at(c, world, agent_wake.at_tick(world, last_check + CURIOSITY_CHECK_INTERVAL), "curiosity")
         return
     c["_curiosity_last_check"] = tick
 
@@ -84,8 +90,14 @@ def tick_curiosity(c, world):
         return
 
     target = _find_notable_target(c, world)
+    c["_curiosity_target"] = bool(target)
     if not target:
-        return
+        return                          # nothing to look into: something new nearby wakes them (brain/agent_wake.py)
+    # While something notable is around, look again after the usual interval (the update may not run in between).
+    from brain import agent_wake
+    from core.clock import now_ts
+    from core.tick_schedule import TICK_RATE_SECONDS
+    agent_wake.wake_at(c, world, now_ts(world) + CURIOSITY_CHECK_INTERVAL * TICK_RATE_SECONDS, "curiosity")
 
     from systems.unresolved import has_unresolved
     if has_unresolved(c, world):

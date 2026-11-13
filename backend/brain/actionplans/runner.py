@@ -253,6 +253,8 @@ def autopilot(c, world, intention_entry):
         return None
     iid = intention["id"]
     if world.get("tick", 0) < (c.get("_plan_cooldown") or {}).get(iid, -1):
+        from brain import agent_wake          # tried again when the cooldown is over, not on the next look
+        agent_wake.wake_at(c, world, agent_wake.at_tick(world, c["_plan_cooldown"][iid]), "plan_cooldown")
         return "busy"
     att = (c.setdefault("plan_attempts", {})).get(iid)
     act_when = intention.get("act_when")
@@ -436,6 +438,8 @@ def _on_wait_timer(world, entry):
     intention = store.get(_data(world), "intentions", iid)
     if c and att and intention and att.get("wait") and not c.get("activity"):
         _run(c, world, iid, att, intention)
+        from brain import agent_wake
+        agent_wake.wake(c, world, "plan_wait")
     elif c and att and att.get("wait"):
         from core import scheduler
         scheduler.schedule_in(world, f"planwait:{c['id']}", iid, WAIT_RECHECK_SECONDS)

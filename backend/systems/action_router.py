@@ -568,6 +568,12 @@ def clear_expired_speech(c, world):
     speech = c.get("current_speech")
     if speech and tick >= speech.get("expires_at_tick", 0):
         c["current_speech"] = None
+    elif speech:                        # the bubble goes when it expires, whether or not anything else happens then
+        from brain import agent_wake
+        from core.clock import now_ts
+        from core.tick_schedule import TICK_RATE_SECONDS
+        agent_wake.wake_at(c, world, now_ts(world) + (speech.get("expires_at_tick", 0) - tick) * TICK_RATE_SECONDS,
+                           "speech_expires")
 
 
 # =========================================================
