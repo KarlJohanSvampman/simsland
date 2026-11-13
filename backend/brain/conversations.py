@@ -172,6 +172,11 @@ def create_conversation(
         "conversations"
     ][cid] = conv
 
+    # A spoken conversation is live from now on: turn-taking and its ending are looked after by the floor loop
+    # (systems/conversation_floor.py, core/active_loops.py) until it ends.
+    from systems.conversation_floor import join_floor_loop
+    join_floor_loop(world, conv)
+
     return conv
 
 
@@ -302,6 +307,8 @@ def reopen_conversation(world, conv):
         f["state"] = "open"
     from systems.conversation_archive import unarchive
     unarchive(world, conv["id"])
+    from systems.conversation_floor import join_floor_loop
+    join_floor_loop(world, conv)
 
 
 def set_subject(conv, subject, by=None):

@@ -62,7 +62,7 @@ def _install():
             fn(*a, **k)
     ca._pool = _Inline()
     import brain.llm_brain as lb
-    if os.environ.get("DET_POLICY") == "varied":
+    if os.environ.get("DET_POLICY") in ("varied", "social"):
         lb.think = _varied_think
     else:
         lb.think = lambda context, char_id=None, session=None, priority=None: {"thought": "ok", "action": {"type": "wait", "reason": "x"}}
@@ -85,6 +85,8 @@ def _varied_think(context, char_id=None, session=None, priority=None):
     props = [p for p in aa.get("interactable_props") or [] if p.get("interactions")]
     people = [p for p in aa.get("nearby_characters") or [] if p.get("id")]
     roll = rng.random()
+    if os.environ.get("DET_POLICY") == "social" and people and roll < 0.8:
+        roll = 0.7                           # DET_POLICY=social: mostly talk to whoever is near
     if roll < 0.35 and props:
         p = rng.choice(props)
         return {"thought": "ok", "action": {"type": "interact", "target": p["id"],
@@ -141,6 +143,19 @@ def fixture(start=None):
     return w
 
 
+def _together(w):
+    """DET_SETUP=together: everyone in a household stands next to its first member (same room), so they talk."""
+    chars = w["characters"]
+    for hh in (w.get("households") or {}).values():
+        members = [chars[m] for m in hh.get("members") or [] if m in chars]
+        for i, c in enumerate(members[1:], 1):
+            for k in ("x", "y", "building_id", "_in_building"):
+                if k in members[0]:
+                    c[k] = members[0][k]
+            c["x"] = (c.get("x") or 0) + 0.8 * i
+            c["route"], c["is_moving"], c["move_target"] = [], False, None
+
+
 def run_sim(ticks, start="2026-11-01T23:50:00", seed=1234, setup=None, checkpoint_every=None, checkpoint_fn=None):
     _install()
     import sim_loop
@@ -153,6 +168,8 @@ def run_sim(ticks, start="2026-11-01T23:50:00", seed=1234, setup=None, checkpoin
     random.seed(seed)
     _bi._intention_seq = 0
     w = fixture(start)
+    if os.environ.get("DET_SETUP") == "together":
+        _together(w)
     if setup:
         setup(w)
     errs = collections.Counter()

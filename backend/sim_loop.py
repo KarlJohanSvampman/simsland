@@ -533,8 +533,10 @@ def _tick_impl(world):
     _prof.mark("section:per_tick_conversation_floor")
     # -- Per-tick: conversation floor (who has the ball, notice/ignore timers) --
     try:
-        from systems.conversation_floor import tick as _floor_tick
-        _floor_tick(world)
+        # only the live spoken conversations (core/active_loops.py); nothing at all when nobody is talking
+        from systems.conversation_floor import ensure_floor_members
+        ensure_floor_members(world)
+        active_loops.run_one(world, "floor")
     except Exception as exc:
         print(f"[sim_loop] conversation floor error: {exc}")
 

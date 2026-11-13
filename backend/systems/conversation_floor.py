@@ -285,16 +285,58 @@ def _wake_speaker(world, speaker, holder, reason):
     wake_character(speaker, world, reason, {"holder_name": _name(holder), "doing": _doing(holder)})
 
 
+def _spoken(conv):
+    return conv.get("medium", "in_person") in ("in_person", "call")
+
+
+def join_floor_loop(world, conv):
+    """A live spoken conversation is a member of the floor loop (core/active_loops.py) until it ends."""
+    if conv.get("active") and _spoken(conv):
+        from core import active_loops
+        active_loops.add(world, "floor", conv.get("id"))
+
+
+def ensure_floor_members(world):
+    """A world that has never had a floor loop (an older save, a fixture): its live spoken conversations join once,
+    and any stale "thinking"/"waiting" cue is cleared."""
+    from core import active_loops
+    if "floor" in (world.get("_active_loops") or {}):
+        return
+    active_loops.rebuild(world, "floor", [cid for cid, conv in (world.get("conversations") or {}).items()
+                                          if conv.get("active") and _spoken(conv)])
+    for c in world.get("characters", {}).values():
+        if c.get("floor_status") is not None:
+            c["floor_status"] = None
+
+
+def floor_step(world, ids):
+    """One step of the floor loop: the live spoken conversations (in the order they were made, as the sweep over all
+    of them went). Members that have ended, by whatever path, leave."""
+    convs = world.get("conversations") or {}
+    order = {k: i for i, k in enumerate(convs)}
+    live = [convs[i] for i in sorted(ids, key=lambda i: order.get(i, 1 << 30)) if i in convs]
+    who = set(world.get("_floor_status_ids") or ())
+    for conv in live:
+        who.update(conv.get("participants") or ())
+    _tick(world, live, who)
+    return [i for i in ids if i not in convs or not convs[i].get("active") or not _spoken(convs[i])]
+
+
 def tick(world):
+    """A pass over every conversation and character (old callers and tests; the sim runs floor_step)."""
+    _tick(world, list(world.get("conversations", {}).values()), None)
+
+
+def _tick(world, convs, status_ids):
     # Conversations that are resolved, or have gone on too long without it, end first
     # (systems/conversation_outcome.py).
-    from systems.conversation_outcome import tick as _outcome_tick
-    _outcome_tick(world)
+    from systems.conversation_outcome import tick_conversations
+    tick_conversations(world, convs)
 
     chars = world.get("characters", {})
     t = world.get("tick", 0)
     status = {}
-    for conv in world.get("conversations", {}).values():
+    for conv in convs:
         f = conv.get("floor")
         if not conv.get("active") or not f or f.get("state") == "closed" or not _managed(conv):
             continue
@@ -378,11 +420,18 @@ def tick(world):
         if f["state"] in ("waiting", "thinking", "unnoticed", "unanswered"):
             status.setdefault(sid, "waiting_for_reply")
 
-    for c in chars.values():
+    # the cues: everyone (a full pass), or whoever is in a live conversation or showed a cue last step
+    targets = chars.values() if status_ids is None else [chars[i] for i in status_ids if i in chars]
+    for c in targets:
         cur = c.get("floor_status")
         new = status.get(c.get("id"))
         if cur != new:
             c["floor_status"] = new
+    world["_floor_status_ids"] = sorted(status)
+
+
+from core import active_loops as _active_loops      # noqa: E402
+_active_loops.register("floor", floor_step, order=20)
 
 
 # ── prompt context ────────────────────────────────────────────────────────────
