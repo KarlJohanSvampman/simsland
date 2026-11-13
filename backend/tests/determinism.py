@@ -168,6 +168,9 @@ def run_sim(ticks, start="2026-11-01T23:50:00", seed=1234, setup=None, checkpoin
     random.seed(seed)
     _bi._intention_seq = 0
     w = fixture(start)
+    if os.environ.get("DET_VIEW") == "1":            # the resident world's WorldView façade (core/world_view.py)
+        from core import world_view
+        w = world_view.install(w)
     if os.environ.get("DET_SETUP") == "together":
         _together(w)
     if setup:

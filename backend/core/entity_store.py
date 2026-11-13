@@ -65,20 +65,22 @@ def split(world):
     """{(kind, id): entity} for everything persisted, and the manifest that puts it back together."""
     static = _static_keys()
     out, keys, orders = {}, [], {}
-    for k, v in world.items():
+    for k, v in dict.items(world):           # raw access: reading the world to persist it touches nothing
+        # (core/world_view.py)
         if k in static:
             continue
         keys.append(k)
         shape = COLLECTIONS.get(k)
         if shape == "dict" and isinstance(v, dict):
-            orders[k] = {"type": "dict", "order": [str(i) for i in v]}
-            for i, e in v.items():
+            orders[k] = {"type": "dict", "order": [str(i) for i in dict.keys(v)]}
+            for i, e in dict.items(v):
                 out[(k, str(i))] = e
         elif shape == "list" and isinstance(v, list):
-            ids = [_list_id(e, n) for n, e in enumerate(v)]
+            items = list(list.__iter__(v))
+            ids = [_list_id(e, n) for n, e in enumerate(items)]
             if len(set(ids)) == len(ids):
                 orders[k] = {"type": "list", "order": ids}
-                for i, e in zip(ids, v):
+                for i, e in zip(ids, items):
                     out[(k, i)] = e
             else:
                 out[("key", k)] = v          # ids not unique: kept as one record
@@ -87,20 +89,63 @@ def split(world):
     return out, {"keys": keys, "collections": orders}
 
 
+def _manifest_and_present(world):
+    """The manifest, and the set of (kind, id) the world holds now -- without rendering any entity."""
+    static = _static_keys()
+    keys, orders, present = [], {}, set()
+    for k, v in dict.items(world):
+        if k in static:
+            continue
+        keys.append(k)
+        shape = COLLECTIONS.get(k)
+        if shape == "dict" and isinstance(v, dict):
+            ids = [str(i) for i in dict.keys(v)]
+            orders[k] = {"type": "dict", "order": ids}
+            present.update((k, i) for i in ids)
+        elif shape == "list" and isinstance(v, list):
+            ids = [_list_id(e, n) for n, e in enumerate(list.__iter__(v))]
+            if len(set(ids)) == len(ids):
+                orders[k] = {"type": "list", "order": ids}
+                present.update((k, i) for i in ids)
+            else:
+                present.add(("key", k))
+        else:
+            present.add(("key", k))
+    return {"keys": keys, "collections": orders}, present
+
+
+def _entity(world, key):
+    kind, i = key
+    if kind == "key":
+        return dict.__getitem__(world, i)
+    coll = dict.__getitem__(world, kind)
+    if isinstance(coll, dict):
+        return dict.__getitem__(coll, i) if dict.__contains__(coll, i) else next(
+            v for k, v in dict.items(coll) if str(k) == i)
+    return next(e for n, e in enumerate(list.__iter__(coll)) if _list_id(e, n) == i)
+
+
 def diff(sim_id, world, only=None):
     """What to write so the store matches `world`. `only`: the (kind, id) touched since the last flush -- just those
-    are rendered and compared (plus the manifest); None compares everything."""
+    are rendered and compared (lists whole, plus the manifest); None compares everything."""
     t0 = time.perf_counter()
     last = _written.setdefault(sim_id, {})
-    entities, manifest = split(world)
     upserts, deletes = {}, []
-    keys = entities.keys() if only is None or not last else (set(only) & set(entities))
-    for key in keys:
-        text = _dumps(entities[key])
+    if only is None or not last:
+        entities, manifest = split(world)
+        present = set(entities)
+        items = entities.items()
+    else:
+        manifest, present = _manifest_and_present(world)
+        whole = {k for kind, k in only if kind == "*list"}            # lists are compared whole (core/world_view.py)
+        want = (set(only) & present) | {key for key in present if key[0] in whole}
+        items = ((key, _entity(world, key)) for key in want)
+    for key, entity in items:
+        text = _dumps(entity)
         if last.get(key) != text:
             upserts[key] = text
     for key in list(last):
-        if key not in entities and key[0] != "meta":
+        if key not in present and key[0] != "meta":
             deletes.append(key)
     mtext = _dumps(manifest)
     if last.get(("meta", "manifest")) != mtext:

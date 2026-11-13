@@ -212,6 +212,19 @@ def _view_radius(zoom: int) -> int:
     return {0: 110, 1: 64, 2: 40, 3: 24}.get(zoom, 40)
 
 
+def _untracked(fn):
+    """A read-only view of the world built for a client: reading it touches nothing (core/world_view.py)."""
+    import functools
+
+    @functools.wraps(fn)
+    def run(*a, **k):
+        from core import world_view
+        with world_view.untracked():
+            return fn(*a, **k)
+    return run
+
+
+@_untracked
 def _build_full_snapshot(world, definitions, cx, cy, zoom):
     """Full world slice for a given viewport — sent on first connect."""
     radius = _view_radius(zoom)
@@ -252,6 +265,7 @@ def _character_patches(world: dict, visible_chars: dict, selected_id, sent: dict
     return out
 
 
+@_untracked
 def _build_delta(world: dict, dirty: dict, cx: int, cy: int, zoom: int,
                  selected_id: str | None = None, sent: dict | None = None) -> dict | None:
     """

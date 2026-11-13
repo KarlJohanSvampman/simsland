@@ -42,11 +42,15 @@ import threading
 import time
 from contextlib import contextmanager
 
-PERSIST_EVERY_TICKS = 15
+PERSIST_EVERY_TICKS = int(os.getenv("WORLD_PERSIST_EVERY_TICKS", "15"))
 # How the world is made durable (core/entity_store.py): "entities" -- per-entity rows, only what changed, one
 # transaction per flush -- or "blob" (the whole world as one JSON value, the old way). With entities the blob is still
 # written every BLOB_EVERY_TICKS (and at shutdown) as a backup and for tools that read it.
 WORLD_STORE = os.getenv("WORLD_STORE", "entities").lower()
+if WORLD_STORE == "entities" and "WORLD_PERSIST_EVERY_TICKS" not in os.environ:
+    # only what changed is written, and with the WorldView only what was touched is rendered (~5 ms for a few
+    # characters): a flush every 2 ticks, so a crash loses at most a tick or two
+    PERSIST_EVERY_TICKS = 2
 BLOB_EVERY_TICKS = int(os.getenv("WORLD_BLOB_EVERY_TICKS", "300"))
 
 _lock = threading.Lock()              # protects _residents / the snapshot cache bookkeeping
@@ -99,6 +103,19 @@ REPLICA_MODE = os.getenv("SIM_ROLE", "all").lower() == "api"     # a gateway: th
 REPLICA = False                                                    # ... and it has synced at least once
 
 
+WORLD_VIEW = os.getenv("WORLD_VIEW", "on").lower() == "on"
+FULL_FLUSH_EVERY = int(os.getenv("WORLD_FULL_FLUSH_EVERY", "20"))
+_flush_count = {}
+
+
+def _view(world, sim_id):
+    """The resident world as a WorldView (core/world_view.py): it learns which entities each step touched."""
+    if not WORLD_VIEW:
+        return world
+    from core import world_view
+    return world_view.install(world, sim_id)
+
+
 def install_replica(sim_id, world):
     """Gateway: (re)place the world with a snapshot from the core. Caller holds the world lock."""
     global REPLICA
@@ -128,7 +145,7 @@ def resident(sim_id):
             entry = _residents.get(sim_id)
             if entry is None:
                 import db
-                entry = _residents[sim_id] = _Resident(db._load_world_cold(sim_id))
+                entry = _residents[sim_id] = _Resident(_view(db._load_world_cold(sim_id), sim_id))
     return entry.world
 
 
@@ -253,7 +270,14 @@ def persist_async(sim_id, reason="interval"):
         if WORLD_STORE == "entities":
             from core import entity_store
             only = _touched_since_flush(sim_id)
-            upserts, deletes, _m = entity_store.diff(sim_id, entry.world, only=only)
+            n = _flush_count[sim_id] = _flush_count.get(sim_id, 0) + 1
+            if only is not None and n % FULL_FLUSH_EVERY == 0:
+                # every so often: compare everything, and report what changed without being touched (world_view)
+                upserts, deletes, _m = entity_store.diff(sim_id, entry.world)
+                from core import world_view
+                world_view.note_missed([k for k in upserts if k not in only and k[0] != "meta"])
+            else:
+                upserts, deletes, _m = entity_store.diff(sim_id, entry.world, only=only)
             entity_store.note_written(sim_id, upserts, deletes)
             payload = ("entities", upserts, deletes)
             _stats["last_persist_bytes"] = sum(len(t) for t in upserts.values())
