@@ -1063,13 +1063,6 @@ def _job_influence_exposure(world, entry):
     resolve_exposure_influence(world)
 
 
-def _job_reading(world, entry):
-    """Scheduled job `reading` (was an every() block in tick()); see core/scheduler.py."""
-    characters = [c for c in world.get("characters", {}).values() if not c.get("is_workplace_npc")]
-    for c in characters:
-        update_reading_process(c, world)
-
-
 def _job_health(world, entry):
     """Scheduled job `health` (was an every() block in tick()); see core/scheduler.py."""
     characters = [c for c in world.get("characters", {}).values() if not c.get("is_workplace_npc")]
@@ -1079,12 +1072,9 @@ def _job_health(world, entry):
 
 
 def _job_reading_2(world, entry):
-    """Scheduled job `reading#2` (was an every() block in tick()); see core/scheduler.py."""
-    characters = [c for c in world.get("characters", {}).values() if not c.get("is_workplace_npc")]
+    """DUTY sports_watching: games kick off (armed by each fixture's timer). Watching a broadcast is the watcher's own
+    update (brain/agent_loop.py)."""
     kickoff_scheduled_games(world)
-    for c in characters:
-        update_game_broadcast(c, world)
-
 
 def _job_cooking_2(world, entry):
     """Scheduled job `cooking#2`: the household's background processes (laundry, dishes, ...); see core/scheduler.py. (The old per-character

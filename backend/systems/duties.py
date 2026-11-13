@@ -69,6 +69,15 @@ def on_world_loaded(world, entry=None):
     check_duties(world, {"event": "world.loaded"})
     for d in world.get("deliveries") or []:
         arm_delivery(world, d)
+    # games planned before kickoff had timers: each upcoming fixture with attendees gets one
+    from core import scheduler
+    tick = world.get("tick", 0)
+    for sport, leagues in (world.get("sports_leagues") or {}).items():
+        for scope, league in (leagues or {}).items():
+            for fx in (league or {}).get("schedule") or []:
+                if fx.get("attendees") and fx.get("scheduled_tick", -1) >= tick:
+                    scheduler.schedule(world, "kickoff", f"{sport}:{scope}:{fx.get('id', fx['scheduled_tick'])}",
+                                       fx["scheduled_tick"])
 
 
 def _register():

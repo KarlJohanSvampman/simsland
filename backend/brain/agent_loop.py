@@ -249,6 +249,14 @@ def update_internal_state(
     from systems.harassment import tick_harassment_for
     _prof.mark("internal:tick_harassment")
     tick_harassment_for(c, world)
+    # Reading the paper, watching a game: the character's own processes, picked up every few minutes (step 5a: in their
+    # own update, with a wake for the next pick -- on the old 5-second grid -- instead of a sweep over everyone).
+    from systems.reading_process import update_reading_process, READING_PICK_INTERVAL_TICKS
+    from systems.sports_broadcast import update_game_broadcast, SCORE_PICK_INTERVAL_TICKS
+    _prof.mark("internal:reading_and_broadcast")
+    update_reading_process(c, world)
+    update_game_broadcast(c, world)
+    _arm_media_picks(c, world, READING_PICK_INTERVAL_TICKS, SCORE_PICK_INTERVAL_TICKS)
     from systems.power import sync_batteries              # devices drained / charged up to now (lazily)
     sync_batteries(c, world)
     from systems.crushes import tick_crushes_for          # a blush fades, a thought bubble ends, a daydream may come
@@ -282,6 +290,23 @@ def update_internal_state(
 # =========================================================
 # ECONOMY
 # =========================================================
+
+def _arm_media_picks(c, world, reading_every, score_every):
+    """The next news pick / score update falls due on the 5-second grid the old sweep ran on."""
+    from brain import agent_wake
+    tick = world.get("tick", 0)
+    due = []
+    proc = c.get("active_process") or {}
+    if proc.get("type") == "reading_news":
+        due.append(proc.get("last_pick_tick", tick) + reading_every)
+    act = c.get("activity") or {}
+    if act.get("type") == "watch_tv" and act.get("watching_game"):
+        due.append(act.get("_last_score_pick_tick", act.get("phase_started_tick", tick)) + score_every)
+    if due:
+        nxt = max(min(due), tick + 1)
+        nxt += (-nxt) % 5
+        agent_wake.wake_at(c, world, agent_wake.at_tick(world, nxt), "media_pick")
+
 
 def update_economy(
 
