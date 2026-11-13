@@ -204,7 +204,7 @@ class ExternalBrainReq(BaseModel):
 
 
 @router.post("/characters/{char_id}/external_brain")
-@command("middleware_bridge.set_external_brain")
+@command("middleware_bridge.set_external_brain", entities=lambda a: [("characters", a["char_id"])])
 def set_external_brain(char_id: str, req: ExternalBrainReq):
     external_brain.touch()
     with world_lock():

@@ -668,7 +668,7 @@ def clear_stuck_travel_state(sim_id: str = DEFAULT_SIM_ID):
 
 
 @router.post("/set_body_need")
-@command("admin.set_body_need")
+@command("admin.set_body_need", entities=lambda a: [("characters", (a.get("payload") or {}).get("character_id"))])
 def set_body_need(payload: dict, sim_id: str = DEFAULT_SIM_ID):
     """Live-testing helper: force one character's body need to a value
     without waiting for it to occur naturally. payload: {"character_id",
@@ -854,7 +854,7 @@ def toggle_light_admin(payload: dict, sim_id: str = DEFAULT_SIM_ID):
 
 
 @router.post("/set_relationship")
-@command("admin.set_relationship")
+@command("admin.set_relationship", entities=lambda a: [("characters", (a.get("payload") or {}).get("from_id"))])
 def set_relationship(payload: dict, sim_id: str = DEFAULT_SIM_ID):
     """Live-fix helper: overwrite fields on one directed relationship edge
     (from_id's view of to_id). payload: {"from_id", "to_id", "fields": {...}}.

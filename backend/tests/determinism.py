@@ -181,7 +181,12 @@ def run_sim(ticks, start="2026-11-01T23:50:00", seed=1234, setup=None, checkpoin
         ensure_world_defaults(w)
         _Clock.t += 1.0
         try:
-            sim_loop.tick(w)
+            if os.environ.get("DET_LOCKS") == "1":   # each step as a tick unit (core/entity_locks.py, needs DET_VIEW=1)
+                from core import entity_locks
+                with entity_locks.tick_unit():
+                    sim_loop.tick(w)
+            else:
+                sim_loop.tick(w)
         except Exception:
             text = traceback.format_exc().strip()
             errs[text.splitlines()[-1]] += 1

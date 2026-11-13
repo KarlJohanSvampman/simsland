@@ -48,7 +48,7 @@ def create(sim_id: str, payload: dict):
 # =========================================================
 
 @router.post("/household/set_name")
-@command("household.set_name")
+@command("household.set_name", entities=lambda a: [("households", (a.get("payload") or {}).get("household_id"))])
 def set_name(sim_id: str, payload: dict):
     with world_lock():
         world = load_world(sim_id)

@@ -73,14 +73,19 @@ def _decode(value):
 # the decorator
 # ---------------------------------------------------------------------------
 
-def command(name=None, timeout=None):
-    """timeout: seconds a caller waits (default COMMAND_TIMEOUT_SECONDS); for commands that call a model."""
+def command(name=None, timeout=None, entities=None):
+    """timeout: seconds a caller waits (default COMMAND_TIMEOUT_SECONDS); for commands that call a model.
+    entities: fn(arguments by name) -> [(kind, id)] -- the entities the command changes. With ENTITY_LOCKS=on a declared
+    command takes just those (core/entity_locks.py) and runs alongside the tick when they differ; an undeclared one
+    takes the whole world, as before. A lock cycle it was caught in answers 409."""
     def deco(fn):
         if inspect.iscoroutinefunction(fn):
             raise TypeError(f"{fn.__qualname__}: a command must be a plain (sync) function")
         cname = name or f"{fn.__module__}.{fn.__qualname__}"
-        if cname in REGISTRY and REGISTRY[cname] is not fn:
+        if cname in REGISTRY and getattr(REGISTRY[cname], "__wrapped_command__", REGISTRY[cname]) is not fn:
             raise ValueError(f"duplicate command name {cname!r}")
+        if entities is not None:
+            fn = _with_entity_locks(fn, entities)
         REGISTRY[cname] = fn
         if timeout:
             TIMEOUTS[cname] = timeout
@@ -98,6 +103,32 @@ def command(name=None, timeout=None):
         stub.__command__ = cname
         return stub
     return deco
+
+
+def _with_entity_locks(fn, entities):
+    sig = inspect.signature(fn)
+
+    @functools.wraps(fn)
+    def locked(*args, **kwargs):
+        from core import entity_locks
+        if not entity_locks.ENABLED:
+            return fn(*args, **kwargs)
+        bound = sig.bind(*args, **kwargs)
+        bound.apply_defaults()
+        try:
+            wanted = list(entities(dict(bound.arguments)) or ())
+        except Exception as exc:
+            print(f"[commands] {fn.__qualname__}: could not name its entities ({exc!r}); taking the whole world")
+            return fn(*args, **kwargs)
+        try:
+            with entity_locks.command_unit(wanted):
+                return fn(*args, **kwargs)
+        except entity_locks.LockConflict as exc:
+            from fastapi import HTTPException
+            raise HTTPException(status_code=409, detail=f"busy, try again ({exc})")
+    locked.__wrapped_command__ = fn
+    locked.__entities__ = entities
+    return locked
 
 
 def core_only(fn):

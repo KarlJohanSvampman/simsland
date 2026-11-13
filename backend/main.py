@@ -417,6 +417,9 @@ def _run_tick_and_persist(sim_id: str) -> tuple[dict, dict]:
     """
     from core import world_state
     _t_wait = time.perf_counter()
+    from core import entity_locks
+    if entity_locks.ENABLED:
+        return _run_tick_entity_locked(sim_id, _t_wait)
     with _world_lock, world_state.hold():
         _t_held = time.perf_counter()
         _tick_watch["thread"] = threading.get_ident()
@@ -472,6 +475,54 @@ def _run_tick_and_persist(sim_id: str) -> tuple[dict, dict]:
                   f"(waited {_t_held - _t_wait:.1f}s for it; tick {_t_persist - _t_held:.1f}s, "
                   f"persist {_t_end - _t_persist:.1f}s)", flush=True)
 
+    return world, dirty
+
+
+def _prepare_world(world, sim_id):
+    ensure_world_defaults(world)
+    defs = load_definitions(sim_id)
+    if world.get("definitions") is not defs:
+        world["definitions"] = defs
+    from systems.schema_defaults import ensure_prop_template_fields
+    from systems.electrical import ensure_power_outlets
+    from systems.vehicles import ensure_vehicle_fields
+    from systems.market import init_market_catalog
+    ensure_prop_template_fields(world, defs)
+    ensure_power_outlets(world, defs)
+    ensure_vehicle_fields(world, defs)
+    init_market_catalog(world)
+    _maybe_resync_clock_to_real_time(world)
+
+
+def _run_tick_entity_locked(sim_id, t_wait):
+    """ENTITY_LOCKS=on (core/entity_locks.py): the step runs with the world SHARED -- every entity it reaches is locked
+    for the rest of the step, so a declared command on other entities runs meanwhile; then, with the world EXCLUSIVE,
+    what changed is published to gateways and handed to the write-behind (both read the whole world)."""
+    from core import world_state, entity_locks, tick_state, replication
+    from systems.directors_cut import is_stopped
+    with entity_locks.tick_unit():
+        t_held = time.perf_counter()
+        _tick_watch["thread"] = threading.get_ident()
+        _tick_watch["started"] = t_held
+        _tick_watch["reported"] = 0.0
+        world = world_state.resident(sim_id)
+        _prepare_world(world, sim_id)
+        if not is_stopped(world):
+            tick_state.enter()
+            try:
+                tick(world)
+            finally:
+                tick_state.leave()
+    with _world_lock, world_state.hold():
+        t_persist = time.perf_counter()
+        dirty = collect_dirty(world)
+        replication.publisher.publish(sim_id, world, dirty)
+        world_state.after_tick(sim_id, world)
+        t_end = time.perf_counter()
+    _tick_watch["started"] = None
+    if t_end - t_held > SLOW_TICK_LOG_SECONDS:
+        print(f"[tick] tick {world['tick']} took {t_end - t_held:.1f}s (waited {t_held - t_wait:.1f}s to start; "
+              f"step {t_persist - t_held:.1f}s, publish+persist {t_end - t_persist:.1f}s)", flush=True)
     return world, dirty
 
 

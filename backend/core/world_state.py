@@ -168,7 +168,7 @@ def load(sim_id):
 def _render(entry):
     """JSON of the persisted part of the world (no static map data). Caller holds the lock."""
     static = _static_keys()
-    body = {k: v for k, v in entry.world.items() if k not in static}
+    body = {k: v for k, v in dict.items(entry.world) if k not in static}      # raw: rendering touches nothing
     try:
         return json.dumps(body)
     except TypeError:
@@ -233,11 +233,18 @@ def save(sim_id, world):
     entry.version += 1
     entry.snap_key = None
     # A route changed the world (the editor, an admin or director action): whatever it changed about anyone, their
-    # update sees it on the next step (brain/agent_wake.py) rather than at their next heartbeat.
+    # update sees it on the next step (brain/agent_wake.py) rather than at their next heartbeat. A declared command
+    # (core/entity_locks.py) changed only what it declared: just those are woken, and the durable save is left to the
+    # exclusive pass after the next step -- rendering the whole world here would read entities a running step holds.
+    from core import entity_locks
+    unit = entity_locks._unit() if entity_locks.ENABLED else None
     try:
         from brain import agent_wake
-        for _c in (entry.world.get("characters") or {}).values():
-            agent_wake.wake_now(_c, "route")
+        chars = dict.get(entry.world, "characters") or {}
+        ids = [i for k, i in unit.declared if k == "characters"] if unit is not None else list(dict.keys(chars))
+        for cid in ids:
+            if dict.__contains__(chars, cid):
+                agent_wake.wake_now(dict.__getitem__(chars, cid), "route")
     except Exception as exc:
         print(f"[world_state] could not wake characters after a save: {exc!r}")
     try:
@@ -245,7 +252,8 @@ def save(sim_id, world):
         replication.publisher.force_full()
     except Exception:
         pass
-    persist_async(sim_id, "save")
+    if unit is None:
+        persist_async(sim_id, "save")
 
 
 def after_tick(sim_id, world):

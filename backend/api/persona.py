@@ -27,7 +27,7 @@ def get_persona(char_id: str, sim_id: str = "default"):
 
 
 @router.post("/characters/{char_id}/persona")
-@command("persona.update")
+@command("persona.update", entities=lambda a: [("characters", a["char_id"])])
 def update_persona(char_id: str, payload: dict, sim_id: str = "default"):
     from systems.personality_profile import update
     with world_lock():
