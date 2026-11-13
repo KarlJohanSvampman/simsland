@@ -399,16 +399,36 @@ def _tick_micro_requests(chars, world):
 
 # ── Departure flag management (call from movement.py) ─────────────────────
 
-def mark_departure(char, previous_location):
-    """Call this when movement.py confirms a location change."""
+def mark_departure(char, previous_location, world=None):
+    """Call this when movement.py confirms a location change. The flags last until the end of this step
+    (clear_departure_flags); who carries them is listed on the world so the clearing touches only them."""
     char["_departed_this_tick"]  = True
     char["_previous_location"]   = previous_location
     char["_announced_departure"] = False
+    if world is not None:
+        flagged = world.setdefault("_departure_flagged", [])
+        if char.get("id") not in flagged:
+            flagged.append(char.get("id"))
+
+
+def note_announced(char, world):
+    """Someone said they're leaving (or left a note): _announced_departure, cleared at the end of the step like the
+    other departure flags."""
+    char["_announced_departure"] = True
+    flagged = world.setdefault("_departure_flagged", [])
+    if char.get("id") not in flagged:
+        flagged.append(char.get("id"))
 
 
 def clear_departure_flags(world):
-    """Call at start of each tick to reset one-tick flags."""
-    for c in world.get("characters", {}).values():
+    """End of each step: reset the one-step departure flags of whoever was marked. A world saved by an older version
+    (no list yet) is swept once."""
+    chars = world.get("characters", {})
+    flagged = world.pop("_departure_flagged", None)
+    targets = chars.values() if flagged is None and not world.get("_departure_swept") else \
+        [chars[i] for i in (flagged or ()) if i in chars]
+    world["_departure_swept"] = True
+    for c in targets:
         c.pop("_departed_this_tick",  None)
         c.pop("_announced_departure", None)
         c.pop("_previous_location",   None)

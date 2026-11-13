@@ -2970,7 +2970,8 @@ def _route_announce_departure(c, world, action):
     except Exception:
         pass
 
-    c["_announced_departure"] = True
+    from systems.incidental_speech import note_announced
+    note_announced(c, world)
 
 
 def _route_apply_discipline(c, world, action):
@@ -3007,7 +3008,8 @@ def _route_leave_note(c, world, action):
         from systems.excuses import leave_note
         leave_note(c, world, text=text)
     except Exception:
-        c["_announced_departure"] = True
+        from systems.incidental_speech import note_announced
+        note_announced(c, world)
         c["_left_note_this_tick"] = True
 
 

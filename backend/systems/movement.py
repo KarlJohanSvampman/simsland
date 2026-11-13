@@ -271,7 +271,7 @@ def _advance(c, world, state):
                 if prev_building:
                     try:
                         from systems.incidental_speech import mark_departure
-                        mark_departure(c, prev_building)
+                        mark_departure(c, prev_building, world)
                     except Exception:
                         pass
 

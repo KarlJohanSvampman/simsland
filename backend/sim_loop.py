@@ -180,7 +180,6 @@ from systems.calendar_events import check_calendar_reminders
 from systems.reminders import check_reminders
 from systems.contract_clauses import tick_contract_clauses, tick_pending_payouts
 from systems.insurance import tick_insurance_renewals
-from systems.story      import update_story_arc
 from systems.events     import maybe_generate_shared_event
 
 
@@ -419,23 +418,33 @@ def tick(world):
 
 def _announce_new_characters(world):
     """`character.added` for each character that was not there last tick (spawned, born, moved in, made in the editor).
-    A set difference per tick -- a bridge until every place that creates a character says so itself."""
+    A set difference per tick -- a bridge until every place that creates a character says so itself.
+    Returns the ids that are new to this process: everyone on the first look after a load, else the new arrivals."""
     ids = set(world.get("characters", {}))
     known = world.get("_known_char_ids")
     world["_known_char_ids"] = sorted(ids)
-    if known is None:
-        from core.event_bus import emit
-        emit("world.loaded", {"tick": world.get("tick", 0)})     # first look after a load: everyone looks around once
-        return
     from core.event_bus import emit
-    for cid in sorted(ids - set(known)):
+    if known is None:
+        emit("world.loaded", {"tick": world.get("tick", 0)})     # first look after a load: everyone looks around once
+        return sorted(ids)
+    new = sorted(ids - set(known))
+    for cid in new:
         emit("character.added", {"character_id": cid})
+    return new
+
+
+def ensure_schedule(c, world):
+    """A character with no week schedule gets one now (generate_week_schedule + adjust_for_household)."""
+    if c.get("is_workplace_npc") or "schedule" in c:
+        return
+    c["schedule"] = generate_week_schedule(c, world)
+    adjust_for_household(c, world)
 
 
 def _tick_impl(world):
     world["tick"] += 1
     t = world["tick"]
-    _announce_new_characters(world)
+    _arrived = _announce_new_characters(world)
     set_current_tick(t)
     _prof.mark("tick_head")
     from core import event_log as _event_log
@@ -475,10 +484,12 @@ def _tick_impl(world):
     # full week: no work/sleep blocks, no schedule-derived expectation
     # windows, no "it's bedtime" wake regardless of how late it got. Self-
     # heals every tick instead of waiting for the next weekly reset.
-    for c in characters:
-        if "schedule" not in c:
-            c["schedule"] = generate_week_schedule(c, world)
-            adjust_for_household(c, world)
+    # Only whoever is new to this process (first look after a load, or just arrived) is looked at here; a schedule
+    # cleared later (the admin "reset" route) is regenerated right where it is cleared.
+    _chars = world.get("characters", {})
+    for _cid in _arrived:
+        if _cid in _chars:
+            ensure_schedule(_chars[_cid], world)
 
     # Weekly / hourly / daily / monthly work, popularity decay, post engagement and the
     # orphaned-prop sweep are no longer checked for here: the clock emits time.week/hour/day/
@@ -748,10 +759,6 @@ def _tick_impl(world):
     # doesn't treat as blocking.
 
 
-    # Story arcs are lightweight — keep per-tick
-    for c in characters:
-        update_story_arc(c)
-
     # Process events queued this tick (emitted from worker threads during
     # agent updates and from the systems above) — must run last, main-thread
     # only, after every emit() site for this tick has had a chance to fire.
@@ -940,7 +947,7 @@ def _job_incidental_speech(world, entry):
     data = entry.get("data") or {}
     c = world.get("characters", {}).get(data.get("character_id"))
     if c and data.get("from_building"):
-        mark_departure(c, data.get("from_building"))
+        mark_departure(c, data.get("from_building"), world)
         tick_incidental_speech(world)
 
 PERCEPTION_RADIUS_OUTDOORS = 24      # tiles: who outdoors may see a change (vision tops out well inside this)

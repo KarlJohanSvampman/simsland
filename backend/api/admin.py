@@ -802,6 +802,8 @@ def reset_character_state(payload: dict, sim_id: str = DEFAULT_SIM_ID):
             ensure_body(c)
             c.pop("schedule", None)
             c.pop("active_schedule_block", None)
+            from sim_loop import ensure_schedule
+            ensure_schedule(c, world)
             c["active_intentions"] = []
             c["is_moving"] = False
             c["move_target"] = None

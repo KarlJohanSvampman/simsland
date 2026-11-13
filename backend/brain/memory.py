@@ -263,6 +263,11 @@ def store_memory(
 
     prune_memories(c)
 
+    # The character's running story (systems/story.py) follows their newest memories -- kept up when one is stored,
+    # instead of by a pass over every character every tick.
+    from systems.story import update_story_arc
+    update_story_arc(c)
+
     # systems/stories.py -- near-universal hook: most notable events in
     # this codebase already call store_memory(), so this is where
     # "is this worth telling someone" gets evaluated, rather than

@@ -6,7 +6,7 @@ Deterministic seeded runs of the real simulation, for differential tests.
 run_sim(ticks, start="2026-11-01T23:50:00", setup=None, checkpoint_every=None, before_tick=None)
 returns (world, errors, checkpoints). The clock, uuids and worker threads are made
 deterministic, the LLM is a fixed "wait", and the world starts from /tmp/backup_world.json
-(a populated snapshot from backups/) with the live static map data.
+(a populated snapshot from backups/, or one built by tools/make_det_fixture.py) with the live static map data.
 """
 
 import collections
