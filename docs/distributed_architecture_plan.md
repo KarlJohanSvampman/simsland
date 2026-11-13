@@ -508,3 +508,26 @@ component; a replayable event log.
   one process that this exposed is fixed (the id carries a random suffix). Remaining single points: the core
   (one tick owner -- by design), Redis, Postgres, nginx.
 
+- **No-tick, part A: what is left of the tick (done)** — the tick body no longer walks the population for
+  bookkeeping. Measured by what `_tick_impl` still does per step:
+  *clock + scheduler* (the clock service itself); *the arrival bridge* (`_announce_new_characters`, a set difference
+  -- a missing week schedule is generated there, for the new arrivals only, and where the admin reset clears it);
+  *active loops* (`core/active_loops.py`, the plan's "temporary active loop": a component runs per step for its
+  **members** only, and not at all with none -- whoever starts the activity adds the member, the loop drops it when
+  the work is over; members live on the world): **movement** (every walk is started through
+  `systems/movement.py::start_moving()`, 24 sites, enforced by `tests/test_movement_loop.py`; a 30-second safety
+  sweep picks up and logs any walker set off by hand), **floor** (turn-taking + conversation endings, only live
+  spoken conversations; they leave the loop whichever of the seven ending paths closed them), **bus** (the clock
+  marks each 15-minute slot, CLOCK jobs `bus_slot_*`; the bus is a member while a departure is due or a trip runs),
+  **ambient_sounds**; *departure flags* (cleared at the end of the step for exactly the characters that were
+  marked); *the event flush*. The story arc is updated when a memory is stored (it has no reader; the only
+  behavioural difference in the determinism runs: it no longer picks up later in-place rewrites of a memory).
+  Still a per-step check, deliberately: the job-market refill (`if not world["job_listings"]`, O(1) whenever there
+  are listings; the list only empties inside `generate_job_listings` itself).
+  **What remains is part C**: `update_agent()` for every character on every step.
+  The harness gained a fixture builder for a fresh checkout (`tools/make_det_fixture.py`, from `tests/house_world`)
+  and two policies besides "always wait": `DET_POLICY=varied` (interacts, walks, talks; seeded per character and
+  call, so still exactly repeatable) and `DET_POLICY=social` + `DET_SETUP=together` (households stand together and
+  mostly talk). Every change above: identical worlds in three scenarios (1500 ticks across midnight and a week
+  boundary, 1500 ticks of afternoon, 3000 ticks of social morning) apart from its own bookkeeping keys, and the
+  same backend suite pass/fail set.
