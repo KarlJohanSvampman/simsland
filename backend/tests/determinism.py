@@ -177,8 +177,9 @@ def run_sim(ticks, start="2026-11-01T23:50:00", seed=1234, setup=None, checkpoin
         setup(w)
     errs = collections.Counter()
     checkpoints = []
+    from systems.schema_defaults import ensure_world_defaults_if_due
     for i in range(ticks):
-        ensure_world_defaults(w)
+        ensure_world_defaults_if_due(w)
         _Clock.t += 1.0
         try:
             if os.environ.get("DET_LOCKS") == "1":   # each step as a tick unit (core/entity_locks.py, needs DET_VIEW=1)

@@ -42,6 +42,7 @@ from brain.intentions   import set_current_tick
 from systems.reactions  import process_reaction_queue
 import systems.step_timeouts  # noqa: F401 -- registers the "stuck" timeout handler before any timer fires
 import systems.path_debug     # noqa: F401 -- registers the "pathalarm" handler (the end of a lost episode)
+from systems.schema_defaults import ensure_character_defaults
 import brain.agent_wake       # noqa: F401 -- events wake the characters they are about
 import systems.transit        # noqa: F401 -- registers the bus loop and its 15-minute slots
 import systems.movement_log   # noqa: F401 -- registers the 15-second movement sampling job
@@ -494,6 +495,7 @@ def _tick_impl(world):
     _chars = world.get("characters", {})
     for _cid in _arrived:
         if _cid in _chars:
+            ensure_character_defaults(_chars[_cid], world=world)      # a newcomer gets its defaults at once
             ensure_schedule(_chars[_cid], world)
 
     # Weekly / hourly / daily / monthly work, popularity decay, post engagement and the

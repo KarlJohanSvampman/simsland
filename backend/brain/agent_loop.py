@@ -723,6 +723,11 @@ def update_agent(
         process_reflections
     )
 
+    # The character heals its own missing fields when it is updated (systems/schema_defaults.py) -- no longer a pass
+    # over everyone on every step.
+    from systems.schema_defaults import ensure_character_defaults
+    ensure_character_defaults(c, world=world)
+
     # =====================================
     # OFFGRID
     # =====================================

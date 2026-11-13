@@ -232,6 +232,7 @@ def save(sim_id, world):
                 replace()
     entry.version += 1
     entry.snap_key = None
+    dict.__setitem__(entry.world, "_defaults_due", True)    # the self-healing defaults pass runs at the next step
     # A route changed the world (the editor, an admin or director action): whatever it changed about anyone, their
     # update sees it on the next step (brain/agent_wake.py) rather than at their next heartbeat. A declared command
     # (core/entity_locks.py) changed only what it declared: just those are woken, and the durable save is left to the

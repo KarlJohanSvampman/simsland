@@ -35,7 +35,7 @@ from api.view import get_view, in_view, RESPONDER_FADE_TICKS
 from core.definitions import load_definitions
 from api.editor import save_definitions
 from systems.economy import household_economy
-from systems.schema_defaults import ensure_world_defaults
+from systems.schema_defaults import ensure_world_defaults, ensure_world_defaults_if_due
 from api.assets  import router as assets_router
 from api.editor  import router as editor_router
 from api.props   import router as props_router
@@ -428,7 +428,7 @@ def _run_tick_and_persist(sim_id: str) -> tuple[dict, dict]:
         # The live world stays in memory between ticks (core/world_state.py): no per-tick load,
         # JSON round trip or database write. The idempotent ensure_* passes still run each tick.
         world = world_state.resident(sim_id)
-        ensure_world_defaults(world)
+        ensure_world_defaults_if_due(world)
         # Loaded fresh every tick (cheap on a cache hit) rather than once at loop() startup --
         # definitions.json edits via the Definitions editor otherwise never reach a running
         # simulation until restart, even though save_definitions() already invalidates the
@@ -479,7 +479,7 @@ def _run_tick_and_persist(sim_id: str) -> tuple[dict, dict]:
 
 
 def _prepare_world(world, sim_id):
-    ensure_world_defaults(world)
+    ensure_world_defaults_if_due(world)
     defs = load_definitions(sim_id)
     if world.get("definitions") is not defs:
         world["definitions"] = defs
