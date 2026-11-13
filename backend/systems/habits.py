@@ -3,7 +3,12 @@ habits.py — time-of-day habit tracking
 
 c["habits"] is a dict of  "activity_type@hour" → strength (float).
 Strength grows by 1 each time the activity completes at that hour and
-decays by 0.1% per tick, so habits fade naturally if broken.
+fades with a half-life of HABIT_HALF_LIFE_DAYS sim days (tunable in the
+environment, default 3), so habits fade naturally if broken. The fade is
+lazy (refresh_habits): applied whenever habits are read or written, and the
+same however often that happens. It used to be 0.1% per tick, which made
+even a strong habit vanish in ~2 hours -- before the hour it belongs to
+came round again the next day.
 
 Habit strength biases intention sorting: an activity done at 7am every
 day gets a priority boost during the 7am hour, nudging the AI toward
@@ -15,8 +20,32 @@ its routine without forcing it.
 # RECORD  (call on activity completion)
 # =========================================================
 
+import os
+
+HABIT_HALF_LIFE_SECONDS = float(os.getenv("HABIT_HALF_LIFE_DAYS", "3")) * 86400.0
+HABIT_FORGET_BELOW = 0.01
+
+
+def refresh_habits(c, world):
+    """Bring c["habits"] up to now: strength x 0.5 ** (sim seconds since the last refresh / half-life); habits under
+    HABIT_FORGET_BELOW are dropped. c["_habits_ts"] is when they were last brought up to date."""
+    from core.clock import now_ts
+    now = now_ts(world)
+    last = c.get("_habits_ts")
+    c["_habits_ts"] = now
+    habits = c.get("habits")
+    if last is None or not habits or now <= last:
+        return
+    f = 0.5 ** ((now - last) / HABIT_HALF_LIFE_SECONDS)
+    for k in list(habits):
+        habits[k] *= f
+        if habits[k] < HABIT_FORGET_BELOW:
+            del habits[k]
+
+
 def record_habit(c, activity_type, world):
     """Increment the habit counter for this activity at the current hour."""
+    refresh_habits(c, world)
     hour = world.get("calendar", {}).get("hour", 0)
     key  = f"{activity_type}@{hour}"
     habits = c.setdefault("habits", {})
@@ -49,6 +78,7 @@ def apply_habit_bias_to_intentions(c, world):
     Apply time-of-day habit bias to c["active_intentions"] priorities in-place.
     Intentions whose type matches a habit at the current hour get a priority boost.
     """
+    refresh_habits(c, world)
     hour    = world.get("calendar", {}).get("hour", 0)
     habits  = c.get("habits", {})
     if not habits:
@@ -75,15 +105,13 @@ def apply_habit_bias_to_intentions(c, world):
 
 
 # =========================================================
-# DECAY  (call every tick)
+# DECAY  (lazy -- see refresh_habits)
 # =========================================================
 
-def decay_habits(c):
-    """Habits decay slowly — 0.1% per tick. Remove when negligible."""
-    for k in list(c.get("habits", {})):
-        c["habits"][k] *= 0.999
-        if c["habits"][k] < 0.01:
-            del c["habits"][k]
+def decay_habits(c, world=None):
+    """Kept for older callers: the lazy fade (refresh_habits) when a world is given, else nothing."""
+    if world is not None:
+        refresh_habits(c, world)
 
 
 # =========================================================

@@ -233,10 +233,10 @@ def update_internal_state(
     promote_pending_posture(c, world)
 
     _prof.mark("internal:decay_memories")
-    decay_memories(c)
+    decay_memories(c, world)       # lazy (brain/memory.py::refresh_memory_importance): not compounding per call
 
     _prof.mark("internal:decay_habits")
-    decay_habits(c)
+    decay_habits(c, world)         # lazy (systems/habits.py::refresh_habits)
 
     _prof.mark("internal:process_health")
     process_health(

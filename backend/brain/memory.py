@@ -1,3 +1,4 @@
+import os
 import uuid
 import time
 
@@ -511,50 +512,46 @@ def prune_memories(
 # DECAY
 # =========================================================
 
-def decay_memories(c):
+# How fast a memory's importance fades, in SIM time (core/clock.now_ts). Tunable: MEMORY_HALF_LIFE_HOURS in the
+# environment. 38.5 h is the rate the old per-tick formula (importance *= 0.999995 ** age) was written for; applied
+# every tick it compounded, so even an importance-1.0 memory was gone ~20 real minutes after it was made.
+MEMORY_HALF_LIFE_SECONDS = float(os.getenv("MEMORY_HALF_LIFE_HOURS", "38.5")) * 3600.0
+MEMORY_FORGET_BELOW = 0.03
 
-    now = time.time()
 
+def _fade(age_seconds):
+    return 0.5 ** (max(0.0, age_seconds) / MEMORY_HALF_LIFE_SECONDS)
+
+
+def refresh_memory_importance(c, world):
+    """Lazy memory fade: importance = importance_base x 0.5 ** (age / half-life), age in sim seconds since created_ts.
+    The result is the same however often this runs (once a tick, once an hour) -- nothing compounds. A memory without
+    a sim-time stamp (just stored -- store_memory has no world -- or from an older save) is stamped now, with its
+    current importance as the base. An importance someone rewrote since the last refresh (reflection's
+    rewrite_memory_salience, confiding) becomes the new base, as of now. Memories under MEMORY_FORGET_BELOW are
+    forgotten; the rest are kept most important first, at most 150 (as before)."""
+    from core.clock import now_ts
+    now = now_ts(world)
     kept = []
-
-    for m in c.get(
-        "memories",
-        []
-    ):
-
-        age = now - m.get(
-            "created_at",
-            now
-        )
-
-        decay_factor = (
-            0.999995 ** age
-        )
-
-        m["importance"] *= (
-            decay_factor
-        )
-
-        if m["importance"] > 0.03:
-
+    for m in c.get("memories", []):
+        imp = m.get("importance", 0.5)
+        if "created_ts" not in m or "importance_base" not in m:
+            m["created_ts"] = m.get("created_ts", now)
+            m["importance_base"] = imp
+        elif imp != m.get("_importance_seen"):
+            f = _fade(now - m["created_ts"])
+            m["importance_base"] = imp / f if f > 0 else imp
+        m["importance"] = m["_importance_seen"] = m["importance_base"] * _fade(now - m["created_ts"])
+        if m["importance"] > MEMORY_FORGET_BELOW:
             kept.append(m)
-
-    kept.sort(
-
-        key=lambda m: m.get(
-            "importance",
-            0
-        ),
-
-        reverse=True
-    )
-
-    # kept is sorted highest-importance first -- keep the FRONT of that
-    # list. (Was kept[-150:], which took the tail of a descending-sorted
-    # list -- i.e. the least important entries -- once len(kept) ever
-    # exceeded 150; harmless today only because prune_memories() always
-    # caps the list at 150 before decay_memories() ever sees it.)
+    kept.sort(key=lambda m: m.get("importance", 0), reverse=True)
     c["memories"] = kept[:150]
+
+
+def decay_memories(c, world=None):
+    """Kept for older callers: the lazy fade (refresh_memory_importance) when a world is given, else nothing."""
+    if world is not None:
+        refresh_memory_importance(c, world)
 
 
 # =========================================================
