@@ -210,6 +210,9 @@ def _run_agent(c, world, t):
     # after the update (an activity that undresses them may just have started): exposed people join the "nudity" loop
     from systems.nudity_perception import note_exposure
     note_exposure(c, world)
+    # ... and the battery regime they leave the update in (charging, on the phone) is what their devices run under
+    from systems.power import sync_batteries
+    sync_batteries(c, world)
     return c["id"]
 
 
@@ -1551,17 +1554,6 @@ def _job_claustrophobia(world, entry):
     """Scheduled job `claustrophobia` (was an every() block in tick()); see core/scheduler.py."""
     from systems.claustrophobia import tick_claustrophobia
     tick_claustrophobia(world)
-
-
-def _job_phone_battery(world, entry):
-    """Scheduled job `phone_battery` (was an every() block in tick()); see core/scheduler.py."""
-    characters = [c for c in world.get("characters", {}).values() if not c.get("is_workplace_npc")]
-    for c in characters:
-        act = c.get("activity") or {}
-        if act.get("interaction") == "charge":
-            charge_device(c, world)
-        else:
-            update_phone_battery(c)
 
 
 def _job_phone_behavior(world, entry):

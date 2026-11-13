@@ -138,3 +138,103 @@ def tick_battery_items(c):
             continue
         in_use = active_type is not None and item.get("object_type") == active_type
         drain_battery(item, in_use=in_use)
+
+
+# ── batteries as lazy values of sim time (core/lazy.py) ───────────────────────────────────────────────────────────────
+# A battery drains (idle / in use) or charges at a steady per-tick rate that depends only on what its owner is doing --
+# the "regime". It is brought up to date (sync_batteries) in the owner's own update and right after it, under the
+# regime recorded at the last sync, and a scheduler timer fires at the next moment that matters: a draining device
+# hitting 0 (it switches off), a charging one becoming usable or full. The old per-second job drained everyone's
+# devices, the off-grid included; so does this.
+
+def battery_regime(c):
+    act = c.get("activity") or {}
+    if act.get("interaction") == "charge":
+        return ["charge", act.get("device_item_id")]
+    return ["use", _active_device_type(c)]
+
+
+def _apply_regime(c, regime, ticks):
+    from systems.personal_items import get_inventory, get_item_by_id
+    if regime[0] == "charge":
+        device = get_item_by_id(c, regime[1]) if regime[1] else None
+        charger = find_charger_for(c, device) if device else None
+        if not device or not charger or not is_battery_powered(device):
+            return                      # (as before: a charge activity drains nothing, and charges only with a charger)
+        states = device.setdefault("states", {})
+        battery = min(100.0, float(states.get("battery", 100)) + charger.get("charges_per_tick", DEFAULT_CHARGE_RATE) * ticks)
+        states["battery"] = round(battery, 2)
+        if battery >= MIN_USABLE:
+            states["powered_on"] = True
+        return
+    for item in get_inventory(c):
+        if not is_battery_powered(item):
+            continue
+        in_use = regime[1] is not None and item.get("object_type") == regime[1]
+        rate = item.get("battery_drain_in_use", DEFAULT_IN_USE_DRAIN) if in_use else item.get("battery_drain_idle", DEFAULT_IDLE_DRAIN)
+        states = item.setdefault("states", {})
+        battery = max(0.0, float(states.get("battery", 100)) - rate * ticks)
+        states["battery"] = round(battery, 2)
+        if battery <= 0:
+            states["powered_on"] = False
+
+
+def sync_batteries(c, world):
+    """Bring c's batteries up to now under the regime that held since the last sync, then note the current one and set
+    the timer for the next battery moment."""
+    from core.lazy import elapsed_ticks
+    st = c.setdefault("_battery", {})
+    ticks = elapsed_ticks(st, "t", world)
+    if ticks and st.get("regime"):
+        _apply_regime(c, st["regime"], ticks)
+    st["regime"] = battery_regime(c)
+    _arm_battery_timer(c, world, st["regime"])
+
+
+def _arm_battery_timer(c, world, regime):
+    from core import scheduler
+    from core.clock import now_ts
+    from core.tick_schedule import TICK_RATE_SECONDS
+    from systems.personal_items import get_inventory, get_item_by_id
+    waits = []
+    if regime[0] == "charge":
+        device = get_item_by_id(c, regime[1]) if regime[1] else None
+        charger = find_charger_for(c, device) if device else None
+        if device and charger and is_battery_powered(device):
+            b = float(device.get("states", {}).get("battery", 100))
+            rate = charger.get("charges_per_tick", DEFAULT_CHARGE_RATE)
+            if rate > 0:
+                for target in (MIN_USABLE, 100.0):
+                    if b < target:
+                        waits.append((target - b) / rate)
+    else:
+        for item in get_inventory(c):
+            if not is_battery_powered(item):
+                continue
+            b = float(item.get("states", {}).get("battery", 100))
+            in_use = regime[1] is not None and item.get("object_type") == regime[1]
+            rate = item.get("battery_drain_in_use", DEFAULT_IN_USE_DRAIN) if in_use else item.get("battery_drain_idle", DEFAULT_IDLE_DRAIN)
+            if b > 0 and rate > 0:
+                waits.append(b / rate)
+    owner = f"battery:{c.get('id')}"
+    if waits:
+        scheduler.schedule_at(world, owner, "next", now_ts(world) + min(waits) * TICK_RATE_SECONDS + 1e-6)
+    else:
+        scheduler.cancel(world, owner, "next")
+
+
+def _on_battery_timer(world, entry):
+    c = (world.get("characters") or {}).get(entry["owner"].split(":", 1)[1])
+    if c:
+        sync_batteries(c, world)
+
+
+def sync_all_batteries(world, entry=None):
+    """Everyone (a loaded world, a newcomer): batteries brought up to date and timed."""
+    for c in (world.get("characters") or {}).values():
+        if not c.get("is_workplace_npc"):
+            sync_batteries(c, world)
+
+
+from core import scheduler as _scheduler      # noqa: E402
+_scheduler.register("battery", _on_battery_timer)

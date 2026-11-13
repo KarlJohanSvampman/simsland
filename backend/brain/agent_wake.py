@@ -268,6 +268,9 @@ def _real_view(c):
             v = {kk: vv for kk, vv in (v or {}).items() if kk not in _LAZY_FIELDS[k] and kk != "_lazy_ts"}
         elif k == "relationships":
             v = {oid: {kk: vv for kk, vv in (r or {}).items() if kk != "arousal_level"} for oid, r in (v or {}).items()}
+        elif k == "inventory":                      # battery levels are lazy (systems/power.py); the rest of an item is not
+            v = [dict(it, states={sk: sv for sk, sv in ((it or {}).get("states") or {}).items()
+                                  if sk not in ("battery", "powered_on")}) for it in (v or [])]
         out[k] = _digest(v)
     return out
 
@@ -279,7 +282,7 @@ _LAZY_FIELDS = {
     "intoxication_state": ("alcohol_level", "drug_level", "libido_boost"),
     "baby_needs": ("hunger", "sleep", "comfort", "stimulation"),
 }
-_LAZY_STAMPS.update({"_crush", "_intimacy", "_baby", "blush_score", "is_blushing"})
+_LAZY_STAMPS.update({"_crush", "_intimacy", "_baby", "blush_score", "is_blushing", "_battery"})
 
 
 def shadow_before(c):

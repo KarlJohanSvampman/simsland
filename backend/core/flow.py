@@ -86,6 +86,8 @@ JOBS = [
     EVENT("conversation_cleanup", "_job_conversation_cleanup", ["conversation.ended", "time.hour"],
           "a finished conversation is archived when it ends; a quiet one ends on its own idle timer (re-armed by each "
           "line, brain/conversations.py); the hourly pass only catches conversations from saves made before the timer"),
+    EVENT("batteries", "systems.power:sync_all_batteries", ["world.loaded", "character.added"],
+          "devices drain and charge on their own clock (a timer at the next moment that matters: off, usable, full)"),
     EVENT("baby_needs", "systems.baby:_on_babies_appear", ["world.loaded", "character.added"],
           "a baby's needs fall on their own clock (a timer at the next crying point); a loaded world or a birth sets it"),
     EVENT("neighbours", "_job_neighbours", ["character.added", "time.day"],
@@ -107,7 +109,6 @@ JOBS = [
     CLOCK("home_presence", "_job_home_presence", "the hourly 'are they home' sample", hourly=46),
 
     # ── processes: time passing ────────────────────────────────────────────────────────────────────────────────────
-    PROCESS("phone_battery", "_job_phone_battery", SECOND, "batteries drain and charge"),
     PROCESS("memory_decay", "_job_memory_decay", 15 * SECOND, "memories fade"),
     PROCESS("polarization", "_job_polarization", 15 * SECOND, "opinions drift"),
     PROCESS("relationships", "_job_relationships", 15 * SECOND, "time spent near each other builds familiarity"),

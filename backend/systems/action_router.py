@@ -5490,9 +5490,10 @@ def _route_retrieve_phone(c, world, action):
 
 def _route_charge_device(c, world, action):
     """
-    Start charging. systems/power.py::charge_device() is called each tick
-    by sim_loop while activity interaction == "charge", reading
-    activity["device_item_id"] to know which item to charge and its
+    Start charging. While activity interaction == "charge" the battery
+    charges lazily (systems/power.py::sync_batteries: the "charge" regime,
+    brought up to date in the owner's update and timed to "usable"/"full"),
+    reading activity["device_item_id"] to know which item to charge and its
     matching charger (systems/power.py::CHARGER_BY_OBJECT_TYPE) --
     generalized from the old phone-only version so any battery-powered
     item (phone, laptop, ...) works the same way. Requires a matching

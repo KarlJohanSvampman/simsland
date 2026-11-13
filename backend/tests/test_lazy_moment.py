@@ -132,6 +132,40 @@ check("arousal fades on every relationship at the old rate",
       abs(c["relationships"]["x"]["arousal_level"] - (0.5 - 1000 * I.AROUSAL_DECAY)) < 1e-9
       and c["relationships"]["y"]["arousal_level"] == 0.0)
 
+# ── batteries ────────────────────────────────────────────────────────────────────────────────────────────────────────
+import systems.power as P
+import systems.personal_items as PI
+
+phone = {"id": "ph", "object_type": "phone", "states": {"battery": 50.0, "powered_on": True}}
+charger = {"id": "ch", "template": "phone_charger", "charges_per_tick": 0.8}
+PI.get_inventory = lambda c: c.get("_inv", [])
+PI.get_item_by_id = lambda c, i: next((x for x in c.get("_inv", []) if x["id"] == i), None)
+P.find_charger_for = lambda c, d: charger
+w = W(0)
+c = {"id": "p", "_inv": [phone], "activity": None}
+P.sync_batteries(c, w)
+due = [t["due"] for t in w.get("timers", []) if t["owner"] == "battery:p"]
+check("an idle phone's switching-off point has a timer", due and abs(due[0] - 50.0 / P.DEFAULT_IDLE_DRAIN) < 1, due)
+c["activity"] = {"interaction": "phone_call"}            # on the phone from tick 100 (their update notes it)
+w["sim_time"] = w["tick"] = 100
+P.sync_batteries(c, w)
+check("idle drain up to the change of regime", abs(phone["states"]["battery"] - (50 - 100 * P.DEFAULT_IDLE_DRAIN)) < 1e-6)
+w["sim_time"] = w["tick"] = 200
+P.sync_batteries(c, w)
+check("... in-use drain after it", abs(phone["states"]["battery"] - (45 - 100 * P.DEFAULT_IN_USE_DRAIN)) < 1e-6, phone["states"])
+c["activity"] = {"interaction": "charge", "device_item_id": "ph"}
+P.sync_batteries(c, w)
+w["sim_time"] = w["tick"] = 250
+P.sync_batteries(c, w)
+check("charging at the charger's rate", abs(phone["states"]["battery"] - (15 + 50 * 0.8)) < 1e-6, phone["states"])
+due = [t["due"] for t in w.get("timers", []) if t["owner"] == "battery:p"]
+check("... with a timer for when it is full", due and abs(due[0] - (250 + (100 - 55) / 0.8)) < 1, due)
+c["activity"] = None
+P.sync_batteries(c, w)
+w["sim_time"] = w["tick"] = 250 + int(55 / P.DEFAULT_IDLE_DRAIN) + 5
+P._on_battery_timer({**w, "characters": {"p": c}}, {"owner": "battery:p"})
+check("an empty phone switches off", phone["states"]["battery"] == 0 and phone["states"]["powered_on"] is False, phone["states"])
+
 print()
 print("all passed" if not failures else f"FAILED: {', '.join(failures)}")
 sys.exit(1 if failures else 0)

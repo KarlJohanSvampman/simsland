@@ -249,6 +249,8 @@ def update_internal_state(
     from systems.harassment import tick_harassment_for
     _prof.mark("internal:tick_harassment")
     tick_harassment_for(c, world)
+    from systems.power import sync_batteries              # devices drained / charged up to now (lazily)
+    sync_batteries(c, world)
     from systems.crushes import tick_crushes_for          # a blush fades, a thought bubble ends, a daydream may come
     tick_crushes_for(c, world)
     from systems.intimacy import tick_intimacy_for        # arousal fades lazily; a lapsed touch proposal is settled
