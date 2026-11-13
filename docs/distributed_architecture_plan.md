@@ -531,3 +531,25 @@ component; a replayable event log.
   mostly talk). Every change above: identical worlds in three scenarios (1500 ticks across midnight and a week
   boundary, 1500 ticks of afternoon, 3000 ticks of social morning) apart from its own bookkeeping keys, and the
   same backend suite pass/fail set.
+- **No-tick, part C: characters run when they are due (done)** — first the last per-call drifts became lazy values of
+  sim time (memories, habits, mood expiry, desire frustration; memory and habit half-lives are tunable:
+  `MEMORY_HALF_LIFE_HOURS`, default 38.5; `HABIT_HALF_LIFE_DAYS`, default 3 -- both used to be per-tick factors, and
+  memory decay compounded so even an important memory was gone in ~20 real minutes). Then `brain/agent_wake.py`
+  (`AGENT_GATING`, default `on`; `off` = everyone every step; `shadow` = everyone every step plus a record of every
+  skippable step that changed real state or drew a random number) decides whose `update_agent()` runs: whoever an
+  event names (an `event_bus.after_dispatch` hook), whoever is near an incident or a one-off sound, a new intention,
+  a route that saved the world, the lazy body's timer, cognition's `wake_character`, the timers each time-based check
+  arms for itself (activity clock, schedule blocks, alarm minute and snooze, bedtime cooldown, intention deadlines,
+  reflections, speech expiry, posture, plan cooldown/wait, memory upkeep, mood, curiosity, validation, the daily
+  health boundary), anyone walking or with something moving step by step (an emergency, a hazard or symptom,
+  dehydration, an investigation), a free character whose decision cycle is due, the top of the hour (CLOCK
+  `agent_hourly_wake`), and a 60-second heartbeat (`AGENT_HEARTBEAT_SECONDS`). Per-tick dice rolls are drawn ahead
+  (`agent_wake.chance`: geometric, the same distribution). Shadow runs (4 h morning, 3 h evening, 2 h across midnight,
+  50 min of conversation): 94-95% of steps skipped, 0-2 misses each, all within the heartbeat. On vs off: the morning
+  ends identically with 2,951 agent runs instead of 57,600; conversation runs agree across seeds; ~35% faster. Accepted:
+  what the lazy body writes outside `body` (stress, weight, health threshold events) is brought up to date when the body
+  syncs, at most `BODY_MAX_SLEEP_TICKS` (2 min) late for other systems' readers.
+  Deliberately not done from step 3 of the plan: movement at its own rate decoupled from the step (it is an active loop
+  per step; a separate rate only matters once movement is its own process, step 5), and a spatial index for perception
+  (the perception job is already event-driven with a 5 s settle; finding who is affected is an O(n) scan, negligible
+  at this population -- worth doing at a few hundred characters).
