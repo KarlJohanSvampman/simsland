@@ -576,3 +576,28 @@ component; a replayable event log.
   exhaustion, influence, popularity, household monitoring, child care, domestic control, cookware, calendar
   reminders, contract checks, persona expectations, mentality compilation, appliance wear, orphan props) -- each
   wants the part-C treatment (lazy value + timers at its own thresholds, or an event).
+- **Step 4, the entity store (done: D1-D3)** —
+  *D1, per-entity records* (`core/entity_store.py`, `WORLD_STORE=entities`, the default): every character, household,
+  conversation, archived conversation and prop is its own Postgres row (`entities`, data as JSON -- not JSONB, which
+  re-orders object keys, and key order inside an entity is iteration order the simulation depends on), every other
+  top-level key a row of kind `key`, and a manifest row keeps the order of keys and ids. A flush writes only what
+  changed, deletes what is gone, and writes the manifest and a commit row in ONE transaction, so a reload is always the
+  world as of one flush (byte-for-byte, checked). The writer merges queued diffs instead of dropping them. The blob is
+  still written every 300 ticks and at shutdown (backup, tools). A blob-only save loads and is migrated by its first
+  flush. Flush every 2 ticks (`WORLD_PERSIST_EVERY_TICKS`): a crash loses a tick or two instead of 15.
+  *D2, the WorldView façade* (`core/world_view.py`): the resident world is a `WorldDict`, its entity collections
+  `EntityMap` / `EntityList` -- dict/list subclasses, so the ~325 systems modules are untouched and json.dumps is
+  unaffected. Reaching an entity notes it (the hot path is one set test: no measurable cost); a flush renders only what
+  was touched (~20-30 of ~210 entities per step; the touched characters dominate, ~5 ms). Props are compared whole
+  (reading the list is too common to note). Read-only observers run `untracked()`. Every 20th flush compares
+  everything and reports entities changed without being touched -- none found in 1500 ticks.
+  *D3, per-entity locks* (`core/entity_locks.py`, `ENTITY_LOCKS=on`, default off until it has run in the real stack):
+  a read/write world lock -- the tick's step and declared commands (`@command(..., entities=...)`) share the world and
+  lock entities (the step as it reaches them, a command all up front), everything else is exclusive as before; the
+  publish and persistence pass after a step is exclusive; a command in a lock cycle is aborted (409), never the step.
+  Measured with the real tick runner and a command thread: ~1,400 ticks in 15 s instead of 754, declared commands
+  6-8 ms instead of 31 ms, 0 conflicts, ~80 commands ran during a step, reload identical.
+  Honest limits: the step reaches every character each time (systems iterate the whole collection), so a command on a
+  character still waits for the step to end -- the concurrency is with other commands and with the publish/persist
+  pass; real per-character parallelism needs the step itself split into per-entity handlers (step 5, not done).
+  Only five commands declare their entities so far; props stay exclusive (their reads are not noted).
