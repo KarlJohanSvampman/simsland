@@ -241,7 +241,8 @@ def update_bus(world):
 # ── the bus as an active loop (core/active_loops.py) ──────────────────────────────────────────────────────────────────
 # It used to be looked at every tick to catch its 15-minute slot. Now the clock marks each slot (four hourly jobs, at
 # :00 :15 :30 :45 local time), which makes the bus a member of the "bus" loop; the loop runs update_bus() at the same
-# point in the step as before for as long as a departure is due or a trip is under way.
+# point in the step as before for as long as a departure is due or a trip is under way. The slots are CLOCK jobs in
+# core/flow.py, so they appear in the flow map and the section registry like every other job.
 
 def _bus_slot(world, entry=None):
     from core import active_loops
@@ -261,11 +262,6 @@ def ensure_bus_member(world):
     active_loops.rebuild(world, "bus", ["bus"] if (world.get("_bus") or {}).get("phase") else [])
 
 
-def _install_bus_loop():
-    from core import active_loops, scheduler
-    active_loops.register("bus", bus_step, order=30)
-    for minute in range(0, 60, BUS_INTERVAL_MINUTES):
-        scheduler.register_hourly(f"bus_slot_{minute:02d}", _bus_slot, at=minute * 60)
-
-
-_install_bus_loop()
+from core import active_loops as _active_loops      # noqa: E402
+_active_loops.register("bus", bus_step, order=30)
+# the slots themselves are CLOCK jobs in core/flow.py ("bus_slot_00" .. "bus_slot_45")
