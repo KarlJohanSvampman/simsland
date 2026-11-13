@@ -12,6 +12,8 @@ def queue_message(world, sender_id, receiver_id, text, delay=5):
         "send_time": time.time(),
         "deliver_at": time.time() + delay
     })
+    from core.flow import wake_duty
+    wake_duty(world, "deliveries")
 
 
 def deliver_messages(world):

@@ -74,6 +74,8 @@ def start_process(household, world, process_type, template_id, stages, prop_id=N
         **extra,
     }
     world.setdefault("household_processes", []).append(process)
+    from core.flow import wake_duty
+    wake_duty(world, "household_processes")
     begin_stage(household, process, world)
     return process
 

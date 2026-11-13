@@ -73,6 +73,8 @@ def archive(world, conv):
     for pid in participants:
         _to_log(chars[pid], entry)
     world.setdefault("_conv_tag_queue", []).append(entry["id"])
+    from core.flow import wake_duty
+    wake_duty(world, "convtags")
     return entry
 
 

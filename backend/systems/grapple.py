@@ -69,6 +69,8 @@ def start_grapple(holder, held, world, mode="wrestle"):
         "outcome":         None,
     }
     world.setdefault("grapples", {})[grapple["id"]] = grapple
+    from core.flow import wake_duty
+    wake_duty(world, "grapples")
 
     fields = _MODE_FIELDS[mode]
     held[fields["held"]] = holder["id"]

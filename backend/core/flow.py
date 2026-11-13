@@ -30,6 +30,15 @@ def CLOCK(name, run, why, daily=None, hourly=None):
     return {"name": name, "run": run, "kind": "clock", "daily": daily, "hourly": hourly, "why": why}
 
 
+def DUTY(name, run, every, why, active):
+    """A job that is continuous only while something is going on (a fire burning, a delivery under way): it runs every
+    `every` sim seconds (anchored to multiples of it, as a PROCESS would) for as long as `active(world)` -- a cheap
+    world-level check -- is true, and has no timer at all otherwise. Whatever starts its work calls
+    wake_duty(world, name); a loaded world arms the active ones, and an hourly safety check arms (and reports) any that
+    is active with no timer."""
+    return {"name": name, "run": run, "kind": "duty", "every": every, "active": active, "why": why}
+
+
 def PROCESS(name, run, every, why, offset=0):
     return {"name": name, "run": run, "kind": "process", "every": every, "offset": offset, "why": why}
 
@@ -86,6 +95,11 @@ JOBS = [
     EVENT("conversation_cleanup", "_job_conversation_cleanup", ["conversation.ended", "time.hour"],
           "a finished conversation is archived when it ends; a quiet one ends on its own idle timer (re-armed by each "
           "line, brain/conversations.py); the hourly pass only catches conversations from saves made before the timer"),
+    EVENT("duties", "systems.duties:on_world_loaded", ["world.loaded"],
+          "a loaded world: every DUTY that has work is armed, every parcel in transit is timed"),
+    CLOCK("duty_safety", "core.flow:check_duties",
+          "hourly safety net: a DUTY with work but no timer is armed and reported (a start site is missing wake_duty)",
+          hourly=30 * MINUTE),
     EVENT("plants", "systems.plants:_on_world_loaded", ["world.loaded"],
           "each plant on its own timer: the next moisture/weed threshold or growth stage, or every 30 s while it needs "
           "attention (a loaded world arms them all)"),
@@ -118,7 +132,7 @@ JOBS = [
     PROCESS("grievances", "_job_grievances", 15 * SECOND, "grievances, goodwill, guilt fade or grow"),
     PROCESS("child_care", "_job_child_care", 15 * SECOND, "children's needs and who is looking after them"),
     PROCESS("conflicts", "_job_conflicts", 5 * SECOND, "an argument or fight in progress moves on"),
-    PROCESS("grapples", "_job_grapples", 5 * SECOND, "a grapple in progress moves on"),
+    DUTY("grapples", "_job_grapples", 5 * SECOND, "a grapple in progress moves on", "systems.duties:grapples_active"),
     PROCESS("reading", "_job_reading", 5 * SECOND, "reading in progress"),
     PROCESS("sports_watching", "_job_reading_2", 5 * SECOND, "games kick off and are broadcast"),
     CLOCK("agent_hourly_wake", "brain.agent_wake:_hourly",
@@ -128,16 +142,16 @@ JOBS = [
             hourly=m * MINUTE) for m in (0, 15, 30, 45)],
         PROCESS("movement_sweep", "systems.movement:safety_sweep", 30 * SECOND,
             "safety net: anyone set walking without start_moving() joins the movement loop (and is reported)"),
-    PROCESS("scripted_conversations", "_job_reading_3", 5 * SECOND, "scripted scenes play out"),
-    PROCESS("household_processes", "_job_cooking_2", 10 * SECOND, "laundry, dishes, cooking stages advance"),
-    PROCESS("deliveries", "_job_deliveries", 10 * SECOND, "messages and parcels travel"),
+    DUTY("scripted_conversations", "_job_reading_3", 5 * SECOND, "scripted scenes play out", "systems.duties:scripted_active"),
+    DUTY("household_processes", "_job_cooking_2", 10 * SECOND, "laundry, dishes, cooking stages advance", "systems.duties:household_processes_active"),
+    DUTY("deliveries", "_job_deliveries", 10 * SECOND, "messages travel (parcels: a timer at their arrival, systems/duties.py)", "systems.duties:messages_active"),
     PROCESS("service_workers", "_job_service_workers", 10 * SECOND, "service workers do their rounds"),
     PROCESS("store_staffing", "_job_service_workers_2", 10 * SECOND, "shop staffing follows opening hours"),
-    PROCESS("service_vehicles", "_job_service_workers_3", 10 * SECOND, "service vans drive"),
-    PROCESS("rideshare", "_job_service_workers_4", 10 * SECOND, "rideshare cars drive"),
+    DUTY("service_vehicles", "_job_service_workers_3", 10 * SECOND, "service vans drive", "systems.duties:service_vehicles_active"),
+    DUTY("rideshare", "_job_service_workers_4", 10 * SECOND, "rideshare cars drive", "systems.duties:rideshare_active"),
     PROCESS("services", "_job_service_workers_5", 10 * SECOND, "booked services progress"),
-    PROCESS("fires", "_job_fires", 10 * SECOND, "a fire burns"),
-    PROCESS("intercourse_sessions", "_job_intercourse_sessions", 10 * SECOND, "a scene in progress"),
+    DUTY("fires", "_job_fires", 10 * SECOND, "a fire burns", "systems.duties:fires_active"),
+    DUTY("intercourse_sessions", "_job_intercourse_sessions", 10 * SECOND, "a scene in progress", "systems.duties:intercourse_active"),
     PROCESS("household_monitoring", "_job_household_monitoring", 20 * SECOND, "who watches the children, babysitting asks"),
     PROCESS("market", "_job_market", 20 * SECOND, "prices, stocks, production and consumption"),
     PROCESS("social_odor", "_job_social_odor", 20 * SECOND, "a smell bothers the people near it"),
@@ -192,7 +206,7 @@ JOBS = [
     PROCESS("background_services", "systems.calendar_handlers:_background_services", 5 * SECOND,
             "background services", offset=2),
     PROCESS("movelog", "systems.movement_log:_job", 15 * SECOND, "the movement log samples where people are"),
-    PROCESS("convtags", "systems.conversation_archive:_service", 5 * SECOND, "archived conversations get their AI tags"),
+    DUTY("convtags", "systems.conversation_archive:_service", 5 * SECOND, "archived conversations get their AI tags", "systems.duties:convtags_active"),
     PROCESS("riftscan", "systems.rifts:on_timer", HOUR, "standing between housemates is re-read", offset=1234),
 ]
 
@@ -264,6 +278,9 @@ def install(module=None):
         fn = _resolve(module, job["run"])
         if job["kind"] == "process":
             scheduler.register_recurring(job["name"], fn, every=job["every"], offset=job.get("offset", 0))
+        elif job["kind"] == "duty":
+            _duty_fns[job["name"]] = (fn, _resolve(module, job["active"]))
+            scheduler.register(_duty_owner(job["name"]), _duty_timer)
         elif job["kind"] == "clock":
             if job.get("daily") is not None:
                 scheduler.register_daily(job["name"], fn, at=job["daily"])
@@ -277,6 +294,59 @@ def install(module=None):
                     "data": {}, "ids": (entry.get("payload") or {}).get("ids", [])}))(fn))
             for ev in job["on"]:
                 subscribe(ev, _event_handler(job, fn, ev))
+
+
+# ── duties ───────────────────────────────────────────────────────────────────────────────────────────────────────────
+_duty_fns = {}           # name -> (run fn, active fn)
+
+
+def _duty_owner(name):
+    return f"duty:{name}"
+
+
+def wake_duty(world, name):
+    """Something started that `name` looks after: armed (at the next multiple of its interval) unless it already is."""
+    from core import scheduler
+    from core.clock import now_ts
+    j = job(name)
+    if not j or j.get("kind") != "duty" or world is None:
+        return
+    owner = _duty_owner(name)
+    if scheduler.pending(world, owner):
+        return
+    now, every = now_ts(world), j["every"]
+    scheduler.schedule_at(world, owner, "run", now + ((-now) % every or every))
+
+
+def _duty_timer(world, entry):
+    from core import scheduler
+    from core.clock import now_ts
+    name = entry["owner"].split(":", 1)[1]
+    fn, active = _duty_fns.get(name, (None, None))
+    if fn is None:
+        return
+    fn(world, entry)
+    if active(world):
+        every = job(name)["every"]
+        now = now_ts(world)
+        scheduler.schedule_at(world, _duty_owner(name), "run", now + ((-now) % every or every))
+
+
+def check_duties(world, entry=None):
+    """A loaded world, and hourly as a safety net: every duty that has work is armed. One found active with no timer
+    (whatever started its work did not call wake_duty) is reported -- that start site needs the call."""
+    from core import scheduler
+    loaded = (entry or {}).get("event") == "world.loaded"
+    for name, (fn, active) in _duty_fns.items():
+        try:
+            busy = active(world)
+        except Exception as exc:
+            print(f"[flow] duty {name}: active() failed: {exc!r}")
+            continue
+        if busy and not scheduler.pending(world, _duty_owner(name)):
+            if not loaded:
+                print(f"[flow] duty {name} had work but no timer -- a start site is missing wake_duty()")
+            wake_duty(world, name)
 
 
 def job(name):

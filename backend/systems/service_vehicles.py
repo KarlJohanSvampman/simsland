@@ -96,6 +96,8 @@ def spawn_service_vehicle(
     world[
         "service_vehicles"
     ].append(vehicle)
+    from core.flow import wake_duty
+    wake_duty(world, "service_vehicles")
 
     assign_next_vehicle_route(
         vehicle,

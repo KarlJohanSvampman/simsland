@@ -1,3 +1,4 @@
+import uuid
 """
 Procurement system.
 
@@ -199,6 +200,7 @@ def purchase_from_catalog(c, household, world, catalog_id, method="in_person"):
 
 def schedule_delivery_item(household, catalog_id, world, buyer_id=None, price=None):
     world.setdefault("deliveries", []).append({
+        "id":           f"dlv_{uuid.uuid4().hex[:10]}",
         "household_id": household["id"],
         "type":         "item",
         "catalog_id":   catalog_id,
@@ -209,16 +211,21 @@ def schedule_delivery_item(household, catalog_id, world, buyer_id=None, price=No
         "buyer_id":     buyer_id,
         "price":        price,
     })
+    from systems.duties import arm_delivery      # handled when it arrives, not looked for every few seconds
+    arm_delivery(world, world["deliveries"][-1])
 
 
 def schedule_delivery_prop(household, catalog_id, world):
     world.setdefault("deliveries", []).append({
+        "id":           f"dlv_{uuid.uuid4().hex[:10]}",
         "household_id": household["id"],
         "type":         "prop",
         "catalog_id":   catalog_id,
         "arrival_tick": world["tick"] + random.randint(24, 72) * 3600,
         "status":       "in_transit",
     })
+    from systems.duties import arm_delivery
+    arm_delivery(world, world["deliveries"][-1])
 
 
 # =========================================================

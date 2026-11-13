@@ -107,6 +107,8 @@ def _dispatch_taxi(c, world):
     vehicle["route"] = find_road_path(world, (int(vehicle["x"]), int(vehicle["y"])), road_target) or []
 
     world.setdefault("rideshare_vehicles", []).append(vehicle)
+    from core.flow import wake_duty
+    wake_duty(world, "rideshare")
     c["pickup_request"]["vehicle_id"] = vehicle["id"]
     return {"ok": True, "vehicle_id": vehicle["id"]}
 
