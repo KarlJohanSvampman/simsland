@@ -67,6 +67,7 @@ def wake_now(c, reason="event"):
         return
     w = _rec(c)
     w["at"], w["why"] = 0.0, reason      # any time in the past is due (and, unlike -inf, it is valid JSON)
+    _woken.add(c.get("id"))
 
 
 def wake_at(c, world, ts, reason="timer"):
@@ -76,6 +77,110 @@ def wake_at(c, world, ts, reason="timer"):
     w = _rec(c)
     if w["at"] is None or ts < w["at"]:
         w["at"], w["why"] = ts, reason
+        _push(world, ts, c.get("id"))
+
+
+# ── the due index (step 5a): who is due, without asking every character every step ──────────────────────────────────
+# A heap of (time, character id) per world, pushed whenever a character's next wake moves earlier; stale entries
+# (the character ran meanwhile, or its wake moved) are dropped when popped. Characters woken without a world at hand
+# (wake_now) are collected in _woken. The movement loop's members (walking) are due every step.
+
+import heapq
+
+_heaps = {}              # id(world) -> heap of (ts, cid)
+_woken = set()
+
+
+def _push(world, ts, cid):
+    if world is None or cid is None:
+        _woken.add(cid)
+        return
+    heap = _heaps.get(id(world))
+    if heap is not None:
+        heapq.heappush(heap, (ts, cid))
+
+
+def _build_index(world):
+    """First use with this world (a load): everyone is looked at once, and their pending wakes are indexed."""
+    heap = []
+    for cid in dict.keys(world.get("characters") or {}):
+        heap.append((float("-1"), cid))
+    heapq.heapify(heap)
+    _heaps[id(world)] = heap
+    return heap
+
+
+_pending = {}            # id(world) -> candidate ids popped from the index but not yet run
+
+
+def _candidates(world):
+    chars = world.get("characters") or {}
+    heap = _heaps.get(id(world)) or _build_index(world)
+    cand = _pending.setdefault(id(world), set())
+    now = _now(world)
+    while heap and heap[0][0] <= now:
+        cand.add(heapq.heappop(heap)[1])
+    if _woken:
+        cand |= {i for i in _woken if dict.__contains__(chars, i)}
+        _woken.clear()
+    return cand
+
+
+def iter_due(world):
+    """Yield (cid, c, why) for each character due this step, in the characters' own order -- re-checked after each one
+    runs, so someone an earlier character wakes (spoken to, ...) runs in this same step when they come later in the
+    order, exactly as the old sweep over everyone did; someone earlier in the order is left for the next step."""
+    from core import active_loops
+    chars = world.get("characters") or {}
+    order = {cid: n for n, cid in enumerate(dict.keys(chars))}
+    pos = -1
+    while True:
+        cand = _candidates(world)
+        movers = set(active_loops.members(world, "movement"))
+        nxt = None
+        for cid in sorted((cand | movers), key=lambda i: order.get(i, 1 << 30)):
+            n = order.get(cid)
+            if n is None:
+                cand.discard(cid)
+                continue
+            if n <= pos:
+                continue
+            c = dict.__getitem__(chars, cid)
+            ok, why = due(c, world)
+            if not ok:
+                cand.discard(cid)
+                continue
+            nxt = (cid, c, why)
+            break
+        if nxt is None:
+            return
+        cand.discard(nxt[0])
+        pos = order[nxt[0]]
+        yield nxt
+
+
+def due_set(world):
+    """The characters due right now, in order (a snapshot: iter_due is what the step runs)."""
+    chars = world.get("characters") or {}
+    from core import active_loops
+    cand = set(_candidates(world)) | set(active_loops.members(world, "movement"))
+    out = []
+    for cid in cand:
+        if not dict.__contains__(chars, cid):
+            continue
+        c = dict.__getitem__(chars, cid)
+        ok, why = due(c, world)
+        if ok:
+            out.append((cid, c, why))
+    if len(out) > 1:
+        order = {cid: n for n, cid in enumerate(dict.keys(chars))}
+        out.sort(key=lambda t: order.get(t[0], 1 << 30))
+    return out
+
+
+def defer(c, world, reason="excluded"):
+    """A due character the step does not run (asleep in a coma, a service worker...): looked at again later."""
+    wake_at(c, world, _now(world) + HEARTBEAT_SECONDS, reason)
 
 
 def due(c, world):
@@ -104,9 +209,16 @@ def begin_run(c, world):
 
 
 def note_run(c, world):
-    """Called after the update ran: when it last ran, and the activity under way sets its next wake by its own clock."""
-    _rec(c)["last"] = _now(world)
+    """Called after the update ran: when it last ran; the activity under way sets its next wake by its own clock; the
+    heartbeat, and -- free, with no decision pending -- the moment its decision cycle is due, are armed (the index finds
+    them; due() would also find them by asking)."""
+    now = _now(world)
+    _rec(c)["last"] = now
     _arm_activity(c, world)
+    wake_at(c, world, now + HEARTBEAT_SECONDS, "heartbeat")
+    cog = c.get("cognition") or {}
+    if not c.get("activity") and not cog.get("pending"):
+        wake_at(c, world, at_tick(world, cog.get("next_think_tick", 0)), "think")
 
 
 def wake_at_minute(c, world, minute_of_day, reason="clock"):

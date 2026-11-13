@@ -478,10 +478,7 @@ def _tick_impl(world):
     # reach them (workplace_reputation decay, career_ladder, contract
     # clauses) find them via world["companies"]/workplace_contact_ids,
     # never through this generic list.
-    characters = [
-        c for c in world.get("characters", {}).values()
-        if not c.get("is_workplace_npc")
-    ]
+    # (Step 5a: no list of every character is built here any more -- whatever needs one is per entity now.)
 
     # Confirmed live bug: schedule generation only ever runs for whoever is
     # already in world["characters"] at the one Monday-midnight tick per week
@@ -551,10 +548,11 @@ def _tick_impl(world):
     _prof.mark("section:per_tick_agent_brain")
     # -- Per-tick: character updates (sequential; decisions are requested, not awaited) --
     # Service worker NPCs are driven by update_services, not LLM -- skip them.
-    agent_chars = [
-        c for c in characters
-        if not c.get("is_service_worker")
-        and not c.get("is_workplace_npc")
+    from brain import agent_wake as _aw
+    agent_chars = [] if _aw.MODE == "on" else [      # gating on: the due index decides (below); nobody is scanned
+        c for c in world.get("characters", {}).values()
+        if not c.get("is_workplace_npc")
+        and not c.get("is_service_worker")
         and c.get("alive") is not False
         and c.get("posture") != "incapacitated"
     ]
@@ -563,6 +561,22 @@ def _tick_impl(world):
     # have missed.
     from brain import agent_wake
     gating = agent_wake.MODE
+    if gating == "on":
+        # Step 5a: only the characters that are due (brain/agent_wake.py's index) -- nobody else is looked at.
+        for cid, c, why in agent_wake.iter_due(world):
+            if (c.get("is_service_worker") or c.get("is_workplace_npc") or c.get("alive") is False
+                    or c.get("posture") == "incapacitated"):
+                agent_wake.defer(c, world)
+                continue
+            try:
+                agent_wake.begin_run(c, world)
+                _run_agent(c, world, t)
+                agent_wake.note_run(c, world)
+                dirty_char_ids.add(cid)
+            except Exception as exc:
+                import traceback as _tb
+                print(f"[sim_loop] agent error for {cid}: {exc!r}\n{_tb.format_exc()[-600:]}")
+        agent_chars = []
     for c in agent_chars:
         try:
             if gating == "off":
