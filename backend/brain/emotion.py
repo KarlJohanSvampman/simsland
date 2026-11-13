@@ -108,18 +108,30 @@ def apply_emotion_inertia(c, llm_emotion=None):
 
 # ── emotion label update ──────────────────────────────────────────────────────
 
+from core.tick_schedule import TICK_RATE_SECONDS
+
+
+def _now_ts(c, world):
+    """Sim time for mood expiry (core/clock.now_ts); with no world at hand, the time the character last saw."""
+    if world is not None:
+        from core.clock import now_ts
+        c["_emotion_seen_ts"] = now_ts(world)
+    return c.get("_emotion_seen_ts", 0.0)
+
+
 def update_emotion(c, world=None):
     temp        = float(c.get("emotional_temperature", 20))
     active_mood = c.get("mood")
     c["emotion"] = _temp_to_emotion(temp, active_mood)
 
-    # Tick down mood duration
+    # A mood lasts until its expiry time (sim seconds) -- a lazy value, not a per-tick countdown, so it ends at the same
+    # moment however often this runs. A mood from an older save (remaining_ticks only) is given its expiry now.
     if active_mood:
-        remaining = active_mood.get("remaining_ticks", 0) - 1
-        if remaining <= 0:
+        now = _now_ts(c, world)
+        if "expires_ts" not in active_mood:
+            active_mood["expires_ts"] = now + (active_mood.get("remaining_ticks", 0) - 1) * TICK_RATE_SECONDS
+        if now >= active_mood["expires_ts"]:
             c["mood"] = None
-        else:
-            active_mood["remaining_ticks"] = remaining
 
     # Check if a new mood should be triggered
     if world and not c.get("mood"):
@@ -137,7 +149,10 @@ def _maybe_trigger_mood(c, world):
     if not templates:
         return
     # Avoid immediately re-triggering a mood that just expired.
-    if (world.get("tick", 0) or 0) < (c.get("_mood_cooldown_until", 0) or 0):
+    if "_mood_cooldown_until" in c and "_mood_cooldown_until_ts" not in c:     # an older save: in ticks
+        c["_mood_cooldown_until_ts"] = _now_ts(c, world) + ((c.pop("_mood_cooldown_until") or 0)
+                                                             - (world.get("tick", 0) or 0)) * TICK_RATE_SECONDS
+    if _now_ts(c, world) < (c.get("_mood_cooldown_until_ts") or float("-inf")):
         return
 
     body       = c.get("body", {})
@@ -170,13 +185,13 @@ def _maybe_trigger_mood(c, world):
         "need_modifiers":             chosen.get("need_modifiers", {}),
         "emotional_temperature_range":chosen.get("emotional_temperature_range", [0, 100]),
         "polarity":                   chosen.get("polarity", "neutral"),
-        "remaining_ticks":            chosen.get("duration_ticks", 3600),
+        "expires_ts":                 _now_ts(c, world) + chosen.get("duration_ticks", 3600) * TICK_RATE_SECONDS,
     }
 
     # Apply need modifiers immediately
     _apply_mood_need_modifiers(c)
     # Cooldown before another mood can trigger.
-    c["_mood_cooldown_until"] = (world.get("tick", 0) or 0) + chosen.get("duration_ticks", 3600)
+    c["_mood_cooldown_until_ts"] = _now_ts(c, world) + chosen.get("duration_ticks", 3600) * TICK_RATE_SECONDS
 
 
 def _check_triggers(triggers, stress, temp, body, lt_needs, c):

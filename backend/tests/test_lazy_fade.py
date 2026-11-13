@@ -98,6 +98,44 @@ w1["sim_time"] += 60 * 86400
 refresh_habits(c1, w1)
 check("a habit given up for two months is gone", "jog@7" not in c1["habits"], c1["habits"])
 
+# ── persistent desires ───────────────────────────────────────────────────────────────────────────────────────────────
+from systems.persistent_desires import refresh_desires, FRUSTRATION_PER_SECOND, IMPORTANCE_PER_SECOND
+
+
+def desire_world():
+    return {"sim_time": 0.0}, {"id": "d", "persistent_desires": [{"type": "x", "frustration": 0.4, "importance": 0.3}]}
+
+
+w1, c1 = desire_world()
+w2, c2 = desire_world()
+refresh_desires(c1, w1)
+refresh_desires(c2, w2)
+for _ in range(100):
+    w1["sim_time"] += 60
+    refresh_desires(c1, w1)
+w2["sim_time"] += 6000
+refresh_desires(c2, w2)
+d1, d2 = c1["persistent_desires"][0], c2["persistent_desires"][0]
+check("desire frustration does not depend on how often it is refreshed",
+      abs(d1["frustration"] - d2["frustration"]) < 1e-9 and abs(d1["importance"] - d2["importance"]) < 1e-9, (d1, d2))
+above = 6000 - (0.5 - 0.4) / FRUSTRATION_PER_SECOND
+check("... importance grows only for the time spent above 0.5",
+      abs(d2["importance"] - (0.3 + IMPORTANCE_PER_SECOND * above)) < 1e-9, d2)
+
+# ── mood ─────────────────────────────────────────────────────────────────────────────────────────────────────────────
+from brain.emotion import update_emotion
+
+w = {"sim_time": 100.0, "tick": 1, "definitions": {}}
+c = {"id": "e", "emotional_temperature": 20, "mood": {"id": "gloomy", "expires_ts": 160.0}}
+update_emotion(c, w)
+check("a mood holds until its expiry time", c.get("mood"))
+w["sim_time"] = 160.0
+update_emotion(c, w)
+check("... and ends then, however few updates happened in between", c.get("mood") is None)
+c = {"id": "e", "emotional_temperature": 20, "mood": {"id": "old", "remaining_ticks": 10}}
+update_emotion(c, w)
+check("a mood from an older save gets an expiry from its remaining ticks", c["mood"]["expires_ts"] == 169.0, c["mood"])
+
 print()
 print("all passed" if not failures else f"FAILED: {', '.join(failures)}")
 sys.exit(1 if failures else 0)
