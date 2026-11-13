@@ -341,3 +341,37 @@ def build_lt_need_context(c):
                 f"and it's starting to weigh on you."
             )
     return issues
+
+
+# ── step 5a: the character's own (core/flow.py PERCHAR "lt_needs") ───────────────────────────────────────────────────
+
+def lt_needs_tick(c, world):
+    """One 30-second step of a character's long-term needs: frustration moves toward its target, and the wants it
+    raises become intentions."""
+    update_lt_needs(c, world)
+    generate_lt_need_intentions(c, world)
+
+
+def lt_needs_active(c, world):
+    """PERCHAR check: a need still carries frustration, or is overdue (or has never been looked at). Otherwise there is
+    nothing to step -- and a wake is set for the moment the first one becomes overdue."""
+    tick = world.get("tick", 0)
+    soonest = None
+    for nd in (c.get("lt_needs") or {}).values():
+        pts = nd.get("points", 0)
+        if pts == 0:
+            continue
+        if nd.get("frustration", 0.0) > 0.001 or "phase_offset_ticks" not in nd:
+            return True
+        last = nd.get("last_satisfied_tick", 0)
+        since = (0 if (last == 0 and tick < TICKS_PER_GAME_WEEK) else tick - last) + nd.get("phase_offset_ticks", 0)
+        if since > TICKS_PER_GAME_WEEK:
+            return True
+        due = tick + (TICKS_PER_GAME_WEEK - since) + 1
+        if last == 0 and tick < TICKS_PER_GAME_WEEK:
+            due = max(due, TICKS_PER_GAME_WEEK)
+        soonest = due if soonest is None else min(soonest, due)
+    if soonest is not None:
+        from brain import agent_wake
+        agent_wake.wake_at(c, world, agent_wake.at_tick(world, soonest), "lt_need_overdue")
+    return False

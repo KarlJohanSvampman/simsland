@@ -1055,14 +1055,6 @@ def _job_influence_exposure(world, entry):
     resolve_exposure_influence(world)
 
 
-def _job_health(world, entry):
-    """Scheduled job `health` (was an every() block in tick()); see core/scheduler.py."""
-    characters = [c for c in world.get("characters", {}).values() if not c.get("is_workplace_npc")]
-    for c in characters:
-        tick_psychosis(c, world)
-        decay_stress(c, world)
-
-
 def _job_reading_2(world, entry):
     """DUTY sports_watching: games kick off (armed by each fixture's timer). Watching a broadcast is the watcher's own
     update (brain/agent_loop.py)."""
@@ -1422,20 +1414,6 @@ def _job_faction(world, entry):
 def _job_hierarchy(world, entry):
     """Scheduled job `hierarchy` (was an every() block in tick()); see core/scheduler.py."""
     update_hierarchy(world)
-
-
-def _job_lt_needs(world, entry):
-    """Scheduled job `lt_needs` (was an every() block in tick()); see core/scheduler.py."""
-    characters = [c for c in world.get("characters", {}).values() if not c.get("is_workplace_npc")]
-    for c in characters:
-        update_lt_needs(c, world)
-        # generate_socialize_intention (systems/social.py) was fully
-        # built -- real target selection off relationship strength --
-        # but had no caller anywhere; generate_lt_need_intentions covers
-        # the other 11 lt_needs categories, none of which previously
-        # ever produced a real active_intentions entry either.
-        generate_socialize_intention(c, world)
-        generate_lt_need_intentions(c, world)
 
 
 def _job_social_odor(world, entry):

@@ -251,6 +251,10 @@ def update_internal_state(
     tick_harassment_for(c, world)
     # Reading the paper, watching a game: the character's own processes, picked up every few minutes (step 5a: in their
     # own update, with a wake for the next pick -- on the old 5-second grid -- instead of a sweep over everyone).
+    from systems.social import generate_social_intentions     # lonely enough: a want to see someone (idempotent)
+    generate_social_intentions(c, world)
+    from systems.body import sync_stress_decay                # stress eases on its own, lazily (step 5a)
+    sync_stress_decay(c, world.get("tick", 0))
     from systems.grievances import social_checks_for          # grievances, goodwill, guilt fade; thresholds (5a)
     social_checks_for(c, world)
     from brain.opinions import sync_polarization              # opinions drift outward, lazily (step 5a)
@@ -756,6 +760,9 @@ def update_agent(
     # over everyone on every step.
     from systems.schema_defaults import ensure_character_defaults
     ensure_character_defaults(c, world=world)
+    # the character's own periodic work (core/flow.py PERCHAR jobs: what a sweep over everyone used to do for them)
+    from core.flow import run_perchar
+    run_perchar(c, world)
 
     # =====================================
     # OFFGRID

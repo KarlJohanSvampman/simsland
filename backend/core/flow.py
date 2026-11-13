@@ -39,6 +39,13 @@ def DUTY(name, run, every, why, active):
     return {"name": name, "run": run, "kind": "duty", "every": every, "active": active, "why": why}
 
 
+def PERCHAR(name, run, every, why, active):
+    """A character's own periodic work (step 5a): run(c, world) on the old grid (multiples of `every` sim seconds) but
+    inside that character's update, and only while active(c, world) -- the character is woken at each grid point while
+    it has this work, and not at all otherwise. Replaces a PROCESS that swept every character."""
+    return {"name": name, "run": run, "kind": "perchar", "every": every, "active": active, "why": why}
+
+
 def PROCESS(name, run, every, why, offset=0):
     return {"name": name, "run": run, "kind": "process", "every": every, "offset": offset, "why": why}
 
@@ -156,12 +163,14 @@ JOBS = [
     PROCESS("libido", "_job_libido", 24 * SECOND, "libido moves"),
     PROCESS("mentality_compilation", "_job_mentality_compilation", 25 * SECOND, "mentalities compile in the background"),
     PROCESS("influence_exposure", "_job_influence_exposure", 30 * SECOND, "being around opinions wears on you"),
-    PROCESS("health", "_job_health", 30 * SECOND, "stress fades, psychosis episodes progress"),
+    PERCHAR("psychosis", "systems.psychosis:tick_psychosis", 30 * SECOND, "psychosis episodes (while the mechanic is on)",
+            "systems.psychosis:psychosis_possible"),
     PROCESS("traffic", "_job_traffic", 30 * SECOND, "ambient traffic"),
     PROCESS("postal", "_job_postal", 30 * SECOND, "the post goes round"),
     PROCESS("newspapers", "_job_postal_2", 30 * SECOND, "the paper is delivered"),
     PROCESS("business_support", "_job_business_support", 30 * SECOND, "businesses answer their inboxes"),
-    PROCESS("lt_needs", "_job_lt_needs", 30 * SECOND, "long-term needs grow more pressing"),
+    PERCHAR("lt_needs", "systems.lt_needs:lt_needs_tick", 30 * SECOND, "long-term needs grow more pressing",
+            "systems.lt_needs:lt_needs_active"),
     PROCESS("cleanliness", "_job_cleanliness", 30 * SECOND, "rooms and clothes get dirty"),
     PROCESS("addictions", "_job_addictions", 30 * SECOND, "cravings (time-gated hourly inside)"),
     PROCESS("cookware", "_job_cookware", 30 * SECOND, "dinner planning and who cooks"),
@@ -274,6 +283,8 @@ def install(module=None):
         fn = _resolve(module, job["run"])
         if job["kind"] == "process":
             scheduler.register_recurring(job["name"], fn, every=job["every"], offset=job.get("offset", 0))
+        elif job["kind"] == "perchar":
+            _perchar_fns[job["name"]] = (fn, _resolve(module, job["active"]), job["every"])
         elif job["kind"] == "duty":
             _duty_fns[job["name"]] = (fn, _resolve(module, job["active"]))
             scheduler.register(_duty_owner(job["name"]), _duty_timer)
@@ -290,6 +301,36 @@ def install(module=None):
                     "data": {}, "ids": (entry.get("payload") or {}).get("ids", [])}))(fn))
             for ev in job["on"]:
                 subscribe(ev, _event_handler(job, fn, ev))
+
+
+# ── per-character jobs ───────────────────────────────────────────────────────────────────────────────────────────────
+_perchar_fns = {}        # name -> (run fn(c, world), active fn(c, world), every)
+
+
+def run_perchar(c, world):
+    """Called at the start of a character's update (and for characters the step defers): each PERCHAR job that has
+    work for this character runs once per grid point passed since it last ran, and a wake is set for the next one."""
+    from core.clock import now_ts
+    if not _perchar_fns:
+        return
+    now = now_ts(world)
+    stamps = c.setdefault("_perchar", {})
+    for name, (fn, active, every) in _perchar_fns.items():
+        try:
+            if not active(c, world):
+                stamps.pop(name, None)
+                continue
+            grid = int(now // every)
+            last = stamps.get(name)
+            if last is None:
+                stamps[name] = grid             # it has work from now on: first run at the next grid point
+            elif grid > last:
+                stamps[name] = grid
+                fn(c, world)
+            from brain import agent_wake
+            agent_wake.wake_at(c, world, (grid + 1) * every, "perchar:" + name)
+        except Exception as exc:
+            print(f"[flow] per-character job {name} failed for {c.get('id')}: {exc!r}")
 
 
 # ── duties ───────────────────────────────────────────────────────────────────────────────────────────────────────────

@@ -52,8 +52,8 @@ def when(j):
     return f'hourly at :{(j["hourly"] or 0)//60:02d}' + (f':{(j["hourly"] or 0)%60:02d}' if (j["hourly"] or 0) % 60 else "")
 clock_rows = "".join(f'<tr><td class="nm">{E(j["name"])}</td><td class="num">{when(j)}</td><td>{E(j["why"])}</td><td>{emits_cell(j)}</td><td class="fns">{fn_cell(j)}</td></tr>' for j in clock)
 
-procs = sorted([dict(j, why=("[while active] " + j["why"]) if j["kind"] == "duty" else j["why"])
-                for j in jobs if j["kind"] in ("process", "duty")], key=lambda j: (j["every"], j["name"]))
+procs = sorted([dict(j, why=({"duty": "[while active] ", "perchar": "[per character] "}.get(j["kind"], "")) + j["why"])
+                for j in jobs if j["kind"] in ("process", "duty", "perchar")], key=lambda j: (j["every"], j["name"]))
 import math
 maxlog = math.log10(3600)
 def bar(sec):

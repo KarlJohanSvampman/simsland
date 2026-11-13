@@ -82,7 +82,7 @@ REGISTRY = {
 # disagree -- a job added to the table is classified by being added.
 def _from_flow():
     from core import flow
-    kinds = {"event": "event", "clock": "calendar", "process": "continuous", "duty": "timer"}
+    kinds = {"event": "event", "clock": "calendar", "process": "continuous", "duty": "timer", "perchar": "timer"}
     out = {}
     for job in flow.JOBS:
         if job["kind"] == "event":
@@ -92,6 +92,8 @@ def _from_flow():
                        else f"hourly at :{(job.get('hourly') or 0) // 60:02d}")
         elif job["kind"] == "duty":
             becomes = f"every {job['every']} s of sim time while there is work (armed by what starts it)"
+        elif job["kind"] == "perchar":
+            becomes = f"every {job['every']} s, in the character's own update, while it has this work"
         else:
             becomes = f"every {job['every']} s of sim time"
         out["every:" + job["name"]] = (kinds[job["kind"]], job["name"], f"{becomes} -- {job['why']}")

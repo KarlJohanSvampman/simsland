@@ -337,3 +337,8 @@ def get_psychosis_context(c, world):
         "your thoughts are disorganized, you may misread what's happening around you, "
         "hear or see things that aren't there, and struggle to focus on anything for long."
     ]
+
+
+def psychosis_possible(c, world):
+    """PERCHAR check (core/flow.py): the psychosis mechanic is switched on at all."""
+    return PSYCHOSIS_ENABLED
