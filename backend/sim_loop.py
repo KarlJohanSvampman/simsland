@@ -1044,14 +1044,6 @@ def _job_attention(world, entry):
             update_attention(c, world)
 
 
-def _job_polarization(world, entry):
-    """Scheduled job `polarization` (was an every() block in tick()); see core/scheduler.py."""
-    characters = [c for c in world.get("characters", {}).values() if not c.get("is_workplace_npc")]
-    for c in characters:
-        polarize_opinions(c)
-        compute_political_lean(c)
-
-
 def _job_relationships(world, entry):
     """Scheduled job `relationships` (was an every() block in tick()); see core/scheduler.py."""
     characters = [c for c in world.get("characters", {}).values() if not c.get("is_workplace_npc")]
@@ -1261,18 +1253,6 @@ def _job_conflicts(world, entry):
 def _job_grapples(world, entry):
     """Scheduled job `grapples` (was an every() block in tick()); see core/scheduler.py."""
     process_grapples(world)
-
-
-def _job_grievances(world, entry):
-    """Scheduled job `grievances` (was an every() block in tick()); see core/scheduler.py."""
-    characters = [c for c in world.get("characters", {}).values() if not c.get("is_workplace_npc")]
-    update_grievances(world)    # decay + emit confrontation_desired
-    from systems.goodwill import update_goodwill
-    update_goodwill(world)      # decay + stamp _bond_emitted, same cadence
-    from systems.offense_rationalization import decay_guilt_paranoia
-    for c in characters:
-        if c.get("_guilt_paranoia"):
-            decay_guilt_paranoia(c)
 
 
 def _job_contract_checks(world, entry):

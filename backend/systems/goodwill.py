@@ -37,6 +37,10 @@ GOODWILL_SEVERITY = {
 def add_goodwill(c, caused_by_id, event_type, world, severity=None, details=None):
     """Record a new goodwill entry on character c toward caused_by_id.
     severity overrides the default for event_type."""
+    from systems.grievances import sync_social_decay, _wake_for_next_check
+    sync_social_decay(c, world.get("tick", 0) if world else 0)
+    if world is not None:
+        _wake_for_next_check(c, world)
     c.setdefault("goodwill", [])
 
     base_severity = severity if severity is not None else GOODWILL_SEVERITY.get(event_type, 5.0)

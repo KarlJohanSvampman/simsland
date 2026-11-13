@@ -70,6 +70,23 @@ for k, i in (("loop", "a"), ("hhsum", "h"), ("rules", "b")):
     bg_work.done(w, k, i)
 check("nothing waiting: the duty has no work", not bg_work.active(w))
 
+# ── lazy polarization and grievance decay ───────────────────────────────────────────────────────────────────────────
+from brain.opinions import sync_polarization
+c = {"id": "p", "opinions": {"tax": [{"stance": 0.5, "confidence": 1.0}], "war": [{"stance": 0.1, "confidence": 1.0}]}}
+sync_polarization(c, 0)
+sync_polarization(c, 150)                    # 10 periods of 15 ticks
+check("polarization drifts a strong stance outward per 15-tick period, in one go",
+      abs(c["opinions"]["tax"][-1]["stance"] - 0.55) < 1e-9 and c["opinions"]["war"][-1]["stance"] == 0.1, c["opinions"])
+from systems.grievances import sync_social_decay, social_checks_for, DECAY_RATE, CONFRONT_THRESHOLD
+c = {"id": "g", "grievances": [{"caused_by": "x", "weight": 40.0}]}
+sync_social_decay(c, 0)
+sync_social_decay(c, 150)
+check("a grievance decays by the rate per period", abs(c["grievances"][0]["weight"] - 40 * DECAY_RATE ** 10) < 1e-9)
+w = W(150)
+social_checks_for(c, w)
+check("over the threshold: the wish to confront is noted", "x" in c.get("_confrontation_emitted", []), c)
+check("... and a wake is set for when it falls through the next threshold", c["_wake"]["at"] > 150, c.get("_wake"))
+
 print()
 print("all passed" if not failures else f"FAILED: {', '.join(failures)}")
 sys.exit(1 if failures else 0)

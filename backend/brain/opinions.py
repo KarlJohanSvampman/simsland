@@ -167,6 +167,35 @@ def political_similarity(a, b):
     return max(0.0, 1 - (sum(abs(aa.get(k, 0) - bb.get(k, 0)) for k in keys) / len(keys) / 2))
 
 
+POLARIZE_EVERY_TICKS = 15     # the drift steps on the 15-second grid it always ran on
+
+
+def sync_polarization(c, tick):
+    """Polarization as a lazy value (step 5a): the outward drift of every 15-tick period since the last sync, applied in
+    one go -- the same amount each period until a stance reaches +-1, so the result is the same as stepping it. Then
+    the political lean is recomputed if anything moved."""
+    last = c.get("_polarized_tick")
+    c["_polarized_tick"] = tick
+    if last is None:
+        return
+    periods = tick // POLARIZE_EVERY_TICKS - last // POLARIZE_EVERY_TICKS
+    if periods <= 0:
+        return
+    moved = False
+    for history in (c.get("opinions") or {}).values():
+        if not history:
+            continue
+        entry = history[-1]
+        v = entry.get("stance", 0)
+        conf = entry.get("confidence", 0)
+        if abs(v) > 0.2 and conf:
+            step = 0.005 * conf if v > 0 else -0.005 * conf
+            entry["stance"] = max(-1.0, min(1.0, v + step * periods))
+            moved = True
+    if moved or "political_lean" not in c:
+        compute_political_lean(c)
+
+
 def polarize_opinions(c):
     """Replaces the retired brain/beliefs.py::polarization_drift() --
     same math, over the current stance of every opinion topic instead
@@ -193,6 +222,7 @@ def nudge_opinion(c, topic, sentiment, intensity, tick, reasoning="", source_id=
     gets seeded at generation by the mentality-compilation sweep) or
     creates a fresh one as a defensive fallback for an edge-case
     character whose compilation hasn't run yet."""
+    sync_polarization(c, tick)          # the drift so far, before this nudge lands
     delta = 0.2 * float(intensity)
     if sentiment in ("negative", "anti"):
         delta = -abs(delta)

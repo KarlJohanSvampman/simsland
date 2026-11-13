@@ -126,9 +126,7 @@ JOBS = [
     CLOCK("home_presence", "_job_home_presence", "the hourly 'are they home' sample", hourly=46),
 
     # ── processes: time passing ────────────────────────────────────────────────────────────────────────────────────
-    PROCESS("polarization", "_job_polarization", 15 * SECOND, "opinions drift"),
     PROCESS("relationships", "_job_relationships", 15 * SECOND, "time spent near each other builds familiarity"),
-    PROCESS("grievances", "_job_grievances", 15 * SECOND, "grievances, goodwill, guilt fade or grow"),
     PROCESS("child_care", "_job_child_care", 15 * SECOND, "children's needs and who is looking after them"),
     PROCESS("conflicts", "_job_conflicts", 5 * SECOND, "an argument or fight in progress moves on"),
     DUTY("grapples", "_job_grapples", 5 * SECOND, "a grapple in progress moves on", "systems.duties:grapples_active"),

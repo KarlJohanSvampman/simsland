@@ -251,6 +251,10 @@ def update_internal_state(
     tick_harassment_for(c, world)
     # Reading the paper, watching a game: the character's own processes, picked up every few minutes (step 5a: in their
     # own update, with a wake for the next pick -- on the old 5-second grid -- instead of a sweep over everyone).
+    from systems.grievances import social_checks_for          # grievances, goodwill, guilt fade; thresholds (5a)
+    social_checks_for(c, world)
+    from brain.opinions import sync_polarization              # opinions drift outward, lazily (step 5a)
+    sync_polarization(c, world.get("tick", 0))
     from systems.reading_process import update_reading_process, READING_PICK_INTERVAL_TICKS
     from systems.sports_broadcast import update_game_broadcast, SCORE_PICK_INTERVAL_TICKS
     _prof.mark("internal:reading_and_broadcast")
