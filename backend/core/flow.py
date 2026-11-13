@@ -86,6 +86,9 @@ JOBS = [
     EVENT("conversation_cleanup", "_job_conversation_cleanup", ["conversation.ended", "time.hour"],
           "a finished conversation is archived when it ends; a quiet one ends on its own idle timer (re-armed by each "
           "line, brain/conversations.py); the hourly pass only catches conversations from saves made before the timer"),
+    EVENT("plants", "systems.plants:_on_world_loaded", ["world.loaded"],
+          "each plant on its own timer: the next moisture/weed threshold or growth stage, or every 30 s while it needs "
+          "attention (a loaded world arms them all)"),
     EVENT("batteries", "systems.power:sync_all_batteries", ["world.loaded", "character.added"],
           "devices drain and charge on their own clock (a timer at the next moment that matters: off, usable, full)"),
     EVENT("baby_needs", "systems.baby:_on_babies_appear", ["world.loaded", "character.added"],
@@ -149,7 +152,6 @@ JOBS = [
     PROCESS("newspapers", "_job_postal_2", 30 * SECOND, "the paper is delivered"),
     PROCESS("business_support", "_job_business_support", 30 * SECOND, "businesses answer their inboxes"),
     PROCESS("lt_needs", "_job_lt_needs", 30 * SECOND, "long-term needs grow more pressing"),
-    PROCESS("plants", "_job_plants", 30 * SECOND, "plants grow, dry out, get weedy"),
     PROCESS("cleanliness", "_job_cleanliness", 30 * SECOND, "rooms and clothes get dirty"),
     PROCESS("addictions", "_job_addictions", 30 * SECOND, "cravings (time-gated hourly inside)"),
     PROCESS("cookware", "_job_cookware", 30 * SECOND, "dinner planning and who cooks"),

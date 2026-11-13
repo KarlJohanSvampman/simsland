@@ -1494,16 +1494,6 @@ def _job_bedroom_assignment(world, entry):
     tick_bedroom_assignments(world)
 
 
-def _job_plants(world, entry):
-    """Scheduled job `plants` (was an every() block in tick()); see core/scheduler.py."""
-    characters = [c for c in world.get("characters", {}).values() if not c.get("is_workplace_npc")]
-    tick_plants(world)
-    from systems.chores import maybe_tend_plants
-    for c in characters:
-        if c.get("alive", True) and not c.get("off_grid"):
-            maybe_tend_plants(c, world)
-
-
 def _job_cookware(world, entry):
     """Scheduled job `cookware`: pots, pans and the oven finish cooking, and served food ends its window (systems/cookware.py)."""
     from systems.cookware import update

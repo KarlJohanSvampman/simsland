@@ -3423,7 +3423,7 @@ def _route_water(c, world, action):
     if not can or water_uses_remaining(can) <= 0:
         return
     from systems.plants import water_plant
-    if not water_plant(prop):
+    if not water_plant(prop, world):
         return
     use_water(can)
 
@@ -3449,7 +3449,7 @@ def _route_pull_weed(c, world, action):
     if not prop:
         return
     from systems.plants import pull_weed
-    pull_weed(prop)
+    pull_weed(prop, world)
 
 
 def _route_harvest(c, world, action):

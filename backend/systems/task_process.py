@@ -317,7 +317,7 @@ def _watering_on_complete(household, process, world):
     for pid in process.get("target_prop_ids", []):
         prop = get_prop_by_id(world, pid)
         if prop:
-            water_plant(prop)
+            water_plant(prop, world)
 
 
 def _weeding_on_complete(household, process, world):
@@ -327,7 +327,7 @@ def _weeding_on_complete(household, process, world):
     for pid in process.get("target_prop_ids", []):
         prop = get_prop_by_id(world, pid)
         if prop:
-            pull_weed(prop)
+            pull_weed(prop, world)
 
 
 def _harvest_on_complete(household, process, world):

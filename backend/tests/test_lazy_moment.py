@@ -166,6 +166,43 @@ w["sim_time"] = w["tick"] = 250 + int(55 / P.DEFAULT_IDLE_DRAIN) + 5
 P._on_battery_timer({**w, "characters": {"p": c}}, {"owner": "battery:p"})
 check("an empty phone switches off", phone["states"]["battery"] == 0 and phone["states"]["powered_on"] is False, phone["states"])
 
+# ── plants ───────────────────────────────────────────────────────────────────────────────────────────────────────────
+import systems.plants as PL
+import systems.chores as CH
+
+TPL = {"basil": {"name": "basil", "moisture_decay_per_day": 10, "weed_growth_per_day": 5, "days_to_sprout": 2,
+                 "days_to_grow": 3, "days_mature_before_overgrown": 4}}
+D = PL.TICKS_PER_DAY
+
+
+def garden(ts=0):
+    w = W(ts)
+    w["definitions"] = {"plant_templates": TPL}
+    w["households"] = {"h": {"members": ["g"]}}
+    w["characters"] = {"g": {"id": "g", "household_id": "h", "cleanliness_threshold": 40, "alive": True}}
+    w["props"] = []
+    return w
+
+
+w = garden()
+plant = PL.plant_seed(w, "basil", x=1, y=1, household_id="h")
+due = [t["due"] for t in w.get("timers", []) if t["owner"] == f"plant:{plant['id']}"]
+check("a new plant times its next moment (moisture under the 90 watering cut-off after a day)", due and abs(due[0] - D) < 5, (due, D))
+tended = []
+CH.maybe_tend_plants = lambda c, world: tended.append(c["id"])
+w["sim_time"] = w["tick"] = 2 * D + 1
+PL._on_plant_timer(w, {"owner": f"plant:{plant['id']}"})
+check("... it sprouts then, with moisture integrated over the two days",
+      plant["plant_state"]["stage"] == "sprout" and abs(plant["plant_state"]["moisture"] - (100 - 20)) < 0.01, plant["plant_state"])
+check("... and the household's chores look at it", tended == ["g"])
+due = [t["due"] for t in w.get("timers", []) if t["owner"] == f"plant:{plant['id']}"]
+check("next: the 3-day growth (moisture reaches the 40 tolerance only after 4 days)", due and abs(due[0] - (2 * D + 1 + 3 * D)) < 5,
+      (due, 2 * D + 1 + 3 * D))
+w["sim_time"] = w["tick"] = 2 * D + 100
+PL.water_plant(plant, w)
+check("watering brings it up to date first, then fills it", plant["plant_state"]["moisture"] == 100 and
+      plant["plant_state"]["last_decay_tick"] == 2 * D + 100)
+
 print()
 print("all passed" if not failures else f"FAILED: {', '.join(failures)}")
 sys.exit(1 if failures else 0)
