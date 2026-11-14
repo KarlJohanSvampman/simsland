@@ -78,6 +78,18 @@ from core.commands import command, core_only
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
+
+def _pc(a, key="character_id"):
+    return (a.get("payload") or {}).get(key)
+
+
+def _listed_or_world(extra=()):
+    """The listed characters (payload["character_ids"]), or -- with none listed -- the whole world."""
+    def name(a):
+        ids = (a.get("payload") or {}).get("character_ids")
+        return [("characters", i) for i in ids] + list(extra) if ids else "world"
+    return name
+
 DEFAULT_SIM_ID = "default"
 
 
@@ -109,7 +121,7 @@ def get_fights(limit: int = 30, sim_id: str = DEFAULT_SIM_ID):
 
 
 @router.post("/time_scale")
-@command("admin.set_time_scale")
+@command("admin.set_time_scale", entities=lambda a: [("key", "time_scale")])
 def set_time_scale(payload: dict, sim_id: str = DEFAULT_SIM_ID):
     value = max(1, min(50, int(payload.get("value", 1))))
     with world_lock():
@@ -120,7 +132,7 @@ def set_time_scale(payload: dict, sim_id: str = DEFAULT_SIM_ID):
 
 
 @router.post("/movement_speed")
-@command("admin.set_movement_speed")
+@command("admin.set_movement_speed", entities=lambda a: [("key", "movement_speed_multiplier")])
 def set_movement_speed(payload: dict, sim_id: str = DEFAULT_SIM_ID):
     """Per the user's explicit ask: a knob for how fast characters walk on
     screen that's independent of time_scale (see systems/movement.py's
@@ -214,7 +226,7 @@ def _scrub_leftovers_after_wipe(world):
 
 
 @router.post("/reset_characters")
-@command("admin.reset_characters")
+@command("admin.reset_characters", entities="world")
 def reset_characters(sim_id: str = DEFAULT_SIM_ID):
     """Wipes all characters and households -- the map/buildings/roads/props
     are hand-placed via the World Editor and aren't code-regenerable, so
@@ -316,7 +328,7 @@ def reset_characters(sim_id: str = DEFAULT_SIM_ID):
 
 
 @router.post("/settle_characters")
-@command("admin.settle_characters")
+@command("admin.settle_characters", entities="world")
 def settle_characters(payload: dict = None, sim_id: str = DEFAULT_SIM_ID):
     """Run the spawn-time settling (systems/spawn_setup.py: placement, a fresh schedule, the body clock for the time of day,
     bedtime) on characters already in the world. payload: {"character_ids": [...]} (default: everyone who is not a workplace
@@ -348,7 +360,7 @@ def get_vision_settings(sim_id: str = DEFAULT_SIM_ID):
 
 
 @router.post("/vision")
-@command("admin.set_vision_settings")
+@command("admin.set_vision_settings", entities=lambda a: [("key", "settings")])
 def set_vision_settings(payload: dict, sim_id: str = DEFAULT_SIM_ID):
     """payload: any of normal_m, exceptional_m, impaired_m, detect_factor, tile_meters."""
     from systems.vision import set_settings
@@ -363,7 +375,7 @@ def set_vision_settings(payload: dict, sim_id: str = DEFAULT_SIM_ID):
 
 
 @router.post("/set_vision")
-@command("admin.set_vision")
+@command("admin.set_vision", entities=lambda a: [("characters", _pc(a))])
 def set_vision(payload: dict, sim_id: str = DEFAULT_SIM_ID):
     """Set one character's natural vision level (accidents, disease, tests): {"character_id", "vision": normal|exceptional|impaired|blind,
     "glasses": bool (optional)}."""
@@ -384,7 +396,7 @@ def set_vision(payload: dict, sim_id: str = DEFAULT_SIM_ID):
 
 
 @router.post("/clear_legal")
-@command("admin.clear_legal")
+@command("admin.clear_legal", entities=_listed_or_world())
 def clear_legal(payload: dict = None, sim_id: str = DEFAULT_SIM_ID):
     """Wipe legal records and the incident log (cleaning up after something that should never have happened, e.g. the
     off-grid assaults the old impulse system produced). payload: {"character_ids": [...]} (default: everyone)."""
@@ -392,9 +404,8 @@ def clear_legal(payload: dict = None, sim_id: str = DEFAULT_SIM_ID):
     with world_lock():
         world = load_world(sim_id)
         cleared = []
-        for cid, c in world.get("characters", {}).items():
-            if ids and cid not in ids:
-                continue
+        chars = world.get("characters", {})
+        for cid, c in ([(i, chars[i]) for i in ids if i in chars] if ids else chars.items()):
             legal = c.get("legal")
             if legal and (legal.get("record") or legal.get("status") not in (None, "free")):
                 c["legal"] = {"status": "free", "record": [], "jail_until": None}
@@ -406,7 +417,7 @@ def clear_legal(payload: dict = None, sim_id: str = DEFAULT_SIM_ID):
 
 
 @router.post("/recall_characters")
-@command("admin.recall_characters")
+@command("admin.recall_characters", entities=_listed_or_world([("key", "offmap")]))
 def recall_characters(payload: dict = None, sim_id: str = DEFAULT_SIM_ID):
     """Bring characters who are away (off-grid) home now: their return is due this tick and the normal return handling runs
     (story, fatigue, the trip home). payload: {"character_ids": [...], "reason": "temporary_separation"} -- both optional
@@ -416,8 +427,9 @@ def recall_characters(payload: dict = None, sim_id: str = DEFAULT_SIM_ID):
     with world_lock():
         world = load_world(sim_id)
         recalled = []
-        for cid, c in world.get("characters", {}).items():
-            if (ids and cid not in ids) or not c.get("off_grid") or (reason and c.get("off_grid_reason") != reason):
+        chars = world.get("characters", {})
+        for cid, c in ([(i, chars[i]) for i in ids if i in chars] if ids else chars.items()):
+            if not c.get("off_grid") or (reason and c.get("off_grid_reason") != reason):
                 continue
             c["return_tick"] = world.get("tick", 0)
             for o in world.get("offmap", []):
@@ -429,7 +441,7 @@ def recall_characters(payload: dict = None, sim_id: str = DEFAULT_SIM_ID):
 
 
 @router.post("/add_building")
-@command("admin.add_building")
+@command("admin.add_building", entities="world")                  # geometry and furniture
 def add_building(payload: dict, sim_id: str = DEFAULT_SIM_ID):
     """Place another building of an existing floorplan template (the World Editor's save rejects a whole world over
     furniture clearance in buildings that are already there, so this is the way to add a house without it).
@@ -470,7 +482,7 @@ def add_building(payload: dict, sim_id: str = DEFAULT_SIM_ID):
 
 
 @router.post("/remove_character")
-@command("admin.remove_character")
+@command("admin.remove_character", entities="world")
 def remove_character(payload: dict, sim_id: str = DEFAULT_SIM_ID):
     """Remove a single character -- everyone else keeps going. Applies the
     same orphan cleanup as reset_characters (placed_items/world_objects
@@ -527,7 +539,7 @@ def remove_character(payload: dict, sim_id: str = DEFAULT_SIM_ID):
 
 
 @router.post("/fix_malnutrition")
-@command("admin.fix_malnutrition")
+@command("admin.fix_malnutrition", entities="world")
 def fix_malnutrition(sim_id: str = DEFAULT_SIM_ID):
     """Item nutrition values were miscalibrated far below what
     nutrition.py's daily settlement AND body_composition.py's calorie-
@@ -575,7 +587,7 @@ def fix_malnutrition(sim_id: str = DEFAULT_SIM_ID):
 
 
 @router.post("/purge_garbage_intentions")
-@command("admin.purge_garbage_intentions")
+@command("admin.purge_garbage_intentions", entities="world")
 def purge_garbage_intentions(sim_id: str = DEFAULT_SIM_ID):
     """store_intention() (brain/agent_loop.py) used to fall back to the
     LLM's raw, free-text "then" phrase as an intention's own "type" field
@@ -601,7 +613,7 @@ def purge_garbage_intentions(sim_id: str = DEFAULT_SIM_ID):
 
 
 @router.post("/clear_stale_anchor_occupancy")
-@command("admin.clear_stale_anchor_occupancy")
+@command("admin.clear_stale_anchor_occupancy", entities="world")
 def clear_stale_anchor_occupancy(sim_id: str = DEFAULT_SIM_ID):
     """One-off cleanup for anchors reserved by a character that no
     longer exists (e.g. from before a reset_characters call made before
@@ -623,7 +635,7 @@ def clear_stale_anchor_occupancy(sim_id: str = DEFAULT_SIM_ID):
 
 
 @router.post("/release_stuck_anchor")
-@command("admin.release_stuck_anchor")
+@command("admin.release_stuck_anchor", entities="world")        # a prop's anchor
 def release_stuck_anchor(payload: dict, sim_id: str = DEFAULT_SIM_ID):
     """One-off correction for the pre-fix interrupt_activity() gap (see
     systems/occupancy.py) -- a character whose activity was interrupted
@@ -645,7 +657,7 @@ def release_stuck_anchor(payload: dict, sim_id: str = DEFAULT_SIM_ID):
 
 
 @router.post("/clear_stuck_travel_state")
-@command("admin.clear_stuck_travel_state")
+@command("admin.clear_stuck_travel_state", entities="world")
 def clear_stuck_travel_state(sim_id: str = DEFAULT_SIM_ID):
     """Live-testing helper for a real, still-unfixed bug: a character can
     end up with off_grid=False (marked home) while travel_state is still
@@ -668,7 +680,7 @@ def clear_stuck_travel_state(sim_id: str = DEFAULT_SIM_ID):
 
 
 @router.post("/set_body_need")
-@command("admin.set_body_need", entities=lambda a: [("characters", (a.get("payload") or {}).get("character_id"))])
+@command("admin.set_body_need", entities=lambda a: [("characters", _pc(a))])
 def set_body_need(payload: dict, sim_id: str = DEFAULT_SIM_ID):
     """Live-testing helper: force one character's body need to a value
     without waiting for it to occur naturally. payload: {"character_id",
@@ -689,7 +701,8 @@ def set_body_need(payload: dict, sim_id: str = DEFAULT_SIM_ID):
 
 
 @router.post("/impact")
-@command("admin.impact")
+@command("admin.impact", entities=lambda a: [("characters", _pc(a, "source")), ("characters", _pc(a, "target")),
+                                            ("key", "relationship_ledgers"), ("key", "_impact_seq")])
 def impact_admin(payload: dict, sim_id: str = DEFAULT_SIM_ID):
     """Live-testing helper for the relationship ledger and grudges (systems/relationship_ledger.py, grudges.py): make
     something registered between two characters without going through the perception ladder. payload: {"source",
@@ -730,7 +743,7 @@ def impact_admin(payload: dict, sim_id: str = DEFAULT_SIM_ID):
 
 
 @router.post("/register_worry")
-@command("admin.register_worry")
+@command("admin.register_worry", entities=lambda a: [("characters", _pc(a))])
 def register_worry_admin(payload: dict, sim_id: str = DEFAULT_SIM_ID):
     """Live-testing helper for the worry system (systems/worry_cases.py): give a character a worry, or push them
     into a breakdown. payload: {"character_id", "kind" (self/person/event/expectation/choice/conflict/area),
@@ -767,7 +780,7 @@ def register_worry_admin(payload: dict, sim_id: str = DEFAULT_SIM_ID):
 
 
 @router.post("/reset_character_state")
-@command("admin.reset_character_state")
+@command("admin.reset_character_state", entities="world")      # anchors, conflicts
 def reset_character_state(payload: dict, sim_id: str = DEFAULT_SIM_ID):
     """Per the user's explicit ask: reset the SAME characters' state
     (accumulated fatigue/sleep_debt/other body needs, stuck activities,
@@ -823,7 +836,7 @@ def reset_character_state(payload: dict, sim_id: str = DEFAULT_SIM_ID):
 
 
 @router.post("/toggle_light")
-@command("admin.toggle_light_admin")
+@command("admin.toggle_light_admin", entities="world")          # props
 def toggle_light_admin(payload: dict, sim_id: str = DEFAULT_SIM_ID):
     """Live-testing helper: flip a lamp or wall switch's on/off state
     without waiting for a character to actually walk up and interact
@@ -854,7 +867,7 @@ def toggle_light_admin(payload: dict, sim_id: str = DEFAULT_SIM_ID):
 
 
 @router.post("/set_relationship")
-@command("admin.set_relationship", entities=lambda a: [("characters", (a.get("payload") or {}).get("from_id"))])
+@command("admin.set_relationship", entities=lambda a: [("characters", _pc(a, "from_id"))])
 def set_relationship(payload: dict, sim_id: str = DEFAULT_SIM_ID):
     """Live-fix helper: overwrite fields on one directed relationship edge
     (from_id's view of to_id). payload: {"from_id", "to_id", "fields": {...}}.
@@ -873,7 +886,8 @@ def set_relationship(payload: dict, sim_id: str = DEFAULT_SIM_ID):
 
 
 @router.post("/dedupe_long_term_memory")
-@command("admin.dedupe_long_term_memory")
+@command("admin.dedupe_long_term_memory",
+         entities=lambda a: [("characters", _pc(a))] if _pc(a) else "world")
 def dedupe_long_term_memory(payload: dict, sim_id: str = DEFAULT_SIM_ID):
     """Live-testing/cleanup helper: collapse a character's long_term_memory
     down to one entry per unique text, keeping the most recent (highest
@@ -994,7 +1008,7 @@ def get_cognition_for_char(char_id: str, sim_id: str = DEFAULT_SIM_ID):
 
 
 @router.post("/preview_mentality")
-@command("admin.preview_mentality")
+@command("admin.preview_mentality", entities=lambda a: [])   # a throwaway character
 def preview_mentality(payload: dict, sim_id: str = DEFAULT_SIM_ID):
     """held_beliefs: [belief_template_id, ...], plus optional
     society_categories: [id, ...] (max 3), traits: [trait_id, ...], and

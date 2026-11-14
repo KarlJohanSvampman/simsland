@@ -214,6 +214,29 @@ def _release_all(unit):
         _meta.notify_all()
 
 
+NEW = "*new*"            # (kind, NEW) in a declaration: the entities of that kind the command creates
+
+
+class Peek:
+    """What an entities function (core/commands.py) can look at to name related entities -- the household a character
+    is in, the owner of a building: raw reads of the live world, nothing reached or locked. What it reads can change
+    before the locks are taken; that only costs a wait (an undeclared access is still locked), never correctness."""
+
+    def __init__(self, sim_id):
+        from core import world_state
+        self._w = world_state.resident(sim_id)
+
+    def get(self, kind, eid, field=None, default=None):
+        coll = dict.get(self._w, kind) or {}
+        if isinstance(coll, dict):
+            e = dict.get(coll, eid)
+        else:
+            e = next((x for x in list.__iter__(coll) if isinstance(x, dict) and x.get("id") == eid), None)
+        if e is None:
+            return default
+        return e if field is None else e.get(field, default)
+
+
 # Top-level keys that are not locked: read-mostly clock/definition values, and the dirty-id sets every writer adds to
 # (set.add is atomic under the GIL). Locking them would make every command wait on (and cycle with) every step.
 LOCK_FREE_KEYS = {"tick", "sim_time", "calendar", "definitions", "_dirty", "simulation_id"}
@@ -225,7 +248,7 @@ def _on_access(kind, key):
     if unit is None or (kind, key) in unit.held or (kind == "key" and key in LOCK_FREE_KEYS):
         return
     k = (kind, key)
-    if unit.kind == "command" and k not in unit.declared:
+    if unit.kind == "command" and k not in unit.declared and (kind, NEW) not in unit.declared:
         _stats["undeclared"] += 1
         _undeclared[k] = _undeclared.get(k, 0) + 1
     _acquire(unit, k)
@@ -273,7 +296,7 @@ def tick_unit():
 def command_unit(entities, timeout=30.0):
     """A declared command: shared world lock and its entities, all up front (all-or-nothing)."""
     install()
-    declared = sorted({(k, str(i)) for k, i in entities})
+    declared = sorted({(k, str(i)) for k, i in entities if i is not None})
     if not _rw.acquire_shared(timeout):
         raise LockConflict("the world is held exclusively")
     try:
@@ -282,9 +305,11 @@ def command_unit(entities, timeout=30.0):
         deadline = time.monotonic() + timeout
         with _meta:
             while True:
-                busy = [k for k in declared if _owner.get(k) not in (None, me)]
+                busy = [k for k in declared if k[1] != NEW and _owner.get(k) not in (None, me)]
                 if not busy:
                     for k in declared:
+                        if k[1] == NEW:
+                            continue
                         _owner[k] = me
                         unit.held.add(k)
                     break

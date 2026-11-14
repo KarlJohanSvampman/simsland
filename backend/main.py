@@ -836,7 +836,7 @@ def household(household_id: str):
 
 
 @app.post("/api/config/environment")
-@command("main.update_environment")
+@command("main.update_environment", entities=lambda a: [("key", "environment")])
 def update_environment(payload: dict):
     with world_lock():
         world = load_world(SIM_ID)
@@ -853,7 +853,7 @@ def llm_logs():
 
 
 @app.delete("/api/llm/logs")
-@command("main.clear_llm_logs")
+@command("main.clear_llm_logs", entities=lambda a: [("key", "llm_logs")])
 def clear_llm_logs():
     with world_lock():
         world = load_world(SIM_ID)

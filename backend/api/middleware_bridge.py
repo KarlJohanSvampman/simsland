@@ -231,7 +231,8 @@ class ExecuteReq(BaseModel):
 
 
 @router.post("/characters/{char_id}/execute")
-@command("middleware_bridge.execute")
+@command("middleware_bridge.execute", entities="world")   # a decision can reach props (anchors), which are not
+                                                                # locked one by one
 def execute(char_id: str, req: ExecuteReq):
     external_brain.touch()
     from brain.agent_loop import process_decision, post_update

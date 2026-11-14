@@ -627,3 +627,13 @@ component; a replayable event log.
   ages, relationship partners); household-level jobs that write to members; and once-a-day sweeps (calendar
   reminders, contract clauses, bills). Those reads are not ownership: in step 5b they read replicated snapshots of
   other entities. World-level processes (market, traffic, post, news, elections, ...) belong to world services in 5b.
+- **Step 5a, commands declare their entities (done).** All 53 commands now say what they change. 28 name their
+  entities: `entities=fn(args[, peek])`, where `peek` (`entity_locks.Peek`) looks up related ids in the live world
+  without reaching anything (a character's household, a building's owner), and `(kind, NEW)` names entities the
+  command creates. 25 take the whole world on purpose (`entities="world"`): resets and one-off repairs over everyone,
+  the editor, and anything that reaches props. Props are still not locked one by one: their in-place changes are not
+  seen by the façade. That includes `middleware_bridge.execute`, whose decisions can take an anchor -- the case for
+  per-prop locks. `tests/test_command_entities.py` checks every `@command` declares, and runs the declared ones under
+  `ENTITY_LOCKS=on`: none reaches an entity it did not declare. Live, with the real tick runner and a command thread
+  for 12 s: 1,716 ticks, 1,088 declared commands at a median of 1.5 ms (was 6-8 ms), 0 entity waits, 0 conflicts,
+  reload identical. Commands no longer wait for the step because the step now rarely reaches the same characters.

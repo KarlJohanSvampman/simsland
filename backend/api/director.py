@@ -30,12 +30,17 @@ router = APIRouter(prefix="/director", tags=["director"])
 DEFAULT_SIM_ID = "default"
 
 
+def _one(a):
+    """The character the operator is directing, and the director log."""
+    return [("characters", (a.get("payload") or {}).get("char_id")), ("key", "director_log")]
+
+
 def _get_character(world, char_id):
     return world.get("characters", {}).get(char_id)
 
 
 @router.post("/start_session")
-@command("director.start_session")
+@command("director.start_session", entities=_one)
 def start_session(payload: dict, sim_id: str = DEFAULT_SIM_ID):
     with world_lock():
         world = load_world(sim_id)
@@ -48,7 +53,7 @@ def start_session(payload: dict, sim_id: str = DEFAULT_SIM_ID):
 
 
 @router.post("/interrupt_attention")
-@command("director.interrupt_attention")
+@command("director.interrupt_attention", entities=_one)
 def interrupt_attention(payload: dict, sim_id: str = DEFAULT_SIM_ID):
     with world_lock():
         world = load_world(sim_id)
@@ -61,7 +66,7 @@ def interrupt_attention(payload: dict, sim_id: str = DEFAULT_SIM_ID):
 
 
 @router.post("/inject_line")
-@command("director.inject_line")
+@command("director.inject_line", entities=_one)
 def inject_line(payload: dict, sim_id: str = DEFAULT_SIM_ID):
     with world_lock():
         world = load_world(sim_id)
@@ -74,7 +79,7 @@ def inject_line(payload: dict, sim_id: str = DEFAULT_SIM_ID):
 
 
 @router.post("/set_preference")
-@command("director.set_preference")
+@command("director.set_preference", entities=_one)
 def set_preference(payload: dict, sim_id: str = DEFAULT_SIM_ID):
     with world_lock():
         world = load_world(sim_id)
@@ -89,7 +94,7 @@ def set_preference(payload: dict, sim_id: str = DEFAULT_SIM_ID):
 
 
 @router.post("/end_session")
-@command("director.end_session")
+@command("director.end_session", entities=_one)
 def end_session(payload: dict, sim_id: str = DEFAULT_SIM_ID):
     with world_lock():
         world = load_world(sim_id)
@@ -102,7 +107,7 @@ def end_session(payload: dict, sim_id: str = DEFAULT_SIM_ID):
 
 
 @router.post("/call_attention_radius")
-@command("director.call_attention_radius")
+@command("director.call_attention_radius", entities="world")   # everyone within the radius
 def call_attention_radius(payload: dict, sim_id: str = DEFAULT_SIM_ID):
     with world_lock():
         world = load_world(sim_id)

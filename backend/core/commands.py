@@ -39,6 +39,7 @@ SERVE_THREADS = int(os.getenv("COMMAND_THREADS", "4"))
 
 REGISTRY = {}                                         # command name -> the original function
 TIMEOUTS = {}                                         # command name -> seconds, where not the default
+DECLARED = {}                                         # command name -> its entities declaration (None: none)
 queue = WorkQueue("cmd", claim_idle_ms=COMMAND_TIMEOUT_SECONDS * 1000 * 2)
 
 _waiters = {}                                         # request id -> {"event", "result"}
@@ -75,9 +76,11 @@ def _decode(value):
 
 def command(name=None, timeout=None, entities=None):
     """timeout: seconds a caller waits (default COMMAND_TIMEOUT_SECONDS); for commands that call a model.
-    entities: fn(arguments by name) -> [(kind, id)] -- the entities the command changes. With ENTITY_LOCKS=on a declared
-    command takes just those (core/entity_locks.py) and runs alongside the tick when they differ; an undeclared one
-    takes the whole world, as before. A lock cycle it was caught in answers 409."""
+    entities: fn(arguments by name[, peek]) -> [(kind, id)] -- the entities the command changes. With ENTITY_LOCKS=on a
+    declared command takes just those (core/entity_locks.py) and runs alongside the tick when they differ. `peek`
+    (entity_locks.Peek) looks up related ids in the live world; (kind, entity_locks.NEW) names the entities of that
+    kind it creates. entities="world" (or a fn returning "world"): it takes the whole world on purpose -- every command
+    says one or the other (tests/test_command_entities.py). A lock cycle it was caught in answers 409."""
     def deco(fn):
         if inspect.iscoroutinefunction(fn):
             raise TypeError(f"{fn.__qualname__}: a command must be a plain (sync) function")
@@ -87,6 +90,7 @@ def command(name=None, timeout=None, entities=None):
         if entities is not None:
             fn = _with_entity_locks(fn, entities)
         REGISTRY[cname] = fn
+        DECLARED[cname] = entities
         if timeout:
             TIMEOUTS[cname] = timeout
         fn.__command__ = cname
@@ -105,6 +109,18 @@ def command(name=None, timeout=None, entities=None):
     return deco
 
 
+def name_entities(entities, arguments):
+    """What a command's declaration names for these arguments: [(kind, id)], or "world"."""
+    if entities == "world":
+        return "world"
+    if len(inspect.signature(entities).parameters) >= 2:
+        from core.entity_locks import Peek
+        got = entities(arguments, Peek(arguments.get("sim_id")))
+    else:
+        got = entities(arguments)
+    return "world" if got == "world" else list(got or ())
+
+
 def _with_entity_locks(fn, entities):
     sig = inspect.signature(fn)
 
@@ -116,9 +132,11 @@ def _with_entity_locks(fn, entities):
         bound = sig.bind(*args, **kwargs)
         bound.apply_defaults()
         try:
-            wanted = list(entities(dict(bound.arguments)) or ())
+            wanted = name_entities(entities, dict(bound.arguments))
         except Exception as exc:
             print(f"[commands] {fn.__qualname__}: could not name its entities ({exc!r}); taking the whole world")
+            return fn(*args, **kwargs)
+        if wanted == "world":
             return fn(*args, **kwargs)
         try:
             with entity_locks.command_unit(wanted):

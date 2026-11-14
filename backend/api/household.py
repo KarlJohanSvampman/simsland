@@ -12,6 +12,22 @@ from systems.household_manager import (
 )
 
 from core.commands import command
+from core.entity_locks import NEW
+
+
+def _hh(a):
+    return (a.get("payload") or {}).get("household_id")
+
+
+def _building(a, peek):
+    """The buildings record and the household that owns the building (its owner is changed on it)."""
+    bid = (a.get("payload") or {}).get("building_id")
+    return [("key", "buildings"), ("households", peek.get("buildings", bid, "owner_household_id"))]
+
+
+def _member(a, peek):
+    cid = (a.get("payload") or {}).get("character_id")
+    return [("characters", cid), ("households", peek.get("characters", cid, "household_id"))]
 
 router = APIRouter()
 
@@ -21,7 +37,8 @@ router = APIRouter()
 # =========================================================
 
 @router.post("/household/create")
-@command("household.create")
+@command("household.create",
+         entities=lambda a: "world" if (a.get("payload") or {}).get("mailbox_prop_id") else [("households", NEW)])
 def create(sim_id: str, payload: dict):
     with world_lock():
         world = load_world(sim_id)
@@ -48,7 +65,7 @@ def create(sim_id: str, payload: dict):
 # =========================================================
 
 @router.post("/household/set_name")
-@command("household.set_name", entities=lambda a: [("households", (a.get("payload") or {}).get("household_id"))])
+@command("household.set_name", entities=lambda a: [("households", _hh(a))])
 def set_name(sim_id: str, payload: dict):
     with world_lock():
         world = load_world(sim_id)
@@ -63,7 +80,7 @@ def set_name(sim_id: str, payload: dict):
 
 
 @router.post("/household/set_newspaper_subscription")
-@command("household.set_newspaper_subscription")
+@command("household.set_newspaper_subscription", entities=lambda a: [("households", _hh(a))])
 def set_newspaper_subscription(sim_id: str, payload: dict):
     with world_lock():
         world = load_world(sim_id)
@@ -82,7 +99,7 @@ def set_newspaper_subscription(sim_id: str, payload: dict):
 # =========================================================
 
 @router.post("/household/set_building_address")
-@command("household.set_building_address")
+@command("household.set_building_address", entities=lambda a: [("key", "buildings")])
 def set_building_address(sim_id: str, payload: dict):
     with world_lock():
         world = load_world(sim_id)
@@ -97,7 +114,7 @@ def set_building_address(sim_id: str, payload: dict):
 
 
 @router.post("/household/assign_building")
-@command("household.assign_building")
+@command("household.assign_building", entities="world")       # homes, a mortgage, insurance
 def assign_building(sim_id: str, payload: dict):
     with world_lock():
         world = load_world(sim_id)
@@ -116,7 +133,7 @@ def assign_building(sim_id: str, payload: dict):
 
 
 @router.post("/household/unassign_building")
-@command("household.unassign_building_route")
+@command("household.unassign_building_route", entities=_building)
 def unassign_building_route(sim_id: str, payload: dict):
     with world_lock():
         world = load_world(sim_id)
@@ -136,7 +153,7 @@ def unassign_building_route(sim_id: str, payload: dict):
 # =========================================================
 
 @router.post("/household/add_member")
-@command("household.add_member")
+@command("household.add_member", entities="world")            # keys, beds and food for them (props)
 def add_member(sim_id: str, payload: dict):
     with world_lock():
         world = load_world(sim_id)
@@ -155,7 +172,7 @@ def add_member(sim_id: str, payload: dict):
 
 
 @router.post("/household/remove_member")
-@command("household.remove_member")
+@command("household.remove_member", entities=_member)
 def remove_member(sim_id: str, payload: dict):
     with world_lock():
         world = load_world(sim_id)
