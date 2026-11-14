@@ -773,3 +773,23 @@ scripted Turn outputs. Pure modules (state machine, codec, policies, context) ge
   - `apply_speech` now calls `deliver()`.
   - Determinism identical. The tests covering these effects pass, or fail exactly as before (`test_grudges`,
     `test_memory_acknowledgement`: fixture issues). `tests/test_cpl_delivery.py`.
+- **Phase 1, step 5b: the turn lines in the decision prompt (done).**
+  - With `CPL_MODE=on`, a character in a live CPL conversation gets a block on their decision context
+    (`cpl/turns.py`): who they're talking with, what is still open as labels ("R1 Theo asked for: … (needs your
+    answer)"), and whether it is winding down.
+  - The system prompt gains `ANSWERS / ACT / CONDITION / NEXT` only then. The reply parser keeps those lines, and
+    the speech carries them to `apply_speech`.
+  - The line hook applies them:
+    - a question or request opens a tracked item (questions on the conversation, requests as `cpl_requests`
+      entities);
+    - an answer settles it;
+    - an accepted request emits `cpl.commitment_created` (`commit_<request id>`; the contracts handler is Phase 3);
+    - once everything asked is answered, the conversation winds down;
+    - `NEXT leave:angry` ends it as an angry withdrawal.
+  - An answer to an item that isn't open answers nothing and is logged on the conversation (`turn_errors`). The
+    fallback keeps the line and a valid NEXT, and never invents an accept or reject.
+  - A first reply that settles everything goes straight to winding down. Words followed by walking off count as
+    started and left, not declined. Only a deliberate wrap-up counts as the speaker's closing line.
+  - Determinism: `off` and `shadow` unchanged. `tests/test_cpl_turns.py` (request → accepted → commitment →
+    request fulfilled; an angry exit).
+  - Phase 1 still to do: the append-only archive tables (item 7).

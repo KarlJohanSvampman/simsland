@@ -94,9 +94,13 @@ TAGS: <the ONE trait from your personality above that most decided this choice -
 """
 
 
-def build_system_prompt(available_actions):
+def build_system_prompt(available_actions, cpl=None):
     menu = _format_action_menu(available_actions or {})
-    return f"{_PREAMBLE}\n\nActions: {menu}\n{_ENVELOPE_FORMAT}"
+    extra = ""
+    if cpl:                       # in a CPL conversation (cpl/turns.py): the lines that answer what is open
+        from cpl.turns import FORMAT_LINES
+        extra = FORMAT_LINES + "\n"
+    return f"{_PREAMBLE}\n\nActions: {menu}\n{_ENVELOPE_FORMAT}{extra}"
 
 
 # =========================================================
@@ -476,6 +480,7 @@ def build_prompt(context):
 
 _ACTION_LINE_RE = re.compile(r'(?im)^[ \t>*_-]*ACTION[ \t]*:[ \t]*(.+)$')
 _SAY_LINE_RE    = re.compile(r'(?im)^[ \t>*_-]*SAY[ \t]*:[ \t]*(.*)$')
+_CPL_LINE_RE    = re.compile(r'(?im)^[ \t>*_-]*(ANSWERS|ACT|CONDITION|NEXT|STANCE)[ \t]*:[ \t]*(.*)$')
 _THEN_LINE_RE   = re.compile(r'(?im)^[ \t>*_-]*THEN[ \t]*:[ \t]*(.*)$')
 _REMARK_LINE_RE = re.compile(r'(?im)^[ \t>*_-]*REMARK[ \t]*:[ \t]*(.*)$')
 _INTENT_LINE_RE = re.compile(r'(?im)^[ \t>*_-]*INTENT[ \t]*:[ \t]*(.*)$')
@@ -678,6 +683,7 @@ def _parse_compact_envelope(raw):
         "uses": _parse_uses_line(uses_match.group(1)) if uses_match else [],
         "then": then_match.group(1).strip() if then_match else "",
         "tags": _parse_tags_line(tags_match.group(1)) if tags_match else None,
+        "cpl_lines": "\n".join(f"{m.group(1).upper()}: {m.group(2).strip()}" for m in _CPL_LINE_RE.finditer(text)),
     }
 
 
@@ -1152,6 +1158,8 @@ def _to_legacy_decision(envelope, char_id=None):
             "topic": "",
             "target": None,
         }
+        if envelope.get("cpl_lines"):
+            speech["cpl"] = envelope["cpl_lines"]          # ANSWERS / ACT / NEXT (cpl/turns.py)
         # If the action targets a character and speech has no target of
         # its own, they're almost certainly the same person — share the
         # description so process_decision() can reuse the action's
@@ -1234,11 +1242,14 @@ def think(
 ):
 
     available_actions = context.get("available_actions") or {}
-    system_prompt = build_system_prompt(available_actions)
+    system_prompt = build_system_prompt(available_actions, context.get("cpl"))
 
     prompt = build_prompt(
         context
     )
+    if context.get("cpl"):
+        from cpl.turns import prompt_section
+        prompt = prompt + "\n\n" + prompt_section(context["cpl"])
 
     from brain.cognition_scheduler import record_prompt_bytes
     record_prompt_bytes(len(system_prompt.encode("utf-8")) + len(prompt.encode("utf-8")))

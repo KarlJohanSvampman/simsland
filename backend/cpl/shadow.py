@@ -159,17 +159,41 @@ def _on_line(world, legacy, speaker_id, utterance, speech_act):
                                     topic=legacy.get("topic") or "", legacy_id=legacy["id"])
         _map(world)[legacy["id"]] = conv["id"]
         st["opened"] += 1
+        lines = _turn_lines(world, speaker_id)
+        if lines:                                   # the opening line can ask something: tracked from the start
+            from cpl.turns import apply_turn
+            apply_turn(world, conv, (world.get("characters") or {})[speaker_id], lines, utterance, others,
+                       now_ts(world))
         store.append_message(world, conv, _envelope(conv, speaker_id, others, utterance, speech_act, now_ts(world),
                                                     requires))
         return
-    res = CV.submit(world, conv, {"type": "turn", "by": speaker_id, "requires_response": requires,
-                                  "addressed": others[0] if others else None,
-                                  "raises_item": requires and conv.get("state") == "resolving"})
+    event = {"type": "turn", "by": speaker_id, "requires_response": requires,
+             "addressed": others[0] if others else None,
+             "raises_item": requires and conv.get("state") == "resolving"}
+    lines = _turn_lines(world, speaker_id)
+    if lines:                                       # CPL_MODE=on: the speaker's ANSWERS / ACT / NEXT (cpl/turns.py)
+        from cpl.turns import apply_turn
+        ev = apply_turn(world, conv, (world.get("characters") or {})[speaker_id], lines, utterance, others,
+                        now_ts(world))
+        ev["requires_response"] = ev["requires_response"] or requires
+        ev["raises_item"] = ev["raises_item"] and conv.get("state") == "resolving"
+        if not conv["open_items"]["questions"] and not conv["open_items"]["requests"] and conv.get("outcome_hint"):
+            ev["settles_all"] = True                # everything asked is answered: wind down
+        event = ev
+        st["structured_turns"] = st.get("structured_turns", 0) + 1
+    res = CV.submit(world, conv, event)
     if not res.changed:
         st["rejected_turns"] += 1
         st["rejections"][res.rejected] = st["rejections"].get(res.rejected, 0) + 1
     store.append_message(world, conv, _envelope(conv, speaker_id, others, utterance, speech_act, now_ts(world),
                                                 requires))
+
+
+def _turn_lines(world, speaker_id):
+    """The speaker's parsed CPL lines for the line being added (systems/action_router.py sets them), in "on" mode."""
+    if not deciding(world):
+        return None
+    return ((world.get("characters") or {}).get(speaker_id) or {}).get("_cpl_turn")
 
 
 def on_declined(world, speaker, listener, medium, topic, excuse=None):

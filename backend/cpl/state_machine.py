@@ -152,6 +152,8 @@ def transition(conv, event, now):
             if ctl == "defer":
                 return _end(S.RESOLVED, R.DECLINED.value, [{"do": "settle_open", "status": "deferred"},
                                                             {"do": "notify_initiator", "why": "later"}])
+            if ctl == "leave" and event.get("said"):
+                return _leave(conv, event)              # answered, then walked off: it started, and ended with them
             if ctl == "leave":
                 return _end(S.RESOLVED, R.DECLINED.value, [{"do": "settle_open", "status": "rejected"},
                                                             {"do": "notify_initiator", "why": "walked_off"}])
@@ -159,6 +161,8 @@ def transition(conv, event, now):
             eff = [{"do": "cancel", "kind": "invite"}, {"do": "publish", "event": "cpl.conversation_started"},
                    {"do": "schedule", "kind": "cap", "in": pol["hard_seconds"]},
                    {"do": "schedule", "kind": "idle", "in": pol["idle_s"]}]
+            if event.get("wrap_up") or event.get("settles_all"):     # the first answer settles it: wind down at once
+                return Result(S.RESOLVING, None, eff + _wind_down(conv, event, pol))
             eff += _floor_after(conv, event, pol)
             return Result(S.ACTIVE, None, eff)
         if kind == "interrupt":
@@ -241,13 +245,20 @@ def transition(conv, event, now):
                           + [{"do": "request_turn", "who": p, "closing": True} for p in _active(conv) if p not in done])
         # ACTIVE
         if event.get("wrap_up") or event.get("settles_all") or over == "soft" or ctl == "close":
-            return Result(S.RESOLVING, None, [{"do": "cancel", "kind": "reply"},
-                                              {"do": "schedule", "kind": "close", "in": pol["close_s"]},
-                                              {"do": "wind_down"}, {"do": "closed_by", "who": event.get("by")}]
-                          + [{"do": "request_turn", "who": p, "closing": True} for p in _others(conv, event.get("by"))])
+            return Result(S.RESOLVING, None, _wind_down(conv, event, pol))
         return Result(S.ACTIVE, None, _floor_after(conv, event, pol))
 
     return _reject(conv, f"{kind} in {state}")
+
+
+def _wind_down(conv, event, pol):
+    """Into RESOLVING: the close timer runs, the next turn prompts say "wrap up", the others get a closing turn.
+    The speaker counts as having said their closing line only if they meant to wrap up."""
+    eff = [{"do": "cancel", "kind": "reply"}, {"do": "schedule", "kind": "close", "in": pol["close_s"]},
+           {"do": "wind_down"}]
+    if event.get("wrap_up") or event.get("control") == "close":
+        eff.append({"do": "closed_by", "who": event.get("by")})
+    return eff + [{"do": "request_turn", "who": p, "closing": True} for p in _others(conv, event.get("by"))]
 
 
 def _floor_after(conv, event, pol):

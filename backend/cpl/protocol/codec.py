@@ -9,8 +9,8 @@ as labels (Q1 a question, R1 a request, P1 a proposal), mapped back here.
     parse_turn(text, labels)            -> (TurnDecision dict, errors)
     parse_initiate(text)                -> (InitiateIntent dict, errors)
     fallback(decision)                  what an invalid turn becomes after the one corrective retry: its line, as a
-                                        plain statement, NEXT continue -- never an invented accept or reject
-                                        (spec invariant 16)
+                                        plain statement, answering nothing -- never an invented accept or reject
+                                        (spec invariant 16); a NEXT that parsed (leave, pause) still stands
     to_event(decision, character_id)    the state-machine event for it (cpl/state_machine.py)
 
 Turn:
@@ -130,13 +130,13 @@ def fallback(decision):
     """After the corrective retry also failed: the line it had, as a plain statement; nothing answered for them."""
     return {"answers": None, "act": "statement", "message_type": "statement", "stance": decision.get("stance"),
             "emotion": decision.get("emotion"), "say": decision.get("say"), "condition": None,
-            "next": {"action": "continue"}, "fallback": True}
+            "next": decision.get("next") or {"action": "continue"}, "fallback": True}
 
 
 def to_event(decision, character_id, addressed=None):
     """The state-machine event for a parsed turn."""
     nxt = decision.get("next") or {}
-    ev = {"type": "turn", "by": character_id, "addressed": addressed,
+    ev = {"type": "turn", "by": character_id, "addressed": addressed, "said": bool(decision.get("say")),
           "requires_response": decision.get("message_type") in ("question", "request", "proposal"),
           "raises_item": decision.get("message_type") in ("question", "request", "proposal"),
           "wrap_up": nxt.get("action") == "wrap_up"}

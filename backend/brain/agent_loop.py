@@ -1367,6 +1367,10 @@ def _think_now(c, world):
         wake_line=_wake_line(c),
         staged=c.get("cognition", {}).get("staged_knowledge") or (),
     )
+    from cpl.turns import context_block as _cpl_block      # CPL_MODE=on: the conversation's open items (cpl/turns.py)
+    _cpl = _cpl_block(world, c)
+    if _cpl:
+        context["cpl"] = _cpl
 
     # =====================================
     # THINK

@@ -151,3 +151,23 @@ def open_requests(world, character_id):
     return [r for r in (world.get("cpl_requests") or {}).values()
             if r.get("status") in ("open", "deferred", "negotiating", "conditional")
             and character_id in (r.get("requester_id"), r.get("recipient_id"))]
+
+
+def add_question(world, conv, *, asker_id, to_id, text, source_message_id, now):
+    """A question asked in a conversation: open until answered (or the conversation ends)."""
+    qid = next_id(world, "q")
+    conv.setdefault("questions", {})[qid] = {"id": qid, "asker_id": asker_id, "to_id": to_id, "text": text,
+                                             "source_message_id": source_message_id, "status": "open", "asked_at": now}
+    conv["open_items"]["questions"].append(qid)
+    return conv["questions"][qid]
+
+
+def answer_question(conv, qid, by, response_type, now):
+    q = (conv.get("questions") or {}).get(qid)
+    if q is None or q.get("status") != "open":
+        return None
+    q.update(status="answered" if response_type not in ("cant_answer", "ignore", "clarify") else response_type,
+             answered_by=by, answered_at=now, response_type=response_type)
+    if qid in conv["open_items"]["questions"]:
+        conv["open_items"]["questions"].remove(qid)
+    return q

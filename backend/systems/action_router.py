@@ -307,10 +307,13 @@ def apply_speech(c, world, speech):
         if conversation_type:
             conv["conversation_type"] = conversation_type
 
+        if speech.get("cpl"):
+            c["_cpl_turn"] = speech["cpl"]                  # read by cpl/shadow.py::on_line as the line is added
         add_message(
             world, conv, c["id"], utterance, speech_act,
             topic or conv.get("topic", "general"), tick
         )
+        c.pop("_cpl_turn", None)
 
         # What the line does once it reaches them -- subject and social reading, pattern concern, the impact ledger,
         # memory acknowledgement, dialogue memory, reactions, the relationship, analysis and reflections: subscribers
