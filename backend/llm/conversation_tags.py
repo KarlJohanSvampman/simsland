@@ -60,6 +60,9 @@ def _ctx_block(ctx):
         lines.append(f"- agreement {k['id']}: {k.get('title')} -- terms: {'; '.join(t for t in k['terms'] if t)}")
     for r in ctx.get("rumours") or []:
         lines.append(f"- rumour {r['id']} going round about {r['about']}: {r['claim']}")
+    if ctx.get("structured"):
+        lines.append("- recorded as it happened (take this as given, don't guess it from the lines):")
+        lines += [f"    {l}" for l in ctx["structured"]]
     return "\n".join(lines) or "(nothing on record)"
 
 

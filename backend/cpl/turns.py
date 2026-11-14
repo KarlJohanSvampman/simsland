@@ -8,8 +8,11 @@ existing decision prompt plus a few lines, decided).
     prompt_section(block)          the lines the decision prompt shows for it
     FORMAT_LINES                   the extra reply lines (brain/llm_brain.py's envelope), shown only with a block
     apply_turn(world, conv, c, lines, utterance, others)
-                                   the parsed lines applied: answers settle open items, a question or request opens one;
-                                   returns the extra fields for the turn event (cpl/state_machine.py)
+                                   the parsed lines applied: answers settle open items, a question or request opens one,
+                                   a counteroffer opens a proposal back, an accepted request is a commitment (a social
+                                   contract: cpl/adapters/contracts.py), a STANCE takes a claim as acknowledged or
+                                   disputed; returns the extra fields for the turn event (cpl/state_machine.py)
+    add_claim(world, conv, ...)    something told (gossip, an urgent report): asserted -- heard is not believed
 """
 
 from cpl import config, store
@@ -87,27 +90,95 @@ def apply_turn(world, conv, c, lines, utterance, others, now):
             decision = codec.fallback(decision)             # an answer we can't read is no answer (invariant 16)
     ans = decision.get("answers")
     if ans:
-        iid, rtype = ans["item_id"], ans["response_type"]
-        if iid.startswith("q_"):
-            store.answer_question(conv, iid, c["id"], rtype, now)
-            if not conv["open_items"]["questions"] and not conv["open_items"]["requests"]:
-                conv["outcome_hint"] = "question_answered"
-        else:
-            status = {"accept": "accepted", "reject": "rejected", "conditional": "conditional", "counter": "negotiating",
-                      "defer": "deferred", "partial": "conditional"}.get(rtype)
-            if status:
-                store.set_request_status(world, iid, status, now, by=c["id"], condition=ans.get("condition"))
-                conv["outcome_hint"] = {"accepted": "request_fulfilled", "rejected": "request_rejected"}.get(
-                    status, conv.get("outcome_hint"))
-                if status == "accepted":
-                    from core.event_bus import emit
-                    req = world["cpl_requests"][iid]
-                    emit("cpl.commitment_created", {"commitment_id": "commit_" + iid, "request": dict(req),
-                                                    "conversation_id": conv["id"]})
+        _settle(world, conv, c, ans["item_id"], ans["response_type"], ans.get("condition"), now)
+    _claims_answered(conv, c, decision.get("stance"), now)
     to = others[0] if others else None
+    if decision["message_type"] == "argument":
+        from core.event_bus import emit
+        emit("cpl.argument", {"conversation_id": conv["id"], "by": c["id"], "to": to, "claim": utterance,
+                              "stance": decision.get("stance")})
     if decision["message_type"] == "question" and utterance:
         store.add_question(world, conv, asker_id=c["id"], to_id=to, text=utterance, source_message_id=None, now=now)
     elif decision["message_type"] in ("request", "proposal") and utterance:
         store.add_request(world, conv, kind=decision["message_type"], requester_id=c["id"], recipient_id=to,
                           action=utterance, source_message_id=None, now=now)
     return codec.to_event(decision, c["id"], to)
+
+
+_ACKNOWLEDGE = {"agree", "agreeing", "believe", "believing", "convinced", "accepting", "sympathetic", "supportive"}
+_DISPUTE = {"doubt", "doubtful", "disagree", "disagreeing", "disbelieve", "skeptical", "sceptical", "unconvinced",
+            "opposed", "dismissive"}
+
+
+def _claims_answered(conv, c, stance, now):
+    """What someone told them, taken one way or the other: acknowledged (not the same as confirmed) or disputed."""
+    if not stance:
+        return
+    st = "acknowledged" if stance in _ACKNOWLEDGE else "disputed" if stance in _DISPUTE else None
+    if st is None:
+        return
+    for cl in (conv.get("claims") or {}).values():
+        if cl.get("status") == "asserted" and cl.get("by") != c["id"] and c["id"] in cl.get("to", []):
+            cl.setdefault("stances", {})[c["id"]] = st
+            cl["status"] = st
+            cl["answered_at"] = now
+            from core.event_bus import emit
+            emit("cpl.information_" + ("acknowledged" if st == "acknowledged" else "disputed"),
+                 {"conversation_id": conv["id"], "claim_id": cl["id"], "by": c["id"], "claim": cl.get("text")})
+
+
+def add_claim(world, conv, speaker_id, to, text, now, kind="reported_claim"):
+    """A line telling something (gossip, an urgent report): recorded as asserted -- heard is not believed (C8)."""
+    cid = store.next_id(world, "claim")
+    conv.setdefault("claims", {})[cid] = {"id": cid, "by": speaker_id, "to": list(to), "text": text, "kind": kind,
+                                          "status": "asserted", "at": now}
+    from core.event_bus import emit
+    emit("cpl.information_shared", {"conversation_id": conv["id"], "claim_id": cid, "source": speaker_id,
+                                    "to": list(to), "claim": text, "epistemic_status": "asserted"})
+    return conv["claims"][cid]
+
+
+_STATUS = {"accept": "accepted", "reject": "rejected", "conditional": "conditional", "counter": "negotiating",
+           "defer": "deferred", "partial": "conditional"}
+
+
+def _settle(world, conv, c, iid, rtype, condition, now):
+    """An answer to an open item: a question answered; a request or proposal accepted / rejected / countered ..."""
+    if iid.startswith("q_"):
+        store.answer_question(conv, iid, c["id"], rtype, now)
+        if not conv["open_items"]["questions"] and not conv["open_items"]["requests"]:
+            conv["outcome_hint"] = "question_answered"
+        return
+    status = _STATUS.get(rtype)
+    if not status:
+        return
+    req = (world.get("cpl_requests") or {}).get(iid) or {}
+    store.set_request_status(world, iid, status, now, by=c["id"], condition=condition)
+    if req.get("kind") == "proposal" and req.get("counter_to"):
+        # the answer to a counteroffer settles the original request: accepted on the counter's terms, or not
+        orig = req["counter_to"]
+        if status in ("accepted", "conditional"):
+            store.set_request_status(world, orig, "accepted", now, by=c["id"], condition=req.get("action"))
+            _commit(world, conv, orig)
+            conv["outcome_hint"] = "mutual_agreement"
+        elif status == "rejected":
+            store.set_request_status(world, orig, "rejected", now, by=c["id"])
+            conv["outcome_hint"] = "request_rejected"
+        return
+    if status == "negotiating" and condition:
+        # a counteroffer: a proposal back to the one who asked, on these terms (P1 on their prompt)
+        p = store.add_request(world, conv, kind="proposal", requester_id=c["id"], recipient_id=req.get("requester_id"),
+                              action=condition, source_message_id=None, now=now)
+        p["counter_to"] = iid
+        return
+    conv["outcome_hint"] = {"accepted": "request_fulfilled", "rejected": "request_rejected"}.get(
+        status, conv.get("outcome_hint"))
+    if status in ("accepted", "conditional"):
+        _commit(world, conv, iid)
+
+
+def _commit(world, conv, rid):
+    from core.event_bus import emit
+    req = world["cpl_requests"][rid]
+    emit("cpl.commitment_created", {"commitment_id": "commit_" + rid, "request": dict(req),
+                                    "conversation_id": conv["id"]})

@@ -166,6 +166,7 @@ def _on_line(world, legacy, speaker_id, utterance, speech_act):
                        now_ts(world))
         store.append_message(world, conv, _envelope(conv, speaker_id, others, utterance, speech_act, now_ts(world),
                                                     requires))
+        _note_claim(world, conv, speaker_id, others, utterance, speech_act)
         return
     event = {"type": "turn", "by": speaker_id, "requires_response": requires,
              "addressed": others[0] if others else None,
@@ -177,7 +178,7 @@ def _on_line(world, legacy, speaker_id, utterance, speech_act):
                         now_ts(world))
         ev["requires_response"] = ev["requires_response"] or requires
         ev["raises_item"] = ev["raises_item"] and conv.get("state") == "resolving"
-        if not conv["open_items"]["questions"] and not conv["open_items"]["requests"] and conv.get("outcome_hint"):
+        if not any(conv["open_items"].values()) and conv.get("outcome_hint"):
             ev["settles_all"] = True                # everything asked is answered: wind down
         event = ev
         st["structured_turns"] = st.get("structured_turns", 0) + 1
@@ -189,8 +190,18 @@ def _on_line(world, legacy, speaker_id, utterance, speech_act):
         st["rejections"][res.rejected] = st["rejections"].get(res.rejected, 0) + 1
     store.append_message(world, conv, _envelope(conv, speaker_id, others, utterance, speech_act, now_ts(world),
                                                 requires))
+    _note_claim(world, conv, speaker_id, others, utterance, speech_act)
     from cpl.lifecycle import summarize
     conv["context"]["summary"] = summarize(conv, world)
+
+
+def _note_claim(world, conv, speaker_id, others, utterance, speech_act):
+    """Telling something about the world or someone (gossip, an urgent report): a claim, asserted until the listener
+    takes it one way or the other (cpl/turns.py) -- the epistemic event, recorded as it happens (C8)."""
+    if (speech_act or "").lower() in ("gossip", "urgent_report") and utterance:
+        from core.clock import now_ts
+        from cpl.turns import add_claim
+        add_claim(world, conv, speaker_id, others, utterance, now_ts(world))
 
 
 def _turn_lines(world, speaker_id):

@@ -847,3 +847,25 @@ scripted Turn outputs. Pure modules (state machine, codec, policies, context) ge
     - information shared with an epistemic status (asserted, acknowledged, disputed …), passed to rumours and
       memory (C8);
     - the structured record fed into the conversation-tags prompt (C9).
+- **Phase 3: semantics (done).**
+  - **C7, contracts.** `cpl/adapters/contracts.py`: an accepted or conditionally accepted request becomes a one-term
+    social contract (`social/contracts.create`). The recipient is responsible, under the conditions they named. The
+    request records the `contract_id` it became, so a commitment delivered twice makes one contract.
+    - The agreement reaches both prompts the way every contract does. No separate intention, since nothing would act
+      on one.
+    - Contracts make their own ids, so the link is the request's `contract_id` rather than commitment id = contract
+      id.
+  - **Counteroffers.** `ANSWERS: R1 counter` + `CONDITION` puts the request under negotiation and opens a proposal
+    back to the requester (P1 on their prompt). Accepting it accepts the request on those terms and makes a contract
+    ("mutual agreement"); rejecting it rejects the request.
+  - **C8, claims.** A gossip or urgent-report line is a claim, asserted. The listener's next STANCE takes it as
+    acknowledged (which is not the same as confirmed) or disputed. `cpl.information_shared` /
+    `_acknowledged` / `_disputed` are emitted. Third-party rumours stay with the reader of the finished conversation,
+    so nothing is counted twice. An `ACT: argument` emits `cpl.argument`.
+  - **C9, the record for the reader.** `cpl/record.py` lists who asked what and how it was answered, agreements,
+    claims and how they were taken, and how it ended. With `CPL_MODE=on` it goes into the conversation-tags prompt as
+    given (`social/discourse.context_for_reader` → `llm/conversation_tags._ctx_block`). Shadow mode keeps it out.
+  - Determinism: `off` and `shadow` unchanged. The soak still passes. `tests/test_cpl_semantics.py` (13 checks).
+  - Next, Phase 4: groups (`apply_speech_to_group` into CPL participants), late joiners with a summary up to when
+    they joined, overheard vs told, text and email through CPL, and removing the legacy mirror. Then Phase 5: the
+    compact turn prompt, Mode A/B/C, and metrics.
