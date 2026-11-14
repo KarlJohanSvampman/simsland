@@ -174,7 +174,8 @@ JOBS = [
     PERCHAR("libido", "systems.libido:libido_for", 24 * SECOND, "libido moves", "systems.libido:libido_active"),
     PERCHAR("mentality_compilation", "systems.mentality:mentality_for", 25 * SECOND,
             "mentalities compile in the background", "systems.mentality:mentality_active", cap=5),
-    PROCESS("influence_exposure", "_job_influence_exposure", 30 * SECOND, "being around opinions wears on you"),
+    PERCHAR("influence_exposure", "systems.influence:exposure_influence_for", 30 * SECOND,
+            "being around opinions wears on you", "systems.influence:exposure_influence_active"),
     PERCHAR("psychosis", "systems.psychosis:tick_psychosis", 30 * SECOND, "psychosis episodes (while the mechanic is on)",
             "systems.psychosis:psychosis_possible"),
     PROCESS("traffic", "_job_traffic", 30 * SECOND, "ambient traffic"),
@@ -191,6 +192,8 @@ JOBS = [
     PROCESS("cookware", "_job_cookware", 30 * SECOND, "dinner planning and who cooks"),
     PROCESS("emergencies", "_job_arrests", 30 * SECOND, "incidents happen, are reported, responders arrive, arrests"),
     PROCESS("weather", "_job_weather", MINUTE, "the weather changes"),
+    PERCHAR("weather_exposure", "systems.weather:weather_exposure_for", MINUTE, "cold and heat wear on people outdoors",
+            "systems.weather:weather_exposure_active"),
     PERCHAR("focus_check", "systems.worry_relief:focus_check_for", MINUTE,
             "worry leaves less focus for what they are doing", "systems.worry_relief:focus_check_active"),
     PERCHAR("worry_poll", "systems.worry_cases:worry_poll_for", MINUTE, "each character's worries are re-read against "
@@ -205,7 +208,8 @@ JOBS = [
     PROCESS("crisis", "_job_crisis", MINUTE, "community crises"),
     PROCESS("news", "_job_news", MINUTE, "news is written"),
     PROCESS("social_projects", "_job_social_projects", MINUTE, "projects start and expire; hobby sessions"),
-    PROCESS("detective_work", "_job_detective_work", MINUTE, "a detective story moves on"),
+    PERCHAR("detective_work", "systems.detective_work:detective_work_for", MINUTE, "a detective story moves on",
+            "systems.detective_work:detective_work_active"),
     PROCESS("contract_checks", "_job_contract_checks", MINUTE, "contract terms are checked; worries fade"),
     PROCESS("contagion", "_job_contagion", 15 * SECOND, "disease spreads between people who are together (time together)"),
     PERCHAR("claustrophobia", "systems.claustrophobia:claustrophobia_for", 30 * SECOND,
@@ -229,7 +233,8 @@ JOBS = [
     # ── jobs that live in their own modules ────────────────────────────────────────────────────────────────────────
     CLOCK("feelingsday", "systems.feelings:_daily", "the daily standing snapshot", daily=6 * HOUR),
     CLOCK("post_engagement", "systems.calendar_handlers:_post_engagement", "likes and comments on posts", hourly=0),
-    PROCESS("popularity_decay", "systems.calendar_handlers:_popularity_decay", MINUTE, "popularity fades"),
+    PERCHAR("popularity_decay", "systems.validation:popularity_decay_for", MINUTE, "popularity fades",
+            "systems.validation:popularity_active"),
     PROCESS("orphan_props", "systems.calendar_handlers:_orphan_props", 30 * SECOND, "props left nowhere are tidied",
             offset=5),
     DUTY("background_services", "systems.calendar_handlers:_background_services", 5 * SECOND,
@@ -370,8 +375,30 @@ def run_perchar(c, world):
             members[cid] = at
 
 
+_perchar_seeded = set()  # (id(world), name): members looked up for everyone once in this process
+
+
+def _seed(world, name):
+    """First firing in this process (a load, or a job new to this save): every character is checked once, so no one
+    with work waits for their own first look."""
+    _perchar_seeded.add((id(world), name))
+    _fn, active, _every = _perchar_fns[name]
+    members = _members(world, name)
+    for cid, c in dict.items(world.get("characters") or {}):
+        try:
+            at = _check(active, c, world)
+        except Exception:
+            at = None
+        if at is None:
+            members.pop(cid, None)
+        else:
+            members[cid] = at
+
+
 def _perchar_timer(name):
     def handler(world, entry):
+        if (id(world), name) not in _perchar_seeded:
+            _seed(world, name)
         members = (world.get("_perchar_members") or {}).get(name)
         if not members:
             return

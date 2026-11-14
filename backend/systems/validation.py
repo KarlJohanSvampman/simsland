@@ -79,18 +79,13 @@ def _prune_expired_queue(c, world):
 
 
 def _nearby_characters(c, world):
+    """Who a question can be put to: the others in their building, or within 6 tiles outdoors (core/positions.py --
+    only those are reached)."""
+    from core import positions
     chars = world.get("characters", {})
-    bid = c.get("building_id")
-    if bid:
-        return [o for o in chars.values()
-                if o["id"] != c["id"] and o.get("building_id") == bid and o.get("alive", True) is not False]
-    result = []
-    for o in chars.values():
-        if o["id"] == c["id"] or o.get("building_id") or o.get("alive", True) is False:
-            continue
-        if abs(o.get("x", 0) - c.get("x", 0)) + abs(o.get("y", 0) - c.get("y", 0)) <= 6:
-            result.append(o)
-    return result
+    if c.get("building_id"):
+        return [chars[i] for i, alive, _b in positions.ids_near(world, c, same_building=True) if alive]
+    return [chars[i] for i, alive, obid in positions.ids_near(world, c, radius=6) if alive and not obid]
 
 
 def _question_text(entry):
@@ -250,3 +245,14 @@ def tick_popularity_decay(world):
         pop = c.get("popularity", 0.0)
         if pop > 0:
             c["popularity"] = round(max(0.0, pop - POPULARITY_DECAY_PER_MINUTE), 2)
+
+
+def popularity_active(c, world):
+    """Has popularity left to fade (core/flow.py PERCHAR `popularity_decay`)."""
+    return (c.get("popularity", 0.0) or 0) > 0
+
+
+def popularity_decay_for(c, world):
+    pop = c.get("popularity", 0.0)
+    if pop > 0:
+        c["popularity"] = round(max(0.0, pop - POPULARITY_DECAY_PER_MINUTE), 2)

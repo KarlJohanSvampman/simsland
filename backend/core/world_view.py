@@ -292,3 +292,12 @@ def install(world, sim_id="default"):
         for keys in _seen.values():
             keys.clear()
     return wd
+
+
+def where(collection, pred):
+    """The entities of a collection for which pred(entity) is true, in order -- pred sees each entity WITHOUT it being
+    reached (it should only read), and only the matches are reached (touched, locked). For "every child", "everyone
+    with X" loops that would otherwise reach every entity to filter it."""
+    if not isinstance(collection, dict):
+        return [e for e in collection if pred(e)]
+    return [collection[k] for k, e in dict.items(collection) if pred(e)]

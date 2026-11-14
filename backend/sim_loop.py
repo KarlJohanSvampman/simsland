@@ -103,7 +103,6 @@ from systems.government_debt import assess_monthly_tax, apply_debt_consequences
 from systems.government_budget import tick_government_budget
 from systems.credit     import tick_monthly_card_cycle
 from systems.personal_items import recall_overdue_loans
-from systems.validation    import tick_popularity_decay
 from systems.social_media  import tick_post_engagement
 from systems.convenience_store import update_convenience_store_staffing
 
@@ -145,7 +144,7 @@ from systems.body_composition import tick_body_composition
 # -- Very slow (÷300) ─────────────────────────────────────────────
 from systems.crisis         import check_crises, process_crises
 from systems.politics       import process_pending_effects, check_election, schedule_upcoming_legislation, resolve_legislation_votes
-from systems.influence      import apply_public_figure_influence, apply_social_influence, resolve_exposure_influence, resolve_value_influence
+from systems.influence      import apply_public_figure_influence, apply_social_influence, resolve_value_influence
 from systems.socioeconomics import tick_socioeconomics
 from systems.reputation     import tick_reputation
 from systems.secrets        import tick_secrets
@@ -390,7 +389,17 @@ _RELATIONSHIP_RADIUS = 8
 _HOURS_PER_RELATIONSHIP_SWEEP = (CADENCE["relationships"] * TICK_RATE_SECONDS) / 3600.0
 
 
+def _near_each_other(c, o):
+    first_impression(c, o)
+    update_relationship_state(c, o["id"])
+    accumulate_hours(ensure_relationship(c, o["id"]), _HOURS_PER_RELATIONSHIP_SWEEP)
+    first_impression(o, c)
+    update_relationship_state(o, c["id"])
+    accumulate_hours(ensure_relationship(o, c["id"]), _HOURS_PER_RELATIONSHIP_SWEEP)
+
+
 def _update_nearby_relationships(characters, world):
+    """Every pair of `characters` near each other (kept for tools and tests; the job asks core/positions.py)."""
     n = len(characters)
     for i in range(n):
         c = characters[i]
@@ -398,12 +407,7 @@ def _update_nearby_relationships(characters, world):
             o = characters[j]
             if (abs(c.get("x", 0) - o.get("x", 0)) +
                     abs(c.get("y", 0) - o.get("y", 0))) <= _RELATIONSHIP_RADIUS:
-                first_impression(c, o)
-                update_relationship_state(c, o["id"])
-                accumulate_hours(ensure_relationship(c, o["id"]), _HOURS_PER_RELATIONSHIP_SWEEP)
-                first_impression(o, c)
-                update_relationship_state(o, c["id"])
-                accumulate_hours(ensure_relationship(o, c["id"]), _HOURS_PER_RELATIONSHIP_SWEEP)
+                _near_each_other(c, o)
 
 
 # =========================================================
@@ -1035,13 +1039,13 @@ def _job_attention(world, entry):
 
 def _job_relationships(world, entry):
     """Scheduled job `relationships` (was an every() block in tick()); see core/scheduler.py."""
-    characters = [c for c in world.get("characters", {}).values() if not c.get("is_workplace_npc")]
-    _update_nearby_relationships(characters, world)
+    # Only the pairs that are near each other are reached (core/positions.py); the rest are not looked at.
+    from core import positions
+    chars = world.get("characters", {})
+    for a, b in positions.pairs_within(world, _RELATIONSHIP_RADIUS, keep=lambda r: not r[6]["workplace_npc"]):
+        _near_each_other(chars[a], chars[b])
 
 
-def _job_influence_exposure(world, entry):
-    """Scheduled job `influence_exposure` (was an every() block in tick()); see core/scheduler.py."""
-    resolve_exposure_influence(world)
 
 
 def _job_reading_2(world, entry):
@@ -1178,9 +1182,9 @@ def _job_conversation_seating(world, entry):
 
 def _job_weather(world, entry):
     """Scheduled job `weather` (was an every() block in tick()); see core/scheduler.py."""
-    from systems.weather import generate_weather_tick, apply_weather_to_characters
+    from systems.weather import generate_weather_tick
     generate_weather_tick(world)
-    apply_weather_to_characters(world)
+    # its effect on each character outdoors: the PERCHAR job `weather_exposure`
 
 
 def _job_social_projects(world, entry):
@@ -1374,13 +1378,16 @@ def _job_hierarchy(world, entry):
 
 def _job_contagion(world, entry):
     """Scheduled job `contagion` (was an every() block in tick()); see core/scheduler.py."""
-    characters = [c for c in world.get("characters", {}).values() if not c.get("is_workplace_npc")]
-    groups = {}
-    for c in characters:
-        c["location_tile"] = f"{int(c.get('x', 0))},{int(c.get('y', 0))}"
-        groups.setdefault(c.get("building_id"), []).append(c)
-    for group in groups.values():
-        if len(group) > 1:
+    # Only buildings with someone contagious in them are looked at (core/positions.py): nobody else can catch anything.
+    from core import positions
+    chars = world.get("characters", {})
+    groups = positions.by_building(world, keep=lambda r: not r[6]["workplace_npc"])
+    hot = {r[3] for r in positions.snapshot(world) if r[6]["contagious"] and not r[6]["workplace_npc"]}
+    for bid, ids in groups.items():
+        if len(ids) > 1 and bid in hot:
+            group = [chars[i] for i in ids]
+            for c in group:
+                c["location_tile"] = f"{int(c.get('x', 0))},{int(c.get('y', 0))}"
             tick_contagion_location(group, world)
 
 
@@ -1431,10 +1438,6 @@ def _job_intercourse_sessions(world, entry):
         tick_intercourse_sessions(world)
 
 
-def _job_detective_work(world, entry):
-    """Scheduled job `detective_work` (was an every() block in tick()); see core/scheduler.py."""
-    from systems.detective_work import tick_detective_work
-    tick_detective_work(world)
 
 
 

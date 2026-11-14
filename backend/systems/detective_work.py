@@ -888,13 +888,24 @@ def get_detective_work_context(c, world):
 
 def tick_detective_work(world):
     for c in world.get("characters", {}).values():
-        stories = c.get("detective_stories")
-        if not stories:
+        detective_work_for(c, world)
+
+def detective_work_active(c, world):
+    """Has a detective story still open (core/flow.py PERCHAR `detective_work`)."""
+    return any(not (s.get("resolved") or s.get("final_outcome")) for s in (c.get("detective_stories") or {}).values())
+
+
+def detective_work_for(c, world):
+    """One character's open detective stories move on."""
+    stories = c.get("detective_stories")
+    if not stories:
+        return
+    for story in list(stories.values()):
+        if story.get("resolved") or story.get("final_outcome"):
             continue
-        for story in list(stories.values()):
-            if story.get("resolved") or story.get("final_outcome"):
-                continue
-            try:
-                advance_chapter(c, story, world)
-            except Exception:
-                pass
+        try:
+            advance_chapter(c, story, world)
+        except Exception:
+            pass
+
+

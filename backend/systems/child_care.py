@@ -223,8 +223,9 @@ def tick_child_needs(world):
     and lazily seeds the baseline accountability contract."""
     from brain.intentions import add_intention
 
-    for c in world.get("characters", {}).values():
-        if c.get("age_group") != "child" or c.get("alive") is False:
+    from core.world_view import where
+    for c in where(world.get("characters", {}), lambda e: e.get("age_group") == "child"):   # only the children
+        if c.get("alive") is False:
             continue
 
         parents = _find_parents_for_child(c, world)
