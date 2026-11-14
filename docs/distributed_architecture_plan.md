@@ -612,3 +612,18 @@ component; a replayable event log.
   psychosis, lt_needs, social_odor, libido, addictions (hourly, per character), exhaustion and claustrophobia. All
   three determinism runs are identical to before. The only differences are bookkeeping: the claustrophobia state is no
   longer stamped on characters who are not moving, and the world-level hourly gate for addictions is gone.
+  More PERCHAR jobs since: focus_check, worry_poll (each character due from its own next hourly poll), grudges,
+  jail (due from the release tick), dependent_checks, mentality_compilation (with a per-firing cap, as the old sweep
+  had), play_urges (due from the start of play hours), domestic control (three jobs, in the old order),
+  persona_expectations, personal_mess, influence_exposure, detective_work, popularity_decay and weather_exposure.
+  Members are seeded once per process, so a load or a new job doesn't wait for anyone's first look.
+  *Who is near* (`core/positions.py`): positions read raw, so building the read model reaches nobody. Relationships
+  reach only the pairs near each other, contagion only buildings with someone contagious, and a validation question
+  only its audience. The nudity pass scans only its members and visits only places where there is something to see.
+  `world_view.where()` filters a collection on the raw entities and reaches only the matches.
+  Measured (afternoon run, 1,500 steps, the fixture's nudity switched off -- its characters have no clothes, so that
+  loop has members every step): on average a step reaches 0.97 of the 5 characters, and 1,122 steps reach none.
+  What still reaches characters: their own updates; reads of other characters from inside one (household members'
+  ages, relationship partners); household-level jobs that write to members; and once-a-day sweeps (calendar
+  reminders, contract clauses, bills). Those reads are not ownership: in step 5b they read replicated snapshots of
+  other entities. World-level processes (market, traffic, post, news, elections, ...) belong to world services in 5b.
