@@ -25,7 +25,7 @@ A rejected event (an illegal transition, a stale timer) returns the state unchan
 Events:
     open         {reachable}                                        CREATED -> PENDING | EXPIRED(unavailable)
     turn         {by, control?, leave_reason?, requires_response?, raises_item?, settles_all?, wrap_up?}
-    timer        {kind: invite|reply|pause|close, version, holder_thinking?, holder_busy?}
+    timer        {kind: invite|reply|pause|close|idle|cap, version, holder_thinking?, holder_busy?}
     interrupt    {by?, kind?}
     unavailable  {who}
     escalation   {}
@@ -73,7 +73,7 @@ def _reject(conv, why):
 
 
 def _end(state, reason, extra=()):
-    eff = [{"do": "cancel", "kind": k} for k in ("invite", "reply", "pause", "close")]
+    eff = [{"do": "cancel", "kind": k} for k in ("invite", "reply", "pause", "close", "idle", "cap")]
     eff += list(extra)
     eff.append({"do": "publish", "event": "cpl.conversation_ended"})
     return Result(state, reason, eff)
@@ -156,7 +156,9 @@ def transition(conv, event, now):
                 return _end(S.RESOLVED, R.DECLINED.value, [{"do": "settle_open", "status": "rejected"},
                                                             {"do": "notify_initiator", "why": "walked_off"}])
             # any other reply -- "What do you want?", "No.", even a hostile one -- starts it (spec invariant 7)
-            eff = [{"do": "cancel", "kind": "invite"}, {"do": "publish", "event": "cpl.conversation_started"}]
+            eff = [{"do": "cancel", "kind": "invite"}, {"do": "publish", "event": "cpl.conversation_started"},
+                   {"do": "schedule", "kind": "cap", "in": pol["hard_seconds"]},
+                   {"do": "schedule", "kind": "idle", "in": pol["idle_s"]}]
             eff += _floor_after(conv, event, pol)
             return Result(S.ACTIVE, None, eff)
         if kind == "interrupt":
@@ -165,6 +167,8 @@ def transition(conv, event, now):
 
     # ── PAUSED ───────────────────────────────────────────────────────────────────────────────────────────────────
     if state == S.PAUSED:
+        if kind == "timer" and event.get("kind") == "cap" and not _stale(conv, event):
+            return _end(S.RESOLVED, R.TIMEOUT.value)
         if kind == "timer":
             if event.get("kind") != "pause" or _stale(conv, event):
                 return _reject(conv, "stale or foreign timer")
@@ -186,6 +190,13 @@ def transition(conv, event, now):
         tk = event.get("kind")
         if _stale(conv, event):
             return _reject(conv, "stale timer")
+        if tk == "cap":
+            return _end(S.RESOLVED, R.TIMEOUT.value)          # the hard stop, even if nobody says anything again
+        if tk == "idle":
+            if event.get("holder_thinking"):
+                return Result(state, None, [{"do": "schedule", "kind": "idle", "in": pol["idle_s"]}])
+            return _end(S.RESOLVED, closing_reason(conv) if state == S.RESOLVING else
+                        (R.ABANDONED.value if conv.get("lines", 0) <= 1 else R.TIMEOUT.value))
         if tk == "close" and state == S.RESOLVING:
             return _end(S.RESOLVED, closing_reason(conv))
         if tk == "reply":
@@ -240,16 +251,18 @@ def transition(conv, event, now):
 
 
 def _floor_after(conv, event, pol):
-    """After a line: if it wants an answer, the floor goes to whoever is to answer and the reply timer runs."""
+    """After a line: if it wants an answer, the floor goes to whoever is to answer and the reply timer runs. Every
+    line re-arms the idle timer."""
     by = event.get("by")
     others = _others(conv, by)
+    idle = [{"do": "schedule", "kind": "idle", "in": pol["idle_s"]}]
     if event.get("requires_response") and others:
         holder = event.get("addressed") or others[0]
-        return [{"do": "set_floor", "holder": holder, "waiting_on": by, "attempts": 0},
-                {"do": "schedule", "kind": "reply", "in": pol["reply_s"]},
-                {"do": "request_turn", "who": holder}]
-    return [{"do": "set_floor", "holder": None}, {"do": "cancel", "kind": "reply"}] + \
-           [{"do": "request_turn", "who": p, "optional": True} for p in others]
+        return idle + [{"do": "set_floor", "holder": holder, "waiting_on": by, "attempts": 0},
+                       {"do": "schedule", "kind": "reply", "in": pol["reply_s"]},
+                       {"do": "request_turn", "who": holder}]
+    return idle + [{"do": "set_floor", "holder": None}, {"do": "cancel", "kind": "reply"}] + \
+        [{"do": "request_turn", "who": p, "optional": True} for p in others]
 
 
 def _leave(conv, event):

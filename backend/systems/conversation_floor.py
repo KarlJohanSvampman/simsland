@@ -231,6 +231,9 @@ def _name(c):
 
 
 def _end(world, conv, reason):
+    from cpl import shadow as _cpl_shadow                    # CPL_MODE=on: an ending by time or length is CPL's
+    if not _cpl_shadow.legacy_end_allowed(world, conv, reason):
+        return
     from brain.conversations import _archive_conversation
     f = conv.get("floor")
     if f:

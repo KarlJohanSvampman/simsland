@@ -1,6 +1,9 @@
 """
-cpl/shadow.py -- CPL_MODE=shadow: CPL follows the legacy conversation path and changes nothing outside its own
-entities (docs/cpl_implementation_plan.md section 11).
+cpl/shadow.py -- CPL follows the legacy conversation path (docs/cpl_implementation_plan.md section 11).
+
+CPL_MODE=shadow: it changes nothing outside its own entities. CPL_MODE=on: the same following, and CPL decides when
+a conversation ends by time or length (its policies) -- the legacy path's own such endings are held back
+(legacy_end_allowed), and when CPL ends one the legacy conversation ends with it (on_cpl_end).
 
 The legacy path still decides everything. CPL is told what happened, synchronously, at the points where it happens:
 
@@ -28,6 +31,12 @@ LEGACY_REASON = {
     "timed_out": "timeout", "left": "participant_left", "no_response": "abandoned",
 }
 
+# CPL's reason -> the legacy reason readers of a legacy ending know (archive, memories of being ignored, ...)
+LEGACY_FOR = {"abandoned": "ignored", "timeout": "timed_out", "unavailable": "participant_gone",
+              "participant_left": "left", "angry_withdrawal": "left", "question_answered": "resolved",
+              "request_rejected": "resolved", "request_fulfilled": "resolved", "mutual_agreement": "resolved",
+              "topic_exhausted": "resolved", "declined": "declined"}
+
 _PURPOSE_BY_ACT = {
     "question": "question", "ask": "question", "micro_request": "request", "request": "request",
     "flirt": "romantic", "compliment": "social", "smalltalk": "social", "joke": "social", "brag": "social",
@@ -38,7 +47,48 @@ _PURPOSE_BY_ACT = {
 
 
 def active(world):
-    return config.mode(world) == "shadow"
+    """CPL follows the legacy path: in shadow mode only to compare, in "on" mode to decide."""
+    return config.mode(world) in ("shadow", "on")
+
+
+def deciding(world):
+    return config.mode(world) == "on"
+
+
+# CPL_MODE=on: endings by time and length are CPL's (its policies and timers, cpl/policies.py) -- the legacy path's
+# own ones are held back. A legacy ending for something that happened (settled, someone left or gone) still ends it.
+CPL_OWNED_ENDINGS = {"timed_out", "no_response", "idle", "lapsed", "ignored"}
+
+
+def legacy_end_allowed(world, legacy, reason):
+    """systems/conversation_floor.py::_end asks first: in "on" mode a time/length ending is CPL's to make."""
+    if not deciding(world) or legacy.get("_cpl_ending") or reason not in CPL_OWNED_ENDINGS:
+        return True
+    conv = _cpl_for(world, legacy.get("id"))
+    if conv is None or conv.get("state") in _FINAL:
+        return True                          # CPL has no live copy of it: nothing to defer to
+    if not legacy.get("_cpl_held"):
+        legacy["_cpl_held"] = True
+        st = _stats(world)
+        st["held_back"] = st.get("held_back", 0) + 1
+    return False
+
+
+def on_cpl_end(world, conv, event):
+    """CPL ended a conversation by itself (its timer, a turn): in "on" mode the legacy one ends with it."""
+    if not deciding(world) or event.get("type") == "force_resolve" or not conv.get("legacy_id"):
+        return
+    legacy = (world.get("conversations") or {}).get(conv["legacy_id"])
+    if not legacy or not legacy.get("active"):
+        return
+    from systems.conversation_floor import _end
+    legacy["_cpl_ending"] = True
+    try:
+        _end(world, legacy, LEGACY_FOR.get(conv.get("reason"), f"cpl_{conv.get('reason')}"))
+    finally:
+        legacy.pop("_cpl_ending", None)
+    st = _stats(world)
+    st["cpl_ended"] = st.get("cpl_ended", 0) + 1
 
 
 def _stats(world):
@@ -146,7 +196,9 @@ def on_unreachable(world, speaker, listener, medium, topic, utterance=None):
 
 
 def on_legacy_end(world, legacy, reason):
-    if not active(world) or not legacy:
+    if not active(world) or not legacy or legacy.get("_cpl_ending"):
+        if legacy is not None and legacy.get("_cpl_ending"):
+            (world.get("cpl_legacy_map") or {}).pop(legacy.get("id"), None)
         return
     try:
         st = _stats(world)

@@ -745,3 +745,21 @@ scripted Turn outputs. Pure modules (state machine, codec, policies, context) ge
   or a reject. `to_event` turns a decision into its state-machine event. `tests/test_cpl_codec.py` (21 checks).
   Next: invitations as PENDING with CPL deciding (step 3, `CPL_MODE=on`), the `cpl.message_delivered` adapter for
   the per-line side effects (step 4), and these lines added to the decision prompt.
+- **C6 decided (2026-11-14): keep the looser defaults** (`cpl/policies.py`).
+- **Phase 1, step 3: `CPL_MODE=on` decides when a conversation ends (done).**
+  - The legacy path's time and length endings (`timed_out`, `no_response`, `idle`, `lapsed`, `ignored`) are held
+    back while CPL has a live copy (`shadow.legacy_end_allowed`, asked first by `conversation_floor._end`).
+  - When CPL ends a conversation, the legacy one ends with it, under the legacy reason readers know
+    (`shadow.on_cpl_end`).
+  - Endings for something that actually happened (settled, someone left or gone) still come from the legacy path,
+    and CPL's copy is closed with them.
+  - Two new timers make sure a conversation ends even if nobody speaks: `idle` (re-armed by every line, 120 s face
+    to face) and `cap` (the hard cap, set when the conversation starts; it also ends a pause).
+  - Determinism: `off` and `shadow` are unchanged.
+  - Social run under `on`: no errors. Conversations ran to 10–11 lines where legacy cut them at 6, and every one
+    ended with a CPL reason (question answered, topic exhausted, no answer; plus 9 declined invitations). 6 legacy
+    endings were held back, and CPL ended 4 conversations itself. Nothing was left live past its cap.
+  - Known for Phase 2: an initiator still speaks a second line before the invitation is answered (CPL rejects it as
+    a turn, but the legacy path lets it through). The memories that come with "ignored" are written before the
+    legacy end is held back.
+  - `tests/test_cpl_on.py`.

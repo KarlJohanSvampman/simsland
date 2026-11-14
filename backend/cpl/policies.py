@@ -19,6 +19,7 @@ DEFAULT = {
     "reply_attempts": 2,     # unanswered this many times: the conversation is abandoned
     "pause_s": 300,          # a pause longer than this ends the sitting (INTERRUPTED)
     "close_s": 20,           # winding down: the closing lines, or this long
+    "idle_s": 120,           # nobody has said anything for this long: it's over (brain/conversations.py's idle timeout)
     "max_lines": 6,
     "max_seconds": 240,
 }
@@ -41,9 +42,9 @@ BY_PURPOSE = {
 BY_CHANNEL = {
     Channel.CALL: {"invite_s": 30},                              # it rings, then it doesn't
     Channel.TEXT: {"invite_s": 6 * 3600, "reply_s": 6 * 3600, "reply_attempts": 1, "pause_s": 24 * 3600,
-                   "close_s": 3600, "max_seconds": 24 * 3600},
+                   "close_s": 3600, "idle_s": 24 * 3600, "max_seconds": 24 * 3600},
     Channel.EMAIL: {"invite_s": 48 * 3600, "reply_s": 48 * 3600, "reply_attempts": 1, "pause_s": 7 * 86400,
-                    "close_s": 86400, "max_seconds": 14 * 86400},
+                    "close_s": 86400, "idle_s": 7 * 86400, "max_seconds": 14 * 86400},
 }
 
 URGENT = {"invite_s": 20, "reply_s": 20}
