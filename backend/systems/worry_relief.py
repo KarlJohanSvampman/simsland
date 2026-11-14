@@ -149,32 +149,44 @@ def tick_focus_checks(world):
     focus, and roll for an abort when they are in the middle of something that needs more focus than they have."""
     tick = world.get("tick", 0)
     for c in world.get("characters", {}).values():
-        if c.get("is_workplace_npc") or c.get("is_service_worker") or c.get("alive") is False:
-            continue
-        if not c.get("worry_cases"):
-            continue
-        avail = wc.focus_available(c, world)
-        from systems.worry_breakdown import tick_breakdown, in_breakdown
-        tick_breakdown(c, world, avail)                   # starts, steps or ends a breakdown episode
-        if in_breakdown(c):
-            continue                                       # nothing else applies while they are falling apart
-        sync_mitigation(c, world, avail)
-        act = c.get("activity")
-        if not act or act.get("phase") != "using":
-            continue
-        req = required_focus(world, act.get("type"))
-        if not req:
-            continue
-        due = act.get("_focus_roll")
-        if due is None:
-            act["_focus_roll"] = tick + ROLL_EVERY_TICKS
-            continue
-        if tick < due:
-            continue
+        focus_check_for(c, world)
+
+
+def focus_check_active(c, world):
+    """A worried character (core/flow.py PERCHAR `focus_check`)."""
+    return bool(c.get("worry_cases")) and not (c.get("is_workplace_npc") or c.get("is_service_worker")
+                                               or c.get("alive") is False)
+
+
+def focus_check_for(c, world):
+    """One minute of focus for one worried character."""
+    tick = world.get("tick", 0)
+    if c.get("is_workplace_npc") or c.get("is_service_worker") or c.get("alive") is False:
+        return
+    if not c.get("worry_cases"):
+        return
+    avail = wc.focus_available(c, world)
+    from systems.worry_breakdown import tick_breakdown, in_breakdown
+    tick_breakdown(c, world, avail)                   # starts, steps or ends a breakdown episode
+    if in_breakdown(c):
+        return                                       # nothing else applies while they are falling apart
+    sync_mitigation(c, world, avail)
+    act = c.get("activity")
+    if not act or act.get("phase") != "using":
+        return
+    req = required_focus(world, act.get("type"))
+    if not req:
+        return
+    due = act.get("_focus_roll")
+    if due is None:
         act["_focus_roll"] = tick + ROLL_EVERY_TICKS
-        shortfall = max(0, min(100, req - avail))
-        if shortfall and random.random() * 100.0 < shortfall:
-            abort_activity(c, world, act, req, avail)
+        return
+    if tick < due:
+        return
+    act["_focus_roll"] = tick + ROLL_EVERY_TICKS
+    shortfall = max(0, min(100, req - avail))
+    if shortfall and random.random() * 100.0 < shortfall:
+        abort_activity(c, world, act, req, avail)
 
 
 def abort_activity(c, world, act, req, avail):

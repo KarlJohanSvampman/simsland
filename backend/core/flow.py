@@ -39,14 +39,15 @@ def DUTY(name, run, every, why, active):
     return {"name": name, "run": run, "kind": "duty", "every": every, "active": active, "why": why}
 
 
-def PERCHAR(name, run, every, why, active):
+def PERCHAR(name, run, every, why, active, cap=None):
     """A character's own periodic work (step 5a): run(c, world) for each character it concerns, on the old PROCESS's
     timer (same interval, same offset -- same place in the step), but only over its MEMBERS: the characters for whom
     active(c, world) -- a cheap check of the character itself -- is true, or returns a sim time from which it will be
     (a member skipped until then: the job needs no wake of its own). A character's own update (and a deferred
     character's) adds it as a member or drops it (run_perchar); the timer drops anyone no longer active. Nobody else
-    is looked at. Replaces a PROCESS that swept every character."""
-    return {"name": name, "run": run, "kind": "perchar", "every": every, "active": active, "why": why}
+    is looked at. Replaces a PROCESS that swept every character. `cap`: at most that many run per firing (the first in
+    the characters' order); the rest wait for the next one."""
+    return {"name": name, "run": run, "kind": "perchar", "every": every, "active": active, "why": why, "cap": cap}
 
 
 def PROCESS(name, run, every, why, offset=0):
@@ -138,6 +139,8 @@ JOBS = [
     # ── processes: time passing ────────────────────────────────────────────────────────────────────────────────────
     PROCESS("relationships", "_job_relationships", 15 * SECOND, "time spent near each other builds familiarity"),
     PROCESS("child_care", "_job_child_care", 15 * SECOND, "children's needs and who is looking after them"),
+    PERCHAR("dependent_checks", "systems.dependent_tracking:tick_dependent_checks", 15 * SECOND,
+            "parents check on their dependents", "systems.dependent_tracking:dependent_checks_active"),
     PROCESS("conflicts", "_job_conflicts", 5 * SECOND, "an argument or fight in progress moves on"),
     DUTY("grapples", "_job_grapples", 5 * SECOND, "a grapple in progress moves on", "systems.duties:grapples_active"),
     DUTY("sports_watching", "_job_reading_2", 5 * SECOND, "games kick off (from each fixture's timer)", "systems.sports:kickoff_pending"),
@@ -162,10 +165,15 @@ JOBS = [
     PROCESS("market", "_job_market", 20 * SECOND, "prices, stocks, production and consumption"),
     PERCHAR("social_odor", "systems.social_odor:apply_odor_social_pressure", 20 * SECOND,
             "a smell bothers the people near it", "systems.social_odor:odor_active"),
-    PROCESS("domestic_control", "_job_domestic_control", 24 * SECOND, "controlling partners' tactics, quid pro quo, "
-            "emotional control (their own medium cadence)"),
+    PERCHAR("domestic_control", "systems.domestic_control:domestic_control_for", 24 * SECOND,
+            "controlling partners' tactics", "systems.domestic_control:domestic_control_active"),
+    PERCHAR("quid_pro_quo", "systems.domestic_control:quid_pro_quo_for", 24 * SECOND,
+            "gatekeepers press those who depend on them", "systems.domestic_control:quid_pro_quo_active"),
+    PERCHAR("emotional_control", "systems.domestic_control:emotional_control_for", 24 * SECOND,
+            "emotional control of a partner", "systems.domestic_control:emotional_control_active"),
     PERCHAR("libido", "systems.libido:libido_for", 24 * SECOND, "libido moves", "systems.libido:libido_active"),
-    PROCESS("mentality_compilation", "_job_mentality_compilation", 25 * SECOND, "mentalities compile in the background"),
+    PERCHAR("mentality_compilation", "systems.mentality:mentality_for", 25 * SECOND,
+            "mentalities compile in the background", "systems.mentality:mentality_active", cap=5),
     PROCESS("influence_exposure", "_job_influence_exposure", 30 * SECOND, "being around opinions wears on you"),
     PERCHAR("psychosis", "systems.psychosis:tick_psychosis", 30 * SECOND, "psychosis episodes (while the mechanic is on)",
             "systems.psychosis:psychosis_possible"),
@@ -175,16 +183,20 @@ JOBS = [
     PROCESS("business_support", "_job_business_support", 30 * SECOND, "businesses answer their inboxes"),
     PERCHAR("lt_needs", "systems.lt_needs:lt_needs_tick", 30 * SECOND, "long-term needs grow more pressing",
             "systems.lt_needs:lt_needs_active"),
-    PROCESS("cleanliness", "_job_cleanliness", 30 * SECOND, "rooms and clothes get dirty"),
+    PROCESS("cleanliness", "_job_cleanliness", 30 * SECOND, "rooms get dirty"),
+    PERCHAR("personal_mess", "systems.chores:personal_mess_for", 30 * SECOND,
+            "mess bothers people; clothes get dirty", "systems.chores:personal_mess_active"),
     PERCHAR("addictions", "systems.addictions:addictions_for", HOUR, "cravings, hourly",
             "systems.addictions:addictions_active"),
     PROCESS("cookware", "_job_cookware", 30 * SECOND, "dinner planning and who cooks"),
     PROCESS("emergencies", "_job_arrests", 30 * SECOND, "incidents happen, are reported, responders arrive, arrests"),
     PROCESS("weather", "_job_weather", MINUTE, "the weather changes"),
-    PROCESS("focus_check", "_job_focus_check", MINUTE, "worry leaves less focus for what they are doing"),
-    PROCESS("worry_poll", "_job_worry_poll", MINUTE, "each character's worries are re-read against new evidence about "
-            "once an hour, staggered (candidate: feed it memory.stored instead)"),
-    PROCESS("grudges", "_job_grudges", MINUTE, "grudges fade or escalate"),
+    PERCHAR("focus_check", "systems.worry_relief:focus_check_for", MINUTE,
+            "worry leaves less focus for what they are doing", "systems.worry_relief:focus_check_active"),
+    PERCHAR("worry_poll", "systems.worry_cases:worry_poll_for", MINUTE, "each character's worries are re-read against "
+            "new evidence about once an hour, staggered", "systems.worry_cases:worry_poll_active"),
+    PERCHAR("grudges", "systems.grudges:grudges_for", MINUTE, "grudges fade or escalate",
+            "systems.grudges:grudges_active"),
     PERCHAR("exhaustion", "systems.exhaustion:exhaustion_for", MINUTE, "strain builds; offers to take over",
             "systems.exhaustion:exhaustion_active"),
     PROCESS("appliance_degradation", "_job_appliance_degradation", MINUTE, "appliances wear out"),
@@ -200,14 +212,19 @@ JOBS = [
             "panic builds while someone is somewhere too small", "systems.claustrophobia:claustrophobia_active"),
     PROCESS("calendar_events", "_job_calendar_events", MINUTE, "reminders come due at their time; clauses, payouts, "
             "insurance (day-gated inside)"),
+    PERCHAR("jail", "systems.law:process_jail", MINUTE, "released from jail when the time is up",
+            "systems.law:jail_active"),
     PROCESS("trials", "_job_trials", MINUTE, "court dates, jail releases; prison reporting and check-ins (day-gated)"),
     PROCESS("rumors", "_job_rumors", 5 * MINUTE, "posts are discovered; old talk forgotten"),
     PROCESS("election", "_job_election", 5 * MINUTE, "elections and legislation"),
     PROCESS("faction", "_job_faction", 5 * MINUTE, "faction, public-figure and social influence nudge beliefs"),
     PROCESS("hierarchy", "_job_hierarchy", 5 * MINUTE, "standing in groups"),
     PROCESS("migration", "_job_migration", 5 * MINUTE, "households weigh moving away"),
-    PROCESS("persona_expectations", "_job_persona_expectations", 5 * MINUTE, "what close kin expect of each other"),
+    PERCHAR("persona_expectations", "systems.persona_expectations:persona_expectations_for", 5 * MINUTE,
+            "what close kin expect of each other", "systems.persona_expectations:persona_expectations_active"),
     PROCESS("kids_play", "_job_kids_play", 10 * MINUTE, "urges to play end; agreed play starts"),
+    PERCHAR("play_urges", "systems.kids_play:play_urge_for", 10 * MINUTE, "a free child may feel like playing with a "
+            "friend nearby", "systems.kids_play:play_urge_active"),
 
     # ── jobs that live in their own modules ────────────────────────────────────────────────────────────────────────
     CLOCK("feelingsday", "systems.feelings:_daily", "the daily standing snapshot", daily=6 * HOUR),
@@ -292,6 +309,8 @@ def install(module=None):
             scheduler.register_recurring(job["name"], fn, every=job["every"], offset=job.get("offset", 0))
         elif job["kind"] == "perchar":
             _perchar_fns[job["name"]] = (fn, _resolve(module, job["active"]), job["every"])
+            if job.get("cap"):
+                _perchar_caps[job["name"]] = job["cap"]
             scheduler.register_recurring(job["name"], _perchar_timer(job["name"]), every=job["every"])
         elif job["kind"] == "duty":
             _duty_fns[job["name"]] = (fn, _resolve(module, job["active"]))
@@ -313,6 +332,7 @@ def install(module=None):
 
 # ── per-character jobs ───────────────────────────────────────────────────────────────────────────────────────────────
 _perchar_fns = {}        # name -> (run fn(c, world), active fn(c, world), every)
+_perchar_caps = {}       # name -> most members run per firing
 
 
 def _members(world, name):
@@ -363,6 +383,7 @@ def _perchar_timer(name):
         fn, active, _every = _perchar_fns[name]
         chars = world.get("characters") or {}
         order = {cid: n for n, cid in enumerate(dict.keys(chars))}
+        left = _perchar_caps.get(name)
         for cid in sorted(due, key=lambda i: order.get(i, 1 << 30)):
             c = chars.get(cid) if cid in order else None
             try:
@@ -373,6 +394,10 @@ def _perchar_timer(name):
                 if at > now:
                     members[cid] = at
                     continue
+                if left is not None:
+                    if left <= 0:
+                        break
+                    left -= 1
                 fn(c, world)
                 after = _check(active, c, world)          # done for now? then due again only from when it says
                 if after is None:

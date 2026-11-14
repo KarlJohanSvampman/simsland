@@ -60,22 +60,37 @@ def tick_domestic_control(world):
         chars = {c["id"]: c for c in chars}
 
     for cid, c in chars.items():
-        if c.get("is_offscreen"):
-            continue
-        traits = set(c.get("traits", []) + c.get("personality_traits", []))
-        if not ({"controlling_partner", "domestic_abuser"} & traits):
-            continue
+        domestic_control_for(c, world)
 
-        control_score = 0.6 if "controlling_partner" in traits else 0.0
-        control_score = max(control_score, 0.9 if "domestic_abuser" in traits else 0.0)
 
-        # Find intimate partner(s)
-        partners = _find_intimate_partners(c, chars)
-        for partner_id in partners:
-            partner = chars.get(partner_id)
-            if not partner:
-                continue
-            _apply_control_tactics(c, partner, control_score, world)
+def domestic_control_active(c, world):
+    """Has controlling traits (core/flow.py PERCHAR `domestic_control`)."""
+    return not c.get("is_offscreen") and bool({"controlling_partner", "domestic_abuser"} & _traits(c))
+
+
+def _traits(c):
+    return set(c.get("traits", []) + c.get("personality_traits", []))
+
+
+def domestic_control_for(c, world):
+    chars = world.get("characters", {})
+    cid = c.get("id")
+    if c.get("is_offscreen"):
+        return
+    traits = set(c.get("traits", []) + c.get("personality_traits", []))
+    if not ({"controlling_partner", "domestic_abuser"} & traits):
+        return
+
+    control_score = 0.6 if "controlling_partner" in traits else 0.0
+    control_score = max(control_score, 0.9 if "domestic_abuser" in traits else 0.0)
+
+    # Find intimate partner(s)
+    partners = _find_intimate_partners(c, chars)
+    for partner_id in partners:
+        partner = chars.get(partner_id)
+        if not partner:
+            continue
+        _apply_control_tactics(c, partner, control_score, world)
 
 
 # ── Target selection helper for impulse system ─────────────────────────────
@@ -813,20 +828,31 @@ def tick_quid_pro_quo(world):
         chars = {c["id"]: c for c in chars}
 
     for cid, c in chars.items():
-        if c.get("is_offscreen"):
-            continue
-        traits = set(c.get("traits", []) + c.get("personality_traits", []))
-        if "power_gatekeeper" not in traits:
-            continue
+        quid_pro_quo_for(c, world)
 
-        # Find professionally dependent contacts
-        for oid, rel in c.get("relationships", {}).items():
-            if oid not in chars:
-                continue
-            target = chars[oid]
-            if _is_professionally_dependent(target, c, chars):
-                if random.random() < QP_BASE_CHANCE:
-                    _apply_qp_pressure(c, target, world)
+
+def quid_pro_quo_active(c, world):
+    """A power gatekeeper (core/flow.py PERCHAR `quid_pro_quo`)."""
+    return not c.get("is_offscreen") and "power_gatekeeper" in _traits(c)
+
+
+def quid_pro_quo_for(c, world):
+    chars = world.get("characters", {})
+    cid = c.get("id")
+    if c.get("is_offscreen"):
+        return
+    traits = set(c.get("traits", []) + c.get("personality_traits", []))
+    if "power_gatekeeper" not in traits:
+        return
+
+    # Find professionally dependent contacts
+    for oid, rel in c.get("relationships", {}).items():
+        if oid not in chars:
+            continue
+        target = chars[oid]
+        if _is_professionally_dependent(target, c, chars):
+            if random.random() < QP_BASE_CHANCE:
+                _apply_qp_pressure(c, target, world)
 
 
 def _is_professionally_dependent(target, gatekeeper, chars):
@@ -968,27 +994,39 @@ def tick_emotional_control(world):
         chars = {c["id"]: c for c in chars}
 
     for cid, c in chars.items():
-        if c.get("is_offscreen"):
-            continue
-        traits = set(c.get("traits", []) + c.get("personality_traits", []))
-        if not ({"emotionally_controlling", "emasculator", "financial_dominator"} & traits):
-            continue
+        emotional_control_for(c, world)
 
-        control_score = max(
-            0.75 if "emotionally_controlling" in traits else 0.0,
-            0.80 if "emasculator"             in traits else 0.0,
-        )
 
-        partners = _find_intimate_partners(c, chars)
-        for pid in partners:
-            partner = chars.get(pid)
-            if not partner or partner.get("sex") not in ("male", "intersex"):
-                continue   # this pattern primarily targets male partners
-            _apply_emotional_control_tactics(c, partner, control_score, world)
+def emotional_control_active(c, world):
+    """Emotionally controlling (core/flow.py PERCHAR `emotional_control`)."""
+    return not c.get("is_offscreen") and bool({"emotionally_controlling", "emasculator", "financial_dominator"}
+                                              & _traits(c))
 
-        # Financial dominance — boost controller's career drive
-        if "financial_dominator" in traits or "emotionally_controlling" in traits:
-            _maintain_financial_dominance(c, chars, world)
+
+def emotional_control_for(c, world):
+    chars = world.get("characters", {})
+    cid = c.get("id")
+    if c.get("is_offscreen"):
+        return
+    traits = set(c.get("traits", []) + c.get("personality_traits", []))
+    if not ({"emotionally_controlling", "emasculator", "financial_dominator"} & traits):
+        return
+
+    control_score = max(
+        0.75 if "emotionally_controlling" in traits else 0.0,
+        0.80 if "emasculator"             in traits else 0.0,
+    )
+
+    partners = _find_intimate_partners(c, chars)
+    for pid in partners:
+        partner = chars.get(pid)
+        if not partner or partner.get("sex") not in ("male", "intersex"):
+            continue   # this pattern primarily targets male partners
+        _apply_emotional_control_tactics(c, partner, control_score, world)
+
+    # Financial dominance — boost controller's career drive
+    if "financial_dominator" in traits or "emotionally_controlling" in traits:
+        _maintain_financial_dominance(c, chars, world)
 
 
 def _apply_emotional_control_tactics(controller, partner, control_score, world):

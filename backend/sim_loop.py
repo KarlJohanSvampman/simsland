@@ -85,7 +85,7 @@ from systems.media      import generate_news
 from brain.conversations import cleanup_conversations
 from systems.emergency  import trigger_incident, resolve, tick_fire_incidents, auto_report_incidents   # resolve polls arrival ticks
 from systems.health     import apply_severity_consequences
-from systems.law        import process_jail, process_trials, maybe_arrest_from_incidents, process_prison_reporting
+from systems.law        import process_trials, maybe_arrest_from_incidents, process_prison_reporting
 from systems.jobs       import generate_job_listings, tick_job_market, maybe_fire, advance_job_application, init_company_slots
 from systems.driver_license import advance_driver_license, maybe_practice_with_companion
 from systems.postal_service     import update_postal_service
@@ -114,7 +114,6 @@ from systems.grapple         import process_grapples
 from systems.social_contracts  import check_contract_violations
 from systems.social_rules      import cleanup_expired_rule_exceptions
 from systems.worries           import decay_worries
-from systems.persona_expectations import tick_persona_expectations
 from systems.intimate_item_discovery import tick_discovery_checks
 from systems.stories import decay_stories
 from systems.workplace_reputation import decay_workplace_views
@@ -139,7 +138,6 @@ from systems.contagion       import tick_contagion_location, age_food_items
 from systems.child_care      import tick_child_needs
 from systems.child_welfare   import tick_child_welfare
 from systems.child_disclosure import tick_child_disclosure
-from systems.dependent_tracking import tick_dependent_checks
 from systems.bedroom_assignment import tick_bedroom_assignments
 from systems.plants           import tick_plants
 from systems.body_composition import tick_body_composition
@@ -158,7 +156,7 @@ from systems.envy       import tick_envy
 from systems.trauma     import tick_trauma
 from systems.exercise        import tick_exercise
 from systems.impulse         import tick_impulse, sync_anger_from_grievances, add_anger_pressure
-from systems.domestic_control import tick_domestic_control, tick_quid_pro_quo, check_victim_revenge, tick_emotional_control
+from systems.domestic_control import check_victim_revenge
 from systems.religious_repression import tick_religious_repression
 from systems.pregnancy import tick_pregnancy
 from systems.harassment import tick_harassment, tick_harassment_daily
@@ -963,11 +961,6 @@ def _job_arrests(world, entry):
             process_return(c, world)
 
 
-def _job_domestic_control(world, entry):
-    """Controlling partners: tactics, quid pro quo, emotional control (their own medium cadence)."""
-    tick_domestic_control(world)
-    tick_quid_pro_quo(world)
-    tick_emotional_control(world)
 
 
 
@@ -1085,10 +1078,6 @@ def _job_household_monitoring(world, entry):
     tick_babysitting_requests(world)
 
 
-def _job_mentality_compilation(world, entry):
-    """Scheduled job `mentality_compilation` (was an every() block in tick()); see core/scheduler.py."""
-    from systems.mentality import tick_mentality_compilation
-    tick_mentality_compilation(world)
 
 
 def _job_market(world, entry):
@@ -1156,10 +1145,8 @@ def _job_fires(world, entry):
 
 
 def _job_trials(world, entry):
-    """Scheduled job `trials` (was an every() block in tick()); see core/scheduler.py."""
-    characters = [c for c in world.get("characters", {}).values() if not c.get("is_workplace_npc")]
-    for c in characters:
-        process_jail(c, world)     # emits character_released
+    """Scheduled job `trials`: court dates, prison reporting, long-stay check-ins (a release from jail is the PERCHAR
+    job `jail`)."""
     process_trials(world)          # emits character_jailed / character_acquitted
     process_prison_reporting(world)  # mail-scheduled self-surrender + failure-to-appear
     from systems.offgrid import tick_long_stay_checkins
@@ -1250,11 +1237,6 @@ def _job_contract_checks(world, entry):
     decay_worries(world)  # passive suspicion decay, see worries.py
 
 
-def _job_worry_poll(world, entry):
-    """Scheduled job `worry_poll`: each character looks over what happened in the last hour and lets it
-    refresh or start worries (systems/worry_cases.py)."""
-    from systems.worry_cases import tick_worry_polls
-    tick_worry_polls(world)
 
 
 def _job_neighbours(world, entry):
@@ -1265,9 +1247,10 @@ def _job_neighbours(world, entry):
 
 
 def _job_kids_play(world, entry):
-    """Scheduled job `kids_play`: free children with a free friend nearby get the urge to play (systems/kids_play.py)."""
-    from systems.kids_play import tick_kids_play
-    tick_kids_play(world)
+    """Scheduled job `kids_play`: urges to play end, agreed play starts (systems/kids_play.py)."""
+    from systems.kids_play import settle_play_urges, start_agreed_play
+    settle_play_urges(world)
+    start_agreed_play(world)                # the urges themselves: the PERCHAR job `play_urges`
 
 
 def _job_introductions(world, entry):
@@ -1286,36 +1269,16 @@ def _job_rumors(world, entry):
     tick_rumors(world)
 
 
-def _job_grudges(world, entry):
-    """Scheduled job `grudges`: open grudges fade, jab, escalate and nudge the offender to apologise (systems/grudges.py)."""
-    from systems.grudges import tick_grudges
-    tick_grudges(world)
 
 
-def _job_focus_check(world, entry):
-    """Scheduled job `focus_check`: worried characters' mitigation intentions and the 3-minute concentration
-    roll (systems/worry_relief.py)."""
-    from systems.worry_relief import tick_focus_checks
-    tick_focus_checks(world)
 
 
-def _job_persona_expectations(world, entry):
-    """Scheduled job `persona_expectations` (was an every() block in tick()); see core/scheduler.py."""
-    tick_persona_expectations(world)  # value-alignment clashes between close kin
 
 
 def _job_cleanliness(world, entry):
     """Scheduled job `cleanliness` (was an every() block in tick()); see core/scheduler.py."""
-    characters = [c for c in world.get("characters", {}).values() if not c.get("is_workplace_npc")]
-    from systems.chores import tick_room_cleanliness_decay, maybe_react_to_mess
-    from systems.refurnishing import maybe_want_to_redecorate
-    from systems.clothing import tick_clothing_dirty
-    tick_room_cleanliness_decay(world)
-    for c in characters:
-        if c.get("alive", True) and not c.get("off_grid"):
-            maybe_react_to_mess(c, world)
-            maybe_want_to_redecorate(c, world)
-            tick_clothing_dirty(c, world)
+    from systems.chores import tick_room_cleanliness_decay
+    tick_room_cleanliness_decay(world)      # each character's own part: the PERCHAR job `personal_mess`
 
 
 def _job_socioeconomics(world, entry):
@@ -1422,14 +1385,11 @@ def _job_contagion(world, entry):
 
 
 def _job_child_care(world, entry):
-    """Scheduled job `child_care` (was an every() block in tick()); see core/scheduler.py."""
-    characters = [c for c in world.get("characters", {}).values() if not c.get("is_workplace_npc")]
+    """Scheduled job `child_care`: children's needs, welfare and disclosure (each parent's checks on its dependents are
+    the PERCHAR job `dependent_checks`)."""
     tick_child_needs(world)
     tick_child_welfare(world)
     tick_child_disclosure(world)
-    for c in characters:
-        if c.get("dependents"):
-            tick_dependent_checks(c, world)
 
 
 def _job_bedroom_assignment(world, entry):

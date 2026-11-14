@@ -143,18 +143,35 @@ def tick_kids_play(world):
     from brain.intentions import add_intention
     settle_play_urges(world)
     start_agreed_play(world)
-    tick = world.get("tick", 0)
     for c in list(world.get("characters", {}).values()):
-        friend = want_to_play(world, c)
-        if friend is None or random.random() >= PLAY_CHANCE:
-            continue
-        c.setdefault("_play_log", {})[friend["id"]] = tick
-        add_intention(c, {
-            "type": "play_with_friend",
-            "category": "social",
-            "priority": PLAY_PRIORITY,
-            "target_id": friend["id"],
-            "source": "kids_play",
-            "reason": f"{friend['name']} lives close by and you feel like playing together -- go and ask "
-                      f"{friend['name']} if they can play, or invite them over.",
-        })
+        play_urge_for(c, world)
+
+
+def play_urge_active(c, world):
+    """A child (core/flow.py PERCHAR `play_urges`) -- from the start of the play hours when it is outside them."""
+    if not _is_child(c):
+        return False
+    hour = (world.get("calendar") or {}).get("hour")
+    if hour is not None and not (PLAY_HOURS[0] <= hour < PLAY_HOURS[1]):
+        from core.clock import next_time_of_day, HOUR
+        return next_time_of_day(world, PLAY_HOURS[0] * HOUR)
+    return True
+
+
+def play_urge_for(c, world):
+    """A free child with a free friend nearby may get the urge to play with them."""
+    from brain.intentions import add_intention
+    tick = world.get("tick", 0)
+    friend = want_to_play(world, c)
+    if friend is None or random.random() >= PLAY_CHANCE:
+        return
+    c.setdefault("_play_log", {})[friend["id"]] = tick
+    add_intention(c, {
+        "type": "play_with_friend",
+        "category": "social",
+        "priority": PLAY_PRIORITY,
+        "target_id": friend["id"],
+        "source": "kids_play",
+        "reason": f"{friend['name']} lives close by and you feel like playing together -- go and ask "
+                  f"{friend['name']} if they can play, or invite them over.",
+    })

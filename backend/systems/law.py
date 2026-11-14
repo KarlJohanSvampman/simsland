@@ -357,3 +357,15 @@ def process_prison_reporting(world):
 # So maybe_arrest_from_incidents()'s type filter also recognizes a real
 # failure_to_appear incident (see process_prison_reporting() above).
 _CRIME_CAREER_TYPES = _CRIME_CAREER_TYPES + ("failure_to_appear",)
+
+
+def jail_active(c, world):
+    """In jail (core/flow.py PERCHAR `jail`): due from the release tick."""
+    legal = c.get("legal") or {}
+    if legal.get("status") != "jailed":
+        return False
+    until = legal.get("jail_until") or 0
+    if world.get("tick", 0) >= until:
+        return True
+    from brain import agent_wake
+    return agent_wake.at_tick(world, until)
