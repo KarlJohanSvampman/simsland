@@ -699,3 +699,24 @@ scripted Turn outputs. Pure modules (state machine, codec, policies, context) ge
 5. **Phase 1 prompt:** add the `ANSWERS/ACT/NEXT` lines to the existing decision prompt first (lower risk), and
    build the compact turn prompt in Phase 5 as planned? Or start with the compact prompt, since that's where most
    of the token savings come from?
+
+---
+
+## Progress log
+
+- **Decisions (2026-11-14).** C1: live state on the world, as entities (`cpl_conversations`, `cpl_requests`), with
+  Postgres as an append-only archive. C4: invitations are PENDING conversations, and declines are recorded. C7:
+  commitments are social contracts. Phase 1 prompt: extend the existing decision prompt first.
+- **Phase 1, step 1 (done).** `backend/cpl/`:
+  - `model/enums.py`
+  - `protocol/envelope.py`: pydantic. The payload is validated by message type, and the model never writes ids.
+  - `policies.py`: purpose × channel × urgency. Today's 6 lines / 4 minutes is the casual default. Reaching it
+    winds down; twice it is a hard stop.
+  - `state_machine.py`: a pure transition table whose effects are data.
+  - `store.py`: entities on the world, ids from a world counter (deterministic), messages capped on their
+    conversation, duplicates dropped by message id, requests that outlive their conversation.
+  - `conversations.py`: carries out the effects. Timers are `cpl:<id>` on the scheduler, stamped per kind, so a
+    replaced or cancelled one is stale.
+
+  `tests/test_cpl_state_machine.py` (50 checks) covers every row of the table and the engine on a bare world.
+  Not wired into `apply_speech` yet (`CPL_MODE=off`).
