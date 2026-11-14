@@ -263,6 +263,9 @@ def _end(world, conv, reason):
 
 
 def _ignored(world, conv, speaker, holder, f, heard):
+    from cpl import shadow as _cpl_shadow                    # CPL_MODE=on: not ignored until CPL says so
+    if not _cpl_shadow.legacy_end_allowed(world, conv, "ignored"):
+        return
     tick = world.get("tick", 0)
     _end(world, conv, "ignored")
     from systems.addressing import addressed_elsewhere

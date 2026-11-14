@@ -205,6 +205,8 @@ def apply_speech(c, world, speech):
     # the recipient's inbox instead of threading a live conversation.
     medium = speech.get("medium", "in_person")
     if listener and medium == "call":
+        from cpl.lifecycle import interrupt as _cpl_interrupt   # a call to someone mid-conversation interrupts it
+        _cpl_interrupt(world, listener["id"], by=c["id"], kind="phone", channel="in_person")
         if not _parts.channel_open(world, listener, medium):
             from cpl import shadow as _cpl_shadow
             if _cpl_shadow.active(world):

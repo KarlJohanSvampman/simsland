@@ -46,9 +46,12 @@ def repeat_dropped(c, world, utterance, target_id):
 
 def floor_blocks(world, speaker_id, target_id, medium="in_person"):
     """Ball discipline (systems/conversation_floor.py): while the other person holds the floor and is still within
-    their time to respond, a line from the speaker is dropped rather than talking over them."""
+    their time to respond, a line from the speaker is dropped rather than talking over them. With CPL_MODE=on, the
+    same for an invitation not yet answered: its initiator waits (cpl/state_machine.py rejects the line anyway)."""
     if not target_id or medium not in ("in_person", "call"):
         return False
+    if pending_invitation(world, speaker_id, target_id):
+        return True
     from brain.conversations import find_conversation
     from systems.conversation_floor import blocks
     existing = find_conversation(world, [speaker_id, target_id])
@@ -70,3 +73,15 @@ def channel_open(world, listener, medium):
     from systems.personal_items import phone_is_usable
     in_meeting = world.get("tick", 0) < listener.get("_work_busy_until_tick", 0)
     return phone_is_usable(listener) and not in_meeting
+
+
+def pending_invitation(world, speaker_id, target_id):
+    """CPL_MODE=on: speaker_id opened a conversation with target_id that target_id has not answered yet."""
+    from cpl import config, store
+    if config.mode(world) != "on":
+        return False
+    for conv in store.live(world, speaker_id):
+        if conv.get("state") == "pending" and conv.get("initiator_id") == speaker_id \
+                and target_id in (conv.get("participants") or {}):
+            return True
+    return False

@@ -809,3 +809,24 @@ scripted Turn outputs. Pure modules (state machine, codec, policies, context) ge
     - recovery after a restart;
     - the template summary;
     - closing the two gaps from step 3.
+- **Phase 2, part 1: what changes a conversation from outside (done).** `cpl/lifecycle.py`.
+  - **Interruptions.** `interrupt()` is called at the doorbell (`systems/doorbell.py`), at an incoming call to
+    someone mid-conversation (face-to-face conversations only; the call itself goes on), and at the director's time
+    stop.
+    - The conversation carries the interruption, and both participants are asked what to do about it.
+    - The interrupted person's prompt says so: carry on, `NEXT: pause`, or `leave:excuse`. The next line clears it.
+  - **Unavailability.** `notify_unavailable()` is wired to the existing events: `character.offgrid`,
+    `character_arrested` / `character_jailed`, and `activity_started` for sleep or a nap. A two-person conversation
+    ends (unavailable); a larger one carries on without them.
+  - **Recovery.** `recover()` runs on `world.loaded`. It re-asks a turn whose model request was lost, and resolves
+    conversations with someone now away.
+  - **Waking.** In `on` mode, `cpl.turn_requested` wakes the character for turns nothing else would prompt: a
+    follow-up, a closing line, an interruption, a recovered turn.
+  - **Pause and resume** through the turn lines; speaking again picks the conversation up.
+  - **Template summary**, kept up to date line by line and shown on the prompt ("So far: …").
+  - **Both step-3 gaps closed in `on`.** An initiator can't talk over an unanswered invitation
+    (`participants.pending_invitation`): 0 rejected turns in the social run, down from 8. A legacy "ignored" (with
+    its memory) waits for CPL.
+  - Determinism: `off` and `shadow` unchanged. `tests/test_cpl_lifecycle.py` (21 checks).
+  - Still in Phase 2: work-shift and child-care interruptions (no clean event to hang them on yet), and a soak run
+    asserting the hard cap over a whole sim day.

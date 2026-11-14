@@ -150,6 +150,7 @@ def install():
     from core import scheduler
     scheduler.register(OWNER, on_timer)
     import cpl.archive  # noqa: F401 -- finished conversations go to the archive tables
+    import cpl.lifecycle  # noqa: F401 -- sleep, arrest, off-grid, a load: what changes a conversation from outside
 
 
 install()

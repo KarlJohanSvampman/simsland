@@ -182,11 +182,15 @@ def _on_line(world, legacy, speaker_id, utterance, speech_act):
         event = ev
         st["structured_turns"] = st.get("structured_turns", 0) + 1
     res = CV.submit(world, conv, event)
+    if res.changed and conv.get("interruption"):
+        conv["interruption"] = None                 # someone spoke: the interruption has been dealt with
     if not res.changed:
         st["rejected_turns"] += 1
         st["rejections"][res.rejected] = st["rejections"].get(res.rejected, 0) + 1
     store.append_message(world, conv, _envelope(conv, speaker_id, others, utterance, speech_act, now_ts(world),
                                                 requires))
+    from cpl.lifecycle import summarize
+    conv["context"]["summary"] = summarize(conv, world)
 
 
 def _turn_lines(world, speaker_id):

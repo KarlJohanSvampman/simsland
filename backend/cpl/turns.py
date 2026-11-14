@@ -46,15 +46,29 @@ def context_block(world, c):
                           f"{'asked' if label.startswith('Q') else 'asked for'}: {what}"
                           + (" (needs your answer)" if mine else ""))
     others = [p for p in conv["participants"] if p != c.get("id")]
+    intr = conv.get("interruption")
+    interrupted = None
+    if intr and intr.get("who") == c.get("id"):
+        interrupted = {"doorbell": "the doorbell rang", "phone": "your phone is ringing",
+                       "director_stop": "everything around you has frozen"}.get(intr.get("kind"), "you were interrupted")
     return {"conversation_id": conv["id"], "with": [_name(world, p) for p in others], "labels": labels,
-            "open": open_lines, "winding_down": bool(conv.get("winding_down")), "state": conv.get("state")}
+            "open": open_lines, "winding_down": bool(conv.get("winding_down")), "state": conv.get("state"),
+            "summary": (conv.get("context") or {}).get("summary") or "", "interrupted": interrupted,
+            "paused": conv.get("state") == "paused"}
 
 
 def prompt_section(block):
     if not block:
         return ""
     lines = [f"Conversation with {', '.join(block['with'])}:"]
+    if block.get("summary"):
+        lines.append("So far: " + block["summary"])
     lines += ["Still open: " + l for l in block["open"]] or ["Nothing is waiting for an answer."]
+    if block.get("interrupted"):
+        lines.append(f"Just now {block['interrupted']}: carry on talking, put the conversation on hold (NEXT: pause), "
+                     "or excuse yourself (NEXT: leave:excuse).")
+    if block.get("paused"):
+        lines.append("The conversation is on hold: pick it up again by speaking, or leave it (NEXT: leave:excuse).")
     if block.get("winding_down"):
         lines.append("It is time to wrap this conversation up: say your goodbye (NEXT: wrap_up) unless something new "
                      "really needs saying.")
