@@ -162,6 +162,9 @@ def _on_line(world, legacy, speaker_id, utterance, speech_act):
         lines = _turn_lines(world, speaker_id)
         if lines:
             conv["structured_lines"] = 1
+        elif deciding(world) and requires and kind in ("question", "binary_question") and utterance:
+            store.add_question(world, conv, asker_id=speaker_id, to_id=others[0] if others else None,
+                               text=utterance, source_message_id=None, now=now_ts(world))   # asked without ACT
         if lines:                                   # the opening line can ask something: tracked from the start
             from cpl.turns import apply_turn
             apply_turn(world, conv, (world.get("characters") or {})[speaker_id], lines, utterance, others,
@@ -186,6 +189,9 @@ def _on_line(world, legacy, speaker_id, utterance, speech_act):
         event = ev
         st["structured_turns"] = st.get("structured_turns", 0) + 1
         conv["structured_lines"] = conv.get("structured_lines", 0) + 1
+    if not lines and deciding(world) and requires and kind in ("question", "binary_question") and utterance:
+        store.add_question(world, conv, asker_id=speaker_id, to_id=others[0] if others else None, text=utterance,
+                           source_message_id=None, now=now_ts(world))     # a question asked without ACT: still open
     res = CV.submit(world, conv, event)
     if res.changed and conv.get("interruption"):
         conv["interruption"] = None                 # someone spoke: the interruption has been dealt with
@@ -265,6 +271,8 @@ def on_legacy_end(world, legacy, reason):
         if conv is None:
             return
         want = LEGACY_REASON.get(reason, reason)
+        if deciding(world) and conv.get("outcome_hint") and want in ("question_answered", "request_rejected"):
+            want = conv["outcome_hint"]             # "on": CPL knows what was settled better than the legacy guess
         if conv.get("state") in _FINAL:
             st["cpl_ended_first"] += 1
             got = conv.get("reason")

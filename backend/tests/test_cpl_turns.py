@@ -90,6 +90,28 @@ check("an answer to an item that isn't open answers nothing (no invented answer)
 check("NEXT leave:angry -> RESOLVED (angry withdrawal)", conv2["state"] == "resolved" and conv2["reason"] == "angry_withdrawal",
       (conv2["state"], conv2["reason"]))
 
+# ── found by the live-test run (tools/cpl_live_test.py) ──────────────────────────────────────────────────────────────
+w3 = {"tick": 0, "sim_time": 1000.0, "timers": [], "conversations": {},
+      "characters": {"theo": {"id": "theo", "name": "Theo"}, "ana": {"id": "ana", "name": "Ana"}}}
+leg3 = {"id": "L3", "participants": ["theo", "ana"], "medium": "in_person", "active": True}
+shadow.on_line(w3, leg3, "theo", "Where are you?", "declare")        # an opener: no ACT line (no CPL block yet)
+conv3 = store.get(w3, w3["cpl_legacy_map"]["L3"])
+check("a question asked without an ACT line (an opener) is still tracked, so it can be answered (and mode A can apply)",
+      len(conv3["open_items"]["questions"]) == 1, conv3["open_items"])
+w4 = {"tick": 0, "sim_time": 1000.0, "timers": [], "conversations": {},
+      "characters": {"theo": {"id": "theo", "name": "Theo"}, "ana": {"id": "ana", "name": "Ana"}}}
+leg4 = {"id": "L4", "participants": ["theo", "ana"], "medium": "in_person", "active": True}
+w4["characters"]["theo"]["_cpl_turn"] = "ACT: request"
+shadow.on_line(w4, leg4, "theo", "Could you help me with the dishes later?", "declare")
+w4["characters"]["theo"].pop("_cpl_turn")
+w4["characters"]["ana"]["_cpl_turn"] = "ANSWERS: R1 accept"
+shadow.on_line(w4, leg4, "ana", "Sure, I can do that.", "declare")
+w4["characters"]["ana"].pop("_cpl_turn")
+conv4 = store.get(w4, w4["cpl_legacy_map"]["L4"])
+shadow.on_legacy_end(w4, leg4, "resolved")                           # the legacy path's guess: "answered"
+check("a legacy 'resolved' ending takes CPL's own reading of what was settled (request fulfilled, not question "
+      "answered)", conv4["reason"] == "request_fulfilled", conv4["reason"])
+
 config.CPL_MODE = "shadow"
 w["characters"]["ana"]["_cpl_turn"] = "ACT: request"
 check("in shadow mode the lines are not applied (CPL only follows)", shadow._turn_lines(w, "ana") is None)

@@ -911,3 +911,17 @@ scripted Turn outputs. Pure modules (state machine, codec, policies, context) ge
     The stand-in model used by the determinism harness never writes the turn lines, so the `on` path is exercised
     with scripted exchanges. Suggested next: run `CPL_MODE=on` against the real model on a test world, read
     `/admin/cpl/metrics` and the shadow tallies, then decide on the compact prompt and on removing the legacy mirror.
+- **Live-test runner (built; the run against the real model is still to do).** `backend/tools/cpl_live_test.py`
+  runs the fixture world with everyone together, `CPL_MODE=on`, and the real `think()` (new `DET_POLICY=real` in
+  `tests/determinism.py`). It reports adherence (how often characters wrote the turn lines, and their mistakes),
+  tracking (questions, requests, contracts, claims), lifecycle (endings, lengths, shadow tallies), cost (turns by
+  mode, model calls, prompt sizes, seconds per decision) and sample transcripts.
+  - The real Ollama (`192.168.10.176` in docker-compose) is on the user's network, so it can't be reached from the
+    cloud session. Model downloads are blocked there too.
+  - The plumbing was checked end to end with a scripted stand-in model: the real `think()`, parser, turn lines,
+    accepted requests and contracts. That run found and fixed two bugs:
+    - a legacy `resolved` ending overrode CPL's own reading (an accepted request was recorded as "question
+      answered");
+    - a question asked without an `ACT` line, as every opener is, wasn't tracked, so Mode A could never apply.
+
+    Regression checks are in `tests/test_cpl_turns.py`.

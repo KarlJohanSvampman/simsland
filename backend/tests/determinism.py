@@ -62,7 +62,9 @@ def _install():
             fn(*a, **k)
     ca._pool = _Inline()
     import brain.llm_brain as lb
-    if os.environ.get("DET_POLICY") in ("varied", "social"):
+    if os.environ.get("DET_POLICY") == "real":
+        pass                                   # the real model (tools/cpl_live_test.py): think() calls Ollama
+    elif os.environ.get("DET_POLICY") in ("varied", "social"):
         lb.think = _varied_think
     else:
         lb.think = lambda context, char_id=None, session=None, priority=None: {"thought": "ok", "action": {"type": "wait", "reason": "x"}}
