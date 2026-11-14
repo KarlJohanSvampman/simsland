@@ -763,3 +763,13 @@ scripted Turn outputs. Pure modules (state machine, codec, policies, context) ge
     a turn, but the legacy path lets it through). The memories that come with "ignored" are written before the
     legacy end is held back.
   - `tests/test_cpl_on.py`.
+- **Phase 1, step 4: delivery (done).** The per-line side effects at the end of `apply_speech` (subject and social
+  line, pattern concern, impact ledger, memory acknowledgement, dialogue memory, reaction and interaction, analysis
+  and reflections) moved unchanged into `cpl/adapters/line_effects.py`, as subscribers to a delivered line
+  (`cpl/adapters/events.py`).
+  - They run synchronously, in their original order: they depend on each other's writes and on the shared random
+    stream, so plain event-bus subscribers, run only at the next flush, would change results.
+  - `cpl.message_delivered` is then emitted on the bus.
+  - `apply_speech` now calls `deliver()`.
+  - Determinism identical. The tests covering these effects pass, or fail exactly as before (`test_grudges`,
+    `test_memory_acknowledgement`: fixture issues). `tests/test_cpl_delivery.py`.
