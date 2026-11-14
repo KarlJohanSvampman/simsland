@@ -13,8 +13,13 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from db import load_world, save_world, world_lock
+from core.commands import command
 
 router = APIRouter(prefix="/admin/rules", tags=["rules"])
+
+
+# A note or a rule can hand work to the background LLM (systems/bg_work.py), which arms its duty's timer.
+_BG_WORK = [("key", "_bg_work"), ("key", "timers"), ("key", "_timer_seq")]
 
 
 class TextIn(BaseModel):
@@ -61,6 +66,7 @@ def get_rules(char_id: str, sim_id: str = "default"):
 
 
 @router.post("/{char_id}/ask")
+@command("personal_rules.ask", entities=lambda a: [("characters", a["char_id"])] + _BG_WORK)
 def ask(char_id: str, sim_id: str = "default"):
     from systems.personal_rules import ask_now
     with world_lock():
@@ -73,6 +79,7 @@ def ask(char_id: str, sim_id: str = "default"):
 
 
 @router.post("/{char_id}/add")
+@command("personal_rules.add_rule", entities=lambda a: [("characters", a["char_id"])] + _BG_WORK)
 def add_rule(char_id: str, body: TextIn, sim_id: str = "default"):
     from systems.personal_rules import add
     if not body.text.strip():
@@ -86,6 +93,7 @@ def add_rule(char_id: str, body: TextIn, sim_id: str = "default"):
 
 
 @router.post("/{char_id}/{rule_id}")
+@command("personal_rules.decide_rule", entities=lambda a: [("characters", a["char_id"])] + _BG_WORK)
 def decide_rule(char_id: str, rule_id: str, body: DecideIn, sim_id: str = "default"):
     from systems.personal_rules import decide
     with world_lock():

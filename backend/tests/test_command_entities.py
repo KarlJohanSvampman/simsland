@@ -60,6 +60,7 @@ import db
 import main  # noqa: F401 -- registers its commands
 from core import commands, entity_locks as EL
 from api import admin, household, director, persona, editor, middleware_bridge  # noqa: F401
+from api import dialogue_feedback, personal_rules, directors_cut
 
 SIM = "default"
 with db.world_lock():
@@ -101,6 +102,29 @@ CALLS = {
     "main.update_environment": lambda: main.update_environment({"test": True}),
     "main.clear_llm_logs": lambda: main.clear_llm_logs(),
 }
+_note = {}
+
+
+def _give():
+    _note.update(dialogue_feedback.give_note(a, dialogue_feedback.NoteIn(conv_id="c1", tick=1, utterance="Hi.",
+                                                                         verdict="dislike", comment="too stiff"),
+                                             sim_id=SIM)["note"])
+
+
+def _add_rule():
+    out = personal_rules.add_rule(a, personal_rules.TextIn(text="Keep it short."), sim_id=SIM)
+    _note["rule_id"] = (out["approved"] + out["proposed"])[-1]["id"]
+
+
+CALLS.update({
+    "dialogue_feedback.give_note": _give,
+    "personal_rules.ask": lambda: personal_rules.ask(a, sim_id=SIM),
+    "dialogue_feedback.delete_note": lambda: dialogue_feedback.delete_note(a, _note["id"], sim_id=SIM),
+    "personal_rules.add_rule": _add_rule,
+    "personal_rules.decide_rule": lambda: personal_rules.decide_rule(a, _note["rule_id"],
+                                                                     personal_rules.DecideIn(action="retire"), sim_id=SIM),
+    "directors_cut.resume": lambda: directors_cut.resume(sim_id=SIM),
+})
 if bld:
     CALLS["household.unassign_building_route"] = lambda: household.unassign_building_route(SIM, {"building_id": bld})
 CALLS["household.remove_member"] = lambda: household.remove_member(SIM, {"character_id": b})

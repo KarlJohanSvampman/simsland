@@ -10,8 +10,13 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from db import load_world, save_world, world_lock
+from core.commands import command
 
 router = APIRouter(prefix="/admin/feedback", tags=["feedback"])
+
+
+# A note or a rule can hand work to the background LLM (systems/bg_work.py), which arms its duty's timer.
+_BG_WORK = [("key", "_bg_work"), ("key", "timers"), ("key", "_timer_seq")]
 
 class NoteIn(BaseModel):
     conv_id: str
@@ -36,6 +41,7 @@ def _char(world, cid):
 
 
 @router.post("/{speaker_id}")
+@command("dialogue_feedback.give_note", entities=lambda a: [("characters", a["speaker_id"])] + _BG_WORK)
 def give_note(speaker_id: str, body: NoteIn, sim_id: str = "default"):
     from systems.dialogue_feedback import give
     changes = {}
@@ -66,6 +72,7 @@ def list_notes(speaker_id: str, sim_id: str = "default"):
 
 
 @router.delete("/{speaker_id}/{fb_id}")
+@command("dialogue_feedback.delete_note", entities=lambda a: [("characters", a["speaker_id"])])
 def delete_note(speaker_id: str, fb_id: str, sim_id: str = "default"):
     from systems.dialogue_feedback import remove
     with world_lock():

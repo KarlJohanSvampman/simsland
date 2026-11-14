@@ -14,9 +14,14 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from db import load_world, save_world, world_lock
+from core.commands import command
 from systems import directors_cut as dc
 
 router = APIRouter(prefix="/director", tags=["director"])
+
+
+# A note or a rule can hand work to the background LLM (systems/bg_work.py), which arms its duty's timer.
+_BG_WORK = [("key", "_bg_work"), ("key", "timers"), ("key", "_timer_seq")]
 
 
 class StopIn(BaseModel):
@@ -53,6 +58,7 @@ def get_stop(sim_id: str = "default"):
 
 
 @router.post("/stop")
+@command("directors_cut.stop", entities="world")          # everyone within the radius
 def stop(body: StopIn, sim_id: str = "default"):
     with world_lock():
         world = load_world(sim_id)
@@ -62,6 +68,7 @@ def stop(body: StopIn, sim_id: str = "default"):
 
 
 @router.post("/resume")
+@command("directors_cut.resume", entities=lambda a: [("key", "director_stop"), ("key", "director_log")])
 def resume(sim_id: str = "default"):
     with world_lock():
         world = load_world(sim_id)
@@ -84,6 +91,7 @@ def get_cut(char_id: str, sim_id: str = "default"):
 
 
 @router.post("/cut/{char_id}")
+@command("directors_cut.cut", entities="world")            # interrupting the activity can free a prop's anchor
 def cut(char_id: str, body: CutIn, sim_id: str = "default"):
     with world_lock():
         world = load_world(sim_id)
@@ -97,6 +105,7 @@ def cut(char_id: str, body: CutIn, sim_id: str = "default"):
 
 
 @router.post("/cut/{char_id}/{cut_id}/undo")
+@command("directors_cut.undo", entities=lambda a: [("characters", a["char_id"]), ("key", "director_log")] + _BG_WORK)
 def undo(char_id: str, cut_id: str, sim_id: str = "default"):
     with world_lock():
         world = load_world(sim_id)
