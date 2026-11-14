@@ -129,12 +129,16 @@ def _thinking(world, cid):
 
 
 def on_timer(world, entry):
-    """A cpl:<conversation_id> timer: invite / reply / pause / close."""
+    """A cpl:<conversation_id> timer: invite / reply / pause / close / idle / cap, or gc for a finished one."""
     cid = entry["owner"].split(":", 1)[1]
     conv = store.get(world, cid)
     if conv is None:
         return
     kind = entry["key"]
+    if kind == "gc":                                  # finished an hour ago, and archived (cpl/archive.py)
+        from cpl import archive
+        archive.gc(world, cid)
+        return
     waiting = (conv.get("floor") or {}).get("holder")
     if kind == "invite":
         waiting = next((p for p, d in conv["participants"].items() if d.get("status") == "invited"), None)
@@ -145,6 +149,7 @@ def on_timer(world, entry):
 def install():
     from core import scheduler
     scheduler.register(OWNER, on_timer)
+    import cpl.archive  # noqa: F401 -- finished conversations go to the archive tables
 
 
 install()

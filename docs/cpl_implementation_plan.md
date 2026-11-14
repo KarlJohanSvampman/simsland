@@ -793,3 +793,19 @@ scripted Turn outputs. Pure modules (state machine, codec, policies, context) ge
   - Determinism: `off` and `shadow` unchanged. `tests/test_cpl_turns.py` (request → accepted → commitment →
     request fulfilled; an angry exit).
   - Phase 1 still to do: the append-only archive tables (item 7).
+- **Phase 1, item 7: archive (done).** `scripts/migrations/cpl_001_archive.sql` (the tables are also created on
+  first write) and `cpl/archive.py`.
+  - On `cpl.conversation_ended`, a copy of the conversation, its participants, messages and requests is queued. A
+    background thread writes it (`ON CONFLICT DO NOTHING`, so archiving twice writes once). The step never waits on
+    Postgres.
+  - An hour later a `gc` timer drops the finished conversation from the world, with its settled requests. Open,
+    deferred and negotiating requests stay.
+  - `tests/test_cpl_archive.py`. Determinism: `off` and `shadow` unchanged.
+  - **Phase 1 is complete.** Next is Phase 2 (lifecycle):
+    - interruptions (doorbell, phone, work shift, child care, director STOP);
+    - pause and resume;
+    - departures with reasons;
+    - unavailability (sleep, arrest, off-grid);
+    - recovery after a restart;
+    - the template summary;
+    - closing the two gaps from step 3.

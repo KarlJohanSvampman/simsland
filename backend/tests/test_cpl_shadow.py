@@ -50,8 +50,9 @@ legacy_live = {cid for cid, c in (w.get("conversations") or {}).items() if c.get
 check("only conversations the legacy path still has open are live in CPL",
       all(lid in legacy_live for lid in mapped), {k: v for k, v in mapped.items() if k not in legacy_live})
 dead = {cid for cid, c in (w.get("cpl_conversations") or {}).items() if c.get("state") in ("resolved", "expired")}
-orphans = [t for t in w.get("timers") or [] if t["owner"].startswith("cpl:") and t["owner"][4:] in dead]
-check("no timer outlives its conversation", not orphans, orphans[:3])
+orphans = [t for t in w.get("timers") or [] if t["owner"].startswith("cpl:") and t["owner"][4:] in dead
+           and t["key"] != "gc"]
+check("no timer outlives its conversation (but the one that clears it off the world later)", not orphans, orphans[:3])
 ended = [c for c in (w.get("cpl_conversations") or {}).values() if c.get("state") in ("resolved", "expired")]
 check("ended conversations carry their reason and an outcome",
       ended and all(c.get("reason") and c.get("outcome") and c.get("resolved_at") for c in ended))
