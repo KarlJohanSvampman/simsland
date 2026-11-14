@@ -166,6 +166,7 @@ def _on_line(world, legacy, speaker_id, utterance, speech_act):
                        now_ts(world))
         store.append_message(world, conv, _envelope(conv, speaker_id, others, utterance, speech_act, now_ts(world),
                                                     requires))
+        _overheard(world, conv, speaker_id)
         _note_claim(world, conv, speaker_id, others, utterance, speech_act)
         return
     event = {"type": "turn", "by": speaker_id, "requires_response": requires,
@@ -190,9 +191,23 @@ def _on_line(world, legacy, speaker_id, utterance, speech_act):
         st["rejections"][res.rejected] = st["rejections"].get(res.rejected, 0) + 1
     store.append_message(world, conv, _envelope(conv, speaker_id, others, utterance, speech_act, now_ts(world),
                                                 requires))
+    _overheard(world, conv, speaker_id)
     _note_claim(world, conv, speaker_id, others, utterance, speech_act)
     from cpl.lifecycle import summarize
     conv["context"]["summary"] = summarize(conv, world)
+
+
+def _overheard(world, conv, speaker_id):
+    """Who overheard the line just stored (in person only): recorded on the message's audience."""
+    if conv.get("channel") != "in_person" or not conv.get("messages"):
+        return []
+    from cpl.participants import overhearers
+    sp = (world.get("characters") or {}).get(speaker_id)
+    if sp is None:
+        return []
+    heard = overhearers(world, sp, set(conv.get("participants") or {}))
+    conv["messages"][-1].setdefault("audience", {})["overheard_by"] = heard
+    return heard
 
 
 def _note_claim(world, conv, speaker_id, others, utterance, speech_act):
@@ -201,7 +216,8 @@ def _note_claim(world, conv, speaker_id, others, utterance, speech_act):
     if (speech_act or "").lower() in ("gossip", "urgent_report") and utterance:
         from core.clock import now_ts
         from cpl.turns import add_claim
-        add_claim(world, conv, speaker_id, others, utterance, now_ts(world))
+        heard = ((conv.get("messages") or [{}])[-1].get("audience") or {}).get("overheard_by") or []
+        add_claim(world, conv, speaker_id, others, utterance, now_ts(world), overheard_by=heard)
 
 
 def _turn_lines(world, speaker_id):

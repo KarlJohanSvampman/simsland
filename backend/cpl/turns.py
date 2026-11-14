@@ -93,6 +93,9 @@ def apply_turn(world, conv, c, lines, utterance, others, now):
         _settle(world, conv, c, ans["item_id"], ans["response_type"], ans.get("condition"), now)
     _claims_answered(conv, c, decision.get("stance"), now)
     to = others[0] if others else None
+    nxt = decision.get("next") or {}
+    if nxt.get("action") == "let_join" and nxt.get("who"):
+        _let_join(world, conv, c, nxt["who"])
     if decision["message_type"] == "argument":
         from core.event_bus import emit
         emit("cpl.argument", {"conversation_id": conv["id"], "by": c["id"], "to": to, "claim": utterance,
@@ -127,14 +130,16 @@ def _claims_answered(conv, c, stance, now):
                  {"conversation_id": conv["id"], "claim_id": cl["id"], "by": c["id"], "claim": cl.get("text")})
 
 
-def add_claim(world, conv, speaker_id, to, text, now, kind="reported_claim"):
-    """A line telling something (gossip, an urgent report): recorded as asserted -- heard is not believed (C8)."""
+def add_claim(world, conv, speaker_id, to, text, now, kind="reported_claim", overheard_by=()):
+    """A line telling something (gossip, an urgent report): recorded as asserted -- heard is not believed (C8). Who
+    was told and who only overheard it are kept apart: overhearing is knowing less (no one asked them to believe)."""
     cid = store.next_id(world, "claim")
     conv.setdefault("claims", {})[cid] = {"id": cid, "by": speaker_id, "to": list(to), "text": text, "kind": kind,
-                                          "status": "asserted", "at": now}
+                                          "status": "asserted", "at": now, "overheard_by": list(overheard_by)}
     from core.event_bus import emit
     emit("cpl.information_shared", {"conversation_id": conv["id"], "claim_id": cid, "source": speaker_id,
-                                    "to": list(to), "claim": text, "epistemic_status": "asserted"})
+                                    "to": list(to), "overheard_by": list(overheard_by), "claim": text,
+                                    "epistemic_status": "asserted"})
     return conv["claims"][cid]
 
 
@@ -182,3 +187,15 @@ def _commit(world, conv, rid):
     req = world["cpl_requests"][rid]
     emit("cpl.commitment_created", {"commitment_id": "commit_" + rid, "request": dict(req),
                                     "conversation_id": conv["id"]})
+
+
+def _let_join(world, conv, c, name):
+    """NEXT: let_join:<name> -- someone they can see joins the conversation."""
+    from cpl.participants import join
+    name = (name or "").strip().lower()
+    for p in (c.get("perception") or {}).get("visible_people", []):
+        pid = p.get("id")
+        pc = (world.get("characters") or {}).get(pid) or {}
+        if name and (name == (pc.get("name") or "").lower() or name == (pc.get("name") or "").split(" ")[0].lower()):
+            return join(world, conv, pid, by=c["id"])
+    return False

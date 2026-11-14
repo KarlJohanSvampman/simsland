@@ -85,3 +85,42 @@ def pending_invitation(world, speaker_id, target_id):
                 and target_id in (conv.get("participants") or {}):
             return True
     return False
+
+
+def join(world, conv, char_id, by=None):
+    """Someone joins a conversation under way (NEXT: let_join, cpl/turns.py). They know what is said from now on, and
+    only a summary of what came before (their knowledge boundary: joined_at_seq). The legacy conversation takes them
+    in too, with the tick they joined at (brain/context_builder.py shows them only the lines since)."""
+    from core.clock import now_ts
+    from core.event_bus import emit
+    from cpl.lifecycle import summarize
+    parts = conv.setdefault("participants", {})
+    if char_id in parts and parts[char_id].get("status") == "active":
+        return False
+    parts[char_id] = {"role": "participant", "status": "active", "joined_at": now_ts(world), "left_at": None,
+                      "left_reason": None, "last_seen_seq": conv.get("seq", 0), "joined_at_seq": conv.get("seq", 0),
+                      "summary_at_join": summarize(conv, world), "invited_by": by}
+    legacy = (world.get("conversations") or {}).get(conv.get("legacy_id")) if conv.get("legacy_id") else None
+    if legacy is not None:
+        if char_id not in legacy.setdefault("participants", []):
+            legacy["participants"].append(char_id)
+        legacy.setdefault("joined_ticks", {})[char_id] = world.get("tick", 0)
+        legacy.setdefault("joined_summaries", {})[char_id] = parts[char_id]["summary_at_join"]
+    emit("cpl.participant_joined", {"conversation_id": conv["id"], "who": char_id, "by": by,
+                                    "joined_at_seq": parts[char_id]["joined_at_seq"]})
+    return True
+
+
+def overhearers(world, speaker, participant_ids, radius=6.0):
+    """Who hears a line said aloud without being in the conversation: awake, on the map, within earshot of the speaker
+    (same building, or close by outdoors) -- read from the positions model (core/positions.py), reaching nobody."""
+    from core import positions
+    out = []
+    for cid, alive, obid in positions.ids_near(world, speaker, radius=radius):
+        if cid in participant_ids or not alive or obid != speaker.get("building_id"):
+            continue
+        o = dict.get(world.get("characters") or {}, cid) or {}
+        if o.get("off_grid") or (o.get("activity") or {}).get("type") in ("sleep", "nap"):
+            continue
+        out.append(cid)
+    return out

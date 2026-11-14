@@ -869,3 +869,19 @@ scripted Turn outputs. Pure modules (state machine, codec, policies, context) ge
   - Next, Phase 4: groups (`apply_speech_to_group` into CPL participants), late joiners with a summary up to when
     they joined, overheard vs told, text and email through CPL, and removing the legacy mirror. Then Phase 5: the
     compact turn prompt, Mode A/B/C, and metrics.
+- **Phase 4: more than two people, and who knows what (done, except removing the legacy mirror).**
+  - **Groups.** Group talk, texts and scripted conversations all go through `add_message`, so CPL already follows
+    them: a group conversation has all its participants, one leaving doesn't end it, and a text conversation runs
+    under the text policy.
+  - **Late joiners.** `NEXT: let_join:<name>` (`cpl/participants.join`): someone nearby joins under way. CPL records
+    `joined_at_seq` and the summary so far, and the legacy conversation takes them in (`joined_ticks`). Their prompt
+    shows only what was said since they joined, plus "Before you joined: …" (`brain/context_builder.py`).
+  - **Overheard vs told.** A line said aloud records who overheard it: in earshot in the same building, awake, not
+    in the conversation (read from `core/positions.py`, reaching nobody). A claim keeps who was told apart from who
+    only overheard it, and both are in `cpl.information_shared`.
+  - `tests/test_cpl_groups.py`. Determinism: `off` and `shadow` unchanged. The soak passes.
+  - **Not done: removing the legacy mirror.** As built (safely, step by step), CPL *follows* the legacy conversation
+    (`world["conversations"]`) rather than the legacy conversation mirroring CPL. Removing it means moving every
+    reader and writer of `world["conversations"]` onto CPL: the context builder, floor, outcome, archive, reach,
+    conversation goals, the VR conversations timeline, social_sandbox, debug_draw. That is its own step, and it
+    should wait until `CPL_MODE=on` has run with the real model.
