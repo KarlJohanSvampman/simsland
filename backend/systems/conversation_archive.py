@@ -155,6 +155,13 @@ def _service(world, timer=None):
             entry["tag_tries"] = entry.get("tag_tries", 0) + 1
             if entry["tag_tries"] >= TAG_TRIES:
                 continue                              # the model couldn't read it; left untagged
+        try:                                          # CPL: nothing the structure doesn't already say (cpl/record.py)
+            from cpl import record as _cpl_record
+            if _cpl_record.skippable(world, cid):
+                apply_tags(world, entry, _cpl_record.minimal_tags(world, cid))
+                continue
+        except Exception as exc:
+            print(f"[conversation_archive] cpl skip check failed: {exc!r}")
         if not bg_llm.is_pending(key):
             earlier = [{"id": e["id"], "subject": (e.get("tags") or {}).get("subject"),
                         "when": e.get("ended_tick")} for e in earlier_between(world, entry)]

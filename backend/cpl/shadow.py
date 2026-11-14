@@ -160,6 +160,8 @@ def _on_line(world, legacy, speaker_id, utterance, speech_act):
         _map(world)[legacy["id"]] = conv["id"]
         st["opened"] += 1
         lines = _turn_lines(world, speaker_id)
+        if lines:
+            conv["structured_lines"] = 1
         if lines:                                   # the opening line can ask something: tracked from the start
             from cpl.turns import apply_turn
             apply_turn(world, conv, (world.get("characters") or {})[speaker_id], lines, utterance, others,
@@ -183,6 +185,7 @@ def _on_line(world, legacy, speaker_id, utterance, speech_act):
             ev["settles_all"] = True                # everything asked is answered: wind down
         event = ev
         st["structured_turns"] = st.get("structured_turns", 0) + 1
+        conv["structured_lines"] = conv.get("structured_lines", 0) + 1
     res = CV.submit(world, conv, event)
     if res.changed and conv.get("interruption"):
         conv["interruption"] = None                 # someone spoke: the interruption has been dealt with

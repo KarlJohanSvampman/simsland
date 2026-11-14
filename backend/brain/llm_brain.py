@@ -1247,7 +1247,10 @@ def think(
     prompt = build_prompt(
         context
     )
-    if context.get("cpl"):
+    if context.get("compact_turn"):              # CPL mode B, compact (cpl/turns.py): the short turn prompt instead
+        from cpl.turns import COMPACT_SYSTEM
+        system_prompt, prompt = COMPACT_SYSTEM, context["compact_turn"]
+    elif context.get("cpl"):
         from cpl.turns import prompt_section
         prompt = prompt + "\n\n" + prompt_section(context["cpl"])
 

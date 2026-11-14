@@ -885,3 +885,29 @@ scripted Turn outputs. Pure modules (state machine, codec, policies, context) ge
     reader and writer of `world["conversations"]` onto CPL: the context builder, floor, outcome, archive, reach,
     conversation goals, the VR conversations timeline, social_sandbox, debug_draw. That is its own step, and it
     should wait until `CPL_MODE=on` has run with the real model.
+- **Phase 5: optimization (done; all five phases built).**
+  - **Mode A/B/C** (`cpl/generation.py`). Mode A answers with no model call, and only when every condition holds:
+    - the only thing waiting on the character is a factual question answerable from their own state (where they
+      are, what they're doing, whether they're home or have eaten);
+    - the question has no edge (the spec's "you were supposed to pick up the kids" is B);
+    - they aren't upset or stressed, they get on with the asker, and nothing is disputed.
+
+    `brain/agent_loop.py` applies a mode-A decision directly. C is a request or proposal waiting on them, or a
+    conflict, persuasion or negotiation. B is everything else.
+  - **Compact turn prompt** for B (`cpl/turns.compact_prompt`, opt-in with `CPL_COMPACT_TURNS=on`): who they are,
+    their mood and activity, who they're talking to and how they relate, what is open, and the last lines (under
+    800 characters), instead of the whole decision context.
+  - **Skipping the AI reading** (`cpl/record.skippable`, on only): every line structured, two people, no claims,
+    nothing to read between the lines. The structure stands in for the tags call.
+  - **Metrics** (`cpl/metrics.py`, `GET /admin/cpl/metrics`): turns by mode, model calls, compact turns, the share
+    of turns without a model call, and the endings (with the share by timeout or abandonment). Also
+    `GET /admin/cpl/conversations[/{id}]` and `/admin/cpl/shadow`.
+  - Determinism: `off` and `shadow` unchanged. Full suite: no new failures (114 pass). `tests/test_cpl_generation.py`.
+  - **What only the real model can show:**
+    - whether characters write the turn lines well, and how often they answer open items correctly;
+    - the compact prompt's quality, which is why it is off by default;
+    - actual token savings.
+
+    The stand-in model used by the determinism harness never writes the turn lines, so the `on` path is exercised
+    with scripted exchanges. Suggested next: run `CPL_MODE=on` against the real model on a test world, read
+    `/admin/cpl/metrics` and the shadow tallies, then decide on the compact prompt and on removing the legacy mirror.

@@ -58,7 +58,8 @@ def submit(world, conv, event):
     for eff in res.effects:
         _apply(world, conv, eff, event, now)
     if conv["state"] in {s.value for s in FINAL}:
-        from cpl import shadow
+        from cpl import metrics, shadow
+        metrics.note_ended(world, conv["reason"])
         shadow.on_cpl_end(world, conv, event)
     return res
 

@@ -1396,6 +1396,22 @@ def _think_now(c, world):
     # Ask the model in the background and carry on: the answer comes back as a
     # `decision_ready` event, is noted and processed (re-validated against the world as it is
     # THEN) by brain/cognition_actor.py::on_decision_ready. Nothing here blocks the tick.
+    if context.get("cpl"):
+        # In a CPL conversation: a turn CPL can answer from the character's own state needs no model call (mode A);
+        # otherwise the model is asked, with the full context (B, C) -- cpl/generation.py
+        from cpl import generation as _gen, metrics as _cplm
+        _mode = _gen.choose_mode(world, c, context["cpl"])
+        _structured = _gen.structured_decision(world, c, context["cpl"]) if _mode == "A" else None
+        from cpl.turns import COMPACT as _compact, compact_prompt as _compact_prompt
+        _use_compact = _compact and not _structured and _mode == "B"
+        if _use_compact:
+            context["compact_turn"] = _compact_prompt(world, c, context["cpl"])
+        _cplm.note_turn(world, "A" if _structured else ("C" if _mode == "C" else "B"), compact=_use_compact)
+        if _structured:
+            from brain.cognition_scheduler import note_think
+            note_think(c, world, _structured, wake_reason=wake_reason)
+            process_decision(c, world, _structured, available_actions=context.get("available_actions"))
+            return
     _prof.mark("agent:request_decision")
     request_decision(c, world, context, wake_reason, llm_priority)
 

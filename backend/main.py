@@ -60,6 +60,7 @@ from api.conversation_trace import router as conversation_trace_router
 from api.dialogue_feedback import router as dialogue_feedback_router
 from api.personal_rules import router as personal_rules_router
 from api.directors_cut import router as directors_cut_router
+from api.cpl import router as cpl_router
 from api.dependents import router as dependents_router
 from api.director  import router as director_router
 from api.middleware_bridge import router as middleware_bridge_router
@@ -106,6 +107,7 @@ app.include_router(conversation_trace_router)
 app.include_router(dialogue_feedback_router)
 app.include_router(personal_rules_router)
 app.include_router(directors_cut_router)
+app.include_router(cpl_router)
 app.include_router(dependents_router, prefix="/api")
 app.include_router(director_router)
 app.include_router(middleware_bridge_router)

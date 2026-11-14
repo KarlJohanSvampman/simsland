@@ -199,3 +199,35 @@ def _let_join(world, conv, c, name):
         if name and (name == (pc.get("name") or "").lower() or name == (pc.get("name") or "").split(" ")[0].lower()):
             return join(world, conv, pid, by=c["id"])
     return False
+
+
+COMPACT = __import__("os").getenv("CPL_COMPACT_TURNS", "off").lower() == "on"
+
+COMPACT_SYSTEM = """You are playing one person in a life simulation, in the middle of a conversation. Answer as them, in
+character, briefly. Reply in EXACTLY this shape, one line each:
+ACTION: speak | <who you are talking to>
+SAY: <your exact words>
+""" + FORMAT_LINES
+
+
+def compact_prompt(world, c, block):
+    """The compact turn prompt (plan section 6.2): a few lines of who they are and how they feel, who they are talking
+    to, what is open, and the last lines -- instead of the whole decision context. CPL_COMPACT_TURNS=on, mode B only."""
+    from cpl import store
+    conv = store.get(world, block["conversation_id"]) or {}
+    traits = ", ".join((c.get("personality_traits") or c.get("traits") or [])[:5])
+    mood = ((c.get("emotion") or {}).get("primary") or (c.get("mood") or {}).get("label") or "calm")
+    act = str((c.get("activity") or {}).get("type") or "nothing in particular").replace("_", " ")
+    out = [f"You are {c.get('name')}" + (f" ({traits})." if traits else "."),
+           f"Right now: {act}; feeling {mood}."]
+    for other in [p for p in conv.get("participants") or {} if p != c["id"]][:3]:
+        o = (world.get("characters") or {}).get(other) or {}
+        rel = (c.get("relationships") or {}).get(other) or {}
+        labels = ", ".join(rel.get("labels") or []) or "someone you know"
+        out.append(f"Talking with {o.get('name', other)} ({labels}; trust {round(rel.get('trust', 0.5), 1)}).")
+    out.append(prompt_section(block))
+    for m in (conv.get("messages") or [])[-4:]:
+        who = "You" if m.get("sender_id") == c["id"] else ((world.get("characters") or {}).get(m.get("sender_id"))
+                                                           or {}).get("name", m.get("sender_id"))
+        out.append(f'{who}: "{m.get("content")}"')
+    return "\n".join(out)

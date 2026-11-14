@@ -39,3 +39,28 @@ def lines(world, conv):
     if conv.get("reason"):
         out.append(f"it ended: {conv['reason'].replace('_', ' ')}")
     return out
+
+
+_NEEDS_READING = {"conflict", "persuasion", "negotiation", "gossip", "emotional"}
+
+
+def skippable(world, legacy_id):
+    """Phase 5 (C9): a conversation whose structure already says everything the reader would add -- every line carried
+    CPL's lines, two people, no claims about others, nothing to read between the lines (no conflict, persuasion,
+    negotiation, gossip, feelings) -- needs no AI reading. CPL_MODE=on only."""
+    from cpl import config
+    if config.mode(world) != "on":
+        return False
+    conv = for_legacy(world, legacy_id)
+    if not conv or conv.get("claims") or conv.get("purpose") in _NEEDS_READING:
+        return False
+    if len(conv.get("participants") or {}) != 2:
+        return False
+    return conv.get("lines", 0) >= 1 and conv.get("structured_lines", 0) >= conv.get("lines", 0)
+
+
+def minimal_tags(world, legacy_id):
+    """What the reader would have said, from the structure: the subject, and nothing else to apply."""
+    conv = for_legacy(world, legacy_id) or {}
+    return {"subject": conv.get("topic") or "a short exchange", "tags": [], "interaction_tags": [], "issues": [],
+            "skipped": "structured", "structured": lines(world, conv)}
