@@ -91,3 +91,14 @@ path is proven.
 3. Real processes: per-partition publisher and feed, patches over Redis streams, `SIM_PARTITION=n` and the
    docker-compose services.
 4. Rebalancing: moving a household between partitions (hand over its entities, then the owner map).
+
+## Progress
+
+- **Slice 1 (done).**
+  - `core/entity_patch.py`: `diff` / `apply` for field-level patches, with `set`, `del`, `append` (merges with the
+    owner's own appends) and `trim` (a capped list dropping its oldest, so the owner's appends survive). Equality is
+    type-strict (`True` is not `1`), and key order is kept (a reordered dict is set whole).
+  - `core/ownership.py`: the owner map on the world, households spread round-robin over partitions 1..n-1, members
+    and building props going with them, the rest partition 0; `move_household`.
+  - `tests/test_entity_patch.py`: 2,000 random round trips in the test (plus 20,000 run once, 0 mismatches),
+    concurrent edits landing, appends merging, ownership.
