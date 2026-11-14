@@ -341,4 +341,4 @@ def get_psychosis_context(c, world):
 
 def psychosis_possible(c, world):
     """PERCHAR check (core/flow.py): the psychosis mechanic is switched on at all."""
-    return PSYCHOSIS_ENABLED
+    return PSYCHOSIS_ENABLED and not c.get("is_workplace_npc")

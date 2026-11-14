@@ -87,6 +87,32 @@ social_checks_for(c, w)
 check("over the threshold: the wish to confront is noted", "x" in c.get("_confrontation_emitted", []), c)
 check("... and a wake is set for when it falls through the next threshold", c["_wake"]["at"] > 150, c.get("_wake"))
 
+# ── PERCHAR: the old job's timer runs over its members only; a member can be due from a later moment ─────────────────
+from core import flow
+ran = []
+flow._perchar_fns["_t"] = (lambda c, w: ran.append(c["id"]),
+                           lambda c, w: True if c.get("busy") else (700.0 if c.get("later") else False), 20)
+handler = flow._perchar_timer("_t")
+w = W(100)
+w["characters"] = {"a": {"id": "a", "busy": True}, "b": {"id": "b"}, "c": {"id": "c", "later": True}}
+for cid in ("c", "b", "a"):
+    flow.run_perchar(w["characters"][cid], w)
+check("a character with work joins, one without does not, one with work later joins from then",
+      w["_perchar_members"]["_t"] == {"c": 700.0, "a": 0}, w["_perchar_members"]["_t"])
+handler(w, {})
+check("the timer runs only the members that are due", ran == ["a"], ran)
+w["characters"]["a"]["busy"] = False
+w["sim_time"] = 600.0
+handler(w, {})
+check("... drops a member with no more work, and skips one not due yet",
+      ran == ["a"] and w["_perchar_members"]["_t"] == {"c": 700.0}, (ran, w["_perchar_members"]["_t"]))
+w["sim_time"] = 720.0
+w["characters"]["a"]["busy"] = True
+flow.run_perchar(w["characters"]["a"], w)
+handler(w, {})
+check("... runs it once its time comes, in the characters' own order", ran == ["a", "a", "c"], ran)
+del flow._perchar_fns["_t"]
+
 print()
 print("all passed" if not failures else f"FAILED: {', '.join(failures)}")
 sys.exit(1 if failures else 0)

@@ -354,7 +354,9 @@ def lt_needs_tick(c, world):
 
 def lt_needs_active(c, world):
     """PERCHAR check: a need still carries frustration, or is overdue (or has never been looked at). Otherwise there is
-    nothing to step -- and a wake is set for the moment the first one becomes overdue."""
+    nothing to step until the first one becomes overdue: that moment is returned."""
+    if c.get("is_workplace_npc"):
+        return False
     tick = world.get("tick", 0)
     soonest = None
     for nd in (c.get("lt_needs") or {}).values():
@@ -373,5 +375,5 @@ def lt_needs_active(c, world):
         soonest = due if soonest is None else min(soonest, due)
     if soonest is not None:
         from brain import agent_wake
-        agent_wake.wake_at(c, world, agent_wake.at_tick(world, soonest), "lt_need_overdue")
+        return agent_wake.at_tick(world, soonest)       # due from then (core/flow.py PERCHAR: no wake needed)
     return False

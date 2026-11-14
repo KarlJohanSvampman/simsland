@@ -229,28 +229,43 @@ def _decide(c, helper, world):
         c["_rest_refusals"] = offer["count"]
 
 
-def tick_exhaustion(world):
-    """Every minute: strain builds, offers are made, and offers are answered."""
+def tick_exhaustion(world, entry=None):
+    """Every minute: strain builds, offers are made, and offers are answered (the world sweep; the simulation runs
+    exhaustion_for per character -- core/flow.py PERCHAR)."""
+    for c in list(world.get("characters", {}).values()):
+        exhaustion_for(c, world)
+
+
+def exhaustion_active(c, world):
+    """Has exhaustion anything to do for this character: an offer to answer, strain, or refusals to forget."""
+    if c.get("is_workplace_npc") or c.get("is_service_worker") or c.get("alive") is False:
+        return False
+    if c.get("_rest_offer"):
+        return True
+    return bool(c.get("_rest_refusals")) or strain(c, world) > 0
+
+
+def exhaustion_for(c, world):
+    """One minute of strain for one character."""
     tick = world.get("tick", 0)
     chars = world.get("characters", {})
-    for c in chars.values():
-        if c.get("is_workplace_npc") or c.get("is_service_worker") or c.get("alive") is False:
-            continue
-        offer = c.get("_rest_offer")
-        if offer and tick >= offer["decide_at"]:
-            _decide(c, chars.get(offer["by"]), world)
-            continue
-        s = strain(c, world)
-        if s <= 0:
-            if not offer and (c.get("_rest_refusals") and _fatigue(c) < STRAIN_FROM_FATIGUE):
-                c.pop("_rest_refusals", None)
-            continue
-        _apply_strain(c, world, s)
-        _maybe_slip(c, world, s)
-        if offer or tick < (c.get("_rest_offer_cd") or 0) or s < OFFER_MIN_STRAIN or not duties(c):
-            continue
-        if random.random() >= OFFER_CHANCE_PER_MINUTE:
-            continue
-        helpers = _helpers(c, world)
-        if helpers:
-            _offer(c, helpers[0], world, (c.get("_rest_refusals") or 0) + 1)
+    if c.get("is_workplace_npc") or c.get("is_service_worker") or c.get("alive") is False:
+        return
+    offer = c.get("_rest_offer")
+    if offer and tick >= offer["decide_at"]:
+        _decide(c, chars.get(offer["by"]), world)
+        return
+    s = strain(c, world)
+    if s <= 0:
+        if not offer and (c.get("_rest_refusals") and _fatigue(c) < STRAIN_FROM_FATIGUE):
+            c.pop("_rest_refusals", None)
+        return
+    _apply_strain(c, world, s)
+    _maybe_slip(c, world, s)
+    if offer or tick < (c.get("_rest_offer_cd") or 0) or s < OFFER_MIN_STRAIN or not duties(c):
+        return
+    if random.random() >= OFFER_CHANCE_PER_MINUTE:
+        return
+    helpers = _helpers(c, world)
+    if helpers:
+        _offer(c, helpers[0], world, (c.get("_rest_refusals") or 0) + 1)

@@ -99,3 +99,11 @@ def apply_odor_social_pressure(smelly_c, world):
                 "other_name": smelly_c.get("name"),
             },
         })
+
+
+def odor_active(c, world):
+    """Does this character smell enough to be noticed (core/flow.py PERCHAR `social_odor`)."""
+    if c.get("is_workplace_npc"):
+        return False
+    return ((c.get("body") or {}).get("odor", 0) or 0) >= ODOR_NOTICE_THRESHOLD
+

@@ -115,7 +115,6 @@ from systems.social_contracts  import check_contract_violations
 from systems.social_rules      import cleanup_expired_rule_exceptions
 from systems.worries           import decay_worries
 from systems.persona_expectations import tick_persona_expectations
-from systems.libido import tick_libido
 from systems.intimate_item_discovery import tick_discovery_checks
 from systems.stories import decay_stories
 from systems.workplace_reputation import decay_workplace_views
@@ -174,7 +173,6 @@ from systems.scheduling import generate_week_schedule, adjust_for_household
 from systems.lt_needs   import update_lt_needs, reset_weekly_counts, distribute_lt_needs, generate_lt_need_intentions
 from systems.social     import generate_social_intentions as generate_socialize_intention
 from systems.social     import interrupt_socializing_with_unavailable_targets
-from systems.social_odor import apply_odor_social_pressure
 from systems.phone      import update_phone_battery, maybe_set_phone_down, maybe_forget_phone
 from systems.power      import charge_device
 from systems.calendar_events import check_calendar_reminders
@@ -972,8 +970,6 @@ def _job_domestic_control(world, entry):
     tick_emotional_control(world)
 
 
-def _job_libido(world, entry):
-    tick_libido(world)
 
 
 def _job_life_comparison(world, entry):
@@ -1281,11 +1277,6 @@ def _job_introductions(world, entry):
     tick_introductions(world, only=set(entry.get("ids") or []) or None)
 
 
-def _job_exhaustion(world, entry):
-    """Scheduled job `exhaustion`: worn-out characters grow short-tempered and make mistakes; someone may offer to take over for them
-    (systems/exhaustion.py)."""
-    from systems.exhaustion import tick_exhaustion
-    tick_exhaustion(world)
 
 
 def _job_rumors(world, entry):
@@ -1416,11 +1407,6 @@ def _job_hierarchy(world, entry):
     update_hierarchy(world)
 
 
-def _job_social_odor(world, entry):
-    """Scheduled job `social_odor` (was an every() block in tick()); see core/scheduler.py."""
-    characters = [c for c in world.get("characters", {}).values() if not c.get("is_workplace_npc")]
-    for c in characters:
-        apply_odor_social_pressure(c, world)
 
 
 def _job_contagion(world, entry):
@@ -1491,16 +1477,8 @@ def _job_detective_work(world, entry):
     tick_detective_work(world)
 
 
-def _job_addictions(world, entry):
-    """Scheduled job `addictions` (was an every() block in tick()); see core/scheduler.py."""
-    from systems.addictions import tick_addictions
-    tick_addictions(world)
 
 
-def _job_claustrophobia(world, entry):
-    """Scheduled job `claustrophobia` (was an every() block in tick()); see core/scheduler.py."""
-    from systems.claustrophobia import tick_claustrophobia
-    tick_claustrophobia(world)
 
 
 def _job_phone_behavior(world, entry):

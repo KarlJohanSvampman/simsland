@@ -40,9 +40,12 @@ def DUTY(name, run, every, why, active):
 
 
 def PERCHAR(name, run, every, why, active):
-    """A character's own periodic work (step 5a): run(c, world) on the old grid (multiples of `every` sim seconds) but
-    inside that character's update, and only while active(c, world) -- the character is woken at each grid point while
-    it has this work, and not at all otherwise. Replaces a PROCESS that swept every character."""
+    """A character's own periodic work (step 5a): run(c, world) for each character it concerns, on the old PROCESS's
+    timer (same interval, same offset -- same place in the step), but only over its MEMBERS: the characters for whom
+    active(c, world) -- a cheap check of the character itself -- is true, or returns a sim time from which it will be
+    (a member skipped until then: the job needs no wake of its own). A character's own update (and a deferred
+    character's) adds it as a member or drops it (run_perchar); the timer drops anyone no longer active. Nobody else
+    is looked at. Replaces a PROCESS that swept every character."""
     return {"name": name, "run": run, "kind": "perchar", "every": every, "active": active, "why": why}
 
 
@@ -157,10 +160,11 @@ JOBS = [
     DUTY("intercourse_sessions", "_job_intercourse_sessions", 10 * SECOND, "a scene in progress", "systems.duties:intercourse_active"),
     PROCESS("household_monitoring", "_job_household_monitoring", 20 * SECOND, "who watches the children, babysitting asks"),
     PROCESS("market", "_job_market", 20 * SECOND, "prices, stocks, production and consumption"),
-    PROCESS("social_odor", "_job_social_odor", 20 * SECOND, "a smell bothers the people near it"),
+    PERCHAR("social_odor", "systems.social_odor:apply_odor_social_pressure", 20 * SECOND,
+            "a smell bothers the people near it", "systems.social_odor:odor_active"),
     PROCESS("domestic_control", "_job_domestic_control", 24 * SECOND, "controlling partners' tactics, quid pro quo, "
             "emotional control (their own medium cadence)"),
-    PROCESS("libido", "_job_libido", 24 * SECOND, "libido moves"),
+    PERCHAR("libido", "systems.libido:libido_for", 24 * SECOND, "libido moves", "systems.libido:libido_active"),
     PROCESS("mentality_compilation", "_job_mentality_compilation", 25 * SECOND, "mentalities compile in the background"),
     PROCESS("influence_exposure", "_job_influence_exposure", 30 * SECOND, "being around opinions wears on you"),
     PERCHAR("psychosis", "systems.psychosis:tick_psychosis", 30 * SECOND, "psychosis episodes (while the mechanic is on)",
@@ -172,7 +176,8 @@ JOBS = [
     PERCHAR("lt_needs", "systems.lt_needs:lt_needs_tick", 30 * SECOND, "long-term needs grow more pressing",
             "systems.lt_needs:lt_needs_active"),
     PROCESS("cleanliness", "_job_cleanliness", 30 * SECOND, "rooms and clothes get dirty"),
-    PROCESS("addictions", "_job_addictions", 30 * SECOND, "cravings (time-gated hourly inside)"),
+    PERCHAR("addictions", "systems.addictions:addictions_for", HOUR, "cravings, hourly",
+            "systems.addictions:addictions_active"),
     PROCESS("cookware", "_job_cookware", 30 * SECOND, "dinner planning and who cooks"),
     PROCESS("emergencies", "_job_arrests", 30 * SECOND, "incidents happen, are reported, responders arrive, arrests"),
     PROCESS("weather", "_job_weather", MINUTE, "the weather changes"),
@@ -180,7 +185,8 @@ JOBS = [
     PROCESS("worry_poll", "_job_worry_poll", MINUTE, "each character's worries are re-read against new evidence about "
             "once an hour, staggered (candidate: feed it memory.stored instead)"),
     PROCESS("grudges", "_job_grudges", MINUTE, "grudges fade or escalate"),
-    PROCESS("exhaustion", "_job_exhaustion", MINUTE, "strain builds; offers to take over"),
+    PERCHAR("exhaustion", "systems.exhaustion:exhaustion_for", MINUTE, "strain builds; offers to take over",
+            "systems.exhaustion:exhaustion_active"),
     PROCESS("appliance_degradation", "_job_appliance_degradation", MINUTE, "appliances wear out"),
     PROCESS("job_market", "_job_job_market", MINUTE, "applications and interviews progress"),
     PROCESS("investments", "_job_job_market_2", MINUTE, "investing"),
@@ -190,7 +196,8 @@ JOBS = [
     PROCESS("detective_work", "_job_detective_work", MINUTE, "a detective story moves on"),
     PROCESS("contract_checks", "_job_contract_checks", MINUTE, "contract terms are checked; worries fade"),
     PROCESS("contagion", "_job_contagion", 15 * SECOND, "disease spreads between people who are together (time together)"),
-    PROCESS("claustrophobia", "_job_claustrophobia", 30 * SECOND, "panic builds while someone is somewhere too small"),
+    PERCHAR("claustrophobia", "systems.claustrophobia:claustrophobia_for", 30 * SECOND,
+            "panic builds while someone is somewhere too small", "systems.claustrophobia:claustrophobia_active"),
     PROCESS("calendar_events", "_job_calendar_events", MINUTE, "reminders come due at their time; clauses, payouts, "
             "insurance (day-gated inside)"),
     PROCESS("trials", "_job_trials", MINUTE, "court dates, jail releases; prison reporting and check-ins (day-gated)"),
@@ -285,6 +292,7 @@ def install(module=None):
             scheduler.register_recurring(job["name"], fn, every=job["every"], offset=job.get("offset", 0))
         elif job["kind"] == "perchar":
             _perchar_fns[job["name"]] = (fn, _resolve(module, job["active"]), job["every"])
+            scheduler.register_recurring(job["name"], _perchar_timer(job["name"]), every=job["every"])
         elif job["kind"] == "duty":
             _duty_fns[job["name"]] = (fn, _resolve(module, job["active"]))
             scheduler.register(_duty_owner(job["name"]), _duty_timer)
@@ -307,30 +315,74 @@ def install(module=None):
 _perchar_fns = {}        # name -> (run fn(c, world), active fn(c, world), every)
 
 
+def _members(world, name):
+    """{character id: sim time from which it is due} -- 0 for now."""
+    return world.setdefault("_perchar_members", {}).setdefault(name, {})
+
+
+def _check(active, c, world):
+    """active(c, world) is True (work now), False/None (none), or a sim time (work from then on)."""
+    on = active(c, world)
+    if on is True:
+        return 0
+    if on is False or on is None:
+        return None
+    return float(on)
+
+
 def run_perchar(c, world):
-    """Called at the start of a character's update (and for characters the step defers): each PERCHAR job that has
-    work for this character runs once per grid point passed since it last ran, and a wake is set for the next one."""
-    from core.clock import now_ts
+    """Called in a character's update (and for characters the step defers): for each PERCHAR job, is this character
+    one it has work for (now, or from a known moment) -- added to its members, or dropped. The work itself runs on
+    the job's timer."""
     if not _perchar_fns:
         return
-    now = now_ts(world)
-    stamps = c.setdefault("_perchar", {})
-    for name, (fn, active, every) in _perchar_fns.items():
+    cid = c.get("id")
+    for name, (_fn, active, _every) in _perchar_fns.items():
         try:
-            if not active(c, world):
-                stamps.pop(name, None)
-                continue
-            grid = int(now // every)
-            last = stamps.get(name)
-            if last is None:
-                stamps[name] = grid             # it has work from now on: first run at the next grid point
-            elif grid > last:
-                stamps[name] = grid
-                fn(c, world)
-            from brain import agent_wake
-            agent_wake.wake_at(c, world, (grid + 1) * every, "perchar:" + name)
+            at = _check(active, c, world)
         except Exception as exc:
-            print(f"[flow] per-character job {name} failed for {c.get('id')}: {exc!r}")
+            print(f"[flow] per-character check {name} failed for {cid}: {exc!r}")
+            at = None
+        members = _members(world, name)
+        if at is None:
+            members.pop(cid, None)
+        else:
+            members[cid] = at
+
+
+def _perchar_timer(name):
+    def handler(world, entry):
+        members = (world.get("_perchar_members") or {}).get(name)
+        if not members:
+            return
+        from core.clock import now_ts
+        now = now_ts(world)
+        due = [cid for cid, at in members.items() if at <= now]
+        if not due:
+            return
+        fn, active, _every = _perchar_fns[name]
+        chars = world.get("characters") or {}
+        order = {cid: n for n, cid in enumerate(dict.keys(chars))}
+        for cid in sorted(due, key=lambda i: order.get(i, 1 << 30)):
+            c = chars.get(cid) if cid in order else None
+            try:
+                at = None if c is None else _check(active, c, world)
+                if at is None:
+                    members.pop(cid, None)
+                    continue
+                if at > now:
+                    members[cid] = at
+                    continue
+                fn(c, world)
+                after = _check(active, c, world)          # done for now? then due again only from when it says
+                if after is None:
+                    members.pop(cid, None)
+                else:
+                    members[cid] = after
+            except Exception as exc:
+                print(f"[flow] per-character job {name} failed for {cid}: {exc!r}")
+    handler.__qualname__ = f"flow.perchar.{name}"
+    return handler
 
 
 # ── duties ───────────────────────────────────────────────────────────────────────────────────────────────────────────

@@ -181,9 +181,8 @@ def due_set(world):
 def defer(c, world, reason="excluded"):
     """A due character the step does not run (incapacitated, a service worker...): its own periodic work still runs
     (core/flow.py PERCHAR -- the old sweeps covered them too), and it is looked at again later."""
-    if not c.get("is_workplace_npc"):
-        from core.flow import run_perchar
-        run_perchar(c, world)
+    from core.flow import run_perchar
+    run_perchar(c, world)                       # each job's own check says whether it concerns this character
     wake_at(c, world, _now(world) + HEARTBEAT_SECONDS, reason)
 
 

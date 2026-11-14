@@ -601,3 +601,14 @@ component; a replayable event log.
   character still waits for the step to end -- the concurrency is with other commands and with the publish/persist
   pass; real per-character parallelism needs the step itself split into per-entity handlers (step 5, not done).
   Only five commands declare their entities so far; props stay exclusive (their reads are not noted).
+- **Step 5a, per-character jobs (in progress).** A sweep over every character on a cadence becomes the character's own
+  work. Three shapes: a lazy value or a wake in the character's update (memories, habits, mood, anger, polarization,
+  grievances, ...); a `DUTY` for world-level work that is only continuous while something is going on; and a
+  `PERCHAR` job (`core/flow.py`). A `PERCHAR` job keeps the old job's recurring timer (same interval, same offset, so the
+  same point in the step) but runs only over its members. The characters it concerns are decided by a cheap check of
+  the character itself, made in that character's update. The check can also say "from time X", which replaces a wake:
+  libido waits for the next midnight's roll; long-term needs wait for the moment one becomes overdue. A character's
+  update never runs just because of a `PERCHAR` job, so nobody thinks at a different moment. Converted this way:
+  psychosis, lt_needs, social_odor, libido, addictions (hourly, per character), exhaustion and claustrophobia. All
+  three determinism runs are identical to before. The only differences are bookkeeping: the claustrophobia state is no
+  longer stamped on characters who are not moving, and the world-level hourly gate for addictions is gone.

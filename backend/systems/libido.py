@@ -65,7 +65,7 @@ def is_spiking(c):
     return bool((c.get("libido_state") or {}).get("spike_until_tick"))
 
 
-def tick_libido(world):
+def tick_libido(world, entry=None):
     """Call on any reasonably frequent cadence (see sim_loop.py) -- the
     actual once-per-day roll is gated internally by calendar date, not
     by call frequency."""
@@ -76,50 +76,80 @@ def tick_libido(world):
     tick = world.get("tick", 0)
 
     for c in world.get("characters", {}).values():
-        if c.get("is_offscreen") or c.get("age_group") in ("child", "teen"):
-            continue
-        state = ensure_libido_state(c)
+        _libido_step(c, world, day_key, tick)
 
-        if state.get("spike_until_tick") and tick >= state["spike_until_tick"]:
-            state["spike_until_tick"] = None
-            state["denied_count"] = 0
 
-        if state.get("_last_roll_day") != day_key:
-            state["_last_roll_day"] = day_key
-            libido_trait = (c.get("attraction_profile") or {}).get("libido", 0.5)
-            if not state.get("spike_until_tick"):
-                if random.random() < SPIKE_DAILY_CHANCE_BASE * (0.3 + libido_trait):
-                    days = random.randint(*SPIKE_DURATION_DAYS)
-                    state["spike_until_tick"] = tick + days * TICKS_PER_DAY
+def libido_active(c, world):
+    """Has libido anything to do for this character now (core/flow.py PERCHAR `libido`): a new day to roll for, a spike
+    to end, or a drive high enough to act on -- else the sim time of the next day's roll (core/flow.py PERCHAR)."""
+    if c.get("is_offscreen") or c.get("age_group") in ("child", "teen"):
+        return False
+    state = c.get("libido_state")
+    if not isinstance(state, dict):
+        return True
+    if state.get("_last_roll_day") != _day_key(world.get("calendar", {})):
+        return True
+    if state.get("spike_until_tick") or (state.get("current") or 0) >= SEEK_RELEASE_THRESHOLD:
+        return True
+    return _next_midnight(world)          # the next day's roll
 
-        state["current"] = round(min(1.0, state["baseline"] +
-                                      (SPIKE_BONUS if state.get("spike_until_tick") else 0.0)), 3)
 
-        if state["current"] >= SEEK_RELEASE_THRESHOLD:
-            from systems.persistent_desires import add_desire
-            add_desire(c, "seek_sexual_release", importance=state["current"])
+def _next_midnight(world):
+    from core.clock import now_ts, seconds_into_day, DAY
+    return now_ts(world) + (DAY - seconds_into_day(world))
 
-            # Autonomous, once-per-day attempt while spiking -- mirrors
-            # this codebase's existing pattern of AI-computed-but-
-            # automatically-applied background drives (e.g.
-            # attraction.py::recipient_decision(), tick_domestic_control())
-            # rather than requiring a dedicated LLM action every roll.
-            # See systems/sexual_release.py for the actual cascade.
-            # With "Relieve Sexual Tension" live (simulations/default/behaviour.json) the autopilot's ActionPlans
-            # decide what to do -- partner, booty call, or somewhere private -- and walk there, one activity at a
-            # time; the old in-place cascade below only runs while that intention is not live.
-            from brain.actionplans.runner import live_intention_for
-            if is_spiking(c) and live_intention_for(world, "seek_sexual_release"):
-                if not any(i.get("type") == "seek_sexual_release" for i in c.get("active_intentions") or []):
-                    from brain.intentions import add_intention
-                    add_intention(c, {"type": "seek_sexual_release", "category": "private",
-                                      "priority": int(40 + 30 * state["current"]), "reason": "feeling horny"})
-                continue
-            try:
-                from systems.sexual_release import attempt_release
-                attempt_release(c, world)
-            except Exception:
-                pass
+
+def libido_for(c, world):
+    day_key = _day_key(world.get("calendar", {}))
+    if day_key is not None:
+        _libido_step(c, world, day_key, world.get("tick", 0))
+
+
+def _libido_step(c, world, day_key, tick):
+    if c.get("is_offscreen") or c.get("age_group") in ("child", "teen"):
+        return
+    state = ensure_libido_state(c)
+
+    if state.get("spike_until_tick") and tick >= state["spike_until_tick"]:
+        state["spike_until_tick"] = None
+        state["denied_count"] = 0
+
+    if state.get("_last_roll_day") != day_key:
+        state["_last_roll_day"] = day_key
+        libido_trait = (c.get("attraction_profile") or {}).get("libido", 0.5)
+        if not state.get("spike_until_tick"):
+            if random.random() < SPIKE_DAILY_CHANCE_BASE * (0.3 + libido_trait):
+                days = random.randint(*SPIKE_DURATION_DAYS)
+                state["spike_until_tick"] = tick + days * TICKS_PER_DAY
+
+    state["current"] = round(min(1.0, state["baseline"] +
+                                  (SPIKE_BONUS if state.get("spike_until_tick") else 0.0)), 3)
+
+    if state["current"] >= SEEK_RELEASE_THRESHOLD:
+        from systems.persistent_desires import add_desire
+        add_desire(c, "seek_sexual_release", importance=state["current"])
+
+        # Autonomous, once-per-day attempt while spiking -- mirrors
+        # this codebase's existing pattern of AI-computed-but-
+        # automatically-applied background drives (e.g.
+        # attraction.py::recipient_decision(), tick_domestic_control())
+        # rather than requiring a dedicated LLM action every roll.
+        # See systems/sexual_release.py for the actual cascade.
+        # With "Relieve Sexual Tension" live (simulations/default/behaviour.json) the autopilot's ActionPlans
+        # decide what to do -- partner, booty call, or somewhere private -- and walk there, one activity at a
+        # time; the old in-place cascade below only runs while that intention is not live.
+        from brain.actionplans.runner import live_intention_for
+        if is_spiking(c) and live_intention_for(world, "seek_sexual_release"):
+            if not any(i.get("type") == "seek_sexual_release" for i in c.get("active_intentions") or []):
+                from brain.intentions import add_intention
+                add_intention(c, {"type": "seek_sexual_release", "category": "private",
+                                  "priority": int(40 + 30 * state["current"]), "reason": "feeling horny"})
+            return
+        try:
+            from systems.sexual_release import attempt_release
+            attempt_release(c, world)
+        except Exception:
+            pass
 
 
 def note_denied(c, world):
