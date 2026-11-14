@@ -738,3 +738,10 @@ scripted Turn outputs. Pure modules (state machine, codec, policies, context) ge
   `floor_blocks`, `earshot`, `channel_open`. `apply_speech` calls them, so the legacy path and CPL share one
   implementation. Determinism identical. The regression tests that pinned the original bugs pass unchanged: talking,
   unheard speech, speech repeat, conversation outcome, floor, archive, latency, log.
+- **Phase 1, step 5: codec (done).** `cpl/protocol/codec.py` parses the compact turn lines (`ANSWERS / ACT / STANCE
+  / FEELING / SAY / CONDITION / NEXT`) and the initiate lines (`TALK_TO / PURPOSE / ABOUT / APPROACH / FEELING / SAY
+  / CHANNEL`). Open items are shown to the model as labels (Q1, R1, P1) and mapped back to ids. Invalid answers are
+  reported for the corrective retry. The fallback keeps the line as a plain statement and never invents an accept
+  or a reject. `to_event` turns a decision into its state-machine event. `tests/test_cpl_codec.py` (21 checks).
+  Next: invitations as PENDING with CPL deciding (step 3, `CPL_MODE=on`), the `cpl.message_delivered` adapter for
+  the per-line side effects (step 4), and these lines added to the decision prompt.
