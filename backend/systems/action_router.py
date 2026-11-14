@@ -47,13 +47,8 @@ _ACTION_ANIMATION = {
 
 def _answering(c, world, target_id):
     """True when c holds the floor (systems/conversation_floor.py) of an active conversation with target_id."""
-    if not target_id:
-        return False
-    from brain.conversations import find_conversation
-    conv = find_conversation(world, [c["id"], target_id])
-    f = (conv or {}).get("floor") or {}
-    return bool(conv and conv.get("active") and f.get("state") != "closed" and f.get("holder") == c["id"]
-                and f.get("from") == target_id)
+    from cpl.participants import answering
+    return answering(c, world, target_id)
 
 
 UNHEARD_RAISE_TICKS = 60        # not heard by someone this recently: the next line to them is called out (volume "high")
@@ -103,18 +98,14 @@ def apply_speech(c, world, speech):
     # grabbing nearby person) so ordinary conversation still threads
     # properly even when the LLM didn't -- or, mid some other narrated
     # activity, couldn't cleanly -- name anyone.
-    if not target_id:
-        visible = (c.get("perception") or {}).get("visible_people", [])
-        if visible:
-            nearest = max(visible, key=lambda p: p.get("visibility", 0))
-            target_id = nearest.get("id")
+    from cpl import participants as _parts            # who it is for, and whether it can reach them (cpl/participants.py)
+    target_id = _parts.addressee(c, target_id)
 
     # Said once: the same line to the same person again is dropped (systems/speech_repeat.py) -- unless it is an answer.
     # Someone holding the floor of a live conversation with this person is being waited on: "Okay!" or "Yeah!" said twice
     # in half an hour is ordinary talk, and dropping it made the other person's wait run out -- the conversation ended
     # as "ignored" and they remembered being ignored by someone who had answered.
-    from systems.speech_repeat import is_repeat
-    if is_repeat(c, world, utterance, target_id) and not _answering(c, world, target_id):
+    if _parts.repeat_dropped(c, world, utterance, target_id):
         return
 
     # Volume (see brain/perception.py's VOLUME_TIERS) -- explicit caller
@@ -128,12 +119,8 @@ def apply_speech(c, world, speech):
     # holds the floor and is still within their time to respond, a line from
     # the speaker is dropped rather than talking over them -- the stale-context
     # pile-ups where both sides keep opening the conversation.
-    if target_id and speech.get("medium", "in_person") in ("in_person", "call"):
-        from brain.conversations import find_conversation
-        from systems.conversation_floor import blocks
-        _existing = find_conversation(world, [c["id"], target_id])
-        if _existing and blocks(world, _existing, c["id"]):
-            return
+    if _parts.floor_blocks(world, c["id"], target_id, speech.get("medium", "in_person")):
+        return
 
     volume = speech.get("volume")
     if not volume and target_id:
@@ -200,9 +187,9 @@ def apply_speech(c, world, speech):
     # "X just said to you". The speaker notices they weren't heard (go over, or call out louder: repeat_volume above
     # raises the voice on a repeat). Conversations used to carry on between rooms like this, line after line.
     if listener and speech.get("medium", "in_person") == "in_person":
-        from systems.conversation_reach import check_pair, note_unheard
-        _reach = check_pair(world, c, listener, volume)
-        if any(i.startswith("too far") for i in _reach["issues"]):
+        from systems.conversation_reach import note_unheard
+        _heard, _reach = _parts.earshot(world, c, listener, volume)
+        if not _heard:
             # a plan's own line (brain/actionplans: "Dinner's ready!") has already done its work -- the plan doesn't
             # stop to wonder whether it was heard; anything else, the speaker notices
             note_unheard(world, c, listener, utterance, _reach, tell_speaker=not speech.get("scripted"))
@@ -218,10 +205,7 @@ def apply_speech(c, world, speech):
     # the recipient's inbox instead of threading a live conversation.
     medium = speech.get("medium", "in_person")
     if listener and medium == "call":
-        from systems.personal_items import phone_is_usable
-        busy_until = listener.get("_work_busy_until_tick", 0)
-        in_meeting = tick < busy_until
-        if not phone_is_usable(listener) or in_meeting:
+        if not _parts.channel_open(world, listener, medium):
             from cpl import shadow as _cpl_shadow
             if _cpl_shadow.active(world):
                 _cpl_shadow.on_unreachable(world, c, listener, medium, topic, utterance)

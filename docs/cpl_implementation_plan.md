@@ -733,3 +733,8 @@ scripted Turn outputs. Pure modules (state machine, codec, policies, context) ge
     ends single-line exchanges within a second; CPL's policies are looser on purpose (C6: social allows 8 lines,
     an invitation 60 s). Where to set them is the C6 decision, now with numbers behind it.
   - `tests/test_cpl_shadow.py`.
+- **Phase 1, step 2b: participants (done).** `cpl/participants.py` holds the checks that decide whether a line can
+  reach someone, moved unchanged out of `apply_speech` (C12): `addressee`, `answering`, `repeat_dropped`,
+  `floor_blocks`, `earshot`, `channel_open`. `apply_speech` calls them, so the legacy path and CPL share one
+  implementation. Determinism identical. The regression tests that pinned the original bugs pass unchanged: talking,
+  unheard speech, speech repeat, conversation outcome, floor, archive, latency, log.
