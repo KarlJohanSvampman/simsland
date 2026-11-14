@@ -40,8 +40,11 @@ class _Clock:
 
 
 class _U:
+    """A sequential stand-in for uuid4(). The counter is in the leading digits as well as the trailing ones: callers
+    take hex[:8] for ids (conv_..., cut_...), and with the counter only at the end every one of them was "00000000"
+    -- harmless one at a time, a collision as soon as two are made side by side (core/partitions.py)."""
     def __init__(self, i):
-        self.hex = f"{i:032x}"
+        self.hex = f"{i:08x}{'0' * 12}{i:012x}"
         self.int = i
 
     def __str__(self):

@@ -68,6 +68,9 @@ def run_one(world, name):
     """Run one loop now (for its members only); nothing when it has none."""
     loop = _loops.get(name)
     ids = members(world, name)
+    if ids:
+        from core import partitions
+        ids = partitions.loop_ids(world, name, ids)       # this partition's members only (core/partitions.py)
     if loop is None or not ids:
         return
     st = _stats[name]

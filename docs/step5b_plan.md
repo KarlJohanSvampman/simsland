@@ -102,3 +102,30 @@ path is proven.
     and building props going with them, the rest partition 0; `move_household`.
   - `tests/test_entity_patch.py`: 2,000 random round trips in the test (plus 20,000 run once, 0 mismatches),
     concurrent edits landing, appends merging, ownership.
+- **Slice 2 (done): partitions in one process.** `core/partitions.py`.
+  - A `Cluster` of N world copies steps each partition in turn, for what it owns: its characters' updates, its
+    timers, its loop members; partition 0 also runs world jobs, duties and conversations.
+  - A change to an entity a partition doesn't own becomes a patch to the owner, and the partition's copy goes back
+    to the published one. Owners apply patches in partition order, then publish their changes to everyone.
+  - Timers and duty wake-ups for another partition's entities go to its inbox (`_inbox_<p>`, a key it owns). A
+    patched character's wake-up is re-indexed at its owner.
+  - Per-process bookkeeping stays local (`LOCAL_KEYS`: timers, dirty sets, loop and per-character-job membership,
+    the clock).
+  - Hooks, all inert outside a cluster: `scheduler.install` / `schedule_at`, `agent_wake.iter_due`, PERCHAR
+    members, `active_loops`, `wake_duty`.
+  - In one process the partitions share module state, above all the event queue: a decision can be applied during
+    another partition's turn. So the cluster compares every entity each step (`exact=True`) rather than trusting
+    only what the façade saw; a change in the "wrong" partition just travels as a patch. Separate processes won't
+    share that state.
+  - **Harness fix.** The `uuid4` stand-in put the counter only in the trailing digits, so every `hex[:8]` id
+    (`conv_…`) was `00000000`. That is harmless one at a time, but a collision once partitions create side by side.
+    Determinism outputs made before this change aren't comparable with ones made after; new baselines come from
+    `base_at.sh` with the new harness.
+  - `tests/test_partitions.py` (1,500 ticks, social):
+    - one partition gives exactly the single writer's world;
+    - three partitions (households over partitions 1 and 2) run with no errors and no divergence after any step;
+    - 564 patches landed, nobody stalled;
+    - 33 conversation lines against 15 for one writer: looser, not quieter, since a partition sees the floor a
+      step late.
+
+    The off path is identical; full suite: no new failures.

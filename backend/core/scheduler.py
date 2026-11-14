@@ -102,7 +102,11 @@ def _remove(world, owner, key):
 
 
 def schedule_at(world, owner, key, ts, payload=None, every=None, _spec=None):
-    """Deliver (owner, key) at sim timestamp `ts`. Replaces an existing timer with the same identity."""
+    """Deliver (owner, key) at sim timestamp `ts`. Replaces an existing timer with the same identity. In a partition, a
+    timer for something another partition owns goes to that partition's inbox instead (core/partitions.py)."""
+    from core import partitions
+    if partitions.forward_timer(world, owner, key, ts, payload, every, _spec):
+        return None
     _remove(world, owner, key)
     seq = world.get("_timer_seq", 0) + 1
     world["_timer_seq"] = seq
@@ -205,10 +209,12 @@ def fire_due(world):
 
 def install(world):
     """Ensure each registered recurring job has a timer (and that an old interval timer of a job that is now clock-anchored
-    is replaced)."""
+    is replaced). In a partition (core/partitions.py) only the recurring jobs that run there."""
     if not _recurring:
         return
-    if world.get("_sched_sig") == _recurring_sig and len(_timers(world)) >= len(_recurring):
+    from core import partitions
+    regs = {o: v for o, v in _recurring.items() if partitions.runs_recurring(o)}
+    if world.get("_sched_sig") == _recurring_sig and len(_timers(world)) >= len(regs):
         return                       # nothing registered since last time and nothing was wiped
     world["_sched_sig"] = _recurring_sig
     # a recurring job that no longer exists (removed from core/flow.py) leaves its timer behind in older saves: dropped
@@ -216,7 +222,7 @@ def install(world):
         _remove(world, t["owner"], "recurring")
     have = {(t["owner"], t["key"]): t for t in _timers(world)}
     now = now_ts(world)
-    for owner, (kind, value, offset) in _recurring.items():
+    for owner, (kind, value, offset) in regs.items():
         old = have.get((owner, "recurring"))
         if kind == "every":
             if old and old.get("every") == value and not old.get("spec"):

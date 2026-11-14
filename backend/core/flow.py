@@ -411,7 +411,10 @@ def _perchar_timer(name):
         chars = world.get("characters") or {}
         order = {cid: n for n, cid in enumerate(dict.keys(chars))}
         left = _perchar_caps.get(name)
+        from core import partitions
         for cid in sorted(due, key=lambda i: order.get(i, 1 << 30)):
+            if not partitions.here(world, "characters", cid):
+                continue                              # its owner's partition runs it (core/partitions.py)
             c = chars.get(cid) if cid in order else None
             try:
                 at = None if c is None else _check(active, c, world)
@@ -452,6 +455,9 @@ def wake_duty(world, name):
     j = job(name)
     if not j or j.get("kind") != "duty" or world is None:
         return
+    from core import partitions
+    if partitions.forward_duty(world, name):
+        return                                        # duties run in partition 0 (core/partitions.py)
     owner = _duty_owner(name)
     if scheduler.pending(world, owner):
         return

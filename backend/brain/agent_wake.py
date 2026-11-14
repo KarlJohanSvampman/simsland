@@ -121,8 +121,10 @@ def _candidates(world):
     while heap and heap[0][0] <= now:
         cand.add(heapq.heappop(heap)[1])
     if _woken:
-        cand |= {i for i in _woken if dict.__contains__(chars, i)}
-        _woken.clear()
+        from core import partitions
+        mine = {i for i in _woken if dict.__contains__(chars, i) and partitions.here(world, "characters", i)}
+        cand |= mine
+        _woken.difference_update(mine | {i for i in _woken if not dict.__contains__(chars, i)})
     return cand
 
 
@@ -140,8 +142,8 @@ def iter_due(world):
         nxt = None
         for cid in sorted((cand | movers), key=lambda i: order.get(i, 1 << 30)):
             n = order.get(cid)
-            if n is None:
-                cand.discard(cid)
+            if n is None or not _here(world, cid):
+                cand.discard(cid)                     # gone, or another partition's character (core/partitions.py)
                 continue
             if n <= pos:
                 continue
@@ -157,6 +159,19 @@ def iter_due(world):
         cand.discard(nxt[0])
         pos = order[nxt[0]]
         yield nxt
+
+
+def _here(world, cid):
+    from core import partitions
+    return partitions.here(world, "characters", cid)
+
+
+def reindex(world, cid):
+    """A character's wake changed somewhere else (a patch from another partition): put it on this world's index."""
+    c = dict.get(world.get("characters") or {}, cid)
+    w = (c or {}).get("_wake") or {}
+    if w.get("at") is not None:
+        _push(world, w["at"], cid)
 
 
 def due_set(world):
