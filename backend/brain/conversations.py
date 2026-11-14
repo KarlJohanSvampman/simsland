@@ -569,6 +569,9 @@ def add_message(
     from core.event_bus import emit
     emit("conversation.message", {"conv_id": conv.get("id"), "speaker_id": speaker_id,
                                   "character_ids": list(conv.get("participants") or [])})
+    from cpl import shadow as _cpl_shadow                    # CPL_MODE=shadow: CPL follows along (cpl/shadow.py)
+    if _cpl_shadow.active(world):
+        _cpl_shadow.on_line(world, conv, speaker_id, utterance, speech_act)
     if conv.get("active"):
         from core import scheduler
         scheduler.schedule_in(world, "convidle", conv["id"], IDLE_TIMEOUT_SECONDS)

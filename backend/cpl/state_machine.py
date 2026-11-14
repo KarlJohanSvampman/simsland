@@ -29,6 +29,7 @@ Events:
     interrupt    {by?, kind?}
     unavailable  {who}
     escalation   {}
+    force_resolve {reason}                                         any live -> RESOLVED (EXPIRED if never started)
 """
 
 from dataclasses import dataclass, field
@@ -112,6 +113,9 @@ def transition(conv, event, now):
         if len(_active(conv)) <= 2:
             return _end(S.RESOLVED, R.UNAVAILABLE.value, [left])
         return Result(state, None, [left, {"do": "set_floor", "holder": None}])
+    if kind == "force_resolve":                       # from outside: an admin, or the legacy path ending it (shadow)
+        final = S.EXPIRED if state in (S.CREATED, S.PENDING) else S.RESOLVED
+        return _end(final, event.get("reason") or R.ABANDONED.value)
     if kind == "escalation":
         if state in (S.ACTIVE, S.RESOLVING, S.PAUSED):
             return _end(S.RESOLVED, R.CONFLICT_ESCALATION.value)

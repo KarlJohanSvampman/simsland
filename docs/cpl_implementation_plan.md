@@ -720,3 +720,16 @@ scripted Turn outputs. Pure modules (state machine, codec, policies, context) ge
 
   `tests/test_cpl_state_machine.py` (50 checks) covers every row of the table and the engine on a bare world.
   Not wired into `apply_speech` yet (`CPL_MODE=off`).
+- **Phase 1, step 2a: shadow mode (done).** `cpl/shadow.py` with `CPL_MODE=shadow`. CPL follows the legacy path
+  from synchronous hooks: each line (`add_message`), each declined invitation and each voicemail (`apply_speech`),
+  and each legacy ending (`conversation_floor._end`). It keeps its own conversation per legacy one, with its own
+  timers. When legacy ends one, CPL records where its copy stood and closes it with the legacy reason. The tallies
+  are in `world["cpl_shadow"]` (`shadow.compare`). A state-machine event, `force_resolve`, closes from outside (also
+  for the planned admin action).
+  - Determinism: `CPL_MODE=off` is identical to before. `shadow` vs `off` is identical outside CPL's own state in
+    all three runs.
+  - First reading (social run, 2,400 ticks): 8 conversations, 15 lines, 1 declined invitation. Legacy ended all 8
+    while CPL's copies were still live (4 pending, 3 active, 1 pending at "lapsed"). Legacy stops at 6 lines and
+    ends single-line exchanges within a second; CPL's policies are looser on purpose (C6: social allows 8 lines,
+    an invitation 60 s). Where to set them is the C6 decision, now with numbers behind it.
+  - `tests/test_cpl_shadow.py`.

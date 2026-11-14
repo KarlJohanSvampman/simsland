@@ -241,6 +241,9 @@ def _end(world, conv, reason):
     from core.event_bus import emit
     emit("conversation.ended", {"conv_id": conv.get("id"), "reason": reason,
                                 "character_ids": list(conv.get("participants") or [])})
+    from cpl import shadow as _cpl_shadow
+    if _cpl_shadow.active(world):
+        _cpl_shadow.on_legacy_end(world, conv, reason)
     from core import scheduler
     scheduler.cancel(world, "convidle", conv.get("id"))
     try:

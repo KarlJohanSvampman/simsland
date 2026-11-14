@@ -222,6 +222,9 @@ def apply_speech(c, world, speech):
         busy_until = listener.get("_work_busy_until_tick", 0)
         in_meeting = tick < busy_until
         if not phone_is_usable(listener) or in_meeting:
+            from cpl import shadow as _cpl_shadow
+            if _cpl_shadow.active(world):
+                _cpl_shadow.on_unreachable(world, c, listener, medium, topic, utterance)
             from systems.inbox import get_character_inbox, add_message as add_inbox_message
             add_inbox_message(
                 get_character_inbox(listener), "voicemail", c["id"], target_id,
@@ -277,6 +280,9 @@ def apply_speech(c, world, speech):
             accepted, engagement, excuse = check_conversation_interest(
                 listener, world, topic_for_interest, c["id"])
             if not accepted:
+                from cpl import shadow as _cpl_shadow
+                if _cpl_shadow.active(world):
+                    _cpl_shadow.on_declined(world, c, listener, medium, topic, excuse)
                 if medium == "call":
                     # A declined call leaves a real voicemail (the same
                     # answering-machine path just above for an unusable/

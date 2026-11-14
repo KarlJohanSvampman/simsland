@@ -1494,3 +1494,4 @@ def _job_calendar_events(world, entry):
 # from the same table: tools/flow_map/).
 from core import flow as _flow
 _flow.install(sys.modules[__name__])
+import cpl.conversations  # noqa: E402,F401 -- its cpl:<id> timers have a handler before any can fire
