@@ -50,7 +50,8 @@ def context_block(world, c):
     interrupted = None
     if intr and intr.get("who") == c.get("id"):
         interrupted = {"doorbell": "the doorbell rang", "phone": "your phone is ringing",
-                       "director_stop": "everything around you has frozen"}.get(intr.get("kind"), "you were interrupted")
+                       "director_stop": "everything around you has frozen",
+                       "child": "your child is calling for you"}.get(intr.get("kind"), "you were interrupted")
     return {"conversation_id": conv["id"], "with": [_name(world, p) for p in others], "labels": labels,
             "open": open_lines, "winding_down": bool(conv.get("winding_down")), "state": conv.get("state"),
             "summary": (conv.get("context") or {}).get("summary") or "", "interrupted": interrupted,

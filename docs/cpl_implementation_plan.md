@@ -830,3 +830,20 @@ scripted Turn outputs. Pure modules (state machine, codec, policies, context) ge
   - Determinism: `off` and `shadow` unchanged. `tests/test_cpl_lifecycle.py` (21 checks).
   - Still in Phase 2: work-shift and child-care interruptions (no clean event to hang them on yet), and a soak run
     asserting the hard cap over a whole sim day.
+- **Phase 2, part 2 (done; Phase 2 complete).**
+  - A hungry child who can't feed themselves interrupts a parent mid-conversation ("your child is calling for
+    you").
+  - A work shift needs no interruption of its own: leaving for work takes the character off the map, and that ends
+    the conversation as unavailable.
+  - `tests/test_cpl_soak.py`: a full sim day (86,400 ticks, social, `CPL_MODE=on`, about 90 s) produced 104
+    conversations and 637 lines.
+    - Nothing was live past its hard cap; no message was stored twice; sequence numbers ran in order.
+    - Finished conversations were cleared after the gc delay, with no orphan timers.
+    - Only open requests outlived their conversations.
+  - Next, Phase 3 (semantics):
+    - accepted requests become social contracts (C7);
+    - proposals, counteroffers and conditional accepts, carried through;
+    - structured arguments;
+    - information shared with an epistemic status (asserted, acknowledged, disputed …), passed to rumours and
+      memory (C8);
+    - the structured record fed into the conversation-tags prompt (C9).
