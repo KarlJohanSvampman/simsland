@@ -1,6 +1,7 @@
 """
 cpl/archive.py -- finished conversations to the append-only archive tables (docs/cpl_implementation_plan.md C1, 5;
-schema: scripts/migrations/cpl_001_archive.sql, created here if missing).
+schema: cpl/archive_schema.sql, next to this file -- inside the backend, so it is there wherever the backend is
+mounted; created here if missing).
 
     on `cpl.conversation_ended`: a copy of the conversation (participants, messages, its requests) is queued, and a
     background thread writes it -- INSERT ... ON CONFLICT DO NOTHING, so a conversation archived twice is written once.
@@ -24,7 +25,7 @@ _thread = None
 _stats = {"queued": 0, "written": 0, "failed": 0}
 _tables_ok = False
 
-_SCHEMA = os.path.join(os.path.dirname(__file__), "..", "..", "scripts", "migrations", "cpl_001_archive.sql")
+_SCHEMA = os.path.join(os.path.dirname(os.path.abspath(__file__)), "archive_schema.sql")
 
 
 def _snapshot(world, conv):

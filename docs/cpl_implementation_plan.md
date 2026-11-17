@@ -220,7 +220,7 @@ backend/cpl/
   metrics.py             counters: llm calls, tokens, mode mix, latency, end reasons (exposed on /admin)
 backend/api/cpl.py       read-only debug routes (+ @command admin actions: force-resolve, inject interrupt)
 backend/tests/test_cpl_*.py
-scripts/migrations/cpl_001_archive.sql
+backend/cpl/archive_schema.sql
 ```
 
 Each component takes its collaborators as arguments (store, clock, scheduler, availability, publisher). The state
@@ -349,7 +349,7 @@ decision/message ids (section 9).
 
 ## 5. Database migration (archive only, see C1)
 
-`scripts/migrations/cpl_001_archive.sql`. The tables follow the spec's schema with these changes: `payload` and
+`backend/cpl/archive_schema.sql`. The tables follow the spec's schema with these changes: `payload` and
 `context_summary` are `jsonb`, primary keys are natural ids so writes are `INSERT … ON CONFLICT DO NOTHING`, and every
 table carries `sim_id` (one database holds several simulations).
 
@@ -793,7 +793,7 @@ scripted Turn outputs. Pure modules (state machine, codec, policies, context) ge
   - Determinism: `off` and `shadow` unchanged. `tests/test_cpl_turns.py` (request → accepted → commitment →
     request fulfilled; an angry exit).
   - Phase 1 still to do: the append-only archive tables (item 7).
-- **Phase 1, item 7: archive (done).** `scripts/migrations/cpl_001_archive.sql` (the tables are also created on
+- **Phase 1, item 7: archive (done).** `backend/cpl/archive_schema.sql` (the tables are also created on
   first write) and `cpl/archive.py`.
   - On `cpl.conversation_ended`, a copy of the conversation, its participants, messages and requests is queued. A
     background thread writes it (`ON CONFLICT DO NOTHING`, so archiving twice writes once). The step never waits on
