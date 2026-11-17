@@ -1,6 +1,7 @@
 -- CPL archive (docs/cpl_implementation_plan.md section 5): append-only history of finished conversations.
 -- Live state is on the world (cpl_conversations / cpl_requests entities); these rows are never read back as state.
--- Written by backend/cpl/archive.py, which also creates them if missing.
+-- Written by backend/cpl/archive.py, which also creates them if missing (this file sits next to it, inside the backend:
+-- the container mounts only ./backend).
 create table if not exists cpl_conversations (
   sim_id text not null, conversation_id text not null, channel text not null,
   primary_purpose text, current_topic text, status text not null, resolution_reason text,

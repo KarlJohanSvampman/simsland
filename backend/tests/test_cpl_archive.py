@@ -26,6 +26,10 @@ from core import event_bus, scheduler
 from cpl import archive, store
 from cpl import conversations as CV
 
+check("the schema ships inside the backend (the container mounts only ./backend)",
+      os.path.exists(archive._SCHEMA) and os.path.dirname(archive._SCHEMA).startswith(
+          os.path.dirname(os.path.dirname(os.path.abspath(archive.__file__)))), archive._SCHEMA)
+
 SIM = "cpl_archive_test"
 archive.SIM_ID = SIM
 with db._conn_lock, db.conn:
