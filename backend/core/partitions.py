@@ -189,6 +189,44 @@ def _dumps(v):
     return json.dumps(v, default=str)
 
 
+class RedisTransport:
+    """Messages between partition processes: one Redis stream per partition (part:<sim>:<p>), read in order from where
+    this process last read. A message is a JSON blob in the field "m"."""
+
+    def __init__(self, n, sim="default", client=None):
+        from core.cache import r
+        self.n, self.sim = n, sim
+        self.r = client or r
+        self.last = {}
+
+    def _stream(self, p):
+        return f"part:{self.sim}:{p}"
+
+    def send(self, to, msg):
+        self.r.xadd(self._stream(to), {"m": json.dumps(msg, default=str)}, maxlen=100000, approximate=True)
+
+    def broadcast(self, frm, msg):
+        for p in range(self.n):
+            if p != frm:
+                self.send(p, msg)
+
+    def receive(self, p):
+        out = []
+        while True:
+            got = self.r.xread({self._stream(p): self.last.get(p, "0")}, count=1000)
+            if not got:
+                return out
+            for _stream, entries in got:
+                for mid, fields in entries:
+                    self.last[p] = mid
+                    raw = fields.get(b"m") if b"m" in fields else fields.get("m")
+                    out.append(json.loads(raw))
+
+    def clear(self):
+        for p in range(self.n):
+            self.r.delete(self._stream(p))
+
+
 class MemoryTransport:
     """Messages between partitions in one process (tests, the in-process cluster)."""
 
@@ -226,6 +264,8 @@ class Node:
         self._keep_own_timers()
         self.published = {k: _dumps(_get(self.world, k)) for k in _keys(self.world)}
         self.changed = set()
+        self.pending = []                                # messages from a step not yet over (lockstep, see receive)
+        self.seq = 0                                     # this partition's message counter (orders what it sent)
         self.stats = {"ticks": 0, "patches_in": 0, "patches_out": 0, "ops_landed": 0, "frames_in": 0,
                       "frames_out": 0, "entities_out": 0, "creates": 0, "deletes": 0}
 
@@ -241,9 +281,15 @@ class Node:
             CURRENT = prev
 
     # -- receiving ------------------------------------------------------------------------------------------------
-    def receive(self):
+    def receive(self, everything=False):
+        """Take in messages. Only those from steps already over (step < this partition's own) unless `everything`:
+        a faster partition's messages from the step now running wait, so a lockstep run is the same every time."""
         w = self.world
-        for m in self.transport.receive(self.id):
+        msgs = self.pending + self.transport.receive(self.id)
+        self.pending = [] if everything else [m for m in msgs if m.get("step", -1) >= self.stats["ticks"]]
+        msgs = msgs if everything else [m for m in msgs if m.get("step", -1) < self.stats["ticks"]]
+        msgs.sort(key=lambda m: (m.get("step", -1), m.get("from", 0), m.get("seq", 0)))   # not arrival order
+        for m in msgs:
             if m["t"] == "frame":
                 self.stats["frames_in"] += 1
                 for kind, eid, text in m["entities"]:
@@ -309,13 +355,16 @@ class Node:
             self.receive()
             self._drain_inbox()
             tick_fn(self.world)
+            if self.transport.n > 1:
+                from core import event_bus
+                event_bus.flush(self.world)              # what this tick set off is handled here, by its owner
         finally:
             CURRENT = None
         self.stats["ticks"] += 1
         self._send_changes(world_view.take_touched(self.sim_id) or set())
 
     def settle(self):
-        self.receive()
+        self.receive(everything=True)
         self._send_changes(set())
 
     def _send_changes(self, touched):
@@ -348,20 +397,27 @@ class Node:
             if text == before:
                 continue
             if before is None:
-                msg = {"t": "patch", "key": list(key), "what": "create", "body": copy.deepcopy(now), "from": p}
+                msg = {"t": "patch", "key": list(key), "what": "create", "body": copy.deepcopy(now), "from": p,
+                       "step": self.stats["ticks"]}
             elif now is None:
-                msg = {"t": "patch", "key": list(key), "what": "delete", "body": None, "from": p}
+                msg = {"t": "patch", "key": list(key), "what": "delete", "body": None, "from": p,
+                       "step": self.stats["ticks"]}
             else:
                 ops = entity_patch.diff(json.loads(before), json.loads(text))
                 if not ops:
                     continue
-                msg = {"t": "patch", "key": list(key), "what": "patch", "body": ops, "from": p}
+                msg = {"t": "patch", "key": list(key), "what": "patch", "body": ops, "from": p,
+                       "step": self.stats["ticks"]}
+            self.seq += 1
+            msg["seq"] = self.seq
             self.transport.send(owner, msg)
             self.stats["patches_out"] += 1
             _put(w, key, None if before is None else json.loads(before))      # back to the published copy
         self.changed = set()
         if frame:
-            self.transport.broadcast(p, {"t": "frame", "from": p, "entities": frame})
+            self.seq += 1
+            self.transport.broadcast(p, {"t": "frame", "from": p, "entities": frame, "step": self.stats["ticks"],
+                                         "seq": self.seq})
             self.stats["frames_out"] += 1
             self.stats["entities_out"] += len(frame)
 
