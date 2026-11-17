@@ -112,9 +112,13 @@ def _fixture_path():
     """/tmp/backup_world.json if someone put one there, else the populated snapshot in the mounted backups/ folder."""
     import glob
     import os
+    if os.environ.get("DET_FIXTURE") == "live":
+        return None                                     # a copy of the live world (fixture() below)
     if os.path.exists("/tmp/backup_world.json"):
         return "/tmp/backup_world.json"
     found = sorted(glob.glob("/backups/world_default_before_reset_*.json"), reverse=True)    # newest first
+    if not found and os.environ.get("DET_FIXTURE") == "live_if_missing":
+        return None
     if not found:
         raise FileNotFoundError("no /tmp/backup_world.json and no /backups/world_default_before_reset_*.json (mount ./backups)")
     # the most populated snapshot (newest among equals): a fresh reset backup of a nearly empty world must not become the fixture
@@ -128,7 +132,10 @@ def _fixture_path():
 
 def fixture(start=None):
     live = load_world("default")
-    w = json.load(open(_fixture_path(), encoding="utf-8"))
+    path = _fixture_path()
+    # no snapshot file (DET_FIXTURE=live / live_if_missing): a deep copy of the live world, read once -- this process
+    # never writes it back (the tick doesn't persist; that is the server loop's job)
+    w = json.load(open(path, encoding="utf-8")) if path else json.loads(json.dumps(live, default=str))
     for k in STATIC:
         if k in live:
             w[k] = live[k]
