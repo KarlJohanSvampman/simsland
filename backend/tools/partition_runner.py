@@ -45,7 +45,8 @@ w = D.fixture("2026-11-04T09:00:00")
 w = world_view.install(w)
 D._together(w)
 ownership.assign(w, n)
-node = partitions.Node(w, p, partitions.RedisTransport(n, sim), sim_id=f"{sim}_")
+FREE = os.getenv("PART_FREE") == "1"          # free-running, as the server runs (no barrier per step)
+node = partitions.Node(w, p, partitions.RedisTransport(n, sim), sim_id=f"{sim}_", lockstep=not FREE)
 
 
 def barrier(name):
@@ -67,7 +68,9 @@ for i in range(ticks):
         node.tick(sim_loop.tick)
     except Exception:
         errs[traceback.format_exc().strip().splitlines()[-1]] += 1
-    barrier(f"t{i}")
+    if not FREE:
+        barrier(f"t{i}")
+barrier("end")
 for k in range(3):                       # the last messages in: patches to owners, their frames back to everyone
     node.settle()
     barrier(f"s{k}")

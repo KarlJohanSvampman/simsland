@@ -267,6 +267,15 @@ def after_tick(sim_id, world):
 
 # ── durable writes ──────────────────────────────────────────────────────────────
 
+def _owned_only(world, upserts, deletes):
+    """With partitions (core/partitions.py), each process writes only what it owns."""
+    from core import partitions
+    if partitions.SERVER_N <= 1:
+        return upserts, deletes
+    return ({k: v for k, v in upserts.items() if partitions.persists(world, k)},
+            [k for k in deletes if partitions.persists(world, k)])
+
+
 def persist_async(sim_id, reason="interval"):
     """Serialise now (the world is only safe to read while the lock is held) and let the
     writer thread do the database round trip."""
@@ -287,10 +296,12 @@ def persist_async(sim_id, reason="interval"):
                 world_view.note_missed([k for k in upserts if k not in only and k[0] != "meta"])
             else:
                 upserts, deletes, _m = entity_store.diff(sim_id, entry.world, only=only)
+            upserts, deletes = _owned_only(entry.world, upserts, deletes)
             entity_store.note_written(sim_id, upserts, deletes)
             payload = ("entities", upserts, deletes)
             _stats["last_persist_bytes"] = sum(len(t) for t in upserts.values())
-            if tick - entry.blob_tick >= BLOB_EVERY_TICKS or reason in ("save", "shutdown"):
+            from core import partitions
+            if (tick - entry.blob_tick >= BLOB_EVERY_TICKS or reason in ("save", "shutdown")) and partitions.is_core():
                 entry.blob_tick = tick
                 _ensure_writer()
                 _writer_q.put((sim_id, _render(entry), tick, reason + "+blob"))
@@ -323,6 +334,7 @@ def persist_now(sim_id):
         if WORLD_STORE == "entities":
             from core import entity_store
             upserts, deletes, _m = entity_store.diff(sim_id, entry.world)
+            upserts, deletes = _owned_only(entry.world, upserts, deletes)
             entity_store.note_written(sim_id, upserts, deletes)
             payload = ("entities", upserts, deletes)
         entry.persisted_tick = entry.world.get("tick", 0)
@@ -379,9 +391,9 @@ def _replace_entities(sim_id, world, tick):
             entity_store.ensure_tables(cur)
             cur.execute("DELETE FROM entities WHERE sim_id=%s", (sim_id,))
     entity_store.forget(sim_id)
-    upserts, deletes, _m = entity_store.diff(sim_id, world)
-    entity_store.note_written(sim_id, upserts, deletes)
-    entity_store.write(sim_id, upserts, [], tick)
+    upserts, deletes, _m = entity_store.diff(sim_id, world)       # a whole new world: every entity (partition 0,
+    entity_store.note_written(sim_id, upserts, deletes)            # which runs the commands; the other partitions
+    entity_store.write(sim_id, upserts, [], tick)                  # load it when restarted)
 
 
 def _merge_payloads(a, b):

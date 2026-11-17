@@ -30,6 +30,41 @@ from core import entity_patch, ownership
 
 CURRENT = None                 # the partition whose step is running (None: not partitioned)
 
+# The server (main.py): SIM_PARTITIONS > 1 runs the simulation as that many partition processes, this one being
+# SIM_PARTITION (0 = the core: commands, the replica for API gateways, world services, the backup blob).
+import os as _os
+SERVER_N = int(_os.getenv("SIM_PARTITIONS", "1"))
+SERVER_P = int(_os.getenv("SIM_PARTITION", "0"))
+_server_node = None
+
+
+def server_node(world, sim_id):
+    """This process's partition (created on first use, from the world as loaded): the owner map is made the same way in
+    every partition (households in id order), so they agree without asking each other."""
+    global _server_node
+    if _server_node is None or _server_node.world is not world:
+        if (world.get("_owners") or {}).get("n") != SERVER_N:
+            ownership.assign(world, SERVER_N)
+        _server_node = Node(world, SERVER_P, RedisTransport(SERVER_N, sim_id), sim_id=f"{sim_id}_p", exact=True,
+                            lockstep=False)
+    return _server_node
+
+
+def is_core():
+    return SERVER_N <= 1 or SERVER_P == 0
+
+
+def persists(world, key):
+    """Which partition writes an entity to the store: its owner (the manifest and the blob: partition 0)."""
+    if SERVER_N <= 1:
+        return True
+    kind, eid = key
+    if kind == "meta":
+        return SERVER_P == 0
+    if kind == "key" and str(eid) in LOCAL_KEYS:
+        return SERVER_P == 0
+    return _owner(world, key) == SERVER_P
+
 LOCAL_KEYS = {"timers", "_timer_seq", "_sched_sig", "_dirty", "_perchar_members", "_active_loops", "_bg_work",
               "tick", "sim_time", "calendar", "_clock", "_owners_local", "cpl_dedupe", "_defaults_tick",
               "_known_char_ids", "_conv_tag_queue"}
@@ -256,9 +291,9 @@ class Node:
         settle()        receive and publish, no tick (to let the copies catch up, e.g. before comparing them)
     """
 
-    def __init__(self, world, p, transport, sim_id="part", exact=True):
+    def __init__(self, world, p, transport, sim_id="part", exact=True, lockstep=True):
         from core import world_view
-        self.id, self.transport, self.exact = p, transport, exact
+        self.id, self.transport, self.exact, self.lockstep = p, transport, exact, lockstep
         self.sim_id = f"{sim_id}{p}"
         self.world = world_view.install(world, self.sim_id)
         self._keep_own_timers()
@@ -352,7 +387,7 @@ class Node:
         CURRENT = self.id
         try:
             world_view.take_touched(self.sim_id)
-            self.receive()
+            self.receive(everything=not self.lockstep)   # free-running processes take what has arrived
             self._drain_inbox()
             tick_fn(self.world)
             if self.transport.n > 1:

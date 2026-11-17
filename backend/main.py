@@ -402,6 +402,16 @@ def _wake_sleepers_after_clock_jump(world):
         interrupt_activity(c, world, reason="the clock moved on to the day while they slept")
 
 
+def _tick_world(world, sim_id):
+    """One step. With SIM_PARTITIONS > 1 this process is one partition of several: it steps what it owns and trades
+    patches and frames with the others (core/partitions.py, docs/step5b_plan.md)."""
+    from core import partitions as _parts
+    if _parts.SERVER_N > 1:
+        _parts.server_node(world, sim_id).tick(tick)
+    else:
+        tick(world)
+
+
 def _run_tick_and_persist(sim_id: str) -> tuple[dict, dict]:
     """Runs the whole load->tick->persist span for one tick, held under
     _world_lock end to end. Bundled into one function (rather than the
@@ -454,7 +464,7 @@ def _run_tick_and_persist(sim_id: str) -> tuple[dict, dict]:
         if not is_stopped(world):          # "STOP!" (Director Mode): time stands still until "Action!"
             tick_state.enter()
             try:
-                tick(world)
+                _tick_world(world, sim_id)
             finally:
                 tick_state.leave()
 
@@ -464,7 +474,9 @@ def _run_tick_and_persist(sim_id: str) -> tuple[dict, dict]:
 
         # Gateway replicas (core/replication.py): a no-op unless one is connected.
         from core import replication
-        replication.publisher.publish(sim_id, world, dirty)
+        from core import partitions as _parts
+        if _parts.is_core():                       # partition 0 holds everyone's entities: it feeds the gateways
+            replication.publisher.publish(sim_id, world, dirty)
 
         _t_persist = time.perf_counter()
         # Durable persistence is write-behind: every PERSIST_EVERY_TICKS ticks the world is
@@ -512,13 +524,15 @@ def _run_tick_entity_locked(sim_id, t_wait):
         if not is_stopped(world):
             tick_state.enter()
             try:
-                tick(world)
+                _tick_world(world, sim_id)
             finally:
                 tick_state.leave()
     with _world_lock, world_state.hold():
         t_persist = time.perf_counter()
         dirty = collect_dirty(world)
-        replication.publisher.publish(sim_id, world, dirty)
+        from core import partitions as _parts
+        if _parts.is_core():                       # partition 0 holds everyone's entities: it feeds the gateways
+            replication.publisher.publish(sim_id, world, dirty)
         world_state.after_tick(sim_id, world)
         t_end = time.perf_counter()
     _tick_watch["started"] = None
@@ -710,8 +724,11 @@ async def startup():
         app.state.feed = feed
         asyncio.create_task(replica_loop(feed))
         return
-    # Answer commands from gateway processes (core/commands.py). A no-op cost when none exist.
-    commands.serve()
+    # Answer commands from gateway processes (core/commands.py). A no-op cost when none exist. With partitions, the core
+    # (partition 0) answers them; a change to another partition's entity travels to it as a patch (core/partitions.py).
+    from core import partitions as _parts
+    if _parts.is_core():
+        commands.serve()
     threading.Thread(target=_tick_watchdog, name="tick-watchdog", daemon=True).start()
     asyncio.create_task(loop())
 

@@ -33,7 +33,7 @@ N, TICKS = 3, int(os.getenv("PART_TICKS", "600"))
 here = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
-def run():
+def run(free=False):
     sim = "t" + uuid.uuid4().hex[:8]
     tmp = tempfile.mkdtemp()
     procs, outs = [], []
@@ -42,7 +42,8 @@ def run():
         outs.append(out)
         procs.append(subprocess.Popen([sys.executable, os.path.join(here, "tools", "partition_runner.py"), sim, str(p),
                                        str(N), str(TICKS), out], cwd=here, stdout=subprocess.DEVNULL,
-                                      stderr=subprocess.PIPE, env=dict(os.environ, PYTHONHASHSEED="0")))
+                                      stderr=subprocess.PIPE,
+                                      env=dict(os.environ, PYTHONHASHSEED="0", PART_FREE="1" if free else "0")))
     codes = []
     for pr in procs:
         _o, err = pr.communicate(timeout=1800)
@@ -70,6 +71,15 @@ if len(res) == N:
     same = len(res2) == N and all(res2[i]["entities"] == res[i]["entities"] for i in range(N))
     check("the same run again gives the same world (reproducible)", same,
           [k for k in keys if len(res2) == N and res2[0]["entities"].get(k) != res[0]["entities"].get(k)][:5])
+
+codes3, res3 = run(free=True)
+if len(res3) == N:
+    keys3 = set().union(*(r["entities"] for r in res3))
+    differ3 = [k for k in keys3 if len({r["entities"].get(k) for r in res3}) > 1]
+    check("free-running (as the server runs: no barrier per step), they still converge once the last messages are in",
+          all(c == 0 for c, _ in codes3) and not any(r["errors"] for r in res3) and not differ3, (codes3, differ3[:5]))
+else:
+    check("free-running partitions ran to the end", False, codes3)
 
 print()
 print("all passed" if not failures else f"FAILED: {', '.join(failures)}")
