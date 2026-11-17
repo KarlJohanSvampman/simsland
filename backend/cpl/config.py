@@ -1,9 +1,10 @@
 """cpl/config.py -- CPL_MODE (docs/cpl_implementation_plan.md section 11).
 
-    off      today's conversation code only (the default until each phase is proven)
-    shadow   CPL runs alongside: it builds its conversations from what happens, changes nothing outside its own
-             entities, and its state can be compared with the legacy one
-    on       CPL owns the conversation lifecycle
+    on       CPL owns the conversation lifecycle (the default: there is one conversation store, and CPL's state is on
+             each conversation's record)
+    shadow   CPL follows along and decides nothing: its fields are kept on the record, the rest of the simulation's
+             own rules end conversations (for comparing the two)
+    off      CPL stays out: no CPL fields, the older rules alone (a kill switch)
 
 A world can override the environment: world["cpl_mode"]."""
 
@@ -11,8 +12,8 @@ import os
 
 PROTOCOL_VERSION = "1.0"
 MODES = ("off", "shadow", "on")
-_ENV = os.getenv("CPL_MODE", "off").lower()
-CPL_MODE = _ENV if _ENV in MODES else "off"
+_ENV = os.getenv("CPL_MODE", "on").lower()
+CPL_MODE = _ENV if _ENV in MODES else "on"
 
 
 def mode(world=None):

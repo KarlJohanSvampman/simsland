@@ -63,7 +63,7 @@ def say(who, text, lines=None, act="declare"):
 
 
 say("theo", "Could I borrow your car tonight?", "ACT: request\nNEXT: continue")
-conv = store.get(w, w["cpl_legacy_map"]["L1"])
+conv = store.get(w, "L1")
 rid = conv["open_items"]["requests"][0] if conv["open_items"]["requests"] else None
 check("Theo's opening request is tracked from the start (R1)", rid and w["cpl_requests"][rid]["status"] == "open"
       and w["cpl_requests"][rid]["recipient_id"] == "ana", conv["open_items"])
@@ -83,7 +83,7 @@ check("Theo's closing line ends it: RESOLVED (request fulfilled)", conv["state"]
 legacy2 = {"id": "L2", "participants": ["theo", "ana"], "medium": "in_person", "active": True}
 legacy = legacy2
 say("ana", "Where were you last night?", "ACT: question")
-conv2 = store.get(w, w["cpl_legacy_map"]["L2"])
+conv2 = store.get(w, "L2")
 say("theo", "None of your business.", "ANSWERS: Q9 answer\nNEXT: leave:angry")
 check("an answer to an item that isn't open answers nothing (no invented answer)",
       conv2["open_items"]["questions"] and conv2.get("turn_errors"), conv2.get("turn_errors"))
@@ -95,7 +95,7 @@ w3 = {"tick": 0, "sim_time": 1000.0, "timers": [], "conversations": {},
       "characters": {"theo": {"id": "theo", "name": "Theo"}, "ana": {"id": "ana", "name": "Ana"}}}
 leg3 = {"id": "L3", "participants": ["theo", "ana"], "medium": "in_person", "active": True}
 shadow.on_line(w3, leg3, "theo", "Where are you?", "declare")        # an opener: no ACT line (no CPL block yet)
-conv3 = store.get(w3, w3["cpl_legacy_map"]["L3"])
+conv3 = store.get(w3, "L3")
 check("a question asked without an ACT line (an opener) is still tracked, so it can be answered (and mode A can apply)",
       len(conv3["open_items"]["questions"]) == 1, conv3["open_items"])
 w4 = {"tick": 0, "sim_time": 1000.0, "timers": [], "conversations": {},
@@ -107,7 +107,7 @@ w4["characters"]["theo"].pop("_cpl_turn")
 w4["characters"]["ana"]["_cpl_turn"] = "ANSWERS: R1 accept"
 shadow.on_line(w4, leg4, "ana", "Sure, I can do that.", "declare")
 w4["characters"]["ana"].pop("_cpl_turn")
-conv4 = store.get(w4, w4["cpl_legacy_map"]["L4"])
+conv4 = store.get(w4, "L4")
 shadow.on_legacy_end(w4, leg4, "resolved")                           # the legacy path's guess: "answered"
 check("a legacy 'resolved' ending takes CPL's own reading of what was settled (request fulfilled, not question "
       "answered)", conv4["reason"] == "request_fulfilled", conv4["reason"])

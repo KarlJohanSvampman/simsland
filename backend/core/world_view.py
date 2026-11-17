@@ -22,8 +22,7 @@ that changed without being touched (missed(): kind, id) -- the code path that di
 
 import threading
 
-ENTITY_COLLECTIONS = {"characters", "households", "conversations", "conversation_archive",
-                      "cpl_conversations", "cpl_requests"}
+ENTITY_COLLECTIONS = {"characters", "households", "conversations", "conversation_archive", "cpl_requests"}
 ENTITY_LISTS = {"props"}      # a list is compared whole at every flush (iterating it -- a lookup by id -- is too common
                               # to note one by one); its entities are still noted when assigned, appended or removed
 

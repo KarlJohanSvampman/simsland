@@ -69,6 +69,7 @@ LOCAL_KEYS = {"timers", "_timer_seq", "_sched_sig", "_dirty", "_perchar_members"
               "tick", "sim_time", "calendar", "_clock", "_owners_local", "cpl_dedupe", "_defaults_tick",
               "_known_char_ids", "_conv_tag_queue"}
 _CHARACTER_LOOPS = {"movement", "nudity"}
+_COLLECTIONS = ("characters", "households", "conversations", "conversation_archive", "cpl_requests")
 _WORLD_TIMER_PREFIXES = ("cpl", "duty", "convidle", "flow")
 
 
@@ -83,11 +84,23 @@ def here(world, kind, eid):
     return ownership.owner_of(world, kind, eid) == CURRENT
 
 
+def conv_owner(world, cid, kind="conversations"):
+    """A conversation belongs to the partition of its first participant (who started it): talk within a household
+    stays in its partition. Read from the record itself, so every partition works it out the same way."""
+    rec = dict.get(dict.get(world, kind) or {}, cid) if isinstance(dict.get(world, kind), dict) else None
+    parts = (rec or {}).get("participants") or []
+    if isinstance(parts, dict):
+        parts = list(parts)
+    return ownership.owner_of(world, "characters", parts[0]) if parts else 0
+
+
 def loop_ids(world, name, ids):
     if CURRENT is None:
         return ids
     if name in _CHARACTER_LOOPS:
         return [i for i in ids if here(world, "characters", i)]
+    if name == "floor":                                  # its members are conversations: their owner runs them
+        return [i for i in ids if conv_owner(world, i) == CURRENT]
     return ids if CURRENT == 0 else []
 
 
@@ -101,11 +114,16 @@ def runs_recurring(owner):
     return CURRENT is None or CURRENT == 0 or owner in _perchar_names()
 
 
-def route(world, owner):
-    """Which partition a timer belongs to: a character's (its id in the owner string) -> that character's owner;
-    anything else -> partition 0. Per-character jobs' recurring timers stay where they are set."""
+def route(world, owner, key=None):
+    """Which partition a timer belongs to: a character's (its id in the owner string) -> that character's owner; a
+    conversation's (cpl:<id>, the idle timer) -> the conversation's owner; anything else -> partition 0.
+    Per-character jobs' recurring timers stay where they are set."""
     if owner in _perchar_names():
         return CURRENT if CURRENT is not None else 0
+    if str(owner).startswith("cpl:"):
+        return conv_owner(world, str(owner)[4:])
+    if owner == "convidle" and key:
+        return conv_owner(world, key)
     chars = world.get("characters") or {}
     for part in str(owner).split(":")[1:]:
         if dict.__contains__(chars, part):
@@ -125,7 +143,7 @@ def forward_timer(world, owner, key, ts, payload, every, spec):
     """In a partition: a timer for another partition's entity is sent to it. True if forwarded (not set here)."""
     if CURRENT is None:
         return False
-    p = route(world, owner)
+    p = route(world, owner, key)
     if p == CURRENT:
         return False
     _inbox(world, p).append({"t": "timer", "owner": owner, "key": key, "ts": ts, "payload": payload,
@@ -155,10 +173,13 @@ def _keys(world):
     for k, v in dict.items(world):
         if k in LOCAL_KEYS or k in _static():
             continue
-        if k in ("characters", "households", "conversations", "conversation_archive", "cpl_conversations",
-                 "cpl_requests") and isinstance(v, dict):
-            out += [(k, str(i)) for i in dict.keys(v)]
-        elif k == "props" and isinstance(v, list):
+        if k in _COLLECTIONS:
+            if isinstance(v, dict):                      # an entity collection: its entities, never the whole of it
+                out += [(k, str(i)) for i in dict.keys(v)]
+            continue                                     # (not there yet, or None: nothing to share)
+        elif k == "props":
+            if not isinstance(v, list):
+                continue
             out += [("props", str(p.get("id"))) for p in list.__iter__(v) if isinstance(p, dict) and p.get("id")]
         else:
             out.append(("key", k))
@@ -218,10 +239,20 @@ def _put(world, key, value):
             list.__setitem__(coll, idx, value)
 
 
-def _owner(world, key):
+def _owner(world, key, incoming=None):
+    """Who owns an entity. For the kinds whose owner is read off the record (a conversation: its first participant)
+    and a record this world doesn't have yet, `incoming` (the copy that just arrived, as JSON) is read instead."""
     kind, eid = key
     if kind in ownership.KINDS:
         return ownership.owner_of(world, kind, eid)
+    if kind in ("conversations", "conversation_archive", "cpl_requests"):
+        rec = dict.get(dict.get(world, kind) or {}, eid) if isinstance(dict.get(world, kind), dict) else None
+        if rec is None and incoming not in (None, "null"):
+            rec = json.loads(incoming) if isinstance(incoming, str) else incoming
+        if kind == "cpl_requests":
+            return conv_owner(world, (rec or {}).get("conversation_id"))
+        parts = (rec or {}).get("participants") or []
+        return ownership.owner_of(world, "characters", list(parts)[0]) if parts else 0
     return owner_of_key(kind, eid)
 
 
@@ -320,7 +351,7 @@ class Node:
         try:
             w = self.world
             dict.__setitem__(w, "timers", [t for t in (dict.get(w, "timers") or [])
-                                           if route(w, t["owner"]) == self.id and (t.get("key") != "recurring"
+                                           if route(w, t["owner"], t.get("key")) == self.id and (t.get("key") != "recurring"
                                                                                    or runs_recurring(t["owner"]))])
         finally:
             CURRENT = prev
@@ -343,7 +374,7 @@ class Node:
                 ents = sorted(m["entities"], key=lambda e: (e[0], e[1]) == ("key", "_owners"))   # the map last
                 for kind, eid, text in ents:
                     key = (kind, eid)
-                    if _owner(w, key) == self.id:
+                    if _owner(w, key, text) == self.id:
                         continue                         # ours now (moved here since): our copy stands
                     _put(w, key, None if text is None else json.loads(text))
                     if text is None:
@@ -548,8 +579,9 @@ class Node:
         cands |= {("key", k) for k in dict.keys(w) if k.startswith("_inbox_")}
         frame = []
         for key in sorted(cands):
-            if key[0] == "key" and (key[1] in LOCAL_KEYS or key[1] in _static()):
-                continue
+            if key[0] == "key" and (key[1] in LOCAL_KEYS or key[1] in _static() or key[1] in _COLLECTIONS
+                                    or key[1] == "props"):
+                continue                                 # a collection is shared entity by entity, never whole
             now, before = _get(w, key), self.published.get(key)
             text = None if now is None else _dumps(now)
             owner = _owner(w, key)

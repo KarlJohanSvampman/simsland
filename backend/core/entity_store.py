@@ -37,8 +37,7 @@ COLLECTIONS = {
     "households": "dict",
     "conversations": "dict",
     "conversation_archive": "dict",
-    "cpl_conversations": "dict",           # the conversation protocol layer (cpl/store.py)
-    "cpl_requests": "dict",
+    "cpl_requests": "dict",                # the conversation protocol layer (cpl/store.py)
     "props": "list",
 }
 

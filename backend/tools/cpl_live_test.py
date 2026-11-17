@@ -84,7 +84,7 @@ started = time.monotonic()
 w, errs, _ = determinism.run_sim(TICKS, start="2026-11-04T09:00:00")
 took = time.monotonic() - started
 
-convs = list((w.get("cpl_conversations") or {}).values())
+convs = list(CPLS(w).values())
 reqs = list((w.get("cpl_requests") or {}).values())
 questions = [q for c in convs for q in (c.get("questions") or {}).values()]
 claims = [cl for c in convs for cl in (c.get("claims") or {}).values()]
@@ -111,7 +111,7 @@ report = {
     "cost": dict(metrics.report(w), avg_full_prompt_chars=_avg(seen["prompt_chars"]),
                  avg_compact_prompt_chars=_avg(seen["compact_chars"]),
                  avg_seconds_per_decision=_avg(seen["seconds"])),
-    "transcripts": [{"id": c["id"], "state": c["state"], "reason": c.get("reason"), "purpose": c.get("purpose"),
+    "transcripts": [{"id": c["id"], "state": c["state"], "reason": c.get("reason"), "purpose": c.get("cpl_purpose"),
                      "lines": [f"{m.get('sender_id')}: {m.get('content')}" for m in c.get("messages") or []],
                      "record": record.lines(w, c)}
                     for c in sorted(convs, key=lambda c: -c.get("lines", 0))[:5]],

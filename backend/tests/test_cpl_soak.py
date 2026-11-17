@@ -22,6 +22,7 @@ sys.path.insert(0, "/app")
 sys.path.insert(0, ".")
 
 failures = []
+CPLS = lambda w: {cid: c for cid, c in (w.get("conversations") or {}).items() if "members" in c}
 
 
 def check(name, cond, detail=""):
@@ -37,13 +38,13 @@ TICKS = int(os.getenv("SOAK_TICKS", "86400"))         # a sim day
 config.CPL_MODE = "on"
 w, errs, _ = determinism.run_sim(TICKS, start="2026-11-04T08:00:00")
 check(f"{TICKS} ticks with CPL on, no errors", not errs, errs)
-convs = w.get("cpl_conversations") or {}
+convs = CPLS(w)
 st = w.get("cpl_shadow") or {}
 print(f"   {st.get('opened', 0)} conversations opened, {st.get('lines', 0)} lines, on the world now: {len(convs)}; "
       f"reasons: {dict(Counter(c.get('reason') for c in convs.values()))}")
 now = w.get("sim_time") or 0
 over = [cid for cid, c in convs.items() if c["state"] not in ("resolved", "expired")
-        and now - (c.get("started_at") or c["created_at"]) > policies.from_key(c["policy_key"])["hard_seconds"]]
+        and now - (c.get("cpl_started_at") or c["created_at"]) > policies.from_key(c["policy_key"])["hard_seconds"]]
 check("no conversation is live past its hard cap", not over, over)
 dup = [cid for cid, c in convs.items() if len({m["message_id"] for m in c["messages"]}) != len(c["messages"])]
 check("no message stored twice", not dup, dup)

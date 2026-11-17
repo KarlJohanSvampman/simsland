@@ -22,6 +22,7 @@ sys.path.insert(0, "/app")
 sys.path.insert(0, ".")
 
 failures = []
+CPLS = lambda w: {cid: c for cid, c in (w.get("conversations") or {}).items() if "members" in c}
 
 
 def check(name, cond, detail=""):
@@ -38,18 +39,18 @@ w, errs, _ = determinism.run_sim(3000, start="2026-11-04T09:00:00")
 check("a social simulation runs with CPL_MODE=on", not errs, errs)
 st = shadow.compare(w)
 print(f"   tallies: { {k: v for k, v in st.items() if k != 'pairs'} }")
-convs = list((w.get("cpl_conversations") or {}).values())
-check("CPL conversations went past the legacy 6-line cap", any(c.get("lines", 0) > 6 for c in convs),
-      sorted(c.get("lines", 0) for c in convs))
+convs = list(CPLS(w).values())
+_lines = [max([c.get("lines", 0)] + [r.get("lines", 0) for r in c.get("cpl_rounds") or []]) for c in convs]
+check("CPL conversations went past the legacy 6-line cap", any(n > 6 for n in _lines), sorted(_lines))
 check("legacy time/length endings were held back for CPL", st.get("held_back", 0) > 0, st)
 check("CPL ended conversations itself, the legacy ones with them", st.get("cpl_ended", 0) > 0, st)
 check("CPL's own reasons on what it ended", any(c.get("reason") in ("topic_exhausted", "question_answered", "timeout",
                                                                        "abandoned", "no_answer") for c in convs))
 now = w.get("sim_time") or 0
 over = [c["id"] for c in convs if c["state"] not in ("resolved", "expired")
-        and now - (c.get("started_at") or c["created_at"]) > policies.from_key(c["policy_key"])["hard_seconds"]]
+        and now - (c.get("cpl_started_at") or c["created_at"]) > policies.from_key(c["policy_key"])["hard_seconds"]]
 check("nothing live past its hard cap", not over, over)
-mapped = set((w.get("cpl_legacy_map") or {}))
+mapped = set(cid for cid, c in CPLS(w).items() if c.get("state") not in ("resolved", "expired"))
 open_legacy = [cid for cid, c in (w.get("conversations") or {}).items() if c.get("active") and c.get("history")]
 check("every open legacy conversation has a live CPL copy", all(cid in mapped for cid in open_legacy),
       [c for c in open_legacy if c not in mapped])

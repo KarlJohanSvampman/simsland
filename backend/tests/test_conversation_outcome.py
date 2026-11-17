@@ -10,6 +10,10 @@ Run inside the backend container:   python tests/test_conversation_outcome.py
 """
 
 import os
+# These are the older ending rules (the 6-line / 4-minute caps, "no reply in a minute", "ignored"): with CPL on (the
+# default) CPL ends conversations by its own policies (cpl/policies.py, tests/test_cpl_*); the older rules are what
+# CPL_MODE=off -- the kill switch -- runs, and that is what is tested here.
+os.environ["CPL_MODE"] = "off"
 import sys
 
 os.environ["COGNITION_MODE"] = "local"

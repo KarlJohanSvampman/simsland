@@ -82,8 +82,9 @@ def pending_invitation(world, speaker_id, target_id):
         return False
     for conv in store.live(world, speaker_id):
         if conv.get("state") == "pending" and conv.get("initiator_id") == speaker_id \
-                and target_id in (conv.get("participants") or {}):
-            return True
+                and target_id in (conv.get("members") or {}) \
+                and (conv.get("active", True) is not False or conv.get("_cpl_only")):
+            return True                       # (a conversation the rest of the simulation closed blocks nobody)
     return False
 
 
@@ -94,7 +95,7 @@ def join(world, conv, char_id, by=None):
     from core.clock import now_ts
     from core.event_bus import emit
     from cpl.lifecycle import summarize
-    parts = conv.setdefault("participants", {})
+    parts = conv.setdefault("members", {})
     if char_id in parts and parts[char_id].get("status") == "active":
         return False
     parts[char_id] = {"role": "participant", "status": "active", "joined_at": now_ts(world), "left_at": None,

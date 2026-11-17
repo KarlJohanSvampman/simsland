@@ -23,6 +23,7 @@ sys.path.insert(0, "/app")
 sys.path.insert(0, ".")
 
 failures = []
+CPLS = lambda w: {cid: c for cid, c in (w.get("conversations") or {}).items() if "members" in c}
 
 
 def check(name, cond, detail=""):
@@ -45,22 +46,23 @@ st = shadow.compare(w)
 print(f"   shadow: {st}")
 check("conversations and their lines reach CPL", st["opened"] > 0 and st["lines"] >= st["opened"], st)
 check("every legacy ending is seen", st["legacy_ended"] > 0 and st["legacy_ended"] >= st["cpl_still_live"] + st["cpl_ended_first"], st)
-mapped = w.get("cpl_legacy_map") or {}
+mapped = {cid: cid for cid, c in CPLS(w).items() if c.get("state") not in ("resolved", "expired")}
 legacy_live = {cid for cid, c in (w.get("conversations") or {}).items() if c.get("active")}
 check("only conversations the legacy path still has open are live in CPL",
       all(lid in legacy_live for lid in mapped), {k: v for k, v in mapped.items() if k not in legacy_live})
-dead = {cid for cid, c in (w.get("cpl_conversations") or {}).items() if c.get("state") in ("resolved", "expired")}
+dead = {cid for cid, c in CPLS(w).items() if c.get("state") in ("resolved", "expired")}
 orphans = [t for t in w.get("timers") or [] if t["owner"].startswith("cpl:") and t["owner"][4:] in dead
            and t["key"] != "gc"]
 check("no timer outlives its conversation (but the one that clears it off the world later)", not orphans, orphans[:3])
-ended = [c for c in (w.get("cpl_conversations") or {}).values() if c.get("state") in ("resolved", "expired")]
+ended = [c for c in CPLS(w).values() if c.get("state") in ("resolved", "expired")]
 check("ended conversations carry their reason and an outcome",
-      ended and all(c.get("reason") and c.get("outcome") and c.get("resolved_at") for c in ended))
+      ended and all(c.get("reason") and c.get("cpl_outcome") and c.get("resolved_at") for c in ended))
 seqs_ok = all([m["sequence_number"] for m in c["messages"]] == sorted({m["sequence_number"] for m in c["messages"]})
-              for c in (w.get("cpl_conversations") or {}).values())
+              for c in CPLS(w).values())
 check("messages are numbered in order, without duplicates", seqs_ok)
-check("CPL's own counter makes the ids (no uuids: reproducible)",
-      all(cid.startswith("cv_") and cid[3:].isdigit() for cid in w.get("cpl_conversations") or {}))
+check("CPL's state is on the conversations' own records (one store: no copy, no map between ids)",
+      all(c.get("legacy_id") == cid for cid, c in CPLS(w).items()) and "cpl_conversations" not in w
+      and "cpl_legacy_map" not in w)
 
 print()
 print("all passed" if not failures else f"FAILED: {', '.join(failures)}")

@@ -55,12 +55,12 @@ def _policy(conv):
 
 
 def _others(conv, who):
-    return [p for p, d in (conv.get("participants") or {}).items() if p != who and d.get("status") in ("active",
+    return [p for p, d in (conv.get("members") or {}).items() if p != who and d.get("status") in ("active",
                                                                                                        "invited")]
 
 
 def _active(conv):
-    return [p for p, d in (conv.get("participants") or {}).items() if d.get("status") == "active"]
+    return [p for p, d in (conv.get("members") or {}).items() if d.get("status") == "active"]
 
 
 def _stale(conv, event):
@@ -81,7 +81,7 @@ def _end(state, reason, extra=()):
 
 def _over_length(conv, now, pol):
     lines = conv.get("lines", 0)
-    started = next((t for t in (conv.get("started_at"), conv.get("created_at")) if t is not None), now)
+    started = next((t for t in (conv.get("cpl_started_at"), conv.get("created_at")) if t is not None), now)
     elapsed = now - started
     if lines >= pol["hard_lines"] or elapsed >= pol["hard_seconds"]:
         return "hard"
@@ -206,14 +206,14 @@ def transition(conv, event, now):
         if tk == "reply":
             if event.get("holder_thinking"):
                 return Result(state, None, [{"do": "schedule", "kind": "reply", "in": pol["reply_s"]}])
-            attempts = (conv.get("floor") or {}).get("attempts", 0) + 1
+            attempts = (conv.get("cpl_floor") or {}).get("attempts", 0) + 1
             if attempts >= pol["reply_attempts"]:
                 reason = R.ABANDONED.value if conv.get("lines", 0) <= 1 else R.TIMEOUT.value
                 return _end(S.RESOLVED, reason)
-            return Result(state, None, [{"do": "set_floor", "holder": (conv.get("floor") or {}).get("holder"),
+            return Result(state, None, [{"do": "set_floor", "holder": (conv.get("cpl_floor") or {}).get("holder"),
                                          "attempts": attempts},
                                         {"do": "schedule", "kind": "reply", "in": pol["reply_s"]},
-                                        {"do": "request_turn", "who": (conv.get("floor") or {}).get("waiting_on")
+                                        {"do": "request_turn", "who": (conv.get("cpl_floor") or {}).get("waiting_on")
                                          or conv.get("initiator_id"), "follow_up": True}])
         return _reject(conv, f"timer {tk} in {state}")
 

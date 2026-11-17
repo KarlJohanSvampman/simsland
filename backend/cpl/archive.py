@@ -39,10 +39,17 @@ def _on_ended(data, world):
     conv = store.get(world, data.get("conversation_id")) if world is not None else None
     if conv is None:
         return
+    if not conv.get("_cpl_archived_at") == conv.get("resolved_at"):
+        queue(world, conv)
+    scheduler.schedule_at(world, f"cpl:{conv['id']}", "gc", now_ts(world) + GC_AFTER_S, {})
+
+
+def queue(world, conv):
+    """Archive a conversation as it stands (called as it ends: cpl/conversations.py)."""
+    conv["_cpl_archived_at"] = conv.get("resolved_at")
     _q.put((SIM_ID, _snapshot(world, conv)))
     _stats["queued"] += 1
     _ensure_thread()
-    scheduler.schedule_at(world, f"cpl:{conv['id']}", "gc", now_ts(world) + GC_AFTER_S, {})
 
 
 def gc(world, conversation_id):
@@ -52,14 +59,16 @@ def gc(world, conversation_id):
     conv = store.get(world, conversation_id)
     if conv is None or conv.get("state") not in {s.value for s in FINAL}:
         return False
-    del world["cpl_conversations"][conversation_id]
+    if conv.get("active"):
+        return False                          # the rest of the simulation still has it open (shadow mode): it stays
+    if not conv.get("_archived"):
+        from brain.conversations import _archive_conversation
+        _archive_conversation(world, conv)     # its archive record (systems/conversation_archive.py) first
+    del world["conversations"][conversation_id]           # archived (both kinds): off the world
     reqs = world.get("cpl_requests") or {}
     for rid in [rid for rid, r in reqs.items() if r.get("conversation_id") == conversation_id
                 and r.get("status") not in ("open", "deferred", "negotiating", "conditional")]:
         del reqs[rid]
-    m = world.get("cpl_legacy_map") or {}
-    for k in [k for k, v in m.items() if v == conversation_id]:
-        del m[k]
     return True
 
 
@@ -89,12 +98,12 @@ def write(sim_id, snap):
                                current_topic, status, resolution_reason, initiator_id, created_at, started_at,
                                last_activity_at, resolved_at, context_summary, outcome)
                            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING""",
-                        (sim_id, c["id"], c.get("channel") or "in_person", c.get("purpose"), c.get("topic"),
+                        (sim_id, c["id"], c.get("channel") or "in_person", c.get("cpl_purpose"), c.get("topic"),
                          c.get("state"), c.get("reason"), c.get("initiator_id"), c.get("created_at"),
-                         c.get("started_at"), c.get("last_activity_at"), c.get("resolved_at"),
-                         Json(c.get("context") or {}), Json(c.get("outcome") or {})))
+                         c.get("cpl_started_at"), c.get("last_activity_at"), c.get("resolved_at"),
+                         Json(c.get("context") or {}), Json(c.get("cpl_outcome") or {})))
             parts = [(sim_id, c["id"], pid, p.get("role"), p.get("status"), p.get("joined_at"), p.get("left_at"),
-                      p.get("left_reason"), p.get("last_seen_seq")) for pid, p in (c.get("participants") or {}).items()]
+                      p.get("left_reason"), p.get("last_seen_seq")) for pid, p in (c.get("members") or {}).items()]
             if parts:
                 execute_values(cur, "INSERT INTO cpl_participants VALUES %s ON CONFLICT DO NOTHING", parts)
             msgs = [(sim_id, m["message_id"], c["id"], m["sequence_number"], m.get("sender_id"),

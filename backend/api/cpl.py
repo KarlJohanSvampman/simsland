@@ -27,8 +27,8 @@ def conversations(sim_id: str = "default"):
     world = load_world(sim_id)
     out = []
     for c in store.live(world):
-        out.append({"id": c["id"], "state": c["state"], "purpose": c.get("purpose"), "channel": c.get("channel"),
-                    "participants": {p: d.get("status") for p, d in c["participants"].items()},
+        out.append({"id": c["id"], "state": c["state"], "purpose": c.get("cpl_purpose"), "channel": c.get("channel"),
+                    "participants": {p: d.get("status") for p, d in c["members"].items()},
                     "lines": c.get("lines", 0), "open": c.get("open_items"), "summary": c["context"].get("summary")})
     return {"conversations": out}
 

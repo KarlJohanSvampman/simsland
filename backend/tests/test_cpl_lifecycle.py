@@ -54,8 +54,7 @@ blk = turns.context_block(w, w["characters"]["ana"])
 check("... and Ana's prompt says so, with what she can do", blk["interrupted"] == "the doorbell rang"
       and "NEXT: pause" in turns.prompt_section(blk), blk)
 check("... Theo's prompt doesn't claim his doorbell rang", turns.context_block(w, w["characters"]["theo"])["interrupted"] is None)
-legacy = {"id": "L1", "participants": ["ana", "theo"], "medium": "in_person", "active": True}
-w["cpl_legacy_map"] = {"L1": c["id"]}
+legacy = {"id": c["id"], "participants": ["ana", "theo"], "medium": "in_person", "active": True}
 shadow.on_line(w, legacy, "ana", "Hold on, someone's at the door.", "declare")
 check("once someone speaks, the interruption is dealt with", c["interruption"] is None)
 
@@ -68,8 +67,7 @@ check("a call interrupts the face-to-face conversation, not the call itself", hi
 # ── pause and resume ─────────────────────────────────────────────────────────────────────────────────────────────────
 w = world()
 c = talking(w)
-w["cpl_legacy_map"] = {"L1": c["id"]}
-legacy = {"id": "L1", "participants": ["ana", "theo"], "medium": "in_person", "active": True}
+legacy = {"id": c["id"], "participants": ["ana", "theo"], "medium": "in_person", "active": True}
 w["characters"]["ana"]["_cpl_turn"] = "NEXT: pause"
 shadow.on_line(w, legacy, "ana", "One second.", "declare")
 w["characters"]["ana"].pop("_cpl_turn")
@@ -91,10 +89,10 @@ for event, data, why in (("character.offgrid", {"character_id": "theo", "reason"
 w = world()
 c3 = CV.open_conversation(w, "ana", ["theo", "mia"], channel="in_person", purpose="social")
 CV.submit(w, c3, {"type": "turn", "by": "theo"})
-c3["participants"]["mia"]["status"] = "active"
+c3["members"]["mia"]["status"] = "active"
 lifecycle.notify_unavailable(w, "mia", "asleep")
 check("three talking, one falls asleep: it carries on without her", c3["state"] == "active"
-      and c3["participants"]["mia"]["status"] == "unavailable")
+      and c3["members"]["mia"]["status"] == "unavailable")
 
 # ── recovery after a load ────────────────────────────────────────────────────────────────────────────────────────────
 w = world()
@@ -114,7 +112,7 @@ w = world()
 legacy = {"id": "L9", "participants": ["ana", "theo"], "medium": "in_person", "active": True, "topic": "the weekend"}
 shadow.on_line(w, legacy, "ana", "Any plans for the weekend?", "question")
 shadow.on_line(w, legacy, "theo", "Hiking, I think.", "declare")
-conv = store.get(w, w["cpl_legacy_map"]["L9"])
+conv = store.get(w, "L9")
 check("the template summary keeps up, line by line", conv["context"]["summary"].startswith("2 lines so far about the weekend"),
       conv["context"]["summary"])
 check("... and shows on the prompt", "So far: 2 lines" in turns.prompt_section(turns.context_block(w, w["characters"]["ana"])))
@@ -126,9 +124,8 @@ check("CPL on: the initiator of an unanswered invitation can't talk over it", pa
 config.CPL_MODE = "shadow"
 check("... in shadow mode that is left to the legacy path", not participants.floor_blocks(w, "ana", "theo"))
 config.CPL_MODE = "on"
-w["cpl_legacy_map"] = {"L2": p["id"]}
-check("CPL on, live copy: a legacy 'ignored' is held back", not shadow.legacy_end_allowed(w, {"id": "L2"}, "ignored"))
-check("... a legacy 'resolved' is not", shadow.legacy_end_allowed(w, {"id": "L2"}, "resolved"))
+check("CPL on, live copy: a legacy 'ignored' is held back", not shadow.legacy_end_allowed(w, {"id": p["id"]}, "ignored"))
+check("... a legacy 'resolved' is not", shadow.legacy_end_allowed(w, {"id": p["id"]}, "resolved"))
 
 print()
 print("all passed" if not failures else f"FAILED: {', '.join(failures)}")
