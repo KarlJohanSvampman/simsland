@@ -11,11 +11,9 @@ def _name(world, cid):
 
 
 def for_legacy(world, legacy_id):
-    """The CPL conversation that followed a legacy one (still on the world until its gc), or None."""
-    for conv in (world.get("cpl_conversations") or {}).values():
-        if conv.get("legacy_id") == legacy_id:
-            return conv
-    return None
+    """The conversation's CPL state (the same record; on the world until its gc), or None if CPL never took it up."""
+    from cpl import store
+    return store.get(world, legacy_id)               # one record per conversation
 
 
 def lines(world, conv):
@@ -52,9 +50,9 @@ def skippable(world, legacy_id):
     if config.mode(world) != "on":
         return False
     conv = for_legacy(world, legacy_id)
-    if not conv or conv.get("claims") or conv.get("purpose") in _NEEDS_READING:
+    if not conv or conv.get("claims") or conv.get("cpl_purpose") in _NEEDS_READING:
         return False
-    if len(conv.get("participants") or {}) != 2:
+    if len(conv.get("members") or {}) != 2:
         return False
     return conv.get("lines", 0) >= 1 and conv.get("structured_lines", 0) >= conv.get("lines", 0)
 

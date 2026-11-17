@@ -33,12 +33,12 @@ from cpl.model.enums import ConvState as S, ResolutionReason as R
 
 def conv(state, parts=("a", "b"), **kw):
     c = {"id": "cv_1", "state": state, "state_version": 3, "initiator_id": parts[0], "lines": 1,
-         "participants": {p: {"status": "active"} for p in parts}, "floor": {"holder": "b", "waiting_on": "a",
+         "members": {p: {"status": "active"} for p in parts}, "cpl_floor": {"holder": "b", "waiting_on": "a",
                                                                                "attempts": 0},
-         "policy_key": policies.key("social", "in_person"), "created_at": 0.0, "started_at": 0.0,
+         "policy_key": policies.key("social", "in_person"), "created_at": 0.0, "cpl_started_at": 0.0,
          "timers": {"invite": 3, "reply": 3, "pause": 3, "close": 3}, "closed_by": []}
     if state == S.PENDING.value:
-        c["participants"]["b"]["status"] = "invited"
+        c["members"]["b"]["status"] = "invited"
     c.update(kw)
     return c
 
@@ -93,9 +93,9 @@ check("reply timer while the holder is thinking: re-armed, no timeout", r.state 
 r = T(conv(A), {"type": "timer", "kind": "reply", "version": 3})
 check("reply timer, first miss: attempt 1, the speaker may follow up", r.state == S.ACTIVE and did(r, "set_floor", attempts=1)
       and did(r, "request_turn", who="a", follow_up=True))
-r = T(conv(A, floor={"holder": "b", "waiting_on": "a", "attempts": 1}, lines=3), {"type": "timer", "kind": "reply", "version": 3})
+r = T(conv(A, cpl_floor={"holder": "b", "waiting_on": "a", "attempts": 1}, lines=3), {"type": "timer", "kind": "reply", "version": 3})
 check("reply timer, attempts used up: RESOLVED (timeout)", r.state == S.RESOLVED and r.reason == R.TIMEOUT.value)
-r = T(conv(A, floor={"holder": "b", "waiting_on": "a", "attempts": 1}, lines=1), {"type": "timer", "kind": "reply", "version": 3})
+r = T(conv(A, cpl_floor={"holder": "b", "waiting_on": "a", "attempts": 1}, lines=1), {"type": "timer", "kind": "reply", "version": 3})
 check("... or abandoned if it never got past the first line", r.reason == R.ABANDONED.value)
 r = T(conv(A), {"type": "turn", "by": "b", "control": "leave", "leave_reason": "angry"})
 check("one of two leaves angry: RESOLVED (angry withdrawal)", r.state == S.RESOLVED and r.reason == R.ANGRY_WITHDRAWAL.value
@@ -169,13 +169,13 @@ check("a message gets the next sequence number; the same message id twice is sto
 w["sim_time"] += 30
 CV.submit(w, c, {"type": "turn", "by": "b", "requires_response": True})
 check("the reply: ACTIVE, b now active, started_at set, the invite timer gone",
-      c["state"] == "active" and c["participants"]["b"]["status"] == "active" and c["started_at"] == 1030.0
+      c["state"] == "active" and c["members"]["b"]["status"] == "active" and c["cpl_started_at"] == 1030.0
       and not any(t["key"] == "invite" for t in w["timers"] if t["owner"] == "cpl:cv_000001"))
 w["sim_time"] += policies.policy("request", "in_person")["reply_s"] + 1
 due = [t for t in w["timers"] if t["owner"] == "cpl:cv_000001"]
 scheduler.fire_due(w)
-check("its reply timer firing: the first miss (attempt 1), re-armed", c["state"] == "active" and c["floor"]["attempts"] == 1
-      and any(t["key"] == "reply" for t in w["timers"] if t["owner"] == "cpl:cv_000001"), (due, c["floor"]))
+check("its reply timer firing: the first miss (attempt 1), re-armed", c["state"] == "active" and c["cpl_floor"]["attempts"] == 1
+      and any(t["key"] == "reply" for t in w["timers"] if t["owner"] == "cpl:cv_000001"), (due, c["cpl_floor"]))
 old = dict(w["timers"][0]) if w["timers"] else None
 CV.submit(w, c, {"type": "turn", "by": "a"})          # a statement: replaces the reply timer
 if old:
@@ -183,7 +183,7 @@ if old:
     check("a timer cancelled since is stale", not stale.changed)
 CV.submit(w, c, {"type": "turn", "by": "b", "control": "leave", "leave_reason": "angry"})
 check("an angry exit: RESOLVED, the outcome records it and the request it left open",
-      c["state"] == "resolved" and c["reason"] == "angry_withdrawal" and c["outcome"]["settled"] == {req["id"]: "open"})
+      c["state"] == "resolved" and c["reason"] == "angry_withdrawal" and c["cpl_outcome"]["settled"] == {req["id"]: "open"})
 check("... and the open request outlives the conversation (invariant 9)", store.open_requests(w, "b")[0]["id"] == req["id"])
 check("no timers left behind for it", not [t for t in w["timers"] if t["owner"] == "cpl:cv_000001"])
 

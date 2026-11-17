@@ -925,3 +925,23 @@ scripted Turn outputs. Pure modules (state machine, codec, policies, context) ge
     - a question asked without an `ACT` line, as every opener is, wasn't tracked, so Mode A could never apply.
 
     Regression checks are in `tests/test_cpl_turns.py`.
+- **The legacy store is gone: one record per conversation (2026-11-17).** CPL's state now lives on the conversation's
+  own record in `world["conversations"]`, next to the fields the rest of the simulation reads.
+  - The separate `cpl_conversations` collection and the legacy-to-CPL id map are removed. Older saves drop them on
+    first use; live CPL state is transient.
+  - Five CPL fields were renamed where both sides used the same name with different meanings: `members` (who is in
+    it and how), `cpl_floor`, `cpl_outcome`, `cpl_started_at`, `cpl_purpose`.
+  - A conversation that never got going elsewhere (a declined invitation, an unreachable call) gets a minimal,
+    inactive record marked `_cpl_only`.
+  - **`CPL_MODE` now defaults to `on`.** `shadow` follows without deciding; `off` is the kill switch, running the
+    older ending rules alone.
+  - Problems found and fixed while merging:
+    - a line added after a conversation ended reopened CPL on the record and overwrote how it ended (now kept as a
+      plain message);
+    - when the rest of the simulation reopens a conversation, CPL starts a new round on the same record, archiving
+      the finished round as it ends and summing it up in `cpl_rounds`;
+    - `gc` never deletes a conversation that is still open, and archives it first if needed;
+    - a conversation the rest of the simulation closed no longer blocks its initiator.
+  - The older ending rules are now `CPL_MODE=off` behaviour, so their tests (conversation archive, latency, outcome)
+    run with it.
+  - Determinism with `CPL_MODE=off` is identical to `master`. Full suite: no new failures.

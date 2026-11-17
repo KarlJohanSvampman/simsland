@@ -172,3 +172,14 @@ stack. The process tests use the same `Node` and `RedisTransport` on the fixture
 - Every partition compares every entity each tick (`exact=True`) instead of trusting the façade's touched set.
 - A household moving mid-walk can lose its place in the movement loop until its next update.
 - A whole-world replacement needs the partitions restarted.
+- **Conversations follow their first participant (2026-11-17).**
+  - A conversation (and its archive entry and its CPL requests) belongs to the partition of whoever started it. That
+    is read off the record itself, so talk within a household stays in its partition instead of round-tripping
+    through partition 0.
+  - Its CPL and idle timers and its floor-loop membership go with it.
+  - A partition receiving a record it doesn't have yet reads the owner from the incoming copy.
+  - Entity collections (`conversations` above all) are shared entity by entity and never as one value. When the
+    collection didn't exist yet at start-up, it had been treated as a single partition-0 value, and the first
+    conversation a partition created was rolled back with it.
+  - `tests/test_partitions.py` with CPL on: 19 conversation lines against 31 for the single writer, converged.
+    With CPL off: 14 against 15.

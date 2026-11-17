@@ -34,6 +34,6 @@ def report(world):
     m["share_without_model"] = round(m["turns"].get("A", 0) / turns, 3)
     m["share_timeout_or_abandoned"] = round((m["ended"].get("timeout", 0) + m["ended"].get("abandoned", 0)
                                              + m["ended"].get("no_answer", 0)) / ended, 3)
-    m["live"] = sum(1 for c in (world.get("cpl_conversations") or {}).values()
-                    if c.get("state") not in ("resolved", "expired"))
+    from cpl import store
+    m["live"] = len(store.live(world))
     return m

@@ -108,16 +108,9 @@ def _purpose(speech_act, conversation_type=None):
     return _PURPOSE_BY_ACT.get((speech_act or "").lower(), "social")
 
 
-def _map(world):
-    m = world.get("cpl_legacy_map")
-    if m is None:
-        world["cpl_legacy_map"] = m = {}
-    return m
-
-
 def _cpl_for(world, legacy_id):
-    cid = (world.get("cpl_legacy_map") or {}).get(legacy_id)
-    return store.get(world, cid) if cid else None
+    """The conversation's CPL state -- on the same record (one store), or None before CPL took it up."""
+    return store.get(world, legacy_id)
 
 
 def _envelope(conv, speaker_id, recipients, utterance, speech_act, ts, requires):
@@ -153,11 +146,16 @@ def _on_line(world, legacy, speaker_id, utterance, speech_act):
         st["reopened"] = st.get("reopened", 0) + 1         # CPL had ended it; the legacy one carries on
         key = f"(carried on) -> {conv.get('reason')}"
         st["pairs"][key] = st["pairs"].get(key, 0) + 1
+    if conv is not None and conv.get("state") in _FINAL and not legacy.get("active"):
+        # a line added to a conversation that has ended (a closing word after the end): kept, nothing reopened --
+        # one record per conversation, so a new lifecycle here would overwrite how this one ended
+        store.append_message(world, conv, _envelope(conv, speaker_id, others, utterance, speech_act, now_ts(world),
+                                                    requires))
+        return
     if conv is None or conv.get("state") in _FINAL:
         conv = CV.open_conversation(world, speaker_id, others, channel=legacy.get("medium", "in_person"),
                                     purpose=_purpose(speech_act, legacy.get("conversation_type")),
                                     topic=legacy.get("topic") or "", legacy_id=legacy["id"])
-        _map(world)[legacy["id"]] = conv["id"]
         st["opened"] += 1
         lines = _turn_lines(world, speaker_id)
         if lines:
@@ -214,7 +212,7 @@ def _overheard(world, conv, speaker_id):
     sp = (world.get("characters") or {}).get(speaker_id)
     if sp is None:
         return []
-    heard = overhearers(world, sp, set(conv.get("participants") or {}))
+    heard = overhearers(world, sp, set(conv.get("members") or {}))
     conv["messages"][-1].setdefault("audience", {})["overheard_by"] = heard
     return heard
 
@@ -261,8 +259,6 @@ def on_unreachable(world, speaker, listener, medium, topic, utterance=None):
 
 def on_legacy_end(world, legacy, reason):
     if not active(world) or not legacy or legacy.get("_cpl_ending"):
-        if legacy is not None and legacy.get("_cpl_ending"):
-            (world.get("cpl_legacy_map") or {}).pop(legacy.get("id"), None)
         return
     try:
         st = _stats(world)
@@ -284,7 +280,6 @@ def on_legacy_end(world, legacy, reason):
             st["agree"] += 1
         key = f"{reason} -> {got}"
         st["pairs"][key] = st["pairs"].get(key, 0) + 1
-        (world.get("cpl_legacy_map") or {}).pop(legacy.get("id"), None)
     except Exception as exc:
         print(f"[cpl.shadow] on_legacy_end failed: {exc!r}")
 

@@ -42,10 +42,10 @@ def submit(world, conv, event):
         return res
     conv["state_version"] = conv.get("state_version", 0) + 1
     conv["state"] = res.state.value if hasattr(res.state, "value") else res.state
-    if conv["state"] == ConvState.ACTIVE.value and conv.get("started_at") is None:
-        conv["started_at"] = now
+    if conv["state"] == ConvState.ACTIVE.value and conv.get("cpl_started_at") is None:
+        conv["cpl_started_at"] = now
     if before == ConvState.PENDING.value and conv["state"] == ConvState.ACTIVE.value:
-        p = conv["participants"].get(event.get("by"))
+        p = conv["members"].get(event.get("by"))
         if p is not None and p.get("status") == "invited":
             p.update(status="active", joined_at=now, joined_at_seq=conv.get("seq", 0))
     if conv["state"] == ConvState.ACTIVE.value and before == ConvState.RESOLVING.value:
@@ -54,11 +54,12 @@ def submit(world, conv, event):
     if conv["state"] in {s.value for s in FINAL}:
         conv["reason"] = res.reason.value if hasattr(res.reason, "value") else res.reason
         conv["resolved_at"] = now
-        conv["outcome"] = _outcome(world, conv, event)
+        conv["cpl_outcome"] = _outcome(world, conv, event)
     for eff in res.effects:
         _apply(world, conv, eff, event, now)
     if conv["state"] in {s.value for s in FINAL}:
-        from cpl import metrics, shadow
+        from cpl import archive, metrics, shadow
+        archive.queue(world, conv)                    # now, as it ended (the record can start a new round later)
         metrics.note_ended(world, conv["reason"])
         shadow.on_cpl_end(world, conv, event)
     return res
@@ -87,13 +88,13 @@ def _apply(world, conv, eff, event, now):
         (conv.get("timers") or {}).pop(eff["kind"], None)
         scheduler.cancel(world, _owner(conv), eff["kind"])
     elif do == "set_floor":
-        fl = conv.setdefault("floor", {})
+        fl = conv.setdefault("cpl_floor", {})
         fl["holder"] = eff.get("holder")
         if "waiting_on" in eff:
             fl["waiting_on"] = eff["waiting_on"]
         fl["attempts"] = eff.get("attempts", 0)
     elif do == "participant_left":
-        p = conv["participants"].get(eff["who"])
+        p = conv["members"].get(eff["who"])
         if p is not None:
             p.update(status="left" if eff["reason"] != "unavailable" else "unavailable", left_at=now,
                      left_reason=eff["reason"])
@@ -119,7 +120,7 @@ def _apply(world, conv, eff, event, now):
 
 def _publish(world, conv, name, cause, **extra):
     emit(name, dict({"conversation_id": conv["id"], "state": conv["state"], "state_version": conv["state_version"],
-                     "reason": conv.get("reason"), "participants": list(conv["participants"]),
+                     "reason": conv.get("reason"), "participants": list(conv["members"]),
                      "event_id": f"{conv['id']}:{conv['state_version']}:{name}:{extra.get('who', '')}",
                      "cause": cause.get("type")}, **extra))
 
@@ -140,9 +141,9 @@ def on_timer(world, entry):
         from cpl import archive
         archive.gc(world, cid)
         return
-    waiting = (conv.get("floor") or {}).get("holder")
+    waiting = (conv.get("cpl_floor") or {}).get("holder")
     if kind == "invite":
-        waiting = next((p for p, d in conv["participants"].items() if d.get("status") == "invited"), None)
+        waiting = next((p for p, d in conv["members"].items() if d.get("status") == "invited"), None)
     submit(world, conv, {"type": "timer", "kind": kind, "version": (entry.get("payload") or {}).get("version"),
                          "holder_thinking": _thinking(world, waiting)})
 

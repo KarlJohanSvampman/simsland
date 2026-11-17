@@ -27,7 +27,7 @@ from cpl.model.enums import ConvState
 def _live_for(world, char_id, states=None):
     out = []
     for conv in store.live(world, char_id):
-        p = (conv.get("participants") or {}).get(char_id) or {}
+        p = (conv.get("members") or {}).get(char_id) or {}
         if p.get("status") in ("active", "invited") and (states is None or conv.get("state") in states):
             out.append(conv)
     return out
@@ -47,7 +47,7 @@ def interrupt(world, char_id, by=None, kind="interruption", priority="normal", c
     from cpl import conversations as CV
     hit = []
     for conv in _live_for(world, char_id, {ConvState.ACTIVE.value, ConvState.RESOLVING.value}):
-        if (channel and conv.get("channel") != channel) or (by and by in (conv.get("participants") or {})):
+        if (channel and conv.get("channel") != channel) or (by and by in (conv.get("members") or {})):
             continue
         conv["interruption"] = {"who": char_id, "by": by, "kind": kind, "priority": priority,
                                 "can_resume": can_resume, "since": now_ts(world)}
@@ -87,13 +87,13 @@ def recover(world):
     chars = world.get("characters") or {}
     done = {"re_asked": [], "unavailable": []}
     for conv in list(store.live(world)):
-        gone = [p for p, d in conv["participants"].items() if d.get("status") in ("active", "invited")
+        gone = [p for p, d in conv["members"].items() if d.get("status") in ("active", "invited")
                 and _unavailable_reason(chars.get(p))]
         if gone:
             notify_unavailable(world, gone[0], _unavailable_reason(chars.get(gone[0])))
             done["unavailable"].append(conv["id"])
             continue
-        holder = (conv.get("floor") or {}).get("holder")
+        holder = (conv.get("cpl_floor") or {}).get("holder")
         hc = chars.get(holder) if holder else None
         if hc is not None and not ((hc.get("cognition") or {}).get("pending")):
             emit("cpl.turn_requested", {"conversation_id": conv["id"], "who": holder, "recovered": True,

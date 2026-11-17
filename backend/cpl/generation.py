@@ -50,7 +50,7 @@ def choose_mode(world, c, block):
         return "B"
     from cpl import store
     conv = store.get(world, block.get("conversation_id")) or {}
-    if conv.get("purpose") in ("conflict", "persuasion", "negotiation"):
+    if conv.get("cpl_purpose") in ("conflict", "persuasion", "negotiation"):
         return "C"
     for label, iid in (block.get("labels") or {}).items():
         if not label.startswith("Q") and ((world.get("cpl_requests") or {}).get(iid) or {}).get("recipient_id") == c["id"]:

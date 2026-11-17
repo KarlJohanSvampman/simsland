@@ -1,17 +1,20 @@
 """
-cpl/store.py -- where CPL keeps its state: on the world, as entities (docs/cpl_implementation_plan.md C1, decided).
+cpl/store.py -- where CPL keeps its state: on the conversation itself (docs/cpl_implementation_plan.md C1, decided;
+the legacy store is gone -- there is one record per conversation).
 
-    world["cpl_conversations"][conversation_id]   a conversation, its participants, floor, open items, outcome, and
-                                                  its messages (the last MESSAGE_CAP; the archive keeps them all)
-    world["cpl_requests"][request_id]             a request or proposal being negotiated -- it can outlive its
-                                                  conversation while open / deferred (spec invariant 9)
-    world["cpl_seq"]                              the counter ids are made from (deterministic: no uuids)
-    world["cpl_dedupe"]                           recently applied message ids (a result delivered twice is dropped)
+    world["conversations"][id]           THE conversation: the fields the rest of the simulation reads (participants as
+                                         a list, history, floor, topic, ...) and CPL's own on the same record -- its
+                                         state, members (who is in it and how), cpl_floor, open items, messages (the
+                                         last MESSAGE_CAP; the archive keeps them all), cpl_outcome, cpl_purpose ...
+                                         (CPL's names never collide with the older ones)
+    world["cpl_requests"][request_id]    a request or proposal being negotiated -- it can outlive its conversation
+                                         while open / deferred (spec invariant 9)
+    world["cpl_seq"]                     the counter ids are made from (deterministic: no uuids)
+    world["cpl_dedupe"]                  recently applied message ids (a result delivered twice is dropped)
 
-Both collections are entity collections (core/world_view.py, core/entity_store.py): each conversation and request
-is its own record, persisted and locked one by one -- so a conversation is saved together with everything it refers
-to, in the same flush (no split brain after a crash). Finished conversations also go to the append-only archive
-tables (cpl/archive.py) for history and metrics; those are never read back as live state.
+Both are entity collections (core/world_view.py, core/entity_store.py): each conversation and request is its own
+record, persisted and locked one by one. Finished conversations also go to the append-only archive tables
+(cpl/archive.py) for history and metrics; those are never read back as live state.
 
 Everything here runs on the simulation core under the world lock (or the entity locks of a unit): sequence numbers
 are assigned here.
@@ -31,8 +34,22 @@ def _coll(world, name):
     return coll
 
 
+def _migrate(world):
+    """A save from before the stores were merged: CPL kept its own copy (cpl_conversations, mapped by cpl_legacy_map).
+    Live CPL state is transient -- it is dropped, and conversations still under way pick CPL up on their next line."""
+    if "cpl_conversations" in world:
+        world.pop("cpl_conversations", None)
+    if "cpl_legacy_map" in world:
+        world.pop("cpl_legacy_map", None)
+
+
 def conversations(world):
-    return _coll(world, "cpl_conversations")
+    _migrate(world)
+    return _coll(world, "conversations")
+
+
+def is_cpl(conv):
+    return isinstance(conv, dict) and "state" in conv and "members" in conv
 
 
 def requests(world):
@@ -46,33 +63,49 @@ def next_id(world, prefix):
 
 
 def get(world, conversation_id):
-    return (world.get("cpl_conversations") or {}).get(conversation_id)
+    conv = (world.get("conversations") or {}).get(conversation_id)
+    return conv if is_cpl(conv) else None
 
 
 def create(world, *, initiator_id, recipient_ids, channel, purpose, topic, policy_key, now, urgent=False,
            legacy_id=None):
-    """A new conversation in CREATED, with its participants invited."""
-    cid = next_id(world, "cv")
+    """CPL takes up a conversation: its fields go on the conversation's record (`legacy_id`: the record the rest of
+    the simulation made, brain/conversations.py), or -- for one that never got going in the rest of the simulation (a
+    declined invitation, an unreachable call) -- on a new record, inactive, with the fields every reader expects."""
+    coll = conversations(world)
+    conv = coll.get(legacy_id) if legacy_id else None
+    if conv is not None and is_cpl(conv):
+        # the rest of the simulation reopened this conversation (a talk resuming within a minute): a new round for
+        # CPL on the same record; the round that ended is archived (cpl/archive.py) and summed up here
+        conv.setdefault("cpl_rounds", []).append({"state": conv.get("state"), "reason": conv.get("reason"),
+                                                  "lines": conv.get("lines", 0), "resolved_at": conv.get("resolved_at")})
+        conv["cpl_rounds"] = conv["cpl_rounds"][-10:]
+    if conv is None:
+        cid = legacy_id or next_id(world, "cv")
+        conv = {"id": cid, "participants": [initiator_id] + [r for r in recipient_ids if r != initiator_id],
+                "topic": topic or "general", "medium": channel, "history": [], "active": False, "status": "pending",
+                "_archived": True, "_cpl_only": True}
+        coll[cid] = conv
     parts = {initiator_id: _participant("initiator", "active", now)}
     for r in recipient_ids:
         if r != initiator_id:
             parts[r] = _participant("participant", "invited", None)
-    conv = {
-        "id": cid, "channel": channel, "initiator_id": initiator_id,
+    conv.update({
+        "channel": channel, "initiator_id": initiator_id,
         "state": ConvState.CREATED.value, "state_version": 0, "reason": None,
-        "purpose": purpose, "secondary_purposes": [], "topic": topic, "active_topics": [topic] if topic else [],
-        "participants": parts,
-        "floor": {"holder": None, "waiting_on": None, "attempts": 0},
+        "cpl_purpose": purpose, "secondary_purposes": [], "active_topics": [topic] if topic else [],
+        "members": parts,
+        "cpl_floor": {"holder": None, "waiting_on": None, "attempts": 0},
         "interruption": None,
         "context": {"summary": "", "agreements": [], "disagreements": [], "emotions": {}},
         "open_items": {"questions": [], "requests": [], "proposals": []},
-        "outcome": None, "outcome_hint": None, "closed_by": [],
-        "created_at": now, "started_at": None, "last_activity_at": now, "resolved_at": None,
+        "cpl_outcome": None, "outcome_hint": None, "closed_by": [], "questions": {}, "claims": {},
+        "created_at": now, "cpl_started_at": None, "last_activity_at": now, "resolved_at": None,
         "policy_key": policy_key, "urgent": bool(urgent),
-        "seq": 0, "lines": 0, "messages": [], "timers": {},
-        "legacy_id": legacy_id,
-    }
-    conversations(world)[cid] = conv
+        "seq": 0, "lines": 0, "messages": [], "timers": {}, "structured_lines": 0, "turn_errors": [],
+        "legacy_id": conv["id"],
+    })
+    conv.setdefault("topic", topic)
     return conv
 
 
@@ -84,10 +117,10 @@ def _participant(role, status, now):
 def live(world, character_id=None):
     """The live conversations (of one character)."""
     out = []
-    for conv in (world.get("cpl_conversations") or {}).values():
-        if conv.get("state") in {s.value for s in FINAL}:
+    for conv in (world.get("conversations") or {}).values():
+        if not is_cpl(conv) or conv.get("state") in {s.value for s in FINAL}:
             continue
-        if character_id is None or character_id in (conv.get("participants") or {}):
+        if character_id is None or character_id in (conv.get("members") or {}):
             out.append(conv)
     return out
 

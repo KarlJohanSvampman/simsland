@@ -48,7 +48,7 @@ def context_block(world, c):
         open_lines.append(f"{label} {_name(world, who) if who != c.get('id') else 'You'} "
                           f"{'asked' if label.startswith('Q') else 'asked for'}: {what}"
                           + (" (needs your answer)" if mine else ""))
-    others = [p for p in conv["participants"] if p != c.get("id")]
+    others = [p for p in conv["members"] if p != c.get("id")]
     intr = conv.get("interruption")
     interrupted = None
     if intr and intr.get("who") == c.get("id"):
@@ -220,7 +220,7 @@ def compact_prompt(world, c, block):
     act = str((c.get("activity") or {}).get("type") or "nothing in particular").replace("_", " ")
     out = [f"You are {c.get('name')}" + (f" ({traits})." if traits else "."),
            f"Right now: {act}; feeling {mood}."]
-    for other in [p for p in conv.get("participants") or {} if p != c["id"]][:3]:
+    for other in [p for p in conv.get("members") or {} if p != c["id"]][:3]:
         o = (world.get("characters") or {}).get(other) or {}
         rel = (c.get("relationships") or {}).get(other) or {}
         labels = ", ".join(rel.get("labels") or []) or "someone you know"

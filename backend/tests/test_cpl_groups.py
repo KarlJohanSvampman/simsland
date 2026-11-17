@@ -59,11 +59,11 @@ w["conversations"]["G1"] = g
 say(w, g, "theo", "So, what's everyone doing tonight?")
 say(w, g, "ana", "Movies, I think.")
 conv = record.for_legacy(w, "G1")
-check("a group conversation has all three in it", set(conv["participants"]) == {"theo", "ana", "mia"})
-conv["participants"]["mia"]["status"] = "active"
+check("a group conversation has all three in it", set(conv["members"]) == {"theo", "ana", "mia"})
+conv["members"]["mia"]["status"] = "active"
 say(w, g, "mia", "I have to go, see you!", "NEXT: leave:excuse")
 check("one of three leaves: it carries on without them", conv["state"] == "active"
-      and conv["participants"]["mia"]["status"] == "left", (conv["state"], conv["participants"]["mia"]))
+      and conv["members"]["mia"]["status"] == "left", (conv["state"], conv["members"]["mia"]))
 
 # ── a late joiner ────────────────────────────────────────────────────────────────────────────────────────────────────
 w = world()
@@ -74,7 +74,7 @@ say(w, legacy, "ana", "Train, it's cheaper.", "ANSWERS: Q1 answer")
 w["characters"]["ana"]["perception"]["visible_people"] = [{"id": "mia", "visibility": 1.0}]
 say(w, legacy, "ana", "Mia, come over -- we're planning the trip!", "NEXT: let_join:Mia")
 conv = record.for_legacy(w, "L1")
-p = conv["participants"].get("mia") or {}
+p = conv["members"].get("mia") or {}
 check("NEXT let_join:Mia -- Mia joins as she is called over (she hears that line, not the two before)",
       p.get("status") == "active" and p.get("joined_at_seq") == 2, p)
 check("... the legacy conversation takes her in too", "mia" in legacy["participants"] and "mia" in legacy["joined_ticks"])
