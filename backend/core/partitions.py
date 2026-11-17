@@ -189,41 +189,109 @@ def _dumps(v):
     return json.dumps(v, default=str)
 
 
-class Cluster:
-    def __init__(self, world, n, sim_id="part", exact=True):
-        from core import world_view
-        self.exact = exact
-        ownership.assign(world, n)
-        self.n = n
-        self.parts = []
-        for p in range(n):
-            w = copy.deepcopy(dict(world)) if p else world
-            w = world_view.install(w, f"{sim_id}{p}")
-            self._keep_own_timers(w, p)
-            self.parts.append({"id": p, "world": w, "sim_id": f"{sim_id}{p}",
-                               "published": {k: _dumps(_get(w, k)) for k in _keys(w)}})
-        self.stats = {"steps": 0, "patches": 0, "ops": 0, "ops_landed": 0, "published": 0, "creates": 0,
-                      "deletes": 0}
+class MemoryTransport:
+    """Messages between partitions in one process (tests, the in-process cluster)."""
 
-    def _keep_own_timers(self, w, p):
+    def __init__(self, n):
+        self.n = n
+        self.queues = {p: [] for p in range(n)}
+
+    def send(self, to, msg):
+        self.queues[to].append(copy.deepcopy(msg))
+
+    def broadcast(self, frm, msg):
+        for p in range(self.n):
+            if p != frm:
+                self.send(p, msg)
+
+    def receive(self, p):
+        out, self.queues[p] = self.queues[p], []
+        return out
+
+
+class Node:
+    """One partition: its world copy, what it last published / received of each entity, and the step around a tick.
+
+        tick(tick_fn)   receive (patches for what it owns, frames for the rest), take in its inbox, run the tick for
+                        what it owns, then send: patches to the owners of what it changed but doesn't own (its copy
+                        goes back to the published one), a frame to everyone with what it owns and changed
+        settle()        receive and publish, no tick (to let the copies catch up, e.g. before comparing them)
+    """
+
+    def __init__(self, world, p, transport, sim_id="part", exact=True):
+        from core import world_view
+        self.id, self.transport, self.exact = p, transport, exact
+        self.sim_id = f"{sim_id}{p}"
+        self.world = world_view.install(world, self.sim_id)
+        self._keep_own_timers()
+        self.published = {k: _dumps(_get(self.world, k)) for k in _keys(self.world)}
+        self.changed = set()
+        self.stats = {"ticks": 0, "patches_in": 0, "patches_out": 0, "ops_landed": 0, "frames_in": 0,
+                      "frames_out": 0, "entities_out": 0, "creates": 0, "deletes": 0}
+
+    def _keep_own_timers(self):
         global CURRENT
-        prev, CURRENT = CURRENT, p
+        prev, CURRENT = CURRENT, self.id
         try:
+            w = self.world
             dict.__setitem__(w, "timers", [t for t in (dict.get(w, "timers") or [])
-                                           if route(w, t["owner"]) == p and (t.get("key") != "recurring"
-                                                                             or runs_recurring(t["owner"]))])
+                                           if route(w, t["owner"]) == self.id and (t.get("key") != "recurring"
+                                                                                   or runs_recurring(t["owner"]))])
         finally:
             CURRENT = prev
 
-    def world(self, p=0):
-        return self.parts[p]["world"]
+    # -- receiving ------------------------------------------------------------------------------------------------
+    def receive(self):
+        w = self.world
+        for m in self.transport.receive(self.id):
+            if m["t"] == "frame":
+                self.stats["frames_in"] += 1
+                for kind, eid, text in m["entities"]:
+                    key = (kind, eid)
+                    if _owner(w, key) == self.id:
+                        continue                         # ours now (moved here since): our copy stands
+                    _put(w, key, None if text is None else json.loads(text))
+                    if text is None:
+                        self.published.pop(key, None)
+                    else:
+                        self.published[key] = text
+                    if kind == "characters":
+                        from brain import agent_wake
+                        agent_wake.reindex(w, eid)
+                continue
+            key = tuple(m["key"])
+            owner = _owner(w, key)
+            if owner != self.id:
+                self.transport.send(owner, m)            # moved on: pass it to the owner now
+                continue
+            self.stats["patches_in"] += 1
+            if m["what"] == "patch":
+                ent = _get(w, key)
+                if ent is None:
+                    continue
+                self.stats["ops_landed"] += entity_patch.apply(ent, m["body"])
+            elif m["what"] == "create":
+                if _get(w, key) is None:
+                    _put(w, key, m["body"])
+                    self.stats["creates"] += 1
+                else:
+                    self.stats["ops_landed"] += entity_patch.apply(_get(w, key), entity_patch.diff(_get(w, key),
+                                                                                                    m["body"]))
+            else:
+                _put(w, key, None)
+                self.stats["deletes"] += 1
+            self.changed.add(key)
+            if key[0] == "characters":
+                from brain import agent_wake
+                agent_wake.reindex(w, key[1])
 
-    def _drain_inbox(self, part):
-        w, p = part["world"], part["id"]
+    def _drain_inbox(self):
+        w, p = self.world, self.id
         box = dict.get(w, f"_inbox_{p}") or []
         if not box:
             return
         dict.__setitem__(w, f"_inbox_{p}", [])
+        self.changed.add(("key", f"_inbox_{p}"))
         from core import scheduler, flow
         for m in box:
             if m["t"] == "timer":
@@ -231,95 +299,117 @@ class Cluster:
             elif m["t"] == "duty":
                 flow.wake_duty(w, m["name"])
 
-    def step(self, tick_fn):
+    # -- a step ---------------------------------------------------------------------------------------------------
+    def tick(self, tick_fn):
         global CURRENT
         from core import world_view
-        outgoing = []                                  # (owner, key, op): "patch" ops | "create" value | "delete"
-        changed = {p["id"]: set() for p in self.parts}
-        for part in self.parts:
-            w, p = part["world"], part["id"]
-            CURRENT = p
-            try:
-                world_view.take_touched(part["sim_id"])
-                self._drain_inbox(part)
-                tick_fn(w)
-            finally:
-                CURRENT = None
-            touched = world_view.take_touched(part["sim_id"]) or set()
-            cands = {k for k in touched if k[0] != "*list"}
-            if self.exact:
-                # every entity, not only those the façade saw reached: in ONE process the partitions share module
-                # state (the event queue above all -- a decision can be applied during another partition's turn), so
-                # a change can land outside the partition's own window; compared whole, it is found wherever it is
-                cands |= set(_keys(w)) | set(part["published"])
-            cands |= {("props", str(x.get("id"))) for x in list.__iter__(dict.get(w, "props") or [])
-                      if isinstance(x, dict) and x.get("id")}
-            cands |= {k for k in part["published"] if k[0] == "props"}
-            cands |= {("key", k) for k in dict.keys(w) if k.startswith("_inbox_")}
-            for key in cands:
-                if key[0] == "key" and (key[1] in LOCAL_KEYS or key[1] in _static()):
-                    continue
-                now, before = _get(w, key), part["published"].get(key)
-                text = None if now is None else _dumps(now)
-                if text == before:
-                    continue
-                owner = _owner(w, key)
-                if owner == p:
-                    changed[p].add(key)
-                    continue
-                if before is None:
-                    outgoing.append((owner, key, "create", copy.deepcopy(now)))
-                elif now is None:
-                    outgoing.append((owner, key, "delete", None))
-                else:
-                    ops = entity_patch.diff(json.loads(before), json.loads(text))
-                    if ops:
-                        outgoing.append((owner, key, "patch", ops))
-                _put(w, key, None if before is None else json.loads(before))      # back to the published copy
-        for owner, key, what, body in outgoing:          # partition order: deterministic
-            w = self.parts[owner]["world"]
-            if what == "patch":
-                ent = _get(w, key)
-                if ent is None:
-                    continue
-                self.stats["patches"] += 1
-                self.stats["ops"] += len(body)
-                self.stats["ops_landed"] += entity_patch.apply(ent, body)
-            elif what == "create":
-                if _get(w, key) is None:
-                    _put(w, key, body)
-                    self.stats["creates"] += 1
-                else:
-                    ops = entity_patch.diff(_get(w, key), body)
-                    self.stats["ops_landed"] += entity_patch.apply(_get(w, key), ops)
-            else:
-                _put(w, key, None)
-                self.stats["deletes"] += 1
-            changed[owner].add(key)
-            if key[0] == "characters":
-                from brain import agent_wake
-                agent_wake.reindex(w, key[1])
-        for part in self.parts:                          # publish: every owner's changed entities to everyone
-            src = part["world"]
-            for key in changed[part["id"]]:
-                ent = _get(src, key)
-                text = None if ent is None else _dumps(ent)
-                self.stats["published"] += 1
-                for other in self.parts:
-                    other["published"][key] = text
-                    if other is not part:
-                        _put(other["world"], key, None if ent is None else json.loads(text))
+        CURRENT = self.id
+        try:
+            world_view.take_touched(self.sim_id)
+            self.receive()
+            self._drain_inbox()
+            tick_fn(self.world)
+        finally:
+            CURRENT = None
+        self.stats["ticks"] += 1
+        self._send_changes(world_view.take_touched(self.sim_id) or set())
+
+    def settle(self):
+        self.receive()
+        self._send_changes(set())
+
+    def _send_changes(self, touched):
+        w, p = self.world, self.id
+        cands = {k for k in touched if k[0] != "*list"} | self.changed
+        if self.exact:
+            # every entity, not only those the façade saw reached: in ONE process the partitions share module state
+            # (the event queue above all -- a decision can be applied during another partition's turn), so a change
+            # can land outside the partition's own window; compared whole, it is found wherever it is
+            cands |= set(_keys(w)) | set(self.published)
+        cands |= {("props", str(x.get("id"))) for x in list.__iter__(dict.get(w, "props") or [])
+                  if isinstance(x, dict) and x.get("id")}
+        cands |= {k for k in self.published if k[0] == "props"}
+        cands |= {("key", k) for k in dict.keys(w) if k.startswith("_inbox_")}
+        frame = []
+        for key in sorted(cands):
+            if key[0] == "key" and (key[1] in LOCAL_KEYS or key[1] in _static()):
+                continue
+            now, before = _get(w, key), self.published.get(key)
+            text = None if now is None else _dumps(now)
+            owner = _owner(w, key)
+            if owner == p:
+                if text != before or key in self.changed:
+                    frame.append([key[0], key[1], text])
                     if text is None:
-                        other["published"].pop(key, None)
-        self.stats["steps"] += 1
+                        self.published.pop(key, None)
+                    else:
+                        self.published[key] = text
+                continue
+            if text == before:
+                continue
+            if before is None:
+                msg = {"t": "patch", "key": list(key), "what": "create", "body": copy.deepcopy(now), "from": p}
+            elif now is None:
+                msg = {"t": "patch", "key": list(key), "what": "delete", "body": None, "from": p}
+            else:
+                ops = entity_patch.diff(json.loads(before), json.loads(text))
+                if not ops:
+                    continue
+                msg = {"t": "patch", "key": list(key), "what": "patch", "body": ops, "from": p}
+            self.transport.send(owner, msg)
+            self.stats["patches_out"] += 1
+            _put(w, key, None if before is None else json.loads(before))      # back to the published copy
+        self.changed = set()
+        if frame:
+            self.transport.broadcast(p, {"t": "frame", "from": p, "entities": frame})
+            self.stats["frames_out"] += 1
+            self.stats["entities_out"] += len(frame)
+
+
+class Cluster:
+    """N partitions in one process, stepped in turn over a MemoryTransport (tests/test_partitions.py)."""
+
+    def __init__(self, world, n, sim_id="part", exact=True):
+        ownership.assign(world, n)
+        self.n = n
+        self.transport = MemoryTransport(n)
+        self.nodes = [Node(copy.deepcopy(dict(world)) if p else world, p, self.transport, sim_id, exact)
+                      for p in range(n)]
+
+    @property
+    def parts(self):
+        return [{"id": nd.id, "world": nd.world} for nd in self.nodes]
+
+    @property
+    def stats(self):
+        out = {}
+        for nd in self.nodes:
+            for k, v in nd.stats.items():
+                out[k] = out.get(k, 0) + v
+        return out
+
+    def world(self, p=0):
+        return self.nodes[p].world
+
+    def step(self, tick_fn):
+        for nd in self.nodes:
+            nd.tick(tick_fn)
+
+    def settle(self, rounds=3):
+        for _ in range(rounds):
+            for nd in self.nodes:
+                nd.settle()
 
     def divergence(self):
-        """Entities whose copies differ between partitions (should be none after a step)."""
+        """Entities whose copies differ between partitions (none once settled)."""
         bad = []
-        base = self.parts[0]["world"]
-        for key in _keys(base):
+        base = self.nodes[0].world
+        keys = set(_keys(base))
+        for other in self.nodes[1:]:
+            keys |= set(_keys(other.world))
+        for key in sorted(keys):
             t = _dumps(_get(base, key))
-            for other in self.parts[1:]:
-                if _dumps(_get(other["world"], key)) != t:
-                    bad.append((key, other["id"]))
+            for other in self.nodes[1:]:
+                if _dumps(_get(other.world, key)) != t:
+                    bad.append((key, other.id))
         return bad
