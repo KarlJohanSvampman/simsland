@@ -885,6 +885,25 @@ def set_relationship(payload: dict, sim_id: str = DEFAULT_SIM_ID):
     return {"ok": True, "edge": rel}
 
 
+@router.post("/move_household")
+@command("admin.move_household", entities="world")
+def move_household(payload: dict, sim_id: str = DEFAULT_SIM_ID):
+    """Partitioned simulation (docs/step5b_plan.md): hand a household -- its members and its props -- to another
+    partition, while everything runs. payload: {"household_id", "partition"}."""
+    from core import partitions
+    if partitions.SERVER_N <= 1:
+        return JSONResponse({"error": "the simulation is not partitioned (SIM_PARTITIONS=1)"}, status_code=400)
+    to = int(payload.get("partition", -1))
+    if not 0 <= to < partitions.SERVER_N:
+        return JSONResponse({"error": f"partition must be 0..{partitions.SERVER_N - 1}"}, status_code=400)
+    with world_lock():
+        world = load_world(sim_id)
+        if payload.get("household_id") not in (world.get("households") or {}):
+            return JSONResponse({"error": "no such household"}, status_code=404)
+        started = partitions.server_node(world, sim_id).request_move(payload["household_id"], to)
+    return {"ok": True, "moving": started}
+
+
 @router.post("/dedupe_long_term_memory")
 @command("admin.dedupe_long_term_memory",
          entities=lambda a: [("characters", _pc(a))] if _pc(a) else "world")

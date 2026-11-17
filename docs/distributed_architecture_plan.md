@@ -637,3 +637,13 @@ component; a replayable event log.
   `ENTITY_LOCKS=on`: none reaches an entity it did not declare. Live, with the real tick runner and a command thread
   for 12 s: 1,716 ticks, 1,088 declared commands at a median of 1.5 ms (was 6-8 ms), 0 entity waits, 0 conflicts,
   reload identical. Commands no longer wait for the step because the step now rarely reaches the same characters.
+- **Step 5b, separate processes (done).** Partitioned ownership, chosen over "one writer, compute out" (details and
+  measurements in `docs/step5b_plan.md`).
+  - Partition 0 is the core: world services, conversations, commands, the gateway replica. Further partitions own
+    households (members, props).
+  - Writes to another partition's entity travel as field-level patches (`core/entity_patch.py`), and owners publish
+    frames (`core/partitions.py`), over Redis streams between processes.
+  - Households can be moved between partitions while running.
+  - Tested in one process and across three real processes (converging, reproducible in lockstep, free-running).
+  - Wired into `main.py` (`SIM_PARTITIONS` / `SIM_PARTITION`), and into docker-compose under the `partitions`
+    profile.

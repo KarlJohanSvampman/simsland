@@ -72,9 +72,14 @@ _CHARACTER_LOOPS = {"movement", "nudity"}
 _WORLD_TIMER_PREFIXES = ("cpl", "duty", "convidle", "flow")
 
 
+_HANDING = {}                  # partition -> {(kind, id)} it is handing over (owns, but no longer runs)
+
+
 def here(world, kind, eid):
     if CURRENT is None:
         return True
+    if (kind, eid) in _HANDING.get(CURRENT, ()):
+        return False
     return ownership.owner_of(world, kind, eid) == CURRENT
 
 
@@ -301,6 +306,11 @@ class Node:
         self.changed = set()
         self.pending = []                                # messages from a step not yet over (lockstep, see receive)
         self.seq = 0                                     # this partition's message counter (orders what it sent)
+        self.handing = {}                                # (kind, id) -> partition it is going to (slice 4: moves)
+        self.incoming = set()                            # (kind, id) coming here: patches for them wait in buffer
+        self.forced = set()                              # handed-over state partition 0 publishes as is, once
+        self.buffer = []
+        _HANDING[p] = self.handing
         self.stats = {"ticks": 0, "patches_in": 0, "patches_out": 0, "ops_landed": 0, "frames_in": 0,
                       "frames_out": 0, "entities_out": 0, "creates": 0, "deletes": 0}
 
@@ -325,9 +335,13 @@ class Node:
         msgs = msgs if everything else [m for m in msgs if m.get("step", -1) < self.stats["ticks"]]
         msgs.sort(key=lambda m: (m.get("step", -1), m.get("from", 0), m.get("seq", 0)))   # not arrival order
         for m in msgs:
+            if m["t"] in ("incoming", "handover", "handed", "adopt_timers"):
+                self._move_message(m)
+                continue
             if m["t"] == "frame":
                 self.stats["frames_in"] += 1
-                for kind, eid, text in m["entities"]:
+                ents = sorted(m["entities"], key=lambda e: (e[0], e[1]) == ("key", "_owners"))   # the map last
+                for kind, eid, text in ents:
                     key = (kind, eid)
                     if _owner(w, key) == self.id:
                         continue                         # ours now (moved here since): our copy stands
@@ -342,6 +356,12 @@ class Node:
                 continue
             key = tuple(m["key"])
             owner = _owner(w, key)
+            if key in self.incoming and owner != self.id:
+                self.buffer.append(m)                    # on its way here: wait for the owner map to say so
+                continue
+            if key in self.handing:
+                self.transport.send(self.handing[key], m)    # handed over: to its new owner
+                continue
             if owner != self.id:
                 self.transport.send(owner, m)            # moved on: pass it to the owner now
                 continue
@@ -365,6 +385,118 @@ class Node:
             if key[0] == "characters":
                 from brain import agent_wake
                 agent_wake.reindex(w, key[1])
+        self._after_receive()
+
+    def _after_receive(self):
+        """A move completed (the owner map now says these are ours, or no longer ours): settle its loose ends."""
+        w = self.world
+        arrived = {k for k in self.incoming if _owner(w, k) == self.id}
+        if arrived:
+            self.incoming -= arrived
+            held, self.buffer = [m for m in self.buffer if tuple(m.get("key", ())) in arrived], \
+                [m for m in self.buffer if tuple(m.get("key", ())) not in arrived]
+            for m in held:                               # patches that waited: now ours to apply
+                self._apply_patch(tuple(m["key"]), m)
+        gone = [k for k in self.handing if _owner(w, k) != self.id]
+        for k in gone:
+            del self.handing[k]
+        pend = [m for m in self.buffer if m.get("t") == "adopt_timers"
+                and all(_owner(w, ("characters", c)) == self.id for c in m.get("chars", []))]
+        for m in pend:
+            self.buffer.remove(m)
+            self._adopt(m)
+
+    def _apply_patch(self, key, m):
+        w = self.world
+        self.stats["patches_in"] += 1
+        if m["what"] == "patch":
+            ent = _get(w, key)
+            if ent is not None:
+                self.stats["ops_landed"] += entity_patch.apply(ent, m["body"])
+        elif m["what"] == "create" and _get(w, key) is None:
+            _put(w, key, m["body"])
+        elif m["what"] == "delete":
+            _put(w, key, None)
+        self.changed.add(key)
+
+    def _adopt(self, m):
+        global CURRENT
+        from core import scheduler
+        prev, CURRENT = CURRENT, self.id
+        try:
+            for t in m.get("timers", []):
+                scheduler.schedule_at(self.world, t["owner"], t["key"], t["due"], t.get("payload"), t.get("every"),
+                                      t.get("spec"))
+        finally:
+            CURRENT = prev
+        from brain import agent_wake
+        for cid in m.get("chars", []):
+            agent_wake.reindex(self.world, cid)
+            agent_wake.wake_now((self.world.get("characters") or {}).get(cid), "moved_here")
+        self.stats["moves_in"] = self.stats.get("moves_in", 0) + 1
+
+    # -- moving a household (slice 4) ------------------------------------------------------------------------------
+    def request_move(self, hid, to):
+        """Partition 0: move household `hid` (members, props) to partition `to`. Four messages (docs/step5b_plan.md)."""
+        if self.id != 0:
+            raise RuntimeError("moves are made by partition 0")
+        w = self.world
+        frm = ownership.owner_of(w, "households", hid)
+        if frm == to:
+            return False
+        keys = [("households", hid)] + [("characters", c) for c in ownership._members(w, hid)
+                                         if ownership.owner_of(w, "characters", c) == frm] + \
+               [("props", pid) for pid in ownership._props_of(w, hid)]
+        msg = {"hid": hid, "to": to, "from": frm, "keys": [list(k) for k in keys], "step": -1}
+        if to == 0:
+            self.incoming |= set(keys)
+        else:
+            self.transport.send(to, dict(msg, t="incoming"))
+        if frm == 0:
+            self._move_message(dict(msg, t="handover"))
+        else:
+            self.transport.send(frm, dict(msg, t="handover"))
+        return True
+
+    def _move_message(self, m):
+        global CURRENT
+        w = self.world
+        keys = [tuple(k) for k in m.get("keys", [])]
+        if m["t"] == "incoming":
+            self.incoming |= set(keys)
+        elif m["t"] == "handover":                       # we own them: stop running them, hand over the final state
+            for k in keys:
+                self.handing[k] = m["to"]
+            chars = [k[1] for k in keys if k[0] == "characters"]
+            timers, keep = [], []
+            prev, CURRENT = CURRENT, self.id
+            try:
+                for t in dict.get(w, "timers") or []:
+                    (timers if route(w, t["owner"]) == self.id and any(
+                        c in str(t["owner"]).split(":")[1:] for c in chars) else keep).append(t)
+            finally:
+                CURRENT = prev
+            dict.__setitem__(w, "timers", keep)
+            handed = dict(m, t="handed", entities=[[k[0], k[1], _dumps(_get(w, k))] for k in keys],
+                          timers=timers, chars=chars)
+            if self.id == 0:
+                self._move_message(handed)
+            else:
+                self.transport.send(0, handed)
+        elif m["t"] == "handed":                         # partition 0: the final state in, the owner map flipped
+            for kind, eid, text in m["entities"]:
+                _put(w, (kind, eid), None if text in (None, "null") else json.loads(text))
+                self.forced.add((kind, eid))
+            ownership.move_household(w, m["hid"], m["to"])
+            self.changed.add(("key", "_owners"))
+            adopt = {"t": "adopt_timers", "timers": m.get("timers", []), "chars": m.get("chars", []), "step": -1}
+            if m["to"] == 0:
+                self.buffer.append(adopt)
+            else:
+                self.transport.send(m["to"], adopt)
+            self.stats["moves"] = self.stats.get("moves", 0) + 1
+        elif m["t"] == "adopt_timers":
+            self.buffer.append(m)                        # once the owner map says they are ours (_after_receive)
 
     def _drain_inbox(self):
         w, p = self.world, self.id
@@ -404,7 +536,7 @@ class Node:
 
     def _send_changes(self, touched):
         w, p = self.world, self.id
-        cands = {k for k in touched if k[0] != "*list"} | self.changed
+        cands = {k for k in touched if k[0] != "*list"} | self.changed | self.forced
         if self.exact:
             # every entity, not only those the façade saw reached: in ONE process the partitions share module state
             # (the event queue above all -- a decision can be applied during another partition's turn), so a change
@@ -421,6 +553,10 @@ class Node:
             now, before = _get(w, key), self.published.get(key)
             text = None if now is None else _dumps(now)
             owner = _owner(w, key)
+            if key in self.forced:                       # a moved household's final state: everyone takes it as is
+                frame.append([key[0], key[1], text])
+                self.published[key] = text
+                continue
             if owner == p:
                 if text != before or key in self.changed:
                     frame.append([key[0], key[1], text])
@@ -449,6 +585,7 @@ class Node:
             self.stats["patches_out"] += 1
             _put(w, key, None if before is None else json.loads(before))      # back to the published copy
         self.changed = set()
+        self.forced = set()
         if frame:
             self.seq += 1
             self.transport.broadcast(p, {"t": "frame", "from": p, "entities": frame, "step": self.stats["ticks"],
@@ -485,6 +622,9 @@ class Cluster:
     def step(self, tick_fn):
         for nd in self.nodes:
             nd.tick(tick_fn)
+
+    def move_household(self, hid, to):
+        return self.nodes[0].request_move(hid, to)
 
     def settle(self, rounds=3):
         for _ in range(rounds):

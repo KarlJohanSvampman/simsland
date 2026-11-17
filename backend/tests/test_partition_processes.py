@@ -33,7 +33,7 @@ N, TICKS = 3, int(os.getenv("PART_TICKS", "600"))
 here = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
-def run(free=False):
+def run(free=False, move_at=0):
     sim = "t" + uuid.uuid4().hex[:8]
     tmp = tempfile.mkdtemp()
     procs, outs = [], []
@@ -43,7 +43,8 @@ def run(free=False):
         procs.append(subprocess.Popen([sys.executable, os.path.join(here, "tools", "partition_runner.py"), sim, str(p),
                                        str(N), str(TICKS), out], cwd=here, stdout=subprocess.DEVNULL,
                                       stderr=subprocess.PIPE,
-                                      env=dict(os.environ, PYTHONHASHSEED="0", PART_FREE="1" if free else "0")))
+                                      env=dict(os.environ, PYTHONHASHSEED="0", PART_FREE="1" if free else "0",
+                                               PART_MOVE_AT=str(move_at))))
     codes = []
     for pr in procs:
         _o, err = pr.communicate(timeout=1800)
@@ -80,6 +81,21 @@ if len(res3) == N:
           all(c == 0 for c, _ in codes3) and not any(r["errors"] for r in res3) and not differ3, (codes3, differ3[:5]))
 else:
     check("free-running partitions ran to the end", False, codes3)
+
+codes4, res4 = run(free=True, move_at=TICKS // 2)
+if len(res4) == N:
+    keys4 = set().union(*(r["entities"] for r in res4))
+    differ4 = [k for k in keys4 if len({r["entities"].get(k) for r in res4}) > 1]
+    moved = [h for h, q in res4[0]["owners"]["households"].items() if q == 1 and res[0]["owners"]["households"][h] == N - 1]
+    check("a household moved between processes mid-run: the map says so everywhere, copies agree, no errors",
+          moved and not differ4 and not any(r["errors"] for r in res4)
+          and all(r["owners"] == res4[0]["owners"] for r in res4), (moved, differ4[:5]))
+    owners4 = res4[0]["owners"]["characters"]
+    stalled4 = [cid for cid, part in owners4.items()
+                if (res4[part]["last_run"].get(cid) or 0) < (res4[part]["sim_time"] or 0) - 120]
+    check("... and its members kept running in their new process", not stalled4, (stalled4, owners4))
+else:
+    check("the moving run ran to the end", False, codes4)
 
 print()
 print("all passed" if not failures else f"FAILED: {', '.join(failures)}")

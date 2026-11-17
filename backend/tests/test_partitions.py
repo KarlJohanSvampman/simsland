@@ -120,6 +120,38 @@ last_run = {cid: ((ch.get("_wake") or {}).get("last") or 0) for cid, ch in (w0.g
 stuck = [cid for cid, t in last_run.items() if t < (w0.get("sim_time") or 0) - 120]
 check("every character kept running in its own partition (none stalled)", not stuck, (stuck, last_run))
 
+# ── slice 4: moving a household while it runs ────────────────────────────────────────────────────────────────────────
+mid = {}
+
+
+def mover(cl):
+    step = cl.nodes[0].stats["ticks"]
+    if step == TICKS // 2 and not mid:
+        w = cl.world(0)
+        hid = next(h for h, p in w["_owners"]["households"].items() if p == 2)
+        members = [c for c in w["households"][hid]["members"] if c in w["characters"]]
+        mid.update(hid=hid, members=members,
+                   mem={c: len(cl.world(2)["characters"][c].get("long_term_memory") or []) for c in members},
+                   at=cl.world(0).get("sim_time"))
+        cl.move_household(hid, 1)
+
+
+cm, em, divm = run_cluster(TICKS, 3, mover)
+wm = cm.world(0)
+check("a household moved while running: no errors", not em, dict(em))
+check("... the owner map now gives it, its members and its props to partition 1",
+      mid and wm["_owners"]["households"][mid["hid"]] == 1 and all(wm["_owners"]["characters"][c] == 1
+                                                                    for c in mid["members"]), (mid, wm["_owners"]))
+check("... every copy agrees afterwards", divm == 0, cm.divergence()[:5])
+w1m = cm.world(1)
+ran = {c: ((w1m["characters"][c].get("_wake") or {}).get("last") or 0) for c in mid.get("members", [])}
+check("... its members kept running, now in partition 1", all(t > (mid.get("at") or 0) for t in ran.values()), ran)
+kept = {c: len(w1m["characters"][c].get("long_term_memory") or []) >= mid["mem"][c] for c in mid.get("members", [])}
+check("... and nothing they had was lost in the move (memories kept)", all(kept.values()), (kept, mid.get("mem")))
+check("... partition 2 runs none of them any more", not cm.nodes[2].handing and all(
+    wm["_owners"]["characters"][c] != 2 for c in mid.get("members", [])))
+print(f"   move stats: moves {cm.stats.get('moves')}, moves_in {cm.stats.get('moves_in')}")
+
 print()
 print("all passed" if not failures else f"FAILED: {', '.join(failures)}")
 sys.exit(1 if failures else 0)

@@ -129,3 +129,46 @@ path is proven.
       step late.
 
     The off path is identical; full suite: no new failures.
+- **Slice 3 (done): separate processes.**
+  - `core/partitions.py` is split into a `Node` (one partition: receive, inbox, tick, send) and a transport:
+    `MemoryTransport` in one process, `RedisTransport` (a stream per partition) between processes.
+  - Messages carry their step and the sender's sequence number, and are applied in that order rather than arrival
+    order. In lockstep a partition takes in only finished steps, so runs reproduce. Free-running (the server)
+    takes what has arrived.
+  - Events still queued at the end of a partition's tick are flushed there, by the owner.
+  - `tools/partition_runner.py` runs one partition as a process. `tests/test_partition_processes.py` runs three:
+    - no errors, the copies converge, and patches land;
+    - nobody stalls, and a lockstep run reproduces exactly;
+    - free-running also converges.
+  - **The server.** `SIM_PARTITIONS` / `SIM_PARTITION`:
+    - `main.py` steps through the partition node;
+    - only partition 0 serves commands, publishes the replica for API gateways (its copy holds everyone's
+      entities) and writes the backup blob;
+    - each partition persists only what it owns (`core/world_state.py::_owned_only`, `partitions.persists`);
+    - cognition results were already filtered per core process.
+
+    docker-compose has `partition1` and `partition2` under the `partitions` profile:
+    `SIM_PARTITIONS=3 docker compose --profile partitions up -d`. `tests/test_partition_server.py`.
+  - A whole new world saved by the editor is written whole by partition 0. The other partitions pick it up when
+    restarted.
+- **Slice 4 (done): moving a household while it runs.** `Node.request_move` (partition 0;
+  `POST /admin/move_household` on the server) runs four messages:
+  1. **incoming** to the new owner, which holds patches for those entities;
+  2. **handover** to the old owner, which stops running them and sends their final state and the characters' timers;
+  3. partition 0 installs that state and flips the owner map in one frame, the map applied last;
+  4. the new owner takes over the timers, re-indexes and wakes the characters, and applies the held patches. Stray
+     patches reaching the old owner are passed on.
+
+  Tested in one process (`tests/test_partitions.py`: no errors, copies agree, the members keep running in their
+  new partition, no memories lost) and between processes (`tests/test_partition_processes.py`).
+
+### Status
+
+Step 5b is built. Off the partitioned path nothing changes: determinism is identical, and the full suite has no new
+failures (117 pass). What hasn't been done is running the docker-compose partition profile itself, which needs the
+stack. The process tests use the same `Node` and `RedisTransport` on the fixture world.
+
+**Known limits** (fine at tens of characters):
+- Every partition compares every entity each tick (`exact=True`) instead of trusting the façade's touched set.
+- A household moving mid-walk can lose its place in the movement loop until its next update.
+- A whole-world replacement needs the partitions restarted.

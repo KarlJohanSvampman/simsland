@@ -46,6 +46,7 @@ w = world_view.install(w)
 D._together(w)
 ownership.assign(w, n)
 FREE = os.getenv("PART_FREE") == "1"          # free-running, as the server runs (no barrier per step)
+MOVE_AT = int(os.getenv("PART_MOVE_AT", "0"))   # partition 0 moves a household at this step (slice 4)
 node = partitions.Node(w, p, partitions.RedisTransport(n, sim), sim_id=f"{sim}_", lockstep=not FREE)
 
 
@@ -66,6 +67,9 @@ for i in range(ticks):
     D._Clock.t += 1.0
     try:
         node.tick(sim_loop.tick)
+        if p == 0 and MOVE_AT and i == MOVE_AT:          # move the first household of the last partition to partition 1
+            hid = sorted(h for h, q in node.world["_owners"]["households"].items() if q == n - 1)[0]
+            node.request_move(hid, 1)
     except Exception:
         errs[traceback.format_exc().strip().splitlines()[-1]] += 1
     if not FREE:
