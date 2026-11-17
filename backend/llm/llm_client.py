@@ -115,88 +115,12 @@ def _cache_key(messages, char_id=None):
 
 
 # =========================================================
-# RAW OLLAMA CALL
+# RAW MODEL CALL (Ollama, or an OpenAI-compatible service: llm/provider.py)
 # =========================================================
 
-async def _call_llm(
-
-    messages,
-
-    timeout=60.0,
-
-    max_tokens=None
-):
-
-    base = os.getenv(
-
-        "OLLAMA_BASE_URL",
-
-        "http://ollama:11434"
-    ).rstrip("/")
-
-    model = os.getenv(
-
-        "OLLAMA_MODEL",
-
-        "llama3"
-    )
-
-    # Ollama defaults num_ctx to whatever the model's Modelfile specifies
-    # (measured 4096 for the llama3.1 instance this backend actually talks
-    # to — uncomfortably close to a real character context, risking silent
-    # truncation) and keep_alive to 5m, which can cold-reload the model
-    # (~20-40s) between ticks on a quiet character. Both are made explicit
-    # and tunable rather than left to whatever the server happens to default
-    # to.
-    num_ctx = int(os.getenv("OLLAMA_NUM_CTX", "8192"))
-    keep_alive = os.getenv("OLLAMA_KEEP_ALIVE", "10m")
-
-    async with httpx.AsyncClient(
-
-        timeout=timeout
-
-    ) as client:
-
-        response = await client.post(
-
-            f"{base}/api/chat",
-
-            json={
-
-                "model": model,
-
-                "messages": messages,
-
-                "stream": False,
-
-                "keep_alive": keep_alive,
-
-                "options": {
-
-                    "num_ctx": num_ctx,
-
-                    # a cap on the reply, when the caller wants one (the decision reply is a few short lines; on a slow
-                    # server every token it is left to ramble on for is seconds of waiting)
-                    **({"num_predict": int(max_tokens)} if max_tokens else {})
-                }
-            }
-        )
-
-        response.raise_for_status()
-
-        data = response.json()
-
-        return data.get(
-
-            "message",
-
-            {}
-        ).get(
-
-            "content",
-
-            ""
-        )
+async def _call_llm(messages, timeout=60.0, max_tokens=None):
+    from llm import provider
+    return await provider.chat(messages, timeout=timeout, max_tokens=max_tokens)
 
 
 # =========================================================
@@ -252,18 +176,19 @@ def describe_llm_error(e, call_timeout=120, overall_timeout=150):
     usually ""), so a character's "wait" said "The model gave no usable answer ()."
     The text starts with a kind ("timeout:", "unreachable:", "http 500:", ...) that
     brain/llm_brain.py::_why_unusable() turns into the line shown in memory."""
-    base = os.getenv("OLLAMA_BASE_URL", "http://ollama:11434").rstrip("/")
+    from llm import provider
+    base, who = provider.base_url(), provider.label()
     if isinstance(e, asyncio.TimeoutError):
         return f"timeout: no answer from the model within {overall_timeout} s"
     if isinstance(e, httpx.ConnectTimeout):
-        return f"unreachable: couldn't connect to Ollama at {base} (connection timed out)"
+        return f"unreachable: couldn't connect to {who} at {base} (connection timed out)"
     if isinstance(e, httpx.TimeoutException):
-        return f"timeout: Ollama at {base} didn't answer within {call_timeout} s"
+        return f"timeout: {who} at {base} didn't answer within {call_timeout} s"
     if isinstance(e, httpx.ConnectError):
-        return f"unreachable: couldn't connect to Ollama at {base}"
+        return f"unreachable: couldn't connect to {who} at {base}"
     if isinstance(e, httpx.HTTPStatusError):
         body = (e.response.text or "").strip().replace("\n", " ")[:120]
-        return f"http {e.response.status_code}: Ollama refused the request" + (f" -- {body}" if body else "")
+        return f"http {e.response.status_code}: {who} refused the request" + (f" -- {body}" if body else "")
     detail = str(e).strip()
     return f"{type(e).__name__}" + (f": {detail}" if detail else "")
 

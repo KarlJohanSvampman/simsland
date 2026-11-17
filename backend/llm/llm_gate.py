@@ -50,7 +50,7 @@ import os
 import threading
 import time
 
-OLLAMA_MAX_CONCURRENCY = int(os.getenv("OLLAMA_MAX_CONCURRENCY", "2"))
+OLLAMA_MAX_CONCURRENCY = int(os.getenv("LLM_MAX_CONCURRENCY") or os.getenv("OLLAMA_MAX_CONCURRENCY", "2"))
 
 # Discrete tiers, not a continuous score -- avoids two similarly-important
 # calls constantly preempting each other over marginal differences. Only a

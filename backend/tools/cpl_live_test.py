@@ -2,7 +2,8 @@
 tools/cpl_live_test.py -- CPL against the real model (docs/cpl_implementation_plan.md, after phase 5).
 
 The determinism fixture world, everyone in a household standing together so they talk, CPL_MODE=on, and the real
-think() calling Ollama (OLLAMA_BASE_URL / OLLAMA_MODEL, as in docker-compose.yml). Afterwards, what only the real model
+think() calling the model (Ollama, OLLAMA_BASE_URL / OLLAMA_MODEL as in docker-compose.yml; or an OpenAI-compatible
+service, LLM_PROVIDER=openai: llm/provider.py). Afterwards, what only the real model
 can show:
 
     adherence     of the decisions made inside a CPL conversation, how many carried the turn lines (ANSWERS / ACT /
@@ -21,7 +22,6 @@ import json
 import os
 import sys
 import time
-import urllib.request
 from collections import Counter
 
 os.environ["CPL_MODE"] = "on"
@@ -37,16 +37,13 @@ OUT = sys.argv[2] if len(sys.argv) > 2 else "cpl_live_report.json"
 
 
 def preflight():
-    base = os.getenv("OLLAMA_BASE_URL", "http://ollama:11434").rstrip("/")
-    model = os.getenv("OLLAMA_MODEL", "llama3.1:latest")
-    try:
-        with urllib.request.urlopen(base + "/api/tags", timeout=8) as r:
-            names = [m.get("name") for m in json.load(r).get("models", [])]
-    except Exception as exc:
-        sys.exit(f"The model server at {base} can't be reached ({exc!r}). Set OLLAMA_BASE_URL to it.")
-    if not any(n == model or n.split(":")[0] == model.split(":")[0] for n in names):
-        sys.exit(f"{base} is up but has no {model} (it has: {names}). Pull it, or set OLLAMA_MODEL.")
-    print(f"model: {model} at {base}")
+    from llm import provider
+    st = provider.status(timeout=8)
+    if st["state"] != "up":
+        sys.exit(f"{st['provider_label']} at {st['base_url']} isn't ready for model {st['model']}: {st['error']}. "
+                 "Set OLLAMA_BASE_URL / OLLAMA_MODEL, or LLM_PROVIDER=openai with LLM_BASE_URL / LLM_MODEL / LLM_API_KEY "
+                 "(llm/provider.py).")
+    print(f"model: {st['model']} at {st['base_url']} ({st['provider_label']})")
 
 
 preflight()

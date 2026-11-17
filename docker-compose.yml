@@ -13,6 +13,13 @@ services:
       - SIM_PARTITION=0                        #     this one is partition 0, the core (see the partition services below)
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/sim
       - REDIS_HOST=redis
+      # The model service (backend/llm/provider.py). Ollama by default; for ChatGPT or another OpenAI-compatible API set
+      # LLM_PROVIDER=openai, LLM_MODEL (e.g. gpt-4o-mini), LLM_API_KEY (in a .env file next to this one, not here) and,
+      # for a service other than OpenAI, LLM_BASE_URL. The same goes for the cognition and bg_llm services below.
+      - LLM_PROVIDER=${LLM_PROVIDER:-ollama}
+      - LLM_BASE_URL=${LLM_BASE_URL:-}
+      - LLM_MODEL=${LLM_MODEL:-}
+      - LLM_API_KEY=${LLM_API_KEY:-}
       - OLLAMA_BASE_URL=http://192.168.10.176:11434  # 👈 your remote Ollama
       - OLLAMA_MODEL=llama3.1:latest
       - OLLAMA_NUM_CTX=8192          # 👈 explicit context window (was implicit 4096)
@@ -49,6 +56,10 @@ services:
       SIM_PARTITION: "1"
       DATABASE_URL: postgresql://postgres:postgres@db:5432/sim
       REDIS_HOST: redis
+      LLM_PROVIDER: ${LLM_PROVIDER:-ollama}
+      LLM_BASE_URL: ${LLM_BASE_URL:-}
+      LLM_MODEL: ${LLM_MODEL:-}
+      LLM_API_KEY: ${LLM_API_KEY:-}
       OLLAMA_BASE_URL: http://192.168.10.176:11434
       OLLAMA_MODEL: llama3.1:latest
       OLLAMA_NUM_CTX: "8192"
@@ -84,6 +95,10 @@ services:
     mem_limit: 1g
     environment:
       - REDIS_HOST=redis
+      - LLM_PROVIDER=${LLM_PROVIDER:-ollama}
+      - LLM_BASE_URL=${LLM_BASE_URL:-}
+      - LLM_MODEL=${LLM_MODEL:-}
+      - LLM_API_KEY=${LLM_API_KEY:-}
       - OLLAMA_BASE_URL=http://192.168.10.176:11434
       - OLLAMA_MODEL=llama3.1:latest
       - OLLAMA_NUM_CTX=8192
@@ -110,6 +125,10 @@ services:
     mem_limit: 1g
     environment:
       - REDIS_HOST=redis
+      - LLM_PROVIDER=${LLM_PROVIDER:-ollama}
+      - LLM_BASE_URL=${LLM_BASE_URL:-}
+      - LLM_MODEL=${LLM_MODEL:-}
+      - LLM_API_KEY=${LLM_API_KEY:-}
       - OLLAMA_BASE_URL=http://192.168.10.176:11434
       - OLLAMA_MODEL=llama3.1:latest
       - OLLAMA_NUM_CTX=8192
