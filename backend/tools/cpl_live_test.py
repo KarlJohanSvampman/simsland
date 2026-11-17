@@ -27,7 +27,8 @@ from collections import Counter
 os.environ["CPL_MODE"] = "on"
 os.environ["DET_POLICY"] = "real"
 os.environ.setdefault("DET_SETUP", "together")
-os.environ.setdefault("COGNITION_MODE", "local")
+os.environ["COGNITION_MODE"] = "local"           # decisions in this process (not handed to the running cognition workers)
+os.environ.setdefault("DET_FIXTURE", "live_if_missing")   # no snapshot file: a copy of the live world, never written back
 sys.path.insert(0, "/app")
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
@@ -49,6 +50,13 @@ def preflight():
 
 
 preflight()
+
+# Nothing of this run goes into the live simulation's data: no events in its Redis event log, and the CPL archive rows
+# under their own sim id. (The world itself is a copy; the tick never persists -- that is the server loop's job.)
+from core import event_log  # noqa: E402
+event_log.enable(False)
+from cpl import archive as _archive  # noqa: E402
+_archive.SIM_ID = "cpl_live_test"
 
 # ── count what the model wrote, and the prompt sizes, as decisions pass through ─────────────────────────────────────
 import brain.llm_brain as LB
@@ -78,9 +86,13 @@ def think(context, char_id=None, session=None, priority=None):
 LB.think = think
 
 from tests import determinism  # noqa: E402
+
+CPLS = lambda w: {cid: c for cid, c in (w.get("conversations") or {}).items() if "members" in c}   # CPL's records
 from cpl import metrics, record, shadow  # noqa: E402
 
 started = time.monotonic()
+_src = determinism._fixture_path()
+print(f"world: {_src or 'a copy of the live world (read only)'}")
 w, errs, _ = determinism.run_sim(TICKS, start="2026-11-04T09:00:00")
 took = time.monotonic() - started
 
