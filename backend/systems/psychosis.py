@@ -261,7 +261,8 @@ def _erratic_wander(c, world):
     ty = c.get("y", 0) + random.randint(-_ERRATIC_WANDER_RADIUS, _ERRATIC_WANDER_RADIUS)
     if plan_character_route(world, c, tx, ty):
         c["animation_state"] = "walk"
-        c["is_moving"] = True
+        from systems.movement import start_moving
+        start_moving(c, world)
     try:
         from systems.reactions import trigger_reaction
         trigger_reaction(c, world, "hallucinating")
@@ -336,3 +337,8 @@ def get_psychosis_context(c, world):
         "your thoughts are disorganized, you may misread what's happening around you, "
         "hear or see things that aren't there, and struggle to focus on anything for long."
     ]
+
+
+def psychosis_possible(c, world):
+    """PERCHAR check (core/flow.py): the psychosis mechanic is switched on at all."""
+    return PSYCHOSIS_ENABLED and not c.get("is_workplace_npc")

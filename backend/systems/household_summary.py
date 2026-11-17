@@ -36,9 +36,15 @@ NARRATION_INPUT_CAP = 30
 def service_narrations(world):
     """Submit and collect the background narrations for roll-up entries that still
     carry a "pending" request (stored on the entry, so a restart re-submits it)."""
-    from systems import bg_llm
+    from systems import bg_llm, bg_work
     from llm.household_summary_narration import narrate_blocking
-    for household in world.get("households", {}).values():
+    households = world.get("households", {})
+    for hid in bg_work.targets(world, "hhsum"):
+        household = households.get(hid)
+        if not household or not any(e.get("pending") for t in ("hourly_summaries", "daily_summaries", "weekly_summaries")
+                                    for e in household.get(t) or []):
+            bg_work.done(world, "hhsum", hid)
+            continue
         label = household.get("name") or "the household"
         for tier in ("hourly_summaries", "daily_summaries", "weekly_summaries"):
             for entry in household.get(tier) or []:
@@ -206,6 +212,8 @@ def update_household_hourly_summaries(world):
             "pending": {"kind": "hourly", "lines": lines},
         })
         del household["hourly_summaries"][:-MAX_HOURLY_SUMMARIES]
+        from systems import bg_work
+        bg_work.note(world, "hhsum", household.get("id"))      # its narration is waiting
         household["event_log"] = []
         household["_active_event_starts"] = {}
 
@@ -234,6 +242,8 @@ def update_household_daily_summaries(world):
             "pending": {"kind": "daily", "lines": hourly_texts[-NARRATION_INPUT_CAP:]},
         })
         del household["daily_summaries"][:-MAX_DAILY_SUMMARIES]
+        from systems import bg_work
+        bg_work.note(world, "hhsum", household.get("id"))      # its narration is waiting
         household["hourly_summaries"] = []
 
 
@@ -261,4 +271,6 @@ def update_household_weekly_summaries(world):
             "pending": {"kind": "weekly", "lines": daily_texts[-NARRATION_INPUT_CAP:]},
         })
         del household["weekly_summaries"][:-MAX_WEEKLY_SUMMARIES]
+        from systems import bg_work
+        bg_work.note(world, "hhsum", household.get("id"))      # its narration is waiting
         household["daily_summaries"] = []

@@ -19,7 +19,7 @@ def get_world(sim_id: str):
     return load_world(sim_id)
 
 @router.post("/world")
-@command("editor.save")
+@command("editor.save", entities="world")
 def save(sim_id: str, data: dict):
     # Minimum-clearance check (systems/prop_placement.py) -- this editor
     # edits a client-side buffer and posts the whole world back in one
@@ -104,7 +104,7 @@ def load_definitions(sim_id: str):
 # =====================================
 
 @router.post("/definitions")
-@command("editor.save_definitions")
+@command("editor.save_definitions", entities="world")
 def save_definitions(sim_id: str, data: dict):
     path = defs_path(sim_id)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -223,7 +223,7 @@ def _spawn_character_locked(sim_id, template_id, x, y, body):
 
 
 @router.post("/spawn_character")
-@command("editor.spawn_character")
+@command("editor.spawn_character", entities="world")          # placement, household, belongings
 def spawn_character(body: dict):
     """
     Spawn a character into the simulation.
@@ -297,7 +297,7 @@ def _generate_family_locked(sim_id, char_id, depth, replace):
 
 
 @router.post("/characters/{char_id}/generate_family")
-@command("editor.generate_family")
+@command("editor.generate_family", entities="world")
 def generate_family(char_id: str, body: dict = Body(default=None)):
     """
     Procedurally generate a family tree for the given character and persist it.
@@ -321,7 +321,7 @@ def generate_family(char_id: str, body: dict = Body(default=None)):
 # =====================================
 
 @router.post("/character_templates/{template_id}/generate_relative")
-@command("editor.generate_relative", timeout=150)
+@command("editor.generate_relative", timeout=150, entities="world")
 def generate_relative(template_id: str, body: dict = Body(default=None)):
     """
     Derive a new character_template for a relative of an existing template,
@@ -503,7 +503,7 @@ def _set_family_relation_locked(sim_id, a_id, b_id, relation_type):
 
 
 @router.post("/family_relation")
-@command("editor.set_family_relation")
+@command("editor.set_family_relation", entities="world")    # families merge; kinship synced across members
 def set_family_relation(body: dict):
     """
     Create or overwrite the relation between two existing characters.
@@ -566,7 +566,9 @@ def _remove_family_relation_locked(sim_id, a_id, b_id):
 
 
 @router.post("/family_relation/remove")
-@command("editor.remove_family_relation")
+@command("editor.remove_family_relation",
+         entities=lambda a: [("characters", (a.get("body") or {}).get("a_id")),
+                             ("characters", (a.get("body") or {}).get("b_id")), ("key", "families")])
 def remove_family_relation(body: dict):
     """Body: {sim_id, a_id, b_id} -- cuts the relation between two
     existing characters (both directions), if any."""

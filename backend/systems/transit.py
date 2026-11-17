@@ -236,3 +236,32 @@ def update_bus(world):
     # No passenger gate -- the bus runs on its own 15-minute schedule
     # unconditionally, same as a real public transit line.
     _dispatch_bus(world)
+
+
+# ── the bus as an active loop (core/active_loops.py) ──────────────────────────────────────────────────────────────────
+# It used to be looked at every tick to catch its 15-minute slot. Now the clock marks each slot (four hourly jobs, at
+# :00 :15 :30 :45 local time), which makes the bus a member of the "bus" loop; the loop runs update_bus() at the same
+# point in the step as before for as long as a departure is due or a trip is under way. The slots are CLOCK jobs in
+# core/flow.py, so they appear in the flow map and the section registry like every other job.
+
+def _bus_slot(world, entry=None):
+    from core import active_loops
+    active_loops.add(world, "bus", "bus")
+
+
+def bus_step(world, ids):
+    update_bus(world)
+    return [] if (world.get("_bus") or {}).get("phase") else ["bus"]
+
+
+def ensure_bus_member(world):
+    """A world saved before the loop existed, with a trip under way: the bus joins once."""
+    from core import active_loops
+    if "bus" in (world.get("_active_loops") or {}):
+        return
+    active_loops.rebuild(world, "bus", ["bus"] if (world.get("_bus") or {}).get("phase") else [])
+
+
+from core import active_loops as _active_loops      # noqa: E402
+_active_loops.register("bus", bus_step, order=30)
+# the slots themselves are CLOCK jobs in core/flow.py ("bus_slot_00" .. "bus_slot_45")

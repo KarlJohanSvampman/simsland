@@ -172,6 +172,11 @@ def create_conversation(
         "conversations"
     ][cid] = conv
 
+    # A spoken conversation is live from now on: turn-taking and its ending are looked after by the floor loop
+    # (systems/conversation_floor.py, core/active_loops.py) until it ends.
+    from systems.conversation_floor import join_floor_loop
+    join_floor_loop(world, conv)
+
     return conv
 
 
@@ -302,6 +307,8 @@ def reopen_conversation(world, conv):
         f["state"] = "open"
     from systems.conversation_archive import unarchive
     unarchive(world, conv["id"])
+    from systems.conversation_floor import join_floor_loop
+    join_floor_loop(world, conv)
 
 
 def set_subject(conv, subject, by=None):
@@ -562,6 +569,9 @@ def add_message(
     from core.event_bus import emit
     emit("conversation.message", {"conv_id": conv.get("id"), "speaker_id": speaker_id,
                                   "character_ids": list(conv.get("participants") or [])})
+    from cpl import shadow as _cpl_shadow                    # CPL_MODE=shadow: CPL follows along (cpl/shadow.py)
+    if _cpl_shadow.active(world):
+        _cpl_shadow.on_line(world, conv, speaker_id, utterance, speech_act)
     if conv.get("active"):
         from core import scheduler
         scheduler.schedule_in(world, "convidle", conv["id"], IDLE_TIMEOUT_SECONDS)

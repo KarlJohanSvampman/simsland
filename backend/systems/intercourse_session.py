@@ -105,6 +105,8 @@ def _get_or_create_session(a, b, world):
         "ended": False,
     }
     sessions[sid] = sess
+    from core.flow import wake_duty
+    wake_duty(world, "intercourse_sessions")
     a["active_intercourse_session_id"] = sid
     b["active_intercourse_session_id"] = sid
     return sess

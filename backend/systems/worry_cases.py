@@ -380,13 +380,30 @@ def tick_worry_polls(world):
     """Scheduled job: poll each character about once an hour (staggered per character)."""
     tick = world.get("tick", 0)
     for c in world.get("characters", {}).values():
-        if c.get("is_workplace_npc") or c.get("is_service_worker") or c.get("alive") is False:
-            continue
-        state = c.setdefault("focus_state", {})
-        if "last_poll" not in state:                 # first sight: spread the characters over the hour
-            state["last_poll"] = tick - (zlib.crc32(str(c.get("id")).encode()) % POLL_EVERY_TICKS)
-        if tick - state["last_poll"] >= POLL_EVERY_TICKS:
-            poll_worries(c, world)
+        worry_poll_for(c, world)
+
+
+def worry_poll_active(c, world):
+    """core/flow.py PERCHAR `worry_poll`: due now on first sight (it is stamped then), else from the next poll."""
+    if c.get("is_workplace_npc") or c.get("is_service_worker") or c.get("alive") is False:
+        return False
+    last = (c.get("focus_state") or {}).get("last_poll")
+    if last is None or world.get("tick", 0) - last >= POLL_EVERY_TICKS:
+        return True
+    from brain import agent_wake
+    return agent_wake.at_tick(world, last + POLL_EVERY_TICKS)
+
+
+def worry_poll_for(c, world):
+    """The hourly poll, for one character, when it is due."""
+    tick = world.get("tick", 0)
+    if c.get("is_workplace_npc") or c.get("is_service_worker") or c.get("alive") is False:
+        return
+    state = c.setdefault("focus_state", {})
+    if "last_poll" not in state:                 # first sight: spread the characters over the hour
+        state["last_poll"] = tick - (zlib.crc32(str(c.get("id")).encode()) % POLL_EVERY_TICKS)
+    if tick - state["last_poll"] >= POLL_EVERY_TICKS:
+        poll_worries(c, world)
 
 
 # ---------------------------------------------------------------------------

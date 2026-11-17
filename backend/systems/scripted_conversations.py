@@ -141,6 +141,8 @@ def _register(world, conv_id, medium, a_id, b_id, script, tier, severity, subcat
         "tier": tier, "severity": severity, "subcategory": subcategory,
     }
     world.setdefault("scripted_conversations", {})[conv_id] = entry
+    from core.flow import wake_duty
+    wake_duty(world, "scripted_conversations")
 
 
 def _sms_turn_delay_ticks(turns_so_far):

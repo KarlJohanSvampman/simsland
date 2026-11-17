@@ -93,6 +93,7 @@ def plant_seed(world, plant_template_id, target_prop=None, x=None, y=None, house
         if target_prop.get("plant_template"):
             return None
         init_plant_state(target_prop, plant_template_id, tick, tmpl=tmpl)
+        arm_plant(target_prop, world)
         return target_prop
 
     if x is None or y is None:
@@ -106,23 +107,32 @@ def plant_seed(world, plant_template_id, target_prop=None, x=None, y=None, house
     }
     init_plant_state(prop, plant_template_id, tick, tmpl=tmpl)
     _add_prop(world, prop)
+    arm_plant(prop, world)
     return prop
 
 
-def water_plant(prop):
+def water_plant(prop, world=None):
     state = prop.get("plant_state")
     if not state:
         return False
+    if world is not None:
+        tick_plant(prop, world)          # its own clock up to now first: the elapsed days must not land on the watering
     state["moisture"] = 100
     state["_water_warned"] = False
+    if world is not None:
+        arm_plant(prop, world)
     return True
 
 
-def pull_weed(prop):
+def pull_weed(prop, world=None):
     state = prop.get("plant_state")
     if not state:
         return False
+    if world is not None:
+        tick_plant(prop, world)
     state["weed_level"] = 0
+    if world is not None:
+        arm_plant(prop, world)
     return True
 
 
@@ -148,76 +158,158 @@ def _clear_plant_container(prop):
 
 
 def tick_plants(world):
-    """Cadence-driven (see CADENCE["plants"]). Advances growth stage,
-    decays moisture, grows weeds, cycles mature -> overgrown -> growing."""
+    """Every plant at once (older callers, tests, a world loaded from an older save) -- each then times itself. The sim
+    runs each plant on its own timer (_on_plant_timer): growth, moisture and weeds are integrated over the elapsed
+    time anyway, so a plant only has to be looked at when something about it changes."""
+    for prop in list(_props_iter(world)):
+        if prop.get("plant_state"):
+            tick_plant(prop, world)
+            arm_plant(prop, world)
+
+
+def tick_plant(prop, world):
+    """Bring one plant up to now: moisture and weeds over the elapsed days, the dry warning, the next growth stage."""
     tick = world.get("tick", 0)
     plant_templates = world.get("definitions", {}).get("plant_templates", {})
+    state = prop.get("plant_state")
+    if not state:
+        return
+    tmpl = plant_templates.get(prop.get("plant_template"))
+    if not tmpl:
+        return
 
-    for prop in _props_iter(world):
-        state = prop.get("plant_state")
-        if not state:
-            continue
-        tmpl = plant_templates.get(prop.get("plant_template"))
-        if not tmpl:
-            continue
+    # moisture/weed decay used to apply a flat "per day" amount on
+    # EVERY call to tick_plants() regardless of how much simulated
+    # time had actually passed since the last call (CADENCE["plants"]
+    # fires every 30 real ticks -- 30 seconds -- not once a day), so
+    # a plant dried out and weeded over in minutes no matter what
+    # TICKS_PER_DAY was set to. Scaled by real elapsed simulated
+    # days since the last decay tick instead; last_decay_tick is
+    # stamped at planting time (init_plant_state) so the very first
+    # tick after planting doesn't see a huge bogus elapsed window.
+    elapsed_days = max(0, (tick - state.get("last_decay_tick", tick)) / TICKS_PER_DAY)
+    state["moisture"] = max(0, state["moisture"] - tmpl.get("moisture_decay_per_day", 10) * elapsed_days)
+    state["weed_level"] = min(100, state["weed_level"] + tmpl.get("weed_growth_per_day", 5) * elapsed_days)
+    state["last_decay_tick"] = tick
 
-        # moisture/weed decay used to apply a flat "per day" amount on
-        # EVERY call to tick_plants() regardless of how much simulated
-        # time had actually passed since the last call (CADENCE["plants"]
-        # fires every 30 real ticks -- 30 seconds -- not once a day), so
-        # a plant dried out and weeded over in minutes no matter what
-        # TICKS_PER_DAY was set to. Scaled by real elapsed simulated
-        # days since the last decay tick instead; last_decay_tick is
-        # stamped at planting time (init_plant_state) so the very first
-        # tick after planting doesn't see a huge bogus elapsed window.
-        elapsed_days = max(0, (tick - state.get("last_decay_tick", tick)) / TICKS_PER_DAY)
-        state["moisture"] = max(0, state["moisture"] - tmpl.get("moisture_decay_per_day", 10) * elapsed_days)
-        state["weed_level"] = min(100, state["weed_level"] + tmpl.get("weed_growth_per_day", 5) * elapsed_days)
-        state["last_decay_tick"] = tick
+    # Real reactive wake for the household's own plant, once, when it
+    # crosses a real "needs water soon" threshold -- confirmed gap:
+    # moisture already decayed for real, but nothing ever surfaced it
+    # to anyone before growth silently paused at 0 (plant_needs_water/
+    # garden_dry, ChatGPT-authored household situation spec).
+    # water_plant() clears the flag so this can re-arm on the next
+    # real dry-out, not just once ever.
+    if state["moisture"] <= 20 and not state.get("_water_warned"):
+        state["_water_warned"] = True
+        household = world.get("households", {}).get(prop.get("household_id"))
+        if household:
+            from systems.household_monitoring import choose_responsible_member
+            chars = world.get("characters", {})
+            members = [chars[mid] for mid in household.get("members", []) if mid in chars]
+            responsible = choose_responsible_member(members, world) if members else None
+            if responsible:
+                from brain.cognition_scheduler import wake_character
+                wake_character(responsible, world, "plant_needs_water", {
+                    "plant_id": prop["id"],
+                    "plant_name": tmpl.get("name", prop.get("plant_template", "a plant")),
+                    "moisture": state["moisture"],
+                })
 
-        # Real reactive wake for the household's own plant, once, when it
-        # crosses a real "needs water soon" threshold -- confirmed gap:
-        # moisture already decayed for real, but nothing ever surfaced it
-        # to anyone before growth silently paused at 0 (plant_needs_water/
-        # garden_dry, ChatGPT-authored household situation spec).
-        # water_plant() clears the flag so this can re-arm on the next
-        # real dry-out, not just once ever.
-        if state["moisture"] <= 20 and not state.get("_water_warned"):
-            state["_water_warned"] = True
-            household = world.get("households", {}).get(prop.get("household_id"))
-            if household:
-                from systems.household_monitoring import choose_responsible_member
-                chars = world.get("characters", {})
-                members = [chars[mid] for mid in household.get("members", []) if mid in chars]
-                responsible = choose_responsible_member(members, world) if members else None
-                if responsible:
-                    from brain.cognition_scheduler import wake_character
-                    wake_character(responsible, world, "plant_needs_water", {
-                        "plant_id": prop["id"],
-                        "plant_name": tmpl.get("name", prop.get("plant_template", "a plant")),
-                        "moisture": state["moisture"],
-                    })
+    # Growth pauses entirely while bone dry.
+    if state["moisture"] <= 0:
+        return
 
-        # Growth pauses entirely while bone dry.
-        if state["moisture"] <= 0:
-            continue
+    days_in_stage = (tick - state["stage_started_tick"]) / TICKS_PER_DAY
+    if state["weed_level"] >= HIGH_WEED_THRESHOLD:
+        days_in_stage *= WEED_GROWTH_PENALTY
 
-        days_in_stage = (tick - state["stage_started_tick"]) / TICKS_PER_DAY
-        if state["weed_level"] >= HIGH_WEED_THRESHOLD:
-            days_in_stage *= WEED_GROWTH_PENALTY
+    stage = state["stage"]
+    if stage == "seed" and days_in_stage >= tmpl.get("days_to_sprout", 2):
+        state["stage"], state["stage_started_tick"] = "sprout", tick
+    elif stage == "sprout" and days_in_stage >= tmpl.get("days_to_grow", 3):
+        state["stage"], state["stage_started_tick"] = "growing", tick
+    elif stage == "growing" and days_in_stage >= tmpl.get("days_to_grow", 3):
+        state["stage"], state["stage_started_tick"] = "mature", tick
+        _fruit_plant(prop, tmpl, world)
+    elif stage == "mature" and days_in_stage >= tmpl.get("days_mature_before_overgrown", 4):
+        state["stage"], state["stage_started_tick"] = "overgrown", tick
+        _clear_plant_container(prop)
+    elif stage == "overgrown":
+        # Unharvested yield is already lost by reaching this stage --
+        # cycle continues immediately rather than lingering "dead".
+        state["stage"], state["stage_started_tick"] = "growing", tick
 
-        stage = state["stage"]
-        if stage == "seed" and days_in_stage >= tmpl.get("days_to_sprout", 2):
-            state["stage"], state["stage_started_tick"] = "sprout", tick
-        elif stage == "sprout" and days_in_stage >= tmpl.get("days_to_grow", 3):
-            state["stage"], state["stage_started_tick"] = "growing", tick
-        elif stage == "growing" and days_in_stage >= tmpl.get("days_to_grow", 3):
-            state["stage"], state["stage_started_tick"] = "mature", tick
-            _fruit_plant(prop, tmpl, world)
-        elif stage == "mature" and days_in_stage >= tmpl.get("days_mature_before_overgrown", 4):
-            state["stage"], state["stage_started_tick"] = "overgrown", tick
-            _clear_plant_container(prop)
-        elif stage == "overgrown":
-            # Unharvested yield is already lost by reaching this stage --
-            # cycle continues immediately rather than lingering "dead".
-            state["stage"], state["stage_started_tick"] = "growing", tick
+
+# ── each plant on its own timer ───────────────────────────────────────────────────────────────────────────────────────
+# Moisture, weeds and growth are integrated over elapsed time (tick_plant), so a plant only needs looking at when
+# something about it changes: moisture crossing the dry warning (20), the watering cut-off, a household member's own
+# tolerance (their cleanliness_threshold) or 0; weeds reaching HIGH_WEED_THRESHOLD; the next growth stage. While it
+# needs attention (thirsty or weedy past someone's tolerance, or produce waiting) it is looked at on the old 30-second
+# cadence -- the household's chores (systems/chores.py::maybe_tend_plants) nag, plan or harvest as before.
+
+ATTENTION_RECHECK_SECONDS = 30
+
+
+def _household_members(world, prop):
+    hh = (world.get("households") or {}).get(prop.get("household_id")) or {}
+    chars = world.get("characters") or {}
+    return [chars[m] for m in hh.get("members", []) if m in chars]
+
+
+def arm_plant(prop, world):
+    from core import scheduler
+    from core.clock import now_ts
+    from core.tick_schedule import TICK_RATE_SECONDS
+    state = prop.get("plant_state")
+    tmpl = world.get("definitions", {}).get("plant_templates", {}).get(prop.get("plant_template"))
+    owner = f"plant:{prop.get('id')}"
+    if not state or not tmpl:
+        scheduler.cancel(world, owner, "next")
+        return
+    from systems.chores import PLANT_WATER_MOISTURE_CUTOFF
+    members = _household_members(world, prop)
+    m, w = state.get("moisture", 100), state.get("weed_level", 0)
+    per_tick_m = tmpl.get("moisture_decay_per_day", 10) / TICKS_PER_DAY
+    per_tick_w = tmpl.get("weed_growth_per_day", 5) / TICKS_PER_DAY
+    waits = []
+    thresholds = {20, PLANT_WATER_MOISTURE_CUTOFF, 0} | {c.get("cleanliness_threshold", 40) for c in members}
+    for thr in thresholds:
+        if m > thr and per_tick_m > 0:
+            waits.append((m - thr) / per_tick_m + 1)
+    if w < HIGH_WEED_THRESHOLD and per_tick_w > 0:
+        waits.append((HIGH_WEED_THRESHOLD - w) / per_tick_w + 1)
+    if m > 0:
+        need = {"seed": tmpl.get("days_to_sprout", 2), "sprout": tmpl.get("days_to_grow", 3),
+                "growing": tmpl.get("days_to_grow", 3), "mature": tmpl.get("days_mature_before_overgrown", 4),
+                "overgrown": 0}.get(state.get("stage"))
+        if need is not None:
+            factor = WEED_GROWTH_PENALTY if w >= HIGH_WEED_THRESHOLD else 1.0
+            done = (world.get("tick", 0) - state.get("stage_started_tick", 0)) * factor
+            waits.append(max(1.0, (need * TICKS_PER_DAY - done) / factor))
+    attention = prop.get("items") or w >= HIGH_WEED_THRESHOLD or \
+        any(m < min(PLANT_WATER_MOISTURE_CUTOFF, c.get("cleanliness_threshold", 40)) for c in members)
+    if attention:
+        waits.append(ATTENTION_RECHECK_SECONDS / TICK_RATE_SECONDS)
+    if waits:
+        scheduler.schedule_at(world, owner, "next", now_ts(world) + min(waits) * TICK_RATE_SECONDS)
+
+
+def _on_plant_timer(world, entry):
+    pid = entry["owner"].split(":", 1)[1]
+    prop = next((p for p in _props_iter(world) if p.get("id") == pid), None)
+    if not prop or not prop.get("plant_state"):
+        return
+    tick_plant(prop, world)
+    from systems.chores import maybe_tend_plants
+    for c in _household_members(world, prop):
+        if c.get("alive", True) and not c.get("off_grid"):
+            maybe_tend_plants(c, world)
+    arm_plant(prop, world)
+
+
+def _on_world_loaded(world, entry=None):
+    tick_plants(world)
+
+
+from core import scheduler as _scheduler      # noqa: E402
+_scheduler.register("plant", _on_plant_timer)

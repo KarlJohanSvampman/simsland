@@ -285,3 +285,8 @@ def _maybe_auto_propagate(parent, child, world):
     already_confirmed = known.get("confirmed_tick", -1) if known else -1
     if contact["tick"] > already_confirmed:
         propagate_from_caretaker_contact(parent, child, world)
+
+
+def dependent_checks_active(parent, world):
+    """Has dependents to keep an eye on (core/flow.py PERCHAR `dependent_checks`)."""
+    return bool(parent.get("dependents")) and not parent.get("is_workplace_npc")

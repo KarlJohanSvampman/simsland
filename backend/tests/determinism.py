@@ -6,7 +6,7 @@ Deterministic seeded runs of the real simulation, for differential tests.
 run_sim(ticks, start="2026-11-01T23:50:00", setup=None, checkpoint_every=None, before_tick=None)
 returns (world, errors, checkpoints). The clock, uuids and worker threads are made
 deterministic, the LLM is a fixed "wait", and the world starts from /tmp/backup_world.json
-(a populated snapshot from backups/) with the live static map data.
+(a populated snapshot from backups/, or one built by tools/make_det_fixture.py) with the live static map data.
 """
 
 import collections
@@ -40,8 +40,11 @@ class _Clock:
 
 
 class _U:
+    """A sequential stand-in for uuid4(). The counter is in the leading digits as well as the trailing ones: callers
+    take hex[:8] for ids (conv_..., cut_...), and with the counter only at the end every one of them was "00000000"
+    -- harmless one at a time, a collision as soon as two are made side by side (core/partitions.py)."""
     def __init__(self, i):
-        self.hex = f"{i:032x}"
+        self.hex = f"{i:08x}{'0' * 12}{i:012x}"
         self.int = i
 
     def __str__(self):
@@ -62,9 +65,47 @@ def _install():
             fn(*a, **k)
     ca._pool = _Inline()
     import brain.llm_brain as lb
-    lb.think = lambda context, char_id=None, session=None, priority=None: {"thought": "ok", "action": {"type": "wait", "reason": "x"}}
+    if os.environ.get("DET_POLICY") == "real":
+        pass                                   # the real model (tools/cpl_live_test.py): think() calls Ollama
+    elif os.environ.get("DET_POLICY") in ("varied", "social"):
+        lb.think = _varied_think
+    else:
+        lb.think = lambda context, char_id=None, session=None, priority=None: {"thought": "ok", "action": {"type": "wait", "reason": "x"}}
     from systems import bg_llm
     bg_llm.submit = lambda key, fn, *a: (bg_llm._done.__setitem__(key, None), True)[1]
+
+
+_LINES = [("Hi! How are you doing?", "greet"), ("Did you sleep well?", "question"), ("That's a great idea.", "compliment"),
+          ("Can you help me with something later?", "request"), ("Ha, you're funny.", "joke"), ("I'm a bit tired today.", "vulnerable"),
+          ("Okay, see you later.", "farewell"), ("Sure, sounds good.", "agree")]
+_think_calls = itertools.count(1)
+
+
+def _varied_think(context, char_id=None, session=None, priority=None):
+    """DET_POLICY=varied: a stand-in model that does things -- uses what is in reach, walks to things, talks to whoever is
+    near -- chosen by a RNG seeded from the character and the call number, so a run is still exactly repeatable (inline
+    workers make the call order deterministic). Wider coverage for differential runs than "always wait"."""
+    rng = random.Random(f"{char_id}:{next(_think_calls)}")
+    aa = context.get("available_actions") or {}
+    props = [p for p in aa.get("interactable_props") or [] if p.get("interactions")]
+    people = [p for p in aa.get("nearby_characters") or [] if p.get("id")]
+    roll = rng.random()
+    if os.environ.get("DET_POLICY") == "social" and people and roll < 0.8:
+        roll = 0.7                           # DET_POLICY=social: mostly talk to whoever is near
+    if roll < 0.35 and props:
+        p = rng.choice(props)
+        return {"thought": "ok", "action": {"type": "interact", "target": p["id"],
+                                            "interaction": rng.choice(p["interactions"]), "reason": "x"}}
+    remembered = [p for p in aa.get("remembered_props") or [] if p.get("id")]
+    if roll < 0.6 and (props or remembered):
+        p = rng.choice(props + remembered)
+        return {"thought": "ok", "action": {"type": "move", "target": p["id"], "reason": "x"}}
+    if roll < 0.85 and people:
+        who = rng.choice(people)
+        line, act = rng.choice(_LINES)
+        return {"thought": "ok", "action": {"type": "speak", "target": who["id"], "reason": "x"},
+                "speech": {"target": who["id"], "utterance": line, "speech_act": act, "topic": "general"}}
+    return {"thought": "ok", "action": {"type": "wait", "reason": "x"}}
 
 
 def _fixture_path():
@@ -107,6 +148,19 @@ def fixture(start=None):
     return w
 
 
+def _together(w):
+    """DET_SETUP=together: everyone in a household stands next to its first member (same room), so they talk."""
+    chars = w["characters"]
+    for hh in (w.get("households") or {}).values():
+        members = [chars[m] for m in hh.get("members") or [] if m in chars]
+        for i, c in enumerate(members[1:], 1):
+            for k in ("x", "y", "building_id", "_in_building"):
+                if k in members[0]:
+                    c[k] = members[0][k]
+            c["x"] = (c.get("x") or 0) + 0.8 * i
+            c["route"], c["is_moving"], c["move_target"] = [], False, None
+
+
 def run_sim(ticks, start="2026-11-01T23:50:00", seed=1234, setup=None, checkpoint_every=None, checkpoint_fn=None):
     _install()
     import sim_loop
@@ -114,18 +168,31 @@ def run_sim(ticks, start="2026-11-01T23:50:00", seed=1234, setup=None, checkpoin
     from systems.schema_defaults import ensure_world_defaults
     _Clock.t = 1.7e9
     _Clock.counter = itertools.count(1)
+    global _think_calls
+    _think_calls = itertools.count(1)
     random.seed(seed)
     _bi._intention_seq = 0
     w = fixture(start)
+    if os.environ.get("DET_VIEW") == "1":            # the resident world's WorldView façade (core/world_view.py)
+        from core import world_view
+        w = world_view.install(w)
+    if os.environ.get("DET_SETUP") == "together":
+        _together(w)
     if setup:
         setup(w)
     errs = collections.Counter()
     checkpoints = []
+    from systems.schema_defaults import ensure_world_defaults_if_due
     for i in range(ticks):
-        ensure_world_defaults(w)
+        ensure_world_defaults_if_due(w)
         _Clock.t += 1.0
         try:
-            sim_loop.tick(w)
+            if os.environ.get("DET_LOCKS") == "1":   # each step as a tick unit (core/entity_locks.py, needs DET_VIEW=1)
+                from core import entity_locks
+                with entity_locks.tick_unit():
+                    sim_loop.tick(w)
+            else:
+                sim_loop.tick(w)
         except Exception:
             text = traceback.format_exc().strip()
             errs[text.splitlines()[-1]] += 1

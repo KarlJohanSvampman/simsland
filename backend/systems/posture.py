@@ -90,6 +90,8 @@ def promote_pending_posture(c, world):
     if not pending:
         return
     if world.get("tick", 0) < pending["ready_at_tick"]:
+        from brain import agent_wake
+        agent_wake.wake_at(c, world, agent_wake.at_tick(world, pending["ready_at_tick"]), "posture_settles")
         return
     if c.get("animation_state") == pending["expected_state"]:
         c["animation_state"] = pending["target_idle"]

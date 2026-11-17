@@ -233,16 +233,47 @@ def update_internal_state(
     promote_pending_posture(c, world)
 
     _prof.mark("internal:decay_memories")
-    decay_memories(c)
+    decay_memories(c, world)       # lazy (brain/memory.py::refresh_memory_importance): not compounding per call
 
     _prof.mark("internal:decay_habits")
-    decay_habits(c)
+    decay_habits(c, world)         # lazy (systems/habits.py::refresh_habits)
 
     _prof.mark("internal:process_health")
     process_health(
         c,
         world
     )
+
+    # Intoxication wears off lazily, and a harassment act may follow (systems/harassment.py) -- here, when the
+    # character is due, rather than in a sweep over everyone every second.
+    from systems.harassment import tick_harassment_for
+    _prof.mark("internal:tick_harassment")
+    tick_harassment_for(c, world)
+    # Reading the paper, watching a game: the character's own processes, picked up every few minutes (step 5a: in their
+    # own update, with a wake for the next pick -- on the old 5-second grid -- instead of a sweep over everyone).
+    from systems.social import generate_social_intentions     # lonely enough: a want to see someone (idempotent)
+    generate_social_intentions(c, world)
+    from systems.body import sync_stress_decay                # stress eases on its own, lazily (step 5a)
+    sync_stress_decay(c, world.get("tick", 0))
+    from systems.grievances import social_checks_for          # grievances, goodwill, guilt fade; thresholds (5a)
+    social_checks_for(c, world)
+    from brain.opinions import sync_polarization              # opinions drift outward, lazily (step 5a)
+    sync_polarization(c, world.get("tick", 0))
+    from systems.reading_process import update_reading_process, READING_PICK_INTERVAL_TICKS
+    from systems.sports_broadcast import update_game_broadcast, SCORE_PICK_INTERVAL_TICKS
+    _prof.mark("internal:reading_and_broadcast")
+    update_reading_process(c, world)
+    update_game_broadcast(c, world)
+    _arm_media_picks(c, world, READING_PICK_INTERVAL_TICKS, SCORE_PICK_INTERVAL_TICKS)
+    from systems.power import sync_batteries              # devices drained / charged up to now (lazily)
+    sync_batteries(c, world)
+    from systems.crushes import tick_crushes_for          # a blush fades, a thought bubble ends, a daydream may come
+    tick_crushes_for(c, world)
+    from systems.intimacy import tick_intimacy_for        # arousal fades lazily; a lapsed touch proposal is settled
+    tick_intimacy_for(c, world)
+    from systems.impulse import tick_impulse_for          # anger cools lazily; a boilover when it is over the top
+    _prof.mark("internal:tick_impulse")
+    tick_impulse_for(c, world)
 
     from systems.waiting import tick_waiting
     _prof.mark("internal:tick_waiting")
@@ -267,6 +298,23 @@ def update_internal_state(
 # =========================================================
 # ECONOMY
 # =========================================================
+
+def _arm_media_picks(c, world, reading_every, score_every):
+    """The next news pick / score update falls due on the 5-second grid the old sweep ran on."""
+    from brain import agent_wake
+    tick = world.get("tick", 0)
+    due = []
+    proc = c.get("active_process") or {}
+    if proc.get("type") == "reading_news":
+        due.append(proc.get("last_pick_tick", tick) + reading_every)
+    act = c.get("activity") or {}
+    if act.get("type") == "watch_tv" and act.get("watching_game"):
+        due.append(act.get("_last_score_pick_tick", act.get("phase_started_tick", tick)) + score_every)
+    if due:
+        nxt = max(min(due), tick + 1)
+        nxt += (-nxt) % 5
+        agent_wake.wake_at(c, world, agent_wake.at_tick(world, nxt), "media_pick")
+
 
 def update_economy(
 
@@ -322,6 +370,13 @@ def update_economy(
     maybe_consolidate_memories(c, world)
     _prof.mark("economy:maybe_forget_short_term")
     maybe_forget_short_term(c, world)
+    # ... and run again when the interval is up (brain/agent_wake.py), not on every look
+    from systems.memory_consolidation import CONSOLIDATION_INTERVAL_TICKS, FORGET_INTERVAL_TICKS
+    from brain import agent_wake
+    for key, every in (("_last_memory_consolidation_tick", CONSOLIDATION_INTERVAL_TICKS),
+                       ("_last_memory_forget_tick", FORGET_INTERVAL_TICKS)):
+        if c.get(key) is not None:
+            agent_wake.wake_at(c, world, agent_wake.at_tick(world, c[key] + every), "memory_upkeep")
 
 
 # =========================================================
@@ -701,6 +756,14 @@ def update_agent(
         process_reflections
     )
 
+    # The character heals its own missing fields when it is updated (systems/schema_defaults.py) -- no longer a pass
+    # over everyone on every step.
+    from systems.schema_defaults import ensure_character_defaults
+    ensure_character_defaults(c, world=world)
+    # the character's own periodic work (core/flow.py PERCHAR jobs: what a sweep over everyone used to do for them)
+    from core.flow import run_perchar
+    run_perchar(c, world)
+
     # =====================================
     # OFFGRID
     # =====================================
@@ -1013,6 +1076,17 @@ def update_agent(
         alarm = c.get("phone_alarm")
         now_minute = world.get("calendar", {}).get("minute_of_day", -1)
         snooze = c.get("_alarm_snooze")
+        # The minutes that matter while asleep are known: the alarm's and a snooze's recheck (brain/agent_wake.py).
+        if act_type == "sleep":
+            from brain import agent_wake
+            if alarm and alarm.get("minute_of_day") is not None and not snooze:
+                agent_wake.wake_at_minute(c, world, alarm["minute_of_day"], "alarm")
+            if snooze and snooze.get("next_check_minute") is not None:
+                agent_wake.wake_at_minute(c, world, snooze["next_check_minute"], "alarm_snooze")
+        _bed_cooldown_end = c.get("_bedtime_interrupt_tick", -10 ** 9) + 600
+        if world.get("tick", 0) < _bed_cooldown_end:
+            from brain import agent_wake
+            agent_wake.wake_at(c, world, agent_wake.at_tick(world, _bed_cooldown_end), "bedtime_cooldown")
         alarm_ringing = act_type == "sleep" and alarm and alarm.get("minute_of_day") == now_minute and not snooze
         alarm_rechecking = act_type == "sleep" and snooze and snooze.get("next_check_minute") == now_minute
 
@@ -1293,6 +1367,10 @@ def _think_now(c, world):
         wake_line=_wake_line(c),
         staged=c.get("cognition", {}).get("staged_knowledge") or (),
     )
+    from cpl.turns import context_block as _cpl_block      # CPL_MODE=on: the conversation's open items (cpl/turns.py)
+    _cpl = _cpl_block(world, c)
+    if _cpl:
+        context["cpl"] = _cpl
 
     # =====================================
     # THINK
@@ -1318,6 +1396,22 @@ def _think_now(c, world):
     # Ask the model in the background and carry on: the answer comes back as a
     # `decision_ready` event, is noted and processed (re-validated against the world as it is
     # THEN) by brain/cognition_actor.py::on_decision_ready. Nothing here blocks the tick.
+    if context.get("cpl"):
+        # In a CPL conversation: a turn CPL can answer from the character's own state needs no model call (mode A);
+        # otherwise the model is asked, with the full context (B, C) -- cpl/generation.py
+        from cpl import generation as _gen, metrics as _cplm
+        _mode = _gen.choose_mode(world, c, context["cpl"])
+        _structured = _gen.structured_decision(world, c, context["cpl"]) if _mode == "A" else None
+        from cpl.turns import COMPACT as _compact, compact_prompt as _compact_prompt
+        _use_compact = _compact and not _structured and _mode == "B"
+        if _use_compact:
+            context["compact_turn"] = _compact_prompt(world, c, context["cpl"])
+        _cplm.note_turn(world, "A" if _structured else ("C" if _mode == "C" else "B"), compact=_use_compact)
+        if _structured:
+            from brain.cognition_scheduler import note_think
+            note_think(c, world, _structured, wake_reason=wake_reason)
+            process_decision(c, world, _structured, available_actions=context.get("available_actions"))
+            return
     _prof.mark("agent:request_decision")
     request_decision(c, world, context, wake_reason, llm_priority)
 

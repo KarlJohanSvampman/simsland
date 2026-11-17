@@ -290,3 +290,15 @@ def principle_stance_toward(c, other, world):
             }
 
     return best
+
+
+def mentality_active(c, world):
+    """A mentality waiting to be compiled (core/flow.py PERCHAR `mentality_compilation`, capped per firing)."""
+    return bool(c.get("_mentality_pending")) and not c.get("is_workplace_npc")
+
+
+def mentality_for(c, world):
+    try:
+        _compile_one(c, world)
+    except Exception:
+        pass                       # left pending: retried next time (see tick_mentality_compilation)

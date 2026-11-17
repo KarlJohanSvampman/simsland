@@ -170,6 +170,8 @@ def trip(c, world, kind, what, count):
     c["_loop_assessment"] = {"record_id": record["id"], "tick": tick, "activity": activities[0],
                              "count": count, "minutes": max(1, round(span / 60)),
                              "reason": reason, "submitted": False}
+    from systems import bg_work
+    bg_work.note(world, "loop", c["id"])
 
     # 3. immediate fallback memory; the real thought replaces it when it arrives
     from llm.self_assessment import fallback_thought
@@ -225,9 +227,15 @@ def service(c, world):
 
 
 def service_all(world):
-    for c in world.get("characters", {}).values():
-        if c.get("_loop_assessment"):
+    """The characters with an assessment waiting (systems/bg_work.py), not everyone."""
+    from systems import bg_work
+    chars = world.get("characters", {})
+    for cid in bg_work.targets(world, "loop"):
+        c = chars.get(cid)
+        if c and c.get("_loop_assessment"):
             try:
                 service(c, world)
             except Exception as exc:
                 print(f"[loop_guard] assessment error for {c.get('id')}: {exc}")
+        if not c or not c.get("_loop_assessment"):
+            bg_work.done(world, "loop", cid)

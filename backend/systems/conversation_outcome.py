@@ -177,9 +177,14 @@ def on_message(world, conv, speaker_id, utterance, speech_act, tick):
 
 
 def tick(world):
-    """Every tick (from conversation_floor.tick): end what is settled or has run too long."""
+    """End what is settled or has run too long -- over every conversation (old callers, tests)."""
+    tick_conversations(world, list((world.get("conversations") or {}).values()))
+
+
+def tick_conversations(world, convs):
+    """End what is settled or has run too long, among `convs` (the floor loop passes its live conversations)."""
     t = world.get("tick", 0)
-    for conv in list((world.get("conversations") or {}).values()):
+    for conv in convs:
         if not conv.get("active") or conv.get("medium", "in_person") not in ("in_person", "call"):
             continue
         if conv.get("outcome") and t >= conv.get("resolved_tick", t) + CLOSE_GRACE_TICKS:

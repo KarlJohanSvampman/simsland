@@ -185,7 +185,19 @@ def context_for_reader(world, entry):
             "confrontation": {"id": conf["id"], "type": conf["confrontation_type"], "problem": conf["problem_statement"],
                               "initiator": name(world, conf["initiator_id"]),
                               "target": name(world, conf["primary_target_id"])} if conf else None,
-            "contracts": contracts[:6], "rumours": rumours[:10]}
+            "contracts": contracts[:6], "rumours": rumours[:10],
+            "structured": _cpl_record(world, entry)}
+
+
+def _cpl_record(world, entry):
+    """What CPL recorded as it happened (cpl/record.py): requests and answers, claims and how they were taken."""
+    try:
+        from cpl import config, record
+        if config.mode(world) != "on":             # shadow mode changes nothing the legacy path reads
+            return []
+        return record.lines(world, record.for_legacy(world, entry.get("id")))[:12]
+    except Exception:
+        return []
 
 
 def after(world, entry, tags):

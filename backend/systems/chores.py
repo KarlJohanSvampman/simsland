@@ -603,3 +603,17 @@ def maybe_tend_plants(c, world):
             "priority": 35,
             "reason":   "there's ripe produce ready to pick",
         })
+
+
+def personal_mess_active(c, world):
+    """Alive, on the map, a real character (core/flow.py PERCHAR `personal_mess`)."""
+    return c.get("alive", True) and not c.get("off_grid") and not c.get("is_workplace_npc")
+
+
+def personal_mess_for(c, world):
+    """Their own reaction to mess, wish to redecorate, and clothes getting dirty."""
+    from systems.refurnishing import maybe_want_to_redecorate
+    from systems.clothing import tick_clothing_dirty
+    maybe_react_to_mess(c, world)
+    maybe_want_to_redecorate(c, world)
+    tick_clothing_dirty(c, world)

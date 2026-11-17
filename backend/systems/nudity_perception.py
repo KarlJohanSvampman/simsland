@@ -58,11 +58,19 @@ REL_TYPES_FRIEND     = {"close_friend", "friend"}
 
 # ── Public API ────────────────────────────────────────────────────────────────
 
-def tick_nudity_perception(world):
-    """Call every sim tick. Handles all three perception events."""
+def tick_nudity_perception(world, ids=None):
+    """Call every sim tick. Handles all three perception events. `ids`: the nudity loop's members (everyone exposed or
+    in an intimate session) -- then only they are scanned for sessions, and only the places where there is something
+    to perceive are visited (see _places_to_visit); None scans everyone, as before."""
     tick       = world.get("tick", 0)
     characters = world.get("characters", {})
     by_loc     = world.get("characters_by_location", {})
+    if ids is not None:
+        order = {cid: n for n, cid in enumerate(dict.keys(characters))}
+        scan = [(cid, characters[cid]) for cid in sorted(set(ids), key=lambda i: order.get(i, 1 << 30))
+                if cid in order]
+    else:
+        scan = characters.items()
 
     # Build index of active sex locations from world state
     sex_locs = world.get("active_sex_locations", {})
@@ -75,7 +83,7 @@ def tick_nudity_perception(world):
     # gendered escalation) as walking in on partnered sex, no separate
     # logic needed.
     sex_locs = {}
-    for cid, c in characters.items():
+    for cid, c in scan:
         act = c.get("activity", {})
         if not act:
             continue
@@ -106,9 +114,13 @@ def tick_nudity_perception(world):
                     _push_reaction(c, "moan_pleasure", tick, world)
     world["active_sex_locations"] = sex_locs
 
+    visit = None if ids is None else _places_to_visit(world, by_loc, sex_locs)
+
     # Process each location that has occupants
     for loc_id, occupant_ids in by_loc.items():
         if not occupant_ids:
+            continue
+        if visit is not None and loc_id not in visit:
             continue
 
         occupants = [characters.get(cid) for cid in occupant_ids if characters.get(cid)]
@@ -163,6 +175,29 @@ def tick_nudity_perception(world):
                         observer["_last_sound_react"] = tick
                         _react_to_sex_sounds(observer, sloc_id, world, tick)
                         break   # one reaction per tick
+
+
+def _places_to_visit(world, by_loc, sex_locs):
+    """The places where the pass below can do anything: someone there is nude or exposed (read without reaching them:
+    core/world_view.py), a session is going on there, or a session elsewhere in the same building made a sound this
+    pass. Anywhere else, every check below comes to nothing."""
+    chars = dict.get(world, "characters") or {}
+    visit = set(sex_locs)
+    for loc_id, occupant_ids in dict.items(by_loc) if isinstance(by_loc, dict) else ():
+        for cid in occupant_ids or ():
+            c = dict.get(chars, cid) if dict.__contains__(chars, cid) else None
+            if c is not None and (dict.get(c, "is_nude") or dict.get(c, "exposed_chest")):
+                visit.add(loc_id)
+                break
+    if SOUND_BLEEDS_BUILDING:
+        loud = {_get_location_building(l, world) for l, d in sex_locs.items() if d.get("_sound_this_pass")}
+        loud.discard(None)
+        if loud:
+            for loc_id, occupant_ids in by_loc.items():
+                if _get_location_building(loc_id, world) in loud or any(
+                        dict.get(dict.get(chars, cid) or {}, "building_id") in loud for cid in occupant_ids or ()):
+                    visit.add(loc_id)
+    return visit
 
 
 # ── Reaction handlers ──────────────────────────────────────────────────────────
@@ -272,8 +307,8 @@ def _react_to_walking_in(observer, participant_ids, world, tick):
             "participant_ids": participant_ids,
             "tick":            tick,
         }, world)
-        imp = observer.setdefault("impulse_state", {})
-        imp["anger_pressure"] = min(1.0, imp.get("anger_pressure", 0) + 0.50)
+        from systems.impulse import bump_anger
+        bump_anger(observer, world, 0.50)
     else:
         _push_reaction(observer, "embarrassed", tick, world)
 
@@ -370,8 +405,8 @@ def _react_to_sex_sounds(observer, source_loc_id, world, tick):
             "participant_ids": participants,
             "tick":            tick,
         }, world)
-        imp = observer.setdefault("impulse_state", {})
-        imp["anger_pressure"] = min(1.0, imp.get("anger_pressure", 0) + 0.30)
+        from systems.impulse import bump_anger
+        bump_anger(observer, world, 0.30)
 
     _emit("heard_sex_sounds", {
         "observer_id":  o_id,
@@ -484,8 +519,8 @@ def _check_partner_nudity_jealousy(observer, target, world, tick):
             trust = obs_rel.get("trust", 0.5)
             # Low trust → anger
             if trust < 0.60:
-                imp = observer.setdefault("impulse_state", {})
-                imp["anger_pressure"] = min(1.0, imp.get("anger_pressure", 0) + 0.25)
+                from systems.impulse import bump_anger
+                bump_anger(observer, world, 0.25)
             break
 
 
@@ -511,3 +546,41 @@ def _emit(event_type, data, world):
         emit(event_type, data, world)
     except Exception:
         pass
+
+
+# ── as an active loop (core/active_loops.py) ──────────────────────────────────────────────────────────────────────────
+# There is something to perceive only while someone is nude or exposed, or in an intimate session: those characters
+# are the loop's members (added from their own update, brain/agent_loop.py, where such a state begins), and while any
+# is, the full pass above runs every step exactly as before (its per-step sound chances included). With nobody exposed
+# it does not run at all.
+
+def _exposed(c):
+    if c.get("is_nude") or c.get("exposed_chest"):
+        return True
+    act = c.get("activity") or {}
+    if act.get("interaction") in ("masturbate", "watch_porn"):
+        return SOLO_SESSION_STAGE >= 4
+    return (act.get("act_stage") or 0) >= 4
+
+
+def note_exposure(c, world):
+    if _exposed(c):
+        from core import active_loops
+        active_loops.add(world, "nudity", c.get("id"))
+
+
+def ensure_nudity_members(world):
+    from core import active_loops
+    if "nudity" in (world.get("_active_loops") or {}):
+        return
+    active_loops.rebuild(world, "nudity", [cid for cid, c in (world.get("characters") or {}).items() if _exposed(c)])
+
+
+def nudity_step(world, ids):
+    tick_nudity_perception(world, ids)
+    chars = world.get("characters") or {}
+    return [i for i in ids if i not in chars or not _exposed(chars[i])]
+
+
+from core import active_loops as _active_loops      # noqa: E402
+_active_loops.register("nudity", nudity_step, order=50)

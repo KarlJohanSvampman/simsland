@@ -508,3 +508,142 @@ component; a replayable event log.
   one process that this exposed is fixed (the id carries a random suffix). Remaining single points: the core
   (one tick owner -- by design), Redis, Postgres, nginx.
 
+- **No-tick, part A: what is left of the tick (done)** — the tick body no longer walks the population for
+  bookkeeping. Measured by what `_tick_impl` still does per step:
+  *clock + scheduler* (the clock service itself); *the arrival bridge* (`_announce_new_characters`, a set difference
+  -- a missing week schedule is generated there, for the new arrivals only, and where the admin reset clears it);
+  *active loops* (`core/active_loops.py`, the plan's "temporary active loop": a component runs per step for its
+  **members** only, and not at all with none -- whoever starts the activity adds the member, the loop drops it when
+  the work is over; members live on the world): **movement** (every walk is started through
+  `systems/movement.py::start_moving()`, 24 sites, enforced by `tests/test_movement_loop.py`; a 30-second safety
+  sweep picks up and logs any walker set off by hand), **floor** (turn-taking + conversation endings, only live
+  spoken conversations; they leave the loop whichever of the seven ending paths closed them), **bus** (the clock
+  marks each 15-minute slot, CLOCK jobs `bus_slot_*`; the bus is a member while a departure is due or a trip runs),
+  **ambient_sounds**; *departure flags* (cleared at the end of the step for exactly the characters that were
+  marked); *the event flush*. The story arc is updated when a memory is stored (it has no reader; the only
+  behavioural difference in the determinism runs: it no longer picks up later in-place rewrites of a memory).
+  Still a per-step check, deliberately: the job-market refill (`if not world["job_listings"]`, O(1) whenever there
+  are listings; the list only empties inside `generate_job_listings` itself).
+  **What remains is part C**: `update_agent()` for every character on every step.
+  The harness gained a fixture builder for a fresh checkout (`tools/make_det_fixture.py`, from `tests/house_world`)
+  and two policies besides "always wait": `DET_POLICY=varied` (interacts, walks, talks; seeded per character and
+  call, so still exactly repeatable) and `DET_POLICY=social` + `DET_SETUP=together` (households stand together and
+  mostly talk). Every change above: identical worlds in three scenarios (1500 ticks across midnight and a week
+  boundary, 1500 ticks of afternoon, 3000 ticks of social morning) apart from its own bookkeeping keys, and the
+  same backend suite pass/fail set.
+- **No-tick, part C: characters run when they are due (done)** — first the last per-call drifts became lazy values of
+  sim time (memories, habits, mood expiry, desire frustration; memory and habit half-lives are tunable:
+  `MEMORY_HALF_LIFE_HOURS`, default 38.5; `HABIT_HALF_LIFE_DAYS`, default 3 -- both used to be per-tick factors, and
+  memory decay compounded so even an important memory was gone in ~20 real minutes). Then `brain/agent_wake.py`
+  (`AGENT_GATING`, default `on`; `off` = everyone every step; `shadow` = everyone every step plus a record of every
+  skippable step that changed real state or drew a random number) decides whose `update_agent()` runs: whoever an
+  event names (an `event_bus.after_dispatch` hook), whoever is near an incident or a one-off sound, a new intention,
+  a route that saved the world, the lazy body's timer, cognition's `wake_character`, the timers each time-based check
+  arms for itself (activity clock, schedule blocks, alarm minute and snooze, bedtime cooldown, intention deadlines,
+  reflections, speech expiry, posture, plan cooldown/wait, memory upkeep, mood, curiosity, validation, the daily
+  health boundary), anyone walking or with something moving step by step (an emergency, a hazard or symptom,
+  dehydration, an investigation), a free character whose decision cycle is due, the top of the hour (CLOCK
+  `agent_hourly_wake`), and a 60-second heartbeat (`AGENT_HEARTBEAT_SECONDS`). Per-tick dice rolls are drawn ahead
+  (`agent_wake.chance`: geometric, the same distribution). Shadow runs (4 h morning, 3 h evening, 2 h across midnight,
+  50 min of conversation): 94-95% of steps skipped, 0-2 misses each, all within the heartbeat. On vs off: the morning
+  ends identically with 2,951 agent runs instead of 57,600; conversation runs agree across seeds; ~35% faster. Accepted:
+  what the lazy body writes outside `body` (stress, weight, health threshold events) is brought up to date when the body
+  syncs, at most `BODY_MAX_SLEEP_TICKS` (2 min) late for other systems' readers.
+  Deliberately not done from step 3 of the plan: movement at its own rate decoupled from the step (it is an active loop
+  per step; a separate rate only matters once movement is its own process, step 5), and a spatial index for perception
+  (the perception job is already event-driven with a 5 s settle; finding who is affected is an O(n) scan, negligible
+  at this population -- worth doing at a few hundred characters).
+- **No-tick, part B: periodic jobs (partly done; stopped here by decision)** — measured first (every PROCESS job's
+  runs, cost and whether a run changed anything, 1 h of varied play): all of them together cost well under 1 ms per
+  sim-second, so what is left is architecture, not speed. Done: the two every-second jobs are gone -- `body_moment`
+  (anger, intoxication, arousal, baby needs, blushes/daydreams become lazy values of sim time, `core/lazy.py`, at the
+  old per-tick rates, brought up to date in the character's own update, with timers at the thresholds that matter;
+  walking in on someone undressed is the `nudity` active loop; micro-requests a one-tick timer) and `phone_battery`
+  (batteries lazy under the owner's regime -- idle / in use / charging -- with a timer at off / usable / full).
+  Plants run on their own timers (thresholds, growth stages; every 30 s only while they need attention).
+  `memory_decay` is gone (the lazy fade runs in every character update). A new kind of job, **DUTY** (`core/flow.py`):
+  continuous only while there is work -- armed by whatever starts it (`wake_duty`), its old cadence while its cheap
+  world-level check holds, no timer at all otherwise; an hourly safety check reports a start site that forgot
+  `wake_duty`. Converted: grapples, scripted conversations, household processes, messages, service vans, rideshare,
+  fires, intercourse sessions, conversation tagging; parcels are timed for their arrival tick.
+  **Left as PROCESS jobs (57):** ~15 are genuine world processes that change something every run -- market, job market,
+  weather, news, elections, faction/hierarchy/migration, traffic, crises, the movement-log sampler, the movement safety
+  sweep, riftscan (the plan's "calendar" kind, already clock-anchored); ~10 are "while active" and would be quick DUTY
+  conversions (reading, sports broadcasts, emergencies, trials/jail, social projects, detective stories, kids' play,
+  business inboxes, background-LLM mailboxes, services/staffing); ~30 are per-character sweeps that change nothing in
+  most runs (grudges, grievances/goodwill, libido, polarization, stress/psychosis, cravings, long-term needs,
+  cleanliness/clothing, relationships while together, contagion, social odor, claustrophobia, worries/focus,
+  exhaustion, influence, popularity, household monitoring, child care, domestic control, cookware, calendar
+  reminders, contract checks, persona expectations, mentality compilation, appliance wear, orphan props) -- each
+  wants the part-C treatment (lazy value + timers at its own thresholds, or an event).
+- **Step 4, the entity store (done: D1-D3)** —
+  *D1, per-entity records* (`core/entity_store.py`, `WORLD_STORE=entities`, the default): every character, household,
+  conversation, archived conversation and prop is its own Postgres row (`entities`, data as JSON -- not JSONB, which
+  re-orders object keys, and key order inside an entity is iteration order the simulation depends on), every other
+  top-level key a row of kind `key`, and a manifest row keeps the order of keys and ids. A flush writes only what
+  changed, deletes what is gone, and writes the manifest and a commit row in ONE transaction, so a reload is always the
+  world as of one flush (byte-for-byte, checked). The writer merges queued diffs instead of dropping them. The blob is
+  still written every 300 ticks and at shutdown (backup, tools). A blob-only save loads and is migrated by its first
+  flush. Flush every 2 ticks (`WORLD_PERSIST_EVERY_TICKS`): a crash loses a tick or two instead of 15.
+  *D2, the WorldView façade* (`core/world_view.py`): the resident world is a `WorldDict`, its entity collections
+  `EntityMap` / `EntityList` -- dict/list subclasses, so the ~325 systems modules are untouched and json.dumps is
+  unaffected. Reaching an entity notes it (the hot path is one set test: no measurable cost); a flush renders only what
+  was touched (~20-30 of ~210 entities per step; the touched characters dominate, ~5 ms). Props are compared whole
+  (reading the list is too common to note). Read-only observers run `untracked()`. Every 20th flush compares
+  everything and reports entities changed without being touched -- none found in 1500 ticks.
+  *D3, per-entity locks* (`core/entity_locks.py`, `ENTITY_LOCKS=on`, default off until it has run in the real stack):
+  a read/write world lock -- the tick's step and declared commands (`@command(..., entities=...)`) share the world and
+  lock entities (the step as it reaches them, a command all up front), everything else is exclusive as before; the
+  publish and persistence pass after a step is exclusive; a command in a lock cycle is aborted (409), never the step.
+  Measured with the real tick runner and a command thread: ~1,400 ticks in 15 s instead of 754, declared commands
+  6-8 ms instead of 31 ms, 0 conflicts, ~80 commands ran during a step, reload identical.
+  Honest limits: the step reaches every character each time (systems iterate the whole collection), so a command on a
+  character still waits for the step to end -- the concurrency is with other commands and with the publish/persist
+  pass; real per-character parallelism needs the step itself split into per-entity handlers (step 5, not done).
+  Only five commands declare their entities so far; props stay exclusive (their reads are not noted).
+- **Step 5a, per-character jobs (in progress).** A sweep over every character on a cadence becomes the character's own
+  work. Three shapes: a lazy value or a wake in the character's update (memories, habits, mood, anger, polarization,
+  grievances, ...); a `DUTY` for world-level work that is only continuous while something is going on; and a
+  `PERCHAR` job (`core/flow.py`). A `PERCHAR` job keeps the old job's recurring timer (same interval, same offset, so the
+  same point in the step) but runs only over its members. The characters it concerns are decided by a cheap check of
+  the character itself, made in that character's update. The check can also say "from time X", which replaces a wake:
+  libido waits for the next midnight's roll; long-term needs wait for the moment one becomes overdue. A character's
+  update never runs just because of a `PERCHAR` job, so nobody thinks at a different moment. Converted this way:
+  psychosis, lt_needs, social_odor, libido, addictions (hourly, per character), exhaustion and claustrophobia. All
+  three determinism runs are identical to before. The only differences are bookkeeping: the claustrophobia state is no
+  longer stamped on characters who are not moving, and the world-level hourly gate for addictions is gone.
+  More PERCHAR jobs since: focus_check, worry_poll (each character due from its own next hourly poll), grudges,
+  jail (due from the release tick), dependent_checks, mentality_compilation (with a per-firing cap, as the old sweep
+  had), play_urges (due from the start of play hours), domestic control (three jobs, in the old order),
+  persona_expectations, personal_mess, influence_exposure, detective_work, popularity_decay and weather_exposure.
+  Members are seeded once per process, so a load or a new job doesn't wait for anyone's first look.
+  *Who is near* (`core/positions.py`): positions read raw, so building the read model reaches nobody. Relationships
+  reach only the pairs near each other, contagion only buildings with someone contagious, and a validation question
+  only its audience. The nudity pass scans only its members and visits only places where there is something to see.
+  `world_view.where()` filters a collection on the raw entities and reaches only the matches.
+  Measured (afternoon run, 1,500 steps, the fixture's nudity switched off -- its characters have no clothes, so that
+  loop has members every step): on average a step reaches 0.97 of the 5 characters, and 1,122 steps reach none.
+  What still reaches characters: their own updates; reads of other characters from inside one (household members'
+  ages, relationship partners); household-level jobs that write to members; and once-a-day sweeps (calendar
+  reminders, contract clauses, bills). Those reads are not ownership: in step 5b they read replicated snapshots of
+  other entities. World-level processes (market, traffic, post, news, elections, ...) belong to world services in 5b.
+- **Step 5a, commands declare their entities (done).** All 53 commands now say what they change. 28 name their
+  entities: `entities=fn(args[, peek])`, where `peek` (`entity_locks.Peek`) looks up related ids in the live world
+  without reaching anything (a character's household, a building's owner), and `(kind, NEW)` names entities the
+  command creates. 25 take the whole world on purpose (`entities="world"`): resets and one-off repairs over everyone,
+  the editor, and anything that reaches props. Props are still not locked one by one: their in-place changes are not
+  seen by the façade. That includes `middleware_bridge.execute`, whose decisions can take an anchor -- the case for
+  per-prop locks. `tests/test_command_entities.py` checks every `@command` declares, and runs the declared ones under
+  `ENTITY_LOCKS=on`: none reaches an entity it did not declare. Live, with the real tick runner and a command thread
+  for 12 s: 1,716 ticks, 1,088 declared commands at a median of 1.5 ms (was 6-8 ms), 0 entity waits, 0 conflicts,
+  reload identical. Commands no longer wait for the step because the step now rarely reaches the same characters.
+- **Step 5b, separate processes (done).** Partitioned ownership, chosen over "one writer, compute out" (details and
+  measurements in `docs/step5b_plan.md`).
+  - Partition 0 is the core: world services, conversations, commands, the gateway replica. Further partitions own
+    households (members, props).
+  - Writes to another partition's entity travel as field-level patches (`core/entity_patch.py`), and owners publish
+    frames (`core/partitions.py`), over Redis streams between processes.
+  - Households can be moved between partitions while running.
+  - Tested in one process and across three real processes (converging, reproducible in lockstep, free-running).
+  - Wired into `main.py` (`SIM_PARTITIONS` / `SIM_PARTITION`), and into docker-compose under the `partitions`
+    profile.

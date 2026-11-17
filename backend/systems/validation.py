@@ -79,18 +79,13 @@ def _prune_expired_queue(c, world):
 
 
 def _nearby_characters(c, world):
+    """Who a question can be put to: the others in their building, or within 6 tiles outdoors (core/positions.py --
+    only those are reached)."""
+    from core import positions
     chars = world.get("characters", {})
-    bid = c.get("building_id")
-    if bid:
-        return [o for o in chars.values()
-                if o["id"] != c["id"] and o.get("building_id") == bid and o.get("alive", True) is not False]
-    result = []
-    for o in chars.values():
-        if o["id"] == c["id"] or o.get("building_id") or o.get("alive", True) is False:
-            continue
-        if abs(o.get("x", 0) - c.get("x", 0)) + abs(o.get("y", 0) - c.get("y", 0)) <= 6:
-            result.append(o)
-    return result
+    if c.get("building_id"):
+        return [chars[i] for i, alive, _b in positions.ids_near(world, c, same_building=True) if alive]
+    return [chars[i] for i, alive, obid in positions.ids_near(world, c, radius=6) if alive and not obid]
 
 
 def _question_text(entry):
@@ -124,13 +119,22 @@ def maybe_seek_validation_from_queue(c, world):
     if not queue:
         return
 
+    from brain import agent_wake
+    tick = world.get("tick", 0)
+    first_expiry = min(e["expires_tick"] for e in queue)
+    agent_wake.wake_at(c, world, agent_wake.at_tick(world, first_expiry), "validation_expiry")
+    urgent_at = first_expiry - _EXPIRY_WARNING_HOURS * TICKS_PER_HOUR + 1
+    agent_wake.wake_at(c, world, agent_wake.at_tick(world, max(tick + 1, urgent_at)), "validation_urgent")
     nearby = _nearby_characters(c, world)
+    if not nearby:
+        agent_wake.chance_off(c, "ask_validation")
     # Small per-tick chance, not per-check -- this runs every tick per
     # character (see brain/agent_loop.py), same order of magnitude as
     # offgrid.py::maybe_go_offgrid's per-tick rolls (e.g. 0.004), not a
     # "roll once when conditions align" probability, which at 1 tick =
     # 1 second would fire almost immediately.
-    if nearby and random.random() < 0.003:
+    # (Drawn ahead by agent_wake.chance: the same per-tick chance, without the update running every tick.)
+    if nearby and agent_wake.chance(c, world, "ask_validation", 0.003):
         entry = random.choice(queue)
         _ask_about_choice(c, world, random.choice(nearby), entry)
         c["validation_queue"] = [e for e in queue if e["id"] != entry["id"]]
@@ -162,6 +166,9 @@ def check_validation_refresh(c, world):
     tick = world.get("tick", 0)
     refresh_ticks = c.get("validation_refresh_time", 48) * TICKS_PER_HOUR
     if tick - c.get("last_validation_received", 0) < refresh_ticks:
+        from brain import agent_wake
+        agent_wake.wake_at(c, world, agent_wake.at_tick(world, c.get("last_validation_received", 0) + refresh_ticks),
+                           "validation_refresh")
         return
     from systems.social_media import create_post
     create_post(c, world, random.choice(_CHECKIN_PROMPTS), tags=["check_in"])
@@ -238,3 +245,14 @@ def tick_popularity_decay(world):
         pop = c.get("popularity", 0.0)
         if pop > 0:
             c["popularity"] = round(max(0.0, pop - POPULARITY_DECAY_PER_MINUTE), 2)
+
+
+def popularity_active(c, world):
+    """Has popularity left to fade (core/flow.py PERCHAR `popularity_decay`)."""
+    return (c.get("popularity", 0.0) or 0) > 0
+
+
+def popularity_decay_for(c, world):
+    pop = c.get("popularity", 0.0)
+    if pop > 0:
+        c["popularity"] = round(max(0.0, pop - POPULARITY_DECAY_PER_MINUTE), 2)

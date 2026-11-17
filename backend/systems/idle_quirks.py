@@ -181,7 +181,8 @@ def _start_roam(c, world) -> bool:
         if not reachable:
             continue
         c["animation_state"] = "walk"
-        c["is_moving"] = True
+        from systems.movement import start_moving
+        start_moving(c, world)
         lo, hi = ROAM_LINGER_TICKS
         c["activity"] = _occupy(c, world, {"type": "roam", "phase": "walking",
                          "phase_started_tick": world.get("tick", 0),
@@ -225,7 +226,8 @@ def _start_check_door(c, world) -> bool:
     if not plan_character_route(world, c, door["x"], door["y"]):
         return False
     c["animation_state"] = "walk"
-    c["is_moving"] = True
+    from systems.movement import start_moving
+    start_moving(c, world)
     lo, hi = CHECK_DOOR_LINGER_TICKS
     c["activity"] = _occupy(c, world, {"type": "check_door_lock", "phase": "walking",
                      "phase_started_tick": world.get("tick", 0),
@@ -261,7 +263,8 @@ def _start_look_out_window(c, world) -> bool:
     if prop_distance(c, window) > 1 and not plan_character_route(world, c, window["x"], window["y"]):
         return False
     c["animation_state"] = "walk"
-    c["is_moving"] = True
+    from systems.movement import start_moving
+    start_moving(c, world)
     lo, hi = LOOK_OUT_WINDOW_LINGER_TICKS
     c["activity"] = _occupy(c, world, {"type": "look_out_window", "phase": "walking",
                      "phase_started_tick": world.get("tick", 0),

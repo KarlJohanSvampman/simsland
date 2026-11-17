@@ -107,6 +107,9 @@ def add_grievance(c, caused_by_id, event_type, world, severity=None, details=Non
     Record a new grievance on character c against caused_by_id.
     severity overrides the default for event_type.
     """
+    sync_social_decay(c, world.get("tick", 0) if world else 0)      # what is left of the old ones first
+    if world is not None:
+        _wake_for_next_check(c, world)                              # the thresholds are looked at next period
     c.setdefault("grievances", [])
 
     base_severity = severity if severity is not None else SEVERITY.get(event_type, 5.0)
@@ -253,3 +256,77 @@ def update_grievances(world):
         if c.get("alive") is False or c.get("posture") == "incapacitated":
             continue
         check_grievance_thresholds(c, world)
+
+
+# ── step 5a: grievances, goodwill and guilt as the character's own lazy values ───────────────────────────────────────
+# They decayed by a fixed factor on every 15-second run of a sweep over everyone. Now they are brought up to date in the
+# character's own update (the periods since the last time, applied at once -- the same result), the thresholds are
+# checked there, and a wake is set for the next period at which a score falls through one. A score only rises when a
+# grievance or goodwill is added: that brings the values up to date first and wakes the character for the next period.
+
+SOCIAL_DECAY_EVERY_TICKS = 15
+
+
+def _periods(c, tick):
+    last = c.get("_social_decay_tick")
+    c["_social_decay_tick"] = tick
+    if last is None:
+        return 0
+    return max(0, tick // SOCIAL_DECAY_EVERY_TICKS - last // SOCIAL_DECAY_EVERY_TICKS)
+
+
+def sync_social_decay(c, tick):
+    n = _periods(c, tick)
+    if not n:
+        return
+    from systems import goodwill as GW
+    from systems.offense_rationalization import _GUILT_PARANOIA_DECAY
+    for key, rate in (("grievances", DECAY_RATE), ("goodwill", GW.DECAY_RATE)):
+        if c.get(key):
+            f = rate ** n
+            kept = []
+            for g in c[key]:
+                g["weight"] *= f
+                if g["weight"] > 0.5:
+                    kept.append(g)
+            c[key] = kept
+    level = c.get("_guilt_paranoia", 0.0)
+    if level > 0:
+        rate = 0.90 if c.get("_offense_rationalization") is None else _GUILT_PARANOIA_DECAY
+        c["_guilt_paranoia"] = max(0.0, level * rate ** n)
+
+
+def _next_grid(tick):
+    return (tick // SOCIAL_DECAY_EVERY_TICKS + 1) * SOCIAL_DECAY_EVERY_TICKS
+
+
+def social_checks_for(c, world):
+    """The character's own update: values brought up to date, thresholds checked, the next crossing woken for."""
+    import math
+    tick = world.get("tick", 0)
+    sync_social_decay(c, tick)
+    if c.get("alive") is False or c.get("posture") == "incapacitated":
+        return
+    check_grievance_thresholds(c, world)
+    from systems.goodwill import check_bond_thresholds, BOND_THRESHOLD, DECAY_RATE as GW_RATE
+    check_bond_thresholds(c, world)
+    waits = []
+    for key, rate, thresholds in (("grievances", DECAY_RATE, (CONFRONT_THRESHOLD, COLD_SHOULDER_THRESHOLD,
+                                                              COLD_SHOULDER_THRESHOLD * 0.5)),
+                                  ("goodwill", GW_RATE, (BOND_THRESHOLD * 0.5,))):
+        scores = {}
+        for g in c.get(key) or []:
+            scores[g["caused_by"]] = scores.get(g["caused_by"], 0) + g["weight"]
+        for score in scores.values():
+            for thr in thresholds:
+                if score >= thr > 0:
+                    waits.append(math.floor(math.log(thr / score) / math.log(rate)) + 1)
+    if waits:
+        from brain import agent_wake
+        at = (tick // SOCIAL_DECAY_EVERY_TICKS + min(waits)) * SOCIAL_DECAY_EVERY_TICKS
+        agent_wake.wake_at(c, world, agent_wake.at_tick(world, max(at, _next_grid(tick))), "social_decay")
+
+
+def _wake_for_next_check(c, world):
+    from brain import agent_wake
+    agent_wake.wake_at(c, world, agent_wake.at_tick(world, _next_grid(world.get("tick", 0))), "social_added")

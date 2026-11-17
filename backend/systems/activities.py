@@ -1664,6 +1664,9 @@ def execute_activity(
             routed = bool(dest) and plan_character_route(world, c, dest_x, dest_y)
             c["is_moving"] = bool(routed)
             if routed:
+                from systems.movement import start_moving
+                start_moving(c, world)
+            if routed:
                 set_activity_phase(act, "delivering", world)
                 c["animation_state"] = "carry_walk"
             else:
@@ -1733,7 +1736,8 @@ def execute_activity(
             from systems.road_network import nearest_road_tile
             spot = nearest_road_tile(world, pickup["x"], pickup["y"]) or (pickup["x"], pickup["y"])
             c["move_target"] = {"x": spot[0], "y": spot[1], "target_type": "tile"}
-            c["is_moving"] = True
+            from systems.movement import start_moving
+            start_moving(c, world)
             set_activity_phase(act, "walking_to_pickup", world)
             c["animation_state"] = "walk"
             return True

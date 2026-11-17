@@ -790,7 +790,8 @@ def leave_note(c, world, text=None):
     }
     world.setdefault("notes", []).append(note)
     c["_left_note_this_tick"] = True
-    c["_announced_departure"] = True
+    from systems.incidental_speech import note_announced
+    note_announced(c, world)
 
     # Fire incidental speech bubble showing the action
     try:

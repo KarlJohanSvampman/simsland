@@ -260,7 +260,9 @@ def _plan_fixture_attendance(world, sport, scope, fx):
                 attendees[viewer_id] = {"mode": mode, "team": c[key][sport]}
 
     fx["attendees"] = attendees
-
+    if attendees:                       # kickoff is looked after from its scheduled tick (a timer, then a DUTY)
+        from core import scheduler
+        scheduler.schedule(world, "kickoff", f"{sport}:{scope}:{fx.get('id', fx['scheduled_tick'])}", fx["scheduled_tick"])
     off_grid_ids = [cid for cid, a in attendees.items()
                     if a["mode"] in ("playing", "off_grid", "off_grid_spectator")]
     if off_grid_ids:
@@ -555,3 +557,26 @@ def _escalate_team_rivalry(char_a, char_b, world):
         })
     except Exception:
         pass
+
+
+def kickoff_pending(world):
+    """DUTY check: a game under way that still has an attendee who hasn't set off."""
+    from systems.sports_leagues import GAME_DURATION_TICKS
+    tick = world.get("tick", 0)
+    for sport_leagues in (world.get("sports_leagues") or {}).values():
+        for league in (sport_leagues or {}).values():
+            for fx in (league or {}).get("schedule") or []:
+                att = fx.get("attendees")
+                if att and fx["scheduled_tick"] <= tick < fx["scheduled_tick"] + GAME_DURATION_TICKS \
+                        and any(not a.get("started") for a in att.values()):
+                    return True
+    return False
+
+
+def _on_kickoff_timer(world, entry):
+    from core.flow import wake_duty
+    wake_duty(world, "sports_watching")
+
+
+from core import scheduler as _scheduler      # noqa: E402
+_scheduler.register("kickoff", _on_kickoff_timer)

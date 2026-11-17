@@ -35,7 +35,7 @@ from api.view import get_view, in_view, RESPONDER_FADE_TICKS
 from core.definitions import load_definitions
 from api.editor import save_definitions
 from systems.economy import household_economy
-from systems.schema_defaults import ensure_world_defaults
+from systems.schema_defaults import ensure_world_defaults, ensure_world_defaults_if_due
 from api.assets  import router as assets_router
 from api.editor  import router as editor_router
 from api.props   import router as props_router
@@ -60,6 +60,7 @@ from api.conversation_trace import router as conversation_trace_router
 from api.dialogue_feedback import router as dialogue_feedback_router
 from api.personal_rules import router as personal_rules_router
 from api.directors_cut import router as directors_cut_router
+from api.cpl import router as cpl_router
 from api.dependents import router as dependents_router
 from api.director  import router as director_router
 from api.middleware_bridge import router as middleware_bridge_router
@@ -106,6 +107,7 @@ app.include_router(conversation_trace_router)
 app.include_router(dialogue_feedback_router)
 app.include_router(personal_rules_router)
 app.include_router(directors_cut_router)
+app.include_router(cpl_router)
 app.include_router(dependents_router, prefix="/api")
 app.include_router(director_router)
 app.include_router(middleware_bridge_router)
@@ -212,6 +214,19 @@ def _view_radius(zoom: int) -> int:
     return {0: 110, 1: 64, 2: 40, 3: 24}.get(zoom, 40)
 
 
+def _untracked(fn):
+    """A read-only view of the world built for a client: reading it touches nothing (core/world_view.py)."""
+    import functools
+
+    @functools.wraps(fn)
+    def run(*a, **k):
+        from core import world_view
+        with world_view.untracked():
+            return fn(*a, **k)
+    return run
+
+
+@_untracked
 def _build_full_snapshot(world, definitions, cx, cy, zoom):
     """Full world slice for a given viewport — sent on first connect."""
     radius = _view_radius(zoom)
@@ -252,6 +267,7 @@ def _character_patches(world: dict, visible_chars: dict, selected_id, sent: dict
     return out
 
 
+@_untracked
 def _build_delta(world: dict, dirty: dict, cx: int, cy: int, zoom: int,
                  selected_id: str | None = None, sent: dict | None = None) -> dict | None:
     """
@@ -386,6 +402,16 @@ def _wake_sleepers_after_clock_jump(world):
         interrupt_activity(c, world, reason="the clock moved on to the day while they slept")
 
 
+def _tick_world(world, sim_id):
+    """One step. With SIM_PARTITIONS > 1 this process is one partition of several: it steps what it owns and trades
+    patches and frames with the others (core/partitions.py, docs/step5b_plan.md)."""
+    from core import partitions as _parts
+    if _parts.SERVER_N > 1:
+        _parts.server_node(world, sim_id).tick(tick)
+    else:
+        tick(world)
+
+
 def _run_tick_and_persist(sim_id: str) -> tuple[dict, dict]:
     """Runs the whole load->tick->persist span for one tick, held under
     _world_lock end to end. Bundled into one function (rather than the
@@ -403,6 +429,9 @@ def _run_tick_and_persist(sim_id: str) -> tuple[dict, dict]:
     """
     from core import world_state
     _t_wait = time.perf_counter()
+    from core import entity_locks
+    if entity_locks.ENABLED:
+        return _run_tick_entity_locked(sim_id, _t_wait)
     with _world_lock, world_state.hold():
         _t_held = time.perf_counter()
         _tick_watch["thread"] = threading.get_ident()
@@ -411,7 +440,7 @@ def _run_tick_and_persist(sim_id: str) -> tuple[dict, dict]:
         # The live world stays in memory between ticks (core/world_state.py): no per-tick load,
         # JSON round trip or database write. The idempotent ensure_* passes still run each tick.
         world = world_state.resident(sim_id)
-        ensure_world_defaults(world)
+        ensure_world_defaults_if_due(world)
         # Loaded fresh every tick (cheap on a cache hit) rather than once at loop() startup --
         # definitions.json edits via the Definitions editor otherwise never reach a running
         # simulation until restart, even though save_definitions() already invalidates the
@@ -435,7 +464,7 @@ def _run_tick_and_persist(sim_id: str) -> tuple[dict, dict]:
         if not is_stopped(world):          # "STOP!" (Director Mode): time stands still until "Action!"
             tick_state.enter()
             try:
-                tick(world)
+                _tick_world(world, sim_id)
             finally:
                 tick_state.leave()
 
@@ -445,7 +474,9 @@ def _run_tick_and_persist(sim_id: str) -> tuple[dict, dict]:
 
         # Gateway replicas (core/replication.py): a no-op unless one is connected.
         from core import replication
-        replication.publisher.publish(sim_id, world, dirty)
+        from core import partitions as _parts
+        if _parts.is_core():                       # partition 0 holds everyone's entities: it feeds the gateways
+            replication.publisher.publish(sim_id, world, dirty)
 
         _t_persist = time.perf_counter()
         # Durable persistence is write-behind: every PERSIST_EVERY_TICKS ticks the world is
@@ -458,6 +489,56 @@ def _run_tick_and_persist(sim_id: str) -> tuple[dict, dict]:
                   f"(waited {_t_held - _t_wait:.1f}s for it; tick {_t_persist - _t_held:.1f}s, "
                   f"persist {_t_end - _t_persist:.1f}s)", flush=True)
 
+    return world, dirty
+
+
+def _prepare_world(world, sim_id):
+    ensure_world_defaults_if_due(world)
+    defs = load_definitions(sim_id)
+    if world.get("definitions") is not defs:
+        world["definitions"] = defs
+    from systems.schema_defaults import ensure_prop_template_fields
+    from systems.electrical import ensure_power_outlets
+    from systems.vehicles import ensure_vehicle_fields
+    from systems.market import init_market_catalog
+    ensure_prop_template_fields(world, defs)
+    ensure_power_outlets(world, defs)
+    ensure_vehicle_fields(world, defs)
+    init_market_catalog(world)
+    _maybe_resync_clock_to_real_time(world)
+
+
+def _run_tick_entity_locked(sim_id, t_wait):
+    """ENTITY_LOCKS=on (core/entity_locks.py): the step runs with the world SHARED -- every entity it reaches is locked
+    for the rest of the step, so a declared command on other entities runs meanwhile; then, with the world EXCLUSIVE,
+    what changed is published to gateways and handed to the write-behind (both read the whole world)."""
+    from core import world_state, entity_locks, tick_state, replication
+    from systems.directors_cut import is_stopped
+    with entity_locks.tick_unit():
+        t_held = time.perf_counter()
+        _tick_watch["thread"] = threading.get_ident()
+        _tick_watch["started"] = t_held
+        _tick_watch["reported"] = 0.0
+        world = world_state.resident(sim_id)
+        _prepare_world(world, sim_id)
+        if not is_stopped(world):
+            tick_state.enter()
+            try:
+                _tick_world(world, sim_id)
+            finally:
+                tick_state.leave()
+    with _world_lock, world_state.hold():
+        t_persist = time.perf_counter()
+        dirty = collect_dirty(world)
+        from core import partitions as _parts
+        if _parts.is_core():                       # partition 0 holds everyone's entities: it feeds the gateways
+            replication.publisher.publish(sim_id, world, dirty)
+        world_state.after_tick(sim_id, world)
+        t_end = time.perf_counter()
+    _tick_watch["started"] = None
+    if t_end - t_held > SLOW_TICK_LOG_SECONDS:
+        print(f"[tick] tick {world['tick']} took {t_end - t_held:.1f}s (waited {t_held - t_wait:.1f}s to start; "
+              f"step {t_persist - t_held:.1f}s, publish+persist {t_end - t_persist:.1f}s)", flush=True)
     return world, dirty
 
 
@@ -643,8 +724,11 @@ async def startup():
         app.state.feed = feed
         asyncio.create_task(replica_loop(feed))
         return
-    # Answer commands from gateway processes (core/commands.py). A no-op cost when none exist.
-    commands.serve()
+    # Answer commands from gateway processes (core/commands.py). A no-op cost when none exist. With partitions, the core
+    # (partition 0) answers them; a change to another partition's entity travels to it as a patch (core/partitions.py).
+    from core import partitions as _parts
+    if _parts.is_core():
+        commands.serve()
     threading.Thread(target=_tick_watchdog, name="tick-watchdog", daemon=True).start()
     asyncio.create_task(loop())
 
@@ -771,7 +855,7 @@ def household(household_id: str):
 
 
 @app.post("/api/config/environment")
-@command("main.update_environment")
+@command("main.update_environment", entities=lambda a: [("key", "environment")])
 def update_environment(payload: dict):
     with world_lock():
         world = load_world(SIM_ID)
@@ -788,7 +872,7 @@ def llm_logs():
 
 
 @app.delete("/api/llm/logs")
-@command("main.clear_llm_logs")
+@command("main.clear_llm_logs", entities=lambda a: [("key", "llm_logs")])
 def clear_llm_logs():
     with world_lock():
         world = load_world(SIM_ID)

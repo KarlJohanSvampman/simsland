@@ -141,14 +141,27 @@ def tick_persona_expectations(world):
     where "who you turned out to be" carries real stakes."""
     characters = world.get("characters", {})
     for c in characters.values():
-        if c.get("is_offscreen"):
+        persona_expectations_for(c, world)
+
+def persona_expectations_active(c, world):
+    """Has close kin whose expectations count (core/flow.py PERCHAR `persona_expectations`)."""
+    return not c.get("is_offscreen") and any(
+        (rel or {}).get("kinship") in RELEVANT_KINSHIP for rel in (c.get("relationships") or {}).values())
+
+
+def persona_expectations_for(c, world):
+    """Close kin's expectations of one character."""
+    characters = world.get("characters", {})
+    if c.get("is_offscreen"):
+        return
+    for other_id, rel in list(c.get("relationships", {}).items()):
+        if rel.get("kinship") not in RELEVANT_KINSHIP:
             continue
-        for other_id, rel in list(c.get("relationships", {}).items()):
-            if rel.get("kinship") not in RELEVANT_KINSHIP:
-                continue
-            other = characters.get(other_id)
-            if not other:
-                continue
-            evaluate_persona_clashes(c, other, world)
-            if rel.get("kinship") == "parent":
-                evaluate_parenting_guideline_clash(c, other, world)
+        other = characters.get(other_id)
+        if not other:
+            continue
+        evaluate_persona_clashes(c, other, world)
+        if rel.get("kinship") == "parent":
+            evaluate_parenting_guideline_clash(c, other, world)
+
+

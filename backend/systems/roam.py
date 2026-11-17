@@ -149,7 +149,8 @@ def start_roam(c, world, retry=None):
     if not where:
         return False
     c["animation_state"] = "walk"
-    c["is_moving"] = True
+    from systems.movement import start_moving
+    start_moving(c, world)
     lo, hi = ROAM_LINGER_TICKS
     c["activity"] = _occupy(c, world, {"type": "roam", "phase": "walking", "phase_started_tick": world.get("tick", 0),
                      "duration": random.randint(lo, hi), "target_room": where, "state": {}})

@@ -132,7 +132,7 @@ base.pop("timers", None)
 
 # recurring jobs fire on schedule through tick() -- on SIM TIME (world["sim_time"]), not tick counts
 import systems.calendar_handlers as ch
-fired = {"popularity_decay": [], "post_engagement": [], "orphan_props": [], "background_services": []}
+fired = {"popularity_decay": [], "post_engagement": [], "orphan_props": []}     # (background_services is a DUTY now)
 for name in fired:
     spec = scheduler._recurring[name]
     scheduler._register(name, (lambda n: lambda w, e: fired[n].append((w["tick"], w["sim_time"], dict(w["calendar"]))))(name), spec)
@@ -144,7 +144,7 @@ for _ in range(260):
 ts = lambda n: [f[1] for f in fired[n]]
 check("popularity decay runs every 60 sim seconds", len(ts("popularity_decay")) >= 3 and all(round(b - a) == 60 for a, b in zip(ts("popularity_decay"), ts("popularity_decay")[1:])), str(ts("popularity_decay")))
 check("post engagement runs once, at the top of the hour by the clock", [(f[2]["hour"], f[2]["minute"]) for f in fired["post_engagement"]] == [(14, 0)], str([f[2] for f in fired["post_engagement"]]))
-check("orphan sweep and background services keep their sim-second offsets", all(round(t) % 30 == 5 for t in ts("orphan_props")) and all(round(t) % 5 == 2 for t in ts("background_services")) and fired["background_services"])
+check("the orphan sweep keeps its sim-second offset", all(round(t) % 30 == 5 for t in ts("orphan_props")) and fired["orphan_props"])
 
 # a daily job fires at its time of day, once, and re-arms for the next day
 dl = []

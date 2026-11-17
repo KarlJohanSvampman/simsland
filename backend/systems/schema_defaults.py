@@ -95,6 +95,22 @@ def ensure_prop_template_fields(world, defs):
         prop.setdefault("extra_tags", [])
 
 
+FULL_DEFAULTS_EVERY_TICKS = 3600
+
+
+def ensure_world_defaults_if_due(world):
+    """The tick runner's call (step 5: no pass over every entity each step). The full self-healing pass
+    (ensure_world_defaults: households, buildings, props, characters) runs when something asked for it -- a load, a
+    route that saved the world, new characters (world["_defaults_due"]) -- and hourly as a safety net; each character
+    heals its own fields at the start of its own update (brain/agent_loop.py)."""
+    tick = world.get("tick", 0)
+    last = world.get("_defaults_tick")
+    if last is None or world.get("_defaults_due") or tick - last >= FULL_DEFAULTS_EVERY_TICKS:
+        ensure_world_defaults(world)
+        world["_defaults_tick"] = tick
+        world.pop("_defaults_due", None)
+
+
 def ensure_world_defaults(world, defs=None):
     # Server-side time-scale control (see api/admin.py) -- 1x is realtime.
     world.setdefault("time_scale", 1)

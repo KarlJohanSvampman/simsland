@@ -39,6 +39,16 @@ def pg_row():
         return r[0] if r else None
 
 
+def durable_tick():
+    """The tick of the newest durable write: the entity rows (core/entity_store.py) when that is the store, else the blob."""
+    if ws.WORLD_STORE == "entities":
+        with db._conn_lock, db.conn.cursor() as cur:
+            cur.execute("SELECT data FROM entities WHERE sim_id=%s AND kind='key' AND id='tick'", (SIM,))
+            r = cur.fetchone()
+            return r[0] if r else 0
+    return (pg_row() or {}).get("tick", 0)
+
+
 def wait_for(cond, timeout=10.0):
     end = time.time() + timeout
     while time.time() < end:
@@ -116,7 +126,7 @@ for i in range(12):
 w_after = ws._residents[SIM].world
 check("the tick advanced the resident world in memory", w_after["tick"] == base_tick + 12)
 check("ticks don't write to Postgres every tick (write-behind)", ws._stats["persists"] - persisted_before <= 12 // 5 + 1, str(ws._stats["persists"] - persisted_before))
-check("…but it reaches Postgres at the interval", wait_for(lambda: (pg_row() or {}).get("tick", 0) >= base_tick + 10), str((pg_row() or {}).get("tick")))
+check("…but it reaches Postgres at the interval", wait_for(lambda: durable_tick() >= base_tick + 10), str(durable_tick()))
 check("a reader sees the latest tick", db.load_world(SIM)["tick"] == base_tick + 12)
 
 # ── readers and the tick at the same time ────────────────────────────────────────────────

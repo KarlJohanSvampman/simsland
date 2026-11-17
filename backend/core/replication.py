@@ -167,7 +167,12 @@ class Publisher:
 
     def publish(self, sim_id, world, dirty):
         """Called after each tick with the world lock held. `dirty` is sim_loop.collect_dirty()'s
-        result. Never raises."""
+        result. Never raises. A read-only observer: nothing it reads counts as touched (core/world_view.py)."""
+        from core import world_view
+        with world_view.untracked():
+            return self._publish(sim_id, world, dirty)
+
+    def _publish(self, sim_id, world, dirty):
         try:
             self.sim_id = sim_id
             if not self.subscribers_alive():

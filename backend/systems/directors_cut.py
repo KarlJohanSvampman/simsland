@@ -62,6 +62,9 @@ def stop_time(world, x, y, radius=STOP_RADIUS):
             near.append(c["id"])
     world["director_stop"] = {"active": True, "x": x, "y": y, "radius": radius, "char_ids": near,
                               "tick": world.get("tick", 0)}
+    from cpl.lifecycle import interrupt as _cpl_interrupt
+    for cid in near:
+        _cpl_interrupt(world, cid, by="director", kind="director_stop", priority="high")
     _log(world, None, "stop", {"x": x, "y": y, "radius": radius, "affected": near})
     return world["director_stop"]
 

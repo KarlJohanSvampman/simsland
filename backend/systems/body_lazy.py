@@ -201,6 +201,8 @@ def on_body_timer(world, entry):
     sync(c, world)
     regenerate_intentions(c, world)
     schedule_next(c, world)
+    from brain import agent_wake
+    agent_wake.wake(c, world, "body")          # the body-driven intentions may have changed: their update runs
 
 
 scheduler.register("body", on_body_timer)

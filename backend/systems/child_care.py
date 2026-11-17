@@ -223,8 +223,9 @@ def tick_child_needs(world):
     and lazily seeds the baseline accountability contract."""
     from brain.intentions import add_intention
 
-    for c in world.get("characters", {}).values():
-        if c.get("age_group") != "child" or c.get("alive") is False:
+    from core.world_view import where
+    for c in where(world.get("characters", {}), lambda e: e.get("age_group") == "child"):   # only the children
+        if c.get("alive") is False:
             continue
 
         parents = _find_parents_for_child(c, world)
@@ -256,7 +257,9 @@ def tick_child_needs(world):
                 if c.get("_awaiting_caregiver", {}).get("need") == need:
                     continue
                 c["_awaiting_caregiver"] = {"need": need, "tick": world.get("tick", 0)}
+                from cpl.lifecycle import interrupt as _cpl_interrupt   # the child calls out: a parent mid-talk hears it
                 for parent in parents_now:
+                    _cpl_interrupt(world, parent["id"], by=c["id"], kind="child", priority="high")
                     add_intention(parent, {
                         "type":     f"feed_child_{c['id']}",
                         "category": "health",

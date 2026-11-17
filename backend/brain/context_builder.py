@@ -346,8 +346,11 @@ def build_active_conversations(c, world):
                     "speaker": _speaker_label(m.get("speaker")),
                     "utterance": m.get("utterance"),
                 }
-                for m in conv.get("history", [])[-5:]
+                # a late joiner (cpl/participants.py::join) heard only what was said since they joined
+                for m in [h for h in conv.get("history", [])
+                          if (h.get("tick") or 0) >= (conv.get("joined_ticks") or {}).get(c["id"], -1)][-5:]
             ],
+            "before_you_joined": (conv.get("joined_summaries") or {}).get(c["id"]),
             # systems/action_router.py::_prime_call_topic_pool() -- when
             # called while at work, this character's own recent hourly
             # work-shift beats (systems/offgrid.py::_resolve_work_shift())
@@ -1493,6 +1496,8 @@ def build_scene_description(c, world):
         lines.append(_conversation_frame_line(conv) + turn_note)
         if conv.get("floor_note"):
             lines.append(conv["floor_note"])
+        if conv.get("before_you_joined"):
+            lines.append(f"Before you joined: {conv['before_you_joined']}.")
         for m in conv.get("recent_messages", [])[-2:]:
             lines.append(f'{m["speaker"]}: "{m["utterance"]}"')
 

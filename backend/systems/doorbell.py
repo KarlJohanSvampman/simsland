@@ -97,7 +97,9 @@ def resolve_door_signal(visitor, world, household, target_id=None, method="ring_
     from brain.intentions import add_intention
 
     heard_by, target_heard = ring_at_door(world, household, target_id, method)
+    from cpl.lifecycle import interrupt as _cpl_interrupt     # someone talking is interrupted (cpl/lifecycle.py)
     for occ in heard_by:
+        _cpl_interrupt(world, occ["id"], by=visitor.get("id"), kind="doorbell")
         wake_character(occ, world, "door_signal", {
             "visitor_name": visitor.get("name", "someone"),
         })

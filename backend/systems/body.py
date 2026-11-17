@@ -474,6 +474,21 @@ def _apply_sleep_debt_effects(c):
 _STRESS_PASSIVE_DECAY_PER_TICK = 0.2   # at CADENCE["health"] cadence -- ~100->0 over ~4h with nothing re-adding it
 
 
+STRESS_DECAY_EVERY_TICKS = 30
+
+
+def sync_stress_decay(c, tick):
+    """Passive stress recovery as a lazy value (step 5a): _STRESS_PASSIVE_DECAY_PER_TICK for every 30-tick period since
+    the last sync (the grid the 'health' sweep ran on), applied at once in the character's own update."""
+    last = c.get("_stress_decay_tick")
+    c["_stress_decay_tick"] = tick
+    if last is None:
+        return
+    n = tick // STRESS_DECAY_EVERY_TICKS - last // STRESS_DECAY_EVERY_TICKS
+    if n > 0 and c.get("stress", 0) > 0:
+        c["stress"] = max(0, c["stress"] - _STRESS_PASSIVE_DECAY_PER_TICK * n)
+
+
 def decay_stress(c, world=None):
     """Cadence-driven (CADENCE["health"], see sim_loop.py) passive stress
     recovery. Purely additive-safe: any system that's still actively

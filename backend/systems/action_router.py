@@ -47,13 +47,8 @@ _ACTION_ANIMATION = {
 
 def _answering(c, world, target_id):
     """True when c holds the floor (systems/conversation_floor.py) of an active conversation with target_id."""
-    if not target_id:
-        return False
-    from brain.conversations import find_conversation
-    conv = find_conversation(world, [c["id"], target_id])
-    f = (conv or {}).get("floor") or {}
-    return bool(conv and conv.get("active") and f.get("state") != "closed" and f.get("holder") == c["id"]
-                and f.get("from") == target_id)
+    from cpl.participants import answering
+    return answering(c, world, target_id)
 
 
 UNHEARD_RAISE_TICKS = 60        # not heard by someone this recently: the next line to them is called out (volume "high")
@@ -103,18 +98,14 @@ def apply_speech(c, world, speech):
     # grabbing nearby person) so ordinary conversation still threads
     # properly even when the LLM didn't -- or, mid some other narrated
     # activity, couldn't cleanly -- name anyone.
-    if not target_id:
-        visible = (c.get("perception") or {}).get("visible_people", [])
-        if visible:
-            nearest = max(visible, key=lambda p: p.get("visibility", 0))
-            target_id = nearest.get("id")
+    from cpl import participants as _parts            # who it is for, and whether it can reach them (cpl/participants.py)
+    target_id = _parts.addressee(c, target_id)
 
     # Said once: the same line to the same person again is dropped (systems/speech_repeat.py) -- unless it is an answer.
     # Someone holding the floor of a live conversation with this person is being waited on: "Okay!" or "Yeah!" said twice
     # in half an hour is ordinary talk, and dropping it made the other person's wait run out -- the conversation ended
     # as "ignored" and they remembered being ignored by someone who had answered.
-    from systems.speech_repeat import is_repeat
-    if is_repeat(c, world, utterance, target_id) and not _answering(c, world, target_id):
+    if _parts.repeat_dropped(c, world, utterance, target_id):
         return
 
     # Volume (see brain/perception.py's VOLUME_TIERS) -- explicit caller
@@ -128,12 +119,8 @@ def apply_speech(c, world, speech):
     # holds the floor and is still within their time to respond, a line from
     # the speaker is dropped rather than talking over them -- the stale-context
     # pile-ups where both sides keep opening the conversation.
-    if target_id and speech.get("medium", "in_person") in ("in_person", "call"):
-        from brain.conversations import find_conversation
-        from systems.conversation_floor import blocks
-        _existing = find_conversation(world, [c["id"], target_id])
-        if _existing and blocks(world, _existing, c["id"]):
-            return
+    if _parts.floor_blocks(world, c["id"], target_id, speech.get("medium", "in_person")):
+        return
 
     volume = speech.get("volume")
     if not volume and target_id:
@@ -200,9 +187,9 @@ def apply_speech(c, world, speech):
     # "X just said to you". The speaker notices they weren't heard (go over, or call out louder: repeat_volume above
     # raises the voice on a repeat). Conversations used to carry on between rooms like this, line after line.
     if listener and speech.get("medium", "in_person") == "in_person":
-        from systems.conversation_reach import check_pair, note_unheard
-        _reach = check_pair(world, c, listener, volume)
-        if any(i.startswith("too far") for i in _reach["issues"]):
+        from systems.conversation_reach import note_unheard
+        _heard, _reach = _parts.earshot(world, c, listener, volume)
+        if not _heard:
             # a plan's own line (brain/actionplans: "Dinner's ready!") has already done its work -- the plan doesn't
             # stop to wonder whether it was heard; anything else, the speaker notices
             note_unheard(world, c, listener, utterance, _reach, tell_speaker=not speech.get("scripted"))
@@ -218,10 +205,12 @@ def apply_speech(c, world, speech):
     # the recipient's inbox instead of threading a live conversation.
     medium = speech.get("medium", "in_person")
     if listener and medium == "call":
-        from systems.personal_items import phone_is_usable
-        busy_until = listener.get("_work_busy_until_tick", 0)
-        in_meeting = tick < busy_until
-        if not phone_is_usable(listener) or in_meeting:
+        from cpl.lifecycle import interrupt as _cpl_interrupt   # a call to someone mid-conversation interrupts it
+        _cpl_interrupt(world, listener["id"], by=c["id"], kind="phone", channel="in_person")
+        if not _parts.channel_open(world, listener, medium):
+            from cpl import shadow as _cpl_shadow
+            if _cpl_shadow.active(world):
+                _cpl_shadow.on_unreachable(world, c, listener, medium, topic, utterance)
             from systems.inbox import get_character_inbox, add_message as add_inbox_message
             add_inbox_message(
                 get_character_inbox(listener), "voicemail", c["id"], target_id,
@@ -232,9 +221,6 @@ def apply_speech(c, world, speech):
     if listener:
 
         from brain.conversations import get_or_create_conversation, add_message, find_conversation
-        from systems.reactions import push_conversation_reaction
-        from brain.relationships import apply_interaction
-        from systems.conversation_analysis import analyze_message, should_schedule_reflection
 
         topic_for_interest = topic or "general"
         # Per the ChatGPT-proposed communication.call.incoming situation
@@ -277,6 +263,9 @@ def apply_speech(c, world, speech):
             accepted, engagement, excuse = check_conversation_interest(
                 listener, world, topic_for_interest, c["id"])
             if not accepted:
+                from cpl import shadow as _cpl_shadow
+                if _cpl_shadow.active(world):
+                    _cpl_shadow.on_declined(world, c, listener, medium, topic, excuse)
                 if medium == "call":
                     # A declined call leaves a real voicemail (the same
                     # answering-machine path just above for an unusable/
@@ -308,7 +297,7 @@ def apply_speech(c, world, speech):
         # conversation_goals.py) -- assigned lazily/idempotently for
         # whichever side hasn't formed one yet, so both directions are
         # populated from the first exchange rather than only the speaker.
-        from systems.conversation_goals import assign_conversation_goal, check_goal_trending
+        from systems.conversation_goals import assign_conversation_goal
         assign_conversation_goal(c, world, conv, target_id)
         assign_conversation_goal(listener, world, conv, c["id"])
 
@@ -320,98 +309,22 @@ def apply_speech(c, world, speech):
         if conversation_type:
             conv["conversation_type"] = conversation_type
 
+        if speech.get("cpl"):
+            c["_cpl_turn"] = speech["cpl"]                  # read by cpl/shadow.py::on_line as the line is added
         add_message(
             world, conv, c["id"], utterance, speech_act,
             topic or conv.get("topic", "general"), tick
         )
+        c.pop("_cpl_turn", None)
 
-        # What it's about (kept on the conversation so nobody loses the thread), and what the line does socially
-        # (social/discourse.py: applied on the main thread).
-        from brain.conversations import set_subject
-        _social = speech.get("social") if isinstance(speech.get("social"), dict) else {}
-        set_subject(conv, _social.get("issue") or speech.get("subject") or topic, by=c["id"])
-        emit("social_line", {"conversation_id": conv.get("id"), "speaker_id": c["id"], "target_id": target_id,
-                             "utterance": utterance, "speech_act": speech_act, "social": _social, "tick": tick,
-                             "listeners": [p.get("id") for p in (c.get("perception") or {}).get("visible_people", [])]})
-
-        # Someone who has been worried about this person is raising it now.
-        from systems.pattern_concern import on_speech as _concern_on_speech
-        _concern_on_speech(c, listener, world)
-
-        # What the line MEANT (insult, apology, compliment, lie, ...) -> the
-        # relationship-impact ledger. Emit-only from this worker thread; see
-        # systems/relationship_ledger.py.
-        from systems.impact_kinds import kind_for_speech
-        _impact_kind = kind_for_speech(speech_act, speech.get("intent"))
-        if _impact_kind:
-            from systems.relationship_ledger import emit_impact
-            emit_impact(
-                c, _impact_kind, target_id=target_id, channel="speech" if medium == "in_person" else medium,
-                audience="hearing" if medium == "in_person" else "targets", volume=volume,
-                text=utterance, ref={"type": "conversation", "id": conv.get("id"),
-                                     "line": len(conv.get("history", [])) - 1},
-                intent=speech.get("intent"),
-            )
-
-        # A line that draws on something the speaker remembers about the listener ("I remember you"): the ids the model
-        # listed are checked, and what holds up is a personal acknowledgement (systems/memory_acknowledgement.py).
-        if speech.get("uses_memories"):
-            try:
-                from systems.memory_acknowledgement import acknowledge
-                acknowledge(c, listener, speech["uses_memories"], utterance, world, intent=speech.get("intent"),
-                            channel="speech" if medium == "in_person" else medium,
-                            audience="hearing" if medium == "in_person" else "targets", volume=volume,
-                            ref={"type": "conversation", "id": conv.get("id"), "line": len(conv.get("history", [])) - 1})
-            except Exception as _exc:
-                print(f"[memory_acknowledgement] could not record an acknowledgement: {_exc!r}")
-
-        # What the line said ABOUT someone who isn't part of this conversation (gossip, praise, a lie about them) is read
-        # from the whole conversation once it ends (social/discourse.py -> social/rumours.py), not guessed per line.
-
-
-        # Per the user's explicit ask: commit every spoken exchange to
-        # real memory, both what was said and what was heard, keyword-
-        # tagged so it's searchable later.
-        from systems.dialogue_memory import remember_dialogue
-        remember_dialogue(c, listener, utterance, world,
-                           speech_act=speech_act, conversation_type=conversation_type)
-
-        push_conversation_reaction(listener, speech_act, tick)
-
-        apply_interaction(c, listener, speech_act)
-        if speech_act == "flirt":
-            _maybe_trigger_jealousy(c, listener, world)
-
-        result = analyze_message(world, conv, c, listener, utterance, speech_act)
-
-        # Is this trending toward the LISTENER's own goal for talking to
-        # c? A sustained "no" from a not_interested participant retires
-        # the conversation for them without spending a real LLM turn on
-        # it -- see conversation_goals.py::check_goal_trending.
-        check_goal_trending(conv, listener, topic or conv.get("topic", "general"))
-
-        if should_schedule_reflection(result):
-            listener.setdefault("pending_reflections", []).append({
-                "type":           "conversation",
-                "target_id":      c["id"],
-                "reason":         speech_act,
-                "scheduled_tick": tick + random.randint(50, 300),
-                "observations":   result.get("observations", []),
-            })
-
-        # A real (non-generic) topic surfaced and the listener has no
-        # opinion on it yet -- schedule an automatic, spontaneous
-        # opinion-forming reflection (systems/reflection.py's
-        # "form_opinion" kind), independent of the relationship-
-        # significance gate above. See brain/opinions.py.
-        topic_str = topic or conv.get("topic", "general")
-        if topic_str not in ("general", "incidental") and topic_str not in listener.get("opinions", {}):
-            listener.setdefault("pending_reflections", []).append({
-                "type":           "form_opinion",
-                "topic":          topic_str,
-                "reason":         f"{c.get('name', 'Someone')} brought this up in conversation.",
-                "scheduled_tick": tick + random.randint(20, 120),
-            })
+        # What the line does once it reaches them -- subject and social reading, pattern concern, the impact ledger,
+        # memory acknowledgement, dialogue memory, reactions, the relationship, analysis and reflections: subscribers
+        # to a delivered line, run here in that order (cpl/adapters/line_effects.py).
+        import cpl.adapters.line_effects  # noqa: F401 -- registers them
+        from cpl.adapters.events import deliver
+        deliver(world, {"speaker": c, "listener": listener, "conv": conv, "utterance": utterance,
+                        "speech_act": speech_act, "topic": topic, "tick": tick, "medium": medium, "volume": volume,
+                        "speech": speech, "conversation_type": conversation_type, "target_id": target_id})
 
     # =====================================================
     # WAKE LISTENERS — see brain/cognition_scheduler.py. A directed line
@@ -568,6 +481,12 @@ def clear_expired_speech(c, world):
     speech = c.get("current_speech")
     if speech and tick >= speech.get("expires_at_tick", 0):
         c["current_speech"] = None
+    elif speech:                        # the bubble goes when it expires, whether or not anything else happens then
+        from brain import agent_wake
+        from core.clock import now_ts
+        from core.tick_schedule import TICK_RATE_SECONDS
+        agent_wake.wake_at(c, world, now_ts(world) + (speech.get("expires_at_tick", 0) - tick) * TICK_RATE_SECONDS,
+                           "speech_expires")
 
 
 # =========================================================
@@ -639,7 +558,8 @@ def _route_move(c, world, action, mode="walk"):
         }
         if plan_character_route(world, c, x, y):
             c["animation_state"] = mode
-            c["is_moving"]       = True
+            from systems.movement import start_moving
+            start_moving(c, world)
         return
 
     if is_room_target(target_id):
@@ -668,7 +588,8 @@ def _route_move(c, world, action, mode="walk"):
         }
         if plan_character_route(world, c, x, y):
             c["animation_state"] = mode
-            c["is_moving"]       = True
+            from systems.movement import start_moving
+            start_moving(c, world)
         return
 
     # Find target position from characters or props
@@ -683,7 +604,8 @@ def _route_move(c, world, action, mode="walk"):
         }
         if plan_character_route(world, c, t.get("x", 0), t.get("y", 0)):
             c["animation_state"] = mode
-            c["is_moving"]       = True
+            from systems.movement import start_moving
+            start_moving(c, world)
         return
 
     # world["props"] is a list, not a dict keyed by id -- see
@@ -963,7 +885,8 @@ def _route_interact(c, world, action, definitions):
         wx, wy = _walk_target_for(seat, "sit") if seat else _walk_target_for(prop, interaction)
         if plan_character_route(world, c, wx, wy):
             c["animation_state"] = "walk"
-            c["is_moving"] = True
+            from systems.movement import start_moving
+            start_moving(c, world)
         c["activity"] = _occupy(c, world, {
             "type": "interact", "phase": "walking",
             "phase_started_tick": world.get("tick", 0),
@@ -1048,7 +971,8 @@ def _route_eat(c, world, action):
             wx, wy = _walk_target_for(seat, "sit") if seat else _walk_target_for(prop, "eat")
             if plan_character_route(world, c, wx, wy):
                 c["animation_state"] = "walk"
-                c["is_moving"] = True
+                from systems.movement import start_moving
+                start_moving(c, world)
             c["activity"] = _occupy(c, world, {
                 "type": "eat", "phase": "walking",
                 "phase_started_tick": world.get("tick", 0),
@@ -1268,7 +1192,8 @@ def _route_search_documents(c, world, action):
                 c["move_target"] = {"x": pile["x"], "y": pile["y"], "target_type": "tile"}
                 if plan_character_route(world, c, pile["x"], pile["y"]):
                     c["animation_state"] = "walk"
-                    c["is_moving"] = True
+                    from systems.movement import start_moving
+                    start_moving(c, world)
         c["activity"] = _occupy(c, world, _scaffold(c, world, "search_documents", interaction="search", duration=duration))
         c["_last_found_document_id"] = result["item"]["id"]
         return
@@ -2129,6 +2054,9 @@ def _route_carry(c, world, action):
     # "walking" phase (activities.py) would wait on is_moving forever with
     # no route ever progressing to clear it.
     c["is_moving"] = plan_character_route(world, c, prop.get("x", 0), prop.get("y", 0))
+    if c["is_moving"]:
+        from systems.movement import start_moving
+        start_moving(c, world)
     c["activity"] = _occupy(c, world, act)
     c["animation_state"] = "walk"
 
@@ -2970,7 +2898,8 @@ def _route_announce_departure(c, world, action):
     except Exception:
         pass
 
-    c["_announced_departure"] = True
+    from systems.incidental_speech import note_announced
+    note_announced(c, world)
 
 
 def _route_apply_discipline(c, world, action):
@@ -3007,7 +2936,8 @@ def _route_leave_note(c, world, action):
         from systems.excuses import leave_note
         leave_note(c, world, text=text)
     except Exception:
-        c["_announced_departure"] = True
+        from systems.incidental_speech import note_announced
+        note_announced(c, world)
         c["_left_note_this_tick"] = True
 
 
@@ -3406,7 +3336,7 @@ def _route_water(c, world, action):
     if not can or water_uses_remaining(can) <= 0:
         return
     from systems.plants import water_plant
-    if not water_plant(prop):
+    if not water_plant(prop, world):
         return
     use_water(can)
 
@@ -3432,7 +3362,7 @@ def _route_pull_weed(c, world, action):
     if not prop:
         return
     from systems.plants import pull_weed
-    pull_weed(prop)
+    pull_weed(prop, world)
 
 
 def _route_harvest(c, world, action):
@@ -3892,7 +3822,8 @@ def _route_turn_and_run(c, world, action):
     c["_panic_fleeing"] = {"from_id": aggressor_id, "tick": world.get("tick", 0)}
     if plan_character_route(world, c, flee_x, flee_y):
         c["animation_state"] = "run"
-        c["is_moving"] = True
+        from systems.movement import start_moving
+        start_moving(c, world)
 
 
 # =========================================================
@@ -4443,13 +4374,16 @@ def _route_bottle_feed(c, world, action):
                                target_id=target_id,
                                interaction="bottle_feed",
                                duration=25))
-    # Apply feed
+    # Apply feed (needs brought up to date first: systems/baby.py)
+    from systems.baby import sync_baby_needs
+    sync_baby_needs(baby, world)
     needs = baby.setdefault("baby_needs", {})
     needs["hunger"]  = min(1.0, needs.get("hunger",  0) + 0.65)
     needs["comfort"] = min(1.0, needs.get("comfort", 0) + 0.15)
     # Clear cry if needs are met
     if min(needs.values()) >= 0.30:
         baby["is_crying"] = False
+    sync_baby_needs(baby, world)       # the next cry timer from the fed state
 
 
 def _route_hold_baby(c, world, action):
@@ -4766,7 +4700,8 @@ def _route_watch_tv(c, world, action):
         wx, wy = _walk_target_for(seat, "sit")
         if plan_character_route(world, c, wx, wy):
             c["animation_state"] = "walk"
-            c["is_moving"] = True
+            from systems.movement import start_moving
+            start_moving(c, world)
         c["activity"] = _occupy(c, world, {
             "type": "watch_tv", "phase": "walking",
             "phase_started_tick": world.get("tick", 0),
@@ -5468,9 +5403,10 @@ def _route_retrieve_phone(c, world, action):
 
 def _route_charge_device(c, world, action):
     """
-    Start charging. systems/power.py::charge_device() is called each tick
-    by sim_loop while activity interaction == "charge", reading
-    activity["device_item_id"] to know which item to charge and its
+    Start charging. While activity interaction == "charge" the battery
+    charges lazily (systems/power.py::sync_batteries: the "charge" regime,
+    brought up to date in the owner's update and timed to "usable"/"full"),
+    reading activity["device_item_id"] to know which item to charge and its
     matching charger (systems/power.py::CHARGER_BY_OBJECT_TYPE) --
     generalized from the old phone-only version so any battery-powered
     item (phone, laptop, ...) works the same way. Requires a matching

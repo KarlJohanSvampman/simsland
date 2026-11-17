@@ -98,7 +98,7 @@ def maybe_induce_depression_from_addiction(c, key, world):
         mental_health.append("depression")
 
 
-def tick_addictions(world):
+def tick_addictions(world, entry=None):
     """Hourly cadence (sim_time-gated, not a raw tick divisor -- see module
     docstring). Called from a moderate CADENCE entry in sim_loop.py; no-ops
     internally until a full sim-hour has actually passed."""
@@ -112,37 +112,54 @@ def tick_addictions(world):
     world["_addictions_last_check_sim_time"] = sim_time
 
     for c in world.get("characters", {}).values():
-        addictions = c.get("addictions")
-        if not addictions:
+        _addictions_hour(c, world, templates, sim_time)
+
+
+def addictions_active(c, world):
+    """Has this character an addiction still counting down (core/flow.py PERCHAR `addictions`, hourly)."""
+    return bool(world.get("definitions", {}).get("addiction_templates")) and any(
+        (e or {}).get("usages", 0) > 0 for e in (c.get("addictions") or {}).values())
+
+
+def addictions_for(c, world):
+    """One hour of cravings for one character."""
+    templates = world.get("definitions", {}).get("addiction_templates", {})
+    if templates:
+        _addictions_hour(c, world, templates, world.get("sim_time", 0.0))
+
+
+def _addictions_hour(c, world, templates, sim_time):
+    addictions = c.get("addictions")
+    if not addictions:
+        return
+    for key, entry in addictions.items():
+        tmpl = templates.get(key)
+        if not tmpl or entry.get("usages", 0) <= 0:
             continue
-        for key, entry in addictions.items():
-            tmpl = templates.get(key)
-            if not tmpl or entry.get("usages", 0) <= 0:
-                continue
 
-            last_used = entry.get("last_used_sim_time")
-            if last_used is None:
-                continue
-            hours_since_use = (sim_time - last_used) / SECONDS_PER_HOUR
-            if hours_since_use < tmpl.get("cooldown_hours", 24):
-                continue
+        last_used = entry.get("last_used_sim_time")
+        if last_used is None:
+            continue
+        hours_since_use = (sim_time - last_used) / SECONDS_PER_HOUR
+        if hours_since_use < tmpl.get("cooldown_hours", 24):
+            continue
 
-            next_decay = entry.get("next_decay_sim_time")
-            refresh_seconds = tmpl.get("refresh_rate_hours", 24) * SECONDS_PER_HOUR
-            if next_decay is None:
-                entry["next_decay_sim_time"] = sim_time + refresh_seconds
-                continue
-            while sim_time >= next_decay and entry["usages"] > 0:
-                entry["usages"] -= 1
-                next_decay += refresh_seconds
-            entry["next_decay_sim_time"] = next_decay
+        next_decay = entry.get("next_decay_sim_time")
+        refresh_seconds = tmpl.get("refresh_rate_hours", 24) * SECONDS_PER_HOUR
+        if next_decay is None:
+            entry["next_decay_sim_time"] = sim_time + refresh_seconds
+            continue
+        while sim_time >= next_decay and entry["usages"] > 0:
+            entry["usages"] -= 1
+            next_decay += refresh_seconds
+        entry["next_decay_sim_time"] = next_decay
 
-            if entry.get("usages", 0) >= tmpl.get("threshold", 9999):
-                _roll_hazards(c, world, key, tmpl)
-                maybe_induce_depression_from_addiction(c, key, world)
-                if key in _DEPRESSION_INDUCING_ADDICTIONS:
-                    try:
-                        from systems.detective_work import notice_substance_abuse
-                        notice_substance_abuse(c, key, world)
-                    except Exception:
-                        pass
+        if entry.get("usages", 0) >= tmpl.get("threshold", 9999):
+            _roll_hazards(c, world, key, tmpl)
+            maybe_induce_depression_from_addiction(c, key, world)
+            if key in _DEPRESSION_INDUCING_ADDICTIONS:
+                try:
+                    from systems.detective_work import notice_substance_abuse
+                    notice_substance_abuse(c, key, world)
+                except Exception:
+                    pass

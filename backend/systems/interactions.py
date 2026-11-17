@@ -53,7 +53,8 @@ def request_route_to_anchor(c, world, prop, anchor):
     # no route ever progressing to clear it.
     if plan_character_route(world, c, ax, ay):
         c["animation_state"] = "walk"
-        c["is_moving"]       = True
+        from systems.movement import start_moving
+        start_moving(c, world)
     else:
         # Already at the anchor -- no route/tile-crossing needed, so
         # movement.py's indoor/outdoor segment tracking (the ONLY other

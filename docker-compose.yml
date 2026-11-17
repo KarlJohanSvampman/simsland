@@ -11,6 +11,8 @@ services:
       - "8002:8000"                  # the core's own (ops-only) HTTP server; the public API is the `api` service on :8000
     environment:
       - SIM_ROLE=core                # the tick, the command consumer, the replica publisher; serves only @core_only routes
+      - SIM_PARTITIONS=${SIM_PARTITIONS:-1}   # >1: the simulation runs as that many partition processes (docs/step5b_plan.md);
+      - SIM_PARTITION=0                        #     this one is partition 0, the core (see the partition services below)
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/sim
       - REDIS_HOST=redis
       - OLLAMA_BASE_URL=http://192.168.10.176:11434  # 👈 your remote Ollama
@@ -32,6 +34,46 @@ services:
       - ./backups:/backups:ro                           # the populated world the seeded test harness starts from (tests/determinism.py)
     command: >
       uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+  # Partition processes (docs/step5b_plan.md, core/partitions.py): each owns a share of the households -- their
+  # characters, homes and things -- and runs them; the core (`backend`, partition 0) keeps the world services,
+  # conversations, commands and the gateway replica. They trade patches and frames over Redis streams.
+  #   SIM_PARTITIONS=3 docker compose --profile partitions up -d
+  # (SIM_PARTITIONS must be the same everywhere: partition 0 plus one service per further partition.)
+  partition1: &partition
+    build: ./backend
+    restart: unless-stopped
+    profiles: ["partitions"]
+    mem_limit: 2g
+    environment: &partition_env
+      SIM_ROLE: core
+      SIM_PARTITIONS: ${SIM_PARTITIONS:-3}
+      SIM_PARTITION: "1"
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/sim
+      REDIS_HOST: redis
+      OLLAMA_BASE_URL: http://192.168.10.176:11434
+      OLLAMA_MODEL: llama3.1:latest
+      OLLAMA_NUM_CTX: "8192"
+      OLLAMA_KEEP_ALIVE: 10m
+      OLLAMA_MAX_CONCURRENCY: "2"
+      LLM_CALL_MAX_WAIT_SECONDS: "90"
+      PYTHONPATH: /app
+      PYTHONUNBUFFERED: "1"
+    depends_on:
+      - db
+      - redis
+      - backend
+    volumes:
+      - ./backend:/app
+      - ./resources:/resources
+      - ./simulations:/data/simulations
+    command: uvicorn main:app --host 0.0.0.0 --port 8000
+
+  partition2:
+    <<: *partition
+    environment:
+      <<: *partition_env
+      SIM_PARTITION: "2"
 
   # Cognition worker: the model round-trip for character decisions, off the simulation core's
   # process (backend/workers/cognition.py). The core uses it while its heartbeat is current and

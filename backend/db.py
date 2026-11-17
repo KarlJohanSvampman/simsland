@@ -189,7 +189,10 @@ _conn_lock = threading.RLock()
 # routes, so no safe key-level partition exists either. Full mutual
 # exclusion over the whole read-modify-write span, on both sides, is the
 # correct fix.
-_world_lock = threading.Lock()   # not RLock — no call path re-enters it
+# Not an RLock -- no call path re-enters it. With ENTITY_LOCKS=on it is the EXCLUSIVE side of a read/write world lock
+# (core/entity_locks.py): the tick's step and declared commands share the world, locking entities one by one.
+from core import entity_locks as _entity_locks
+_world_lock = _entity_locks.lock()
 
 
 @contextmanager
@@ -203,6 +206,9 @@ def world_lock(timeout=30):
     raw _world_lock (unbounded wait is fine for a background task). A 503
     here means "simulation busy, retry" — expected under load, not a bug.
     """
+    if _entity_locks.in_unit():
+        yield                              # a declared command (core/entity_locks.py): it holds what it needs already
+        return
     acquired = _world_lock.acquire(timeout=timeout)
     if not acquired:
         raise HTTPException(status_code=503, detail="simulation busy, try again")
@@ -374,35 +380,31 @@ def _load_world_cold(sim_id):
     # LOAD DB
     # =====================================
 
-    with _conn_lock, conn.cursor() as cur:
-
-        cur.execute(
-
-            """
-            SELECT data
-            FROM world
-            WHERE simulation_id=%s
-            """,
-
-            (sim_id,)
-        )
-
-        row = cur.fetchone()
-
-        world = (
-
-            row[0]
-
-            if row else {
-
-                "tick": 0,
-
-                "characters": {},
-
-                "props": []
-            }
-            
-        )
+    # Per-entity records first (core/entity_store.py): they are written every flush; the blob only now and then.
+    world = None
+    from core import world_state as _ws
+    if _ws.WORLD_STORE == "entities":
+        from core import entity_store
+        world = entity_store.load(sim_id)
+    if world is None:
+        with _conn_lock, conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT data
+                FROM world
+                WHERE simulation_id=%s
+                """,
+                (sim_id,)
+            )
+            row = cur.fetchone()
+            world = (
+                row[0]
+                if row else {
+                    "tick": 0,
+                    "characters": {},
+                    "props": []
+                }
+            )
 
     # =====================================
     # WORLD DEFAULTS

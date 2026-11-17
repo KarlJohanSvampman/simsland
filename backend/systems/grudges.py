@@ -218,19 +218,32 @@ def tick_grudges(world):
     tick = world.get("tick", 0)
     chars = world.get("characters", {})
     for holder in chars.values():
-        if not holder.get("grudges") or holder.get("alive") is False or holder.get("off_grid"):
+        grudges_for(holder, world)
+
+
+def grudges_active(holder, world):
+    """Holds an open grudge, alive and on the map (core/flow.py PERCHAR `grudges`)."""
+    return bool(holder.get("grudges")) and holder.get("alive") is not False and not holder.get("off_grid") \
+        and bool(open_grudges(holder))
+
+
+def grudges_for(holder, world):
+    """One minute of one holder's grudges."""
+    tick = world.get("tick", 0)
+    chars = world.get("characters", {})
+    if not holder.get("grudges") or holder.get("alive") is False or holder.get("off_grid"):
+        return
+    for g in open_grudges(holder):
+        offender = chars.get(g["offender"])
+        if not offender or offender.get("alive") is False:
+            close(world, holder, g, "faded", "they are gone")
             continue
-        for g in open_grudges(holder):
-            offender = chars.get(g["offender"])
-            if not offender or offender.get("alive") is False:
-                close(world, holder, g, "faded", "they are gone")
-                continue
-            _decay(world, holder, g, tick)
-            if g["status"] != "open":
-                continue
-            _behave(world, holder, offender, g, tick)
-            _nudge(world, holder, offender, g, tick)
-            _escalate(world, holder, offender, g, tick)
+        _decay(world, holder, g, tick)
+        if g["status"] != "open":
+            continue
+        _behave(world, holder, offender, g, tick)
+        _nudge(world, holder, offender, g, tick)
+        _escalate(world, holder, offender, g, tick)
 
 
 def _decay(world, holder, g, tick):

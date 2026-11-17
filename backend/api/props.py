@@ -57,7 +57,7 @@ def _resolve_building(world, payload):
 # =========================================================
 
 @router.post("/prop/create")
-@command("props.create_prop")
+@command("props.create_prop", entities="world")
 def create_prop(
     sim_id: str,
     payload: dict
@@ -165,7 +165,7 @@ def _create_prop_dict(payload, template):
 # =========================================================
 
 @router.post("/prop/move")
-@command("props.move_prop")
+@command("props.move_prop", entities="world")
 def move_prop(
     sim_id: str,
     payload: dict
@@ -253,7 +253,7 @@ def move_prop(
 # =========================================================
 
 @router.post("/prop/set_extra_tags")
-@command("props.set_extra_tags")
+@command("props.set_extra_tags", entities="world")
 def set_extra_tags(
     sim_id: str,
     payload: dict
@@ -290,7 +290,7 @@ def set_extra_tags(
 # =========================================================
 
 @router.post("/prop/delete")
-@command("props.delete_prop")
+@command("props.delete_prop", entities="world")
 def delete_prop(
     sim_id: str,
     payload: dict

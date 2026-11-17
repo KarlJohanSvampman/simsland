@@ -14,6 +14,7 @@ import time
 from fastapi import APIRouter, HTTPException
 
 from db import load_world
+from core.commands import core_only
 
 router = APIRouter(prefix="/admin/llm", tags=["llm-debug"])
 
@@ -36,6 +37,7 @@ def _summary(i, e):
 
 
 @router.get("/{char_id}/log")
+@core_only                       # the prompt log lives in the core process (llm/llm_client.py)
 def llm_log(char_id: str, limit: int = 50, full: int = 0):
     from llm.llm_client import get_prompt_log
     entries = get_prompt_log(char_id)[:max(1, min(100, limit))]
@@ -50,6 +52,7 @@ def llm_log(char_id: str, limit: int = 50, full: int = 0):
 
 
 @router.get("/{char_id}/log/{n}")
+@core_only
 def llm_log_entry(char_id: str, n: int):
     from llm.llm_client import get_prompt_log
     entries = get_prompt_log(char_id)

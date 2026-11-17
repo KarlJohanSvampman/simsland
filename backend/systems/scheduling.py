@@ -458,6 +458,27 @@ def get_current_activity(c, world):
     return block["activity"] if block else None
 
 
+def _arm_next_block(c, world, day_plan, cal):
+    """The update runs again at the next block boundary of today's plan (or midnight), and when an oversleep ends --
+    not on every look (brain/agent_wake.py)."""
+    from brain import agent_wake
+    now_min = cal.get("hour", 0) * 60 + cal.get("minute", 0)
+    marks = []
+    for block in day_plan:
+        for hhmm in (block.get("start"), block.get("end")):
+            try:
+                h, m = str(hhmm).split(":")[:2]
+                marks.append(int(h) * 60 + int(m))
+            except (ValueError, AttributeError):
+                continue
+    later = [m for m in marks if m > now_min]
+    nxt = min(later) if later else 24 * 60
+    secs = (nxt - now_min) * 60 - cal.get("second", 0)
+    agent_wake.wake_at(c, world, agent_wake._now(world) + max(1, secs), "schedule_block")
+    if c.get("_oversleep_until_tick") is not None:
+        agent_wake.wake_at(c, world, agent_wake.at_tick(world, c["_oversleep_until_tick"]), "oversleep_ends")
+
+
 def update_schedule_runtime(c, world):
     """Update the character's active schedule block each tick."""
     cal      = world.get("calendar", {})
@@ -487,6 +508,8 @@ def update_schedule_runtime(c, world):
             lo, hi = OVERSLEEP_EXTRA_TICKS
             c["_oversleep_until_tick"] = tick + random.randint(lo, hi)
             current = previous
+
+    _arm_next_block(c, world, day_plan, cal)
 
     if current == previous:
         return

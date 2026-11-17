@@ -60,32 +60,46 @@ def resolve_exposure_influence(world):
 
     chars = world.get("characters", {})
     for c in chars.values():
-        for other_id, rel in c.get("relationships", {}).items():
-            exposure = rel.get("exposure_ticks", 0)
-            if exposure < _MIN_EXPOSURE_TO_RESOLVE:
-                continue
+        exposure_influence_for(c, world)
 
-            other = chars.get(other_id)
-            if not other:
-                continue
 
-            trust  = rel.get("trust", 0)
-            weight = min(1.0, exposure / 100.0)
+def exposure_influence_active(c, world):
+    """Has spent enough time around someone (core/flow.py PERCHAR `influence_exposure`)."""
+    return any((rel or {}).get("exposure_ticks", 0) >= _MIN_EXPOSURE_TO_RESOLVE
+               for rel in (c.get("relationships") or {}).values())
 
-            if trust > _TRUST_POSITIVE_GATE:
-                record_influence(other, c, weight, world)
-                for trait in set(other.get("traits", []) + other.get("personality_traits", [])):
-                    record_positive_exposure(c, other, trait, world)
-            elif trust < _TRUST_NEGATIVE_GATE:
-                bump_suspicion(
-                    c, other_id, 0.01 * weight, "prolonged_exposure",
-                    f"You've been around {other.get('name', other_id)} a lot lately, "
-                    f"and something about it doesn't sit right",
-                    world,
-                )
 
-            # Halve, don't zero -- influence has memory but doesn't compound unboundedly.
-            rel["exposure_ticks"] = exposure // 2
+def exposure_influence_for(c, world):
+    """Time spent around people resolves into influence (or suspicion), for one character."""
+    from systems.peer_influence import record_positive_exposure
+    from systems.worries import bump_suspicion
+    chars = world.get("characters", {})
+    for other_id, rel in c.get("relationships", {}).items():
+        exposure = rel.get("exposure_ticks", 0)
+        if exposure < _MIN_EXPOSURE_TO_RESOLVE:
+            continue
+
+        other = chars.get(other_id)
+        if not other:
+            continue
+
+        trust  = rel.get("trust", 0)
+        weight = min(1.0, exposure / 100.0)
+
+        if trust > _TRUST_POSITIVE_GATE:
+            record_influence(other, c, weight, world)
+            for trait in set(other.get("traits", []) + other.get("personality_traits", [])):
+                record_positive_exposure(c, other, trait, world)
+        elif trust < _TRUST_NEGATIVE_GATE:
+            bump_suspicion(
+                c, other_id, 0.01 * weight, "prolonged_exposure",
+                f"You've been around {other.get('name', other_id)} a lot lately, "
+                f"and something about it doesn't sit right",
+                world,
+            )
+
+        # Halve, don't zero -- influence has memory but doesn't compound unboundedly.
+        rel["exposure_ticks"] = exposure // 2
 
 
 # =========================================================

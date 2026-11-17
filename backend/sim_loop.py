@@ -42,6 +42,9 @@ from brain.intentions   import set_current_tick
 from systems.reactions  import process_reaction_queue
 import systems.step_timeouts  # noqa: F401 -- registers the "stuck" timeout handler before any timer fires
 import systems.path_debug     # noqa: F401 -- registers the "pathalarm" handler (the end of a lost episode)
+from systems.schema_defaults import ensure_character_defaults
+import brain.agent_wake       # noqa: F401 -- events wake the characters they are about
+import systems.transit        # noqa: F401 -- registers the bus loop and its 15-minute slots
 import systems.movement_log   # noqa: F401 -- registers the 15-second movement sampling job
 import systems.feelings       # noqa: F401 -- registers the daily standing snapshot
 import systems.conversation_archive  # noqa: F401 -- registers the conversation-tagging job
@@ -82,7 +85,7 @@ from systems.media      import generate_news
 from brain.conversations import cleanup_conversations
 from systems.emergency  import trigger_incident, resolve, tick_fire_incidents, auto_report_incidents   # resolve polls arrival ticks
 from systems.health     import apply_severity_consequences
-from systems.law        import process_jail, process_trials, maybe_arrest_from_incidents, process_prison_reporting
+from systems.law        import process_trials, maybe_arrest_from_incidents, process_prison_reporting
 from systems.jobs       import generate_job_listings, tick_job_market, maybe_fire, advance_job_application, init_company_slots
 from systems.driver_license import advance_driver_license, maybe_practice_with_companion
 from systems.postal_service     import update_postal_service
@@ -90,7 +93,6 @@ from systems.newspaper_delivery import update_newspaper_delivery
 from systems.business_support   import process_business_inboxes
 from systems.service_vehicles   import update_service_vehicles
 from systems.rideshare          import update_rideshare_vehicles
-from systems.transit            import update_bus
 from systems.appliance_degradation import update_appliance_degradation
 from systems.messaging  import deliver_messages
 from systems.migration  import check_migration_desires
@@ -101,7 +103,6 @@ from systems.government_debt import assess_monthly_tax, apply_debt_consequences
 from systems.government_budget import tick_government_budget
 from systems.credit     import tick_monthly_card_cycle
 from systems.personal_items import recall_overdue_loans
-from systems.validation    import tick_popularity_decay
 from systems.social_media  import tick_post_engagement
 from systems.convenience_store import update_convenience_store_staffing
 
@@ -112,8 +113,6 @@ from systems.grapple         import process_grapples
 from systems.social_contracts  import check_contract_violations
 from systems.social_rules      import cleanup_expired_rule_exceptions
 from systems.worries           import decay_worries
-from systems.persona_expectations import tick_persona_expectations
-from systems.libido import tick_libido
 from systems.intimate_item_discovery import tick_discovery_checks
 from systems.stories import decay_stories
 from systems.workplace_reputation import decay_workplace_views
@@ -138,7 +137,6 @@ from systems.contagion       import tick_contagion_location, age_food_items
 from systems.child_care      import tick_child_needs
 from systems.child_welfare   import tick_child_welfare
 from systems.child_disclosure import tick_child_disclosure
-from systems.dependent_tracking import tick_dependent_checks
 from systems.bedroom_assignment import tick_bedroom_assignments
 from systems.plants           import tick_plants
 from systems.body_composition import tick_body_composition
@@ -146,7 +144,7 @@ from systems.body_composition import tick_body_composition
 # -- Very slow (÷300) ─────────────────────────────────────────────
 from systems.crisis         import check_crises, process_crises
 from systems.politics       import process_pending_effects, check_election, schedule_upcoming_legislation, resolve_legislation_votes
-from systems.influence      import apply_public_figure_influence, apply_social_influence, resolve_exposure_influence, resolve_value_influence
+from systems.influence      import apply_public_figure_influence, apply_social_influence, resolve_value_influence
 from systems.socioeconomics import tick_socioeconomics
 from systems.reputation     import tick_reputation
 from systems.secrets        import tick_secrets
@@ -157,7 +155,7 @@ from systems.envy       import tick_envy
 from systems.trauma     import tick_trauma
 from systems.exercise        import tick_exercise
 from systems.impulse         import tick_impulse, sync_anger_from_grievances, add_anger_pressure
-from systems.domestic_control import tick_domestic_control, tick_quid_pro_quo, check_victim_revenge, tick_emotional_control
+from systems.domestic_control import check_victim_revenge
 from systems.religious_repression import tick_religious_repression
 from systems.pregnancy import tick_pregnancy
 from systems.harassment import tick_harassment, tick_harassment_daily
@@ -165,7 +163,6 @@ from systems.baby     import tick_baby_hourly, tick_baby_daily, tick_baby_weekly
 from systems.nudity_perception import tick_nudity_perception
 from systems.crushes import tick_crushes
 from systems.incidental_speech import tick_incidental_speech, clear_departure_flags
-from brain.perception import cleanup_ambient_sounds
 from systems.conditioning import tick_conditioning_weekly
 
 # -- Weekly ───────────────────────────────────────────────────────
@@ -173,14 +170,12 @@ from systems.scheduling import generate_week_schedule, adjust_for_household
 from systems.lt_needs   import update_lt_needs, reset_weekly_counts, distribute_lt_needs, generate_lt_need_intentions
 from systems.social     import generate_social_intentions as generate_socialize_intention
 from systems.social     import interrupt_socializing_with_unavailable_targets
-from systems.social_odor import apply_odor_social_pressure
 from systems.phone      import update_phone_battery, maybe_set_phone_down, maybe_forget_phone
 from systems.power      import charge_device
 from systems.calendar_events import check_calendar_reminders
 from systems.reminders import check_reminders
 from systems.contract_clauses import tick_contract_clauses, tick_pending_payouts
 from systems.insurance import tick_insurance_renewals
-from systems.story      import update_story_arc
 from systems.events     import maybe_generate_shared_event
 
 
@@ -208,6 +203,12 @@ def _run_agent(c, world, t):
     _prof.mark("agent:reaction_queue")
     process_reaction_queue(c, t)
     update_agent(c, world)
+    # after the update (an activity that undresses them may just have started): exposed people join the "nudity" loop
+    from systems.nudity_perception import note_exposure
+    note_exposure(c, world)
+    # ... and the battery regime they leave the update in (charging, on the phone) is what their devices run under
+    from systems.power import sync_batteries
+    sync_batteries(c, world)
     return c["id"]
 
 
@@ -388,7 +389,17 @@ _RELATIONSHIP_RADIUS = 8
 _HOURS_PER_RELATIONSHIP_SWEEP = (CADENCE["relationships"] * TICK_RATE_SECONDS) / 3600.0
 
 
+def _near_each_other(c, o):
+    first_impression(c, o)
+    update_relationship_state(c, o["id"])
+    accumulate_hours(ensure_relationship(c, o["id"]), _HOURS_PER_RELATIONSHIP_SWEEP)
+    first_impression(o, c)
+    update_relationship_state(o, c["id"])
+    accumulate_hours(ensure_relationship(o, c["id"]), _HOURS_PER_RELATIONSHIP_SWEEP)
+
+
 def _update_nearby_relationships(characters, world):
+    """Every pair of `characters` near each other (kept for tools and tests; the job asks core/positions.py)."""
     n = len(characters)
     for i in range(n):
         c = characters[i]
@@ -396,12 +407,7 @@ def _update_nearby_relationships(characters, world):
             o = characters[j]
             if (abs(c.get("x", 0) - o.get("x", 0)) +
                     abs(c.get("y", 0) - o.get("y", 0))) <= _RELATIONSHIP_RADIUS:
-                first_impression(c, o)
-                update_relationship_state(c, o["id"])
-                accumulate_hours(ensure_relationship(c, o["id"]), _HOURS_PER_RELATIONSHIP_SWEEP)
-                first_impression(o, c)
-                update_relationship_state(o, c["id"])
-                accumulate_hours(ensure_relationship(o, c["id"]), _HOURS_PER_RELATIONSHIP_SWEEP)
+                _near_each_other(c, o)
 
 
 # =========================================================
@@ -419,23 +425,33 @@ def tick(world):
 
 def _announce_new_characters(world):
     """`character.added` for each character that was not there last tick (spawned, born, moved in, made in the editor).
-    A set difference per tick -- a bridge until every place that creates a character says so itself."""
+    A set difference per tick -- a bridge until every place that creates a character says so itself.
+    Returns the ids that are new to this process: everyone on the first look after a load, else the new arrivals."""
     ids = set(world.get("characters", {}))
     known = world.get("_known_char_ids")
     world["_known_char_ids"] = sorted(ids)
-    if known is None:
-        from core.event_bus import emit
-        emit("world.loaded", {"tick": world.get("tick", 0)})     # first look after a load: everyone looks around once
-        return
     from core.event_bus import emit
-    for cid in sorted(ids - set(known)):
+    if known is None:
+        emit("world.loaded", {"tick": world.get("tick", 0)})     # first look after a load: everyone looks around once
+        return sorted(ids)
+    new = sorted(ids - set(known))
+    for cid in new:
         emit("character.added", {"character_id": cid})
+    return new
+
+
+def ensure_schedule(c, world):
+    """A character with no week schedule gets one now (generate_week_schedule + adjust_for_household)."""
+    if c.get("is_workplace_npc") or "schedule" in c:
+        return
+    c["schedule"] = generate_week_schedule(c, world)
+    adjust_for_household(c, world)
 
 
 def _tick_impl(world):
     world["tick"] += 1
     t = world["tick"]
-    _announce_new_characters(world)
+    _arrived = _announce_new_characters(world)
     set_current_tick(t)
     _prof.mark("tick_head")
     from core import event_log as _event_log
@@ -462,10 +478,7 @@ def _tick_impl(world):
     # reach them (workplace_reputation decay, career_ladder, contract
     # clauses) find them via world["companies"]/workplace_contact_ids,
     # never through this generic list.
-    characters = [
-        c for c in world.get("characters", {}).values()
-        if not c.get("is_workplace_npc")
-    ]
+    # (Step 5a: no list of every character is built here any more -- whatever needs one is per entity now.)
 
     # Confirmed live bug: schedule generation only ever runs for whoever is
     # already in world["characters"] at the one Monday-midnight tick per week
@@ -473,12 +486,14 @@ def _tick_impl(world):
     # restored between two Mondays (a character brought back into the sim,
     # a new NPC, ...) got no schedule at all and stayed that way for up to a
     # full week: no work/sleep blocks, no schedule-derived expectation
-    # windows, no "it's bedtime" wake regardless of how late it got. Self-
-    # heals every tick instead of waiting for the next weekly reset.
-    for c in characters:
-        if "schedule" not in c:
-            c["schedule"] = generate_week_schedule(c, world)
-            adjust_for_household(c, world)
+    # windows, no "it's bedtime" wake regardless of how late it got.
+    # Only whoever is new to this process (first look after a load, or just arrived) is looked at here; a schedule
+    # cleared later (the admin "reset" route) is regenerated right where it is cleared.
+    _chars = world.get("characters", {})
+    for _cid in _arrived:
+        if _cid in _chars:
+            ensure_character_defaults(_chars[_cid], world=world)      # a newcomer gets its defaults at once
+            ensure_schedule(_chars[_cid], world)
 
     # Weekly / hourly / daily / monthly work, popularity decay, post engagement and the
     # orphaned-prop sweep are no longer checked for here: the clock emits time.week/hour/day/
@@ -512,37 +527,80 @@ def _tick_impl(world):
     # no longer calls this itself (see its own matching comments) --
     # is_moving/position are already this tick's final values by the time
     # it runs.
-    from systems.movement import update_character_movement
+    # Only the people who are walking are advanced: they are members of the movement loop (core/active_loops.py)
+    # from the moment something sets them off (systems/movement.py::start_moving) until they stop.
+    from systems.movement import ensure_movement_members
+    from core import active_loops
+    ensure_movement_members(world)
+    active_loops.run_one(world, "movement")
     dirty_char_ids = set()
-    for c in characters:
-        if c.get("is_moving"):
-            try:
-                update_character_movement(c, world)
-                dirty_char_ids.add(c["id"])
-            except Exception as exc:
-                print(f"[sim_loop] movement error for {c.get('id')}: {exc}")
 
     _prof.mark("section:per_tick_conversation_floor")
     # -- Per-tick: conversation floor (who has the ball, notice/ignore timers) --
     try:
-        from systems.conversation_floor import tick as _floor_tick
-        _floor_tick(world)
+        # only the live spoken conversations (core/active_loops.py); nothing at all when nobody is talking
+        from systems.conversation_floor import ensure_floor_members
+        ensure_floor_members(world)
+        active_loops.run_one(world, "floor")
     except Exception as exc:
         print(f"[sim_loop] conversation floor error: {exc}")
 
     _prof.mark("section:per_tick_agent_brain")
     # -- Per-tick: character updates (sequential; decisions are requested, not awaited) --
     # Service worker NPCs are driven by update_services, not LLM -- skip them.
-    agent_chars = [
-        c for c in characters
-        if not c.get("is_service_worker")
-        and not c.get("is_workplace_npc")
+    from brain import agent_wake as _aw
+    agent_chars = [] if _aw.MODE == "on" else [      # gating on: the due index decides (below); nobody is scanned
+        c for c in world.get("characters", {}).values()
+        if not c.get("is_workplace_npc")
+        and not c.get("is_service_worker")
         and c.get("alive") is not False
         and c.get("posture") != "incapacitated"
     ]
+    # Only characters who are due run (brain/agent_wake.py): woken by an event, a timer of their own, their decision
+    # cycle, or the heartbeat. AGENT_GATING=off runs everyone; =shadow runs everyone and records what skipping would
+    # have missed.
+    from brain import agent_wake
+    gating = agent_wake.MODE
+    if gating == "on":
+        # Step 5a: only the characters that are due (brain/agent_wake.py's index) -- nobody else is looked at.
+        for cid, c, why in agent_wake.iter_due(world):
+            if (c.get("is_service_worker") or c.get("is_workplace_npc") or c.get("alive") is False
+                    or c.get("posture") == "incapacitated"):
+                agent_wake.defer(c, world)
+                continue
+            try:
+                agent_wake.begin_run(c, world)
+                _run_agent(c, world, t)
+                agent_wake.note_run(c, world)
+                dirty_char_ids.add(cid)
+            except Exception as exc:
+                import traceback as _tb
+                print(f"[sim_loop] agent error for {cid}: {exc!r}\n{_tb.format_exc()[-600:]}")
+        agent_chars = []
     for c in agent_chars:
         try:
-            _run_agent(c, world, t)
+            if gating == "off":
+                _run_agent(c, world, t)
+            else:
+                would_run, why = agent_wake.due(c, world)
+                if would_run:
+                    agent_wake.begin_run(c, world)
+                if gating == "shadow":
+                    before = agent_wake.shadow_before(c)
+                    agent_wake.IN_SKIPPABLE = not would_run
+                    try:
+                        _run_agent(c, world, t)
+                    finally:
+                        agent_wake.IN_SKIPPABLE = False
+                    agent_wake.shadow_after(c, world, before, would_run, why)
+                    if not would_run:          # as if skipped: the gate's own clock does not move
+                        dirty_char_ids.add(c["id"])
+                        continue
+                elif would_run:
+                    _run_agent(c, world, t)
+                else:
+                    continue
+            agent_wake.note_run(c, world)
             dirty_char_ids.add(c["id"])
         except Exception as exc:
             import traceback as _tb
@@ -603,9 +661,11 @@ def _tick_impl(world):
         generate_job_listings(world)
 
 
-    # Not every()-gated -- the 15-sim-minute bus schedule (see transit.py)
-    # needs single-tick precision to catch the boundary reliably.
-    update_bus(world)
+    # The bus runs only while a departure is due or a trip is under way (systems/transit.py: the clock marks each
+    # 15-minute slot; core/active_loops.py runs it).
+    from systems.transit import ensure_bus_member
+    ensure_bus_member(world)
+    active_loops.run_one(world, "bus")
 
 
 
@@ -667,7 +727,14 @@ def _tick_impl(world):
     _prof.mark("section:prune_expired_transient_ambient_sounds")
     # -- Prune expired transient ambient sounds (see brain/perception.py's
     # emit_ambient_sound/VOLUME_TIERS) ──────────────────────
-    cleanup_ambient_sounds(world)
+    from brain.perception import ensure_ambient_member
+    ensure_ambient_member(world)
+    active_loops.run_one(world, "ambient_sounds")
+
+    # walking in on someone undressed, overhearing a scene: only while someone is exposed (systems/nudity_perception.py)
+    from systems.nudity_perception import ensure_nudity_members
+    ensure_nudity_members(world)
+    active_loops.run_one(world, "nudity")
 
     _prof.mark("section:intimacy_arousal_decay")
     # -- Intimacy arousal decay (every tick) ───────────────
@@ -747,10 +814,6 @@ def _tick_impl(world):
     # meanwhile." The wait state has to live somewhere the LLM loop
     # doesn't treat as blocking.
 
-
-    # Story arcs are lightweight — keep per-tick
-    for c in characters:
-        update_story_arc(c)
 
     # Process events queued this tick (emitted from worker threads during
     # agent updates and from the systems above) — must run last, main-thread
@@ -902,30 +965,8 @@ def _job_arrests(world, entry):
             process_return(c, world)
 
 
-def _job_body_moment(world, entry):
-    """Every second: arousal, anger pressure, intoxication, baby needs, blushes and daydreams; walking in on someone
-    undressed; small spoken requests answered."""
-    tick_intimacy(world)
-
-    _prof.mark("section:impulse_control_pressure_boilover")
-    # -- Impulse control pressure + boilover (every tick) ───
-    tick_impulse(world)
-    tick_harassment(world)
-    tick_baby_hourly(world)
-    tick_nudity_perception(world)
-    tick_crushes(world)
-    tick_incidental_speech(world)
 
 
-def _job_domestic_control(world, entry):
-    """Controlling partners: tactics, quid pro quo, emotional control (their own medium cadence)."""
-    tick_domestic_control(world)
-    tick_quid_pro_quo(world)
-    tick_emotional_control(world)
-
-
-def _job_libido(world, entry):
-    tick_libido(world)
 
 
 def _job_life_comparison(world, entry):
@@ -940,7 +981,7 @@ def _job_incidental_speech(world, entry):
     data = entry.get("data") or {}
     c = world.get("characters", {}).get(data.get("character_id"))
     if c and data.get("from_building"):
-        mark_departure(c, data.get("from_building"))
+        mark_departure(c, data.get("from_building"), world)
         tick_incidental_speech(world)
 
 PERCEPTION_RADIUS_OUTDOORS = 24      # tiles: who outdoors may see a change (vision tops out well inside this)
@@ -996,54 +1037,21 @@ def _job_attention(world, entry):
             update_attention(c, world)
 
 
-def _job_memory_decay(world, entry):
-    """Scheduled job `memory_decay` (was an every() block in tick()); see core/scheduler.py."""
-    characters = [c for c in world.get("characters", {}).values() if not c.get("is_workplace_npc")]
-    for c in characters:
-        decay_memories(c)
-
-
-def _job_polarization(world, entry):
-    """Scheduled job `polarization` (was an every() block in tick()); see core/scheduler.py."""
-    characters = [c for c in world.get("characters", {}).values() if not c.get("is_workplace_npc")]
-    for c in characters:
-        polarize_opinions(c)
-        compute_political_lean(c)
-
-
 def _job_relationships(world, entry):
     """Scheduled job `relationships` (was an every() block in tick()); see core/scheduler.py."""
-    characters = [c for c in world.get("characters", {}).values() if not c.get("is_workplace_npc")]
-    _update_nearby_relationships(characters, world)
+    # Only the pairs that are near each other are reached (core/positions.py); the rest are not looked at.
+    from core import positions
+    chars = world.get("characters", {})
+    for a, b in positions.pairs_within(world, _RELATIONSHIP_RADIUS, keep=lambda r: not r[6]["workplace_npc"]):
+        _near_each_other(chars[a], chars[b])
 
 
-def _job_influence_exposure(world, entry):
-    """Scheduled job `influence_exposure` (was an every() block in tick()); see core/scheduler.py."""
-    resolve_exposure_influence(world)
-
-
-def _job_reading(world, entry):
-    """Scheduled job `reading` (was an every() block in tick()); see core/scheduler.py."""
-    characters = [c for c in world.get("characters", {}).values() if not c.get("is_workplace_npc")]
-    for c in characters:
-        update_reading_process(c, world)
-
-
-def _job_health(world, entry):
-    """Scheduled job `health` (was an every() block in tick()); see core/scheduler.py."""
-    characters = [c for c in world.get("characters", {}).values() if not c.get("is_workplace_npc")]
-    for c in characters:
-        tick_psychosis(c, world)
-        decay_stress(c, world)
 
 
 def _job_reading_2(world, entry):
-    """Scheduled job `reading#2` (was an every() block in tick()); see core/scheduler.py."""
-    characters = [c for c in world.get("characters", {}).values() if not c.get("is_workplace_npc")]
+    """DUTY sports_watching: games kick off (armed by each fixture's timer). Watching a broadcast is the watcher's own
+    update (brain/agent_loop.py)."""
     kickoff_scheduled_games(world)
-    for c in characters:
-        update_game_broadcast(c, world)
-
 
 def _job_cooking_2(world, entry):
     """Scheduled job `cooking#2`: the household's background processes (laundry, dishes, ...); see core/scheduler.py. (The old per-character
@@ -1074,10 +1082,6 @@ def _job_household_monitoring(world, entry):
     tick_babysitting_requests(world)
 
 
-def _job_mentality_compilation(world, entry):
-    """Scheduled job `mentality_compilation` (was an every() block in tick()); see core/scheduler.py."""
-    from systems.mentality import tick_mentality_compilation
-    tick_mentality_compilation(world)
 
 
 def _job_market(world, entry):
@@ -1145,10 +1149,8 @@ def _job_fires(world, entry):
 
 
 def _job_trials(world, entry):
-    """Scheduled job `trials` (was an every() block in tick()); see core/scheduler.py."""
-    characters = [c for c in world.get("characters", {}).values() if not c.get("is_workplace_npc")]
-    for c in characters:
-        process_jail(c, world)     # emits character_released
+    """Scheduled job `trials`: court dates, prison reporting, long-stay check-ins (a release from jail is the PERCHAR
+    job `jail`)."""
     process_trials(world)          # emits character_jailed / character_acquitted
     process_prison_reporting(world)  # mail-scheduled self-surrender + failure-to-appear
     from systems.offgrid import tick_long_stay_checkins
@@ -1180,9 +1182,9 @@ def _job_conversation_seating(world, entry):
 
 def _job_weather(world, entry):
     """Scheduled job `weather` (was an every() block in tick()); see core/scheduler.py."""
-    from systems.weather import generate_weather_tick, apply_weather_to_characters
+    from systems.weather import generate_weather_tick
     generate_weather_tick(world)
-    apply_weather_to_characters(world)
+    # its effect on each character outdoors: the PERCHAR job `weather_exposure`
 
 
 def _job_social_projects(world, entry):
@@ -1232,18 +1234,6 @@ def _job_grapples(world, entry):
     process_grapples(world)
 
 
-def _job_grievances(world, entry):
-    """Scheduled job `grievances` (was an every() block in tick()); see core/scheduler.py."""
-    characters = [c for c in world.get("characters", {}).values() if not c.get("is_workplace_npc")]
-    update_grievances(world)    # decay + emit confrontation_desired
-    from systems.goodwill import update_goodwill
-    update_goodwill(world)      # decay + stamp _bond_emitted, same cadence
-    from systems.offense_rationalization import decay_guilt_paranoia
-    for c in characters:
-        if c.get("_guilt_paranoia"):
-            decay_guilt_paranoia(c)
-
-
 def _job_contract_checks(world, entry):
     """Scheduled job `contract_checks` (was an every() block in tick()); see core/scheduler.py."""
     check_contract_violations(world)  # emits contract_violated
@@ -1251,11 +1241,6 @@ def _job_contract_checks(world, entry):
     decay_worries(world)  # passive suspicion decay, see worries.py
 
 
-def _job_worry_poll(world, entry):
-    """Scheduled job `worry_poll`: each character looks over what happened in the last hour and lets it
-    refresh or start worries (systems/worry_cases.py)."""
-    from systems.worry_cases import tick_worry_polls
-    tick_worry_polls(world)
 
 
 def _job_neighbours(world, entry):
@@ -1266,9 +1251,10 @@ def _job_neighbours(world, entry):
 
 
 def _job_kids_play(world, entry):
-    """Scheduled job `kids_play`: free children with a free friend nearby get the urge to play (systems/kids_play.py)."""
-    from systems.kids_play import tick_kids_play
-    tick_kids_play(world)
+    """Scheduled job `kids_play`: urges to play end, agreed play starts (systems/kids_play.py)."""
+    from systems.kids_play import settle_play_urges, start_agreed_play
+    settle_play_urges(world)
+    start_agreed_play(world)                # the urges themselves: the PERCHAR job `play_urges`
 
 
 def _job_introductions(world, entry):
@@ -1278,11 +1264,6 @@ def _job_introductions(world, entry):
     tick_introductions(world, only=set(entry.get("ids") or []) or None)
 
 
-def _job_exhaustion(world, entry):
-    """Scheduled job `exhaustion`: worn-out characters grow short-tempered and make mistakes; someone may offer to take over for them
-    (systems/exhaustion.py)."""
-    from systems.exhaustion import tick_exhaustion
-    tick_exhaustion(world)
 
 
 def _job_rumors(world, entry):
@@ -1292,36 +1273,16 @@ def _job_rumors(world, entry):
     tick_rumors(world)
 
 
-def _job_grudges(world, entry):
-    """Scheduled job `grudges`: open grudges fade, jab, escalate and nudge the offender to apologise (systems/grudges.py)."""
-    from systems.grudges import tick_grudges
-    tick_grudges(world)
 
 
-def _job_focus_check(world, entry):
-    """Scheduled job `focus_check`: worried characters' mitigation intentions and the 3-minute concentration
-    roll (systems/worry_relief.py)."""
-    from systems.worry_relief import tick_focus_checks
-    tick_focus_checks(world)
 
 
-def _job_persona_expectations(world, entry):
-    """Scheduled job `persona_expectations` (was an every() block in tick()); see core/scheduler.py."""
-    tick_persona_expectations(world)  # value-alignment clashes between close kin
 
 
 def _job_cleanliness(world, entry):
     """Scheduled job `cleanliness` (was an every() block in tick()); see core/scheduler.py."""
-    characters = [c for c in world.get("characters", {}).values() if not c.get("is_workplace_npc")]
-    from systems.chores import tick_room_cleanliness_decay, maybe_react_to_mess
-    from systems.refurnishing import maybe_want_to_redecorate
-    from systems.clothing import tick_clothing_dirty
-    tick_room_cleanliness_decay(world)
-    for c in characters:
-        if c.get("alive", True) and not c.get("off_grid"):
-            maybe_react_to_mess(c, world)
-            maybe_want_to_redecorate(c, world)
-            tick_clothing_dirty(c, world)
+    from systems.chores import tick_room_cleanliness_decay
+    tick_room_cleanliness_decay(world)      # each character's own part: the PERCHAR job `personal_mess`
 
 
 def _job_socioeconomics(world, entry):
@@ -1413,63 +1374,34 @@ def _job_hierarchy(world, entry):
     update_hierarchy(world)
 
 
-def _job_lt_needs(world, entry):
-    """Scheduled job `lt_needs` (was an every() block in tick()); see core/scheduler.py."""
-    characters = [c for c in world.get("characters", {}).values() if not c.get("is_workplace_npc")]
-    for c in characters:
-        update_lt_needs(c, world)
-        # generate_socialize_intention (systems/social.py) was fully
-        # built -- real target selection off relationship strength --
-        # but had no caller anywhere; generate_lt_need_intentions covers
-        # the other 11 lt_needs categories, none of which previously
-        # ever produced a real active_intentions entry either.
-        generate_socialize_intention(c, world)
-        generate_lt_need_intentions(c, world)
-
-
-def _job_social_odor(world, entry):
-    """Scheduled job `social_odor` (was an every() block in tick()); see core/scheduler.py."""
-    characters = [c for c in world.get("characters", {}).values() if not c.get("is_workplace_npc")]
-    for c in characters:
-        apply_odor_social_pressure(c, world)
 
 
 def _job_contagion(world, entry):
     """Scheduled job `contagion` (was an every() block in tick()); see core/scheduler.py."""
-    characters = [c for c in world.get("characters", {}).values() if not c.get("is_workplace_npc")]
-    groups = {}
-    for c in characters:
-        c["location_tile"] = f"{int(c.get('x', 0))},{int(c.get('y', 0))}"
-        groups.setdefault(c.get("building_id"), []).append(c)
-    for group in groups.values():
-        if len(group) > 1:
+    # Only buildings with someone contagious in them are looked at (core/positions.py): nobody else can catch anything.
+    from core import positions
+    chars = world.get("characters", {})
+    groups = positions.by_building(world, keep=lambda r: not r[6]["workplace_npc"])
+    hot = {r[3] for r in positions.snapshot(world) if r[6]["contagious"] and not r[6]["workplace_npc"]}
+    for bid, ids in groups.items():
+        if len(ids) > 1 and bid in hot:
+            group = [chars[i] for i in ids]
+            for c in group:
+                c["location_tile"] = f"{int(c.get('x', 0))},{int(c.get('y', 0))}"
             tick_contagion_location(group, world)
 
 
 def _job_child_care(world, entry):
-    """Scheduled job `child_care` (was an every() block in tick()); see core/scheduler.py."""
-    characters = [c for c in world.get("characters", {}).values() if not c.get("is_workplace_npc")]
+    """Scheduled job `child_care`: children's needs, welfare and disclosure (each parent's checks on its dependents are
+    the PERCHAR job `dependent_checks`)."""
     tick_child_needs(world)
     tick_child_welfare(world)
     tick_child_disclosure(world)
-    for c in characters:
-        if c.get("dependents"):
-            tick_dependent_checks(c, world)
 
 
 def _job_bedroom_assignment(world, entry):
     """Scheduled job `bedroom_assignment` (was an every() block in tick()); see core/scheduler.py."""
     tick_bedroom_assignments(world)
-
-
-def _job_plants(world, entry):
-    """Scheduled job `plants` (was an every() block in tick()); see core/scheduler.py."""
-    characters = [c for c in world.get("characters", {}).values() if not c.get("is_workplace_npc")]
-    tick_plants(world)
-    from systems.chores import maybe_tend_plants
-    for c in characters:
-        if c.get("alive", True) and not c.get("off_grid"):
-            maybe_tend_plants(c, world)
 
 
 def _job_cookware(world, entry):
@@ -1506,33 +1438,10 @@ def _job_intercourse_sessions(world, entry):
         tick_intercourse_sessions(world)
 
 
-def _job_detective_work(world, entry):
-    """Scheduled job `detective_work` (was an every() block in tick()); see core/scheduler.py."""
-    from systems.detective_work import tick_detective_work
-    tick_detective_work(world)
 
 
-def _job_addictions(world, entry):
-    """Scheduled job `addictions` (was an every() block in tick()); see core/scheduler.py."""
-    from systems.addictions import tick_addictions
-    tick_addictions(world)
 
 
-def _job_claustrophobia(world, entry):
-    """Scheduled job `claustrophobia` (was an every() block in tick()); see core/scheduler.py."""
-    from systems.claustrophobia import tick_claustrophobia
-    tick_claustrophobia(world)
-
-
-def _job_phone_battery(world, entry):
-    """Scheduled job `phone_battery` (was an every() block in tick()); see core/scheduler.py."""
-    characters = [c for c in world.get("characters", {}).values() if not c.get("is_workplace_npc")]
-    for c in characters:
-        act = c.get("activity") or {}
-        if act.get("interaction") == "charge":
-            charge_device(c, world)
-        else:
-            update_phone_battery(c)
 
 
 def _job_phone_behavior(world, entry):
@@ -1585,3 +1494,4 @@ def _job_calendar_events(world, entry):
 # from the same table: tools/flow_map/).
 from core import flow as _flow
 _flow.install(sys.modules[__name__])
+import cpl.conversations  # noqa: E402,F401 -- its cpl:<id> timers have a handler before any can fire

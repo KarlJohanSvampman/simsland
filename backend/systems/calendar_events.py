@@ -247,6 +247,8 @@ def _inject_intention(c, intent_type, priority, event, extra=None):
     if extra:
         intent.update(extra)
     c.setdefault("active_intentions", []).append(intent)
+    from brain import agent_wake
+    agent_wake.wake_now(c, "intention_added")
 
 
 def _inject_intentions_for_event(c, event):

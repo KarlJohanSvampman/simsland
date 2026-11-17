@@ -204,7 +204,7 @@ class ExternalBrainReq(BaseModel):
 
 
 @router.post("/characters/{char_id}/external_brain")
-@command("middleware_bridge.set_external_brain")
+@command("middleware_bridge.set_external_brain", entities=lambda a: [("characters", a["char_id"])])
 def set_external_brain(char_id: str, req: ExternalBrainReq):
     external_brain.touch()
     with world_lock():
@@ -231,7 +231,8 @@ class ExecuteReq(BaseModel):
 
 
 @router.post("/characters/{char_id}/execute")
-@command("middleware_bridge.execute")
+@command("middleware_bridge.execute", entities="world")   # a decision can reach props (anchors), which are not
+                                                                # locked one by one
 def execute(char_id: str, req: ExecuteReq):
     external_brain.touch()
     from brain.agent_loop import process_decision, post_update

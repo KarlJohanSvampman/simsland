@@ -59,7 +59,6 @@ REGISTRY = {
 
     # ---- body / needs ----
     "section:intimacy_arousal_decay": ("threshold", "body", "lazy decay"),
-    "section:impulse_control_pressure_boilover": ("threshold", "body", "lazy pressure + boilover timer"),
     "section:body_lt_needs_systems": ("threshold", "body", "lazy needs"),
     "section:disease_contagion_proximity_sweep_grouped_by": ("event", "body", "on proximity change"),
     "section:child_needs_oversight_baseline_accountabilit": ("event", "social", "on child need threshold"),
@@ -83,7 +82,7 @@ REGISTRY = {
 # disagree -- a job added to the table is classified by being added.
 def _from_flow():
     from core import flow
-    kinds = {"event": "event", "clock": "calendar", "process": "continuous"}
+    kinds = {"event": "event", "clock": "calendar", "process": "continuous", "duty": "timer", "perchar": "timer"}
     out = {}
     for job in flow.JOBS:
         if job["kind"] == "event":
@@ -91,6 +90,10 @@ def _from_flow():
         elif job["kind"] == "clock":
             becomes = (f"daily at {job['daily'] // 3600:02d}:{job['daily'] % 3600 // 60:02d}" if job.get("daily") is not None
                        else f"hourly at :{(job.get('hourly') or 0) // 60:02d}")
+        elif job["kind"] == "duty":
+            becomes = f"every {job['every']} s of sim time while there is work (armed by what starts it)"
+        elif job["kind"] == "perchar":
+            becomes = f"every {job['every']} s, in the character's own update, while it has this work"
         else:
             becomes = f"every {job['every']} s of sim time"
         out["every:" + job["name"]] = (kinds[job["kind"]], job["name"], f"{becomes} -- {job['why']}")

@@ -74,6 +74,8 @@ def start_process(household, world, process_type, template_id, stages, prop_id=N
         **extra,
     }
     world.setdefault("household_processes", []).append(process)
+    from core.flow import wake_duty
+    wake_duty(world, "household_processes")
     begin_stage(household, process, world)
     return process
 
@@ -317,7 +319,7 @@ def _watering_on_complete(household, process, world):
     for pid in process.get("target_prop_ids", []):
         prop = get_prop_by_id(world, pid)
         if prop:
-            water_plant(prop)
+            water_plant(prop, world)
 
 
 def _weeding_on_complete(household, process, world):
@@ -327,7 +329,7 @@ def _weeding_on_complete(household, process, world):
     for pid in process.get("target_prop_ids", []):
         prop = get_prop_by_id(world, pid)
         if prop:
-            pull_weed(prop)
+            pull_weed(prop, world)
 
 
 def _harvest_on_complete(household, process, world):

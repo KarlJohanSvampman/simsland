@@ -40,6 +40,10 @@ def track(c, world):
     # a mark for something no longer (or never) there does not wait forever
     for k in [k for k, m in marks.items() if tick - m.get("tick", tick) > 600 and k not in now]:
         marks.pop(k, None)
+    left = [m.get("tick", tick) for k, m in marks.items() if k not in now]
+    if left:                              # ... and goes when its time is up, whether or not anything else happens then
+        from brain import agent_wake
+        agent_wake.wake_at(c, world, agent_wake.at_tick(world, min(left) + 601), "intention_marks")
 
 
 def mark(c, world, intention_type, outcome, how, target=None):

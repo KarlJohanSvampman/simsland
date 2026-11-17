@@ -115,11 +115,6 @@ subscribe("time.month", on_month)
 
 # ── scheduled jobs ────────────────────────────────────────────────────────────
 
-def _popularity_decay(world, entry):
-    import sim_loop as S
-    S.tick_popularity_decay(world)
-
-
 def _post_engagement(world, entry):
     import sim_loop as S
     S.tick_post_engagement(world)

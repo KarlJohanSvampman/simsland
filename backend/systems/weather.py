@@ -214,33 +214,50 @@ def apply_weather_to_characters(world):
         return
 
     for c in world.get("characters", {}).values():
-        body = c.setdefault("body", {})
-        outdoors = not _resolve_effective_building_id(c, world)
+        weather_exposure_for(c, world)
 
-        if not outdoors:
-            body["cold_exposure"] = max(0, body.get("cold_exposure", 0) - _EXPOSURE_DECAY_PER_TICK)
-            body["heat_exposure"] = max(0, body.get("heat_exposure", 0) - _EXPOSURE_DECAY_PER_TICK)
-            continue
 
-        low, high = _COMFORTABLE_RANGE_C
-        insulation = clothing_insulation(c)
-        effective_low = low - insulation * _INSULATION_COLD_TOLERANCE_C_PER_POINT
+def weather_exposure_active(c, world):
+    """Outdoors, or with cold or heat exposure still to fade (core/flow.py PERCHAR `weather_exposure`)."""
+    if (world.get("weather") or {}).get("temperature_c") is None:
+        return False
+    body = c.get("body") or {}
+    return bool(body.get("cold_exposure") or body.get("heat_exposure")) or not _resolve_effective_building_id(c, world)
 
-        if outdoor_temp < effective_low:
-            deficit = effective_low - outdoor_temp
-            body["cold_exposure"] = min(100, body.get("cold_exposure", 0)
-                                        + _EXPOSURE_RISE_PER_TICK * (1 + deficit / 10))
-        else:
-            body["cold_exposure"] = max(0, body.get("cold_exposure", 0) - _EXPOSURE_DECAY_PER_TICK)
 
-        if outdoor_temp > high:
-            excess = outdoor_temp - high
-            body["heat_exposure"] = min(100, body.get("heat_exposure", 0)
-                                        + _EXPOSURE_RISE_PER_TICK * (1 + excess / 10))
-        else:
-            body["heat_exposure"] = max(0, body.get("heat_exposure", 0) - _EXPOSURE_DECAY_PER_TICK)
+def weather_exposure_for(c, world):
+    """A minute of the weather on one character: exposure rises outdoors, fades indoors."""
+    weather = world.get("weather") or {}
+    outdoor_temp = weather.get("temperature_c")
+    if outdoor_temp is None:
+        return
+    body = c.setdefault("body", {})
+    outdoors = not _resolve_effective_building_id(c, world)
 
-        _apply_exposure_consequences(c, world)
+    if not outdoors:
+        body["cold_exposure"] = max(0, body.get("cold_exposure", 0) - _EXPOSURE_DECAY_PER_TICK)
+        body["heat_exposure"] = max(0, body.get("heat_exposure", 0) - _EXPOSURE_DECAY_PER_TICK)
+        return
+
+    low, high = _COMFORTABLE_RANGE_C
+    insulation = clothing_insulation(c)
+    effective_low = low - insulation * _INSULATION_COLD_TOLERANCE_C_PER_POINT
+
+    if outdoor_temp < effective_low:
+        deficit = effective_low - outdoor_temp
+        body["cold_exposure"] = min(100, body.get("cold_exposure", 0)
+                                    + _EXPOSURE_RISE_PER_TICK * (1 + deficit / 10))
+    else:
+        body["cold_exposure"] = max(0, body.get("cold_exposure", 0) - _EXPOSURE_DECAY_PER_TICK)
+
+    if outdoor_temp > high:
+        excess = outdoor_temp - high
+        body["heat_exposure"] = min(100, body.get("heat_exposure", 0)
+                                    + _EXPOSURE_RISE_PER_TICK * (1 + excess / 10))
+    else:
+        body["heat_exposure"] = max(0, body.get("heat_exposure", 0) - _EXPOSURE_DECAY_PER_TICK)
+
+    _apply_exposure_consequences(c, world)
 
 
 def _apply_exposure_consequences(c, world):

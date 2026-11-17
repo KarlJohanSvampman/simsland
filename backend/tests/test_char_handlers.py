@@ -1,0 +1,118 @@
+"""
+Step 5a: per-character work that used to be a sweep over every character on a cadence is the character's own (run in
+its update, with a wake for when it next has something to do), and world-level schedules wake their duty on time.
+
+Run inside the backend container:   python tests/test_char_handlers.py
+"""
+
+import os
+import sys
+
+os.environ.setdefault("COGNITION_MODE", "local")
+sys.path.insert(0, "/app")
+sys.path.insert(0, ".")
+
+failures = []
+
+
+def check(name, cond, detail=""):
+    print(("ok   " if cond else "FAIL ") + name + (f"  {detail}" if detail and not cond else ""))
+    if not cond:
+        failures.append(name)
+
+
+def W(tick):
+    return {"sim_time": float(tick), "tick": tick, "calendar": {"hour": 12, "minute": 0}, "characters": {}, "timers": []}
+
+
+# ── reading / watching: the next pick is a wake on the old 5-second grid ────────────────────────────────────────────
+from brain.agent_loop import _arm_media_picks
+
+w = W(1003)
+c = {"id": "r", "active_process": {"type": "reading_news", "last_pick_tick": 1001}}
+_arm_media_picks(c, w, 300, 300)
+check("someone reading wakes for the next pick, on the 5-second grid", c["_wake"]["at"] == 1305.0, c.get("_wake"))
+c = {"id": "q"}
+_arm_media_picks(c, w, 300, 300)
+check("someone not reading or watching gets no wake", "_wake" not in c)
+
+# ── kickoff: a fixture's timer wakes the duty, which runs while someone has yet to set off ──────────────────────────
+import systems.sports as S
+from core import flow, scheduler
+import systems.duties  # noqa: F401
+flow.install()
+
+w = W(100)
+w["sports_leagues"] = {"football": {"pro": {"schedule": [
+    {"id": "fx1", "scheduled_tick": 500, "attendees": {"a": {"mode": "on_grid"}}, "result": None}]}}}
+check("before kickoff nothing is pending", not S.kickoff_pending(w))
+from systems.duties import on_world_loaded
+on_world_loaded(w)
+check("a loaded world times each upcoming fixture", [(t["owner"], t["due"]) for t in w["timers"] if t["owner"] == "kickoff"] == [("kickoff", 500.0)],
+      w["timers"])
+w["tick"] = w["sim_time"] = 500
+check("at kickoff it is pending", S.kickoff_pending(w))
+S._on_kickoff_timer(w, {})
+check("... and the timer arms the sports_watching duty", scheduler.pending(w, "duty:sports_watching"))
+w["sports_leagues"]["football"]["pro"]["schedule"][0]["attendees"]["a"]["started"] = True
+check("once everyone has set off, nothing is pending", not S.kickoff_pending(w))
+
+# ── background-LLM work: only the entities that have some are looked at ─────────────────────────────────────────────
+from systems import bg_work
+w = W(0)
+w["characters"] = {"a": {"id": "a", "_loop_assessment": {"x": 1}}, "b": {"id": "b"}}
+w["households"] = {"h": {"id": "h", "daily_summaries": [{"id": "d", "pending": {"kind": "daily", "lines": []}}]}}
+check("a world never seen before is scanned once for waiting work",
+      bg_work.targets(w, "loop") == ["a"] and bg_work.targets(w, "hhsum") == ["h"], w.get("_bg_work"))
+bg_work.note(w, "rules", "b")
+check("noted work makes the duty active and arms it", bg_work.active(w) and scheduler.pending(w, "duty:background_services"))
+for k, i in (("loop", "a"), ("hhsum", "h"), ("rules", "b")):
+    bg_work.done(w, k, i)
+check("nothing waiting: the duty has no work", not bg_work.active(w))
+
+# ── lazy polarization and grievance decay ───────────────────────────────────────────────────────────────────────────
+from brain.opinions import sync_polarization
+c = {"id": "p", "opinions": {"tax": [{"stance": 0.5, "confidence": 1.0}], "war": [{"stance": 0.1, "confidence": 1.0}]}}
+sync_polarization(c, 0)
+sync_polarization(c, 150)                    # 10 periods of 15 ticks
+check("polarization drifts a strong stance outward per 15-tick period, in one go",
+      abs(c["opinions"]["tax"][-1]["stance"] - 0.55) < 1e-9 and c["opinions"]["war"][-1]["stance"] == 0.1, c["opinions"])
+from systems.grievances import sync_social_decay, social_checks_for, DECAY_RATE, CONFRONT_THRESHOLD
+c = {"id": "g", "grievances": [{"caused_by": "x", "weight": 40.0}]}
+sync_social_decay(c, 0)
+sync_social_decay(c, 150)
+check("a grievance decays by the rate per period", abs(c["grievances"][0]["weight"] - 40 * DECAY_RATE ** 10) < 1e-9)
+w = W(150)
+social_checks_for(c, w)
+check("over the threshold: the wish to confront is noted", "x" in c.get("_confrontation_emitted", []), c)
+check("... and a wake is set for when it falls through the next threshold", c["_wake"]["at"] > 150, c.get("_wake"))
+
+# ── PERCHAR: the old job's timer runs over its members only; a member can be due from a later moment ─────────────────
+from core import flow
+ran = []
+flow._perchar_fns["_t"] = (lambda c, w: ran.append(c["id"]),
+                           lambda c, w: True if c.get("busy") else (700.0 if c.get("later") else False), 20)
+handler = flow._perchar_timer("_t")
+w = W(100)
+w["characters"] = {"a": {"id": "a", "busy": True}, "b": {"id": "b"}, "c": {"id": "c", "later": True}}
+for cid in ("c", "b", "a"):
+    flow.run_perchar(w["characters"][cid], w)
+check("a character with work joins, one without does not, one with work later joins from then",
+      w["_perchar_members"]["_t"] == {"c": 700.0, "a": 0}, w["_perchar_members"]["_t"])
+handler(w, {})
+check("the timer runs only the members that are due", ran == ["a"], ran)
+w["characters"]["a"]["busy"] = False
+w["sim_time"] = 600.0
+handler(w, {})
+check("... drops a member with no more work, and skips one not due yet",
+      ran == ["a"] and w["_perchar_members"]["_t"] == {"c": 700.0}, (ran, w["_perchar_members"]["_t"]))
+w["sim_time"] = 720.0
+w["characters"]["a"]["busy"] = True
+flow.run_perchar(w["characters"]["a"], w)
+handler(w, {})
+check("... runs it once its time comes, in the characters' own order", ran == ["a", "a", "c"], ran)
+del flow._perchar_fns["_t"]
+
+print()
+print("all passed" if not failures else f"FAILED: {', '.join(failures)}")
+sys.exit(1 if failures else 0)
