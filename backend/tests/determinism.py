@@ -26,7 +26,11 @@ from db import load_world, _STATIC_WORLD_KEYS
 from core.definitions import load_definitions
 import core.event_handlers  # noqa: F401
 import llm.llm_gate as _g
-_g.run_llm_call = lambda coro, *a, **k: (coro.close(), None)[1]
+if os.environ.get("DET_POLICY") != "real":
+    # model calls made in the middle of a tick (systems/choice.py's picks -- whether to take up a conversation, what to
+    # wear --, narrations) fall back as if the model failed, so runs repeat. With the real model (tools/cpl_live_test.py)
+    # they go to it: otherwise a choice like "is Kathleen willing to talk now" is a coin flip, not the model's
+    _g.run_llm_call = lambda coro, *a, **k: (coro.close(), None)[1]
 
 STATIC = set(_STATIC_WORLD_KEYS)
 ERROR_TRACES = {}                       # last line of an exception -> its first full traceback (see run_sim)
