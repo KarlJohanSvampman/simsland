@@ -10,7 +10,7 @@ The OpenAI form covers ChatGPT and most hosted services, which offer the same AP
 
     service          LLM_BASE_URL                                              LLM_MODEL (examples)
     OpenAI           https://api.openai.com/v1 (the default)                   gpt-4o-mini, gpt-4.1-mini
-    Google Gemini    https://generativelanguage.googleapis.com/v1beta/openai   gemini-2.5-flash
+    Google Gemini    https://generativelanguage.googleapis.com/v1beta/openai   gemini-3.5-flash-lite
     Anthropic        https://api.anthropic.com/v1                              (a Claude model id)
     OpenRouter       https://openrouter.ai/api/v1                              any model it lists
     Groq             https://api.groq.com/openai/v1                            llama-3.1-8b-instant
