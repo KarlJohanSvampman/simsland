@@ -1812,6 +1812,30 @@ def _sec_identity(c, world):
     return " ".join(bits)
 
 
+# Live (2026-11-23): Alexander and Margaret had four conversations in a quarter of an hour about one muddled remark,
+# each going back over the same ground. Three or more with the same person in CIRCLES_WINDOW_TICKS: say so.
+CIRCLES_WINDOW_TICKS = 1800
+CIRCLES_MIN = 3
+
+
+def _sec_going_in_circles(c, world):
+    tick = world.get("tick", 0)
+    count = {}
+    for e in (c.get("conversation_log") or [])[-20:]:
+        if tick - (e.get("started_tick") or 0) > CIRCLES_WINDOW_TICKS:
+            continue
+        for pid in e.get("participants") or []:
+            if pid != c.get("id"):
+                count[pid] = count.get(pid, 0) + 1
+    names = [(world.get("characters", {}).get(pid) or {}).get("name") or pid
+             for pid, n in count.items() if n >= CIRCLES_MIN]
+    if not names:
+        return ""
+    who = " and ".join(names)
+    return (f"You've already talked with {who} {max(count.values())} times in the last half hour, going back over the "
+            f"same ground. Unless there's something genuinely new to say, let it rest and get on with something else.")
+
+
 def _sec_child_cognition(c, world):
     # Who a child believes, how readily, and what they're still wondering
     # about -- None for everyone but children (systems/child_cognition.py).
@@ -2481,6 +2505,7 @@ NARRATIVE_SECTIONS = [
     ("attention",             "full", _sec_attention),
     ("claustrophobia",        "core", _sec_claustrophobia),
     ("identity",              "core", _sec_identity),
+    ("going_in_circles",      "core", _sec_going_in_circles),
     ("child_cognition",       "core", _sec_child_cognition),
     ("concern_raised",        "core", _sec_concern_raised),
     ("body",                  "core", _sec_body),

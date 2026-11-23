@@ -1150,6 +1150,15 @@ def update_agent(
             from systems.occupancy import interrupt_activity
             interrupt_activity(c, world, reason="they needed the toilet urgently")
             start_activity(c, world, "use_toilet")
+        elif act_type in ("sleep", "nap") and _starving_in_bed(c, world):
+            # Starving or parched while asleep (live 2026-11-23: Daniel and Rachel slept 8 hours of the afternoon off a
+            # sleep debt at hunger 100): they get up for food or a drink. For a while their own sleep intentions stand
+            # aside (the loop below), or the higher-priority "sleep" would put them straight back to bed -- the same trap
+            # as the bathroom case above.
+            c["_up_for_food_until"] = world.get("tick", 0) + UP_FOR_FOOD_TICKS
+            from systems.occupancy import interrupt_activity
+            interrupt_activity(c, world, reason="they woke up starving" if (c.get("body") or {}).get("hunger", 0) >= 97
+                               else "they woke up parched")
         elif act_type in ("sleep", "nap") and should_wake_for_duty(c, world):
             # A hungry child is waiting for them and nobody has taken it over: they are got up (groggy and short-tempered -- it
             # shows as strain, systems/exhaustion.py).
@@ -1273,6 +1282,8 @@ def update_agent(
 
         if blocked_urgent and intention.get("category") in ("chores", "leisure", "identity"):
             continue
+        if intention.get("type") in _SLEEP_INTENTIONS and world.get("tick", 0) < (c.get("_up_for_food_until") or 0):
+            continue                       # up for food or a drink (_starving_in_bed): back to bed once that's done
         if pressing_open and _todo_tier(intention) == "when_free":
             continue                       # for when there is time: not while something pressing is still open
 
@@ -1348,6 +1359,19 @@ def update_agent(
 
     _think_now(c, world)
 
+
+
+# Woken by hunger or thirst: how long their sleep intentions stand aside, and how often it may happen.
+UP_FOR_FOOD_TICKS = 1200
+_SLEEP_INTENTIONS = {"sleep", "take_nap", "nap", "bedtime"}
+
+
+def _starving_in_bed(c, world):
+    """Asleep at hunger 97+ or hydration 10-, and not woken for this in the last UP_FOR_FOOD_TICKS * 2."""
+    body = c.get("body") or {}
+    if body.get("hunger", 0) < 97 and body.get("hydration", 100) > 10:
+        return False
+    return world.get("tick", 0) - (c.get("_up_for_food_until") or -10 ** 9) >= UP_FOR_FOOD_TICKS
 
 
 # A wake that isn't just the clock or the end of an activity: something happened that they should get to think about.

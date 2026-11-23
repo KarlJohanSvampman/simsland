@@ -48,3 +48,38 @@ def is_repeat(c, world, utterance, target_id=None):
         if entry.get("target") == target_id and _normalize(entry.get("utterance")) == line:
             return True
     return False
+
+
+# ---- nearly the same line -----------------------------------------------------------------------------------------
+# Live (2026-11-23): Margaret apologised to Alexander four times running in near-identical words ("I think I was
+# feeling a bit overwhelmed and didn't think about how my words might affect you...") -- different by a word or two, so
+# the exact check above let every one through. Lines of more than SIMILAR_MIN_WORDS words that share SIMILAR_RATIO of
+# their words with one of the speaker's last few lines to the same listener count as said already.
+SIMILAR_MIN_WORDS = 6
+SIMILAR_RATIO = 0.7
+_WORD = re.compile(r"[a-z']+")
+
+
+def _words(text):
+    return set(_WORD.findall((text or "").lower()))
+
+
+def near_repeat(c, world, utterance, target_id=None, lookback=4):
+    """The earlier line this one nearly repeats (to the same listener, within REPEAT_WINDOW_TICKS), or None."""
+    new = _words(utterance)
+    if len(new) < SIMILAR_MIN_WORDS:
+        return None
+    tick = world.get("tick", 0)
+    seen = 0
+    for entry in reversed(c.get("speech_log") or []):
+        if tick - entry.get("tick", 0) > REPEAT_WINDOW_TICKS:
+            break
+        if entry.get("target") != target_id:
+            continue
+        seen += 1
+        old = _words(entry.get("utterance"))
+        if old and len(new & old) / max(len(new), len(old)) >= SIMILAR_RATIO:
+            return entry.get("utterance")
+        if seen >= lookback:
+            break
+    return None

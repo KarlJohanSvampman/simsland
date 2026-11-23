@@ -68,7 +68,7 @@ function render() {
   if (!el || !d) return;
   const moods = d.moods || [];
   const logRows = (d.trait_log || []).slice().reverse().map((e) => `
-    <tr><td style="white-space:nowrap">${esc(e.when || ("tick " + e.tick))}</td>
+    <tr><td style="white-space:nowrap">${esc(e.when || (window._simDateTimeAt ? window._simDateTimeAt(e.tick) : ""))}</td>
         <td>${(e.added || []).map((t) => `<span class="pos">+${esc(t)}</span>`).join(" ")}
             ${(e.removed || []).map((t) => `<span class="neg">−${esc(t)}</span>`).join(" ")}
             ${e.list === "personality_traits" ? '<span class="hint">(picked up)</span>' : ""}</td>

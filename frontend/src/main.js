@@ -628,10 +628,9 @@ function _projectCalendarForward(cal, seconds){
 
 function _formatProjectedTime(proj){
   if(!proj) return null;
-  const ampmHour = ((proj.hour % 12) || 12);
-  const ampm = proj.hour < 12 ? "AM" : "PM";
+  // 24-hour, per the user's ask (2026-11-23): "Mon, Nov 23 17:05"
   const weekdayLabel = proj.weekday ? `${proj.weekday.slice(0, 3)}, ` : "";
-  return `${weekdayLabel}${_MONTH_NAMES[proj.month - 1]} ${proj.day} at ${ampmHour}:${String(proj.minute).padStart(2, "0")} ${ampm}`;
+  return `${weekdayLabel}${_MONTH_NAMES[proj.month - 1]} ${proj.day} ${String(proj.hour).padStart(2, "0")}:${String(proj.minute).padStart(2, "0")}`;
 }
 
 // Per the user's explicit ask: "Recent Memories" must show WHEN each one
@@ -654,6 +653,13 @@ function _formatMemoryTimestamp(tick){
   const proj = _projectCalendarForward(_lastCalendar, tick - _lastCalendarWorldTick);
   return _formatProjectedTime(proj);
 }
+
+// Sim date and time of a tick, for display -- per the user's ask (2026-11-23), durations, planned ends and "how long
+// ago" are shown as a datetime, never as a count of ticks. "—" before the first calendar has arrived.
+function _dateTimeAt(tick){
+  return (tick == null ? null : _formatMemoryTimestamp(tick)) || "—";
+}
+window._simDateTimeAt = _dateTimeAt;      // for the other panels (personaTab.js)
 
 const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
 scene.add(ambientLight);
@@ -4876,8 +4882,8 @@ function openActivityModal(charId){
       ? `${prop?.template?.replace(/_/g, " ") || targetChar?.name || "unknown"} (${act.target_id})` : null],
     ["Anchor", act.anchor_name],
     ["Eating", act.state?.food_name],
-    ["Started", act.phase_started_tick != null ? `${Math.max(0, tick - act.phase_started_tick)} ticks ago` : null],
-    ["Duration", act.duration != null ? `${act.duration} ticks` : null],
+    ["Started", act.phase_started_tick != null ? _dateTimeAt(act.phase_started_tick) : null],
+    ["Ends", act.duration != null && act.phase_started_tick != null ? _dateTimeAt(act.phase_started_tick + act.duration) : null],
     ["Waiting for", act.state?.waiting_for ? JSON.stringify(act.state.waiting_for) : null],
     ["Moving", c.is_moving ? "yes" : "no"],
   ];
@@ -5366,7 +5372,7 @@ function _focusBadges(c, avail){
   const badges = [];
   if(c._breakdown){
     const left = Math.max(0, (c._breakdown.end || tick) - tick);
-    badges.push([`Breaking down — about ${_durationLabel(left)} left`, "bad"]);
+    badges.push([`Breaking down — until ${_dateTimeAt(tick + left)}`, "bad"]);
   } else if((fs.last_breakdown != null) && tick - fs.last_breakdown < 3 * 3600){
     badges.push([`Broke down ${_ticksAgoLabel(tick - fs.last_breakdown)}`, "warn"]);
   }
@@ -5379,7 +5385,7 @@ function _focusBadges(c, avail){
     badges.push([`Gave up on ${String(abort.activity).replace(/_/g, " ")} ${_ticksAgoLabel(tick - abort.tick)}`, "warn"]);
   }
   if(fs.breakdown_cooldown_until && fs.breakdown_cooldown_until > tick && !c._breakdown){
-    badges.push([`Can't break down again for ${_durationLabel(fs.breakdown_cooldown_until - tick)}`, ""]);
+    badges.push([`Can't break down again until ${_dateTimeAt(fs.breakdown_cooldown_until)}`, ""]);
   }
   return badges;
 }
@@ -5407,7 +5413,7 @@ function _renderWorryCase(w){
   const last = (w.evidence || []).slice(-1)[0];
   const eased = (w.mitigated_by || []).slice(-1)[0];
   const bits = [];
-  if(left != null) bits.push(`about ${_durationLabel(left)} left`);
+  if(left != null) bits.push(`until ${_dateTimeAt(tick + left)}`);
   if(w.refreshes) bits.push(`kept alive ${w.refreshes}×`);
   if(w.origin) bits.push(`from ${String(w.origin).replace(/^scan:/, "").replace(/_/g, " ")}`);
   return `
@@ -5913,7 +5919,7 @@ function _intentionOutcome(c, intention){
   const tick = _worldState.tick || 0;
   const deadline = intention.deadline_tick;
   const untilText = deadline != null && deadline > tick
-    ? ` (next check-in in ${_durationLabel(deadline - tick)})` : "";
+    ? ` (next check-in ${_dateTimeAt(deadline)})` : "";
   return { color: colors[Math.min(stage, colors.length - 1)],
            label: labels[Math.min(stage, labels.length - 1)] + untilText };
 }
@@ -6019,7 +6025,7 @@ function _formatIntentionFieldValue(key, value){
   if(value == null || value === "") return "(none)";
   if(key === "created_at"){
     const nowTick = _worldState.tick || 0;
-    return `${_ticksAgoLabel(Math.max(0, nowTick - value))} (tick ${value})`;
+    return _dateTimeAt(value);
   }
   if(key === "service_id"){
     const tmpl = (definitions.service_templates || {})[value];
@@ -7039,7 +7045,7 @@ function renderLifeTab(c){
           : `At (${Math.round(loc.x)}, ${Math.round(loc.y)})`;
 
         const contactLine = d.last_contact
-          ? `Last contact: ${d.last_contact.medium.replace(/_/g, " ")} at tick ${d.last_contact.tick}`
+          ? `Last contact: ${d.last_contact.medium.replace(/_/g, " ")}, ${_dateTimeAt(d.last_contact.tick)}`
           : `Last contact: none on record`;
 
         const lines = [locLine, contactLine];
@@ -7047,7 +7053,7 @@ function renderLifeTab(c){
         if(d.current_caretaker) lines.push(`Currently with: ${d.current_caretaker}`);
         if(d.announced_departure === false) lines.push(`<span class="viewerWarn">Left without announcing departure</span>`);
         if(!d.expected_home_today) lines.push(`<span class="viewerWarn">Not expected home today</span>`);
-        else if(d.expected_return_tick != null) lines.push(`Expected back around tick ${d.expected_return_tick}`);
+        else if(d.expected_return_tick != null) lines.push(`Expected back around ${_dateTimeAt(d.expected_return_tick)}`);
 
         return `
           <div class="viewerCard">
@@ -7767,7 +7773,7 @@ async function openPoliticsModal(){
   const billRows = (data.legislation || []).map(b => `
     <div class="viewerCard">
       <b>${b.title}</b> <span style="opacity:.6">(${b.status})</span><br/>
-      <span style="opacity:.6">Vote at tick ${b.vote_tick}${b.status !== "pending" ? ` — ${b.votes_for} for / ${b.votes_against} against` : ""}</span>
+      <span style="opacity:.6">Vote ${_dateTimeAt(b.vote_tick)}${b.status !== "pending" ? ` — ${b.votes_for} for / ${b.votes_against} against` : ""}</span>
     </div>`).join("");
   const election = data.election || {};
   body.innerHTML = `
@@ -8604,13 +8610,24 @@ if(inspectorToggleBtn){
   });
 }
 
+// The sim's date and time at the top of the left panel (select character), 24-hour -- per the user's ask (2026-11-23).
+function _outlinerClockText(){
+  if(!_lastCalendar || _lastCalendarWorldTick == null || _worldState.tick == null) return "—";
+  const p = _projectCalendarForward(_lastCalendar, _worldState.tick - _lastCalendarWorldTick);
+  if(!p) return "—";
+  const p2 = (n) => String(n ?? 0).padStart(2, "0");
+  return `${p.weekday || ""} ${p.day} ${_MONTH_NAMES[p.month - 1]} ${p.year}  ${p2(p.hour)}:${p2(p.minute)}:${p2(p.second)}`.trim();
+}
+setInterval(() => {
+  const el = document.getElementById("outlinerClock");
+  if(el) el.textContent = _outlinerClockText();
+}, 1000);
+
 function _terminalLogTimeLabel(){
   if(!_lastCalendar || _lastCalendarWorldTick == null || _worldState.tick == null) return "--:--";
   const proj = _projectCalendarForward(_lastCalendar, _worldState.tick - _lastCalendarWorldTick);
   if(!proj) return "--:--";
-  const ampmHour = ((proj.hour % 12) || 12);
-  const ampm = proj.hour < 12 ? "AM" : "PM";
-  return `${ampmHour}:${String(proj.minute).padStart(2, "0")} ${ampm}`;
+  return `${String(proj.hour).padStart(2, "0")}:${String(proj.minute).padStart(2, "0")}`;
 }
 
 function terminalLog(kind, characterName, text){
@@ -8685,7 +8702,8 @@ function _durationLabel(ticks){
 }
 
 function _ticksAgoLabel(ticks){
-  return `${_durationLabel(ticks)} ago`;
+  // the moment that many ticks ago, as a sim datetime (callers pass now - then)
+  return _dateTimeAt((_worldState.tick || 0) - ticks);
 }
 
 async function fetchEvents(){
@@ -8940,12 +8958,8 @@ function _offgridBackIn(c, fallbackTick){
   const live = _worldState.characters?.[c.id];
   const tick = _worldState.tick ?? fallbackTick ?? 0;
   const returnTick = live?.return_tick ?? c.return_tick ?? tick;
-  const remain = returnTick - tick;
-  if(remain <= 0) return "due now";
-  const m = Math.max(1, Math.round(remain / 60));
-  if(m < 180) return `in ~${m}m`;
-  const h = Math.round(m / 60);
-  return h < 48 ? `in ~${h} h` : `in ~${Math.floor(h / 24)} d ${h % 24} h`;
+  if(returnTick - tick <= 0) return "due now";
+  return `around ${_dateTimeAt(returnTick)}`;
 }
 
 function _outlinerStatus(c, tick){

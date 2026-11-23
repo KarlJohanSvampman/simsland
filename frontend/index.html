@@ -802,6 +802,16 @@
     overflow-y: auto;
   }
 
+  /* the sim's date and time, 24-hour (main.js::_outlinerClockText) */
+  #outlinerClock {
+    font-size: 13px;
+    font-weight: bold;
+    color: #e8e8e8;
+    padding: 2px 2px 8px;
+    letter-spacing: .3px;
+    font-variant-numeric: tabular-nums;
+  }
+
   #outlinerSearch {
     width: 100%;
     box-sizing: border-box;
@@ -1217,6 +1227,7 @@
 <button id="inspectorToggleBtn" class="overviewToolbarBtn" style="right: 676px;" title="Toggle inspector">🔍</button>
 
 <div id="outlinerSidebar">
+  <div id="outlinerClock">—</div>
   <input id="outlinerSearch" type="text" placeholder="Search households / characters..." />
   <div id="outlinerTree"></div>
 </div>
