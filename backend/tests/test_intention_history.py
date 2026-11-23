@@ -106,6 +106,68 @@ confiding.resolve_confide_opportunities(c, w)
 check("told to someone close: every memory marked told, and the wish is over",
       all(m.get("confided") for m in c["memories"]) and not [d for d in c["persistent_desires"] if d["type"] == "confide_in_someone" and d["active"]])
 
+# Live (2026-11-21): needs that were met showed as "dropped" -- the completed activity is named differently from the
+# intention ("drink_water" for drink, "eat_meal" for eat_food, "dust_and_wipe" for clean_zone)
+def _done_after(activity, itype, interaction=None, started_for=None, other_current=None):
+    w["tick"] += 100
+    k["active_intentions"] = [{"type": itype, "reason": "x"}] + ([{"type": other_current}] if other_current else [])
+    if started_for is not None:
+        k["_activity_starts"] = [[w["tick"], activity, started_for]]
+    ih.track(k, w)
+    w["tick"] += 50
+    event_bus.emit("activity_completed", {"character_id": "kathleen", "activity_type": activity, "interaction": interaction})
+    event_bus.flush(w)
+    k["active_intentions"] = [i for i in k["active_intentions"] if i["type"] != itype]
+    ih.track(k, w)
+    return next(x for x in reversed(k["intention_history"]) if x["type"] == itype)["outcome"]
+
+check("drinking water ticks 'drink' off", _done_after("drink_water", "drink") == "done")
+check("eating a meal ticks 'eat_food' off", _done_after("eat_meal", "eat_food") == "done")
+check("dusting ticks 'clean_zone' off", _done_after("dust_and_wipe", "clean_zone") == "done")
+check("a night's sleep ticks 'seek_caffeine_or_rest' off", _done_after("sleep", "seek_caffeine_or_rest") == "done")
+check("a prop interaction on the satisfied-by list counts", _done_after("interact", "drink", interaction="use_tap") == "done")
+check("an activity started for an intention ticks it off ('sit_and_relax' for relieve_worry)",
+      _done_after("sit_and_relax", "relieve_worry", started_for="relieve_worry") == "done")
+check("... but not one with its own list: a toilet trip started during 'sleep' doesn't tick sleep off",
+      _done_after("use_toilet", "sleep", started_for="sleep") == "dropped")
+check("heating a meal is not eating it", _done_after("heat_meal", "eat_food") == "dropped")
+
+# Live (2026-11-21): an intention a plan saw to (eat_food for Reduce Hunger, feed_child_* for Feed the Kids) was cleared
+# by the plan before the intention.satisfied event marked it, so it showed as "dropped"
+from brain.actionplans import runner
+w["tick"] += 100
+k["active_intentions"] = [{"type": "eat_food", "reason": "hungry"}, {"type": "feed_child_char_kid", "child_id": "char_kid"},
+                          {"type": "brush_teeth", "reason": "x"}]
+ih.track(k, w)
+w["tick"] += 10
+runner._clear_replaced(k, {"replaces": ["eat_food", "feed_child_*"]}, world=w, how="Light meal worked")
+ih.track(k, w)
+last = {x["type"]: x for x in k["intention_history"][-2:]}
+check("what a plan cleared is ticked off as done, saying how",
+      last.get("eat_food", {}).get("outcome") == "done" and last["eat_food"].get("how") == "Light meal worked", str(last))
+check("... the per-child ones too", last.get("feed_child_char_kid", {}).get("outcome") == "done", str(last))
+check("... and only those", [i["type"] for i in k["active_intentions"]] == ["brush_teeth"])
+
+# socializing with someone who has left ends (systems/activities.py)
+from systems import activities as A
+w["tick"] = 50000
+pat = {"id": "pat", "x": 10, "y": 10, "building_id": "house"}
+mar = {"id": "mar", "name": "Margaret", "x": 11, "y": 10, "building_id": "house"}
+w["characters"].update(pat=pat, mar=mar)
+act = {"type": "socialize", "phase": "using", "target_id": "mar"}
+check("socializing side by side goes on", not A._socialize_partner_gone(pat, w, act))
+mar.update(building_id=None, x=40, y=30)
+check("... a partner who just stepped away gets a moment", not A._socialize_partner_gone(pat, w, act))
+w["tick"] += A.SOCIALIZE_AWAY_GRACE_TICKS
+check("... and once they've been gone a while, it's over", A._socialize_partner_gone(pat, w, act))
+mar.update(building_id="house", x=12, y=11)
+check("... back in the room: the chat goes on", not A._socialize_partner_gone(pat, w, act) and "_partner_away_since" not in act)
+mar["off_grid"] = True
+w["tick"] += A.SOCIALIZE_AWAY_GRACE_TICKS + 1
+A._socialize_partner_gone(pat, w, act)
+w["tick"] += A.SOCIALIZE_AWAY_GRACE_TICKS
+check("a partner who left the map ends it", A._socialize_partner_gone(pat, w, act))
+
 print()
 if failures:
     print(f"FAILED: {len(failures)}")

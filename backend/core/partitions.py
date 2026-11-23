@@ -63,6 +63,8 @@ def persists(world, key):
         return SERVER_P == 0
     if kind == "key" and str(eid) in LOCAL_KEYS:
         return SERVER_P == 0
+    if kind == "char_cold":                       # a character's cold row (core/entity_store.py): its character's owner
+        key = ("characters", str(eid).split("/", 1)[0])
     return _owner(world, key) == SERVER_P
 
 LOCAL_KEYS = {"timers", "_timer_seq", "_sched_sig", "_dirty", "_perchar_members", "_active_loops", "_bg_work",

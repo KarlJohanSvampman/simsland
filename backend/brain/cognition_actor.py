@@ -57,6 +57,8 @@ MODE = os.getenv("COGNITION_MODE", "auto").lower()
 REMOTE_FALLBACK_SECONDS = 20.0
 WORKERS = 16
 REQUEST_TIMEOUT_SECONDS = 240.0       # comfortably above llm_gate's own worst-case wait
+# A request made by an earlier run of this process was lost with it (its answer has nowhere to go): asked again at once.
+PROCESS_STARTED = time.time()
 SESSION_TURNS = 6
 
 _pool = ThreadPoolExecutor(max_workers=WORKERS, thread_name_prefix="cognition")
@@ -73,6 +75,14 @@ def is_waiting(c, world=None):
     the Inspector rather than only in the container log."""
     p = pending(c)
     if not p:
+        return False
+    if p.get("wall", 0) < PROCESS_STARTED:
+        # Live (2026-11-22): after a restart / code reload, Daniel, Pamela and Patrick sat "thinking" for 7+ minutes on
+        # requests the old process had made -- nobody was waiting for those answers any more. Not the model's fault:
+        # no blackout, just ask again.
+        c["cognition"]["pending"] = None
+        from systems.conversation_floor import clear_thinking
+        clear_thinking(c["id"], p.get("tick", 0))
         return False
     if time.time() - p.get("wall", 0) > REQUEST_TIMEOUT_SECONDS:
         c["cognition"]["pending"] = None
@@ -155,6 +165,7 @@ def _send_remote(char_id, req_id, tick, context, session, priority, wake_reason)
             "req_id": req_id, "char_id": char_id, "tick": tick, "context": context,
             "session": session, "priority": priority, "wake_reason": wake_reason,
             "deadline": time.time() + REQUEST_TIMEOUT_SECONDS,
+            "llm_assign": _llm_assignments(),     # which model profile each character uses (llm/provider.py)
         })
     except Exception as exc:
         with _inflight_lock:
@@ -162,6 +173,11 @@ def _send_remote(char_id, req_id, tick, context, session, priority, wake_reason)
         print(f"[cognition] could not queue {char_id}'s decision remotely ({exc!r}); running it locally")
         return False
     return True
+
+
+def _llm_assignments():
+    from llm import provider
+    return provider.assignments()
 
 
 def _ensure_reader():
@@ -262,6 +278,24 @@ def on_decision_ready(data, world):
 
     from brain.cognition_scheduler import note_think
     decision = data.get("decision")
+    if decision:
+        # "Your recent turns" in the next prompt (brain/llm_brain.py). think() appends this turn to the COPY of the session
+        # it was given (on a worker, or a pool thread) -- nothing ever wrote it back, so every prompt showed the same stale
+        # history, the same moment came out as the same prompt, and characters went round in loops.
+        try:
+            from brain.llm_brain import _append_history
+            session = c.setdefault("_llm_session", {"history": []})
+            _append_history(session, decision)
+            # the same thing four times running (Margaret examining the bathroom sink, over and over, all night): the
+            # "(x4 in a row -- try something different)" note wasn't enough -- they catch themselves at it
+            last = (session.get("history") or [{}])[-1]
+            if isinstance(last, dict) and last.get("count", 1) >= 4 and last.get("count", 1) % 4 == 0:
+                from brain.cognition_scheduler import wake_character
+                wake_character(c, world, "self_assessment", {"thought": (
+                    "That's the same thing " + str(last["count"]) + " times in a row -- do something else now: "
+                    "a different place, a different person, or something you've been putting off.")})
+        except Exception as exc:                          # noqa: BLE001
+            print(f"[cognition] could not note {cid}'s turn in their history: {exc!r}")
     note_think(c, world, decision, wake_reason=data.get("wake_reason"), asked_at_seq=p.get("wake_seq"))
     try:                                         # which of their tags decided it (systems/choice_tags.py)
         from systems.choice_tags import record as record_choice_tags
@@ -303,6 +337,7 @@ def _drop_answered_wake(c, world):
     last = (c.get("speech_log") or [{}])[-1]
     if speaker and last.get("tick") == world.get("tick", 0) and last.get("target") == speaker:
         from brain.cognition_scheduler import IDLE_BASE_TICKS
+        cog["spoken_to"] = None
         cog["wake_reason"] = None
         cog["wake_payload"] = None
         cog["next_think_tick"] = world.get("tick", 0) + IDLE_BASE_TICKS

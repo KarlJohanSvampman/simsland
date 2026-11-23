@@ -74,31 +74,72 @@ LLM_CALL_MAX_WAIT_SECONDS = float(os.getenv("LLM_CALL_MAX_WAIT_SECONDS", "170"))
 
 _loop = asyncio.new_event_loop()
 _counter = itertools.count()
-_heap: list = []             # [(priority, seq, coro, future), ...] -- a min-heap
-_running: list = []          # [(priority, task), ...] -- currently executing, len <= OLLAMA_MAX_CONCURRENCY
-_wakeup: asyncio.Event | None = None  # created on _loop's own thread, see _run_loop
+_wakeup_ready = threading.Event()
 
 
-async def _dispatcher():
-    """One of OLLAMA_MAX_CONCURRENCY identical workers -- pops the single
-    highest-priority queued entry, runs it as a cancellable task, and
-    resolves that entry's future on completion, failure, or cancellation.
-    Never lets a CancelledError escape to the caller (see _ABORTED_ERROR)."""
+# One lane per model profile (llm/provider.py): its own queue, its own running set and its own number of dispatchers
+# (the profile's max_concurrency), so a slow local server never holds up characters on a hosted API. Preemption is
+# within a lane. Lanes are made on first use; with no profiles file there is one, "env", sized OLLAMA_MAX_CONCURRENCY.
+class _Lane:
+    def __init__(self, name, size):
+        self.name, self.size = name, size
+        self.heap = []           # [(priority, seq, coro, future), ...] -- a min-heap
+        self.running = []        # [(priority, task), ...] -- currently executing, len <= size
+        self.wakeup = asyncio.Event()
+        for _ in range(size):
+            _loop.create_task(_dispatcher(self))
+
+
+_lanes = {}
+
+
+def _lane(name):
+    """On _loop's thread only."""
+    lane = _lanes.get(name)
+    if lane is None:
+        try:
+            from llm import provider
+            size = provider.settings(name)["max_concurrency"]
+        except Exception:                                 # noqa: BLE001
+            size = OLLAMA_MAX_CONCURRENCY
+        lane = _lanes[name] = _Lane(name, size)
+    return lane
+
+
+def __getattr__(attr):
+    # api/admin.py::llm_gate_state reads _heap / _running: all lanes together
+    if attr == "_heap":
+        return [e for lane in list(_lanes.values()) for e in lane.heap]
+    if attr == "_running":
+        return [e for lane in list(_lanes.values()) for e in lane.running]
+    raise AttributeError(attr)
+
+
+def lanes_state():
+    return {n: {"queued": len(l.heap), "running": len(l.running), "max_concurrency": l.size,
+                "queued_priorities": [p for p, *_ in l.heap]} for n, l in list(_lanes.items())}
+
+
+async def _dispatcher(lane):
+    """One of the lane's identical workers -- pops its highest-priority queued entry, runs it as a cancellable task,
+    and resolves that entry's future on completion, failure, or cancellation. Never lets a CancelledError escape to
+    the caller (see _ABORTED_ERROR)."""
     while True:
-        if not _heap:
-            await _wakeup.wait()
-            _wakeup.clear()
+        if not lane.heap:
+            await lane.wakeup.wait()
+            lane.wakeup.clear()
             continue
 
-        priority, _seq, coro, fut = heapq.heappop(_heap)
+        priority, _seq, coro, fut = heapq.heappop(lane.heap)
         if fut.done():
+            coro.close()
             continue  # caller already gave up (e.g. its own timeout fired first)
 
         task = asyncio.ensure_future(coro)
         # If the caller gives up (hard timeout), stop the in-flight request too.
         fut.add_done_callback(lambda f, t=task: t.cancel() if f.cancelled() else None)
         slot = (priority, task)
-        _running.append(slot)
+        lane.running.append(slot)
         try:
             result = await task
             if not fut.done():
@@ -110,40 +151,56 @@ async def _dispatcher():
             if not fut.done():
                 fut.set_result({"error": str(e)})
         finally:
-            _running.remove(slot)
+            lane.running.remove(slot)
 
 
-def _enqueue(coro, priority):
+def _enqueue(coro, priority, profile):
     """Runs on _loop's own thread (called from within a coroutine already
     scheduled there via run_coroutine_threadsafe) -- heapq/list mutations
     here need no separate lock."""
+    lane = _lane(profile)
     fut = _loop.create_future()
-    heapq.heappush(_heap, (priority, next(_counter), coro, fut))
+    heapq.heappush(lane.heap, (priority, next(_counter), coro, fut))
 
-    # Preempt the single least-urgent running task if it's strictly less
+    # Preempt the single least-urgent running task in this lane if it's strictly less
     # urgent than this new arrival -- e.g. a background item-content call
     # already in flight gets cancelled the moment a survival-critical
     # character decision shows up, rather than making it wait its turn.
-    if _running:
-        worst_priority, worst_task = max(_running, key=lambda s: s[0])
+    if lane.running:
+        worst_priority, worst_task = max(lane.running, key=lambda s: s[0])
         if priority < worst_priority:
             worst_task.cancel()
 
-    _wakeup.set()
+    lane.wakeup.set()
     return fut
 
 
-async def _submit_and_await(coro, priority):
-    fut = _enqueue(coro, priority)
+async def _submit_and_await(coro, priority, profile):
+    fut = _enqueue(coro, priority, profile)
     return await fut
 
 
+def _profile_of(coro, profile=None):
+    """Which lane a call belongs in: the profile asked for, else that of the character the coroutine is for (its
+    char_id argument -- call_llm_safe(..., char_id=...) and most callers), else the background profile."""
+    try:
+        from llm import provider
+        if profile:
+            return profile
+        frame = getattr(coro, "cr_frame", None)
+        args = frame.f_locals if frame is not None else {}
+        cid = args.get("char_id")
+        if cid is None:
+            c = args.get("c") or args.get("char") or args.get("character")
+            cid = c.get("id") if isinstance(c, dict) else None
+        return provider.profile_for(cid if isinstance(cid, str) else None)
+    except Exception:                                     # noqa: BLE001
+        return "env"
+
+
 def _run_loop():
-    global _wakeup
     asyncio.set_event_loop(_loop)
-    _wakeup = asyncio.Event()
-    for _ in range(OLLAMA_MAX_CONCURRENCY):
-        _loop.create_task(_dispatcher())
+    _wakeup_ready.set()
     _loop.run_forever()
 
 
@@ -151,7 +208,7 @@ _thread = threading.Thread(target=_run_loop, name="llm-gate", daemon=True)
 _thread.start()
 
 
-def run_llm_call(coro, priority=PRIORITY_NORMAL, timeout=None):
+def run_llm_call(coro, priority=PRIORITY_NORMAL, timeout=None, profile=None):
     """Submit an awaitable (e.g. call_llm_safe(...)) to the gate's event
     loop and block the calling thread until it completes (or is aborted
     for a higher-priority arrival -- see module docstring), bounded by
@@ -169,7 +226,7 @@ def run_llm_call(coro, priority=PRIORITY_NORMAL, timeout=None):
             return dict(_TIMEOUT_ERROR)
         timeout = min(timeout if timeout is not None else tick_state.TICK_LLM_CALL_MAX_SECONDS,
                       tick_state.TICK_LLM_CALL_MAX_SECONDS, remaining)
-    future = asyncio.run_coroutine_threadsafe(_submit_and_await(coro, priority), _loop)
+    future = asyncio.run_coroutine_threadsafe(_submit_and_await(coro, priority, _profile_of(coro, profile)), _loop)
     t0 = time.perf_counter()
     try:
         return future.result(timeout=timeout if timeout is not None else LLM_CALL_MAX_WAIT_SECONDS)
@@ -202,11 +259,11 @@ def gate_failed(result):
     return isinstance(result, dict) and set(result) == {"error"}
 
 
-async def run_llm_call_async(coro, priority=PRIORITY_NORMAL, timeout=None):
+async def run_llm_call_async(coro, priority=PRIORITY_NORMAL, timeout=None, profile=None):
     """Async equivalent of run_llm_call, for callers already inside an
     event loop (e.g. cognition_jobs.py) -- schedules onto the gate's loop
     and awaits the result without blocking the caller's own loop thread."""
-    future = asyncio.run_coroutine_threadsafe(_submit_and_await(coro, priority), _loop)
+    future = asyncio.run_coroutine_threadsafe(_submit_and_await(coro, priority, _profile_of(coro, profile)), _loop)
     try:
         return await asyncio.wait_for(asyncio.wrap_future(future),
                                       timeout if timeout is not None else LLM_CALL_MAX_WAIT_SECONDS)

@@ -150,6 +150,8 @@ def _check_child_room_mess(c, parents, world):
         return
     if c.get("_awaiting_reminder") or c.get("_awaiting_caregiver"):
         return
+    if _recently_reminded(c, world, "clean_room"):
+        return
 
     from systems.chores import get_room_cleanliness
     zone_key = f"{building_id}:{bedroom_id}"
@@ -173,6 +175,25 @@ def _check_child_room_mess(c, parents, world):
 
 
 TENDED_PREFIXES = ("feed_child_", "remind_child_")
+
+# After a reminder the child needs time to act on it (walk to the toilet, get to bed). Live (2026-11-21): the need was
+# still over its threshold the next time tick_child_needs looked, so a new "remind child" went up straight away --
+# Rebecca reminded Alexander about his bladder ten times in a minute, each one filed as a dropped intention.
+REMIND_AGAIN_AFTER_TICKS = 600
+_DOING_IT = {"bladder": ("use_toilet", "go_to_toilet"), "bowels": ("use_toilet", "use_toilet_bowels", "go_to_toilet"),
+             "fatigue": ("sleep", "nap", "take_nap", "go_to_sleep"), "clean_room": ("clean_zone", "dust_and_wipe", "clean")}
+
+
+def _recently_reminded(c, world, need):
+    """Reminded about this need a moment ago, or already seeing to it (on the way to the toilet, in bed)."""
+    t = world.get("tick", 0)
+    if t - (c.get("_reminded") or {}).get(need, -10**9) < REMIND_AGAIN_AFTER_TICKS:
+        return True
+    doing = _DOING_IT.get(need, ())
+    if ((c.get("activity") or {}).get("type") in doing
+            or any(i.get("type") in doing for i in c.get("active_intentions") or [])):
+        return True
+    return False
 
 
 def _drop_for_parents(world, child, intention_type):
@@ -269,6 +290,8 @@ def tick_child_needs(world):
                     })
             else:
                 if c.get("_awaiting_reminder", {}).get("need") == need:
+                    continue
+                if _recently_reminded(c, world, need):
                     continue
                 c["_awaiting_reminder"] = {"need": need, "tick": world.get("tick", 0)}
                 for parent in parents_now:

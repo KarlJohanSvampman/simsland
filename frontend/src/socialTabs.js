@@ -147,7 +147,7 @@ export function openArgumentModal(c, issueId, ctx) {
       return `<div class="viewerCard viewerCardClickable" data-modal-conv="${ctx.esc(e.id || e.conv_id)}">
         <div style="opacity:.6">${ctx.fmt(e.ended_tick) || ""} · ${ctx.esc(ctx.name(e.initiator))} opened with ${ctx.esc(pretty(t.opening || "?"))}</div>
         <div><b>${ctx.esc(t.subject || e.subject || "")}</b></div>
-        ${(e.lines || []).slice(0, 2).map(l => `<div style="opacity:.8"><span style="opacity:.6">${ctx.clock(l.tick)}</span> ${ctx.esc(ctx.name(l.speaker))}: "${ctx.esc(l.utterance)}"</div>`).join("")}
+        ${(e.line_count ?? (e.lines || []).length) ? `<div style="opacity:.6;font-size:.85em">${e.line_count ?? e.lines.length} lines -- open to read</div>` : ""}
       </div>`;
     }).join("") || `<div style="opacity:.6">None of ${ctx.esc(c.name)}'s logged conversations are filed here.</div>`);
     body.innerHTML = html;

@@ -587,6 +587,8 @@ def perceived_activity(other):
         "lie_down":        "lying down",
         "lean_against_wall": "leaning against the wall",
         "sleep":        "sleeping",
+        "nap":          "napping",
+        "take_nap":     "napping",
         "cook":         "cooking",
         "eat":          "eating",
         "take_shower":  "taking a shower",
@@ -620,6 +622,15 @@ def perceived_activity(other):
     }
 
     description = mapping.get(key)
+    if not description and key != activity.get("type"):
+        description = mapping.get(activity.get("type"))
+    if not description:
+        # the activity's own plain words (systems/doing.py) before the shrug: live (2026-11-23) a napping Daniel showed
+        # up in Rachel's prompt as "currently doing something", so she kept trying to talk to him
+        from systems.doing import VERBS
+        description = VERBS.get(activity.get("type")) or VERBS.get(key)
+        if description == "asleep":
+            description = "sleeping"
     if not description:
         return "doing something"
 

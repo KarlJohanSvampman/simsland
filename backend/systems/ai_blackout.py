@@ -24,6 +24,7 @@ from core import scheduler
 
 BLACKOUT_GRACE_TICKS = 600          # 10 sim-minutes of the AI not answering before it turns into an episode
 GROWTH_PER_MINUTE = 0.02            # ... then this much per minute it still isn't
+RECOVERY_PER_MINUTE = 0.05          # once the AI answers again it fades by this much a minute (1.0 -> gone in 20 min)
 CALM_PER_LINE = 0.2
 CRISIS_INTENSITY = 0.85
 ERRATIC_CHANCE = 0.25               # per failed turn, scaled by intensity
@@ -120,6 +121,15 @@ def _grow(c, world):
     minutes = (t - st.get("last_grow", t)) / 60
     if still_failing and minutes > 0:
         st["intensity"] = round(min(1.0, st.get("intensity", 0) + GROWTH_PER_MINUTE * minutes), 3)
+    elif minutes > 0:
+        # The AI is answering again: the fog lifts. Live (2026-11-23): episodes from a night of failed calls stayed at
+        # full strength for hours after the model was back (only kind words or a hospital night could end them), and
+        # characters who were thinking fine kept shouting "None of this is real!".
+        st["intensity"] = round(max(0.0, st.get("intensity", 0) - RECOVERY_PER_MINUTE * minutes), 3)
+        if st["intensity"] <= 0:
+            st["last_grow"] = t
+            end(c, world, "My head feels clear again.")
+            return
     st["last_grow"] = t
     if st["intensity"] >= CRISIS_INTENSITY and not st.get("incident_id"):
         _crisis(c, world)

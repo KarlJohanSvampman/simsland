@@ -27,6 +27,15 @@ function render(state, title) {
 function describe(s) {
   const who = s.provider_label || "Ollama";
   if (nameEl) nameEl.textContent = who;
+  if (Array.isArray(s.profiles) && s.profiles.length > 1) {
+    // several model profiles (backend/llm/provider.py): one line each
+    const lines = s.profiles.map((p) => `${p.profile}: ${p.provider_label} ${p.model} -- ${p.state}`
+      + (p.latency_ms != null ? ` (${p.latency_ms} ms)` : "")
+      + (p.characters && p.characters.length ? `, ${p.characters.length} character(s)` : "")
+      + (p.error ? `\n   ${p.error}` : ""));
+    lines.push("click to check now");
+    return lines.join("\n");
+  }
   const lines = [`${who}: ${s.state}`, s.base_url, `model: ${s.model}`];
   if (s.latency_ms != null) lines.push(`answered in ${s.latency_ms} ms`);
   if (Array.isArray(s.loaded)) lines.push(s.loaded.length ? `in memory: ${s.loaded.join(", ")}` : "no model in memory yet");

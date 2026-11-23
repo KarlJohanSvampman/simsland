@@ -77,6 +77,15 @@ function render() {
     <div class="bar"><button data-save ${state.dirty ? "" : "disabled"}>Save</button>
       <span class="msg">${state.dirty ? "unsaved changes" : ""}</span></div>
 
+    ${(d.llm_profiles || []).length > 1 || d.llm_profile ? `<h4>AI model</h4>
+    <p class="hint">Which model this character thinks and talks with (backend/llm_profiles.json).
+      Now using: <b>${esc(d.llm_profile_in_use || "")}</b></p>
+    <select data-llm>
+      <option value="" ${d.llm_profile ? "" : "selected"}>default (${esc(d.llm_profile_default || "")})</option>
+      ${(d.llm_profiles || []).map((p) => `<option value="${esc(p.name)}" ${p.name === d.llm_profile ? "selected" : ""}>
+        ${esc(p.name)} -- ${esc(p.label)} ${esc(p.model)}</option>`).join("")}
+    </select>` : ""}
+
     <h4>Personality traits</h4>
     ${chipEditor("traits", d.traits, "add a trait…")}
     ${(d.personality_traits || []).length ? `<p class="hint" style="margin-top:6px">Picked up later (changed by the simulation):</p>
@@ -108,7 +117,8 @@ function render() {
 async function save() {
   const d = state.data;
   const body = { traits: d.traits, speech_quirks: d.speech_quirks, insecurities: d.insecurities,
-                 confidence_sources: d.confidence_sources, mood_traits: d.mood_traits };
+                 confidence_sources: d.confidence_sources, mood_traits: d.mood_traits,
+                 llm_profile: d.llm_profile || "" };
   const msg = state.el.querySelector(".msg");
   if (msg) msg.textContent = "saving…";
   try {
@@ -136,6 +146,13 @@ function wire(el) {
       return;
     }
     if (e.target.closest("[data-save]")) save();
+  });
+  el.addEventListener("change", (e) => {
+    const sel = e.target.closest("select[data-llm]");
+    if (!sel) return;
+    state.data.llm_profile = sel.value || null;
+    state.dirty = true;
+    render();
   });
   el.addEventListener("keydown", (e) => {
     const inp = e.target.closest("input[data-add]");

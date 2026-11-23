@@ -1,6 +1,11 @@
 services:
   backend:
     build: ./backend
+    # every variable in .env reaches the container too -- the keys a model profile names (backend/llm_profiles.json,
+    # e.g. OPENAI_API_KEY, GEMINI_API_KEY) without listing each one here
+    env_file:
+      - path: .env
+        required: false
     container_name: sim-backend
     restart: unless-stopped
     mem_limit: 3g                 # hard cap; core/memory_guard.py exits cleanly (soft 1.5GB / hard 2.6GB RSS) before the kernel OOM-kills
@@ -47,6 +52,11 @@ services:
   # (SIM_PARTITIONS must be the same everywhere: partition 0 plus one service per further partition.)
   partition1: &partition
     build: ./backend
+    # every variable in .env reaches the container too -- the keys a model profile names (backend/llm_profiles.json,
+    # e.g. OPENAI_API_KEY, GEMINI_API_KEY) without listing each one here
+    env_file:
+      - path: .env
+        required: false
     restart: unless-stopped
     profiles: ["partitions"]
     mem_limit: 2g
@@ -91,6 +101,11 @@ services:
   # Bind-mounted like the backend; restart it after editing brain/ or llm/ code.
   cognition:
     build: ./backend
+    # every variable in .env reaches the container too -- the keys a model profile names (backend/llm_profiles.json,
+    # e.g. OPENAI_API_KEY, GEMINI_API_KEY) without listing each one here
+    env_file:
+      - path: .env
+        required: false
     restart: unless-stopped
     mem_limit: 1g
     environment:
@@ -121,6 +136,11 @@ services:
   # whenever no worker is alive.   docker compose up -d --scale bg_llm=2
   bg_llm:
     build: ./backend
+    # every variable in .env reaches the container too -- the keys a model profile names (backend/llm_profiles.json,
+    # e.g. OPENAI_API_KEY, GEMINI_API_KEY) without listing each one here
+    env_file:
+      - path: .env
+        required: false
     restart: unless-stopped
     mem_limit: 1g
     environment:
@@ -151,6 +171,11 @@ services:
   # (@core_only) to it over HTTP. It runs no tick. The core is the `backend` service (SIM_ROLE=core).
   api:
     build: ./backend
+    # every variable in .env reaches the container too -- the keys a model profile names (backend/llm_profiles.json,
+    # e.g. OPENAI_API_KEY, GEMINI_API_KEY) without listing each one here
+    env_file:
+      - path: .env
+        required: false
     restart: unless-stopped
     mem_limit: 2g
     deploy:

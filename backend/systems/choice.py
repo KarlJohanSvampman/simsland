@@ -21,7 +21,7 @@ deterministic instead).
 import random
 
 
-def choose(c, world, choice_type, options, occasion=None, max_num_options=None, context=None):
+def choose(c, world, choice_type, options, occasion=None, max_num_options=None, context=None, random_on_fail=True):
     """
     choice_type: short label for what's being chosen ("clothing item",
     "restaurant", "time slot", ...) -- shapes the LLM prompt only, no
@@ -80,6 +80,8 @@ def choose(c, world, choice_type, options, occasion=None, max_num_options=None, 
         if match:
             return match
 
+    if not random_on_fail:
+        return None                  # the caller has a better fallback than a dice roll (systems/conversation_interest.py)
     return random.choice(pool)
 
 

@@ -43,6 +43,8 @@ def run_request(req):
     started = time.time()
     decision, error = None, None
     try:
+        from llm import provider
+        provider.load_assignments(req.get("llm_assign"))     # the core's character -> model profile map
         decision = think(req["context"], char_id=req["char_id"], session=req.get("session"),
                          priority=req.get("priority"))
     except Exception as exc:

@@ -293,7 +293,10 @@ def persist_async(sim_id, reason="interval"):
                 # every so often: compare everything, and report what changed without being touched (world_view)
                 upserts, deletes, _m = entity_store.diff(sim_id, entry.world)
                 from core import world_view
-                world_view.note_missed([k for k in upserts if k not in only and k[0] != "meta"])
+                _touched_chars = {i for kind, i in only if kind == "characters"}
+                world_view.note_missed([k for k in upserts if k not in only and k[0] != "meta"
+                                        and not (k[0] == entity_store.COLD_KIND
+                                                 and k[1].split("/", 1)[0] in _touched_chars)])
             else:
                 upserts, deletes, _m = entity_store.diff(sim_id, entry.world, only=only)
             upserts, deletes = _owned_only(entry.world, upserts, deletes)

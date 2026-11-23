@@ -41,7 +41,13 @@ def repeat_dropped(c, world, utterance, target_id):
     answer. Someone holding the floor of a live conversation with this person is being waited on: "Okay!" said twice
     in half an hour is ordinary talk, and dropping it made the other person's wait run out."""
     from systems.speech_repeat import is_repeat
-    return is_repeat(c, world, utterance, target_id) and not answering(c, world, target_id)
+    if not is_repeat(c, world, utterance, target_id):
+        return False
+    # the answer exemption is for short stock replies ("Okay!", "Yeah, sure"), not a whole sentence said again: live
+    # (2026-11-22) Margaret said "I wish I'd met you before you passed away, I'm sure you'd have been fascinated by..."
+    # twice in one conversation, because she held the floor each time
+    short = len((utterance or "").split()) <= 4
+    return not (short and answering(c, world, target_id))
 
 
 def floor_blocks(world, speaker_id, target_id, medium="in_person"):

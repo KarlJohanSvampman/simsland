@@ -27,7 +27,8 @@ def _purpose():
     return "?"
 
 
-def log_prompt_entry(char_id: str, messages: list, response: str, elapsed: float, cached: bool, purpose=None, error=None):
+def log_prompt_entry(char_id: str, messages: list, response: str, elapsed: float, cached: bool, purpose=None, error=None,
+                     profile=None):
     """Store a prompt/response pair for a character. Thread-safe for asyncio."""
     if char_id not in _PROMPT_LOG:
         _PROMPT_LOG[char_id] = deque(maxlen=_PROMPT_LOG_MAX)
@@ -38,6 +39,7 @@ def log_prompt_entry(char_id: str, messages: list, response: str, elapsed: float
         "elapsed_s": round(elapsed, 3),
         "cached": cached,
         "purpose": purpose or "?",
+        **({"profile": profile} if profile else {}),
         **({"error": error} if error else {}),
     })
 
@@ -94,7 +96,7 @@ def _hash_prompt(messages):
     ).hexdigest()
 
 
-def _cache_key(messages, char_id=None):
+def _cache_key(messages, char_id=None, profile=None):
     # Confirmed live bug: this cache was keyed ONLY off the prompt's own
     # hash, with no character identity folded in at all -- two DIFFERENT
     # characters whose situations happened to produce the same (or even
@@ -108,6 +110,7 @@ def _cache_key(messages, char_id=None):
     return (
 
         f"llm_cache:"
+        f"{profile or 'default'}:"          # another model's reply is not this one's (llm/provider.py profiles)
         f"{char_id or 'anon'}:"
 
         f"{_hash_prompt(messages)}"
@@ -118,9 +121,12 @@ def _cache_key(messages, char_id=None):
 # RAW MODEL CALL (Ollama, or an OpenAI-compatible service: llm/provider.py)
 # =========================================================
 
-async def _call_llm(messages, timeout=60.0, max_tokens=None):
+async def _call_llm(messages, timeout=60.0, max_tokens=None, char_id=None, profile=None):
+    """One raw call, to the character's profile (llm/provider.py; no character: the background profile)."""
     from llm import provider
-    return await provider.chat(messages, timeout=timeout, max_tokens=max_tokens)
+    if profile is None:
+        profile = provider.profile_for(char_id)
+    return await provider.chat(messages, timeout=timeout, max_tokens=max_tokens, profile=profile)
 
 
 # =========================================================
@@ -135,7 +141,9 @@ async def call_llm_safe(
 
     char_id=None,
 
-    max_tokens=None
+    max_tokens=None,
+
+    use_cache=True
 ):
 
     try:
@@ -145,6 +153,8 @@ async def call_llm_safe(
             call_llm(
 
                 messages,
+
+                use_cache=use_cache,
 
                 session=session,
 
@@ -170,14 +180,14 @@ async def call_llm_safe(
         }
 
 
-def describe_llm_error(e, call_timeout=120, overall_timeout=150):
+def describe_llm_error(e, call_timeout=120, overall_timeout=150, profile=None):
     """What went wrong with a model call, in words a person can act on. Timeouts
     used to come through as an empty string (str() of a timeout exception is
     usually ""), so a character's "wait" said "The model gave no usable answer ()."
     The text starts with a kind ("timeout:", "unreachable:", "http 500:", ...) that
     brain/llm_brain.py::_why_unusable() turns into the line shown in memory."""
     from llm import provider
-    base, who = provider.base_url(), provider.label()
+    base, who = provider.base_url(profile), provider.label(profile)
     if isinstance(e, asyncio.TimeoutError):
         return f"timeout: no answer from the model within {overall_timeout} s"
     if isinstance(e, httpx.ConnectTimeout):
@@ -252,9 +262,13 @@ async def call_llm(
     # CACHE
     # =====================================================
 
+    from llm import provider as _provider
+    profile = _provider.profile_for(char_id)
+
     key = _cache_key(
         full_messages,
-        char_id=char_id
+        char_id=char_id,
+        profile=profile
     )
 
     purpose = _purpose() if char_id else None
@@ -268,7 +282,7 @@ async def call_llm(
             result = json.loads(cached)
             if char_id:                                # a cached reply is still what the character got
                 log_prompt_entry(char_id, full_messages, result if isinstance(result, str) else json.dumps(result),
-                                 elapsed=0.0, cached=True, purpose=purpose)
+                                 elapsed=0.0, cached=True, purpose=purpose, profile=profile)
             return result
 
     # =====================================================
@@ -284,12 +298,16 @@ async def call_llm(
 
             timeout,
 
-            max_tokens
+            max_tokens,
+
+            char_id=char_id,
+
+            profile=profile
         )
     except Exception as e:
         if char_id:                                    # a failed call is logged too, with why
             log_prompt_entry(char_id, full_messages, "", elapsed=time.time() - _t0, cached=False, purpose=purpose,
-                             error=describe_llm_error(e))
+                             error=describe_llm_error(e, profile=profile), profile=profile)
         raise
 
     _elapsed = time.time() - _t0
@@ -346,6 +364,7 @@ async def call_llm(
             elapsed=_elapsed,
             cached=False,
             purpose=purpose,
+            profile=profile,
         )
 
     return result
