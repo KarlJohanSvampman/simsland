@@ -62,7 +62,7 @@ world = {
 }
 ups, dels = flush(world, 7)
 check("the first flush writes every entity and the manifest",
-      set(ups) == {("characters", "zed"), ("characters", "amy"), ("households", "h1"), ("props", "p2"), ("props", "p1"),
+      set(ups) == {("characters", "zed"), ("characters", "amy"), ("char_cold", "amy/memories"), ("households", "h1"), ("props", "p2"), ("props", "p1"),
                    ("key", "tick"), ("key", "sim_time"), ("key", "timers"), ("key", "weather"), ("meta", "manifest")}, sorted(ups))
 ES.forget(SIM)
 back = ES.load(SIM)

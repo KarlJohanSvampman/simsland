@@ -59,6 +59,35 @@ SATISFIED_BY = {
 }
 
 
+# Activities (their activity type, not a prop interaction) that, once COMPLETED, see to these intentions. Live
+# (2026-11-21): SATISFIED_BY lists prop interactions, but brain/intention_history.py matched it against the completed
+# activity's type -- "drink_water" is not "drink" -- so most needs that were met showed up as "dropped": drink 73
+# dropped / 26 done (60+ of the drops right after "drink water (completed)"), eat_food 35 / 5 after "eat meal", every
+# clean_zone (23) after "dust and wipe" / "wash dishes", seek_caffeine_or_rest after a night's sleep.
+ACTIVITY_COMPLETES = {
+    "drink_water":   ["drink"],
+    "drink":         ["drink"],
+    "make_coffee":   ["drink", "seek_caffeine_or_rest"],
+    "eat":           ["eat_food"],
+    "eat_meal":      ["eat_food", "family_dinner_together"],
+    "eat_snack":     ["eat_food"],
+    "dust_and_wipe": ["clean_zone"],
+    "wash_dishes":   ["clean_zone", "wash_dishes"],
+    "clean":         ["clean_zone"],
+    "vacuum":        ["clean_zone"],
+    "sleep":         ["sleep", "take_nap", "seek_caffeine_or_rest"],
+    "nap":           ["take_nap", "seek_caffeine_or_rest"],
+    "take_nap":      ["take_nap", "seek_caffeine_or_rest"],
+    "take_shower":   ["take_shower"],
+    "take_bath":     ["take_shower"],
+}
+
+
+def completes(activity_type):
+    """Intention types a completed activity of this type sees to (besides one of the same name)."""
+    return ACTIVITY_COMPLETES.get(str(activity_type or ""), [])
+
+
 def satisfied_by(intention_type):
     """[interaction, ...] that would help with this intention, best first; [] if it isn't one a thing helps with."""
     t = str(intention_type or "")

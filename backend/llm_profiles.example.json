@@ -1,0 +1,34 @@
+{
+  "_readme": "Copy to backend/llm_profiles.json to use several models at once (llm/provider.py). Keys never go here: a profile names the .env variable that holds its key (api_key_env). Each character uses its own choice (Persona tab), else 'assign', else 'default'; calls for no character use 'background'. max_concurrency = calls at once to that profile. The file is re-read when it changes.",
+  "default": "gpt",
+  "background": "gpt",
+  "profiles": {
+    "gpt": {
+      "provider": "openai",
+      "model": "gpt-4o-mini",
+      "api_key_env": "LLM_API_KEY",
+      "max_concurrency": 8
+    },
+    "local": {
+      "provider": "ollama",
+      "base_url": "http://192.168.10.176:11434",
+      "model": "llama3.1:latest",
+      "max_concurrency": 2
+    },
+    "gemini_example": {
+      "provider": "openai",
+      "base_url": "https://generativelanguage.googleapis.com/v1beta/openai",
+      "model": "gemini-3.5-flash-lite",
+      "api_key_env": "GEMINI_API_KEY",
+      "max_concurrency": 4
+    }
+  },
+  "assign": {
+    "characters": {
+      "Kathleen Okafor": "local"
+    },
+    "surnames": {
+      "Okafor": "local"
+    }
+  }
+}

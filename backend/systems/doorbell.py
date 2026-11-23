@@ -38,7 +38,7 @@ _DISTRACTING_ACTIVITIES = {"take_shower", "listen_to_music"}
 
 
 def _is_asleep(occupant):
-    return (occupant.get("activity") or {}).get("type") == "sleep"
+    return (occupant.get("activity") or {}).get("type") in ("sleep", "nap", "take_nap")
 
 
 def _is_distracted(occupant):
@@ -86,6 +86,42 @@ def ring_at_door(world, household, target_id=None, method="ring_doorbell"):
     return heard_by, target_heard
 
 
+RELAY_STALE_TICKS = 30 * 60       # nobody waits at a door half an hour: after that the message is moot
+
+
+def settle_relay_intentions(c, world):
+    """A "tell X someone's at the door" intention is over once it can't matter any more: the visitor has come in or
+    gone, the person asked for has seen them, or it's been RELAY_STALE_TICKS. Live (2026-11-23): these never ended --
+    Rachel carried "Pamela Martinez is at the door asking for Daniel Martinez -- let them know" for 1,337 minutes, the
+    prompt telling her "This cannot wait any longer", so she kept trying to wake her napping father to tell him."""
+    intents = c.get("active_intentions") or []
+    if not any(str(i.get("type", "")).startswith("relay_door_visitor_") for i in intents):
+        return
+    chars = world.get("characters") or {}
+    t = world.get("tick", 0)
+    keep = []
+    for i in intents:
+        if not str(i.get("type", "")).startswith("relay_door_visitor_"):
+            keep.append(i)
+            continue
+        visitor, target = chars.get(i.get("visitor_id")), chars.get(i.get("target_id"))
+        why = None
+        if not visitor or not target or visitor.get("off_grid"):
+            why = "the visitor isn't at the door any more"
+        elif t - int(i.get("created_at") or t) > RELAY_STALE_TICKS:
+            why = "too long ago -- whoever was at the door has gone"
+        elif visitor.get("building_id") and visitor.get("building_id") == target.get("building_id"):
+            why = "they've met"
+        elif visitor.get("household_id") and visitor.get("household_id") == target.get("household_id"):
+            why = "they live here"
+        if why:
+            from brain.intention_history import mark
+            mark(c, world, i.get("type"), "dropped", why, target=i.get("target_id"))
+        else:
+            keep.append(i)
+    c["active_intentions"] = keep
+
+
 def resolve_door_signal(visitor, world, household, target_id=None, method="ring_doorbell"):
     """Full effect of ringing/knocking: wakes/notifies whoever noticed
     (brain/cognition_scheduler.py::wake_character), and if the specific
@@ -104,7 +140,10 @@ def resolve_door_signal(visitor, world, household, target_id=None, method="ring_
             "visitor_name": visitor.get("name", "someone"),
         })
 
-    if target_id and not target_heard and heard_by:
+    # someone who lives here doesn't need announcing -- they let themselves in (live: Rachel was told for 22 hours that
+    # her own daughter Pamela was "at the door asking for Daniel")
+    lives_here = visitor.get("household_id") and visitor.get("household_id") == (household or {}).get("id")
+    if target_id and not target_heard and heard_by and not lives_here:
         target = world.get("characters", {}).get(target_id)
         target_name = target.get("name", "them") if target else "them"
         for occ in heard_by:

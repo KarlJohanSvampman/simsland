@@ -131,6 +131,119 @@ def set_time_scale(payload: dict, sim_id: str = DEFAULT_SIM_ID):
     return {"time_scale": value}
 
 
+@router.post("/set_clock")
+@core_only           # served by the core itself (http://<host>:8002/admin/set_clock): it moves the core's own clock
+def set_clock(payload: dict, sim_id: str = DEFAULT_SIM_ID):
+    """Move the simulation clock to a time of day (today, in the sim's own calendar): {"hour": 9, "minute": 0}.
+    The difference from real time is kept as world["clock_offset_s"], so a restart at 1x (main.py resyncs the clock to
+    real time) lands on real time plus that offset -- a sim set to daytime at 4 a.m. stays in daytime. {"reset": true}
+    clears the offset (the clock follows real time again)."""
+    import time as _time
+    from datetime import datetime
+    with world_lock():
+        world = load_world(sim_id)
+        if payload.get("reset"):
+            world["clock_offset_s"] = 0.0
+            target = _time.time()
+        else:
+            hour = max(0, min(23, int(payload.get("hour", 9))))
+            minute = max(0, min(59, int(payload.get("minute", 0))))
+            now = datetime.fromtimestamp(world.get("sim_time") or _time.time())
+            target = now.replace(hour=hour, minute=minute, second=0, microsecond=0).timestamp()
+            world["clock_offset_s"] = target - _time.time()
+        world["sim_time"] = target - 1.0          # the next tick advances it onto the target and rebuilds the calendar
+        save_world(sim_id, world)
+    return {"ok": True, "sim_time": target, "clock_offset_s": world["clock_offset_s"],
+            "now": datetime.fromtimestamp(target).isoformat(timespec="minutes")}
+
+
+@router.post("/clear_ai_blackout")
+@core_only           # served by the core itself (http://<host>:8002/admin/clear_ai_blackout)
+def clear_ai_blackout(payload: dict = None, sim_id: str = DEFAULT_SIM_ID):
+    """End every "AI blackout" episode (systems/ai_blackout.py) -- for after the model service was down or out of
+    credits, which the characters lived as a snowballing loss of their minds. Their mental-health crisis incidents
+    are closed too. payload: optional {"character_ids": [...]}."""
+    from systems import ai_blackout
+    ids = (payload or {}).get("character_ids")
+    cleared = []
+    with world_lock():
+        world = load_world(sim_id)
+        incidents = {i.get("id"): i for i in (world.get("incidents") or []) if isinstance(i, dict)}
+        for cid, c in (world.get("characters") or {}).items():
+            if ids and cid not in ids:
+                continue
+            had = ai_blackout.in_episode(c) or c.get("_ai_blackout")
+            if not had:
+                continue
+            inc = incidents.get((c.get("psychosis_state") or {}).get("incident_id"))
+            if inc:
+                inc["status"] = "resolved"
+                inc["resolved"] = True
+            if ai_blackout.in_episode(c):
+                ai_blackout.end(c, world)
+            c.pop("psychosis_state", None)
+            c.pop("_ai_blackout", None)
+            cleared.append(c.get("name") or cid)
+        from sim_loop import _mark_dirty
+        _mark_dirty(world, char_ids=list((world.get("characters") or {}).keys()))
+        save_world(sim_id, world)
+    return {"ok": True, "cleared": cleared}
+
+
+@router.post("/restore_cold_keys")
+@core_only
+def restore_cold_keys(payload: dict, sim_id: str = DEFAULT_SIM_ID, dry_run: bool = True):
+    """Put back characters' cold keys (core/entity_versions.py COLD_KEYS: memories, logs, relationships...) from a
+    backup copy, where they are missing or were wiped and started over -- live 2026-11-23: a half-finished change to
+    the hot/cold store (core/entity_store.py) was reloaded mid-edit and lost them for most characters. Never replaces
+    a key that still holds its own data. payload: {"characters": {char_id: {key: value from the backup}}}.
+    dry_run=true (the default) only reports what it would do."""
+    import json as _json
+    from core.entity_versions import COLD_KEYS
+
+    def _k(x):
+        return _json.dumps(x, sort_keys=True, default=str)
+
+    report = {}
+    with world_lock():
+        world = load_world(sim_id)
+        chars = world.get("characters") or {}
+        for cid, backup in ((payload or {}).get("characters") or {}).items():
+            c = chars.get(cid)
+            if not isinstance(c, dict) or not isinstance(backup, dict):
+                continue
+            done = {}
+            for k, old in backup.items():
+                if k not in COLD_KEYS or old in (None, [], {}, ""):
+                    continue
+                cur = c.get(k)
+                if cur is None or cur == [] or cur == {} or cur == "":
+                    done[k] = "restored"
+                    if not dry_run:
+                        c[k] = old
+                elif isinstance(cur, list) and isinstance(old, list) and len(cur) <= 2 and len(old) >= 5:
+                    seen = {_k(x) for x in old}
+                    merged = old + [x for x in cur if _k(x) not in seen]
+                    merged = merged[-max(len(old), len(cur)):]
+                    done[k] = f"merged ({len(cur)} new + backup {len(old)})"
+                    if not dry_run:
+                        c[k] = merged
+                elif isinstance(cur, dict) and isinstance(old, dict) and len(cur) < len(old):
+                    missing = [kk for kk in old if kk not in cur]
+                    if missing:
+                        done[k] = f"added {len(missing)} missing entries"
+                        if not dry_run:
+                            for kk in missing:
+                                cur[kk] = old[kk]
+            if done:
+                report[c.get("name") or cid] = done
+        if not dry_run and report:
+            from sim_loop import _mark_dirty
+            _mark_dirty(world, char_ids=[cid for cid, c in chars.items() if (c.get("name") or cid) in report])
+            save_world(sim_id, world)
+    return {"ok": True, "dry_run": dry_run, "restored": report}
+
+
 @router.post("/movement_speed")
 @command("admin.set_movement_speed", entities=lambda a: [("key", "movement_speed_multiplier")])
 def set_movement_speed(payload: dict, sim_id: str = DEFAULT_SIM_ID):
@@ -949,8 +1062,9 @@ def get_llm_gate_state():
     return {
         "heap_size": len(gate._heap),
         "running": len(gate._running),
-        "max_concurrency": gate.OLLAMA_MAX_CONCURRENCY,
+        "max_concurrency": sum(l["max_concurrency"] for l in gate.lanes_state().values()) or gate.OLLAMA_MAX_CONCURRENCY,
         "heap_priorities": [p for p, *_ in gate._heap],
+        "lanes": gate.lanes_state(),            # one per model profile (llm/provider.py)
     }
 
 
@@ -1142,6 +1256,6 @@ def event_log_handlers(top: int = 40):
 def world_state_stats():
     """The in-memory world store (core/world_state.py): resident ticks/versions, how many
     snapshots were rendered for readers, and the write-behind persistence counters."""
-    from core import world_state
-    return world_state.stats()
+    from core import world_state, entity_store
+    return {**world_state.stats(), "entity_store": entity_store.stats()}
 

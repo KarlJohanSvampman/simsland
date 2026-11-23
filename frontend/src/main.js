@@ -6303,7 +6303,8 @@ function _renderConversationLog(c){
     const medium = _MEDIUM_LABELS[entry.medium] || entry.medium || "in person";
     const stamp = _formatMemoryTimestamp(entry.ended_tick);
     const starter = entry.initiator ? (entry.initiator === c.id ? "you started it" : `${_escapeHTML(_charName(entry.initiator))} started it`) : "";
-    const count = entry.lines?.length ? `${entry.lines.length} line${entry.lines.length > 1 ? "s" : ""}` : "";
+    const nLines = entry.line_count ?? entry.lines?.length ?? 0;
+    const count = nLines ? `${nLines} line${nLines > 1 ? "s" : ""}` : "";
     const ended = entry.end_reason ? `ended: ${_escapeHTML(String(entry.end_reason).replace(/_/g, " "))}` : "";
     return `
     <div class="viewerCard viewerCardClickable" data-conv-index="${idx}">
@@ -6317,10 +6318,35 @@ function _renderConversationLog(c){
   return _section(`Conversations (${log.length})`, filter + (lines || _empty("None with this person.")));
 }
 
-function openConversationModal(entry){
+// The page only has a summary of each logged conversation (backend/core/client_view.py): the full entry -- every line,
+// the whole tag reading -- is fetched here, when its modal is opened, and not before.
+const _fullConversationCache = new Map();
+
+async function openConversationModal(entry){
   const titleEl = document.getElementById("intentionModalTitle");
   const body = document.getElementById("intentionModalBody");
   if(!entry || !body) return;
+  if(entry.summary_only){
+    const id = entry.id || entry.conv_id || (entry.conv_ids || [])[0];
+    const who = [selectedCharacterId, ...(entry.with || []).map(p => p.id)].filter(Boolean).join(",");
+    let full = _fullConversationCache.get(id);
+    if(!full){
+      if(titleEl) titleEl.textContent = "Conversation";
+      body.innerHTML = `<div style="opacity:.6">Loading the conversation…</div>`;
+      openModal("modal-intention");
+      try{
+        const res = await fetch(`/api/conversation/${encodeURIComponent(id)}?sim_id=default&participants=${encodeURIComponent(who)}`);
+        const data = await res.json();
+        if(!data.ok) throw new Error(data.error || res.statusText);
+        full = data;
+        if(!data.active) _fullConversationCache.set(id, full);    // a finished one doesn't change; a live one might
+      }catch(err){
+        body.innerHTML = `<div style="opacity:.6">Couldn't load the conversation: ${_escapeHTML(err.message)}</div>`;
+        return;
+      }
+    }
+    entry = {...entry, ...full, summary_only: false};
+  }
   const withNames = entry.with?.map(p => p.name || p.id).join(", ") || "someone";
   if(titleEl) titleEl.textContent = `Conversation with ${withNames}`;
   body.innerHTML = "";

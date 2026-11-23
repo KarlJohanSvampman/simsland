@@ -250,7 +250,9 @@ def _character_patches(world: dict, visible_chars: dict, selected_id, sent: dict
         have = sent.get(cid)
         digests = ev.char_digests(c, tick, fresh_cold=(cid == selected_id))
         if have is None:
-            out[cid] = {k: v for k, v in c.items() if k not in _NOT_SENT_CHAR_KEYS}
+            # conversation_log goes as summaries: the full transcript is fetched when its modal opens (core/client_view.py)
+            from core.client_view import client_character
+            out[cid] = client_character(c, _NOT_SENT_CHAR_KEYS)
             sent[cid] = digests
             continue
         changed = [k for k, d in digests.items() if have.get(k) != d and k not in _NOT_SENT_CHAR_KEYS]
@@ -258,8 +260,9 @@ def _character_patches(world: dict, visible_chars: dict, selected_id, sent: dict
         if not changed and not deleted:
             continue
         patch = {"__patch__": True}
+        from core.client_view import client_value
         for k in changed:
-            patch[k] = c[k]
+            patch[k] = client_value(k, c[k])
         if deleted:
             patch["__deleted__"] = deleted
         out[cid] = patch
@@ -377,7 +380,8 @@ def _maybe_resync_clock_to_real_time(world):
     _resynced_clock_this_process = True
     if max(1, min(50, world.get("time_scale", 1))) == 1:
         before = world.get("sim_time", time.time())
-        world["sim_time"] = time.time()
+        # real time, plus the offset POST /admin/set_clock keeps (a sim set to daytime at night stays in daytime)
+        world["sim_time"] = time.time() + float(world.get("clock_offset_s") or 0.0)
         if world["sim_time"] - before > CLOCK_JUMP_WAKES_SLEEPERS_AFTER:
             _wake_sleepers_after_clock_jump(world)
 

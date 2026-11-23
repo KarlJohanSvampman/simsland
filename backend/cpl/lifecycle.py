@@ -127,9 +127,14 @@ def _on_arrested(data, world):
     notify_unavailable(world, data.get("character_id"), "arrested")
 
 
+_CANT_TALK = {"sleep": "asleep", "nap": "asleep", "take_nap": "asleep", "take_shower": "in the shower",
+              "take_bath": "in the bath", "use_toilet": "on the toilet", "use_toilet_bowels": "on the toilet"}
+
+
 def _on_activity(data, world):
-    if data.get("activity_type") in ("sleep", "nap"):
-        notify_unavailable(world, data.get("character_id"), "asleep")
+    why = _CANT_TALK.get(data.get("activity_type"))
+    if why:
+        notify_unavailable(world, data.get("character_id"), why)
 
 
 def _on_loaded(data, world):

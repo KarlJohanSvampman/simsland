@@ -102,3 +102,6 @@ temp/
 *.old
 *.orig
 dump.rdb
+
+# the model profiles in use on this machine (backend/llm_profiles.example.json shows the format)
+backend/llm_profiles.json

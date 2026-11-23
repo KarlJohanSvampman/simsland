@@ -98,9 +98,10 @@ def get_view(
     # were a list, Object.entries() would key characters by array index
     # ("0", "1", ...) instead of their real id, creating a second,
     # never-cleaned-up model for the same character once a delta arrived.
+    from core.client_view import client_character    # conversation_log as summaries (core/client_view.py)
     characters = {
 
-        cid: c
+        cid: client_character(c)
 
         for cid, c in world.get(
             "characters",

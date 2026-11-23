@@ -1596,6 +1596,33 @@ def _finish_seated(c, world):
 # EXECUTE ACTIVITY
 # =========================================================
 
+SOCIALIZE_EARSHOT_TILES = 6.0          # further apart than this (systems/conversation_outcome.py EARSHOT_TILES) ...
+SOCIALIZE_AWAY_GRACE_TICKS = 30        # ... for this long, and the chat is over
+
+
+def _socialize_partner_gone(c, world, act):
+    """The person c is socializing with has gone: missing, dead, off the map, in another building, or out of earshot --
+    for SOCIALIZE_AWAY_GRACE_TICKS in a row (a step to the fridge doesn't end it)."""
+    p = (world.get("characters") or {}).get(act.get("target_id"))
+    from systems.social import why_cant_talk
+    if why_cant_talk(p) in ("nobody", "gone", "asleep", "unconscious"):
+        return True                                   # fallen asleep mid-chat: over at once, no grace
+    away = (not p or p.get("alive") is False or p.get("off_grid")
+            or (p.get("building_id") and c.get("building_id") and p.get("building_id") != c.get("building_id")))
+    if not away:
+        try:
+            dx, dy = float(p.get("x", 0)) - float(c.get("x", 0)), float(p.get("y", 0)) - float(c.get("y", 0))
+            away = (dx * dx + dy * dy) ** 0.5 > SOCIALIZE_EARSHOT_TILES
+        except (TypeError, ValueError):
+            away = False
+    t = world.get("tick", 0)
+    if not away:
+        act.pop("_partner_away_since", None)
+        return False
+    since = act.setdefault("_partner_away_since", t)
+    return t - since >= SOCIALIZE_AWAY_GRACE_TICKS
+
+
 def execute_activity(
 
     c,
@@ -1617,6 +1644,17 @@ def execute_activity(
         or ACTIVITIES.get(activity_type, {}).get("interaction")
         or activity_type
     )
+
+    # Socializing with someone who has gone (left the house, out of earshot, off the map) is over: live (2026-11-21)
+    # Patrick kept "socializing" with Margaret for its full 15 minutes while she stood at the bus stop.
+    if activity_type == "socialize" and act.get("phase") == "using" and act.get("target_id"):
+        if _socialize_partner_gone(c, world, act):
+            from systems.occupancy import interrupt_activity
+            other = ((world.get("characters") or {}).get(act["target_id"]) or {}).get("name") or "they"
+            interrupt_activity(c, world, reason=f"{other} left")
+            from brain.cognition_scheduler import wake_character
+            wake_character(c, world, "activity_finished", {"activity": "socialize"})
+            return
 
     # =====================================================
     # WALKING  — wait until movement system clears is_moving
@@ -2080,6 +2118,9 @@ def _find_clean_glass(c):
 # COMPLETE ACTIVITY
 # =========================================================
 
+_INTERACT_AS = {"drink": "drink", "eat": "eat"}
+
+
 def complete_activity(
 
     c,
@@ -2090,6 +2131,11 @@ def complete_activity(
 ):
 
     activity_type = act["type"]
+    # The model often picks a plain "interact" with the sink (interaction "drink") or the table ("eat"): that has to do
+    # what drinking / eating does. Live (2026-11-22): Rachel "drank" at the sink five times in ten minutes -- an
+    # interact-drink restored nothing, so she stayed thirsty and went straight back.
+    if activity_type == "interact" and act.get("interaction") in _INTERACT_AS:
+        activity_type = _INTERACT_AS[act["interaction"]]
     # Done: what its completion starts next (the next queued task, back to bed after the toilet) is not a second
     # activity on top of this one (systems/occupancy.py::occupy).
     act["_completed"] = True
@@ -2874,7 +2920,7 @@ def complete_activity(
 
     from core.event_bus import emit
     emit("activity_completed", {
-        "character_id": c["id"], "activity_type": activity_type,
+        "character_id": c["id"], "activity_type": activity_type, "interaction": act.get("interaction"),
         "target_id": act.get("target_id"), "anchor_name": act.get("anchor_name"),
         "x": c.get("x"), "y": c.get("y"), "building_id": c.get("building_id"),
     })

@@ -66,7 +66,9 @@ check("the proper format reads as before",
       and env["narration"] == "I look around the kitchen.", str(env))
 check("narration with a '|' that isn't an action stays unreadable",
       lb._parse_compact_envelope("I think | maybe I should wait") is None)
-check("a SAY line with a '|' isn't an action", lb._parse_compact_envelope("SAY: left | right") is None)
+_e = lb._parse_compact_envelope("SAY: left | right")
+check("a SAY line with a '|' isn't an action -- it's a line said (tests/test_loops.py: speech-only replies)",
+      _e is not None and _e["action"]["type"] == "wait" and _e["say"] == "left | right", _e)
 check("plain prose is still no action", lb._parse_compact_envelope("I examine the bathroom_sink to assess hygiene.") is None)
 check("an empty reply is still no action", lb._parse_compact_envelope("") is None)
 

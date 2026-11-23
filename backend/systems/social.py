@@ -356,6 +356,26 @@ def generate_social_intentions(
 # running against a target who was no longer there to talk to). This
 # sweep is the fix for that second half.
 
+ASLEEP_ACTIVITIES = {"sleep", "nap", "take_nap"}
+
+
+def why_cant_talk(target):
+    """None if this person can be talked with face to face right now, else why not ("asleep", "away", ...).
+    Live (2026-11-23): only "sleep" counted -- Rachel spent a quarter of an hour "socializing" with her father Daniel
+    while he napped ("Daniel, wake up, we need to talk")."""
+    if not target:
+        return "nobody"
+    if target.get("alive") is False:
+        return "gone"
+    if target.get("off_grid"):
+        return "away"
+    if (target.get("activity") or {}).get("type") in ASLEEP_ACTIVITIES:
+        return "asleep"
+    if target.get("posture") == "incapacitated":
+        return "unconscious"
+    return None
+
+
 def interrupt_socializing_with_unavailable_targets(world):
     """Called on a moderate cadence (see CADENCE["social_availability"],
     sim_loop.py). For every character mid-"socialize", checks whether
@@ -371,9 +391,7 @@ def interrupt_socializing_with_unavailable_targets(world):
         if act.get("type") != "socialize":
             continue
         target = chars.get(act.get("target_id"))
-        if not target:
-            continue
-        if (target.get("activity") or {}).get("type") == "sleep" or target.get("off_grid"):
+        if why_cant_talk(target):                 # no one to talk with, or they've fallen asleep / gone
             interrupt_activity(c, world)
 
 

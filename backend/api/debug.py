@@ -526,5 +526,16 @@ def ollama_status_ep():
     if cached is not None and now - _ollama_status_cache["at"] < _OLLAMA_STATUS_TTL:
         return cached
     out = provider.status()
+    names = provider.profile_names()
+    if len(names) > 1:
+        # several model profiles: the light shows the default one, coloured by the worst of them, and lists them all
+        allst = provider.status_all()
+        out["profiles"] = allst["profiles"]
+        rank = {"up": 0, "degraded": 1, "down": 2}
+        worst = max(allst["profiles"], key=lambda s: rank.get(s.get("state"), 2))
+        if rank.get(worst.get("state"), 2) > rank.get(out.get("state"), 2):
+            out["state"] = worst["state"]
+            out["error"] = f"profile {worst['profile']!r}: {worst.get('error') or worst.get('state')}"
+        out["provider_label"] = " + ".join(dict.fromkeys(s["provider_label"] for s in allst["profiles"]))
     _ollama_status_cache.update(at=now, value=out)
     return out

@@ -150,8 +150,10 @@ def _send_remote(key, entry):
         json.dumps(args)                              # plain data only; anything else runs here
         _ensure_reader()                              # listening before the request exists
         entry["remote"] = True
+        from llm import provider
         queue.enqueue({"key": key, "token": entry["token"], "task": name, "args": args,
-                       "deadline": time.time() + INFLIGHT_STALE_SECONDS})
+                       "deadline": time.time() + INFLIGHT_STALE_SECONDS,
+                       "llm_assign": provider.assignments()})   # which model profile each character uses
         return True
     except Exception as exc:
         entry["remote"] = False

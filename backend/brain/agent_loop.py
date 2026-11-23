@@ -512,7 +512,13 @@ def process_decision(
 
     # The AI couldn't answer for them (systems/ai_blackout.py): no stand-in decision -- they can't think straight.
     from systems import ai_blackout
-    if ((decision or {}).get("action") or {}).get("fallback") and not decision["action"].get("blackout"):
+    _why = str(((decision or {}).get("action") or {}).get("reason") or "")
+    if ((decision or {}).get("action") or {}).get("fallback") and "cancelled to make room" in _why:
+        # the gate cancelled their call for a more urgent one (llm/llm_gate.py): not the AI failing them -- no blackout;
+        # they just think again shortly
+        from brain.cognition_scheduler import wake_character
+        wake_character(c, world, "idle", delay=5)
+    elif ((decision or {}).get("action") or {}).get("fallback") and not decision["action"].get("blackout"):
         decision = ai_blackout.decision(c, world, why=decision["action"].get("reason"))
     elif not ((decision or {}).get("action") or {}).get("fallback"):
         ai_blackout.on_success(c, world)
@@ -760,6 +766,17 @@ def update_agent(
     # over everyone on every step.
     from systems.schema_defaults import ensure_character_defaults
     ensure_character_defaults(c, world=world)
+    # which model profile this character's calls go to (llm/provider.py) -- their own choice, the profiles file, the default
+    from llm.provider import resolve_character as _llm_profile
+    _llm_profile(c)
+    # a doorbell message for someone is moot once the visitor has gone, come in, or it's been half an hour
+    from systems.doorbell import settle_relay_intentions
+    settle_relay_intentions(c, world)
+    # a decision request that has timed out, or was lost with an earlier run of the process, is cleared here -- not only
+    # once they get as far as the cognition gate: someone mid-activity could stay "thinking" (unable to answer anyone,
+    # and blocking any new decision) on a request that would never come back
+    from brain.cognition_actor import is_waiting as _is_waiting
+    _is_waiting(c, world)
     # the character's own periodic work (core/flow.py PERCHAR jobs: what a sweep over everyone used to do for them)
     from core.flow import run_perchar
     run_perchar(c, world)
@@ -1204,6 +1221,10 @@ def update_agent(
     _prof.mark("agent:if_L1006")
     if (c.get("is_moving") or c.get("pushing_prop_id")
             or c.get("travel_state") in TRAVEL_WALKING_STATES):
+        # Spoken to on the way somewhere: they can answer while they walk.
+        from brain.cognition_scheduler import spoken_to_due
+        if spoken_to_due(c, world):
+            _think_now(c, world)
         return
 
     # A breakdown (systems/worry_breakdown.py): their own intentions are suspended and nobody asks their model what
@@ -1211,6 +1232,25 @@ def update_agent(
     from systems.worry_breakdown import in_breakdown, survival_only
     if in_breakdown(c):
         survival_only(c, world)
+        return
+
+    # Someone is talking to them: they decide how to answer before their own errands (a drink, a snack) take them off
+    # somewhere.
+    from brain.cognition_scheduler import spoken_to_due
+    if spoken_to_due(c, world):
+        _think_now(c, world)
+        return
+
+    # Their own judgment before the next autopilot errand. Live (2026-11-23): the loop below starts the next intention
+    # (feed the kids, a drink, a chore) and returns before the cognition gate, so anyone with something on their list
+    # never thought: 44 model requests in 3,485 ticks for 11 characters, Anthony not once in 18,000 ticks while it
+    # cooked for a child who was at school, and only 3 of 20 conversations answered.
+    if _think_overdue(c, world):
+        _think_now(c, world)
+        from brain.cognition_actor import is_waiting as _is_waiting
+        if _is_waiting(c, world):
+            return
+    elif _holding_for_decision(c, world):
         return
 
     # =====================================
@@ -1236,6 +1276,14 @@ def update_agent(
         if pressing_open and _todo_tier(intention) == "when_free":
             continue                       # for when there is time: not while something pressing is still open
 
+        # A child who is away (at school, out, in another building) can't be fed or reminded: the duty waits until they're
+        # back. Live (2026-11-23): the Feed the Kids plan had Anthony cooking, eating and washing up for Christopher, who
+        # was at school.
+        if intention.get("child_id") and str(intention.get("type", "")).startswith(("feed_child_", "remind_child_")):
+            _kid = world.get("characters", {}).get(intention["child_id"])
+            if _kid and (_kid.get("off_grid") or _kid.get("building_id") != c.get("building_id")):
+                continue
+
         # Feeding or reminding a child: done directly (systems/child_care.py::tend_child), not left to the model's choice
         from brain.actionplans.runner import live_intention_for as _live_for
         if (intention.get("child_id") and str(intention.get("type", "")).startswith(("feed_child_", "remind_child_"))
@@ -1253,6 +1301,12 @@ def update_agent(
             c["current_intention"] = intention
             return
         if _plan == "busy":
+            if intention.get("category") in ("survival", "health"):
+                from brain.cognition_scheduler import _urgent_need
+                if _urgent_need(c):
+                    # a plan for an urgent need that isn't getting anywhere: no chores in its place (Anthony, hunger
+                    # 100, dusting over and over while his hunger plan sat "busy" -- live 2026-11-23)
+                    blocked_urgent = True
             continue
 
         activity_type = resolve_strategy(
@@ -1295,6 +1349,48 @@ def update_agent(
     _think_now(c, world)
 
 
+
+# A wake that isn't just the clock or the end of an activity: something happened that they should get to think about.
+_ROUTINE_WAKES = {None, "idle", "heartbeat", "activity_finished", "schedule_block"}
+# Ten sim-minutes on autopilot is enough: they get to think even with nothing new going on.
+THINK_STARVED_TICKS = 600
+# While their decision is with the model the autopilot holds off this long, so it doesn't start an errand the decision
+# then cancels. Short: a slow model (or a hung call, up to REQUEST_TIMEOUT_SECONDS) mustn't leave them standing about.
+DECISION_HOLD_TICKS = 45
+
+
+def _think_overdue(c, world):
+    """Due to think (next_think_tick reached), and either woken by something that happened or on autopilot for
+    THINK_STARVED_TICKS. An urgent body need is left to the autopilot -- that's what it is quickest at -- unless
+    they have gone THINK_STARVED_TICKS without thinking anyway."""
+    cog = c.get("cognition") or {}
+    tick = world.get("tick", 0)
+    if tick < cog.get("next_think_tick", 0):
+        return False
+    from brain.cognition_actor import pending
+    if pending(c):
+        return False
+    starved = tick - cog.get("last_think_tick", -10 ** 9) >= THINK_STARVED_TICKS
+    from brain.cognition_scheduler import _urgent_need
+    if _urgent_need(c):
+        # the autopilot is quickest at a body need -- unless it hasn't sorted it out in ten minutes either
+        return starved
+    if cog.get("wake_reason") not in _ROUTINE_WAKES:
+        return True
+    return starved
+
+
+def _holding_for_decision(c, world):
+    """Their decision was asked for moments ago and hasn't come back: don't start an errand in the meantime."""
+    from brain.cognition_actor import pending, is_waiting
+    p = pending(c)
+    if not p or not is_waiting(c, world):
+        return False
+    from brain.cognition_scheduler import _urgent_need
+    if _urgent_need(c):
+        return False
+    return world.get("tick", 0) - p.get("tick", 0) < DECISION_HOLD_TICKS
+
 # Activities a character can be talked to in the middle of: they keep doing it, but hearing someone
 # speak to them lets them decide what to say (systems/conversation_floor.py gives a listener 3 ticks to
 # start responding). Everything else -- sleep, the toilet, a shower, eating, work, chores -- still runs
@@ -1305,15 +1401,20 @@ LISTENING_ACTIVITIES = {
     "browse_news", "hangout", "meditate", "daydream", "reflect", "make_drawing",
 }
 SPOKEN_TO_WAKES = {"heard_speech", "floor_unnoticed", "floor_unanswered", "door_signal"}
+# asleep, in the shower or bath, on the toilet: no answering from there
+CANT_HEAR_ACTIVITIES = {"sleep", "nap", "take_nap", "take_shower", "take_bath", "use_toilet", "use_toilet_bowels", "vomit"}
 
 
 def _spoken_to_while_busy(c, world, act_type):
     """In a listening activity, and due to think because someone spoke to them."""
-    if act_type not in LISTENING_ACTIVITIES:
+    # Live (2026-11-21): only LISTENING_ACTIVITIES could answer, so a listener dusting (Alexander), eating or washing up
+    # never thought while Christopher talked to him -- 93 of 99 conversations in a morning were one line nobody answered.
+    # Now anyone can answer while carrying on, except where they can't hear or answer (CANT_HEAR_ACTIVITIES:
+    # cpl/lifecycle.py makes those conversations end "unavailable").
+    from brain.cognition_scheduler import spoken_to_due
+    if act_type in CANT_HEAR_ACTIVITIES:
         return False
-    cog = c.get("cognition") or {}
-    return (cog.get("wake_reason") in SPOKEN_TO_WAKES
-            and world.get("tick", 0) >= cog.get("next_think_tick", 0))
+    return spoken_to_due(c, world)
 
 
 def _think_now(c, world):

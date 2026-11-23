@@ -192,15 +192,26 @@ def _start_plan(c, world, att, pid, entry=None, return_to=None):
     _trace(att, world, plan=pid, what="plan", why=("sidetrack" if return_to else "chosen") + (f" via entry {entry}" if entry else ""))
 
 
-def _clear_replaced(c, intention, target=None):
+def _clear_replaced(c, intention, target=None, world=None, how=None):
     """Remove the old intention types this intention took over (eat_food for Reduce Hunger) from the list -- only the
-    ones about `target`, when the attempt was about one person (an apology to Susan is not one to Robert)."""
+    ones about `target`, when the attempt was about one person (an apology to Susan is not one to Robert).
+
+    Given `world`, each one removed is ticked off as done first (brain/intention_history.py). Live (2026-11-21): they
+    were removed here and the intention.satisfied event that marks them came later, so the history had already filed
+    them as "dropped" -- every eat_food ("make myself something to eat"), feed_child_* and remind_child_* that a plan
+    saw to showed as dropped, never done."""
     old = intention.get("replaces") or []
     def replaced(t):
         t = str(t or "")
         return any(t == r or (r.endswith("*") and t.startswith(r[:-1])) for r in old)
-    c["active_intentions"] = [i for i in c.get("active_intentions") or []
-                              if not (replaced(i.get("type")) and (target is None or i.get("target_id") == target))]
+    keep, gone = [], []
+    for i in c.get("active_intentions") or []:
+        (gone if replaced(i.get("type")) and (target is None or i.get("target_id") == target) else keep).append(i)
+    if world is not None and gone:
+        from brain.intention_history import mark
+        for i in gone:
+            mark(c, world, i.get("type"), "done", how or "the need is met", target=i.get("target_id") or i.get("child_id"))
+    c["active_intentions"] = keep
 
 
 def _finish(c, world, iid, att, status, why):
@@ -208,7 +219,7 @@ def _finish(c, world, iid, att, status, why):
     if status == "satisfied":
         intention = store.get(_data(world), "intentions", iid)
         if intention:
-            _clear_replaced(c, intention, (att.get("vars") or {}).get("target_id"))
+            _clear_replaced(c, intention, (att.get("vars") or {}).get("target_id"), world=world, how=why)
     c.pop("_social_purpose", None)
     _trace(att, world, what=status, why=why)
     c.setdefault("plan_log", []).append({k: att[k] for k in ("id", "intention", "started", "ended", "status", "why",
@@ -266,7 +277,7 @@ def autopilot(c, world, intention_entry):
     if att is None and _satisfied(c, world, intention):
         # a leftover old-style intention (heat_meal's "eat it, it's hot") while the need is already met: nothing to do,
         # and it goes -- not a new "satisfied" attempt every tick
-        _clear_replaced(c, intention)
+        _clear_replaced(c, intention, world=world, how="the need was already met")
         return "busy"
     if att is None:
         att = c["plan_attempts"][iid] = {"id": f"{iid}@{world.get('tick', 0)}", "intention": iid,
@@ -426,6 +437,13 @@ def on_activity_end(data, world, out):
         if c.get("activity"):
             # events arrive after the fact: something else (an urgent toilet visit that interrupted this step) has started
             # since -- the plan picks up with this outcome once they are free, not on top of it (systems/occupancy.py)
+            att["resume"] = {"node": node, "out": out}
+            continue
+        from brain.agent_loop import _think_overdue
+        if _think_overdue(c, world):
+            # Overdue to think: the next step waits a moment, so they get a free tick to think in (brain/agent_loop.py)
+            # and the plan picks up from here afterwards. Live (2026-11-23): one step started the next straight from
+            # this event, so a plan's chain -- cook, eat, wash up, dust -- left no moment for thinking at all.
             att["resume"] = {"node": node, "out": out}
             continue
         _run(c, world, iid, att, intention, came_out=out, at=node)

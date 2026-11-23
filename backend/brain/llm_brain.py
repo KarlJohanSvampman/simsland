@@ -119,6 +119,7 @@ You ARE the character — not a narrator, not an observer.
 CORE RULES
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 - Stay consistent with your memories, intentions, emotions, relationships, beliefs, and personality.
+- When you speak, sound like yourself (see "How you talk"), not like a counsellor. Skip stock lines such as "what's going on", "we need to talk", "I understand", "calm down", "let's take a step back" -- say the actual thing. Don't open every line with the other person's name.
 - The world persists. Consequences carry forward.
 - Respond ONLY with a single valid JSON object. No markdown, no explanations, no narration outside the schema.
 
@@ -651,7 +652,7 @@ def _parse_compact_envelope(raw):
         # bathroom", " | the kitchen cabinet | ..."): read the line anyway rather than lose the turn.
         loose = _find_loose_action_line(text)
         if loose is None:
-            return None
+            return _speech_only_envelope(text)
         action_start, action_line = loose
 
     narration = _clean_narration(text[:action_start])
@@ -685,6 +686,65 @@ def _parse_compact_envelope(raw):
         "tags": _parse_tags_line(tags_match.group(1)) if tags_match else None,
         "cpl_lines": "\n".join(f"{m.group(1).upper()}: {m.group(2).strip()}" for m in _CPL_LINE_RE.finditer(text)),
     }
+
+
+# Pieces of _ENVELOPE_FORMAT's own placeholders, and the shapes llama copies them in (live 2026-11-22: replies of
+# "<what you do, ONLY if it's worth describing -- skip this line ...>", "<what I do>", "<move> | ...",
+# "<SAY: "Sorry, ..."", shown as the character's thought and bubble).
+_TEMPLATE_ECHO_RE = re.compile(
+    r"<\s*(?:what (?:you|i) do|type|target, in your own words|extra detail|exact words|words said aloud|"
+    r"short next intention|the one trait|the \[ids\]|hurt \| help|your action|action)\b[^>\n]*>?"
+    r"|only if it'?s worth describing|skip this line for a routine action|don'?t narrate every single move",
+    re.IGNORECASE)
+_TEMPLATE_ECHO_RETRY = (
+    "Your reply copied the format's <placeholder> text instead of filling it in. Reply again with what your "
+    "character actually does -- real words on each line (ACTION: speak | Rachel | ..., SAY: the actual words), "
+    "no <angle brackets>, and leave out any line that doesn't apply.")
+
+
+_NO_ACTION_RETRY = (
+    "That reply had no ACTION line, so nothing can happen. Reply again in the format: an ACTION: line "
+    "(ACTION: <type> | <target> | <detail>) with your real choice, and SAY: with the actual words if you speak.")
+
+
+def _echoes_template(raw):
+    return isinstance(raw, str) and bool(_TEMPLATE_ECHO_RE.search(raw))
+
+
+def _strip_template_echo(raw):
+    """Cut the placeholder lines out, and unwrap a real line the model put in <...> ("<SAY: "Sorry..."", "<move> | x")."""
+    if not isinstance(raw, str):
+        return raw
+    keep = []
+    for line in raw.splitlines():
+        if _TEMPLATE_ECHO_RE.search(line):
+            continue
+        s = line.strip()
+        if s.startswith("<"):
+            s = s[1:]
+            s = re.sub(r"^(\w+)>", r"\1", s)          # "<move> | towards Patrick" -> "move | towards Patrick"
+            s = s[:-1] if s.endswith(">") else s
+        keep.append(s)
+    return "\n".join(keep).strip()
+
+
+def _speech_only_envelope(text):
+    """A reply that only says something -- a SAY: or REMARK: line, or just the words ("What's wrong, Rach?") -- is a
+    turn spent talking, not a failure. Live (2026-11-22): these replies were "unusable", and every one counted towards
+    an AI blackout -- characters mid-argument went "psychotic" for talking without an ACTION line. None if it isn't."""
+    say_m, remark_m = _SAY_LINE_RE.search(text), _REMARK_LINE_RE.search(text)
+    say = say_m.group(1).strip() if say_m and not _meaningless(say_m.group(1)) else ""
+    remark = remark_m.group(1).strip() if remark_m and not _meaningless(remark_m.group(1)) else ""
+    if not say and not remark:
+        plain = text.strip()
+        if ("\n" not in plain and 0 < len(plain) <= 220 and ":" not in plain[:12] and not plain.startswith("<")
+                and (plain[0] in "\"'\u201c" or plain.rstrip("\"'\u201d").endswith(("?", "!")))):
+            say = plain.strip("\"'\u201c\u201d ")
+    if not say and not remark:
+        return None
+    return {"narration": "", "action": {"type": "wait", "target_description": "", "detail": "talking"},
+            "say": say.strip('"'), "remark": remark.strip('"'), "intent": None, "uses": [], "then": "", "tags": None,
+            "cpl_lines": ""}
 
 
 # =========================================================
@@ -825,7 +885,13 @@ def _append_history(session, decision):
         last["count"] = last.get("count", 1) + 1
         last["text"] = digest
     else:
-        history.append({"_key": key, "count": 1, "text": digest})
+        entry = {"_key": key, "count": 1, "text": digest}
+        # back and forth between two things (move to the chair / examine the chair / move to the chair ...): the run
+        # collapse above never fires, so count the cycles instead
+        before = history[-2] if len(history) >= 2 else None
+        if isinstance(before, dict) and before.get("_key") == key:
+            entry["cycle"] = before.get("cycle", 1) + 1
+        history.append(entry)
     session["history"] = history[-20:]
 
 
@@ -840,7 +906,11 @@ def _render_history_entry(h):
         return h
     text = h.get("text", "")
     count = h.get("count", 1)
-    return f"{text} (×{count} in a row now -- try something different)" if count > 1 else text
+    if count > 1:
+        return f"{text} (×{count} in a row now -- try something different)"
+    if h.get("cycle", 1) > 1:
+        return f"{text} (going back and forth, {h['cycle']} times now -- stop and do something else)"
+    return text
 
 
 # =========================================================
@@ -1292,10 +1362,25 @@ def think(
     # is selected — without it, that log only ever gets populated by the
     # manual /debug/prompt-send tool, never by real gameplay decisions.
     from llm.llm_gate import PRIORITY_NORMAL
+    # use_cache=False: a decision is asked for again because the moment moved on. Live (2026-11-21): with the 5-minute
+    # reply cache a character whose prompt came out the same twice got the SAME answer back -- Rebecca alternated
+    # "move to the chair_modern_a" / "examine the chair_modern_a" for minutes, every reply a cache hit.
     raw = run_llm_call(
-        call_llm_safe(messages, char_id=char_id, max_tokens=DECISION_MAX_TOKENS),
+        call_llm_safe(messages, char_id=char_id, max_tokens=DECISION_MAX_TOKENS, use_cache=False),
         priority=PRIORITY_NORMAL if priority is None else priority,
     )
+    # The model copied the reply format's <placeholders> ("<what you do, ONLY if it's worth describing ...>", "<type>",
+    # "<what I do>") instead of filling them in: thrown away and asked again, once, with a word about it -- never shown.
+    # If the second reply copies them too, the placeholder lines are cut out and whatever real lines are left are used.
+    if _echoes_template(raw):
+        retry = messages + [{"role": "assistant", "content": raw if isinstance(raw, str) else ""},
+                            {"role": "user", "content": _TEMPLATE_ECHO_RETRY}]
+        raw2 = run_llm_call(
+            call_llm_safe(retry, char_id=char_id, max_tokens=DECISION_MAX_TOKENS, use_cache=False),
+            priority=PRIORITY_NORMAL if priority is None else priority,
+        )
+        raw = _strip_template_echo(raw2 if isinstance(raw2, str) and not _echoes_template(raw2) else
+                                   (raw2 if isinstance(raw2, str) else raw))
 
     # Compact line-based reply (see _ENVELOPE_FORMAT) is the primary
     # format now. Falls back to strict JSON for a stale llm_client.py
@@ -1304,6 +1389,21 @@ def think(
     # _to_legacy_decision()/process_decision() below never see the
     # difference, only this parsing step does.
     envelope = _parse_compact_envelope(raw)
+
+    # A reply with no usable ACTION line (plain narration -- "I run towards the front door" --, "<SNAP>", half a
+    # template) is thrown away and asked for again, once, saying what was wrong -- not shown, and not counted against
+    # the character as the AI failing (systems/ai_blackout.py) unless the second try is no better. Not for a gate
+    # error (a timeout or a preempted call): that is a dict, and asking again at once would only queue behind the same.
+    if envelope is None and isinstance(raw, str) and raw.strip() and not raw.lstrip().startswith("{"):
+        retry = messages + [{"role": "assistant", "content": raw},
+                            {"role": "user", "content": _NO_ACTION_RETRY}]
+        raw2 = run_llm_call(
+            call_llm_safe(retry, char_id=char_id, max_tokens=DECISION_MAX_TOKENS, use_cache=False),
+            priority=PRIORITY_NORMAL if priority is None else priority,
+        )
+        env2 = _parse_compact_envelope(_strip_template_echo(raw2)) if isinstance(raw2, str) else None
+        if env2 is not None:
+            raw, envelope = raw2, env2
 
     if envelope is not None:
 

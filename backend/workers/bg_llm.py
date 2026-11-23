@@ -31,6 +31,8 @@ def run_request(req):
             raise ValueError(f"task {name!r} is not allowed on a worker")
         module, func = name.split(":")
         args = req.get("args") or []
+        from llm import provider
+        provider.load_assignments(req.get("llm_assign"))     # the core's character -> model profile map
         value = getattr(importlib.import_module(module), func)(*args)
         char_index = REMOTE_TASKS[name]
         if char_index is not None and len(args) > char_index and args[char_index]:

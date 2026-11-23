@@ -1769,7 +1769,8 @@ def _sec_identity(c, world):
                     else f"You go to {school.get('name', 'school')}.")
     traits = c.get("traits", [])
     if traits:
-        bits.append(f"Your personality: {', '.join(traits)}.")
+        # shown as words ("power gatekeeper"), not ids; systems/choice_tags.py ignores the underscores when matching TAGS
+        bits.append(f"Your personality: {', '.join(str(t).replace('_', ' ') for t in traits)}.")
     # what their current mood brings out, how they talk, what they're insecure about, what their confidence rests on
     # (systems/personality_profile.py -- set per character in the inspector's Persona tab)
     from systems.personality_profile import prompt_lines
@@ -1785,6 +1786,9 @@ def _sec_identity(c, world):
         style = world.get("definitions", {}).get("speech_style_registry", {}).get(style_id)
         if style:
             bits.append(f"How you talk and write: {style['description']}")
+    # a voice of their own, rolled once, and the lines they said lately so they don't keep reusing them (systems/voice.py)
+    from systems.voice import prompt_lines as voice_lines
+    bits.extend(voice_lines(c))
 
     # Developmental profile -- same "registry id -> behavioral prose"
     # pattern as speech_style just above, keyed by age_group instead of a

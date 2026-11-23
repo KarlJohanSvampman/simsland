@@ -58,14 +58,27 @@ def _on_activity_completed(data, world):
     c = (world.get("characters") or {}).get(data.get("character_id"))
     if not c:
         return
-    from brain.intention_needs import satisfied_by
+    from brain.intention_needs import satisfied_by, completes
     t = data.get("activity_type")
+    inter = data.get("interaction")
+    done_types = set(completes(t))
+    # the intention this activity was started for (systems/loop_guard.py records it at the start) -- completing it
+    # sees to that intention, whatever the two are called. Not for intentions with their own lists above: the current
+    # intention at the start can be unrelated (a toilet trip that interrupted "sleep" must not tick sleep off).
+    from brain.intention_needs import ACTIVITY_COMPLETES
+    listed = {i for v in ACTIVITY_COMPLETES.values() for i in v}
+    for _tick, act, intention in reversed(c.get("_activity_starts") or []):
+        if act == t:
+            if intention and not satisfied_by(intention) and intention not in listed:
+                done_types.add(intention)
+            break
     for k, rec in list((c.get("_intention_seen") or {}).items()):
         itype = rec["type"]
         base = itype.split(":", 1)[1] if itype.startswith("expectation:") else itype
         sb = satisfied_by(itype)
-        if t in (itype, base) or t in sb:
-            c.setdefault("_intention_done", {})[k] = {"outcome": "done", "how": t.replace("_", " "), "tick": world.get("tick", 0)}
+        if t in (itype, base) or t in sb or (inter and inter in sb) or itype in done_types or base in done_types:
+            c.setdefault("_intention_done", {})[k] = {"outcome": "done", "how": str(t).replace("_", " "),
+                                                       "tick": world.get("tick", 0)}
 
 
 def _on_plan_end(outcome):

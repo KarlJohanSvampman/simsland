@@ -263,6 +263,9 @@ def apply_speech(c, world, speech):
             accepted, engagement, excuse = check_conversation_interest(
                 listener, world, topic_for_interest, c["id"])
             if not accepted:
+                # remembered, compared with last time, followed up ("what are you busy with?") -- systems/rejection.py
+                from systems.rejection import on_rejected
+                on_rejected(world, c, listener, excuse, "busy" if engagement == "decline_busy" else "uninterested")
                 from cpl import shadow as _cpl_shadow
                 if _cpl_shadow.active(world):
                     _cpl_shadow.on_declined(world, c, listener, medium, topic, excuse)
@@ -2388,15 +2391,22 @@ def route_action(c, world, action, speech, definitions=None, available_actions=N
             # interrupt_socializing_with_unavailable_targets() is the
             # other half, for a target who falls asleep partway through
             # an already-running conversation.
-            target_unavailable = bool(target_char) and (
-                (target_char.get("activity") or {}).get("type") == "sleep"
-                or target_char.get("off_grid")
-            )
-            if not target_unavailable:
+            # A socialize needs someone to socialize WITH, awake (systems/social.py::why_cant_talk: asleep, napping,
+            # away, unconscious): otherwise no activity -- and they are told why, so the next decision is about that.
+            from systems.social import why_cant_talk
+            why = why_cant_talk(target_char)
+            if not why:
                 c["activity"] = _occupy(c, world, _scaffold(
                     c, world, "socialize", target_id=target_id, interaction="talk",
                     duration=_INTERACTION_DURATIONS.get("socialize", 900),
                 ))
+            else:
+                from brain.cognition_scheduler import wake_character
+                who = (target_char or {}).get("name") or "anyone"
+                wake_character(c, world, "cant_talk", {"line": (
+                    "There's nobody here to chat with -- pick someone who's around and awake." if why == "nobody" else
+                    f"{who} is {why} -- you can't sit down for a chat with them now. Let them be, or do something else "
+                    "until they're up.")})
 
     elif action_type == "eat":
         _route_eat(c, world, action)
@@ -4498,6 +4508,8 @@ def _route_remind_child(c, world, action):
             "reason":   f"your parent just reminded you about {need}",
         })
     child.pop("_awaiting_reminder", None)
+    # when they were reminded, so the same need isn't raised again the moment the reminder is given (systems/child_care.py)
+    child.setdefault("_reminded", {})[need] = world.get("tick", 0)
     _clear_parent_intention(c, f"remind_child_{child['id']}")
 
 

@@ -57,6 +57,8 @@ WAKE_PRIORITY = {
     "worry_overload": 97,      # systems/worry_relief.py -- couldn't concentrate and gave up on what they were doing
     "floor_unnoticed": 98,     # systems/conversation_floor.py -- spoke, got no reaction
     "floor_unanswered": 98,    # ... or was heard and brushed off
+    "conversation_declined": 96,  # systems/rejection.py -- the person you tried to talk to turned you down
+    "cant_talk": 96,           # systems/action_router.py -- tried to socialize with nobody, or with someone asleep / away
     "door_signal": 95,
     "asked_to_leave": 96,      # systems/guests.py -- someone whose home you're in told you to go
     "house_guest": 93,         # systems/guests.py -- someone came into your home / won't leave it        # systems/doorbell.py -- noticed a doorbell/
@@ -180,6 +182,20 @@ def should_think(c, world):
     return cog.get("wake_reason") or "idle"
 
 
+# Being spoken to (or needing to answer in a conversation). Tracked apart from wake_reason (cog["spoken_to"]) because a
+# higher-priority wake ("provoked", "director_attention") used to replace heard_speech there, and the checks that let a
+# busy or walking character answer only looked at wake_reason -- the line was then never answered and the speaker
+# recorded being ignored.
+SPOKEN_TO_WAKES = {"heard_speech", "floor_unnoticed", "floor_unanswered", "door_signal"}
+
+
+def spoken_to_due(c, world):
+    """True when someone spoke to this character, the decision that answers it hasn't been asked for yet, and they are
+    due to think."""
+    cog = c.get("cognition") or {}
+    return bool(cog.get("spoken_to")) and world.get("tick", 0) >= cog.get("next_think_tick", 0)
+
+
 def wake_character(c, world, reason, payload=None, delay=0):
     """Mark a character as due for a think() call, at or before its current
     schedule. A lower-priority wake never clobbers a pending higher one —
@@ -193,6 +209,8 @@ def wake_character(c, world, reason, payload=None, delay=0):
         cog["wake_reason"] = reason
         cog["wake_payload"] = payload or {}
     cog["wake_seq"] = cog.get("wake_seq", 0) + 1      # note_think() keeps a wake that came after the decision was asked for
+    if reason in SPOKEN_TO_WAKES:
+        cog["spoken_to"] = {"seq": cog["wake_seq"], "reason": reason, "payload": payload or {}, "tick": tick}
 
     cog["next_think_tick"] = min(cog.get("next_think_tick", tick), target_tick)
     # ... and their update runs then (brain/agent_wake.py)
@@ -214,6 +232,8 @@ _WAKE_LINE_TEMPLATES = {
     "worry_overload": "You tried to {activity} but couldn't concentrate -- your worries keep pulling your mind away. Do something about it first.",
     "floor_unnoticed": "{holder_name} hasn't reacted to what you said -- they're {doing}. Say it again louder, call their attention, or let it go.",
     "floor_unanswered": "{holder_name} heard you but didn't answer (they're {doing}).",
+    "conversation_declined": '{listener_name} turned you down: "{excuse}" {hint}',
+    "cant_talk": "{line}",
     "provoked": "{actor_name} just {verb_phrase} you. {reaction_hint}",
     "activity_phase_changed": "You're finishing up what you were doing.",
     "wait_ready": "What you were waiting on is ready now.",
@@ -242,13 +262,22 @@ def wake_line(c):
     cog = c.get("cognition") or {}
     reason = cog.get("wake_reason")
     template = _WAKE_LINE_TEMPLATES.get(reason)
-    if not template:
+    if not template and not cog.get("spoken_to"):
         return None
     payload = cog.get("wake_payload") or {}
     try:
-        return template.format(**payload)
+        line = template.format(**payload) if template else None
     except (KeyError, IndexError):
-        return None
+        line = None
+    # A stronger wake won, but someone also spoke to them: the prompt still says so.
+    st = cog.get("spoken_to")
+    if st and reason not in SPOKEN_TO_WAKES and _WAKE_LINE_TEMPLATES.get(st.get("reason")):
+        try:
+            extra = _WAKE_LINE_TEMPLATES[st["reason"]].format(**(st.get("payload") or {}))
+            line = f"{line} {extra}" if line else extra
+        except (KeyError, IndexError):
+            pass
+    return line
 
 
 def note_think(c, world, decision, wake_reason=None, asked_at_seq=None):
@@ -271,6 +300,9 @@ def note_think(c, world, decision, wake_reason=None, asked_at_seq=None):
     if not woken_since:
         cog["wake_reason"] = None
         cog["wake_payload"] = None
+    st = cog.get("spoken_to")
+    if st and (asked_at_seq is None or st.get("seq", 0) <= asked_at_seq):
+        cog["spoken_to"] = None                     # this decision was asked for after the line: it has seen it
     cog["staged_knowledge"] = []
     cog["last_think_tick"] = tick
 

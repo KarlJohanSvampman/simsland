@@ -136,7 +136,20 @@ def read(c, world):
         "moods": [{"id": m, "name": t.get("name", m), "polarity": t.get("polarity"), "description": t.get("description")}
                   for m, t in moods.items()],
         "trait_log": list(c.get("trait_log") or []),
+        **_llm_profile_fields(c),
     }
+
+
+def _llm_profile_fields(c):
+    """Which model profile the character's calls go to (llm/provider.py), and what there is to pick from."""
+    try:
+        from llm import provider
+        return {"llm_profile": c.get("llm_profile") or None, "llm_profile_in_use": provider.resolve_character(c),
+                "llm_profiles": [{"name": n, "label": provider.label(n), "model": provider.model(n)}
+                                 for n in provider.profile_names()],
+                "llm_profile_default": provider.default_name()}
+    except Exception:                                     # noqa: BLE001
+        return {}
 
 
 def update(c, world, payload, why="set by hand"):
@@ -148,4 +161,11 @@ def update(c, world, payload, why="set by hand"):
             c[f] = _clean(payload[f])
     if "mood_traits" in payload:
         c["mood_traits"] = {str(m): _clean(v) for m, v in (payload["mood_traits"] or {}).items() if _clean(v)}
+    if "llm_profile" in payload:
+        # their model: a profile name (llm/provider.py), or empty for "whatever the profiles file / default says"
+        v = str(payload["llm_profile"] or "").strip()
+        if v:
+            c["llm_profile"] = v
+        else:
+            c.pop("llm_profile", None)
     return read(c, world)
