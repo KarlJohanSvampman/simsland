@@ -33068,6 +33068,103 @@
       "cognitive_modifiers": [],
       "belief_modifiers": [],
       "conditions": []
+    },
+    "conformist": {
+      "name": "Conformist",
+      "polarity": "neutral",
+      "description": "Lives by what you're supposed to do and be; dreads shame and being left out, and uses shame to keep others in line. Practical and logical rather than creative or philosophical.",
+      "need_modifiers": {
+        "social": 0.08
+      },
+      "skill_modifiers": {
+        "creativity": -0.15,
+        "logic": 0.1
+      },
+      "behavior_flags": [
+        "conformist",
+        "conforming"
+      ],
+      "descriptions": {
+        "positive": "There's a version of this that serves them: Lives by what you're supposed to do and be; dreads shame and being left out, and uses shame to keep others in line. Practical and logical rather than creative or philosophical.",
+        "negative": "There's a sharper edge to it than it first appears: Lives by what you're supposed to do and be; dreads shame and being left out, and uses shame to keep others in line. Practical and logical rather than creative or philosophical.",
+        "balanced": "Plainly put: Lives by what you're supposed to do and be; dreads shame and being left out, and uses shame to keep others in line. Practical and logical rather than creative or philosophical."
+      },
+      "learn_chance": {
+        "balanced": 12,
+        "logical": 10,
+        "self_aware": 8
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [
+        {
+          "belief": "tradition_matters",
+          "modifier": 25
+        },
+        {
+          "belief": "rules_are_meant_to_be_tested",
+          "modifier": -25
+        }
+      ],
+      "conditions": []
+    },
+    "nonconformist": {
+      "name": "Non-conformist",
+      "polarity": "neutral",
+      "description": "Goes their own way; thinks shaming people into line is wrong and blames institutions for boxing people in. Being judged makes them more determined, not less.",
+      "need_modifiers": {},
+      "skill_modifiers": {
+        "creativity": 0.15
+      },
+      "behavior_flags": [
+        "nonconformist"
+      ],
+      "descriptions": {
+        "positive": "There's a version of this that serves them: Goes their own way; thinks shaming people into line is wrong and blames institutions for boxing people in. Being judged makes them more determined, not less.",
+        "negative": "There's a sharper edge to it than it first appears: Goes their own way; thinks shaming people into line is wrong and blames institutions for boxing people in. Being judged makes them more determined, not less.",
+        "balanced": "Plainly put: Goes their own way; thinks shaming people into line is wrong and blames institutions for boxing people in. Being judged makes them more determined, not less."
+      },
+      "learn_chance": {
+        "balanced": 8,
+        "logical": 6,
+        "self_aware": 14
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [
+        {
+          "belief": "rules_are_meant_to_be_tested",
+          "modifier": 25
+        },
+        {
+          "belief": "tradition_matters",
+          "modifier": -20
+        }
+      ],
+      "conditions": []
+    },
+    "validation_seeking": {
+      "name": "Validation-seeking",
+      "polarity": "negative",
+      "description": "Needs praise and appreciation; plans to go beyond what their parents expect, even at the cost of what they want themselves.",
+      "need_modifiers": {
+        "social": 0.1
+      },
+      "skill_modifiers": {},
+      "behavior_flags": [
+        "validation_seeking"
+      ],
+      "descriptions": {
+        "positive": "There's a version of this that serves them: Needs praise and appreciation; plans to go beyond what their parents expect, even at the cost of what they want themselves.",
+        "negative": "There's a sharper edge to it than it first appears: Needs praise and appreciation; plans to go beyond what their parents expect, even at the cost of what they want themselves.",
+        "balanced": "Plainly put: Needs praise and appreciation; plans to go beyond what their parents expect, even at the cost of what they want themselves."
+      },
+      "learn_chance": {
+        "balanced": 10,
+        "logical": 6,
+        "self_aware": 6
+      },
+      "cognitive_modifiers": [],
+      "belief_modifiers": [],
+      "conditions": []
     }
   },
   "recipe_templates": {},

@@ -835,6 +835,13 @@ def generate_character(defs, overrides=None, world=None):
         except Exception:
             pass
 
+    # Conformist / non-conformist / validation-seeking (systems/social_script.py) -- rolled once, seeded by id.
+    try:
+        from systems.social_script import ensure_traits
+        ensure_traits(character)
+    except Exception:
+        pass
+
     # Speech/writing quirk (see speech_style_registry) -- most characters
     # have none; a minority talk/write distinctly differently.
     try:
