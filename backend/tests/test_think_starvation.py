@@ -66,5 +66,30 @@ p = planner(wake_reason="activity_finished", last_think_tick=990)
 runner.on_activity_end({"character_id": "a", "activity_type": "cook_recipe"}, w, "done")
 check("D: thought recently -> the plan carries straight on", ran == ["feed_kids"], ran)
 
+# E. A starving or parched sleeper gets up; their sleep intentions stand aside for a while.
+sleeper = char(); sleeper["body"] = {"hunger": 100}
+check("E: starving in bed -> up", al._starving_in_bed(sleeper, w))
+sleeper["_up_for_food_until"] = 1000 + al.UP_FOR_FOOD_TICKS
+check("E: ...not again straight away", not al._starving_in_bed(sleeper, w))
+dozy = char(); dozy["body"] = {"hunger": 80, "hydration": 50}
+check("E: merely hungry -> sleeps on", not al._starving_in_bed(dozy, w))
+
+# F. Talking to someone asleep: a wake-up call wakes them, anything else isn't delivered and the speaker is told.
+from systems import action_router as ar
+import systems.social as social, systems.occupancy as occ, systems.expressions as ex
+import brain.cognition_scheduler as cs
+woken, said, told = [], [], []
+social.why_cant_talk = lambda t: "asleep" if (t.get("activity") or {}).get("type") == "sleep" else None
+occ.interrupt_activity = lambda t, world, reason=None: (woken.append(t["id"]), t.update(activity=None))
+ex.express = lambda c, world, sp: said.append(sp["utterance"])
+cs.wake_character = lambda c, world, reason, payload=None, delay=0: told.append((c["id"], reason))
+w2 = {"tick": 5, "characters": {"d": {"id": "d", "name": "Daniel", "activity": {"type": "sleep"}}}}
+pam = {"id": "p", "name": "Pamela"}
+handled = ar._speak_to_sleeper(pam, w2, "d", "Daniel, buddy, I need some water", {"utterance": "x"})
+check("F: a line to a sleeper isn't delivered", handled and not woken)
+check("F: ...it's said aloud, and the speaker is told", said and told == [("p", "cant_talk")], (said, told))
+handled = ar._speak_to_sleeper(pam, w2, "d", "Daniel, wake up!", {"utterance": "x"})
+check("F: 'wake up' wakes them and the line goes on", not handled and woken == ["d"])
+
 print("\n" + ("all passed" if not failures else f"{len(failures)} FAILED: {failures}"))
 sys.exit(1 if failures else 0)

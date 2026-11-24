@@ -5,6 +5,7 @@ from systems.occupancy import occupy as _occupy  # one activity at a time (syste
 # changes. Called from agent_loop.process_decision.
 # =========================================================
 
+import re
 import time
 import random
 
@@ -106,6 +107,12 @@ def apply_speech(c, world, speech):
     # in half an hour is ordinary talk, and dropping it made the other person's wait run out -- the conversation ended
     # as "ignored" and they remembered being ignored by someone who had answered.
     if _parts.repeat_dropped(c, world, utterance, target_id):
+        return
+
+    # Talking to someone who is asleep (live 2026-11-23: Pamela, five times in a row, "Daniel, wake up hon, I'm making
+    # dinner...", "Daniel, buddy, I need to get some water" -- each a conversation that died unheard). A wake-up call
+    # wakes them, and the line goes on as usual; anything else is said aloud to nobody, and the speaker is told.
+    if target_id and _speak_to_sleeper(c, world, target_id, utterance, speech):
         return
 
     # Volume (see brain/perception.py's VOLUME_TIERS) -- explicit caller
@@ -377,6 +384,31 @@ def apply_speech(c, world, speech):
 # reaction/relationship update off the one shared conversation object,
 # which is actually more correct than a single blended one would be.
 # =========================================================
+
+_WAKE_CALL_RE = re.compile(r"(?i)\b(wake up|get up|rise and shine|time to get up|up you get)\b")
+
+
+def _speak_to_sleeper(c, world, target_id, utterance, speech):
+    """True when the line was handled because its listener is asleep (and so is not to be delivered)."""
+    target = world.get("characters", {}).get(target_id)
+    if not target:
+        return False
+    from systems.social import why_cant_talk
+    if why_cant_talk(target) != "asleep":
+        return False
+    who = target.get("name") or "they"
+    if _WAKE_CALL_RE.search(utterance):
+        from systems.occupancy import interrupt_activity
+        interrupt_activity(target, world, reason=f"{c.get('name', 'someone')} woke them up")
+        return False                       # awake now: the line is delivered as usual
+    from systems.expressions import express
+    express(c, world, {**speech, "speech_act": "mutter"})
+    from brain.cognition_scheduler import wake_character
+    wake_character(c, world, "cant_talk", {"line": (
+        f"{who} is asleep and didn't hear a word of that. If it really can't wait, wake them up (\"wake up\"); "
+        f"otherwise let them sleep and get on with it yourself.")})
+    return True
+
 
 def apply_speech_to_group(c, world, speech, participant_ids):
     """speech: same shape as apply_speech()'s, but "target" is ignored --

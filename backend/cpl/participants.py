@@ -40,8 +40,16 @@ def repeat_dropped(c, world, utterance, target_id):
     """Said once: the same line to the same person again is dropped (systems/speech_repeat.py) -- unless it is an
     answer. Someone holding the floor of a live conversation with this person is being waited on: "Okay!" said twice
     in half an hour is ordinary talk, and dropping it made the other person's wait run out."""
-    from systems.speech_repeat import is_repeat
+    from systems.speech_repeat import is_repeat, near_repeat
     if not is_repeat(c, world, utterance, target_id):
+        if near_repeat(c, world, utterance, target_id):
+            # nearly the same thing again: not said, and they're told -- otherwise the model keeps producing it
+            from brain.cognition_scheduler import wake_character
+            who = (world.get("characters", {}).get(target_id) or {}).get("name") or "them"
+            wake_character(c, world, "cant_talk", {"line": (
+                f"You've already said that to {who}, nearly word for word. Say something new -- answer what they "
+                f"actually said, move on to another subject, or let it rest and end the conversation.")})
+            return True
         return False
     # the answer exemption is for short stock replies ("Okay!", "Yeah, sure"), not a whole sentence said again: live
     # (2026-11-22) Margaret said "I wish I'd met you before you passed away, I'm sure you'd have been fascinated by..."

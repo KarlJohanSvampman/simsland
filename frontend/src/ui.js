@@ -18,7 +18,6 @@ export function updateOverlay(state) {
   document.getElementById('overlay').innerHTML = `
     <div style="font-size:18px;font-weight:bold">🕒 ${time}</div>
     <div style="margin-bottom:6px">${date}</div>
-    <b>Tick:</b> ${state.tick}<br>
     <b>Jobs:</b> ${(state.job_listings||[]).filter(j=>j.open).length}<br>
     <b>News</b><br>${news || 'No news yet'}
   `;

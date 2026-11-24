@@ -1211,7 +1211,9 @@ def _archive_conversation(world, conv):
     archive(world, conv)
 
 
-IDLE_TIMEOUT_SECONDS = 120     # a conversation nobody has added to for this long is over
+IDLE_TIMEOUT_SECONDS = 300     # a conversation nobody has added to for this long is over (was 120: live 2026-11-23,
+                               # Anthony took 146 s to answer Christopher, the talk had been archived, his answer
+                               # opened a new one)
 
 
 def _on_idle(world, entry):

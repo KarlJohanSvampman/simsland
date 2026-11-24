@@ -181,7 +181,9 @@ def describe(c):
             parts.append(options[i])
     line = "How you talk: " + "; ".join(parts) + "."
     if v.get("habit"):
-        line += f" A habit of yours: {v['habit']}."
+        # "now and then": told plainly, llama put the habit in every line (Anthony answering everything with one word
+        # thrown back as a question -- "Thinking?", "Mistakes?", "Pressing?" -- live 2026-11-23)
+        line += f" A habit that shows now and then, not in every line: {v['habit']}."
     return line
 
 
