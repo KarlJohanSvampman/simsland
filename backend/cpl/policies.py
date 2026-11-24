@@ -14,28 +14,30 @@ from cpl.model.enums import Channel, Purpose
 HARD_CAP_FACTOR = 2.0
 
 DEFAULT = {
-    "invite_s": 60,          # an invitation nobody answers expires
-    "reply_s": 60,           # the floor holder's time to answer (a generation in progress does not count)
+    "invite_s": 90,          # an invitation nobody answers expires
+    "reply_s": 150,          # the floor holder's time to answer (a generation in progress does not count)
     "reply_attempts": 2,     # unanswered this many times: the conversation is abandoned
     "pause_s": 300,          # a pause longer than this ends the sitting (INTERRUPTED)
-    "close_s": 20,           # winding down: the closing lines, or this long
-    "idle_s": 120,           # nobody has said anything for this long: it's over (brain/conversations.py's idle timeout)
-    "max_lines": 6,
-    "max_seconds": 240,
+    "close_s": 60,           # winding down: the closing lines, or this long
+    "idle_s": 300,           # nobody has said anything for this long: it's over (brain/conversations.py's idle timeout)
+    # Live (2026-11-23): at 6 lines / 4 minutes most talks were cut off right after the first reply -- with a local
+    # model a decision takes 30+ s, so 4 sim-minutes is three or four lines. A real conversation gets room.
+    "max_lines": 14,
+    "max_seconds": 900,
 }
 
 # purpose -> overrides (face to face)
 BY_PURPOSE = {
-    Purpose.SOCIAL: {"max_lines": 8, "max_seconds": 300},
-    Purpose.ROMANTIC: {"max_lines": 10, "max_seconds": 420},
+    Purpose.SOCIAL: {"max_lines": 16, "max_seconds": 900},
+    Purpose.ROMANTIC: {"max_lines": 16, "max_seconds": 900},
     Purpose.SUPPORT: {"max_lines": 12, "max_seconds": 600},
     Purpose.EMOTIONAL: {"max_lines": 12, "max_seconds": 600},
     Purpose.NEGOTIATION: {"max_lines": 20, "max_seconds": 900},
     Purpose.PERSUASION: {"max_lines": 16, "max_seconds": 720},
-    Purpose.CONFLICT: {"max_lines": 14, "max_seconds": 600, "reply_s": 30},
-    Purpose.COORDINATION: {"max_lines": 10, "max_seconds": 420},
-    Purpose.QUESTION: {"max_lines": 6, "max_seconds": 240},
-    Purpose.REQUEST: {"max_lines": 8, "max_seconds": 300},
+    Purpose.CONFLICT: {"max_lines": 14, "max_seconds": 900, "reply_s": 90},
+    Purpose.COORDINATION: {"max_lines": 14, "max_seconds": 900},
+    Purpose.QUESTION: {"max_lines": 12, "max_seconds": 600},
+    Purpose.REQUEST: {"max_lines": 12, "max_seconds": 600},
 }
 
 # channel -> overrides applied on top

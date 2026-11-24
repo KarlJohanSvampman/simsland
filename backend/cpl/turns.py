@@ -58,7 +58,10 @@ def context_block(world, c):
     return {"conversation_id": conv["id"], "with": [_name(world, p) for p in others], "labels": labels,
             "open": open_lines, "winding_down": bool(conv.get("winding_down")), "state": conv.get("state"),
             "summary": (conv.get("context") or {}).get("summary") or "", "interrupted": interrupted,
-            "paused": conv.get("state") == "paused"}
+            "paused": conv.get("state") == "paused", "lines": len(conv.get("history") or [])}
+
+
+YOUNG_LINES = 6       # fewer lines than this: still getting going (prompt_section)
 
 
 def prompt_section(block):
@@ -73,6 +76,11 @@ def prompt_section(block):
                      "or excuse yourself (NEXT: leave:excuse).")
     if block.get("paused"):
         lines.append("The conversation is on hold: pick it up again by speaking, or leave it (NEXT: leave:excuse).")
+    if not block.get("winding_down") and not block.get("paused") and (block.get("lines") or 0) < YOUNG_LINES:
+        # Live (2026-11-23): most answers were one line and the talk died there -- "when someone replies we expect a
+        # real conversation, or an explanation" (the user)
+        lines.append("This conversation has only just started: answer properly -- explain, give details, say what you "
+                     "think, ask something back -- not a one-liner, unless you really want it over.")
     if block.get("winding_down"):
         lines.append("It is time to wrap this conversation up: say your goodbye (NEXT: wrap_up) unless something new "
                      "really needs saying.")

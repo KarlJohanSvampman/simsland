@@ -21,11 +21,15 @@ kids_play.settle_play_urges() sees them play.
 
 import re
 
-MAX_LINES = 6                 # a conversation longer than this ends, settled or not
-MAX_TICKS = 240               # 4 sim-minutes
-NO_REPLY_TICKS = 60           # a minute without a line: nobody is answering any more
+# Backstops only -- CPL's policies (cpl/policies.py) wind a conversation down first. Live (2026-11-23): at 6 lines /
+# 4 minutes / 60 s without a line, a third of answered conversations ended after the first reply, before the one who
+# opened it had even had the model write an answer (a decision takes 30+ s with a local model).
+MAX_LINES = 24                # a conversation longer than this ends, settled or not
+MAX_TICKS = 1800              # 30 sim-minutes
+NO_REPLY_TICKS = 180          # three minutes without a line: nobody is answering any more
+SETTLING_MAX_WORDS = 14       # an answer longer than this explains something: the talk goes on, it isn't settled
 EARSHOT_TILES = 6.0           # in person, further apart than this and they have parted
-CLOSE_GRACE_TICKS = 20        # after the answer, the asker's closing line (or this long) and it's over
+CLOSE_GRACE_TICKS = 90        # after the answer, the asker's closing line (or this long) and it's over
 LATER_DEFAULT_MINUTES = 60    # "later" with no time given
 
 _FILLERS = {"hey", "hi", "hello", "oh", "um", "uh", "well", "so", "hmm", "ah", "and", "but"}
@@ -168,6 +172,13 @@ def on_message(world, conv, speaker_id, utterance, speech_act, tick):
         return
     if speaker_id == purpose.get("by"):
         return                                         # still the asker: no answer yet
+    if expects_reply(utterance, speech_act, kind):
+        # The answer asks something back ("Hmm, what game?", "Sorry, but what's going on with Rachel?"): not settled.
+        # Live (2026-11-23): replies that began "Sorry, ..." or "Okay, ..." and went on to ask something were read as
+        # a no or a yes, and the conversation ended after two lines.
+        return
+    if len((utterance or "").split()) > SETTLING_MAX_WORDS:
+        return                                         # an explanation, not a bare yes/no/later: the talk goes on
     verdict, at_tick = read_answer(utterance, speech_act, world, _names(world, conv))
     if not verdict:
         return
