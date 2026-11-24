@@ -86,7 +86,8 @@ def _ask_permission_to_use(c, world, prop):
     there's nobody to grant permission, so the answer is no by default,
     not an assumed yes. A closer/more familiar relationship with whoever
     IS home makes a yes more likely."""
-    household = world.get("households", {}).get(prop.get("household_id"))
+    from systems.props import owner_household_id
+    household = world.get("households", {}).get(owner_household_id(world, prop))
     if not household:
         return False
     from systems.service_worker_runtime import _resident_present
@@ -122,8 +123,14 @@ def begin_interaction(c, world, interaction_name):
     prop, anchor = result
 
     if used_other_household:
-        prop_household = prop.get("household_id")
-        if prop_household and prop_household != c.get("household_id"):
+        from systems.props import owner_household_id, may_use_fixture
+        prop_household = owner_household_id(world, prop)
+        if prop_household and not may_use_fixture(c, world, prop):
+            # Someone else's home: nobody walks over to the neighbours' for the toilet or to cook (live 2026-11-24, the
+            # user: "these things they obviously do in their own homes unless invited to"). Only someone already inside
+            # may ask the people who live there.
+            if c.get("building_id") != prop.get("building_id"):
+                return None
             if not _ask_permission_to_use(c, world, prop):
                 # Denied, or nobody home to ask -- don't presume it's
                 # fine to just use it anyway. Nothing usable this tick;
@@ -140,6 +147,9 @@ def begin_interaction(c, world, interaction_name):
         # toilet/sink, ...) is free elsewhere and go there instead.
         from systems.props import find_nearest_free_anchor
         alt = find_nearest_free_anchor(c, world, interaction_name, exclude_anchor=anchor)
+        from systems.props import may_use_fixture
+        if alt and not may_use_fixture(c, world, alt[0]):
+            alt = None        # the free one is in someone else's home: wait for their own instead (live 2026-11-24)
         if alt:
             prop, anchor = alt
         else:

@@ -1812,6 +1812,12 @@ def _sec_identity(c, world):
     return " ".join(bits)
 
 
+def _sec_social_script(c, world):
+    # society's script -- what you're supposed to be and do, where you stand, conformity, shame (systems/social_script.py)
+    from systems.social_script import prompt_lines
+    return " ".join(prompt_lines(world, c))
+
+
 # Live (2026-11-23): Alexander and Margaret had four conversations in a quarter of an hour about one muddled remark,
 # each going back over the same ground. Three or more with the same person in CIRCLES_WINDOW_TICKS: say so.
 CIRCLES_WINDOW_TICKS = 1800
@@ -2506,6 +2512,7 @@ NARRATIVE_SECTIONS = [
     ("claustrophobia",        "core", _sec_claustrophobia),
     ("identity",              "core", _sec_identity),
     ("going_in_circles",      "core", _sec_going_in_circles),
+    ("social_script",         "core", _sec_social_script),
     ("child_cognition",       "core", _sec_child_cognition),
     ("concern_raised",        "core", _sec_concern_raised),
     ("body",                  "core", _sec_body),

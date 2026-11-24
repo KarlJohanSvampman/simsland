@@ -845,6 +845,18 @@ def _sit_in(c, world, seat):
     set_posture(c, world, "sitting_seat")
 
 
+_PRIVATE_FIXTURE_RE = re.compile(r"toilet|shower|bath|bed\b|bed_|stove|oven|microwave|fridge|sink|kettle|coffee")
+
+
+def _private_fixture(prop):
+    return bool(_PRIVATE_FIXTURE_RE.search(str(prop.get("template") or "")))
+
+
+def _may_use(c, world, prop):
+    from systems.props import may_use_fixture
+    return may_use_fixture(c, world, prop)
+
+
 def _route_interact(c, world, action, definitions):
     target_id = action.get("target")
     if not target_id:
@@ -858,6 +870,15 @@ def _route_interact(c, world, action, definitions):
         prop = props.get(target_id)
 
     if not prop:
+        return
+
+    # Someone else's toilet, stove, fridge, shower, bed: only in a home they've been welcomed into (live 2026-11-24).
+    if _private_fixture(prop) and not _may_use(c, world, prop):
+        from brain.cognition_scheduler import wake_character
+        what = str(prop.get("template") or "that").replace("_", " ")
+        wake_character(c, world, "cant_talk", {"line": (
+            f"The {what} isn't yours -- this isn't your home and nobody here has invited you to make yourself at home. "
+            f"Ask whoever lives here first, or wait until you're back home.")})
         return
 
     # prefer interaction specified by the LLM, then fall back to definition

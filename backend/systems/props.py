@@ -489,6 +489,32 @@ def find_nearest_free_anchor(c, world, interaction_name, exclude_anchor=None):
     return (best_prop, best_anchor)
 
 
+def owner_household_id(world, prop):
+    """The household a prop belongs to: its own household_id, or else the household whose home it stands in. Live
+    (2026-11-23): every fixture in the starter houses (toilet, stove, fridge, sink, shower) had no household_id, so
+    they all counted as public -- characters walked to the neighbours' to use the toilet or cook."""
+    hid = prop.get("household_id")
+    if hid:
+        return hid
+    bid = prop.get("building_id")
+    if not bid:
+        return None
+    for hh in (world.get("households") or {}).values():
+        if hh.get("home_id") == bid or bid in (hh.get("building_ids") or []):
+            return hh.get("id")
+    return None
+
+
+def may_use_fixture(c, world, prop, household_id=None):
+    """Their own household's, a public one, or the home they're a welcome guest in right now (systems/guests.py)."""
+    owner = owner_household_id(world, prop)
+    if not owner or owner == (household_id if household_id is not None else c.get("household_id")):
+        return True
+    visit = c.get("guest_visit") or {}
+    return (visit.get("status") == "welcome" and visit.get("household_id") == owner
+            and c.get("building_id") == prop.get("building_id"))
+
+
 def find_nearest_household_anchor(c, world, interaction_name, household_id):
     """Same scan as find_nearest_free_anchor(), but restricted to props
     that belong to the given household, OR have no household at all (a
@@ -504,8 +530,9 @@ def find_nearest_household_anchor(c, world, interaction_name, household_id):
     best_dist = 999999
 
     for prop in world.get("props", []):
-        prop_household = prop.get("household_id")
-        if prop_household and prop_household != household_id:
+        if not any(a.get("interaction") == interaction_name for a in prop.get("anchors", [])):
+            continue
+        if not may_use_fixture(c, world, prop, household_id):
             continue
         for anchor in prop.get("anchors", []):
             if anchor.get("interaction") != interaction_name:
