@@ -2249,6 +2249,8 @@ def _route_wear(c, world, action, definitions=None):
 
 def _route_undress(c, world, action):
     from systems.clothing import take_off_clothing, undress_all
+    # their own choice: systems/wardrobe.py doesn't dress them again straight away
+    c["_undressed_on_purpose_until"] = world.get("tick", 0) + 1800
     slot = action.get("slot")
     if slot:
         take_off_clothing(c, world, slot)

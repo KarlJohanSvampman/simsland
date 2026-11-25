@@ -94,7 +94,7 @@ PERSIST_COLD_EXTRA = frozenset({
     # mid-sized and slow to change (measured live after the first split: the hot row was still ~42 KB, spread over these)
     "selected_situation", "_debug_event_last", "inventory", "grudges", "absorbed_traits", "health_state", "principles",
     "values", "belief_influence_profile", "attraction_profile", "food_taste", "child_cognition", "mentality",
-    "_last_sighting_recall",
+    "_last_sighting_recall", "closet",
 })
 
 # World-level keys that change every tick but don't matter to the minute: written at most every this many flushes

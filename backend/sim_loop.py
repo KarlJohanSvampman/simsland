@@ -52,6 +52,7 @@ import systems.ai_blackout   # noqa: F401 -- the AI not answering: confusion, an
 import social.tick           # noqa: F401 -- social discourse: handlers, the old-data conversion, upkeep
 import systems.rifts          # noqa: F401 -- registers the rift timers and the hourly standing scan
 import brain.intention_history  # noqa: F401 -- finished intentions, for the inspector
+import systems.wardrobe  # noqa: F401 -- clothes: dressed awake, pyjamas asleep, laundry (every 10 sim-minutes + activity events)
 import systems.social_script  # noqa: F401 -- society's script: milestones, shame, hopelessness (hourly + speech_spoken)
 import systems.rejection  # noqa: F401 -- being turned down: remembered, looked back on, followed up (cpl.initiator_notified)
 import brain.actionplans.runner     # noqa: F401 -- ActionPlans: step-end events and wait timers (brain/actionplans)

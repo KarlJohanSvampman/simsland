@@ -255,6 +255,8 @@ def _laundry_on_complete(household, process, world):
         if member is not None:
             launder_worn(member)
             launder_inventory(member)
+    from systems.wardrobe import launder_closets          # what's in the closets too (systems/wardrobe.py)
+    launder_closets(world, household)
 
 
 register_process_type("laundry", on_begin=_laundry_on_begin, on_complete=_laundry_on_complete)
