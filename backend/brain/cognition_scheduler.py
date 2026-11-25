@@ -59,7 +59,8 @@ WAKE_PRIORITY = {
     "floor_unanswered": 98,    # ... or was heard and brushed off
     "conversation_declined": 96,  # systems/rejection.py -- the person you tried to talk to turned you down
     "cant_talk": 96,           # systems/action_router.py -- tried to socialize with nobody, or with someone asleep / away
-    "someone_in_crisis": 97,   # systems/social_script.py -- someone at home / nearby is in a crisis and needs someone
+    "someone_in_crisis": 97,
+    "owe_answer": 99,          # systems/conversation_health.py -- spoken to, decided on something that didn't answer   # systems/social_script.py -- someone at home / nearby is in a crisis and needs someone
     "door_signal": 95,
     "asked_to_leave": 96,      # systems/guests.py -- someone whose home you're in told you to go
     "house_guest": 93,         # systems/guests.py -- someone came into your home / won't leave it        # systems/doorbell.py -- noticed a doorbell/
@@ -187,7 +188,7 @@ def should_think(c, world):
 # higher-priority wake ("provoked", "director_attention") used to replace heard_speech there, and the checks that let a
 # busy or walking character answer only looked at wake_reason -- the line was then never answered and the speaker
 # recorded being ignored.
-SPOKEN_TO_WAKES = {"heard_speech", "floor_unnoticed", "floor_unanswered", "door_signal"}
+SPOKEN_TO_WAKES = {"heard_speech", "floor_unnoticed", "floor_unanswered", "door_signal", "owe_answer"}
 
 
 def spoken_to_due(c, world):
@@ -236,6 +237,7 @@ _WAKE_LINE_TEMPLATES = {
     "conversation_declined": '{listener_name} turned you down: "{excuse}" {hint}',
     "cant_talk": "{line}",
     "someone_in_crisis": "{line}",
+    "owe_answer": "{line}",
     "provoked": "{actor_name} just {verb_phrase} you. {reaction_hint}",
     "activity_phase_changed": "You're finishing up what you were doing.",
     "wait_ready": "What you were waiting on is ready now.",

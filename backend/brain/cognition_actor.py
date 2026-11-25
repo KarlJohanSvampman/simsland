@@ -318,6 +318,7 @@ def on_decision_ready(data, world):
 
     from brain.agent_loop import process_decision, post_update
     process_decision(c, world, decision, available_actions=data.get("available_actions"))
+    _nudge_if_unanswered(c, world, decision)
     _drop_answered_wake(c, world)
     post_update(c, world)
     try:
@@ -325,6 +326,33 @@ def on_decision_ready(data, world):
         _mark_dirty(world, char_ids={cid})
     except Exception:
         pass
+
+
+_NOT_IGNORING = {"leave_conversation", "dismiss_conversation", "speak", "socialize", "phone_call", "phone_answer"}
+
+
+def _nudge_if_unanswered(c, world, decision):
+    """Spoken to, and decided on something that says nothing back: asked once more to answer (live 2026-11-25: the
+    person addressed answered once or twice, then went quiet while the other kept talking)."""
+    try:
+        from systems.conversation_health import owes_answer
+        owed = owes_answer(world, c)
+        if not owed or ((decision or {}).get("speech") or {}).get("utterance"):
+            return
+        if (((decision or {}).get("action") or {}).get("type") or "") in _NOT_IGNORING:
+            return
+        conv, line = owed
+        key = f"{conv.get('id')}:{line.get('tick')}"
+        if c.get("_nudged_line") == key:
+            return                                   # once per line
+        c["_nudged_line"] = key
+        who = (world.get("characters", {}).get(line.get("speaker")) or {}).get("name") or "Someone"
+        from brain.cognition_scheduler import wake_character
+        wake_character(c, world, "owe_answer", {"line": (
+            f'{who} said to you: "{str(line.get("utterance"))[:200]}" -- and is waiting for your answer. Answer them '
+            f"properly; if you really can't talk now, say so and why.")})
+    except Exception as exc:                          # noqa: BLE001
+        print(f"[cognition] nudge for {c.get('id')}: {exc!r}")
 
 
 def _drop_answered_wake(c, world):

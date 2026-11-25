@@ -114,6 +114,11 @@ def apply_speech(c, world, speech):
     # wakes them, and the line goes on as usual; anything else is said aloud to nobody, and the speaker is told.
     if target_id and _speak_to_sleeper(c, world, target_id, utterance, speech):
         return
+    # Talking into silence, or speaking as the other person (systems/conversation_health.py) -- live 2026-11-25:
+    # Anthony asked Alexander "What's really going on here?" a dozen times with no answer, and one of his lines was
+    # really Alexander's ("It's not just about your entry, Anthony").
+    if target_id and (_talking_into_silence(c, world, target_id) or _speaking_as_other(c, world, target_id, utterance)):
+        return
 
     # Volume (see brain/perception.py's VOLUME_TIERS) -- explicit caller
     # value wins (e.g. a future hostile-action shout), otherwise inferred
@@ -386,6 +391,41 @@ def apply_speech(c, world, speech):
 # =========================================================
 
 _WAKE_CALL_RE = re.compile(r"(?i)\b(wake up|get up|rise and shine|time to get up|up you get)\b")
+
+
+MAX_UNANSWERED_RUN = 2     # lines in a row with no answer; the next one isn't said
+
+
+def _talking_into_silence(c, world, target_id):
+    from brain.conversations import find_conversation
+    from systems.conversation_health import unanswered_run
+    conv = find_conversation(world, [c["id"], target_id])
+    if not conv or not conv.get("active"):
+        return False
+    n = unanswered_run(conv, c["id"])
+    if n < MAX_UNANSWERED_RUN:
+        return False
+    from brain.cognition_scheduler import wake_character
+    who = (world.get("characters", {}).get(target_id) or {}).get("name") or "They"
+    wake_character(c, world, "cant_talk", {"line": (
+        f"{who} hasn't answered your last {n} lines. Don't keep talking at them: wait for an answer, or let it go "
+        f"and get on with something else.")})
+    return True
+
+
+def _speaking_as_other(c, world, target_id, utterance):
+    """A line that calls the speaker by their own name is the other person's line, written by mistake."""
+    mine = ((c.get("name") or "").split() or [""])[0]
+    theirs = (((world.get("characters", {}).get(target_id) or {}).get("name") or "").split() or [""])[0]
+    if len(mine) < 2 or mine.lower() == theirs.lower():
+        return False
+    if not re.search(rf"(?:^|[.!?]\s+|,\s*){re.escape(mine)}\s*[,.!?]", utterance or "", re.I):
+        return False
+    from brain.cognition_scheduler import wake_character
+    wake_character(c, world, "cant_talk", {"line": (
+        f"You started to answer as if you were {theirs}, calling yourself \"{mine}\". You are {c.get('name')}: "
+        f"say what YOU say to {theirs}.")})
+    return True
 
 
 def _speak_to_sleeper(c, world, target_id, utterance, speech):

@@ -67,6 +67,11 @@ def archive(world, conv):
     }
     store = world.setdefault("conversation_archive", {})
     store[entry["id"]] = entry
+    try:                                       # was it two people talking, or one talking at the other?
+        from systems.conversation_health import note
+        note(world, entry)
+    except Exception as exc:                   # noqa: BLE001
+        print(f"[conversation_archive] health: {exc!r}")
     if len(store) > ARCHIVE_CAP:
         for old in sorted(store, key=lambda k: store[k].get("ended_tick") or 0)[:len(store) - ARCHIVE_CAP]:
             store.pop(old, None)

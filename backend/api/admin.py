@@ -1251,6 +1251,17 @@ def event_log_handlers(top: int = 40):
     return {"handlers": event_log.handler_stats(top), "bus": event_bus.stats()}
 
 
+@router.get("/conversation_health")
+@core_only
+def conversation_health():
+    """Two people talking, or one talking at the other (systems/conversation_health.py): counts of finished two-person
+    conversations by kind -- unanswered, one_sided, lopsided, short, balanced -- and the latest lopsided ones."""
+    from systems.conversation_health import summary
+    with world_lock():
+        world = load_world(DEFAULT_SIM_ID)
+        return summary(world)
+
+
 @router.get("/world_state")
 @core_only
 def world_state_stats():
