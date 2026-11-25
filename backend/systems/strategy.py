@@ -161,6 +161,17 @@ def resolve_strategy(
     if t in ("water_plants", "weed_plants", "harvest_plants", "redecorate_room"):
         return t
 
+    # The laundry's piling up (systems/wardrobe.py): load the washing machine -- the rest runs by itself
+    # (systems/task_process.py's laundry process). Gone if somebody else already started a load.
+    if t == "do_laundry":
+        from systems.wardrobe import _laundry_running
+        household = world.get("households", {}).get(c.get("household_id"))
+        if not household or _laundry_running(world, household):
+            from brain.intentions import remove_intention
+            remove_intention(c, "do_laundry")
+            return None
+        return "do_laundry_fill"
+
     # Dinner time and it is this person's turn (systems/dinner.py): cook if there is anything to make it from.
     if t == "cook_dinner":
         from systems import cookware

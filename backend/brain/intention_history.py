@@ -31,6 +31,11 @@ def track(c, world):
                        "reason": str(i.get("reason") or "")[:160], "category": i.get("category"), "since": tick}
     marks = c.get("_intention_done") or {}
     for k in [k for k in seen if k not in now]:
+        if _still_at_it(c, seen[k]["type"]):
+            # the activity started for it is still running: the record stays open until it ends. Live (2026-11-25):
+            # "sleep" left the list the moment the character lay down and was logged done that same minute, hours
+            # before they woke up.
+            continue
         rec = seen.pop(k)
         mark = marks.pop(k, None) or marks.pop(rec["type"] + "|", None)
         rec.update(ended=tick, outcome=(mark or {}).get("outcome", "dropped"), how=(mark or {}).get("how"))
@@ -44,6 +49,17 @@ def track(c, world):
     if left:                              # ... and goes when its time is up, whether or not anything else happens then
         from brain import agent_wake
         agent_wake.wake_at(c, world, agent_wake.at_tick(world, min(left) + 601), "intention_marks")
+
+
+def _still_at_it(c, intention_type):
+    """Is c in the middle of the activity that was started for this intention (systems/loop_guard.py records which)?"""
+    act = (c.get("activity") or {}).get("type")
+    if not act:
+        return False
+    if act == intention_type:
+        return True
+    starts = c.get("_activity_starts") or []
+    return bool(starts) and starts[-1][1] == act and starts[-1][2] == intention_type
 
 
 def mark(c, world, intention_type, outcome, how, target=None):

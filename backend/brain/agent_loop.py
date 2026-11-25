@@ -1254,6 +1254,13 @@ def update_agent(
     # (feed the kids, a drink, a chore) and returns before the cognition gate, so anyone with something on their list
     # never thought: 44 model requests in 3,485 ticks for 11 characters, Anthony not once in 18,000 ticks while it
     # cooked for a child who was at school, and only 3 of 20 conversations answered.
+    # Someone is waiting for their answer: their own errands wait a moment (systems/conversation_health.py -- live
+    # 2026-11-25, listeners walked off to their chores and the conversation ended "left", or went one-sided).
+    from systems.conversation_health import owes_answer
+    from brain.cognition_scheduler import _urgent_need as _urgent
+    if not _urgent(c) and owes_answer(world, c):
+        _think_now(c, world)
+        return
     if _think_overdue(c, world):
         _think_now(c, world)
         from brain.cognition_actor import is_waiting as _is_waiting

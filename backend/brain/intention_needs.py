@@ -34,7 +34,7 @@ SATISFIED_BY = {
     "make_dinner":           ["cook", "prepare_food", "open_fridge", "use_microwave", "grill_food"],
     "feed_child_kid":        ["open_fridge", "prepare_food", "use_microwave", "cook", "eat"],
     "family_dinner_together": ["eat", "cook", "prepare_food"],
-    "do_laundry":            ["do_laundry", "add_laundry", "dry_laundry", "iron_clothes"],
+    "do_laundry":            ["do_laundry", "do_laundry_fill", "add_laundry", "dry_laundry", "iron_clothes"],
     "wash_dishes":           ["wash_dishes", "load_dishwasher"],
     "take_out_trash":        ["take_out_trash", "dispose_trash"],
     "check_mail":            ["check_mail"],

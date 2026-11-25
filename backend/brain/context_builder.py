@@ -1812,6 +1812,12 @@ def _sec_identity(c, world):
     return " ".join(bits)
 
 
+def _sec_clothes(c, world):
+    # what they're wearing, and whether the laundry needs doing (systems/wardrobe.py)
+    from systems.wardrobe import prompt_line
+    return prompt_line(world, c)
+
+
 def _sec_social_script(c, world):
     # society's script -- what you're supposed to be and do, where you stand, conformity, shame (systems/social_script.py)
     from systems.social_script import prompt_lines
@@ -2513,6 +2519,7 @@ NARRATIVE_SECTIONS = [
     ("identity",              "core", _sec_identity),
     ("going_in_circles",      "core", _sec_going_in_circles),
     ("social_script",         "core", _sec_social_script),
+    ("clothes",               "core", _sec_clothes),
     ("child_cognition",       "core", _sec_child_cognition),
     ("concern_raised",        "core", _sec_concern_raised),
     ("body",                  "core", _sec_body),
