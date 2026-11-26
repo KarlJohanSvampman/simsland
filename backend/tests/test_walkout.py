@@ -63,6 +63,11 @@ check("B: settled conversations, single unanswered calls, other end reasons: not
       and W.note(w, conv([("ant", "Rachel, food's ready!"), ("ant", "Rachel?")])) is None
       and W.note(w, conv(ARGUMENT, end_reason="timed_out")) is None)
 check("B: a closing line is recognised", W.closes("Sorry, I need some space.") and W.closes("Bye!") and not W.closes("I'll do it later."))
+check("B: live closings (2026-11-26): said enough, table this, I need to get a drink",
+      W.closes("You're clearly upset, but I think we've said enough for today.")
+      and W.closes("Can we agree to table this for now and focus on something more productive?")
+      and W.closes("Patrick, wake up, I need to get a drink")
+      and not W.closes("What's going on with you? You seem a bit down."))
 
 # C
 w = make_world()
@@ -77,10 +82,17 @@ check("C: what the ending recorded wins", W.leaver_of(w, conv(ARGUMENT, left_by=
 # D
 w = make_world(); woken.clear()
 rec = W.note(w, conv(ARGUMENT))
-W.after_decision(w["characters"]["alex"], w, {"thought": "This conversation was just going in circles.", "action": {"type": "drink_water"}})
+woken.clear()
+W.after_decision(w["characters"]["alex"], w, {"thought": "I get on with it.", "action": {"type": "drink_water"}}, "schedule_block")
+check("D: a decision not asked for the walk-out isn't their explanation; asked again once",
+      rec["thought"] is None and [r for _, r, _ in woken] == ["walked_out"], (rec, woken))
+w["characters"]["alex"]["cognition"] = {"wake_reason": "schedule_block"}; woken.clear()
+W.after_decision(w["characters"]["alex"], w, {"thought": "Hm.", "action": {"type": "wait"}}, "schedule_block")
+check("D: ... only once", not woken)
+W.after_decision(w["characters"]["alex"], w, {"thought": "This conversation was just going in circles.", "action": {"type": "drink_water"}}, "walked_out")
 check("D: the thought is kept, still open", rec["thought"].startswith("This conversation") and rec["status"] == "open", rec)
 W.after_decision(w["characters"]["alex"], w, {"thought": "I'll tell him.",
-                 "action": {"type": "phone_send_text", "target_id": "ant", "message": "Sorry, I needed air."}})
+                 "action": {"type": "phone_send_text", "target_id": "ant", "message": "Sorry, I needed air."}}, "walked_out")
 check("D: texting the other settles it (told)", rec["status"] == "done" and rec["outcome"] == "told" and w["walkout_stats"]["told"] == 1, rec)
 
 # E
