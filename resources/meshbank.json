@@ -290,14 +290,14 @@
       "Seat"
     ],
     "placement": {
-      "pivot": "center",
-      "snap_to_ground": false,
-      "snap_to_grid": false
+      "pivot": "bottom_center",
+      "snap_to_ground": true,
+      "snap_to_grid": true
     },
     "transform": {
       "position": {
         "x": 0,
-        "y": -0.1,
+        "y": 0,
         "z": 0
       },
       "rotation": {
@@ -601,11 +601,21 @@
   },
   "disjhwasher_a": {
     "mesh": "/resources/props/disjhwasher_a.glb",
-    "category": "props"
+    "category": "props",
+    "placement": {
+      "pivot": "bottom_center",
+      "snap_to_ground": true,
+      "snap_to_grid": true
+    }
   },
   "toilet_a": {
     "mesh": "/resources/props/toilet_a.glb",
-    "category": "props"
+    "category": "props",
+    "placement": {
+      "pivot": "bottom_center",
+      "snap_to_ground": true,
+      "snap_to_grid": true
+    }
   },
   "adult_female": {
     "display_name": "Adult Female",
@@ -747,8 +757,8 @@
     "anchors": {},
     "mesh": "/resources/props/wall_cabinet.glb",
     "placement": {
-      "pivot": "bottom_center",
-      "snap_to_ground": true,
+      "pivot": "rear_center",
+      "snap_to_ground": false,
       "snap_to_grid": true
     },
     "bones": {},
@@ -860,7 +870,7 @@
     "transform": {
       "position": {
         "x": 0,
-        "y": -0.4,
+        "y": 0,
         "z": 0
       },
       "rotation": {

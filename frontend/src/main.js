@@ -239,6 +239,72 @@ function resolveModelScale(modelRef) {
     z: scale?.z ?? 1,
   };
 }
+
+// The meshbank asset behind a model ref: a meshbank key, or (raw-path props) the asset whose .mesh is that path.
+function resolveMeshAsset(modelRef) {
+  if (!modelRef) return null;
+  return meshbank[modelRef] || Object.values(meshbank).find(a => a.mesh === modelRef) || null;
+}
+
+// The meshbank's per-asset settings, applied in the game (until 2026-11-26 only transform.scale was; position,
+// rotation, pivot, snap_to_ground and snap_to_grid were saved by meshbank.html and read by nothing):
+//
+//   transform.rotation / .scale  -- applied to the model, as the meshbank viewer shows it;
+//   snap_to_ground (or pivot bottom_center) -- the model's lowest point on the floor;
+//   pivot top_center (ceiling-mounted)      -- its highest point at the mount height;
+//   pivot rear_center / front_center        -- its back / front at the placement point (against the wall);
+//   snap_to_grid -- centred over its footprint: the prop's own tiles (a sofa over both of its tiles, not hanging off
+//                   the first one), the tile it stands on otherwise;
+//   transform.position -- a manual nudge on top of all that.
+//
+// Everything goes on an inner group, so the model's own position stays the plain tile position the update code sets.
+// The model's bounds are measured once, here, in its rest pose. `footprint` is [{dx,dy}, ...] (prop templates' size);
+// `wallMounted` skips the footprint centring (the wall edge offset places those).
+function applyMeshbankPlacement(model, asset, { footprint = null, ceiling = false, wallMounted = false } = {}) {
+  const inner = new THREE.Group();
+  inner.name = "_meshbankPlacement";
+  while (model.children.length) inner.add(model.children[0]);
+  model.add(inner);
+  if (!asset) return inner;
+
+  const t = asset.transform || {};
+  const r = t.rotation || {};
+  const sc = t.scale || {};
+  inner.rotation.set(THREE.MathUtils.degToRad(r.x || 0), THREE.MathUtils.degToRad(r.y || 0),
+                     THREE.MathUtils.degToRad(r.z || 0));
+  inner.scale.set(sc.x ?? 1, sc.y ?? 1, sc.z ?? 1);
+
+  // bounds in the model's own frame (its tile position / wall turn taken out for the measurement)
+  const keep = [model.position.clone(), model.quaternion.clone(), model.scale.clone()];
+  model.position.set(0, 0, 0); model.quaternion.identity(); model.scale.set(1, 1, 1);
+  model.updateMatrixWorld(true);
+  const box = new THREE.Box3().setFromObject(inner, true);
+  model.position.copy(keep[0]); model.quaternion.copy(keep[1]); model.scale.copy(keep[2]);
+  model.updateMatrixWorld(true);
+  if (box.isEmpty()) return inner;
+
+  const p = asset.placement || {};
+  const off = new THREE.Vector3();
+  if (ceiling) {
+    if (p.pivot === "top_center" || p.snap_to_ground) off.y = -box.max.y;
+  } else if (p.snap_to_ground || p.pivot === "bottom_center") {
+    off.y = -box.min.y;
+  }
+  if (p.pivot === "rear_center") off.z = -box.min.z;
+  else if (p.pivot === "front_center") off.z = -box.max.z;
+  if (p.snap_to_grid && !wallMounted) {
+    const cells = (Array.isArray(footprint) && footprint.length) ? footprint : [{ dx: 0, dy: 0 }];
+    const dxs = cells.map(c => c.dx || 0), dys = cells.map(c => c.dy || 0);
+    const fx = (Math.min(...dxs) + Math.max(...dxs)) / 2;    // tile x -> world x
+    const fz = (Math.min(...dys) + Math.max(...dys)) / 2;    // tile y -> world z
+    const centre = box.getCenter(new THREE.Vector3());
+    off.x = fx - centre.x;
+    if (p.pivot !== "rear_center" && p.pivot !== "front_center") off.z = fz - centre.z;
+  }
+  const pos = t.position || {};
+  inner.position.set(off.x + (pos.x || 0), off.y + (pos.y || 0), off.z + (pos.z || 0));
+  return inner;
+}
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x20242a);
 
@@ -2368,7 +2434,7 @@ async function updateProps(state){
 
       props[prop.id].position.set(
         prop.x - 10,
-        resolvedExisting?.ceiling_mounted ? CEILING_PROP_Y : 0.5,
+        props[prop.id].userData.baseY ?? (resolvedExisting?.ceiling_mounted ? CEILING_PROP_Y : 0.5),
         prop.y - 7
       );
       applyWallSideTransform(props[prop.id], prop, resolvedExisting);
@@ -2457,15 +2523,22 @@ try {
   // resolve through createFallbackProp above instead) -- this just keeps
   // a future ceiling-mounted model consistent with the fallback cylinder
   // rather than sitting on the floor like every other prop's own y=0.
+  // Its height, for every later update too (the update path used 0.5 -- right for the 1 m fallback boxes, centred
+  // on their middle -- and lifted every real model half a metre off the floor; live 2026-11-26).
+  model.userData.baseY = resolved?.ceiling_mounted ? CEILING_PROP_Y : 0;
   model.position.set(
     prop.x - 10,
-    resolved?.ceiling_mounted ? CEILING_PROP_Y : 0,
+    model.userData.baseY,
     prop.y - 7
   );
-  applyWallSideTransform(model, prop, resolved);
 
-  const propScale = resolveModelScale(resolved?.model);
-  model.scale.set(propScale.x, propScale.y, propScale.z);
+  // the meshbank's transform, pivot, snap to ground and snap to grid (applyMeshbankPlacement)
+  applyMeshbankPlacement(model, resolveMeshAsset(resolved?.model), {
+    footprint: resolved?.size || resolved?.footprint,
+    ceiling: !!resolved?.ceiling_mounted,
+    wallMounted: !!resolved?.wall_mounted,
+  });
+  applyWallSideTransform(model, prop, resolved);
 
   model.userData = {
 
@@ -2473,7 +2546,9 @@ try {
 
     id: prop.id,
 
-    template: prop.template
+    template: prop.template,
+
+    baseY: model.userData.baseY
   };
 
   model.traverse((o)=>{
@@ -3867,9 +3942,29 @@ const loaded =
       m.depthWrite = true;
     });
   });
+  // skeleton.pose() rebuilds every bone from its inverse bind matrix -- for a ROOT bone (no bone parent) that sets its
+  // LOCAL transform to its bind WORLD transform, ignoring the non-bone node above it ("Armature", rotated +90 deg about
+  // X, sometimes scaled 0.01 on these Mixamo GLBs). The hips came out tilted 90 deg, 1/100 size, and 1.1 m FORWARD
+  // instead of 1.1 m up; the two corrections below then fixed the tilt and the size but never the position. Any moment
+  // no clip drove the hips (a state with no clip, between one-shot variants -- three.js restores a binding's original
+  // state when no action uses it) the whole body dropped by its hip height: "they all fall through the floor"
+  // (live 2026-11-26: Anthony's feet at -1.13, head at 0.72). The GLB's own rest transform for the root bone is right
+  // by definition (its inverse bind matrices were authored against it), so put it back.
+  const _rootRest = [];
+  model.traverse(o => {
+    if (!o.isBone || o.parent?.isBone) return;
+    _rootRest.push([o, o.position.clone(), o.quaternion.clone(), o.scale.clone()]);
+  });
   model.traverse(o => {
     if (o.isSkinnedMesh && o.skeleton) o.skeleton.pose();
   });
+  for (const [bone, pos, quat, scl] of _rootRest) {
+    bone.position.copy(pos);
+    bone.quaternion.copy(quat);
+    bone.scale.copy(scl);
+    bone.userData._authoredRest = true;     // the corrections below are for a root bone pose() left wrong
+    bone.updateMatrixWorld(true);
+  }
 
   // Some exported rigs (seen on Mixamo-derived character GLBs) bake a
   // cm-to-meters scale correction onto BOTH the top-level object node and
@@ -3883,7 +3978,7 @@ const loaded =
     if (!o.isSkinnedMesh || !o.skeleton || !o.skeleton.bones.length) return;
 
     const rootBone = o.skeleton.bones.find(b => !b.parent?.isBone);
-    if (!rootBone) return;
+    if (!rootBone || rootBone.userData._authoredRest) return;
 
     const meshScale = new THREE.Vector3();
     o.getWorldScale(meshScale);
@@ -3910,7 +4005,7 @@ const loaded =
     if (!o.isSkinnedMesh || !o.skeleton || !o.skeleton.bones.length) return;
 
     const rootBone = o.skeleton.bones.find(b => !b.parent?.isBone);
-    if (!rootBone || !rootBone.parent) return;
+    if (!rootBone || !rootBone.parent || rootBone.userData._authoredRest) return;
 
     const worldQuat = new THREE.Quaternion();
     rootBone.getWorldQuaternion(worldQuat);
@@ -3923,6 +4018,20 @@ const loaded =
       rootBone.updateMatrixWorld(true);
     }
   });
+
+  // The meshbank's snap_to_ground for characters: feet on the floor in the rest pose, measured once (an animated pose
+  // would bob them). Only when it's actually off -- these GLBs have their origin at the feet already.
+  {
+    const cAsset = resolveMeshAsset(character?.model);
+    const cp = cAsset?.placement || {};
+    if (cp.snap_to_ground || cp.pivot === "bottom_center") {
+      model.updateMatrixWorld(true);
+      const box = new THREE.Box3().setFromObject(model, true);
+      if (!box.isEmpty() && Math.abs(box.min.y) > 0.02 && Math.abs(box.min.y) < 3) {
+        applyMeshbankPlacement(model, null).position.y = -box.min.y;
+      }
+    }
+  }
 
     // =========================
     // ANIMATION SETUP
