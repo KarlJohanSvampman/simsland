@@ -634,6 +634,9 @@ async def _broadcast(world, dirty):
             pass
 
 
+MIN_TICK_GAP_SECONDS = 0.02
+
+
 async def loop():
     from core.tick_schedule import TICK_RATE_SECONDS
 
@@ -642,6 +645,7 @@ async def loop():
                 # tick throws before ever assigning it.
 
     while True:
+        _t_start = time.perf_counter()
         try:
             world, dirty = await asyncio.get_event_loop().run_in_executor(
                 _tick_executor, _run_tick_and_persist, SIM_ID
@@ -664,7 +668,11 @@ async def loop():
         # durations, need decay, calendar). movement.py counter-scales its
         # own per-tick distance so walking speed on screen stays constant.
         time_scale = max(1, min(50, world.get("time_scale", 1)))
-        await asyncio.sleep(TICK_RATE_SECONDS / time_scale)
+        # Only what's left of the tick period: sleeping the whole period AFTER the tick's own work made every tick
+        # period + work long -- live (2026-11-25) ~1.3 s a tick at 1x, the sim falling ever further behind real time.
+        # A short minimum still lets the event loop serve requests between back-to-back ticks.
+        _left = TICK_RATE_SECONDS / time_scale - (time.perf_counter() - _t_start)
+        await asyncio.sleep(max(MIN_TICK_GAP_SECONDS, _left))
 
 
 # =========================================================

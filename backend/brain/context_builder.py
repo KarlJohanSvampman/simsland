@@ -1818,6 +1818,12 @@ def _sec_clothes(c, world):
     return prompt_line(world, c)
 
 
+def _sec_walkout(c, world):
+    # walked off mid-conversation / was walked out on / about to (systems/walkout.py)
+    from systems.walkout import prompt_line
+    return prompt_line(world, c)
+
+
 def _sec_social_script(c, world):
     # society's script -- what you're supposed to be and do, where you stand, conformity, shame (systems/social_script.py)
     from systems.social_script import prompt_lines
@@ -2520,6 +2526,7 @@ NARRATIVE_SECTIONS = [
     ("going_in_circles",      "core", _sec_going_in_circles),
     ("social_script",         "core", _sec_social_script),
     ("clothes",               "core", _sec_clothes),
+    ("walkout",               "core", _sec_walkout),
     ("child_cognition",       "core", _sec_child_cognition),
     ("concern_raised",        "core", _sec_concern_raised),
     ("body",                  "core", _sec_body),

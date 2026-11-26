@@ -213,6 +213,9 @@ def record_gaps(world, conv):
     start = conv.setdefault("_start_gaps", {})
     chars = world.get("characters") or {}
     people = [chars.get(p) for p in conv.get("participants") or [] if chars.get(p)]
+    pos = conv.setdefault("_start_pos", {})            # where each stood: who walked off (systems/walkout.py)
+    for p in people:
+        pos.setdefault(p.get("id"), [p.get("x", 0), p.get("y", 0), p.get("_in_building") or None])
     for i, a in enumerate(people):
         for b in people[i + 1:]:
             key = f"{a.get('id')}|{b.get('id')}"
@@ -227,9 +230,10 @@ def _someone_left(world, conv):
     or -- on the phone -- off it) it is over, not paused to pick up later."""
     chars = world.get("characters") or {}
     people = [chars.get(p) for p in conv.get("participants") or []]
-    if any(p is None or p.get("off_grid") or p.get("alive") is False
-           or (p.get("activity") or {}).get("type") == "sleep" for p in people):
-        return True
+    for pid, p in zip(conv.get("participants") or [], people):
+        if p is None or p.get("off_grid") or p.get("alive") is False or (p.get("activity") or {}).get("type") == "sleep":
+            conv.setdefault("left_by", pid)
+            return True
     if conv.get("medium", "in_person") != "in_person":
         return False
     # Measured against how far apart they were when it started: a talk called across the house (or begun from the
@@ -242,9 +246,11 @@ def _someone_left(world, conv):
             gap = abs(a.get("x", 0) - b.get("x", 0)) + abs(a.get("y", 0) - b.get("y", 0))
             where = [(a.get("_in_building") or None), (b.get("_in_building") or None)]
             first = start.get(key) or {"gap": gap, "same_building": where[0] == where[1]}
-            if gap > max(EARSHOT_TILES, first["gap"] + 3):
-                return True
-            if first["same_building"] and where[0] != where[1]:
+            if gap > max(EARSHOT_TILES, first["gap"] + 3) or (first["same_building"] and where[0] != where[1]):
+                from systems.walkout import leaver_of
+                who = leaver_of(world, conv)
+                if who:
+                    conv.setdefault("left_by", who)
                 return True
     return False
 

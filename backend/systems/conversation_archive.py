@@ -72,6 +72,11 @@ def archive(world, conv):
         note(world, entry)
     except Exception as exc:                   # noqa: BLE001
         print(f"[conversation_archive] health: {exc!r}")
+    try:                                       # did someone walk off in the middle of it? (systems/walkout.py)
+        from systems.walkout import note as _walkout_note
+        _walkout_note(world, conv, entry)
+    except Exception as exc:                   # noqa: BLE001
+        print(f"[conversation_archive] walkout: {exc!r}")
     if len(store) > ARCHIVE_CAP:
         for old in sorted(store, key=lambda k: store[k].get("ended_tick") or 0)[:len(store) - ARCHIVE_CAP]:
             store.pop(old, None)
