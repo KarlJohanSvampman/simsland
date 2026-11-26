@@ -35,6 +35,10 @@ def run_request(req):
         provider.load_assignments(req.get("llm_assign"))     # the core's character -> model profile map
         value = getattr(importlib.import_module(module), func)(*args)
         char_index = REMOTE_TASKS[name]
+        from llm import llm_client as _lc               # calls for no one character too (the LLM debug page)
+        bg = [e for e in _lc.get_prompt_log(_lc.BACKGROUND_KEY) if e.get("ts", 0) >= started]
+        if bg:
+            log[_lc.BACKGROUND_KEY] = bg
         if char_index is not None and len(args) > char_index and args[char_index]:
             from llm import llm_client
             cid = args[char_index]

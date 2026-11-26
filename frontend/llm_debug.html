@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>LLM Requests</title>
+<style>
+*,*::before,*::after { box-sizing:border-box; margin:0; padding:0; }
+html,body { width:100%; height:100%; overflow:hidden; background:#1a1e24; color:#ccc; font-family:Arial,sans-serif; font-size:12px; }
+#topbar { height:40px; background:#22272e; border-bottom:1px solid #3a3f48; display:flex; align-items:center; gap:8px; padding:0 12px; }
+#topbar h1 { font-size:14px; color:#adf; margin-right:6px; white-space:nowrap; }
+#topbar select, #topbar input[type=text] { background:#2d3440; border:1px solid #444; color:#ccc; padding:3px 6px; border-radius:4px; font-size:12px; }
+#topbar label { display:flex; align-items:center; gap:4px; color:#aaa; cursor:pointer; white-space:nowrap; }
+.btn { padding:4px 10px; background:#2d3440; border:1px solid #444; color:#ccc; border-radius:4px; cursor:pointer; font-size:12px; }
+.btn:hover { background:#3a4254; }
+#status { margin-left:auto; color:#789; white-space:nowrap; }
+#main { display:flex; height:calc(100% - 40px); }
+#left { flex:1.25; min-width:0; display:flex; flex-direction:column; border-right:1px solid #3a3f48; }
+#totals { padding:6px 10px; border-bottom:1px solid #3a3f48; background:#1e232a; display:flex; gap:18px; flex-wrap:wrap; color:#9ab; }
+#totals b { color:#def; }
+#totalsTables { display:none; padding:6px 10px; border-bottom:1px solid #3a3f48; max-height:38%; overflow:auto; background:#1c2026; }
+#totalsTables.open { display:flex; gap:16px; }
+#totalsTables table { flex:1; }
+#listWrap { flex:1; overflow:auto; }
+table { border-collapse:collapse; width:100%; }
+th { position:sticky; top:0; background:#262c35; color:#9ab; text-align:left; padding:4px 6px; font-weight:normal; cursor:pointer; white-space:nowrap; border-bottom:1px solid #3a3f48; user-select:none; }
+th.sorted { color:#fff; }
+td { padding:3px 6px; border-bottom:1px solid #262b33; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:260px; }
+tr.row { cursor:pointer; }
+tr.row:hover td { background:#232a33; }
+tr.sel td { background:#1a3a52 !important; }
+tr.err td { color:#f99; }
+tr.cached td { color:#8a8; }
+.num { text-align:right; font-variant-numeric:tabular-nums; }
+.bar { display:inline-block; height:6px; background:#2e86c1; vertical-align:middle; margin-left:4px; border-radius:2px; }
+.bar.resp { background:#27ae60; }
+#detail { flex:1; min-width:0; overflow:auto; padding:10px 12px; }
+#detail h2 { font-size:13px; color:#adf; margin:4px 0 8px; }
+#detail .meta { display:grid; grid-template-columns:max-content 1fr; gap:2px 12px; margin-bottom:10px; }
+#detail .meta div:nth-child(odd) { color:#789; }
+.msg { border:1px solid #333a44; border-radius:4px; margin-bottom:8px; }
+.msg .hd { background:#232933; padding:4px 8px; display:flex; justify-content:space-between; cursor:pointer; }
+.msg .hd .role { color:#fc6; font-weight:bold; }
+.msg.user .hd .role { color:#6cf; }
+.msg.assistant .hd .role, .msg.reply .hd .role { color:#6e6; }
+.msg pre { padding:6px 8px; white-space:pre-wrap; word-break:break-word; font-family:Consolas,monospace; font-size:11.5px; color:#ddd; max-height:none; }
+.msg.collapsed pre { display:none; }
+.empty { color:#678; padding:20px; }
+.pill { display:inline-block; padding:0 6px; border-radius:8px; background:#2d3440; color:#9ab; margin-left:4px; font-size:11px; }
+.pill.err { background:#5c1a1a; color:#faa; }
+.pill.cached { background:#1a4a1a; color:#afa; }
+</style>
+</head>
+<body>
+<div id="topbar">
+  <h1>LLM Requests</h1>
+  <select id="fChar"><option value="">All characters</option></select>
+  <input id="fPurpose" type="text" placeholder="prompt (e.g. think)" size="14">
+  <label><input id="fErrors" type="checkbox"> errors only</label>
+  <label><input id="fAuto" type="checkbox" checked> auto-refresh</label>
+  <button class="btn" id="btnRefresh">Refresh</button>
+  <button class="btn" id="btnTotals">Totals ▾</button>
+  <span id="status"></span>
+</div>
+<div id="main">
+  <div id="left">
+    <div id="totals"></div>
+    <div id="totalsTables"></div>
+    <div id="listWrap"><table id="list"><thead></thead><tbody></tbody></table></div>
+  </div>
+  <div id="detail"><div class="empty">Pick a request on the left to see what was sent and what came back.</div></div>
+</div>
+<script>
+// Every model call the simulation made, for every character and the background (summaries, tags, narration) --
+// backend/api/llm_debug.py (/admin/llm/all, /admin/llm/entry/{id}); the log keeps the last 100 calls per character.
+const COLS = [
+  ["ago_s", "When", r => ago(r.ago_s), true],
+  ["name", "Who", r => esc(r.name)],
+  ["purpose", "Prompt", r => esc(r.purpose)],
+  ["wake_reason", "Woken by", r => esc(r.wake_reason || "")],
+  ["elapsed_s", "Time", r => r.cached ? "cached" : (r.elapsed_s != null ? r.elapsed_s.toFixed(1) + " s" : ""), true],
+  ["prompt_chars", "Request", r => kb(r.prompt_chars) + bar(r.prompt_chars, maxP, ""), true],
+  ["prompt_tokens", "In tok", r => r.prompt_tokens ?? "", true],
+  ["response_chars", "Response", r => kb(r.response_chars) + bar(r.response_chars, maxR, "resp"), true],
+  ["completion_tokens", "Out tok", r => r.completion_tokens ?? "", true],
+  ["messages", "Msgs", r => r.messages, true],
+  ["response_start", "Reply starts", r => r.error ? "⚠ " + esc(r.error) : esc(r.response_start)],
+];
+let rows = [], selId = null, sortKey = "ago_s", sortDir = 1, maxP = 1, maxR = 1, busy = false;
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const kb = n => n == null ? "" : (n >= 1000 ? (n / 1000).toFixed(1) + "k" : String(n));
+const bar = (n, max, cls) => `<span class="bar ${cls}" style="width:${Math.max(1, Math.round(40 * (n || 0) / max))}px"></span>`;
+function ago(s) { if (s == null) return ""; if (s < 60) return s + "s ago"; if (s < 3600) return Math.floor(s / 60) + "m ago"; return (s / 3600).toFixed(1) + "h ago"; }
+async function getJSON(url, ms = 30000) {
+  const c = new AbortController(); const t = setTimeout(() => c.abort(), ms);
+  try { const r = await fetch(url, { signal: c.signal }); if (!r.ok) throw new Error("HTTP " + r.status); return await r.json(); }
+  finally { clearTimeout(t); }
+}
+
+async function load() {
+  if (busy) return; busy = true;
+  const q = new URLSearchParams({ limit: 2000 });
+  if ($("fChar").value) q.set("char", $("fChar").value);
+  if ($("fPurpose").value.trim()) q.set("purpose", $("fPurpose").value.trim());
+  if ($("fErrors").checked) q.set("errors", 1);
+  const t0 = performance.now();
+  try {
+    const data = await getJSON("/admin/llm/all?" + q);
+    rows = data.entries || [];
+    fillChars(rows);
+    renderTotals(data);
+    renderList();
+    $("status").textContent = `${data.count} calls · loaded in ${Math.round(performance.now() - t0)} ms · ${new Date().toLocaleTimeString()}`;
+  } catch (e) { $("status").textContent = "couldn't load: " + e.message; }
+  busy = false;
+}
+
+const seenChars = {};
+function fillChars(list) {
+  let added = false;
+  for (const r of list) {
+    const k = r.char_id || "_background";
+    if (!seenChars[k]) { seenChars[k] = r.name; added = true; }
+  }
+  if (!added) return;
+  const sel = $("fChar"), cur = sel.value;
+  sel.innerHTML = `<option value="">All characters</option>` + Object.entries(seenChars)
+    .sort((a, b) => a[1].localeCompare(b[1])).map(([k, n]) => `<option value="${esc(k)}">${esc(n)}</option>`).join("");
+  sel.value = cur;
+}
+
+function renderTotals(data) {
+  const all = Object.values(data.by_purpose || {});
+  const sum = k => all.reduce((a, t) => a + (t[k] || 0), 0);
+  const calls = sum("calls");
+  $("totals").innerHTML = [
+    `<span>calls <b>${calls}</b></span>`, `<span>errors <b>${sum("errors")}</b></span>`, `<span>cached <b>${sum("cached")}</b></span>`,
+    `<span>sent <b>${kb(sum("prompt_chars"))}</b> chars / <b>${kb(sum("prompt_tokens"))}</b> tok</span>`,
+    `<span>received <b>${kb(sum("response_chars"))}</b> chars / <b>${kb(sum("completion_tokens"))}</b> tok</span>`,
+    `<span>model time <b>${Math.round(sum("seconds"))}</b> s${calls ? ` (avg ${(sum("seconds") / calls).toFixed(1)} s)` : ""}</span>`,
+  ].join("");
+  const table = (title, obj) => `<table><thead><tr><th>${title}</th><th class="num">calls</th><th class="num">err</th><th class="num">avg req</th><th class="num">avg resp</th><th class="num">avg in tok</th><th class="num">avg s</th></tr></thead><tbody>` +
+    Object.entries(obj).sort((a, b) => b[1].calls - a[1].calls).map(([k, t]) =>
+      `<tr><td>${esc(k)}</td><td class="num">${t.calls}</td><td class="num">${t.errors}</td><td class="num">${kb(Math.round(t.prompt_chars / t.calls))}</td><td class="num">${kb(Math.round(t.response_chars / t.calls))}</td><td class="num">${t.prompt_tokens ? Math.round(t.prompt_tokens / t.calls) : ""}</td><td class="num">${(t.seconds / t.calls).toFixed(1)}</td></tr>`).join("") + "</tbody></table>";
+  $("totalsTables").innerHTML = table("By prompt", data.by_purpose || {}) + table("By character", data.by_character || {});
+}
+
+function renderList() {
+  maxP = Math.max(1, ...rows.map(r => r.prompt_chars || 0));
+  maxR = Math.max(1, ...rows.map(r => r.response_chars || 0));
+  const sorted = rows.slice().sort((a, b) => {
+    const x = a[sortKey], y = b[sortKey];
+    if (x == null && y == null) return 0; if (x == null) return 1; if (y == null) return -1;
+    return (typeof x === "number" ? x - y : String(x).localeCompare(String(y))) * sortDir;
+  });
+  $("list").querySelector("thead").innerHTML = "<tr>" + COLS.map(([k, label, , num]) =>
+    `<th data-k="${k}" class="${num ? "num" : ""} ${k === sortKey ? "sorted" : ""}">${label}${k === sortKey ? (sortDir > 0 ? " ▴" : " ▾") : ""}</th>`).join("") + "</tr>";
+  $("list").querySelector("tbody").innerHTML = sorted.map(r =>
+    `<tr class="row ${r.error ? "err" : ""} ${r.cached ? "cached" : ""} ${r.id === selId ? "sel" : ""}" data-id="${esc(r.id)}">` +
+    COLS.map(([k, , fmt, num]) => `<td class="${num ? "num" : ""}">${fmt(r)}</td>`).join("") + "</tr>").join("") ||
+    `<tr><td colspan="${COLS.length}" class="empty">No calls logged yet.</td></tr>`;
+}
+
+async function showDetail(id) {
+  selId = id; renderList();
+  $("detail").innerHTML = `<div class="empty">Loading…</div>`;
+  let e;
+  try { e = await getJSON("/admin/llm/entry/" + encodeURIComponent(id)); }
+  catch (err) { $("detail").innerHTML = `<div class="empty">Couldn't load it: ${esc(err.message)} (the log keeps the last 100 calls per character).</div>`; return; }
+  const m = e.meta || {};
+  const meta = [
+    ["Who", e.name], ["Prompt", e.purpose], ["Woken by", e.wake_reason], ["Sim tick", e.tick],
+    ["When", new Date(e.ts * 1000).toLocaleString() + ` (${ago(e.ago_s)})`],
+    ["Time", e.cached ? "from cache" : e.elapsed_s + " s" + (m.prompt_eval_s != null ? ` (load ${m.load_s} s · reading prompt ${m.prompt_eval_s} s · writing ${m.eval_s} s)` : "")],
+    ["Model", [m.model, e.profile && `profile ${e.profile}`, m.provider].filter(Boolean).join(" · ")],
+    ["Request", `${e.messages.length} messages · ${e.prompt_chars.toLocaleString()} chars` + (m.prompt_tokens != null ? ` · ${m.prompt_tokens} tokens` : "") + (m.num_ctx ? ` (context window ${m.num_ctx})` : "")],
+    ["Response", `${e.response_chars.toLocaleString()} chars` + (m.completion_tokens != null ? ` · ${m.completion_tokens} tokens` : "") + (m.max_tokens ? ` (cap ${m.max_tokens})` : "") + (m.done_reason ? ` · stopped: ${m.done_reason}` : "")],
+    ["Error", e.error],
+  ].filter(([, v]) => v != null && v !== "");
+  const msgHtml = (role, content, chars, cls, collapsed) =>
+    `<div class="msg ${cls}${collapsed ? " collapsed" : ""}"><div class="hd"><span class="role">${esc(role)}</span><span>${chars.toLocaleString()} chars ▸</span></div><pre>${esc(content)}</pre></div>`;
+  $("detail").innerHTML =
+    `<h2>${esc(e.name)} — ${esc(e.purpose)}${e.cached ? '<span class="pill cached">cached</span>' : ""}${e.error ? '<span class="pill err">failed</span>' : ""}</h2>` +
+    `<div class="meta">${meta.map(([k, v]) => `<div>${esc(k)}</div><div>${esc(v)}</div>`).join("")}</div>` +
+    `<h2>Request</h2>` + e.messages.map((x, i) =>
+      msgHtml(x.role, typeof x.content === "string" ? x.content : JSON.stringify(x.content, null, 2), x.chars, x.role,
+              e.messages.length > 3 && i < e.messages.length - 2)).join("") +
+    `<h2>Response</h2>` + msgHtml("reply", prettyReply(e.response || (e.error ? "(no reply: " + e.error + ")" : "")), e.response_chars, "reply", false);
+  $("detail").querySelectorAll(".msg .hd").forEach(h => h.onclick = () => h.parentElement.classList.toggle("collapsed"));
+}
+
+function prettyReply(s) {          // a JSON reply (the decision) is easier to read laid out
+  const t = String(s || "").trim();
+  if (t.startsWith("{") || t.startsWith("[")) { try { return JSON.stringify(JSON.parse(t), null, 2); } catch (_) {} }
+  return s;
+}
+
+$("list").addEventListener("click", ev => {
+  const th = ev.target.closest("th");
+  if (th) { const k = th.dataset.k; if (k === sortKey) sortDir = -sortDir; else { sortKey = k; sortDir = k === "ago_s" ? 1 : -1; } renderList(); return; }
+  const tr = ev.target.closest("tr.row");
+  if (tr) showDetail(tr.dataset.id);
+});
+$("btnRefresh").onclick = load;
+$("btnTotals").onclick = () => $("totalsTables").classList.toggle("open");
+["fChar", "fErrors"].forEach(id => $(id).onchange = load);
+let typing; $("fPurpose").oninput = () => { clearTimeout(typing); typing = setTimeout(load, 400); };
+setInterval(() => { if ($("fAuto").checked && !document.hidden) load(); }, 5000);
+load();
+</script>
+</body>
+</html>

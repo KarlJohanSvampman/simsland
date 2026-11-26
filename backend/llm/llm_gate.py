@@ -198,6 +198,21 @@ def _profile_of(coro, profile=None):
         return "env"
 
 
+def _tagged(coro):
+    """The call, carrying what it's for (llm/llm_client.py::CALL_TAGS) onto this loop: who asked (taken here, while
+    the asker is still on the stack) and the asking thread's tags (cognition: the wake reason)."""
+    try:
+        from llm import llm_client
+        tags = dict(llm_client.thread_call_tags(), purpose=llm_client.caller_purpose(3))
+    except Exception:                                     # noqa: BLE001
+        return coro
+
+    async def run():
+        llm_client.CALL_TAGS.set(tags)
+        return await coro
+    return run()
+
+
 def _run_loop():
     asyncio.set_event_loop(_loop)
     _wakeup_ready.set()
@@ -226,7 +241,8 @@ def run_llm_call(coro, priority=PRIORITY_NORMAL, timeout=None, profile=None):
             return dict(_TIMEOUT_ERROR)
         timeout = min(timeout if timeout is not None else tick_state.TICK_LLM_CALL_MAX_SECONDS,
                       tick_state.TICK_LLM_CALL_MAX_SECONDS, remaining)
-    future = asyncio.run_coroutine_threadsafe(_submit_and_await(coro, priority, _profile_of(coro, profile)), _loop)
+    lane_profile = _profile_of(coro, profile)            # read from the call's own arguments, before it is wrapped
+    future = asyncio.run_coroutine_threadsafe(_submit_and_await(_tagged(coro), priority, lane_profile), _loop)
     t0 = time.perf_counter()
     try:
         return future.result(timeout=timeout if timeout is not None else LLM_CALL_MAX_WAIT_SECONDS)
@@ -263,7 +279,8 @@ async def run_llm_call_async(coro, priority=PRIORITY_NORMAL, timeout=None, profi
     """Async equivalent of run_llm_call, for callers already inside an
     event loop (e.g. cognition_jobs.py) -- schedules onto the gate's loop
     and awaits the result without blocking the caller's own loop thread."""
-    future = asyncio.run_coroutine_threadsafe(_submit_and_await(coro, priority, _profile_of(coro, profile)), _loop)
+    lane_profile = _profile_of(coro, profile)
+    future = asyncio.run_coroutine_threadsafe(_submit_and_await(_tagged(coro), priority, lane_profile), _loop)
     try:
         return await asyncio.wait_for(asyncio.wrap_future(future),
                                       timeout if timeout is not None else LLM_CALL_MAX_WAIT_SECONDS)
