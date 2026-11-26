@@ -1257,9 +1257,10 @@ def conversation_health():
     """Two people talking, or one talking at the other (systems/conversation_health.py): counts of finished two-person
     conversations by kind -- unanswered, one_sided, lopsided, short, balanced -- and the latest lopsided ones."""
     from systems.conversation_health import summary
+    from systems.walkout import summary as walkouts
     with world_lock():
         world = load_world(DEFAULT_SIM_ID)
-        return summary(world)
+        return dict(summary(world), walkouts=walkouts(world))
 
 
 @router.get("/world_state")

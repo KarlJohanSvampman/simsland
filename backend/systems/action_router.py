@@ -2672,6 +2672,10 @@ def route_action(c, world, action, speech, definitions=None, available_actions=N
         _route_order_taxi(c, world, action)
     elif action_type == "phone_send_text":
         _route_phone_send_text(c, world, action)
+    elif action_type == "text" and (action.get("target_id") or action.get("target")) and action.get("message"):
+        _route_phone_send_text(c, world, action)       # "text" with a recipient and words is a text, not a glance
+    elif action_type == "call" and (action.get("target_id") or action.get("target")):
+        _route_phone_call(c, world, action)
     elif action_type in ("phone_check", "call", "text"):
         _route_phone_check(c, world, action)
     elif action_type == "phone_read_text":
@@ -5452,6 +5456,8 @@ def _route_leave_conversation(c, world, action):
     conv = find_active_conversation_for(world, c["id"])
     if conv:
         conv["active"] = False
+        conv.setdefault("end_reason", "left")
+        conv.setdefault("left_by", c["id"])            # systems/walkout.py: said why, or asked to
         _archive_conversation(world, conv)
 
     c["current_speech"] = None

@@ -61,6 +61,8 @@ WAKE_PRIORITY = {
     "cant_talk": 96,           # systems/action_router.py -- tried to socialize with nobody, or with someone asleep / away
     "someone_in_crisis": 97,
     "owe_answer": 99,          # systems/conversation_health.py -- spoken to, decided on something that didn't answer   # systems/social_script.py -- someone at home / nearby is in a crisis and needs someone
+    "walked_out": 97,          # systems/walkout.py -- walked off mid-conversation: say why, or think it
+    "walkout_follow_up": 94,   # systems/walkout.py -- was walked out on and heard nothing since: text or call
     "door_signal": 95,
     "asked_to_leave": 96,      # systems/guests.py -- someone whose home you're in told you to go
     "house_guest": 93,         # systems/guests.py -- someone came into your home / won't leave it        # systems/doorbell.py -- noticed a doorbell/
@@ -238,6 +240,8 @@ _WAKE_LINE_TEMPLATES = {
     "cant_talk": "{line}",
     "someone_in_crisis": "{line}",
     "owe_answer": "{line}",
+    "walked_out": "{line}",
+    "walkout_follow_up": "{line}",
     "provoked": "{actor_name} just {verb_phrase} you. {reaction_hint}",
     "activity_phase_changed": "You're finishing up what you were doing.",
     "wait_ready": "What you were waiting on is ready now.",

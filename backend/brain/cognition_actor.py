@@ -319,6 +319,11 @@ def on_decision_ready(data, world):
     from brain.agent_loop import process_decision, post_update
     process_decision(c, world, decision, available_actions=data.get("available_actions"))
     _nudge_if_unanswered(c, world, decision)
+    try:                                         # walked off mid-conversation: what they thought, did they say why
+        from systems.walkout import after_decision as _walkout_after
+        _walkout_after(c, world, decision)
+    except Exception as exc:                     # noqa: BLE001
+        print(f"[cognition] walkout for {cid}: {exc!r}")
     _drop_answered_wake(c, world)
     post_update(c, world)
     try:
