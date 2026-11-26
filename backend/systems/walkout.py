@@ -39,7 +39,10 @@ _CLOSING = re.compile(
     r"(got|gotta|have|need|ought) to (go|run|head|get going|leave)|i'?m (off|heading|going to head)|"
     r"i'?ll (let you go|leave you|go now)|take care|let'?s (talk|pick this up|continue) (about (it|this) )?"
     r"(later|tomorrow|another time)|excuse me|i need (some )?(space|air|a minute|a moment)|i'?m done (talking|with this)|"
-    r"we'?ll talk (later|tomorrow|about (it|this) later))", re.I)
+    r"we'?ll talk (later|tomorrow|about (it|this) later)|"
+    # live 2026-11-26: "I think we've said enough for today", "can we agree to table this for now", "I need to get a drink"
+    r"(said|talked) enough|enough for (now|today|tonight)|table (this|it)|put (this|it) on hold|leave it (there|at that)|"
+    r"drop (it|this)|(pick|come back to) (this|it) (up )?later|i need to (go )?(get|grab|make|check|do|use|find) )", re.I)
 
 
 def closes(line):
@@ -139,8 +142,8 @@ def _ask_leaver(world, rec):
     line = (f"You just walked away from your conversation with {other} in the middle of it, without a word.{said} "
             f"Why did you go? If {other} should know, tell them now -- you're apart, so text them (phone_send_text, the words in action.message) or call "
             f"them (phone_call). "
-            f"If you'd rather not tell them, think it through in your thought -- e.g. \"this conversation was just "
-            f"going in circles\", or what you had to get to.")
+            f"If you'd rather not tell them, your thought must say plainly why you left {other} -- e.g. \"this "
+            f"conversation was just going in circles\", or what you had to get to.")
     from brain.cognition_scheduler import wake_character
     wake_character(c, world, "walked_out", {"line": line})
     rec["asked_tick"] = world.get("tick", 0)
@@ -150,12 +153,22 @@ def _spoke_to(c, target, since):
     return any(e.get("target") == target and (e.get("tick") or 0) >= since for e in (c or {}).get("speech_log") or [])
 
 
-def after_decision(c, world, decision):
-    """The leaver's answer to being asked (brain/cognition_actor.py): what they thought, and whether they told them."""
+def after_decision(c, world, decision, wake_reason=None):
+    """The leaver's answer to being asked (brain/cognition_actor.py): what they thought, and whether they told them.
+    Only the decision asked FOR the walk-out counts as their explanation (live 2026-11-26: "I get on with it." came
+    from a decision already under way when they were asked). A stronger wake that took its place: asked again, once."""
     for rec in world.get("walkouts") or []:
         if rec.get("status") != "open" or rec.get("leaver") != c.get("id") or rec.get("asked_tick") is None:
             continue
         decision = decision or {}
+        if wake_reason != "walked_out" and rec.get("thought") is None:
+            cog = c.get("cognition") or {}
+            if cog.get("wake_reason") != "walked_out" and rec.get("asks", 1) < 2:
+                rec["asks"] = rec.get("asks", 1) + 1
+                _ask_leaver(world, rec)
+            if (decision.get("speech") or {}).get("target") == rec["left"]:
+                _resolve(world, rec, "told")
+            continue
         action = decision.get("action") or {}
         speech = decision.get("speech") or {}
         to_them = bool(speech.get("utterance") and speech.get("target") == rec["left"]) or (
