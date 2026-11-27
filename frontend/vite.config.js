@@ -61,7 +61,10 @@ export default defineConfig({
           resolve(__dirname, "behaviour.html"),
 
         panels:
-          resolve(__dirname, "panels.html")
+          resolve(__dirname, "panels.html"),
+
+        llm_debug:
+          resolve(__dirname, "llm_debug.html")
       }
     }
   }

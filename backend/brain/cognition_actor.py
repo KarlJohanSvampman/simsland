@@ -248,11 +248,14 @@ def _worker(char_id, req_id, tick, context, session, priority, wake_reason):
     from systems.conversation_floor import note_llm_result
     decision = None
     started = time.time()
+    from llm.llm_client import set_call_tags
+    set_call_tags(wake_reason=wake_reason, tick=tick)     # what woke them, on the LLM debug page
     try:
         decision = think(context, char_id=char_id, session=session, priority=priority)
     except Exception as exc:
         print(f"[cognition] decision for {char_id} failed: {exc!r}")
     finally:
+        set_call_tags()
         note_llm_result(bool(decision), time.time() - started)
     # Still "thinking" (systems/conversation_floor.py) until on_decision_ready has applied the answer on the tick thread: the
     # floor's tick runs before the event flush, and clearing it here let the floor see a listener who had stopped thinking

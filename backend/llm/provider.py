@@ -45,6 +45,7 @@ never holds up characters on a hosted API. The file is re-read when it changes.
 No file: a single profile, "env", built from the LLM_* / OLLAMA_* variables above -- exactly the old behaviour.
 """
 
+import contextvars
 import json
 import os
 import threading
@@ -274,12 +275,46 @@ def reply_text(data, profile=None):
     return (data.get("message") or {}).get("content", "")
 
 
+# What the service said about the last call in this task -- tokens, model, its own timings -- for the LLM log
+# (llm/llm_client.py reads it right after chat() returns; an awaited coroutine shares its caller's context).
+last_meta = contextvars.ContextVar("llm_last_meta", default=None)
+
+
+def usage_meta(data, profile=None, max_tokens=None):
+    """Token counts and timings out of a response body (Ollama's or the OpenAI shape), plus the model and profile."""
+    s = settings(profile)
+    meta = {"model": data.get("model") or s["model"], "profile": s["name"], "provider": s["provider"],
+            "max_tokens": max_tokens}
+    u = data.get("usage") or {}
+    if u:
+        meta.update(prompt_tokens=u.get("prompt_tokens"), completion_tokens=u.get("completion_tokens"),
+                    total_tokens=u.get("total_tokens"))
+    if "prompt_eval_count" in data or "eval_count" in data:       # Ollama
+        ns = 1e9
+        meta.update(prompt_tokens=data.get("prompt_eval_count"), completion_tokens=data.get("eval_count"),
+                    load_s=round((data.get("load_duration") or 0) / ns, 3),
+                    prompt_eval_s=round((data.get("prompt_eval_duration") or 0) / ns, 3),
+                    eval_s=round((data.get("eval_duration") or 0) / ns, 3),
+                    done_reason=data.get("done_reason"))
+    choices = data.get("choices") or []
+    if choices and choices[0].get("finish_reason"):
+        meta["done_reason"] = choices[0]["finish_reason"]
+    if s["provider"] != "openai":
+        meta["num_ctx"] = s["num_ctx"]
+    return meta
+
+
 async def chat(messages, timeout=60.0, max_tokens=None, profile=None):
     url, body, headers = chat_request(messages, max_tokens, profile)
     async with httpx.AsyncClient(timeout=timeout) as client:
         response = await client.post(url, json=body, headers=headers)
         response.raise_for_status()
-        return reply_text(response.json(), profile)
+        data = response.json()
+        try:
+            last_meta.set(usage_meta(data, profile, max_tokens))
+        except Exception:                                   # noqa: BLE001 -- telemetry never breaks a call
+            last_meta.set(None)
+        return reply_text(data, profile)
 
 
 def status(timeout=3.0, profile=None):

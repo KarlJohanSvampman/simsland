@@ -14,6 +14,36 @@ _PROMPT_LOG: dict[str, deque] = {}
 _PROMPT_LOG_MAX = 100
 
 
+import contextvars
+import threading
+
+# What a call is for, carried onto the gate's event loop with it (llm/llm_gate.py): by the time the call runs there,
+# the code that asked for it is no longer on the stack (the log said "threading.run" for every decision).
+CALL_TAGS = contextvars.ContextVar("llm_call_tags", default=None)
+_thread_tags = threading.local()
+
+
+def set_call_tags(**tags):
+    """Tags for the model calls this thread makes next (cognition: the wake reason and tick); none: clear them."""
+    _thread_tags.tags = {k: v for k, v in tags.items() if v is not None} or None
+
+
+def thread_call_tags():
+    return dict(getattr(_thread_tags, "tags", None) or {})
+
+
+def caller_purpose(skip=1):
+    """The first caller outside the LLM plumbing, as "module.function" -- taken where the call is handed over."""
+    import sys
+    f = sys._getframe(skip)
+    while f is not None:
+        mod = f.f_globals.get("__name__", "")
+        if mod not in (__name__, "llm.llm_gate") and not mod.startswith(("asyncio", "concurrent", "threading")):
+            return f"{mod}.{f.f_code.co_name}"
+        f = f.f_back
+    return None
+
+
 def _purpose():
     """Which prompt this is: the first caller outside this module and the LLM gate, as "module.function"
     (e.g. "brain.llm_brain.think", "llm.diary_narration._generate_diary_text") -- for the VR LLM log."""
@@ -27,13 +57,28 @@ def _purpose():
     return "?"
 
 
+BACKGROUND_KEY = "_background"     # calls made for no one character (summaries, tags, narration): the LLM debug page
+
+
+def _with_sizes(entry):
+    """An id and the sizes the LLM debug page lists (frontend/llm_debug.html), for an entry that lacks them."""
+    import uuid
+    entry.setdefault("id", uuid.uuid4().hex[:12])
+    msgs = entry.get("messages") or []
+    entry.setdefault("prompt_chars", sum(len(str(m.get("content") or "")) for m in msgs))
+    entry.setdefault("response_chars", len(str(entry.get("response") or "")))
+    return entry
+
+
 def log_prompt_entry(char_id: str, messages: list, response: str, elapsed: float, cached: bool, purpose=None, error=None,
-                     profile=None):
-    """Store a prompt/response pair for a character. Thread-safe for asyncio."""
+                     profile=None, meta=None, tags=None):
+    """Store a prompt/response pair for a character (None: a background call). Thread-safe for asyncio."""
+    char_id = char_id or BACKGROUND_KEY
     if char_id not in _PROMPT_LOG:
         _PROMPT_LOG[char_id] = deque(maxlen=_PROMPT_LOG_MAX)
-    _PROMPT_LOG[char_id].appendleft({
+    _PROMPT_LOG[char_id].appendleft(_with_sizes({
         "ts": time.time(),
+        "char_id": None if char_id == BACKGROUND_KEY else char_id,
         "messages": messages,
         "response": response,
         "elapsed_s": round(elapsed, 3),
@@ -41,13 +86,33 @@ def log_prompt_entry(char_id: str, messages: list, response: str, elapsed: float
         "purpose": purpose or "?",
         **({"profile": profile} if profile else {}),
         **({"error": error} if error else {}),
-    })
+        **({"meta": meta} if meta else {}),
+        **{k: v for k, v in (tags or {}).items() if k in ("wake_reason", "tick")},
+    }))
 
 def add_prompt_entry(char_id: str, entry: dict):
-    """Store an entry made elsewhere (a cognition worker's) as-is."""
+    """Store an entry made elsewhere (a cognition worker's)."""
     if char_id not in _PROMPT_LOG:
         _PROMPT_LOG[char_id] = deque(maxlen=_PROMPT_LOG_MAX)
-    _PROMPT_LOG[char_id].appendleft(entry)
+    if entry.get("id") and any(e.get("id") == entry["id"] for e in _PROMPT_LOG[char_id]):
+        return                                     # already here (a background call shipped twice)
+    entry.setdefault("char_id", None if char_id == BACKGROUND_KEY else char_id)
+    _PROMPT_LOG[char_id].appendleft(_with_sizes(entry))
+
+
+def all_prompt_entries():
+    """Every logged call, every character and the background ones, newest first."""
+    out = [e for q in list(_PROMPT_LOG.values()) for e in list(q)]
+    out.sort(key=lambda e: e.get("ts") or 0, reverse=True)
+    return out
+
+
+def find_prompt_entry(entry_id: str):
+    for q in list(_PROMPT_LOG.values()):
+        for e in list(q):
+            if e.get("id") == entry_id:
+                return e
+    return None
 
 def get_prompt_log(char_id: str) -> list:
     """Return prompt history for a character, newest first."""
@@ -271,7 +336,8 @@ async def call_llm(
         profile=profile
     )
 
-    purpose = _purpose() if char_id else None
+    _tags = CALL_TAGS.get() or thread_call_tags()      # what it's for, when it ran on the gate (llm/llm_gate.py)
+    purpose = _tags.get("purpose") or _purpose()       # background calls are logged too (the LLM debug page)
 
     if use_cache:
 
@@ -280,9 +346,9 @@ async def call_llm(
         if cached:
 
             result = json.loads(cached)
-            if char_id:                                # a cached reply is still what the character got
-                log_prompt_entry(char_id, full_messages, result if isinstance(result, str) else json.dumps(result),
-                                 elapsed=0.0, cached=True, purpose=purpose, profile=profile)
+            # a cached reply is still what the character got
+            log_prompt_entry(char_id, full_messages, result if isinstance(result, str) else json.dumps(result),
+                             elapsed=0.0, cached=True, purpose=purpose, profile=profile, tags=_tags)
             return result
 
     # =====================================================
@@ -290,6 +356,7 @@ async def call_llm(
     # =====================================================
 
     _t0 = time.time()
+    _provider.last_meta.set(None)
 
     try:
         result = await _call_llm(
@@ -305,9 +372,8 @@ async def call_llm(
             profile=profile
         )
     except Exception as e:
-        if char_id:                                    # a failed call is logged too, with why
-            log_prompt_entry(char_id, full_messages, "", elapsed=time.time() - _t0, cached=False, purpose=purpose,
-                             error=describe_llm_error(e, profile=profile), profile=profile)
+        log_prompt_entry(char_id, full_messages, "", elapsed=time.time() - _t0, cached=False, purpose=purpose,
+                         error=describe_llm_error(e, profile=profile), profile=profile, tags=_tags)   # a failed call too, with why
         raise
 
     _elapsed = time.time() - _t0
@@ -355,16 +421,18 @@ async def call_llm(
             ex=300
         )
 
-    # Log prompt/response for debugging (keyed by char_id if provided)
-    if char_id:
-        log_prompt_entry(
-            char_id,
-            full_messages,
-            result if isinstance(result, str) else json.dumps(result),
-            elapsed=_elapsed,
-            cached=False,
-            purpose=purpose,
-            profile=profile,
-        )
+    # Log prompt/response for debugging (keyed by char_id; no character: the background log) -- with what the service
+    # said about it: tokens, model, its own timings (llm/provider.py::last_meta)
+    log_prompt_entry(
+        char_id,
+        full_messages,
+        result if isinstance(result, str) else json.dumps(result),
+        elapsed=_elapsed,
+        cached=False,
+        purpose=purpose,
+        profile=profile,
+        meta=_provider.last_meta.get(),
+        tags=_tags,
+    )
 
     return result

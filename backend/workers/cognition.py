@@ -45,12 +45,17 @@ def run_request(req):
     try:
         from llm import provider
         provider.load_assignments(req.get("llm_assign"))     # the core's character -> model profile map
+        llm_client.set_call_tags(wake_reason=req.get("wake_reason"), tick=req.get("tick"))
         decision = think(req["context"], char_id=req["char_id"], session=req.get("session"),
                          priority=req.get("priority"))
     except Exception as exc:
         error = repr(exc)
         traceback.print_exc()
+    llm_client.set_call_tags()
     log = [e for e in llm_client.get_prompt_log(req["char_id"]) if e.get("ts", 0) >= started]
+    for e in log:                                   # what woke them, and when: the LLM debug page
+        e.setdefault("wake_reason", req.get("wake_reason"))
+        e.setdefault("tick", req.get("tick"))
     return {
         "req_id": req["req_id"], "char_id": req["char_id"], "tick": req.get("tick"),
         "decision": decision, "error": error, "prompt_bytes": getattr(_local, "prompt_bytes", 0),
