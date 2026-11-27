@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Prompt Templates</title>
+<style>
+*,*::before,*::after { box-sizing:border-box; margin:0; padding:0; }
+html,body { width:100%; height:100%; overflow:hidden; background:#1a1e24; color:#ccc; font-family:Arial,sans-serif; font-size:12px; }
+#topbar { height:40px; background:#22272e; border-bottom:1px solid #3a3f48; display:flex; align-items:center; gap:8px; padding:0 12px; }
+#topbar h1 { font-size:14px; color:#adf; margin-right:6px; white-space:nowrap; }
+.btn { padding:4px 10px; background:#2d3440; border:1px solid #444; color:#ccc; border-radius:4px; cursor:pointer; font-size:12px; }
+.btn:hover { background:#3a4254; }
+.btn.go { background:#1a4a1a; border-color:#27ae60; color:#cfc; }
+.btn.go:disabled { opacity:.45; cursor:default; }
+.btn.warn { background:#4a3a1a; border-color:#a67c27; color:#fd9; }
+select { background:#2d3440; border:1px solid #444; color:#ccc; padding:3px 6px; border-radius:4px; font-size:12px; }
+#status { margin-left:auto; color:#789; white-space:nowrap; }
+#main { display:flex; height:calc(100% - 40px); }
+#editorCol { flex:1.15; min-width:0; display:flex; flex-direction:column; border-right:1px solid #3a3f48; }
+#tabs { display:flex; gap:2px; padding:6px 8px 0; background:#1e232a; border-bottom:1px solid #3a3f48; }
+.tab { padding:6px 12px; background:#262c35; border:1px solid #3a3f48; border-bottom:none; border-radius:4px 4px 0 0; cursor:pointer; color:#9ab; }
+.tab.active { background:#1a1e24; color:#fff; }
+.tab .dot { display:inline-block; width:7px; height:7px; border-radius:50%; background:#e6a23c; margin-left:6px; vertical-align:middle; }
+.tab .dot.saved { background:#2e86c1; }
+#info { padding:6px 10px; color:#9ab; background:#1c2026; border-bottom:1px solid #2a2f37; display:flex; gap:10px; align-items:center; }
+#info span { flex:1; }
+#editor { flex:1; width:100%; resize:none; background:#14171c; color:#e6e6e6; border:none; padding:10px 12px; font-family:Consolas,monospace; font-size:12.5px; line-height:1.45; outline:none; tab-size:2; }
+#warnings { padding:6px 10px; background:#3a2a12; color:#fd9; border-top:1px solid #6b4f1d; display:none; max-height:110px; overflow:auto; }
+#warnings div { margin:2px 0; }
+#vars { height:34%; min-height:150px; border-top:1px solid #3a3f48; display:flex; flex-direction:column; }
+#varsHead { padding:5px 10px; background:#1e232a; display:flex; gap:8px; align-items:center; color:#9ab; }
+#varsHead input { flex:1; background:#2d3440; border:1px solid #444; color:#ccc; padding:3px 6px; border-radius:4px; font-size:12px; }
+#varList { flex:1; overflow:auto; }
+.var { display:flex; gap:8px; padding:3px 10px; border-bottom:1px solid #22272e; cursor:pointer; align-items:baseline; }
+.var:hover { background:#232a33; }
+.var code { color:#6cf; font-family:Consolas,monospace; white-space:nowrap; }
+.var .d { color:#9ab; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.var .sz { color:#7a8; font-variant-numeric:tabular-nums; white-space:nowrap; }
+.var.used code::after { content:" •"; color:#e6a23c; }
+#previewCol { flex:1; min-width:0; display:flex; flex-direction:column; }
+#previewHead { padding:6px 10px; background:#1e232a; border-bottom:1px solid #3a3f48; display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+#previewHead .sum { color:#9ab; margin-left:auto; }
+#previewBody { flex:1; overflow:auto; padding:10px 12px; }
+.msg { border:1px solid #333a44; border-radius:4px; margin-bottom:10px; }
+.msg .hd { background:#232933; padding:4px 8px; display:flex; justify-content:space-between; cursor:pointer; }
+.msg .hd .role { color:#fc6; font-weight:bold; }
+.msg.user .hd .role { color:#6cf; }
+.msg pre { padding:6px 8px; white-space:pre-wrap; word-break:break-word; font-family:Consolas,monospace; font-size:11.5px; color:#ddd; }
+.msg.collapsed pre { display:none; }
+.empty { color:#678; padding:20px; }
+#valuePop { position:fixed; right:16px; bottom:16px; width:46%; max-height:50%; background:#1e232a; border:1px solid #4a5260; border-radius:6px; display:none; flex-direction:column; box-shadow:0 6px 24px #000a; }
+#valuePop .hd { padding:6px 10px; background:#262c35; display:flex; justify-content:space-between; color:#adf; }
+#valuePop pre { padding:8px 10px; overflow:auto; white-space:pre-wrap; word-break:break-word; font-family:Consolas,monospace; font-size:11.5px; }
+</style>
+</head>
+<body>
+<div id="topbar">
+  <h1>Prompt Templates</h1>
+  <button class="btn go" id="btnSave" disabled>Save</button>
+  <button class="btn" id="btnRevert">Discard changes</button>
+  <span id="status"></span>
+</div>
+<div id="main">
+  <div id="editorCol">
+    <div id="tabs"></div>
+    <div id="info"><span id="infoText"></span><button class="btn warn" id="btnReset">Reset to default</button></div>
+    <textarea id="editor" spellcheck="false"></textarea>
+    <div id="warnings"></div>
+    <div id="vars">
+      <div id="varsHead">Variables — click to insert at the cursor, double-click to see its value <input id="varFilter" placeholder="filter (e.g. section_, body)"></div>
+      <div id="varList"></div>
+    </div>
+  </div>
+  <div id="previewCol">
+    <div id="previewHead">
+      Preview for <select id="pChar"></select>
+      <select id="pMode"><option value="brief">brief (most decisions)</option><option value="full">full (re-orientation)</option></select>
+      <button class="btn" id="btnPreview">Preview</button>
+      <label style="display:flex;gap:4px;align-items:center;color:#aaa"><input type="checkbox" id="pAuto" checked> as I type</label>
+      <span class="sum" id="pSum"></span>
+    </div>
+    <div id="previewBody"><div class="empty">Pick a character to see the exact messages they'd be sent right now, with your edits — saved or not. Nothing in the simulation changes.</div></div>
+  </div>
+</div>
+<div id="valuePop"><div class="hd"><span id="vpTitle"></span><span style="cursor:pointer" id="vpClose">✕</span></div><pre id="vpText"></pre></div>
+<script>
+// The decision prompt's templates -- backend/brain/prompt_templates.py, api/prompt_templates.py.
+// A saved edit applies to every character's next decision; nothing needs restarting.
+const ORDER = ["system", "preamble", "reply_format", "user"];
+let server = null, draft = {}, current = "system", lastValues = {}, previewTimer = null;
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const kb = n => n >= 1000 ? (n / 1000).toFixed(1) + "k" : String(n);
+
+async function api(method, url, body, ms = 60000) {
+  const c = new AbortController(); const t = setTimeout(() => c.abort(), ms);
+  try {
+    const r = await fetch(url, { method, signal: c.signal, headers: body ? { "Content-Type": "application/json" } : {},
+                                 body: body ? JSON.stringify(body) : undefined });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(data.detail || ("HTTP " + r.status));
+    return data;
+  } finally { clearTimeout(t); }
+}
+
+async function load() {
+  $("status").textContent = "loading…";
+  try {
+    server = await api("GET", "/admin/prompt_templates");
+  } catch (e) { $("status").textContent = "couldn't load: " + e.message; return; }
+  draft = { ...server.templates };
+  const sel = $("pChar");
+  sel.innerHTML = `<option value="">— character —</option>` + (server.characters || []).map(c => `<option value="${esc(c.id)}">${esc(c.name)}</option>`).join("");
+  try { const saved = localStorage.getItem("promptEditor.char"); if (saved) sel.value = saved; } catch (_) {}
+  renderTabs(); showTemplate(current); renderWarnings(server.warnings); renderVars();
+  $("status").textContent = server.edited.length ? `edited: ${server.edited.join(", ")} · saved in ${server.file}` : "all templates at their defaults";
+  if (sel.value) preview();
+}
+
+function dirty(name) { return draft[name] !== server.templates[name]; }
+function edited(name) { return draft[name] !== server.defaults[name]; }
+
+function renderTabs() {
+  $("tabs").innerHTML = ORDER.filter(n => n in draft).map(n =>
+    `<div class="tab ${n === current ? "active" : ""}" data-n="${n}">${n}${dirty(n) ? '<span class="dot" title="unsaved"></span>' : edited(n) ? '<span class="dot saved" title="edited (saved)"></span>' : ""}</div>`).join("");
+  $("btnSave").disabled = !ORDER.some(dirty);
+}
+
+function showTemplate(name) {
+  current = name;
+  $("editor").value = draft[name] ?? "";
+  $("infoText").textContent = server.info[name] || "";
+  $("btnReset").style.visibility = edited(name) ? "visible" : "hidden";
+  renderTabs(); renderVars();
+}
+
+function renderWarnings(list) {
+  const w = $("warnings");
+  w.style.display = list && list.length ? "block" : "none";
+  w.innerHTML = (list || []).map(x => `<div>⚠ ${esc(x)}</div>`).join("");
+}
+
+function renderVars() {
+  if (!server) return;
+  const f = $("varFilter").value.trim().toLowerCase();
+  const text = Object.values(draft).join("\n");
+  const blocks = ORDER.filter(n => n !== current && n !== "system" && n !== "user");
+  const all = Object.entries(server.variables).filter(([k]) => !(k === current));
+  const rows = all.filter(([k, d]) => !f || k.includes(f) || d.toLowerCase().includes(f));
+  $("varList").innerHTML = rows.map(([k, d]) => {
+    const v = lastValues[k];
+    return `<div class="var ${text.includes("{" + k + "}") ? "used" : ""}" data-k="${esc(k)}" title="${esc(d)}"><code>{${esc(k)}}</code><span class="d">${esc(d)}</span><span class="sz">${v ? (v.chars ? kb(v.chars) + " chars" : "empty") : ""}</span></div>`;
+  }).join("");
+}
+
+function insertVar(k) {
+  const ed = $("editor"), s = ed.selectionStart, e = ed.selectionEnd, t = "{" + k + "}";
+  ed.setRangeText(t, s, e, "end"); ed.focus(); onEdit();
+}
+
+function onEdit() {
+  draft[current] = $("editor").value;
+  renderTabs(); renderVars();
+  $("btnReset").style.visibility = edited(current) ? "visible" : "hidden";
+  if ($("pAuto").checked && $("pChar").value) { clearTimeout(previewTimer); previewTimer = setTimeout(preview, 700); }
+}
+
+async function preview() {
+  const cid = $("pChar").value; if (!cid) return;
+  try { localStorage.setItem("promptEditor.char", cid); } catch (_) {}
+  $("pSum").textContent = "building…";
+  const t0 = performance.now();
+  let p;
+  try { p = await api("POST", "/admin/prompt_templates/preview", { char_id: cid, mode: $("pMode").value, templates: draft }); }
+  catch (e) { $("pSum").textContent = "preview failed: " + e.message; return; }
+  lastValues = p.values || {};
+  renderVars(); renderWarnings(p.warnings);
+  $("pSum").textContent = `${p.name} · ${p.mode} · ${p.messages.length} messages · ${p.total_chars.toLocaleString()} chars ≈ ${p.approx_tokens.toLocaleString()} tokens · ${Math.round(performance.now() - t0)} ms`;
+  const open = new Set([...document.querySelectorAll("#previewBody .msg:not(.collapsed)")].map(m => m.dataset.i));
+  $("previewBody").innerHTML = p.messages.map((m, i) =>
+    `<div class="msg ${esc(m.role)} ${open.size && !open.has(String(i)) ? "collapsed" : ""}" data-i="${i}"><div class="hd"><span class="role">${esc(m.role)}${i === 1 && m.role === "system" ? " (recent turns)" : ""}</span><span>${m.chars.toLocaleString()} chars ▾</span></div><pre>${esc(m.content)}</pre></div>`).join("");
+  document.querySelectorAll("#previewBody .msg .hd").forEach(h => h.onclick = () => h.parentElement.classList.toggle("collapsed"));
+}
+
+async function save() {
+  try {
+    const r = await api("PUT", "/admin/prompt_templates", { templates: draft });
+    server.templates = { ...draft };
+    server.edited = r.edited;
+    renderTabs(); renderWarnings(r.warnings);
+    $("btnReset").style.visibility = edited(current) ? "visible" : "hidden";
+    $("status").textContent = `saved ${new Date().toLocaleTimeString()} — applies to the next decision` + (r.edited.length ? ` · edited: ${r.edited.join(", ")}` : " · all at defaults");
+  } catch (e) { $("status").textContent = "save failed: " + e.message; }
+}
+
+$("tabs").onclick = ev => { const t = ev.target.closest(".tab"); if (t) showTemplate(t.dataset.n); };
+$("editor").oninput = onEdit;
+$("editor").onkeydown = ev => {
+  if (ev.key === "Tab") { ev.preventDefault(); $("editor").setRangeText("  ", $("editor").selectionStart, $("editor").selectionEnd, "end"); onEdit(); }
+};
+document.addEventListener("keydown", ev => { if ((ev.ctrlKey || ev.metaKey) && ev.key === "s") { ev.preventDefault(); if (!$("btnSave").disabled) save(); } });
+$("varList").onclick = ev => { const v = ev.target.closest(".var"); if (v) insertVar(v.dataset.k); };
+$("varList").ondblclick = ev => {
+  const v = ev.target.closest(".var"); if (!v) return;
+  const val = lastValues[v.dataset.k];
+  $("vpTitle").textContent = "{" + v.dataset.k + "}" + (val ? ` — ${val.chars.toLocaleString()} chars` : "");
+  $("vpText").textContent = val ? (val.text || "(empty for this character right now)") : "Preview a character to see its value.";
+  $("valuePop").style.display = "flex";
+};
+$("vpClose").onclick = () => $("valuePop").style.display = "none";
+$("varFilter").oninput = renderVars;
+$("btnSave").onclick = save;
+$("btnRevert").onclick = () => { draft = { ...server.templates }; showTemplate(current); if ($("pChar").value) preview(); };
+$("btnReset").onclick = () => { draft[current] = server.defaults[current]; showTemplate(current); onEdit(); };
+$("btnPreview").onclick = preview;
+$("pChar").onchange = preview;
+$("pMode").onchange = preview;
+window.addEventListener("beforeunload", ev => { if (server && ORDER.some(dirty)) { ev.preventDefault(); ev.returnValue = ""; } });
+load();
+</script>
+</body>
+</html>

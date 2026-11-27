@@ -64,7 +64,10 @@ export default defineConfig({
           resolve(__dirname, "panels.html"),
 
         llm_debug:
-          resolve(__dirname, "llm_debug.html")
+          resolve(__dirname, "llm_debug.html"),
+
+        prompt_editor:
+          resolve(__dirname, "prompt_editor.html")
       }
     }
   }

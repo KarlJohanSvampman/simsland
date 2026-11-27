@@ -2604,9 +2604,12 @@ BRIEF_REASONS = {
 }
 
 
-def build_narrative(c, world, mode="full", wake_line=None, staged=()):
+def build_narrative(c, world, mode="full", wake_line=None, staged=(), parts_out=None):
+    """The narrative prose. `parts_out` (a dict), if given, is filled with its pieces -- wake_line, staged, and each
+    section's text by key -- for the prompt templates (brain/prompt_templates.py), which can place them one by one."""
     paragraphs = [wake_line] if wake_line else []
     paragraphs.extend(staged)
+    sections = []
 
     # Transient, read-this-cycle-only signal for _sec_examine_reminder()
     # below -- section functions only ever receive (c, world), and adding
@@ -2627,9 +2630,16 @@ def build_narrative(c, world, mode="full", wake_line=None, staged=()):
             continue
         if isinstance(out, list):
             paragraphs.extend(p for p in out if p)
+            text = "\n\n".join(p for p in out if p)
         else:
             paragraphs.append(out)
+            text = out
+        if text:
+            sections.append([_key, text])
 
+    if parts_out is not None:
+        parts_out.update(wake_line=wake_line or "", staged=[s for s in staged if s], sections=sections, mode=mode,
+                         character_name=c.get("name") or "")
     return "\n\n".join(p for p in paragraphs if p)
 
 
@@ -2697,9 +2707,11 @@ def build_context(
     else:
         mode = "brief"
 
+    parts = {"wake_reason": trigger_reason}
     return {
 
-        "narrative": build_narrative(c, world, mode=mode, wake_line=wake_line, staged=staged),
+        "narrative": build_narrative(c, world, mode=mode, wake_line=wake_line, staged=staged, parts_out=parts),
+        "narrative_parts": parts,                  # each piece, for the prompt templates (brain/prompt_templates.py)
 
         "available_actions": build_available_actions(c, world),
 
