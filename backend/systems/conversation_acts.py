@@ -252,7 +252,17 @@ def situation(c, other, world):
         "plan": _plan_with(c, other), "needs_hand": _needs_hand(c), "common": _common(c, other),
         "clash": _opinion_clash(c, other), "traits": _traits(c),
         "adults": _adult(c) and _adult(other),
+        "checkin": _checkin(c, other, world),
     }
+
+
+def _checkin(c, other, world):
+    """A check-in is due with them (systems/catch_up.py): why, or None."""
+    try:
+        from systems.catch_up import checkin_due
+        return checkin_due(c, other, world)
+    except Exception:                                     # noqa: BLE001
+        return None
 
 
 # ── scoring ──────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -289,7 +299,16 @@ def score(c, other, world, replying_to=None, s=None):
     elif s["common"]:
         topic = f"{s['common'][0]} -- something you both care about"
     v -= 1.5 * s["hostility"] + (1.5 if furious else 0)
-    put("inquiry", v, topic, "you want to know")
+    why = "you want to know"
+    if s["checkin"] and not furious and not (s["their_upset"] and s["empathy"] < 0):
+        # first time today / a few hours apart: check in -- how they are, plans, yesterday / the weekend, and news on
+        # something from before (systems/catch_up.py)
+        from systems.catch_up import checkin_topic
+        v += 4.0 - 2.0 * s["hostility"] - 3.0 * s["grievance"]      # a real grievance gets raised instead
+        topic, why = checkin_topic(c, other, world), f"you haven't caught up with them -- {s['checkin']}"
+        if s["their_upset"] and s["empathy"] >= 0:
+            topic = f"{topic} (they seem {s['their_emotion']})"
+    put("inquiry", v, topic, why)
 
     # criticism: a grievance or an open issue
     if s["grievance"] or s["issue_heat"]:
@@ -391,8 +410,13 @@ def pick(c, other, world, replying_to=None, rng=None):
     rng = rng or random.Random(f"{c.get('id')}:{other.get('id')}:{int(world.get('tick', 0)) // 600}")
     act = rng.choice(close)
     sc, topic, why = scored[act]
+    try:
+        from systems.catch_up import recent_topics
+        recent = recent_topics(c, other.get("id"))
+    except Exception:                                     # noqa: BLE001
+        recent = []
     return {"act": act, "label": LABEL[act], "topic": topic or "", "why": why, "how": HOW[act], "score": sc,
-            "replying_to": replying_to, "with": other.get("id")}
+            "replying_to": replying_to, "with": other.get("id"), "recent": recent}
 
 
 # ── the prompt, and the line that follows ────────────────────────────────────────────────────────────────────────────
@@ -481,6 +505,8 @@ def prompt_lines(c, world):
             lines.append(f"Talking with {who}, you're going for: {p['label']}{about}. {p['how']}")
         else:
             lines.append(f"If you talk to {who} now, it would be: {p['label']}{about} ({p['why']}). {p['how']}")
+        if p.get("recent"):
+            lines.append(f"What you've talked about with {who} before: {'; '.join(p['recent'])}.")
     if lines:
         lines.append("Write what you say inside that -- in your own voice, about the actual thing.")
     return lines

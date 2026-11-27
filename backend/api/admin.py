@@ -1251,6 +1251,25 @@ def event_log_handlers(top: int = 40):
     return {"handlers": event_log.handler_stats(top), "bus": event_bus.stats()}
 
 
+@router.post("/relationships/recover")
+@core_only
+def relationships_recover(days: float = 3.0, dry_run: bool = True):
+    """Heal every relationship by `days` of sim time at once (systems/relationship_recovery.py): hostility, resentment
+    and fear fade, trust / friendship / respect / comfort return toward their resting level. dry_run (default) only
+    shows before -> after."""
+    from systems.relationship_recovery import repair_preview, repair
+    with world_lock():
+        world = load_world(DEFAULT_SIM_ID)
+        rows = repair_preview(world, days)
+        if dry_run:
+            return {"dry_run": True, "days": days, "pairs": len(rows), "preview": rows}
+        n = repair(world, days)
+        from sim_loop import _mark_dirty
+        _mark_dirty(world, char_ids=list((world.get("characters") or {}).keys()))
+        save_world(DEFAULT_SIM_ID, world)
+        return {"dry_run": False, "days": days, "changed": n}
+
+
 @router.get("/conversation_health")
 @core_only
 def conversation_health():
