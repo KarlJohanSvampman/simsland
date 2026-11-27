@@ -55,6 +55,7 @@ from api.debug_panels import router as debug_panels_router
 from api.debug_draw import router as debug_draw_router
 from api.watch_values import router as watch_values_router
 from api.llm_debug import router as llm_debug_router
+from api.prompt_templates import router as prompt_templates_router
 from api.memory_trace import router as memory_trace_router
 from api.conversation_trace import router as conversation_trace_router
 from api.dialogue_feedback import router as dialogue_feedback_router
@@ -102,6 +103,7 @@ app.include_router(debug_panels_router)
 app.include_router(debug_draw_router)
 app.include_router(watch_values_router)
 app.include_router(llm_debug_router)
+app.include_router(prompt_templates_router)
 app.include_router(memory_trace_router)
 app.include_router(conversation_trace_router)
 app.include_router(dialogue_feedback_router)
