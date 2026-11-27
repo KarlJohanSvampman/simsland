@@ -700,6 +700,11 @@ def process_decision(
                     definitions=world.get("definitions", {}),
                     available_actions=available_actions
                 )
+            try:                                     # on the phone / computer: what they're doing on it (inspector)
+                from systems.screen_activity import after_route as _screen_after
+                _screen_after(c, world, action)
+            except Exception as exc:                 # noqa: BLE001
+                print(f"[agent_loop] screen activity: {exc!r}")
 
             # route_action() above scaffolds c["activity"] for activity-style
             # action types (eat, sleep, work, ...) via _scaffold()/start_activity().

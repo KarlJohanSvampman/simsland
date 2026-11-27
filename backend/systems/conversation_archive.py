@@ -191,6 +191,11 @@ def apply_tags(world, entry, tags):
     entry["tags"] = tags
     from social.discourse import after
     after(world, entry, tags)
+    try:                                       # what it was about, into each pair's topic memory (systems/catch_up.py)
+        from systems.catch_up import on_conversation_read
+        on_conversation_read(world, entry)
+    except Exception as exc:                   # noqa: BLE001
+        print(f"[conversation_archive] topics: {exc!r}")
     _rewrite_memories(world, entry, tags)
     _refresh_logs(world, entry)
 

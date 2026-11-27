@@ -5129,6 +5129,17 @@ function renderCharacterInspector(id){
         return `State: ${c.animation_state || "idle"}`;
       })();
   rows.push(activityLabel);
+  // On the phone / computer: what they're doing on it (backend/systems/screen_activity.py)
+  {
+    const scr = c.screen;
+    if(scr && c.activity && c.activity.type === scr.activity){
+      const icon = scr.device === "phone" ? "📱" : "💻";
+      rows.push(`<span style="color:#9cf">${icon} ${_escapeHTML(scr.app || "")}: ${_escapeHTML(scr.what || "")}</span>`);
+      if(scr.in_their_words) rows.push(`<span style="opacity:.7">&nbsp;&nbsp;"${_escapeHTML(scr.in_their_words)}"</span>`);
+    }
+    const earlier = (c.screen_log || []).slice(0, -1).slice(-3).reverse();
+    if(earlier.length) rows.push(`<span style="opacity:.65">&nbsp;&nbsp;Earlier on screen: ${earlier.map(e => _escapeHTML(e.what)).join(" · ")}</span>`);
+  }
 
   // The generic "wait" activity (systems/interactions.py's queueing path,
   // systems/waiting.py's patience/give-up timer) carried no detail of its

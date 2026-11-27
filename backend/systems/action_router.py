@@ -105,6 +105,12 @@ def apply_speech(c, world, speech):
     # What they're going for with this person (systems/conversation_acts.py): the line carries the act -- and the
     # speech act the tone / relationship analysis reacts to (praise -> compliment, rage -> insult, ...)
     try:
+        from systems.relationship_recovery import check_intent      # "hurt" only when the line reads hurtful
+        if check_intent(c, speech, world, target_id):
+            speech_act = speech.get("speech_act", speech_act)
+    except Exception as exc:                          # noqa: BLE001
+        print(f"[action_router] intent check: {exc!r}")
+    try:
         from systems.conversation_acts import stamp_speech
         if stamp_speech(c, speech, world, target_id):
             speech_act = speech["speech_act"]
@@ -344,6 +350,12 @@ def apply_speech(c, world, speech):
         _last = (conv.get("history") or [{}])[-1]
         if speech.get("conv_act") and _last.get("speaker") == c["id"]:
             _last["conv_act"] = speech["conv_act"]          # what the other answers to (systems/conversation_acts.py)
+        try:                                                 # they've talked now; the act's topic is remembered
+            from systems.catch_up import on_line as _catch_up_line
+            _catch_up_line(world, c, listener, topic=speech.get("topic") if speech.get("conv_act") else None,
+                           act=speech.get("conv_act"))
+        except Exception as exc:                          # noqa: BLE001
+            print(f"[action_router] catch-up: {exc!r}")
 
         # What the line does once it reaches them -- subject and social reading, pattern concern, the impact ledger,
         # memory acknowledgement, dialogue memory, reactions, the relationship, analysis and reflections: subscribers
