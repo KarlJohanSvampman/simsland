@@ -102,6 +102,22 @@ def apply_speech(c, world, speech):
     from cpl import participants as _parts            # who it is for, and whether it can reach them (cpl/participants.py)
     target_id = _parts.addressee(c, target_id)
 
+    # What they're going for with this person (systems/conversation_acts.py): the line carries the act -- and the
+    # speech act the tone / relationship analysis reacts to (praise -> compliment, rage -> insult, ...)
+    try:
+        from systems.relationship_recovery import check_intent      # "hurt" only when the line reads hurtful
+        if check_intent(c, speech, world, target_id):
+            speech_act = speech.get("speech_act", speech_act)
+    except Exception as exc:                          # noqa: BLE001
+        print(f"[action_router] intent check: {exc!r}")
+    try:
+        from systems.conversation_acts import stamp_speech
+        if stamp_speech(c, speech, world, target_id):
+            speech_act = speech["speech_act"]
+            topic = speech.get("topic") or topic
+    except Exception as exc:                          # noqa: BLE001
+        print(f"[action_router] conversation act: {exc!r}")
+
     # Said once: the same line to the same person again is dropped (systems/speech_repeat.py) -- unless it is an answer.
     # Someone holding the floor of a live conversation with this person is being waited on: "Okay!" or "Yeah!" said twice
     # in half an hour is ordinary talk, and dropping it made the other person's wait run out -- the conversation ended
@@ -331,6 +347,15 @@ def apply_speech(c, world, speech):
             topic or conv.get("topic", "general"), tick
         )
         c.pop("_cpl_turn", None)
+        _last = (conv.get("history") or [{}])[-1]
+        if speech.get("conv_act") and _last.get("speaker") == c["id"]:
+            _last["conv_act"] = speech["conv_act"]          # what the other answers to (systems/conversation_acts.py)
+        try:                                                 # they've talked now; the act's topic is remembered
+            from systems.catch_up import on_line as _catch_up_line
+            _catch_up_line(world, c, listener, topic=speech.get("topic") if speech.get("conv_act") else None,
+                           act=speech.get("conv_act"))
+        except Exception as exc:                          # noqa: BLE001
+            print(f"[action_router] catch-up: {exc!r}")
 
         # What the line does once it reaches them -- subject and social reading, pattern concern, the impact ledger,
         # memory acknowledgement, dialogue memory, reactions, the relationship, analysis and reflections: subscribers
