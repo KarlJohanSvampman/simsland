@@ -34,4 +34,4 @@ def apply_sms_emotion(receiver, sender, text):
     # -----------------------
     # apply via existing system
     # -----------------------
-    apply_emotion_inertia(receiver, emotion)
+    apply_emotion_inertia(receiver, emotion, why=f"a {tone} text from {(sender.get('name') or 'someone').split(' ')[0]}")

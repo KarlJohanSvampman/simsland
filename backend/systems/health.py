@@ -592,7 +592,9 @@ def _apply_passive_traits(char, hazard_tmpl, tick):
         elif t == "low_stamina":
             char["stamina"] = max(0.0, char.get("stamina", 1.0) - _PASSIVE_TRAIT_INCREMENT * 0.01)
         elif t in ("moody", "short_temper"):
-            char["emotional_temperature"] = min(100, char.get("emotional_temperature", 20) + _PASSIVE_TRAIT_INCREMENT)
+            from brain.emotion import nudge
+            nudge(char, _PASSIVE_TRAIT_INCREMENT,
+                  f"short-tempered from feeling unwell ({hazard_tmpl.get('name') or hazard_tmpl.get('id') or 'illness'})")
         elif t == "dizzy":
             hs = char.setdefault("health_state", {})
             hs.setdefault("temporary_traits", {})["dizzy"] = tick + _DIZZY_TRAIT_DURATION_TICKS

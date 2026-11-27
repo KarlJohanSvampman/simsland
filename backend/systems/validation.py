@@ -212,7 +212,10 @@ def receive_validation(c, world, points=BASE_VALIDATION_POINTS, source="social")
     # more instance, unless it's a record.
     mood_scale = 1.0 if is_record else max(0.15, taper)
     c["self_confidence"] = round(min(1.0, c.get("self_confidence", 0.6) + 0.01 * mood_scale), 4)
-    c["emotional_temperature"] = round(min(100, c.get("emotional_temperature", 20) + 3 * mood_scale), 2)
+    # Being appreciated settles them (brain/emotion.py). It used to ADD 3 degrees of heat -- temperature is what reads as
+    # angry/furious when high -- so 26 likes and comments a day had everyone "furious" (live 2026-11-27).
+    from brain.emotion import nudge
+    nudge(c, -2 * mood_scale, f"appreciated ({source.replace('_', ' ')})", world)
 
     try:
         from systems.lt_needs import satisfy_lt_need

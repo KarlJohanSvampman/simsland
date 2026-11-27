@@ -148,6 +148,15 @@ def add_grievance(c, caused_by_id, event_type, world, severity=None, details=Non
         "tick":        world["tick"],
         "details":     details or {},
     })
+    # It heats them up, and that's what they're worked up about (brain/emotion.py: emotion_causes)
+    try:
+        from brain.emotion import nudge
+        from systems.fights import ISSUE_PHRASES
+        what = ISSUE_PHRASES.get(event_type) or str(event_type).replace("_", " ")
+        who = ((caused_by or {}).get("name") or "someone").split(" ")[0]
+        nudge(c, min(20.0, base_severity * 1.5), f"{who}: {what}", world)
+    except Exception as exc:                          # noqa: BLE001
+        print(f"[grievances] emotion: {exc!r}")
     # The incident is evidence on the issue between them (social/issues.py: the persistent problem, which a
     # later conversation picks up), and it feeds c's frustration about that issue -- not their standing directly.
     _to_issue(c, caused_by_id, event_type, base_severity, gid, details or {}, world)

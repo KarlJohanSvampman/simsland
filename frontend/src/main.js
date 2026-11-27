@@ -722,6 +722,20 @@ function _formatMemoryTimestamp(tick){
 
 // Sim date and time of a tick, for display -- per the user's ask (2026-11-23), durations, planned ends and "how long
 // ago" are shown as a datetime, never as a count of ticks. "—" before the first calendar has arrived.
+// What has been heating a character up (backend/brain/emotion.py::causes): their recorded pushes, the recent ones
+// weighing most (halving every two sim hours), strongest first -- shown under their mood in the inspector.
+function _emotionCauses(c, limit = 3){
+  const now = Number(c._emotion_seen_ts) || 0;
+  const totals = {};
+  for(const e of (c.emotion_causes || [])){
+    const age = Math.max(0, now - (e.ts || now));
+    totals[e.why] = (totals[e.why] || 0) + (e.delta || 0) * Math.pow(0.5, age / 7200);
+  }
+  const out = Object.entries(totals).filter(([, w]) => w >= 1).sort((a, b) => b[1] - a[1]).map(([why]) => why);
+  if(c.mood && (c.mood.emotional_temperature_range || [0])[0] >= 50) out.unshift(`in a ${String(c.mood.name || c.mood.id).toLowerCase()} mood`);
+  return out.slice(0, limit);
+}
+
 function _dateTimeAt(tick){
   return (tick == null ? null : _formatMemoryTimestamp(tick)) || "—";
 }
@@ -5150,7 +5164,13 @@ function renderCharacterInspector(id){
     if(formatted) rows.push(`<span style="opacity:.75">Wakes up: ${formatted}</span>`);
   }
 
-  if(c.emotion) rows.push(`Mood: ${c.emotion}`);
+  if(c.emotion){
+    const temp = Number(c.emotional_temperature);
+    rows.push(`Mood: ${c.emotion}` + (isFinite(temp) ? ` <span style="opacity:.6">(${Math.round(temp)}°)</span>` : "") +
+              (c.mood?.name ? ` <span style="opacity:.6">· ${_escapeHTML(String(c.mood.name).toLowerCase())} mood</span>` : ""));
+    const why = _emotionCauses(c);
+    if(why.length) rows.push(`<span style="opacity:.8">&nbsp;&nbsp;Worked up about: ${why.map(w => _escapeHTML(w)).join("; ")}</span>`);
+  }
   if(c.vision){
     const glasses = c.glasses?.owned ? " (with glasses)" : (c.vision === "impaired" ? " (no glasses)" : "");
     rows.push(`<span style="opacity:.8">Vision: ${c.vision}${glasses}</span>`);

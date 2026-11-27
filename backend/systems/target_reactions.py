@@ -122,6 +122,9 @@ def flag_provocation(target, world, actor, provocation_type, outcome=None, incid
     label, weights = sample_reaction(target, provocation_type)
     if not label:
         return
+    from brain.emotion import nudge                 # what they're worked up about (emotion_causes)
+    nudge(target, 12, f"{(actor.get('name') or 'someone').split(' ')[0]} {_VERB_PHRASE.get(provocation_type, 'provoked')} you",
+          world)
 
     top = sorted(weights.items(), key=lambda kv: -kv[1])[:2]
     if len(top) > 1 and top[1][1] >= 0.2:

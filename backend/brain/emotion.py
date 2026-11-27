@@ -4,6 +4,13 @@ emotion.py — emotional temperature, emotion labels, and persistent moods.
 c["emotional_temperature"]  float 0-100 — current arousal/valence blend
 c["emotion"]                str   — short label derived from temperature + mood
 c["mood"]                   dict  — active persistent mood state or None
+c["emotion_causes"]         list  — what moved the temperature, and by how much: [{ts, delta, why}] (newest last)
+
+The temperature relaxes toward a calm baseline (relax(), every update_emotion): stress and sleep debt raise the
+baseline, an active mood keeps it inside its range. Until 2026-11-27 the only decay was inside apply_emotion_inertia(),
+which hardly ever ran -- every push (a like, a comment, a passive health trait) only ever added heat, and everyone sat
+at 100, "furious", about nothing. Every push now goes through nudge() / apply_emotion_inertia(why=...), which records
+why; causes() / explain() say what someone is worked up about (the inspector, their own prompt).
 
 Moods are data-driven: they come from definitions["mood_templates"].
 They persist for duration_ticks and can stack (only one active at a time;
@@ -75,35 +82,96 @@ def _temp_to_emotion(temp, active_mood=None):
 
 # ── inertia / drift ───────────────────────────────────────────────────────────
 
-def apply_emotion_inertia(c, llm_emotion=None):
+def apply_emotion_inertia(c, llm_emotion=None, why=None, world=None):
     """
-    Drift emotional_temperature toward the LLM-reported emotion.
-    Volatility trait modulates how fast it shifts.
-    Sleep debt and stress push it upward.
+    Drift emotional_temperature toward an emotion's temperature (EMOTION_TEMP). Volatility modulates how fast it
+    shifts. `why` is recorded as the cause (emotion_causes). Stress and sleep debt work through relax()'s baseline.
     """
-    current    = float(c.get("emotional_temperature", 20))
+    before     = float(c.get("emotional_temperature", 20))
+    current    = before
     volatility = float(c.get("volatility", 0.5))
 
     if llm_emotion:
         target  = EMOTION_TEMP.get(llm_emotion, current)
         current = current * (1 - 0.25 * volatility) + target * (0.25 * volatility)
 
-    # Stress pushes temperature up
-    stress = float(c.get("stress", 0))
-    current += max(0, stress - 40) * 0.012
+    c["emotional_temperature"] = _clamp_to_mood(c, max(0.0, min(100.0, current)))
+    if why:
+        _note_cause(c, c["emotional_temperature"] - before, why, world)
 
-    # Sleep debt adds baseline irritability
-    sleep_debt = c.get("body", {}).get("sleep_debt", 0)
-    current += max(0, sleep_debt - 25) * 0.008
 
-    # Active mood can pin a floor
+# ── pushes, and what they were about ─────────────────────────────────────────
+
+CAUSES_KEPT = 16
+CAUSE_HALF_LIFE_S = 2 * 3600        # how long a reason keeps counting, halving every two sim hours
+RELAX_HALF_LIFE_S = 45 * 60         # the temperature halves its distance to the baseline every 45 sim minutes
+BASELINE = 30.0
+
+
+def _clamp_to_mood(c, temp):
     mood = c.get("mood")
     if mood:
         lo, hi = mood.get("emotional_temperature_range", [0, 100])
-        current = max(lo, min(hi, current))
+        return max(lo, min(hi, temp))
+    return temp
 
-    # Gentle decay toward baseline
-    c["emotional_temperature"] = max(0, min(100, current * 0.995))
+
+def _note_cause(c, delta, why, world=None):
+    if not why or abs(delta) < 0.05:
+        return
+    causes_ = c.setdefault("emotion_causes", [])
+    causes_.append({"ts": round(_now_ts(c, world), 1), "delta": round(delta, 2), "why": str(why)[:160]})
+    del causes_[:-CAUSES_KEPT]
+
+
+def nudge(c, delta, why, world=None):
+    """Move the temperature by `delta` (clamped 0-100 and to the mood's range) and record why."""
+    before = float(c.get("emotional_temperature", 20))
+    c["emotional_temperature"] = _clamp_to_mood(c, max(0.0, min(100.0, before + delta)))
+    _note_cause(c, c["emotional_temperature"] - before, why, world)
+    return c["emotional_temperature"]
+
+
+def baseline(c):
+    """Where the temperature settles on its own: calm, raised by stress and by sleep debt."""
+    stress = float(c.get("stress", 0) or 0)
+    sleep_debt = float((c.get("body") or {}).get("sleep_debt", 0) or 0)
+    return min(75.0, BASELINE + max(0.0, stress - 40) * 0.5 + max(0.0, sleep_debt - 25) * 0.25)
+
+
+def relax(c, world=None):
+    """Toward the baseline, by how much sim time has passed since the last time (lazy: the same however often it
+    runs), then inside the active mood's range."""
+    now = _now_ts(c, world)
+    last = c.get("_emotion_relax_ts")
+    c["_emotion_relax_ts"] = now
+    temp = float(c.get("emotional_temperature", 20) or 20)
+    if last is not None and now > last:
+        dt = min(now - last, 12 * 3600)
+        base = baseline(c)
+        temp = base + (temp - base) * 0.5 ** (dt / RELAX_HALF_LIFE_S)
+    c["emotional_temperature"] = round(_clamp_to_mood(c, max(0.0, min(100.0, temp))), 2)
+
+
+def causes(c, world=None, limit=3):
+    """What has been heating them up: [(why, weight)], the strongest first -- recent pushes count most."""
+    now = _now_ts(c, world) if world is not None else c.get("_emotion_seen_ts", 0.0)
+    totals = {}
+    for e in c.get("emotion_causes") or []:
+        age = max(0.0, now - (e.get("ts") or now))
+        w = (e.get("delta") or 0) * 0.5 ** (age / CAUSE_HALF_LIFE_S)
+        totals[e.get("why")] = totals.get(e.get("why"), 0.0) + w
+    out = sorted(((k, round(v, 1)) for k, v in totals.items() if v >= 1.0), key=lambda kv: -kv[1])
+    mood = c.get("mood")
+    if mood and (mood.get("emotional_temperature_range") or [0])[0] >= 50:
+        out.insert(0, (f"in a {str(mood.get('name') or mood.get('id')).lower()} mood", None))
+    return out[:limit]
+
+
+def explain(c, world=None):
+    """'mostly because: Rebecca shouted at you; unmet needs: exercise' -- or "" when nothing stands out."""
+    found = causes(c, world)
+    return "; ".join(why for why, _w in found)
 
 
 # ── emotion label update ──────────────────────────────────────────────────────
@@ -120,6 +188,7 @@ def _now_ts(c, world):
 
 
 def update_emotion(c, world=None):
+    relax(c, world)
     temp        = float(c.get("emotional_temperature", 20))
     active_mood = c.get("mood")
     c["emotion"] = _temp_to_emotion(temp, active_mood)
@@ -192,6 +261,14 @@ def _maybe_trigger_mood(c, world):
         "polarity":                   chosen.get("polarity", "neutral"),
         "expires_ts":                 _now_ts(c, world) + chosen.get("duration_ticks", 3600) * TICK_RATE_SECONDS,
     }
+
+    # what it is about (emotion_causes): the heaviest grievance for an angry mood, else the mood itself
+    about = chosen.get("name", chosen_id)
+    if chosen.get("triggers", {}).get("grievance_active"):
+        g = max(c.get("grievances") or [{}], key=lambda g: g.get("weight", 0) or 0)
+        who = ((world.get("characters") or {}).get(g.get("caused_by")) or {}).get("name", "someone")
+        about = f"{who.split(' ')[0]}: {str(g.get('event_type') or 'what they did').replace('_', ' ')}"
+    _note_cause(c, max(0.0, c["mood"]["emotional_temperature_range"][0] - temp), about, world)
 
     # Apply need modifiers immediately
     _apply_mood_need_modifiers(c)

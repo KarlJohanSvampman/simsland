@@ -203,6 +203,12 @@ def update_lt_needs(c, world):
     _apply_lt_frustration(c, total_frustration)
 
 
+def _unmet_needs_phrase(c):
+    worst = sorted(((k, n.get("frustration", 0)) for k, n in (c.get("lt_needs") or {}).items()), key=lambda kv: -kv[1])
+    names = [k.replace("_", " ") for k, f in worst[:3] if f > 0.5]
+    return "unmet needs: " + ", ".join(names) if names else "unmet needs"
+
+
 def _apply_lt_frustration(c, total_frustration):
     """total_frustration is 0-1 weighted average. Raise stress + emotional temp."""
     if total_frustration < 0.1:
@@ -213,7 +219,7 @@ def _apply_lt_frustration(c, total_frustration):
     # Raise emotional temperature toward "irritable" baseline
     from brain.emotion import apply_emotion_inertia
     if total_frustration > 0.5:
-        apply_emotion_inertia(c, llm_emotion="annoyed")
+        apply_emotion_inertia(c, llm_emotion="annoyed", why=_unmet_needs_phrase(c))
 
 
 # ── SATISFY A NEED ────────────────────────────────────────────────────────────
