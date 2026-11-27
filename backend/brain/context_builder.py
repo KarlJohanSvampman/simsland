@@ -1806,7 +1806,12 @@ def _sec_identity(c, world):
     if dev_profile:
         bits.append(dev_profile["description"])
 
-    bits.append(f"Right now you feel {c.get('emotion', 'neutral')}.")
+    feel = c.get('emotion', 'neutral')
+    why = ""
+    if float(c.get("emotional_temperature", 0) or 0) >= 65:       # worked up: about what (brain/emotion.py)
+        from brain.emotion import explain
+        why = explain(c, world)
+    bits.append(f"Right now you feel {feel}" + (f" -- {why}." if why else "."))
     if c.get("stress", 0) > 60:
         bits.append("You're under real stress.")
     return " ".join(bits)

@@ -373,7 +373,7 @@ install()
 # Keys whose change on an otherwise idle step is only a lazy value catching up with sim time, or this module's own
 # bookkeeping. They are compared by what they really contain (which memories, which desires, which habits), not by
 # their numbers.
-_LAZY_STAMPS = {"_wake", "_habits_ts", "_desires_ts", "_emotion_seen_ts", "body", "_body_lazy", "emotion",
+_LAZY_STAMPS = {"_wake", "_habits_ts", "_desires_ts", "_emotion_seen_ts", "_emotion_relax_ts", "body", "_body_lazy", "emotion",
                 "emotional_temperature", "_step",
                 "_curiosity_last_check", "_curiosity_target",
                 "stamina", "_chance",
